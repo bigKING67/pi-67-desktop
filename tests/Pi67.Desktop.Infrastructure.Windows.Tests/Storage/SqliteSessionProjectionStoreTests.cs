@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Pi67.Desktop.Domain.Sessions;
 using Pi67.Desktop.Infrastructure.Windows.Storage;
 
@@ -37,6 +38,7 @@ public sealed class SqliteSessionProjectionStoreTests
         }
         finally
         {
+            SqliteConnection.ClearAllPools();
             Directory.Delete(root, recursive: true);
         }
     }
