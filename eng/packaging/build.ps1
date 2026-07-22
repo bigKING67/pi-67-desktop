@@ -11,6 +11,8 @@ $artifacts = [System.IO.Path]::GetFullPath($OutputRoot)
 $appOutput = Join-Path $artifacts "app/win-x64"
 $bootstrapOutput = Join-Path $artifacts "runtime-bootstrap"
 $releaseOutput = Join-Path $artifacts "release"
+$msiProject = Join-Path $repo "installer/Pi67.Desktop.Msi/Pi67.Desktop.Msi.wixproj"
+$bundleProject = Join-Path $repo "installer/Pi67.Desktop.Bundle/Pi67.Desktop.Bundle.wixproj"
 $versionSource = Join-Path $repo "eng/version.json"
 $version = Get-Content -LiteralPath $versionSource -Raw | ConvertFrom-Json
 $expectedMsiName = "Pi67-Desktop-$($version.semver)-win-x64.msi"
@@ -25,6 +27,10 @@ if ($LASTEXITCODE -ne 0) { throw "Version projection verification failed." }
 & dotnet restore (Join-Path $repo "Pi67.Desktop.slnx") `
     --locked-mode "-p:Configuration=$Configuration"
 if ($LASTEXITCODE -ne 0) { throw "Configuration-aware locked restore failed." }
+foreach ($project in @($msiProject, $bundleProject)) {
+    & dotnet restore $project --locked-mode "-p:Configuration=$Configuration"
+    if ($LASTEXITCODE -ne 0) { throw "Locked restore failed for $project." }
+}
 
 & dotnet publish (Join-Path $repo "src/Pi67.Desktop.App/Pi67.Desktop.App.csproj") `
     --configuration $Configuration --runtime win-x64 --no-restore --output $appOutput
@@ -37,7 +43,7 @@ if ($LASTEXITCODE -ne 0) { throw "Runtime bootstrap publish failed." }
 $dotnetInstaller = & (Join-Path $PSScriptRoot "prepare-prerequisites.ps1") `
     -OutputDirectory (Join-Path $artifacts "prerequisites")
 
-& dotnet build (Join-Path $repo "installer/Pi67.Desktop.Msi/Pi67.Desktop.Msi.wixproj") `
+& dotnet build $msiProject `
     --configuration $Configuration --no-restore `
     "-p:AppPublishDir=$appOutput"
 if ($LASTEXITCODE -ne 0) { throw "MSI build failed." }
@@ -48,7 +54,7 @@ $msi = $msiCandidates[0]
 
 $runtimeBootstrap = Join-Path $bootstrapOutput "Pi67.Desktop.RuntimeBootstrap.exe"
 $windowsAppRuntime = Join-Path $repo ".nuget/packages/microsoft.windowsappsdk.runtime/2.3.1/tools/MSIX/win10-x64"
-& dotnet build (Join-Path $repo "installer/Pi67.Desktop.Bundle/Pi67.Desktop.Bundle.wixproj") `
+& dotnet build $bundleProject `
     --configuration $Configuration --no-restore `
     "-p:MsiPath=$($msi.FullName)" `
     "-p:DotNetDesktopRuntimeInstaller=$dotnetInstaller" `
