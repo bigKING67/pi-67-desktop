@@ -22,6 +22,10 @@ Get-ChildItem -LiteralPath $releaseOutput -Force | Remove-Item -Recurse -Force
 & node (Join-Path $repo "eng/version/verify-version.mjs")
 if ($LASTEXITCODE -ne 0) { throw "Version projection verification failed." }
 
+& dotnet restore (Join-Path $repo "Pi67.Desktop.slnx") `
+    --locked-mode "-p:Configuration=$Configuration"
+if ($LASTEXITCODE -ne 0) { throw "Configuration-aware locked restore failed." }
+
 & dotnet publish (Join-Path $repo "src/Pi67.Desktop.App/Pi67.Desktop.App.csproj") `
     --configuration $Configuration --runtime win-x64 --no-restore --output $appOutput
 if ($LASTEXITCODE -ne 0) { throw "App publish failed." }
