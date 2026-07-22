@@ -11,7 +11,7 @@ using Pi67.Desktop.Presentation.Shell;
 
 namespace Pi67.Desktop.App;
 
-public partial class App : Application
+public partial class App : global::Microsoft.UI.Xaml.Application
 {
     public App()
     {
