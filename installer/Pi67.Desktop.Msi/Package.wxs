@@ -37,7 +37,7 @@
         <Exclude Files="$(var.AppPublishDir)\Pi67.Desktop.App.exe" />
         <Exclude Files="$(var.AppPublishDir)\e_sqlite3.dll" />
       </Files>
-      <Component Id="ApplicationRuntimeFiles" Guid="*">
+      <Component Id="ApplicationRuntimeFiles" Guid="D5605345-B577-4028-A784-EA2FD0F53B22">
         <File
           Id="ApplicationExecutableFile"
           Source="$(var.AppPublishDir)\Pi67.Desktop.App.exe"
