@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Bundle</OutputType>
     <Platform>x64</Platform>
+    <DebugType>full</DebugType>
     <InstallerPlatform>x64</InstallerPlatform>
     <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\msi\Pi67-Desktop-0.1.0-alpha.1-win-x64.msi</MsiPath>
     <DotNetDesktopRuntimeInstaller Condition="'$(DotNetDesktopRuntimeInstaller)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\prerequisites\windowsdesktop-runtime-10.0.10-win-x64.exe</DotNetDesktopRuntimeInstaller>

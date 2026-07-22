@@ -20,7 +20,6 @@
 
     <Feature Id="Complete" Title="Pi-67 Desktop" Level="1">
       <ComponentGroupRef Id="ApplicationFiles" />
-      <ComponentRef Id="ApplicationShortcut" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -34,24 +33,31 @@
     </StandardDirectory>
 
     <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.AppPublishDir)\**" />
+      <Files Include="$(var.AppPublishDir)\**">
+        <Exclude Files="$(var.AppPublishDir)\Pi67.Desktop.App.exe" />
+        <Exclude Files="$(var.AppPublishDir)\e_sqlite3.dll" />
+      </Files>
+      <Component Id="ApplicationRuntimeFiles" Guid="*">
+        <File
+          Id="ApplicationExecutableFile"
+          Source="$(var.AppPublishDir)\Pi67.Desktop.App.exe"
+          KeyPath="yes" />
+        <File
+          Id="NativeSqliteFile"
+          Source="$(var.AppPublishDir)\e_sqlite3.dll"
+          CompanionFile="ApplicationExecutableFile" />
+        <Shortcut
+          Id="StartMenuShortcut"
+          Directory="ApplicationProgramsFolder"
+          Name="Pi-67 Desktop"
+          Description="Native Windows client for Pi and pi-67"
+          Advertise="yes"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder
+          Id="RemoveApplicationProgramsFolder"
+          Directory="ApplicationProgramsFolder"
+          On="uninstall" />
+      </Component>
     </ComponentGroup>
-
-    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
-      <Shortcut
-        Id="StartMenuShortcut"
-        Name="Pi-67 Desktop"
-        Description="Native Windows client for Pi and pi-67"
-        Target="[INSTALLFOLDER]Pi67.Desktop.App.exe"
-        WorkingDirectory="INSTALLFOLDER" />
-      <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
-      <RegistryValue
-        Root="HKLM"
-        Key="Software\bigKING67\Pi-67 Desktop"
-        Name="Installed"
-        Type="integer"
-        Value="1"
-        KeyPath="yes" />
-    </Component>
   </Package>
 </Wix>

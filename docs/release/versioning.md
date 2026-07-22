@@ -24,7 +24,11 @@ file before commit.
 `msiVersion` must advance for every installer build that may be installed over
 an earlier controlled-test build, including successive prereleases that share
 the same SemVer core. Its first three components must continue to match the
-SemVer `major.minor.patch` values.
+SemVer `major.minor.patch` values. Windows Installer compares only those first
+three components, so WiX intentionally enables same-version major upgrades and
+suppresses ICE61. The governed fourth component must increase monotonically
+within a shared SemVer core; lowering it can otherwise be interpreted as an
+allowed same-version upgrade.
 
 Release outputs are a flat, exact set. `release-manifest.json` hashes and types
 the MSI, Burn setup, compatibility data, bootstrap inventory, and SBOM. SLSA

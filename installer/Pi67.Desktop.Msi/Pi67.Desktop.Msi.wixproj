@@ -3,6 +3,9 @@
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
+    <DebugType>full</DebugType>
+    <!-- MSI compares only three version fields; the governed fourth field identifies prerelease rebuilds. -->
+    <SuppressIces>ICE61</SuppressIces>
     <AppPublishDir Condition="'$(AppPublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\app\win-x64</AppPublishDir>
     <DefineConstants>AppPublishDir=$(AppPublishDir)</DefineConstants>
     <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\installer\msi\</BaseOutputPath>
