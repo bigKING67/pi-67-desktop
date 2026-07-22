@@ -101,6 +101,42 @@ public sealed partial class RepositoryGovernanceTests
     }
 
     [Fact]
+    public void BurnBundleUsesWix5CompatiblePrerequisiteDetection()
+    {
+        string root = FindRepositoryRoot();
+        XDocument authoring = XDocument.Load(Path.Combine(
+            root,
+            "installer/Pi67.Desktop.Bundle/Bundle.wxs"));
+        XNamespace wix = "http://wixtoolset.org/schemas/v4/wxs";
+        XNamespace netfx = "http://wixtoolset.org/schemas/v4/wxs/netfx";
+        XNamespace bal = "http://wixtoolset.org/schemas/v4/wxs/bal";
+
+        XElement bundle = Assert.Single(authoring.Root!.Elements(wix + "Bundle"));
+        XElement dotnetSearch = Assert.Single(bundle.Elements(netfx + "DotNetCoreSearch"));
+        Assert.Equal("DOTNET_DESKTOP_10_X64", (string?)dotnetSearch.Attribute("Variable"));
+        Assert.Equal("desktop", (string?)dotnetSearch.Attribute("RuntimeType"));
+        Assert.Equal("x64", (string?)dotnetSearch.Attribute("Platform"));
+        Assert.Equal("10", (string?)dotnetSearch.Attribute("MajorVersion"));
+        Assert.Empty(bundle.Elements(netfx + "DotNetCompatibilityCheck"));
+
+        XElement chain = Assert.Single(bundle.Elements(wix + "Chain"));
+        XElement dotnetPackage = chain.Elements(wix + "ExePackage").Single(static element =>
+            (string?)element.Attribute("Id") == "DotNetDesktopRuntime10X64");
+        Assert.Equal(
+            "DOTNET_DESKTOP_10_X64 >= v10.0.0",
+            (string?)dotnetPackage.Attribute("DetectCondition"));
+
+        XElement appRuntimePackage = chain.Elements(wix + "ExePackage").Single(static element =>
+            (string?)element.Attribute("Id") == "WindowsAppRuntime23X64");
+        Assert.Equal(string.Empty, (string?)appRuntimePackage.Attribute("DetectCondition"));
+        Assert.Equal("yes", (string?)appRuntimePackage.Attribute("Permanent"));
+
+        XElement msiPackage = Assert.Single(chain.Elements(wix + "MsiPackage"));
+        Assert.Null(msiPackage.Attribute("DisplayInternalUI"));
+        Assert.Null(msiPackage.Attribute(bal + "DisplayInternalUICondition"));
+    }
+
+    [Fact]
     public void MarkdownLinksRequireTheNativeOneShotApprovalPath()
     {
         string root = FindRepositoryRoot();

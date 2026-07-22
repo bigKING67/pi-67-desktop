@@ -15,13 +15,12 @@
         SuppressOptionsUI="yes" />
     </BootstrapperApplication>
 
-    <netfx:DotNetCompatibilityCheck
+    <netfx:DotNetCoreSearch
       Id="DotNetDesktop10X64"
-      Property="DOTNET_DESKTOP_10_X64"
+      Variable="DOTNET_DESKTOP_10_X64"
       RuntimeType="desktop"
       Platform="x64"
-      Version="10.0.0"
-      RollForward="minor" />
+      MajorVersion="10" />
 
     <Chain>
       <ExePackage
@@ -30,12 +29,14 @@
         InstallArguments="/install /quiet /norestart"
         RepairArguments="/repair /quiet /norestart"
         UninstallArguments="/uninstall /quiet /norestart"
-        DetectCondition="DOTNET_DESKTOP_10_X64"
+        DetectCondition="DOTNET_DESKTOP_10_X64 &gt;= v10.0.0"
         Permanent="yes"
         Vital="yes" />
+      <!-- Empty detection is intentional: the permanent helper idempotently repairs MSIX prerequisites. -->
       <ExePackage
         Id="WindowsAppRuntime23X64"
         SourceFile="$(var.RuntimeBootstrapExe)"
+        DetectCondition=""
         PerMachine="yes"
         Permanent="yes"
         Vital="yes">
@@ -55,7 +56,6 @@
       <MsiPackage
         Id="Pi67DesktopMsi"
         SourceFile="$(var.MsiPath)"
-        DisplayInternalUI="no"
         Visible="no"
         Vital="yes" />
     </Chain>
