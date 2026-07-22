@@ -1,0 +1,57 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Pi-67 Desktop"
+    Manufacturer="bigKING67"
+    Version="0.1.0.0"
+    UpgradeCode="4D4067D0-FFF6-408C-A019-BF93965E2597"
+    Language="2052"
+    Scope="perMachine"
+    InstallerVersion="500"
+    Compressed="yes">
+
+    <SummaryInformation Description="Native Windows x64 client for the real Pi runtime" />
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A newer Pi-67 Desktop version is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Launch Condition="VersionNT64" Message="Pi-67 Desktop requires 64-bit Windows." />
+    <Launch Condition="WindowsBuild &gt;= 19045" Message="Pi-67 Desktop requires Windows 10 22H2 build 19045 or newer." />
+
+    <Feature Id="Complete" Title="Pi-67 Desktop" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="ManufacturerFolder" Name="bigKING67">
+        <Directory Id="INSTALLFOLDER" Name="Pi-67 Desktop" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Pi-67 Desktop" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AppPublishDir)\**" />
+    </ComponentGroup>
+
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut
+        Id="StartMenuShortcut"
+        Name="Pi-67 Desktop"
+        Description="Native Windows client for Pi and pi-67"
+        Target="[INSTALLFOLDER]Pi67.Desktop.App.exe"
+        WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\bigKING67\Pi-67 Desktop"
+        Name="Installed"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

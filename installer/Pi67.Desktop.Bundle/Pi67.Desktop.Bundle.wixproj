@@ -1,0 +1,18 @@
+<Project Sdk="WixToolset.Sdk">
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\msi\Pi67-Desktop-0.1.0-alpha.1-win-x64.msi</MsiPath>
+    <DotNetDesktopRuntimeInstaller Condition="'$(DotNetDesktopRuntimeInstaller)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\prerequisites\windowsdesktop-runtime-10.0.10-win-x64.exe</DotNetDesktopRuntimeInstaller>
+    <RuntimeBootstrapExe Condition="'$(RuntimeBootstrapExe)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\runtime-bootstrap\Pi67.Desktop.RuntimeBootstrap.exe</RuntimeBootstrapExe>
+    <WindowsAppRuntimeDir Condition="'$(WindowsAppRuntimeDir)' == ''">$(MSBuildThisFileDirectory)..\..\.nuget\packages\microsoft.windowsappsdk.runtime\2.3.1\tools\MSIX\win10-x64</WindowsAppRuntimeDir>
+    <DefineConstants>MsiPath=$(MsiPath);DotNetDesktopRuntimeInstaller=$(DotNetDesktopRuntimeInstaller);RuntimeBootstrapExe=$(RuntimeBootstrapExe);WindowsAppRuntimeDir=$(WindowsAppRuntimeDir)</DefineConstants>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\installer\bundle\</BaseOutputPath>
+    <OutputName>Pi67-Desktop-Setup-0.1.0-alpha.1-win-x64</OutputName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Bal.wixext" />
+    <PackageReference Include="WixToolset.Netfx.wixext" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Data;
+
+namespace Pi67.Desktop.App.Converters;
+
+public sealed class BooleanToVisibilityConverter : IValueConverter
+{
+    public bool Invert { get; init; }
+
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        bool visible = value is true;
+        if (Invert) visible = !visible;
+        return visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        throw new NotSupportedException();
+}

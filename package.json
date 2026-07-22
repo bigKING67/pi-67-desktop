@@ -1,0 +1,30 @@
+{
+  "name": "pi-67-desktop-node-assets",
+  "private": true,
+  "version": "0.1.0-alpha.1",
+  "type": "module",
+  "workspaces": [
+    "src/Pi67.Desktop.PiBridge",
+    "extensions/pi67-desktop-safety"
+  ],
+  "scripts": {
+    "build:node": "npm run --workspaces --if-present build",
+    "check": "npm run --workspaces --if-present check",
+    "pretest": "npm run test:governance",
+    "test": "npm run --workspaces --if-present test",
+    "test:governance": "node --test eng/version/version-contract.test.mjs eng/release/release-artifact-contract.test.mjs",
+    "version:verify": "node eng/version/verify-version.mjs",
+    "version:sync": "node eng/version/sync-version.mjs",
+    "verify:no-embedded-pi": "node eng/release/verify-no-embedded-pi.mjs",
+    "verify:artifact-budget": "node eng/performance/check-artifact-budget.mjs",
+    "release:sbom": "node eng/release/generate-sbom.mjs",
+    "release:manifest": "node eng/release/generate-release-manifest.mjs",
+    "release:provenance": "node eng/release/generate-provenance.mjs",
+    "release:checksums": "node eng/release/generate-checksums.mjs",
+    "release:verify": "node eng/release/verify-release-artifacts.mjs"
+  },
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "packageManager": "npm@11.16.0"
+}

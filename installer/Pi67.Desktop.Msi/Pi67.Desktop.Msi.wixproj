@@ -1,0 +1,11 @@
+<Project Sdk="WixToolset.Sdk">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <AppPublishDir Condition="'$(AppPublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\app\win-x64</AppPublishDir>
+    <DefineConstants>AppPublishDir=$(AppPublishDir)</DefineConstants>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\installer\msi\</BaseOutputPath>
+    <OutputName>Pi67-Desktop-0.1.0-alpha.1-win-x64</OutputName>
+  </PropertyGroup>
+</Project>

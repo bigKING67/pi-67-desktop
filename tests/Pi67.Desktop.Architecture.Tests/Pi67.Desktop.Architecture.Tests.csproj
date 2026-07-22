@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Pi67.Desktop.Application/Pi67.Desktop.Application.csproj" />
+    <ProjectReference Include="../../src/Pi67.Desktop.Domain/Pi67.Desktop.Domain.csproj" />
+    <ProjectReference Include="../../src/Pi67.Desktop.Infrastructure.Windows/Pi67.Desktop.Infrastructure.Windows.csproj" />
+    <ProjectReference Include="../../src/Pi67.Desktop.PiRpc/Pi67.Desktop.PiRpc.csproj" />
+    <ProjectReference Include="../../src/Pi67.Desktop.Presentation/Pi67.Desktop.Presentation.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

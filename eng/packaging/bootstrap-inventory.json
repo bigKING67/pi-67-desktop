@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "desktopVersion": "0.1.0-alpha.1",
+  "installerPrerequisites": {
+    "dotnetDesktopRuntime": {
+      "version": "10.0.10",
+      "fileName": "windowsdesktop-runtime-10.0.10-win-x64.exe",
+      "url": "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-x64.exe",
+      "sha512": "a5502261c25ba163f35bca7d50611c195e78b8797b16c5bbf2203fbdfff92c0275d36838a3200c08443d2d23a2f6a867c58093d5c239a60dd798a6596df4dc13"
+    },
+    "windowsAppRuntime": {
+      "version": "2.3.1",
+      "source": "Microsoft.WindowsAppSDK.Runtime NuGet package",
+      "architecture": "win10-x64"
+    }
+  },
+  "steps": [
+    {
+      "id": "git",
+      "displayName": "Git for Windows",
+      "source": "Microsoft WinGet / Git.Git",
+      "testedVersion": "2.51.0",
+      "command": "winget install --id Git.Git --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements",
+      "separateConfirmation": true
+    },
+    {
+      "id": "node",
+      "displayName": "Node.js 24 LTS",
+      "source": "Microsoft WinGet / OpenJS.NodeJS.LTS",
+      "testedVersion": "24.18.0",
+      "command": "winget install --id OpenJS.NodeJS.LTS --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements",
+      "separateConfirmation": true
+    },
+    {
+      "id": "pi",
+      "displayName": "Upstream Pi",
+      "source": "npm / @earendil-works/pi-coding-agent",
+      "testedVersion": "0.80.6",
+      "command": "npm install -g @earendil-works/pi-coding-agent@0.80.6",
+      "separateConfirmation": true
+    },
+    {
+      "id": "pi67-manager",
+      "displayName": "pi-67 manager",
+      "source": "npm / @bigking67/pi-67",
+      "testedVersion": "0.14.3",
+      "command": "npm install -g @bigking67/pi-67@0.14.3",
+      "separateConfirmation": true
+    },
+    {
+      "id": "pi67-distro",
+      "displayName": "pi-67 distro",
+      "source": "https://github.com/bigKING67/pi-67",
+      "testedVersion": "0.14.3",
+      "command": "pi-67 --yes install",
+      "separateConfirmation": true,
+      "dirtyCheckoutPolicy": "block"
+    }
+  ],
+  "uninstallPreserves": [
+    "user Pi credentials",
+    "Pi sessions",
+    "~/.pi/agent",
+    "user workspaces",
+    "disposable Desktop projection database"
+  ]
+}

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Pi67.Desktop.Application</RootNamespace>
+    <AssemblyName>Pi67.Desktop.Application</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Pi67.Desktop.Domain/Pi67.Desktop.Domain.csproj" />
+  </ItemGroup>
+</Project>
