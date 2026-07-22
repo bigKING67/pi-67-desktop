@@ -5,7 +5,7 @@ namespace Pi67.Desktop.App.Converters;
 
 public sealed class BooleanToVisibilityConverter : IValueConverter
 {
-    public bool Invert { get; init; }
+    public bool Invert { get; set; }
 
     public object Convert(object value, Type targetType, object parameter, string language)
     {
