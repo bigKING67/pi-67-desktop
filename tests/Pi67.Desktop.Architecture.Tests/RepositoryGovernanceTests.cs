@@ -164,7 +164,8 @@ public sealed partial class RepositoryGovernanceTests
         string root = FindRepositoryRoot();
         string bridge = File.ReadAllText(Path.Combine(
             root,
-            "src/Pi67.Desktop.Infrastructure.Windows/PiControl/NodePiControlBridge.cs"));
+            "src/Pi67.Desktop.Infrastructure.Windows/PiControl/NodePiControlBridge.cs"))
+            .ReplaceLineEndings("\n");
 
         Assert.Contains(
             "await startGate.WaitAsync(cancellationToken).ConfigureAwait(false);\n        try\n        {\n            ObjectDisposedException.ThrowIf",
@@ -179,7 +180,8 @@ public sealed partial class RepositoryGovernanceTests
     public void WindowShutdownCancelsInitializationBeforeDisposal()
     {
         string root = FindRepositoryRoot();
-        string window = File.ReadAllText(Path.Combine(root, "src/Pi67.Desktop.App/MainWindow.xaml.cs"));
+        string window = File.ReadAllText(Path.Combine(root, "src/Pi67.Desktop.App/MainWindow.xaml.cs"))
+            .ReplaceLineEndings("\n");
 
         Assert.Contains("await viewModel.InitializeAsync(lifetime.Token);", window, StringComparison.Ordinal);
         Assert.Contains("catch (OperationCanceledException) when (lifetime.IsCancellationRequested)", window, StringComparison.Ordinal);
