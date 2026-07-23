@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 
 const temporaryDirectories: string[] = [];
+// Two cold Pi SDK initializations can exceed 15 seconds under Windows Defender on hosted runners.
+const sdkSmokeTimeout = process.platform === "win32" ? 45_000 : 15_000;
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -74,7 +76,7 @@ describe("PiSdkRuntime", () => {
       restoreEnvironment("HOME", originalHome);
       restoreEnvironment("USERPROFILE", originalUserProfile);
     }
-  }, 15_000);
+  }, sdkSmokeTimeout);
 });
 
 function restoreEnvironment(name: "HOME" | "USERPROFILE", value: string | undefined): void {
