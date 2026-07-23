@@ -1,10 +1,19 @@
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, sep } from "node:path";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 
 const temporaryDirectories: string[] = [];
+const zeroUsage = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+};
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -48,6 +57,28 @@ describe("PiSdkRuntime", () => {
 
       const renamed = await runtime.setSessionName("Isolated SDK smoke");
       expect(renamed.sessionName).toBe("Isolated SDK smoke");
+      const sessionPath = renamed.sessionPath;
+      if (!sessionPath) throw new Error("Pi SDK smoke requires a session path.");
+      expect(sessionPath.startsWith(`${join(agentDir, "sessions")}${sep}`)).toBe(true);
+      const fixture = SessionManager.create(cwd, dirname(sessionPath));
+      fixture.appendSessionInfo("Restored SDK smoke");
+      fixture.appendMessage({ role: "user", content: "Restore this isolated Pi session.", timestamp: Date.now() });
+      fixture.appendMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "Isolated Pi session restored." }],
+        api: "openai-responses",
+        provider: "pi67-test",
+        model: "fixture",
+        usage: zeroUsage,
+        stopReason: "stop",
+        timestamp: Date.now() + 1
+      });
+      const fixturePath = fixture.getSessionFile();
+      if (!fixturePath) throw new Error("Pi SDK smoke fixture was not persisted.");
+      expect(await runtime.listSessions()).toEqual([
+        expect.objectContaining({ path: fixturePath, name: "Restored SDK smoke" })
+      ]);
+      expect((await runtime.listSessions(true)).some((session) => session.path === fixturePath)).toBe(true);
       const provider = snapshot.models.find((model) => !model.configured)?.provider;
       if (!provider) throw new Error("Pi SDK smoke requires at least one unconfigured provider.");
       const authPath = join(agentDir, "auth.json");
@@ -66,8 +97,18 @@ describe("PiSdkRuntime", () => {
       expect(await readFile(authPath, "utf8")).toBe(authBefore);
       expect(authBefore).not.toContain(runtimeKey);
 
-      const restored = await restoredRuntime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      const restored = await restoredRuntime.initialize({
+        cwd,
+        agentDir,
+        sessionPath: fixturePath,
+        trust: "unknown",
+        approvalMode: "guided"
+      });
+      expect(restored.sessionId).toBe(fixture.getSessionId());
+      expect(restored.sessionName).toBe("Restored SDK smoke");
+      expect(restored.messages).toHaveLength(2);
       expect(restored.models.some((model) => model.provider === provider && model.configured)).toBe(false);
+      await expect(stat(join(root, ".pi", "agent", "sessions"))).rejects.toMatchObject({ code: "ENOENT" });
     } finally {
       await runtime.dispose();
       await restoredRuntime.dispose();

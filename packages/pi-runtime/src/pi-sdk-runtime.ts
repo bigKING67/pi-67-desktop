@@ -27,6 +27,7 @@ import { DesktopExtensionUiBridge } from "./extension-ui-bridge.js";
 import { normalizeMessages, normalizeStreamDelta } from "./message-normalizer.js";
 import { createDoctorReport } from "./runtime-doctor.js";
 import { createDesktopSafetyExtension, type SafetyPolicyState } from "./safety-extension.js";
+import { listAgentSessions } from "./session-discovery.js";
 import { StreamBatcher } from "./stream-batcher.js";
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -53,11 +54,8 @@ export class PiSdkRuntime implements AgentRuntime {
   async initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot> {
     this.agentDir = options.agentDir ?? getAgentDir();
     this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
-    await this.replaceSession(
-      options.sessionPath
-        ? SessionManager.open(options.sessionPath, undefined, options.cwd)
-        : SessionManager.create(options.cwd)
-    );
+    const sessionManager = options.sessionPath ? SessionManager.open(options.sessionPath, undefined, options.cwd) : undefined;
+    await this.replaceSession(options.cwd, sessionManager);
     return this.getSnapshot();
   }
 
@@ -77,7 +75,12 @@ export class PiSdkRuntime implements AgentRuntime {
   }
 
   async listSessions(all = false): Promise<SessionSummary[]> {
-    const sessions = all ? await SessionManager.listAll() : await SessionManager.list(this.safety.cwd);
+    const configuredSessionDir = this.settingsManager?.getSessionDir();
+    const sessions = all
+      ? configuredSessionDir
+        ? await SessionManager.listAll(configuredSessionDir)
+        : await listAgentSessions(this.agentDir)
+      : await SessionManager.list(this.safety.cwd, configuredSessionDir ?? this.requireSession().sessionManager.getSessionDir());
     return sessions.map((session) => ({
       id: session.id,
       path: session.path,
@@ -91,13 +94,14 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async createSession(cwd: string): Promise<SessionSnapshot> {
     this.safety = { ...this.safety, cwd };
-    await this.replaceSession(SessionManager.create(cwd));
+    await this.replaceSession(cwd);
     return this.getSnapshot();
   }
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
     await this.assertNoExternalSessionChange();
-    await this.replaceSession(SessionManager.open(path, undefined, cwdOverride));
+    const sessionManager = SessionManager.open(path, undefined, cwdOverride);
+    await this.replaceSession(sessionManager.getCwd(), sessionManager);
     this.safety = { ...this.safety, cwd: this.requireSession().state ? this.requireSession().sessionManager.getCwd() : this.safety.cwd };
     return this.getSnapshot();
   }
@@ -261,14 +265,16 @@ export class PiSdkRuntime implements AgentRuntime {
     };
   }
 
-  private async replaceSession(sessionManager: SessionManager): Promise<void> {
+  private async replaceSession(cwd: string, sessionManager?: SessionManager): Promise<void> {
     this.sessionUnsubscribe?.();
     this.sessionUnsubscribe = undefined;
     if (this.session?.isStreaming) await this.session.abort();
     this.session?.dispose();
 
-    const cwd = sessionManager.getCwd();
     const settingsManager = SettingsManager.create(cwd, this.agentDir);
+    const configuredSessionDir = settingsManager.getSessionDir();
+    const resolvedSessionManager = sessionManager ??
+      (configuredSessionDir ? SessionManager.create(cwd, configuredSessionDir) : undefined);
     this.settingsManager = settingsManager;
     this.resourceLoader = new DefaultResourceLoader({
       cwd,
@@ -282,7 +288,7 @@ export class PiSdkRuntime implements AgentRuntime {
     const result = await createAgentSession({
       cwd,
       agentDir: this.agentDir,
-      sessionManager,
+      ...(resolvedSessionManager ? { sessionManager: resolvedSessionManager } : {}),
       settingsManager,
       resourceLoader: this.resourceLoader
     });
@@ -388,7 +394,7 @@ export class PiSdkRuntime implements AgentRuntime {
 
   private emit(event: AgentEvent): void {
     this.sequence += 1;
-    for (const listener of this.listeners) listener(event);
+    this.listeners.forEach((listener) => listener(event));
   }
 
   private requireSession(): AgentSession {
