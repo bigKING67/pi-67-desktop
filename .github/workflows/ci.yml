@@ -44,6 +44,10 @@ jobs:
         run: corepack pnpm exec playwright install --no-shell chromium
       - name: Renderer and Electron smoke
         run: corepack pnpm exec playwright test
+      - name: Build unsigned native smoke package
+        run: corepack pnpm run package:native:unsigned
+      - name: Smoke packaged Electron runtime
+        run: corepack pnpm run package:smoke
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

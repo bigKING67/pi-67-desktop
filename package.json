@@ -30,6 +30,7 @@
     "check:structure": "node eng/quality/check-structure.mjs",
     "check:production-transport": "node eng/quality/check-production-transport.mjs",
     "check": "corepack pnpm run typecheck && corepack pnpm run lint && corepack pnpm run check:architecture && corepack pnpm run check:dead-code && corepack pnpm run check:structure && corepack pnpm run check:production-transport && corepack pnpm run test",
+    "package:native:unsigned": "corepack pnpm run build && node eng/packaging/package-native-unsigned.mjs",
     "package:win": "corepack pnpm run build && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && electron-builder --mac dmg zip --arm64",
     "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",

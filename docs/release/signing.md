@@ -39,3 +39,13 @@ Windows 使用 NSIS；macOS 使用 hardened runtime、Developer ID 签名和 not
 
 `eng/release/generate-manifest.mjs` 与 `verify-artifacts.mjs` 只证明文件身份和 checksum，
 不证明签名、notarization、安装或运行质量。
+
+## Native package smoke
+
+普通 CI 会在 Windows x64 与 macOS arm64 原生 runner 上执行
+`package:native:unsigned`，随后运行 `package:smoke`。该路径会显式移除签名和
+notarization credential，只用于提前发现 electron-builder、平台可选原生依赖、
+`app://pi67`、preload sandbox、主题持久化和按需 Agent Host 回归。
+
+unsigned native smoke package 不是 release artifact，不上传、不生成 release manifest，
+也不能替代 Authenticode、Developer ID、Gatekeeper、notarization 或真实安装/升级/卸载验证。

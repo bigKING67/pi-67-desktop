@@ -82,6 +82,17 @@ corepack pnpm run dev
 Electron。仅预览 renderer 不能证明 utility process、`app://`、原生标题栏、文件
 对话框或进程清理正确。
 
+在当前受支持的原生平台上，可以生成明确不带签名的 CI 冒烟包并验证 packaged runtime：
+
+```bash
+corepack pnpm run package:native:unsigned
+corepack pnpm run package:smoke
+```
+
+该入口只接受 Windows x64 或 macOS arm64，会清除签名环境变量并拒绝交叉平台构建。
+它验证目标平台原生依赖、隔离 user-data、`app://pi67`、主题持久化、sandbox 和按需
+Agent Host，但不生成可发布的签名产物。
+
 可重复性能测量会构建当前平台的 unsigned unpacked application，并把本机报告写入 ignored 的
 `artifacts/performance/`：
 
