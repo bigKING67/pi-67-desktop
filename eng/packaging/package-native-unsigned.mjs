@@ -10,13 +10,13 @@ export function resolveUnsignedNativeTarget(platform, arch) {
   if (platform === "win32" && arch === "x64") {
     return {
       label: "windows-x64",
-      arguments: ["--win", "nsis", "--x64"]
+      arguments: ["--win", "nsis", "--x64", "--publish", "never"]
     };
   }
   if (platform === "darwin" && arch === "arm64") {
     return {
       label: "macos-arm64",
-      arguments: ["--mac", "dmg", "zip", "--arm64", "-c.mac.notarize=false"]
+      arguments: ["--mac", "dmg", "zip", "--arm64", "-c.mac.notarize=false", "--publish", "never"]
     };
   }
   throw new Error(`Unsigned native packaging does not support ${platform}/${arch}.`);

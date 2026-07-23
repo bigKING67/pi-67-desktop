@@ -8,11 +8,11 @@ describe("unsigned native packaging policy", () => {
   it("accepts only the two supported native release targets", () => {
     expect(resolveUnsignedNativeTarget("win32", "x64")).toEqual({
       label: "windows-x64",
-      arguments: ["--win", "nsis", "--x64"]
+      arguments: ["--win", "nsis", "--x64", "--publish", "never"]
     });
     expect(resolveUnsignedNativeTarget("darwin", "arm64")).toEqual({
       label: "macos-arm64",
-      arguments: ["--mac", "dmg", "zip", "--arm64", "-c.mac.notarize=false"]
+      arguments: ["--mac", "dmg", "zip", "--arm64", "-c.mac.notarize=false", "--publish", "never"]
     });
     expect(() => resolveUnsignedNativeTarget("win32", "arm64")).toThrow(/does not support win32\/arm64/u);
     expect(() => resolveUnsignedNativeTarget("darwin", "x64")).toThrow(/does not support darwin\/x64/u);
