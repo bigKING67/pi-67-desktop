@@ -163,7 +163,9 @@ export class PiSdkRuntime implements AgentRuntime {
     const normalizedKey = apiKey.trim();
     if (!normalizedProvider || normalizedKey.length < 8) throw new Error("Provider and API key are required.");
     try {
-      await this.requireSession().modelRuntime.setRuntimeApiKey(normalizedProvider, normalizedKey);
+      await this.requireSession().modelRuntime.setRuntimeApiKey(normalizedProvider, normalizedKey, {
+        allowNetwork: false
+      });
     } catch {
       // Provider errors are intentionally hidden so a credential can never be echoed into UI events.
       throw new Error("Unable to configure the runtime API key for this provider.");

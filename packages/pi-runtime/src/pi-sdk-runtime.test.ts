@@ -1,12 +1,10 @@
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 
 const temporaryDirectories: string[] = [];
-// Two cold Pi SDK initializations can exceed 15 seconds under Windows Defender on hosted runners.
-const sdkSmokeTimeout = process.platform === "win32" ? 45_000 : 15_000;
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
@@ -55,7 +53,7 @@ describe("PiSdkRuntime", () => {
       const authPath = join(agentDir, "auth.json");
       const authBefore = await readFile(authPath, "utf8");
       const runtimeKey = "pi67-test-runtime-secret";
-      const configured = await runtime.setRuntimeApiKey(provider, runtimeKey);
+      const configured = await expectNoFetch(() => runtime.setRuntimeApiKey(provider, runtimeKey));
       expect(configured.models.some((model) => model.provider === provider && model.configured)).toBe(true);
       const diagnostics = await runtime.collectDiagnostics();
       expect(diagnostics).toMatchObject({
@@ -76,8 +74,19 @@ describe("PiSdkRuntime", () => {
       restoreEnvironment("HOME", originalHome);
       restoreEnvironment("USERPROFILE", originalUserProfile);
     }
-  }, sdkSmokeTimeout);
+  }, 15_000);
 });
+
+async function expectNoFetch<T>(operation: () => Promise<T>): Promise<T> {
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected network access."));
+  try {
+    const result = await operation();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    return result;
+  } finally {
+    fetchSpy.mockRestore();
+  }
+}
 
 function restoreEnvironment(name: "HOME" | "USERPROFILE", value: string | undefined): void {
   if (value === undefined) delete process.env[name];
