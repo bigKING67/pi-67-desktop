@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify -- "${{ inputs.tag }}"
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
       - name: Verify runner architecture
         shell: bash
         run: >-
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24.18.0
-      - run: corepack pnpm run release:tag:verify -- "${{ inputs.tag }}"
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
       - uses: actions/download-artifact@v8
         with:
           pattern: unsigned-preview-*
