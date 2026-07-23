@@ -27,7 +27,7 @@ import { convertTransferImages, normalizeMessages, normalizeStreamDelta } from "
 import { createDoctorReport } from "./runtime-doctor.js";
 import { createDesktopSafetyExtension, type SafetyPolicyState } from "./safety-extension.js";
 import { listAgentSessions } from "./session-discovery.js";
-import { discardStagedSessionImport, stageSessionImport } from "./session-import.js";
+import { discardStagedSessionImport, resolveManagedSessionPath, stageSessionImport } from "./session-import.js";
 import { StreamBatcher } from "./stream-batcher.js";
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -54,7 +54,10 @@ export class PiSdkRuntime implements AgentRuntime {
   async initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot> {
     this.agentDir = options.agentDir ?? getAgentDir();
     this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
-    const sessionManager = options.sessionPath ? SessionManager.open(options.sessionPath, undefined, options.cwd) : undefined;
+    const sessionPath = options.sessionPath
+      ? await resolveManagedSessionPath(options.sessionPath, options.cwd, this.agentDir)
+      : undefined;
+    const sessionManager = sessionPath ? SessionManager.open(sessionPath, undefined, options.cwd) : undefined;
     await this.replaceSession(options.cwd, sessionManager);
     return this.getSnapshot();
   }
@@ -100,7 +103,8 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
     await this.assertNoExternalSessionChange();
-    const sessionManager = SessionManager.open(path, undefined, cwdOverride);
+    const managedPath = await resolveManagedSessionPath(path, cwdOverride ?? this.safety.cwd, this.agentDir);
+    const sessionManager = SessionManager.open(managedPath, undefined, cwdOverride);
     await this.replaceSession(sessionManager.getCwd(), sessionManager);
     this.safety = { ...this.safety, cwd: this.requireSession().state ? this.requireSession().sessionManager.getCwd() : this.safety.cwd };
     return this.getSnapshot();

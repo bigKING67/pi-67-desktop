@@ -98,6 +98,8 @@ describe("PiSdkRuntime", () => {
       const externalPath = externalFixture.getSessionFile();
       if (!externalPath) throw new Error("Pi SDK import fixture was not persisted.");
       const externalContent = await readFile(externalPath, "utf8");
+      await expect(runtime.openSession(externalPath, cwd)).rejects.toThrow(/managed Pi sessions/u);
+      expect(await readFile(externalPath, "utf8")).toBe(externalContent);
 
       const firstImport = await runtime.importSession(externalPath);
       const firstImportPath = firstImport.sessionPath;

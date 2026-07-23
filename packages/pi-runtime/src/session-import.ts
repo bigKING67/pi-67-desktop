@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { copyFile, mkdir, realpath, rm, stat } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 
 const MAX_IMPORT_NAME_ATTEMPTS = 1_000;
 
@@ -9,6 +9,20 @@ export interface StagedSessionImport {
   copied: boolean;
   path: string;
   sessionManager: SessionManager;
+}
+
+export async function resolveManagedSessionPath(path: string, cwd: string, agentDir: string): Promise<string> {
+  const configuredDirectory = SettingsManager.create(cwd, agentDir).getSessionDir();
+  const managedRoot = configuredDirectory ?? join(agentDir, "sessions");
+  const [resolvedPath, resolvedRoot] = await Promise.all([
+    realpath(resolve(path)),
+    realpath(resolve(managedRoot))
+  ]);
+  const relativePath = relative(resolvedRoot, resolvedPath);
+  if (relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error("Only managed Pi sessions can be opened directly. Import external JSONL first.");
+  }
+  return resolvedPath;
 }
 
 export async function stageSessionImport(
