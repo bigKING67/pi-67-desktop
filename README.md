@@ -4,7 +4,9 @@ Pi-67 Desktop 是面向 Pi / pi-67 的本地优先桌面客户端。它保留 Pi
 模型、Skills、Prompts、Extensions 和 JSONL 会话语义，用图形界面提供会话树、
 流式消息、Steer、Follow-up、回滚、压缩和常见 extension 交互。
 
-当前仓库处于 alpha 实施阶段，尚未发布签名安装包。
+当前仓库处于 alpha 实施阶段。GitHub Releases 可以提供明确标记的 unsigned
+preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Developer ID
+签名和 Apple notarization。
 
 ## 支持范围
 
@@ -14,6 +16,26 @@ Pi-67 Desktop 是面向 Pi / pi-67 的本地优先桌面客户端。它保留 Pi
 - macOS 12+ Apple Silicon arm64：`.dmg` 和 `.zip`
 
 不构建 Windows x86/ARM64、macOS Intel/Universal 或 Linux 版本。
+
+## 下载 Alpha Preview
+
+公开下载入口：
+
+```text
+https://github.com/bigKING67/pi-67-desktop/releases
+```
+
+Unsigned Preview 只提供：
+
+- Windows x64：`Pi-67-Desktop-<version>-win-x64-unsigned-preview.exe`
+- macOS Apple Silicon：`Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.dmg`
+- macOS Apple Silicon：`Pi-67-Desktop-<version>-mac-arm64-unsigned-preview.zip`
+
+这些 preview 不包含稳定自动更新 metadata，并且没有 Windows publisher、macOS
+Developer ID 或 Apple notarization。Windows SmartScreen 可能要求通过“更多信息”继续；
+macOS 可以在 Finder 中右键选择“打开”，或在“系统设置 -> 隐私与安全性”中允许。
+下载后应使用同一 Release 中的 `SHA256SUMS.txt` 或
+`unsigned-preview-manifest.json` 核对文件身份。
 
 ## 运行时决策
 

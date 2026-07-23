@@ -34,8 +34,11 @@
     "package:win": "corepack pnpm run build && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && electron-builder --mac dmg zip --arm64",
     "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",
+    "release:tag:verify": "node eng/release/verify-version-tag.mjs",
     "release:manifest": "node eng/release/generate-manifest.mjs",
-    "release:verify": "node eng/release/verify-artifacts.mjs"
+    "release:verify": "node eng/release/verify-artifacts.mjs",
+    "release:preview:prepare": "node eng/release/unsigned-preview-artifacts.mjs prepare",
+    "release:preview:verify": "node eng/release/unsigned-preview-artifacts.mjs verify"
   },
   "dependencies": {
     "@pi67/agent-host": "workspace:*",

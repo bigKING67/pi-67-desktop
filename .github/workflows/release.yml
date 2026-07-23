@@ -39,6 +39,7 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
+      - run: corepack pnpm run release:tag:verify -- "${{ inputs.tag }}"
       - name: Verify runner architecture
         shell: bash
         run: |

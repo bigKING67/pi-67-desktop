@@ -1,0 +1,123 @@
+name: Unsigned preview release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing alpha version tag to publish as an unsigned prerelease
+        required: true
+        type: string
+
+concurrency:
+  group: unsigned-preview-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-2025
+            arch: x64
+          - platform: macos-arm64
+            os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm run release:tag:verify -- "${{ inputs.tag }}"
+      - name: Verify runner architecture
+        shell: bash
+        run: >-
+          node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('Unexpected runner arch: ' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run check
+      - run: corepack pnpm run package:native:unsigned
+      - run: corepack pnpm run package:smoke
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: unsigned-preview-${{ matrix.platform }}
+          path: artifacts/release/Pi-67-Desktop-*-win-x64.exe
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
+        with:
+          name: unsigned-preview-${{ matrix.platform }}
+          path: |
+            artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
+            artifacts/release/Pi-67-Desktop-*-mac-arm64.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - run: corepack pnpm run release:tag:verify -- "${{ inputs.tag }}"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: unsigned-preview-*
+          path: artifacts/release
+          merge-multiple: true
+      - run: corepack pnpm run release:preview:prepare
+      - run: corepack pnpm run release:preview:verify
+      - name: Publish unsigned GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/unsigned-preview-notes.md" <<'EOF'
+          ## Unsigned Alpha Preview
+
+          This is a non-commercial, unsigned preview build of Pi-67 Desktop. The Windows publisher and macOS developer identity are not verified. Download only from this GitHub repository and verify the SHA-256 value in `SHA256SUMS.txt` or `unsigned-preview-manifest.json`.
+
+          ### Downloads
+
+          - Windows 10/11 x64: `Pi-67-Desktop-*-win-x64-unsigned-preview.exe`
+          - macOS 12+ Apple Silicon: `Pi-67-Desktop-*-mac-arm64-unsigned-preview.dmg` or `.zip`
+
+          Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. No stable updater metadata is included; install a later preview manually.
+
+          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners, but they are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
+          EOF
+          gh release create "$RELEASE_TAG" \
+            artifacts/release/Pi-67-Desktop-*-unsigned-preview.* \
+            artifacts/release/SHA256SUMS.txt \
+            artifacts/release/unsigned-preview-manifest.json \
+            --verify-tag \
+            --prerelease \
+            --title "Pi-67 Desktop ${RELEASE_TAG#v} (Unsigned Preview)" \
+            --notes-file "$RUNNER_TEMP/unsigned-preview-notes.md"
