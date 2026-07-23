@@ -1,0 +1,24 @@
+{
+  "name": "@pi67/agent-host",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts false --deps.never-bundle electron --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pi67/domain": "workspace:*",
+    "@pi67/pi-runtime": "workspace:*",
+    "@pi67/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "electron": "43.2.0",
+    "tsdown": "0.22.13",
+    "typescript": "7.0.2"
+  }
+}

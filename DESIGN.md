@@ -1,21 +1,29 @@
 ---
-version: 1
-name: Pi-67 Desktop Native Design Authority
+version: 2
+name: Pi-67 Desktop Design Authority
 status: active
-platform: windows-x64
-theme: system
+platform: electron-web
+theme: light-system
 color:
-  canvas: SystemControlBackgroundBaseLowBrush
-  surface: SystemControlBackgroundChromeMediumLowBrush
-  surface-raised: CardBackgroundFillColorDefaultBrush
-  text-primary: TextFillColorPrimaryBrush
-  text-secondary: TextFillColorSecondaryBrush
-  border: CardStrokeColorDefaultBrush
-  accent: SystemAccentColor
-  success: SystemFillColorSuccessBrush
-  warning: SystemFillColorCautionBrush
-  danger: SystemFillColorCriticalBrush
-  info: SystemFillColorAttentionBrush
+  canvas: "#f5f6f4"
+  surface: "#ffffff"
+  surface-muted: "#eef0ed"
+  surface-raised: "#ffffff"
+  text-primary: "#171a18"
+  text-secondary: "#626862"
+  border: "#d9ddd8"
+  accent: "#2f6757"
+  focus: "#2c70c9"
+  info: "#2d67aa"
+  warning: "#9a5b16"
+  danger: "#a43b35"
+  success: "#287248"
+  diff-added: "#e0f1e7"
+  diff-removed: "#f8e4e2"
+  code-surface: "#0d1117"
+  code-border: "#30363d"
+  code-text: "#e6edf3"
+  code-muted: "#8b949e"
 spacing:
   unit: 4
   compact: 8
@@ -23,157 +31,179 @@ spacing:
   section: 24
   region: 32
 radius:
-  control: 4
-  panel: 8
-  overlay: 12
+  control: 8
+  panel: 12
+  overlay: 14
 motion:
   fast: 120
   standard: 180
   deliberate: 240
 ---
 
-# Native Design Authority
+# Pi-67 Desktop Design Authority
 
 ## Design read
 
-Reading this as: a native Windows coding workspace for beginner and experienced
-Pi users, with a calm, exact, operational developer-tool character, optimized
-for completing real Pi tasks without first learning terminal workflows.
+Reading this as: a desktop Pi coding workspace for beginner and experienced Pi
+users, with a calm, exact, compact, operational character, optimized for
+completing a real session without learning terminal UI conventions first.
 
 ## Visual direction
 
 - Preserve Peak Code's useful three-region information architecture, not its
-  Electron implementation or exact pixels.
-- The transcript/composer is the dominant work plane. Navigation is quieter;
-  tool and diff context appears only when it explains the active task.
-- Prefer flat native composition, restrained separators, and system materials.
-  Avoid equal-card dashboards, decorative gradients, excessive glass, large
-  radii, and generic AI visual motifs.
-- Use Windows 11 Mica where supported. Use opaque semantic surfaces on Windows
-  10 and in High Contrast.
+  provider marketplace, exact pixels, assets, or giant component structure.
+- Transcript and composer form the dominant work plane. Navigation is quieter;
+  files, tools, diffs, and resources appear only when they explain active work.
+- Use editorial utility composition, restrained surfaces, precise alignment,
+  and a small number of real panels.
+- Avoid equal card grids, decorative gradients, broad glass effects, oversized
+  empty states, low-contrast metadata, and generic AI visual motifs.
+- Light and dark modes share information architecture, spacing, type roles,
+  component behavior, and motion.
 
 ## Window structure
 
-### Wide window
-
 ```text
-+----------------+--------------------------------+----------------------+
-| Projects       | Transcript                     | Context              |
-| Sessions       | Reasoning / tools              | Tool / diff / health |
-| Runtime status | Composer                       |                      |
-+----------------+--------------------------------+----------------------+
++----------------------+--------------------------------------+----------------------+
+| Workspaces           | Transcript                           | Context              |
+| Sessions             | Reasoning / tools                    | Files / diff         |
+| Session tree         | Composer / follow-up queue           | Resources / health   |
++----------------------+--------------------------------------+----------------------+
 ```
 
-- Project/session rail: 248 logical pixels by default, resizable from 208 to
-  360.
-- Context pane: 360 logical pixels by default, collapsible, resizable from 300
-  to 560.
-- Transcript owns remaining width and never shrinks below 520 logical pixels.
-
-### Compact window
-
-- Below 1040 logical pixels, the context pane becomes an on-demand drawer.
-- Below 760 logical pixels, project/session navigation becomes a navigation
-  pane; transcript and composer remain primary.
-- The application does not target phone layouts.
+- Navigation rail: 248px default, resizable from 208px to 360px.
+- Context pane: 360px default, resizable from 300px to 560px and collapsible.
+- Transcript owns remaining width and never drops below 520px on a wide layout.
+- Below 1040px, context becomes a drawer.
+- Below 760px, navigation becomes a drawer; transcript remains primary.
+- Windows keeps native caption buttons through `titleBarOverlay`.
+- macOS keeps traffic lights through `hiddenInset`.
 
 ## Typography
 
-- UI: Segoe UI Variable with Windows system fallback.
-- Code: Cascadia Mono, then Consolas.
-- Use native type ramp and system text scaling. Do not hard-code physical pixel
-  sizes around accessibility settings.
-- Transcript body prioritizes reading comfort; runtime metadata uses a compact
-  label role and tabular figures where appropriate.
+```css
+--font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  "PingFang SC", "Microsoft YaHei", sans-serif;
+--font-code: "Maple Mono", "SFMono-Regular", Consolas, monospace;
+```
 
-## Color and semantic tokens
+- Use the UI stack for navigation, transcript prose, dialogs, forms, and help.
+- Use Maple Mono for code, tools, diffs, paths, commands, and compact runtime
+  metadata.
+- Code blocks may use ligatures. Commands, paths, diffs, and exact output do not.
+- Body text is 14-15px with a 1.5-1.6 line height. Metadata is 12-13px.
+- Use tabular figures for tokens, context, time, and cost.
 
-- Consume WinUI theme resources rather than duplicating literal light/dark
-  palettes.
-- Accent marks the current destination, primary action, focus, and selected
-  session only.
-- Success, warning, danger, and info always include text or an icon plus an
-  accessible name.
-- Diff added/removed backgrounds use semantic brushes with readable foreground
-  in light, dark, and High Contrast themes.
+## Semantic tokens
 
-## Component behavior
+CSS consumes only semantic roles:
+
+```text
+canvas surface surfaceMuted surfaceRaised
+textPrimary textSecondary border accent focus
+info warning danger success diffAdded diffRemoved
+codeSurface codeBorder codeText codeMuted overlayBackdrop
+shadowFloating shadowFocus shadowComposer shadowHero
+```
+
+- Accent marks selection, the primary action, and current navigation only.
+- Status always includes text or an accessible icon, never color alone.
+- Focus-visible must remain stronger than hover on every surface.
+
+## Color
+
+- Use the semantic roles declared above rather than raw palette values in
+  components. Light and dark themes may change values, but not role meaning.
+- Canvas and surface colors establish depth quietly; borders separate regions
+  without turning every group into a card.
+- Accent is reserved for the current selection and primary action. Info,
+  warning, danger, success, and diff colors communicate only their named state.
+- Text and interactive-state contrast must remain usable at 200% zoom and in
+  both themes. Never rely on hue alone to communicate status or selection.
+- Code roles stay dark in both themes so syntax highlighting has one calibrated
+  contrast surface. Overlay and shadow roles adapt by theme and communicate
+  depth without becoming component-local color values.
+
+## Component contract
 
 Every interactive component defines:
 
 ```text
-default
-pointer-over
-pressed
-focused
-selected/current where applicable
-disabled
-loading where asynchronous
-error where failure is possible
+default hover pressed focus-visible selected/current disabled
+loading error where the operation can produce those states
 ```
 
 ### Transcript
 
-- Virtualized message groups preserve author, timing, model, and tool context.
-- The UI keeps a rolling projection of the latest 1,000 messages and states
-  when older history is omitted; the Pi JSONL session remains complete.
-- Streaming text updates are coalesced; the UI does not re-layout per token.
-- Long code and tool output show a bounded preview with explicit expansion.
-- Markdown is parsed to an internal AST and rendered with native elements;
-  arbitrary HTML is never executed.
+- Variable-height virtualization is mandatory.
+- Session tree projections are flattened without recursive rendering and keep a
+  bounded virtual DOM even when the underlying Pi branch contains thousands of entries.
+- Streaming text is coalesced; token-level React commits are forbidden.
+- Long code uses a bounded 520px viewport, worker-based highlighting, internally
+  virtualized lines, and a full-content copy action; tool output and diff remain
+  bounded and require an explicit expansion path when those views are added.
+- Markdown never executes raw HTML.
+- A stopped, aborted, or crashed turn never appears completed.
 
 ### Composer
 
-- The main action is `Send` or `Stop`, never a generic `Submit`.
-- `Enter` sends and `Shift+Enter` inserts a line break; the setting is
-  discoverable and configurable.
-- Attached images are named and removable before sending.
+- Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
+- Enter sends and Shift+Enter inserts a new line.
+- While streaming, users choose steer or follow-up queue behavior explicitly.
+- Attachments are named, previewed, and removable before sending.
+- Image attachments accept PNG, JPEG, WebP, and GIF only, with an eight-image,
+  10 MiB per-image, and 30 MiB per-message boundary. Rejections remain visible
+  beside the composer instead of being truncated silently.
 
-### Approval and trust
+### Extension UI and approval
 
-- Approval dialogs name the exact command or path, affected scope, reason for
-  confirmation, and the result of denying it.
-- Use `Allow once` and `Deny`; do not offer a global permanent bypass in v0.1.
-- External HTTP/HTTPS links show the exact target and require `Allow once`
-  before launching the system browser.
-- Project trust language explicitly says it controls Pi project resources and
-  is separate from tool approval.
+- Dialogs identify the extension or tool that requested them.
+- Approval names exact command/path, cwd, scope, reason, and denial behavior.
+- Common extension select/confirm/input/editor requests use accessible dialogs.
+- TUI-only custom components show an actionable compatibility message.
+- Runtime credential dialogs never display or refill a key and state that the
+  value is cleared when the Agent Host exits or restarts.
+- Doctor reports use text and icons for pass, warning, and failure and keep
+  retry available without changing the active Pi session.
+- Update checks disclose their GitHub Release network purpose before the first
+  request. Download and quit-to-install remain separate explicit actions.
 
 ### Empty, loading, and error states
 
 - Empty states point to the first useful action.
-- Loading text names the active operation, such as `Checking Pi runtime`.
-- Errors state what failed, what state was preserved, and the next safe action.
-- A stopped or crashed Pi process never renders as a completed turn.
+- Welcome keeps workspace selection available before the Agent Host exists and
+  labels the host as on-demand until the MessagePort connection is observed.
+- Loading copy names the operation, such as `正在加载 Pi 资源`.
+- Errors name what failed, what state was preserved, and the next safe action.
+- Partial resource failure remains visible rather than silently disappearing.
 
 ## Motion
 
-- Use system transitions for navigation and overlays.
-- Use 120-180ms opacity/translation feedback for local state changes.
-- No decorative idle animation or typing simulation.
+- Use 120-180ms transform/opacity feedback for local interactions.
+- Use 180-240ms for drawers, menus, and route-local transitions.
+- Motion starts from the invoking element and remains interruptible.
+- Never use `transition: all` or decorative idle animation.
 - Reduced Motion replaces travel with a short fade or immediate state change.
 
 ## Accessibility
 
-- Follow logical visual order in tab traversal.
-- Return focus to the invoking control after dialogs and drawers close.
-- Important streaming/status changes use appropriately throttled live regions;
-  token-level announcements are forbidden.
-- Controls meet native target sizes and remain operable at 200% scaling.
+- Keyboard order follows visible task order.
+- Dialogs trap focus and return it to the invoker.
+- Streaming live regions are throttled; token-level announcements are forbidden.
+- Icon-only controls have accessible names and visible tooltips.
+- 200% zoom and long Chinese/English strings do not hide primary actions.
 
 ## Voice
 
-- Use short, factual Chinese by default and exact English parity.
-- Prefer `重试 Pi RPC` over `重试`, `允许本次命令` over `确定`, and
-  `未保存 API key` over `出错了`.
-- Never claim installation, update, session recovery, or tool execution
-  succeeded until the decisive runtime check passes.
+- Default Chinese and matching English are short, specific, and factual.
+- Prefer `重新加载 Pi 资源` over `重试` and `允许本次命令` over `确定`.
+- Never claim installation, recovery, update, or execution succeeded before the
+  decisive runtime check passes.
 
 ## Avoid
 
-- Generic AI card grids and oversized empty surfaces.
-- Web conventions that conflict with Windows navigation or focus behavior.
-- Hidden critical actions that appear only on hover.
-- Color-only state, low-contrast metadata, blanket animations, or unbounded
-  transcript rendering.
-- UI controls that edit Pi credential/session formats directly.
+- Provider marketplace navigation or non-Pi branding.
+- Hidden critical actions that exist only on hover.
+- Unbounded transcript rendering or synchronous Markdown work in hot paths.
+- UI that directly edits Pi credential or session file formats.
+- Runtime, smoothness, or accessibility claims without observed evidence.

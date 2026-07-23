@@ -1,0 +1,35 @@
+{
+  "name": "@pi67/renderer",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pi67/domain": "workspace:*",
+    "@pi67/protocol": "workspace:*",
+    "lucide-react": "1.25.0",
+    "react": "19.2.8",
+    "react-aria-components": "1.19.0",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0",
+    "react-virtuoso": "4.18.11",
+    "remark-gfm": "4.0.1",
+    "shiki": "4.3.1",
+    "zustand": "5.0.14"
+  },
+  "devDependencies": {
+    "@babel/core": "8.0.1",
+    "@rolldown/plugin-babel": "0.2.3",
+    "@types/babel__core": "7.20.5",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "6.0.4",
+    "babel-plugin-react-compiler": "1.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.1.5"
+  }
+}

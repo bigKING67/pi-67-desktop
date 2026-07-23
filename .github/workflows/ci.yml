@@ -1,125 +1,55 @@
-name: Windows x64 CI
+name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: windows-x64-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  windows-x64:
-    runs-on: windows-2025
-    timeout-minutes: 60
-    env:
-      CI: "true"
-      DOTNET_NOLOGO: "true"
-      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-      PI_TELEMETRY: "0"
+  quality-and-native-smoke:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2025
+            expectedArch: x64
+          - name: macOS arm64
+            os: macos-15
+            expectedArch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24.18.0
-          cache: npm
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+          cache: pnpm
+      - name: Enable pinned pnpm
+        run: corepack enable
+      - name: Verify runner architecture
+        shell: bash
+        run: node -e "if (process.arch !== '${{ matrix.expectedArch }}') throw new Error('Expected ${{ matrix.expectedArch }}, got ' + process.arch)"
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Quality gates
+        run: corepack pnpm run check
+      - name: Build
+        run: corepack pnpm run build
+      - name: Install Playwright Chromium
+        run: corepack pnpm exec playwright install --no-shell chromium
+      - name: Renderer and Electron smoke
+        run: corepack pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
         with:
-          dotnet-version: 10.0.302
-
-      - name: Restore Node assets
-        run: npm ci
-
-      - name: Check and test Node assets
-        run: |
-          npm run version:verify
-          npm run check
-          npm test
-          npm run build:node
-
-      - name: Restore locked .NET and WiX dependencies
-        run: dotnet restore Pi67.Desktop.slnx --locked-mode
-
-      - name: Build core and native XAML
-        shell: pwsh
-        run: |
-          $projects = @(
-            "src/Pi67.Desktop.Domain/Pi67.Desktop.Domain.csproj",
-            "src/Pi67.Desktop.Application/Pi67.Desktop.Application.csproj",
-            "src/Pi67.Desktop.PiRpc/Pi67.Desktop.PiRpc.csproj",
-            "src/Pi67.Desktop.Infrastructure.Windows/Pi67.Desktop.Infrastructure.Windows.csproj",
-            "src/Pi67.Desktop.Presentation/Pi67.Desktop.Presentation.csproj",
-            "tests/Pi67.Desktop.App.StaticTests/Pi67.Desktop.App.StaticTests.csproj",
-            "tests/Pi67.Desktop.UiTests/Pi67.Desktop.UiTests.csproj",
-            "src/Pi67.Desktop.App/Pi67.Desktop.App.csproj",
-            "installer/Pi67.Desktop.RuntimeBootstrap/Pi67.Desktop.RuntimeBootstrap.csproj"
-          )
-          foreach ($project in $projects) {
-            dotnet build $project --configuration Release --no-restore
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-      - name: Run core tests
-        shell: pwsh
-        run: |
-          $tests = @(
-            "tests/Pi67.Desktop.Domain.Tests/Pi67.Desktop.Domain.Tests.csproj",
-            "tests/Pi67.Desktop.Application.Tests/Pi67.Desktop.Application.Tests.csproj",
-            "tests/Pi67.Desktop.PiRpc.Tests/Pi67.Desktop.PiRpc.Tests.csproj",
-            "tests/Pi67.Desktop.Infrastructure.Windows.Tests/Pi67.Desktop.Infrastructure.Windows.Tests.csproj",
-            "tests/Pi67.Desktop.Presentation.Tests/Pi67.Desktop.Presentation.Tests.csproj",
-            "tests/Pi67.Desktop.Architecture.Tests/Pi67.Desktop.Architecture.Tests.csproj"
-          )
-          foreach ($project in $tests) {
-            dotnet test $project --configuration Release --no-restore
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-
-      - name: Install tested upstream Pi for integration evidence
-        run: npm install --global @earendil-works/pi-coding-agent@0.80.6
-
-      - name: Run installed Pi bridge and offline RPC smoke
-        shell: pwsh
-        run: |
-          $env:PI67_TEST_PI_PACKAGE_ROOT = Join-Path (npm root --global) "@earendil-works/pi-coding-agent"
-          npm test
-          $env:PI67_RUN_LIVE_PI_TESTS = "1"
-          $env:PI67_TEST_PI_EXECUTABLE = (Get-Command pi.cmd).Source
-          dotnet test tests/Pi67.Desktop.IntegrationTests/Pi67.Desktop.IntegrationTests.csproj --configuration Release --no-restore
-
-      - name: Build MSI and Burn bundle
-        shell: pwsh
-        run: ./eng/packaging/build.ps1 -Configuration Release
-
-      - name: Audit release isolation and artifact budgets
-        shell: pwsh
-        run: |
-          npm run verify:no-embedded-pi -- --root artifacts/app/win-x64
-          npm run verify:artifact-budget -- --root artifacts/app/win-x64
-
-      - name: Generate and verify release evidence
-        shell: pwsh
-        run: |
-          npm run release:sbom -- --output artifacts/release/pi67-desktop.cdx.json
-          npm run release:manifest -- --root artifacts/release --output artifacts/release/release-manifest.json
-          npm run release:provenance -- --root artifacts/release --output artifacts/release/provenance.intoto.json
-          npm run release:checksums -- --root artifacts/release --output artifacts/release/SHA256SUMS
-          npm run release:verify -- --root artifacts/release
-
-      - name: Upload unsigned alpha evidence
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi67-desktop-0.1.0-alpha.1-win-x64-unsigned
-          path: artifacts/release/
-          if-no-files-found: error
-          retention-days: 14
+          name: failure-evidence-${{ matrix.expectedArch }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

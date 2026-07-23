@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+overrides:
+  '@earendil-works/pi-agent-core': 0.81.1
+  '@earendil-works/pi-ai': 0.81.1
+  '@earendil-works/pi-coding-agent': 0.81.1
+  '@earendil-works/pi-tui': 0.81.1
+allowBuilds:
+  '@google/genai': false
+  electron-winstaller: false
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - '@vitejs/plugin-react@6.0.4'
+  - knip@6.29.0
+  - pnpm@11.16.0

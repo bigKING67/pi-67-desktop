@@ -1,0 +1,106 @@
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../assets/fonts/MapleMono-Regular.ttf.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../assets/fonts/MapleMono-Italic.ttf.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../assets/fonts/MapleMono-Bold.ttf.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Maple Mono";
+  src: url("../assets/fonts/MapleMono-BoldItalic.ttf.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-code: "Maple Mono", "SFMono-Regular", Consolas, monospace;
+  --canvas: #f5f6f4;
+  --surface: #ffffff;
+  --surface-muted: #eef0ed;
+  --surface-raised: #ffffff;
+  --surface-hover: #e8ebe7;
+  --surface-active: #e0e9e4;
+  --text-primary: #171a18;
+  --text-secondary: #626862;
+  --text-tertiary: #858c86;
+  --border: #d9ddd8;
+  --border-strong: #c8cec8;
+  --accent: #2f6757;
+  --accent-strong: #215244;
+  --accent-soft: #dcebe5;
+  --focus: #2c70c9;
+  --info: #2d67aa;
+  --warning: #9a5b16;
+  --danger: #a43b35;
+  --success: #287248;
+  --diff-added: #e0f1e7;
+  --diff-removed: #f8e4e2;
+  --code-surface: #0d1117;
+  --code-border: #30363d;
+  --code-text: #e6edf3;
+  --code-muted: #8b949e;
+  --overlay-backdrop: rgb(10 13 11 / 0.48);
+  --shadow-floating: 0 18px 50px rgb(23 32 26 / 0.14);
+  --shadow-focus: 0 0 0 3px rgb(44 112 201 / 0.22);
+  --shadow-composer: 0 7px 24px rgb(18 27 22 / 0.08);
+  --shadow-hero: 0 28px 80px rgb(20 30 24 / 0.12);
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-overlay: 14px;
+  --titlebar-height: 42px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #111412;
+    --surface: #181c19;
+    --surface-muted: #202521;
+    --surface-raised: #252b26;
+    --surface-hover: #2a302b;
+    --surface-active: #30433a;
+    --text-primary: #f0f3ef;
+    --text-secondary: #a9b1aa;
+    --text-tertiary: #7f8981;
+    --border: #343b35;
+    --border-strong: #465047;
+    --accent: #7bc5ad;
+    --accent-strong: #a1dbc8;
+    --accent-soft: #203b32;
+    --focus: #83b9f3;
+    --info: #84b8f4;
+    --warning: #e2ad69;
+    --danger: #ef9189;
+    --success: #7bc99c;
+    --diff-added: #1d3a2b;
+    --diff-removed: #482725;
+    --code-surface: #0d1117;
+    --code-border: #30363d;
+    --code-text: #e6edf3;
+    --code-muted: #8b949e;
+    --overlay-backdrop: rgb(0 0 0 / 0.58);
+    --shadow-floating: 0 20px 54px rgb(0 0 0 / 0.44);
+    --shadow-focus: 0 0 0 3px rgb(131 185 243 / 0.24);
+    --shadow-composer: 0 7px 24px rgb(0 0 0 / 0.3);
+    --shadow-hero: 0 28px 80px rgb(0 0 0 / 0.34);
+  }
+}

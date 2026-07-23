@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Pi-67 Desktop">
+  <rect x="96" y="96" width="832" height="832" rx="208" fill="#171a18"/>
+  <path
+    d="M280 288h464c40 0 72 32 72 72s-32 72-72 72h-48v288c0 35-29 64-64 64s-64-29-64-64V432H456v288c0 35-29 64-64 64s-64-29-64-64V432H280c-40 0-72-32-72-72s32-72 72-72Z"
+    fill="#f5f6f4"
+  />
+</svg>

@@ -1,30 +1,57 @@
 {
-  "name": "pi-67-desktop-node-assets",
-  "private": true,
+  "name": "pi-67-desktop",
   "version": "0.1.0-alpha.1",
+  "description": "Pi-first desktop client for Windows x64 and macOS Apple Silicon.",
+  "author": "bigKING67",
+  "private": true,
   "type": "module",
-  "workspaces": [
-    "src/Pi67.Desktop.PiBridge",
-    "extensions/pi67-desktop-safety"
-  ],
-  "scripts": {
-    "build:node": "npm run --workspaces --if-present build",
-    "check": "npm run --workspaces --if-present check",
-    "pretest": "npm run test:governance",
-    "test": "npm run --workspaces --if-present test",
-    "test:governance": "node --test eng/version/version-contract.test.mjs eng/release/release-artifact-contract.test.mjs",
-    "version:verify": "node eng/version/verify-version.mjs",
-    "version:sync": "node eng/version/sync-version.mjs",
-    "verify:no-embedded-pi": "node eng/release/verify-no-embedded-pi.mjs",
-    "verify:artifact-budget": "node eng/performance/check-artifact-budget.mjs",
-    "release:sbom": "node eng/release/generate-sbom.mjs",
-    "release:manifest": "node eng/release/generate-release-manifest.mjs",
-    "release:provenance": "node eng/release/generate-provenance.mjs",
-    "release:checksums": "node eng/release/generate-checksums.mjs",
-    "release:verify": "node eng/release/verify-release-artifacts.mjs"
-  },
+  "main": "apps/desktop/dist/main.mjs",
+  "packageManager": "pnpm@11.16.0",
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": "24.18.0"
   },
-  "packageManager": "npm@11.16.0"
+  "scripts": {
+    "dev": "node eng/dev/start.mjs",
+    "build": "corepack pnpm run build:packages && corepack pnpm run build:apps",
+    "build:packages": "corepack pnpm --filter @pi67/domain --filter @pi67/protocol --filter @pi67/pi-runtime run build",
+    "build:apps": "corepack pnpm --filter @pi67/renderer run build && corepack pnpm --filter @pi67/agent-host run build && corepack pnpm --filter @pi67/desktop run build",
+    "typecheck": "corepack pnpm exec tsc -p tsconfig.tests.json --noEmit && corepack pnpm -r --if-present run typecheck",
+    "lint": "oxlint --type-aware --type-check --deny-warnings apps packages tests eng",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "corepack pnpm run build && playwright test",
+    "performance:prepare": "corepack pnpm run build && node eng/performance/prepare-packaged-app.mjs",
+    "performance:renderer": "node eng/performance/measure-renderer.mjs",
+    "performance:electron": "node eng/performance/measure-electron.mjs",
+    "performance:measure": "corepack pnpm run performance:prepare && corepack pnpm run performance:renderer && corepack pnpm run performance:electron",
+    "icons:generate": "node eng/packaging/generate-icon.mjs",
+    "check:architecture": "node eng/quality/check-architecture.mjs",
+    "check:dead-code": "knip",
+    "check:structure": "node eng/quality/check-structure.mjs",
+    "check:production-transport": "node eng/quality/check-production-transport.mjs",
+    "check": "corepack pnpm run typecheck && corepack pnpm run lint && corepack pnpm run check:architecture && corepack pnpm run check:dead-code && corepack pnpm run check:structure && corepack pnpm run check:production-transport && corepack pnpm run test",
+    "package:win": "corepack pnpm run build && electron-builder --win nsis --x64",
+    "package:mac": "corepack pnpm run build && electron-builder --mac dmg zip --arm64",
+    "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",
+    "release:manifest": "node eng/release/generate-manifest.mjs",
+    "release:verify": "node eng/release/verify-artifacts.mjs"
+  },
+  "dependencies": {
+    "@pi67/agent-host": "workspace:*",
+    "@pi67/desktop": "workspace:*",
+    "@pi67/renderer": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.10.1",
+    "@vitest/coverage-v8": "4.1.10",
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3",
+    "knip": "6.29.0",
+    "oxlint": "1.75.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "pnpm": "11.16.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
 }

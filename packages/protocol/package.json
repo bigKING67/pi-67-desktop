@@ -1,0 +1,26 @@
+{
+  "name": "@pi67/protocol",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --dts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pi67/domain": "workspace:*",
+    "typebox": "1.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsdown": "0.22.13",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "apps/agent-host": {
+      "project": ["src/**/*.ts"]
+    },
+    "apps/desktop": {
+      "project": ["src/**/*.ts"]
+    },
+    "apps/renderer": {
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/domain": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/pi-runtime": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/protocol": {
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": [
+    "@pi67/agent-host",
+    "@pi67/desktop",
+    "@pi67/renderer",
+    "@types/semver",
+    "electron",
+    "pnpm"
+  ]
+}

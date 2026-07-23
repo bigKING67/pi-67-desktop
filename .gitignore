@@ -1,27 +1,21 @@
-.vs/
 .vscode/
 .idea/
 .DS_Store
 
 artifacts/
-TestResults/
-BenchmarkDotNet.Artifacts/
-*.binlog
-*.etl
-*.diagsession
+coverage/
+playwright-report/
+test-results/
+.vite/
+.tsdown/
 
-**/bin/
-**/obj/
 **/node_modules/
 **/dist/
-.nuget/packages/
-*.user
-*.suo
 
 *.db
 *.db-shm
 *.db-wal
 *.log
-
-installer/output/
-eng/release/output/
+*.trace
+*.png
+!eng/packaging/icon.png
