@@ -62,14 +62,12 @@
   background: var(--surface-muted);
   color: var(--accent);
 }
-.update-summary.phase-current,
-.update-summary.phase-downloaded { color: var(--success); }
+.update-summary.phase-current { color: var(--success); }
 .update-summary.phase-error { color: var(--danger); }
 .update-summary > div { display: grid; gap: 2px; }
 .update-summary strong { color: var(--text-primary); font-size: 12px; }
 .update-summary span { color: var(--text-secondary); font-size: 11px; }
 .update-network-note { color: var(--text-tertiary); font-size: 10px; line-height: 1.6; }
-.update-progress { height: 5px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
-.update-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.update-action-error { color: var(--danger); font-size: 11px; line-height: 1.5; }
 
 @keyframes loading-spin { to { transform: rotate(360deg); } }

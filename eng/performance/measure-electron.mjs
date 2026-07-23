@@ -172,7 +172,7 @@ const metrics = [
     samples: realPiSessionProjectionSamples,
     budget: 1_500,
     evidenceLevel: "packaged",
-    method: "SessionManager.appendMessage JSONL fixture; native file dialog bridge; Pi SDK restore; validated 1,000-message transcript, bounded virtualized tree, visible fixture content, and composer paint",
+    method: "SessionManager.appendMessage JSONL fixture; native import dialog bridge; managed copy; Pi SDK restore; validated 1,000-message transcript, bounded virtualized tree, visible fixture content, and composer paint",
     limitations: ["The synthetic session contains user and assistant text messages but no images, tool results, compaction, or branches."]
   }),
   summarizeMetric({
@@ -275,7 +275,7 @@ async function measureRealPiSessionProjection(application, window, sessionPath, 
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
   }, sessionPath);
   return withTimeout(window.evaluate((messageCount) => new Promise((resolve, reject) => {
-    const button = document.querySelector('[aria-label="打开 Pi session 文件"]');
+    const button = document.querySelector('[aria-label="导入 Pi session 到当前工作区"]');
     if (!(button instanceof HTMLButtonElement)) {
       reject(new Error("Pi session file action is unavailable."));
       return;

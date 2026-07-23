@@ -195,7 +195,9 @@ loading error where the operation can produce those states
 - Doctor reports use text and icons for pass, warning, and failure and keep
   retry available without changing the active Pi session.
 - Update checks disclose their GitHub Release network purpose before the first
-  request. Download and quit-to-install remain separate explicit actions.
+  request. Unsigned Preview checks and opening the canonical GitHub Release page
+  remain separate explicit actions. Unsigned builds expose no in-app download,
+  background download, or quit-to-install path.
 
 ### Empty, loading, and error states
 

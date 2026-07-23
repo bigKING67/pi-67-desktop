@@ -16,13 +16,6 @@ const systemBridge = {
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
   getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
-  downloadUpdate: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-download"),
-  installUpdate: (): Promise<void> => ipcRenderer.invoke("pi67:update-install"),
-  onUpdateStateChanged: (listener: (state: unknown) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(state);
-    ipcRenderer.on("pi67:update-state-changed", handler);
-    return () => ipcRenderer.removeListener("pi67:update-state-changed", handler);
-  },
   onAgentHostFailed: (listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: { code: number; recoverable: boolean; attempt?: number }) => listener(state);
     ipcRenderer.on("pi67:agent-host-failed", handler);

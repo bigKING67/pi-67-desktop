@@ -14,13 +14,14 @@ import {
   utilityProcess,
   type UtilityProcess
 } from "electron";
-import type { AppUpdater } from "electron-updater";
+import type { ManualUpdateState } from "./manual-update.js";
 import { redact } from "./redaction.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
 const agentHostEntry = normalize(join(currentDirectory, "../../agent-host/dist/index.mjs"));
 const devServerUrl = process.env.PI67_RENDERER_DEV_URL;
+const manualUpdateChannel = "unsigned-preview" as const;
 const supportedTarget = (process.platform === "win32" && process.arch === "x64")
   || (process.platform === "darwin" && process.arch === "arm64");
 
@@ -41,8 +42,8 @@ let mainWindow: BrowserWindow | undefined;
 let agentHost: UtilityProcess | undefined;
 let stopping = false;
 let restartHistory: number[] = [];
-let updateState: Record<string, unknown> = { phase: "idle" };
-let updaterLoad: Promise<AppUpdater> | undefined;
+let updateState: ManualUpdateState | undefined;
+let updateCheck: Promise<ManualUpdateState> | undefined;
 
 if (!supportedTarget) {
   throw new Error(`Pi-67 Desktop does not support ${process.platform}/${process.arch}.`);
@@ -250,41 +251,47 @@ function registerSystemBridge(): void {
     await shell.openExternal(target.toString());
     return true;
   });
-  ipcMain.handle("pi67:update-state", () => updateState);
+  ipcMain.handle("pi67:update-state", () => currentUpdateState());
   ipcMain.handle("pi67:update-check", async () => {
-    if (!app.isPackaged) return { phase: "disabled", detail: "Development build" };
-    await (await getUpdater()).checkForUpdates();
-    return updateState;
-  });
-  ipcMain.handle("pi67:update-download", async () => (await getUpdater()).downloadUpdate());
-  ipcMain.handle("pi67:update-install", async () => {
-    stopping = true;
-    (await getUpdater()).quitAndInstall(false, true);
+    if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
+    if (updateCheck) return updateCheck;
+
+    const currentVersion = app.getVersion();
+    const pendingCheck = import("./manual-update.js").then(({ checkForUnsignedPreviewUpdate }) => (
+      checkForUnsignedPreviewUpdate({
+        currentVersion,
+        fetcher: (input, init) => net.fetch(input, init)
+      })
+    )).catch((error: unknown) => errorManualUpdateState(
+      currentVersion,
+      redact(error instanceof Error ? error.message : String(error))
+    ));
+    updateCheck = pendingCheck;
+    try {
+      updateState = await pendingCheck;
+      return updateState;
+    } finally {
+      if (updateCheck === pendingCheck) updateCheck = undefined;
+    }
   });
 }
 
-async function getUpdater(): Promise<AppUpdater> {
-  updaterLoad ??= import("electron-updater").then((module) => {
-    const updater = module.autoUpdater;
-    updater.autoDownload = false;
-    updater.autoInstallOnAppQuit = false;
-    updater.on("checking-for-update", () => setUpdateState({ phase: "checking" }));
-    updater.on("update-available", (info) => setUpdateState({ phase: "available", version: info.version }));
-    updater.on("update-not-available", () => setUpdateState({ phase: "current" }));
-    updater.on("download-progress", (progress) => setUpdateState({ phase: "downloading", percent: progress.percent }));
-    updater.on("update-downloaded", (info) => setUpdateState({ phase: "downloaded", version: info.version }));
-    updater.on("error", (error) => setUpdateState({ phase: "error", detail: redact(error.message) }));
-    return updater;
-  }).catch((error: unknown) => {
-    updaterLoad = undefined;
-    throw error;
-  });
-  return updaterLoad;
+function currentUpdateState(): ManualUpdateState {
+  if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
+  updateState ??= initialManualUpdateState(app.getVersion());
+  return updateState;
 }
 
-function setUpdateState(state: Record<string, unknown>): void {
-  updateState = state;
-  mainWindow?.webContents.send("pi67:update-state-changed", state);
+function initialManualUpdateState(currentVersion: string): ManualUpdateState {
+  return { phase: "idle", channel: manualUpdateChannel, currentVersion };
+}
+
+function disabledManualUpdateState(currentVersion: string): ManualUpdateState {
+  return { phase: "disabled", channel: manualUpdateChannel, currentVersion, detail: "Development build" };
+}
+
+function errorManualUpdateState(currentVersion: string, detail: string): ManualUpdateState {
+  return { phase: "error", channel: manualUpdateChannel, currentVersion, detail: detail.slice(0, 500) };
 }
 
 function asNotification(value: unknown): { title: string; body: string } | undefined {

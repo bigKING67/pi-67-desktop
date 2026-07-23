@@ -13,9 +13,6 @@ declare global {
         requestOpenExternal(url: string): Promise<boolean>;
         getUpdateState(): Promise<unknown>;
         checkForUpdates(): Promise<unknown>;
-        downloadUpdate(): Promise<unknown>;
-        installUpdate(): Promise<void>;
-        onUpdateStateChanged(listener: (state: unknown) => void): () => void;
         onAgentHostFailed(listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): () => void;
       };
     };

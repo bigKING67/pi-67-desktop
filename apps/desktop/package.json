@@ -1,17 +1,17 @@
 {
   "name": "@pi67/desktop",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./dist/main.mjs"
   },
   "scripts": {
-    "build": "tsdown src/main.ts --format esm --dts false --deps.never-bundle electron-updater && tsdown src/preload.ts --format cjs --dts false --no-clean",
+    "build": "tsdown src/main.ts --format esm --dts false && tsdown src/preload.ts --format cjs --dts false --no-clean",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "electron-updater": "6.8.9"
+    "semver": "7.7.4"
   },
   "peerDependencies": {
     "electron": "43.2.0"

@@ -3,7 +3,7 @@ export async function measurePackagedCodeHighlight(application, window, sessionP
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
   }, sessionPath);
   return withTimeout(window.evaluate((lineCount) => new Promise((resolve, reject) => {
-    const button = document.querySelector('[aria-label="打开 Pi session 文件"]');
+    const button = document.querySelector('[aria-label="导入 Pi session 到当前工作区"]');
     if (!(button instanceof HTMLButtonElement)) {
       reject(new Error("Pi session file action is unavailable."));
       return;

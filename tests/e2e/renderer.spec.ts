@@ -12,15 +12,37 @@ test.beforeEach(async ({ page }) => {
           selectSessionFile: async () => "/Users/test/.pi/agent/sessions/demo.jsonl",
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
           showNotification: async () => undefined,
-          requestOpenExternal: async () => true,
-          getUpdateState: async () => ({ phase: "idle" }),
-          checkForUpdates: async () => ({ phase: "available", version: "0.2.0" }),
-          downloadUpdate: async () => undefined,
-          installUpdate: async () => undefined,
-          onUpdateStateChanged: () => () => undefined,
+          requestOpenExternal: async (url: string) => {
+            const testWindow = window as unknown as {
+              __pi67UpdateTest: { checks: number; openedUrls: string[]; allowOpen: boolean };
+            };
+            testWindow.__pi67UpdateTest.openedUrls.push(url);
+            return testWindow.__pi67UpdateTest.allowOpen;
+          },
+          getUpdateState: async () => ({
+            phase: "idle",
+            channel: "unsigned-preview",
+            currentVersion: "0.1.0-alpha.1"
+          }),
+          checkForUpdates: async () => {
+            const testWindow = window as unknown as { __pi67UpdateTest: { checks: number; openedUrls: string[] } };
+            testWindow.__pi67UpdateTest.checks += 1;
+            return {
+              phase: "available",
+              channel: "unsigned-preview",
+              currentVersion: "0.1.0-alpha.1",
+              version: "0.1.0-alpha.2",
+              releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
+              publishedAt: "2026-07-23T06:00:00.000Z"
+            };
+          },
           onAgentHostFailed: () => () => undefined
         }
       }
+    });
+    Object.defineProperty(window, "__pi67UpdateTest", {
+      configurable: false,
+      value: { checks: 0, openedUrls: [], allowOpen: false }
     });
   });
 });
@@ -252,18 +274,33 @@ function isHighlightResource(name: string): boolean {
   return /(?:code-highlighter|shiki_wasm|shiki_langs_typescript|\/wasm-[^/]+\.js$|\/typescript-[^/]+\.js$)/u.test(name);
 }
 
-test("keeps update network and install actions user initiated", async ({ page }, testInfo) => {
+test("keeps unsigned preview checks and external downloads user initiated", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "检查 Pi-67 Desktop 更新" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Pi-67 Desktop 更新" });
+  const dialog = page.getByRole("dialog", { name: "Unsigned Preview 手动更新" });
   await expect(dialog.getByText(/不会发送工作区、会话、模型、Provider 或凭据数据/u)).toBeVisible();
   await expect(dialog.getByText("由你决定何时联网检查")).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(0);
   await dialog.getByRole("button", { name: "检查更新" }).click();
-  await expect(dialog.getByText("发现 Pi-67 Desktop 0.2.0")).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "下载 0.2.0" })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("update-dialog.png"), animations: "disabled" });
+  await expect(dialog.getByText("发现 Pi-67 Desktop 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByText(/核对 SHA-256 后手动下载安装/u)).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(1);
+
+  await dialog.getByRole("button", { name: "打开 GitHub 下载页" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("GitHub 下载页未打开");
+  await expect(dialog.getByText("发现 Pi-67 Desktop 0.1.0-alpha.2")).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as unknown as { __pi67UpdateTest: { allowOpen: boolean } }).__pi67UpdateTest.allowOpen = true;
+  });
+  await dialog.getByRole("button", { name: "打开 GitHub 下载页" }).click();
+  const releaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2";
+  expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { openedUrls: string[] } }).__pi67UpdateTest.openedUrls)).toEqual([
+    releaseUrl,
+    releaseUrl
+  ]);
 });
 
 async function attachMockAgent(

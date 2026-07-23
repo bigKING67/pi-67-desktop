@@ -79,9 +79,9 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
 - browser-tier message projection 使用 production Vite bundle 和 MessagePort fixture，不包含 Pi
   JSONL 磁盘读取或 Pi SDK restore。
 - `realPiSessionProjection`：在 profile 内使用 Pi SDK 的 `SessionManager.create()` 和
-  `appendMessage()` 生成、重新打开并校验 1,000 条 user/assistant message，再通过 packaged
-  Electron 原生文件对话框 bridge 打开；计时直到 1,000 个 session tree 节点、fixture message
-  和 composer 均完成投影。fixture 位于临时 profile，测量后删除，不进入仓库。
+  `appendMessage()` 生成并校验 1,000 条 user/assistant message，再通过 packaged Electron
+  原生文件对话框 bridge 导入为 managed copy；计时直到 1,000 个 session tree 节点、fixture
+  message 和 composer 均完成投影。fixture 位于临时 profile，测量后删除，不进入仓库。
 - `welcomeHighlightResources`：在 Welcome 且 Agent Host 尚未连接时检查 production resource
   timing，`code-highlighter`、Shiki WASM 和 TypeScript grammar chunk 必须全部为 0。
 - `coldLongCodeHighlight` / `warmLongCodeHighlight`：分别测量 2,000 行冷加载与 1,800 行已加载

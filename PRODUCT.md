@@ -78,6 +78,8 @@ count.
   does not persist credentials, prompts, source, tool payloads, or session data.
 - Update checks disclose their network purpose and send no workspace, provider,
   model, session, or credential data.
+- Unsigned Preview checks accept only complete prerelease artifact sets and open
+  a canonical GitHub Release page; they never download or install in-app.
 - Diagnostic export is local, bounded, and redacted by default.
 
 ## Non-goals for v1

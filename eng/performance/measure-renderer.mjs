@@ -235,11 +235,18 @@ async function installSystemBridge(page) {
           saveDiagnostics: async () => undefined,
           showNotification: async () => undefined,
           requestOpenExternal: async () => false,
-          getUpdateState: async () => ({ phase: "disabled", detail: "Performance fixture" }),
-          checkForUpdates: async () => ({ phase: "disabled", detail: "Performance fixture" }),
-          downloadUpdate: async () => undefined,
-          installUpdate: async () => undefined,
-          onUpdateStateChanged: () => () => undefined,
+          getUpdateState: async () => ({
+            phase: "disabled",
+            channel: "unsigned-preview",
+            currentVersion: "performance",
+            detail: "Performance fixture"
+          }),
+          checkForUpdates: async () => ({
+            phase: "disabled",
+            channel: "unsigned-preview",
+            currentVersion: "performance",
+            detail: "Performance fixture"
+          }),
           onAgentHostFailed: () => () => undefined
         }
       }
