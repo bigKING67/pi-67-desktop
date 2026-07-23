@@ -20,6 +20,10 @@ test("boots the real sandboxed Electron shell over app://", async () => {
     await expect(window.getByText("Pi-first desktop workspace")).toBeVisible();
     await expect(window.getByRole("button", { name: "选择工作区" })).toBeEnabled();
     await expect(window.getByText("选择工作区后按需启动")).toBeVisible();
+    await expect(window.locator("html")).toHaveAttribute("data-theme-preference", "system");
+    await window.getByRole("button", { name: /外观：跟随系统/u }).click();
+    await expect(window.getByRole("menu")).toBeVisible();
+    await window.keyboard.press("Escape");
 
     const utilityProcessesBefore = await utilityProcessCount(application);
     await window.evaluate(() => {

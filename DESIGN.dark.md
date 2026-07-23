@@ -31,6 +31,8 @@ color:
 Dark mode uses the same product purpose, information architecture, typography,
 spacing, component states, and motion as `DESIGN.md`.
 
+- Dark may come from the operating system or an explicit persisted selection;
+  both paths resolve to the same semantic tokens and component states.
 - Large backgrounds remain neutral and low glare.
 - Raised surfaces are slightly lighter than the canvas.
 - Borders separate only where spacing or luminance is insufficient.

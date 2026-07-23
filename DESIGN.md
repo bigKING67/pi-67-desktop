@@ -3,7 +3,7 @@ version: 2
 name: Pi-67 Desktop Design Authority
 status: active
 platform: electron-web
-theme: light-system
+theme: system-light-dark
 color:
   canvas: "#f5f6f4"
   surface: "#ffffff"
@@ -60,6 +60,8 @@ completing a real session without learning terminal UI conventions first.
   empty states, low-contrast metadata, and generic AI visual motifs.
 - Light and dark modes share information architecture, spacing, type roles,
   component behavior, and motion.
+- Appearance defaults to the operating system. A compact TitleBar menu lets
+  users choose System, Light, or Dark without turning theme into primary UI.
 
 ## Window structure
 
@@ -121,7 +123,8 @@ shadowFloating shadowFocus shadowComposer shadowHero
 - Text and interactive-state contrast must remain usable at 200% zoom and in
   both themes. Never rely on hue alone to communicate status or selection.
 - Code roles stay dark in both themes so syntax highlighting has one calibrated
-  contrast surface. Overlay and shadow roles adapt by theme and communicate
+  contrast surface and uses one dark Shiki theme without re-tokenizing when the
+  surrounding UI theme changes. Overlay and shadow roles adapt by theme and communicate
   depth without becoming component-local color values.
 
 ## Component contract
@@ -144,6 +147,18 @@ loading error where the operation can produce those states
   bounded and require an explicit expansion path when those views are added.
 - Markdown never executes raw HTML.
 - A stopped, aborted, or crashed turn never appears completed.
+
+### Appearance
+
+- The TitleBar exposes an accessible three-option menu: System, Light, and Dark.
+- System is the default and reacts to operating-system theme changes while the
+  application is running. Explicit Light or Dark overrides the system.
+- Only the non-sensitive preference is persisted in renderer-local storage.
+  Storage failure keeps the runtime choice and explains that it is temporary.
+- The effective theme is applied before React mounts. Components consume the
+  same semantic tokens and never branch on theme-specific literal colors.
+- The trigger shows the effective theme, the menu marks the stored preference,
+  Escape restores focus, and Reduced Motion removes menu travel.
 
 ### Composer
 

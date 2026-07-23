@@ -61,12 +61,16 @@ count.
 - Chinese is the default language; English has behavioral parity.
 - Core flows support keyboard-only operation, Narrator, and VoiceOver.
 - Focus is restored after dialogs and drawers close.
+- Appearance defaults to the operating system and offers explicit System,
+  Light, and Dark choices without involving the Agent Host.
 - 200% zoom, Reduced Motion, light mode, and dark mode retain all primary actions.
 - Status is never encoded by color alone.
 
 ## Privacy
 
 - Local-first and no analytics or PostHog in v1.
+- The renderer may persist only the non-sensitive appearance preference; it
+  does not persist credentials, prompts, source, tool payloads, or session data.
 - Update checks disclose their network purpose and send no workspace, provider,
   model, session, or credential data.
 - Diagnostic export is local, bounded, and redacted by default.

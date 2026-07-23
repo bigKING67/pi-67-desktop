@@ -38,9 +38,8 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   useEffect(() => {
     let current = true;
     setHighlight({ state: "loading", lines: [] });
-    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     void import("./code-highlighter.js").then(async ({ highlightCode }) => {
-      const result = await highlightCode(code, language, dark);
+      const result = await highlightCode(code, language);
       if (!current) return;
       setHighlight({ state: "ready", lines: result });
     }).catch((error: unknown) => {

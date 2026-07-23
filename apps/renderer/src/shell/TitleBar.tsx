@@ -1,6 +1,7 @@
 import { Command, DownloadCloud, KeyRound, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
+import { ThemeButton } from "../theme/ThemeButton.js";
 
 export function TitleBar() {
   const runtime = useAppStore((state) => state.runtime);
@@ -62,6 +63,7 @@ export function TitleBar() {
         <Button className="icon-button" aria-label="检查 Pi-67 Desktop 更新" onPress={() => setUpdateDialogOpen(true)}>
           <DownloadCloud size={15} />
         </Button>
+        <ThemeButton />
         <Button className="icon-button context-toggle" aria-label={contextVisible ? "隐藏上下文" : "显示上下文"} onPress={() => setContextVisible(!contextVisible)}>
           {contextVisible ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
         </Button>

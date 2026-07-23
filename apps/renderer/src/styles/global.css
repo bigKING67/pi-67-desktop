@@ -185,6 +185,7 @@ html[data-platform="darwin"] .title-bar {
 .phase-failed .status-dot { background: var(--danger); }
 
 .icon-button {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 30px;

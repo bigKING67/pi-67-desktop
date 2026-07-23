@@ -7,7 +7,6 @@ interface HighlightRequest {
   id: number;
   code: string;
   language?: string;
-  dark: boolean;
 }
 
 interface HighlightSuccess {
@@ -36,8 +35,7 @@ const pending = new Map<number, PendingHighlight>();
 
 export function highlightCode(
   code: string,
-  language: string | undefined,
-  dark: boolean
+  language: string | undefined
 ): Promise<HighlightToken[][]> {
   const id = nextRequestId = (nextRequestId + 1) % Number.MAX_SAFE_INTEGER;
   return new Promise((resolve, reject) => {
@@ -45,8 +43,7 @@ export function highlightCode(
     const request: HighlightRequest = {
       id,
       code,
-      ...(language === undefined ? {} : { language }),
-      dark
+      ...(language === undefined ? {} : { language })
     };
     getWorker().postMessage(request);
   });

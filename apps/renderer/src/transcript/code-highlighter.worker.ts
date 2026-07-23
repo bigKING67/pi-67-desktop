@@ -1,11 +1,10 @@
 import { createHighlighterCore } from "shiki/core";
 import { createOnigurumaEngine } from "shiki/engine/oniguruma";
 import githubDark from "shiki/themes/github-dark-default.mjs";
-import githubLight from "shiki/themes/github-light-default.mjs";
 import type { HighlightToken } from "./code-highlighter.js";
 
 const highlighter = createHighlighterCore({
-  themes: [githubDark, githubLight],
+  themes: [githubDark],
   langs: [],
   engine: createOnigurumaEngine(import("shiki/wasm"))
 });
@@ -75,7 +74,6 @@ interface HighlightRequest {
   id: number;
   code: string;
   language?: string;
-  dark: boolean;
 }
 
 globalThis.addEventListener("message", (event: MessageEvent<HighlightRequest>) => {
@@ -102,7 +100,7 @@ async function highlightCode(request: HighlightRequest): Promise<HighlightToken[
   await ensureLanguage(normalizedLanguage);
   const result = instance.codeToTokens(request.code, {
     lang: normalizedLanguage,
-    theme: request.dark ? "github-dark-default" : "github-light-default"
+    theme: "github-dark-default"
   });
   return result.tokens.map((line) => line.map((token) => ({
     content: token.content,
