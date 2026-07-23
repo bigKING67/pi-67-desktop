@@ -58,7 +58,6 @@ export async function attachMockAgent(
   messages: FixtureMessage[] = [],
   responseDelays: Record<string, number> = {}
 ): Promise<void> {
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   await page.evaluate(({ fixtureMessages, fixtureResponseDelays }) => {
     let snapshot = {
       sessionId: "session-test",

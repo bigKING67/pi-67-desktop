@@ -241,12 +241,13 @@ test("keeps Shiki deferred and permits only its WASM engine when code is present
   await page.goto("/");
   const welcomeResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name));
   expect(welcomeResources.some(isHighlightResource)).toBe(false);
-  await attachMockAgent(page, [{
+  const messages = [{
     id: "code-message",
     role: "assistant",
     parts: [{ type: "text", text: "```typescript\nconst answer: number = 42;\n```" }]
-  }]);
+  }];
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await attachMockAgent(page, messages);
 
   await expect(page.locator('.code-block[data-highlight-state="ready"]')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".code-line")).toHaveCount(1);

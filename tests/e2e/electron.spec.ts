@@ -102,7 +102,7 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await expect(createSessionButton).toBeEnabled();
     await createSessionButton.click();
     await expect(createSessionButton).toBeDisabled();
-    await expect(window.getByText("Pi 新会话已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(window.getByRole("banner").getByText("Pi 新会话已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(createSessionButton).toBeEnabled();
     await expect(window.getByText(/extension ctx is stale/iu)).toHaveCount(0);
   } finally {
