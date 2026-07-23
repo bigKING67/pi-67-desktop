@@ -1,12 +1,14 @@
 import { FileInput, FilePlus2, FolderOpen, RefreshCw, Settings2 } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
+import { ThemeButton } from "../theme/ThemeButton.js";
 
 export function NavigationRail() {
   const workspace = useAppStore((state) => state.workspace);
   const sessions = useAppStore((state) => state.sessions);
   const activePath = useAppStore((state) => state.snapshot?.sessionPath);
   const snapshot = useAppStore((state) => state.snapshot);
+  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const openWorkspace = useAppStore((state) => state.openWorkspace);
   const createSession = useAppStore((state) => state.createSession);
   const openSession = useAppStore((state) => state.openSession);
@@ -26,9 +28,9 @@ export function NavigationRail() {
       <div className="navigation-heading">
         <span className="section-label">会话</span>
         <div>
-          <Button className="icon-button" aria-label="刷新会话" onPress={() => void refreshSessions()}><RefreshCw size={14} /></Button>
-          <Button className="icon-button" aria-label="导入 Pi session 到当前工作区" onPress={() => void importSessionFile()}><FileInput size={14} /></Button>
-          <Button className="icon-button" aria-label="新建会话" onPress={() => void createSession()}><FilePlus2 size={15} /></Button>
+          <Button className="icon-button" aria-label="刷新会话" isDisabled={sessionTransitionPending} onPress={() => void refreshSessions()}><RefreshCw size={14} /></Button>
+          <Button className="icon-button" aria-label="导入 Pi session 到当前工作区" isDisabled={sessionTransitionPending} onPress={() => void importSessionFile()}><FileInput size={14} /></Button>
+          <Button className="icon-button" aria-label="新建会话" isDisabled={sessionTransitionPending} onPress={() => void createSession()}><FilePlus2 size={15} /></Button>
         </div>
       </div>
       <nav className="session-list" aria-label="Pi sessions">
@@ -37,6 +39,7 @@ export function NavigationRail() {
           <button
             type="button"
             className={`session-item ${session.path === activePath ? "is-active" : ""}`}
+            disabled={sessionTransitionPending}
             key={session.path}
             onClick={() => void openSession(session.path)}
           >
@@ -50,6 +53,7 @@ export function NavigationRail() {
           <span>{snapshot?.models.filter((model) => model.configured).length ?? 0} 个可用模型</span>
           <span>{snapshot?.resources.length ?? 0} 个资源</span>
         </div>
+        <ThemeButton variant="navigation" />
         <Button className="navigation-action" onPress={() => void saveDiagnostics()}>
           <Settings2 size={15} /> 导出脱敏诊断
         </Button>

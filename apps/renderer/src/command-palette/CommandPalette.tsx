@@ -46,7 +46,7 @@ export function CommandPalette() {
     { id: "compact", label: "压缩当前会话", detail: "使用 Pi compaction 释放上下文空间", icon: Scissors, run: compact },
     { id: "diagnostics", label: "导出脱敏诊断", detail: "不包含凭据、Prompt 和源码正文", icon: PackageOpen, run: saveDiagnostics },
     { id: "doctor", label: "运行环境 Doctor", detail: "检查内置 Node、Pi SDK、Shell 和 Git", icon: HeartPulse, run: runDoctor },
-    { id: "runtime-key", label: "配置 Provider API key", detail: "只在本次运行内存中使用，不写入磁盘", icon: KeyRound, run: () => setCredentialDialogOpen(true) },
+    { id: "runtime-key", label: "管理 Provider 与凭据", detail: "查看认证状态，新增或替换本次运行密钥", icon: KeyRound, run: () => setCredentialDialogOpen(true) },
     ...extensionCommands.map((item) => ({ id: `extension-${item.name}`, label: `/${item.name}`, detail: item.description ?? "Pi extension command", icon: Command, run: () => invokeCommand(item.name) }))
   ], [compact, extensionCommands, invokeCommand, reload, runDoctor, saveDiagnostics, setCredentialDialogOpen]);
   const visible = actions.filter((action) => `${action.label} ${action.detail}`.toLowerCase().includes(query.toLowerCase()));

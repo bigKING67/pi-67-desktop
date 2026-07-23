@@ -20,6 +20,48 @@ afterEach(async () => {
 });
 
 describe("PiSdkRuntime", () => {
+  it("uses the Pi session runtime lifecycle for new sessions and reloads", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-lifecycle-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const extensionsDirectory = join(agentDir, "extensions");
+    const lifecyclePath = join(root, "extension-lifecycle.txt");
+    await Promise.all([mkdir(cwd), mkdir(extensionsDirectory, { recursive: true })]);
+    await writeFile(join(extensionsDirectory, "lifecycle.ts"), `
+      import { appendFileSync } from "node:fs";
+      export default function lifecycle(pi) {
+        pi.on("session_start", (event) => appendFileSync(${JSON.stringify(lifecyclePath)}, "start:" + event.reason + "\\n"));
+        pi.on("session_shutdown", (event) => appendFileSync(${JSON.stringify(lifecyclePath)}, "shutdown:" + event.reason + "\\n"));
+      }
+    `, "utf8");
+
+    const runtime = new PiSdkRuntime();
+    const extensionErrors: string[] = [];
+    runtime.subscribe((event) => {
+      if (event.type === "extension.compatibilityChanged") extensionErrors.push(event.payload.detail);
+    });
+    try {
+      const initial = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      const created = await runtime.createSession(cwd);
+      expect(created.sessionId).not.toBe(initial.sessionId);
+      await runtime.reloadResources();
+      await runtime.dispose();
+
+      expect((await readFile(lifecyclePath, "utf8")).trim().split("\n")).toEqual([
+        "start:startup",
+        "shutdown:new",
+        "start:new",
+        "shutdown:reload",
+        "start:reload",
+        "shutdown:quit"
+      ]);
+      expect(extensionErrors).toEqual([]);
+    } finally {
+      await runtime.dispose();
+    }
+  }, 15_000);
+
   it("creates an isolated real Pi SDK session without a system pi process", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-sdk-runtime-"));
     temporaryDirectories.push(root);
@@ -138,6 +180,19 @@ describe("PiSdkRuntime", () => {
       const runtimeKey = "pi67-test-runtime-secret";
       const configured = await expectNoFetch(() => runtime.setRuntimeApiKey(provider, runtimeKey));
       expect(configured.models.some((model) => model.provider === provider && model.configured)).toBe(true);
+      expect(configured.providers).toContainEqual(expect.objectContaining({
+        id: provider,
+        configured: true,
+        credentialSource: "runtime"
+      }));
+      expect(JSON.stringify(configured.providers)).not.toContain(runtimeKey);
+      const configuredAfterNewSession = await runtime.createSession(cwd);
+      expect(configuredAfterNewSession.providers).toContainEqual(expect.objectContaining({
+        id: provider,
+        configured: true,
+        credentialSource: "runtime"
+      }));
+      expect(JSON.stringify(configuredAfterNewSession)).not.toContain(runtimeKey);
       const diagnostics = await runtime.collectDiagnostics();
       expect(diagnostics).toMatchObject({
         application: "Pi-67 Desktop",

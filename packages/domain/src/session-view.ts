@@ -51,6 +51,23 @@ export interface ModelSummary {
   reasoning: boolean;
 }
 
+export type ProviderCredentialSource =
+  | "stored"
+  | "runtime"
+  | "environment"
+  | "fallback"
+  | "models_json_key"
+  | "models_json_command";
+
+export interface ProviderSummary {
+  id: string;
+  label: string;
+  configured: boolean;
+  credentialSource?: ProviderCredentialSource;
+  credentialLabel?: string;
+  modelCount: number;
+}
+
 export interface ResourceSummary {
   kind: "skill" | "prompt" | "extension" | "context";
   id: string;
@@ -68,6 +85,7 @@ export interface SessionSnapshot {
   streaming: boolean;
   messages: SessionMessageView[];
   models: ModelSummary[];
+  providers: ProviderSummary[];
   selectedModel?: { provider: string; id: string };
   thinkingLevel: string;
   availableThinkingLevels: string[];

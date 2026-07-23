@@ -1,50 +1,14 @@
 import { expect, test } from "@playwright/test";
+import {
+  attachMockAgent,
+  clearRecordedCommands,
+  emitMockAgentEvent,
+  installMockDesktopBridge,
+  recordedCommands
+} from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(window, "pi67", {
-      configurable: false,
-      value: {
-        system: {
-          getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "0.1.0-alpha.1" }),
-          connectAgentHost: async () => undefined,
-          selectWorkspace: async () => "/Users/test/Projects/pi-demo",
-          selectSessionFile: async () => "/Users/test/.pi/agent/sessions/demo.jsonl",
-          saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
-          showNotification: async () => undefined,
-          requestOpenExternal: async (url: string) => {
-            const testWindow = window as unknown as {
-              __pi67UpdateTest: { checks: number; openedUrls: string[]; allowOpen: boolean };
-            };
-            testWindow.__pi67UpdateTest.openedUrls.push(url);
-            return testWindow.__pi67UpdateTest.allowOpen;
-          },
-          getUpdateState: async () => ({
-            phase: "idle",
-            channel: "unsigned-preview",
-            currentVersion: "0.1.0-alpha.1"
-          }),
-          checkForUpdates: async () => {
-            const testWindow = window as unknown as { __pi67UpdateTest: { checks: number; openedUrls: string[] } };
-            testWindow.__pi67UpdateTest.checks += 1;
-            return {
-              phase: "available",
-              channel: "unsigned-preview",
-              currentVersion: "0.1.0-alpha.1",
-              version: "0.1.0-alpha.2",
-              releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
-              publishedAt: "2026-07-23T06:00:00.000Z"
-            };
-          },
-          onAgentHostFailed: () => () => undefined
-        }
-      }
-    });
-    Object.defineProperty(window, "__pi67UpdateTest", {
-      configurable: false,
-      value: { checks: 0, openedUrls: [], allowOpen: false }
-    });
-  });
+  await installMockDesktopBridge(page);
 });
 
 test("opens a trusted Pi workspace through the MessagePort contract", async ({ page }, testInfo) => {
@@ -79,6 +43,8 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByRole("tab", { name: /会话树/u })).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
+  await expect(page.locator(".title-actions").getByRole("button", { name: /外观：/u })).toHaveCount(0);
+  await expect(page.locator(".navigation-footer").getByRole("button", { name: /外观：跟随系统/u })).toBeVisible();
 
   await page.getByRole("button", { name: /信任并加载资源/u }).click();
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
@@ -90,6 +56,38 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   const fontFamily = await page.locator(".runtime-summary").evaluate((element) => getComputedStyle(element).fontFamily);
   expect(fontFamily).toContain("Maple Mono");
   await page.screenshot({ path: testInfo.outputPath("workspace-after.png"), animations: "disabled" });
+});
+
+test("gives the first on-demand Agent Host connection one initialization owner", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await expect(page.getByText("pi-demo", { exact: true })).toBeVisible();
+  const trustButton = page.locator(".trust-banner .secondary-button");
+  await expect(trustButton).toBeDisabled();
+  await expect(trustButton).toContainText("等待 Agent Host");
+
+  await attachMockAgent(page);
+
+  await expect.poll(() => recordedCommands(page)).toEqual(["runtime.initialize", "session.list"]);
+  await expect(trustButton).toBeEnabled();
+  await expect(trustButton).toContainText("信任并加载资源");
+});
+
+test("serializes trust and resource reload without stacking clicks", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [], { "resource.reload": 200 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByText("从一个具体任务开始")).toBeVisible();
+  await clearRecordedCommands(page);
+
+  const trustButton = page.locator(".trust-banner .secondary-button");
+  await expect(trustButton).toContainText("信任并加载资源");
+  await trustButton.click();
+  await expect(trustButton).toBeDisabled();
+  await expect(trustButton).toContainText("正在加载 Pi 资源");
+  await expect.poll(() => recordedCommands(page)).toEqual(["workspace.setTrust", "resource.reload"]);
+  await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
 });
 
 test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
@@ -127,29 +125,21 @@ test("imports an external Pi session instead of opening the source file in place
   expect(await recordedCommands(page)).toEqual([]);
 });
 
-test("runs Doctor and keeps a runtime API key ephemeral", async ({ page }, testInfo) => {
+test("serializes new-session transitions and deduplicates repeated notices", async ({ page }) => {
   await page.goto("/");
-  await attachMockAgent(page);
+  await attachMockAgent(page, [], { "session.create": 200 });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: "打开命令面板" }).click();
-  await page.getByRole("button", { name: /运行环境 Doctor/u }).click();
-  await expect(page.getByRole("dialog", { name: "运行环境 Doctor" })).toBeVisible();
-  await expect(page.getByText("当前运行环境的关键检查均已通过。")).toBeVisible();
-  await expect(page.getByLabel("Doctor 检查结果").getByText("Pi SDK")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("doctor-dialog.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "关闭" }).click();
+  const createButton = page.getByRole("button", { name: "新建会话" });
+  await createButton.click();
+  await expect(createButton).toBeDisabled();
+  await expect(page.getByLabel("Pi conversation").getByText("正在创建 Pi 新会话")).toBeVisible();
+  await expect.poll(() => recordedCommands(page)).toEqual(["session.create", "session.list"]);
 
-  await page.getByRole("button", { name: "配置本次运行的 Provider API key" }).click();
-  const keyInput = page.getByLabel("Provider API key", { exact: true });
-  await keyInput.fill("test-secret-1234");
-  await page.screenshot({ path: testInfo.outputPath("credential-dialog.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "仅为本次运行启用" }).click();
-  await expect(page.getByRole("dialog", { name: "配置本次运行的 Provider API key" })).toHaveCount(0);
-  await expect(page.locator("body")).not.toContainText("test-secret-1234");
-
-  await page.getByRole("button", { name: "配置本次运行的 Provider API key" }).click();
-  await expect(page.getByLabel("Provider API key", { exact: true })).toHaveValue("");
+  await emitMockAgentEvent(page, { type: "turn.failed", payload: { message: "重复错误" } });
+  await emitMockAgentEvent(page, { type: "turn.failed", payload: { message: "重复错误" } });
+  await expect(page.getByText("重复错误")).toHaveCount(1);
 });
 
 test("preserves the workspace hierarchy in dark mode", async ({ page }, testInfo) => {
@@ -302,72 +292,3 @@ test("keeps unsigned preview checks and external downloads user initiated", asyn
     releaseUrl
   ]);
 });
-
-async function attachMockAgent(
-  page: import("@playwright/test").Page,
-  messages: Array<{ id: string; role: string; parts: Array<{ type: string; text: string }> }> = []
-): Promise<void> {
-  await page.evaluate((fixtureMessages) => {
-    const snapshot = {
-      sessionId: "session-test",
-      sessionPath: "/Users/test/.pi/agent/sessions/demo.jsonl",
-      cwd: "/Users/test/Projects/pi-demo",
-      streaming: false,
-      messages: fixtureMessages,
-      models: [{ provider: "openai", id: "gpt-test", label: "GPT Test", configured: true, reasoning: true }],
-      selectedModel: { provider: "openai", id: "gpt-test" },
-      thinkingLevel: "medium",
-      availableThinkingLevels: ["off", "medium", "high"],
-      steeringQueue: [],
-      followUpQueue: [],
-      tree: [],
-      resources: [{ kind: "skill", id: "design-craft", label: "design-craft", status: "ready" }],
-      stats: { tokens: 0, cost: 0, contextPercent: 0 }
-    };
-    const channel = new MessageChannel();
-    channel.port2.onmessage = (event) => {
-      const envelope = event.data as { requestId?: string; command?: { type?: string } };
-      if (!envelope.requestId) return;
-      const testWindow = window as unknown as { __pi67TestCommands?: string[] };
-      testWindow.__pi67TestCommands ??= [];
-      if (envelope.command?.type) testWindow.__pi67TestCommands.push(envelope.command.type);
-      const doctorReport = {
-        generatedAt: Date.now(),
-        checks: [
-          { id: "platform", label: "Platform", status: "pass", detail: "darwin/arm64" },
-          { id: "node", label: "Embedded Node", status: "pass", detail: "24.18.0" },
-          { id: "pi-sdk", label: "Pi SDK", status: "pass", detail: "0.81.1" },
-          { id: "shell", label: "Pi shell", status: "pass", detail: "/bin/bash - GNU bash" },
-          { id: "git", label: "Git", status: "pass", detail: "git version 2.50.0" }
-        ]
-      };
-      const data = envelope.command?.type === "session.list" || envelope.command?.type === "command.list"
-        ? []
-        : envelope.command?.type === "doctor.run"
-          ? doctorReport
-          : snapshot;
-      channel.port2.postMessage({
-        protocolVersion: 1,
-        kind: "response",
-        messageId: `mock-${Date.now()}`,
-        requestId: envelope.requestId,
-        timestamp: Date.now(),
-        response: { ok: true, data }
-      });
-    };
-    channel.port2.start();
-    window.postMessage({ source: "pi67-preload", type: "agent-port" }, "*", [channel.port1]);
-  }, messages);
-}
-
-async function clearRecordedCommands(page: import("@playwright/test").Page): Promise<void> {
-  await page.evaluate(() => {
-    (window as unknown as { __pi67TestCommands?: string[] }).__pi67TestCommands = [];
-  });
-}
-
-async function recordedCommands(page: import("@playwright/test").Page): Promise<string[]> {
-  return page.evaluate(() => [
-    ...((window as unknown as { __pi67TestCommands?: string[] }).__pi67TestCommands ?? [])
-  ]);
-}

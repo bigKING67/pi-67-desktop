@@ -150,7 +150,9 @@ loading error where the operation can produce those states
 
 ### Appearance
 
-- The TitleBar exposes an accessible three-option menu: System, Light, and Dark.
+- Inside a workspace, the navigation footer exposes an accessible three-option
+  menu: System, Light, and Dark. Welcome keeps the same control in the TitleBar
+  because the navigation rail does not exist before workspace selection.
 - System is the default and reacts to operating-system theme changes while the
   application is running. Explicit Light or Dark overrides the system.
 - Only the non-sensitive preference is persisted in renderer-local storage.
@@ -159,6 +161,15 @@ loading error where the operation can produce those states
   same semantic tokens and never branch on theme-specific literal colors.
 - The trigger shows the effective theme, the menu marks the stored preference,
   Escape restores focus, and Reduced Motion removes menu travel.
+
+### Runtime controls
+
+- The primary model selector lists configured models only. It may retain the
+  current model if authentication changes so the selected value never disappears.
+- Provider setup belongs to the `Provider 与凭据` dialog rather than the model
+  selector. An empty configured-model set names that next action explicitly.
+- Thinking levels use readable product labels such as `思考：关闭` and
+  `思考：高`; raw SDK enum values are not the primary user-facing copy.
 
 ### Composer
 
@@ -183,6 +194,10 @@ loading error where the operation can produce those states
   previously completed managed import.
 - Filename collisions create an explicit `-imported-N` copy rather than
   replacing an existing managed session.
+- New, resume, import, fork, and reload transitions are mutually exclusive.
+  Desktop uses Pi's `AgentSessionRuntime` lifecycle so extensions receive
+  `session_shutdown` before their context becomes stale and `session_start`
+  after the replacement session has been rebound.
 
 ### Extension UI and approval
 
@@ -190,8 +205,12 @@ loading error where the operation can produce those states
 - Approval names exact command/path, cwd, scope, reason, and denial behavior.
 - Common extension select/confirm/input/editor requests use accessible dialogs.
 - TUI-only custom components show an actionable compatibility message.
-- Runtime credential dialogs never display or refill a key and state that the
-  value is cleared when the Agent Host exits or restarts.
+- The Provider dialog lists configured state, non-secret credential source, and
+  model count. A configured credential is represented as hidden rather than read
+  back; complete keys never enter renderer state.
+- Runtime credential inputs never refill and state that the value is cleared
+  when the Agent Host exits or restarts. A runtime key remains available across
+  Desktop-created session transitions within that Agent Host lifetime.
 - Doctor reports use text and icons for pass, warning, and failure and keep
   retry available without changing the active Pi session.
 - Update checks disclose their GitHub Release network purpose before the first
@@ -205,6 +224,13 @@ loading error where the operation can produce those states
 - Welcome keeps workspace selection available before the Agent Host exists and
   labels the host as on-demand until the MessagePort connection is observed.
 - Loading copy names the operation, such as `正在加载 Pi 资源`.
+- The first on-demand Agent Host connection has one initialization owner. The
+  trust action stays disabled until a session snapshot exists, remains disabled
+  while resources reload, and never stacks duplicate trust commands.
+- Session creation failures replace the loading animation with the failed
+  operation and preserved error detail instead of leaving an indefinite spinner.
+- Session-transition actions disable together while Pi replaces its runtime;
+  repeated extension notices with the same level and message occupy one notice.
 - Errors name what failed, what state was preserved, and the next safe action.
 - Partial resource failure remains visible rather than silently disappearing.
 

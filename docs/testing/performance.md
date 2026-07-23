@@ -78,6 +78,9 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
   等待 renderer 收到 failure notice、新 Agent Host PID 出现并重新得到 `Pi SDK 已就绪`。
 - browser-tier message projection 使用 production Vite bundle 和 MessagePort fixture，不包含 Pi
   JSONL 磁盘读取或 Pi SDK restore。
+- `transcriptScrollDroppedFrames` 对同一个 1,000 条消息虚拟列表连续执行三次 1 秒全程快速
+  滚动，并对三轮丢帧率取平均。每轮仍保持原有滚动速度，避免单个调度抖动决定整个样本，
+  同时持续掉帧仍会超过 1% 预算。
 - `realPiSessionProjection`：在 profile 内使用 Pi SDK 的 `SessionManager.create()` 和
   `appendMessage()` 生成并校验 1,000 条 user/assistant message，再通过 packaged Electron
   原生文件对话框 bridge 导入为 managed copy；计时直到 1,000 个 session tree 节点、fixture

@@ -7,14 +7,9 @@ import type {
   SessionSummary,
   WorkspaceTrust
 } from "@pi67/domain";
-import { AgentPortClient, type AgentEvent, type TransferImage } from "@pi67/protocol";
+import { AgentPortClient, type TransferImage } from "@pi67/protocol";
 import { create } from "zustand";
-
-export interface UiNotice {
-  id: string;
-  level: "info" | "warning" | "error";
-  message: string;
-}
+import { addNotice, handleAgentEvent, type UiNotice } from "./app-events.js";
 
 interface AppState {
   client?: AgentPortClient;
@@ -22,6 +17,8 @@ interface AppState {
   runtime: RuntimeStatus;
   workspace?: string;
   trust: WorkspaceTrust;
+  trustUpdating: boolean;
+  sessionTransitionPending: boolean;
   approvalMode: ApprovalMode;
   snapshot: SessionSnapshot | undefined;
   sessions: SessionSummary[];
@@ -77,6 +74,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   connected: false,
   runtime: initialRuntime,
   trust: "unknown",
+  trustUpdating: false,
+  sessionTransitionPending: false,
   approvalMode: "guided",
   sessions: [],
   snapshot: undefined,
@@ -96,28 +95,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   commandPaletteOpen: false,
 
   setClient(client) {
-    get().client?.dispose();
-    client.onEvent((event) => handleEvent(event, set));
-    set({ client, connected: true });
-    const state = get();
-    if (!state.workspace) return;
-    set({ runtime: { phase: "recovering", detail: "正在恢复 Pi 会话", recoverable: true } });
+    const previousState = get();
+    previousState.client?.dispose();
+    client.onEvent((event) => handleAgentEvent(event, set));
+    set({ client, connected: true, trustUpdating: false, sessionTransitionPending: false });
+
+    // The first port is awaited by openWorkspace(), which owns initialization.
+    // Only a replacement port represents Agent Host recovery.
+    if (!previousState.client || !previousState.workspace) return;
+    set({
+      sessionTransitionPending: true,
+      runtime: { phase: "recovering", detail: "正在恢复 Pi 会话", recoverable: true }
+    });
     void client.request<"runtime.initialize", SessionSnapshot>("runtime.initialize", {
-      cwd: state.workspace,
-      ...(state.snapshot?.sessionPath === undefined ? {} : { sessionPath: state.snapshot.sessionPath }),
-      trust: state.trust,
-      approvalMode: state.approvalMode
+      cwd: previousState.workspace,
+      ...(previousState.snapshot?.sessionPath === undefined ? {} : { sessionPath: previousState.snapshot.sessionPath }),
+      trust: previousState.trust,
+      approvalMode: previousState.approvalMode
     }).then((snapshot) => {
-      set({ snapshot, runtime: { phase: "ready", detail: "Pi 会话已恢复", recoverable: true } });
-    }).catch((error: unknown) => reportError(error, set, "无法恢复 Pi 会话"));
+      set({ snapshot, sessionTransitionPending: false, runtime: { phase: "ready", detail: "Pi 会话已恢复", recoverable: true } });
+    }).catch((error: unknown) => {
+      set({ sessionTransitionPending: false });
+      reportError(error, set, "无法恢复 Pi 会话");
+    });
   },
 
   async openWorkspace() {
+    if (get().sessionTransitionPending) return;
     const workspace = await window.pi67.system.selectWorkspace();
     if (!workspace) return;
     set({
       workspace,
       trust: "unknown",
+      trustUpdating: false,
+      sessionTransitionPending: true,
       approvalMode: "guided",
       runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true },
       snapshot: undefined,
@@ -130,24 +141,41 @@ export const useAppStore = create<AppState>((set, get) => ({
         trust: "unknown",
         approvalMode: "guided"
       });
-      set({ snapshot, runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true } });
+      set({ snapshot, sessionTransitionPending: false, runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true } });
       await get().refreshSessions();
     } catch (error) {
+      set({ sessionTransitionPending: false });
       reportError(error, set, "无法打开工作区");
     }
   },
 
   async setTrust(trust) {
-    const client = requireClient(get());
+    const state = get();
+    if (state.trustUpdating || state.sessionTransitionPending) return;
+    if (!state.snapshot || state.runtime.phase === "starting" || state.runtime.phase === "recovering") {
+      addNotice(set, "warning", "Pi 会话尚未就绪；完成加载后才能更新工作区信任。");
+      return;
+    }
+
+    const client = requireClient(state);
+    set({
+      trustUpdating: true,
+      sessionTransitionPending: true,
+      runtime: { phase: "starting", detail: "正在加载 Pi 资源", recoverable: true }
+    });
     try {
-      const snapshot = await client.request<"workspace.setTrust", SessionSnapshot>("workspace.setTrust", {
+      let snapshot = await client.request<"workspace.setTrust", SessionSnapshot>("workspace.setTrust", {
         trust,
-        approvalMode: get().approvalMode
+        approvalMode: state.approvalMode
       });
-      set({ trust, snapshot });
-      if (trust === "trusted") await get().reloadResources();
+      if (trust === "trusted") {
+        snapshot = await client.request<"resource.reload", SessionSnapshot>("resource.reload", {});
+      }
+      set({ trust, snapshot, runtime: { phase: "ready", detail: "Pi 资源已就绪", recoverable: true } });
     } catch (error) {
       reportError(error, set, "无法更新工作区信任");
+    } finally {
+      set({ trustUpdating: false, sessionTransitionPending: false });
     }
   },
 
@@ -168,34 +196,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   async createSession() {
     const workspace = get().workspace;
     if (!workspace) return;
-    const snapshot = await requireClient(get()).request<"session.create", SessionSnapshot>("session.create", { cwd: workspace });
-    set({ snapshot, liveText: "", liveThinking: "" });
-    await get().refreshSessions();
+    await runSessionTransition(get, set, {
+      detail: "正在创建 Pi 新会话",
+      errorContext: "无法创建 Pi 会话",
+      readyDetail: "Pi 新会话已就绪",
+      refreshSessions: true,
+      request: (client) => client.request<"session.create", SessionSnapshot>("session.create", { cwd: workspace })
+    });
   },
 
   async openSession(path) {
-    try {
-      const workspace = get().workspace;
-      const snapshot = await requireClient(get()).request<"session.open", SessionSnapshot>("session.open", {
+    const workspace = get().workspace;
+    await runSessionTransition(get, set, {
+      detail: "正在恢复 Pi 会话",
+      errorContext: "无法恢复 Pi 会话",
+      readyDetail: "Pi 会话已恢复",
+      request: (client) => client.request<"session.open", SessionSnapshot>("session.open", {
         path,
         ...(workspace ? { cwdOverride: workspace } : {})
-      });
-      set({ snapshot, liveText: "", liveThinking: "" });
-    } catch (error) {
-      reportError(error, set, "无法恢复 Pi 会话");
-    }
+      })
+    });
   },
 
   async importSessionFile() {
     const path = await window.pi67.system.selectSessionFile();
     if (!path) return;
-    try {
-      const snapshot = await requireClient(get()).request<"session.import", SessionSnapshot>("session.import", { path });
-      set({ snapshot, liveText: "", liveThinking: "" });
-      await get().refreshSessions();
-    } catch (error) {
-      reportError(error, set, "无法导入 Pi 会话");
-    }
+    await runSessionTransition(get, set, {
+      detail: "正在导入 Pi 会话",
+      errorContext: "无法导入 Pi 会话",
+      readyDetail: "Pi 会话已导入",
+      refreshSessions: true,
+      request: (client) => client.request<"session.import", SessionSnapshot>("session.import", { path })
+    });
   },
 
   async send(text, images, behavior) {
@@ -225,7 +257,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         provider,
         apiKey
       });
-      set({ snapshot, credentialDialogOpen: false });
+      set({ snapshot });
       addNotice(set, "info", `${provider} API key 已在本次运行中启用；退出后不会保留。`);
       return true;
     } catch (error) {
@@ -250,8 +282,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   async reloadResources() {
-    const snapshot = await requireClient(get()).request<"resource.reload", SessionSnapshot>("resource.reload", {});
-    set({ snapshot });
+    await runSessionTransition(get, set, {
+      detail: "正在重新加载 Pi 资源",
+      errorContext: "无法重新加载 Pi 资源",
+      readyDetail: "Pi 资源已重新加载",
+      request: (client) => client.request<"resource.reload", SessionSnapshot>("resource.reload", {})
+    });
   },
 
   async invokeCommand(command) {
@@ -314,8 +350,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   }
 }));
 
-type StoreSet = typeof useAppStore.setState;
-
 async function ensureAgentClient(get: () => AppState): Promise<AgentPortClient> {
   const existingClient = get().client;
   if (existingClient) return existingClient;
@@ -342,95 +376,41 @@ async function ensureAgentClient(get: () => AppState): Promise<AgentPortClient> 
   });
 }
 
-function handleEvent(event: AgentEvent, set: StoreSet): void {
-  switch (event.type) {
-    case "runtime.statusChanged":
-      set({ runtime: event.payload });
-      break;
-    case "runtime.ready":
-      set({ snapshot: event.payload.snapshot, runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true } });
-      break;
-    case "runtime.crashed":
-      set({ runtime: { phase: "failed", detail: event.payload.detail, recoverable: event.payload.recoverable } });
-      break;
-    case "session.snapshot":
-      set({ snapshot: event.payload, liveText: "", liveThinking: "" });
-      break;
-    case "session.listed":
-      set({ sessions: event.payload.sessions });
-      break;
-    case "session.delta":
-      if (event.payload.eventType === "agent_start") {
-        set({ liveText: "", liveThinking: "" });
-      }
-      break;
-    case "turn.streamBatch":
-      applyStreamBatch(event.payload.events, set);
-      break;
-    case "turn.failed":
-      addNotice(set, "error", event.payload.message);
-      break;
-    case "approval.requested":
-    case "extension.ui.requested":
-      set((state) => ({ extensionRequests: [...state.extensionRequests, event.payload] }));
-      break;
-    case "extension.ui.updated":
-      applyExtensionUpdate(event.payload, set);
-      break;
-    case "extension.compatibilityChanged":
-      set((state) => ({
-        extensionStatuses: { ...state.extensionStatuses, [event.payload.extensionId]: event.payload.detail }
-      }));
-      if (event.payload.status !== "partial") addNotice(set, "warning", event.payload.detail);
-      break;
-    case "session.externalChangeDetected":
-      addNotice(set, "warning", "该 Pi 会话已被外部进程修改。重新加载后才能继续写入。");
-      break;
-    case "resource.changed":
-      addNotice(set, "info", "Pi 资源已重新加载。");
-      break;
-    case "approval.resolved":
-    case "diagnostics.progress":
-      break;
-    case "doctor.completed":
-      set({ doctorReport: event.payload, doctorRunning: false, doctorError: undefined });
-      break;
-  }
+type StoreSet = typeof useAppStore.setState;
+
+interface SessionTransitionOptions {
+  detail: string;
+  errorContext: string;
+  readyDetail: string;
+  refreshSessions?: boolean;
+  request: (client: AgentPortClient) => Promise<SessionSnapshot>;
 }
 
-function applyStreamBatch(events: unknown[], set: StoreSet): void {
-  let text = "";
-  let thinking = "";
-  for (const value of events) {
-    if (typeof value !== "object" || value === null) continue;
-    const event = value as Record<string, unknown>;
-    const assistant = typeof event.assistantMessageEvent === "object" && event.assistantMessageEvent !== null
-      ? event.assistantMessageEvent as Record<string, unknown>
-      : undefined;
-    if (assistant?.type === "text_delta" && typeof assistant.delta === "string") text += assistant.delta;
-    if (assistant?.type === "thinking_delta" && typeof assistant.delta === "string") thinking += assistant.delta;
+async function runSessionTransition(
+  get: () => AppState,
+  set: StoreSet,
+  options: SessionTransitionOptions
+): Promise<void> {
+  const state = get();
+  if (state.sessionTransitionPending) return;
+  set({
+    sessionTransitionPending: true,
+    runtime: { phase: "starting", detail: options.detail, recoverable: true }
+  });
+  try {
+    const snapshot = await options.request(requireClient(get()));
+    set({
+      snapshot,
+      liveText: "",
+      liveThinking: "",
+      runtime: { phase: "ready", detail: options.readyDetail, recoverable: true }
+    });
+    if (options.refreshSessions) await get().refreshSessions();
+  } catch (error) {
+    reportError(error, set, options.errorContext);
+  } finally {
+    set({ sessionTransitionPending: false });
   }
-  if (!text && !thinking) return;
-  set((state) => ({
-    liveText: state.liveText + text,
-    liveThinking: state.liveThinking + thinking
-  }));
-}
-
-function applyExtensionUpdate(request: ExtensionUiRequestView, set: StoreSet): void {
-  if (request.kind === "notify" && request.message) {
-    addNotice(set, request.level ?? "info", request.message);
-    return;
-  }
-  if (request.kind === "status" && request.key) {
-    set((state) => ({ extensionStatuses: { ...state.extensionStatuses, [request.key!]: request.message ?? "" } }));
-    return;
-  }
-  if (request.kind === "widget" && request.key) {
-    set((state) => ({ extensionWidgets: { ...state.extensionWidgets, [request.key!]: request.message ?? "" } }));
-    return;
-  }
-  if (request.kind === "title" && request.message) document.title = `${request.message} - Pi-67 Desktop`;
 }
 
 function requireClient(state: AppState): AgentPortClient {
@@ -450,9 +430,4 @@ function reportActionError(error: unknown, set: StoreSet, context: string): void
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
-}
-
-function addNotice(set: StoreSet, level: UiNotice["level"], message: string): void {
-  const notice: UiNotice = { id: `notice-${Date.now()}-${Math.random().toString(36).slice(2)}`, level, message };
-  set((state) => ({ notices: [...state.notices.slice(-3), notice] }));
 }

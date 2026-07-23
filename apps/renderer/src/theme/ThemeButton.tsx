@@ -18,22 +18,25 @@ const PREFERENCE_LABELS: Readonly<Record<ThemePreference, string>> = {
   dark: "深色"
 };
 
-export function ThemeButton() {
+export function ThemeButton({ variant = "icon" }: { variant?: "icon" | "navigation" }) {
   const theme = useThemeSnapshot();
   const EffectiveIcon = theme.effective === "dark" ? Moon : Sun;
   const currentLabel = PREFERENCE_LABELS[theme.preference];
+  const navigation = variant === "navigation";
 
   return (
     <MenuTrigger>
       <Button
-        className="icon-button theme-trigger"
+        className={navigation ? "navigation-action theme-navigation-trigger" : "icon-button theme-trigger"}
         aria-label={`外观：${currentLabel}，当前${theme.effective === "dark" ? "深色" : "浅色"}`}
-        aria-describedby="theme-trigger-tooltip"
+        {...(navigation ? {} : { "aria-describedby": "theme-trigger-tooltip" })}
       >
-        <EffectiveIcon size={15} />
-        <span className="control-tooltip" id="theme-trigger-tooltip" role="tooltip">外观</span>
+        <EffectiveIcon aria-hidden="true" size={15} />
+        {navigation ? <><span>外观</span><small>{currentLabel}</small></> : (
+          <span className="control-tooltip" id="theme-trigger-tooltip" role="tooltip">外观</span>
+        )}
       </Button>
-      <Popover className="theme-popover" placement="bottom end" offset={6}>
+      <Popover className="theme-popover" placement={navigation ? "top start" : "bottom end"} offset={6}>
         <div className="theme-popover-content">
           <div className="theme-menu-heading">
             <strong>外观</strong>

@@ -207,6 +207,12 @@ html[data-platform="darwin"] .title-bar {
   transform: translateY(1px);
 }
 
+.icon-button[data-disabled],
+.session-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: 248px minmax(520px, 1fr) 360px;
@@ -354,6 +360,8 @@ html[data-platform="darwin"] .title-bar {
 }
 
 .navigation-action:hover { background: var(--surface-hover); color: var(--text-primary); }
+.navigation-action > small { margin-left: auto; color: var(--text-tertiary); font-size: 10px; }
+.theme-navigation-trigger { margin-bottom: 2px; }
 
 .conversation-region {
   display: grid;
@@ -408,7 +416,11 @@ html[data-platform="darwin"] .title-bar {
 .primary-button:hover,
 .send-button:hover { background: var(--accent-strong); }
 .primary-button[data-disabled],
-.send-button[data-disabled] { opacity: 0.45; }
+.secondary-button[data-disabled],
+.send-button[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 
 .secondary-button,
 .small-button {
@@ -427,6 +439,7 @@ html[data-platform="darwin"] .title-bar {
 }
 
 .transcript-loading,
+.transcript-error,
 .transcript-empty {
   grid-area: transcript;
   display: grid;
@@ -436,6 +449,22 @@ html[data-platform="darwin"] .title-bar {
   padding: 48px;
   color: var(--text-secondary);
   text-align: center;
+}
+
+.transcript-error {
+  gap: 7px;
+  color: var(--danger);
+}
+
+.transcript-error strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.transcript-error span {
+  max-width: 560px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .loading-line {

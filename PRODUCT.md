@@ -34,7 +34,9 @@ count.
 1. Open a workspace, understand trust, start or resume a managed Pi session,
    and import an external Pi JSONL session without turning its source file into
    Desktop's active writer.
-2. Select a configured Pi model and thinking level without editing JSON.
+2. Understand Provider authentication status, add a runtime-only API key when
+   needed, and select a configured Pi model and readable thinking level without
+   editing JSON.
 3. Follow streaming reasoning, tools, file changes, and follow-up work without
    losing the current task.
 4. Use skills, prompts, extension commands, session tree, rollback, and compact
@@ -59,6 +61,9 @@ count.
   Agent Host-backed diagnostic action needs it.
 - Credential, prompt, source, and raw tool content never enters telemetry or
   default diagnostic logs.
+- Provider status may expose only non-secret metadata such as configured state,
+  credential source, and model count; complete credential values never cross
+  into the renderer.
 - Release performance meets `docs/testing/performance.md`.
 
 ## Accessibility and localization

@@ -1,11 +1,13 @@
 import type { SessionMessageView } from "@pi67/domain";
-import { MessageSquareText } from "lucide-react";
+import { CircleAlert, MessageSquareText } from "lucide-react";
 import { Virtuoso } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { MessageCard } from "./MessageCard.js";
 
 export function Transcript() {
   const snapshot = useAppStore((state) => state.snapshot);
+  const runtime = useAppStore((state) => state.runtime);
+  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const liveText = useAppStore((state) => state.liveText);
   const liveThinking = useAppStore((state) => state.liveThinking);
   const messages = snapshot?.messages ?? [];
@@ -13,8 +15,17 @@ export function Transcript() {
     ? [...messages, liveMessage(liveText, liveThinking)]
     : messages;
 
-  if (!snapshot) {
-    return <div className="transcript-loading"><span className="loading-line" />正在创建 Pi session</div>;
+  if (!snapshot || sessionTransitionPending) {
+    if (runtime.phase === "failed") {
+      return (
+        <div className="transcript-error" role="alert">
+          <CircleAlert size={22} />
+          <strong>Pi session 创建失败</strong>
+          <span>{runtime.detail}</span>
+        </div>
+      );
+    }
+    return <div className="transcript-loading"><span className="loading-line" />{runtime.detail}</div>;
   }
 
   if (data.length === 0) {

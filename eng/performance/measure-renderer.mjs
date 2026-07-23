@@ -27,6 +27,7 @@ const outputPath = process.env.PI67_PERF_RENDERER_OUTPUT
   ?? join(root, "artifacts/performance", `renderer-${process.platform}-${process.arch}.json`);
 const coldCodeLineCount = 2_000;
 const warmCodeLineCount = 1_800;
+const scrollSweepCount = 3;
 const coldCodeMarkdown = createTypeScriptMarkdown(coldCodeLineCount, "cold_fixture");
 const warmCodeMarkdown = createTypeScriptMarkdown(warmCodeLineCount, "warm_fixture");
 
@@ -104,7 +105,7 @@ try {
       samples: scrollSamples,
       budget: 1,
       evidenceLevel: "browser",
-      method: "One-second requestAnimationFrame scroll; missed frames estimated from observed median refresh interval",
+      method: `${scrollSweepCount} consecutive one-second full-range requestAnimationFrame scrolls; per-sweep dropped-frame rates averaged`,
       limitations: ["Headless Chromium is not a packaged Electron compositor or physical display measurement."]
     }),
     summarizeMetric({
@@ -374,7 +375,7 @@ async function measureComposerPaint(page, index) {
 }
 
 async function measureScroll(page) {
-  const timestamps = await page.evaluate(() => new Promise((resolve, reject) => {
+  const sweeps = await page.evaluate((sweepCount) => new Promise((resolve, reject) => {
     const scroller = document.querySelector('[data-testid="virtuoso-scroller"]');
     if (!(scroller instanceof HTMLElement) || scroller.scrollHeight <= scroller.clientHeight) {
       reject(new Error("Virtualized transcript scroller is unavailable."));
@@ -385,20 +386,28 @@ async function measureScroll(page) {
       reject(new Error(`Transcript rendered ${renderedMessages} message cards instead of virtualizing.`));
       return;
     }
-    scroller.scrollTop = 0;
-    const frames = [];
-    let started;
-    const step = (timestamp) => {
-      started ??= timestamp;
-      frames.push(timestamp);
-      const progress = Math.min(1, (timestamp - started) / 1_000);
-      scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * progress;
-      if (progress < 1) requestAnimationFrame(step);
-      else resolve(frames);
+    const results = [];
+    const runSweep = () => {
+      scroller.scrollTop = 0;
+      const frames = [];
+      let started;
+      const step = (timestamp) => {
+        started ??= timestamp;
+        frames.push(timestamp);
+        const progress = Math.min(1, (timestamp - started) / 1_000);
+        scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * progress;
+        if (progress < 1) requestAnimationFrame(step);
+        else {
+          results.push(frames);
+          if (results.length < sweepCount) requestAnimationFrame(runSweep);
+          else resolve(results);
+        }
+      };
+      requestAnimationFrame(step);
     };
-    requestAnimationFrame(step);
-  }));
-  return droppedFrameRate(timestamps);
+    runSweep();
+  }), scrollSweepCount);
+  return sweeps.reduce((total, timestamps) => total + droppedFrameRate(timestamps), 0) / sweeps.length;
 }
 
 async function measureStreamingRate(page) {

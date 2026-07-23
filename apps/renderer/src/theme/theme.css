@@ -3,6 +3,11 @@
   color: var(--text-primary);
 }
 
+.theme-navigation-trigger[data-pressed] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+
 .control-tooltip {
   position: absolute;
   top: calc(100% + 7px);

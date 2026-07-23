@@ -28,6 +28,8 @@ export function App() {
   useEffect(() => window.pi67.system.onAgentHostFailed((state) => {
     useAppStore.setState((current) => ({
       connected: false,
+      trustUpdating: false,
+      sessionTransitionPending: false,
       credentialDialogOpen: false,
       notices: [
         ...current.notices.slice(-2),

@@ -43,6 +43,11 @@ try {
   await window.getByText("选择工作区后按需启动").waitFor({ state: "visible", timeout: 15_000 });
   await window.evaluate(() => window.pi67.system.connectAgentHost());
   await window.getByText("Agent Host 已连接").waitFor({ state: "visible", timeout: 15_000 });
+  await window.getByRole("button", { name: "打开命令面板" }).click();
+  await window.getByRole("button", { name: /运行环境 Doctor/u }).click();
+  await window.getByRole("dialog", { name: "运行环境 Doctor" }).waitFor({ state: "visible", timeout: 15_000 });
+  await window.getByLabel("Doctor 检查结果").getByText("Pi SDK").waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByRole("button", { name: "关闭" }).click();
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({
     hasNodeProcess: "process" in globalThis,
@@ -58,7 +63,7 @@ try {
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
   await window.reload();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, native modules, app://pi67, theme persistence, sandbox, and on-demand Agent Host.`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, native modules, app://pi67, theme persistence, sandbox, and real Agent Host command roundtrip.`);
 } finally {
   try {
     if (application) await application.close();

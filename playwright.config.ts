@@ -16,7 +16,7 @@ export default defineConfig({
   projects: [
     {
       name: "renderer-chromium",
-      testMatch: /renderer\.spec\.ts/u,
+      testMatch: /renderer(?:-[a-z-]+)?\.spec\.ts/u,
       use: { ...devices["Desktop Chrome"], channel: "chromium", viewport: { width: 1440, height: 920 } }
     },
     {
