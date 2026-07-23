@@ -1,4 +1,14 @@
+import type { ImageContent } from "@earendil-works/pi-ai";
 import type { MessagePart, SessionMessageView } from "@pi67/domain";
+import type { TransferImage } from "@pi67/protocol";
+
+export function convertTransferImages(images: TransferImage[]): ImageContent[] {
+  return images.map((image) => ({
+    type: "image",
+    mimeType: image.mimeType,
+    data: Buffer.from(image.data).toString("base64")
+  }));
+}
 
 export function normalizeMessages(messages: readonly unknown[]): SessionMessageView[] {
   return messages.map((message, index) => normalizeMessage(message, index));

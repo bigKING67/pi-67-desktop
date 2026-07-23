@@ -82,6 +82,29 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   expect(columns.split(" ").length).toBeLessThanOrEqual(2);
 });
 
+test("imports an external Pi session instead of opening the source file in place", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await recordedCommands(page)).includes("session.list")).toBe(true);
+  await clearRecordedCommands(page);
+
+  await page.getByRole("button", { name: "导入 Pi session 到当前工作区" }).click();
+  await expect.poll(() => recordedCommands(page)).toEqual(["session.import", "session.list"]);
+
+  await page.evaluate(() => {
+    const testWindow = window as unknown as {
+      pi67: { system: { selectSessionFile(): Promise<string | undefined> } };
+    };
+    testWindow.pi67.system.selectSessionFile = async () => undefined;
+  });
+  await clearRecordedCommands(page);
+  await page.getByRole("button", { name: "导入 Pi session 到当前工作区" }).click();
+  await page.waitForTimeout(50);
+  expect(await recordedCommands(page)).toEqual([]);
+});
+
 test("runs Doctor and keeps a runtime API key ephemeral", async ({ page }, testInfo) => {
   await page.goto("/");
   await attachMockAgent(page);
@@ -268,6 +291,9 @@ async function attachMockAgent(
     channel.port2.onmessage = (event) => {
       const envelope = event.data as { requestId?: string; command?: { type?: string } };
       if (!envelope.requestId) return;
+      const testWindow = window as unknown as { __pi67TestCommands?: string[] };
+      testWindow.__pi67TestCommands ??= [];
+      if (envelope.command?.type) testWindow.__pi67TestCommands.push(envelope.command.type);
       const doctorReport = {
         generatedAt: Date.now(),
         checks: [
@@ -295,4 +321,16 @@ async function attachMockAgent(
     channel.port2.start();
     window.postMessage({ source: "pi67-preload", type: "agent-port" }, "*", [channel.port1]);
   }, messages);
+}
+
+async function clearRecordedCommands(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __pi67TestCommands?: string[] }).__pi67TestCommands = [];
+  });
+}
+
+async function recordedCommands(page: import("@playwright/test").Page): Promise<string[]> {
+  return page.evaluate(() => [
+    ...((window as unknown as { __pi67TestCommands?: string[] }).__pi67TestCommands ?? [])
+  ]);
 }

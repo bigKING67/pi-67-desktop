@@ -46,7 +46,7 @@ interface AppState {
   refreshSessions: () => Promise<void>;
   createSession: () => Promise<void>;
   openSession: (path: string) => Promise<void>;
-  openSessionFile: () => Promise<void>;
+  importSessionFile: () => Promise<void>;
   send: (text: string, images: TransferImage[], behavior: "send" | "steer" | "followUp") => Promise<void>;
   abort: () => Promise<void>;
   selectModel: (provider: string, id: string) => Promise<void>;
@@ -175,16 +175,27 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   async openSession(path) {
     try {
-      const snapshot = await requireClient(get()).request<"session.open", SessionSnapshot>("session.open", { path });
+      const workspace = get().workspace;
+      const snapshot = await requireClient(get()).request<"session.open", SessionSnapshot>("session.open", {
+        path,
+        ...(workspace ? { cwdOverride: workspace } : {})
+      });
       set({ snapshot, liveText: "", liveThinking: "" });
     } catch (error) {
       reportError(error, set, "无法恢复 Pi 会话");
     }
   },
 
-  async openSessionFile() {
+  async importSessionFile() {
     const path = await window.pi67.system.selectSessionFile();
-    if (path) await get().openSession(path);
+    if (!path) return;
+    try {
+      const snapshot = await requireClient(get()).request<"session.import", SessionSnapshot>("session.import", { path });
+      set({ snapshot, liveText: "", liveThinking: "" });
+      await get().refreshSessions();
+    } catch (error) {
+      reportError(error, set, "无法导入 Pi 会话");
+    }
   },
 
   async send(text, images, behavior) {

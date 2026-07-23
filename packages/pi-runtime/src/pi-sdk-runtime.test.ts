@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -79,6 +79,56 @@ describe("PiSdkRuntime", () => {
         expect.objectContaining({ path: fixturePath, name: "Restored SDK smoke" })
       ]);
       expect((await runtime.listSessions(true)).some((session) => session.path === fixturePath)).toBe(true);
+
+      const externalSessionDir = join(root, "external-sessions");
+      await mkdir(externalSessionDir);
+      const externalFixture = SessionManager.create(cwd, externalSessionDir);
+      externalFixture.appendSessionInfo("Imported SDK smoke");
+      externalFixture.appendMessage({ role: "user", content: "Import this Pi session.", timestamp: Date.now() + 2 });
+      externalFixture.appendMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "Imported Pi session restored." }],
+        api: "openai-responses",
+        provider: "pi67-test",
+        model: "fixture",
+        usage: zeroUsage,
+        stopReason: "stop",
+        timestamp: Date.now() + 3
+      });
+      const externalPath = externalFixture.getSessionFile();
+      if (!externalPath) throw new Error("Pi SDK import fixture was not persisted.");
+      const externalContent = await readFile(externalPath, "utf8");
+
+      const firstImport = await runtime.importSession(externalPath);
+      const firstImportPath = firstImport.sessionPath;
+      if (!firstImportPath) throw new Error("Imported Pi SDK session must be persisted.");
+      expect(firstImportPath).not.toBe(externalPath);
+      expect(await realpath(dirname(firstImportPath))).toBe(await realpath(dirname(sessionPath)));
+      expect(firstImport.sessionId).toBe(externalFixture.getSessionId());
+      expect(firstImport.sessionName).toBe("Imported SDK smoke");
+      expect(firstImport.messages).toHaveLength(2);
+      expect(await readFile(externalPath, "utf8")).toBe(externalContent);
+      const firstImportContent = await readFile(firstImportPath, "utf8");
+      expect((await runtime.listSessions()).some((session) => session.path === firstImportPath)).toBe(true);
+
+      const secondImport = await runtime.importSession(externalPath);
+      const secondImportPath = secondImport.sessionPath;
+      if (!secondImportPath) throw new Error("Repeated Pi SDK import must be persisted.");
+      expect(secondImportPath).not.toBe(firstImportPath);
+      expect(await realpath(dirname(secondImportPath))).toBe(await realpath(dirname(sessionPath)));
+      expect(secondImportPath).toMatch(/-imported-1\.jsonl$/u);
+      expect(await readFile(firstImportPath, "utf8")).toBe(firstImportContent);
+      expect(await readFile(externalPath, "utf8")).toBe(externalContent);
+
+      const managedFilesBeforeInvalidImport = await readdir(dirname(sessionPath));
+      const invalidPath = join(root, "invalid-session.jsonl");
+      await writeFile(invalidPath, "not a Pi JSONL session\n", "utf8");
+      await expect(runtime.importSession(invalidPath)).rejects.toThrow();
+      expect(await readdir(dirname(sessionPath))).toEqual(managedFilesBeforeInvalidImport);
+
+      const managedImport = await runtime.importSession(fixturePath);
+      expect(await realpath(managedImport.sessionPath ?? "")).toBe(await realpath(fixturePath));
+      expect(managedImport.cwd).toBe(cwd);
       const provider = snapshot.models.find((model) => !model.configured)?.provider;
       if (!provider) throw new Error("Pi SDK smoke requires at least one unconfigured provider.");
       const authPath = join(agentDir, "auth.json");

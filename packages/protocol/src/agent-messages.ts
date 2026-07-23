@@ -23,6 +23,7 @@ export interface CommandPayloads {
   "session.list": { all?: boolean };
   "session.create": { cwd: string };
   "session.open": { path: string; cwdOverride?: string };
+  "session.import": { path: string };
   "session.branch": { entryId: string; newFile?: boolean };
   "session.rollback": { entryId: string; summarize?: boolean };
   "session.compact": { instructions?: string };

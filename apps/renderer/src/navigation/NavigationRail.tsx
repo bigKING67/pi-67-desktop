@@ -10,7 +10,7 @@ export function NavigationRail() {
   const openWorkspace = useAppStore((state) => state.openWorkspace);
   const createSession = useAppStore((state) => state.createSession);
   const openSession = useAppStore((state) => state.openSession);
-  const openSessionFile = useAppStore((state) => state.openSessionFile);
+  const importSessionFile = useAppStore((state) => state.importSessionFile);
   const refreshSessions = useAppStore((state) => state.refreshSessions);
   const saveDiagnostics = useAppStore((state) => state.saveDiagnostics);
 
@@ -27,7 +27,7 @@ export function NavigationRail() {
         <span className="section-label">会话</span>
         <div>
           <Button className="icon-button" aria-label="刷新会话" onPress={() => void refreshSessions()}><RefreshCw size={14} /></Button>
-          <Button className="icon-button" aria-label="打开 Pi session 文件" onPress={() => void openSessionFile()}><FileInput size={14} /></Button>
+          <Button className="icon-button" aria-label="导入 Pi session 到当前工作区" onPress={() => void importSessionFile()}><FileInput size={14} /></Button>
           <Button className="icon-button" aria-label="新建会话" onPress={() => void createSession()}><FilePlus2 size={15} /></Button>
         </div>
       </div>

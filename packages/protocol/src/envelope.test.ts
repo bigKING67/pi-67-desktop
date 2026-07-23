@@ -36,6 +36,25 @@ describe("protocol envelopes", () => {
     expect(isCommandEnvelope(malformed)).toBe(false);
   });
 
+  it("keeps managed session open and external session import as separate commands", () => {
+    const managedOpen = commandEnvelope("session.open", {
+      path: "/tmp/managed.jsonl",
+      cwdOverride: "/tmp/workspace"
+    });
+    const externalImport = commandEnvelope("session.import", { path: "/tmp/external.jsonl" });
+    const importWithUnknownField = {
+      ...externalImport,
+      command: {
+        type: "session.import",
+        payload: { path: "/tmp/external.jsonl", cwdOverride: "/tmp/other-workspace" }
+      }
+    };
+
+    expect(isCommandEnvelope(managedOpen)).toBe(true);
+    expect(isCommandEnvelope(externalImport)).toBe(true);
+    expect(isCommandEnvelope(importWithUnknownField)).toBe(false);
+  });
+
   it("rejects image payloads that cannot safely cross the Agent Host boundary", () => {
     const valid = commandEnvelope("prompt.send", {
       text: "inspect",

@@ -17,6 +17,7 @@ export interface AgentRuntime {
   listSessions(all?: boolean): Promise<SessionSummary[]>;
   createSession(cwd: string): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
+  importSession(path: string): Promise<SessionSnapshot>;
   branch(entryId: string, newFile?: boolean): Promise<SessionSnapshot>;
   rollback(entryId: string, summarize?: boolean): Promise<SessionSnapshot>;
   compact(instructions?: string): Promise<SessionSnapshot>;

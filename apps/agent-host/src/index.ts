@@ -110,6 +110,8 @@ async function dispatch(command: AgentCommand): Promise<unknown> {
       return activeRuntime.createSession(command.payload.cwd);
     case "session.open":
       return activeRuntime.openSession(command.payload.path, command.payload.cwdOverride);
+    case "session.import":
+      return activeRuntime.importSession(command.payload.path);
     case "session.branch":
       return activeRuntime.branch(command.payload.entryId, command.payload.newFile);
     case "session.rollback":

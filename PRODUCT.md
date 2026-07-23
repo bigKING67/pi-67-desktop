@@ -31,7 +31,9 @@ count.
 
 ## Primary jobs
 
-1. Open a workspace, understand trust, and start or resume a Pi session.
+1. Open a workspace, understand trust, start or resume a managed Pi session,
+   and import an external Pi JSONL session without turning its source file into
+   Desktop's active writer.
 2. Select a configured Pi model and thinking level without editing JSON.
 3. Follow streaming reasoning, tools, file changes, and follow-up work without
    losing the current task.
@@ -48,6 +50,9 @@ count.
 - Existing users reuse `~/.pi/agent` without credential or session migration.
 - Desktop-created and TUI-created sessions can be resumed sequentially in the
   other interface.
+- Importing external JSONL keeps the selected source unchanged, creates a
+  collision-safe managed copy in the current workspace session directory, and
+  resumes that copy with the current workspace as its effective cwd.
 - Common Pi extension UI primitives work; TUI-only UI is identified explicitly.
 - Production starts no local HTTP server and listens on no application TCP port.
 - Welcome does not start the Agent Host or load the Pi SDK until a workspace or

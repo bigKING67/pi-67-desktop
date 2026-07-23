@@ -18,7 +18,8 @@
 
 已实现的 SDK seam：
 
-- `createAgentSession`、`SessionManager.create/open/list/listAll`；
+- `createAgentSession`、`SessionManager.create/open/list/listAll`，以及基于相同
+  JSONL contract 的 collision-safe managed import；
 - send、steer、follow-up、abort；
 - model list/select、thinking levels；
 - session tree navigation、新文件 branch、rollback、compact、name；
@@ -33,8 +34,10 @@
 - SDK 当前未向 UI bridge 提供稳定的 calling extension identity，因此 common request 暂以
   `pi-extension` 标识；
 - 不支持同一 JSONL session 的并发 Desktop/TUI writer；
-- 不实现 system Pi/RPC session import adapter。已有 Pi JSONL session 通过
-  `SessionManager.list/open` 直接发现和恢复。
+- 不实现 system Pi/RPC session import adapter。当前 agent directory 内的已
+  managed session 通过 `SessionManager.list/open` 原地恢复；文件选择器中的
+  外部 Pi JSONL 会先以不覆盖同名文件的方式复制到当前 workspace session
+  directory，再打开副本。源文件保持只读且不会成为 Desktop 的后续 writer。
 
 ## Upgrade procedure
 

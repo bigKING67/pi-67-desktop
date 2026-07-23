@@ -170,6 +170,20 @@ loading error where the operation can produce those states
   10 MiB per-image, and 30 MiB per-message boundary. Rejections remain visible
   beside the composer instead of being truncated silently.
 
+### Session navigation
+
+- Listed sessions are already managed and open in place with the current
+  workspace as their effective cwd.
+- The file-picker action is named `导入 Pi session 到当前工作区`; it copies a
+  valid external JSONL session into the managed session directory before
+  opening it and never implies that Desktop will keep writing to the selected
+  source file.
+- Cancelling the picker preserves the active session without a notice. Import
+  failure names the failed operation and preserves both the source file and any
+  previously completed managed import.
+- Filename collisions create an explicit `-imported-N` copy rather than
+  replacing an existing managed session.
+
 ### Extension UI and approval
 
 - Dialogs identify the extension or tool that requested them.

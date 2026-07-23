@@ -201,7 +201,7 @@ function registerSystemBridge(): void {
   });
   ipcMain.handle("pi67:select-session-file", async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
-      title: "打开 Pi JSONL session",
+      title: "导入 Pi JSONL session 到当前工作区",
       properties: ["openFile"],
       filters: [
         { name: "Pi JSONL session", extensions: ["jsonl"] },

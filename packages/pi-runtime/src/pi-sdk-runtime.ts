@@ -10,7 +10,6 @@ import {
   type AgentSessionEvent,
   type LoadExtensionsResult
 } from "@earendil-works/pi-coding-agent";
-import type { ImageContent } from "@earendil-works/pi-ai";
 import type {
   ApprovalMode,
   DoctorReport,
@@ -24,10 +23,11 @@ import type {
 import type { AgentEvent, TransferImage } from "@pi67/protocol";
 import type { AgentRuntime, RuntimeInitializeOptions } from "./agent-runtime.js";
 import { DesktopExtensionUiBridge } from "./extension-ui-bridge.js";
-import { normalizeMessages, normalizeStreamDelta } from "./message-normalizer.js";
+import { convertTransferImages, normalizeMessages, normalizeStreamDelta } from "./message-normalizer.js";
 import { createDoctorReport } from "./runtime-doctor.js";
 import { createDesktopSafetyExtension, type SafetyPolicyState } from "./safety-extension.js";
 import { listAgentSessions } from "./session-discovery.js";
+import { discardStagedSessionImport, stageSessionImport } from "./session-import.js";
 import { StreamBatcher } from "./stream-batcher.js";
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -106,6 +106,20 @@ export class PiSdkRuntime implements AgentRuntime {
     return this.getSnapshot();
   }
 
+  async importSession(path: string): Promise<SessionSnapshot> {
+    await this.assertNoExternalSessionChange();
+    const sessionDirectory = this.requireSession().sessionManager.getSessionDir();
+    const staged = await stageSessionImport(path, sessionDirectory, this.safety.cwd);
+    try {
+      await this.replaceSession(staged.sessionManager.getCwd(), staged.sessionManager);
+      this.safety = { ...this.safety, cwd: staged.sessionManager.getCwd() };
+      return this.getSnapshot();
+    } catch (error) {
+      await discardStagedSessionImport(staged, error);
+      throw error;
+    }
+  }
+
   async branch(entryId: string, newFile = false): Promise<SessionSnapshot> {
     const session = this.requireSession();
     if (newFile) {
@@ -136,17 +150,17 @@ export class PiSdkRuntime implements AgentRuntime {
     await this.assertNoExternalSessionChange();
     const session = this.requireSession();
     await session.prompt(text, {
-      images: transferImages(images),
+      images: convertTransferImages(images),
       ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {})
     });
   }
 
   async steer(text: string, images: TransferImage[] = []): Promise<void> {
-    await this.requireSession().steer(text, transferImages(images));
+    await this.requireSession().steer(text, convertTransferImages(images));
   }
 
   async followUp(text: string, images: TransferImage[] = []): Promise<void> {
-    await this.requireSession().followUp(text, transferImages(images));
+    await this.requireSession().followUp(text, convertTransferImages(images));
   }
 
   async abort(): Promise<void> {
@@ -434,12 +448,4 @@ function sessionTreePreview(entry: Record<string, unknown>): string {
   } catch {
     return "Session entry";
   }
-}
-
-function transferImages(images: TransferImage[]): ImageContent[] {
-  return images.map((image) => ({
-    type: "image",
-    mimeType: image.mimeType,
-    data: Buffer.from(image.data).toString("base64")
-  }));
 }
