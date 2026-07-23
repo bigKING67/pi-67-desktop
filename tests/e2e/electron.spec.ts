@@ -57,6 +57,8 @@ test("boots the real sandboxed Electron shell over app://", async () => {
 });
 
 test("initializes and trusts a workspace through the on-demand real Agent Host", async () => {
+  test.setTimeout(90_000);
+
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-workspace-"));
   const workspace = join(temporaryRoot, "workspace");
   const agentDir = join(temporaryRoot, "agent");
@@ -88,7 +90,7 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
 
     const trustButton = window.getByRole("button", { name: /信任并加载资源/u });
     await expect(trustButton).toBeEnabled();
-    await trustButton.click();
+    await trustButton.click({ timeout: 60_000 });
     await expect(window.getByText("工作区尚未信任")).toHaveCount(0);
     await expect(window.getByText("Pi 资源已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
 

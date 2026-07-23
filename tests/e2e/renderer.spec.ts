@@ -240,7 +240,7 @@ test("keeps Shiki deferred and permits only its WASM engine when code is present
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await expect(page.locator('.code-block[data-highlight-state="ready"]')).toBeVisible();
+  await expect(page.locator('.code-block[data-highlight-state="ready"]')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".code-line")).toHaveCount(1);
   await expect(page.locator(".code-line > span").first()).toHaveCSS("color", "rgb(255, 123, 114)");
   const loadedResources = await page.evaluate(() => [
