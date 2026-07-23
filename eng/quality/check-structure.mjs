@@ -12,6 +12,8 @@ const requiredPaths = [
   "DESIGN.md",
   "DESIGN.dark.md",
   "pnpm-lock.yaml",
+  ".github/workflows/ci.yml",
+  ".github/workflows/release.yml",
   "docs/adr/0001-electron-sdk-runtime.md",
   "docs/architecture/processes-and-protocol.md",
   "docs/compatibility/pi-sdk.md",
@@ -83,6 +85,14 @@ for (const required of ["--x64", "--arm64"]) {
 if (!/win:[\s\S]*?arch:\s*\n\s*- x64/u.test(builder)) failures.push("Windows x64 packaging target is missing");
 if (!/mac:[\s\S]*?arch:\s*\n\s*- arm64/u.test(builder)) failures.push("macOS arm64 packaging target is missing");
 if (/\b(?:linux|ia32|universal)\b/iu.test(builder)) failures.push("unsupported packaging target found in electron-builder.yml");
+
+for (const path of [".github/workflows/ci.yml", ".github/workflows/release.yml"]) {
+  const workflow = await readFile(join(root, path), "utf8");
+  const preparesPnpmBeforeCachedNode = /pnpm\/action-setup@v4[\s\S]*?version:\s*11\.16\.0[\s\S]*?actions\/setup-node@v5[\s\S]*?cache:\s*pnpm/u;
+  if (!preparesPnpmBeforeCachedNode.test(workflow)) {
+    failures.push(`${path} must install pinned pnpm before setup-node enables the pnpm cache`);
+  }
+}
 
 const icon = await readFile(join(root, "eng/packaging/icon.png"));
 const iconWidth = icon.readUInt32BE(16);
