@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.tag }}
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
           run_install: false
@@ -95,7 +95,7 @@ jobs:
           codesign --verify --deep --strict "artifacts/release/mac-arm64/Pi-67 Desktop.app"
           spctl --assess --type execute --verbose "artifacts/release/mac-arm64/Pi-67 Desktop.app"
           xcrun stapler validate artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}
           path: |
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24.18.0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: artifacts/release

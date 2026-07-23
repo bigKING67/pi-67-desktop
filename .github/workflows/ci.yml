@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
           run_install: false
@@ -50,7 +50,7 @@ jobs:
         run: corepack pnpm run package:native:unsigned
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: failure-evidence-${{ matrix.expectedArch }}

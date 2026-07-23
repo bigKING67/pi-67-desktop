@@ -88,7 +88,7 @@ if (/\b(?:linux|ia32|universal)\b/iu.test(builder)) failures.push("unsupported p
 
 for (const path of [".github/workflows/ci.yml", ".github/workflows/release.yml"]) {
   const workflow = await readFile(join(root, path), "utf8");
-  const preparesPnpmBeforeCachedNode = /pnpm\/action-setup@v4[\s\S]*?version:\s*11\.16\.0[\s\S]*?actions\/setup-node@v5[\s\S]*?cache:\s*pnpm/u;
+  const preparesPnpmBeforeCachedNode = /pnpm\/action-setup@v6[\s\S]*?version:\s*11\.16\.0[\s\S]*?actions\/setup-node@v5[\s\S]*?cache:\s*pnpm/u;
   if (!preparesPnpmBeforeCachedNode.test(workflow)) {
     failures.push(`${path} must install pinned pnpm before setup-node enables the pnpm cache`);
   }
