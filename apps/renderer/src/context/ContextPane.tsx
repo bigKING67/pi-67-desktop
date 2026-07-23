@@ -14,7 +14,7 @@ export function ContextPane() {
   const treeEntries = useMemo(() => flattenTree(snapshot?.tree ?? []), [snapshot?.tree]);
 
   return (
-    <aside className="context-pane">
+    <aside aria-label="会话上下文" className="context-pane">
       <Tabs selectedKey={selectedTab} onSelectionChange={(key) => setSelectedTab(String(key))}>
         <TabList aria-label="Session context">
           <Tab id="tree"><GitBranch size={14} />会话树</Tab>

@@ -17,6 +17,7 @@ import { useAppStore } from "./app-store.js";
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
   const contextVisible = useAppStore((state) => state.contextVisible);
+  const setContextVisible = useAppStore((state) => state.setContextVisible);
   const setClient = useAppStore((state) => state.setClient);
   const notices = useAppStore((state) => state.notices);
   const dismissNotice = useAppStore((state) => state.dismissNotice);
@@ -61,6 +62,25 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!workspace) return;
+    const breakpoint = window.matchMedia("(max-width: 1040px)");
+    const closeWhenNarrow = (matches: boolean) => {
+      if (matches) setContextVisible(false);
+    };
+    const onBreakpointChange = (event: MediaQueryListEvent) => closeWhenNarrow(event.matches);
+    closeWhenNarrow(breakpoint.matches);
+    breakpoint.addEventListener("change", onBreakpointChange);
+    return () => breakpoint.removeEventListener("change", onBreakpointChange);
+  }, [setContextVisible, workspace]);
+
+  const closeContextDrawer = () => {
+    setContextVisible(false);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(".context-toggle")?.focus();
+    });
+  };
+
   return (
     <div className="application-shell">
       <TitleBar />
@@ -74,7 +94,17 @@ export function App() {
             <Transcript />
             <Composer />
           </section>
-          {contextVisible ? <ContextPane /> : null}
+          {contextVisible ? (
+            <>
+              <button
+                aria-label="关闭上下文抽屉"
+                className="context-drawer-scrim"
+                onClick={closeContextDrawer}
+                type="button"
+              />
+              <ContextPane />
+            </>
+          ) : null}
         </main>
       )}
       <div className="notice-stack" aria-live="polite" aria-atomic="false">

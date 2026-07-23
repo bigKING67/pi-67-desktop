@@ -84,13 +84,17 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     }, workspace);
 
     const window = await application.firstWindow();
+    await application.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(1_024, 684);
+    });
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).click();
     await expect(window.getByText("Pi SDK 已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(window.getByRole("button", { name: "显示上下文" })).toBeVisible();
 
     const trustButton = window.getByRole("button", { name: /信任并加载资源/u });
     await expect(trustButton).toBeEnabled();
-    await trustButton.click({ timeout: 60_000 });
+    await trustButton.click();
     await expect(window.getByText("工作区尚未信任")).toHaveCount(0);
     await expect(window.getByText("Pi 资源已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
 

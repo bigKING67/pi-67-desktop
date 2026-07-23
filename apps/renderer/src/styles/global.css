@@ -821,6 +821,10 @@ html[data-platform="darwin"] .title-bar {
   background: var(--surface-muted);
 }
 
+.context-drawer-scrim {
+  display: none;
+}
+
 .context-pane [role="tablist"] {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1017,6 +1021,15 @@ html[data-platform="darwin"] .title-bar {
 @media (max-width: 1040px) {
   .workspace-grid,
   .workspace-grid.has-context { grid-template-columns: 226px minmax(520px, 1fr); }
+  .context-drawer-scrim {
+    position: fixed;
+    z-index: 29;
+    inset: var(--titlebar-height) 0 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--canvas) 34%, transparent);
+  }
   .context-pane { position: fixed; z-index: 30; top: var(--titlebar-height); right: 0; bottom: 0; width: 360px; box-shadow: var(--shadow-floating); }
   .welcome-screen { grid-template-columns: 1fr; }
   .welcome-preview { display: none; }

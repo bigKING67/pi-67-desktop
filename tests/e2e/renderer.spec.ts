@@ -97,9 +97,17 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
+  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
+  const contextToggle = page.getByRole("button", { name: "显示上下文" });
+  await contextToggle.click();
+  await expect(page.getByLabel("会话上下文")).toBeVisible();
   await expect(page.getByRole("tab", { name: /会话树/u })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭上下文抽屉" })).toBeVisible();
   const columns = await page.locator(".workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns);
   expect(columns.split(" ").length).toBeLessThanOrEqual(2);
+  await page.getByRole("button", { name: "关闭上下文抽屉" }).click();
+  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
+  await expect(contextToggle).toBeFocused();
 });
 
 test("imports an external Pi session instead of opening the source file in place", async ({ page }) => {

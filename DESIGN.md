@@ -76,7 +76,9 @@ completing a real session without learning terminal UI conventions first.
 - Navigation rail: 248px default, resizable from 208px to 360px.
 - Context pane: 360px default, resizable from 300px to 560px and collapsible.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
-- Below 1040px, context becomes a drawer.
+- Below 1040px, context defaults closed and becomes an overlay drawer with a
+  dismissible scrim, so trust, transcript, and composer actions are never
+  covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
