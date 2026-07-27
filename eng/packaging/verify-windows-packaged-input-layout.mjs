@@ -401,8 +401,8 @@ export function viewportWidthMatches({ allowNativeFrameFloor, expectedWidth, inn
   if (Math.abs(innerWidth - expectedWidth) <= 1) return true;
   if (!allowNativeFrameFloor || !Number.isFinite(outerWidth)) return false;
 
-  // At the 760px production minimum, Windows can clamp the outer window and
-  // subtract its native resize frame from the renderer content viewport.
+  // At the 760px navigation probe, Windows can subtract its native resize
+  // frame from the renderer content viewport.
   const nativeFrameWidth = Math.max(0, outerWidth - innerWidth);
   return innerWidth <= expectedWidth + 1
     && innerWidth >= expectedWidth - nativeFrameWidth - 1

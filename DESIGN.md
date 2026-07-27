@@ -80,6 +80,8 @@ completing a real session without learning terminal UI conventions first.
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.
+- The packaged window minimum is 680px so the navigation drawer range remains
+  reachable after native window frames are applied.
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
 - Resizable split handles, a complete Git/workspace Diff, and Files browsing are

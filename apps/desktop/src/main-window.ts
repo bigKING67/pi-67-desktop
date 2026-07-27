@@ -17,7 +17,7 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
     title: "Pi-67 Desktop",
     width: 1440,
     height: 920,
-    minWidth: 760,
+    minWidth: 680,
     minHeight: 600,
     show: false,
     backgroundColor: "#111412",
