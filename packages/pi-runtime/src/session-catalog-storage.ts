@@ -34,7 +34,8 @@ export async function prepareSessionCatalogDirectory(
   const canonical = await realpath(requested);
   if (root !== undefined) {
     assertContained(canonical, root);
-    if (!samePath(canonical, requested)) {
+    // Windows 8.3 aliases can canonicalize to a different string without being a reparse point.
+    if (process.platform !== "win32" && !samePath(canonical, requested)) {
       throw new Error("Session Catalog directory contains link-based indirection.");
     }
   }
@@ -100,14 +101,14 @@ function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoExcepti
 
 async function prepareExpectedRoot(expectedRoot: string, directory: string): Promise<string> {
   const requestedRoot = resolve(expectedRoot);
+  assertContained(directory, requestedRoot);
   const rootInfo = await readPathInfo(requestedRoot);
   if (!rootInfo || rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
     throw new Error("Session Catalog storage root must be a real directory.");
   }
   const root = await realpath(requestedRoot);
-  assertContained(directory, root);
-  const fromRoot = relative(normalizePath(root), normalizePath(directory));
-  let candidate = root;
+  const fromRoot = relative(normalizePath(requestedRoot), normalizePath(directory));
+  let candidate = requestedRoot;
   for (const segment of fromRoot.split(sep).filter(Boolean)) {
     candidate = join(candidate, segment);
     const info = await readPathInfo(candidate);
@@ -115,7 +116,8 @@ async function prepareExpectedRoot(expectedRoot: string, directory: string): Pro
     if (info.isSymbolicLink() || !info.isDirectory()) {
       throw new Error("Session Catalog directory contains link-based indirection.");
     }
-    if (!samePath(await realpath(candidate), candidate)) {
+    // lstat rejects Windows junctions; string equality would also reject benign 8.3 aliases.
+    if (process.platform !== "win32" && !samePath(await realpath(candidate), candidate)) {
       throw new Error("Session Catalog directory contains link-based indirection.");
     }
   }

@@ -174,7 +174,11 @@ describe("SQLite Session Catalog", () => {
         effectiveUserId: currentUserId
       });
 
-      expect(result).toEqual({ kind: "fallback", reason: "unavailable" });
+      expect(result).toEqual({
+        kind: "fallback",
+        reason: "unavailable",
+        degradedReason: "database-verify"
+      });
       expect(closed).toBe(true);
     }
   );
@@ -196,7 +200,11 @@ describe("SQLite Session Catalog", () => {
         effectiveUserId: () => owner
       });
 
-      expect(result).toEqual({ kind: "fallback", reason: "unavailable" });
+      expect(result).toEqual({
+        kind: "fallback",
+        reason: "unavailable",
+        degradedReason: "database-verify"
+      });
     }
   );
 
@@ -211,7 +219,7 @@ describe("SQLite Session Catalog", () => {
     locking.exec("PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE;");
     try {
       const result = await openSqliteSessionCatalog(root);
-      expect(result).toEqual({ kind: "fallback", reason: "busy" });
+      expect(result).toEqual({ kind: "fallback", reason: "busy", degradedReason: "busy" });
       expect(await readFile(location)).toEqual(before);
       expect((await readdir(root)).filter((name) => name.includes("recovery"))).toEqual([]);
     } finally {
@@ -225,12 +233,20 @@ describe("SQLite Session Catalog", () => {
     const outside = await temporaryRoot();
     const linkedDirectory = join(root, "linked-catalog");
     await symlink(outside, linkedDirectory, process.platform === "win32" ? "junction" : "dir");
-    expect(await openSqliteSessionCatalog(linkedDirectory)).toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(linkedDirectory)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "storage-prepare"
+    });
 
     const target = join(outside, "outside.sqlite3");
     await writeFile(target, "OUTSIDE_SENTINEL", "utf8");
     await symlink(target, join(root, SESSION_CATALOG_DATABASE_FILENAME), "file");
-    expect(await openSqliteSessionCatalog(root)).toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(root)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "storage-inspect"
+    });
     expect(await readFile(target, "utf8")).toBe("OUTSIDE_SENTINEL");
   });
 
@@ -242,8 +258,11 @@ describe("SQLite Session Catalog", () => {
     await mkdir(outsideCatalog);
     await symlink(outside, linkedParent, process.platform === "win32" ? "junction" : "dir");
 
-    expect(await openSqliteSessionCatalog(join(linkedParent, "session-catalog"), root))
-      .toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(join(linkedParent, "session-catalog"), root)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "storage-prepare"
+    });
   });
 
   it("does not remove a symlinked recovery file while replacing corruption", async () => {
@@ -254,19 +273,31 @@ describe("SQLite Session Catalog", () => {
     await writeFile(target, "RECOVERY_SENTINEL", "utf8");
     await symlink(target, join(root, SESSION_CATALOG_RECOVERY_FILENAME), "file");
 
-    expect(await openSqliteSessionCatalog(root)).toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(root)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "recovery-prepare"
+    });
     expect(await readFile(target, "utf8")).toBe("RECOVERY_SENTINEL");
   });
 
   it("rejects directory-shaped database and recovery paths", async () => {
     const databaseRoot = await temporaryRoot();
     await mkdir(join(databaseRoot, SESSION_CATALOG_DATABASE_FILENAME));
-    expect(await openSqliteSessionCatalog(databaseRoot)).toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(databaseRoot)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "storage-inspect"
+    });
 
     const recoveryRoot = await temporaryRoot();
     await writeFile(join(recoveryRoot, SESSION_CATALOG_DATABASE_FILENAME), "corrupt", "utf8");
     await mkdir(join(recoveryRoot, SESSION_CATALOG_RECOVERY_FILENAME));
-    expect(await openSqliteSessionCatalog(recoveryRoot)).toEqual({ kind: "fallback", reason: "unavailable" });
+    expect(await openSqliteSessionCatalog(recoveryRoot)).toEqual({
+      kind: "fallback",
+      reason: "unavailable",
+      degradedReason: "recovery-prepare"
+    });
   });
 
   it.runIf(process.platform !== "win32")(
@@ -277,7 +308,11 @@ describe("SQLite Session Catalog", () => {
       await writeFile(outsideDatabase, "DATABASE_SENTINEL", "utf8");
       await link(outsideDatabase, join(databaseRoot, SESSION_CATALOG_DATABASE_FILENAME));
 
-      expect(await openSqliteSessionCatalog(databaseRoot)).toEqual({ kind: "fallback", reason: "unavailable" });
+      expect(await openSqliteSessionCatalog(databaseRoot)).toEqual({
+        kind: "fallback",
+        reason: "unavailable",
+        degradedReason: "storage-inspect"
+      });
       await expect(readFile(outsideDatabase, "utf8")).resolves.toBe("DATABASE_SENTINEL");
 
       const recoveryRoot = await temporaryRoot();
@@ -286,7 +321,11 @@ describe("SQLite Session Catalog", () => {
       await writeFile(outsideRecovery, "RECOVERY_SENTINEL", "utf8");
       await link(outsideRecovery, join(recoveryRoot, SESSION_CATALOG_RECOVERY_FILENAME));
 
-      expect(await openSqliteSessionCatalog(recoveryRoot)).toEqual({ kind: "fallback", reason: "unavailable" });
+      expect(await openSqliteSessionCatalog(recoveryRoot)).toEqual({
+        kind: "fallback",
+        reason: "unavailable",
+        degradedReason: "recovery-prepare"
+      });
       await expect(readFile(outsideRecovery, "utf8")).resolves.toBe("RECOVERY_SENTINEL");
     }
   );

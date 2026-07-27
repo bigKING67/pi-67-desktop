@@ -55,7 +55,8 @@ function formatSessionCatalogStatus(status: SessionCatalogStatus | undefined): s
   if (!status) return "Session Catalog is not configured in this Agent Host runtime.";
   const reconciled = status.reconciledAt === undefined ? "not reconciled" : "reconciled";
   const completeness = status.incomplete ? "incomplete" : "complete";
-  return `schema v1; ${status.state}; ${status.itemCount} items; ${reconciled}; ${completeness}; ${status.skippedCount} skipped.`;
+  const degraded = status.degradedReason === undefined ? "" : `; degraded ${status.degradedReason}`;
+  return `schema v1; ${status.state}; ${status.itemCount} items; ${reconciled}; ${completeness}; ${status.skippedCount} skipped${degraded}.`;
 }
 
 async function commandVersion(command: string, args: string[]): Promise<{ ok: boolean; detail: string }> {

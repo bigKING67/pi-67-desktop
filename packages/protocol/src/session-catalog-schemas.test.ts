@@ -177,6 +177,16 @@ describe("Session Catalog protocol schemas", () => {
 
   it("validates status independently for projection resync", () => {
     expect(Value.Check(SessionCatalogStatusSchema, catalogStatus())).toBe(true);
+    expect(Value.Check(SessionCatalogStatusSchema, {
+      ...catalogStatus(),
+      source: "sdk-fallback",
+      state: "fallback",
+      degradedReason: "storage-prepare"
+    })).toBe(true);
+    expect(Value.Check(SessionCatalogStatusSchema, {
+      ...catalogStatus(),
+      degradedReason: "raw-user-path"
+    })).toBe(false);
     expect(Value.Check(SessionCatalogStatusSchema, { ...catalogStatus(), itemCount: -1 })).toBe(false);
     expect(Value.Check(SessionCatalogStatusSchema, { ...catalogStatus(), total: 1 })).toBe(false);
   });

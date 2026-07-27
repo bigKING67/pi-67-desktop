@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +20,16 @@ describe("Agent Host storage", () => {
 
     expect(storage.capabilityProbeDirectory).toContain("user-data");
     expect(storage.sessionCatalogDirectory).toBe(join(storage.capabilityProbeDirectory, "projections", "session-catalog"));
+  });
+
+  it.runIf(process.platform === "win32")("hands native-canonical Windows paths to the Agent Host", async () => {
+    const root = await temporaryRoot();
+    const userData = join(root, "user-data");
+
+    const storage = createAgentHostStoragePaths(userData);
+
+    expect(storage.storageRoot).toBe(realpathSync.native(userData));
+    expect(storage.sessionCatalogDirectory).toBe(realpathSync.native(join(userData, "projections", "session-catalog")));
   });
 
   it.each(["user-data", "projections", "session-catalog"] as const)(

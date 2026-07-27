@@ -2,11 +2,17 @@ import {
   RuntimeError,
   type SessionCatalogChangedEvent,
   type SessionCatalogChangedReason,
+  type SessionCatalogDegradedReason,
   type SessionCatalogPage,
   type SessionCatalogQuery,
   type SessionCatalogStatus
 } from "@pi67/domain";
 import { assertSessionCatalogCursor, createSessionCatalogQueryKey } from "./session-catalog-cursor.js";
+import {
+  clearAppliedSessionCatalogUpserts,
+  mergePendingSessionCatalogUpserts,
+  type PendingSessionCatalogUpsert
+} from "./session-catalog-pending-upserts.js";
 import {
   createBoundedSessionCatalogPage,
   normalizeSessionCatalogSearch,
@@ -56,10 +62,6 @@ interface ReconcileFlight {
   contextGeneration: number;
   promise: Promise<void>;
 }
-interface PendingCatalogUpsert {
-  generation: number;
-  record: SessionCatalogRecord;
-}
 export function createSessionCatalog(options: CreateSessionCatalogOptions = {}): SessionCatalog {
   return new DefaultSessionCatalog(options);
 }
@@ -70,6 +72,7 @@ class DefaultSessionCatalog implements SessionCatalog {
   private sqliteAttempted = false;
   private sqliteRetryAt = 0;
   private sqliteRetryMs = SQLITE_RETRY_MS.initial;
+  private sqliteDegradedReason: SessionCatalogDegradedReason | undefined;
   private sqliteOpenFlight: Promise<void> | undefined;
   private fallbackRecords: SessionCatalogRecord[] = [];
   private fallbackReady = false;
@@ -78,7 +81,7 @@ class DefaultSessionCatalog implements SessionCatalog {
   private activeContext: SessionCatalogContext | undefined;
   private contextGeneration = 0;
   private mutationGeneration = 0;
-  private readonly pendingUpserts = new Map<string, PendingCatalogUpsert>();
+  private readonly pendingUpserts = new Map<string, PendingSessionCatalogUpsert>();
   private contextPreparation: Promise<void> = Promise.resolve();
   private disposed = false;
   private current: SessionCatalogStatus = {
@@ -174,7 +177,8 @@ class DefaultSessionCatalog implements SessionCatalog {
       source: "sdk-fallback",
       state: "fallback",
       rebuilding: this.reconcileFlight !== undefined,
-      itemCount: this.fallbackRecords.length
+      itemCount: this.fallbackRecords.length,
+      ...degradedReason(this.sqliteDegradedReason)
     };
     if (!this.reconcileFlight && !recoveryScheduled && !sqliteAwaitingReconcile) this.pendingUpserts.delete(safe.path);
     this.publish(reason);
@@ -243,7 +247,8 @@ class DefaultSessionCatalog implements SessionCatalog {
         rebuilding: true,
         itemCount: 0,
         incomplete: true,
-        skippedCount: 0
+        skippedCount: 0,
+        ...degradedReason(this.sqlite ? undefined : this.sqliteDegradedReason)
       };
     }
     if (changed) this.publish("source-changed");
@@ -288,7 +293,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     }
     if (!this.isCurrentContext(context, contextGeneration)) return;
     const appliedMutation = this.mutationGeneration;
-    const records = this.mergePendingUpserts(discovered.records, appliedMutation);
+    const records = mergePendingSessionCatalogUpserts(discovered.records, this.pendingUpserts, appliedMutation);
     const reconciledAt = this.now();
     if (this.sqlite) {
       try {
@@ -302,7 +307,7 @@ class DefaultSessionCatalog implements SessionCatalog {
         this.fallbackRecords = [];
         this.fallbackReady = false;
         this.applySqliteState(state, false);
-        this.clearPendingUpserts(appliedMutation);
+        clearAppliedSessionCatalogUpserts(this.pendingUpserts, appliedMutation);
         this.publish(reason);
         return;
       } catch {
@@ -319,10 +324,11 @@ class DefaultSessionCatalog implements SessionCatalog {
       reconciledAt,
       itemCount: records.length,
       incomplete: discovered.incomplete,
-      skippedCount: discovered.skippedCount
+      skippedCount: discovered.skippedCount,
+      ...degradedReason(this.sqliteDegradedReason)
     };
     this.autoReconciledSource = context.sourceKey;
-    this.clearPendingUpserts(appliedMutation);
+    clearAppliedSessionCatalogUpserts(this.pendingUpserts, appliedMutation);
     this.publish(reason);
   }
   private readProjection(query: ValidatedSessionCatalogQuery) {
@@ -353,7 +359,11 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.sqliteAttempted = true;
     const lifecycleGeneration = this.contextGeneration;
     const flight = this.openSqlite(this.directory, this.storageRoot)
-      .catch(() => ({ kind: "fallback" as const, reason: "unavailable" as const }))
+      .catch(() => ({
+        kind: "fallback" as const,
+        reason: "unavailable" as const,
+        degradedReason: "unavailable" as const
+      }))
       .then((result) => {
         if (this.disposed || lifecycleGeneration !== this.contextGeneration) {
           if (result.kind === "ready") result.catalog.close();
@@ -361,10 +371,12 @@ class DefaultSessionCatalog implements SessionCatalog {
         }
         if (result.kind === "ready") {
           this.sqlite = result.catalog;
+          this.sqliteDegradedReason = undefined;
           this.autoReconciledSource = undefined;
           this.sqliteRetryMs = SQLITE_RETRY_MS.initial;
           return;
         }
+        this.sqliteDegradedReason = result.degradedReason ?? result.reason;
         this.sqliteRetryAt = now + this.sqliteRetryMs;
         this.sqliteRetryMs = Math.min(this.sqliteRetryMs * 2, SQLITE_RETRY_MS.maximum);
       })
@@ -389,6 +401,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       incomplete: state.incomplete,
       skippedCount: state.skippedCount
     };
+    this.sqliteDegradedReason = undefined;
   }
   private demoteSqlite(scheduleReconcile: boolean): void {
     try {
@@ -397,6 +410,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       // The projection is disposable; fallback stays metadata-only.
     }
     this.sqlite = undefined;
+    this.sqliteDegradedReason = "runtime-query";
     this.sqliteRetryAt = this.now() + this.sqliteRetryMs;
     this.sqliteRetryMs = Math.min(this.sqliteRetryMs * 2, SQLITE_RETRY_MS.maximum);
     this.autoReconciledSource = undefined;
@@ -411,7 +425,8 @@ class DefaultSessionCatalog implements SessionCatalog {
       state: context ? "rebuilding" : "unavailable",
       rebuilding: context !== undefined,
       itemCount: 0,
-      incomplete: true
+      incomplete: true,
+      degradedReason: "runtime-query"
     };
     this.publish("source-changed");
     if (!scheduleReconcile || !context) return;
@@ -420,25 +435,6 @@ class DefaultSessionCatalog implements SessionCatalog {
       this.autoReconciledSource = context.sourceKey;
       void this.startReconcile(context, "reconciled", contextGeneration).catch(() => undefined);
     });
-  }
-  private mergePendingUpserts(
-    discovered: SessionCatalogRecord[],
-    appliedMutation: number
-  ): SessionCatalogRecord[] {
-    const records = new Map(discovered.map((record) => [record.path, record]));
-    for (const pending of this.pendingUpserts.values()) {
-      if (pending.generation > appliedMutation) continue;
-      const discoveredRecord = records.get(pending.record.path);
-      if (!discoveredRecord || isPendingRecordCurrent(pending.record, discoveredRecord)) {
-        records.set(pending.record.path, pending.record);
-      }
-    }
-    return sortSessionCatalogRecords([...records.values()]);
-  }
-  private clearPendingUpserts(appliedMutation: number): void {
-    for (const [path, pending] of this.pendingUpserts) {
-      if (pending.generation <= appliedMutation) this.pendingUpserts.delete(path);
-    }
   }
   private publish(reason: SessionCatalogChangedReason): void {
     if (!this.disposed) this.onChanged?.({ revision: this.current.revision, reason });
@@ -452,7 +448,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     if (this.disposed) throw new RuntimeError("RUNTIME_NOT_READY", "Session Catalog has been disposed.");
   }
 }
-function isPendingRecordCurrent(pending: SessionCatalogRecord, discovered: SessionCatalogRecord): boolean {
-  return pending.modifiedAt > discovered.modifiedAt
-    || (pending.modifiedAt === discovered.modifiedAt && pending.messageCount >= discovered.messageCount);
+
+function degradedReason(reason: SessionCatalogDegradedReason | undefined) {
+  return reason === undefined ? {} : { degradedReason: reason };
 }

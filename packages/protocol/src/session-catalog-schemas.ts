@@ -51,6 +51,21 @@ const SessionCatalogStateSchema = Type.Union([
   Type.Literal("fallback"),
   Type.Literal("unavailable")
 ]);
+const SessionCatalogDegradedReasonSchema = Type.Union([
+  Type.Literal("busy"),
+  Type.Literal("unavailable"),
+  Type.Literal("runtime-load"),
+  Type.Literal("storage-prepare"),
+  Type.Literal("storage-inspect"),
+  Type.Literal("database-open"),
+  Type.Literal("database-verify"),
+  Type.Literal("schema-prepare"),
+  Type.Literal("recovery-prepare"),
+  Type.Literal("recovery-open"),
+  Type.Literal("recovery-verify"),
+  Type.Literal("recovery-schema"),
+  Type.Literal("runtime-query")
+]);
 
 const SessionCatalogStatusProperties = {
   revision: RevisionSchema,
@@ -58,6 +73,7 @@ const SessionCatalogStatusProperties = {
   source: SessionCatalogSourceSchema,
   state: SessionCatalogStateSchema,
   rebuilding: Type.Boolean(),
+  degradedReason: Type.Optional(SessionCatalogDegradedReasonSchema),
   reconciledAt: Type.Optional(TimestampSchema),
   incomplete: Type.Boolean(),
   skippedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })

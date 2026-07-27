@@ -21,12 +21,28 @@ export type SessionCatalogSource = "sqlite" | "sdk-fallback";
 
 export type SessionCatalogState = "ready" | "rebuilding" | "fallback" | "unavailable";
 
+export type SessionCatalogDegradedReason =
+  | "busy"
+  | "unavailable"
+  | "runtime-load"
+  | "storage-prepare"
+  | "storage-inspect"
+  | "database-open"
+  | "database-verify"
+  | "schema-prepare"
+  | "recovery-prepare"
+  | "recovery-open"
+  | "recovery-verify"
+  | "recovery-schema"
+  | "runtime-query";
+
 export interface SessionCatalogStatus {
   revision: number;
   itemCount: number;
   source: SessionCatalogSource;
   state: SessionCatalogState;
   rebuilding: boolean;
+  degradedReason?: SessionCatalogDegradedReason;
   reconciledAt?: number;
   incomplete: boolean;
   skippedCount: number;

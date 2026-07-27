@@ -12,6 +12,17 @@ describe("Runtime Doctor Session Catalog status", () => {
     const report = await createDoctorReport(undefined, undefined, status());
     expect(report.checks.find((check) => check.id === "session-catalog")?.status).toBe("pass");
   });
+
+  it("reports only the bounded degraded stage without exposing raw errors", async () => {
+    const report = await createDoctorReport(undefined, undefined, status({
+      source: "sdk-fallback",
+      state: "fallback",
+      degradedReason: "database-verify"
+    }));
+    const check = report.checks.find((item) => item.id === "session-catalog");
+    expect(check).toMatchObject({ status: "warning" });
+    expect(check?.detail).toContain("degraded database-verify");
+  });
 });
 
 function status(overrides: Partial<SessionCatalogStatus> = {}): SessionCatalogStatus {

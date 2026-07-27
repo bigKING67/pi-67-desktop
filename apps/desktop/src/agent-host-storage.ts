@@ -31,11 +31,7 @@ function ensureDirectory(path: string, recursive: boolean): string {
   if (after.isSymbolicLink() || !after.isDirectory()) {
     throw new Error("Agent Host storage path must be a real directory.");
   }
-  const canonical = realpathSync(requested);
-  if (process.platform === "win32" && !samePath(canonical, requested)) {
-    throw new Error("Agent Host storage path contains reparse-point indirection.");
-  }
-  return canonical;
+  return realpathSync.native(requested);
 }
 
 function isContained(candidate: string, root: string): boolean {
@@ -47,10 +43,6 @@ function isContained(candidate: string, root: string): boolean {
     && !fromRoot.startsWith(`..${sep}`)
     && !isAbsolute(fromRoot)
   );
-}
-
-function samePath(left: string, right: string): boolean {
-  return normalizePath(resolve(left)) === normalizePath(resolve(right));
 }
 
 function normalizePath(path: string): string {

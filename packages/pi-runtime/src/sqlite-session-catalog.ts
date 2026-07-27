@@ -1,6 +1,10 @@
 import { rename } from "node:fs/promises";
 import { join } from "node:path";
-import type { SessionCatalogCursor, SessionCatalogScope } from "@pi67/domain";
+import type {
+  SessionCatalogCursor,
+  SessionCatalogDegradedReason,
+  SessionCatalogScope
+} from "@pi67/domain";
 import {
   configureCatalogDatabase,
   CorruptCatalogError,
@@ -94,7 +98,11 @@ export interface SqliteSessionCatalog {
 
 export type SqliteCatalogOpenResult =
   | { kind: "ready"; catalog: SqliteSessionCatalog }
-  | { kind: "fallback"; reason: "busy" | "unavailable" };
+  | {
+      kind: "fallback";
+      reason: "busy" | "unavailable";
+      degradedReason?: Exclude<SessionCatalogDegradedReason, "runtime-query">;
+    };
 
 export type OpenSqliteSessionCatalog = (
   directory: string,
@@ -108,12 +116,17 @@ export async function openSqliteSessionCatalog(
   permissionOperations?: SessionCatalogPermissionOperations
 ): Promise<SqliteCatalogOpenResult> {
   let Database: DatabaseConstructor;
-  let canonicalDirectory: string;
   try {
     Database = await loadDatabase();
+  } catch {
+    return fallback("unavailable", "runtime-load");
+  }
+
+  let canonicalDirectory: string;
+  try {
     canonicalDirectory = await prepareSessionCatalogDirectory(directory, expectedRoot, permissionOperations);
   } catch {
-    return { kind: "fallback", reason: "unavailable" };
+    return fallback("unavailable", "storage-prepare");
   }
 
   const location = join(canonicalDirectory, SESSION_CATALOG_DATABASE_FILENAME);
@@ -122,46 +135,63 @@ export async function openSqliteSessionCatalog(
   try {
     exists = await sessionCatalogFileExists(location);
   } catch {
-    return { kind: "fallback", reason: "unavailable" };
+    return fallback("unavailable", "storage-inspect");
   }
   let database: DatabaseLike | undefined;
+  let stage: Exclude<SessionCatalogDegradedReason, "busy" | "unavailable" | "runtime-query"> = "database-open";
   try {
     if (exists) {
+      stage = "database-verify";
       await enforcePrivateSessionCatalogPermissions(location, 0o600, "database", permissionOperations);
     }
+    stage = "database-open";
     database = new Database(location);
     if (!exists) {
+      stage = "database-verify";
       await sessionCatalogFileExists(location);
       await enforcePrivateSessionCatalogPermissions(location, 0o600, "database", permissionOperations);
     }
+    stage = "schema-prepare";
     const openedVersion = prepareCatalogForUse(database, !exists);
+    stage = "database-verify";
     await sessionCatalogFileExists(location);
     return { kind: "ready", catalog: new NodeSqliteSessionCatalog(database, recovery, openedVersion) };
   } catch (error) {
     safeClose(database);
     const failure = classifySqliteFailure(error);
-    if (failure === "busy") return { kind: "fallback", reason: "busy" };
-    if (failure !== "replaceable") return { kind: "fallback", reason: "unavailable" };
+    if (failure === "busy") return fallback("busy", "busy");
+    if (failure !== "replaceable") return fallback("unavailable", stage);
   }
 
+  stage = "recovery-prepare";
   try {
     await removeSessionCatalogRecovery(recovery);
     await sessionCatalogFileExists(location);
     await rename(location, recovery);
     await sessionCatalogFileExists(recovery);
+    stage = "recovery-open";
     database = new Database(location);
+    stage = "recovery-verify";
     await sessionCatalogFileExists(location);
     await enforcePrivateSessionCatalogPermissions(location, 0o600, "database", permissionOperations);
+    stage = "recovery-schema";
     const openedVersion = prepareCatalogForUse(database, true);
+    stage = "recovery-verify";
     await sessionCatalogFileExists(location);
     return { kind: "ready", catalog: new NodeSqliteSessionCatalog(database, recovery, openedVersion) };
   } catch (error) {
     safeClose(database);
-    return {
-      kind: "fallback",
-      reason: classifySqliteFailure(error) === "busy" ? "busy" : "unavailable"
-    };
+    return classifySqliteFailure(error) === "busy"
+      ? fallback("busy", "busy")
+      : fallback("unavailable", stage);
   }
+}
+
+function fallback(
+  reason: "busy" | "unavailable",
+  degradedReason: Exclude<SessionCatalogDegradedReason, "runtime-query">
+): SqliteCatalogOpenResult {
+  return { kind: "fallback", reason, degradedReason };
 }
 
 class NodeSqliteSessionCatalog implements SqliteSessionCatalog {

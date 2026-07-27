@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { chmod, link, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +25,19 @@ describe("Session Catalog storage boundary", () => {
 
     await expect(prepareSessionCatalogDirectory(catalog, root)).resolves.toBe(catalog);
   });
+
+  it.runIf(process.platform === "win32")(
+    "accepts a contained Windows 8.3 alias while returning its canonical directory",
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), "pi67-session-catalog-alias-"));
+      temporaryRoots.push(root);
+      const catalog = join(root, "projections", "session-catalog");
+      await mkdir(catalog, { recursive: true });
+
+      await expect(prepareSessionCatalogDirectory(catalog, root)).resolves.toBe(await realpath(catalog));
+      expect(realpathSync.native(catalog)).toBe(await realpath(catalog));
+    }
+  );
 
   it.runIf(process.platform !== "win32")(
     "tightens an existing catalog directory to owner-only permissions",

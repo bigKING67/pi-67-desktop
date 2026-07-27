@@ -126,13 +126,22 @@ describe("Session Catalog orchestration", () => {
   });
 
   it("falls back on an injected SQLite busy result without retrying discovery on warm queries", async () => {
-    const openSqlite = vi.fn(async (): Promise<SqliteCatalogOpenResult> => ({ kind: "fallback", reason: "busy" }));
+    const openSqlite = vi.fn(async (): Promise<SqliteCatalogOpenResult> => ({
+      kind: "fallback",
+      reason: "busy",
+      degradedReason: "busy"
+    }));
     const discover = vi.fn(async () => discovery([record(1)]));
     const catalog = createSessionCatalog({ directory: "/owned/catalog", openSqlite, now: () => 1_000 });
     const context = makeContext("source", discover);
 
     await catalog.reconcile(context);
-    expect(catalog.status()).toMatchObject({ source: "sdk-fallback", state: "fallback", itemCount: 1 });
+    expect(catalog.status()).toMatchObject({
+      source: "sdk-fallback",
+      state: "fallback",
+      itemCount: 1,
+      degradedReason: "busy"
+    });
     expect((await catalog.query({ scope: "all" }, context)).items).toHaveLength(1);
     expect((await catalog.query({ scope: "all" }, context)).items).toHaveLength(1);
     expect(openSqlite).toHaveBeenCalledTimes(1);
@@ -143,13 +152,19 @@ describe("Session Catalog orchestration", () => {
   it("uses the same bounded metadata fallback when SQLite cannot load", async () => {
     const openSqlite = vi.fn(async (): Promise<SqliteCatalogOpenResult> => ({
       kind: "fallback",
-      reason: "unavailable"
+      reason: "unavailable",
+      degradedReason: "runtime-load"
     }));
     const catalog = createSessionCatalog({ directory: "/owned/catalog", openSqlite });
     const context = makeContext("source", async () => discovery([record(1)]));
     await catalog.reconcile(context);
 
-    expect(catalog.status()).toMatchObject({ source: "sdk-fallback", state: "fallback", itemCount: 1 });
+    expect(catalog.status()).toMatchObject({
+      source: "sdk-fallback",
+      state: "fallback",
+      itemCount: 1,
+      degradedReason: "runtime-load"
+    });
     expect((await catalog.query({ scope: "all", limit: 100 }, context)).items).toHaveLength(1);
     await catalog.dispose();
   });
