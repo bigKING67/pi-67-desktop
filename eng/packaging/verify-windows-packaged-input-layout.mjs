@@ -185,7 +185,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
 }
 
 async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
-  await setStableContentViewport(window, application, 760, 800);
+  await setStableContentViewport(window, application, 760, 800, { allowNativeFrameFloor: true });
   const navigation = window.getByLabel("会话导航", { exact: true });
   await navigation.waitFor({ state: "hidden" });
   const navigationToggle = window.getByRole("button", { name: "显示会话导航" });
@@ -195,6 +195,7 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
 
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
+    allowNativeFrameFloor: true,
     breakpoint: "navigation-drawer",
     expectedWidth: 760,
     requestedScaleFactor: scaleFactor
@@ -254,12 +255,23 @@ async function verifySyntheticComposition(window, scaleFactor) {
   return result;
 }
 
-async function setStableContentViewport(window, application, width, height) {
+async function setStableContentViewport(
+  window,
+  application,
+  width,
+  height,
+  { allowNativeFrameFloor = false } = {}
+) {
   await setPackagedContentSize(application, width, height);
-  await window.waitForFunction((expected) => (
-    Math.abs(window.innerWidth - expected.width) <= 1
-    && Math.abs(window.innerHeight - expected.height) <= 1
-  ), { height, width });
+  await window.waitForFunction((expected) => {
+    const nativeFrameWidth = Math.max(0, window.outerWidth - window.innerWidth);
+    const widthMatches = Math.abs(window.innerWidth - expected.width) <= 1
+      || (expected.allowNativeFrameFloor
+        && window.innerWidth <= expected.width + 1
+        && window.innerWidth >= expected.width - nativeFrameWidth - 1
+        && window.outerWidth >= expected.width - 1);
+    return widthMatches && Math.abs(window.innerHeight - expected.height) <= 1;
+  }, { allowNativeFrameFloor, height, width });
   await window.evaluate(() => new Promise((resolvePromise) => {
     requestAnimationFrame(() => requestAnimationFrame(resolvePromise));
   }));
@@ -301,6 +313,7 @@ async function observeLayout(window) {
       matchesContextBreakpoint: window.matchMedia("(max-width: 1040px)").matches,
       matchesNavigationBreakpoint: window.matchMedia("(max-width: 760px)").matches,
       navigationDrawerVisible: navigationDrawer !== null && getComputedStyle(navigationDrawer).display !== "none",
+      outerWidth: window.outerWidth,
       send: controlObservation(send, viewportWidth, viewportHeight),
       stop: controlObservation(stop, viewportWidth, viewportHeight),
       titleBar: rect(titleBar),
@@ -338,7 +351,12 @@ export function assertLayoutObservation(observation, contract) {
   if (Math.abs(observation.devicePixelRatio - contract.requestedScaleFactor) > 0.05) {
     throw new Error(`${prefix}: expected DPR ${contract.requestedScaleFactor}, got ${observation.devicePixelRatio}.`);
   }
-  if (Math.abs(observation.innerWidth - contract.expectedWidth) > 1) {
+  if (!viewportWidthMatches({
+    allowNativeFrameFloor: contract.allowNativeFrameFloor === true,
+    expectedWidth: contract.expectedWidth,
+    innerWidth: observation.innerWidth,
+    outerWidth: observation.outerWidth
+  })) {
     throw new Error(`${prefix}: expected innerWidth ${contract.expectedWidth}, got ${observation.innerWidth}.`);
   }
   if (contract.breakpoint === "context-drawer" && !observation.matchesContextBreakpoint) {
@@ -363,6 +381,18 @@ export function assertLayoutObservation(observation, contract) {
       `${prefix}: title actions reserve only ${observation.titleBarNativeControlReserve}px for native Windows controls.`
     );
   }
+}
+
+export function viewportWidthMatches({ allowNativeFrameFloor, expectedWidth, innerWidth, outerWidth }) {
+  if (Math.abs(innerWidth - expectedWidth) <= 1) return true;
+  if (!allowNativeFrameFloor || !Number.isFinite(outerWidth)) return false;
+
+  // At the 760px production minimum, Windows can clamp the outer window and
+  // subtract its native resize frame from the renderer content viewport.
+  const nativeFrameWidth = Math.max(0, outerWidth - innerWidth);
+  return innerWidth <= expectedWidth + 1
+    && innerWidth >= expectedWidth - nativeFrameWidth - 1
+    && outerWidth >= expectedWidth - 1;
 }
 
 async function writeReport(report) {

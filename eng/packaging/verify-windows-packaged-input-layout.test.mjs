@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertLayoutObservation,
+  viewportWidthMatches,
   WINDOWS_SYNTHETIC_SCALE_FACTORS
 } from "./verify-windows-packaged-input-layout.mjs";
 
@@ -28,6 +29,37 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       requestedScaleFactor: 1.5
     })).toThrow(/overflows horizontally/u);
   });
+
+  it("accepts the renderer width left by the native frame at the production minimum", () => {
+    expect(viewportWidthMatches({
+      allowNativeFrameFloor: true,
+      expectedWidth: 760,
+      innerWidth: 744,
+      outerWidth: 760
+    })).toBe(true);
+    expect(() => assertLayoutObservation({
+      ...observation(),
+      innerWidth: 744,
+      matchesContextBreakpoint: true,
+      matchesNavigationBreakpoint: true,
+      outerWidth: 760,
+      titleBar: { bottom: 42, height: 42, left: 0, right: 744, top: 0, width: 744 }
+    }, {
+      allowNativeFrameFloor: true,
+      breakpoint: "navigation-drawer",
+      expectedWidth: 760,
+      requestedScaleFactor: 1.5
+    })).not.toThrow();
+  });
+
+  it("rejects arbitrary narrow viewports as native minimum clamping", () => {
+    expect(viewportWidthMatches({
+      allowNativeFrameFloor: true,
+      expectedWidth: 760,
+      innerWidth: 700,
+      outerWidth: 716
+    })).toBe(false);
+  });
 });
 
 function observation() {
@@ -41,6 +73,7 @@ function observation() {
     matchesContextBreakpoint: true,
     matchesNavigationBreakpoint: false,
     navigationDrawerVisible: false,
+    outerWidth: 1_040,
     send: { contained: true, topmost: true },
     stop: { contained: true, topmost: true },
     titleBar: { bottom: 42, height: 42, left: 0, right: 1_040, top: 0, width: 1_040 },
