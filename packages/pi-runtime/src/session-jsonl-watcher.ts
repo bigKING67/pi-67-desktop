@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from "node:fs";
+import { unwatchFile, watch, watchFile } from "node:fs";
 import { basename, dirname } from "node:path";
 import {
   createSessionJsonlTailCursor,
@@ -11,6 +11,7 @@ import {
 
 const SESSION_JSONL_WATCH_DEBOUNCE_MS = 75;
 const SESSION_JSONL_MAX_DRAIN_PASSES = 64;
+const SESSION_JSONL_WINDOWS_POLL_INTERVAL_MS = 250;
 
 export interface SessionJsonlExternalChange {
   reason: SessionJsonlChangeReason;
@@ -34,6 +35,10 @@ interface ActiveBinding extends SessionJsonlWatcherBinding {
   fileName: string;
 }
 
+interface SessionJsonlWatchHandle {
+  close(): void;
+}
+
 /**
  * Uses fs.watch only as a dirty signal. File identity, byte offsets and JSONL
  * validation are re-established from the file itself before any change is trusted.
@@ -41,7 +46,7 @@ interface ActiveBinding extends SessionJsonlWatcherBinding {
 export class SessionJsonlWatcher {
   private binding: ActiveBinding | undefined;
   private cursor: SessionJsonlTailCursor | undefined;
-  private watchers: FSWatcher[] = [];
+  private watchers: SessionJsonlWatchHandle[] = [];
   private knownRecordKeys = new Set<string>();
   private dirty = false;
   private detected = false;
@@ -68,12 +73,17 @@ export class SessionJsonlWatcher {
       this.knownRecordKeys = cursor.fileIdentity === undefined
         ? new Set()
         : new Set(binding.getExpectedRecords().map(recordKey).filter(isString));
-      const directoryWatcher = watch(dirname(cursor.path), { persistent: false }, (_eventType, fileName) => {
-        if (!this.isCurrent(token)) return;
-        if (fileName !== null && fileName.toString() !== active.fileName) return;
-        this.scheduleDrain(token);
-      });
-      this.registerWatcher(directoryWatcher, token);
+      this.watchers.push(createSessionJsonlWatchHandle(
+        cursor.path,
+        active.fileName,
+        cursor.fileIdentity !== undefined,
+        () => {
+          if (this.isCurrent(token)) this.scheduleDrain(token);
+        },
+        () => {
+          if (this.isCurrent(token)) this.detect({ reason: "unavailable", recoverable: true });
+        }
+      ));
       // Close the baseline-to-watch registration race with an authoritative stat/read.
       await this.checkNow();
     } catch (error) {
@@ -197,13 +207,6 @@ export class SessionJsonlWatcher {
     binding.onExternalChange(change);
   }
 
-  private registerWatcher(watcher: FSWatcher, token: number): void {
-    watcher.on("error", () => {
-      if (this.isCurrent(token)) this.detect({ reason: "unavailable", recoverable: true });
-    });
-    this.watchers.push(watcher);
-  }
-
   private closeWatchers(): void {
     for (const watcher of this.watchers) watcher.close();
     this.watchers = [];
@@ -241,4 +244,35 @@ function isString(value: string | undefined): value is string {
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolveYield) => setTimeout(resolveYield, 0));
+}
+
+function createSessionJsonlWatchHandle(
+  path: string,
+  fileName: string,
+  fileExists: boolean,
+  onDirty: () => void,
+  onError: () => void
+): SessionJsonlWatchHandle {
+  if (process.platform === "win32") {
+    // Node's Windows fs-event backend can abort the process for valid short/temp paths.
+    const listener = () => onDirty();
+    watchFile(path, {
+      persistent: false,
+      interval: SESSION_JSONL_WINDOWS_POLL_INTERVAL_MS
+    }, listener);
+    return { close: () => unwatchFile(path, listener) };
+  }
+  const directoryWatcher = watch(dirname(path), { persistent: false }, (_eventType, changedFileName) => {
+    if (changedFileName !== null && changedFileName.toString() !== fileName) return;
+    onDirty();
+  });
+  directoryWatcher.on("error", onError);
+  const fileWatcher = fileExists ? watch(path, { persistent: false }, onDirty) : undefined;
+  fileWatcher?.on("error", onError);
+  return {
+    close: () => {
+      directoryWatcher.close();
+      fileWatcher?.close();
+    }
+  };
 }
