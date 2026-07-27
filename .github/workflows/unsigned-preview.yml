@@ -105,7 +105,7 @@ jobs:
             --repo $env:GITHUB_REPOSITORY `
             --pattern 'SHA256SUMS.txt' `
             --dir $directory
-          corepack pnpm run release:preview:baseline:verify -- $directory $env:PREVIOUS_TAG
+          corepack pnpm run release:preview:baseline:verify $directory $env:PREVIOUS_TAG
       - run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts
         if: runner.os == 'Windows'
