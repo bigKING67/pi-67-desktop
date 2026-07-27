@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultReleaseDirectory = join(root, "artifacts/release");
@@ -115,8 +116,7 @@ export function validateUnsignedPreviewManifest(manifest, version, runtimeVersio
 
 async function packageReleaseContract() {
   const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-  const runtimeVersion = packageJson.devDependencies?.["@earendil-works/pi-coding-agent"]
-    ?? JSON.parse(await readFile(join(root, "packages/pi-runtime/package.json"), "utf8")).dependencies["@earendil-works/pi-coding-agent"];
+  const { runtimeVersion } = await readPiRuntimeContract(root);
   return { version: packageJson.version, runtimeVersion };
 }
 

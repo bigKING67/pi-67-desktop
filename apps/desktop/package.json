@@ -1,6 +1,6 @@
 {
   "name": "@pi67/desktop",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@pi67/protocol": "workspace:*",
     "semver": "7.7.4"
   },
   "peerDependencies": {

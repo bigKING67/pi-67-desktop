@@ -1,13 +1,19 @@
-export class StreamBatcher {
-  private pending: unknown[] = [];
+export class StreamBatcher<T> {
+  private pending: T[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly flushHandler: (events: unknown[]) => void, private readonly intervalMs = 50) {}
+  constructor(private readonly flushHandler: (events: T[]) => void, private readonly intervalMs = 50) {}
 
-  push(event: unknown): void {
+  push(event: T): void {
     this.pending.push(event);
     if (this.timer) return;
     this.timer = setTimeout(() => this.flush(), this.intervalMs);
+  }
+
+  drop(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.pending = [];
   }
 
   flush(): void {

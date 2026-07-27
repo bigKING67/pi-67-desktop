@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
+import { MAX_PROJECTED_TEXT_BYTES } from "../../packages/domain/dist/index.mjs";
 import {
   createReport,
   droppedFrameRate,
@@ -18,6 +19,13 @@ import {
   createTypeScriptMarkdown,
   measureCodeHighlight
 } from "./renderer-code-highlight.mjs";
+import { attachMockAgent } from "./renderer-agent-fixture.mjs";
+import {
+  createRendererMemoryMetrics,
+  createRendererMemoryProbe,
+  loadAllOlderMessages,
+  switchPerformanceSessions
+} from "./renderer-memory.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const samples = resolveSampleCount();
@@ -25,11 +33,13 @@ const previewPort = await availablePort();
 const previewUrl = `http://127.0.0.1:${previewPort}`;
 const outputPath = process.env.PI67_PERF_RENDERER_OUTPUT
   ?? join(root, "artifacts/performance", `renderer-${process.platform}-${process.arch}.json`);
-const coldCodeLineCount = 2_000;
-const warmCodeLineCount = 1_800;
+const coldCodeLineCount = 780;
+const warmCodeLineCount = 720;
 const scrollSweepCount = 3;
 const coldCodeMarkdown = createTypeScriptMarkdown(coldCodeLineCount, "cold_fixture");
 const warmCodeMarkdown = createTypeScriptMarkdown(warmCodeLineCount, "warm_fixture");
+assertWithinProjectionBudget(coldCodeMarkdown, "cold code fixture");
+assertWithinProjectionBudget(warmCodeMarkdown, "warm code fixture");
 
 const preview = startPreview();
 let browser;
@@ -46,20 +56,41 @@ try {
   const warmCodeHighlightSamples = [];
   const codeHighlightLongTaskSamples = [];
   const longCodeComposerSamples = [];
+  const welcomeHeapSamples = [];
+  const restoredHeapSamples = [];
+  const loadedTranscriptHeapSamples = [];
+  const switchedHeapSamples = [];
+  const loadedTranscriptNodeSamples = [];
+  const switchedNodeSamples = [];
 
   for (let index = 0; index < samples; index += 1) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 920 } });
     const page = await context.newPage();
+    page.on("pageerror", (error) => {
+      console.error(`Renderer performance page error: ${error.message}`);
+    });
+    const memory = await createRendererMemoryProbe(context, page);
     await installSystemBridge(page);
     await page.goto(previewUrl, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible" });
+    welcomeHeapSamples.push((await memory.sample()).usedHeapMiB);
     deferredHighlightResourceSamples.push(await assertHighlightResourcesDeferred(page));
     await attachMockAgent(page, 1_000);
 
     projectionSamples.push(await measureProjection(page));
+    const restoredMemory = await memory.sample();
+    restoredHeapSamples.push(restoredMemory.usedHeapMiB);
     composerSamples.push(await measureComposerPaint(page, index));
     scrollSamples.push((await measureScroll(page)) * 100);
     streamingSamples.push(await measureStreamingRate(page));
+    await loadAllOlderMessages(page, 1_000);
+    const loadedMemory = await memory.sample();
+    loadedTranscriptHeapSamples.push(loadedMemory.usedHeapMiB);
+    loadedTranscriptNodeSamples.push(loadedMemory.nodes);
+    await switchPerformanceSessions(page, 10, 1_000);
+    const switchedMemory = await memory.sample();
+    switchedHeapSamples.push(switchedMemory.usedHeapMiB);
+    switchedNodeSamples.push(switchedMemory.nodes);
     const coldHighlight = await measureCodeHighlight(page, {
       markdown: coldCodeMarkdown,
       messageId: `cold-code-${index}`,
@@ -75,6 +106,7 @@ try {
     warmCodeHighlightSamples.push(warmHighlight.durationMs);
     codeHighlightLongTaskSamples.push(warmHighlight.maxLongTaskMs);
     longCodeComposerSamples.push(await measureComposerPaint(page, `long-code-${index}`));
+    await memory.dispose();
     await context.close();
   }
 
@@ -163,7 +195,15 @@ try {
       evidenceLevel: "browser",
       method: "Native textarea input event to next animation frame after the warm long-code block is fully rendered",
       limitations: ["Measures post-highlight responsiveness; in-task blocking is represented separately by longCodeHighlightMaxLongTask."]
-    })
+    }),
+    ...createRendererMemoryMetrics({
+      welcomeHeap: welcomeHeapSamples,
+      restoredHeap: restoredHeapSamples,
+      loadedHeap: loadedTranscriptHeapSamples,
+      switchedHeap: switchedHeapSamples,
+      loadedNodes: loadedTranscriptNodeSamples,
+      switchedNodes: switchedNodeSamples
+    }, summarizeMetric)
   ];
   const report = await createReport({
     root,
@@ -223,6 +263,13 @@ async function waitForPreview() {
   throw new Error(`Timed out waiting for ${previewUrl}.`);
 }
 
+function assertWithinProjectionBudget(markdown, label) {
+  const bytes = Buffer.byteLength(markdown);
+  if (bytes > MAX_PROJECTED_TEXT_BYTES) {
+    throw new Error(`${label} exceeds the ${MAX_PROJECTED_TEXT_BYTES}-byte text projection budget: ${bytes}.`);
+  }
+}
+
 async function installSystemBridge(page) {
   await page.addInitScript(() => {
     Object.defineProperty(window, "pi67", {
@@ -248,96 +295,17 @@ async function installSystemBridge(page) {
             currentVersion: "performance",
             detail: "Performance fixture"
           }),
-          onAgentHostFailed: () => () => undefined
+          onAgentHostFailed: () => () => undefined,
+          onPowerResume: () => () => undefined
         }
       }
     });
   });
 }
 
-async function attachMockAgent(page, messageCount) {
-  await page.evaluate((count) => {
-    const messages = Array.from({ length: count }, (_, index) => ({
-      id: `message-${index}`,
-      role: index % 2 === 0 ? "user" : "assistant",
-      parts: [{ type: "text", text: `Performance message ${index}: bounded transcript content.` }],
-      createdAt: index
-    }));
-    const snapshot = {
-      sessionId: "performance-session",
-      sessionPath: "/tmp/pi67-performance-session.jsonl",
-      cwd: "/tmp/pi67-performance-workspace",
-      streaming: false,
-      messages,
-      models: [{ provider: "fixture", id: "performance", label: "Performance fixture", configured: true, reasoning: true }],
-      selectedModel: { provider: "fixture", id: "performance" },
-      thinkingLevel: "medium",
-      availableThinkingLevels: ["off", "medium", "high"],
-      steeringQueue: [],
-      followUpQueue: [],
-      tree: [],
-      resources: [],
-      stats: { tokens: 0, cost: 0, contextPercent: 0 }
-    };
-    const channel = new MessageChannel();
-    let messageSequence = 0;
-    const sendEvent = (type, payload) => {
-      messageSequence += 1;
-      channel.port2.postMessage({
-        protocolVersion: 1,
-        kind: "event",
-        messageId: `performance-event-${messageSequence}`,
-        sequence: messageSequence,
-        timestamp: Date.now(),
-        event: { type, payload }
-      });
-    };
-    channel.port2.onmessage = (event) => {
-      const envelope = event.data;
-      if (!envelope?.requestId) return;
-      const type = envelope.command?.type;
-      const data = type === "session.list" || type === "command.list" ? [] : snapshot;
-      channel.port2.postMessage({
-        protocolVersion: 1,
-        kind: "response",
-        messageId: `performance-response-${Date.now()}`,
-        requestId: envelope.requestId,
-        timestamp: Date.now(),
-        response: { ok: true, data }
-      });
-    };
-    channel.port2.start();
-    globalThis.__pi67Performance = {
-      beginStreaming() {
-        snapshot.streaming = true;
-        sendEvent("session.snapshot", snapshot);
-      },
-      emitStreamBatch(delta) {
-        sendEvent("turn.streamBatch", {
-          events: [{
-            type: "message_update",
-            assistantMessageEvent: { type: "text_delta", delta }
-          }]
-        });
-      },
-      showMarkdown(markdown, messageId) {
-        snapshot.streaming = false;
-        snapshot.messages = [{
-          id: messageId,
-          role: "assistant",
-          parts: [{ type: "text", text: markdown }],
-          createdAt: Date.now()
-        }];
-        sendEvent("session.snapshot", snapshot);
-      }
-    };
-    window.postMessage({ source: "pi67-preload", type: "agent-port" }, "*", [channel.port1]);
-  }, messageCount);
-}
-
 async function measureProjection(page) {
   return page.evaluate(() => new Promise((resolve, reject) => {
-    const button = document.querySelector(".welcome-action");
+    const button = document.querySelector('[data-testid="workspace-open-action"]');
     if (!(button instanceof HTMLButtonElement)) {
       reject(new Error("Workspace action is unavailable."));
       return;
@@ -440,6 +408,10 @@ async function measureStreamingRate(page) {
       }
       await new Promise((afterPaint) => requestAnimationFrame(() => requestAnimationFrame(afterPaint)));
       observer.disconnect();
+      if (updates === 0) {
+        reject(new Error("Streaming performance fixture produced no visible live-message updates."));
+        return;
+      }
       resolve(updates / ((performance.now() - started) / 1_000));
     })().catch(reject);
   }));

@@ -1,9 +1,34 @@
-import { constants } from "node:fs";
+import { constants, createReadStream } from "node:fs";
 import { copyFile, mkdir, realpath, rm, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
+import { RuntimeError } from "@pi67/domain";
 
 const MAX_IMPORT_NAME_ATTEMPTS = 1_000;
+export const MAX_SESSION_IMPORT_BYTES = 256 * 1024 * 1024;
+export const MAX_SESSION_IMPORT_LINE_BYTES = 64 * 1024 * 1024;
+
+export type SessionImportLimitCode = "SESSION_IMPORT_FILE_TOO_LARGE" | "SESSION_IMPORT_LINE_TOO_LARGE";
+
+export class SessionImportLimitError extends RuntimeError {
+  readonly limitCode: SessionImportLimitCode;
+  readonly limitBytes: number;
+
+  constructor(limitCode: SessionImportLimitCode, limitBytes: number) {
+    const subject = limitCode === "SESSION_IMPORT_FILE_TOO_LARGE" ? "file" : "physical line";
+    super(
+      "RESOURCE_LIMIT_EXCEEDED",
+      `The selected Pi session ${subject} exceeds the ${formatMiB(limitBytes)} MiB import limit.`,
+      {
+        recoverable: true,
+        details: { resource: "session-import", limitCode, limitBytes }
+      }
+    );
+    this.name = "SessionImportLimitError";
+    this.limitCode = limitCode;
+    this.limitBytes = limitBytes;
+  }
+}
 
 export interface StagedSessionImport {
   copied: boolean;
@@ -33,6 +58,10 @@ export async function stageSessionImport(
   const resolvedSource = await realpath(resolve(sourcePath));
   const sourceStats = await stat(resolvedSource);
   if (!sourceStats.isFile()) throw new Error("The selected Pi session is not a regular file.");
+  if (sourceStats.size > MAX_SESSION_IMPORT_BYTES) {
+    throw new SessionImportLimitError("SESSION_IMPORT_FILE_TOO_LARGE", MAX_SESSION_IMPORT_BYTES);
+  }
+  await assertImportLineLimits(resolvedSource);
 
   // Parse the source before creating a managed copy so invalid JSONL leaves no artifact.
   const sourceManager = SessionManager.open(resolvedSource, undefined, cwdOverride);
@@ -56,6 +85,37 @@ export async function stageSessionImport(
   } catch (error) {
     await removeStagedSessionImport(destination, error);
     throw error;
+  }
+}
+
+async function assertImportLineLimits(path: string): Promise<void> {
+  let currentLineBytes = 0;
+  let totalBytes = 0;
+  const stream = createReadStream(path);
+
+  try {
+    for await (const value of stream) {
+      const chunk = value as Buffer;
+      totalBytes += chunk.byteLength;
+      if (totalBytes > MAX_SESSION_IMPORT_BYTES) {
+        throw new SessionImportLimitError("SESSION_IMPORT_FILE_TOO_LARGE", MAX_SESSION_IMPORT_BYTES);
+      }
+
+      let start = 0;
+      while (start < chunk.byteLength) {
+        const newline = chunk.indexOf(0x0a, start);
+        const end = newline === -1 ? chunk.byteLength : newline;
+        currentLineBytes += end - start;
+        if (currentLineBytes > MAX_SESSION_IMPORT_LINE_BYTES) {
+          throw new SessionImportLimitError("SESSION_IMPORT_LINE_TOO_LARGE", MAX_SESSION_IMPORT_LINE_BYTES);
+        }
+        if (newline === -1) break;
+        currentLineBytes = 0;
+        start = newline + 1;
+      }
+    }
+  } finally {
+    stream.destroy();
   }
 }
 
@@ -96,4 +156,8 @@ async function removeStagedSessionImport(path: string, cause: unknown): Promise<
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === code;
+}
+
+function formatMiB(bytes: number): number {
+  return bytes / (1024 * 1024);
 }

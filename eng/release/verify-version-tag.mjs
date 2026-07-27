@@ -11,9 +11,25 @@ export function expectedVersionTag(version) {
   return `v${version}`;
 }
 
+export function expectedStableVersionTag(version) {
+  if (typeof version !== "string"
+    || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(version)) {
+    throw new Error(`Signed stable releases require a canonical MAJOR.MINOR.PATCH package version: ${String(version)}`);
+  }
+  return `v${version}`;
+}
+
 export async function verifyVersionTag(tag, repositoryRoot = root) {
+  return verifyTag(tag, repositoryRoot, expectedVersionTag);
+}
+
+export async function verifyStableVersionTag(tag, repositoryRoot = root) {
+  return verifyTag(tag, repositoryRoot, expectedStableVersionTag);
+}
+
+async function verifyTag(tag, repositoryRoot, expectedTag) {
   const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
-  const expected = expectedVersionTag(packageJson.version);
+  const expected = expectedTag(packageJson.version);
   if (tag !== expected) throw new Error(`Release tag ${tag} does not match package version ${expected}.`);
 
   const head = git(repositoryRoot, ["rev-parse", "HEAD"]);
@@ -27,7 +43,8 @@ function git(cwd, arguments_) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const tag = process.argv[2];
+  const stable = process.argv[2] === "--stable";
+  const tag = process.argv[stable ? 3 : 2];
   if (!tag) throw new Error("Usage: node eng/release/verify-version-tag.mjs <tag>");
-  await verifyVersionTag(tag);
+  await (stable ? verifyStableVersionTag(tag) : verifyVersionTag(tag));
 }

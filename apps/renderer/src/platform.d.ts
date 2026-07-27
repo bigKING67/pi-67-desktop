@@ -14,6 +14,7 @@ declare global {
         getUpdateState(): Promise<unknown>;
         checkForUpdates(): Promise<unknown>;
         onAgentHostFailed(listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): () => void;
+        onPowerResume(listener: () => void): () => void;
       };
     };
   }

@@ -2,7 +2,7 @@
 
 Pi-67 Desktop 是面向 Pi / pi-67 的本地优先桌面客户端。它保留 Pi 的配置、
 模型、Skills、Prompts、Extensions 和 JSONL 会话语义，用图形界面提供会话树、
-流式消息、Steer、Follow-up、回滚、压缩和常见 extension 交互。
+流式消息、立即纠偏、完成后执行、回滚、压缩和常见 extension 交互。
 
 当前仓库处于 alpha 实施阶段。GitHub Releases 可以提供明确标记的 unsigned
 preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Developer ID
@@ -34,6 +34,13 @@ Unsigned Preview 只提供：
 这些 preview 不包含稳定自动更新 metadata，并且没有 Windows publisher、macOS
 Developer ID 或 Apple notarization。Windows SmartScreen 可能要求通过“更多信息”继续；
 macOS 可以在 Finder 中右键选择“打开”，或在“系统设置 -> 隐私与安全性”中允许。
+如果 Gatekeeper 仍阻止从本仓库下载且已经核对 SHA-256 的应用，可以在拖入
+`/Applications` 后执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
+```
+
 下载后应使用同一 Release 中的 `SHA256SUMS.txt` 或
 `unsigned-preview-manifest.json` 核对文件身份。
 
@@ -78,6 +85,32 @@ Electron Main
 
 开发环境只允许 Vite 在 `127.0.0.1:5173` 提供静态资源和 HMR。
 
+## Protocol v2 与运行模型
+
+跨进程控制面使用同仓 clean-break 的 Protocol v2：
+
+- `hello` / `welcome` 协商 `appInstanceId`、`hostInstanceId`、`hostEpoch`、事件序列和消息上限；
+- 每个 command、response 和 event 都有 TypeBox schema；Session/Operation 事件还交叉校验 envelope 与
+  payload authority，错误使用稳定 code，而不是解析报错字符串；
+- `prompt.submit`、extension command、compact 和 session import 先返回
+  `accepted + operationId`，业务执行不受通用 30 秒请求超时约束；
+- Agent Host 关闭、`messageerror` 或 epoch 更换会立即终止旧 pending request，旧响应不能覆盖新状态；
+- 应用退出由 Main 异步 gate：Host 先关闭 admission、清理 Queue/交互请求、尝试 abort active Operation
+  并 dispose Pi Runtime；超过有界 deadline 才强制 kill，退出期间不会再重启 Host 或 broker 新 Port；
+- Renderer 检测到 event sequence 缺口后停止猜测状态，只通过 `projection.resync` 恢复；
+- Host 侧 scheduler 管理 control、turn、queue、interrupt 和 query lane，Renderer 的禁用状态不是并发保护边界。
+- Extension Catalog 独立于会话快照，过滤 Desktop 内部 hidden extension，并按 command、tool、
+  shared UI 与 TUI custom surface 展示保守兼容性；证据不足明确显示为未知。
+- Session Catalog 通过 `session.catalog.query` 提供 revision-bound keyset 分页和服务端搜索；
+  changed event 只做失效通知，`projection.resync` 只恢复 Catalog status，不回传全量 Session。
+
+日常更新使用 `conversation.changed`、`queue.changed`、`session.metaChanged`、
+`tree.changed` 和 `usage.changed` 等窄事件。初始/恢复状态通过受控 bootstrap 或
+resync 取得；消息默认只投影最近 100 条并按稳定 cursor 向前分页，会话树采用有界 flat
+projection。Agent Host 在 Session bind 时只做一次全量 SDK entry read，Catalog metadata、
+usage、branch cursor、tree、Conversation page 和 Recorded Changes 共享可丢弃的内存索引，
+后续 entry 通过事件增量维护。完整限制见 `docs/architecture/processes-and-protocol.md`。
+
 ## 技术基线
 
 - Electron `43.2.0`（Node `24.18.0` / Chromium `150.0.7871.129`）
@@ -105,6 +138,9 @@ corepack pnpm run build
 corepack pnpm run dev
 ```
 
+`check` 包含按 package 划分的 branch coverage 回归门禁；完整 inventory、当前 floor、
+长期目标和 Electron/E2E 证据边界见 `docs/testing/coverage.md`。
+
 `pnpm run dev` 会先构建 packages/Main/Preload/Agent Host，然后启动 Vite 与真实
 Electron。仅预览 renderer 不能证明 utility process、`app://`、原生标题栏、文件
 对话框或进程清理正确。
@@ -117,8 +153,9 @@ corepack pnpm run package:smoke
 ```
 
 该入口只接受 Windows x64 或 macOS arm64，会清除签名环境变量并拒绝交叉平台构建。
-它验证目标平台原生依赖、隔离 user-data、`app://pi67`、主题持久化、sandbox 和按需
-Agent Host，但不生成可发布的签名产物。
+它验证目标平台原生依赖、隔离 user-data、`app://pi67`、主题持久化、sandbox、按需
+Agent Host，以及活跃受控 Extension command 关闭时的 `session_shutdown(reason="quit")`、
+child process / utility process 回收和五秒关闭预算；但不生成可发布的签名产物。
 
 可重复性能测量会构建当前平台的 unsigned unpacked application，并把本机报告写入 ignored 的
 `artifacts/performance/`：
@@ -133,12 +170,13 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
 
 ```text
 apps/
-  agent-host/       Electron utility process 与命令路由
-  desktop/          Electron Main、Preload、窗口、更新和系统能力
-  renderer/         React 产品界面
+  agent-host/       Protocol server、command scheduler、Operation registry 与恢复边界
+  desktop/          Electron Main、Preload、窗口、app scheme、Host supervisor 与系统能力
+  renderer/         React 产品界面、Connection Controller、增量投影和 feature UI
 packages/
   domain/           无运行时依赖的策略与视图模型
-  protocol/         可验证的跨进程 command/event/response 合同
+  protocol/         Protocol v2 envelope、逐消息 schema 和 Port client
+  extension-compat/ 声明式 Extension Adapter manifest、校验与 immutable registry
   pi-runtime/       AgentRuntime port、PiSdkRuntime、extension UI 与安全扩展
 eng/
   dev/              本地开发编排
@@ -146,6 +184,48 @@ eng/
   quality/          架构、目录和生产 transport 门禁
   release/          产物 manifest 与 SHA-256 验证
 ```
+
+Renderer 的 Raw `AgentPortClient` 只由 `connection/AgentConnectionController.ts` 持有；
+feature controller 发出 typed request，Zustand 只接收 typed domain events，不再保存转发 MessagePort
+request 的 action facade。宽 `SessionSnapshot` 在 Renderer 边界拆分：
+`conversationStore` 持有 settled message pages/cursors/Virtuoso anchor，`liveTurnStore` 持有
+Operation-scoped text/thinking chunks，`extensionUiStore` 持有 Extension request/status/widget/
+compatibility/Catalog/title，`approvalStore` 持有 Safety Approval request；两者在 Host 或 Session
+authority 失效时统一清理。App Store 不再保存 messages、message page、streaming 字符串、
+Extension UI、Approval、Workspace Changes 或 Session view 副本。`workspaceChangesStore` 独占有界修改投影、
+同步状态和 `toolCallId` 索引，独立 controller 负责 transport 与延迟响应失效。App Store 不再保存
+Session ID、generation、projection revision 或 authority phase 的镜像；`sessionProjectionStore` 按 identity、
+model/provider controls、queue、resources 和 usage 保存稳定分组引用；control response 只更新命令拥有且
+请求期间未被更晚增量事件推进的分组，不能用迟到 full snapshot 回滚 Queue 或 Usage。`sessionTreeStore`
+独占 flat tree、同步状态和请求 revision，
+独立 controller 合并并发 dirty signal，且只接受当前 Host/Session/generation 的 response。
+Session authority 由 `session/session-authority.ts` 和 `sessionProjectionStore` 绑定 Host epoch、Session ID、
+generation 与本地 projection revision；`renderer-session-transaction` 统一使 Conversation、Live Turn、Changes、Approval、
+Extension UI 和 Catalog request target 失效。Session/Host/resync transaction 之后的旧 event、成功响应和
+rejection 均不能写回。Pi 在 bootstrap 前发送的 Extension Catalog 只做 revision-bound 暂存，必须与随后
+bootstrap 的 Session ID/generation 精确匹配，不能把未知 generation 当通配符。
+Snapshot 安装采用单 authority 两阶段提交：先把 canonical Session authority 置为 inactive，逐项安装并校验
+Conversation、Tree、Changes 和 Catalog，最后才提交 active authority；subscriber 重入或新 transaction 推进
+revision 后，旧安装立即停止，且不得通过失败清理覆盖更新状态。
+Session view 通过 `session/session-projection-selectors.ts` 消费；Transcript、Navigation、Trust、Composer、
+Context、Credential、TitleBar 和 Command Palette 不再订阅 App Store 的 Session 数据。Usage、Queue、
+Resource 或 Model 更新只替换对应分组引用，不会
+触发这些 surface 的宽重渲染。`sessionCatalogStore` 只管理分页投影和请求状态，独立 Controller
+负责 `session.catalog.query`、stale cursor 重载和延迟结果失效；Store 不持有 transport。样式基础位于 `styles/`，
+feature-specific CSS Module 与组件同目录。Electron Main 的
+scheme、window policy、Agent Host supervisor 和 system bridge 分文件维护，不再集中在单一入口文件。
+
+当前 Alpha 已有有界 Tool Presentation Registry、运行状态栏、响应式导航/上下文抽屉、
+Session 搜索、Queue 查看与原子清空，以及 Pi Session Recorded Changes Inspector。后者只展示
+当前活动分支中可验证的 `edit`/`write` 记录：`edit` 可展示有界 Patch，`write` 不伪造写入前版本；
+	它不是完整 Git/workspace Diff。声明式 Extension Adapter Registry v1 已接通 Catalog、Command
+	Palette 和 Tool Card；当前 source-pinned built-ins 覆盖 `pi-rewind@0.5.0` 的 `/rewind`，以及
+	`@feniix/pi-sequential-thinking@5.0.3` 的八个静态 Tool surface
+	命令元数据。它的快捷键/TUI surface 仍明确标记为 `partial`，shared `ctx.ui` caller attribution
+	仍不可用；不得据此宣称完整 Extension UI 已兼容。文件预览、完整
+Diff、Queue 逐条编辑和 asset handle 仍是后续能力。Session 导航
+已经使用 disposable metadata-only SQLite Catalog：Pi JSONL 仍是唯一真源，SQLite 不保存
+Prompt、Assistant、Thinking、Tool payload、源码、Patch、图片或 transcript，也不提供 FTS。
 
 产品、视觉与运行时边界分别由 `PRODUCT.md`、`DESIGN.md` / `DESIGN.dark.md`、
 `AGENTS.md` 和 `docs/architecture/processes-and-protocol.md` 管理。

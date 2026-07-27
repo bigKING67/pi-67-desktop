@@ -42,6 +42,18 @@ jobs:
         run: corepack pnpm run check
       - name: Build
         run: corepack pnpm run build
+      - name: Measure Session JSONL tail baseline
+        env:
+          PI67_PERF_SAMPLES: 10
+          PI67_PERF_JSONL_BOUNDARY_SAMPLES: 3
+        run: corepack pnpm run performance:session-jsonl-tail
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: session-jsonl-tail-${{ runner.os }}-${{ matrix.expectedArch }}
+          path: artifacts/performance/session-jsonl-tail-*.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Install Playwright Chromium
         run: corepack pnpm exec playwright install --no-shell chromium
       - name: Renderer and Electron smoke
@@ -50,6 +62,26 @@ jobs:
         run: corepack pnpm run package:native:unsigned
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
+      - name: Verify Windows packaged synthetic scale and IME contracts
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-ui
+      - name: Verify Windows NSIS installer lifecycle
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-installer
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-packaged-ui-x64
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-installer-lifecycle-x64
+          path: artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: warn
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

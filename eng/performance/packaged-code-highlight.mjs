@@ -2,14 +2,16 @@ export async function measurePackagedCodeHighlight(application, window, sessionP
   await application.evaluate(({ dialog }, selectedPath) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
   }, sessionPath);
+  await window.getByRole("button", { name: "更多会话操作" }).click();
   return withTimeout(window.evaluate((lineCount) => new Promise((resolve, reject) => {
-    const button = document.querySelector('[aria-label="导入 Pi session 到当前工作区"]');
-    if (!(button instanceof HTMLButtonElement)) {
+    const action = [...document.querySelectorAll('[role="menuitem"]')]
+      .find((element) => element.textContent?.includes("导入 Pi Session"));
+    if (!(action instanceof HTMLElement)) {
       reject(new Error("Pi session file action is unavailable."));
       return;
     }
     const started = performance.now();
-    button.click();
+    action.click();
     const observe = () => {
       const codeBlock = document.querySelector(".code-block");
       const state = codeBlock?.getAttribute("data-highlight-state");

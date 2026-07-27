@@ -42,6 +42,9 @@ importers:
       knip:
         specifier: 6.29.0
         version: 6.29.0
+      oxc-parser:
+        specifier: 0.140.0
+        version: 0.140.0
       oxlint:
         specifier: 1.75.0
         version: 1.75.0(oxlint-tsgolint@7.0.2001)
@@ -51,6 +54,9 @@ importers:
       pnpm:
         specifier: 11.16.0
         version: 11.16.0
+      semver:
+        specifier: 7.7.4
+        version: 7.7.4
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -85,6 +91,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@pi67/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       semver:
         specifier: 7.7.4
         version: 7.7.4
@@ -181,6 +190,25 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(@vitest/coverage-v8@4.1.10)(vite@8.1.5(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
 
+  packages/extension-compat:
+    dependencies:
+      semver:
+        specifier: 7.7.4
+        version: 7.7.4
+    devDependencies:
+      '@types/semver':
+        specifier: 7.7.1
+        version: 7.7.1
+      tsdown:
+        specifier: 0.22.13
+        version: 0.22.13(oxc-resolver@11.24.2)(typescript@7.0.2)
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(@vitest/coverage-v8@4.1.10)(vite@8.1.5(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
+
   packages/pi-runtime:
     dependencies:
       '@earendil-works/pi-agent-core':
@@ -195,6 +223,9 @@ importers:
       '@pi67/domain':
         specifier: workspace:*
         version: link:../domain
+      '@pi67/extension-compat':
+        specifier: workspace:*
+        version: link:../extension-compat
       '@pi67/protocol':
         specifier: workspace:*
         version: link:../protocol

@@ -26,5 +26,8 @@
     "@pi67/renderer",
     "electron",
     "pnpm"
+  ],
+  "ignoreBinaries": [
+    "pwsh"
   ]
 }

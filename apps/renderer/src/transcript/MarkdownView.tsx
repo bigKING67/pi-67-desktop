@@ -4,31 +4,56 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { HighlightToken } from "./code-highlighter.js";
 
-export function MarkdownView({ children }: { children: string }) {
+interface MarkdownViewProps {
+  children: string;
+  mode?: "settled" | "streaming";
+}
+
+export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) {
+  const streaming = mode === "streaming";
   return (
-    <div className="markdown-body">
+    <div className="markdown-body" data-markdown-mode={mode}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ href, children: linkChildren }) => (
-            <button className="markdown-link" type="button" onClick={() => {
-              const target = safeExternalHref(href);
-              if (target) void window.pi67.system.requestOpenExternal(target);
-            }}>
-              {linkChildren}
-            </button>
-          ),
+          a: ({ href, children: linkChildren }) => {
+            const target = safeExternalHref(href);
+            return target ? (
+              <a
+                className="markdown-link"
+                href={target}
+                rel="noreferrer noopener"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void window.pi67.system.requestOpenExternal(target);
+                }}
+              >
+                {linkChildren}
+              </a>
+            ) : <span className="markdown-link is-disabled">{linkChildren}</span>;
+          },
           code: ({ className, children: codeChildren }) => {
             const code = codeText(codeChildren).replace(/\n$/, "");
             const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
             return className
-              ? <CodeBlock code={code} {...(language === undefined ? {} : { language })} />
+              ? streaming
+                ? <StreamingCodeBlock code={code} {...(language === undefined ? {} : { language })} />
+                : <CodeBlock code={code} {...(language === undefined ? {} : { language })} />
               : <code>{codeChildren}</code>;
           }
         }}
       >
         {children}
       </ReactMarkdown>
+    </div>
+  );
+}
+
+function StreamingCodeBlock({ code, language }: { code: string; language?: string }) {
+  return (
+    <div className="code-block" data-highlight-state="streaming">
+      <div className="code-header"><span>{language ?? "text"}</span><button type="button" onClick={() => void navigator.clipboard.writeText(code)}>复制</button></div>
+      <pre><code>{code}</code></pre>
     </div>
   );
 }

@@ -1,23 +1,25 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { rendererSessionInstallationViolations } from "./architecture-rules.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const sourceRoots = [join(root, "apps"), join(root, "packages")];
-const packageEntries = new Map([
-  ["@pi67/domain", join(root, "packages/domain/src/index.ts")],
-  ["@pi67/protocol", join(root, "packages/protocol/src/index.ts")],
-  ["@pi67/pi-runtime", join(root, "packages/pi-runtime/src/index.ts")]
-]);
-
 const files = (await Promise.all(sourceRoots.map(collectSourceFiles))).flat();
 const fileSet = new Set(files);
+const workspacePackages = await discoverWorkspacePackages(fileSet);
+const packageEntries = new Map(
+  workspacePackages
+    .filter((item) => item.sourceEntry)
+    .map((item) => [item.name, item.sourceEntry])
+);
 const graph = new Map(files.map((file) => [file, []]));
 const violations = [];
 let dependencyCount = 0;
 
 for (const file of files) {
   const source = await readFile(file, "utf8");
+  violations.push(...rendererSessionInstallationViolations(toRepoPath(file), source));
   for (const specifier of parseImports(source)) {
     dependencyCount += 1;
     checkBoundary(file, specifier, violations);
@@ -25,6 +27,8 @@ for (const file of files) {
     if (target) graph.get(file)?.push(target);
   }
 }
+
+checkManifestBoundaries(workspacePackages, violations);
 
 for (const cycle of findCycles(graph)) {
   violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
@@ -46,7 +50,10 @@ async function collectSourceFiles(directory) {
       if (entry.name !== "dist" && entry.name !== "node_modules") output.push(...await collectSourceFiles(path));
       continue;
     }
-    if ([".ts", ".tsx", ".mts", ".cts"].includes(extname(entry.name)) && !entry.name.endsWith(".test.ts")) output.push(path);
+    if (
+      [".ts", ".tsx", ".mts", ".cts"].includes(extname(entry.name))
+      && !/\.(?:test|spec)\.[cm]?tsx?$/u.test(entry.name)
+    ) output.push(path);
   }
   return output;
 }
@@ -83,12 +90,26 @@ function checkBoundary(file, specifier, output) {
     || specifier.startsWith("@pi67/")
   )) fail("domain must remain dependency-free");
   if (path.startsWith("packages/protocol/") && (
-    specifier === "electron"
+    specifier.startsWith("node:")
+    || specifier === "electron"
+    || specifier === "react"
+    || specifier === "react-dom"
     || specifier.startsWith("@earendil-works/")
     || specifier === "@pi67/pi-runtime"
   )) fail("protocol must remain runtime-neutral");
+  if (path.startsWith("packages/extension-compat/") && (
+    specifier.startsWith("node:")
+    || specifier === "electron"
+    || specifier === "react"
+    || specifier === "react-dom"
+    || specifier.startsWith("@earendil-works/")
+    || specifier.startsWith("@pi67/")
+  )) fail("extension compatibility manifests must remain runtime-neutral and data-only");
   if (path.startsWith("packages/pi-runtime/") && (specifier === "electron" || specifier.startsWith("apps/"))) {
     fail("Pi runtime cannot depend on Electron or an application");
+  }
+  if (!path.startsWith("packages/pi-runtime/") && specifier.startsWith("@earendil-works/")) {
+    fail("only packages/pi-runtime may import the Pi SDK runtime");
   }
   if (path.startsWith("apps/renderer/") && (
     specifier.startsWith("node:")
@@ -101,6 +122,83 @@ function checkBoundary(file, specifier, output) {
     || specifier === "@pi67/domain"
     || specifier.startsWith("@earendil-works/")
   )) fail("Electron Main must communicate through protocol contracts");
+}
+
+async function discoverWorkspacePackages(sourceFiles) {
+  const entries = [];
+  for (const kind of ["apps", "packages"]) {
+    const parent = join(root, kind);
+    for (const entry of await readdir(parent, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const directory = join(parent, entry.name);
+      const manifest = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
+      const sourceEntry = [join(directory, "src/index.ts"), join(directory, "src/index.tsx")]
+        .find((candidate) => sourceFiles.has(candidate));
+      entries.push({
+        name: manifest.name,
+        kind,
+        directory,
+        sourceEntry,
+        runtimeDependencies: {
+          ...manifest.dependencies,
+          ...manifest.peerDependencies
+        },
+        dependencies: {
+          ...manifest.dependencies,
+          ...manifest.devDependencies,
+          ...manifest.peerDependencies
+        }
+      });
+    }
+  }
+  return entries;
+}
+
+function checkManifestBoundaries(packages, output) {
+  const byName = new Map(packages.map((item) => [item.name, item]));
+  for (const owner of packages) {
+    for (const dependencyName of Object.keys(owner.dependencies)) {
+      const dependency = byName.get(dependencyName);
+      if (!dependency) continue;
+      if (owner.kind === "packages" && dependency.kind === "apps") {
+        output.push(`${toRepoPath(owner.directory)}/package.json -> ${dependencyName}: packages cannot depend on applications`);
+      }
+    }
+
+    for (const dependencyName of Object.keys(owner.runtimeDependencies)) {
+      const fail = (reason) => output.push(
+        `${toRepoPath(owner.directory)}/package.json -> ${dependencyName}: ${reason}`
+      );
+      if (owner.name === "@pi67/domain") fail("domain must remain dependency-free");
+      if (owner.name === "@pi67/protocol" && (
+        dependencyName === "electron"
+        || dependencyName === "react"
+        || dependencyName === "react-dom"
+        || dependencyName === "@pi67/pi-runtime"
+        || dependencyName.startsWith("@earendil-works/")
+      )) fail("protocol must remain runtime-neutral");
+      if (owner.name === "@pi67/extension-compat" && (
+        dependencyName === "electron"
+        || dependencyName === "react"
+        || dependencyName === "react-dom"
+        || dependencyName.startsWith("@earendil-works/")
+        || dependencyName.startsWith("@pi67/")
+      )) fail("extension compatibility manifests must remain runtime-neutral and data-only");
+      if (owner.name !== "@pi67/pi-runtime" && dependencyName.startsWith("@earendil-works/")) {
+        fail("only packages/pi-runtime may own Pi SDK runtime dependencies");
+      }
+      if (owner.name === "@pi67/renderer" && (
+        dependencyName === "electron"
+        || dependencyName === "@pi67/pi-runtime"
+        || dependencyName.startsWith("@earendil-works/")
+      )) fail("renderer cannot depend on privileged runtimes");
+      if (owner.name === "@pi67/desktop" && (
+        dependencyName === "@pi67/domain"
+        || dependencyName === "@pi67/pi-runtime"
+        || dependencyName.startsWith("@earendil-works/")
+      )) fail("Electron Main must depend only on protocol-neutral application contracts");
+    }
+  }
 }
 
 function resolveSourceImport(file, specifier, knownFiles) {

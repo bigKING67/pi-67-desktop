@@ -17,9 +17,9 @@ const forbidden = [
   ["WebSocket API", /\bWebSocket\b/u],
   ["local HTTP server", /\bcreateServer\s*\(/u],
   ["listening socket", /\.listen\s*\(/u],
-  ["WebSocket URL", /\bwss?:\/\//u],
-  ["localhost production URL", /https?:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0)/u]
+  ["WebSocket URL", /\bwss?:\/\//u]
 ];
+const localUrlPattern = /https?:\/\/(?:127\.0\.0\.1|localhost|0\.0\.0\.0)[^"'\s]*/gu;
 const failures = [];
 
 for (const file of files) {
@@ -27,11 +27,29 @@ for (const file of files) {
   for (const [label, pattern] of forbidden) {
     if (pattern.test(source)) failures.push(`${toRepoPath(file)} contains ${label}`);
   }
+  for (const match of source.matchAll(localUrlPattern)) {
+    const isAllowedViteUrl = toRepoPath(file) === "apps/desktop/src/renderer-security.ts"
+      && (match[0] === "http://127.0.0.1:5173/" || match[0] === "http://127.0.0.1:5173");
+    if (!isAllowedViteUrl) failures.push(`${toRepoPath(file)} contains localhost production URL`);
+  }
 }
 
 const main = await readFile(join(root, "apps/desktop/src/main.ts"), "utf8");
-for (const required of ["app://pi67/index.html", "MessageChannelMain", "utilityProcess.fork", "contextIsolation: true", "sandbox: true"]) {
-  if (!main.includes(required)) failures.push(`desktop transport invariant is missing: ${required}`);
+const agentHostSupervisor = await readFile(join(root, "apps/desktop/src/agent-host-supervisor.ts"), "utf8");
+const mainWindow = await readFile(join(root, "apps/desktop/src/main-window.ts"), "utf8");
+const rendererSecurity = await readFile(join(root, "apps/desktop/src/renderer-security.ts"), "utf8");
+const desktopTransportInvariants = [
+  ["MessageChannelMain", agentHostSupervisor],
+  ["utilityProcess.fork", agentHostSupervisor],
+  ["contextIsolation: true", mainWindow],
+  ["sandbox: true", mainWindow],
+  ["resolveRendererUrl", main]
+];
+for (const [required, source] of desktopTransportInvariants) {
+  if (!source.includes(required)) failures.push(`desktop transport invariant is missing: ${required}`);
+}
+if (!rendererSecurity.includes('PACKAGED_RENDERER_URL = "app://pi67/index.html"')) {
+  failures.push("renderer security invariant is missing: packaged app://pi67/index.html");
 }
 
 if (failures.length > 0) {
@@ -46,7 +64,11 @@ async function collect(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) output.push(...await collect(path));
-    else if ([".ts", ".tsx", ".html"].includes(extname(entry.name))) output.push(path);
+    else if (
+      [".ts", ".tsx", ".html"].includes(extname(entry.name))
+      && !entry.name.includes(".test.")
+      && !entry.name.includes(".spec.")
+    ) output.push(path);
   }
   return output;
 }

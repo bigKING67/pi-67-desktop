@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import type { SessionTreeProjection } from "@pi67/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 
@@ -20,6 +21,35 @@ afterEach(async () => {
 });
 
 describe("PiSdkRuntime", () => {
+  it("throws structured errors for runtime lifecycle and selection failures", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-errors-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+    const runtime = new PiSdkRuntime();
+
+    expect(captureError(() => runtime.getSnapshot())).toMatchObject({
+      code: "RUNTIME_NOT_READY",
+      recoverable: true
+    });
+
+    try {
+      const initializing = runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
+      await expect(runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" }))
+        .rejects.toMatchObject({ code: "BUSY", details: { retryable: true } });
+      await initializing;
+
+      await expect(runtime.selectModel("missing-provider", "missing-model"))
+        .rejects.toMatchObject({ code: "MODEL_NOT_FOUND", recoverable: true });
+      await expect(runtime.setThinkingLevel("unsupported-level"))
+        .rejects.toMatchObject({ code: "UNSUPPORTED", details: { feature: "thinking-level" } });
+
+    } finally {
+      await runtime.dispose();
+    }
+  }, 15_000);
+
   it("uses the Pi session runtime lifecycle for new sessions and reloads", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-sdk-lifecycle-"));
     temporaryDirectories.push(root);
@@ -43,9 +73,14 @@ describe("PiSdkRuntime", () => {
     });
     try {
       const initial = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
-      const created = await runtime.createSession(cwd);
+      const created = await runtime.createSession();
       expect(created.sessionId).not.toBe(initial.sessionId);
-      await runtime.reloadResources();
+      expect(created.cwd).toBe(cwd);
+      const resources = await runtime.reloadResources();
+      expect(Object.keys(resources).sort()).toEqual(["controls", "modelCatalog", "resources", "sessionId"]);
+      expect(resources).not.toHaveProperty("messages");
+      expect(resources).not.toHaveProperty("tree");
+      expect(resources).not.toHaveProperty("steeringQueue");
       await runtime.dispose();
 
       expect((await readFile(lifecyclePath, "utf8")).trim().split("\n")).toEqual([
@@ -57,6 +92,61 @@ describe("PiSdkRuntime", () => {
         "shutdown:quit"
       ]);
       expect(extensionErrors).toEqual([]);
+    } finally {
+      await runtime.dispose();
+    }
+  }, 15_000);
+
+  it("commits workspace cwd and trust before target extensions start", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-workspace-policy-"));
+    temporaryDirectories.push(root);
+    const workspaceA = join(root, "workspace-a");
+    const workspaceB = join(root, "workspace-b");
+    const agentDir = join(root, "agent");
+    const extensionsDirectory = join(agentDir, "extensions");
+    const lifecyclePath = join(root, "workspace-lifecycle.jsonl");
+    await Promise.all([
+      mkdir(workspaceA),
+      mkdir(workspaceB),
+      mkdir(extensionsDirectory, { recursive: true })
+    ]);
+    await writeFile(join(extensionsDirectory, "workspace-lifecycle.ts"), `
+      import { appendFileSync } from "node:fs";
+      export default function workspaceLifecycle(pi) {
+        const record = (phase, event, ctx) => appendFileSync(
+          ${JSON.stringify(lifecyclePath)},
+          JSON.stringify({ phase, reason: event.reason, cwd: ctx.sessionManager.getCwd(), trusted: ctx.isProjectTrusted() }) + "\\n"
+        );
+        pi.on("session_start", (event, ctx) => record("start", event, ctx));
+        pi.on("session_shutdown", (event, ctx) => record("shutdown", event, ctx));
+      }
+    `, "utf8");
+
+    const runtime = new PiSdkRuntime();
+    try {
+      await runtime.initialize({
+        cwd: workspaceA,
+        agentDir,
+        trust: "trusted",
+        approvalMode: "balanced"
+      });
+      const target = await runtime.initialize({
+        cwd: workspaceB,
+        agentDir,
+        trust: "unknown",
+        approvalMode: "guided"
+      });
+
+      expect(target.cwd).toBe(workspaceB);
+      const records = (await readFile(lifecyclePath, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(records).toEqual([
+        { phase: "start", reason: "startup", cwd: workspaceA, trusted: true },
+        { phase: "shutdown", reason: "quit", cwd: workspaceA, trusted: true },
+        { phase: "start", reason: "startup", cwd: workspaceB, trusted: false }
+      ]);
     } finally {
       await runtime.dispose();
     }
@@ -75,6 +165,14 @@ describe("PiSdkRuntime", () => {
 
     const runtime = new PiSdkRuntime();
     const restoredRuntime = new PiSdkRuntime();
+    const catalogs: Array<ReturnType<PiSdkRuntime["getExtensionCatalog"]>> = [];
+    const externalChanges: Array<{ reason: string; recoverable: boolean }> = [];
+    runtime.subscribe((event) => {
+      if (event.type === "extension.catalog.changed") catalogs.push(event.payload);
+    });
+    restoredRuntime.subscribe((event) => {
+      if (event.type === "session.externalChangeDetected") externalChanges.push(event.payload);
+    });
     try {
       const snapshot = await runtime.initialize({
         cwd,
@@ -89,15 +187,12 @@ describe("PiSdkRuntime", () => {
       expect(snapshot.models.length).toBeGreaterThan(0);
       expect(snapshot.messages).toEqual([]);
       expect(snapshot.resources.filter((resource) => resource.kind === "skill")).toEqual([]);
-      expect(snapshot.resources).toEqual([
-        expect.objectContaining({
-          id: "<inline:pi67-desktop-safety>",
-          kind: "extension",
-          status: "ready"
-        })
-      ]);
+      expect(snapshot.resources).toEqual([]);
+      expect(runtime.getExtensionCatalog()).toEqual({ items: [], total: 0, truncated: false });
+      expect(catalogs).toEqual([{ items: [], total: 0, truncated: false }]);
 
-      const renamed = await runtime.setSessionName("Isolated SDK smoke");
+      await runtime.setSessionName("Isolated SDK smoke");
+      const renamed = runtime.getSnapshot();
       expect(renamed.sessionName).toBe("Isolated SDK smoke");
       const sessionPath = renamed.sessionPath;
       if (!sessionPath) throw new Error("Pi SDK smoke requires a session path.");
@@ -117,10 +212,11 @@ describe("PiSdkRuntime", () => {
       });
       const fixturePath = fixture.getSessionFile();
       if (!fixturePath) throw new Error("Pi SDK smoke fixture was not persisted.");
-      expect(await runtime.listSessions()).toEqual([
+      expect((await queryReadyCatalog(runtime, { scope: "workspace" })).items).toEqual([
         expect.objectContaining({ path: fixturePath, name: "Restored SDK smoke" })
       ]);
-      expect((await runtime.listSessions(true)).some((session) => session.path === fixturePath)).toBe(true);
+      expect((await queryReadyCatalog(runtime, { scope: "all" })).items.some((session) => session.path === fixturePath))
+        .toBe(true);
 
       const externalSessionDir = join(root, "external-sessions");
       await mkdir(externalSessionDir);
@@ -151,9 +247,16 @@ describe("PiSdkRuntime", () => {
       expect(firstImport.sessionId).toBe(externalFixture.getSessionId());
       expect(firstImport.sessionName).toBe("Imported SDK smoke");
       expect(firstImport.messages).toHaveLength(2);
+      expect(runtime.getSessionTree()).toEqual(firstImport.tree);
+      expect(hasActiveTreeNode(runtime.getSessionTree())).toBe(true);
       expect(await readFile(externalPath, "utf8")).toBe(externalContent);
+      await runtime.setSessionName("Renamed imported SDK smoke");
       const firstImportContent = await readFile(firstImportPath, "utf8");
-      expect((await runtime.listSessions()).some((session) => session.path === firstImportPath)).toBe(true);
+      expect((await runtime.querySessionCatalog({ scope: "workspace" })).items
+        .find((session) => session.path === firstImportPath)).toMatchObject({
+          name: "Renamed imported SDK smoke",
+          messageCount: 2
+        });
 
       const secondImport = await runtime.importSession(externalPath);
       const secondImportPath = secondImport.sessionPath;
@@ -179,14 +282,18 @@ describe("PiSdkRuntime", () => {
       const authBefore = await readFile(authPath, "utf8");
       const runtimeKey = "pi67-test-runtime-secret";
       const configured = await expectNoFetch(() => runtime.setRuntimeApiKey(provider, runtimeKey));
-      expect(configured.models.some((model) => model.provider === provider && model.configured)).toBe(true);
-      expect(configured.providers).toContainEqual(expect.objectContaining({
+      expect(Object.keys(configured).sort()).toEqual(["controls", "modelCatalog", "sessionId"]);
+      expect(configured).not.toHaveProperty("messages");
+      expect(configured).not.toHaveProperty("tree");
+      expect(configured).not.toHaveProperty("steeringQueue");
+      expect(configured.modelCatalog.models.some((model) => model.provider === provider && model.configured)).toBe(true);
+      expect(configured.modelCatalog.providers).toContainEqual(expect.objectContaining({
         id: provider,
         configured: true,
         credentialSource: "runtime"
       }));
-      expect(JSON.stringify(configured.providers)).not.toContain(runtimeKey);
-      const configuredAfterNewSession = await runtime.createSession(cwd);
+      expect(JSON.stringify(configured.modelCatalog.providers)).not.toContain(runtimeKey);
+      const configuredAfterNewSession = await runtime.createSession();
       expect(configuredAfterNewSession.providers).toContainEqual(expect.objectContaining({
         id: provider,
         configured: true,
@@ -215,6 +322,24 @@ describe("PiSdkRuntime", () => {
       expect(restored.sessionName).toBe("Restored SDK smoke");
       expect(restored.messages).toHaveLength(2);
       expect(restored.models.some((model) => model.provider === provider && model.configured)).toBe(false);
+      await restoredRuntime.setSessionName("Desktop rename one");
+      await restoredRuntime.setSessionName("Desktop rename two");
+      const restoredRenamed = restoredRuntime.getSnapshot();
+      expect(restoredRenamed.sessionName).toBe("Desktop rename two");
+      expect(externalChanges).toEqual([]);
+      await appendFile(fixturePath, `${JSON.stringify({
+        type: "session_info",
+        id: "external-change",
+        parentId: fixture.getLeafId(),
+        timestamp: new Date().toISOString(),
+        name: "Changed outside Desktop"
+      })}\n`);
+      await vi.waitFor(() => {
+        expect(externalChanges).toEqual([{ reason: "appended", recoverable: true }]);
+      }, { timeout: 1_000 });
+      await expect(restoredRuntime.submitPrompt("must not execute"))
+        .rejects.toMatchObject({ code: "SESSION_CHANGED_EXTERNALLY", recoverable: true });
+      expect(JSON.stringify(externalChanges)).not.toContain(fixturePath);
       await expect(stat(join(root, ".pi", "agent", "sessions"))).rejects.toMatchObject({ code: "ENOENT" });
     } finally {
       await runtime.dispose();
@@ -236,7 +361,29 @@ async function expectNoFetch<T>(operation: () => Promise<T>): Promise<T> {
   }
 }
 
+async function queryReadyCatalog(
+  runtime: PiSdkRuntime,
+  query: Parameters<PiSdkRuntime["querySessionCatalog"]>[0]
+) {
+  await runtime.querySessionCatalog({ ...query, refresh: true });
+  await vi.waitFor(() => expect(runtime.getSessionCatalogStatus().rebuilding).toBe(false), { timeout: 5_000 });
+  return runtime.querySessionCatalog(query);
+}
+
 function restoreEnvironment(name: "HOME" | "USERPROFILE", value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
+}
+
+function hasActiveTreeNode(tree: SessionTreeProjection): boolean {
+  return tree.nodes.some((node) => node.active);
+}
+
+function captureError(operation: () => unknown): unknown {
+  try {
+    operation();
+    return undefined;
+  } catch (error) {
+    return error;
+  }
 }

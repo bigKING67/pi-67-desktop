@@ -1,29 +1,38 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
+import {
+  expectedSignedReleaseArtifacts,
+  findUnexpectedSignedReleaseProductArtifacts,
+  validateSignedReleaseManifest
+} from "./release-manifest-contract.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const releaseDirectory = join(root, "artifacts/release");
 const manifest = JSON.parse(await readFile(join(releaseDirectory, "release-manifest.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const { runtimeSpecifier } = await readPiRuntimeContract(root);
 const failures = [];
 const entries = Array.isArray(manifest.files) ? manifest.files : [];
-const expectedNames = new Set([
-  `Pi-67-Desktop-${packageJson.version}-win-x64.exe`,
-  `Pi-67-Desktop-${packageJson.version}-mac-arm64.dmg`,
-  `Pi-67-Desktop-${packageJson.version}-mac-arm64.zip`
-]);
+const expectedArtifacts = expectedSignedReleaseArtifacts(packageJson.version);
+const expectedNames = new Set(expectedArtifacts.keys());
+const releaseEntries = await readdir(releaseDirectory, { withFileTypes: true });
 
-if (manifest.schemaVersion !== 1 || manifest.product !== "Pi-67 Desktop") failures.push("invalid release manifest identity");
-if (manifest.version !== packageJson.version) failures.push("release manifest version does not match package.json");
-if (manifest.runtime !== "@earendil-works/pi-coding-agent@0.81.1") failures.push("release manifest runtime is not pinned to Pi SDK 0.81.1");
-if (entries.length !== expectedNames.size) failures.push("release manifest must contain exactly three artifacts");
+failures.push(...validateSignedReleaseManifest(manifest, packageJson.version));
+if (manifest.runtime !== runtimeSpecifier) failures.push(`release manifest runtime must be ${runtimeSpecifier}`);
 
 const actualNames = new Set(entries.map((entry) => entry?.name).filter((name) => typeof name === "string"));
 for (const name of expectedNames) if (!actualNames.has(name)) failures.push(`release manifest is missing ${name}`);
 if (actualNames.size !== entries.length) failures.push("release manifest contains duplicate artifact names");
+for (const name of findUnexpectedSignedReleaseProductArtifacts(
+  packageJson.version,
+  releaseEntries.filter((entry) => entry.isFile()).map((entry) => entry.name)
+)) {
+  failures.push(`release directory contains an unsupported product artifact: ${name}`);
+}
 
 for (const entry of entries) {
   if (typeof entry.name !== "string" || !/^Pi-67-Desktop-[0-9A-Za-z.-]+-(?:win-x64\.exe|mac-arm64\.(?:dmg|zip))$/u.test(entry.name)) {
@@ -36,7 +45,7 @@ for (const entry of entries) {
     const sha256 = await hashFile(path);
     if (bytes !== entry.bytes) failures.push(`${entry.name}: size mismatch`);
     if (sha256 !== entry.sha256) failures.push(`${entry.name}: SHA-256 mismatch`);
-    const expectedTarget = entry.name.includes("win-x64") ? "windows-x64" : "macos-arm64";
+    const expectedTarget = expectedArtifacts.get(entry.name);
     if (entry.target !== expectedTarget) failures.push(`${entry.name}: target mismatch`);
   } catch {
     failures.push(`${entry.name}: file is missing`);

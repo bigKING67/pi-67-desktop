@@ -1,7 +1,7 @@
 import { CircleCheck, ExternalLink, LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
-import { useAppStore } from "../app/app-store.js";
+import { useShellStore } from "../shell/shell-store.js";
 
 const channel = "unsigned-preview" as const;
 const releasePageBaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/tag/";
@@ -23,8 +23,8 @@ type UpdateAction = "check" | "open";
 const idleState: UpdateState = { phase: "idle", channel, currentVersion: "unknown" };
 
 export function UpdateDialog() {
-  const open = useAppStore((state) => state.updateDialogOpen);
-  const setOpen = useAppStore((state) => state.setUpdateDialogOpen);
+  const open = useShellStore((state) => state.updateDialogOpen);
+  const setOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const [update, setUpdate] = useState<UpdateState>(idleState);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string>();

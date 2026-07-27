@@ -61,9 +61,11 @@ export async function measureCodeHighlight(page, { markdown, messageId, expected
         longTaskObserver?.disconnect();
         const fallbackLength = codeBlock?.querySelector("pre > code")?.textContent?.length ?? 0;
         const messageLength = document.querySelector(".message-card .message-content")?.textContent?.length ?? 0;
+        const fixtureDiagnostics = typeof control.diagnostics === "function" ? control.diagnostics() : undefined;
         reject(new Error(
           `Code highlight timed out: highlighted=${highlightedLineCount}, rendered=${renderedLineCount}, expected=${lineCount}, `
-          + `codeBlock=${Boolean(codeBlock)}, fallbackLength=${fallbackLength}, messageLength=${messageLength}.`
+          + `codeBlock=${Boolean(codeBlock)}, fallbackLength=${fallbackLength}, messageLength=${messageLength}, `
+          + `fixture=${JSON.stringify(fixtureDiagnostics)}.`
         ));
         return;
       }

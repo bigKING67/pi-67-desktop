@@ -1,0 +1,160 @@
+.modal {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+
+.dialog,
+.content {
+  max-height: inherit;
+  min-height: 0;
+}
+
+.content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.header {
+  display: grid;
+  gap: 14px;
+  padding: 20px 20px 14px;
+}
+
+.header h2 {
+  margin: -7px 0 0;
+  font-size: 18px;
+}
+
+.reason,
+.denial {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.body {
+  display: grid;
+  min-height: 0;
+  gap: 14px;
+  padding: 0 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.securityWarning {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 36%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.securityWarning strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.details {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--border);
+}
+
+.details > div {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.details dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.securityLiteral {
+  font-family: var(--font-code);
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+.details pre.securityLiteral {
+  max-height: 112px;
+  margin: 0;
+  overflow: auto;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.details small {
+  display: block;
+  margin-top: 4px;
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.details .literalStatus {
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.denial {
+  font-size: 11px;
+}
+
+.actions {
+  flex: none;
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+@media (max-width: 560px) {
+  .overlay {
+    padding: 12px;
+  }
+
+  .modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .details > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .header {
+    padding: 16px 16px 12px;
+  }
+
+  .body {
+    padding: 0 16px;
+  }
+
+  .actions {
+    padding: 12px 16px 16px;
+  }
+}

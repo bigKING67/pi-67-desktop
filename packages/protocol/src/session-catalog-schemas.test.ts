@@ -1,0 +1,218 @@
+import { describe, expect, it } from "vitest";
+import { Value } from "typebox/value";
+import {
+  MAX_SESSION_CATALOG_ID_CHARS,
+  MAX_SESSION_CATALOG_NAME_CHARS,
+  MAX_SESSION_CATALOG_PAGE_ITEMS,
+  MAX_SESSION_CATALOG_PAGE_JSON_BYTES,
+  MAX_SESSION_CATALOG_PATH_CHARS,
+  MAX_SESSION_CATALOG_SEARCH_CHARS
+} from "@pi67/domain";
+import type { SessionCatalogPage, SessionCatalogStatus, SessionSummary } from "@pi67/domain";
+import { eventEnvelope, isEventEnvelope, isResponseEnvelope, responseEnvelope } from "./envelope.js";
+import {
+  SessionCatalogPageSchema,
+  SessionCatalogQuerySchema,
+  SessionCatalogStatusSchema
+} from "./session-catalog-schemas.js";
+
+describe("Session Catalog protocol schemas", () => {
+  const queryKey = "a".repeat(64);
+
+  it("accepts bounded structured queries and rejects invalid limits, cursors and unknown fields", () => {
+    const boundaryQuery = {
+      scope: "all",
+      search: "s".repeat(MAX_SESSION_CATALOG_SEARCH_CHARS),
+      cursor: {
+        revision: Number.MAX_SAFE_INTEGER,
+        queryKey,
+        modifiedAt: Number.MAX_SAFE_INTEGER,
+        path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS)
+      },
+      limit: MAX_SESSION_CATALOG_PAGE_ITEMS,
+      refresh: true
+    };
+
+    expect(Value.Check(SessionCatalogQuerySchema, boundaryQuery)).toBe(true);
+    expect(Value.Check(SessionCatalogQuerySchema, { scope: "workspace", limit: 1 })).toBe(true);
+    expect(Value.Check(SessionCatalogQuerySchema, { scope: "workspace", limit: 0 })).toBe(false);
+    expect(Value.Check(SessionCatalogQuerySchema, {
+      scope: "workspace",
+      limit: MAX_SESSION_CATALOG_PAGE_ITEMS + 1
+    })).toBe(false);
+    expect(Value.Check(SessionCatalogQuerySchema, {
+      scope: "workspace",
+      search: "s".repeat(MAX_SESSION_CATALOG_SEARCH_CHARS + 1)
+    })).toBe(false);
+    expect(Value.Check(SessionCatalogQuerySchema, {
+      scope: "workspace",
+      cursor: { modifiedAt: 1, path: "/sessions/one.jsonl" }
+    })).toBe(false);
+    expect(Value.Check(SessionCatalogQuerySchema, {
+      scope: "workspace",
+      cursor: { revision: 1, queryKey: "A".repeat(64), modifiedAt: 1, path: "/sessions/one.jsonl" }
+    })).toBe(false);
+    expect(Value.Check(SessionCatalogQuerySchema, {
+      scope: "workspace",
+      unexpected: true
+    })).toBe(false);
+  });
+
+  it("bounds page items and every SessionSummary field", () => {
+    const boundaryItem = sessionSummary({
+      id: "i".repeat(MAX_SESSION_CATALOG_ID_CHARS),
+      path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS),
+      cwd: "c".repeat(MAX_SESSION_CATALOG_PATH_CHARS),
+      name: "n".repeat(MAX_SESSION_CATALOG_NAME_CHARS),
+      parentSessionPath: "r".repeat(MAX_SESSION_CATALOG_PATH_CHARS)
+    });
+    const boundaryPage = catalogPage({
+      items: Array.from({ length: MAX_SESSION_CATALOG_PAGE_ITEMS }, () => boundaryItem),
+      total: MAX_SESSION_CATALOG_PAGE_ITEMS
+    });
+
+    expect(Value.Check(SessionCatalogPageSchema, boundaryPage)).toBe(true);
+    expect(Value.Check(SessionCatalogPageSchema, catalogPage({
+      items: Array.from({ length: MAX_SESSION_CATALOG_PAGE_ITEMS + 1 }, () => sessionSummary())
+    }))).toBe(false);
+
+    for (const item of [
+      sessionSummary({ id: "i".repeat(MAX_SESSION_CATALOG_ID_CHARS + 1) }),
+      sessionSummary({ path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS + 1) }),
+      sessionSummary({ cwd: "c".repeat(MAX_SESSION_CATALOG_PATH_CHARS + 1) }),
+      sessionSummary({ name: "n".repeat(MAX_SESSION_CATALOG_NAME_CHARS + 1) }),
+      sessionSummary({ parentSessionPath: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS + 1) })
+    ]) {
+      expect(Value.Check(SessionCatalogPageSchema, catalogPage({ items: [item] }))).toBe(false);
+    }
+
+    expect(Value.Check(SessionCatalogPageSchema, {
+      ...catalogPage(),
+      items: [{ ...sessionSummary(), unknown: true }]
+    })).toBe(false);
+    expect(Value.Check(SessionCatalogPageSchema, { ...catalogPage(), unknown: true })).toBe(false);
+  });
+
+  it("requires a response cursor to stay bound to its catalog revision", () => {
+    const validPage = catalogPage({
+      revision: 7,
+      hasMore: true,
+      nextCursor: { revision: 7, queryKey, modifiedAt: 1_700_000_000_000, path: "/sessions/one.jsonl" }
+    });
+    const response = responseEnvelope("request-1", 3, {
+      ok: true,
+      type: "session.catalog.query",
+      result: validPage
+    });
+    expect(isResponseEnvelope(response)).toBe(true);
+    expect(isResponseEnvelope({
+      ...response,
+      result: {
+        ...validPage,
+        nextCursor: { ...validPage.nextCursor!, revision: 6 }
+      }
+    })).toBe(false);
+  });
+
+  it("keeps a valid page below its dedicated JSON projection budget", () => {
+    const oversizedPage = catalogPage({
+      items: Array.from({ length: 24 }, (_, index) => sessionSummary({
+        id: `session-${index}`,
+        path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS),
+        cwd: "c".repeat(MAX_SESSION_CATALOG_PATH_CHARS)
+      })),
+      total: 24,
+      itemCount: 24
+    });
+    expect(JSON.stringify(oversizedPage).length).toBeGreaterThan(MAX_SESSION_CATALOG_PAGE_JSON_BYTES);
+    expect(isResponseEnvelope(responseEnvelope("request-oversized", 3, {
+      ok: true,
+      type: "session.catalog.query",
+      result: oversizedPage
+    }))).toBe(false);
+  });
+
+  it("validates stale catalog errors as a structured recoverable response", () => {
+    const stale = responseEnvelope("request-1", 3, {
+      ok: false,
+      type: "session.catalog.query",
+      error: {
+        code: "STALE_SESSION_CATALOG",
+        message: "Session Catalog cursor revision is stale.",
+        recoverable: true,
+        details: { cursorRevision: 6, currentRevision: 7 }
+      }
+    });
+    expect(isResponseEnvelope(stale)).toBe(true);
+    if (stale.ok) throw new Error("Expected a stale Session Catalog error response.");
+    expect(isResponseEnvelope({
+      ...stale,
+      error: { ...stale.error, details: { currentRevision: { nested: 7 } } }
+    })).toBe(false);
+  });
+
+  it("keeps change events metadata-only", () => {
+    for (const reason of [
+      "reconciled",
+      "session-created",
+      "session-updated",
+      "session-imported",
+      "source-changed"
+    ] as const) {
+      expect(isEventEnvelope(eventEnvelope("session.catalog.changed", {
+        revision: 8,
+        reason
+      }, { hostEpoch: 3, sequence: 1 }))).toBe(true);
+    }
+
+    const changed = eventEnvelope("session.catalog.changed", {
+      revision: 8,
+      reason: "reconciled"
+    }, { hostEpoch: 3, sequence: 1 });
+    expect(isEventEnvelope({
+      ...changed,
+      payload: { ...changed.payload, items: [sessionSummary()] }
+    })).toBe(false);
+  });
+
+  it("validates status independently for projection resync", () => {
+    expect(Value.Check(SessionCatalogStatusSchema, catalogStatus())).toBe(true);
+    expect(Value.Check(SessionCatalogStatusSchema, { ...catalogStatus(), itemCount: -1 })).toBe(false);
+    expect(Value.Check(SessionCatalogStatusSchema, { ...catalogStatus(), total: 1 })).toBe(false);
+  });
+});
+
+function sessionSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
+  return {
+    id: "session-1",
+    path: "/sessions/one.jsonl",
+    cwd: "/workspace",
+    name: "First session",
+    modifiedAt: 1_700_000_000_000,
+    messageCount: 12,
+    ...overrides
+  };
+}
+
+function catalogStatus(): SessionCatalogStatus {
+  return {
+    revision: 7,
+    itemCount: 1,
+    source: "sqlite",
+    state: "ready",
+    rebuilding: false,
+    reconciledAt: 1_700_000_000_000,
+    incomplete: false,
+    skippedCount: 0
+  };
+}
+
+function catalogPage(overrides: Partial<SessionCatalogPage> = {}): SessionCatalogPage {
+  return {
+    items: [sessionSummary()],
+    total: 1,
+    hasMore: false,
+    ...catalogStatus(),
+    ...overrides
+  };
+}

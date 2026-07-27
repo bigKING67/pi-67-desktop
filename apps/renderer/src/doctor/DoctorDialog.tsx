@@ -1,29 +1,33 @@
 import { CircleCheck, CircleX, LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import type { DoctorCheck } from "@pi67/domain";
-import { useAppStore } from "../app/app-store.js";
+import { messages } from "../localization/message-catalog.js";
+import { useShellStore } from "../shell/shell-store.js";
+import { runRuntimeDoctor } from "./runtime-diagnostics-controller.js";
+import { useDoctorStore } from "./use-doctor-store.js";
 
 const checkLabels: Record<DoctorCheck["id"], string> = {
-  platform: "系统平台",
-  node: "内置 Node.js",
-  "pi-sdk": "Pi SDK",
-  shell: "Pi Shell",
-  git: "Git"
+  platform: messages.doctor.checks.platform,
+  node: messages.doctor.checks.node,
+  "pi-sdk": messages.doctor.checks.piSdk,
+  "sqlite-runtime": messages.doctor.checks.sqliteRuntime,
+  "session-catalog": messages.doctor.checks.sessionCatalog,
+  shell: messages.doctor.checks.shell,
+  git: messages.doctor.checks.git
 };
 
 const statusLabels: Record<DoctorCheck["status"], string> = {
-  pass: "通过",
-  warning: "需注意",
-  fail: "失败"
+  pass: messages.doctor.statuses.pass,
+  warning: messages.doctor.statuses.warning,
+  fail: messages.doctor.statuses.fail
 };
 
 export function DoctorDialog() {
-  const open = useAppStore((state) => state.doctorDialogOpen);
-  const report = useAppStore((state) => state.doctorReport);
-  const running = useAppStore((state) => state.doctorRunning);
-  const error = useAppStore((state) => state.doctorError);
-  const setOpen = useAppStore((state) => state.setDoctorDialogOpen);
-  const runDoctor = useAppStore((state) => state.runDoctor);
+  const open = useShellStore((state) => state.doctorDialogOpen);
+  const setOpen = useShellStore((state) => state.setDoctorDialogOpen);
+  const report = useDoctorStore((state) => state.report);
+  const running = useDoctorStore((state) => state.running);
+  const error = useDoctorStore((state) => state.error);
 
   if (!open) return null;
   const failing = report?.checks.filter((check) => check.status === "fail").length ?? 0;
@@ -32,26 +36,28 @@ export function DoctorDialog() {
   return (
     <ModalOverlay className="modal-overlay" isOpen isDismissable={!running} onOpenChange={setOpen}>
       <Modal className="modal-surface doctor-dialog">
-        <Dialog aria-label="运行环境 Doctor">
+        <Dialog aria-label={messages.doctor.title}>
           <div className="diagnostic-dialog-content">
-            <span className="dialog-eyebrow">Runtime diagnostics</span>
-            <Heading slot="title">运行环境 Doctor</Heading>
+            <span className="dialog-eyebrow">{messages.doctor.eyebrow}</span>
+            <Heading slot="title">{messages.doctor.title}</Heading>
             <p className="dialog-message">
               {running
-                ? "正在检查内置 Node.js、Pi SDK、Shell 和 Git。"
+                ? messages.doctor.runningDescription
                 : error
-                  ? "检查未完成。Pi 会话状态没有被修改，可以重新运行。"
+                  ? messages.doctor.incompleteDescription
+                  : !report
+                    ? messages.doctor.initialDescription
                   : failing > 0
-                    ? `${failing} 项失败，请先处理后再开始需要 Shell 的任务。`
+                    ? messages.doctor.failingDescription(failing)
                     : warnings > 0
-                      ? `核心运行环境可用，另有 ${warnings} 项需要注意。`
-                      : "当前运行环境的关键检查均已通过。"}
+                      ? messages.doctor.warningDescription(warnings)
+                      : messages.doctor.passedDescription}
             </p>
 
             {running ? (
               <div className="doctor-loading" role="status">
                 <LoaderCircle className="spin" size={18} aria-hidden="true" />
-                <span>正在运行检查…</span>
+                <span>{messages.doctor.running}</span>
               </div>
             ) : null}
 
@@ -63,16 +69,16 @@ export function DoctorDialog() {
             ) : null}
 
             {report && !running ? (
-              <div className="doctor-checks" aria-label="Doctor 检查结果">
+              <div className="doctor-checks" aria-label={messages.doctor.results}>
                 {report.checks.map((check) => <DoctorCheckRow check={check} key={check.id} />)}
               </div>
             ) : null}
 
             <div className="dialog-actions">
-              <Button className="secondary-button" onPress={() => setOpen(false)} isDisabled={running}>关闭</Button>
-              <Button className="primary-button" onPress={() => void runDoctor()} isDisabled={running}>
+              <Button className="secondary-button" onPress={() => setOpen(false)} isDisabled={running}>{messages.common.close}</Button>
+              <Button className="primary-button" onPress={() => void runRuntimeDoctor()} isDisabled={running}>
                 <RefreshCw size={14} aria-hidden="true" />
-                {report || error ? "重新运行 Doctor" : "运行 Doctor"}
+                {report || error ? messages.doctor.rerun : messages.doctor.run}
               </Button>
             </div>
           </div>

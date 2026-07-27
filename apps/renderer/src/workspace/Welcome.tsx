@@ -1,37 +1,34 @@
-import { FolderOpen, ShieldCheck, Sparkles } from "lucide-react";
+import { FolderOpen, HardDrive, History } from "lucide-react";
 import { Button } from "react-aria-components";
-import { useAppStore } from "../app/app-store.js";
+import { messages } from "../localization/message-catalog.js";
+import { openRendererWorkspace } from "./workspace-open-controller.js";
+import styles from "./Welcome.module.css";
 
 export function Welcome() {
-  const connected = useAppStore((state) => state.connected);
-  const openWorkspace = useAppStore((state) => state.openWorkspace);
-
   return (
-    <main className="welcome-screen">
-      <section className="welcome-copy">
-        <div className="welcome-eyebrow"><Sparkles size={14} /> Pi-first desktop workspace</div>
-        <h1>把真实的 Pi 会话，放进一个清晰的工作面。</h1>
-        <p>
-          复用现有模型、认证、Skills、Prompts、Extensions 和 JSONL sessions。
-          Desktop 不启动内部服务器，也不会创建第二套 agent runtime。
-        </p>
-        <Button className="primary-button welcome-action" onPress={() => void openWorkspace()}>
+    <main className={styles.screen}>
+      <section className={styles.copy}>
+        <div className={styles.identity}>
+          <span className={styles.mark} aria-hidden="true">π</span>
+          <div>
+            <span className={styles.eyebrow}>{messages.workspace.eyebrow}</span>
+            <h1>{messages.workspace.heading}</h1>
+          </div>
+        </div>
+        <p>{messages.workspace.description}</p>
+        <Button
+          className={`primary-button ${styles.action}`}
+          data-testid="workspace-open-action"
+          onPress={() => void openRendererWorkspace()}
+        >
           <FolderOpen size={17} />
-          选择工作区
+          {messages.workspace.openAction}
         </Button>
-        <div className="welcome-facts">
-          <div><ShieldCheck size={17} /><span><strong>边界明确</strong>项目资源与工具审批分离</span></div>
-          <div><span className="fact-glyph">{`</>`}</span><span><strong>Pi SDK 0.81.1</strong>{connected ? "Agent Host 已连接" : "选择工作区后按需启动"}</span></div>
+        <div className={styles.facts}>
+          <div><History size={17} /><span><strong>{messages.workspace.existingConfiguration}</strong><small>{messages.workspace.existingConfigurationDetail}</small></span></div>
+          <div><HardDrive size={17} /><span><strong>{messages.workspace.localData}</strong><small>{messages.workspace.localDataDetail}</small></span></div>
         </div>
       </section>
-      <aside className="welcome-preview" aria-label="Product structure preview">
-        <div className="preview-toolbar"><span /><span /><span /></div>
-        <div className="preview-layout">
-          <div className="preview-nav"><i /><i /><i /><i /></div>
-          <div className="preview-main"><b /><p /><p /><b /><p /><em /></div>
-          <div className="preview-context"><i /><i /><i /></div>
-        </div>
-      </aside>
     </main>
   );
 }

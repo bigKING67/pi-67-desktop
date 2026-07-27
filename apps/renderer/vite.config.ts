@@ -16,6 +16,12 @@ export default defineConfig(({ command }) => ({
       }
     }
   ],
+  optimizeDeps: {
+    entries: [
+      "index.html",
+      "src/transcript/code-highlighter.worker.ts"
+    ]
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
@@ -28,16 +34,6 @@ export default defineConfig(({ command }) => ({
     target: "chrome150",
     outDir: "dist",
     emptyOutDir: true,
-    sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("react-markdown") || id.includes("remark-gfm")) return "markdown";
-          if (id.includes("react-aria-components")) return "accessibility";
-          if (id.includes("react-virtuoso")) return "virtualization";
-          return undefined;
-        }
-      }
-    }
+    sourcemap: false
   }
 }));

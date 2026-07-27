@@ -1,442 +1,412 @@
-import { stat } from "node:fs/promises";
 import {
-  AgentSessionRuntime,
-  createAgentSessionFromServices,
-  createAgentSessionServices,
-  createAgentSession,
   getAgentDir,
   SessionManager,
-  SettingsManager,
-  VERSION,
-  type AgentSession,
-  type AgentSessionEvent,
-  type AgentSessionServices,
-  type CreateAgentSessionRuntimeFactory,
-  type LoadExtensionsResult
+  VERSION
 } from "@earendil-works/pi-coding-agent";
-import type {
-  ApprovalMode,
-  DoctorReport,
-  SessionSnapshot,
-  SessionSummary,
-  WorkspaceTrust
+import {
+  type ApprovalMode,
+  type ConversationPage,
+  type DoctorReport,
+  type ExtensionCatalogResult,
+  type ExtensionUiCancellationReason,
+  type ModelSummary,
+  type ResourceSummary,
+  type RuntimeCapabilities,
+  type RuntimeIdentity,
+  type RuntimeOperationActivity,
+  type SessionCatalogPage,
+  type SessionCatalogQuery,
+  type SessionCatalogStatus,
+  type SessionControlResult,
+  type SessionModelCatalogResult,
+  type SessionResourceCatalogResult,
+  type SessionSnapshot,
+  type SessionTreeProjection,
+  type WorkspaceTrust
 } from "@pi67/domain";
-import type { AgentEvent, TransferImage } from "@pi67/protocol";
+import type {
+  AgentEvent,
+  AssetReadResult,
+  CommandDescriptor,
+  RuntimeDiagnostics,
+  StreamDelta,
+  TransferImage
+} from "@pi67/protocol";
 import type { AgentRuntime, RuntimeInitializeOptions } from "./agent-runtime.js";
-import { DesktopExtensionUiBridge } from "./extension-ui-bridge.js";
-import { convertTransferImages, normalizeStreamDelta } from "./message-normalizer.js";
+import { bindSessionExtensionUi, createSessionExtensionUiBridge } from "./extension-ui-lifecycle.js";
+import {
+  conversationChangedEvent,
+  sessionMetaChangedEvent,
+  usageChangedEvent
+} from "./incremental-events.js";
+import { convertTransferImages } from "./message-normalizer.js";
+import { configureRuntimeApiKey, selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
 import { createDoctorReport } from "./runtime-doctor.js";
-import { createDesktopSafetyExtension, type SafetyPolicyState } from "./safety-extension.js";
-import { listAgentSessions } from "./session-discovery.js";
+import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-metadata.js";
+import { RuntimeProjectionController } from "./runtime-projection-controller.js";
+import { createRuntimeSessionCatalog } from "./runtime-session-catalog.js";
+import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
+import { clearSessionQueue } from "./session-queue.js";
+import type { SafetyPolicyState } from "./safety-extension.js";
+import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import { discardStagedSessionImport, resolveManagedSessionPath, stageSessionImport } from "./session-import.js";
-import { projectSessionSnapshot } from "./session-snapshot.js";
+import {
+  projectSessionControls,
+  projectSessionModelCatalog,
+  projectSessionModels,
+  projectSessionResources
+} from "./session-snapshot.js";
 import { StreamBatcher } from "./stream-batcher.js";
 
 export class PiSdkRuntime implements AgentRuntime {
   private readonly listeners = new Set<(event: AgentEvent) => void>();
-  private sessionRuntime: AgentSessionRuntime | undefined;
-  private sessionUnsubscribe: (() => void) | undefined;
-  private services: AgentSessionServices | undefined;
-  private settingsManager: SettingsManager | undefined;
-  private extensionsResult: LoadExtensionsResult | undefined;
-  private uiBridge = new DesktopExtensionUiBridge((event) => this.emit(event));
+  private readonly activityListeners = new Set<(activity: RuntimeOperationActivity) => void>();
   private readonly runtimeApiKeys = new Map<string, string>();
   private safety: SafetyPolicyState = { cwd: process.cwd(), trust: "unknown", approvalMode: "guided" };
   private agentDir = getAgentDir();
-  private sessionTransition: Promise<unknown> | undefined;
-  private sequence = 0;
-  private lastSessionMtime = 0;
-  private readonly streamBatcher = new StreamBatcher((events) => {
-    this.emit({ type: "turn.streamBatch", payload: { events } });
-  });
+  private readonly externalSessionChangeGuard = new SessionExternalChangeGuard();
+  private readonly streamBatcher: StreamBatcher<StreamDelta>;
+  private readonly projections: RuntimeProjectionController;
+  private readonly sessionBindings: RuntimeSessionBindings;
+  private readonly sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
+  private uiBridge: ReturnType<typeof createSessionExtensionUiBridge>;
 
+  constructor() {
+    this.uiBridge = createSessionExtensionUiBridge(
+      (event) => this.emit(event),
+      () => this.sessionBindings?.session?.sessionId
+    );
+    this.streamBatcher = new StreamBatcher<StreamDelta>((events) => {
+      this.emit({ type: "turn.streamBatch", payload: { events } });
+    });
+    this.projections = new RuntimeProjectionController({
+      getSession: () => this.sessionBindings.requireSession(),
+      getSessionGeneration: () => this.sessionBindings.sessionGeneration,
+      emit: (event) => this.emit(event),
+      emitActivity: (activity) => this.emitOperationActivity(activity),
+      pushStream: (delta) => this.streamBatcher.push(delta),
+      flushStream: () => this.streamBatcher.flush()
+    });
+    this.sessionBindings = new RuntimeSessionBindings({
+      cancelInteractiveRequests: (reason) => { this.uiBridge.cancelAll(reason); },
+      emit: (event) => this.emit(event),
+      externalChangeGuard: this.externalSessionChangeGuard,
+      getAgentDir: () => this.agentDir,
+      getRuntimeApiKeys: () => this.runtimeApiKeys,
+      getSafety: () => this.safety,
+      projections: this.projections,
+      rebindExtensionUi: async (session) => {
+        this.uiBridge.dispose();
+        this.uiBridge = createSessionExtensionUiBridge(
+          (event) => this.emit(event),
+          () => this.sessionBindings.session?.sessionId
+        );
+        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
+      },
+      requestApproval: (request, options) => this.uiBridge.requestApproval(request, options),
+      setSessionCwd: (cwd) => { this.safety = { ...this.safety, cwd }; }
+    });
+    this.sessionCatalog = createRuntimeSessionCatalog(process.env.PI67_SESSION_CATALOG_DIR, {
+      emit: (event) => this.emit(event),
+      getAgentDir: () => this.agentDir,
+      getConfiguredSessionDir: () => this.sessionBindings.settingsManager?.getSessionDir(),
+      getWorkspaceCwd: () => this.safety.cwd,
+      getSessionManager: () => this.sessionBindings.session?.sessionManager,
+      getSessionMetadata: (manager) => this.projections.getMetadata(manager)
+    }, process.env.PI67_STORAGE_ROOT);
+  }
+
+  getSdkVersion(): string { return VERSION; }
+  getExtensionUiCapabilities(): RuntimeCapabilities["extensionUi"] { return this.projections.getCapabilities(); }
   subscribe(listener: (event: AgentEvent) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.listeners.add(listener); return () => this.listeners.delete(listener);
+  }
+  subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void {
+    this.activityListeners.add(listener); return () => this.activityListeners.delete(listener);
   }
 
   async initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot> {
-    return this.runSessionTransition(async () => {
-      this.agentDir = options.agentDir ?? getAgentDir();
-      this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
+    return this.sessionBindings.runTransition(async () => {
+      this.uiBridge.cancelAll("runtime-dispose");
+      const nextAgentDir = options.agentDir ?? getAgentDir();
       const sessionPath = options.sessionPath
-        ? await resolveManagedSessionPath(options.sessionPath, options.cwd, this.agentDir)
+        ? await resolveManagedSessionPath(options.sessionPath, options.cwd, nextAgentDir)
         : undefined;
       const sessionManager = sessionPath ? SessionManager.open(sessionPath, undefined, options.cwd) : undefined;
-      await this.disposeSessionRuntime();
-      await this.createInitialSessionRuntime(options.cwd, sessionManager);
+
+      // Keep the old policy visible through its shutdown hooks, then commit the
+      // target workspace policy before target services or extensions are loaded.
+      await this.sessionBindings.disposeRuntime();
+      this.agentDir = nextAgentDir;
+      this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
+      await this.sessionBindings.createInitial(options.cwd, sessionManager);
+      await this.sessionCatalog.upsertCurrent("session-updated");
       return this.getSnapshot();
     });
   }
 
   async dispose(): Promise<void> {
-    this.streamBatcher.dispose();
-    await this.sessionTransition?.catch(() => undefined);
-    await this.disposeSessionRuntime();
+    this.streamBatcher.drop();
+    this.uiBridge.cancelAll("runtime-dispose");
+    await this.sessionBindings.settleAndDispose();
+    await this.sessionCatalog.dispose();
     this.uiBridge.dispose();
     this.runtimeApiKeys.clear();
     this.listeners.clear();
+    this.activityListeners.clear();
   }
 
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void {
     this.safety = { ...this.safety, trust, approvalMode };
   }
 
-  async listSessions(all = false): Promise<SessionSummary[]> {
-    const configuredSessionDir = this.settingsManager?.getSessionDir();
-    const sessions = all
-      ? configuredSessionDir
-        ? await SessionManager.listAll(configuredSessionDir)
-        : await listAgentSessions(this.agentDir)
-      : await SessionManager.list(this.safety.cwd, configuredSessionDir ?? this.requireSession().sessionManager.getSessionDir());
-    return sessions.map((session) => ({
-      id: session.id,
-      path: session.path,
-      cwd: session.cwd,
-      name: session.name ?? (session.firstMessage.trim().slice(0, 80) || "Untitled session"),
-      modifiedAt: session.modified.getTime(),
-      messageCount: session.messageCount,
-      ...(session.parentSessionPath ? { parentSessionPath: session.parentSessionPath } : {})
-    }));
-  }
+  querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage> { return this.sessionCatalog.query(query); }
+  getSessionCatalogStatus(): SessionCatalogStatus { return this.sessionCatalog.status(); }
+  getSessionTree(): SessionTreeProjection { return this.projections.getTree(); }
+  getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage { return this.projections.getMessagePage(options); }
+  readAsset(options: {
+    assetId: string;
+    sessionGeneration: number;
+    offset: number;
+    length?: number;
+  }): AssetReadResult { return this.projections.readAsset(options); }
 
-  async createSession(cwd: string): Promise<SessionSnapshot> {
-    return this.runSessionTransition(async () => {
-      this.safety = { ...this.safety, cwd };
-      const result = await this.requireSessionRuntime().newSession();
+  async createSession(): Promise<SessionSnapshot> {
+    return this.sessionBindings.runTransition(async () => {
+      this.uiBridge.cancelAll("session-transition");
+      this.streamBatcher.drop();
+      const result = await this.sessionBindings.requireRuntime().newSession();
       if (result.cancelled) throw new Error("A Pi extension cancelled the new session.");
+      await this.sessionCatalog.upsertCurrent("session-created");
       return this.getSnapshot();
     });
   }
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
-    return this.runSessionTransition(async () => {
-      await this.assertNoExternalSessionChange();
+    return this.sessionBindings.runTransition(async () => {
+      this.uiBridge.cancelAll("session-transition");
+      this.streamBatcher.drop();
+      await this.assertSessionWritable();
       const managedPath = await resolveManagedSessionPath(path, cwdOverride ?? this.safety.cwd, this.agentDir);
-      const result = await this.requireSessionRuntime().switchSession(
+      const result = await this.sessionBindings.requireRuntime().switchSession(
         managedPath,
         cwdOverride ? { cwdOverride } : undefined
       );
       if (result.cancelled) throw new Error("A Pi extension cancelled the session switch.");
-      this.safety = { ...this.safety, cwd: this.requireSession().sessionManager.getCwd() };
+      await this.sessionCatalog.upsertCurrent("session-updated");
       return this.getSnapshot();
     });
   }
 
   async importSession(path: string): Promise<SessionSnapshot> {
-    return this.runSessionTransition(async () => {
-      await this.assertNoExternalSessionChange();
-      const sessionDirectory = this.requireSession().sessionManager.getSessionDir();
+    return this.sessionBindings.runTransition(async () => {
+      this.uiBridge.cancelAll("session-transition");
+      this.streamBatcher.drop();
+      await this.assertSessionWritable();
+      const sessionDirectory = this.sessionBindings.requireSession().sessionManager.getSessionDir();
       const staged = await stageSessionImport(path, sessionDirectory, this.safety.cwd);
+      let switched = false;
       try {
-        const result = await this.requireSessionRuntime().switchSession(staged.path, {
+        const result = await this.sessionBindings.requireRuntime().switchSession(staged.path, {
           cwdOverride: staged.sessionManager.getCwd()
         });
         if (result.cancelled) throw new Error("A Pi extension cancelled the session import.");
-        this.safety = { ...this.safety, cwd: this.requireSession().sessionManager.getCwd() };
+        switched = true;
+        await this.sessionCatalog.upsertCurrent("session-imported");
         return this.getSnapshot();
       } catch (error) {
-        await discardStagedSessionImport(staged, error);
+        if (!switched) await discardStagedSessionImport(staged, error);
         throw error;
       }
     });
   }
 
-  async branch(entryId: string, newFile = false): Promise<SessionSnapshot> {
-    const session = this.requireSession();
-    if (newFile) {
-      return this.runSessionTransition(async () => {
-        const result = await this.requireSessionRuntime().fork(entryId, { position: "at" });
-        if (result.cancelled) throw new Error("A Pi extension cancelled the session branch.");
-        return this.getSnapshot();
-      });
-    }
-    await session.navigateTree(entryId, { summarize: false });
-    return this.emitSnapshot();
-  }
-
-  async rollback(entryId: string, summarize = false): Promise<SessionSnapshot> {
-    await this.requireSession().navigateTree(entryId, { summarize });
-    return this.emitSnapshot();
-  }
-
-  async compact(instructions?: string): Promise<SessionSnapshot> {
-    await this.requireSession().compact(instructions);
-    return this.emitSnapshot();
-  }
-
-  async setSessionName(name: string): Promise<SessionSnapshot> {
-    this.requireSession().setSessionName(name.trim());
-    return this.emitSnapshot();
-  }
-
-  async send(text: string, images: TransferImage[] = []): Promise<void> {
-    await this.assertNoExternalSessionChange();
-    const session = this.requireSession();
-    await session.prompt(text, {
-      images: convertTransferImages(images),
-      ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {})
+  async forkSession(entryId: string): Promise<SessionSnapshot> {
+    await this.assertSessionWritable();
+    return this.sessionBindings.runTransition(async () => {
+      this.uiBridge.cancelAll("session-transition");
+      this.streamBatcher.drop();
+      const result = await this.sessionBindings.requireRuntime().fork(entryId, { position: "at" });
+      if (result.cancelled) throw new Error("A Pi extension cancelled the session fork.");
+      await this.sessionCatalog.upsertCurrent("session-created");
+      return this.getSnapshot();
     });
   }
 
+  async rollback(entryId: string, summarize = false): Promise<void> {
+    await this.assertSessionWritable();
+    const session = this.sessionBindings.requireSession();
+    await session.navigateTree(entryId, { summarize });
+    this.emit(conversationChangedEvent(session, "rolled-back"));
+    this.emit({ type: "tree.changed", payload: { reason: "rollback" } });
+    this.emit(usageChangedEvent(this.projections.getStats(session)));
+  }
+
+  async compact(instructions?: string): Promise<void> {
+    await this.assertSessionWritable();
+    await this.sessionBindings.requireSession().compact(instructions);
+  }
+  async setSessionName(name: string): Promise<void> {
+    await this.assertSessionWritable();
+    const session = this.sessionBindings.requireSession();
+    session.setSessionName(name.trim());
+    await this.sessionCatalog.upsertCurrent("session-updated");
+    this.emit(sessionMetaChangedEvent(session));
+  }
+
+  async submitPrompt(text: string, images: TransferImage[] = []): Promise<void> {
+    await this.assertSessionWritable();
+    const session = this.sessionBindings.requireSession();
+    try {
+      await session.prompt(text, {
+        images: convertTransferImages(images),
+        ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {})
+      });
+    } finally {
+      await this.sessionCatalog.upsertCurrent("session-updated");
+    }
+  }
+
   async steer(text: string, images: TransferImage[] = []): Promise<void> {
-    await this.requireSession().steer(text, convertTransferImages(images));
+    await this.assertSessionWritable();
+    await this.sessionBindings.requireSession().steer(text, convertTransferImages(images));
   }
 
   async followUp(text: string, images: TransferImage[] = []): Promise<void> {
-    await this.requireSession().followUp(text, convertTransferImages(images));
+    await this.assertSessionWritable();
+    await this.sessionBindings.requireSession().followUp(text, convertTransferImages(images));
   }
+
+  clearQueue() { return clearSessionQueue(this.sessionBindings.requireSession()); }
 
   async abort(): Promise<void> {
-    await this.requireSession().abort();
-    this.emitSnapshot();
+    this.uiBridge.cancelAll("abort");
+    await this.sessionBindings.requireSession().abort();
   }
 
-  async selectModel(provider: string, id: string): Promise<SessionSnapshot> {
-    const session = this.requireSession();
-    const model = session.modelRuntime.getModel(provider, id);
-    if (!model) throw new Error(`Unknown Pi model: ${provider}/${id}`);
-    await session.setModel(model);
-    return this.emitSnapshot();
+  async selectModel(provider: string, id: string): Promise<SessionControlResult> {
+    await this.assertSessionWritable();
+    const session = this.sessionBindings.requireSession();
+    await selectSessionModel(session, provider, id);
+    return { sessionId: session.sessionId, controls: projectSessionControls(session) };
   }
 
-  async setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionSnapshot> {
-    const normalizedProvider = provider.trim();
-    const normalizedKey = apiKey.trim();
-    if (!normalizedProvider || normalizedKey.length < 8) throw new Error("Provider and API key are required.");
-    try {
-      await this.requireSession().modelRuntime.setRuntimeApiKey(normalizedProvider, normalizedKey, {
-        allowNetwork: false
-      });
-      this.runtimeApiKeys.set(normalizedProvider, normalizedKey);
-    } catch {
-      // Provider errors are intentionally hidden so a credential can never be echoed into UI events.
-      throw new Error("Unable to configure the runtime API key for this provider.");
-    }
-    return this.emitSnapshot();
+  async setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionModelCatalogResult> {
+    const session = this.sessionBindings.requireSession();
+    await configureRuntimeApiKey(session, this.runtimeApiKeys, provider, apiKey);
+    return {
+      sessionId: session.sessionId,
+      controls: projectSessionControls(session),
+      modelCatalog: projectSessionModelCatalog(session)
+    };
   }
 
-  async setThinkingLevel(level: string): Promise<SessionSnapshot> {
-    const session = this.requireSession();
-    const selectedLevel = session.getAvailableThinkingLevels().find((candidate) => candidate === level);
-    if (!selectedLevel) {
-      throw new Error(`Unsupported thinking level: ${level}`);
-    }
-    session.setThinkingLevel(selectedLevel);
-    return this.emitSnapshot();
+  async setThinkingLevel(level: string): Promise<SessionControlResult> {
+    await this.assertSessionWritable();
+    const session = this.sessionBindings.requireSession();
+    setSessionThinkingLevel(session, level);
+    return { sessionId: session.sessionId, controls: projectSessionControls(session) };
   }
 
-  async reloadResources(): Promise<SessionSnapshot> {
-    return this.runSessionTransition(async () => {
-      await this.requireSession().reload();
-      this.extensionsResult = this.services?.resourceLoader.getExtensions();
+  async reloadResources(): Promise<SessionResourceCatalogResult> {
+    return this.sessionBindings.runTransition(async () => {
+      await this.assertSessionWritable();
+      this.uiBridge.cancelAll("resource-reload");
+      this.projections.resetExtensionAdapters();
+      const generationBeforeReload = this.sessionBindings.sessionGeneration;
+      await this.sessionBindings.requireSession().reload();
+      if (this.sessionBindings.sessionGeneration === generationBeforeReload) {
+        const extensions = this.sessionBindings.refreshExtensions();
+        await this.projections.refreshExtensionAdapters(this.sessionBindings.requireSession(), extensions);
+        this.emit({ type: "extension.catalog.changed", payload: this.getExtensionCatalog() });
+      }
       this.emit({ type: "resource.changed", payload: { reason: "reload" } });
-      return this.emitSnapshot();
+      const session = this.sessionBindings.requireSession();
+      return {
+        sessionId: session.sessionId,
+        controls: projectSessionControls(session),
+        modelCatalog: projectSessionModelCatalog(session),
+        resources: projectSessionResources(
+          this.sessionBindings.services,
+          this.sessionBindings.extensions
+        )
+      };
     });
   }
 
   async invokeCommand(command: string): Promise<void> {
+    await this.assertSessionWritable();
     const normalized = command.startsWith("/") ? command : `/${command}`;
-    const session = this.requireSession();
-    await session.prompt(normalized, session.isStreaming ? { streamingBehavior: "followUp" } : {});
-  }
-
-  getCommands(): Array<{ name: string; description?: string }> {
-    const commands: Array<{ name: string; description?: string }> = [];
-    for (const extension of this.extensionsResult?.extensions ?? []) {
-      for (const [name, command] of extension.commands) {
-        commands.push({ name, ...(command.description ? { description: command.description } : {}) });
-      }
+    const session = this.sessionBindings.requireSession();
+    try {
+      await session.prompt(normalized, session.isStreaming ? { streamingBehavior: "followUp" } : {});
+    } finally {
+      await this.sessionCatalog.upsertCurrent("session-updated");
     }
-    return commands.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean {
-    return this.uiBridge.resolve(requestId, value, cancelled);
+  getCommands(): CommandDescriptor[] { return this.projections.getCommands(); }
+
+  getExtensionCatalog(): ExtensionCatalogResult { return this.projections.getCatalog(); }
+
+  getWorkspaceChanges() {
+    return this.projections.getWorkspaceChanges(this.sessionBindings.requireSession());
   }
 
-  async collectDiagnostics(): Promise<Record<string, unknown>> {
-    const session = this.sessionRuntime?.session;
-    return {
-      application: "Pi-67 Desktop",
-      piSdkVersion: VERSION,
-      platform: process.platform,
-      architecture: process.arch,
-      node: process.versions.node,
-      cwd: session?.sessionManager.getCwd(),
-      sessionConfigured: Boolean(session),
-      sessionFileConfigured: Boolean(session?.sessionFile),
-      model: session?.model ? `${session.model.provider}/${session.model.id}` : undefined,
-      extensionCount: this.extensionsResult?.extensions.length ?? 0,
-      extensionErrors: this.extensionsResult?.errors.map((error) => ({ path: error.path, error: error.error })) ?? []
-    };
+  resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean { return this.uiBridge.resolve(requestId, value, cancelled); }
+  resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean { return this.uiBridge.resolveApproval(requestId, toolCallId, allowed); }
+  cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[] { return this.uiBridge.cancelAll(reason); }
+
+  async collectDiagnostics(): Promise<RuntimeDiagnostics> {
+    return projectRuntimeDiagnostics(this.sessionBindings.runtime, this.sessionBindings.extensions, VERSION);
   }
 
   async runDoctor(): Promise<DoctorReport> {
-    const report = await createDoctorReport(this.settingsManager?.getShellPath());
+    const report = await createDoctorReport(
+      this.sessionBindings.settingsManager?.getShellPath(),
+      process.env.PI67_CAPABILITY_PROBE_DIR,
+      this.getSessionCatalogStatus()
+    );
     this.emit({ type: "doctor.completed", payload: report });
     return report;
   }
 
   getSnapshot(): SessionSnapshot {
-    return projectSessionSnapshot(this.requireSession(), this.services, this.extensionsResult);
+    return this.projections.getSnapshot(
+      this.sessionBindings.requireSession(),
+      this.sessionBindings.services,
+      this.sessionBindings.extensions
+    );
   }
 
-  private async createInitialSessionRuntime(cwd: string, sessionManager?: SessionManager): Promise<void> {
-    const services = await this.createSessionServices(cwd);
-    const result = sessionManager
-      ? await createAgentSessionFromServices({ services, sessionManager })
-      : await createAgentSession({
-        cwd,
-        agentDir: this.agentDir,
-        modelRuntime: services.modelRuntime,
-        settingsManager: services.settingsManager,
-        resourceLoader: services.resourceLoader
-      });
-    const createRuntime = this.createRuntimeFactory();
-    const runtime = new AgentSessionRuntime(result.session, services, createRuntime, services.diagnostics, result.modelFallbackMessage);
-    this.sessionRuntime = runtime;
-    runtime.setBeforeSessionInvalidate(() => this.detachSessionBindings());
-    runtime.setRebindSession((session) => this.bindSession(session));
-    await this.bindSession(result.session);
+  getModels(): ModelSummary[] {
+    return projectSessionModels(this.sessionBindings.requireSession());
   }
 
-  private createRuntimeFactory(): CreateAgentSessionRuntimeFactory {
-    return async ({ cwd, sessionManager, sessionStartEvent }) => {
-      const services = await this.createSessionServices(cwd);
-      const result = await createAgentSessionFromServices({
-        services,
-        sessionManager,
-        ...(sessionStartEvent ? { sessionStartEvent } : {})
-      });
-      return { ...result, services, diagnostics: services.diagnostics };
-    };
+  getResources(): ResourceSummary[] {
+    return projectSessionResources(
+      this.sessionBindings.services,
+      this.sessionBindings.extensions
+    );
   }
 
-  private async createSessionServices(cwd: string): Promise<AgentSessionServices> {
-    const services = await createAgentSessionServices({
-      cwd,
-      agentDir: this.agentDir,
-      resourceLoaderOptions: {
-        extensionFactories: [createDesktopSafetyExtension(() => this.safety)]
-      },
-      resourceLoaderReloadOptions: {
-        resolveProjectTrust: async () => this.safety.trust === "trusted"
-      }
-    });
-    for (const [provider, apiKey] of this.runtimeApiKeys) {
-      await services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false });
-    }
-    return services;
+  getIdentity(): RuntimeIdentity {
+    return projectRuntimeIdentity(this.sessionBindings.runtime, this.sessionBindings.sessionGeneration);
   }
 
-  private async bindSession(session: AgentSession): Promise<void> {
-    this.services = this.requireSessionRuntime().services;
-    this.settingsManager = this.services.settingsManager;
-    this.extensionsResult = this.services.resourceLoader.getExtensions();
-    this.uiBridge.dispose();
-    this.uiBridge = new DesktopExtensionUiBridge((event) => this.emit(event));
-    await session.bindExtensions({
-      uiContext: this.uiBridge.context,
-      mode: "rpc",
-      onError: (error) => {
-        this.emit({
-          type: "extension.compatibilityChanged",
-          payload: { extensionId: error.extensionPath, status: "failed", detail: error.error }
-        });
-      }
-    });
-    this.sessionUnsubscribe = session.subscribe((event) => this.handleSessionEvent(event));
-    await this.rememberSessionMtime();
+  flushStream(): void {
+    this.streamBatcher.flush();
   }
 
-  private detachSessionBindings(): void {
-    this.sessionUnsubscribe?.();
-    this.sessionUnsubscribe = undefined;
-    this.uiBridge.dispose();
-  }
-
-  private async disposeSessionRuntime(): Promise<void> {
-    const runtime = this.sessionRuntime;
-    if (!runtime) return;
-    if (runtime.session.isStreaming) await runtime.session.abort();
-    await runtime.dispose();
-    this.sessionRuntime = undefined;
-    this.services = undefined;
-    this.settingsManager = undefined;
-    this.extensionsResult = undefined;
-  }
-
-  private handleSessionEvent(event: AgentSessionEvent): void {
-    if (event.type === "message_update") {
-      const delta = normalizeStreamDelta(event);
-      if (delta) this.streamBatcher.push(delta);
-    } else {
-      this.emit({ type: "session.delta", payload: { eventType: event.type, data: null } });
-    }
-
-    if (event.type === "entry_appended") void this.rememberSessionMtime();
-    if (
-      event.type === "message_end" ||
-      event.type === "agent_end" ||
-      event.type === "agent_settled" ||
-      event.type === "queue_update" ||
-      event.type === "thinking_level_changed" ||
-      event.type === "compaction_end"
-    ) {
-      this.emitSnapshot();
-    }
-  }
-
-  private emitSnapshot(): SessionSnapshot {
-    const snapshot = this.getSnapshot();
-    this.emit({ type: "session.snapshot", payload: snapshot });
-    return snapshot;
+  private assertSessionWritable(): Promise<void> {
+    return this.externalSessionChangeGuard.assertUnchanged(this.sessionBindings.session);
   }
 
   private emit(event: AgentEvent): void {
-    this.sequence += 1;
     this.listeners.forEach((listener) => listener(event));
   }
 
-  private requireSession(): AgentSession {
-    return this.requireSessionRuntime().session;
-  }
-
-  private requireSessionRuntime(): AgentSessionRuntime {
-    if (!this.sessionRuntime) throw new Error("Pi SDK runtime is not initialized.");
-    return this.sessionRuntime;
-  }
-
-  private async runSessionTransition<T>(operation: () => Promise<T>): Promise<T> {
-    if (this.sessionTransition) throw new Error("Another Pi session transition is already in progress.");
-    const transition = Promise.resolve().then(operation);
-    this.sessionTransition = transition;
-    try {
-      return await transition;
-    } finally {
-      if (this.sessionTransition === transition) this.sessionTransition = undefined;
-    }
-  }
-
-  private async rememberSessionMtime(): Promise<void> {
-    const file = this.sessionRuntime?.session.sessionFile;
-    if (!file) return;
-    try {
-      this.lastSessionMtime = (await stat(file)).mtimeMs;
-    } catch {
-      this.lastSessionMtime = 0;
-    }
-  }
-
-  private async assertNoExternalSessionChange(): Promise<void> {
-    const session = this.sessionRuntime?.session;
-    const file = session?.sessionFile;
-    if (!file || this.lastSessionMtime === 0) return;
-    const current = (await stat(file)).mtimeMs;
-    if (current !== this.lastSessionMtime && !session.isStreaming) {
-      this.emit({ type: "session.externalChangeDetected", payload: { path: file } });
-      throw new Error("The Pi session changed outside Desktop. Reload it before writing.");
-    }
+  private emitOperationActivity(activity: RuntimeOperationActivity): void {
+    this.activityListeners.forEach((listener) => listener(activity));
   }
 }

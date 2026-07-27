@@ -7,6 +7,10 @@ on:
         description: Existing alpha version tag to publish as an unsigned prerelease
         required: true
         type: string
+      previous_tag:
+        description: Previous unsigned preview tag used for Windows cross-version upgrade verification
+        required: false
+        type: string
 
 concurrency:
   group: unsigned-preview-${{ inputs.tag }}
@@ -16,7 +20,34 @@ permissions:
   contents: read
 
 jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run verify:extension-adapters
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-adapter-provenance-unsigned-preview
+          path: artifacts/quality/extension-adapter-provenance.json
+          if-no-files-found: error
+          retention-days: 30
+
   build:
+    needs: provenance
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +80,53 @@ jobs:
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run check
       - run: corepack pnpm run package:native:unsigned
+      - name: Prepare previous unsigned Windows installer
+        if: runner.os == 'Windows' && inputs.previous_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
+        run: |
+          if ($env:PREVIOUS_TAG -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Invalid previous preview tag: $env:PREVIOUS_TAG"
+          }
+          $version = $env:PREVIOUS_TAG.Substring(1)
+          $directory = Join-Path $env:RUNNER_TEMP 'pi67-preview-upgrade-baseline'
+          New-Item -ItemType Directory -Force -Path $directory | Out-Null
+          gh release download $env:PREVIOUS_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern "Pi-67-Desktop-$version-win-x64-unsigned-preview.exe" `
+            --dir $directory
+          gh release download $env:PREVIOUS_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern 'unsigned-preview-manifest.json' `
+            --dir $directory
+          gh release download $env:PREVIOUS_TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern 'SHA256SUMS.txt' `
+            --dir $directory
+          corepack pnpm run release:preview:baseline:verify -- $directory $env:PREVIOUS_TAG
       - run: corepack pnpm run package:smoke
+      - name: Verify Windows packaged synthetic scale and IME contracts
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-ui
+      - name: Verify Windows NSIS installer lifecycle
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-installer
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-packaged-ui-unsigned-preview-x64
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-installer-lifecycle-unsigned-preview-x64
+          path: artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v7
         if: runner.os == 'Windows'
         with:
@@ -68,7 +145,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: build
+    needs: [provenance, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -85,11 +162,16 @@ jobs:
         with:
           node-version: 24.18.0
       - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
-      - uses: actions/download-artifact@v8
+      - name: Download Windows unsigned preview artifacts
+        uses: actions/download-artifact@v8
         with:
-          pattern: unsigned-preview-*
+          name: unsigned-preview-windows-x64
           path: artifacts/release
-          merge-multiple: true
+      - name: Download macOS unsigned preview artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: unsigned-preview-macos-arm64
+          path: artifacts/release
       - run: corepack pnpm run release:preview:prepare
       - run: corepack pnpm run release:preview:verify
       - name: Publish unsigned GitHub prerelease
@@ -113,9 +195,9 @@ jobs:
           - Windows 10/11 x64: `Pi-67-Desktop-*-win-x64-unsigned-preview.exe`
           - macOS 12+ Apple Silicon: `Pi-67-Desktop-*-mac-arm64-unsigned-preview.dmg` or `.zip`
 
-          Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. No stable updater metadata is included; install a later preview manually.
+          Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. If Gatekeeper still blocks an app downloaded from this repository after its SHA-256 is verified, drag it to `/Applications` and run `xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"`. No stable updater metadata is included; install a later preview manually.
 
-          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners, but they are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
+          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners. The Windows candidate also passed synthetic-scale layout checks and automated silent install/reinstall/uninstall lifecycle smoke. When the workflow was supplied a verified `previous_tag`, that lifecycle included a silent previous-preview-to-current upgrade; otherwise it only covered same-version reinstall. These checks do not replace SmartScreen, real IME/DPI, or interactive installation and upgrade certification. The artifacts are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
           EOF
           gh release create "$RELEASE_TAG" \
             artifacts/release/Pi-67-Desktop-*-unsigned-preview.* \

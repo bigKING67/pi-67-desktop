@@ -1,5 +1,33 @@
-import type { ApprovalMode, DoctorReport, SessionSnapshot, SessionSummary, WorkspaceTrust } from "@pi67/domain";
-import type { AgentEvent, TransferImage } from "@pi67/protocol";
+import type {
+  ApprovalMode,
+  ConversationPage,
+  DoctorReport,
+  ExtensionCatalogResult,
+  ExtensionUiCancellationReason,
+  ModelSummary,
+  ResourceSummary,
+  RuntimeCapabilities,
+  RuntimeIdentity,
+  RuntimeOperationActivity,
+  SessionCatalogPage,
+  SessionCatalogQuery,
+  SessionCatalogStatus,
+  SessionControlResult,
+  SessionModelCatalogResult,
+  SessionResourceCatalogResult,
+  SessionSnapshot,
+  SessionTreeProjection,
+  WorkspaceChangesProjection,
+  WorkspaceTrust
+} from "@pi67/domain";
+import type {
+  AgentEvent,
+  AssetReadResult,
+  CommandDescriptor,
+  RuntimeDiagnostics,
+  TransferImage
+} from "@pi67/protocol";
+import type { RuntimeQueueClearResult } from "./session-queue.js";
 
 export interface RuntimeInitializeOptions {
   cwd: string;
@@ -10,30 +38,46 @@ export interface RuntimeInitializeOptions {
 }
 
 export interface AgentRuntime {
+  getSdkVersion(): string;
+  getExtensionUiCapabilities(): RuntimeCapabilities["extensionUi"];
   initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot>;
   dispose(): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
+  subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void;
-  listSessions(all?: boolean): Promise<SessionSummary[]>;
-  createSession(cwd: string): Promise<SessionSnapshot>;
+  querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
+  getSessionCatalogStatus(): SessionCatalogStatus;
+  getSessionTree(): SessionTreeProjection;
+  getWorkspaceChanges(): WorkspaceChangesProjection;
+  getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage;
+  readAsset(options: { assetId: string; sessionGeneration: number; offset: number; length?: number }): AssetReadResult;
+  createSession(): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
   importSession(path: string): Promise<SessionSnapshot>;
-  branch(entryId: string, newFile?: boolean): Promise<SessionSnapshot>;
-  rollback(entryId: string, summarize?: boolean): Promise<SessionSnapshot>;
-  compact(instructions?: string): Promise<SessionSnapshot>;
-  setSessionName(name: string): Promise<SessionSnapshot>;
-  send(text: string, images?: TransferImage[]): Promise<void>;
+  forkSession(entryId: string): Promise<SessionSnapshot>;
+  rollback(entryId: string, summarize?: boolean): Promise<void>;
+  compact(instructions?: string): Promise<void>;
+  setSessionName(name: string): Promise<void>;
+  submitPrompt(text: string, images?: TransferImage[]): Promise<void>;
   steer(text: string, images?: TransferImage[]): Promise<void>;
   followUp(text: string, images?: TransferImage[]): Promise<void>;
+  clearQueue(): RuntimeQueueClearResult;
   abort(): Promise<void>;
-  selectModel(provider: string, id: string): Promise<SessionSnapshot>;
-  setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionSnapshot>;
-  setThinkingLevel(level: string): Promise<SessionSnapshot>;
-  reloadResources(): Promise<SessionSnapshot>;
+  selectModel(provider: string, id: string): Promise<SessionControlResult>;
+  setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionModelCatalogResult>;
+  setThinkingLevel(level: string): Promise<SessionControlResult>;
+  reloadResources(): Promise<SessionResourceCatalogResult>;
   invokeCommand(command: string): Promise<void>;
+  flushStream(): void;
+  getIdentity(): RuntimeIdentity;
   getSnapshot(): SessionSnapshot;
-  getCommands(): Array<{ name: string; description?: string }>;
+  getModels(): ModelSummary[];
+  getResources(): ResourceSummary[];
+  getCommands(): CommandDescriptor[];
+  getExtensionCatalog(): ExtensionCatalogResult;
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean;
-  collectDiagnostics(): Promise<Record<string, unknown>>;
+  resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean;
+  cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[];
+  collectDiagnostics(): Promise<RuntimeDiagnostics>;
   runDoctor(): Promise<DoctorReport>;
 }

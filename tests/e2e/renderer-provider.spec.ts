@@ -10,22 +10,25 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await page.getByRole("button", { name: "打开命令面板" }).click();
-  await page.getByRole("button", { name: /运行环境 Doctor/u }).click();
-  await expect(page.getByRole("dialog", { name: "运行环境 Doctor" })).toBeVisible();
+  await page.getByRole("button", { name: "打开更多菜单" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: /运行环境诊断/u }).click();
+  const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
+  await expect(doctorDialog).toBeVisible();
+  await expect(doctorDialog.getByText(/运行检查以确认/u)).toBeVisible();
+  await doctorDialog.getByRole("button", { name: "运行检查" }).click();
   await expect(page.getByText("当前运行环境的关键检查均已通过。")).toBeVisible();
-  await expect(page.getByLabel("Doctor 检查结果").getByText("Pi SDK")).toBeVisible();
+  await expect(page.getByLabel("运行环境检查结果").getByText("Pi SDK")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("doctor-dialog.png"), animations: "disabled" });
   await page.getByRole("button", { name: "关闭" }).click();
 
-  await page.getByRole("button", { name: "管理 Provider 与凭据" }).click();
+  await openProviderDialog(page);
   const credentialDialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(credentialDialog.getByText("OpenAI", { exact: true }).first()).toBeVisible();
   await expect(credentialDialog.getByText("来源：Pi AuthStorage")).toBeVisible();
   await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
   await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
   await expect(credentialDialog.getByText("尚未配置")).toBeVisible();
-  const keyInput = page.getByLabel("Provider API key", { exact: true });
+  const keyInput = page.getByLabel("Provider API 密钥", { exact: true });
   await keyInput.fill("test-secret-1234");
   await page.screenshot({ path: testInfo.outputPath("credential-dialog.png"), animations: "disabled" });
   await credentialDialog.getByRole("button", { name: "启用本次运行密钥" }).click();
@@ -34,8 +37,8 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(keyInput).toHaveValue("");
 
   await credentialDialog.getByRole("button", { name: "关闭" }).click();
-  await page.getByRole("button", { name: "管理 Provider 与凭据" }).click();
-  await expect(page.getByLabel("Provider API key", { exact: true })).toHaveValue("");
+  await openProviderDialog(page);
+  await expect(page.getByLabel("Provider API 密钥", { exact: true })).toHaveValue("");
 });
 
 test("keeps the title controls limited to configured models and readable thinking labels", async ({ page }) => {
@@ -43,7 +46,7 @@ test("keeps the title controls limited to configured models and readable thinkin
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const modelSelect = page.getByLabel("Pi model");
+  const modelSelect = page.getByLabel("Pi 模型");
   await expect(modelSelect.locator("option")).toHaveCount(2);
   await expect(modelSelect.getByRole("option", { name: /Claude Test/u })).toHaveCount(0);
   const thinkingSelect = page.getByLabel("Pi 思考级别");
@@ -57,7 +60,7 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "管理 Provider 与凭据" }).click();
+  await openProviderDialog(page);
 
   const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(dialog).toBeVisible();
@@ -69,3 +72,8 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(680);
   await page.screenshot({ path: testInfo.outputPath("credential-dialog-narrow-dark.png"), animations: "disabled" });
 });
+
+async function openProviderDialog(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByRole("button", { name: "打开更多菜单" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: /Provider 与凭据/u }).click();
+}

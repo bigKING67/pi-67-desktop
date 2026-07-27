@@ -1,22 +1,24 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { Button } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
+import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { selectHasSession } from "../session/session-projection-selectors.js";
+import { updateWorkspaceTrust } from "./workspace-trust-controller.js";
 
 export function TrustBanner() {
   const trust = useAppStore((state) => state.trust);
   const connected = useAppStore((state) => state.connected);
   const runtime = useAppStore((state) => state.runtime);
-  const snapshot = useAppStore((state) => state.snapshot);
+  const hasSession = useSessionProjectionStore(selectHasSession);
   const trustUpdating = useAppStore((state) => state.trustUpdating);
-  const setTrust = useAppStore((state) => state.setTrust);
   if (trust === "trusted") return null;
 
-  const waitingForSession = !connected || !snapshot || runtime.phase === "starting" || runtime.phase === "recovering";
+  const waitingForSession = !connected || !hasSession || runtime.phase === "starting" || runtime.phase === "recovering";
   const buttonLabel = trustUpdating
     ? "正在加载 Pi 资源…"
     : !connected
       ? "等待 Agent Host…"
-      : !snapshot || runtime.phase === "starting" || runtime.phase === "recovering"
+      : !hasSession || runtime.phase === "starting" || runtime.phase === "recovering"
         ? "等待 Pi 会话…"
         : runtime.phase === "failed"
           ? "重新加载 Pi 资源"
@@ -32,7 +34,7 @@ export function TrustBanner() {
       <Button
         className="secondary-button"
         isDisabled={trustUpdating || waitingForSession}
-        onPress={() => void setTrust("trusted")}
+        onPress={() => void updateWorkspaceTrust("trusted")}
       >
         <ShieldCheck size={15} /> {buttonLabel}
       </Button>

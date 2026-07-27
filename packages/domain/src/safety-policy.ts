@@ -25,8 +25,6 @@ export interface ApprovalDecision {
   reason: string;
 }
 
-const SAFE_READ_COMMAND = /^(?:pwd|git\s+(?:status|diff|log|show)(?:\s|$)|ls(?:\s|$)|find(?:\s|$)|rg(?:\s|$))/i;
-
 const COMMAND_RULES: ReadonlyArray<[RiskCategory, RegExp]> = [
   ["bulk-delete", /\b(?:rm|rmdir|del|erase|Remove-Item)\b[^\n]*(?:-r|-rf|\/s|\*)/i],
   ["destructive-shell", /\b(?:rm|rmdir|del|erase|format|diskpart|mkfs|shutdown|reboot|Stop-Computer)\b/i],
@@ -42,7 +40,7 @@ export function classifyShellCommand(command: string): RiskCategory {
   for (const [category, pattern] of COMMAND_RULES) {
     if (pattern.test(trimmed)) return category;
   }
-  return SAFE_READ_COMMAND.test(trimmed) ? "workspace-read" : "ambiguous-command";
+  return "ambiguous-command";
 }
 
 export function decideApproval(
@@ -55,6 +53,14 @@ export function decideApproval(
       allow: false,
       approvalRequired: false,
       reason: "Workspace is not trusted."
+    };
+  }
+
+  if (intent.toolName.toLowerCase() === "bash") {
+    return {
+      allow: false,
+      approvalRequired: true,
+      reason: riskLabel(intent.category)
     };
   }
 

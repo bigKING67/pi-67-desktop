@@ -2,14 +2,18 @@ import type { ProviderSummary } from "@pi67/domain";
 import { KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Heading, Input, Modal, ModalOverlay } from "react-aria-components";
-import { useAppStore } from "../app/app-store.js";
+import { messages } from "../localization/message-catalog.js";
+import { configureRuntimeProviderKey } from "../session/session-control-controller.js";
+import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { selectSelectedModel, selectSessionProviders } from "../session/session-projection-selectors.js";
+import { useShellStore } from "../shell/shell-store.js";
 
 export function CredentialDialog() {
-  const open = useAppStore((state) => state.credentialDialogOpen);
-  const snapshot = useAppStore((state) => state.snapshot);
-  const setOpen = useAppStore((state) => state.setCredentialDialogOpen);
-  const setRuntimeApiKey = useAppStore((state) => state.setRuntimeApiKey);
-  const providers = useMemo(() => snapshot?.providers ?? [], [snapshot?.providers]);
+  const open = useShellStore((state) => state.credentialDialogOpen);
+  const providerProjection = useSessionProjectionStore(selectSessionProviders);
+  const selectedModel = useSessionProjectionStore(selectSelectedModel);
+  const setOpen = useShellStore((state) => state.setCredentialDialogOpen);
+  const providers = useMemo(() => providerProjection ?? [], [providerProjection]);
   const [providerId, setProviderId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20,9 +24,9 @@ export function CredentialDialog() {
     setSubmitting(false);
     setProviderId((current) => {
       if (providers.some((provider) => provider.id === current)) return current;
-      return snapshot?.selectedModel?.provider ?? providers[0]?.id ?? "";
+      return selectedModel?.provider ?? providers[0]?.id ?? "";
     });
-  }, [open, providers, snapshot?.selectedModel?.provider]);
+  }, [open, providers, selectedModel?.provider]);
 
   if (!open) return null;
   const selectedProvider = providers.find((provider) => provider.id === providerId);
@@ -31,28 +35,28 @@ export function CredentialDialog() {
   return (
     <ModalOverlay className="modal-overlay" isOpen isDismissable={!submitting} onOpenChange={setOpen}>
       <Modal className="modal-surface credential-dialog">
-        <Dialog aria-label="Provider 与凭据">
+        <Dialog aria-label={messages.credentials.title}>
           <form onSubmit={(event) => {
             event.preventDefault();
             if (!canSubmit) return;
             setSubmitting(true);
-            void setRuntimeApiKey(providerId, apiKey).then((configured) => {
+            void configureRuntimeProviderKey(providerId, apiKey).then((configured) => {
               if (configured) setApiKey("");
               setSubmitting(false);
             });
           }}>
-            <span className="dialog-eyebrow">Pi provider status</span>
-            <Heading slot="title">Provider 与凭据</Heading>
+            <span className="dialog-eyebrow">{messages.credentials.eyebrow}</span>
+            <Heading slot="title">{messages.credentials.title}</Heading>
             <div className="credential-notice">
               <LockKeyhole size={17} aria-hidden="true" />
               <p>
-                <strong>显示认证状态，不读取或回显完整密钥。</strong>
-                <span>新增的 API key 仅保存在 Agent Host 内存中；退出应用或 Agent Host 重启后即清除。</span>
+                <strong>{messages.credentials.privacyTitle}</strong>
+                <span>{messages.credentials.privacyDetail}</span>
               </p>
             </div>
             {providers.length > 0 ? (
               <div className="provider-credential-layout">
-                <div className="provider-list" aria-label="Pi Providers">
+                <div className="provider-list" aria-label={messages.credentials.providerList}>
                   {providers.map((provider) => (
                     <button
                       aria-pressed={provider.id === providerId}
@@ -63,10 +67,12 @@ export function CredentialDialog() {
                     >
                       <span>
                         <strong>{provider.label}</strong>
-                        <small>{provider.id} · {provider.modelCount} 个模型</small>
+                        <small>{provider.id} · {messages.credentials.modelCount(provider.modelCount)}</small>
                       </span>
                       <em className={provider.configured ? "is-configured" : ""}>
-                        {provider.configured ? "已配置" : "未配置"}
+                        {provider.configured
+                          ? messages.credentials.configured
+                          : messages.credentials.unconfigured}
                       </em>
                     </button>
                   ))}
@@ -81,12 +87,16 @@ export function CredentialDialog() {
                 ) : null}
               </div>
             ) : (
-              <p className="credential-empty">请先选择工作区并等待 Pi Provider 列表加载。</p>
+              <p className="credential-empty">{messages.credentials.empty}</p>
             )}
             <div className="dialog-actions">
-              <Button className="secondary-button" onPress={() => setOpen(false)} isDisabled={submitting}>关闭</Button>
+              <Button className="secondary-button" onPress={() => setOpen(false)} isDisabled={submitting}>{messages.common.close}</Button>
               <Button className="primary-button" type="submit" isDisabled={!canSubmit}>
-                {submitting ? "正在启用…" : selectedProvider?.configured ? "替换本次运行密钥" : "启用本次运行密钥"}
+                {submitting
+                  ? messages.credentials.enabling
+                  : selectedProvider?.configured
+                    ? messages.credentials.replaceRuntimeKey
+                    : messages.credentials.enableRuntimeKey}
               </Button>
             </div>
           </form>
@@ -105,44 +115,48 @@ interface ProviderCredentialEditorProps {
 
 function ProviderCredentialEditor({ apiKey, provider, submitting, onApiKeyChange }: ProviderCredentialEditorProps) {
   return (
-    <section className="provider-credential-editor" aria-label={`${provider.label} 凭据`}>
+    <section className="provider-credential-editor" aria-label={messages.credentials.editorLabel(provider.label)}>
       <div className="provider-detail-heading">
         <span>
           <strong>{provider.label}</strong>
           <small>{provider.id}</small>
         </span>
-        {provider.configured ? <ShieldCheck size={17} aria-label="已配置" /> : <KeyRound size={17} aria-label="未配置" />}
+        {provider.configured
+          ? <ShieldCheck size={17} aria-label={messages.credentials.configured} />
+          : <KeyRound size={17} aria-label={messages.credentials.unconfigured} />}
       </div>
       <div className={`credential-current ${provider.configured ? "is-configured" : ""}`}>
-        <span>当前认证</span>
-        <code>{provider.configured ? "••••••••••••" : "尚未配置"}</code>
+        <span>{messages.credentials.currentAuthentication}</span>
+        <code>{provider.configured ? "••••••••••••" : messages.credentials.notConfigured}</code>
         <small>{credentialSourceLabel(provider)}</small>
       </div>
       <label className="dialog-field">
-        <span>{provider.configured ? "新增密钥以替换本次运行凭据" : "新增本次运行 API key"}</span>
+        <span>{provider.configured
+          ? messages.credentials.replaceKeyLabel
+          : messages.credentials.addKeyLabel}</span>
         <Input
-          aria-label="Provider API key"
+          aria-label={messages.credentials.apiKeyLabel}
           autoComplete="new-password"
           type="password"
           value={apiKey}
           onChange={(event) => onApiKeyChange(event.target.value)}
           disabled={submitting}
-          placeholder="输入后仅发送到 Agent Host"
+          placeholder={messages.credentials.keyPlaceholder}
         />
-        <small>至少 8 个字符。输入值不会进入会话快照、诊断或日志，也不会在关闭后回填。</small>
+        <small>{messages.credentials.keyPrivacyHelp}</small>
       </label>
     </section>
   );
 }
 
 function credentialSourceLabel(provider: ProviderSummary): string {
-  if (!provider.configured) return "可在此新增临时密钥，或通过 Pi 配置认证。";
+  if (!provider.configured) return messages.credentials.temporaryOrPiConfiguration;
   const source = provider.credentialSource;
-  if (source === "runtime") return "来源：本次运行内存";
-  if (source === "stored") return "来源：Pi AuthStorage";
-  if (source === "environment") return `来源：环境配置${provider.credentialLabel ? ` · ${provider.credentialLabel}` : ""}`;
-  if (source === "models_json_key") return "来源：Pi models.json 配置";
-  if (source === "models_json_command") return "来源：Pi models.json 命令";
-  if (source === "fallback") return "来源：Provider 默认认证";
-  return "来源：Pi Provider 配置";
+  if (source === "runtime") return messages.credentials.runtimeSource;
+  if (source === "stored") return messages.credentials.storedSource;
+  if (source === "environment") return messages.credentials.environmentSource(provider.credentialLabel);
+  if (source === "models_json_key") return messages.credentials.modelsJsonKeySource;
+  if (source === "models_json_command") return messages.credentials.modelsJsonCommandSource;
+  if (source === "fallback") return messages.credentials.fallbackSource;
+  return messages.credentials.providerSource;
 }

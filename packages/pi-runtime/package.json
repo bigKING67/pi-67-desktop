@@ -1,6 +1,6 @@
 {
   "name": "@pi67/pi-runtime",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,7 +10,9 @@
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
+    "build": "corepack pnpm run build:runtime && corepack pnpm run build:performance",
+    "build:runtime": "tsdown src/index.ts --format esm --dts --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
+    "build:performance": "tsdown src/session-jsonl-tail-performance-entry.ts --format esm --dts false --out-dir dist/performance --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -18,6 +20,7 @@
     "@earendil-works/pi-ai": "0.81.1",
     "@earendil-works/pi-coding-agent": "0.81.1",
     "@pi67/domain": "workspace:*",
+    "@pi67/extension-compat": "workspace:*",
     "@pi67/protocol": "workspace:*"
   },
   "devDependencies": {

@@ -1,0 +1,45 @@
+
+@media (max-width: 1040px) {
+  .workspace-grid,
+  .workspace-grid.has-context { grid-template-columns: 226px minmax(520px, 1fr); }
+  .composer-region {
+    z-index: 31;
+  }
+  .context-drawer-scrim {
+    position: fixed;
+    z-index: 29;
+    inset: var(--titlebar-height) 0 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--canvas) 34%, transparent);
+  }
+  .context-pane { position: fixed; z-index: 30; top: var(--titlebar-height); right: 0; bottom: 0; width: 360px; box-shadow: var(--shadow-floating); }
+}
+
+@media (max-width: 760px) {
+  .workspace-grid,
+  .workspace-grid.context-hidden { grid-template-columns: minmax(0, 1fr); }
+  .navigation-rail { display: none; }
+  .runtime-controls { display: none; }
+  .title-actions { padding-right: 120px; }
+  .message-card,
+  .message-card.role-user { width: calc(100% - 28px); }
+  .composer-region { padding-inline: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.72); }
+  50% { opacity: 1; transform: scaleX(1); }
+}

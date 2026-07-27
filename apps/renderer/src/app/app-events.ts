@@ -1,144 +1,116 @@
-import type {
-  DoctorReport,
-  ExtensionUiRequestView,
-  RuntimeStatus,
-  SessionSnapshot,
-  SessionSummary
-} from "@pi67/domain";
-import type { AgentEvent } from "@pi67/protocol";
+import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
+import { handleSessionCatalogChanged } from "../navigation/session-catalog-controller.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import {
+  acceptRendererSessionEvent,
+  type RendererSessionAuthority
+} from "../session/session-authority.js";
+import type { AppEventState, EventStoreGet, EventStoreSet } from "./app-event-state.js";
+import { externalSessionChangeMessage } from "./external-session-change-notification.js";
+import type { ProjectionAgentEvent } from "./incremental-projection.js";
+import { reduceInteractiveEvent } from "./interactive-event-reducer.js";
+import { reduceOperationEvent } from "./operation-event-reducer.js";
+import { reduceRuntimeEvent } from "./runtime-event-reducer.js";
 
-export interface UiNotice {
-  id: string;
-  level: "info" | "warning" | "error";
-  message: string;
-}
+export type RoutedAgentEvent = Exclude<AgentEvent, ProjectionAgentEvent>;
 
-interface AppEventState {
-  runtime: RuntimeStatus;
-  snapshot: SessionSnapshot | undefined;
-  sessions: SessionSummary[];
-  liveText: string;
-  liveThinking: string;
-  extensionRequests: ExtensionUiRequestView[];
-  extensionStatuses: Record<string, string>;
-  extensionWidgets: Record<string, string>;
-  notices: UiNotice[];
-  doctorReport: DoctorReport | undefined;
-  doctorRunning: boolean;
-  doctorError: string | undefined;
-  sessionTransitionPending: boolean;
-}
+export function handleAgentEvent<TState extends AppEventState>(
+  event: RoutedAgentEvent,
+  envelope: EventEnvelope,
+  get: EventStoreGet<TState>,
+  set: EventStoreSet<TState>,
+  onMissingSessionImportBootstrap?: (event: RoutedAgentEvent, envelope: EventEnvelope) => void
+): void {
+  const sessionAuthority = sessionAuthorityForEvent(event, envelope, get);
+  if (requiresSessionAuthority(event.type) && !sessionAuthority) {
+    onMissingSessionImportBootstrap?.(event, envelope);
+    return;
+  }
 
-type EventStoreSet<TState extends AppEventState> = (
-  partial: Partial<TState> | ((state: TState) => Partial<TState>)
-) => void;
-
-export function handleAgentEvent<TState extends AppEventState>(event: AgentEvent, set: EventStoreSet<TState>): void {
   switch (event.type) {
     case "runtime.statusChanged":
-      set({ runtime: event.payload } as Partial<TState>);
-      break;
-    case "runtime.ready":
-      set({
-        snapshot: event.payload.snapshot,
-        sessionTransitionPending: false,
-        runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true }
-      } as Partial<TState>);
-      break;
     case "runtime.crashed":
-      set({
-        sessionTransitionPending: false,
-        runtime: { phase: "failed", detail: event.payload.detail, recoverable: event.payload.recoverable }
-      } as Partial<TState>);
-      break;
-    case "session.snapshot":
-      set({ snapshot: event.payload, liveText: "", liveThinking: "" } as Partial<TState>);
-      break;
-    case "session.listed":
-      set({ sessions: event.payload.sessions } as Partial<TState>);
-      break;
-    case "session.delta":
-      if (event.payload.eventType === "agent_start") {
-        set({ liveText: "", liveThinking: "" } as Partial<TState>);
-      }
-      break;
-    case "turn.streamBatch":
-      applyStreamBatch(event.payload.events, set);
-      break;
-    case "turn.failed":
-      addNotice(set, "error", event.payload.message);
-      break;
-    case "approval.requested":
-    case "extension.ui.requested":
-      set((state) => ({ extensionRequests: [...state.extensionRequests, event.payload] }) as Partial<TState>);
-      break;
-    case "extension.ui.updated":
-      applyExtensionUpdate(event.payload, set);
-      break;
-    case "extension.compatibilityChanged":
-      set((state) => ({
-        extensionStatuses: { ...state.extensionStatuses, [event.payload.extensionId]: event.payload.detail }
-      }) as Partial<TState>);
-      if (event.payload.status !== "partial") addNotice(set, "warning", event.payload.detail);
-      break;
-    case "session.externalChangeDetected":
-      addNotice(set, "warning", "该 Pi 会话已被外部进程修改。重新加载后才能继续写入。");
-      break;
-    case "resource.changed":
-      addNotice(set, "info", "Pi 资源已重新加载。");
-      break;
-    case "approval.resolved":
     case "diagnostics.progress":
-      break;
     case "doctor.completed":
-      set({ doctorReport: event.payload, doctorRunning: false, doctorError: undefined } as Partial<TState>);
-      break;
+      reduceRuntimeEvent(event, set);
+      return;
+    case "turn.streamBatch":
+    case "operation.started":
+    case "operation.heartbeat":
+    case "operation.activityChanged":
+    case "operation.progress":
+    case "operation.completed":
+    case "operation.failed":
+    case "operation.cancelled":
+    case "operation.lost":
+      reduceOperationEvent(event, envelope, get, set, sessionAuthority);
+      return;
+    case "approval.requested":
+    case "approval.resolved":
+    case "approval.cancelled":
+    case "extension.ui.requested":
+    case "extension.ui.updated":
+    case "extension.ui.resolved":
+    case "extension.ui.cancelled":
+    case "extension.compatibilityChanged":
+    case "extension.catalog.changed":
+      reduceInteractiveEvent(event, envelope, get);
+      return;
+    case "session.catalog.changed":
+      handleSessionCatalogChanged(event.payload.revision);
+      return;
+    case "session.externalChangeDetected":
+      publishNotification({
+        level: "warning",
+        title: "Pi 会话已在外部修改",
+        message: externalSessionChangeMessage(event.payload.reason)
+      });
+      return;
+    case "resource.changed":
+      publishNotification({ level: "info", title: "Pi 资源已重新加载" });
+      return;
+    default:
+      assertNever(event);
   }
 }
 
-export function addNotice<TState extends AppEventState>(
-  set: EventStoreSet<TState>,
-  level: UiNotice["level"],
-  message: string
-): void {
-  set((state) => {
-    if (state.notices.some((notice) => notice.level === level && notice.message === message)) return {} as Partial<TState>;
-    const notice: UiNotice = { id: `notice-${Date.now()}-${Math.random().toString(36).slice(2)}`, level, message };
-    return { notices: [...state.notices.slice(-3), notice] } as Partial<TState>;
-  });
+function sessionAuthorityForEvent<TState extends AppEventState>(
+  event: RoutedAgentEvent,
+  envelope: EventEnvelope,
+  get: EventStoreGet<TState>
+): RendererSessionAuthority | undefined {
+  return requiresSessionAuthority(event.type)
+    ? acceptRendererSessionEvent(get(), envelope)
+    : undefined;
 }
 
-function applyStreamBatch<TState extends AppEventState>(events: unknown[], set: EventStoreSet<TState>): void {
-  let text = "";
-  let thinking = "";
-  for (const value of events) {
-    if (typeof value !== "object" || value === null) continue;
-    const event = value as Record<string, unknown>;
-    const assistant = typeof event.assistantMessageEvent === "object" && event.assistantMessageEvent !== null
-      ? event.assistantMessageEvent as Record<string, unknown>
-      : undefined;
-    if (assistant?.type === "text_delta" && typeof assistant.delta === "string") text += assistant.delta;
-    if (assistant?.type === "thinking_delta" && typeof assistant.delta === "string") thinking += assistant.delta;
+function requiresSessionAuthority(type: RoutedAgentEvent["type"]): boolean {
+  switch (type) {
+    case "turn.streamBatch":
+    case "operation.started":
+    case "operation.heartbeat":
+    case "operation.activityChanged":
+    case "operation.progress":
+    case "operation.completed":
+    case "operation.failed":
+    case "operation.cancelled":
+    case "operation.lost":
+    case "approval.requested":
+    case "approval.resolved":
+    case "approval.cancelled":
+    case "extension.ui.requested":
+    case "extension.ui.updated":
+    case "extension.ui.resolved":
+    case "extension.ui.cancelled":
+    case "extension.compatibilityChanged":
+    case "session.externalChangeDetected":
+    case "resource.changed":
+      return true;
+    default:
+      return false;
   }
-  if (!text && !thinking) return;
-  set((state) => ({
-    liveText: state.liveText + text,
-    liveThinking: state.liveThinking + thinking
-  }) as Partial<TState>);
 }
 
-function applyExtensionUpdate<TState extends AppEventState>(request: ExtensionUiRequestView, set: EventStoreSet<TState>): void {
-  if (request.kind === "notify" && request.message) {
-    addNotice(set, request.level ?? "info", request.message);
-    return;
-  }
-  if (request.kind === "status" && request.key) {
-    set((state) => ({ extensionStatuses: { ...state.extensionStatuses, [request.key!]: request.message ?? "" } }) as Partial<TState>);
-    return;
-  }
-  if (request.kind === "widget" && request.key) {
-    set((state) => ({ extensionWidgets: { ...state.extensionWidgets, [request.key!]: request.message ?? "" } }) as Partial<TState>);
-    return;
-  }
-  if (request.kind === "title" && request.message) document.title = `${request.message} - Pi-67 Desktop`;
+function assertNever(value: never): never {
+  throw new Error(`Unhandled Agent event: ${JSON.stringify(value)}`);
 }

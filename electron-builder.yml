@@ -9,6 +9,7 @@ files:
   - apps/agent-host/dist/**
   - apps/renderer/dist/**
   - packages/pi-runtime/dist/**
+  - packages/extension-compat/dist/**
   - packages/protocol/dist/**
   - packages/domain/dist/**
   - node_modules/**

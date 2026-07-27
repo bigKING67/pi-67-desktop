@@ -1,0 +1,248 @@
+.card {
+  margin: 10px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-muted) 74%, transparent);
+  color: var(--text-secondary);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 9px;
+  min-height: 48px;
+  padding: 9px 10px;
+}
+
+.kindIcon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.titleRow strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.titleRow code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.status-completed .status {
+  color: var(--success);
+}
+
+.status-failed {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+}
+
+.status-failed .status,
+.failureDetail,
+.copyError {
+  color: var(--danger);
+}
+
+.status-running .status {
+  color: var(--accent);
+}
+
+.details {
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.details > summary {
+  width: fit-content;
+  padding: 7px 10px;
+  color: var(--text-tertiary);
+  cursor: default;
+  font-size: 11px;
+  list-style-position: inside;
+}
+
+.details > summary:hover {
+  color: var(--text-primary);
+}
+
+.details > summary:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.detailBody {
+  display: grid;
+  gap: 10px;
+  padding: 2px 10px 10px;
+}
+
+.detailList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.detailList > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.detailList dt,
+.rawSummary > span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.detailList dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.detailList code,
+.rawSummary pre {
+  color: var(--text-primary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.rawSummary {
+  display: grid;
+  gap: 5px;
+}
+
+.rawSummary pre {
+  max-height: 220px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.failureDetail {
+  margin: 0;
+  font-size: 12px;
+}
+
+.limitations {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 17px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 27px;
+  font-size: 11px;
+}
+
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.copyButton[data-hovered] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.copyButton[data-pressed] {
+  background: var(--surface-active);
+}
+
+.spinning {
+  animation: tool-card-spin 0.9s linear infinite;
+}
+
+@keyframes tool-card-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 560px) {
+  .header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .status {
+    grid-column: 2;
+    padding-top: 0;
+  }
+
+  .detailList > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+  }
+}

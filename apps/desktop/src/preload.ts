@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { isTrustedRendererOrigin } from "./renderer-security.js";
 
 export interface PlatformInfo {
   platform: "win32" | "darwin";
@@ -20,13 +21,39 @@ const systemBridge = {
     const handler = (_event: Electron.IpcRendererEvent, state: { code: number; recoverable: boolean; attempt?: number }) => listener(state);
     ipcRenderer.on("pi67:agent-host-failed", handler);
     return () => ipcRenderer.removeListener("pi67:agent-host-failed", handler);
+  },
+  onPowerResume: (listener: () => void): (() => void) => {
+    const handler = () => listener();
+    ipcRenderer.on("pi67:power-resumed", handler);
+    return () => ipcRenderer.removeListener("pi67:power-resumed", handler);
   }
 };
 
 contextBridge.exposeInMainWorld("pi67", { system: systemBridge });
 
-ipcRenderer.on("pi67:agent-port", (event) => {
+ipcRenderer.on("pi67:agent-port", (event, value: unknown) => {
   const transferredPort = event.ports[0];
   if (!transferredPort) return;
-  window.postMessage({ source: "pi67-preload", type: "agent-port" }, "*", [transferredPort]);
+  const handoff = typeof value === "object" && value !== null
+    ? value as { expectedOrigin?: unknown; appInstanceId?: unknown; hostEpoch?: unknown }
+    : {};
+  const expectedOrigin = handoff.expectedOrigin;
+  if (
+    typeof expectedOrigin !== "string"
+    || !isTrustedRendererOrigin(expectedOrigin)
+    || window.location.origin !== expectedOrigin
+    || typeof handoff.appInstanceId !== "string"
+    || handoff.appInstanceId.length === 0
+    || !Number.isSafeInteger(handoff.hostEpoch)
+    || Number(handoff.hostEpoch) < 0
+  ) {
+    transferredPort.close();
+    return;
+  }
+  window.postMessage({
+    source: "pi67-preload",
+    type: "agent-port",
+    appInstanceId: handoff.appInstanceId,
+    hostEpoch: handoff.hostEpoch
+  }, expectedOrigin, [transferredPort]);
 });

@@ -1,3 +1,7 @@
+import type { ExtensionToolAdapterView } from "./extension-compatibility.js";
+import type { ExtensionCompatibility } from "./runtime-state.js";
+import type { AssetReference } from "./asset.js";
+
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 
 export interface TextPart {
@@ -11,12 +15,13 @@ export interface ToolCallPart {
   name: string;
   status: "pending" | "running" | "completed" | "failed";
   summary?: string;
+  adapter?: ExtensionToolAdapterView;
 }
 
 export interface ImagePart {
   type: "image";
   mimeType: string;
-  dataUrl?: string;
+  asset?: AssetReference;
   name?: string;
 }
 
@@ -77,6 +82,30 @@ export interface ResourceSummary {
   detail?: string;
 }
 
+export interface SessionControlsView {
+  selectedModel?: { provider: string; id: string };
+  thinkingLevel: string;
+}
+
+export interface SessionModelCatalogView {
+  models: ModelSummary[];
+  providers: ProviderSummary[];
+  availableThinkingLevels: string[];
+}
+
+export interface SessionControlResult {
+  sessionId: string;
+  controls: SessionControlsView;
+}
+
+export interface SessionModelCatalogResult extends SessionControlResult {
+  modelCatalog: SessionModelCatalogView;
+}
+
+export interface SessionResourceCatalogResult extends SessionModelCatalogResult {
+  resources: ResourceSummary[];
+}
+
 export interface SessionSnapshot {
   sessionId: string;
   sessionPath?: string;
@@ -84,20 +113,33 @@ export interface SessionSnapshot {
   cwd: string;
   streaming: boolean;
   messages: SessionMessageView[];
-  models: ModelSummary[];
-  providers: ProviderSummary[];
-  selectedModel?: { provider: string; id: string };
-  thinkingLevel: string;
-  availableThinkingLevels: string[];
+  messagePage: MessagePageMetadata;
+  models: SessionModelCatalogView["models"];
+  providers: SessionModelCatalogView["providers"];
+  selectedModel?: SessionControlsView["selectedModel"];
+  thinkingLevel: SessionControlsView["thinkingLevel"];
+  availableThinkingLevels: SessionModelCatalogView["availableThinkingLevels"];
   steeringQueue: string[];
   followUpQueue: string[];
-  tree: SessionTreeNodeView[];
+  tree: SessionTreeProjection;
   resources: ResourceSummary[];
   stats?: {
     tokens: number;
     cost: number;
     contextPercent?: number;
   };
+}
+
+export interface MessagePageMetadata {
+  startCursor?: string;
+  endCursor?: string;
+  hasOlder: boolean;
+  hasNewer: boolean;
+}
+
+export interface ConversationPage extends MessagePageMetadata {
+  sessionId: string;
+  messages: SessionMessageView[];
 }
 
 export interface SessionTreeNodeView {
@@ -107,7 +149,13 @@ export interface SessionTreeNodeView {
   label?: string;
   preview: string;
   active: boolean;
-  children: SessionTreeNodeView[];
+  depth: number;
+}
+
+export interface SessionTreeProjection {
+  nodes: SessionTreeNodeView[];
+  truncated: boolean;
+  total: number;
 }
 
 export type ExtensionUiKind =
@@ -125,7 +173,13 @@ export type ExtensionUiKind =
 
 export interface ExtensionUiRequestView {
   requestId: string;
-  extensionId: string;
+  extensionId?: string;
+  extensionPackage?: string;
+  extensionPath?: string;
+  sessionId?: string;
+  sessionGeneration?: number;
+  operationId?: string;
+  hostEpoch?: number;
   kind: ExtensionUiKind;
   title?: string;
   message?: string;
@@ -136,3 +190,24 @@ export interface ExtensionUiRequestView {
   placement?: "aboveEditor" | "belowEditor";
   blocking: boolean;
 }
+
+export interface ExtensionCompatibilityEventView {
+  extensionId?: string;
+  extensionPackage?: string;
+  extensionPath?: string;
+  sessionId?: string;
+  sessionGeneration?: number;
+  operationId?: string;
+  hostEpoch?: number;
+  status: ExtensionCompatibility;
+  detail: string;
+}
+
+export type ExtensionUiCancellationReason =
+  | "session-transition"
+  | "resource-reload"
+  | "runtime-dispose"
+  | "connection-close"
+  | "projection-resync"
+  | "timeout"
+  | "abort";

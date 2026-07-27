@@ -1,0 +1,230 @@
+name: Real Provider long-turn certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to certify
+        required: true
+        type: string
+      provider_id:
+        description: Pi Provider ID
+        required: true
+        type: string
+      model_id:
+        description: Pi model ID without the Provider prefix
+        required: true
+        type: string
+      thinking_level:
+        description: Pi thinking level supported by the selected model
+        required: true
+        default: 'off'
+        type: choice
+        options:
+          - 'off'
+          - minimal
+          - low
+          - medium
+          - high
+          - xhigh
+          - max
+      tool_delay_ms:
+        description: Controlled Tool duration in milliseconds, from 90000 to 300000
+        required: true
+        default: '95000'
+        type: string
+      confirm_paid_request:
+        description: I authorize one packaged Pi Operation that may issue multiple billed Provider requests
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: provider-long-turn-${{ inputs.tag }}-${{ inputs.provider_id }}-${{ inputs.model_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    environment: provider-certification
+    runs-on: windows-2025
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Validate paid-call and signing authorization
+        shell: pwsh
+        env:
+          CONFIRM_PAID_REQUEST: ${{ inputs.confirm_paid_request }}
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          MODEL_ID: ${{ inputs.model_id }}
+          PROVIDER_ID: ${{ inputs.provider_id }}
+          REAL_PROVIDER_API_KEY: ${{ secrets.REAL_PROVIDER_API_KEY }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          THINKING_LEVEL: ${{ inputs.thinking_level }}
+          TOOL_DELAY_MS: ${{ inputs.tool_delay_ms }}
+          WINDOWS_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          WINDOWS_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: |
+          if ($env:CONFIRM_PAID_REQUEST -ne 'true') {
+            throw 'confirm_paid_request=true is required for one billed Provider Operation.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:REAL_PROVIDER_API_KEY)) {
+            throw 'REAL_PROVIDER_API_KEY is required.'
+          }
+          if ($env:REAL_PROVIDER_API_KEY.Length -lt 8) {
+            throw 'REAL_PROVIDER_API_KEY must contain at least 8 characters.'
+          }
+          if ($env:EXPECTED_SIGNER_THUMBPRINT -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw 'WINDOWS_SIGNER_THUMBPRINT repository variable must contain the expected SHA-1 thumbprint.'
+          }
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw 'tag must be a v-prefixed SemVer release tag.'
+          }
+          foreach ($field in @(
+            @{ Name = 'provider_id'; Value = $env:PROVIDER_ID; Limit = 256 },
+            @{ Name = 'model_id'; Value = $env:MODEL_ID; Limit = 512 }
+          )) {
+            if ([string]::IsNullOrWhiteSpace($field.Value) `
+              -or $field.Value.Length -gt $field.Limit `
+              -or $field.Value -ne $field.Value.Trim() `
+              -or $field.Value -match '[\x00-\x1F\x7F]') {
+              throw "$($field.Name) must be a canonical bounded single-line value."
+            }
+          }
+          if ($env:THINKING_LEVEL -notmatch '^(off|minimal|low|medium|high|xhigh|max)$') {
+            throw 'thinking_level is not a supported Pi thinking level.'
+          }
+          $delay = 0
+          if (-not [int]::TryParse($env:TOOL_DELAY_MS, [ref]$delay) `
+            -or $delay -lt 90000 -or $delay -gt 300000) {
+            throw 'tool_delay_ms must be an integer from 90000 to 300000.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CSC_LINK) `
+            -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CSC_KEY_PASSWORD)) {
+            throw 'Windows signing credentials are required.'
+          }
+      - name: Verify release tag contract
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: corepack pnpm run release:tag:verify "$env:RELEASE_TAG"
+      - name: Capture checked-out source commit
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Invalid checkout commit: $commit" }
+          "PI67_REAL_PROVIDER_SOURCE_COMMIT=$commit" >> $env:GITHUB_ENV
+      - name: Verify Windows x64 runner
+        run: node -e "if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error(process.platform + '/' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run check
+      - name: Build signed Windows candidate
+        run: corepack pnpm run package:win
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      - name: Create and verify shared Windows signed candidate identity
+        id: signed_candidate
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          SOURCE_TAG: ${{ inputs.tag }}
+        run: |
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $sourcePolicy = if ($packageVersion.Contains('-')) { 'version-tag' } else { 'stable' }
+          $installer = "artifacts/release/Pi-67-Desktop-$packageVersion-win-x64.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected signed Windows installer is missing: $installer"
+          }
+          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          $identityDirectory = 'artifacts/validation/provider-long-turn'
+          New-Item -ItemType Directory -Path $identityDirectory -Force | Out-Null
+          $identity = "$identityDirectory/windows-signed-candidate-identity.json"
+          corepack pnpm run release:candidate:identity `
+            --repository $env:GITHUB_REPOSITORY `
+            --source-policy $sourcePolicy `
+            --source-tag $env:SOURCE_TAG `
+            --source-commit $env:PI67_REAL_PROVIDER_SOURCE_COMMIT `
+            --run-id $env:GITHUB_RUN_ID `
+            --run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --installer $installer `
+            --packaged-executable $executable `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT `
+            --output $identity
+          corepack pnpm run release:candidate:verify `
+            --candidate-identity $identity `
+            --installer $installer `
+            --packaged-executable $executable `
+            --expected-source-policy $sourcePolicy `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:SOURCE_TAG `
+            --expected-source-commit $env:PI67_REAL_PROVIDER_SOURCE_COMMIT `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
+          "installer_path=$installer" >> $env:GITHUB_OUTPUT
+          "source_policy=$sourcePolicy" >> $env:GITHUB_OUTPUT
+      - run: corepack pnpm run package:smoke
+      - name: Run one authorized real Provider Operation
+        id: provider_certification
+        run: corepack pnpm run validate:provider-long-turn
+        env:
+          PI67_REAL_PROVIDER_OPT_IN: '1'
+          PI67_REAL_PROVIDER_ID: ${{ inputs.provider_id }}
+          PI67_REAL_PROVIDER_MODEL_ID: ${{ inputs.model_id }}
+          PI67_REAL_PROVIDER_API_KEY: ${{ secrets.REAL_PROVIDER_API_KEY }}
+          PI67_REAL_PROVIDER_CANDIDATE_IDENTITY: artifacts/validation/provider-long-turn/windows-signed-candidate-identity.json
+          PI67_REAL_PROVIDER_CANDIDATE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PI67_REAL_PROVIDER_CANDIDATE_RUN_ID: ${{ github.run_id }}
+          PI67_REAL_PROVIDER_CANDIDATE_SOURCE_POLICY: ${{ steps.signed_candidate.outputs.source_policy }}
+          PI67_REAL_PROVIDER_EXPECTED_REPOSITORY: ${{ github.repository }}
+          PI67_REAL_PROVIDER_EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          PI67_REAL_PROVIDER_THINKING_LEVEL: ${{ inputs.thinking_level }}
+          PI67_REAL_PROVIDER_TOOL_DELAY_MS: ${{ inputs.tool_delay_ms }}
+          PI67_REAL_PROVIDER_SOURCE_TAG: ${{ inputs.tag }}
+          PI67_REAL_PROVIDER_OUTPUT: artifacts/validation/provider-long-turn/summary.json
+          PI67_REAL_PROVIDER_REQUIRE_CANDIDATE_IDENTITY: '1'
+      - name: Revalidate certified candidate bytes and signer
+        if: ${{ always() && steps.provider_certification.outcome != 'skipped' }}
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          INSTALLER_PATH: ${{ steps.signed_candidate.outputs.installer_path }}
+          SOURCE_POLICY: ${{ steps.signed_candidate.outputs.source_policy }}
+          SOURCE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run release:candidate:verify `
+            --candidate-identity artifacts/validation/provider-long-turn/windows-signed-candidate-identity.json `
+            --installer $env:INSTALLER_PATH `
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-source-policy $env:SOURCE_POLICY `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:SOURCE_TAG `
+            --expected-source-commit $env:PI67_REAL_PROVIDER_SOURCE_COMMIT `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && steps.provider_certification.outcome != 'skipped' }}
+        with:
+          name: provider-long-turn-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/validation/provider-long-turn/summary.json
+            artifacts/validation/provider-long-turn/windows-signed-candidate-identity.json
+            ${{ steps.signed_candidate.outputs.installer_path }}
+            artifacts/release/win-unpacked/
+          if-no-files-found: error
+          retention-days: 30

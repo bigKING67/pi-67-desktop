@@ -1,66 +1,143 @@
-import { useEffect } from "react";
-import { CommandPalette } from "../command-palette/CommandPalette.js";
-import { Composer } from "../composer/Composer.js";
-import { ContextPane } from "../context/ContextPane.js";
-import { DoctorDialog } from "../doctor/DoctorDialog.js";
-import { ExtensionDialog } from "../extension-ui/ExtensionDialog.js";
-import { NavigationRail } from "../navigation/NavigationRail.js";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useApprovalStore } from "../approval/approval-store.js";
+import { DEFAULT_APPLICATION_TITLE } from "../extension-ui/extension-ui-state.js";
+import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
+import { messages } from "../localization/message-catalog.js";
 import { TitleBar } from "../shell/TitleBar.js";
-import { CredentialDialog } from "../settings/CredentialDialog.js";
-import { Transcript } from "../transcript/Transcript.js";
-import { UpdateDialog } from "../updates/UpdateDialog.js";
-import { TrustBanner } from "../workspace/TrustBanner.js";
+import { useShellStore } from "../shell/shell-store.js";
 import { Welcome } from "../workspace/Welcome.js";
-import { subscribeToAgentConnections } from "../bridge/agent-connection.js";
+import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { NotificationToasts } from "../notifications/NotificationToasts.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import { createOperationFreshnessInstallation } from "../operation/operation-freshness-installation.js";
 import { useAppStore } from "./app-store.js";
+import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
+import styles from "./App.module.css";
+
+const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
+const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
+const CommandPalette = lazy(() => import("../command-palette/CommandPalette.js").then((module) => ({ default: module.CommandPalette })));
+const DoctorDialog = lazy(() => import("../doctor/DoctorDialog.js").then((module) => ({ default: module.DoctorDialog })));
+const ExtensionDialog = lazy(() => import("../extension-ui/ExtensionDialog.js").then((module) => ({ default: module.ExtensionDialog })));
+const CredentialDialog = lazy(() => import("../settings/CredentialDialog.js").then((module) => ({ default: module.CredentialDialog })));
+const UpdateDialog = lazy(() => import("../updates/UpdateDialog.js").then((module) => ({ default: module.UpdateDialog })));
 
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
-  const contextVisible = useAppStore((state) => state.contextVisible);
-  const setContextVisible = useAppStore((state) => state.setContextVisible);
-  const setClient = useAppStore((state) => state.setClient);
-  const notices = useAppStore((state) => state.notices);
-  const dismissNotice = useAppStore((state) => state.dismissNotice);
+  const connected = useAppStore((state) => state.connected);
+  const contextVisible = useShellStore((state) => state.contextVisible);
+  const setContextVisible = useShellStore((state) => state.setContextVisible);
+  const extensionTitle = useExtensionUiStore((state) => state.title);
+  const approvalDialogOpen = useApprovalStore((state) => state.requests.length > 0);
+  const extensionDialogOpen = useExtensionUiStore((state) => state.requests.length > 0);
+  const doctorDialogOpen = useShellStore((state) => state.doctorDialogOpen);
+  const credentialDialogOpen = useShellStore((state) => state.credentialDialogOpen);
+  const updateDialogOpen = useShellStore((state) => state.updateDialogOpen);
+  const commandPaletteOpen = useShellStore((state) => state.commandPaletteOpen);
+  const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  const [navigationVisible, setNavigationVisible] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
+  const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
+  if (!freshnessInstallationRef.current) {
+    freshnessInstallationRef.current = createOperationFreshnessInstallation({
+      onLoadFailed: () => publishNotification({
+        level: "warning",
+        title: messages.operation.monitorUnavailableTitle,
+        message: messages.operation.monitorUnavailableDetail
+      })
+    });
+  }
+
+  const restoreNavigationTriggerFocus = useCallback(() => {
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".navigation-toggle")?.focus());
+  }, []);
+
+  const closeNavigation = useCallback((restoreFocus = true) => {
+    setNavigationVisible(false);
+    if (restoreFocus) restoreNavigationTriggerFocus();
+  }, [restoreNavigationTriggerFocus]);
+
+  const toggleNavigation = useCallback(() => {
+    setNavigationVisible((visible) => {
+      const nextVisible = !visible;
+      if (nextVisible) setContextVisible(false);
+      else restoreNavigationTriggerFocus();
+      return nextVisible;
+    });
+  }, [restoreNavigationTriggerFocus, setContextVisible]);
 
   useEffect(() => {
-    return subscribeToAgentConnections(setClient);
-  }, [setClient]);
+    const unsubscribe = agentConnectionController.subscribe({
+      onConnected: (identity) => useAppStore.getState().handleAgentConnected(identity),
+      onEvent: (event, envelope) => {
+        useAppStore.getState().receiveAgentEvent(event, envelope);
+        freshnessInstallationRef.current?.observe(event, envelope);
+      },
+      onSequenceGap: (gap) => useAppStore.getState().handleSequenceGap(gap),
+      onTeardown: (error) => useAppStore.getState().handleAgentTeardown(error)
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const installation = freshnessInstallationRef.current;
+    if (!workspace) {
+      installation?.deactivate();
+      return;
+    }
+    installation?.activate();
+    return () => installation?.deactivate();
+  }, [workspace]);
 
   useEffect(() => window.pi67.system.onAgentHostFailed((state) => {
-    useAppStore.setState((current) => ({
-      connected: false,
-      trustUpdating: false,
-      sessionTransitionPending: false,
-      credentialDialogOpen: false,
-      notices: [
-        ...current.notices.slice(-2),
-        {
-          id: `agent-host-restart-${Date.now()}`,
-          level: "warning",
-          message: "Agent Host 已退出；任何仅在本次运行内存中的 Provider API key 均已清除。"
-        }
-      ],
-      runtime: {
-        phase: state.recoverable ? "recovering" : "failed",
-        detail: state.recoverable
-          ? `Agent Host 已退出，正在进行第 ${state.attempt ?? 1} 次恢复`
-          : "Agent Host 连续退出，自动恢复已停止",
-        recoverable: state.recoverable,
-        ...(state.attempt === undefined ? {} : { attempt: state.attempt })
-      }
-    }));
+    useAppStore.getState().handleAgentHostFailed(state);
   }), []);
+
+  useEffect(() => window.pi67.system.onPowerResume(() => {
+    freshnessInstallationRef.current?.handlePowerResume();
+    useAppStore.getState().handlePowerResume();
+  }), []);
+
+  useEffect(() => {
+    document.title = extensionTitle ? `${extensionTitle} - ${DEFAULT_APPLICATION_TITLE}` : DEFAULT_APPLICATION_TITLE;
+  }, [extensionTitle]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        useAppStore.getState().setCommandPaletteOpen(true);
+        useShellStore.getState().setCommandPaletteOpen(true);
+        return;
       }
+      if (!workspace || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "b") return;
+      event.preventDefault();
+      if (event.shiftKey) {
+        const state = useShellStore.getState();
+        const nextVisible = !state.contextVisible;
+        state.setContextVisible(nextVisible);
+        if (!nextVisible) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".context-toggle")?.focus());
+        return;
+      }
+      toggleNavigation();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleNavigation, workspace]);
+
+  useEffect(() => {
+    const breakpoint = window.matchMedia("(max-width: 760px)");
+    const syncNavigationMode = (matches: boolean) => {
+      setNavigationIsDrawer(matches);
+      setNavigationVisible(!matches);
+    };
+    const onBreakpointChange = (event: MediaQueryListEvent) => syncNavigationMode(event.matches);
+    syncNavigationMode(breakpoint.matches);
+    breakpoint.addEventListener("change", onBreakpointChange);
+    return () => breakpoint.removeEventListener("change", onBreakpointChange);
   }, []);
+
+  useEffect(() => {
+    if (navigationIsDrawer && contextVisible) setNavigationVisible(false);
+  }, [contextVisible, navigationIsDrawer]);
 
   useEffect(() => {
     if (!workspace) return;
@@ -82,49 +159,115 @@ export function App() {
   };
 
   return (
-    <div className="application-shell">
-      <TitleBar />
+    <div className="application-shell" data-agent-connected={connected ? "true" : "false"}>
+      <TitleBar navigationAvailable={Boolean(workspace)} navigationVisible={navigationVisible} onToggleNavigation={toggleNavigation} />
       {!workspace ? (
         <Welcome />
       ) : (
-        <main className={`workspace-grid ${contextVisible ? "has-context" : "context-hidden"}`}>
-          <NavigationRail />
-          <section className="conversation-region" aria-label="Pi conversation">
-            <TrustBanner />
-            <Transcript />
-            <Composer />
-          </section>
-          {contextVisible ? (
-            <>
-              <button
-                aria-label="关闭上下文抽屉"
-                className="context-drawer-scrim"
-                onClick={closeContextDrawer}
-                type="button"
-              />
-              <ContextPane />
-            </>
-          ) : null}
-        </main>
+        <LazySurfaceBoundary
+          description="Pi Agent Host 可能仍在运行。重新加载只会重建 Renderer，并在连接恢复后重新同步当前会话投影。"
+          kind="workspace"
+          surface="workspace-shell"
+          title="工作区界面未能加载"
+        >
+          <Suspense fallback={<WorkspaceShellFallback />}>
+            <WorkspaceShell
+              contextVisible={contextVisible}
+              navigationIsDrawer={navigationIsDrawer}
+              navigationVisible={navigationVisible}
+              onCloseContextDrawer={closeContextDrawer}
+              onCloseNavigation={closeNavigation}
+            />
+          </Suspense>
+        </LazySurfaceBoundary>
       )}
-      <div className="notice-stack" aria-live="polite" aria-atomic="false">
-        {notices.map((notice) => (
-          <button
-            className={`notice notice-${notice.level}`}
-            key={notice.id}
-            onClick={() => dismissNotice(notice.id)}
-            type="button"
-          >
-            <span>{notice.message}</span>
-            <span aria-hidden="true">×</span>
-          </button>
-        ))}
+      <NotificationToasts />
+      {approvalDialogOpen ? (
+        <LazySurfaceBoundary
+          description="工具仍保持阻止状态，没有授权结果会被自动发送。重新加载界面后可继续处理这次请求。"
+          kind="blocking-overlay"
+          surface="approval-dialog"
+          title="授权界面未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载授权界面" />}><ApprovalDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {extensionDialogOpen ? (
+        <LazySurfaceBoundary
+          description="Extension 请求仍保持等待状态，没有输入会被自动提交。重新加载界面后可继续处理这次请求。"
+          kind="blocking-overlay"
+          surface="extension-dialog"
+          title="Extension 输入界面未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载 Extension 输入界面" />}><ExtensionDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {doctorDialogOpen ? (
+        <LazySurfaceBoundary
+          description={messages.doctor.interfaceFailureDescription}
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setDoctorDialogOpen(false)}
+          surface="doctor-dialog"
+          title={messages.doctor.interfaceFailureTitle}
+        >
+          <Suspense fallback={<OverlayLoading label={messages.doctor.loadingInterface} />}><DoctorDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {credentialDialogOpen ? (
+        <LazySurfaceBoundary
+          description={messages.credentials.interfaceFailureDescription}
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setCredentialDialogOpen(false)}
+          surface="credential-dialog"
+          title={messages.credentials.interfaceFailureTitle}
+        >
+          <Suspense fallback={<OverlayLoading label={messages.credentials.loadingInterface} />}><CredentialDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {updateDialogOpen ? (
+        <LazySurfaceBoundary
+          description="更新界面模块发生错误。没有更新操作会在后台自动开始。"
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setUpdateDialogOpen(false)}
+          surface="update-dialog"
+          title="更新界面未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载更新界面" />}><UpdateDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {commandPaletteOpen ? (
+        <LazySurfaceBoundary
+          description="命令面板模块发生错误。可以关闭后继续使用当前工作区，或重新加载界面恢复该功能。"
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setCommandPaletteOpen(false)}
+          surface="command-palette"
+          title="命令面板未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载命令面板" />}><CommandPalette /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+    </div>
+  );
+}
+
+function WorkspaceShellFallback() {
+  return (
+    <main aria-busy="true" className={styles.workspaceLoading}>
+      <div className="transcript-loading" role="status">
+        <span className="loading-line" />
+        正在加载工作区界面
       </div>
-      <ExtensionDialog />
-      <DoctorDialog />
-      <CredentialDialog />
-      <UpdateDialog />
-      <CommandPalette />
+    </main>
+  );
+}
+
+function OverlayLoading({ label }: { label: string }) {
+  return (
+    <div className={`modal-overlay ${styles.overlayLoading}`}>
+      <div aria-busy="true" className={styles.overlayLoadingSurface} role="status">
+        <span className="loading-line" />
+        {label}
+      </div>
     </div>
   );
 }

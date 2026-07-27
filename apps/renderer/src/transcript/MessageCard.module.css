@@ -1,0 +1,40 @@
+.imagePlaceholder {
+  gap: 8px;
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.imageError {
+  color: var(--danger);
+}
+
+.imageRetry {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.imageRetry:hover {
+  background: var(--surface-hover);
+}
+
+.imageRetry:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

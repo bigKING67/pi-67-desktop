@@ -1,40 +1,57 @@
 import type {
   AgentSession,
   AgentSessionServices,
-  LoadExtensionsResult,
-  SessionManager
+  LoadExtensionsResult
 } from "@earendil-works/pi-coding-agent";
 import type {
   ModelSummary,
   ProviderSummary,
   ResourceSummary,
-  SessionSnapshot,
-  SessionTreeNodeView
+  ExtensionToolAdapterView,
+  SessionControlsView,
+  SessionModelCatalogView,
+  SessionSnapshot
 } from "@pi67/domain";
-import { normalizeMessages } from "./message-normalizer.js";
+import type { ImageAssetProjector } from "./message-normalizer.js";
+import { projectMessagePage } from "./message-projection.js";
+import { sanitizeRuntimeText } from "./runtime-redaction.js";
+import type { SessionProjectionIndex } from "./session-projection-index.js";
+import { projectSessionTree } from "./session-tree-projection.js";
 
 export function projectSessionSnapshot(
   session: AgentSession,
   services: AgentSessionServices | undefined,
-  extensionsResult: LoadExtensionsResult | undefined
+  extensionsResult: LoadExtensionsResult | undefined,
+  projection: SessionProjectionIndex,
+  resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
+  projectImageAsset?: ImageAssetProjector
 ): SessionSnapshot {
-  const stats = session.getSessionStats();
+  const stats = projection.getStats(session);
+  const messagePage = projectMessagePage(projection, {}, resolveToolAdapter, projectImageAsset);
+  const controls = projectSessionControls(session);
+  const modelCatalog = projectSessionModelCatalog(session);
   return {
     sessionId: session.sessionId,
     ...(session.sessionFile ? { sessionPath: session.sessionFile } : {}),
     ...(session.sessionName ? { sessionName: session.sessionName } : {}),
     cwd: session.sessionManager.getCwd(),
     streaming: session.isStreaming,
-    messages: normalizeMessages(session.messages),
-    models: projectModels(session),
-    providers: projectProviders(session),
-    ...(session.model ? { selectedModel: { provider: session.model.provider, id: session.model.id } } : {}),
-    thinkingLevel: session.thinkingLevel,
-    availableThinkingLevels: session.getAvailableThinkingLevels(),
+    messages: messagePage.messages,
+    messagePage: {
+      ...(messagePage.startCursor === undefined ? {} : { startCursor: messagePage.startCursor }),
+      ...(messagePage.endCursor === undefined ? {} : { endCursor: messagePage.endCursor }),
+      hasOlder: messagePage.hasOlder,
+      hasNewer: messagePage.hasNewer
+    },
+    models: modelCatalog.models,
+    providers: modelCatalog.providers,
+    ...(controls.selectedModel === undefined ? {} : { selectedModel: controls.selectedModel }),
+    thinkingLevel: controls.thinkingLevel,
+    availableThinkingLevels: modelCatalog.availableThinkingLevels,
     steeringQueue: [...session.getSteeringMessages()],
     followUpQueue: [...session.getFollowUpMessages()],
-    tree: projectSessionTree(session),
-    resources: projectResources(services, extensionsResult),
+    tree: projectSessionTree(projection),
+    resources: projectSessionResources(services, extensionsResult),
     stats: {
       tokens: stats.tokens.total,
       cost: stats.cost,
@@ -45,7 +62,24 @@ export function projectSessionSnapshot(
   };
 }
 
-function projectModels(session: AgentSession): ModelSummary[] {
+export function projectSessionControls(session: AgentSession): SessionControlsView {
+  return {
+    ...(session.model
+      ? { selectedModel: { provider: session.model.provider, id: session.model.id } }
+      : {}),
+    thinkingLevel: session.thinkingLevel
+  };
+}
+
+export function projectSessionModelCatalog(session: AgentSession): SessionModelCatalogView {
+  return {
+    models: projectSessionModels(session),
+    providers: projectProviders(session),
+    availableThinkingLevels: session.getAvailableThinkingLevels()
+  };
+}
+
+export function projectSessionModels(session: AgentSession): ModelSummary[] {
   const runtime = session.modelRuntime;
   return runtime.getModels().map((model) => ({
     provider: model.provider,
@@ -83,7 +117,7 @@ function projectProviders(session: AgentSession): ProviderSummary[] {
     });
 }
 
-function projectResources(
+export function projectSessionResources(
   services: AgentSessionServices | undefined,
   extensionsResult: LoadExtensionsResult | undefined
 ): ResourceSummary[] {
@@ -97,44 +131,20 @@ function projectResources(
     resources.push({ kind: "prompt", id: prompt.name, label: prompt.name, path: prompt.filePath, status: "ready" });
   }
   for (const extension of extensionsResult?.extensions ?? []) {
+    if (extension.hidden) continue;
     resources.push({ kind: "extension", id: extension.resolvedPath, label: extension.path, path: extension.resolvedPath, status: "ready" });
   }
   for (const error of extensionsResult?.errors ?? []) {
-    resources.push({ kind: "extension", id: error.path, label: error.path, status: "failed", detail: error.error });
+    resources.push({
+      kind: "extension",
+      id: error.path,
+      label: error.path,
+      status: "failed",
+      detail: sanitizeRuntimeText(error.error)
+    });
   }
   for (const file of loader.getAgentsFiles().agentsFiles) {
     resources.push({ kind: "context", id: file.path, label: file.path.split(/[\\/]/).pop() ?? file.path, path: file.path, status: "ready" });
   }
   return resources;
-}
-
-function projectSessionTree(session: AgentSession): SessionTreeNodeView[] {
-  const leafId = session.sessionManager.getLeafId();
-  const normalizeNode = (node: ReturnType<SessionManager["getTree"]>[number]): SessionTreeNodeView => {
-    const entry = node.entry as unknown as Record<string, unknown>;
-    const id = typeof entry.id === "string" ? entry.id : "unknown";
-    return {
-      id,
-      parentId: typeof entry.parentId === "string" ? entry.parentId : null,
-      type: typeof entry.type === "string" ? entry.type : "entry",
-      ...(node.label ? { label: node.label } : {}),
-      preview: sessionTreePreview(entry),
-      active: id === leafId,
-      children: node.children.map(normalizeNode)
-    };
-  };
-  return session.sessionManager.getTree().map(normalizeNode);
-}
-
-function sessionTreePreview(entry: Record<string, unknown>): string {
-  const message = typeof entry.message === "object" && entry.message !== null
-    ? entry.message as Record<string, unknown>
-    : undefined;
-  const content = message?.content ?? entry.summary ?? entry.name ?? entry.type;
-  if (typeof content === "string") return content.slice(0, 120);
-  try {
-    return JSON.stringify(content).slice(0, 120);
-  } catch {
-    return "Session entry";
-  }
 }

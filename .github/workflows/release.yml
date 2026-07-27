@@ -7,12 +7,104 @@ on:
         description: Existing version tag to publish
         required: true
         type: string
+      provider_id:
+        description: Pi Provider ID for the release-bound long-turn certification
+        required: true
+        type: string
+      model_id:
+        description: Pi model ID without the Provider prefix
+        required: true
+        type: string
+      thinking_level:
+        description: Pi thinking level supported by the selected model
+        required: true
+        default: 'off'
+        type: choice
+        options:
+          - 'off'
+          - minimal
+          - low
+          - medium
+          - high
+          - xhigh
+          - max
+      provider_tool_delay_ms:
+        description: Controlled Provider Tool duration in milliseconds, from 90000 to 300000
+        required: true
+        default: '95000'
+        type: string
+      confirm_paid_provider_operation:
+        description: I authorize one release-bound packaged Pi Operation that may issue multiple billed Provider requests
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: signed-release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      baseline_kind: ${{ steps.release_baseline.outputs.baseline_kind }}
+      first_signed_release: ${{ steps.release_baseline.outputs.first_signed_release }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify release tag contract
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: corepack pnpm run release:stable-tag:verify "$RELEASE_TAG"
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Resolve direct previous stable release
+        id: release_baseline
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/pi67-releases.json"
+          corepack pnpm run release:baseline:resolve \
+            --releases "$RUNNER_TEMP/pi67-releases.json" \
+            --candidate-tag "$RELEASE_TAG" \
+            --repository "$GITHUB_REPOSITORY" \
+            --output artifacts/release-certification/signed-release-baseline-resolution.json \
+            --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed-release-baseline-resolution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release-certification/signed-release-baseline-resolution.json
+          if-no-files-found: error
+          retention-days: 30
+      - run: corepack pnpm run verify:extension-adapters
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-adapter-provenance-signed-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/extension-adapter-provenance.json
+          if-no-files-found: error
+          retention-days: 30
+
   build:
+    needs: provenance
+    environment: production-release
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +123,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.tag }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -39,7 +132,11 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - name: Verify release tag contract
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: corepack pnpm run release:stable-tag:verify "$RELEASE_TAG"
       - name: Verify runner architecture
         shell: bash
         run: |
@@ -54,13 +151,17 @@ jobs:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          WINDOWS_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          MACOS_EXPECTED_TEAM_ID: ${{ vars.MACOS_EXPECTED_TEAM_ID }}
         run: |
           set -eu
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             [[ -n "$WINDOWS_CSC_LINK" && -n "$WINDOWS_CSC_KEY_PASSWORD" ]] || { echo "Windows signing credentials are required." >&2; exit 1; }
+            [[ "$WINDOWS_SIGNER_THUMBPRINT" =~ ^[0-9A-Fa-f]{40}$ ]] || { echo "WINDOWS_SIGNER_THUMBPRINT must contain the expected Publisher thumbprint." >&2; exit 1; }
           else
             [[ -n "$MACOS_CSC_LINK" && -n "$MACOS_CSC_KEY_PASSWORD" ]] || { echo "macOS signing credentials are required." >&2; exit 1; }
             [[ -n "$APPLE_API_KEY_P8" && -n "$APPLE_API_KEY_ID" && -n "$APPLE_API_ISSUER" ]] || { echo "Apple notarization credentials are required." >&2; exit 1; }
+            [[ "$MACOS_EXPECTED_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo "MACOS_EXPECTED_TEAM_ID must contain the expected Apple Developer Team ID." >&2; exit 1; }
           fi
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run check
@@ -80,40 +181,161 @@ jobs:
           APPLE_API_KEY: ${{ runner.temp }}/AuthKey.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      - uses: actions/download-artifact@v8
+        if: runner.os == 'Windows' && needs.provenance.outputs.first_signed_release != 'true'
+        with:
+          name: signed-release-baseline-resolution-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pi67-release-baseline-resolution
+      - name: Prepare direct previous stable release asset IDs
+        if: runner.os == 'Windows' && needs.provenance.outputs.first_signed_release != 'true'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run release:baseline:verify prepare `
+            --resolution "$env:RUNNER_TEMP/pi67-release-baseline-resolution/signed-release-baseline-resolution.json" `
+            --repository $env:GITHUB_REPOSITORY `
+            --candidate-tag $env:RELEASE_TAG `
+            --github-env $env:GITHUB_ENV
+      - name: Download and verify direct previous signed Windows release
+        if: runner.os == 'Windows' && needs.provenance.outputs.first_signed_release != 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $directory = Join-Path $env:RUNNER_TEMP 'pi67-upgrade-baseline'
+          New-Item -ItemType Directory -Force -Path $directory | Out-Null
+          $releasePath = Join-Path $directory 'release.json'
+          $manifestPath = Join-Path $directory 'release-manifest.json'
+          $installerPath = Join-Path $directory $env:PI67_BASELINE_INSTALLER_NAME
+          gh api "repos/$env:GITHUB_REPOSITORY/releases/$env:PI67_BASELINE_RELEASE_ID" `
+            > $releasePath
+          gh api -H 'Accept: application/octet-stream' `
+            "repos/$env:GITHUB_REPOSITORY/releases/assets/$env:PI67_BASELINE_MANIFEST_ASSET_ID" `
+            > $manifestPath
+          gh api -H 'Accept: application/octet-stream' `
+            "repos/$env:GITHUB_REPOSITORY/releases/assets/$env:PI67_BASELINE_INSTALLER_ASSET_ID" `
+            > $installerPath
+          corepack pnpm run release:baseline:verify verify `
+            --resolution "$env:RUNNER_TEMP/pi67-release-baseline-resolution/signed-release-baseline-resolution.json" `
+            --release $releasePath `
+            --directory $directory `
+            --repository $env:GITHUB_REPOSITORY `
+            --candidate-tag $env:RELEASE_TAG `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT `
+            --receipt artifacts/release-certification/signed-release-baseline-receipt.json `
+            --github-env $env:GITHUB_ENV
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
+      - name: Verify Windows packaged synthetic scale and IME contracts
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-ui
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-packaged-ui-signed-release-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify Authenticode
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
         run: |
-          $artifact = Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe | Select-Object -First 1
-          $signature = Get-AuthenticodeSignature $artifact.FullName
-          if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode status: $($signature.Status)" }
+          $artifacts = @(
+            Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File
+            Get-Item 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          )
+          if ($artifacts.Count -ne 2) { throw "Expected one installer and one packaged executable." }
+          foreach ($artifact in $artifacts) {
+            $signature = Get-AuthenticodeSignature $artifact.FullName
+            if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate) {
+              throw "Invalid Authenticode status for $($artifact.FullName): $($signature.Status)"
+            }
+            if ($signature.SignerCertificate.Thumbprint -ne $env:EXPECTED_SIGNER_THUMBPRINT) {
+              throw "Unexpected Windows Authenticode signer for $($artifact.FullName)."
+            }
+          }
+      - name: Write Windows signed candidate identity
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $installer = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          if ($installer.Count -ne 1) { throw "Expected one Windows installer, found $($installer.Count)." }
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[0-9a-f]{40}$') { throw 'Checked-out source commit is invalid.' }
+          corepack pnpm run release:candidate:identity `
+            --repository $env:GITHUB_REPOSITORY `
+            --source-tag $env:RELEASE_TAG `
+            --source-commit $commit `
+            --run-id $env:GITHUB_RUN_ID `
+            --run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --installer $installer[0].FullName `
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT `
+            --output artifacts/release/windows-signed-candidate-identity.json
+      - name: Verify Windows NSIS installer lifecycle
+        if: runner.os == 'Windows'
+        run: corepack pnpm run package:smoke:windows-installer
+        env:
+          PI67_EXPECTED_WINDOWS_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'Windows'
+        with:
+          name: windows-installer-lifecycle-signed-release-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/validation/windows-installer-lifecycle/
+            artifacts/release-certification/signed-release-baseline-receipt.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify macOS signing and notarization
         if: runner.os == 'macOS'
         shell: bash
+        env:
+          MACOS_EXPECTED_TEAM_ID: ${{ vars.MACOS_EXPECTED_TEAM_ID }}
         run: |
-          codesign --verify --deep --strict "artifacts/release/mac-arm64/Pi-67 Desktop.app"
-          spctl --assess --type execute --verbose "artifacts/release/mac-arm64/Pi-67 Desktop.app"
+          set -euo pipefail
+          app="artifacts/release/mac-arm64/Pi-67 Desktop.app"
+          codesign --verify --deep --strict "$app"
+          team_id="$(codesign -dv --verbose=4 "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+          if [[ "$team_id" != "$MACOS_EXPECTED_TEAM_ID" ]]; then
+            echo "Unexpected macOS TeamIdentifier." >&2
+            exit 1
+          fi
+          spctl --assess --type execute --verbose "$app"
           xcrun stapler validate artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
       - uses: actions/upload-artifact@v7
         with:
-          name: release-${{ matrix.platform }}
+          name: release-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             artifacts/release/Pi-67-Desktop-*
+            artifacts/release/windows-signed-candidate-identity.json
+            artifacts/release/win-unpacked/
             artifacts/release/latest*.yml
             artifacts/release/*.blockmap
           if-no-files-found: error
           retention-days: 7
 
-  publish:
-    needs: build
-    runs-on: macos-15
-    timeout-minutes: 15
+  provider_long_turn_certify:
+    needs: [provenance, build]
+    environment: provider-certification
+    runs-on: windows-2025
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.tag }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -121,14 +343,648 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24.18.0
-      - uses: actions/download-artifact@v8
+          cache: pnpm
+      - name: Validate release-bound paid Provider authorization
+        shell: pwsh
+        env:
+          CONFIRM_PAID_REQUEST: ${{ inputs.confirm_paid_provider_operation }}
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          MODEL_ID: ${{ inputs.model_id }}
+          PROVIDER_ID: ${{ inputs.provider_id }}
+          REAL_PROVIDER_API_KEY: ${{ secrets.REAL_PROVIDER_API_KEY }}
+          THINKING_LEVEL: ${{ inputs.thinking_level }}
+          TOOL_DELAY_MS: ${{ inputs.provider_tool_delay_ms }}
+        run: |
+          if ($env:CONFIRM_PAID_REQUEST -ne 'true') {
+            throw 'confirm_paid_provider_operation=true is required for the release-bound billed Provider Operation.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:REAL_PROVIDER_API_KEY) `
+            -or $env:REAL_PROVIDER_API_KEY.Length -lt 8) {
+            throw 'REAL_PROVIDER_API_KEY must contain at least 8 characters.'
+          }
+          if ($env:EXPECTED_SIGNER_THUMBPRINT -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw 'WINDOWS_SIGNER_THUMBPRINT repository or organization variable is required.'
+          }
+          foreach ($field in @(
+            @{ Name = 'provider_id'; Value = $env:PROVIDER_ID; Limit = 256 },
+            @{ Name = 'model_id'; Value = $env:MODEL_ID; Limit = 512 }
+          )) {
+            if ([string]::IsNullOrWhiteSpace($field.Value) `
+              -or $field.Value.Length -gt $field.Limit `
+              -or $field.Value -ne $field.Value.Trim() `
+              -or $field.Value -match '[\x00-\x1F\x7F]') {
+              throw "$($field.Name) must be a canonical bounded single-line value."
+            }
+          }
+          if ($env:THINKING_LEVEL -notmatch '^(off|minimal|low|medium|high|xhigh|max)$') {
+            throw 'thinking_level is not a supported Pi thinking level.'
+          }
+          $delay = 0
+          if (-not [int]::TryParse($env:TOOL_DELAY_MS, [ref]$delay) `
+            -or $delay -lt 90000 -or $delay -gt 300000) {
+            throw 'provider_tool_delay_ms must be an integer from 90000 to 300000.'
+          }
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Download exact signed Windows release candidate
+        uses: actions/download-artifact@v8
         with:
-          pattern: release-*
+          name: release-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/release
-          merge-multiple: true
+      - name: Verify release candidate before Provider certification
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[0-9a-f]{40}$') { throw 'Checked-out source commit is invalid.' }
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = "artifacts/release/Pi-67-Desktop-$version-win-x64.exe"
+          $identity = 'artifacts/release/windows-signed-candidate-identity.json'
+          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          corepack pnpm run release:candidate:verify `
+            --candidate-identity $identity `
+            --installer $installer `
+            --packaged-executable $executable `
+            --expected-source-policy stable `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $commit `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
+          "PI67_REAL_PROVIDER_SOURCE_COMMIT=$commit" >> $env:GITHUB_ENV
+          "PI67_RELEASE_PROVIDER_INSTALLER=$installer" >> $env:GITHUB_ENV
+      - run: corepack pnpm run package:smoke
+      - name: Run one release-bound real Provider Operation
+        id: provider_certification
+        run: corepack pnpm run validate:provider-long-turn
+        env:
+          PI67_REAL_PROVIDER_OPT_IN: '1'
+          PI67_REAL_PROVIDER_ID: ${{ inputs.provider_id }}
+          PI67_REAL_PROVIDER_MODEL_ID: ${{ inputs.model_id }}
+          PI67_REAL_PROVIDER_API_KEY: ${{ secrets.REAL_PROVIDER_API_KEY }}
+          PI67_REAL_PROVIDER_CANDIDATE_IDENTITY: artifacts/release/windows-signed-candidate-identity.json
+          PI67_REAL_PROVIDER_CANDIDATE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          PI67_REAL_PROVIDER_CANDIDATE_RUN_ID: ${{ github.run_id }}
+          PI67_REAL_PROVIDER_CANDIDATE_SOURCE_POLICY: stable
+          PI67_REAL_PROVIDER_EXPECTED_REPOSITORY: ${{ github.repository }}
+          PI67_REAL_PROVIDER_EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          PI67_REAL_PROVIDER_THINKING_LEVEL: ${{ inputs.thinking_level }}
+          PI67_REAL_PROVIDER_TOOL_DELAY_MS: ${{ inputs.provider_tool_delay_ms }}
+          PI67_REAL_PROVIDER_SOURCE_TAG: ${{ inputs.tag }}
+          PI67_REAL_PROVIDER_OUTPUT: artifacts/validation/provider-long-turn/summary.json
+          PI67_REAL_PROVIDER_REQUIRE_CANDIDATE_IDENTITY: '1'
+      - name: Revalidate release candidate after Provider certification
+        if: ${{ always() && steps.provider_certification.outcome != 'skipped' }}
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run release:candidate:verify `
+            --candidate-identity artifacts/release/windows-signed-candidate-identity.json `
+            --installer $env:PI67_RELEASE_PROVIDER_INSTALLER `
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-source-policy stable `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $env:PI67_REAL_PROVIDER_SOURCE_COMMIT `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() && steps.provider_certification.outcome != 'skipped' }}
+        with:
+          name: provider-long-turn-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/provider-long-turn/summary.json
+          if-no-files-found: error
+          retention-days: 30
+
+  windows_native_certify:
+    needs: [provenance, build]
+    environment: windows-native-certification
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - pi67-native-certification
+      - interactive-desktop
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: read
+    env:
+      PI67_WINDOWS_NATIVE_INSTALL_ROOT: ${{ runner.temp }}\pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}
+      PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE: ${{ runner.temp }}\pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}-uninstall-registry.json
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify release tag contract
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: corepack pnpm run release:stable-tag:verify "$RELEASE_TAG"
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Download exact signed Windows candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: release-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pi67-windows-signed-candidate
+      - name: Verify and install exact signed Windows candidate
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:EXPECTED_SIGNER_THUMBPRINT -notmatch '^[0-9A-Fa-f]{40}$') {
+            throw 'WINDOWS_SIGNER_THUMBPRINT repository or organization variable is required.'
+          }
+          $candidateRoot = Join-Path $env:RUNNER_TEMP 'pi67-windows-signed-candidate'
+          $identityFiles = @(Get-ChildItem $candidateRoot -Recurse -Filter 'windows-signed-candidate-identity.json' -File)
+          $installerFiles = @(Get-ChildItem $candidateRoot -Recurse -Filter 'Pi-67-Desktop-*-win-x64.exe' -File)
+          if ($identityFiles.Count -ne 1) { throw "Expected one Windows candidate identity, found $($identityFiles.Count)." }
+          if ($installerFiles.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installerFiles.Count)." }
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -notmatch '^[0-9a-f]{40}$') { throw 'Checked-out source commit is invalid.' }
+          corepack pnpm run release:candidate:verify `
+            --candidate-identity $identityFiles[0].FullName `
+            --installer $installerFiles[0].FullName `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $commit `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
+          $signature = Get-AuthenticodeSignature -LiteralPath $installerFiles[0].FullName
+          if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate) {
+            throw "Windows candidate installer Authenticode status is $($signature.Status)."
+          }
+          if ($signature.SignerCertificate.Thumbprint -ne $env:EXPECTED_SIGNER_THUMBPRINT) {
+            throw 'Windows candidate installer Publisher does not match the protected release authority.'
+          }
+          $installRoot = $env:PI67_WINDOWS_NATIVE_INSTALL_ROOT
+          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+          $resolvedInstallRoot = [IO.Path]::GetFullPath($installRoot)
+          if (-not $resolvedInstallRoot.StartsWith($runnerTemp, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Windows native certification install root escaped RUNNER_TEMP.'
+          }
+          $expectedInstallLeaf = "pi67-native-install-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if ([IO.Path]::GetFileName($resolvedInstallRoot) -ne $expectedInstallLeaf) {
+            throw 'Windows native certification install root identity is invalid.'
+          }
+          if (Test-Path -LiteralPath $installRoot) { throw 'Windows native certification install root already exists.' }
+          $registryGuard = Join-Path $env:GITHUB_WORKSPACE 'eng/packaging/windows-uninstall-registry-guard.ps1'
+          & $registryGuard `
+            -Action Snapshot `
+            -InstallRoot $installRoot `
+            -StatePath $env:PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE
+          $process = Start-Process -FilePath $installerFiles[0].FullName -ArgumentList @('/S', "/D=$installRoot") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Windows candidate installer exited with code $($process.ExitCode)." }
+          & $registryGuard `
+            -Action Observe `
+            -InstallRoot $installRoot `
+            -StatePath $env:PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE
+          $executable = Join-Path $installRoot 'Pi-67 Desktop.exe'
+          $deadline = [DateTime]::UtcNow.AddMinutes(2)
+          while (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+            if ([DateTime]::UtcNow -ge $deadline) { throw 'Installed Windows candidate executable did not appear.' }
+            Start-Sleep -Milliseconds 250
+          }
+          $certificationRoot = Join-Path $env:GITHUB_WORKSPACE 'artifacts/certification/windows-native'
+          New-Item -ItemType Directory -Force -Path (Join-Path $certificationRoot 'candidate') | Out-Null
+          Copy-Item -LiteralPath $identityFiles[0].FullName -Destination (Join-Path $certificationRoot 'candidate/windows-signed-candidate-identity.json')
+          "PI67_WINDOWS_NATIVE_CANDIDATE_IDENTITY=$($identityFiles[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PI67_WINDOWS_NATIVE_INSTALLER=$($installerFiles[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PI67_WINDOWS_NATIVE_EXECUTABLE=$executable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PI67_WINDOWS_NATIVE_SOURCE_COMMIT=$commit" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Certify Windows native runtime at 125 percent
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run certify:windows-native `
+            --expected-scale 1.25 `
+            --interaction-mode workflow `
+            --candidate-identity $env:PI67_WINDOWS_NATIVE_CANDIDATE_IDENTITY `
+            --installer $env:PI67_WINDOWS_NATIVE_INSTALLER `
+            --executable $env:PI67_WINDOWS_NATIVE_EXECUTABLE `
+            --expected-signer-thumbprint $env:EXPECTED_SIGNER_THUMBPRINT `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $env:PI67_WINDOWS_NATIVE_SOURCE_COMMIT `
+            --expected-candidate-run-id $env:GITHUB_RUN_ID `
+            --expected-candidate-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - name: Certify Windows native runtime at 150 percent with sleep and resume
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run certify:windows-native `
+            --expected-scale 1.5 `
+            --sleep `
+            --interaction-mode workflow `
+            --candidate-identity $env:PI67_WINDOWS_NATIVE_CANDIDATE_IDENTITY `
+            --installer $env:PI67_WINDOWS_NATIVE_INSTALLER `
+            --executable $env:PI67_WINDOWS_NATIVE_EXECUTABLE `
+            --expected-signer-thumbprint $env:EXPECTED_SIGNER_THUMBPRINT `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $env:PI67_WINDOWS_NATIVE_SOURCE_COMMIT `
+            --expected-candidate-run-id $env:GITHUB_RUN_ID `
+            --expected-candidate-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - name: Certify Windows native runtime at 200 percent
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run certify:windows-native `
+            --expected-scale 2 `
+            --interaction-mode workflow `
+            --candidate-identity $env:PI67_WINDOWS_NATIVE_CANDIDATE_IDENTITY `
+            --installer $env:PI67_WINDOWS_NATIVE_INSTALLER `
+            --executable $env:PI67_WINDOWS_NATIVE_EXECUTABLE `
+            --expected-signer-thumbprint $env:EXPECTED_SIGNER_THUMBPRINT `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $env:PI67_WINDOWS_NATIVE_SOURCE_COMMIT `
+            --expected-candidate-run-id $env:GITHUB_RUN_ID `
+            --expected-candidate-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - name: Verify complete Windows native certification set
+        shell: pwsh
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          corepack pnpm run certify:windows-native:verify `
+            --candidate-identity $env:PI67_WINDOWS_NATIVE_CANDIDATE_IDENTITY `
+            --installer $env:PI67_WINDOWS_NATIVE_INSTALLER `
+            --executable $env:PI67_WINDOWS_NATIVE_EXECUTABLE `
+            --expected-signer-thumbprint $env:EXPECTED_SIGNER_THUMBPRINT `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-tag $env:RELEASE_TAG `
+            --expected-source-commit $env:PI67_WINDOWS_NATIVE_SOURCE_COMMIT `
+            --expected-candidate-run-id $env:GITHUB_RUN_ID `
+            --expected-candidate-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-native-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/certification/windows-native/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Uninstall and clean isolated Windows native candidate
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:PI67_WINDOWS_NATIVE_INSTALL_ROOT)) { exit 0 }
+          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\') + '\'
+          $installRoot = [IO.Path]::GetFullPath($env:PI67_WINDOWS_NATIVE_INSTALL_ROOT)
+          if (-not $installRoot.StartsWith($runnerTemp, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Refusing to clean a Windows native install root outside RUNNER_TEMP.'
+          }
+          $expectedInstallLeaf = "pi67-native-install-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if ([IO.Path]::GetFileName($installRoot) -ne $expectedInstallLeaf) {
+            throw 'Refusing to clean a Windows native install root with an unexpected identity.'
+          }
+          $cleanupErrors = [Collections.Generic.List[string]]::new()
+          try {
+            if (Test-Path -LiteralPath $installRoot) {
+              $uninstallers = @(Get-ChildItem $installRoot -Filter 'Uninstall*.exe' -File)
+              if ($uninstallers.Count -eq 1) {
+                $process = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList @('/S') -Wait -PassThru
+                if ($process.ExitCode -ne 0) { throw "Windows candidate uninstaller exited with code $($process.ExitCode)." }
+              } elseif ($uninstallers.Count -gt 1) {
+                throw "Expected at most one Windows candidate uninstaller, found $($uninstallers.Count)."
+              } elseif (Test-Path -LiteralPath (Join-Path $installRoot 'Pi-67 Desktop.exe')) {
+                throw 'Installed Windows candidate has no uninstaller.'
+              }
+              $deadline = [DateTime]::UtcNow.AddMinutes(1)
+              while (Test-Path -LiteralPath (Join-Path $installRoot 'Pi-67 Desktop.exe')) {
+                if ([DateTime]::UtcNow -ge $deadline) { throw 'Windows candidate executable remained after uninstall.' }
+                Start-Sleep -Milliseconds 250
+              }
+            }
+          } catch {
+            $cleanupErrors.Add($_.Exception.Message)
+          }
+          try {
+            if (Test-Path -LiteralPath $installRoot) {
+              Remove-Item -LiteralPath $installRoot -Recurse -Force
+            }
+          } catch {
+            $cleanupErrors.Add("Bounded install root cleanup failed: $($_.Exception.Message)")
+          }
+          try {
+            $registryGuard = Join-Path $env:GITHUB_WORKSPACE 'eng/packaging/windows-uninstall-registry-guard.ps1'
+            & $registryGuard `
+              -Action Cleanup `
+              -InstallRoot $installRoot `
+              -StatePath $env:PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE
+          } catch {
+            $cleanupErrors.Add($_.Exception.Message)
+          }
+          if ($cleanupErrors.Count -gt 0) {
+            throw "Windows native candidate cleanup failed: $($cleanupErrors -join ' | ')"
+          }
+
+  verify_release_gate:
+    needs: [provenance, build, provider_long_turn_certify, windows_native_certify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify release tag contract
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: corepack pnpm run release:stable-tag:verify "$RELEASE_TAG"
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Download Windows release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: release-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release
+      - name: Download macOS release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: release-macos-arm64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/release
+      - name: Download Windows native certification
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-native-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/certification/windows-native
+      - name: Download release-bound Provider certification
+        uses: actions/download-artifact@v8
+        with:
+          name: provider-long-turn-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/certification/provider-long-turn
+      - name: Verify release-bound Windows native certification
+        shell: bash
+        env:
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SIGNER_THUMBPRINT" =~ ^[0-9A-Fa-f]{40}$ ]] || {
+            echo "WINDOWS_SIGNER_THUMBPRINT repository or organization variable is required." >&2
+            exit 1
+          }
+          commit="$(git rev-parse HEAD)"
+          installer="artifacts/release/Pi-67-Desktop-$(node -p "require('./package.json').version")-win-x64.exe"
+          corepack pnpm run release:windows-native-gate \
+            --candidate-identity artifacts/release/windows-signed-candidate-identity.json \
+            --certification-root artifacts/certification/windows-native \
+            --installer "$installer" \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-source-tag "$RELEASE_TAG" \
+            --expected-source-commit "$commit" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-signer "$EXPECTED_SIGNER_THUMBPRINT" \
+            --output artifacts/release/windows-native-release-gate.json
+          cp artifacts/certification/windows-native/summary.json \
+            artifacts/release/windows-native-certification-summary.json
+      - name: Verify release-bound Provider long-turn certification
+        shell: bash
+        env:
+          EXPECTED_MODEL_ID: ${{ inputs.model_id }}
+          EXPECTED_PROVIDER_ID: ${{ inputs.provider_id }}
+          EXPECTED_SIGNER_THUMBPRINT: ${{ vars.WINDOWS_SIGNER_THUMBPRINT }}
+          EXPECTED_THINKING_LEVEL: ${{ inputs.thinking_level }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          corepack pnpm run release:provider-long-turn-gate \
+            --candidate-identity artifacts/release/windows-signed-candidate-identity.json \
+            --summary artifacts/certification/provider-long-turn/summary.json \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-source-tag "$RELEASE_TAG" \
+            --expected-source-commit "$commit" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-signer "$EXPECTED_SIGNER_THUMBPRINT" \
+            --expected-provider-id "$EXPECTED_PROVIDER_ID" \
+            --expected-model-id "$EXPECTED_MODEL_ID" \
+            --expected-thinking-level "$EXPECTED_THINKING_LEVEL" \
+            --output artifacts/release/provider-long-turn-release-gate.json
+          cp artifacts/certification/provider-long-turn/summary.json \
+            artifacts/release/provider-long-turn-summary.json
       - run: corepack pnpm run release:manifest
       - run: corepack pnpm run release:verify
+      - run: corepack pnpm run release:bundle:prepare
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-release-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/verified-release-bundle/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: verify_release_gate
+    environment: production-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: verified-release-bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts
+      - name: Verify immutable publish allowlist
+        shell: bash
+        env:
+          EXPECTED_MODEL_ID: ${{ inputs.model_id }}
+          EXPECTED_PROVIDER_ID: ${{ inputs.provider_id }}
+          EXPECTED_THINKING_LEVEL: ${{ inputs.thinking_level }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+            echo "Signed release publish tag must be canonical stable SemVer." >&2
+            exit 1
+          }
+          VERSION="${RELEASE_TAG#v}"
+          expected=(
+            "Pi-67-Desktop-$VERSION-win-x64.exe"
+            "Pi-67-Desktop-$VERSION-mac-arm64.dmg"
+            "Pi-67-Desktop-$VERSION-mac-arm64.zip"
+            "provider-long-turn-release-gate.json"
+            "provider-long-turn-summary.json"
+            "release-manifest.json"
+            "windows-signed-candidate-identity.json"
+            "windows-native-release-gate.json"
+            "windows-native-certification-summary.json"
+            "windows-native-scale-125-receipt.json"
+            "windows-native-scale-125-workspace.png"
+            "windows-native-scale-150-receipt.json"
+            "windows-native-scale-150-workspace.png"
+            "windows-native-scale-200-receipt.json"
+            "windows-native-scale-200-workspace.png"
+          )
+          for name in "${expected[@]}"; do
+            path="artifacts/release/$name"
+            [[ -f "$path" && ! -L "$path" ]] || {
+              echo "Verified publish file is missing or not regular: $name" >&2
+              exit 1
+            }
+          done
+          actual_count="$(find artifacts/release -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          [[ "$actual_count" == "${#expected[@]}" ]] || {
+            echo "Verified publish directory contains an unexpected file." >&2
+            exit 1
+          }
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "$RELEASE_TAG" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '.schema == "pi67.windows-native-release-gate.v1"
+              and .status == "passed"
+              and .repository == $repository
+              and .source.tag == $tag
+              and .workflow.runId == $run_id
+              and .workflow.runAttempt == $run_attempt' \
+            artifacts/release/windows-native-release-gate.json > /dev/null
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "$RELEASE_TAG" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg provider_id "$EXPECTED_PROVIDER_ID" \
+            --arg model_id "$EXPECTED_MODEL_ID" \
+            --arg thinking_level "$EXPECTED_THINKING_LEVEL" \
+            '.schema == "pi67.provider-long-turn-release-gate.v1"
+              and .status == "passed"
+              and .repository == $repository
+              and .source.policy == "stable"
+              and .source.tag == $tag
+              and .workflow.runId == $run_id
+              and .workflow.runAttempt == $run_attempt
+              and .provider.id == $provider_id
+              and .provider.modelId == $model_id
+              and .provider.requestedThinkingLevel == $thinking_level
+              and .provider.effectiveThinkingLevel == $thinking_level' \
+            artifacts/release/provider-long-turn-release-gate.json > /dev/null
+          jq -e \
+            --arg version "$VERSION" \
+            '.schemaVersion == 2
+              and .channel == "stable"
+              and .signed == true
+              and .version == $version' \
+            artifacts/release/release-manifest.json > /dev/null
+          while IFS=$'\t' read -r name bytes sha256; do
+            path="artifacts/release/$name"
+            [[ "$(stat -c '%s' "$path")" == "$bytes" ]] || {
+              echo "Published product byte length drifted: $name" >&2
+              exit 1
+            }
+            [[ "$(sha256sum "$path" | cut -d ' ' -f 1)" == "$sha256" ]] || {
+              echo "Published product SHA-256 drifted: $name" >&2
+              exit 1
+            }
+          done < <(jq -r '.files[] | [.name, (.bytes | tostring), .sha256] | @tsv' \
+            artifacts/release/release-manifest.json)
+          candidate_hash="$(sha256sum artifacts/release/windows-signed-candidate-identity.json | cut -d ' ' -f 1)"
+          [[ "$candidate_hash" == "$(jq -r '.candidate.identitySha256' artifacts/release/windows-native-release-gate.json)" ]] || {
+            echo "Published Windows candidate identity SHA-256 drifted." >&2
+            exit 1
+          }
+          [[ "$candidate_hash" == "$(jq -r '.candidate.identitySha256' artifacts/release/provider-long-turn-release-gate.json)" ]] || {
+            echo "Published Provider candidate identity SHA-256 drifted." >&2
+            exit 1
+          }
+          provider_summary_hash="$(sha256sum artifacts/release/provider-long-turn-summary.json | cut -d ' ' -f 1)"
+          [[ "$provider_summary_hash" == "$(jq -r '.evidence.summarySha256' artifacts/release/provider-long-turn-release-gate.json)" ]] || {
+            echo "Published Provider long-turn summary SHA-256 drifted." >&2
+            exit 1
+          }
+          summary_hash="$(sha256sum artifacts/release/windows-native-certification-summary.json | cut -d ' ' -f 1)"
+          [[ "$summary_hash" == "$(jq -r '.certification.summarySha256' artifacts/release/windows-native-release-gate.json)" ]] || {
+            echo "Published Windows native summary SHA-256 drifted." >&2
+            exit 1
+          }
+          for label in 125 150 200; do
+            receipt_hash="$(sha256sum "artifacts/release/windows-native-scale-$label-receipt.json" | cut -d ' ' -f 1)"
+            screenshot_hash="$(sha256sum "artifacts/release/windows-native-scale-$label-workspace.png" | cut -d ' ' -f 1)"
+            [[ "$receipt_hash" == "$(jq -r --arg label "$label" '.certification.scales[$label].receiptSha256' artifacts/release/windows-native-release-gate.json)" ]] || {
+              echo "Published Windows native $label percent receipt SHA-256 drifted." >&2
+              exit 1
+            }
+            [[ "$screenshot_hash" == "$(jq -r --arg label "$label" '.certification.scales[$label].screenshotSha256' artifacts/release/windows-native-release-gate.json)" ]] || {
+              echo "Published Windows native $label percent screenshot SHA-256 drifted." >&2
+              exit 1
+            }
+          done
+          expected_commit="$(jq -r '.source.commit' artifacts/release/windows-native-release-gate.json)"
+          ref="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          object_type="$(jq -r '.object.type' <<<"$ref")"
+          object_sha="$(jq -r '.object.sha' <<<"$ref")"
+          for _ in 1 2 3 4; do
+            [[ "$object_type" == "tag" ]] || break
+            tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$object_sha")"
+            object_type="$(jq -r '.object.type' <<<"$tag_object")"
+            object_sha="$(jq -r '.object.sha' <<<"$tag_object")"
+          done
+          [[ "$object_type" == "commit" && "$object_sha" == "$expected_commit" ]] || {
+            echo "Release tag no longer resolves to the verified candidate commit." >&2
+            exit 1
+          }
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ inputs.tag }}" artifacts/release/* --verify-tag --generate-notes
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          gh release create "$RELEASE_TAG" \
+            "artifacts/release/Pi-67-Desktop-$VERSION-win-x64.exe" \
+            "artifacts/release/Pi-67-Desktop-$VERSION-mac-arm64.dmg" \
+            "artifacts/release/Pi-67-Desktop-$VERSION-mac-arm64.zip" \
+            artifacts/release/provider-long-turn-release-gate.json \
+            artifacts/release/provider-long-turn-summary.json \
+            artifacts/release/release-manifest.json \
+            artifacts/release/windows-signed-candidate-identity.json \
+            artifacts/release/windows-native-release-gate.json \
+            artifacts/release/windows-native-certification-summary.json \
+            artifacts/release/windows-native-scale-125-receipt.json \
+            artifacts/release/windows-native-scale-125-workspace.png \
+            artifacts/release/windows-native-scale-150-receipt.json \
+            artifacts/release/windows-native-scale-150-workspace.png \
+            artifacts/release/windows-native-scale-200-receipt.json \
+            artifacts/release/windows-native-scale-200-workspace.png \
+            --verify-tag \
+            --generate-notes

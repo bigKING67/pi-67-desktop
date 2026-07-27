@@ -1,0 +1,123 @@
+.workspaceLoading {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.workspaceFailureRegion {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  padding: 32px;
+  background: var(--surface);
+}
+
+.surfaceFailureOverlay {
+  z-index: 120;
+}
+
+.surfaceFailure {
+  display: grid;
+  width: min(560px, 100%);
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border-strong));
+  border-radius: var(--radius-overlay);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-primary);
+}
+
+.workspaceFailure {
+  align-self: center;
+}
+
+.overlayFailure {
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: auto;
+}
+
+.surfaceFailureEyebrow {
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.04em;
+}
+
+.surfaceFailure h2,
+.surfaceFailure p {
+  margin: 0;
+}
+
+.surfaceFailure h2 {
+  font-size: 18px;
+}
+
+.surfaceFailure p {
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.surfaceFailureDetails {
+  display: grid;
+  gap: 6px;
+}
+
+.surfaceFailureDetails > span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.surfaceFailureDetails textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.surfaceFailureActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.overlayLoading {
+  z-index: 110;
+}
+
+.overlayLoadingSurface {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 760px) {
+  .workspaceFailureRegion {
+    padding: 20px;
+  }
+
+  .surfaceFailure {
+    padding: 18px;
+  }
+
+  .surfaceFailureActions {
+    display: grid;
+  }
+}

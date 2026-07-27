@@ -1,12 +1,19 @@
 import type { SessionMessageView } from "@pi67/domain";
-import { Bot, CheckCircle2, CircleDashed, UserRound, Wrench } from "lucide-react";
+import { Bot, UserRound, Wrench } from "lucide-react";
+import { ToolCard } from "../tool-cards/index.js";
+import { AssetImage } from "./AssetImage.js";
 import { MarkdownView } from "./MarkdownView.js";
 
-export function MessageCard({ message }: { message: SessionMessageView }) {
+export function MessageCard({ message, streaming = false }: { message: SessionMessageView; streaming?: boolean }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
   return (
-    <article className={`message-card role-${message.role}`} aria-label={`${message.role} message`}>
+    <article
+      className={`message-card role-${message.role}`}
+      aria-busy={streaming || undefined}
+      aria-label={streaming ? "Pi 正在回复" : `${message.role} message`}
+      data-render-mode={streaming ? "streaming" : "settled"}
+    >
       <header className="message-header">
         <span className="message-author">
           {isUser ? <UserRound size={14} /> : isTool ? <Wrench size={14} /> : <Bot size={14} />}
@@ -23,20 +30,22 @@ export function MessageCard({ message }: { message: SessionMessageView }) {
             return (
               <details className="thinking-block" key={`${message.id}-thinking-${index}`}>
                 <summary>推理过程</summary>
-                <MarkdownView>{part.text}</MarkdownView>
+                <MarkdownView mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>
               </details>
             );
           }
-          if (part.type === "text") return <MarkdownView key={`${message.id}-text-${index}`}>{part.text}</MarkdownView>;
-          if (part.type === "image") return part.dataUrl ? <img className="message-image" key={`${message.id}-image-${index}`} src={part.dataUrl} alt={part.name ?? "Attached image"} /> : null;
-          if (part.type === "tool-call") {
+          if (part.type === "text") return <MarkdownView key={`${message.id}-text-${index}`} mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>;
+          if (part.type === "image") {
             return (
-              <div className={`tool-call status-${part.status}`} key={part.id}>
-                {part.status === "completed" ? <CheckCircle2 size={15} /> : <CircleDashed size={15} />}
-                <div><strong>{part.name}</strong>{part.summary ? <code>{part.summary}</code> : null}</div>
-              </div>
+              <AssetImage
+                asset={part.asset}
+                key={`${message.id}-image-${index}`}
+                mimeType={part.mimeType}
+                name={part.name}
+              />
             );
           }
+          if (part.type === "tool-call") return <ToolCard key={part.id} tool={part} />;
           return null;
         })}
       </div>

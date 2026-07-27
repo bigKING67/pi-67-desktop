@@ -1,0 +1,134 @@
+.catalog {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heading strong {
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-variant-ligatures: none;
+}
+
+.list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.itemHeading,
+.meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemHeading strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overall {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.overall[data-status="unsupported"],
+.overall[data-status="tui-only"] {
+  color: var(--warning);
+}
+
+.meta {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.item > p,
+.empty,
+.truncated {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.item > .adapter {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-variant-ligatures: none;
+}
+
+.empty {
+  padding: 10px 2px;
+  color: var(--text-tertiary);
+}
+
+.surfaces {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+}
+
+.surfaces > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+}
+
+.surfaces dt,
+.surfaces dd {
+  overflow: hidden;
+  margin: 0;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surfaces dt {
+  color: var(--text-tertiary);
+}
+
+.surfaces dd {
+  color: var(--text-secondary);
+}
+
+.surfaces dd[data-status="supported"] {
+  color: var(--success);
+}
+
+.surfaces dd[data-status="partial"],
+.surfaces dd[data-status="tui-only"],
+.surfaces dd[data-status="unsupported"] {
+  color: var(--warning);
+}
+
+.truncated {
+  color: var(--warning);
+}

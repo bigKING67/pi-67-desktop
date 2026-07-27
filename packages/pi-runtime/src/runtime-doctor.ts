@@ -1,15 +1,21 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getShellConfig, VERSION } from "@earendil-works/pi-coding-agent";
-import type { DoctorCheck, DoctorReport } from "@pi67/domain";
+import type { DoctorCheck, DoctorReport, SessionCatalogStatus } from "@pi67/domain";
+import { probeNodeSqliteCapability } from "./node-sqlite-capability.js";
 
 const execFileAsync = promisify(execFile);
 
-export async function createDoctorReport(shellPath?: string): Promise<DoctorReport> {
+export async function createDoctorReport(
+  shellPath?: string,
+  sqliteProbeDirectory?: string,
+  sessionCatalogStatus?: SessionCatalogStatus
+): Promise<DoctorReport> {
   const shell = getShellConfig(shellPath);
-  const [shellResult, gitResult] = await Promise.all([
+  const [shellResult, gitResult, sqliteResult] = await Promise.all([
     commandVersion(shell.shell, ["--version"]),
-    commandVersion("git", ["--version"])
+    commandVersion("git", ["--version"]),
+    probeNodeSqliteCapability(sqliteProbeDirectory)
   ]);
   const checks: DoctorCheck[] = [
     {
@@ -20,10 +26,36 @@ export async function createDoctorReport(shellPath?: string): Promise<DoctorRepo
     },
     { id: "node", label: "Embedded Node", status: "pass", detail: process.versions.node },
     { id: "pi-sdk", label: "Pi SDK", status: "pass", detail: VERSION },
+    {
+      id: "sqlite-runtime",
+      label: "Embedded SQLite",
+      status: sqliteResult.available ? "pass" : "warning",
+      detail: sqliteResult.detail
+    },
+    {
+      id: "session-catalog",
+      label: "Session Catalog",
+      status: isHealthySessionCatalog(sessionCatalogStatus) ? "pass" : "warning",
+      detail: formatSessionCatalogStatus(sessionCatalogStatus)
+    },
     { id: "shell", label: "Pi shell", status: shellResult.ok ? "pass" : "fail", detail: `${shell.shell} - ${shellResult.detail}` },
     { id: "git", label: "Git", status: gitResult.ok ? "pass" : "warning", detail: gitResult.detail }
   ];
   return { generatedAt: Date.now(), checks };
+}
+
+function isHealthySessionCatalog(status: SessionCatalogStatus | undefined): boolean {
+  return status?.state === "ready"
+    && !status.rebuilding
+    && !status.incomplete
+    && status.skippedCount === 0;
+}
+
+function formatSessionCatalogStatus(status: SessionCatalogStatus | undefined): string {
+  if (!status) return "Session Catalog is not configured in this Agent Host runtime.";
+  const reconciled = status.reconciledAt === undefined ? "not reconciled" : "reconciled";
+  const completeness = status.incomplete ? "incomplete" : "complete";
+  return `schema v1; ${status.state}; ${status.itemCount} items; ${reconciled}; ${completeness}; ${status.skippedCount} skipped.`;
 }
 
 async function commandVersion(command: string, args: string[]): Promise<{ ok: boolean; detail: string }> {

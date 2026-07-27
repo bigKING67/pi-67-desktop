@@ -5,7 +5,6 @@ import { initializeThemeController } from "./theme/theme-controller.js";
 import "./styles/tokens.css";
 import "./styles/global.css";
 import "./styles/dialogs.css";
-import "./theme/theme.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Pi-67 renderer root was not found.");

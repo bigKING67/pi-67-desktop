@@ -1,0 +1,35 @@
+name: Extension Adapter provenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Verify built-in Extension Adapter provenance
+        run: corepack pnpm run verify:extension-adapters
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-adapter-provenance
+          path: artifacts/quality/extension-adapter-provenance.json
+          if-no-files-found: error
+          retention-days: 30

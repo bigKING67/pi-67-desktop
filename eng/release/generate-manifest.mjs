@@ -3,16 +3,18 @@ import { createReadStream } from "node:fs";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
+import {
+  createSignedReleaseManifest,
+  expectedSignedReleaseArtifacts
+} from "./release-manifest-contract.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const releaseDirectory = join(root, "artifacts/release");
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const version = packageJson.version;
-const expected = [
-  `Pi-67-Desktop-${version}-win-x64.exe`,
-  `Pi-67-Desktop-${version}-mac-arm64.dmg`,
-  `Pi-67-Desktop-${version}-mac-arm64.zip`
-];
+const { runtimeSpecifier } = await readPiRuntimeContract(root);
+const expected = [...expectedSignedReleaseArtifacts(version).keys()];
 const available = new Set(await readdir(releaseDirectory));
 const missing = expected.filter((name) => !available.has(name));
 if (missing.length > 0) throw new Error(`Incomplete Pi-67 Desktop ${version} release; missing: ${missing.join(", ")}`);
@@ -28,13 +30,7 @@ for (const name of expected) {
   });
 }
 
-const manifest = {
-  schemaVersion: 1,
-  product: "Pi-67 Desktop",
-  version,
-  runtime: "@earendil-works/pi-coding-agent@0.81.1",
-  files
-};
+const manifest = createSignedReleaseManifest({ files, runtime: runtimeSpecifier, version });
 await writeFile(join(releaseDirectory, "release-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 console.log(`Wrote release manifest for ${files.length} artifact(s).`);
 
