@@ -15,7 +15,7 @@ describe("Renderer message catalog", () => {
   });
 
   it("centralizes relative and notification date formatting", () => {
-    const now = new Date("2026-07-26T10:00:00+08:00").getTime();
+    const now = new Date(2026, 6, 26, 10, 0, 0).getTime();
 
     expect(formatRelativeTime(now - 30_000, now)).toBe("刚刚");
     expect(formatRelativeTime(now - 15 * 60_000, now)).toBe("15 分钟前");

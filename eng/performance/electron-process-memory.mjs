@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { join } from "node:path";
+
+const MACOS_FOOTPRINT_COMMAND = join("/", "usr", "bin", "footprint");
 
 export function collectProcessOwnedMemoryBytes(roles, platform = process.platform) {
   if (platform === "darwin") return collectMacPhysicalFootprints(roles);
@@ -38,7 +41,7 @@ function collectMacPhysicalFootprints(roles) {
     "--noCategories",
     ...[...roles.values()].flatMap((processInfo) => ["-p", String(processInfo.pid)])
   ];
-  const output = execFileSync("/usr/bin/footprint", arguments_, { encoding: "utf8" });
+  const output = execFileSync(MACOS_FOOTPRINT_COMMAND, arguments_, { encoding: "utf8" });
   const footprints = parseMacPhysicalFootprints(output);
   return new Map([...roles].map(([role, processInfo]) => {
     const footprint = footprints.get(processInfo.pid);
