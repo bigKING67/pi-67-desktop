@@ -185,7 +185,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
 }
 
 async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
-  await setStableContentViewport(window, application, 760, 800, { allowNativeFrameFloor: true });
+  await setStableMinimumWindowWidth(window, application, 760);
   const navigation = window.getByLabel("会话导航", { exact: true });
   await navigation.waitFor({ state: "hidden" });
   const navigationToggle = window.getByRole("button", { name: "显示会话导航" });
@@ -259,19 +259,31 @@ async function setStableContentViewport(
   window,
   application,
   width,
-  height,
-  { allowNativeFrameFloor = false } = {}
+  height
 ) {
   await setPackagedContentSize(application, width, height);
-  await window.waitForFunction((expected) => {
-    const nativeFrameWidth = Math.max(0, window.outerWidth - window.innerWidth);
-    const widthMatches = Math.abs(window.innerWidth - expected.width) <= 1
-      || (expected.allowNativeFrameFloor
-        && window.innerWidth <= expected.width + 1
-        && window.innerWidth >= expected.width - nativeFrameWidth - 1
-        && window.outerWidth >= expected.width - 1);
-    return widthMatches && Math.abs(window.innerHeight - expected.height) <= 1;
-  }, { allowNativeFrameFloor, height, width });
+  await window.waitForFunction((expected) => (
+    Math.abs(window.innerWidth - expected.width) <= 1
+    && Math.abs(window.innerHeight - expected.height) <= 1
+  ), { height, width });
+  await waitForTwoAnimationFrames(window);
+}
+
+async function setStableMinimumWindowWidth(window, application, width) {
+  await application.evaluate(({ BrowserWindow }, minimumWidth) => {
+    const browserWindow = BrowserWindow.getAllWindows()[0];
+    if (!browserWindow) throw new Error("Packaged BrowserWindow is unavailable.");
+    const [, currentHeight] = browserWindow.getSize();
+    browserWindow.setSize(minimumWidth, currentHeight);
+  }, width);
+  await window.waitForFunction((expectedWidth) => (
+    Math.abs(window.outerWidth - expectedWidth) <= 1
+    && window.innerWidth <= expectedWidth + 1
+  ), width);
+  await waitForTwoAnimationFrames(window);
+}
+
+async function waitForTwoAnimationFrames(window) {
   await window.evaluate(() => new Promise((resolvePromise) => {
     requestAnimationFrame(() => requestAnimationFrame(resolvePromise));
   }));
