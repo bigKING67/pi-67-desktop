@@ -148,9 +148,17 @@ describe("signed release workflow security", () => {
       nativeJob.indexOf("- name: Uninstall and clean isolated Windows native candidate")
     );
 
-    expect(nativeJob).toContain(
-      "PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE: ${{ runner.temp }}\\pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}-uninstall-registry.json"
+    const pathBindingStep = nativeJob.slice(
+      nativeJob.indexOf("- name: Bind isolated Windows native paths"),
+      nativeJob.indexOf("- uses: actions/checkout@v5")
     );
+    expect(pathBindingStep).toContain(
+      '$registryGuardState = Join-Path $env:RUNNER_TEMP "pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}-uninstall-registry.json"'
+    );
+    expect(pathBindingStep).toContain("PI67_WINDOWS_NATIVE_INSTALL_ROOT=$installRoot");
+    expect(pathBindingStep).toContain("PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE=$registryGuardState");
+    expect(pathBindingStep).toContain("-FilePath $env:GITHUB_ENV");
+    expect(nativeJob.slice(0, nativeJob.indexOf("\n    steps:\n"))).not.toContain("${{ runner.temp }}");
     expect(installStep).toContain("windows-uninstall-registry-guard.ps1");
     expect(installStep.indexOf("-Action Snapshot")).toBeLessThan(installStep.indexOf("Start-Process"));
     expect(installStep.indexOf("Windows candidate installer exited with code"))
