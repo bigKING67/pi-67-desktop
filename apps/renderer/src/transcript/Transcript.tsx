@@ -64,6 +64,7 @@ export function Transcript() {
       data-message-count={messages.length}
       data-session-id={sessionId}
     >
+      {/* Explicit paging avoids Virtuoso chaining requests while a prepend preserves the top anchor. */}
       <Virtuoso
         key={sessionId}
         components={TRANSCRIPT_COMPONENTS}
@@ -83,7 +84,6 @@ export function Transcript() {
         increaseViewportBy={{ top: 500, bottom: 800 }}
         initialTopMostItemIndex={Math.max(0, messages.length - 1)}
         itemContent={(_index, message) => <MessageCard message={message} />}
-        startReached={() => void loadOlderConversation()}
       />
     </div>
   );
