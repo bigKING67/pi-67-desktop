@@ -41,7 +41,7 @@ interface ActiveBinding extends SessionJsonlWatcherBinding {
 export class SessionJsonlWatcher {
   private binding: ActiveBinding | undefined;
   private cursor: SessionJsonlTailCursor | undefined;
-  private fileWatchers: FSWatcher[] = [];
+  private watchers: FSWatcher[] = [];
   private knownRecordKeys = new Set<string>();
   private dirty = false;
   private detected = false;
@@ -74,9 +74,6 @@ export class SessionJsonlWatcher {
         this.scheduleDrain(token);
       });
       this.registerWatcher(directoryWatcher, token);
-      if (cursor.fileIdentity !== undefined) {
-        this.registerWatcher(watch(cursor.path, { persistent: false }, () => this.scheduleDrain(token)), token);
-      }
       // Close the baseline-to-watch registration race with an authoritative stat/read.
       await this.checkNow();
     } catch (error) {
@@ -204,12 +201,12 @@ export class SessionJsonlWatcher {
     watcher.on("error", () => {
       if (this.isCurrent(token)) this.detect({ reason: "unavailable", recoverable: true });
     });
-    this.fileWatchers.push(watcher);
+    this.watchers.push(watcher);
   }
 
   private closeWatchers(): void {
-    for (const watcher of this.fileWatchers) watcher.close();
-    this.fileWatchers = [];
+    for (const watcher of this.watchers) watcher.close();
+    this.watchers = [];
   }
 
   private isCurrent(token: number): boolean {
