@@ -7,10 +7,6 @@ on:
         description: Existing alpha version tag to publish as an unsigned prerelease
         required: true
         type: string
-      previous_tag:
-        description: Previous unsigned preview tag used for Windows cross-version upgrade verification
-        required: false
-        type: string
 
 concurrency:
   group: unsigned-preview-${{ inputs.tag }}
@@ -80,32 +76,6 @@ jobs:
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run check
       - run: corepack pnpm run package:native:unsigned
-      - name: Prepare previous unsigned Windows installer
-        if: runner.os == 'Windows' && inputs.previous_tag != ''
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREVIOUS_TAG: ${{ inputs.previous_tag }}
-        run: |
-          if ($env:PREVIOUS_TAG -notmatch '^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
-            throw "Invalid previous preview tag: $env:PREVIOUS_TAG"
-          }
-          $version = $env:PREVIOUS_TAG.Substring(1)
-          $directory = Join-Path $env:RUNNER_TEMP 'pi67-preview-upgrade-baseline'
-          New-Item -ItemType Directory -Force -Path $directory | Out-Null
-          gh release download $env:PREVIOUS_TAG `
-            --repo $env:GITHUB_REPOSITORY `
-            --pattern "Pi-67-Desktop-$version-win-x64-unsigned-preview.exe" `
-            --dir $directory
-          gh release download $env:PREVIOUS_TAG `
-            --repo $env:GITHUB_REPOSITORY `
-            --pattern 'unsigned-preview-manifest.json' `
-            --dir $directory
-          gh release download $env:PREVIOUS_TAG `
-            --repo $env:GITHUB_REPOSITORY `
-            --pattern 'SHA256SUMS.txt' `
-            --dir $directory
-          corepack pnpm run release:preview:baseline:verify $directory $env:PREVIOUS_TAG
       - run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts
         if: runner.os == 'Windows'
@@ -197,7 +167,7 @@ jobs:
 
           Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. If Gatekeeper still blocks an app downloaded from this repository after its SHA-256 is verified, drag it to `/Applications` and run `xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"`. No stable updater metadata is included; install a later preview manually.
 
-          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners. The Windows candidate also passed synthetic-scale layout checks and automated silent install/reinstall/uninstall lifecycle smoke. When the workflow was supplied a verified `previous_tag`, that lifecycle included a silent previous-preview-to-current upgrade; otherwise it only covered same-version reinstall. These checks do not replace SmartScreen, real IME/DPI, or interactive installation and upgrade certification. The artifacts are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
+          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners. The Windows candidate also passed synthetic-scale layout checks and automated silent install/reinstall/uninstall lifecycle smoke. Cross-version upgrade certification is intentionally outside the unsigned preview release gate. These checks do not replace SmartScreen, real IME/DPI, or interactive installation and upgrade certification. The artifacts are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
           EOF
           gh release create "$RELEASE_TAG" \
             artifacts/release/Pi-67-Desktop-*-unsigned-preview.* \
