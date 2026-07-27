@@ -5,6 +5,7 @@ import {
   type SessionCatalogContext,
   type SessionCatalogDiscoveryResult
 } from "./session-catalog.js";
+import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import type {
   SessionCatalogRecord,
   SqliteCatalogOpenResult,
@@ -407,7 +408,7 @@ function record(index: number, overrides: Partial<SessionCatalogRecord> = {}): S
     id: `id-${index}`,
     path: `/session-${index}.jsonl`,
     cwd: "/workspace",
-    cwdKey: "/workspace",
+    cwdKey: normalizeSessionCatalogPathIdentity("/workspace"),
     explicitName: `Session ${index}`,
     modifiedAt: 10_000 - index,
     messageCount: index,

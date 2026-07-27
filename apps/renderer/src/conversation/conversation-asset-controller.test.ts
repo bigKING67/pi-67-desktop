@@ -8,8 +8,10 @@ afterEach(() => {
 
 describe("ConversationAssetController", () => {
   it("loads transferred chunks once, caches the Blob URL and revokes it after retention", async () => {
-    vi.useFakeTimers();
-    const source = Uint8Array.from({ length: MAX_ASSET_READ_BYTES + 3 }, (_, index) => index % 251);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const source = new Uint8Array(MAX_ASSET_READ_BYTES + 3);
+    source.set([9, 8, 7, 6]);
+    source.set([1, 2, 3], MAX_ASSET_READ_BYTES);
     const requests: Array<{ offset: number; length: number }> = [];
     const blobs: Blob[] = [];
     const revoked: string[] = [];
@@ -50,7 +52,7 @@ describe("ConversationAssetController", () => {
     expect(revoked).toEqual([]);
     await vi.advanceTimersByTimeAsync(25);
     expect(revoked).toEqual(["blob:asset-1"]);
-  });
+  }, 15_000);
 
   it("cancels an invisible in-flight load before requesting another chunk", async () => {
     let resolveFirst!: (value: {

@@ -4,9 +4,13 @@ import { extractWorkflowRunBodies } from "../quality/workflow-source-security.mj
 
 const workflowUrl = new URL("../../.github/workflows/release.yml", import.meta.url);
 
+async function readWorkflowSource() {
+  return (await readFile(workflowUrl, "utf8")).replace(/\r\n?/gu, "\n");
+}
+
 describe("signed release workflow security", () => {
   it("never interpolates workflow inputs into shell source", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
     for (const body of extractWorkflowRunBodies(source)) {
       expect(body).not.toContain("${{ inputs.");
       expect(body).not.toContain("${{ github.event.inputs.");
@@ -14,7 +18,7 @@ describe("signed release workflow security", () => {
   });
 
   it("protects signing and publishing authority", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
 
     expect(source.match(/environment: production-release/gu)).toHaveLength(2);
     expect(source).toContain("environment: provider-certification");
@@ -40,7 +44,7 @@ describe("signed release workflow security", () => {
   });
 
   it("automatically binds Windows upgrade verification to the direct previous stable release", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
 
     expect(source).not.toContain("previous_tag:\n");
     expect(source).toContain("release:stable-tag:verify");
@@ -57,7 +61,7 @@ describe("signed release workflow security", () => {
   });
 
   it("makes real Provider and Windows native certification unavoidable publish dependencies", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
 
     expect(source).toContain("provider_long_turn_certify:");
     expect(source).toContain("windows_native_certify:");
@@ -91,7 +95,7 @@ describe("signed release workflow security", () => {
   });
 
   it("certifies the exact release-built Windows candidate without exposing signing credentials", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
     const providerJob = source.slice(
       source.indexOf("\n  provider_long_turn_certify:\n"),
       source.indexOf("\n  windows_native_certify:\n")
@@ -135,7 +139,7 @@ describe("signed release workflow security", () => {
   });
 
   it("bounds native installer Registry cleanup to new exact InstallLocation entries", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
     const nativeJob = source.slice(
       source.indexOf("\n  windows_native_certify:\n"),
       source.indexOf("\n  verify_release_gate:\n")
@@ -177,7 +181,7 @@ describe("signed release workflow security", () => {
   });
 
   it("keeps the contents-write publish job free of checked-out repository code", async () => {
-    const source = await readFile(workflowUrl, "utf8");
+    const source = await readWorkflowSource();
     const publish = source.slice(source.indexOf("\n  publish:\n"));
 
     expect(publish).not.toContain("actions/checkout");

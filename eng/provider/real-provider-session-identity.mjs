@@ -27,7 +27,7 @@ export async function readIsolatedSessionIdentity(agentDir, boundaries = {}) {
   }
   return {
     id: header.id,
-    relativePath: relative(agentDir, selected.path),
+    relativePath: relative(agentDir, selected.path).replaceAll("\\", "/"),
     byteLength: selected.metadata.size,
     sha256: await sha256File(selected.path)
   };

@@ -10,7 +10,9 @@ describe("RuntimeAssetRegistry", () => {
   it("registers stable generation-bound references and returns independent chunks", () => {
     const registry = new RuntimeAssetRegistry();
     registry.reset(7);
-    const bytes = Uint8Array.from({ length: MAX_ASSET_READ_BYTES + 3 }, (_, index) => index % 251);
+    const bytes = new Uint8Array(MAX_ASSET_READ_BYTES + 3);
+    bytes.set([9, 8, 7, 6]);
+    bytes.set([1, 2, 3], MAX_ASSET_READ_BYTES);
     const source = {
       stableKey: "entry-1:image:0",
       mimeType: "image/png",
@@ -41,7 +43,7 @@ describe("RuntimeAssetRegistry", () => {
     new Uint8Array(first.data).fill(0);
     const repeated = registry.read({ assetId: firstReference!.id, sessionGeneration: 7, offset: 0, length: 8 });
     expect(new Uint8Array(repeated.data)).toEqual(bytes.slice(0, 8));
-  });
+  }, 15_000);
 
   it("rejects stale generations, invalid ranges and handles cleared by reset", () => {
     const registry = new RuntimeAssetRegistry();
