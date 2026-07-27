@@ -172,8 +172,14 @@ export async function verifyWindowsInstallerLifecycle() {
       workspace
     });
     assertRuntimeVersion(firstLaunch, initialVersion);
-    await assertSingleShutdownQuitLifecycle(lifecyclePath, "Initially installed Pi Runtime");
-    report.phases.push({ name: baseline ? "baseline-launch" : "first-launch", ...firstLaunch });
+    if (!baseline) {
+      await assertSingleShutdownQuitLifecycle(lifecyclePath, "Initially installed Pi Runtime");
+    }
+    report.phases.push({
+      name: baseline ? "baseline-launch" : "first-launch",
+      ...firstLaunch,
+      sessionShutdownLifecycle: baseline ? "legacy-baseline-not-required" : "verified"
+    });
 
     if (baseline) {
       await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
@@ -212,7 +218,11 @@ export async function verifyWindowsInstallerLifecycle() {
     });
     assertRuntimeVersion(secondLaunch, packageJson.version);
     await assertSingleShutdownQuitLifecycle(lifecyclePath, "Upgraded Pi Runtime");
-    report.phases.push({ name: baseline ? "post-upgrade-launch" : "post-reinstall-launch", ...secondLaunch });
+    report.phases.push({
+      name: baseline ? "post-upgrade-launch" : "post-reinstall-launch",
+      ...secondLaunch,
+      sessionShutdownLifecycle: "verified"
+    });
 
     const uninstallPath = await resolveUninstallerPath(installDirectory);
     const uninstall = await timedPhase("uninstall", async () => {
