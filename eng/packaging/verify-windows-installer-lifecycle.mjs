@@ -167,6 +167,7 @@ export async function verifyWindowsInstallerLifecycle() {
       artifact: installedArtifact,
       childPidPath,
       expectedTheme: "system",
+      probePackagedRendererIsolation: !baseline,
       selectLightTheme: true,
       userDataDirectory,
       workspace
@@ -200,6 +201,7 @@ export async function verifyWindowsInstallerLifecycle() {
       agentDir,
       artifact: reinstalledArtifact,
       expectedTheme: "light",
+      probePackagedRendererIsolation: true,
       selectLightTheme: false,
       userDataDirectory,
       workspace
@@ -298,6 +300,7 @@ async function launchInstalledApplication({
   artifact,
   childPidPath,
   expectedTheme,
+  probePackagedRendererIsolation,
   selectLightTheme,
   userDataDirectory,
   workspace
@@ -309,6 +312,7 @@ async function launchInstalledApplication({
     application = await launchPackagedApplication({
       agentDir,
       artifact,
+      probePackagedRendererIsolation,
       userDataDirectory
     });
     const mainPid = application.process().pid;
@@ -373,6 +377,7 @@ async function launchInstalledApplication({
         appVersion: runtime.appVersion,
         electronVersion: runtime.electronVersion
       },
+      rendererIsolationProbe: probePackagedRendererIsolation,
       utilityProcessCount: utilityPids.length
     };
   } finally {

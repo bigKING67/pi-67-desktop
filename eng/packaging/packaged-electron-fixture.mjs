@@ -56,20 +56,38 @@ export function launchPackagedApplication({
   applicationArguments = [],
   artifact,
   environment = {},
+  probePackagedRendererIsolation = true,
   userDataDirectory
 }) {
   return electron.launch({
     executablePath: artifact.executablePath,
     args: [...applicationArguments, `--user-data-dir=${userDataDirectory}`],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      PI_CODING_AGENT_DIR: agentDir,
-      PI_OFFLINE: "1",
-      PI67_RENDERER_DEV_URL: "https://renderer.invalid/",
-      ...environment
-    }
+    env: packagedApplicationEnvironment({
+      agentDir,
+      environment,
+      probePackagedRendererIsolation
+    })
   });
+}
+
+export function packagedApplicationEnvironment({
+  agentDir,
+  environment = {},
+  hostEnvironment = process.env,
+  probePackagedRendererIsolation = true
+}) {
+  const baseEnvironment = { ...hostEnvironment };
+  delete baseEnvironment.PI67_RENDERER_DEV_URL;
+  return {
+    ...baseEnvironment,
+    NODE_ENV: "test",
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_OFFLINE: "1",
+    ...(probePackagedRendererIsolation
+      ? { PI67_RENDERER_DEV_URL: "https://renderer.invalid/" }
+      : {}),
+    ...environment
+  };
 }
 
 export async function installWorkspaceDialogResult(application, workspace) {
