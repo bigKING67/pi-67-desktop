@@ -5,6 +5,27 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractWorkflowShellRunBodies } from "./workflow-source-security.mjs";
 
+const POWER_SHELL_PARSE_COMMAND = `
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile(
+  $env:PI67_WORKFLOW_POWERSHELL_PATH,
+  [ref]$tokens,
+  [ref]$errors
+) | Out-Null
+if ($errors.Count -gt 0) {
+  foreach ($parseError in $errors) {
+    [Console]::Error.WriteLine(("{0}:{1}:{2}: {3}" -f
+      $parseError.Extent.File,
+      $parseError.Extent.StartLineNumber,
+      $parseError.Extent.StartColumnNumber,
+      $parseError.Message
+    ))
+  }
+  exit 1
+}
+`;
+
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const workflowDirectory = join(repositoryRoot, ".github/workflows");
 const packagingDirectory = join(repositoryRoot, "eng/packaging");
@@ -75,24 +96,3 @@ async function parsePowerShellScripts(values) {
 function safeName(value) {
   return basename(value).replace(/[^A-Za-z0-9_.-]+/gu, "-");
 }
-
-const POWER_SHELL_PARSE_COMMAND = `
-$tokens = $null
-$errors = $null
-[System.Management.Automation.Language.Parser]::ParseFile(
-  $env:PI67_WORKFLOW_POWERSHELL_PATH,
-  [ref]$tokens,
-  [ref]$errors
-) | Out-Null
-if ($errors.Count -gt 0) {
-  foreach ($parseError in $errors) {
-    [Console]::Error.WriteLine(("{0}:{1}:{2}: {3}" -f
-      $parseError.Extent.File,
-      $parseError.Extent.StartLineNumber,
-      $parseError.Extent.StartColumnNumber,
-      $parseError.Message
-    ))
-  }
-  exit 1
-}
-`;
