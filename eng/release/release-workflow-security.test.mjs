@@ -152,8 +152,12 @@ describe("signed release workflow security", () => {
       nativeJob.indexOf("- name: Bind isolated Windows native paths"),
       nativeJob.indexOf("- uses: actions/checkout@v5")
     );
+    expect(pathBindingStep).toContain('$installLeaf = "pi67-native-install-{0}-{1}" -f');
+    expect(pathBindingStep).toContain('$env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT');
+    expect(pathBindingStep).toContain('$registryGuardLeaf = "{0}-uninstall-registry.json" -f $installLeaf');
+    expect(pathBindingStep).toContain("$installRoot = Join-Path $env:RUNNER_TEMP $installLeaf");
     expect(pathBindingStep).toContain(
-      '$registryGuardState = Join-Path $env:RUNNER_TEMP "pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}-uninstall-registry.json"'
+      "$registryGuardState = Join-Path $env:RUNNER_TEMP $registryGuardLeaf"
     );
     expect(pathBindingStep).toContain("PI67_WINDOWS_NATIVE_INSTALL_ROOT=$installRoot");
     expect(pathBindingStep).toContain("PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE=$registryGuardState");

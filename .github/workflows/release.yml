@@ -481,8 +481,10 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
             throw "RUNNER_TEMP is required for isolated Windows native certification."
           }
-          $installRoot = Join-Path $env:RUNNER_TEMP "pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}"
-          $registryGuardState = Join-Path $env:RUNNER_TEMP "pi67-native-install-${{ github.run_id }}-${{ github.run_attempt }}-uninstall-registry.json"
+          $installLeaf = "pi67-native-install-{0}-{1}" -f $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT
+          $registryGuardLeaf = "{0}-uninstall-registry.json" -f $installLeaf
+          $installRoot = Join-Path $env:RUNNER_TEMP $installLeaf
+          $registryGuardState = Join-Path $env:RUNNER_TEMP $registryGuardLeaf
           "PI67_WINDOWS_NATIVE_INSTALL_ROOT=$installRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "PI67_WINDOWS_NATIVE_REGISTRY_GUARD_STATE=$registryGuardState" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: actions/checkout@v5
