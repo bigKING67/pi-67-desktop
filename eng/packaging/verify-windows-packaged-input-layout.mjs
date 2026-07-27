@@ -277,8 +277,7 @@ async function setStableMinimumWindowWidth(window, application, width) {
     browserWindow.setSize(minimumWidth, currentHeight);
   }, width);
   await window.waitForFunction((expectedWidth) => (
-    Math.abs(window.outerWidth - expectedWidth) <= 1
-    && window.innerWidth <= expectedWidth + 1
+    window.innerWidth <= expectedWidth + 1
   ), width);
   await waitForTwoAnimationFrames(window);
 }
@@ -369,7 +368,10 @@ export function assertLayoutObservation(observation, contract) {
     innerWidth: observation.innerWidth,
     outerWidth: observation.outerWidth
   })) {
-    throw new Error(`${prefix}: expected innerWidth ${contract.expectedWidth}, got ${observation.innerWidth}.`);
+    throw new Error(
+      `${prefix}: expected innerWidth ${contract.expectedWidth} or its native-frame floor, `
+      + `got innerWidth ${observation.innerWidth} and outerWidth ${observation.outerWidth}.`
+    );
   }
   if (contract.breakpoint === "context-drawer" && !observation.matchesContextBreakpoint) {
     throw new Error(`${prefix}: max-width 1040px media query did not match.`);
