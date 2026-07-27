@@ -11,6 +11,7 @@ import {
   waitForProcessExit,
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
+import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -111,7 +112,7 @@ async function verifyScaleScenario(artifact, scaleFactor) {
       appVersion: app.getVersion(),
       electronVersion: process.versions.electron
     }));
-    await startControlledOperation(window);
+    await startControlledPrompt(window);
     childPid = await readPositiveProcessId(childPidPath);
 
     const { contextViewport, navigationViewport } = await verifyPackagedResponsiveLayout(
@@ -157,16 +158,6 @@ export async function verifyPackagedResponsiveLayout(window, application, scaleF
     contextViewport: await verifyContextDrawerLayout(window, application, scaleFactor),
     navigationViewport: await verifyNavigationDrawerLayout(window, application, scaleFactor)
   };
-}
-
-async function startControlledOperation(window) {
-  await window.keyboard.press("Control+k");
-  const command = window.getByRole("option", {
-    name: "/hold-open Start a controlled child process until Pi shuts down"
-  });
-  await command.waitFor({ state: "visible", timeout: 10_000 });
-  await command.click();
-  await window.getByRole("button", { name: "停止" }).waitFor({ state: "visible", timeout: 10_000 });
 }
 
 async function verifyContextDrawerLayout(window, application, scaleFactor) {

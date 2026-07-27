@@ -7,6 +7,7 @@ import {
   waitForProcessExit,
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
+import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -101,12 +102,7 @@ try {
   // Renderer reload reinitializes the Pi runtime and legitimately shuts down the
   // previous runtime generation. Scope the exactly-once probe to final app quit.
   await resetControlledShutdownLifecycle(lifecyclePath);
-  await window.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
-  const controlledCommand = window.getByRole("option", {
-    name: "/hold-open Start a controlled child process until Pi shuts down"
-  });
-  await controlledCommand.waitFor({ state: "visible", timeout: 10_000 });
-  await controlledCommand.click();
+  await startControlledPrompt(window);
   childPid = await readPositiveProcessId(childPidPath);
   if (!isProcessAlive(childPid)) throw new Error("Controlled Extension child exited before packaged shutdown.");
   const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
@@ -124,7 +120,7 @@ try {
   await waitForProcessExit(childPid);
   for (const pid of utilityPids) await waitForProcessExit(pid);
   await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, native modules, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-command shutdown (${closeDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, native modules, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

@@ -3,6 +3,9 @@ import {
   validateNativePowerResumeEvidence,
   validateTrustedImeSubmissionEvidence
 } from "./windows-native-interaction-evidence.mjs";
+import {
+  startControlledPrompt
+} from "./controlled-provider-interaction.mjs";
 
 const IME_EXPECTED_VALUE = "测试";
 const IME_TIMEOUT_MS = 120_000;
@@ -23,20 +26,25 @@ export async function installNativeCertificationProtocolProbe(page) {
         || data?.type !== "agent-port"
         || !port
       ) return;
-      const pendingCommands = new Set();
+      const initialPromptRequests = new Set();
       const imeRequests = new Set();
       port.addEventListener("message", (messageEvent) => {
         const envelope = messageEvent.data;
         const probe = globalThis.__pi67NativeCertificationProbe;
         if (!probe) return;
-        if (envelope?.kind === "request" && envelope.type === "command.invoke") {
-          pendingCommands.add(envelope.requestId);
+        if (
+          envelope?.kind === "request"
+          && envelope.type === "prompt.submit"
+          && probe.ime?.armed !== true
+          && probe.activeOperationId === undefined
+        ) {
+          initialPromptRequests.add(envelope.requestId);
           return;
         }
         if (
           envelope?.kind === "response"
-          && envelope.type === "command.invoke"
-          && pendingCommands.has(envelope.requestId)
+          && envelope.type === "prompt.submit"
+          && initialPromptRequests.has(envelope.requestId)
           && envelope.ok === true
           && envelope.result?.kind === "accepted"
           && typeof envelope.result.operationId === "string"
@@ -79,13 +87,7 @@ export async function installNativeCertificationProtocolProbe(page) {
 }
 
 export async function startControlledOperation(page) {
-  await page.keyboard.press("Control+k");
-  const command = page.getByRole("option", {
-    name: "/hold-open Start a controlled child process until Pi shuts down"
-  });
-  await command.waitFor({ state: "visible", timeout: 10_000 });
-  await command.click();
-  await page.getByRole("button", { name: "停止" }).waitFor({ state: "visible", timeout: 10_000 });
+  await startControlledPrompt(page);
   await page.waitForFunction(
     () => typeof globalThis.__pi67NativeCertificationProbe?.activeOperationId === "string",
     undefined,

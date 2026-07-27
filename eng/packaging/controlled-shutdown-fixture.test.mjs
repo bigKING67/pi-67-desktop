@@ -38,7 +38,9 @@ describe("controlled shutdown fixture", () => {
     await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
     const source = await readFile(extensionPath, "utf8");
     expect(source).toContain('pi.registerCommand("hold-open"');
+    expect(source).toContain('pi.registerProvider("pi67-controlled"');
     expect(source).toContain('pi.on("session_shutdown"');
+    expect(source).toContain('options?.signal?.addEventListener("abort"');
     expect(source).toContain("ELECTRON_RUN_AS_NODE");
 
     const child = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
