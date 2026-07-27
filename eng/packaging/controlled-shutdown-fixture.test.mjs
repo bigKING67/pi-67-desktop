@@ -9,7 +9,8 @@ import {
   readPositiveProcessId,
   resetControlledShutdownLifecycle,
   waitForProcessExit,
-  writeControlledShutdownExtension
+  writeControlledShutdownExtension,
+  writeShutdownLifecycleExtension
 } from "./controlled-shutdown-fixture.ts";
 
 describe("controlled shutdown fixture", () => {
@@ -53,6 +54,20 @@ describe("controlled shutdown fixture", () => {
     child.kill();
     await expect(waitForProcessExit(child.pid)).resolves.toBeUndefined();
     expect(isProcessAlive(child.pid)).toBe(false);
+  });
+
+  it("writes a legacy-compatible shutdown-only Extension", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-shutdown-lifecycle-"));
+    roots.push(root);
+    const extensionPath = join(root, "shutdown-fixture.ts");
+    const lifecyclePath = join(root, "lifecycle.txt");
+
+    await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
+    const source = await readFile(extensionPath, "utf8");
+    expect(source).toContain('pi.on("session_shutdown"');
+    expect(source).not.toContain("pi.registerCommand");
+    expect(source).not.toContain("pi.registerProvider");
+    expect(source).not.toContain("@earendil-works/pi-ai");
   });
 
   it("resets probe evidence and accepts only one final shutdown marker", async () => {

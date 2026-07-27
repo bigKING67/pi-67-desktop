@@ -12,6 +12,26 @@ interface ControlledShutdownExtensionOptions {
   lifecyclePath: string;
 }
 
+interface ShutdownLifecycleExtensionOptions {
+  extensionPath: string;
+  lifecyclePath: string;
+}
+
+export async function writeShutdownLifecycleExtension({
+  extensionPath,
+  lifecyclePath
+}: ShutdownLifecycleExtensionOptions): Promise<void> {
+  await writeFile(extensionPath, `
+    import { appendFileSync } from "node:fs";
+
+    export default function shutdownLifecycleFixture(pi) {
+      pi.on("session_shutdown", (event) => {
+        appendFileSync(${JSON.stringify(lifecyclePath)}, "shutdown:" + event.reason + "\\n");
+      });
+    }
+  `, "utf8");
+}
+
 export async function writeControlledShutdownExtension({
   extensionPath,
   childPidPath,

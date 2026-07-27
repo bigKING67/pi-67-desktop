@@ -13,19 +13,16 @@ import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSingleShutdownQuitLifecycle,
-  isProcessAlive,
-  readPositiveProcessId,
   resetControlledShutdownLifecycle,
-  waitForProcessExit,
-  writeControlledShutdownExtension
+  writeControlledShutdownExtension,
+  writeShutdownLifecycleExtension
 } from "./controlled-shutdown-fixture.ts";
 import {
   assertPackagedRuntimeAssets,
-  installWorkspaceDialogResult,
-  launchPackagedApplication,
   repositoryRoot
 } from "./packaged-electron-fixture.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
+import { launchInstalledApplication } from "./windows-installed-application-lifecycle.mjs";
 import {
   readLifecycleArtifactIdentity,
   resolveExpectedLifecycleSigner,
@@ -131,11 +128,12 @@ export async function verifyWindowsInstallerLifecycle() {
       mkdir(userDataDirectory, { recursive: true }),
       mkdir(workspace, { recursive: true })
     ]);
-    await writeControlledShutdownExtension({
-      extensionPath: join(extensionsDirectory, "installer-lifecycle-fixture.ts"),
-      childPidPath,
-      lifecyclePath
-    });
+    const extensionPath = join(extensionsDirectory, "installer-lifecycle-fixture.ts");
+    if (baseline) {
+      await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
+    } else {
+      await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
+    }
 
     const initialInstallerPath = baseline?.path ?? installerPath;
     const initialVersion = baseline?.version ?? packageJson.version;
@@ -167,6 +165,7 @@ export async function verifyWindowsInstallerLifecycle() {
       artifact: installedArtifact,
       childPidPath,
       expectedTheme: "system",
+      legacyUserInterface: Boolean(baseline),
       probePackagedRendererIsolation: !baseline,
       selectLightTheme: true,
       userDataDirectory,
@@ -175,6 +174,10 @@ export async function verifyWindowsInstallerLifecycle() {
     assertRuntimeVersion(firstLaunch, initialVersion);
     await assertSingleShutdownQuitLifecycle(lifecyclePath, "Initially installed Pi Runtime");
     report.phases.push({ name: baseline ? "baseline-launch" : "first-launch", ...firstLaunch });
+
+    if (baseline) {
+      await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
+    }
 
     const reinstall = await timedPhase(
       baseline ? "upgrade" : "reinstall",
@@ -201,6 +204,7 @@ export async function verifyWindowsInstallerLifecycle() {
       agentDir,
       artifact: reinstalledArtifact,
       expectedTheme: "light",
+      legacyUserInterface: false,
       probePackagedRendererIsolation: true,
       selectLightTheme: false,
       userDataDirectory,
@@ -291,98 +295,6 @@ async function cleanupWindowsInstallation(installDirectory) {
 function assertRuntimeVersion(launchResult, expectedVersion) {
   if (launchResult.runtime.appVersion !== expectedVersion) {
     throw new Error(`Installed app version mismatch: expected ${expectedVersion}, got ${launchResult.runtime.appVersion}.`);
-  }
-}
-
-async function launchInstalledApplication({
-  activeControlledOperation,
-  agentDir,
-  artifact,
-  childPidPath,
-  expectedTheme,
-  probePackagedRendererIsolation,
-  selectLightTheme,
-  userDataDirectory,
-  workspace
-}) {
-  let application;
-  let childPid;
-  try {
-    const startedAt = performance.now();
-    application = await launchPackagedApplication({
-      agentDir,
-      artifact,
-      probePackagedRendererIsolation,
-      userDataDirectory
-    });
-    const mainPid = application.process().pid;
-    const window = await application.firstWindow();
-    await window.waitForLoadState("domcontentloaded");
-    await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
-    if (window.url() !== "app://pi67/index.html") {
-      throw new Error(`Installed renderer did not use app://pi67: ${window.url()}.`);
-    }
-    await window.locator(`html[data-theme-preference="${expectedTheme}"]`).waitFor({ state: "attached" });
-
-    const runtime = await application.evaluate(({ app }) => ({
-      appVersion: app.getVersion(),
-      electronVersion: process.versions.electron,
-      executablePath: app.getPath("exe")
-    }));
-    if (resolve(runtime.executablePath).toLowerCase() !== resolve(artifact.executablePath).toLowerCase()) {
-      throw new Error("Installed Electron runtime launched from an unexpected executable path.");
-    }
-
-    if (selectLightTheme) {
-      await window.getByRole("button", { name: "打开更多菜单" }).click();
-      await window.getByRole("menu").getByRole("menuitem", { name: /外观：浅色/u }).click();
-      await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
-    }
-
-    await installWorkspaceDialogResult(application, workspace);
-    await window.getByRole("button", { name: "选择工作区" }).click();
-    await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
-
-    if (activeControlledOperation) {
-      await window.keyboard.press("Control+k");
-      const command = window.getByRole("option", {
-        name: "/hold-open Start a controlled child process until Pi shuts down"
-      });
-      await command.waitFor({ state: "visible", timeout: 10_000 });
-      await command.click();
-      childPid = await readPositiveProcessId(childPidPath);
-      if (!isProcessAlive(childPid)) throw new Error("Installed controlled Extension child exited before shutdown.");
-    }
-
-    const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
-      .filter((metric) => metric.type === "Utility")
-      .map((metric) => metric.pid));
-    if (utilityPids.length === 0) throw new Error("Installed Agent Host utility process was not observable.");
-
-    const closeStartedAt = performance.now();
-    await application.close();
-    application = undefined;
-    const closeDurationMs = performance.now() - closeStartedAt;
-    if (closeDurationMs > 5_000) {
-      throw new Error(`Installed application shutdown exceeded 5000ms: ${closeDurationMs.toFixed(1)}ms.`);
-    }
-    if (mainPid !== undefined) await waitForProcessExit(mainPid);
-    for (const pid of utilityPids) await waitForProcessExit(pid);
-    if (childPid !== undefined) await waitForProcessExit(childPid);
-
-    return {
-      closeDurationMs: round(closeDurationMs),
-      launchToReadyMs: round(performance.now() - startedAt),
-      runtime: {
-        appVersion: runtime.appVersion,
-        electronVersion: runtime.electronVersion
-      },
-      rendererIsolationProbe: probePackagedRendererIsolation,
-      utilityProcessCount: utilityPids.length
-    };
-  } finally {
-    if (application) await application.close();
-    if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   }
 }
 
