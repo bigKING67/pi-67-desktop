@@ -139,7 +139,7 @@ describe("respondToSafetyApproval", () => {
       expect.objectContaining({
         level: "warning",
         title: "工具授权请求已过期",
-        message: "Agent Host 未接受这次授权响应，工具将保持阻止状态。"
+        message: "Pi 运行服务未接受这次授权响应，工具将保持阻止状态。"
       })
     ]);
   });

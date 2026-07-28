@@ -1,7 +1,8 @@
 import type {
   AgentSession,
   AgentSessionServices,
-  LoadExtensionsResult
+  LoadExtensionsResult,
+  ModelRuntime
 } from "@earendil-works/pi-coding-agent";
 import type {
   ModelSummary,
@@ -74,13 +75,16 @@ export function projectSessionControls(session: AgentSession): SessionControlsVi
 export function projectSessionModelCatalog(session: AgentSession): SessionModelCatalogView {
   return {
     models: projectSessionModels(session),
-    providers: projectProviders(session),
+    providers: projectRuntimeProviders(session.modelRuntime, session.model?.provider),
     availableThinkingLevels: session.getAvailableThinkingLevels()
   };
 }
 
 export function projectSessionModels(session: AgentSession): ModelSummary[] {
-  const runtime = session.modelRuntime;
+  return projectRuntimeModels(session.modelRuntime);
+}
+
+function projectRuntimeModels(runtime: ModelRuntime): ModelSummary[] {
   return runtime.getModels().map((model) => ({
     provider: model.provider,
     id: model.id,
@@ -91,8 +95,10 @@ export function projectSessionModels(session: AgentSession): ModelSummary[] {
   }));
 }
 
-function projectProviders(session: AgentSession): ProviderSummary[] {
-  const runtime = session.modelRuntime;
+export function projectRuntimeProviders(
+  runtime: ModelRuntime,
+  selectedProvider?: string
+): ProviderSummary[] {
   const modelCounts = new Map<string, number>();
   for (const model of runtime.getModels()) {
     modelCounts.set(model.provider, (modelCounts.get(model.provider) ?? 0) + 1);
@@ -110,7 +116,7 @@ function projectProviders(session: AgentSession): ProviderSummary[] {
         modelCount: modelCounts.get(provider.id) ?? 0
       };
     })
-    .filter((provider) => provider.modelCount > 0 || provider.configured || provider.id === session.model?.provider)
+    .filter((provider) => provider.modelCount > 0 || provider.configured || provider.id === selectedProvider)
     .sort((left, right) => {
       if (left.configured !== right.configured) return left.configured ? -1 : 1;
       return left.label.localeCompare(right.label);

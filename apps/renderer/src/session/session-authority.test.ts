@@ -1,6 +1,7 @@
 import type { SessionSnapshot } from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import {
   acceptRendererSessionEvent,
   acceptRendererSessionResponse,
@@ -47,12 +48,12 @@ describe("renderer session authority", () => {
       state(),
       snapshot("session-2")
     )).toBeUndefined();
-    const envelope = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, {
+    const envelope = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-2",
       sessionGeneration: 7
-    });
+    }));
     expect(acceptRendererSessionEvent(state(), envelope)).toBeUndefined();
     expect(currentRendererSessionAuthority(state())).toBeUndefined();
 
@@ -67,16 +68,24 @@ describe("renderer session authority", () => {
 
   it("rejects stale host, session, generation, and payload identities", () => {
     const current = state();
-    const exact = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, {
+    const exact = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
       sessionGeneration: 3
-    });
+    }));
     expect(acceptRendererSessionEvent(current, exact, "session-1")).toBeDefined();
     expect(acceptRendererSessionEvent(current, { ...exact, hostEpoch: 8 })).toBeUndefined();
-    expect(acceptRendererSessionEvent(current, { ...exact, sessionId: "session-old" })).toBeUndefined();
-    expect(acceptRendererSessionEvent(current, { ...exact, sessionGeneration: 2 })).toBeUndefined();
+    expect(acceptRendererSessionEvent(current, eventEnvelope(
+      "usage.changed",
+      { tokens: 1, cost: 0 },
+      taskEventFixture({ hostEpoch: 9, sequence: 1, sessionId: "session-old", sessionGeneration: 3 })
+    ))).toBeUndefined();
+    expect(acceptRendererSessionEvent(current, eventEnvelope(
+      "usage.changed",
+      { tokens: 1, cost: 0 },
+      taskEventFixture({ hostEpoch: 9, sequence: 1, sessionId: "session-1", sessionGeneration: 2 })
+    ))).toBeUndefined();
     expect(acceptRendererSessionEvent(current, exact, "session-old")).toBeUndefined();
   });
 

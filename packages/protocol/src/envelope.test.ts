@@ -1,26 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TREE_NODES, type SessionSnapshot } from "@pi67/domain";
+import { MAX_TREE_NODES } from "@pi67/domain";
 import {
+  APP_PROTOCOL_CONTEXT,
+  PROTOCOL_REVISION,
   PROTOCOL_VERSION,
   commandEnvelope,
   eventEnvelope,
   isRequestEnvelope,
   isEventEnvelope,
   isHostWelcome,
+  isProtocolContext,
   isResponseEnvelope,
   responseEnvelope,
-  welcomeEnvelope
+  welcomeEnvelope,
+  type ProtocolContext
 } from "./envelope.js";
+import {
+  appEventContext,
+  emptyCatalog,
+  emptySnapshot,
+  taskContext,
+  taskEventContext
+} from "./envelope-test-fixtures.js";
 
-describe("protocol v2 envelopes", () => {
+const WORKSPACE_CONTEXT: ProtocolContext = { scope: "workspace", workspaceId: "workspace-1" };
+
+describe("protocol v3 envelopes", () => {
   it("validates typed requests, events, responses and welcome", () => {
-    const request = commandEnvelope("runtime.getStatus", {}, 7);
+    const request = commandEnvelope("runtime.getStatus", {}, APP_PROTOCOL_CONTEXT, 7);
     const event = eventEnvelope("runtime.statusChanged", {
       phase: "ready",
       detail: "Pi SDK ready",
       recoverable: true
-    }, { hostEpoch: 7, sequence: 1 });
-    const response = responseEnvelope(request.requestId, 7, {
+    }, appEventContext(7, 1));
+    const response = responseEnvelope(request.requestId, 7, request.context, {
       ok: true,
       type: "runtime.getStatus",
       result: { initialized: true, loaded: true }
@@ -42,14 +55,15 @@ describe("protocol v2 envelopes", () => {
       maxEnvelopeBytes: 2 * 1024 * 1024
     });
 
-    expect(PROTOCOL_VERSION).toBe(2);
+    expect(PROTOCOL_VERSION).toBe(3);
+    expect(PROTOCOL_REVISION).toMatch(/^[0-9a-f]{64}$/u);
     expect(isRequestEnvelope(request)).toBe(true);
     expect(isEventEnvelope(event)).toBe(true);
     expect(isResponseEnvelope(response)).toBe(true);
     expect(isHostWelcome(welcome)).toBe(true);
   });
 
-  it("rejects v1, missing event sequence and unknown payload fields", () => {
+  it("rejects legacy protocol versions, missing event sequence and unknown payload fields", () => {
     expect(isRequestEnvelope({
       protocolVersion: 1,
       kind: "command",
@@ -59,27 +73,31 @@ describe("protocol v2 envelopes", () => {
       command: { type: "runtime.getStatus", payload: {} }
     })).toBe(false);
 
+    const v3Request = commandEnvelope("runtime.getStatus", {}, APP_PROTOCOL_CONTEXT, 1);
+    expect(isRequestEnvelope({ ...v3Request, protocolVersion: 2 })).toBe(false);
+
     const event = eventEnvelope("runtime.statusChanged", {
       phase: "ready",
       detail: "ready",
       recoverable: true
-    }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 });
+    }, appEventContext(1, 1));
     const { sequence: _sequence, ...withoutSequence } = event;
     expect(isEventEnvelope(withoutSequence)).toBe(false);
 
     const request = commandEnvelope("session.import", {
       submissionId: "session-import-1",
       path: "/tmp/external.jsonl"
-    }, 1);
+    }, APP_PROTOCOL_CONTEXT, 1);
     expect(isRequestEnvelope({ ...request, payload: { ...request.payload, cwdOverride: "/tmp/other" } })).toBe(false);
   });
 
   it("rejects a response whose result does not match the correlated command", () => {
     const malformed = {
-      protocolVersion: 2,
+      protocolVersion: 3,
       kind: "response",
       requestId: "r",
       hostEpoch: 1,
+      context: APP_PROTOCOL_CONTEXT,
       type: "runtime.getStatus",
       ok: true,
       result: { initialized: "yes", loaded: true }
@@ -87,11 +105,30 @@ describe("protocol v2 envelopes", () => {
     expect(isResponseEnvelope(malformed)).toBe(false);
   });
 
+  it("validates error response payloads as strictly as success results", () => {
+    const error = { code: "INTERNAL", message: "Runtime failed.", recoverable: true } as const;
+    const valid = responseEnvelope("request-error", 1, APP_PROTOCOL_CONTEXT, {
+      ok: false,
+      type: "runtime.getStatus",
+      error
+    });
+
+    expect(isResponseEnvelope(valid)).toBe(true);
+    expect(isResponseEnvelope({
+      ...valid,
+      error: { ...error, credential: "must-not-cross-the-port" }
+    })).toBe(false);
+    expect(isResponseEnvelope({
+      ...valid,
+      error: { ...error, message: "x".repeat(4_097) }
+    })).toBe(false);
+  });
+
   it("requires the Host to declare whether an accepted operation is cancellable", () => {
     const request = commandEnvelope("session.import", {
       submissionId: "session-import-1",
       path: "/tmp/external.jsonl"
-    }, 3);
+    }, taskContext(4), 3);
     const result = {
       kind: "accepted" as const,
       operationId: "operation-import",
@@ -100,7 +137,7 @@ describe("protocol v2 envelopes", () => {
       sessionId: "session-1",
       sessionGeneration: 4
     };
-    const response = responseEnvelope(request.requestId, 3, {
+    const response = responseEnvelope(request.requestId, 3, request.context, {
       ok: true,
       type: "session.import",
       result
@@ -138,7 +175,7 @@ describe("protocol v2 envelopes", () => {
         }
       },
       snapshot: emptySnapshot()
-    }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 });
+    }, taskEventContext(1, 1, 1));
     expect(isEventEnvelope(ready)).toBe(true);
     expect(isEventEnvelope({
       ...ready,
@@ -153,18 +190,18 @@ describe("protocol v2 envelopes", () => {
     const managedOpen = commandEnvelope("session.open", {
       path: "/tmp/managed.jsonl",
       cwdOverride: "/tmp/workspace"
-    }, 1);
+    }, taskContext(1), 1);
     const externalImport = commandEnvelope("session.import", {
       submissionId: "session-import-1",
       path: "/tmp/external.jsonl"
-    }, 1);
+    }, taskContext(1), 1);
     expect(isRequestEnvelope(managedOpen)).toBe(true);
     expect(isRequestEnvelope(externalImport)).toBe(true);
   });
 
   it("validates the atomic queue clear contract", () => {
-    const request = commandEnvelope("queue.clear", {}, 1);
-    const validResponse = responseEnvelope(request.requestId, 1, {
+    const request = commandEnvelope("queue.clear", {}, taskContext(1), 1);
+    const validResponse = responseEnvelope(request.requestId, 1, request.context, {
       ok: true,
       type: "queue.clear",
       result: { steeringCount: 1, followUpCount: 1, pendingCount: 2 }
@@ -182,9 +219,9 @@ describe("protocol v2 envelopes", () => {
     })).toBe(false);
   });
   it("validates narrow session tree queries and extension response context", () => {
-    const treeRequest = commandEnvelope("session.tree", {}, 1);
+    const treeRequest = commandEnvelope("session.tree", {}, taskContext(1), 1);
     expect(isRequestEnvelope(treeRequest)).toBe(true);
-    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, {
+    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, treeRequest.context, {
       ok: true,
       type: "session.tree",
       result: {
@@ -200,12 +237,12 @@ describe("protocol v2 envelopes", () => {
         total: 1
       }
     }))).toBe(true);
-    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, {
+    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, treeRequest.context, {
       ok: true,
       type: "session.tree",
       result: [] as never
     }))).toBe(false);
-    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, {
+    expect(isResponseEnvelope(responseEnvelope(treeRequest.requestId, 1, treeRequest.context, {
       ok: true,
       type: "session.tree",
       result: {
@@ -228,7 +265,7 @@ describe("protocol v2 envelopes", () => {
       sessionGeneration: 3,
       operationId: "operation-1",
       value: "accepted"
-    }, 1);
+    }, taskContext(3, "operation-1"), 1);
     expect(isRequestEnvelope(response)).toBe(true);
     expect(isRequestEnvelope({
       ...response,
@@ -237,19 +274,16 @@ describe("protocol v2 envelopes", () => {
   });
 
   it("validates independent Extension Catalog queries and change events", () => {
-    const request = commandEnvelope("extension.catalog.list", {}, 3);
+    const request = commandEnvelope("extension.catalog.list", {}, taskContext(4), 3);
     const catalog = emptyCatalog();
     expect(isRequestEnvelope(request)).toBe(true);
-    expect(isResponseEnvelope(responseEnvelope(request.requestId, 3, {
+    expect(isResponseEnvelope(responseEnvelope(request.requestId, 3, request.context, {
       ok: true,
       type: "extension.catalog.list",
       result: catalog
     }))).toBe(true);
     const changed = eventEnvelope("extension.catalog.changed", catalog, {
-      hostEpoch: 3,
-      sequence: 2,
-      sessionId: "session-1",
-      sessionGeneration: 4
+      ...taskEventContext(3, 2, 4)
     });
     expect(isEventEnvelope(changed)).toBe(true);
     expect(isEventEnvelope({
@@ -266,7 +300,7 @@ describe("protocol v2 envelopes", () => {
       scope: "workspace",
       search: "recovery",
       limit: 50
-    }, 3);
+    }, WORKSPACE_CONTEXT, 3);
     const result = {
       items: [{
         id: "session-1",
@@ -287,7 +321,7 @@ describe("protocol v2 envelopes", () => {
       incomplete: false,
       skippedCount: 0
     };
-    const response = responseEnvelope(request.requestId, 3, {
+    const response = responseEnvelope(request.requestId, 3, request.context, {
       ok: true,
       type: "session.catalog.query",
       result
@@ -306,12 +340,12 @@ describe("protocol v2 envelopes", () => {
       expect(isEventEnvelope(eventEnvelope("session.bootstrap", {
         snapshot: emptySnapshot(),
         reason
-      }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 }))).toBe(true);
+      }, taskEventContext(1, 1, 1)))).toBe(true);
     }
     const bootstrap = eventEnvelope("session.bootstrap", {
       snapshot: emptySnapshot(),
       reason: "session-import"
-    }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 });
+    }, taskEventContext(1, 1, 1));
     expect(isEventEnvelope({
       ...bootstrap,
       payload: { ...bootstrap.payload, reason: "daily-update" }
@@ -319,9 +353,14 @@ describe("protocol v2 envelopes", () => {
   });
 
   it("bounds bootstrap transcripts and message page requests", () => {
-    expect(isRequestEnvelope(commandEnvelope("message.page", { direction: "older", limit: 200 }, 1))).toBe(true);
+    expect(isRequestEnvelope(commandEnvelope(
+      "message.page",
+      { direction: "older", limit: 200 },
+      taskContext(1),
+      1
+    ))).toBe(true);
     expect(isRequestEnvelope({
-      ...commandEnvelope("message.page", { direction: "older", limit: 200 }, 1),
+      ...commandEnvelope("message.page", { direction: "older", limit: 200 }, taskContext(1), 1),
       payload: { direction: "older", limit: 201 }
     })).toBe(false);
 
@@ -359,57 +398,56 @@ describe("protocol v2 envelopes", () => {
         }
       },
       snapshot: oversized
-    }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 });
+    }, taskEventContext(1, 1, 1));
     expect(isEventEnvelope(ready)).toBe(false);
   });
 
+  it("strictly validates app, workspace and generation-bound task contexts", () => {
+    expect(isProtocolContext(APP_PROTOCOL_CONTEXT)).toBe(true);
+    expect(isProtocolContext(WORKSPACE_CONTEXT)).toBe(true);
+    expect(isProtocolContext(taskContext(2, "operation-1"))).toBe(true);
+    expect(isProtocolContext({ scope: "app", workspaceId: "workspace-1" })).toBe(false);
+    expect(isProtocolContext({ scope: "workspace", workspaceId: "" })).toBe(false);
+    expect(isProtocolContext({
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: -1
+    })).toBe(false);
+    expect(isProtocolContext({
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      sessionId: "session-1"
+    })).toBe(false);
+    expect(isProtocolContext({
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      operationId: "operation-1"
+    })).toBe(false);
+  });
+
+  it("requires a strict positive taskSequence only for task events", () => {
+    const taskEvent = eventEnvelope("runtime.statusChanged", {
+      phase: "ready",
+      detail: "ready",
+      recoverable: true
+    }, taskEventContext(1, 1, 1));
+    expect(isEventEnvelope(taskEvent)).toBe(true);
+    const { taskSequence: _taskSequence, ...withoutTaskSequence } = taskEvent;
+    expect(isEventEnvelope(withoutTaskSequence)).toBe(false);
+    expect(isEventEnvelope({ ...taskEvent, taskSequence: 0 })).toBe(false);
+
+    const appEvent = eventEnvelope("runtime.statusChanged", {
+      phase: "ready",
+      detail: "ready",
+      recoverable: true
+    }, appEventContext(1, 2));
+    expect(isEventEnvelope(appEvent)).toBe(true);
+    expect(isEventEnvelope({ ...appEvent, taskSequence: 1 })).toBe(false);
+  });
+
 });
-
-function emptySnapshot(): SessionSnapshot {
-  return {
-    sessionId: "session-1",
-    cwd: "/tmp",
-    streaming: false,
-    messages: [],
-    messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
-    tree: { nodes: [], truncated: false, total: 0 },
-    resources: []
-  };
-}
-
-function emptyCatalog() {
-  return {
-    items: [{
-      id: "/extensions/example.ts",
-      label: "example-extension",
-      path: "/extensions/example.ts",
-      loadState: "loaded" as const,
-      source: {
-        path: "/extensions/example.ts",
-        source: "example-extension",
-        scope: "project" as const,
-        origin: "top-level" as const
-      },
-      assessment: {
-        overall: "partial" as const,
-        detail: "Bounded catalog fixture.",
-        surfaces: [
-          { surface: "commands" as const, status: "supported" as const, detail: "One command." },
-          { surface: "tools" as const, status: "not-present" as const, detail: "No tools." },
-          { surface: "ui-primitives" as const, status: "unknown" as const, detail: "No attribution." },
-          { surface: "tui-custom" as const, status: "unknown" as const, detail: "Unassessed." }
-        ]
-      },
-      commandCount: 1,
-      toolCount: 0
-    }],
-    total: 1,
-    truncated: false
-  };
-}

@@ -87,7 +87,7 @@ describe("renderer Operation recovery", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "任务已中断",
-      message: "Pi 任务 · Agent Host 未能确认任务终态"
+      message: "Pi 任务 · Pi 运行服务未能确认任务终态"
     });
   });
 

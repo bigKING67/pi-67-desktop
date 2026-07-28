@@ -27,7 +27,7 @@ function assertMainOwnedStorageLayout(storage: AgentHostStoragePaths): void {
     !samePath(storage.capabilityProbeDirectory, root)
     || !samePath(storage.sessionCatalogDirectory, join(root, "projections", "session-catalog"))
   ) {
-    throw new Error("Agent Host storage environment must use the Main-owned userData layout.");
+    throw new Error("Pi runtime service storage must use the Main-owned userData layout.");
   }
 }
 

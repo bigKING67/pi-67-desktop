@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -83,12 +84,12 @@ describe("renderer session transition authority", () => {
       type: "session.bootstrap",
       payload: { snapshot: bootstrap, reason: "session-open" }
     } as const;
-    useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, {
+    useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-new",
       sessionGeneration: 4
-    }));
+    })));
     deferred.resolve(bootstrapAcknowledgement("session-new", 4));
     await transition;
 
@@ -121,7 +122,7 @@ describe("renderer session transition authority", () => {
     );
 
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({
-      message: "Agent Host 未发送 authoritative session.bootstrap 事件。"
+      message: "Pi 运行服务未发送 authoritative session.bootstrap 事件。"
     }));
     expect(useAppStore.getState().sessionTransitionPending).toBe(false);
     expect(useSessionProjectionStore.getState().authority.phase).toBe("inactive");

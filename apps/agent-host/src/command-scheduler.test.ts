@@ -164,6 +164,100 @@ describe("CommandScheduler", () => {
     expect(order).toEqual(["transition:start", "transition:end", "recovery"]);
   });
 
+  it("defers projection queries until an admitted transition settles", async () => {
+    const scheduler = new CommandScheduler(() => false);
+    const order: string[] = [];
+    let releaseTransition!: () => void;
+    const transition = scheduler.run(command("resource.reload", {}), async () => {
+      order.push("transition:start");
+      await new Promise<void>((resolve) => { releaseTransition = resolve; });
+      order.push("transition:end");
+    });
+    await Promise.resolve();
+
+    const projectionQueries: AgentCommand[] = [
+      command("workspace.changes", {}),
+      command("session.catalog.query", { scope: "workspace", limit: 50 }),
+      command("session.tree", {}),
+      command("message.page", { direction: "newer" })
+    ];
+    const queries = projectionQueries.map((projectionQuery) => (
+      scheduler.run(projectionQuery, async () => {
+        order.push(projectionQuery.type);
+        return projectionQuery.type;
+      })
+    ));
+    await Promise.resolve();
+    expect(order).toEqual(["transition:start"]);
+    releaseTransition();
+    await expect(Promise.all([transition, ...queries])).resolves.toEqual([
+      undefined,
+      "workspace.changes",
+      "session.catalog.query",
+      "session.tree",
+      "message.page"
+    ]);
+    expect(order).toEqual([
+      "transition:start",
+      "transition:end",
+      "workspace.changes",
+      "session.catalog.query",
+      "session.tree",
+      "message.page"
+    ]);
+  });
+
+  it("runs a deferred projection query after the preceding transition fails", async () => {
+    const scheduler = new CommandScheduler(() => false);
+    let rejectTransition!: (error: Error) => void;
+    const transition = scheduler.run(command("resource.reload", {}), () => (
+      new Promise<void>((_resolve, reject) => { rejectTransition = reject; })
+    ));
+    await Promise.resolve();
+    const tree = scheduler.run(command("session.tree", {}), async () => "tree-after-failure");
+    const transitionFailure = expect(transition).rejects.toThrow("reload failed");
+    rejectTransition(new Error("reload failed"));
+    await transitionFailure;
+    await expect(tree).resolves.toBe("tree-after-failure");
+  });
+
+  it("drops a deferred projection query during shutdown", async () => {
+    const scheduler = new CommandScheduler(() => false);
+    let releaseTransition!: () => void;
+    let queryExecuted = false;
+    const transition = scheduler.run(command("resource.reload", {}), () => (
+      new Promise<void>((resolve) => { releaseTransition = resolve; })
+    ));
+    await Promise.resolve();
+    const tree = scheduler.run(command("session.tree", {}), async () => {
+      queryExecuted = true;
+      return "tree";
+    });
+    expect(scheduler.shutdown()).toEqual({ queuedCommandsDropped: 1 });
+    const treeRejected = expect(tree).rejects.toMatchObject({
+      code: "CONNECTION_CLOSED",
+      details: { shuttingDown: true }
+    });
+    releaseTransition();
+    await transition;
+    await treeRejected;
+    expect(queryExecuted).toBe(false);
+  });
+
+  it("keeps non-projection queries fail-fast during a transition", async () => {
+    const scheduler = new CommandScheduler(() => false);
+    let releaseTransition!: () => void;
+    const transition = scheduler.run(command("resource.reload", {}), () => (
+      new Promise<void>((resolve) => { releaseTransition = resolve; })
+    ));
+    await Promise.resolve();
+
+    await expect(scheduler.run(command("doctor.run", {}), async () => "doctor"))
+      .rejects.toMatchObject({ code: "BUSY", message: "A session transition is in progress." });
+    releaseTransition();
+    await transition;
+  });
+
   it("allows projection recovery to capture an active turn", async () => {
     const scheduler = new CommandScheduler(() => true);
     await expect(scheduler.run(command("projection.resync", {}), async () => "active projection"))

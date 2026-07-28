@@ -1,6 +1,7 @@
 import type { SessionSnapshot } from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import {
   useSessionProjectionStore,
   type SessionProjectionAuthority
@@ -140,12 +141,12 @@ describe("session projection store", () => {
 
     expect(useSessionProjectionStore.getState().acceptEvent(
       CONNECTION,
-      eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, {
+      eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, taskEventFixture({
         hostEpoch: 9,
         sequence: 1,
         sessionId: "session-1",
         sessionGeneration: 3
-      })
+      }))
     )).toBeUndefined();
   });
 
@@ -172,21 +173,22 @@ describe("session projection store", () => {
 
   it("rejects mismatched events without changing active authority", () => {
     installSessionProjectionFixture(CONNECTION, snapshot("session-1"), 3);
-    const exact = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, {
+    const exact = eventEnvelope("usage.changed", { tokens: 1, cost: 0 }, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
       sessionGeneration: 3
-    });
+    }));
 
     expect(useSessionProjectionStore.getState().acceptEvent(CONNECTION, {
       ...exact,
       hostEpoch: 8
     })).toBeUndefined();
-    expect(useSessionProjectionStore.getState().acceptEvent(CONNECTION, {
-      ...exact,
-      sessionId: "session-old"
-    })).toBeUndefined();
+    expect(useSessionProjectionStore.getState().acceptEvent(CONNECTION, eventEnvelope(
+      "usage.changed",
+      { tokens: 1, cost: 0 },
+      taskEventFixture({ hostEpoch: 9, sequence: 1, sessionId: "session-old", sessionGeneration: 3 })
+    ))).toBeUndefined();
     expect(useSessionProjectionStore.getState().acceptEvent(CONNECTION, exact, "session-old")).toBeUndefined();
     expect(useSessionProjectionStore.getState().authority).toEqual({ phase: "active", ...AUTHORITY });
   });

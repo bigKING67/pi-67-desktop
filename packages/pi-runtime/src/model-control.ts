@@ -15,31 +15,6 @@ export async function selectSessionModel(
   await session.setModel(model);
 }
 
-export async function configureRuntimeApiKey(
-  session: AgentSession,
-  runtimeApiKeys: Map<string, string>,
-  provider: string,
-  apiKey: string
-): Promise<void> {
-  const normalizedProvider = provider.trim();
-  const normalizedKey = apiKey.trim();
-  if (!normalizedProvider || normalizedKey.length < 8) {
-    throw new RuntimeError("INVALID_PAYLOAD", "Provider and API key are required.");
-  }
-  try {
-    await session.modelRuntime.setRuntimeApiKey(normalizedProvider, normalizedKey, {
-      allowNetwork: false
-    });
-    runtimeApiKeys.set(normalizedProvider, normalizedKey);
-  } catch {
-    // Provider errors may include credential material and must not cross into UI events.
-    throw new RuntimeError(
-      "INVALID_PAYLOAD",
-      "Unable to configure the runtime API key for this provider."
-    );
-  }
-}
-
 export function setSessionThinkingLevel(session: AgentSession, level: string): void {
   const selectedLevel = session.getAvailableThinkingLevels().find((candidate) => candidate === level);
   if (!selectedLevel) {

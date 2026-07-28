@@ -16,6 +16,7 @@ import {
 import { activateRendererSessionChanges } from "../changes/workspace-changes-controller.js";
 import { replaceRendererSessionSnapshot } from "./renderer-session-installation.js";
 import { cancelSessionImportBootstrapWatchdog } from "./session-import-bootstrap-watchdog.js";
+import { eventSessionAuthority } from "../connection/event-authority.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -27,6 +28,7 @@ type ProjectionAgentEventType =
   | "conversation.changed"
   | "queue.changed"
   | "session.metaChanged"
+  | "model.catalog.changed"
   | "tree.changed"
   | "usage.changed";
 
@@ -62,10 +64,11 @@ export function handleProjectionEvent(
         set,
         bootstrapReadyDetail(event.payload.reason)
       )) return true;
-      if (event.payload.reason === "session-import" && envelope.operationId !== undefined) {
+      const bootstrapAuthority = eventSessionAuthority(envelope);
+      if (event.payload.reason === "session-import" && bootstrapAuthority?.operationId !== undefined) {
         cancelSessionImportBootstrapWatchdog({
           hostEpoch: envelope.hostEpoch,
-          operationId: envelope.operationId
+          operationId: bootstrapAuthority.operationId
         });
       }
       activateRendererSessionChanges(get());
@@ -83,7 +86,7 @@ export function handleProjectionEvent(
     case "conversation.changed": {
       const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
       if (!authority) return true;
-      refreshConversation(event, authority, envelope.operationId);
+      refreshConversation(event, authority, eventSessionAuthority(envelope)?.operationId);
       return true;
     }
     case "queue.changed":
@@ -103,6 +106,14 @@ export function handleProjectionEvent(
         sessionName: event.payload.sessionName,
         selectedModel: event.payload.selectedModel
       });
+      return true;
+    }
+    case "model.catalog.changed": {
+      const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
+      if (!authority) return true;
+      const store = useSessionProjectionStore.getState();
+      const target = store.capture(authority);
+      if (target) store.applyModelCatalogResult(target, event.payload);
       return true;
     }
     case "tree.changed": {
@@ -164,16 +175,16 @@ function installAuthoritativeSnapshot(
   readyDetail?: string
 ): boolean {
   const current = get();
+  const eventAuthority = eventSessionAuthority(envelope);
   if (
     !current.connected
-    ||
-    envelope.sessionId !== snapshot.sessionId
-    || envelope.sessionGeneration === undefined
+    || eventAuthority === undefined
+    || eventAuthority.sessionId !== snapshot.sessionId
     || envelope.hostEpoch !== current.hostEpoch
   ) return false;
   if (!replaceRendererSessionSnapshot(current, snapshot, {
-    sessionGeneration: envelope.sessionGeneration,
-    ...(envelope.operationId === undefined ? {} : { operationId: envelope.operationId })
+    sessionGeneration: eventAuthority.sessionGeneration,
+    ...(eventAuthority.operationId === undefined ? {} : { operationId: eventAuthority.operationId })
   })) return false;
   set((state) => state.connected && state.hostEpoch === envelope.hostEpoch ? {
       sessionTransitionPending: false,
@@ -190,17 +201,17 @@ function reboundSessionImportOperation(
   operation: AppState["operation"],
   envelope: EventEnvelope
 ): Pick<AppState, "operation"> | Record<string, never> {
+  const eventAuthority = eventSessionAuthority(envelope);
   if (
     operation?.kind !== "session-import"
-    || operation.operationId !== envelope.operationId
-    || envelope.sessionId === undefined
-    || envelope.sessionGeneration === undefined
+    || eventAuthority === undefined
+    || operation.operationId !== eventAuthority.operationId
   ) return {};
   return {
     operation: {
       ...operation,
-      sessionId: envelope.sessionId,
-      sessionGeneration: envelope.sessionGeneration
+      sessionId: eventAuthority.sessionId,
+      sessionGeneration: eventAuthority.sessionGeneration
     }
   };
 }
@@ -210,10 +221,12 @@ function acceptSessionImportBootstrap(
   envelope: EventEnvelope
 ): boolean {
   const operation = state.operation;
+  const eventAuthority = eventSessionAuthority(envelope);
   return state.connected
     && state.hostEpoch === envelope.hostEpoch
+    && eventAuthority !== undefined
     && operation?.kind === "session-import"
-    && operation.operationId === envelope.operationId
+    && operation.operationId === eventAuthority.operationId
     && (
       operation.lifecycle === "accepted"
       || operation.lifecycle === "running"

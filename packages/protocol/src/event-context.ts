@@ -1,8 +1,10 @@
 import type { AgentEventType, EventPayloads } from "./agent-messages.js";
+import type { ProtocolContext, TaskProtocolContext } from "./protocol-context.js";
 
 interface EventContextRequirement {
   session: boolean;
   operation: boolean;
+  requiredScope?: ProtocolContext["scope"];
 }
 
 export const EVENT_CONTEXT_REQUIREMENTS = {
@@ -13,10 +15,12 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "conversation.changed": { session: true, operation: false },
   "queue.changed": { session: true, operation: false },
   "session.metaChanged": { session: true, operation: false },
+  "model.catalog.changed": { session: true, operation: false },
   "tree.changed": { session: true, operation: false },
   "usage.changed": { session: true, operation: false },
-  "session.catalog.changed": { session: false, operation: false },
+  "session.catalog.changed": { session: false, operation: false, requiredScope: "workspace" },
   "session.externalChangeDetected": { session: true, operation: false },
+  "provider.configuration.changed": { session: false, operation: false, requiredScope: "workspace" },
   "turn.streamBatch": { session: true, operation: true },
   "operation.started": { session: true, operation: true },
   "operation.heartbeat": { session: true, operation: true },
@@ -45,9 +49,7 @@ export interface EventContextEnvelope<Type extends AgentEventType = AgentEventTy
   hostEpoch: number;
   type: Type;
   payload: EventPayloads[Type];
-  sessionId?: string;
-  sessionGeneration?: number;
-  operationId?: string;
+  context: ProtocolContext;
 }
 
 type EventContextEnvelopeUnion = {
@@ -55,24 +57,26 @@ type EventContextEnvelopeUnion = {
 }[AgentEventType];
 
 export function hasValidEventContext(envelope: EventContextEnvelope): boolean {
-  const requirement = EVENT_CONTEXT_REQUIREMENTS[envelope.type];
-  if (requirement.session && !hasSessionContext(envelope)) return false;
-  if (requirement.operation && envelope.operationId === undefined) return false;
+  const requirement: EventContextRequirement = EVENT_CONTEXT_REQUIREMENTS[envelope.type];
+  const taskContext = envelope.context.scope === "task" ? envelope.context : undefined;
+  if (requirement.requiredScope !== undefined && envelope.context.scope !== requirement.requiredScope) return false;
+  if (requirement.session && !hasSessionContext(taskContext)) return false;
+  if (requirement.operation && taskContext?.operationId === undefined) return false;
 
   const event = envelope as EventContextEnvelopeUnion;
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap":
-      return event.payload.snapshot.sessionId === event.sessionId;
+      return event.payload.snapshot.sessionId === taskContext?.sessionId;
     case "conversation.changed":
     case "workspace.changeChanged":
-      return event.payload.sessionId === event.sessionId;
+      return event.payload.sessionId === taskContext?.sessionId;
     case "operation.started":
-      return event.payload.operation.operationId === event.operationId
-        && event.payload.operation.sessionId === event.sessionId
-        && event.payload.operation.sessionGeneration === event.sessionGeneration;
+      return event.payload.operation.operationId === taskContext?.operationId
+        && event.payload.operation.sessionId === taskContext.sessionId
+        && event.payload.operation.sessionGeneration === taskContext.sessionGeneration;
     case "operation.heartbeat":
-      return event.payload.operationId === event.operationId
+      return event.payload.operationId === taskContext?.operationId
         && event.payload.lastActivityAt <= event.payload.observedAt;
     case "operation.activityChanged":
     case "operation.progress":
@@ -80,12 +84,12 @@ export function hasValidEventContext(envelope: EventContextEnvelope): boolean {
     case "operation.failed":
     case "operation.cancelled":
     case "operation.lost":
-      return event.payload.operationId === event.operationId;
+      return event.payload.operationId === taskContext?.operationId;
     case "approval.requested":
     case "extension.ui.requested":
     case "extension.ui.updated":
     case "extension.compatibilityChanged":
-      return matchesInteractiveContext(event.payload, event);
+      return matchesInteractiveContext(event.payload, event.hostEpoch, taskContext);
     default:
       return true;
   }
@@ -102,8 +106,11 @@ export function correlateInvalidEvent(value: unknown): { hostEpoch: number } | u
   return { hostEpoch: Number(candidate.hostEpoch) };
 }
 
-function hasSessionContext(envelope: EventContextEnvelope): boolean {
-  return envelope.sessionId !== undefined && envelope.sessionGeneration !== undefined;
+function hasSessionContext(context: TaskProtocolContext | undefined): context is TaskProtocolContext & {
+  sessionId: string;
+  sessionGeneration: number;
+} {
+  return context?.sessionId !== undefined && context.sessionGeneration !== undefined;
 }
 
 function matchesInteractiveContext(
@@ -113,10 +120,11 @@ function matchesInteractiveContext(
     sessionGeneration?: number;
     operationId?: string;
   },
-  envelope: EventContextEnvelope
+  hostEpoch: number,
+  context: TaskProtocolContext | undefined
 ): boolean {
-  return payload.hostEpoch === envelope.hostEpoch
-    && payload.sessionId === envelope.sessionId
-    && payload.sessionGeneration === envelope.sessionGeneration
-    && payload.operationId === envelope.operationId;
+  return payload.hostEpoch === hostEpoch
+    && payload.sessionId === context?.sessionId
+    && payload.sessionGeneration === context?.sessionGeneration
+    && payload.operationId === context?.operationId;
 }

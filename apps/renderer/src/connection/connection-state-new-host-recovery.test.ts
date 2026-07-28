@@ -13,6 +13,7 @@ import { useSessionProjectionStore } from "../session/session-projection-store.j
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
 import { agentConnectionController } from "./AgentConnectionController.js";
+import { taskEventFixture } from "./protocol-test-fixtures.js";
 
 const RUNTIME_CAPABILITIES: RuntimeCapabilities = {
   sdkVersion: "0.81.1",
@@ -71,12 +72,12 @@ describe("new Host Session recovery", () => {
         const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
-          eventEnvelope("runtime.ready", payload, {
+          eventEnvelope("runtime.ready", payload, taskEventFixture({
             hostEpoch: 10,
             sequence: 1,
             sessionId: restoredSnapshot.sessionId,
             sessionGeneration: 3
-          })
+          }))
         );
         return projectionAcknowledgement(10, restoredSnapshot.sessionId, 3, 1) as never;
       }
@@ -108,12 +109,12 @@ describe("new Host Session recovery", () => {
         const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
-          eventEnvelope("runtime.ready", payload, {
+          eventEnvelope("runtime.ready", payload, taskEventFixture({
             hostEpoch: 10,
             sequence: 1,
             sessionId: restoredSnapshot.sessionId,
             sessionGeneration: 3
-          })
+          }))
         );
         throw new Error("late initialize rejection");
       }

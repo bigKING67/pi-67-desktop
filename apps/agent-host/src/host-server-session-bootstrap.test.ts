@@ -1,6 +1,6 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -9,6 +9,7 @@ import {
 } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -74,7 +75,8 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-bootstrap", hostInstanceId: "host-bootstrap", hostEpoch: 6 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-bootstrap",
       appInstanceId: "app-bootstrap",
@@ -92,8 +94,11 @@ describe("AgentHostServer session bootstrap", () => {
     const readyIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "runtime.ready");
     expect(readyIndex).toBeLessThan(responseIndex(port, workspaceOpen.requestId));
     expect(port.sent[readyIndex]).toMatchObject({
-      sessionId: "session-workspace",
-      sessionGeneration: 1,
+      context: {
+        scope: "task",
+        sessionId: "session-workspace",
+        sessionGeneration: 1
+      },
       payload: { snapshot: { sessionId: "session-workspace" } }
     });
     expect(successResult(port, workspaceOpen.requestId)).toEqual({
@@ -110,8 +115,11 @@ describe("AgentHostServer session bootstrap", () => {
     const bootstrapIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "session.bootstrap");
     expect(bootstrapIndex).toBeLessThan(responseIndex(port, create.requestId));
     expect(port.sent[bootstrapIndex]).toMatchObject({
-      sessionId: "session-created",
-      sessionGeneration: 2,
+      context: {
+        scope: "task",
+        sessionId: "session-created",
+        sessionGeneration: 2
+      },
       payload: { snapshot: { sessionId: "session-created" }, reason: "session-create" }
     });
     expect(successResult(port, create.requestId)).toEqual({
@@ -130,8 +138,11 @@ describe("AgentHostServer session bootstrap", () => {
     ));
     expect(forkBootstrapIndex).toBeLessThan(responseIndex(port, fork.requestId));
     expect(port.sent[forkBootstrapIndex]).toMatchObject({
-      sessionId: "session-forked",
-      sessionGeneration: 3,
+      context: {
+        scope: "task",
+        sessionId: "session-forked",
+        sessionGeneration: 3
+      },
       payload: { snapshot: { sessionId: "session-forked" }, reason: "session-fork" }
     });
     expect(successResult(port, fork.requestId)).toEqual({
@@ -179,7 +190,8 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-recovery", hostInstanceId: "host-recovery", hostEpoch: 7 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-recovery",
       appInstanceId: "app-recovery",
@@ -232,7 +244,8 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-import", hostInstanceId: "host-import", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-import",
       appInstanceId: "app-import",
@@ -260,8 +273,11 @@ describe("AgentHostServer session bootstrap", () => {
     expect(bootstrapIndex).toBeLessThan(failureIndex);
     expect(port.sent[bootstrapIndex]).toMatchObject({
       hostEpoch: 8,
-      sessionId: "session-after-import",
-      sessionGeneration: 3,
+      context: {
+        scope: "task",
+        sessionId: "session-after-import",
+        sessionGeneration: 3
+      },
       payload: {
         snapshot: { sessionId: "session-after-import" },
         reason: "session-import"
@@ -293,7 +309,8 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-import", hostInstanceId: "host-import", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-import",
       appInstanceId: "app-import",
@@ -322,7 +339,7 @@ describe("AgentHostServer session bootstrap", () => {
         type: "runtime.statusChanged",
         payload: expect.objectContaining({
           phase: "recovering",
-          detail: "Pi 导入会话投影无法恢复，正在替换 Agent Host"
+          detail: "Pi 导入会话投影无法恢复，正在替换 Pi 运行服务"
         })
       })
     ]));

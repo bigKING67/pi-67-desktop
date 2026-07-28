@@ -77,6 +77,22 @@ describe("session tree store", () => {
     expect(useSessionTreeStore.getState().needsRefresh(CANONICAL)).toBe(true);
   });
 
+  it("keeps the invalidation pending when a refresh is deferred", () => {
+    const store = useSessionTreeStore.getState();
+    store.replaceProjection(AUTHORITY, tree("current"));
+    store.markChanged(AUTHORITY);
+    const target = store.beginRefresh(CANONICAL);
+    if (!target) throw new Error("Expected a Session Tree refresh target.");
+
+    expect(store.deferRefresh(target)).toBe(true);
+    expect(useSessionTreeStore.getState()).toMatchObject({
+      status: "stale",
+      changeRevision: 1,
+      refreshedChangeRevision: 0
+    });
+    expect(useSessionTreeStore.getState().needsRefresh(CANONICAL)).toBe(true);
+  });
+
   it("hides staged trees until canonical authority commits and on every mismatch", () => {
     useSessionTreeStore.getState().replaceProjection(AUTHORITY, tree("staged"));
     const state = useSessionTreeStore.getState();

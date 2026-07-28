@@ -1,79 +1,38 @@
 import type {
-  ApprovalRequestView,
   ApprovalMode,
   ConversationPage,
   DoctorReport,
   ExtensionCatalogResult,
   ExtensionCommandAdapterView,
-  ExtensionCompatibilityEventView,
-  ExtensionUiCancellationReason,
-  ExtensionUiRequestView,
+  ExtensionPackageListResult,
+  ExtensionPackageMutationResult,
+  ExtensionPackageScope,
+  ExtensionPackageUpdatesResult,
   ModelSummary,
-  OperationActivity,
   OperationKind,
   OperationView,
+  ProviderSummary,
   ResourceSummary,
-  RuntimeCapabilities,
-  RuntimeStatus,
-  SessionCatalogChangedEvent,
   SessionCatalogPage,
   SessionCatalogQuery,
   SessionCatalogStatus,
+  SessionSummary,
   SessionControlResult,
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
   SessionSnapshot,
   SessionTreeProjection,
   WorkspaceChangesProjection,
-  WorkspaceChangeView,
   WorkspaceTrust
 } from "@pi67/domain";
+import type {
+  PiProviderConfigurationInput,
+  PiProviderConfigurationSnapshot
+} from "./provider-configuration-schemas.js";
+import type { ProtocolError } from "./protocol-error.js";
 
-export type ProtocolErrorCode =
-  | "PROTOCOL_MISMATCH"
-  | "INVALID_PAYLOAD"
-  | "CONNECTION_CLOSED"
-  | "REQUEST_TIMEOUT"
-  | "STALE_HOST_EPOCH"
-  | "STALE_SESSION_GENERATION"
-  | "STALE_OPERATION"
-  | "STALE_SESSION_CATALOG"
-  | "DUPLICATE_REQUEST"
-  | "BUSY"
-  | "OPERATION_NOT_FOUND"
-  | "SESSION_CHANGED_EXTERNALLY"
-  | "RUNTIME_NOT_READY"
-  | "RUNTIME_POISONED"
-  | "MODEL_NOT_FOUND"
-  | "WORKSPACE_NOT_TRUSTED"
-  | "PATH_OUTSIDE_WORKSPACE"
-  | "RESOURCE_LIMIT_EXCEEDED"
-  | "UNSUPPORTED"
-  | "INTERNAL";
-
-export interface ProtocolError {
-  code: ProtocolErrorCode;
-  message: string;
-  recoverable: boolean;
-  retryAfterMs?: number;
-  details?: Record<string, string | number | boolean>;
-}
-
-export class ProtocolRequestError extends Error {
-  readonly code: ProtocolErrorCode;
-  readonly recoverable: boolean;
-  readonly retryAfterMs: number | undefined;
-  readonly details: Record<string, string | number | boolean> | undefined;
-
-  constructor(error: ProtocolError) {
-    super(error.message);
-    this.name = "ProtocolRequestError";
-    this.code = error.code;
-    this.recoverable = error.recoverable;
-    this.retryAfterMs = error.retryAfterMs;
-    this.details = error.details;
-  }
-}
+export { ProtocolRequestError } from "./protocol-error.js";
+export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
 
 export interface TransferImage {
   name: string;
@@ -191,6 +150,19 @@ export interface QueueClearResult {
   pendingCount: number;
 }
 
+export interface TaskCloseResult {
+  closed: true;
+  stopped: boolean;
+}
+
+export interface WorkspaceRegisterResult { registered: true; }
+export interface WorkspaceUnregisterResult { unregistered: true; }
+
+export type SessionCatalogResultItem = SessionSummary & { workspaceId?: string };
+export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
+  items: SessionCatalogResultItem[];
+};
+
 export interface CommandPayloads {
   "runtime.initialize": {
     cwd: string;
@@ -203,8 +175,11 @@ export interface CommandPayloads {
   "projection.resync": Record<string, never>;
   "asset.read": { assetId: string; sessionGeneration: number; offset: number; length?: number };
   "workspace.open": { cwd: string; trust: WorkspaceTrust; approvalMode: ApprovalMode };
+  "workspace.register": { cwd: string; trust: WorkspaceTrust; approvalMode: ApprovalMode };
+  "workspace.unregister": Record<string, never>;
   "workspace.setTrust": { trust: WorkspaceTrust; approvalMode: ApprovalMode };
   "workspace.changes": Record<string, never>;
+  "task.close": { mode: "stop" | "dispose" };
   "session.catalog.query": SessionCatalogQuery;
   "session.tree": Record<string, never>;
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
@@ -223,12 +198,36 @@ export interface CommandPayloads {
   "model.list": Record<string, never>;
   "model.select": { provider: string; id: string };
   "model.setRuntimeKey": { provider: string; apiKey: string };
+  "provider.list": Record<string, never>;
+  "provider.setRuntimeKey": { provider: string; apiKey: string };
+  "provider.configuration.get": Record<string, never>;
+  "provider.configuration.save": {
+    expectedRevision: string;
+    provider: PiProviderConfigurationInput;
+  };
+  "provider.configuration.remove": { expectedRevision: string; provider: string };
+  "provider.credential.store": { expectedRevision: string; provider: string; apiKey: string };
+  "provider.credential.remove": { expectedRevision: string; provider: string };
+  "model.default.set": {
+    expectedRevision: string;
+    scope: "global" | "project";
+    provider?: string;
+    model?: string;
+  };
+  "provider.configuration.reload": Record<string, never>;
   "thinking.set": { level: string };
   "resource.list": Record<string, never>;
   "resource.reload": Record<string, never>;
   "command.list": Record<string, never>;
   "command.invoke": { submissionId: string; command: string };
   "extension.catalog.list": Record<string, never>;
+  "extension.package.list": Record<string, never>;
+  "extension.package.checkUpdates": Record<string, never>;
+  "extension.package.install": { source: string; scope: ExtensionPackageScope };
+  "extension.package.update": { source: string; scope: ExtensionPackageScope };
+  "extension.package.setEnabled": { source: string; scope: ExtensionPackageScope; enabled: boolean };
+  "extension.package.restoreInheritance": { source: string };
+  "extension.package.uninstall": { source: string; scope: ExtensionPackageScope };
   "extension.ui.respond": {
     requestId: string;
     sessionId: string;
@@ -255,9 +254,12 @@ export interface CommandResults {
   "projection.resync": ProjectionResyncResult;
   "asset.read": AssetReadResult;
   "workspace.open": ProjectionMutationAcknowledgement;
+  "workspace.register": WorkspaceRegisterResult;
+  "workspace.unregister": WorkspaceUnregisterResult;
   "workspace.setTrust": SessionResourceCatalogResult;
   "workspace.changes": WorkspaceChangesProjection;
-  "session.catalog.query": SessionCatalogPage;
+  "task.close": TaskCloseResult;
+  "session.catalog.query": SessionCatalogPageResult;
   "session.tree": SessionTreeProjection;
   "message.page": ConversationPage;
   "session.create": ProjectionMutationAcknowledgement;
@@ -275,12 +277,28 @@ export interface CommandResults {
   "model.list": ModelSummary[];
   "model.select": SessionControlResult;
   "model.setRuntimeKey": SessionModelCatalogResult;
+  "provider.list": ProviderSummary[];
+  "provider.setRuntimeKey": ProviderSummary[];
+  "provider.configuration.get": PiProviderConfigurationSnapshot;
+  "provider.configuration.save": PiProviderConfigurationSnapshot;
+  "provider.configuration.remove": PiProviderConfigurationSnapshot;
+  "provider.credential.store": PiProviderConfigurationSnapshot;
+  "provider.credential.remove": PiProviderConfigurationSnapshot;
+  "model.default.set": PiProviderConfigurationSnapshot;
+  "provider.configuration.reload": PiProviderConfigurationSnapshot;
   "thinking.set": SessionControlResult;
   "resource.list": ResourceSummary[];
   "resource.reload": SessionResourceCatalogResult;
   "command.list": CommandDescriptor[];
   "command.invoke": OperationSubmissionResult;
   "extension.catalog.list": ExtensionCatalogResult;
+  "extension.package.list": ExtensionPackageListResult;
+  "extension.package.checkUpdates": ExtensionPackageUpdatesResult;
+  "extension.package.install": ExtensionPackageMutationResult;
+  "extension.package.update": ExtensionPackageMutationResult;
+  "extension.package.setEnabled": ExtensionPackageMutationResult;
+  "extension.package.restoreInheritance": ExtensionPackageMutationResult;
+  "extension.package.uninstall": ExtensionPackageMutationResult;
   "extension.ui.respond": { resolved: boolean };
   "approval.respond": { resolved: boolean };
   "diagnostics.collect": RuntimeDiagnostics;
@@ -292,7 +310,10 @@ export type AgentCommandType = keyof CommandPayloads;
 export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "runtime.initialize",
   "workspace.open",
+  "workspace.register",
+  "workspace.unregister",
   "workspace.setTrust",
+  "task.close",
   "session.create",
   "session.open",
   "session.fork",
@@ -300,8 +321,19 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "session.name",
   "model.select",
   "model.setRuntimeKey",
+  "provider.setRuntimeKey",
+  "provider.configuration.save",
+  "provider.configuration.remove",
+  "provider.credential.store",
+  "provider.credential.remove",
+  "model.default.set",
   "thinking.set",
-  "resource.reload"
+  "resource.reload",
+  "extension.package.install",
+  "extension.package.update",
+  "extension.package.setEnabled",
+  "extension.package.restoreInheritance",
+  "extension.package.uninstall"
 ] as const satisfies readonly AgentCommandType[];
 
 export type ReplaySafeControlMutationType = typeof REPLAY_SAFE_CONTROL_MUTATION_TYPES[number];
@@ -334,68 +366,7 @@ export type AgentCommand<T extends AgentCommandType = AgentCommandType> = {
   [K in T]: { type: K; payload: CommandPayloads[K] };
 }[T];
 
-export interface StreamDelta {
-  assistantMessageEvent: {
-    type: "text_delta" | "thinking_delta";
-    delta: string;
-  };
-}
-
-export interface EventPayloads {
-  "runtime.statusChanged": RuntimeStatus;
-  "runtime.ready": { capabilities: RuntimeCapabilities; snapshot: SessionSnapshot };
-  "runtime.crashed": { detail: string; recoverable: boolean };
-  "session.bootstrap": {
-    snapshot: SessionSnapshot;
-    reason: "session-create" | "session-open" | "session-fork" | "session-import";
-  };
-  "conversation.changed": { sessionId: string; reason: "settled" | "compacted" | "rolled-back" };
-  "queue.changed": { steeringQueue: string[]; followUpQueue: string[] };
-  "session.metaChanged": {
-    streaming: boolean;
-    sessionName?: string;
-    thinkingLevel: string;
-    selectedModel?: { provider: string; id: string };
-  };
-  "tree.changed": { reason: "session-entry" | "compacted" | "rollback" };
-  "usage.changed": { tokens: number; cost: number; contextPercent?: number };
-  "session.catalog.changed": SessionCatalogChangedEvent;
-  "session.externalChangeDetected": {
-    reason: "appended" | "truncated" | "replaced" | "unavailable" | "invalid";
-    recoverable: boolean;
-  };
-  "turn.streamBatch": { events: StreamDelta[] };
-  "operation.started": { operation: OperationView };
-  "operation.heartbeat": { operationId: string; observedAt: number; lastActivityAt: number };
-  "operation.activityChanged": { operationId: string; activity: OperationActivity | null };
-  "operation.progress": { operationId: string; message: string; current?: number; total?: number };
-  "operation.completed": { operationId: string; completedAt: number };
-  "operation.failed": { operationId: string; failedAt: number; error: ProtocolError };
-  "operation.cancelled": { operationId: string; cancelledAt: number; reason: string };
-  "operation.lost": { operationId: string; lostAt: number; reason: string };
-  "workspace.changeChanged": { sessionId: string; change: WorkspaceChangeView };
-  "approval.requested": ApprovalRequestView;
-  "approval.resolved": { requestId: string; toolCallId: string; allowed: boolean };
-  "approval.cancelled": {
-    requests: Array<{ requestId: string; toolCallId: string }>;
-    reason: ExtensionUiCancellationReason;
-  };
-  "extension.ui.requested": ExtensionUiRequestView;
-  "extension.ui.updated": ExtensionUiRequestView;
-  "extension.ui.resolved": { requestId: string; cancelled: boolean };
-  "extension.ui.cancelled": { requestIds: string[]; reason: ExtensionUiCancellationReason };
-  "extension.compatibilityChanged": ExtensionCompatibilityEventView;
-  "extension.catalog.changed": ExtensionCatalogResult;
-  "resource.changed": { reason: string };
-  "diagnostics.progress": { step: string; completed: boolean };
-  "doctor.completed": DoctorReport;
-}
-
-export type AgentEventType = keyof EventPayloads;
-
-export type AgentEvent<T extends AgentEventType = AgentEventType> = {
-  [K in T]: { type: K; payload: EventPayloads[K] };
-}[T];
+export type { AgentEvent, AgentEventType, EventPayloads, StreamDelta } from "./agent-events.js";
 
 export type SuccessCommandResponse<T extends AgentCommandType = AgentCommandType> = {
   [K in T]: { ok: true; type: K; result: CommandResults[K] };

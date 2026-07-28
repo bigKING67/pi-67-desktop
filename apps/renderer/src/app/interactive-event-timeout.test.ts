@@ -2,6 +2,7 @@ import type { ApprovalRequestView, ExtensionUiRequestView, OperationView, Sessio
 import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
@@ -106,13 +107,13 @@ function state() {
 }
 
 function envelope(type: Parameters<typeof eventEnvelope>[0], payload: unknown) {
-  return eventEnvelope(type, payload as never, {
+  return eventEnvelope(type, payload as never, taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId: "session-1",
     sessionGeneration: 3,
     operationId: "operation-1"
-  });
+  }));
 }
 
 function snapshot(): SessionSnapshot {

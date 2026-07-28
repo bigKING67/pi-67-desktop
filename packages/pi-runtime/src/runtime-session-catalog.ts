@@ -18,7 +18,7 @@ type UpsertReason = Extract<
   "session-created" | "session-updated" | "session-imported"
 >;
 
-interface RuntimeSessionCatalogTarget {
+export interface RuntimeSessionCatalogTarget {
   emit(event: AgentEvent): void;
   getAgentDir(): string;
   getConfiguredSessionDir(): string | undefined;
@@ -34,25 +34,79 @@ export interface RuntimeSessionCatalog {
   dispose(): Promise<void>;
 }
 
+export interface RuntimeSessionCatalogOwner {
+  createBinding(target: RuntimeSessionCatalogTarget): RuntimeSessionCatalog;
+  status(): SessionCatalogStatus;
+  dispose(): Promise<void>;
+}
+
+export function createRuntimeSessionCatalogOwner(
+  directory?: string,
+  storageRoot?: string
+): RuntimeSessionCatalogOwner {
+  const targets = new Set<RuntimeSessionCatalogTarget>();
+  const catalog = createSessionCatalog({
+    ...(directory === undefined ? {} : { directory }),
+    ...(storageRoot === undefined ? {} : { storageRoot }),
+    onChanged: (payload) => {
+      for (const target of targets) {
+        target.emit({ type: "session.catalog.changed", payload });
+      }
+    }
+  });
+  let disposed = false;
+
+  return {
+    createBinding(target) {
+      if (disposed) throw new Error("The Workspace Session Catalog has been disposed.");
+      targets.add(target);
+      let bindingDisposed = false;
+      return {
+        query(query) {
+          if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
+          return catalog.query(query, createContext(target));
+        },
+        status: () => catalog.status(),
+        upsertCurrent(reason) {
+          if (bindingDisposed) return Promise.resolve();
+          return upsertCurrentSession(catalog, target, reason);
+        },
+        async dispose() {
+          if (bindingDisposed) return;
+          bindingDisposed = true;
+          targets.delete(target);
+        }
+      };
+    },
+    status: () => catalog.status(),
+    async dispose() {
+      if (disposed) return;
+      disposed = true;
+      targets.clear();
+      await catalog.dispose();
+    }
+  };
+}
+
 export function createRuntimeSessionCatalog(
   directory: string | undefined,
   target: RuntimeSessionCatalogTarget,
   storageRoot?: string
 ): RuntimeSessionCatalog {
-  const catalog = createSessionCatalog({
-    ...(directory === undefined ? {} : { directory }),
-    ...(storageRoot === undefined ? {} : { storageRoot }),
-    onChanged: (payload) => target.emit({ type: "session.catalog.changed", payload })
-  });
+  const owner = createRuntimeSessionCatalogOwner(directory, storageRoot);
+  const binding = owner.createBinding(target);
   return {
-    query: (query) => catalog.query(query, createContext(target)),
-    status: () => catalog.status(),
-    upsertCurrent: (reason) => upsertCurrent(catalog, target, reason),
-    dispose: () => catalog.dispose()
+    query: (query) => binding.query(query),
+    status: () => binding.status(),
+    upsertCurrent: (reason) => binding.upsertCurrent(reason),
+    async dispose() {
+      await binding.dispose();
+      await owner.dispose();
+    }
   };
 }
 
-async function upsertCurrent(
+async function upsertCurrentSession(
   catalog: SessionCatalog,
   target: RuntimeSessionCatalogTarget,
   reason: UpsertReason

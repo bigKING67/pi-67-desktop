@@ -54,7 +54,7 @@ describe("interactive response timeout recovery", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "授权结果需要重新确认",
-      message: "Agent Host 未在同步边界内确认响应；正在重新同步。未确认的授权不会放行。"
+      message: "Pi 运行服务未在同步边界内确认响应；正在重新同步。未确认的授权不会放行。"
     });
   });
 

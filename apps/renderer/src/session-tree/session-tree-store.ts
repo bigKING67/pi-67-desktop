@@ -47,6 +47,7 @@ interface SessionTreeState {
     target: SessionTreeRequestTarget,
     tree: SessionTreeProjection
   ) => SessionTreeRefreshResult;
+  deferRefresh: (target: SessionTreeRequestTarget) => boolean;
   failRefresh: (target: SessionTreeRequestTarget) => boolean;
   needsRefresh: (canonicalAuthority: SessionProjectionAuthorityState) => boolean;
 }
@@ -126,6 +127,12 @@ export const useSessionTreeStore = create<SessionTreeState>((set, get) => ({
       status: superseded ? "stale" : "ready"
     });
     return superseded ? "superseded" : "ready";
+  },
+
+  deferRefresh(target) {
+    if (!matchesTarget(get(), target)) return false;
+    set({ status: "stale" });
+    return true;
   },
 
   failRefresh(target) {

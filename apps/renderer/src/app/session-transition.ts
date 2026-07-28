@@ -70,7 +70,7 @@ export async function runSessionBootstrapTransition(
     const acknowledgement = await options.request();
     const disposition = classifyRendererSessionBootstrap(get(), target, acknowledgement);
     if (disposition === "missing-bootstrap") {
-      throw new Error("Agent Host 未发送 authoritative session.bootstrap 事件。");
+      throw new Error("Pi 运行服务未发送 authoritative session.bootstrap 事件。");
     }
     if (disposition === "stale") return;
     committed = true;

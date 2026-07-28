@@ -24,6 +24,7 @@ import type {
   AgentEvent,
   AssetReadResult,
   CommandDescriptor,
+  PiConfigurationReloadState,
   RuntimeDiagnostics,
   TransferImage
 } from "@pi67/protocol";
@@ -45,6 +46,7 @@ export interface AgentRuntime {
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void;
+  requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
   querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
   getSessionCatalogStatus(): SessionCatalogStatus;
   getSessionTree(): SessionTreeProjection;

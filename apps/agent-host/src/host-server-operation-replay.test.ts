@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -10,6 +10,7 @@ import {
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -89,8 +90,11 @@ describe("AgentHostServer operation replay", () => {
     const completedIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "operation.completed");
     expect(completedIndex).toBeGreaterThan(bootstrapIndex);
     expect(port.sent[bootstrapIndex]).toMatchObject({
-      sessionId: "session-imported",
-      sessionGeneration: 3,
+      context: {
+        scope: "task",
+        sessionId: "session-imported",
+        sessionGeneration: 3
+      },
       payload: { reason: "session-import", snapshot: { sessionId: "session-imported" } }
     });
     const settledReplay = await send(port, "session.import", {
@@ -253,7 +257,8 @@ async function createHarness(overrides: Partial<AgentRuntime>): Promise<{
     hostEpoch: 9
   });
   port.emit({
-    protocolVersion: 2,
+    protocolVersion: 3,
+    protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-operation-replay",
     appInstanceId: "app-operation-replay",

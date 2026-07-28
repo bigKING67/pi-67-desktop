@@ -9,9 +9,11 @@ import {
   type CommandPayloads,
   type CommandResults,
   type EventEnvelope,
+  type ProtocolContext,
   type ProjectionResyncInstaller,
   type SequenceGap
 } from "@pi67/protocol";
+import { currentWorkbenchProtocolContext } from "../workbench/workbench-protocol-context.js";
 import { requestWithBoundedTransportRetry } from "./bounded-transport-retry.js";
 import { requestReplaySafeControlMutation } from "./control-mutation-request.js";
 
@@ -34,6 +36,10 @@ export interface AgentPortHandoffTarget {
   readonly origin: string;
   addMessageListener(listener: (event: MessageEvent) => void): void;
   removeMessageListener(listener: (event: MessageEvent) => void): void;
+}
+
+export interface AgentConnectionRequestOptions {
+  context?: ProtocolContext;
 }
 
 export class AgentConnectionController {
@@ -74,7 +80,7 @@ export class AgentConnectionController {
     return new Promise<AgentConnectionIdentity>((resolve, reject) => {
       const timeout = globalThis.setTimeout(() => {
         unsubscribe();
-        reject(connectionError("Timed out waiting for the Agent Host connection."));
+        reject(connectionError("Timed out waiting for the Pi runtime service connection."));
       }, timeoutMs);
       const unsubscribe = this.subscribe({
         onConnected: (identity) => {
@@ -94,24 +100,26 @@ export class AgentConnectionController {
   async request<T extends AgentCommandType>(
     type: T,
     payload: CommandPayloads[T],
-    transfer: Transferable[] = []
+    transfer: Transferable[] = [],
+    options: AgentConnectionRequestOptions = {}
   ): Promise<CommandResults[T]> {
     if (this.disposed) throw disposedError();
     const expectedHostEpoch = this.identityValue?.hostEpoch;
+    const context = options.context ?? requestContext(type, payload);
     if (isReplaySafeControlMutation(type)) {
       return requestReplaySafeControlMutation(
         type,
-        (idempotencyKey) => this.requestOnce(type, payload, transfer, idempotencyKey),
+        (idempotencyKey) => this.requestOnce(type, payload, transfer, context, idempotencyKey),
         () => this.prepareSameHostRetry(expectedHostEpoch)
       ) as Promise<CommandResults[T]>;
     }
     if (isReplaySafeOperationAck(type)) {
       return requestWithBoundedTransportRetry(
-        () => this.requestOnce(type, payload, transfer),
+        () => this.requestOnce(type, payload, transfer, context),
         () => this.prepareSameHostRetry(expectedHostEpoch)
       ) as Promise<CommandResults[T]>;
     }
-    return this.requestOnce(type, payload, transfer);
+    return this.requestOnce(type, payload, transfer, context);
   }
 
   private async prepareSameHostRetry(expectedHostEpoch: number | undefined): Promise<boolean> {
@@ -125,14 +133,18 @@ export class AgentConnectionController {
     type: T,
     payload: CommandPayloads[T],
     transfer: Transferable[],
+    context: ProtocolContext,
     idempotencyKey?: string
   ): Promise<CommandResults[T]> {
     const client = this.client;
     const generation = this.generation;
-    if (!client || client.isClosed) throw connectionError("Agent Host 尚未连接。");
+    if (!client || client.isClosed) throw connectionError("Pi 运行服务尚未连接。");
     let result: CommandResults[T];
     try {
-      result = await client.request(type, payload, transfer, idempotencyKey === undefined ? {} : { idempotencyKey });
+      result = await client.request(type, payload, transfer, {
+        context,
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey })
+      });
     } catch (error) {
       if (client.isClosed) {
         this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Agent request failed."));
@@ -142,24 +154,27 @@ export class AgentConnectionController {
     if (generation !== this.generation || client !== this.client) {
       throw new ProtocolRequestError({
         code: "STALE_HOST_EPOCH",
-        message: "旧 Agent Host 的响应已被丢弃。",
+        message: "旧 Pi 运行服务的响应已被丢弃。",
         recoverable: true
       });
     }
     return result;
   }
 
-  async resyncProjection(install: ProjectionResyncInstaller): Promise<boolean> {
+  async resyncProjection(
+    install: ProjectionResyncInstaller,
+    context: ProtocolContext = currentWorkbenchProtocolContext()
+  ): Promise<boolean> {
     if (this.disposed) throw disposedError();
     const client = this.client;
     const generation = this.generation;
-    if (!client || client.isClosed) throw connectionError("Agent Host 尚未连接。");
+    if (!client || client.isClosed) throw connectionError("Pi 运行服务尚未连接。");
     let committed: boolean;
     try {
       committed = await client.resyncProjection((result) => {
         if (generation !== this.generation || client !== this.client) return false;
         return install(result);
-      });
+      }, context);
     } catch (error) {
       if (client.isClosed) {
         this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Agent projection resync failed."));
@@ -169,7 +184,7 @@ export class AgentConnectionController {
     if (generation !== this.generation || client !== this.client) {
       throw new ProtocolRequestError({
         code: "STALE_HOST_EPOCH",
-        message: "旧 Agent Host 的重同步结果已被丢弃。",
+        message: "旧 Pi 运行服务的重同步结果已被丢弃。",
         recoverable: true
       });
     }
@@ -237,7 +252,7 @@ export class AgentConnectionController {
       this.identityValue = identity;
       for (const subscriber of this.subscribers) subscriber.onConnected?.(identity);
     }).catch((error: unknown) => {
-      this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Agent Host handshake failed."));
+      this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Pi runtime service handshake failed."));
     });
   }
 
@@ -248,6 +263,19 @@ export class AgentConnectionController {
     client.dispose();
     for (const subscriber of this.subscribers) subscriber.onTeardown?.(error);
   }
+}
+
+function requestContext<T extends AgentCommandType>(type: T, payload: CommandPayloads[T]): ProtocolContext {
+  if (type === "diagnostics.collect" || type === "doctor.run") return { scope: "app" };
+  const current = currentWorkbenchProtocolContext();
+  if (type === "session.catalog.query") {
+    const scope = (payload as CommandPayloads["session.catalog.query"]).scope;
+    if (scope === "all") return { scope: "app" };
+    return current.scope === "app"
+      ? current
+      : { scope: "workspace", workspaceId: current.workspaceId };
+  }
+  return current;
 }
 
 export async function prepareSameHostTransportRetry(

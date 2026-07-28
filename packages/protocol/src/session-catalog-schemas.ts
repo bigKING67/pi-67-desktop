@@ -33,6 +33,7 @@ export const SessionCatalogQuerySchema = strictObject({
 
 const SessionSummarySchema = strictObject({
   id: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_ID_CHARS }),
+  workspaceId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   path: CatalogPathSchema,
   cwd: CatalogPathSchema,
   name: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_NAME_CHARS }),

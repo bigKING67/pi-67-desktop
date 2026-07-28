@@ -2,10 +2,9 @@ import { Type, type TProperties, type TSchema } from "typebox";
 import { MAX_TREE_NODES } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
 import {
-  AssetReadPayloadSchema,
   AssetReadResultSchema
 } from "./asset-schemas.js";
-import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema, ApprovalRespondSchema } from "./approval-schemas.js";
+import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema } from "./approval-schemas.js";
 import {
   ExtensionCompatibilitySchema,
   ExtensionUiCancelledSchema,
@@ -17,9 +16,13 @@ import {
   ExtensionCommandAdapterSchema
 } from "./extension-catalog-schemas.js";
 import {
+  ExtensionPackageListResultSchema,
+  ExtensionPackageMutationResultSchema,
+  ExtensionPackageUpdatesResultSchema
+} from "./extension-package-schemas.js";
+import {
   SessionCatalogChangedSchema,
   SessionCatalogPageSchema,
-  SessionCatalogQuerySchema,
   SessionCatalogStatusSchema
 } from "./session-catalog-schemas.js";
 import { SessionExternalChangeSchema } from "./session-external-change-schema.js";
@@ -48,92 +51,17 @@ import {
   ResourceSummarySchema,
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
+import { ProtocolErrorSchema } from "./protocol-error-schema.js";
+import {
+  PiProviderConfigurationChangedSchema,
+  PiProviderConfigurationSnapshotSchema
+} from "./provider-configuration-schemas.js";
+import {
+  WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema
+} from "./workspace-registration-schemas.js";
 
-const EmptyPayloadSchema = strictObject({});
-const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
-const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("balanced")]);
-const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
-const PromptSchema = Type.String({ maxLength: 2_000_000 });
-const SubmissionIdSchema = Type.String({ minLength: 1, maxLength: 512 });
-
-const TransferImageSchema = strictObject({
-  name: Type.String({ minLength: 1, maxLength: 512 }),
-  mimeType: Type.String({ minLength: 1, maxLength: 128 }),
-  // ArrayBuffer is verified with an explicit runtime predicate after TypeBox validation.
-  data: Type.Any()
-});
-
-const ImagesSchema = Type.Optional(Type.Array(TransferImageSchema, { maxItems: 8 }));
-const PromptPayloadSchema = strictObject({ text: PromptSchema, images: ImagesSchema });
-
-export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
-  "runtime.initialize": strictObject({
-    cwd: PathSchema,
-    agentDir: Type.Optional(PathSchema),
-    sessionPath: Type.Optional(PathSchema),
-    trust: TrustSchema,
-    approvalMode: ApprovalModeSchema
-  }),
-  "runtime.getStatus": EmptyPayloadSchema,
-  "projection.resync": EmptyPayloadSchema,
-  "asset.read": AssetReadPayloadSchema,
-  "workspace.open": strictObject({ cwd: PathSchema, trust: TrustSchema, approvalMode: ApprovalModeSchema }),
-  "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: ApprovalModeSchema }),
-  "workspace.changes": EmptyPayloadSchema,
-  "session.catalog.query": SessionCatalogQuerySchema,
-  "session.tree": EmptyPayloadSchema,
-  "message.page": strictObject({
-    direction: Type.Union([Type.Literal("older"), Type.Literal("newer")]),
-    cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
-    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 }))
-  }),
-  "session.create": EmptyPayloadSchema,
-  "session.open": strictObject({ path: PathSchema, cwdOverride: Type.Optional(PathSchema) }),
-  "session.import": strictObject({ submissionId: SubmissionIdSchema, path: PathSchema }),
-  "session.fork": strictObject({ entryId: Type.String({ minLength: 1 }) }),
-  "session.rollback": strictObject({ entryId: Type.String({ minLength: 1 }), summarize: Type.Optional(Type.Boolean()) }),
-  "session.compact": strictObject({ submissionId: SubmissionIdSchema, instructions: Type.Optional(PromptSchema) }),
-  "session.name": strictObject({ name: Type.String({ minLength: 1, maxLength: 256 }) }),
-  "prompt.submit": strictObject({
-    submissionId: SubmissionIdSchema,
-    text: PromptSchema,
-    images: ImagesSchema,
-    delivery: Type.Union([Type.Literal("new-turn"), Type.Literal("steer"), Type.Literal("follow-up")])
-  }),
-  "prompt.steer": PromptPayloadSchema,
-  "prompt.followUp": PromptPayloadSchema,
-  "queue.clear": EmptyPayloadSchema,
-  "operation.abort": strictObject({ operationId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })) }),
-  "model.list": EmptyPayloadSchema,
-  "model.select": strictObject({
-    provider: Type.String({ minLength: 1, maxLength: 256 }),
-    id: Type.String({ minLength: 1, maxLength: 512 })
-  }),
-  "model.setRuntimeKey": strictObject({
-    provider: Type.String({ minLength: 1, maxLength: 256 }),
-    apiKey: Type.String({ minLength: 8, maxLength: 16_384 })
-  }),
-  "thinking.set": strictObject({ level: Type.String({ minLength: 1, maxLength: 32 }) }),
-  "resource.list": EmptyPayloadSchema,
-  "resource.reload": EmptyPayloadSchema,
-  "command.list": EmptyPayloadSchema,
-  "command.invoke": strictObject({
-    submissionId: SubmissionIdSchema,
-    command: Type.String({ minLength: 1, maxLength: 16_384 })
-  }),
-  "extension.catalog.list": EmptyPayloadSchema,
-  "extension.ui.respond": strictObject({
-    requestId: Type.String({ minLength: 1, maxLength: 512 }),
-    sessionId: Type.String({ minLength: 1, maxLength: 512 }),
-    sessionGeneration: Type.Integer({ minimum: 0 }),
-    operationId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
-    value: Type.Optional(Type.Union([Type.String({ maxLength: 2_000_000 }), Type.Boolean()])),
-    cancelled: Type.Optional(Type.Boolean())
-  }),
-  "approval.respond": ApprovalRespondSchema,
-  "diagnostics.collect": EmptyPayloadSchema,
-  "doctor.run": EmptyPayloadSchema
-};
+export { ProtocolErrorSchema } from "./protocol-error-schema.js";
+export { CommandPayloadSchemas } from "./command-payload-schemas.js";
 
 const SessionTreeNodeSchema = strictObject({
   id: Type.String({ minLength: 1, maxLength: 512 }),
@@ -236,29 +164,6 @@ const DoctorCheckSchema = strictObject({
 });
 const DoctorReportSchema = strictObject({ generatedAt: Type.Number(), checks: Type.Array(DoctorCheckSchema) });
 
-const ProtocolErrorDetailsSchema = Type.Record(
-  Type.String(),
-  Type.Union([Type.String(), Type.Number(), Type.Boolean()])
-);
-export const ProtocolErrorSchema = strictObject({
-  code: Type.Union([
-    Type.Literal("PROTOCOL_MISMATCH"), Type.Literal("INVALID_PAYLOAD"), Type.Literal("CONNECTION_CLOSED"),
-    Type.Literal("REQUEST_TIMEOUT"),
-    Type.Literal("STALE_HOST_EPOCH"), Type.Literal("STALE_SESSION_GENERATION"),
-    Type.Literal("STALE_OPERATION"), Type.Literal("STALE_SESSION_CATALOG"),
-    Type.Literal("DUPLICATE_REQUEST"), Type.Literal("BUSY"),
-    Type.Literal("OPERATION_NOT_FOUND"), Type.Literal("SESSION_CHANGED_EXTERNALLY"),
-    Type.Literal("RUNTIME_NOT_READY"), Type.Literal("RUNTIME_POISONED"),
-    Type.Literal("MODEL_NOT_FOUND"), Type.Literal("WORKSPACE_NOT_TRUSTED"),
-    Type.Literal("PATH_OUTSIDE_WORKSPACE"), Type.Literal("RESOURCE_LIMIT_EXCEEDED"),
-    Type.Literal("UNSUPPORTED"), Type.Literal("INTERNAL")
-  ]),
-  message: Type.String({ maxLength: 4_096 }),
-  recoverable: Type.Boolean(),
-  retryAfterMs: Type.Optional(Type.Number({ minimum: 0 })),
-  details: Type.Optional(ProtocolErrorDetailsSchema)
-});
-
 const OperationSettledSchema = operationSettledSchema(OperationKindSchema);
 
 const AcknowledgementSchema = strictObject({ accepted: Type.Literal(true) });
@@ -304,8 +209,11 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   }),
   "asset.read": AssetReadResultSchema,
   "workspace.open": ProjectionMutationAcknowledgementSchema,
+  "workspace.register": WorkspaceRegisterResultSchema,
+  "workspace.unregister": WorkspaceUnregisterResultSchema,
   "workspace.setTrust": SessionResourceCatalogResultSchema,
   "workspace.changes": WorkspaceChangesProjectionSchema,
+  "task.close": strictObject({ closed: Type.Literal(true), stopped: Type.Boolean() }),
   "session.catalog.query": SessionCatalogPageSchema,
   "session.tree": SessionTreeProjectionSchema,
   "message.page": ConversationPageSchema,
@@ -328,12 +236,28 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "model.list": Type.Array(ModelSummarySchema),
   "model.select": SessionControlResultSchema,
   "model.setRuntimeKey": SessionModelCatalogResultSchema,
+  "provider.list": Type.Array(ProviderSummarySchema),
+  "provider.setRuntimeKey": Type.Array(ProviderSummarySchema),
+  "provider.configuration.get": PiProviderConfigurationSnapshotSchema,
+  "provider.configuration.save": PiProviderConfigurationSnapshotSchema,
+  "provider.configuration.remove": PiProviderConfigurationSnapshotSchema,
+  "provider.credential.store": PiProviderConfigurationSnapshotSchema,
+  "provider.credential.remove": PiProviderConfigurationSnapshotSchema,
+  "model.default.set": PiProviderConfigurationSnapshotSchema,
+  "provider.configuration.reload": PiProviderConfigurationSnapshotSchema,
   "thinking.set": SessionControlResultSchema,
   "resource.list": Type.Array(ResourceSummarySchema),
   "resource.reload": SessionResourceCatalogResultSchema,
   "command.list": Type.Array(CommandDescriptorSchema),
   "command.invoke": operationSubmissionResultSchema(Type.Literal("command")),
   "extension.catalog.list": ExtensionCatalogSchema,
+  "extension.package.list": ExtensionPackageListResultSchema,
+  "extension.package.checkUpdates": ExtensionPackageUpdatesResultSchema,
+  "extension.package.install": ExtensionPackageMutationResultSchema,
+  "extension.package.update": ExtensionPackageMutationResultSchema,
+  "extension.package.setEnabled": ExtensionPackageMutationResultSchema,
+  "extension.package.restoreInheritance": ExtensionPackageMutationResultSchema,
+  "extension.package.uninstall": ExtensionPackageMutationResultSchema,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({ resolved: Type.Boolean() }),
   "diagnostics.collect": RuntimeDiagnosticsSchema,
@@ -374,6 +298,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
     thinkingLevel: Type.String(),
     selectedModel: Type.Optional(strictObject({ provider: Type.String(), id: Type.String() }))
   }),
+  "model.catalog.changed": SessionModelCatalogResultSchema,
   "tree.changed": strictObject({
     reason: Type.Union([Type.Literal("session-entry"), Type.Literal("compacted"), Type.Literal("rollback")])
   }),
@@ -384,6 +309,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   }),
   "session.catalog.changed": SessionCatalogChangedSchema,
   "session.externalChangeDetected": SessionExternalChangeSchema,
+  "provider.configuration.changed": PiProviderConfigurationChangedSchema,
   "turn.streamBatch": strictObject({ events: Type.Array(StreamDeltaSchema) }),
   "operation.started": strictObject({ operation: OperationViewSchema }),
   "operation.heartbeat": strictObject({

@@ -1,6 +1,6 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -11,6 +11,7 @@ import {
 } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -91,9 +92,13 @@ describe("AgentHostServer safety approval", () => {
     const approval = await waitForEvent(port, "approval.requested");
     expect(approval).toMatchObject({
       hostEpoch: 12,
-      sessionId: "session-approval",
-      sessionGeneration: 7,
-      operationId: expect.any(String),
+      taskSequence: expect.any(Number),
+      context: {
+        scope: "task",
+        sessionId: "session-approval",
+        sessionGeneration: 7,
+        operationId: expect.any(String)
+      },
       payload: {
         hostEpoch: 12,
         sessionId: "session-approval",
@@ -102,7 +107,9 @@ describe("AgentHostServer safety approval", () => {
         toolCallId: "tool-call-1"
       }
     });
-    const operationId = approval.operationId;
+    const operationId = approval.context.scope === "task"
+      ? approval.context.operationId
+      : undefined;
     if (!operationId) throw new Error("Expected approval operation identity.");
 
     const staleSession = commandEnvelope("approval.respond", {
@@ -321,7 +328,8 @@ describe("AgentHostServer safety approval", () => {
 
 function handshake(port: FakePort, appInstanceId: string): void {
   port.emitMessage({
-    protocolVersion: 2,
+    protocolVersion: 3,
+    protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${appInstanceId}`,
     appInstanceId,

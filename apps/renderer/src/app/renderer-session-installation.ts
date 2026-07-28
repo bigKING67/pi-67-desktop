@@ -21,6 +21,7 @@ import {
   resetRendererSessionInteractiveState
 } from "./renderer-session-transaction.js";
 import { resetConversationRequests } from "../conversation/conversation-controller.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 
 interface RendererSessionInstallationOptions {
   sessionGeneration?: number;
@@ -65,7 +66,12 @@ export function installRendererSessionResync(
           result.changes
         )) return false;
         if (!isCurrent()) return false;
-        useSessionCatalogStore.getState().applyStatus(result.sessionCatalogStatus);
+        const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
+        if (workspaceId) {
+          useSessionCatalogStore.getState().applyStatus(workspaceId, result.sessionCatalogStatus);
+        } else {
+          useSessionCatalogStore.getState().applyStatus(result.sessionCatalogStatus);
+        }
         return isCurrent();
       }
     }

@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { commandEnvelope, isResponseEnvelope, responseEnvelope } from "./envelope.js";
+import {
+  APP_PROTOCOL_CONTEXT,
+  commandEnvelope,
+  isResponseEnvelope,
+  responseEnvelope
+} from "./envelope.js";
 
 describe("session name acknowledgement", () => {
   it("accepts only a narrow projection mutation acknowledgement", () => {
-    const request = commandEnvelope("session.name", { name: "Renamed" }, 5, "rename-1");
-    const acknowledgement = responseEnvelope(request.requestId, 5, {
+    const request = commandEnvelope(
+      "session.name",
+      { name: "Renamed" },
+      APP_PROTOCOL_CONTEXT,
+      5,
+      "rename-1"
+    );
+    const acknowledgement = responseEnvelope(request.requestId, 5, request.context, {
       ok: true,
       type: "session.name",
       result: {

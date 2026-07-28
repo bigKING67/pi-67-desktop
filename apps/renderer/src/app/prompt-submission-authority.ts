@@ -45,7 +45,7 @@ export function promptSubmissionAuthorityMessage(issue: PromptSubmissionAuthorit
     case "AUTHORITY_NOT_READY":
       return "Pi 会话身份尚未就绪，消息未发送";
     case "STALE_HOST_EPOCH":
-      return "Agent Host 已在发送期间替换，旧确认已忽略";
+      return "Pi 运行服务已在发送期间重启，旧确认已忽略";
     case "STALE_SESSION_GENERATION":
       return "发送期间 Pi 会话已切换，旧确认已忽略";
     case "STALE_PROJECTION":

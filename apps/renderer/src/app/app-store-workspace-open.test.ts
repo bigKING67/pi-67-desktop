@@ -1,9 +1,15 @@
-import type { RuntimeCapabilities, SessionSnapshot, WorkspaceChangesProjection } from "@pi67/domain";
+import type {
+  RuntimeCapabilities,
+  SessionSnapshot,
+  WorkspaceChangesProjection,
+  WorkspaceDescriptor
+} from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -12,7 +18,12 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
-import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
+import {
+  openRendererWorkspace,
+  openRendererWorkspaceDescriptor
+} from "../workspace/workspace-open-controller.js";
+import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 
 describe("App Store workspace open authority", () => {
@@ -47,16 +58,17 @@ describe("App Store workspace open authority", () => {
         const payload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
-          eventEnvelope("runtime.ready", payload, {
+          eventEnvelope("runtime.ready", payload, taskEventFixture({
             hostEpoch: 9,
             sequence: 2,
             sessionId: "session-2",
             sessionGeneration: 4
-          })
+          }))
         );
         throw new Error("late workspace rejection");
       }
       if (type === "workspace.changes") return emptyChanges("session-2") as never;
+      if (type === "workspace.register") return { registered: true } as never;
       if (type === "session.catalog.query") return emptyCatalogPage() as never;
       throw new Error(`Unexpected request: ${type}`);
     });
@@ -82,13 +94,109 @@ describe("App Store workspace open authority", () => {
       sessionTransitionPending: false,
       runtime: {
         phase: "failed",
-        detail: "无法打开工作区：Agent Host 未发送 authoritative runtime.ready 事件。"
+        detail: "无法打开工作区：Pi 运行服务未发送 authoritative runtime.ready 事件。"
       }
     });
     expect(useSessionProjectionStore.getState().authority.phase).toBe("inactive");
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
       title: "无法打开工作区"
+    });
+  });
+
+  it("opens a catalog Session in an independent Task Runtime", async () => {
+    const descriptor: WorkspaceDescriptor = {
+      id: "workspace-catalog",
+      displayName: "catalog",
+      identity: { canonicalPath: "/workspace-catalog", assurance: "path-only" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    };
+    const existingTaskId = "task-existing";
+    rendererWorkbenchStore.getState().registerWorkspace(descriptor);
+    rendererWorkbenchStore.getState().openTask({
+      id: existingTaskId,
+      conversation: { kind: "provisional", workspaceId: descriptor.id, draftId: existingTaskId },
+      workspaceId: descriptor.id,
+      sessionId: "session-existing",
+      taskGeneration: 1,
+      sessionGeneration: 2,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "Pi 会话已就绪", recoverable: true },
+      title: "Existing task",
+      hasDraft: false,
+      attachmentCount: 0
+    });
+    const sessionPath = "/sessions/catalog-target.jsonl";
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
+      type,
+      payload,
+      _transfer,
+      options
+    ) => {
+      if (type === "runtime.initialize") {
+        expect(payload).toEqual({
+          cwd: descriptor.identity.canonicalPath,
+          sessionPath,
+          trust: "trusted",
+          approvalMode: "guided"
+        });
+        const context = options?.context;
+        if (!context || context.scope !== "task") throw new Error("Expected Task context.");
+        expect(context.taskId).not.toBe(existingTaskId);
+        const readySnapshot = {
+          ...snapshot("session-catalog-target"),
+          cwd: descriptor.identity.canonicalPath,
+          sessionPath
+        };
+        const readyPayload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot };
+        const envelope = eventEnvelope("runtime.ready", readyPayload, taskEventFixture({
+          hostEpoch: 9,
+          sequence: 2,
+          workspaceId: context.workspaceId,
+          taskId: context.taskId,
+          taskGeneration: context.taskGeneration,
+          sessionId: readySnapshot.sessionId,
+          sessionGeneration: 1
+        }));
+        const event = { type: "runtime.ready", payload: readyPayload } as const;
+        routeWorkbenchAgentEvent(event, envelope);
+        useAppStore.getState().receiveAgentEvent(event, envelope);
+        return projectionAcknowledgement(readySnapshot.sessionId, 1) as never;
+      }
+      if (type === "session.catalog.query") return emptyCatalogPage() as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    await openRendererWorkspaceDescriptor(descriptor, sessionPath);
+
+    expect(request).toHaveBeenCalledWith(
+      "runtime.initialize",
+      expect.objectContaining({ sessionPath }),
+      [],
+      expect.objectContaining({ context: expect.objectContaining({ scope: "task" }) })
+    );
+    expect(request).not.toHaveBeenCalledWith("workspace.open", expect.anything());
+    expect(request).not.toHaveBeenCalledWith("session.open", expect.anything());
+    const workbench = rendererWorkbenchStore.getState();
+    expect(workbench.runtimeTaskOrder).toHaveLength(2);
+    expect(workbench.tasks[existingTaskId]).toMatchObject({
+      conversation: { kind: "provisional" },
+      sessionId: "session-existing"
+    });
+    expect(Object.values(workbench.tasks)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        conversation: { kind: "session", workspaceId: descriptor.id, sessionPath },
+        sessionId: "session-catalog-target",
+        sessionPath,
+        lifecycle: "idle"
+      })
+    ]));
+    expect(useAppStore.getState()).toMatchObject({
+      workspace: descriptor.identity.canonicalPath,
+      sessionTransitionPending: false,
+      runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
     });
   });
 });
@@ -104,6 +212,7 @@ function resetStores(): void {
   useNotificationStore.setState(useNotificationStore.getInitialState(), true);
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
   useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
+  rendererWorkbenchStore.getState().reset();
 }
 
 function snapshot(sessionId: string): SessionSnapshot {

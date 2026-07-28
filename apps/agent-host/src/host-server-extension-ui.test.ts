@@ -1,6 +1,6 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   type ProtocolPort,
@@ -8,6 +8,7 @@ import {
 } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 describe("AgentHostServer extension UI", () => {
   it("advertises strict extension capabilities and enriches UI events with Host context", async () => {
@@ -40,7 +41,8 @@ describe("AgentHostServer extension UI", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-extension", hostInstanceId: "host-extension", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-extension",
       appInstanceId: "app-extension",
@@ -71,8 +73,12 @@ describe("AgentHostServer extension UI", () => {
       const request = port.sent.find((value) => isEventEnvelope(value) && value.type === "extension.ui.requested");
       expect(request).toMatchObject({
         hostEpoch: 9,
-        sessionId: "session-extension",
-        sessionGeneration: 4,
+        context: {
+          scope: "task",
+          sessionId: "session-extension",
+          sessionGeneration: 4,
+          operationId: expect.any(String)
+        },
         payload: {
           requestId: "extension-request-1",
           hostEpoch: 9,
@@ -86,8 +92,12 @@ describe("AgentHostServer extension UI", () => {
     ));
     expect(compatibility).toMatchObject({
       hostEpoch: 9,
-      sessionId: "session-extension",
-      sessionGeneration: 4,
+      context: {
+        scope: "task",
+        sessionId: "session-extension",
+        sessionGeneration: 4,
+        operationId: expect.any(String)
+      },
       payload: {
         hostEpoch: 9,
         sessionId: "session-extension",

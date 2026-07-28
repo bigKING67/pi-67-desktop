@@ -286,7 +286,7 @@ export class OperationRegistry {
     if (active?.view.kind !== "session-import") return false;
     this.active = undefined;
     this.poisoned = true;
-    const reason = "The imported Pi Session became authoritative, but its projection could not be captured; Agent Host replacement is required.";
+    const reason = "The imported Pi Session became authoritative, but its projection could not be captured; Pi runtime service recovery is required.";
     this.finalizeLost(active, reason);
     this.onRuntimePoisoned?.({
       type: "agent-host-runtime-poisoned",
@@ -364,7 +364,7 @@ export class OperationRegistry {
     if (this.terminating?.view.operationId !== operation.view.operationId) return;
     this.terminating = undefined;
     this.poisoned = true;
-    const reason = `Pi abort did not settle within ${this.abortWatchdogMs} ms; Agent Host replacement is required.`;
+    const reason = `Pi abort did not settle within ${this.abortWatchdogMs} ms; Pi runtime service recovery is required.`;
     this.finalizeLost(operation, reason);
     this.onRuntimePoisoned?.({
       type: "agent-host-runtime-poisoned",
@@ -378,7 +378,7 @@ export class OperationRegistry {
     if (!this.poisoned) return;
     throw new HostCommandError(
       "RUNTIME_POISONED",
-      "Pi runtime is poisoned and the Agent Host must be replaced.",
+      "The Pi runtime is poisoned and the Pi runtime service must be restarted.",
       true
     );
   }

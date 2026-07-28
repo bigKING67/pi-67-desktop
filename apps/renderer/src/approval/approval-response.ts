@@ -22,7 +22,7 @@ export async function respondToSafetyApproval(
     publishNotification({
       level: "warning",
       title: "工具授权请求已过期",
-      message: "Pi-67 未向 Agent Host 发送响应，操作将保持阻止。"
+      message: "π 未向 Pi 运行服务发送响应，操作将保持阻止。"
     });
     return false;
   }
@@ -34,7 +34,7 @@ export async function respondToSafetyApproval(
     publishNotification({
       level: "warning",
       title: "工具授权请求已过期",
-      message: "Agent Host 未接受这次授权响应，工具将保持阻止状态。"
+      message: "Pi 运行服务未接受这次授权响应，工具将保持阻止状态。"
     });
     return false;
   } catch (error) {
@@ -76,5 +76,5 @@ export function approvalResponsePayload(
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Agent Host 连接异常";
+  return error instanceof Error ? error.message : "Pi 运行服务连接异常";
 }

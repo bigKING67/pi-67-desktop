@@ -4,8 +4,10 @@ import { appLocale, messages } from "../localization/message-catalog.js";
 import { querySessionCatalogPage } from "../navigation/session-catalog-controller.js";
 import {
   normalizeSessionCatalogQuery,
+  selectWorkspaceSessionCatalog,
   useSessionCatalogStore
 } from "../navigation/session-catalog-store.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { MAX_SESSION_CANDIDATES } from "./command-palette-model.js";
 
 export type PaletteSessionSearchState =
@@ -26,24 +28,27 @@ export function usePaletteSessions(options: {
   hostEpoch: number | undefined;
   query: string;
 }): PaletteSessionSearchState {
-  const recentSessions = useSessionCatalogStore((state) => state.items);
+  const workspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
+  const recentSessions = useSessionCatalogStore((state) => (
+    workspaceId ? selectWorkspaceSessionCatalog(state, workspaceId).items : EMPTY_SESSIONS
+  ));
   const [remote, setRemote] = useState<RemoteSearchState>();
   const query = normalizeSessionCatalogQuery(options.query);
   const fallback = useMemo(
     () => filterPaletteSessionFallback(recentSessions, query),
     [query, recentSessions]
   );
-  const owner = `${options.hostEpoch ?? "disconnected"}:${query}`;
+  const owner = `${options.hostEpoch ?? "disconnected"}:${workspaceId ?? "no-workspace"}:${query}`;
 
   useEffect(() => {
-    if (!options.open || !options.connected || options.hostEpoch === undefined || !query) {
+    if (!options.open || !options.connected || options.hostEpoch === undefined || !workspaceId || !query) {
       setRemote(undefined);
       return;
     }
     let active = true;
     setRemote({ owner, status: "loading", sessions: fallback });
     const timer = window.setTimeout(() => {
-      void querySessionCatalogPage({ query })
+      void querySessionCatalogPage({ workspaceId, query })
         .then((page) => {
           if (active) setRemote({ owner, status: "ready", sessions: page.items });
         })
@@ -62,7 +67,7 @@ export function usePaletteSessions(options: {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [fallback, options.connected, options.hostEpoch, options.open, owner, query]);
+  }, [fallback, options.connected, options.hostEpoch, options.open, owner, query, workspaceId]);
 
   if (!options.open || !query) {
     return { status: "idle", query: "", sessions: recentSessions.slice(0, MAX_SESSION_CANDIDATES) };
@@ -75,6 +80,8 @@ export function usePaletteSessions(options: {
     ? { status: "failed", query, sessions: remote.sessions, error: remote.error }
     : { status: remote.status, query, sessions: remote.sessions };
 }
+
+const EMPTY_SESSIONS: SessionSummary[] = [];
 
 export function filterPaletteSessionFallback(
   sessions: readonly SessionSummary[],

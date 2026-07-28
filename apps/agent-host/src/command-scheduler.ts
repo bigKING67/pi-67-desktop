@@ -36,6 +36,16 @@ const QUERY_COMMANDS = new Set<AgentCommandType>([
   "doctor.run"
 ]);
 
+// These queries also refresh authoritative projections. If a refresh arrives
+// before its control mutation settles, read the resulting state afterward
+// instead of surfacing an expected BUSY error in the renderer.
+const TRANSITION_DEFERRED_QUERY_COMMANDS = new Set<AgentCommandType>([
+  "workspace.changes",
+  "session.catalog.query",
+  "session.tree",
+  "message.page"
+]);
+
 export function commandClassFor(command: AgentCommand): CommandClass {
   if (EXCLUSIVE_COMMANDS.has(command.type)) return "exclusive-control";
   if (command.type === "projection.resync") return "recovery";
@@ -89,6 +99,9 @@ export class CommandScheduler {
     if (commandClass === "interrupt") return task();
     if (commandClass === "query") {
       if ((this.exclusiveRunning || this.exclusiveQueued > 0) && command.type !== "runtime.getStatus") {
+        if (TRANSITION_DEFERRED_QUERY_COMMANDS.has(command.type)) {
+          return this.runDeferredQuery(task);
+        }
         return Promise.reject(busy("A session transition is in progress."));
       }
       return this.runQuery(task, command.type !== "runtime.getStatus");
@@ -127,6 +140,18 @@ export class CommandScheduler {
     }).catch(() => undefined);
     this.queueTail = cleared.then(() => undefined, () => undefined);
     return cleared;
+  }
+
+  isIdle(): boolean {
+    return !this.closed
+      && !this.exclusiveRunning
+      && this.exclusiveQueued === 0
+      && !this.queueRunning
+      && this.queueAdmitted === 0
+      && !this.queueBarrierRunning
+      && this.queueBarriersAdmitted === 0
+      && !this.turnAdmission
+      && this.activeQueries === 0;
   }
 
   shutdown(): CommandSchedulerShutdownResult {
@@ -182,6 +207,20 @@ export class CommandScheduler {
     return result;
   }
 
+  private runDeferredQuery<T>(task: () => Promise<T>): Promise<T> {
+    const generation = this.exclusiveGeneration;
+    this.exclusiveQueued += 1;
+    const execute = async (): Promise<T> => {
+      if (this.blockingQueries > 0) await this.queriesDrained;
+      this.exclusiveQueued -= 1;
+      if (this.closed || generation !== this.exclusiveGeneration) throw connectionClosed();
+      return this.runQuery(task, true);
+    };
+    const result = this.exclusiveTail.then(execute, execute);
+    this.exclusiveTail = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   private runQueue<T>(task: () => Promise<T>): Promise<T> {
     if (this.queueAdmitted >= this.maxQueuedCommands) {
       return Promise.reject(new HostCommandError(
@@ -219,7 +258,7 @@ export class CommandScheduler {
 
   private runQuery<T>(task: () => Promise<T>, blocksExclusive: boolean): Promise<T> {
     if (this.activeQueries >= this.maxConcurrentQueries) {
-      return Promise.reject(busy("Too many Agent Host queries are already running."));
+      return Promise.reject(busy("Too many Pi runtime service queries are already running."));
     }
     this.activeQueries += 1;
     if (blocksExclusive) {
@@ -252,7 +291,7 @@ function busy(message: string): HostCommandError {
 function connectionClosed(): HostCommandError {
   return new HostCommandError(
     "CONNECTION_CLOSED",
-    "Agent Host is shutting down.",
+    "The Pi runtime service is shutting down.",
     true,
     { shuttingDown: true }
   );

@@ -8,7 +8,12 @@ import {
   queryFirstSessionCatalog,
   querySessionCatalogPage
 } from "./session-catalog-controller.js";
-import { useSessionCatalogStore } from "./session-catalog-store.js";
+import {
+  selectWorkspaceSessionCatalog,
+  useSessionCatalogStore
+} from "./session-catalog-store.js";
+
+const WORKSPACE_ID = "workspace-a";
 
 const SESSION_ONE: SessionSummary = {
   id: "session-1",
@@ -47,15 +52,15 @@ describe("session catalog controller", () => {
   it("owns the bounded first-page transport request", async () => {
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
 
-    await queryFirstSessionCatalog({ query: " session ", refresh: true });
+    await queryFirstSessionCatalog(WORKSPACE_ID, { query: " session ", refresh: true });
 
     expect(request).toHaveBeenCalledWith("session.catalog.query", {
       scope: "workspace",
       limit: 50,
       search: "session",
       refresh: true
-    });
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    }, [], { context: { scope: "workspace", workspaceId: WORKSPACE_ID } });
+    expect(catalog()).toMatchObject({
       items: [SESSION_ONE],
       query: "session",
       loading: false,
@@ -68,10 +73,10 @@ describe("session catalog controller", () => {
       .mockResolvedValueOnce(page([SESSION_ONE], { total: 2, hasMore: true, nextCursor: NEXT_CURSOR }) as never)
       .mockResolvedValueOnce(page([SESSION_ONE, SESSION_TWO], { total: 2 }) as never);
 
-    await queryFirstSessionCatalog();
-    await loadMoreSessionCatalog();
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+    await loadMoreSessionCatalog(WORKSPACE_ID);
 
-    expect(useSessionCatalogStore.getState().items).toEqual([SESSION_ONE, SESSION_TWO]);
+    expect(catalog().items).toEqual([SESSION_ONE, SESSION_TWO]);
   });
 
   it("reloads the first page when a keyset cursor becomes stale", async () => {
@@ -85,10 +90,10 @@ describe("session catalog controller", () => {
       .mockRejectedValueOnce(stale)
       .mockResolvedValueOnce(page([SESSION_TWO], { revision: 2 }) as never);
 
-    await queryFirstSessionCatalog();
-    await loadMoreSessionCatalog();
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+    await loadMoreSessionCatalog(WORKSPACE_ID);
 
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       items: [SESSION_TWO],
       revision: 2,
       loading: false,
@@ -100,12 +105,12 @@ describe("session catalog controller", () => {
     const pending = deferred<SessionCatalogPage>();
     vi.spyOn(agentConnectionController, "request").mockReturnValue(pending.promise as never);
 
-    const query = queryFirstSessionCatalog();
-    useSessionCatalogStore.getState().reset();
+    const query = queryFirstSessionCatalog(WORKSPACE_ID);
+    useSessionCatalogStore.getState().reset(WORKSPACE_ID);
     pending.reject(new Error("old Port closed"));
     await query;
 
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       items: [],
       loading: false,
       error: undefined
@@ -113,30 +118,30 @@ describe("session catalog controller", () => {
   });
 
   it("refreshes on a changed revision but ignores an unchanged ready revision", async () => {
-    useSessionCatalogStore.setState({ revision: 3, rebuilding: false });
+    useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, status(3));
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
       page([SESSION_TWO], { revision: 4 }) as never
     );
 
-    handleSessionCatalogChanged(3);
+    handleSessionCatalogChanged(WORKSPACE_ID, 3);
     expect(request).not.toHaveBeenCalled();
-    handleSessionCatalogChanged(4);
+    handleSessionCatalogChanged(WORKSPACE_ID, 4);
 
-    await vi.waitFor(() => expect(useSessionCatalogStore.getState().items).toEqual([SESSION_TWO]));
+    await vi.waitFor(() => expect(catalog().items).toEqual([SESSION_TWO]));
     expect(request).toHaveBeenCalledOnce();
   });
 
   it("keeps command-palette page queries outside Store mutation", async () => {
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
 
-    await querySessionCatalogPage({ query: " session " });
+    await querySessionCatalogPage({ workspaceId: WORKSPACE_ID, query: " session " });
 
     expect(request).toHaveBeenCalledWith("session.catalog.query", {
       scope: "workspace",
       limit: 50,
       search: "session"
-    });
-    expect(useSessionCatalogStore.getState().items).toEqual([]);
+    }, [], { context: { scope: "workspace", workspaceId: WORKSPACE_ID } });
+    expect(catalog().items).toEqual([]);
   });
 });
 
@@ -168,4 +173,20 @@ function deferred<T>(): {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function catalog() {
+  return selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), WORKSPACE_ID);
+}
+
+function status(revision: number) {
+  return {
+    revision,
+    itemCount: 0,
+    source: "sqlite" as const,
+    state: "ready" as const,
+    rebuilding: false,
+    incomplete: false,
+    skippedCount: 0
+  };
 }

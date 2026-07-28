@@ -27,113 +27,51 @@ import {
 } from "./schemas.js";
 import { hasBoundSessionCatalogCursor } from "./session-catalog-schemas.js";
 import { hasValidEventContext } from "./event-context.js";
+import { isEnvelopeWithinByteLimit } from "./envelope-size.js";
+import {
+  AppProtocolContextSchema,
+  ProtocolContextSchema,
+  TaskProtocolContextWithSessionSchema,
+  TaskProtocolContextWithoutSessionSchema,
+  WorkspaceProtocolContextSchema,
+  hasValidCommandContext,
+  isProtocolContext,
+  type AppProtocolContext,
+  type ProtocolContext,
+  type TaskProtocolContext,
+  type WorkspaceProtocolContext
+} from "./protocol-context.js";
+import {
+  type HandshakeRejected,
+  type HostWelcome,
+  type RendererHello
+} from "./handshake-envelope.js";
+import { PROTOCOL_VERSION } from "./protocol-version.js";
 
-export const PROTOCOL_VERSION = 2 as const;
-export const DEFAULT_MAX_ENVELOPE_BYTES = 2 * 1024 * 1024;
+export { PROTOCOL_REVISION } from "./protocol-revision.js";
+export { DEFAULT_MAX_ENVELOPE_BYTES, PROTOCOL_VERSION } from "./protocol-version.js";
+export * from "./handshake-envelope.js";
 
-export function isEnvelopeWithinByteLimit(value: unknown, maxBytes: number): boolean {
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) return false;
-  const seen = new WeakSet<object>();
-  let bytes = 0;
-  const add = (amount: number): boolean => {
-    bytes += amount;
-    return bytes <= maxBytes;
-  };
-
-  const visit = (candidate: unknown): boolean => {
-    if (candidate === null) return add(4);
-    if (typeof candidate === "string") return add(jsonStringByteLength(candidate));
-    if (typeof candidate === "number") return add(Number.isFinite(candidate) ? String(candidate).length : 4);
-    if (typeof candidate === "boolean") return add(candidate ? 4 : 5);
-    if (candidate instanceof ArrayBuffer) return add(2);
-    if (typeof candidate !== "object" || seen.has(candidate)) return false;
-    seen.add(candidate);
-
-    if (Array.isArray(candidate)) {
-      if (!add(2 + Math.max(0, candidate.length - 1))) return false;
-      for (const item of candidate) if (!visit(item)) return false;
-      return true;
-    }
-
-    let entries: Array<[string, unknown]>;
-    try {
-      entries = Object.entries(candidate);
-    } catch {
-      return false;
-    }
-    if (!add(2 + Math.max(0, entries.length - 1))) return false;
-    for (const [key, child] of entries) {
-      if (!add(jsonStringByteLength(key) + 1) || !visit(child)) return false;
-    }
-    return true;
-  };
-
-  return visit(value);
-}
-
-function jsonStringByteLength(value: string): number {
-  let bytes = 2;
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code === 0x22 || code === 0x5c || code === 0x08 || code === 0x09 || code === 0x0a || code === 0x0c || code === 0x0d) {
-      bytes += 2;
-    } else if (code < 0x20) {
-      bytes += 6;
-    } else if (code < 0x80) {
-      bytes += 1;
-    } else if (code < 0x800) {
-      bytes += 2;
-    } else if (code >= 0xd800 && code <= 0xdbff) {
-      const next = value.charCodeAt(index + 1);
-      if (next >= 0xdc00 && next <= 0xdfff) {
-        bytes += 4;
-        index += 1;
-      } else {
-        bytes += 6;
-      }
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      bytes += 6;
-    } else {
-      bytes += 3;
-    }
-  }
-  return bytes;
-}
-
-export interface RendererHello {
-  protocolVersion: typeof PROTOCOL_VERSION;
-  kind: "hello";
-  rendererInstanceId: string;
-  appInstanceId: string;
-  maxEnvelopeBytes: number;
-}
-
-export interface HostCapabilities {
-  operations: true;
-  eventSequence: true;
-  structuredErrors: true;
-  transferableImages: true;
-  transferableAssets: true;
-  idempotentControlMutations: true;
-}
-
-export interface HostWelcome {
-  protocolVersion: typeof PROTOCOL_VERSION;
-  kind: "welcome";
-  appInstanceId: string;
-  hostInstanceId: string;
-  hostEpoch: number;
-  sdkVersion: string;
-  eventSequence: number;
-  capabilities: HostCapabilities;
-  maxEnvelopeBytes: number;
-}
+export { isEnvelopeWithinByteLimit } from "./envelope-size.js";
+export {
+  APP_PROTOCOL_CONTEXT,
+  COMMAND_CONTEXT_SCOPE_REQUIREMENTS,
+  ProtocolContextSchema,
+  hasValidCommandContext,
+  isProtocolContext,
+  protocolContextsEqual,
+  type AppProtocolContext,
+  type ProtocolContext,
+  type TaskProtocolContext,
+  type WorkspaceProtocolContext
+} from "./protocol-context.js";
 
 export interface RequestEnvelope<T extends AgentCommandType = AgentCommandType> {
   protocolVersion: typeof PROTOCOL_VERSION;
   kind: "request";
   requestId: string;
   hostEpoch: number;
+  context: ProtocolContext;
   idempotencyKey?: string;
   type: T;
   payload: CommandPayloads[T];
@@ -144,6 +82,7 @@ export interface SuccessResponseEnvelope<T extends AgentCommandType = AgentComma
   kind: "response";
   requestId: string;
   hostEpoch: number;
+  context: ProtocolContext;
   type: T;
   ok: true;
   result: import("./agent-messages.js").CommandResults[T];
@@ -154,6 +93,7 @@ export interface ErrorResponseEnvelope<T extends AgentCommandType = AgentCommand
   kind: "response";
   requestId: string;
   hostEpoch: number;
+  context: ProtocolContext;
   type: T;
   ok: false;
   error: import("./agent-messages.js").ProtocolError;
@@ -163,54 +103,35 @@ export type ResponseEnvelope<T extends AgentCommandType = AgentCommandType> =
   | SuccessResponseEnvelope<T>
   | ErrorResponseEnvelope<T>;
 
-export interface EventEnvelope<T extends AgentEventType = AgentEventType> {
+interface EventEnvelopeBase<T extends AgentEventType = AgentEventType> {
   protocolVersion: typeof PROTOCOL_VERSION;
   kind: "event";
   hostEpoch: number;
   sequence: number;
   type: T;
   payload: EventPayloads[T];
-  sessionId?: string;
-  sessionGeneration?: number;
-  operationId?: string;
 }
+
+export type EventEnvelope<T extends AgentEventType = AgentEventType> =
+  | (EventEnvelopeBase<T> & {
+      context: AppProtocolContext | WorkspaceProtocolContext;
+      taskSequence?: never;
+    })
+  | (EventEnvelopeBase<T> & {
+      context: TaskProtocolContext;
+      taskSequence: number;
+    });
 
 // Kept as an exported name while call sites migrate from v1 terminology.
 export type CommandEnvelope = RequestEnvelope;
-export type ProtocolEnvelope = RendererHello | HostWelcome | RequestEnvelope | ResponseEnvelope | EventEnvelope;
-
-export const RendererHelloSchema = strictObject({
-  protocolVersion: Type.Literal(PROTOCOL_VERSION),
-  kind: Type.Literal("hello"),
-  rendererInstanceId: Type.String({ minLength: 1, maxLength: 512 }),
-  appInstanceId: Type.String({ minLength: 1, maxLength: 512 }),
-  maxEnvelopeBytes: Type.Integer({ minimum: 65_536, maximum: 64 * 1024 * 1024 })
-});
-
-export const HostWelcomeSchema = strictObject({
-  protocolVersion: Type.Literal(PROTOCOL_VERSION),
-  kind: Type.Literal("welcome"),
-  appInstanceId: Type.String({ minLength: 1, maxLength: 512 }),
-  hostInstanceId: Type.String({ minLength: 1, maxLength: 512 }),
-  hostEpoch: Type.Integer({ minimum: 0 }),
-  sdkVersion: Type.String({ minLength: 1, maxLength: 128 }),
-  eventSequence: Type.Integer({ minimum: 0 }),
-  capabilities: strictObject({
-    operations: Type.Literal(true),
-    eventSequence: Type.Literal(true),
-    structuredErrors: Type.Literal(true),
-    transferableImages: Type.Literal(true),
-    transferableAssets: Type.Literal(true),
-    idempotentControlMutations: Type.Literal(true)
-  }),
-  maxEnvelopeBytes: Type.Integer({ minimum: 65_536, maximum: 64 * 1024 * 1024 })
-});
+export type ProtocolEnvelope = RendererHello | HostWelcome | HandshakeRejected | RequestEnvelope | ResponseEnvelope | EventEnvelope;
 
 export const RequestEnvelopeSchema = strictObject({
   protocolVersion: Type.Literal(PROTOCOL_VERSION),
   kind: Type.Literal("request"),
   requestId: Type.String({ minLength: 1, maxLength: 512 }),
   hostEpoch: Type.Integer({ minimum: 0 }),
+  context: ProtocolContextSchema,
   idempotencyKey: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   type: Type.String({ minLength: 1, maxLength: 128 }),
   payload: Type.Any()
@@ -221,6 +142,7 @@ const SuccessResponseEnvelopeSchema = strictObject({
   kind: Type.Literal("response"),
   requestId: Type.String({ minLength: 1, maxLength: 512 }),
   hostEpoch: Type.Integer({ minimum: 0 }),
+  context: ProtocolContextSchema,
   type: Type.String({ minLength: 1, maxLength: 128 }),
   ok: Type.Literal(true),
   result: Type.Any()
@@ -231,6 +153,7 @@ const ErrorResponseEnvelopeSchema = strictObject({
   kind: Type.Literal("response"),
   requestId: Type.String({ minLength: 1, maxLength: 512 }),
   hostEpoch: Type.Integer({ minimum: 0 }),
+  context: ProtocolContextSchema,
   type: Type.String({ minLength: 1, maxLength: 128 }),
   ok: Type.Literal(false),
   error: ProtocolErrorSchema
@@ -238,29 +161,30 @@ const ErrorResponseEnvelopeSchema = strictObject({
 
 export const ResponseEnvelopeSchema = Type.Union([SuccessResponseEnvelopeSchema, ErrorResponseEnvelopeSchema]);
 
-export const EventEnvelopeSchema = strictObject({
+const EventEnvelopeFields = {
   protocolVersion: Type.Literal(PROTOCOL_VERSION),
   kind: Type.Literal("event"),
   hostEpoch: Type.Integer({ minimum: 0 }),
-  sequence: Type.Integer({ minimum: 1 }),
+  sequence: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
   type: Type.String({ minLength: 1, maxLength: 128 }),
-  payload: Type.Any(),
-  sessionId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
-  sessionGeneration: Type.Optional(Type.Integer({ minimum: 0 })),
-  operationId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 }))
-});
+  payload: Type.Any()
+};
+export const EventEnvelopeSchema = Type.Union([
+  strictObject({ ...EventEnvelopeFields, context: AppProtocolContextSchema }),
+  strictObject({ ...EventEnvelopeFields, context: WorkspaceProtocolContextSchema }),
+  strictObject({
+    ...EventEnvelopeFields,
+    context: Type.Union([
+      TaskProtocolContextWithoutSessionSchema,
+      TaskProtocolContextWithSessionSchema
+    ]),
+    taskSequence: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+  })
+]);
 
 export type RequestEnvelopeShape = Static<typeof RequestEnvelopeSchema>;
 export type ResponseEnvelopeShape = Static<typeof ResponseEnvelopeSchema>;
 export type EventEnvelopeShape = Static<typeof EventEnvelopeSchema>;
-
-export function isRendererHello(value: unknown): value is RendererHello {
-  return Value.Check(RendererHelloSchema, value);
-}
-
-export function isHostWelcome(value: unknown): value is HostWelcome {
-  return Value.Check(HostWelcomeSchema, value);
-}
 
 export function isRequestEnvelope(value: unknown): value is RequestEnvelope {
   if (!Value.Check(RequestEnvelopeSchema, value)) return false;
@@ -269,6 +193,7 @@ export function isRequestEnvelope(value: unknown): value is RequestEnvelope {
   const schema = CommandPayloadSchemas[type];
   if (!schema || !Value.Check(schema, envelope.payload)) return false;
   if (isReplaySafeControlMutation(type) !== (typeof envelope.idempotencyKey === "string")) return false;
+  if (!hasValidCommandContext(type, envelope.context as ProtocolContext)) return false;
   return !isPromptCommand(type) || hasValidTransferImages(envelope.payload);
 }
 
@@ -276,6 +201,7 @@ export function correlateInvalidRequest(value: unknown): {
   requestId: string;
   hostEpoch: number;
   type: AgentCommandType;
+  context: ProtocolContext;
 } | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const candidate = value as Record<string, unknown>;
@@ -284,13 +210,15 @@ export function correlateInvalidRequest(value: unknown): {
     || candidate.kind !== "request"
     || typeof candidate.requestId !== "string"
     || !Number.isSafeInteger(candidate.hostEpoch)
+    || !isProtocolContext(candidate.context)
     || typeof candidate.type !== "string"
     || !(candidate.type in CommandPayloadSchemas)
   ) return undefined;
   return {
     requestId: candidate.requestId,
     hostEpoch: Number(candidate.hostEpoch),
-    type: candidate.type as AgentCommandType
+    type: candidate.type as AgentCommandType,
+    context: candidate.context
   };
 }
 
@@ -310,6 +238,7 @@ export function isResponseEnvelope(value: unknown): value is ResponseEnvelope {
   const envelope = value as ResponseEnvelopeShape;
   const type = envelope.type as AgentCommandType;
   if (!CommandResultSchemas[type]) return false;
+  if (!hasValidCommandContext(type, envelope.context as ProtocolContext)) return false;
   if (!envelope.ok) return true;
   if (!Value.Check(CommandResultSchemas[type], envelope.result)) return false;
   if (type === "asset.read" && !isValidAssetReadResult(envelope.result)) return false;
@@ -319,7 +248,10 @@ export function isResponseEnvelope(value: unknown): value is ResponseEnvelope {
   );
 }
 
-export function correlateInvalidResponse(value: unknown): { requestId: string; hostEpoch: number } | undefined {
+export function correlateInvalidResponse(value: unknown): {
+  requestId: string;
+  hostEpoch: number;
+} | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const candidate = value as Record<string, unknown>;
   if (
@@ -328,7 +260,10 @@ export function correlateInvalidResponse(value: unknown): { requestId: string; h
     || typeof candidate.requestId !== "string"
     || !Number.isSafeInteger(candidate.hostEpoch)
   ) return undefined;
-  return { requestId: candidate.requestId, hostEpoch: Number(candidate.hostEpoch) };
+  return {
+    requestId: candidate.requestId,
+    hostEpoch: Number(candidate.hostEpoch)
+  };
 }
 
 let localCounter = 0;
@@ -338,21 +273,10 @@ export function createMessageId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${localCounter.toString(36)}`;
 }
 
-export function helloEnvelope(
-  rendererInstanceId: string,
-  appInstanceId: string,
-  maxEnvelopeBytes = DEFAULT_MAX_ENVELOPE_BYTES
-): RendererHello {
-  return { protocolVersion: PROTOCOL_VERSION, kind: "hello", rendererInstanceId, appInstanceId, maxEnvelopeBytes };
-}
-
-export function welcomeEnvelope(options: Omit<HostWelcome, "protocolVersion" | "kind">): HostWelcome {
-  return { protocolVersion: PROTOCOL_VERSION, kind: "welcome", ...options };
-}
-
 export function commandEnvelope<T extends AgentCommandType>(
   type: T,
   payload: CommandPayloads[T],
+  context: ProtocolContext,
   hostEpoch = 0,
   idempotencyKey = isReplaySafeControlMutation(type) ? createMessageId("mutation") : undefined
 ): RequestEnvelope<T> {
@@ -364,36 +288,44 @@ export function commandEnvelope<T extends AgentCommandType>(
     kind: "request",
     requestId: createMessageId("request"),
     hostEpoch,
+    context,
     ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
     type,
     payload
   };
 }
 
-export interface EventEnvelopeContext {
+interface BaseEventEnvelopeContext {
   hostEpoch: number;
   sequence: number;
-  sessionId?: string;
-  sessionGeneration?: number;
-  operationId?: string;
 }
+
+export type EventEnvelopeContext =
+  | (BaseEventEnvelopeContext & {
+      context: AppProtocolContext | WorkspaceProtocolContext;
+      taskSequence?: never;
+    })
+  | (BaseEventEnvelopeContext & {
+      context: TaskProtocolContext;
+      taskSequence: number;
+    });
 
 export function eventEnvelope<T extends AgentEventType>(
   type: T,
   payload: EventPayloads[T],
-  context: EventEnvelopeContext = { hostEpoch: 0, sequence: 1 }
+  context: EventEnvelopeContext
 ): EventEnvelope<T> {
-  return {
+  const envelope = {
     protocolVersion: PROTOCOL_VERSION,
     kind: "event",
     hostEpoch: context.hostEpoch,
     sequence: context.sequence,
+    context: context.context,
     type,
     payload,
-    ...(context.sessionId === undefined ? {} : { sessionId: context.sessionId }),
-    ...(context.sessionGeneration === undefined ? {} : { sessionGeneration: context.sessionGeneration }),
-    ...(context.operationId === undefined ? {} : { operationId: context.operationId })
+    ...(context.context.scope === "task" ? { taskSequence: context.taskSequence } : {})
   };
+  return envelope as EventEnvelope<T>;
 }
 
 export function agentEventEnvelope(event: AgentEvent, context: EventEnvelopeContext): EventEnvelope {
@@ -403,6 +335,7 @@ export function agentEventEnvelope(event: AgentEvent, context: EventEnvelopeCont
 export function responseEnvelope<T extends AgentCommandType>(
   requestId: string,
   hostEpoch: number,
+  context: ProtocolContext,
   response: CommandResponse<T>
 ): ResponseEnvelope<T> {
   if (response.ok) {
@@ -411,6 +344,7 @@ export function responseEnvelope<T extends AgentCommandType>(
       kind: "response",
       requestId,
       hostEpoch,
+      context,
       type: response.type,
       ok: true,
       result: response.result
@@ -421,6 +355,7 @@ export function responseEnvelope<T extends AgentCommandType>(
     kind: "response",
     requestId,
     hostEpoch,
+    context,
     type: response.type,
     ok: false,
     error: response.error

@@ -302,7 +302,7 @@ describe("PiSdkRuntime", () => {
       expect(JSON.stringify(configuredAfterNewSession)).not.toContain(runtimeKey);
       const diagnostics = await runtime.collectDiagnostics();
       expect(diagnostics).toMatchObject({
-        application: "Pi-67 Desktop",
+        application: "π",
         piSdkVersion: "0.81.1",
         sessionConfigured: true
       });

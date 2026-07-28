@@ -43,7 +43,7 @@ export function toProtocolError(error: unknown): ProtocolError {
 }
 
 function safeErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Unknown Agent Host error.";
+  if (!(error instanceof Error)) return "Unknown Pi runtime service error.";
   return redactSensitiveText(error.message).slice(0, 4_096);
 }
 

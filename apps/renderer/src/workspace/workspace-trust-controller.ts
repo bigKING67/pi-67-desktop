@@ -38,7 +38,7 @@ export async function updateWorkspaceTrust(
     });
     return;
   }
-  if (!agentConnectionController.identity) throw new Error("Agent Host 尚未连接。");
+  if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   const projectionTarget = useSessionProjectionStore.getState().capture(authority);
   if (!projectionTarget) throw new Error("Renderer Session projection is not current.");
   const workspace = state.workspace;

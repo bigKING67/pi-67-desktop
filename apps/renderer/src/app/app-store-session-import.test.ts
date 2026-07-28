@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -153,13 +154,13 @@ describe("renderer session import transaction", () => {
       type: "operation.completed",
       payload: { operationId: "operation-import", completedAt: 2 }
     } as const;
-    useAppStore.getState().receiveAgentEvent(terminal, eventEnvelope(terminal.type, terminal.payload, {
+    useAppStore.getState().receiveAgentEvent(terminal, eventEnvelope(terminal.type, terminal.payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-imported",
       sessionGeneration: 7,
       operationId: "operation-import"
-    }));
+    })));
 
     expect(useAppStore.getState().runtime).toMatchObject({
       phase: "recovering",
@@ -198,13 +199,13 @@ function emitImportBootstrap(sessionId: string, sessionGeneration: number): void
     type: "session.bootstrap",
     payload: { snapshot: next, reason: "session-import" }
   } as const;
-  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, {
+  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId,
     sessionGeneration,
     operationId: "operation-import"
-  }));
+  })));
 }
 
 function setActiveSession(sessionId: string, sessionGeneration: number): void {

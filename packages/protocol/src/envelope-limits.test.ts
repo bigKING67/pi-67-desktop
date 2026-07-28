@@ -5,6 +5,7 @@ import {
   MAX_TRANSFER_IMAGE_TOTAL_BYTES
 } from "./agent-messages.js";
 import {
+  APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isEnvelopeWithinByteLimit,
   isRequestEnvelope
@@ -17,7 +18,7 @@ describe("protocol envelope limits", () => {
       text: "inspect",
       delivery: "new-turn",
       images
-    }, 1);
+    }, APP_PROTOCOL_CONTEXT, 1);
     expect(isRequestEnvelope(submit([
       { name: "screen.png", mimeType: "image/png", data: new ArrayBuffer(32) }
     ]))).toBe(true);
@@ -49,5 +50,11 @@ describe("protocol envelope limits", () => {
     const circular: { self?: unknown } = {};
     circular.self = circular;
     expect(isEnvelopeWithinByteLimit(circular, 1_024)).toBe(false);
+
+    const shared = { value: "counted twice" };
+    const aliases = { first: shared, second: shared };
+    const aliasBytes = new TextEncoder().encode(JSON.stringify(aliases)).byteLength;
+    expect(isEnvelopeWithinByteLimit(aliases, aliasBytes)).toBe(true);
+    expect(isEnvelopeWithinByteLimit(aliases, aliasBytes - 1)).toBe(false);
   });
 });

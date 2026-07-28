@@ -2,6 +2,7 @@ import type { SessionSnapshot, WorkspaceChangesProjection, WorkspaceChangeView }
 import { eventEnvelope, type ProjectionResyncResult } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
@@ -11,16 +12,13 @@ import { selectCommittedExtensionCatalog, useExtensionUiStore } from "../extensi
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useAppStore } from "./app-store.js";
-
 const runningChange: WorkspaceChangeView = {
-  kind: "edit",
-  toolCallId: "tool-change-1",
-  path: "src/file.ts",
-  pathTruncated: false,
-  status: "running",
-  patchTruncated: false
+  kind: "edit", toolCallId: "tool-change-1",
+  path: "src/file.ts", pathTruncated: false,
+  status: "running", patchTruncated: false
 };
 
 describe("renderer projection state", () => {
@@ -34,6 +32,12 @@ describe("renderer projection state", () => {
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     useWorkspaceChangesStore.setState(useWorkspaceChangesStore.getInitialState(), true);
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
+    rendererWorkbenchStore.getState().reset();
+    rendererWorkbenchStore.getState().registerWorkspace({
+      id: "workspace-1", displayName: "Workspace",
+      identity: { canonicalPath: "/workspace", assurance: "filesystem" },
+      trust: "trusted", trustProvenance: "native-picker", availability: "available"
+    });
     setSessionState("session-1", 3);
   });
 
@@ -48,6 +52,7 @@ describe("renderer projection state", () => {
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     useWorkspaceChangesStore.setState(useWorkspaceChangesStore.getInitialState(), true);
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
+    rendererWorkbenchStore.getState().reset();
   });
 
   it("clears recorded changes when a bootstrap switches the session identity", () => {
@@ -55,12 +60,12 @@ describe("renderer projection state", () => {
     emitChange(runningChange);
     const nextSnapshot = snapshot("session-2");
     const event = { type: "session.bootstrap", payload: { snapshot: nextSnapshot, reason: "session-open" } } as const;
-    useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, {
+    useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 4
-    }));
+    })));
 
     expect(useSessionProjectionStore.getState().authority).toMatchObject({
       phase: "active",
@@ -121,7 +126,12 @@ describe("renderer projection state", () => {
     useAppStore.getState().handleSequenceGap({ expected: 2, received: 10, hostEpoch: 9 });
     await vi.waitFor(() => expect(useWorkspaceChangesStore.getState().projection).toEqual(resyncedChanges));
     await vi.waitFor(() => expect(useSessionCatalogStore.getState().items).toHaveLength(1));
-    expect(request).toHaveBeenCalledWith("session.catalog.query", { scope: "workspace", limit: 50 });
+    expect(request).toHaveBeenCalledWith(
+      "session.catalog.query",
+      { scope: "workspace", limit: 50 },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-1" } }
+    );
     expect(useAppStore.getState().sessionTransitionPending).toBe(false);
     expect(selectCommittedExtensionCatalog(
       useExtensionUiStore.getState().catalog,
@@ -223,7 +233,7 @@ describe("renderer projection state", () => {
       expect(useAppStore.getState()).toMatchObject({
         connected: false,
         sessionTransitionPending: true,
-        runtime: { phase: "recovering", detail: "系统已恢复，正在重新连接 Agent Host" }
+        runtime: { phase: "recovering", detail: "系统已恢复，正在重新连接 Pi 运行服务" }
       });
     } finally {
       if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
@@ -359,30 +369,17 @@ describe("renderer projection state", () => {
 });
 
 function setSessionState(sessionId: string, sessionGeneration: number): void {
-  useAppStore.setState({
-    connected: true,
-    hostEpoch: 9
-  });
-  const authority = installSessionProjectionFixture(
-    useAppStore.getState(),
-    snapshot(sessionId),
-    sessionGeneration
-  );
+  useAppStore.setState({ connected: true, hostEpoch: 9 });
+  const authority = installSessionProjectionFixture(useAppStore.getState(), snapshot(sessionId), sessionGeneration);
   if (!authority) throw new Error("Expected Session projection fixture authority.");
   useWorkspaceChangesStore.getState().beginSession(authority);
 }
 
 function emitChange(change: WorkspaceChangeView): void {
-  const event = {
-    type: "workspace.changeChanged",
-    payload: { sessionId: "session-1", change }
-  } as const;
-  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, {
-    hostEpoch: 9,
-    sequence: 1,
-    sessionId: "session-1",
-    sessionGeneration: 3
-  }));
+  const event = { type: "workspace.changeChanged", payload: { sessionId: "session-1", change } } as const;
+  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
+    hostEpoch: 9, sequence: 1, sessionId: "session-1", sessionGeneration: 3
+  })));
 }
 
 function snapshot(sessionId: string): SessionSnapshot {

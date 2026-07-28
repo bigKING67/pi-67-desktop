@@ -5,18 +5,14 @@ import {
   isEventEnvelope,
   isRequestEnvelope,
   isResponseEnvelope,
-  responseEnvelope
+  responseEnvelope,
+  type EventEnvelopeContext,
+  type TaskProtocolContext
 } from "./envelope.js";
 
 describe("approval protocol schemas", () => {
   it("round-trips a fully authoritative approval request and response", () => {
-    const approval = eventEnvelope("approval.requested", approvalPayload(), {
-      hostEpoch: 4,
-      sequence: 9,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    const approval = eventEnvelope("approval.requested", approvalPayload(), eventContext(9, 1));
     const request = commandEnvelope("approval.respond", {
       requestId: "approval-1",
       toolCallId: "tool-call-1",
@@ -24,8 +20,8 @@ describe("approval protocol schemas", () => {
       sessionGeneration: 3,
       operationId: "operation-1",
       allowed: true
-    }, 4);
-    const response = responseEnvelope(request.requestId, 4, {
+    }, taskContext(), 4);
+    const response = responseEnvelope(request.requestId, 4, request.context, {
       ok: true,
       type: "approval.respond",
       result: { resolved: true }
@@ -34,23 +30,11 @@ describe("approval protocol schemas", () => {
       requestId: "approval-1",
       toolCallId: "tool-call-1",
       allowed: true
-    }, {
-      hostEpoch: 4,
-      sequence: 10,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    }, eventContext(10, 2));
     const cancelled = eventEnvelope("approval.cancelled", {
       requests: [{ requestId: "approval-1", toolCallId: "tool-call-1" }],
       reason: "abort"
-    }, {
-      hostEpoch: 4,
-      sequence: 11,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    }, eventContext(11, 3));
 
     expect(isEventEnvelope(approval)).toBe(true);
     expect(isEventEnvelope(resolved)).toBe(true);
@@ -60,13 +44,7 @@ describe("approval protocol schemas", () => {
   });
 
   it("rejects missing authority, invalid scope and unknown approval fields", () => {
-    const event = eventEnvelope("approval.requested", approvalPayload(), {
-      hostEpoch: 4,
-      sequence: 9,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    const event = eventEnvelope("approval.requested", approvalPayload(), eventContext(9, 1));
     const { operationId: _operationId, ...withoutOperation } = event.payload;
     expect(isEventEnvelope({ ...event, payload: withoutOperation })).toBe(false);
     expect(isEventEnvelope({
@@ -85,7 +63,7 @@ describe("approval protocol schemas", () => {
       sessionGeneration: 3,
       operationId: "operation-1",
       allowed: true
-    }, 4);
+    }, taskContext(), 4);
     const { operationId: _responseOperationId, ...withoutResponseOperation } = request.payload;
     expect(isRequestEnvelope({ ...request, payload: withoutResponseOperation })).toBe(false);
     expect(isRequestEnvelope({
@@ -96,25 +74,13 @@ describe("approval protocol schemas", () => {
       requestId: "approval-1",
       toolCallId: "tool-call-1",
       allowed: true
-    }, {
-      hostEpoch: 4,
-      sequence: 10,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    }, eventContext(10, 2));
     const { toolCallId: _resolvedToolCallId, ...resolvedWithoutTool } = resolved.payload;
     expect(isEventEnvelope({ ...resolved, payload: resolvedWithoutTool })).toBe(false);
     const cancelled = eventEnvelope("approval.cancelled", {
       requests: [{ requestId: "approval-1", toolCallId: "tool-call-1" }],
       reason: "abort"
-    }, {
-      hostEpoch: 4,
-      sequence: 11,
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-1"
-    });
+    }, eventContext(11, 3));
     expect(isEventEnvelope({
       ...cancelled,
       payload: { ...cancelled.payload, requests: [{ requestId: "approval-1", toolCallId: "" }] }
@@ -139,7 +105,7 @@ describe("workspace change protocol schemas", () => {
     const edit = eventEnvelope("workspace.changeChanged", {
       sessionId: "session-1",
       change: editChange
-    }, { hostEpoch: 1, sequence: 1, sessionId: "session-1", sessionGeneration: 1 });
+    }, taskEventContext(1, 1));
     const writeChange = {
       kind: "write" as const,
       toolCallId: "write-1",
@@ -153,7 +119,7 @@ describe("workspace change protocol schemas", () => {
     const write = eventEnvelope("workspace.changeChanged", {
       sessionId: "session-1",
       change: writeChange
-    }, { hostEpoch: 1, sequence: 2, sessionId: "session-1", sessionGeneration: 1 });
+    }, taskEventContext(2, 2));
 
     expect(isEventEnvelope(edit)).toBe(true);
     expect(isEventEnvelope(write)).toBe(true);
@@ -178,8 +144,8 @@ describe("workspace change protocol schemas", () => {
   });
 
   it("requires authoritative changes in projection resync results", () => {
-    const request = commandEnvelope("projection.resync", {}, 2);
-    const response = responseEnvelope(request.requestId, 2, {
+    const request = commandEnvelope("projection.resync", {}, taskContext(4), 2);
+    const response = responseEnvelope(request.requestId, 2, request.context, {
       ok: true,
       type: "projection.resync",
       result: {
@@ -206,6 +172,31 @@ describe("workspace change protocol schemas", () => {
     expect(isResponseEnvelope({ ...response, result: withoutChanges })).toBe(false);
   });
 });
+
+function taskContext(sessionGeneration = 3): TaskProtocolContext {
+  return {
+    scope: "task",
+    workspaceId: "workspace-1",
+    taskId: "task-1",
+    taskGeneration: 1,
+    sessionId: "session-1",
+    sessionGeneration,
+    operationId: "operation-1"
+  };
+}
+
+function eventContext(sequence: number, taskSequence: number): EventEnvelopeContext {
+  return { hostEpoch: 4, sequence, context: taskContext(), taskSequence };
+}
+
+function taskEventContext(sequence: number, taskSequence: number): EventEnvelopeContext {
+  return {
+    hostEpoch: 1,
+    sequence,
+    context: taskContext(1),
+    taskSequence
+  };
+}
 
 function approvalPayload() {
   return {

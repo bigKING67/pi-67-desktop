@@ -58,7 +58,7 @@ export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void
     trustUpdating: false,
     sessionTransitionPending: false,
     runtime: workspace
-      ? { phase: "recovering", detail: "Agent Host 连接已中断，正在等待恢复", recoverable: true }
+      ? { phase: "recovering", detail: "Pi 运行服务连接已中断，正在等待恢复", recoverable: true }
       : INITIAL_RUNTIME_STATE
   });
   if (!workspace) return;
@@ -101,15 +101,15 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
     runtime: {
       phase: state.recoverable ? "recovering" : "failed",
       detail: state.recoverable
-        ? `Agent Host 已退出，正在进行第 ${state.attempt ?? 1} 次恢复`
-        : "Agent Host 连续退出，自动恢复已停止",
+        ? `Pi 运行服务已退出，正在进行第 ${state.attempt ?? 1} 次恢复`
+        : "Pi 运行服务连续退出，自动恢复已停止",
       recoverable: state.recoverable,
       ...(state.attempt === undefined ? {} : { attempt: state.attempt })
     }
   });
   publishNotification({
     level: "warning",
-    title: "Agent Host 已退出",
+    title: "Pi 运行服务已退出",
     message: messages.credentials.clearedAfterHostReplacement
   });
 }

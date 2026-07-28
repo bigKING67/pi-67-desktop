@@ -24,7 +24,7 @@ export function projectRuntimeDiagnostics(
   const cwd = session?.sessionManager.getCwd();
   const model = session?.model ? `${session.model.provider}/${session.model.id}` : undefined;
   return {
-    application: "Pi-67 Desktop",
+    application: "π",
     piSdkVersion: sdkVersion,
     platform: process.platform,
     architecture: process.arch,

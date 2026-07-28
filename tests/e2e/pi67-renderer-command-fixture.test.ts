@@ -1,0 +1,41 @@
+import {
+  isResponseEnvelope,
+  responseEnvelope,
+  type AgentCommandType,
+  type WorkspaceProtocolContext
+} from "@pi67/protocol";
+import { describe, expect, it } from "vitest";
+import { createMockProviderConfigurationSnapshot } from "./pi67-renderer-fixture.js";
+
+const WORKSPACE_CONTEXT: WorkspaceProtocolContext = {
+  scope: "workspace",
+  workspaceId: "workspace-test"
+};
+
+const PROVIDER_SNAPSHOT_COMMANDS = [
+  "provider.configuration.get",
+  "provider.configuration.reload",
+  "provider.configuration.save",
+  "provider.configuration.remove",
+  "provider.credential.store",
+  "provider.credential.remove",
+  "model.default.set"
+] as const satisfies readonly AgentCommandType[];
+
+describe("renderer Provider command fixture", () => {
+  it("returns one secret-free, schema-valid snapshot shape for every Provider mutation", () => {
+    const snapshot = createMockProviderConfigurationSnapshot();
+
+    for (const type of PROVIDER_SNAPSHOT_COMMANDS) {
+      const response = responseEnvelope(`fixture-${type}`, 1, WORKSPACE_CONTEXT, {
+        ok: true,
+        type,
+        result: snapshot
+      } as never);
+      expect(isResponseEnvelope(response), type).toBe(true);
+    }
+
+    const serialized = JSON.stringify(snapshot);
+    expect(serialized).not.toMatch(/workspace-secret|write-only|header-value/iu);
+  });
+});

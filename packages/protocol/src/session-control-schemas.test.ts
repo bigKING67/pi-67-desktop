@@ -1,6 +1,15 @@
 import type { SessionSnapshot } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
-import { isResponseEnvelope, responseEnvelope } from "./envelope.js";
+import { isResponseEnvelope, responseEnvelope, type ProtocolContext } from "./envelope.js";
+
+const TASK_CONTEXT: ProtocolContext = {
+  scope: "task",
+  workspaceId: "workspace-1",
+  taskId: "task-1",
+  taskGeneration: 1,
+  sessionId: "session-1",
+  sessionGeneration: 1
+};
 
 describe("Session control response schemas", () => {
   it("accepts narrow Session control results and rejects legacy full snapshots", () => {
@@ -11,17 +20,17 @@ describe("Session control response schemas", () => {
         thinkingLevel: "high"
       }
     };
-    const select = responseEnvelope("select-model", 1, {
+    const select = responseEnvelope("select-model", 1, TASK_CONTEXT, {
       ok: true,
       type: "model.select",
       result: controls
     });
-    const thinking = responseEnvelope("thinking-level", 1, {
+    const thinking = responseEnvelope("thinking-level", 1, TASK_CONTEXT, {
       ok: true,
       type: "thinking.set",
       result: controls
     });
-    const runtimeKey = responseEnvelope("runtime-key", 1, {
+    const runtimeKey = responseEnvelope("runtime-key", 1, TASK_CONTEXT, {
       ok: true,
       type: "model.setRuntimeKey",
       result: {

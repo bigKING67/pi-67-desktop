@@ -33,12 +33,13 @@ count.
 
 ## Primary jobs
 
-1. Open a workspace, understand trust, start or resume a managed Pi session,
-   and import an external Pi JSONL session without turning its source file into
-   Desktop's active writer.
-2. Understand Provider authentication status, add a runtime-only API key when
-   needed, and select a configured Pi model and readable thinking level without
-   editing JSON.
+1. Register one or more workspaces and switch conversations from one grouped
+   navigation rail. A running task binds exactly one workspace, one managed Pi
+   JSONL session, and one live Pi Runtime, and continues in the background when
+   another conversation is selected.
+2. Manage Pi Providers, models, default selections, and credentials from
+   Settings. Credentials persist to Pi `auth.json` by default; an explicit
+   runtime-only key remains available for temporary use.
 3. Follow streaming reasoning, tools, file changes, and follow-up work without
    losing the current task.
 4. Use skills, prompts, extension commands, session tree, rollback, and compact
@@ -46,12 +47,54 @@ count.
 5. Diagnose shell, configuration, extension, update, and runtime failures
    without exposing credentials or private content.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
+7. Open the singleton Settings surface for account, application, global, or
+   current-workspace Pi configuration without losing drafts or background work.
 
 ## Success criteria
 
 - Both supported platforms can install, launch, and complete an offline SDK
   contract smoke from signed packages.
 - Existing users reuse `~/.pi/agent` without credential or session migration.
+- One Electron window can register multiple workspaces. The navigation rail is
+  the only Workspace and conversation switcher: each Workspace is a collapsible
+  group containing active work, drafts, and Catalog-backed recent sessions.
+- Session history has no user-visible open-tab limit. Catalog pages, search, and
+  list virtualization keep large histories bounded, while Pi JSONL remains the
+  source of truth. Each group initially shows six ordinary recent sessions and
+  offers an explicit load-more action.
+- A conversation row uses the latest accepted or currently loaded user message
+  as its primary in-memory preview when available, with the stable Pi Session
+  name retained as secondary context. Prompt-derived previews are never copied
+  into the Session Catalog or persisted Workbench state.
+- The application admits at most four tasks in accepted, running, approval-wait,
+  or Extension-input-wait states. The Renderer explains the limit early, but the
+  Pi runtime service owns the atomic admission decision.
+- Each live task owns an independent Pi Runtime and projection. Selecting another
+  conversation, collapsing a Workspace, or opening Settings does not stop
+  background work. One canonical Pi JSONL session path has at most one live
+  writer across the application.
+- There is no tab-close or local archive metaphor. A running or waiting row
+  exposes a deliberate stop action; ordinary history remains discoverable from
+  the rebuildable Session Catalog and no UI action deletes Pi JSONL in v1.
+- A workspace added through the native directory picker is trusted for project
+  resource loading. That trust never replaces one-shot approval for destructive,
+  external, system, or workspace-external Tool actions.
+- Restored Workspace registrations are checked against their persisted filesystem
+  identity before project resources load. A missing or replaced directory stays
+  inactive until the user explicitly repairs it through the native directory
+  picker; repairing it is a fresh trust gesture.
+- Settings opens or focuses one application-level selected surface. Global and project
+  scope are explicit only where meaningful, and changing the current workspace
+  retargets project scope instead of creating another Settings instance.
+- The conversation workbench is the only three-region application surface.
+  Settings and other application-level surfaces replace the Workspace rail with
+  their own bounded navigation, use a two-column shell on wide windows, and
+  provide an explicit `返回工作台` action that restores the prior conversation or
+  Workspace without stopping background tasks.
+- The footer shows a signed-out account entry and a help menu. Account opens the
+  Settings account section; local Pi, Workspace, and Session use does not require
+  login. Enterprise and team capabilities remain unavailable until a real
+  account service is integrated.
 - The user-visible application name and icon are `π` with the locked black-square
   and white-mark assets. `com.pi67.desktop`, the `pi67` URL scheme, package names,
   GitHub repository, executable names, and `Pi-67-Desktop-*` release artifacts
@@ -68,13 +111,28 @@ count.
   SemVer, Registry version matching, and final runtime surface ownership; it never
   implies shared `ctx.ui` caller attribution.
 - Production starts no local HTTP server and listens on no application TCP port.
-- Welcome does not start the Agent Host or load the Pi SDK until a workspace or
-  Agent Host-backed diagnostic action needs it.
+- Welcome does not start the internal Agent Host utility process or load the Pi
+  SDK until a Workspace or Pi-runtime diagnostic action needs it.
 - Credential, prompt, source, and raw tool content never enters telemetry or
   default diagnostic logs.
 - Provider status may expose only non-secret metadata such as configured state,
   credential source, and model count; complete credential values never cross
   into the renderer.
+- Pi configuration files are the only source of truth: Desktop reads and writes
+  `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
+  `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
+  model configuration copy.
+- Desktop watches those Pi files and publishes revisioned snapshots. A clean
+  view adopts external TUI, script, or manual edits automatically; an unsaved
+  draft remains intact and must explicitly adopt the newer revision before it
+  can overwrite anything.
+- An idle Task applies a valid model-catalog change immediately. A running Task
+  marks the reload pending and applies it after the current Operation settles.
+  Removing the selected model clears the selection and blocks the next Prompt
+  until the user chooses an available model.
+- Common Provider and model fields use bounded forms. Advanced JSON cannot carry
+  `apiKey` or header values; credential and header values are write-only and are
+  absent from snapshots, events, projections, logs, and diagnostics.
 - Release performance meets `docs/testing/performance.md`.
 - Prompt drafts and attachments are cleared only after the Agent Host accepts
   the operation for the same Host epoch, Session ID, and Session generation that
@@ -168,6 +226,13 @@ count.
 - Local-first and no analytics or PostHog in v1.
 - The renderer may persist only the non-sensitive appearance preference; it
   does not persist credentials, prompts, source, tool payloads, or session data.
+- Electron Main may persist a bounded, schema-validated Workbench V2 layout with
+  Workspace identity and ordering, expanded Workspace IDs, the selected
+  conversation or Settings surface, Settings scope, at most four runtime recovery
+  identities, and clean-exit state. Ordinary idle Session rows are rebuilt from
+  Catalog instead of being persisted as open UI objects. Draft text, attachments,
+  transcript, runtime detail, private fallback titles, and credential material
+  never enter that layout.
 - Operation terminal receipts are bounded, memory-only recovery metadata. They
   contain lifecycle, timing, Host/Session authority, and redacted structured error
   state only; Prompt text, import paths, commands, compaction instructions, source,

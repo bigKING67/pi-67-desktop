@@ -150,13 +150,13 @@ export class ConversationAssetController {
       offset += result.data.byteLength;
       if (entry.refs === 0) throw new Error("Asset loading was cancelled after leaving the visible transcript.");
       if (result.done !== (offset === entry.reference.byteLength)) {
-        throw new Error("The Agent Host returned an inconsistent asset completion marker.");
+        throw new Error("Pi 运行服务返回了不一致的资源完成标记。");
       }
     }
     if (entry.lifecycle !== this.lifecycle || this.entries.get(entry.key) !== entry) {
-      throw new Error("The asset belongs to a retired Agent Host connection.");
+      throw new Error("The asset belongs to a retired Pi runtime service connection.");
     }
-    if (mimeType === undefined) throw new Error("The Agent Host returned an asset without a MIME type.");
+    if (mimeType === undefined) throw new Error("Pi 运行服务返回的资源缺少 MIME 类型。");
     const objectUrl = this.createObjectUrl(new Blob([bytes], { type: mimeType }));
     entry.objectUrl = objectUrl;
     if (entry.refs === 0) this.scheduleRetention(entry);
@@ -219,7 +219,7 @@ function assertAssetChunk(
     || result.data.byteLength > MAX_ASSET_READ_BYTES
     || (expectedMimeType !== undefined && result.mimeType !== expectedMimeType)
   ) {
-    throw new Error("The Agent Host returned an invalid asset chunk.");
+    throw new Error("Pi 运行服务返回了无效的资源分片。");
   }
 }
 

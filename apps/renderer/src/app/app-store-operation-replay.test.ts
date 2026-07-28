@@ -64,7 +64,7 @@ describe("renderer Operation submission replay", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "任务已中断",
-      message: "上下文压缩 · Agent Host 未能确认任务终态"
+      message: "上下文压缩 · Pi 运行服务未能确认任务终态"
     });
   });
 

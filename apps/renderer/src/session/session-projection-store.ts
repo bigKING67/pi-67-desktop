@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { eventSessionAuthority } from "../connection/event-authority.js";
 import {
   activeSessionProjectionAuthority,
   activeSessionProjectionAuthorityWithoutConnection,
@@ -101,14 +102,15 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
 
   acceptEvent(connection, envelope, payloadSessionId) {
     const current = get().authority;
-    const sessionGeneration = envelope.sessionGeneration;
+    const eventAuthority = eventSessionAuthority(envelope);
+    const sessionGeneration = eventAuthority?.sessionGeneration;
     if (
       !connection.connected
       || connection.hostEpoch === undefined
       || current.phase !== "active"
       || current.hostEpoch !== connection.hostEpoch
       || envelope.hostEpoch !== current.hostEpoch
-      || envelope.sessionId !== current.sessionId
+      || eventAuthority?.sessionId !== current.sessionId
       || sessionGeneration === undefined
       || (payloadSessionId !== undefined && payloadSessionId !== current.sessionId)
       || current.sessionGeneration !== sessionGeneration

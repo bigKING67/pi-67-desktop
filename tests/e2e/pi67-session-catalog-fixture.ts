@@ -12,8 +12,7 @@ export interface FixtureSessionSummary {
 
 type FixtureSessionCatalogSource = "sqlite" | "sdk-fallback";
 type FixtureSessionCatalogState = "ready" | "rebuilding" | "fallback" | "unavailable";
-
-interface FixtureSessionCatalogStatus {
+export interface FixtureSessionCatalogStatus {
   revision: number;
   source: FixtureSessionCatalogSource;
   state: FixtureSessionCatalogState;
@@ -166,6 +165,7 @@ export async function installSessionCatalogFixture(
           kind?: string;
           requestId?: string;
           hostEpoch?: number;
+          context?: Record<string, unknown>;
           type?: string;
           payload?: CatalogRequest;
         };
@@ -176,6 +176,7 @@ export async function installSessionCatalogFixture(
           || (!isCatalogQuery && !isProjectionResync)
           || !envelope.requestId
           || envelope.hostEpoch !== agent.hostEpoch
+          || !envelope.context
         ) {
           originalHandler?.(event);
           return;
@@ -186,10 +187,11 @@ export async function installSessionCatalogFixture(
         agent.commands.push({ type: commandType, payload: structuredClone(payload), hostEpoch: agent.hostEpoch });
         if (isProjectionResync) {
           port.postMessage({
-            protocolVersion: 2,
+            protocolVersion: 3,
             kind: "response",
             requestId: envelope.requestId,
             hostEpoch: agent.hostEpoch,
+            context: envelope.context,
             type: envelope.type,
             ok: true,
             result: {
@@ -219,10 +221,11 @@ export async function installSessionCatalogFixture(
         if (cursorIsStale) {
           if (catalog.staleCursorResponses > 0) catalog.staleCursorResponses -= 1;
           port.postMessage({
-            protocolVersion: 2,
+            protocolVersion: 3,
             kind: "response",
             requestId: envelope.requestId,
             hostEpoch: agent.hostEpoch,
+            context: envelope.context,
             type: envelope.type,
             ok: false,
             error: {
@@ -235,10 +238,11 @@ export async function installSessionCatalogFixture(
         }
 
         port.postMessage({
-          protocolVersion: 2,
+          protocolVersion: 3,
           kind: "response",
           requestId: envelope.requestId,
           hostEpoch: agent.hostEpoch,
+          context: envelope.context,
           type: envelope.type,
           ok: true,
           result: queryCatalog(catalog, payload)
@@ -373,9 +377,21 @@ export async function emitSessionCatalogChanged(
   reason: "reconciled" | "session-created" | "session-updated" | "session-imported" | "source-changed" = "reconciled"
 ): Promise<void> {
   await page.evaluate(({ nextRevision, changeReason }) => {
-    (window as unknown as {
-      __pi67TestAgent: { emit(event: { type: string; payload: unknown }): void };
-    }).__pi67TestAgent.emit({
+    const agent = (window as unknown as {
+      __pi67TestAgent: {
+        activePort?: MessagePort;
+        hostEpoch: number;
+        sequence: number;
+        workspaceId: string;
+      };
+    }).__pi67TestAgent;
+    agent.sequence += 1;
+    agent.activePort?.postMessage({
+      protocolVersion: 3,
+      kind: "event",
+      hostEpoch: agent.hostEpoch,
+      sequence: agent.sequence,
+      context: { scope: "workspace", workspaceId: agent.workspaceId },
       type: "session.catalog.changed",
       payload: { revision: nextRevision, reason: changeReason }
     });

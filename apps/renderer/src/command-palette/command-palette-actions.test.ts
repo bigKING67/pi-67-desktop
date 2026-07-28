@@ -17,8 +17,8 @@ describe("command palette actions", () => {
 
     expect(byId(actions, "settings:provider").disabled).toBeUndefined();
     expect(byId(actions, "settings:update").disabled).toBeUndefined();
-    expect(byId(actions, "settings:doctor")).toMatchObject({ disabled: true, disabledReason: "Agent Host 尚未连接" });
-    expect(byId(actions, "action:compact")).toMatchObject({ disabled: true, disabledReason: "Agent Host 尚未连接" });
+    expect(byId(actions, "settings:doctor")).toMatchObject({ disabled: true, disabledReason: "Pi 运行服务尚未连接" });
+    expect(byId(actions, "action:compact")).toMatchObject({ disabled: true, disabledReason: "Pi 运行服务尚未连接" });
   });
 
   it("matches the Host scheduler by disabling turn and exclusive actions during an active operation", () => {

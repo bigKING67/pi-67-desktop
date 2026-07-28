@@ -1,14 +1,20 @@
 export * from "./agent-runtime.js";
 export * from "./extension-capabilities.js";
 export * from "./extension-catalog.js";
+export * from "./extension-package-management.js";
 export * from "./extension-commands.js";
 export * from "./extension-ui-bridge.js";
 export * from "./message-projection.js";
+export * from "./pi-configuration-service.js";
+export * from "./pi-configuration-service-registry.js";
 export * from "./pi-sdk-runtime.js";
+export * from "./runtime-credential-overrides.js";
 export * from "./safety-extension.js";
 export * from "./session-catalog.js";
 export * from "./session-projection-index.js";
 export * from "./session-tree-projection.js";
+export * from "./workspace-runtime-services.js";
+export * from "./workspace-provider-catalog.js";
 export { normalizeSessionCatalogPathIdentity as normalizeSessionCatalogCwd } from "./session-path-identity.js";
 export {
   createSessionCatalogContext,

@@ -9,6 +9,7 @@ import {
   recordOperationTerminal
 } from "../notifications/notification-store.js";
 import type { RendererSessionAuthority } from "../session/session-authority.js";
+import { eventSessionAuthority } from "../connection/event-authority.js";
 import type { AppEventState, EventStoreGet, EventStoreSet } from "./app-event-state.js";
 
 export function reduceOperationEvent<TState extends AppEventState>(
@@ -168,11 +169,16 @@ function applyStreamBatch(events: unknown[], envelope: EventEnvelope): void {
     if (assistant?.type === "thinking_delta" && typeof assistant.delta === "string") thinking += assistant.delta;
   }
   if (!text && !thinking) return;
+  const authority = eventSessionAuthority(envelope);
   useLiveTurnStore.getState().append({ text, thinking }, {
     hostEpoch: envelope.hostEpoch,
-    ...(envelope.sessionId === undefined ? {} : { sessionId: envelope.sessionId }),
-    ...(envelope.sessionGeneration === undefined ? {} : { sessionGeneration: envelope.sessionGeneration }),
-    ...(envelope.operationId === undefined ? {} : { operationId: envelope.operationId })
+    ...(authority === undefined
+      ? {}
+      : {
+          sessionId: authority.sessionId,
+          sessionGeneration: authority.sessionGeneration,
+          ...(authority.operationId === undefined ? {} : { operationId: authority.operationId })
+        })
   });
 }
 
@@ -192,13 +198,13 @@ function recordRealtimeOperationTerminal(
   input: RealtimeTerminalInput
 ): void {
   const operation = state.operation;
+  const authority = eventSessionAuthority(envelope);
   if (
     !operation
     || operation.operationId !== input.operationId
     || state.hostEpoch !== envelope.hostEpoch
-    || (envelope.operationId !== undefined && envelope.operationId !== input.operationId)
-    || envelope.sessionId === undefined
-    || envelope.sessionGeneration === undefined
+    || authority === undefined
+    || (authority.operationId !== undefined && authority.operationId !== input.operationId)
   ) return;
 
   const base = {
@@ -207,8 +213,8 @@ function recordRealtimeOperationTerminal(
     operationKind: operation.kind,
     cancellable: false as const,
     hostEpoch: envelope.hostEpoch,
-    sessionId: envelope.sessionId,
-    sessionGeneration: envelope.sessionGeneration,
+    sessionId: authority.sessionId,
+    sessionGeneration: authority.sessionGeneration,
     startedAt: operation.startedAt,
     settledAt: input.settledAt
   };

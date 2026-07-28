@@ -1,6 +1,6 @@
 ---
-version: 2
-name: Pi-67 Desktop Design Authority
+version: 3
+name: π Desktop Design Authority
 status: active
 platform: electron-web
 theme: system-light-dark
@@ -9,17 +9,26 @@ color:
   surface: "#ffffff"
   surface-muted: "#eef0ed"
   surface-raised: "#ffffff"
+  surface-hover: "#e8ebe7"
+  surface-active: "#e0e9e4"
   text-primary: "#171a18"
   text-secondary: "#626862"
+  text-tertiary: "#858c86"
   border: "#d9ddd8"
+  border-strong: "#c8cec8"
   accent: "#2f6757"
+  accent-strong: "#215244"
+  accent-soft: "#dcebe5"
   focus: "#2c70c9"
   info: "#2d67aa"
   warning: "#9a5b16"
   danger: "#a43b35"
+  text-on-danger: "#ffffff"
   success: "#287248"
   diff-added: "#e0f1e7"
   diff-removed: "#f8e4e2"
+  code-diff-added-text: "#9be9a8"
+  code-diff-removed-text: "#ffb3ad"
   code-surface: "#0d1117"
   code-border: "#30363d"
   code-text: "#e6edf3"
@@ -34,13 +43,14 @@ radius:
   control: 8
   panel: 12
   overlay: 14
+  pill: 999
 motion:
   fast: 120
   standard: 180
   deliberate: 240
 ---
 
-# Pi-67 Desktop Design Authority
+# π Desktop Design Authority
 
 ## Design read
 
@@ -77,13 +87,35 @@ completing a real session without learning terminal UI conventions first.
 ## Window structure
 
 ```text
-+----------------------+--------------------------------------+----------------------+
-| Workspace / Sessions | Transcript                           | Inspector            |
-| Search / running     | Reasoning / bounded tool cards       | Recorded changes     |
-| recent sessions      | Composer / message queue             | Session / context    |
-+----------------------+--------------------------------------+----------------------+
++----------------------------------------------------------------------------+
+| navigation | current Workspace / conversation | status | notices | Inspector |
++----------------------+--------------------------------------+----------------+
+| Workspace groups     | Conversation or Settings workbench   | Inspector      |
+| active / recent      | Transcript / tools / Composer        | Changes        |
+| account          [?] | or scoped configuration              | Context        |
++----------------------+--------------------------------------+----------------+
 ```
 
+Application-level surfaces use a separate wide-window shell:
+
+```text
++----------------------------------------------------------------------------+
+| π / Settings                                  | notices | application actions |
++----------------------+-----------------------------------------------------+
+| Back + categories    | Settings / update / help content                    |
++----------------------+-----------------------------------------------------+
+```
+
+- The navigation rail is the only Workspace and conversation switcher. Each
+  Workspace is a collapsible group containing active tasks, waiting tasks,
+  provisional drafts, and Catalog-backed recent Sessions.
+- The Title Bar contains navigation, the current Workspace/conversation title,
+  status, notifications, command actions, and the Inspector toggle. It contains
+  no horizontal task strip. The Inspector toggle is the final application action
+  before the Windows caption safe area and the rightmost app action on macOS.
+- Clicking a conversation selects both that conversation and its Workspace.
+  Switching conversations, collapsing a Workspace, or opening Settings never
+  stops or reorders background tasks.
 - Navigation rail: 248px on the current wide layout.
 - Context pane: 360px on the current wide layout and collapsible.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
@@ -91,8 +123,26 @@ completing a real session without learning terminal UI conventions first.
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.
+- At narrow widths, grouped navigation becomes a drawer instead of creating a
+  second horizontal navigation axis. Title and status truncate without moving
+  application actions into the draggable native caption area.
 - The packaged window minimum is 680px so the navigation drawer range remains
   reachable after native window frames are applied.
+- The conversation workbench is the only three-region surface. Settings and
+  future application-level surfaces hide the Workspace rail and Task Inspector,
+  occupy the full area below the Title Bar, and use their own two-column
+  navigation/content shell. `返回工作台` restores the surface that opened Settings
+  when it still exists, otherwise the current Workspace fallback. Background
+  Tasks continue without being reordered or stopped.
+- The Settings navigation column is a compact directory, not a second brand or
+  marketing surface. It begins with `返回工作台` and a functional settings search,
+  followed by single-line categories grouped as `个人`, `应用`, `Pi`, and `支持`.
+  The Title Bar and About page own the visible product lockup; Settings
+  does not repeat the logo, product name, page title, or explanatory hero copy in
+  its navigation column.
+- Settings selection uses a neutral luminance change with text and icon contrast.
+  Product accent colors remain reserved for primary actions, focus, and semantic
+  status such as Pi Runtime readiness rather than ordinary category selection.
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
 - Resizable split handles, a complete Git/workspace Diff, and Files browsing are
@@ -119,12 +169,28 @@ completing a real session without learning terminal UI conventions first.
 CSS consumes only semantic roles:
 
 ```text
-canvas surface surfaceMuted surfaceRaised
-textPrimary textSecondary border accent focus
-info warning danger success diffAdded diffRemoved
+canvas surface surfaceMuted surfaceRaised surfaceHover surfaceActive
+textPrimary textSecondary textTertiary textOnDanger
+border borderStrong accent accentStrong accentSoft focus
+info warning danger success diffAdded diffRemoved codeDiffAddedText codeDiffRemovedText
 codeSurface codeBorder codeText codeMuted overlayBackdrop
 shadowFloating shadowFocus shadowComposer shadowHero
 ```
+
+Spacing uses the 4px scale through named CSS tokens:
+
+```text
+--space-1: 4px   --space-2: 8px   --space-3: 12px
+--space-4: 16px  --space-5: 24px  --space-6: 32px
+```
+
+Components use these names rather than undeclared positional values. A missing
+token must fail review because it can invalidate an entire CSS shorthand.
+
+Radius roles are semantic rather than positional: controls use
+`--radius-control`, panels and cards use `--radius-panel`, dialogs and popovers
+use `--radius-overlay`, pills and badges use `--radius-pill`, and true circles
+use `50%`.
 
 - Accent marks selection, the primary action, and current navigation only.
 - Status always includes text or an accessible icon, never color alone.
@@ -213,6 +279,129 @@ loading error where the operation can produce those states
 - The trigger shows the effective theme, the menu marks the stored preference,
   Escape restores focus, and Reduced Motion removes menu travel.
 
+### Workspaces, conversations, account, and Settings
+
+- A Workspace is a project/configuration/Session Catalog container. A live Task
+  is bound to one Workspace, one Pi JSONL Session, and one independent Pi Runtime.
+  A Conversation is the navigation identity for either that live Task, an idle
+  Catalog Session, or a provisional draft.
+- Each Workspace disclosure initially shows active/waiting/draft rows first and
+  the six most recent ordinary Sessions after them. `展开显示` loads additional
+  bounded Catalog pages; there is no user-visible open-conversation limit.
+- Selecting a conversation automatically expands its Workspace and keeps the row
+  visible. A collapsed Workspace with background work shows running and waiting
+  counts on its group header without relying on color alone.
+- At most four Tasks may be accepted, running, waiting for safety approval, or
+  waiting for blocking Extension input. Reaching the limit explains which state
+  is preserved and that an existing Task must settle or stop before another send.
+- There is no tab close `x`, local hide, archive, or delete control in v1. A live
+  row menu exposes `停止任务`; stopping releases the Runtime but never deletes the
+  Pi JSONL Session. Idle and settled history stays discoverable through Catalog.
+- The stable Task title comes from Pi `session_info.name`. Until an explicit name
+  exists, use `未命名任务`. A row may use the latest accepted or currently loaded
+  user message as its primary one-line preview, while retaining the stable title
+  in secondary metadata. Prompt-derived previews are memory-only: never persist
+  them in Workbench state, copy them into the Session Catalog, or scan every
+  historical JSONL merely to populate navigation.
+- Settings opens as one singleton application-level selected surface and does
+  not count toward Task limits. It replaces the Workspace rail and Inspector
+  with its own category/content columns; opening it again focuses the same
+  surface. `返回工作台` restores the originating conversation or Workspace when
+  it is still available, with the current Workspace fallback after restart or
+  removal.
+- Settings search indexes category labels, visible concepts, and common Pi or
+  localized terms. Search results remain real navigation targets; selecting a
+  result opens the owning category, `Cmd/Ctrl+F` focuses search while Settings is
+  mounted, Escape clears a non-empty query, and an empty result state offers an
+  explicit reset. A decorative or non-functional search field is not allowed.
+- Category rows are single-line and keep detailed explanations in the content
+  header or owning settings group. The content header presents one category
+  title and one bounded summary; global-only sections do not repeat a redundant
+  `全局设置` label, while project-aware sections retain the explicit scope switch.
+- Settings owns Account, General/Appearance, Provider/Models, Extensions,
+  Skills/Prompts, Runtime/Session, Updates, and Help/About. Account, General,
+  Updates, and Help/About are global-only and do not show a meaningless scope
+  control. Provider, Extensions, Skills/Prompts, and Runtime support explicit
+  global or current-Workspace project scope. Extension management exposes
+  source and scope plus install, update, enable, disable, restore inheritance,
+  and uninstall states only when the Pi package/runtime operation actually
+  supports them.
+- Settings and Inspector are structurally mutually exclusive: mounting Settings
+  removes the task-only Inspector surface and its focus targets from the DOM.
+  Returning to a Task restores only that Task's Inspector projection.
+- At high zoom or an equivalently narrow effective viewport, Settings moves its
+  category navigation from a fixed left column to one horizontally reachable
+  compact row above the content. Icons retain their visible category labels so
+  navigation does not depend on memorizing symbols. The scope switch and current
+  section remain in a compact header, while the content owns vertical scrolling
+  without introducing document-level or two-dimensional overflow.
+- Native directory selection is an explicit trust gesture for that Workspace's
+  project resources. The UI does not ask for duplicate Workspace trust after a
+  successful picker result, and it never describes that trust as approval for a
+  dangerous Tool action.
+- Workspace order supports direct drag-and-drop while retaining labeled move-up
+  and move-down controls as the keyboard-accessible equivalent. Reordering never
+  changes conversation recency or the selected Workspace.
+- Main verifies restored filesystem identity before the Renderer can reopen a
+  Workspace. Missing, unavailable, or identity-changed directories get a visible
+  recovery surface; identity change clears project trust until the user confirms
+  a directory again through the native picker.
+- Workspace removal uses an application dialog rather than a native confirm. It
+  states that only the workbench registration is removed and that the directory,
+  Pi Sessions, and project files are not deleted. Open or live Tasks must be
+  stopped first so removal cannot orphan a Runtime or discard a draft implicitly.
+- The footer places the signed-out account entry on the left and a `?` menu on
+  the right. Account opens Settings/Account. The `?` menu contains Settings,
+  Check for Updates, and Help; refresh and Session import belong to the owning
+  Workspace overflow menu.
+- Account v1 is truthfully `signed-out`: local Pi, Workspaces, and Sessions remain
+  available, while enterprise/team features are described as not yet connected.
+- `Cmd/Ctrl+N` creates a conversation in the current Workspace; `Cmd/Ctrl+T` is a
+  temporary alpha compatibility alias. `Cmd/Ctrl+W` retains the native window
+  close behavior. `Cmd/Ctrl+,`, `Cmd/Ctrl+B`, and `Cmd/Ctrl+Shift+B` open
+  Settings, toggle navigation, and toggle Inspector respectively.
+
+### Provider and model configuration
+
+- `Provider 与模型` is the graphical editor for Pi's native configuration, not
+  a parallel Desktop registry. Its file-status region names
+  `~/.pi/agent/models.json`, `auth.json`, `settings.json`, and the trusted
+  Workspace `.pi/settings.json` as the current source of truth.
+- Built-in Pi Providers and models remain visible for credential and default
+  selection but are read-only. Creating or editing a custom Provider writes only
+  its `models.json` entry; Desktop never copies built-in definitions into that
+  file merely to display them.
+- Provider identity, name, Base URL, API protocol, model identity, input types,
+  reasoning, context window, and token limit use labeled bounded controls.
+  Advanced JSON owns uncommon non-secret fields and rejects `apiKey`, `headers`,
+  malformed JSON, and duplicate model IDs with a specific recovery message.
+- Header names may be shown, but existing values are never read back. Adding,
+  replacing, or removing a Header is an explicit write-only mutation; after a
+  save the value field clears and only the safe name remains visible.
+- `保存到 Pi` is the primary credential action and persists to `auth.json`.
+  `仅本次运行` is secondary and clearly states that the value disappears with
+  the runtime. If a persistent credential exists while a runtime override is
+  active, the UI names both facts rather than implying the stored value is active.
+- The API-key field is masked by default and provides an accessible eye control
+  to reveal or hide only the value currently entered by the user. A persisted
+  credential is never read back from `auth.json` or refilled into that field.
+- Global default writes `~/.pi/agent/settings.json`; project default writes the
+  trusted Workspace `.pi/settings.json`. Provider and model must be selected as
+  one pair, while `未设置` removes that scope's pair.
+- A clean view adopts a newer watched revision automatically. A dirty view keeps
+  all local fields, shows a conflict alert, disables stale overwrite through the
+  expected revision, and offers `放弃草稿并采用最新配置` as an explicit recovery.
+- File validation errors keep the last-known-good projection visible, identify
+  the affected Pi file, and block mutations until the file is repaired and
+  reloaded; a successful reload does not invent or expose secret values.
+- Catalog reload applies immediately to an idle Task and is visibly pending for
+  a running Task until its current Operation settles. If the selected model was
+  removed, the model control becomes unselected and the Composer explains that a
+  new model is required before another Prompt can be sent.
+- The Provider list, editor, defaults, sync status, conflict state, and credential
+  dialog retain labeled actions, visible focus, keyboard order, and one-axis
+  scrolling at the 680px packaged-window minimum and at 200% zoom.
+
 ### Runtime controls
 
 - The primary model selector lists configured models only. It may retain the
@@ -247,6 +436,8 @@ loading error where the operation can produce those states
 - A delayed or replayed acknowledgement cannot turn a completed, failed, cancelled,
   or lost Operation back into accepted/running. The Operation status bar renders the
   typed terminal receipt directly and never restores a stop action for settled work.
+- Product-facing status names the affected Task or `Pi 运行服务`; ordinary UI
+  does not expose the internal utility-process term `Agent Host`.
 
 ### Notifications
 
@@ -326,6 +517,10 @@ loading error where the operation can produce those states
   Desktop uses Pi's `AgentSessionRuntime` lifecycle so extensions receive
   `session_shutdown` before their context becomes stale and `session_start`
   after the replacement session has been rebound.
+- Projection reads for workspace changes, the Session Catalog, conversation,
+  and Session Tree wait behind an admitted transition. Incremental events may
+  arrive before the transition acknowledgement, so those reads consume the
+  resulting state instead of surfacing an expected `BUSY` failure.
 
 ### Command Palette
 
@@ -377,9 +572,10 @@ loading error where the operation can produce those states
 - The Provider dialog lists configured state, non-secret credential source, and
   model count. A configured credential is represented as hidden rather than read
   back; complete keys never enter renderer state.
-- Runtime credential inputs never refill and state that the value is cleared
-  when the Agent Host exits or restarts. A runtime key remains available across
-  Desktop-created session transitions within that Agent Host lifetime.
+- Credential inputs never refill. Persistent storage in Pi `auth.json` is the
+  primary path; an explicitly runtime-only key states that it is cleared when the
+  Agent Host exits or restarts and remains available only across Desktop-created
+  session transitions within that Agent Host lifetime.
 - Doctor reports use text and icons for pass, warning, and failure and keep
   retry available without changing the active Pi session.
 - Before Doctor has run, it presents an explicit invitation to run checks and
@@ -406,6 +602,10 @@ loading error where the operation can produce those states
   one history entry within a five-second dedupe window.
 - A retried control mutation remains one logical user action. The UI does not emit a
   second loading row or success notice while the Host replays the original result.
+- A transient Session Tree `BUSY` response keeps its invalidation pending and
+  receives one bounded retry without a warning. A repeated response stays
+  recoverable, uses product language rather than Host internals, and retries on
+  the next authoritative tree change.
 - Errors name what failed, what state was preserved, and the next safe action.
 - An external Pi Session change produces one warning for the current Session
   generation. Append/truncate/replace states instruct the user to reopen the Session;
@@ -469,7 +669,11 @@ loading error where the operation can produce those states
 
 - Keyboard order follows visible task order.
 - Dialogs trap focus and return it to the invoker.
-- Streaming live regions are throttled; token-level announcements are forbidden.
+- Streaming assistant text uses one stable polite live region outside the
+  virtualized transcript. It announces only new visible text, at most once per
+  second in bounded sentence-aware chunks; thinking, Tool payloads, and settled
+  history are never replayed. Session or Operation authority changes clear any
+  pending announcement.
 - Icon-only controls have accessible names and visible tooltips.
 - 200% zoom and long Chinese/English strings do not hide primary actions.
 

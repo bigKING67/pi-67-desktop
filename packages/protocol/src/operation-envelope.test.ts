@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isRequestEnvelope,
   isResponseEnvelope,
@@ -12,12 +13,12 @@ describe("accepted operation envelopes", () => {
       commandEnvelope("session.import", {
         submissionId: "import-1",
         path: "/tmp/external.jsonl"
-      }, 1),
-      commandEnvelope("session.compact", { submissionId: "compact-1" }, 1),
+      }, APP_PROTOCOL_CONTEXT, 1),
+      commandEnvelope("session.compact", { submissionId: "compact-1" }, APP_PROTOCOL_CONTEXT, 1),
       commandEnvelope("command.invoke", {
         submissionId: "command-1",
         command: "inspect"
-      }, 1)
+      }, APP_PROTOCOL_CONTEXT, 1)
     ];
 
     for (const operation of operations) {
@@ -31,7 +32,7 @@ describe("accepted operation envelopes", () => {
     const request = commandEnvelope("command.invoke", {
       submissionId: "command-1",
       command: "inspect"
-    }, 4);
+    }, APP_PROTOCOL_CONTEXT, 4);
     const completed = {
       kind: "settled" as const,
       operationId: "operation-1",
@@ -44,7 +45,7 @@ describe("accepted operation envelopes", () => {
       startedAt: 10,
       settledAt: 20
     };
-    const response = responseEnvelope(request.requestId, 4, {
+    const response = responseEnvelope(request.requestId, 4, request.context, {
       ok: true,
       type: "command.invoke",
       result: completed

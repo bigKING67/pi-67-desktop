@@ -9,8 +9,15 @@ describe("external Session change protocol", () => {
     }, {
       hostEpoch: 1,
       sequence: 2,
-      sessionId: "session-1",
-      sessionGeneration: 3
+      context: {
+        scope: "task",
+        workspaceId: "workspace-1",
+        taskId: "task-1",
+        taskGeneration: 1,
+        sessionId: "session-1",
+        sessionGeneration: 3
+      },
+      taskSequence: 1
     });
 
     expect(isEventEnvelope(event)).toBe(true);

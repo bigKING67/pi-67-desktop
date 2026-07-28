@@ -37,8 +37,15 @@ function eventContext() {
   return {
     hostEpoch: 3,
     sequence: 1,
-    sessionId: "session-1",
-    sessionGeneration: 2,
-    operationId: "operation-1"
+    context: {
+      scope: "task" as const,
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      sessionId: "session-1",
+      sessionGeneration: 2,
+      operationId: "operation-1"
+    },
+    taskSequence: 1
   };
 }

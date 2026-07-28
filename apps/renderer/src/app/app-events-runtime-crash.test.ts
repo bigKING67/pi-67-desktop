@@ -2,6 +2,7 @@ import type { OperationView } from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { handleAgentEvent } from "./app-events.js";
 
@@ -49,13 +50,13 @@ describe("runtime crash event", () => {
     }, { items: [], total: 0, truncated: false });
     const state = eventState();
     const payload = { detail: "Runtime exited", recoverable: true };
-    const envelope = eventEnvelope("runtime.crashed", payload, {
+    const envelope = eventEnvelope("runtime.crashed", payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1"
-    });
+    }));
 
     handleAgentEvent({ type: "runtime.crashed", payload }, envelope, () => state, (update) => {
       Object.assign(state, typeof update === "function" ? update(state) : update);

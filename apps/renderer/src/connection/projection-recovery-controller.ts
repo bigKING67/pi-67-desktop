@@ -1,10 +1,14 @@
-import type { AgentConnectionIdentity } from "@pi67/protocol";
+import {
+  ProtocolRequestError,
+  type AgentConnectionIdentity
+} from "@pi67/protocol";
 import { clearedTransientState } from "../app/app-state-projection.js";
 import type { AppState } from "../app/app-store.types.js";
 import { prepareRendererSessionTransaction } from "../app/renderer-session-transaction.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
+  acceptRendererSessionTransitionResponse,
   captureRendererSessionTransition,
   classifyRendererSessionBootstrap
 } from "../session/session-authority.js";
@@ -29,7 +33,14 @@ export interface ProjectionRecoveryOptions {
   recoveringDetail: string;
   readyDetail: string;
   failureTitle: string;
+  deferRuntimeNotReady?: boolean;
 }
+
+export type ProjectionRecoveryDisposition =
+  | "committed"
+  | "runtime-not-ready"
+  | "stale"
+  | "failed";
 
 interface ConnectedProjectionRecoveryInput {
   identity: AgentConnectionIdentity;
@@ -98,7 +109,7 @@ export function recoverConnectedRendererProjection(
       return;
     }
     if (disposition === "stale") return;
-    throw new Error("Agent Host 未发送 authoritative runtime.ready 事件。");
+    throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
   }).catch((error: unknown) => {
     if (
       projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)
@@ -127,7 +138,7 @@ export function recoverAgentConnectionAfterTeardown(
 ): void {
   publishNotification({
     level: "warning",
-    title: "Agent Host 连接已中断",
+    title: "Pi 运行服务连接已中断",
     message: sourceError.message
   });
   void ensureAgentConnection().catch((reconnectError: unknown) => {
@@ -140,13 +151,13 @@ export function recoverAgentConnectionAfterTeardown(
     set({
       runtime: {
         phase: "failed",
-        detail: `无法恢复 Agent Host 连接：${errorMessage(reconnectError)}`,
+        detail: `无法恢复 Pi 运行服务连接：${errorMessage(reconnectError)}`,
         recoverable: true
       }
     });
     publishNotification({
       level: "error",
-      title: "无法恢复 Agent Host 连接",
+      title: "无法恢复 Pi 运行服务连接",
       message: errorMessage(reconnectError)
     });
   });
@@ -160,7 +171,7 @@ export function recoverAgentConnectionAfterPowerResume(
   const revision = invalidateProjectionRecoveryGeneration();
   set({
     sessionTransitionPending: true,
-    runtime: { phase: "recovering", detail: "系统已恢复，正在重新连接 Agent Host", recoverable: true }
+    runtime: { phase: "recovering", detail: "系统已恢复，正在重新连接 Pi 运行服务", recoverable: true }
   });
   void ensureAgentConnection().catch((error: unknown) => {
     const state = get();
@@ -174,13 +185,13 @@ export function recoverAgentConnectionAfterPowerResume(
       sessionTransitionPending: false,
       runtime: {
         phase: "failed",
-        detail: `系统恢复后无法连接 Agent Host：${detail}`,
+        detail: `系统恢复后无法连接 Pi 运行服务：${detail}`,
         recoverable: true
       }
     });
     publishNotification({
       level: "error",
-      title: "系统恢复后无法连接 Agent Host",
+      title: "系统恢复后无法连接 Pi 运行服务",
       message: detail
     });
   });
@@ -190,7 +201,7 @@ export async function resynchronizeRendererProjection(
   get: StoreGet,
   set: StoreSet,
   options: ProjectionRecoveryOptions
-): Promise<void> {
+): Promise<ProjectionRecoveryDisposition> {
   const revision = invalidateProjectionRecoveryGeneration();
   projectionRecoveryLedger.captureInterruptedOperation(get(), options.operationId);
   prepareRendererSessionTransaction("projection-resync");
@@ -204,10 +215,10 @@ export async function resynchronizeRendererProjection(
     failProjectionRecovery(get, set, options.hostEpoch, revision, options.failureTitle, new Error(
       "Renderer Session transition authority is not connected."
     ));
-    return;
+    return "failed";
   }
   try {
-    await resynchronizeProjection(options.hostEpoch, (result) => (
+    const committed = await resynchronizeProjection(options.hostEpoch, (result) => (
       installResynchronizedProjection(
         get,
         set,
@@ -218,7 +229,16 @@ export async function resynchronizeRendererProjection(
         options.readyDetail
       )
     ));
+    return committed ? "committed" : "stale";
   } catch (error) {
+    if (
+      options.deferRuntimeNotReady
+      && error instanceof ProtocolRequestError
+      && error.code === "RUNTIME_NOT_READY"
+    ) {
+      deferProjectionRecoveryForBootstrap(get, set, options.hostEpoch, revision, transitionTarget);
+      return "runtime-not-ready";
+    }
     failProjectionRecovery(
       get,
       set,
@@ -228,6 +248,7 @@ export async function resynchronizeRendererProjection(
       error,
       transitionTarget
     );
+    return "failed";
   }
 }
 
@@ -238,4 +259,17 @@ export function prepareRendererHostReplacement(): void {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
+}
+
+function deferProjectionRecoveryForBootstrap(
+  get: StoreGet,
+  set: StoreSet,
+  hostEpoch: number,
+  revision: number,
+  transitionTarget: ReturnType<typeof captureRendererSessionTransition>
+): void {
+  if (!transitionTarget || !projectionRecoveryLedger.isCurrent(get(), hostEpoch, revision)) return;
+  if (!acceptRendererSessionTransitionResponse(get(), transitionTarget)) return;
+  projectionRecoveryLedger.clearInterruptedOperation();
+  set({ sessionTransitionPending: false });
 }

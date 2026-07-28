@@ -11,6 +11,8 @@ import {
   promptSubmissionAuthorityMessage,
   validatePromptSubmissionAcceptance
 } from "../app/prompt-submission-authority.js";
+import { userMessagePreview } from "../workbench/recent-user-message.js";
+import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/workbench-store.js";
 
 export type PromptSubmissionResult =
   | { accepted: true; operationId: string }
@@ -22,11 +24,18 @@ export async function submitRendererPrompt(
   behavior: "send" | "steer" | "followUp",
   submissionId: string
 ): Promise<PromptSubmissionResult> {
-  if (!agentConnectionController.identity) throw new Error("Agent Host 尚未连接。");
+  if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   const delivery = behavior === "steer"
     ? "steer"
     : behavior === "followUp" ? "follow-up" : "new-turn";
   const state = useAppStore.getState();
+  const workbench = rendererWorkbenchStore.getState();
+  const selectedTaskId = selectedWorkbenchTask(workbench)?.id;
+  if (selectedTaskId && workbench.canStartTask(selectedTaskId) === "run-limit") {
+    const detail = "已有 4 个任务正在运行或等待输入。请先完成或停止一个任务。";
+    publishNotification({ level: "warning", title: "已达到并发上限", message: `${detail} 草稿和附件已保留。` });
+    return { accepted: false, error: detail };
+  }
   const expectedAuthority = capturePromptSubmissionAuthority(state);
   if (!expectedAuthority) {
     const detail = promptSubmissionAuthorityMessage("AUTHORITY_NOT_READY");
@@ -40,7 +49,15 @@ export async function submitRendererPrompt(
       ...(images.length === 0 ? {} : { images }),
       delivery
     }, images.map((image) => image.data));
-    return applyAcceptedPrompt(accepted, expectedAuthority);
+    const result = applyAcceptedPrompt(accepted, expectedAuthority);
+    if (result.accepted && selectedTaskId) {
+      const preview = userMessagePreview(text, images.length > 0);
+      rendererWorkbenchStore.getState().updateTask(selectedTaskId, {
+        lifecycle: "accepted",
+        ...(preview ? { recentUserMessagePreview: preview } : {})
+      });
+    }
+    return result;
   } catch (error) {
     const detail = errorMessage(error);
     publishNotification({

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isResponseEnvelope,
   responseEnvelope
@@ -7,8 +8,14 @@ import {
 
 describe("session rollback acknowledgement", () => {
   it("accepts a narrow projection mutation acknowledgement and rejects a full Snapshot", () => {
-    const request = commandEnvelope("session.rollback", { entryId: "entry-1" }, 5, "rollback-1");
-    const acknowledgement = responseEnvelope(request.requestId, 5, {
+    const request = commandEnvelope(
+      "session.rollback",
+      { entryId: "entry-1" },
+      APP_PROTOCOL_CONTEXT,
+      5,
+      "rollback-1"
+    );
+    const acknowledgement = responseEnvelope(request.requestId, 5, request.context, {
       ok: true,
       type: "session.rollback",
       result: {

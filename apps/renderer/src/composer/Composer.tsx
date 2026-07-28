@@ -27,18 +27,28 @@ import {
 } from "./composer-attachments.js";
 import { ComposerQueuePanel } from "./ComposerQueuePanel.js";
 import { ComposerRuntimeControls } from "./ComposerRuntimeControls.js";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask,
+  useWorkbenchStore
+} from "../workbench/workbench-store.js";
+import { EMPTY_TASK_DRAFT, useTaskDraftStore } from "../workbench/task-draft-store.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const widgets = useExtensionUiStore((state) => state.widgets);
-  const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
+  const activeTaskId = useWorkbenchStore((state) => selectedWorkbenchTask(state)?.id);
+  const draft = useTaskDraftStore((state) => (
+    activeTaskId ? state.drafts[activeTaskId] ?? EMPTY_TASK_DRAFT : EMPTY_TASK_DRAFT
+  ));
+  const text = draft.text;
+  const attachments = draft.attachments;
+  const streamBehavior = draft.streamBehavior;
   const [attachmentError, setAttachmentError] = useState<string>();
   const [submissionError, setSubmissionError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
-  const [streamBehavior, setStreamBehavior] = useState<"steer" | "followUp">("followUp");
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
   const attachmentsRef = useRef<DraftAttachment[]>([]);
   const attachmentDragDepth = useRef(0);
@@ -48,6 +58,21 @@ export function Composer() {
   const streaming = useCommittedConversationStreaming();
   const canSend = !submitting && (text.trim().length > 0 || attachments.length > 0);
   const widgetItems = Object.values(widgets);
+
+  const setText = (value: string) => {
+    if (activeTaskId) useTaskDraftStore.getState().setText(activeTaskId, value);
+  };
+  const setAttachments = (value: DraftAttachment[] | ((current: DraftAttachment[]) => DraftAttachment[])) => {
+    if (!activeTaskId) return;
+    const current = useTaskDraftStore.getState().drafts[activeTaskId]?.attachments ?? [];
+    useTaskDraftStore.getState().setAttachments(
+      activeTaskId,
+      typeof value === "function" ? value(current) : value
+    );
+  };
+  const setStreamBehavior = (value: "steer" | "followUp") => {
+    if (activeTaskId) useTaskDraftStore.getState().setStreamBehavior(activeTaskId, value);
+  };
 
   useEffect(() => subscribeToComposerPrefill((nextText) => {
     submissionIdRef.current = undefined;
@@ -63,12 +88,16 @@ export function Composer() {
     submissionIdRef.current = undefined;
   }, [hostEpoch, sessionGeneration, sessionId]);
 
-  useEffect(() => () => {
-    revokeDraftAttachments(attachmentsRef.current);
-  }, []);
+  useEffect(() => {
+    if (!activeTaskId) return;
+    rendererWorkbenchStore.getState().updateTask(activeTaskId, {
+      hasDraft: text.trim().length > 0,
+      attachmentCount: attachments.length
+    });
+  }, [activeTaskId, attachments.length, text]);
 
   const submit = async () => {
-    if (!canSend) return;
+    if (!canSend || !activeTaskId) return;
     const nextText = text.trim();
     const nextAttachments = attachments;
     setSubmitting(true);
@@ -90,7 +119,7 @@ export function Composer() {
       setText("");
       submissionIdRef.current = undefined;
       revokeDraftAttachments(nextAttachments);
-      setAttachments([]);
+      useTaskDraftStore.getState().setAttachments(activeTaskId, []);
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : messages.composer.attachmentReadFailed);
     } finally {

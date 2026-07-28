@@ -1,5 +1,11 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
-import { agentEventEnvelope, type AgentEvent } from "@pi67/protocol";
+import {
+  agentEventEnvelope,
+  isEventEnvelope,
+  type AgentEvent,
+  type ProtocolContext,
+  type TaskProtocolContext
+} from "@pi67/protocol";
 import type { HostConnectionContext } from "./connection-context.js";
 import type { OperationRegistry } from "./operation-registry.js";
 
@@ -8,10 +14,18 @@ interface HostEventChannelDependencies {
   getHostEpoch: () => number;
   getOperations: () => OperationRegistry | undefined;
   getRuntime: () => AgentRuntime | undefined;
+  getProtocolContext: () => ProtocolContext;
+}
+
+export interface HostEventSendAuthority {
+  runtime: AgentRuntime | undefined;
+  operations: OperationRegistry | undefined;
+  context: ProtocolContext;
 }
 
 export class HostEventChannel {
   private sequence = 0;
+  private readonly taskSequences = new TaskEventSequenceRegistry();
 
   constructor(private readonly dependencies: HostEventChannelDependencies) {}
 
@@ -19,23 +33,38 @@ export class HostEventChannel {
     return this.sequence;
   }
 
-  send(event: AgentEvent): void {
-    const runtime = this.dependencies.getRuntime();
+  send(event: AgentEvent): boolean {
+    return this.sendWithAuthority(event, {
+      runtime: this.dependencies.getRuntime(),
+      operations: this.dependencies.getOperations(),
+      context: this.dependencies.getProtocolContext()
+    });
+  }
+
+  sendFor(event: AgentEvent, authority: HostEventSendAuthority): boolean {
+    return this.sendWithAuthority(event, authority);
+  }
+
+  private sendWithAuthority(event: AgentEvent, authority: HostEventSendAuthority): boolean {
+    if (!hasEventShape(event)) return false;
+    const blockingInteractiveRequest = isBlockingInteractiveRequest(event);
+    const runtime = authority.runtime;
     const identity = runtime?.getIdentity() ?? { sessionGeneration: 0 };
-    const operations = this.dependencies.getOperations();
+    const operations = authority.operations;
     const operationId = operationIdFor(event) ?? operations?.activeAccepted()?.operationId;
     const hostEpoch = this.dependencies.getHostEpoch();
+    const protocolContext = enrichTaskContext(
+      authority.context,
+      identity,
+      operationId
+    );
     if (
-      isBlockingInteractiveRequest(event)
+      blockingInteractiveRequest
       && (identity.sessionId === undefined || operationId === undefined)
     ) {
       rejectInteractiveRequest(runtime, event);
-      return;
+      return false;
     }
-    operations?.observeEventActivity(event);
-    updateInteractiveActivity(operations, event);
-
-    this.sequence += 1;
     const context = {
       hostEpoch,
       ...(identity.sessionId === undefined ? {} : { sessionId: identity.sessionId }),
@@ -43,19 +72,75 @@ export class HostEventChannel {
       ...(operationId === undefined ? {} : { operationId })
     };
     const contextualEvent = withInteractiveEventContext(event, context);
-    const delivered = this.dependencies.getConnection()?.postEvent(agentEventEnvelope(contextualEvent, {
-      hostEpoch,
-      sequence: this.sequence,
-      ...(identity.sessionId === undefined ? {} : { sessionId: identity.sessionId }),
-      sessionGeneration: identity.sessionGeneration,
-      ...(operationId === undefined ? {} : { operationId })
-    })) ?? false;
+    const nextSequence = this.sequence + 1;
+    const nextTaskSequence = protocolContext.scope === "task"
+      ? this.taskSequences.next(protocolContext)
+      : undefined;
+    const envelope = protocolContext.scope === "task"
+      ? agentEventEnvelope(contextualEvent, {
+          hostEpoch,
+          sequence: nextSequence,
+          context: protocolContext,
+          taskSequence: nextTaskSequence ?? 1
+        })
+      : agentEventEnvelope(contextualEvent, {
+          hostEpoch,
+          sequence: nextSequence,
+          context: protocolContext
+        });
+    if (!isEventEnvelope(envelope)) {
+      if (blockingInteractiveRequest) rejectInteractiveRequest(runtime, event);
+      return false;
+    }
 
-    if (isBlockingInteractiveRequest(event) && !delivered) {
+    operations?.observeEventActivity(event);
+    updateInteractiveActivity(operations, event);
+    this.sequence = nextSequence;
+    if (protocolContext.scope === "task" && nextTaskSequence !== undefined) {
+      this.taskSequences.commit(protocolContext, nextTaskSequence);
+    }
+    const delivered = this.dependencies.getConnection()?.postEvent(envelope) ?? false;
+
+    if (blockingInteractiveRequest && !delivered) {
       rejectInteractiveRequest(runtime, event);
       operations?.completeInteractiveWait(event.payload.requestId);
     }
+    return true;
   }
+}
+
+class TaskEventSequenceRegistry {
+  private readonly sequences = new Map<string, { generation: number; sequence: number }>();
+
+  next(context: TaskProtocolContext): number {
+    const current = this.sequences.get(taskSequenceKey(context));
+    return current?.generation === context.taskGeneration ? current.sequence + 1 : 1;
+  }
+
+  commit(context: TaskProtocolContext, sequence: number): void {
+    this.sequences.set(taskSequenceKey(context), { generation: context.taskGeneration, sequence });
+  }
+}
+
+function taskSequenceKey(context: TaskProtocolContext): string {
+  return JSON.stringify([context.workspaceId, context.taskId]);
+}
+
+function enrichTaskContext(
+  context: ProtocolContext,
+  identity: ReturnType<AgentRuntime["getIdentity"]>,
+  operationId: string | undefined
+): ProtocolContext {
+  if (context.scope !== "task" || identity.sessionId === undefined) return context;
+  return {
+    scope: "task",
+    workspaceId: context.workspaceId,
+    taskId: context.taskId,
+    taskGeneration: context.taskGeneration,
+    sessionId: identity.sessionId,
+    sessionGeneration: identity.sessionGeneration,
+    ...(operationId === undefined ? {} : { operationId })
+  };
 }
 
 function updateInteractiveActivity(operations: OperationRegistry | undefined, event: AgentEvent): void {
@@ -87,18 +172,35 @@ function updateInteractiveActivity(operations: OperationRegistry | undefined, ev
 function isBlockingInteractiveRequest(
   event: AgentEvent
 ): event is Extract<AgentEvent, { type: "approval.requested" | "extension.ui.requested" }> {
-  return event.type === "approval.requested"
-    || (event.type === "extension.ui.requested" && event.payload.blocking);
+  if (event.type === "approval.requested") return true;
+  if (event.type !== "extension.ui.requested") return false;
+  const payload = recordOf(event.payload);
+  return payload === undefined || payload.blocking !== false;
 }
 
 function rejectInteractiveRequest(
   runtime: AgentRuntime | undefined,
   event: Extract<AgentEvent, { type: "approval.requested" | "extension.ui.requested" }>
 ): void {
+  const payload = recordOf(event.payload);
+  const requestId = typeof payload?.requestId === "string" ? payload.requestId : undefined;
+  if (requestId === undefined) {
+    runtime?.cancelInteractiveRequests("abort");
+    return;
+  }
   if (event.type === "approval.requested") {
-    runtime?.resolveApproval(event.payload.requestId, event.payload.toolCallId, false);
+    const toolCallId = typeof payload?.toolCallId === "string" ? payload.toolCallId : undefined;
+    if (toolCallId === undefined) {
+      runtime?.cancelInteractiveRequests("abort");
+      return;
+    }
+    if (runtime?.resolveApproval(requestId, toolCallId, false) === false) {
+      runtime.cancelInteractiveRequests("abort");
+    }
   } else {
-    runtime?.resolveExtensionUi(event.payload.requestId, undefined, true);
+    if (runtime?.resolveExtensionUi(requestId, undefined, true) === false) {
+      runtime.cancelInteractiveRequests("abort");
+    }
   }
 }
 
@@ -112,10 +214,11 @@ function withInteractiveEventContext(
     && event.type !== "extension.ui.updated"
     && event.type !== "extension.compatibilityChanged"
   ) return event;
+  const payload = recordOf(event.payload) ?? {};
   return {
     type: event.type,
     payload: {
-      ...event.payload,
+      ...payload,
       hostEpoch: context.hostEpoch,
       ...(context.sessionId === undefined ? {} : { sessionId: context.sessionId }),
       sessionGeneration: context.sessionGeneration,
@@ -125,7 +228,24 @@ function withInteractiveEventContext(
 }
 
 function operationIdFor(event: AgentEvent): string | undefined {
-  if (event.type === "operation.started") return event.payload.operation.operationId;
-  if (event.type.startsWith("operation.")) return (event.payload as { operationId: string }).operationId;
+  const payload = recordOf(event.payload);
+  if (event.type === "operation.started") {
+    const operation = recordOf(payload?.operation);
+    return typeof operation?.operationId === "string" ? operation.operationId : undefined;
+  }
+  if (event.type.startsWith("operation.")) {
+    return typeof payload?.operationId === "string" ? payload.operationId : undefined;
+  }
   return undefined;
+}
+
+function hasEventShape(event: AgentEvent): boolean {
+  const candidate = recordOf(event);
+  return typeof candidate?.type === "string" && "payload" in candidate;
+}
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : undefined;
 }

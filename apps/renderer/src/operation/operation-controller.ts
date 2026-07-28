@@ -45,7 +45,7 @@ export async function compactRendererSession(): Promise<void> {
 }
 
 export async function listRuntimeCommands(): Promise<CommandDescriptor[]> {
-  if (!agentConnectionController.identity) throw new Error("Agent Host 尚未连接。");
+  if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   return agentConnectionController.request("command.list", {});
 }
 
@@ -95,7 +95,7 @@ function acceptSubmission(
   publishNotification({
     level: "warning",
     title: warningTitle,
-    message: "Agent Host 或 Pi 会话已在请求期间替换，旧确认已忽略。"
+    message: "Pi 运行服务或会话已在请求期间替换，旧确认已忽略。"
   });
   return false;
 }

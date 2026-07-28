@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -9,6 +9,7 @@ import {
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -57,7 +58,8 @@ describe("AgentHostServer abort watchdog", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 5 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-1",
       appInstanceId: "app-1",

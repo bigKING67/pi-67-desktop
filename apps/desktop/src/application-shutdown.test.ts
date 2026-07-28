@@ -42,4 +42,30 @@ describe("ApplicationShutdownController", () => {
     await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
     expect(onError).toHaveBeenCalledWith(failure);
   });
+
+  it("marks the workbench clean only after the Agent Host stops", async () => {
+    const order: string[] = [];
+    const controller = createApplicationShutdownController({
+      stopAgentHost: async () => { order.push("host-stopped"); },
+      markCleanExit: async () => { order.push("workbench-clean"); },
+      quit: () => { order.push("quit"); }
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.waitFor(() => expect(order).toEqual(["host-stopped", "workbench-clean", "quit"]));
+  });
+
+  it("keeps the workbench dirty when Agent Host shutdown fails", async () => {
+    const markCleanExit = vi.fn();
+    const quit = vi.fn();
+    const controller = createApplicationShutdownController({
+      stopAgentHost: async () => { throw new Error("stop failed"); },
+      markCleanExit,
+      quit
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
+    expect(markCleanExit).not.toHaveBeenCalled();
+  });
 });

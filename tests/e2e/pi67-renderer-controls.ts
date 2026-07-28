@@ -12,6 +12,7 @@ interface MockEventOptions {
   hostEpoch?: number;
   operationId?: string;
   sequence?: number;
+  taskSequence?: number;
   sessionId?: string;
   sessionGeneration?: number;
 }
@@ -20,6 +21,7 @@ export interface RecordedCommand {
   type: string;
   payload: unknown;
   hostEpoch: number;
+  context?: Record<string, unknown>;
 }
 
 interface MockWorkspaceChanges {

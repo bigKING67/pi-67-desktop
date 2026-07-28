@@ -12,17 +12,20 @@ import {
 import { RuntimeError, type ExtensionUiCancellationReason } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
+import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import type { SafetyPolicyState, DesktopApprovalRequester } from "./safety-extension.js";
 import { createDesktopSessionServices } from "./session-services.js";
 import type { SessionExternalChangeGuard } from "./session-external-change-guard.js";
+import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
   emit: (event: AgentEvent) => void;
   externalChangeGuard: SessionExternalChangeGuard;
   getAgentDir: () => string;
-  getRuntimeApiKeys: () => ReadonlyMap<string, string>;
+  getRuntimeCredentialOverrides: () => RuntimeCredentialOverrideStore;
   getSafety: () => SafetyPolicyState;
+  getWorkspaceServices: () => PiWorkspaceRuntimeServices | undefined;
   projections: RuntimeProjectionController;
   rebindExtensionUi: (session: AgentSession) => Promise<void>;
   requestApproval: DesktopApprovalRequester;
@@ -136,11 +139,18 @@ export class RuntimeSessionBindings {
     };
   }
 
-  private createServices(cwd: string): Promise<AgentSessionServices> {
+  private async createServices(cwd: string): Promise<AgentSessionServices> {
+    const workspaceServices = this.options.getWorkspaceServices();
+    workspaceServices?.assertCompatible(cwd, this.options.getAgentDir());
+    const modelRuntime = await workspaceServices?.configurationService?.createModelRuntime();
     return createDesktopSessionServices({
       cwd,
       agentDir: this.options.getAgentDir(),
-      runtimeApiKeys: this.options.getRuntimeApiKeys(),
+      runtimeCredentialOverrides: this.options.getRuntimeCredentialOverrides(),
+      ...(workspaceServices === undefined
+        ? {}
+        : { settingsManager: workspaceServices.settingsManager }),
+      ...(modelRuntime === undefined ? {} : { modelRuntime }),
       getSafety: this.options.getSafety,
       requestApproval: this.options.requestApproval
     });

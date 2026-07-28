@@ -1,6 +1,6 @@
 ---
-version: 2
-name: Pi-67 Desktop Dark Calibration
+version: 3
+name: π Desktop Dark Calibration
 status: active
 platform: electron-web
 theme: dark
@@ -9,17 +9,26 @@ color:
   surface: "#181c19"
   surface-muted: "#202521"
   surface-raised: "#252b26"
+  surface-hover: "#2a302b"
+  surface-active: "#30433a"
   text-primary: "#f0f3ef"
   text-secondary: "#a9b1aa"
+  text-tertiary: "#7f8981"
   border: "#343b35"
+  border-strong: "#465047"
   accent: "#7bc5ad"
+  accent-strong: "#a1dbc8"
+  accent-soft: "#203b32"
   focus: "#83b9f3"
   info: "#84b8f4"
   warning: "#e2ad69"
   danger: "#ef9189"
+  text-on-danger: "#171a18"
   success: "#7bc99c"
   diff-added: "#1d3a2b"
   diff-removed: "#482725"
+  code-diff-added-text: "#9be9a8"
+  code-diff-removed-text: "#ffb3ad"
   code-surface: "#0d1117"
   code-border: "#30363d"
   code-text: "#e6edf3"
@@ -37,6 +46,25 @@ spacing, component states, and motion as `DESIGN.md`.
 - Raised surfaces are slightly lighter than the canvas.
 - Borders separate only where spacing or luminance is insufficient.
 - Accent is reserved for current state and primary actions.
+- Workspace disclosures, the active conversation, background-running badges,
+  the signed-out account entry, and the singleton Settings surface remain
+  distinguishable without glowing outlines or relying on accent hue alone.
+- Recent user-message previews use the same primary/secondary text hierarchy as
+  light mode and remain one-line, bounded, and memory-only.
+- Settings replaces both the Workspace rail and Task Inspector with its own
+  two-column application shell in dark mode exactly as it does in light mode;
+  dark calibration never changes return behavior, information architecture, or
+  focus order.
+- The compact Settings directory keeps its search field, group labels, and
+  single-line category rows neutral in dark mode. Category selection uses a
+  low-contrast luminance fill rather than the green runtime accent, and the
+  removed Settings brand/description hero must not reappear as dark-theme-only
+  chrome.
+- Provider file status, revision conflict, invalid-file, pending reload, and
+  model-reselection states use the same semantic success, warning, and danger
+  roles as light mode. The API-key eye control may reveal only the current user
+  input; persisted credentials and Header values never gain a theme-specific
+  value preview, and focus rings remain visible on every raised surface.
 - Disabled controls use explicit tokens rather than blanket opacity.
 - Focus, semantic state, diff foregrounds, and code syntax colors must be
   checked in the rendered dark theme.

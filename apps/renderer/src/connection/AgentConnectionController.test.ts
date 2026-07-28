@@ -8,6 +8,7 @@ import {
   prepareSameHostTransportRetry,
   type AgentPortHandoffTarget
 } from "./AgentConnectionController.js";
+import { taskEventFixture } from "./protocol-test-fixtures.js";
 
 const controllers: AgentConnectionController[] = [];
 const hosts: HostConnection[] = [];
@@ -125,8 +126,8 @@ describe("AgentConnectionController", () => {
     host.handoff(target);
     await controller.waitForConnection();
 
-    host.send(eventEnvelope("runtime.statusChanged", readyStatus("gap"), { hostEpoch: 7, sequence: 7 }));
-    host.send(eventEnvelope("runtime.statusChanged", readyStatus("still blocked"), { hostEpoch: 7, sequence: 8 }));
+    host.send(eventEnvelope("runtime.statusChanged", readyStatus("gap"), taskEventFixture({ hostEpoch: 7, sequence: 7 })));
+    host.send(eventEnvelope("runtime.statusChanged", readyStatus("still blocked"), taskEventFixture({ hostEpoch: 7, sequence: 8 })));
     await vi.waitFor(() => expect(onSequenceGap).toHaveBeenCalledOnce());
     expect(onSequenceGap).toHaveBeenCalledWith({ expected: 6, received: 7, hostEpoch: 7 });
     expect(onEvent).not.toHaveBeenCalled();
@@ -134,7 +135,7 @@ describe("AgentConnectionController", () => {
     const install = vi.fn(() => true);
     const resync = controller.resyncProjection(install);
     const request = await host.nextRequest("projection.resync");
-    host.send(responseEnvelope(request.requestId, 7, {
+    host.send(responseEnvelope(request.requestId, 7, request.context, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(7, 8)
@@ -142,7 +143,7 @@ describe("AgentConnectionController", () => {
     await expect(resync).resolves.toBe(true);
     expect(install).toHaveBeenCalledWith(expect.objectContaining({ hostEpoch: 7, eventSequence: 8 }));
 
-    host.send(eventEnvelope("runtime.statusChanged", readyStatus("resynced"), { hostEpoch: 7, sequence: 9 }));
+    host.send(eventEnvelope("runtime.statusChanged", readyStatus("resynced"), taskEventFixture({ hostEpoch: 7, sequence: 9 })));
     await vi.waitFor(() => expect(onEvent).toHaveBeenCalledOnce());
     expect(onEvent.mock.calls[0]?.[0]).toEqual({
       type: "runtime.statusChanged",
@@ -206,7 +207,7 @@ describe("AgentConnectionController", () => {
       sessionGeneration: 1,
       eventSequence: 1
     };
-    replacement.send(responseEnvelope(secondRequest.requestId, 9, {
+    replacement.send(responseEnvelope(secondRequest.requestId, 9, secondRequest.context, {
       ok: true,
       type: "session.create",
       result: acknowledgement

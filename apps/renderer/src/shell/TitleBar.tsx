@@ -1,41 +1,31 @@
 import type { OperationView, RuntimeStatus } from "@pi67/domain";
 import {
-  Check,
   Circle,
   CircleAlert,
   CircleCheck,
   CircleDashed,
   Command,
-  DownloadCloud,
-  Ellipsis,
-  FileDown,
-  KeyRound,
-  Monitor,
-  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   RefreshCw,
-  Stethoscope,
-  Sun,
   TriangleAlert,
   Wrench
 } from "lucide-react";
-import { useState } from "react";
-import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import { Button } from "react-aria-components";
+import type { ReactNode } from "react";
+import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
-import { saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { messages } from "../localization/message-catalog.js";
 import { NotificationCenter } from "../notifications/NotificationCenter.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionId, selectSessionName } from "../session/session-projection-selectors.js";
-import {
-  setThemePreference,
-  type ThemePreference,
-  useThemeSnapshot
-} from "../theme/theme-controller.js";
 import { useShellStore } from "./shell-store.js";
+import {
+  selectedWorkbenchTask,
+  useWorkbenchStore
+} from "../workbench/workbench-store.js";
 import styles from "./TitleBar.module.css";
 
 interface TitleBarProps {
@@ -45,29 +35,48 @@ interface TitleBarProps {
 }
 
 export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavigation }: TitleBarProps) {
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const runtime = useAppStore((state) => state.runtime);
+  const liveRuntime = useAppStore((state) => state.runtime);
   const workspace = useAppStore((state) => state.workspace);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const operation = useAppStore((state) => state.operation);
   const operationDetail = useAppStore((state) => state.operationDetail);
+  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const contextVisible = useShellStore((state) => state.contextVisible);
   const setContextVisible = useShellStore((state) => state.setContextVisible);
   const setCommandPaletteOpen = useShellStore((state) => state.setCommandPaletteOpen);
-  const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
-  const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
-  const setDoctorDialogOpen = useShellStore((state) => state.setDoctorDialogOpen);
-  const theme = useThemeSnapshot();
-  const status = statusPresentation(runtime, operation, operationDetail);
-  const workspaceName = basename(workspace ?? "");
-  const activeSessionName = sessionName?.trim()
-    || (sessionId ? messages.shell.sessionFallback(sessionId.slice(0, 8)) : undefined);
+  const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
+  const settingsSelected = useWorkbenchStore((state) => state.selectedSurface?.kind === "settings");
+  const selectedWorkspace = useWorkbenchStore((state) => (
+    selectedTask ? state.workspaces[selectedTask.workspaceId] : state.currentWorkspaceId
+      ? state.workspaces[state.currentWorkspaceId]
+      : undefined
+  ));
+  const selectedTaskIsLive = Boolean(selectedTask && sessionId && selectedTask.sessionId === sessionId);
+  const selectedTaskOwnsLiveWorkspace = Boolean(
+    selectedTask
+    && selectedWorkspace?.identity.canonicalPath === workspace
+  );
+  const runtime = selectedTaskIsLive || (selectedTaskOwnsLiveWorkspace && sessionTransitionPending)
+    ? liveRuntime
+    : selectedTask?.runtime ?? liveRuntime;
+  const status = statusPresentation(
+    runtime,
+    selectedTaskIsLive ? operation : undefined,
+    selectedTaskIsLive ? operationDetail : undefined
+  );
+  const workspaceName = settingsSelected
+    ? "π"
+    : selectedWorkspace?.displayName ?? basename(workspace ?? "");
+  const activeSessionName = settingsSelected
+    ? "设置"
+    : selectedTask?.recentUserMessagePreview || selectedTask?.title || sessionName?.trim()
+      || (sessionId ? messages.shell.sessionFallback(sessionId.slice(0, 8)) : undefined);
 
   return (
     <header className={`title-bar ${styles.header}`}>
       <div className={styles.identity}>
-        {navigationAvailable ? (
+        {navigationAvailable && !settingsSelected ? (
           <Button
             className={`icon-button navigation-toggle ${styles.iconButton}`}
             aria-controls="session-navigation"
@@ -83,10 +92,10 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
               : messages.shell.showNavigation}</ControlTooltip>
           </Button>
         ) : null}
-        <div className={`brand-lockup ${styles.brand}`} title={workspace ?? messages.common.appName}>
-          <span className={`brand-mark ${styles.brandMark}`} aria-hidden="true">π</span>
+        <div className={`brand-lockup ${styles.brand}`} title={workspace ?? "π"}>
+          <img alt="" aria-hidden="true" className={`brand-mark ${styles.brandMark}`} src={piIconUrl} />
           <span className={styles.location}>
-            <strong>{workspaceName || messages.common.appName}</strong>
+            <strong>{workspaceName || "π"}</strong>
             {activeSessionName ? (
               <>
                 <span className={styles.locationSeparator} aria-hidden="true">/</span>
@@ -118,7 +127,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
           <Command aria-hidden="true" size={16} />
           <ControlTooltip id="command-palette-tooltip">{messages.shell.commandPalette}</ControlTooltip>
         </Button>
-        {workspace ? (
+        {selectedTaskIsLive ? (
           <Button
             className={`icon-button context-toggle ${styles.iconButton}`}
             aria-controls="session-context"
@@ -126,6 +135,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             aria-expanded={contextVisible}
             aria-keyshortcuts="Control+Shift+B Meta+Shift+B"
             aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
+            data-testid="inspector-toggle"
             onPress={() => setContextVisible(!contextVisible)}
           >
             {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
@@ -134,93 +144,13 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
               : messages.shell.showContextPanel}</ControlTooltip>
           </Button>
         ) : null}
-        <MenuTrigger isOpen={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
-          <Button
-            className={`icon-button ${styles.iconButton}`}
-            aria-describedby="more-actions-tooltip"
-            aria-expanded={moreMenuOpen}
-            aria-label={messages.shell.openMoreMenu}
-          >
-            <Ellipsis aria-hidden="true" size={17} />
-            <ControlTooltip id="more-actions-tooltip">{messages.shell.more}</ControlTooltip>
-          </Button>
-          <Popover className={styles.morePopover!} placement="bottom end" offset={6}>
-            <Menu className={styles.moreMenu!} aria-label={messages.shell.moreApplicationActions}>
-              <MenuItem
-                className={styles.menuItem!}
-                id="credentials"
-                onAction={() => setCredentialDialogOpen(true)}
-                textValue={messages.shell.credentials}
-              >
-                <KeyRound aria-hidden="true" size={15} />
-                <MenuItemCopy label={messages.shell.credentials} detail={messages.shell.credentialsDetail} />
-              </MenuItem>
-              <MenuItem
-                className={styles.menuItem!}
-                id="updates"
-                onAction={() => setUpdateDialogOpen(true)}
-                textValue={messages.shell.updates}
-              >
-                <DownloadCloud aria-hidden="true" size={15} />
-                <MenuItemCopy label={messages.shell.updates} detail={messages.shell.updatesDetail} />
-              </MenuItem>
-              <MenuItem
-                className={styles.menuItem!}
-                id="doctor"
-                onAction={() => setDoctorDialogOpen(true)}
-                textValue={messages.doctor.title}
-              >
-                <Stethoscope aria-hidden="true" size={15} />
-                <MenuItemCopy label={messages.doctor.title} detail={messages.doctor.menuDetail} />
-              </MenuItem>
-              <MenuItem
-                className={styles.menuItem!}
-                id="diagnostics"
-                isDisabled={!workspace}
-                onAction={() => void saveRuntimeDiagnostics()}
-                textValue={messages.shell.diagnostics}
-              >
-                <FileDown aria-hidden="true" size={15} />
-                <MenuItemCopy label={messages.shell.diagnostics} detail={messages.shell.diagnosticsDetail} />
-              </MenuItem>
-              {THEME_OPTIONS.map((option, index) => (
-                <MenuItem
-                  className={`${styles.menuItem} ${index === 0 ? styles.themeStart : ""}`}
-                  id={`theme-${option.id}`}
-                  key={option.id}
-                  aria-label={messages.shell.selectedAppearance(
-                    option.label,
-                    theme.preference === option.id
-                  )}
-                  onAction={() => setThemePreference(option.id)}
-                  textValue={messages.shell.appearance(option.label)}
-                >
-                  <ThemeIcon preference={option.id} />
-                  <MenuItemCopy label={option.label} detail={messages.shell.appearanceDetail} />
-                  <Check
-                    aria-hidden="true"
-                    className={`${styles.selection} ${theme.preference === option.id ? styles.selectionVisible : ""}`}
-                    size={14}
-                  />
-                </MenuItem>
-              ))}
-            </Menu>
-            {theme.persistence === "memory" ? (
-              <p className={styles.themePersistenceNote} role="status">{messages.shell.themePersistenceUnavailable}</p>
-            ) : null}
-          </Popover>
-        </MenuTrigger>
       </div>
     </header>
   );
 }
 
-function ControlTooltip({ id, children }: { id: string; children: React.ReactNode }) {
+function ControlTooltip({ id, children }: { id: string; children: ReactNode }) {
   return <span className={styles.tooltip} id={id} role="tooltip">{children}</span>;
-}
-
-function MenuItemCopy({ label, detail }: { label: string; detail: string }) {
-  return <span className={styles.menuItemCopy}><strong>{label}</strong><small>{detail}</small></span>;
 }
 
 type StatusIconKind = "idle" | "ready" | "active" | "tool" | "warning" | "error" | "recovering";
@@ -273,18 +203,6 @@ function StatusIcon({ kind, spinning }: { kind: StatusIconKind; spinning?: boole
   if (kind === "error") return <TriangleAlert aria-hidden="true" size={14} />;
   if (kind === "recovering") return <RefreshCw aria-hidden="true" className={className} size={14} />;
   return <Circle aria-hidden="true" size={12} />;
-}
-
-const THEME_OPTIONS: ReadonlyArray<{ id: ThemePreference; label: string }> = [
-  { id: "system", label: messages.shell.themeSystem },
-  { id: "light", label: messages.shell.themeLight },
-  { id: "dark", label: messages.shell.themeDark }
-];
-
-function ThemeIcon({ preference }: { preference: ThemePreference }) {
-  if (preference === "system") return <Monitor aria-hidden="true" size={15} />;
-  if (preference === "dark") return <Moon aria-hidden="true" size={15} />;
-  return <Sun aria-hidden="true" size={15} />;
 }
 
 function basename(path: string): string {

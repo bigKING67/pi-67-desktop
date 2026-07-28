@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import {
   selectCommittedExtensionCatalog,
@@ -69,12 +70,12 @@ describe("app events renderer session authority", () => {
     useAppStore.getState().receiveAgentEvent({
       type: "extension.catalog.changed",
       payload: catalog
-    }, eventEnvelope("extension.catalog.changed", catalog, {
+    }, eventEnvelope("extension.catalog.changed", catalog, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-2",
       sessionGeneration: 7
-    }));
+    })));
     expect(committedCatalog()).toBeUndefined();
 
     const nextSnapshot = snapshot("session-2");
@@ -84,12 +85,12 @@ describe("app events renderer session authority", () => {
     }, eventEnvelope("session.bootstrap", {
       snapshot: nextSnapshot,
       reason: "session-open"
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 7
-    }));
+    })));
 
     expect(committedCatalog()).toEqual(catalog);
     expect(useSessionProjectionStore.getState().authority).toMatchObject({
@@ -107,23 +108,23 @@ describe("app events renderer session authority", () => {
     useAppStore.getState().receiveAgentEvent({
       type: "extension.catalog.changed",
       payload: catalog
-    }, eventEnvelope("extension.catalog.changed", catalog, {
+    }, eventEnvelope("extension.catalog.changed", catalog, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
       sessionGeneration: 3
-    }));
+    })));
     expect(committedCatalog()).toEqual(catalog);
 
     useAppStore.getState().receiveAgentEvent({
       type: "extension.catalog.changed",
       payload: staleCatalog
-    }, eventEnvelope("extension.catalog.changed", staleCatalog, {
+    }, eventEnvelope("extension.catalog.changed", staleCatalog, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-1",
       sessionGeneration: 2
-    }));
+    })));
     expect(committedCatalog()).toEqual(catalog);
   });
 
@@ -145,13 +146,13 @@ describe("app events renderer session authority", () => {
     useAppStore.getState().receiveAgentEvent({
       type: "extension.catalog.changed",
       payload: importedCatalog
-    }, eventEnvelope("extension.catalog.changed", importedCatalog, {
+    }, eventEnvelope("extension.catalog.changed", importedCatalog, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-2",
       sessionGeneration: 7,
       operationId: "operation-import"
-    }));
+    })));
 
     expect(committedCatalog()).toEqual(previousCatalog);
     expect(useExtensionUiStore.getState().stagedCatalog).toMatchObject({
@@ -167,13 +168,13 @@ describe("app events renderer session authority", () => {
     }, eventEnvelope("session.bootstrap", {
       snapshot: importedSnapshot,
       reason: "session-import"
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 7,
       operationId: "operation-import"
-    }));
+    })));
 
     expect(committedCatalog()).toEqual(importedCatalog);
     expect(useExtensionUiStore.getState().stagedCatalog).toBeUndefined();
@@ -212,13 +213,13 @@ function committedCatalog() {
 
 function emitOperationStarted(value: OperationView): void {
   const event = { type: "operation.started", payload: { operation: value } } as const;
-  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, {
+  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId: value.sessionId,
     sessionGeneration: value.sessionGeneration,
     operationId: value.operationId
-  }));
+  })));
 }
 
 function operation(sessionId: string, sessionGeneration: number): OperationView {

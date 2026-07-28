@@ -1,5 +1,20 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
+import type {
+  WorkbenchLayoutV2,
+  WorkbenchStateV2
+} from "./workbench-state.js";
+import type { WorkspaceDescriptor } from "./workspace-identity.js";
+
+export type {
+  WorkbenchLayoutV2,
+  WorkbenchStateV2,
+} from "./workbench-state.js";
+export type {
+  NativeWorkspaceDescriptor,
+  WorkspaceDescriptor,
+  WorkspacePathIdentity
+} from "./workspace-identity.js";
 
 export interface PlatformInfo {
   platform: "win32" | "darwin";
@@ -10,6 +25,22 @@ export interface PlatformInfo {
 const systemBridge = {
   getPlatformInfo: (): Promise<PlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
   connectAgentHost: (): Promise<void> => ipcRenderer.invoke("pi67:agent-host-connect"),
+  loadWorkbenchState: (): Promise<WorkbenchStateV2> => ipcRenderer.invoke("pi67:workbench-load"),
+  updateWorkbenchLayout: (layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2> => (
+    ipcRenderer.invoke("pi67:workbench-layout-update", layout)
+  ),
+  pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
+    ipcRenderer.invoke("pi67:workspace-pick-and-add")
+  ),
+  repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
+    ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
+  ),
+  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV2> => (
+    ipcRenderer.invoke("pi67:workspace-remove", workspaceId)
+  ),
+  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV2> => (
+    ipcRenderer.invoke("pi67:workspace-reorder", workspaceIds)
+  ),
   selectWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-workspace"),
   selectSessionFile: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-session-file"),
   saveDiagnostics: (content: string): Promise<string | undefined> => ipcRenderer.invoke("pi67:save-diagnostics", content),

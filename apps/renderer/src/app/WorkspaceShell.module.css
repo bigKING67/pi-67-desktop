@@ -1,3 +1,10 @@
+.applicationSurface {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
 .navigationHidden {
   grid-template-columns: minmax(520px, 1fr) 360px;
 }
@@ -12,6 +19,37 @@
 
 .navigationDrawerScrim {
   display: none;
+}
+
+.emptyWorkspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  padding: 32px;
+  background: var(--surface);
+}
+
+.emptyWorkspace > div {
+  display: grid;
+  width: min(460px, 100%);
+  justify-items: start;
+  gap: 10px;
+}
+
+.emptyWorkspace h2,
+.emptyWorkspace p {
+  margin: 0;
+}
+
+.emptyWorkspace h2 {
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+.emptyWorkspace p {
+  color: var(--text-secondary);
+  line-height: 1.65;
 }
 
 @media (max-width: 1040px) {

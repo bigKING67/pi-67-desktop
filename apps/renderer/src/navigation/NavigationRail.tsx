@@ -1,74 +1,156 @@
 import {
-  FilePlus2,
-  FolderOpen
+  CircleHelp,
+  DownloadCloud,
+  FolderPlus,
+  Info,
+  Settings2,
+  UserRound
 } from "lucide-react";
-import type { RefObject } from "react";
-import { Button } from "react-aria-components";
+import { useMemo, useState, type RefObject } from "react";
+import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
-import { importRendererSessionFile } from "../session/session-import-controller.js";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import { useShellStore } from "../shell/shell-store.js";
+import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
+import { workspaceRemovalDisposition } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
 import styles from "./NavigationRail.module.css";
-import { queryFirstSessionCatalog } from "./session-catalog-controller.js";
-import { useSessionCatalogStore } from "./session-catalog-store.js";
-import { SessionCatalogList } from "./SessionCatalogList.js";
-import { SessionCatalogMenu } from "./SessionCatalogMenu.js";
+import { WorkspaceConversationList } from "./WorkspaceConversationList.js";
 import {
   SessionCatalogSearch,
   useSessionCatalogSearch
 } from "./SessionCatalogSearch.js";
+import { WorkspaceRemovalDialog } from "./WorkspaceRemovalDialog.js";
 
 export function NavigationRail({
   containerRef
 }: {
   containerRef?: RefObject<HTMLElement | null>;
 }) {
-  const workspace = useAppStore((state) => state.workspace);
   const connected = useAppStore((state) => state.connected);
-  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
-  const catalogQuery = useSessionCatalogStore((state) => state.query);
-  const loadingMore = useSessionCatalogStore((state) => state.loadingMore);
-  const { query, setQuery } = useSessionCatalogSearch(connected, catalogQuery);
+  const workspaces = useWorkbenchStore((state) => state.workspaces);
+  const workspaceOrder = useWorkbenchStore((state) => state.workspaceOrder);
+  const expandedWorkspaceIds = useWorkbenchStore((state) => state.expandedWorkspaceIds);
+  const searchableWorkspaceIds = useMemo(() => workspaceOrder.filter((workspaceId) => (
+    workspaces[workspaceId]?.availability === "available"
+  )), [workspaceOrder, workspaces]);
+  const visibleWorkspaceIds = useMemo(() => expandedWorkspaceIds.filter((workspaceId) => (
+    workspaces[workspaceId]?.availability === "available"
+  )), [expandedWorkspaceIds, workspaces]);
+  const { query, setQuery } = useSessionCatalogSearch(
+    connected,
+    visibleWorkspaceIds,
+    searchableWorkspaceIds
+  );
+  const [removalWorkspaceId, setRemovalWorkspaceId] = useState<string>();
+  const removalWorkspace = removalWorkspaceId ? workspaces[removalWorkspaceId] : undefined;
 
   return (
-    <aside ref={containerRef} className="navigation-rail" id="session-navigation" aria-label={messages.navigation.region}>
-      <div className="workspace-switcher">
-        <div>
-          <span className="section-label">{messages.navigation.workspace}</span>
-          <strong title={workspace}>{basename(workspace ?? "")}</strong>
+    <aside
+      ref={containerRef}
+      className={`navigation-rail ${styles.rail}`}
+      id="session-navigation"
+      aria-label={messages.navigation.region}
+    >
+      <header className={styles.railHeader}>
+        <div className={styles.railBrand} aria-label="π 工作台">
+          <img alt="" aria-hidden="true" src={piIconUrl} />
+          <span><strong>π</strong><small>会话工作台</small></span>
         </div>
-        <Button className="icon-button" aria-label={messages.navigation.switchWorkspace} onPress={() => void openRendererWorkspace()}>
-          <FolderOpen aria-hidden="true" size={15} />
+        <Button
+          className={styles.workspaceAdd!}
+          aria-label="添加或创建工作区"
+          data-testid="workspace-add"
+          onPress={() => void openRendererWorkspace()}
+        >
+          <FolderPlus aria-hidden="true" size={15} />
         </Button>
-      </div>
+      </header>
 
       <div className={styles.actions}>
-        <Button
-          className={styles.createButton!}
-          isDisabled={sessionTransitionPending}
-          onPress={() => void createRendererSession()}
-        >
-          <FilePlus2 aria-hidden="true" size={15} />
-          {messages.navigation.createSession}
-        </Button>
         <SessionCatalogSearch query={query} onQueryChange={setQuery} />
       </div>
 
-      <SessionCatalogList query={query} />
+      <WorkspaceConversationList
+        query={query}
+        onRequestRemoval={(workspaceId) => requestWorkspaceRemoval(workspaceId, setRemovalWorkspaceId)}
+      />
 
       <footer className={`navigation-footer ${styles.footer}`}>
-        {loadingMore ? <span className={styles.loadingMore}>{messages.navigation.loadingMore}</span> : null}
-        <SessionCatalogMenu
-          disabled={sessionTransitionPending}
-          onImport={() => void importRendererSessionFile()}
-          onRefresh={() => void queryFirstSessionCatalog({ query, refresh: true })}
-        />
+        <Button
+          className={styles.accountButton!}
+          data-testid="account-settings-entry"
+          onPress={() => rendererWorkbenchStore.getState().openSettings("account")}
+        >
+          <UserRound aria-hidden="true" size={15} />
+          <span><strong>未登录</strong><small>本地模式</small></span>
+        </Button>
+        <HelpMenu />
       </footer>
+
+      {removalWorkspace ? (
+        <WorkspaceRemovalDialog
+          workspace={removalWorkspace}
+          onDismiss={() => setRemovalWorkspaceId(undefined)}
+        />
+      ) : null}
     </aside>
   );
 }
 
-function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+function HelpMenu() {
+  const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
+  return (
+    <MenuTrigger>
+      <Button className={styles.helpButton!} aria-label="帮助与设置" data-testid="help-menu-trigger">
+        <CircleHelp aria-hidden="true" size={16} />
+      </Button>
+      <Popover className={`${styles.menuPopover} ${styles.footerMenu}`} placement="top end" offset={6}>
+        <Menu aria-label="帮助与设置" className={styles.menu!}>
+          <MenuItem
+            className={styles.menuItem!}
+            onAction={() => rendererWorkbenchStore.getState().openSettings("general")}
+            textValue="设置"
+          ><Settings2 aria-hidden="true" size={14} />设置</MenuItem>
+          <MenuItem
+            className={styles.menuItem!}
+            onAction={() => setUpdateDialogOpen(true)}
+            textValue="检查更新"
+          ><DownloadCloud aria-hidden="true" size={14} />检查更新</MenuItem>
+          <MenuItem
+            className={styles.menuItem!}
+            onAction={() => rendererWorkbenchStore.getState().openSettings("about")}
+            textValue="帮助"
+          ><Info aria-hidden="true" size={14} />帮助</MenuItem>
+        </Menu>
+      </Popover>
+    </MenuTrigger>
+  );
+}
+
+function requestWorkspaceRemoval(
+  workspaceId: string,
+  showDialog: (workspaceId: string) => void
+): void {
+  const disposition = workspaceRemovalDisposition(workspaceId);
+  if (disposition === "tasks-open") {
+    publishNotification({
+      level: "warning",
+      title: "无法移除工作区",
+      message: "请先处理这个工作区仍在运行、等待或包含草稿的会话。"
+    });
+    return;
+  }
+  if (disposition === "workspace-active") {
+    publishNotification({
+      level: "warning",
+      title: "无法移除当前工作区",
+      message: "请先切换到另一个工作区，再移除这个工作区。"
+    });
+    return;
+  }
+  if (disposition === "workspace-missing" || disposition === "host-busy") return;
+  showDialog(workspaceId);
 }

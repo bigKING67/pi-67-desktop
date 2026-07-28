@@ -29,7 +29,7 @@ describe("operation heartbeat protocol", () => {
     })).toBe(false);
     expect(isEventEnvelope({
       ...heartbeat,
-      operationId: "operation-2"
+      context: { ...heartbeat.context, operationId: "operation-2" }
     })).toBe(false);
     expect(isEventEnvelope({
       ...heartbeat,
@@ -42,8 +42,15 @@ function eventContext() {
   return {
     hostEpoch: 3,
     sequence: 1,
-    sessionId: "session-1",
-    sessionGeneration: 2,
-    operationId: "operation-1"
+    context: {
+      scope: "task" as const,
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      sessionId: "session-1",
+      sessionGeneration: 2,
+      operationId: "operation-1"
+    },
+    taskSequence: 1
   };
 }

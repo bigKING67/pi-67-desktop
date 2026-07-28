@@ -1,13 +1,26 @@
-export type AgentHostRuntimePoisonedMessage = {
-  type: "agent-host-runtime-poisoned";
-  code: "ABORT_WATCHDOG_EXPIRED";
-  operationId: string;
-  abortTimeoutMs: number;
-} | {
-  type: "agent-host-runtime-poisoned";
-  code: "SESSION_IMPORT_PROJECTION_FAILED";
-  operationId: string;
-};
+import { Type, type Static } from "typebox";
+import { Value } from "typebox/value";
+import { strictObject } from "./schemas.js";
+
+const OperationIdSchema = Type.String({ minLength: 1, maxLength: 512 });
+
+export const AgentHostRuntimePoisonedMessageSchema = Type.Union([
+  strictObject({
+    type: Type.Literal("agent-host-runtime-poisoned"),
+    code: Type.Literal("ABORT_WATCHDOG_EXPIRED"),
+    operationId: OperationIdSchema,
+    abortTimeoutMs: Type.Integer({ minimum: 1, maximum: 60_000 })
+  }),
+  strictObject({
+    type: Type.Literal("agent-host-runtime-poisoned"),
+    code: Type.Literal("SESSION_IMPORT_PROJECTION_FAILED"),
+    operationId: OperationIdSchema
+  })
+]);
+
+export type AgentHostRuntimePoisonedMessage = Static<
+  typeof AgentHostRuntimePoisonedMessageSchema
+>;
 
 export interface AgentHostShutdownRequest {
   type: "agent-host-shutdown";
@@ -22,59 +35,35 @@ export interface AgentHostShutdownCompleteMessage {
   extensionRequestsCancelled: number;
 }
 
+export const AgentHostShutdownRequestSchema = strictObject({
+  type: Type.Literal("agent-host-shutdown"),
+  reason: Type.Literal("application-quit"),
+  deadlineMs: Type.Integer({ minimum: 100, maximum: 10_000 })
+});
+
+export const AgentHostShutdownCompleteMessageSchema = strictObject({
+  type: Type.Literal("agent-host-shutdown-complete"),
+  activeOperation: Type.Union([
+    Type.Literal("none"),
+    Type.Literal("cancelled"),
+    Type.Literal("lost")
+  ]),
+  queuedCommandsDropped: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  extensionRequestsCancelled: Type.Integer({ minimum: 0, maximum: 10_000 })
+});
+
 export function isAgentHostRuntimePoisonedMessage(
   value: unknown
 ): value is AgentHostRuntimePoisonedMessage {
-  if (typeof value !== "object" || value === null) return false;
-  const message = value as {
-    type?: unknown;
-    code?: unknown;
-    operationId?: unknown;
-    abortTimeoutMs?: unknown;
-  };
-  if (
-    message.type !== "agent-host-runtime-poisoned"
-    || typeof message.operationId !== "string"
-    || message.operationId.length === 0
-    || message.operationId.length > 512
-  ) return false;
-  if (message.code === "SESSION_IMPORT_PROJECTION_FAILED") {
-    return Object.keys(value).length === 3;
-  }
-  return message.code === "ABORT_WATCHDOG_EXPIRED"
-    && Object.keys(value).length === 4
-    && Number.isSafeInteger(message.abortTimeoutMs)
-    && Number(message.abortTimeoutMs) >= 1
-    && Number(message.abortTimeoutMs) <= 60_000;
+  return Value.Check(AgentHostRuntimePoisonedMessageSchema, value);
 }
 
 export function isAgentHostShutdownRequest(value: unknown): value is AgentHostShutdownRequest {
-  if (typeof value !== "object" || value === null) return false;
-  const message = value as Partial<AgentHostShutdownRequest>;
-  return Object.keys(value).length === 3
-    && message.type === "agent-host-shutdown"
-    && message.reason === "application-quit"
-    && Number.isSafeInteger(message.deadlineMs)
-    && Number(message.deadlineMs) >= 100
-    && Number(message.deadlineMs) <= 10_000;
+  return Value.Check(AgentHostShutdownRequestSchema, value);
 }
 
 export function isAgentHostShutdownCompleteMessage(
   value: unknown
 ): value is AgentHostShutdownCompleteMessage {
-  if (typeof value !== "object" || value === null) return false;
-  const message = value as Partial<AgentHostShutdownCompleteMessage>;
-  return Object.keys(value).length === 4
-    && message.type === "agent-host-shutdown-complete"
-    && (
-      message.activeOperation === "none"
-      || message.activeOperation === "cancelled"
-      || message.activeOperation === "lost"
-    )
-    && boundedCount(message.queuedCommandsDropped)
-    && boundedCount(message.extensionRequestsCancelled);
-}
-
-function boundedCount(value: unknown): boolean {
-  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 10_000;
+  return Value.Check(AgentHostShutdownCompleteMessageSchema, value);
 }

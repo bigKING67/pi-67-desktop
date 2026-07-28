@@ -39,7 +39,7 @@ describe("toProtocolError", () => {
   it("does not stringify unknown thrown values", () => {
     expect(toProtocolError({ password: "must-not-cross" })).toEqual({
       code: "INTERNAL",
-      message: "Unknown Agent Host error.",
+      message: "Unknown Pi runtime service error.",
       recoverable: true
     });
   });

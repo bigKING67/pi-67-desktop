@@ -2,6 +2,7 @@ import type { OperationView } from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../app/app-store.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import {
   installOperationFreshnessController,
   observeOperationFreshnessEvent
@@ -98,5 +99,5 @@ function heartbeatEnvelope(overrides: Partial<{
     operationId: context.operationId,
     observedAt: 105_000,
     lastActivityAt: 105_000
-  }, context);
+  }, taskEventFixture(context));
 }

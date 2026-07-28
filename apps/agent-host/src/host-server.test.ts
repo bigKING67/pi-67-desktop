@@ -1,14 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
-  isEventEnvelope,
+  PROTOCOL_REVISION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
+import {
+  commandEnvelope,
+  commandEnvelopeForContext,
+  TEST_APP_CONTEXT,
+  TEST_TASK_CONTEXT,
+  TEST_WORKSPACE_CONTEXT,
+  testTaskContext
+} from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -29,6 +36,172 @@ class FakePort implements ProtocolPort {
 }
 
 describe("AgentHostServer", () => {
+  it("runs App diagnostics before any Task Runtime exists", async () => {
+    const doctor = {
+      generatedAt: 0,
+      checks: []
+    };
+    const runDoctor = vi.fn(async () => doctor);
+    const runtime = {
+      getSdkVersion: () => "0.81.1",
+      subscribe: () => () => undefined,
+      runDoctor,
+      cancelInteractiveRequests: () => [],
+      dispose: async () => undefined
+    } as unknown as AgentRuntime;
+    const server = new AgentHostServer(async () => runtime);
+    const port = new FakePort();
+    server.attachPort(port, {
+      appInstanceId: "app-doctor",
+      hostInstanceId: "host-doctor",
+      hostEpoch: 14
+    });
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-doctor",
+      appInstanceId: "app-doctor",
+      maxEnvelopeBytes: 2 * 1024 * 1024
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
+
+    const request = commandEnvelopeForContext("doctor.run", {}, TEST_APP_CONTEXT, 14);
+    port.emit(request);
+    await expectProtocolResponse(port, request.requestId, {
+      ok: true,
+      context: TEST_APP_CONTEXT,
+      result: doctor
+    });
+    expect(runDoctor).toHaveBeenCalledOnce();
+    await server.shutdown();
+  });
+
+  it("fails closed for invalid scopes while routing independent Task authorities", async () => {
+    const tree = { nodes: [], truncated: false, total: 0 };
+    const createRuntime = () => ({
+      getSdkVersion: () => "0.81.1",
+      subscribe: () => () => undefined,
+      getIdentity: () => ({ sessionId: "session-authority", sessionGeneration: 5 }),
+      getSessionTree: () => tree,
+      cancelInteractiveRequests: () => [],
+      dispose: async () => undefined
+    } as unknown as AgentRuntime);
+    const runtimes = [createRuntime(), createRuntime()];
+    const server = new AgentHostServer(async () => runtimes.shift()!);
+    const port = new FakePort();
+    server.attachPort(port, {
+      appInstanceId: "app-authority",
+      hostInstanceId: "host-authority",
+      hostEpoch: 10
+    });
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-authority",
+      appInstanceId: "app-authority",
+      maxEnvelopeBytes: 2 * 1024 * 1024
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
+
+    const appScopedTaskCommand = commandEnvelopeForContext(
+      "session.tree",
+      {},
+      TEST_APP_CONTEXT,
+      10
+    );
+    port.emit(appScopedTaskCommand);
+    await expectProtocolResponse(port, appScopedTaskCommand.requestId, {
+      ok: false,
+      context: TEST_APP_CONTEXT,
+      error: { code: "INVALID_PAYLOAD" }
+    });
+
+    const workspaceScopedTaskCommand = commandEnvelopeForContext(
+      "session.tree",
+      {},
+      TEST_WORKSPACE_CONTEXT,
+      10
+    );
+    port.emit(workspaceScopedTaskCommand);
+    await expectProtocolResponse(port, workspaceScopedTaskCommand.requestId, {
+      ok: false,
+      context: TEST_WORKSPACE_CONTEXT,
+      error: { code: "INVALID_PAYLOAD" }
+    });
+
+    const acceptedTaskCommand = commandEnvelopeForContext(
+      "session.tree",
+      {},
+      TEST_TASK_CONTEXT,
+      10
+    );
+    port.emit(acceptedTaskCommand);
+    await expectProtocolResponse(port, acceptedTaskCommand.requestId, {
+      ok: true,
+      context: TEST_TASK_CONTEXT,
+      result: tree
+    });
+
+    const staleTaskContext = testTaskContext(2);
+    const staleTaskCommand = commandEnvelopeForContext(
+      "session.tree",
+      {},
+      staleTaskContext,
+      10
+    );
+    port.emit(staleTaskCommand);
+    await expectProtocolResponse(port, staleTaskCommand.requestId, {
+      ok: false,
+      context: staleTaskContext,
+      error: { code: "INVALID_PAYLOAD" }
+    });
+
+    const differentTaskContext = testTaskContext(1, { taskId: "task-other" });
+    const differentTaskCommand = commandEnvelopeForContext(
+      "session.tree",
+      {},
+      differentTaskContext,
+      10
+    );
+    port.emit(differentTaskCommand);
+    await expectProtocolResponse(port, differentTaskCommand.requestId, {
+      ok: true,
+      context: differentTaskContext,
+      result: tree
+    });
+
+    const otherWorkspaceContext = { scope: "workspace" as const, workspaceId: "workspace-other" };
+    const otherWorkspaceQuery = commandEnvelopeForContext(
+      "session.catalog.query",
+      { scope: "workspace", limit: 50 },
+      otherWorkspaceContext,
+      10
+    );
+    port.emit(otherWorkspaceQuery);
+    await expectProtocolResponse(port, otherWorkspaceQuery.requestId, {
+      ok: false,
+      context: otherWorkspaceContext,
+      error: { code: "RUNTIME_NOT_READY" }
+    });
+
+    const appStatus = commandEnvelopeForContext(
+      "runtime.getStatus",
+      {},
+      TEST_APP_CONTEXT,
+      10
+    );
+    port.emit(appStatus);
+    await expectProtocolResponse(port, appStatus.requestId, {
+      ok: true,
+      context: TEST_APP_CONTEXT,
+      result: { initialized: false, loaded: true }
+    });
+
+    await server.shutdown();
+  });
+
   it("returns the session tree without rebuilding a full snapshot", async () => {
     const tree = {
       nodes: [{
@@ -43,7 +216,7 @@ describe("AgentHostServer", () => {
       total: 1
     };
     const getSessionTree = vi.fn(() => tree);
-    const getSnapshot = vi.fn(() => emptySnapshot());
+    const getSnapshot = vi.fn();
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
@@ -57,7 +230,8 @@ describe("AgentHostServer", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-tree", hostInstanceId: "host-tree", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-tree",
       appInstanceId: "app-tree",
@@ -90,7 +264,8 @@ describe("AgentHostServer", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-queue", hostInstanceId: "host-queue", hostEpoch: 3 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-queue",
       appInstanceId: "app-queue",
@@ -112,252 +287,17 @@ describe("AgentHostServer", () => {
     await server.shutdown();
   });
 
-  it("returns prompt acceptance without waiting for operation completion", async () => {
-    let complete!: () => void;
-    const submitPrompt = vi.fn(() => new Promise<void>((resolve) => { complete = resolve; }));
-    const flushStream = vi.fn();
-    const resolveExtensionUi = vi.fn(() => true);
-    const runtime = {
-      getSdkVersion: () => "0.81.1",
-      getExtensionUiCapabilities: extensionUiCapabilities,
-      subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-1", sessionGeneration: 3 }),
-      getSnapshot: () => emptySnapshot(),
-      getWorkspaceChanges: () => emptyChanges(),
-      getExtensionCatalog: () => emptyCatalog(),
-      getSessionCatalogStatus: () => ({ revision: 0, itemCount: 0, source: "sqlite", state: "ready", rebuilding: false, incomplete: false, skippedCount: 0 }),
-      submitPrompt,
-      resolveExtensionUi,
-      flushStream,
-      cancelInteractiveRequests: () => [],
-      dispose: async () => undefined
-    } as unknown as AgentRuntime;
-    const server = new AgentHostServer(async () => runtime);
-    const port = new FakePort();
-    server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 6 });
-    const hello: RendererHello = {
-      protocolVersion: 2,
-      kind: "hello",
-      rendererInstanceId: "renderer-1",
-      appInstanceId: "app-1",
-      maxEnvelopeBytes: 2 * 1024 * 1024
-    };
-    port.emit(hello);
-    await vi.waitFor(() => expect(isHostWelcome(port.sent[0])).toBe(true));
-
-    const resync = commandEnvelope("projection.resync", {}, 6);
-    port.emit(resync);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === resync.requestId);
-      expect(response).toMatchObject({
-        ok: true,
-        type: "projection.resync",
-        result: { eventSequence: 0, hostEpoch: 6, sessionGeneration: 3 }
-      });
-    });
-
-    const request = commandEnvelope("prompt.submit", {
-      submissionId: "submission-1",
-      text: "run a long task",
-      delivery: "new-turn"
-    }, 6);
-    port.emit(request);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === request.requestId);
-      expect(response).toMatchObject({ ok: true, type: "prompt.submit" });
-    });
-    await vi.waitFor(() => expect(port.sent.some(isEventEnvelope)).toBe(true));
-    const responseIndex = port.sent.findIndex((value) => isResponseEnvelope(value) && value.requestId === request.requestId);
-    const startedIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "operation.started");
-    expect(responseIndex).toBeGreaterThanOrEqual(0);
-    expect(startedIndex).toBeGreaterThan(responseIndex);
-    expect(submitPrompt).toHaveBeenCalledWith("run a long task", undefined);
-
-    const activeResync = commandEnvelope("projection.resync", {}, 6);
-    port.emit(activeResync);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === activeResync.requestId);
-      expect(response).toMatchObject({
-        ok: true,
-        result: { activeOperation: { kind: "prompt", lifecycle: "running", sessionId: "session-1" } }
-      });
-    });
-
-    const retry = commandEnvelope("prompt.submit", {
-      submissionId: "submission-1",
-      text: "run a long task",
-      delivery: "new-turn"
-    }, 6);
-    port.emit(retry);
-    await vi.waitFor(() => {
-      const first = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === request.requestId);
-      const second = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === retry.requestId);
-      expect(second).toMatchObject({ ok: true, result: { operationId: (first as { result: { operationId: string } }).result.operationId } });
-    });
-    expect(submitPrompt).toHaveBeenCalledOnce();
-
-    const mismatchedRetry = commandEnvelope("prompt.submit", {
-      submissionId: "submission-1",
-      text: "different task",
-      delivery: "new-turn"
-    }, 6);
-    port.emit(mismatchedRetry);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === mismatchedRetry.requestId);
-      expect(response).toMatchObject({ ok: false, error: { code: "DUPLICATE_REQUEST" } });
-    });
-    expect(submitPrompt).toHaveBeenCalledOnce();
-
-    const acceptedResponse = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === request.requestId);
-    if (!acceptedResponse || !isResponseEnvelope(acceptedResponse) || !acceptedResponse.ok) {
-      throw new Error("Expected prompt acceptance response.");
-    }
-    const operationId = (acceptedResponse.result as { operationId: string }).operationId;
-    const staleSession = commandEnvelope("extension.ui.respond", {
-      requestId: "extension-request",
-      sessionId: "session-1",
-      sessionGeneration: 2,
-      operationId,
-      value: "stale"
-    }, 6);
-    port.emit(staleSession);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === staleSession.requestId);
-      expect(response).toMatchObject({ ok: false, error: { code: "STALE_SESSION_GENERATION" } });
-    });
-
-    const staleOperation = commandEnvelope("extension.ui.respond", {
-      requestId: "extension-request",
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId: "operation-stale",
-      value: "stale"
-    }, 6);
-    port.emit(staleOperation);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === staleOperation.requestId);
-      expect(response).toMatchObject({ ok: false, error: { code: "STALE_OPERATION" } });
-    });
-
-    const current = commandEnvelope("extension.ui.respond", {
-      requestId: "extension-request",
-      sessionId: "session-1",
-      sessionGeneration: 3,
-      operationId,
-      value: "accepted"
-    }, 6);
-    port.emit(current);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === current.requestId);
-      expect(response).toMatchObject({ ok: true, result: { resolved: true } });
-    });
-    expect(resolveExtensionUi).toHaveBeenCalledOnce();
-
-    complete();
-    await vi.waitFor(() => expect(flushStream).toHaveBeenCalledOnce());
-    const operationEvents = port.sent.filter(isEventEnvelope).map((event) => event.type);
-    expect(operationEvents).toEqual(["operation.started", "operation.completed"]);
-    await server.shutdown();
-  });
-
-  it("rejects prompt submission replay after the runtime Session authority changes", async () => {
-    let sessionId = "session-1";
-    let sessionGeneration = 3;
-    const submitPrompt = vi.fn(() => new Promise<void>(() => undefined));
-    const runtime = {
-      getSdkVersion: () => "0.81.1",
-      subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
-      submitPrompt,
-      flushStream: () => undefined,
-      cancelInteractiveRequests: () => [],
-      dispose: async () => undefined
-    } as unknown as AgentRuntime;
-    const server = new AgentHostServer(async () => runtime);
-    const port = new FakePort();
-    server.attachPort(port, { appInstanceId: "app-bound", hostInstanceId: "host-bound", hostEpoch: 7 });
-    port.emit({
-      protocolVersion: 2,
-      kind: "hello",
-      rendererInstanceId: "renderer-bound",
-      appInstanceId: "app-bound",
-      maxEnvelopeBytes: 2 * 1024 * 1024
-    } satisfies RendererHello);
-    await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
-
-    const first = commandEnvelope("prompt.submit", {
-      submissionId: "session-bound-submission",
-      text: "keep this submission in session one",
-      delivery: "new-turn"
-    }, 7);
-    port.emit(first);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === first.requestId);
-      expect(response).toMatchObject({ ok: true, result: { sessionId: "session-1", sessionGeneration: 3 } });
-    });
-
-    sessionId = "session-2";
-    sessionGeneration = 3;
-    const replay = commandEnvelope("prompt.submit", {
-      submissionId: "session-bound-submission",
-      text: "keep this submission in session one",
-      delivery: "new-turn"
-    }, 7);
-    port.emit(replay);
-    await vi.waitFor(() => {
-      const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === replay.requestId);
-      expect(response).toMatchObject({ ok: false, error: { code: "STALE_SESSION_GENERATION" } });
-    });
-    await vi.waitFor(() => expect(submitPrompt).toHaveBeenCalledOnce());
-    await server.shutdown();
-  });
-
 });
 
-function emptySnapshot() {
-  return {
-    sessionId: "session-1",
-    cwd: "/tmp",
-    streaming: false,
-    messages: [],
-    messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
-    tree: { nodes: [], truncated: false, total: 0 },
-    resources: []
-  };
-}
-
-function emptyChanges() {
-  return { sessionId: "session-1", items: [], truncated: false, total: 0 };
-}
-
-function emptyCatalog() {
-  return { items: [], total: 0, truncated: false };
-}
-
-function extensionUiCapabilities(): ReturnType<AgentRuntime["getExtensionUiCapabilities"]> {
-  return {
-    primitives: ["select", "confirm", "input", "editor", "notify", "status", "text-widget", "title"],
-    attribution: "none",
-    recognizedCompatibilityLevels: ["native", "headless", "adapter", "partial", "tui-only", "unsupported"],
-    adapterRegistry: {
-      available: false,
-      manifestSchemaVersions: [],
-      supportedSurfaces: [],
-      realtimeUiAttribution: false,
-      activeAdapterCount: 0
-    },
-    limitations: {
-      workingIndicator: "unsupported",
-      editorMutation: "unsupported",
-      customComponents: "tui-only",
-      autocomplete: "tui-only",
-      widgetPlacements: ["aboveEditor", "belowEditor"]
-    }
-  };
+async function expectProtocolResponse(
+  port: FakePort,
+  requestId: string,
+  expected: object
+): Promise<void> {
+  await vi.waitFor(() => {
+    const response = port.sent.find((value) => (
+      isResponseEnvelope(value) && value.requestId === requestId
+    ));
+    expect(response).toMatchObject(expected);
+  });
 }

@@ -110,10 +110,31 @@
 .credential-current code { color: var(--text-primary); font-family: var(--font-code); font-size: 13px; letter-spacing: 0.08em; }
 .credential-current small { color: var(--text-tertiary); font-size: 10px; }
 .dialog-field { display: grid; gap: 6px; }
-.dialog-field > span { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
+.dialog-field > label { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
 .dialog-field select { width: 100%; height: 38px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
 .dialog-field small { color: var(--text-tertiary); font-size: 10px; }
+.credential-secret-input { position: relative; }
+.credential-secret-input input { width: 100%; padding-right: 42px; }
+.credential-secret-toggle {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  transform: translateY(-50%);
+}
+.credential-secret-toggle:hover:not([disabled]) { background: var(--surface-hover); color: var(--text-primary); }
+.credential-secret-toggle[disabled] { background: var(--surface-muted); color: var(--text-tertiary); }
 .credential-empty { margin: 0; padding: 13px; border: 1px dashed var(--border-strong); border-radius: 9px; color: var(--text-secondary); }
+.credential-load-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 @media (max-width: 680px) {
   .provider-credential-layout { grid-template-columns: 1fr; }

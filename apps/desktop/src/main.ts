@@ -11,6 +11,13 @@ import { registerPowerResumeRecovery } from "./power-resume.js";
 import { redact } from "./redaction.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
 import { registerSystemBridge } from "./system-bridge.js";
+import {
+  beginWorkbenchRun,
+  finishWorkbenchRun,
+  replaceWorkspaceRegistrations,
+  WorkbenchStateStore
+} from "./workbench-state.js";
+import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -23,11 +30,12 @@ const supportedTarget = (process.platform === "win32" && process.arch === "x64")
 registerAppSchemePrivileges();
 
 if (!supportedTarget) {
-  throw new Error(`Pi-67 Desktop does not support ${process.platform}/${process.arch}.`);
+  throw new Error(`π does not support ${process.platform}/${process.arch}.`);
 }
 
 let mainWindow: BrowserWindow | undefined;
 let unregisterPowerResumeRecovery: (() => void) | undefined;
+let workbenchState: WorkbenchStateStore | undefined;
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
   appInstanceId: randomUUID(),
@@ -38,6 +46,9 @@ const agentHostSupervisor = new AgentHostSupervisor({
 });
 const applicationShutdown = createApplicationShutdownController({
   stopAgentHost: () => agentHostSupervisor.stop(),
+  markCleanExit: async () => {
+    if (workbenchState) await workbenchState.update(finishWorkbenchRun);
+  },
   quit: () => app.quit(),
   onError: (error) => {
     console.error(redact(error instanceof Error ? error.message : String(error)));
@@ -57,9 +68,17 @@ app.on("second-instance", () => {
 if (hasSingleInstanceLock) {
   void app.whenReady().then(async () => {
     registerApplicationProtocol(rendererDirectory);
+    workbenchState = new WorkbenchStateStore(app.getPath("userData"));
+    await workbenchState.update(beginWorkbenchRun);
+    const persistedWorkbench = (await workbenchState.load()).state;
+    const refreshedWorkspaces = await Promise.all(
+      persistedWorkbench.workspaces.map(refreshPersistedWorkspaceDescriptor)
+    );
+    await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
     registerSystemBridge({
       connectAgentHost: () => agentHostSupervisor.connect(),
-      getMainWindow: () => mainWindow
+      getMainWindow: () => mainWindow,
+      workbenchState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
       getMainWindow: () => mainWindow

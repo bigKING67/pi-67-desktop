@@ -10,6 +10,7 @@ import {
   type ProtocolRequestError as ProtocolRequestErrorType
 } from "./agent-messages.js";
 import {
+  APP_PROTOCOL_CONTEXT,
   DEFAULT_MAX_ENVELOPE_BYTES,
   commandEnvelope,
   correlateInvalidResponse,
@@ -17,11 +18,14 @@ import {
   helloEnvelope,
   isEnvelopeWithinByteLimit,
   isEventEnvelope,
+  isHandshakeRejected,
   isHostWelcome,
   isRequestEnvelope,
   isResponseEnvelope,
+  protocolContextsEqual,
   type EventEnvelope,
-  type HostWelcome
+  type HostWelcome,
+  type ProtocolContext
 } from "./envelope.js";
 import { correlateInvalidEvent } from "./event-context.js";
 
@@ -44,6 +48,7 @@ export interface ProtocolPort {
 
 interface PendingRequest {
   type: AgentCommandType;
+  context: ProtocolContext;
   resolve: (value: never) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
@@ -75,6 +80,7 @@ export interface AgentPortClientOptions {
 
 export interface AgentRequestOptions {
   idempotencyKey?: string;
+  context?: ProtocolContext;
 }
 
 export type ProjectionResyncInstaller = (result: ProjectionResyncResult) => boolean;
@@ -122,13 +128,13 @@ export class AgentPortClient {
     this.addPortListener("close", this.closeListener);
     port.start?.();
     const handshakeTimeout = setTimeout(() => {
-      if (!this.welcome) this.teardown(connectionError("Agent Host handshake timed out."));
+      if (!this.welcome) this.teardown(connectionError("Pi runtime service handshake timed out."));
     }, this.handshakeTimeoutMs);
     void this.readyPromise.finally(() => clearTimeout(handshakeTimeout)).catch(() => undefined);
     try {
       port.postMessage(helloEnvelope(this.rendererInstanceId, this.appInstanceId, this.maxEnvelopeBytes));
     } catch {
-      this.teardown(connectionError("Agent Host handshake could not be sent."));
+      this.teardown(connectionError("Pi runtime service handshake could not be sent."));
     }
   }
 
@@ -155,12 +161,15 @@ export class AgentPortClient {
     return () => this.sequenceGapListeners.delete(listener);
   }
 
-  async resyncProjection(install: ProjectionResyncInstaller): Promise<boolean> {
+  async resyncProjection(
+    install: ProjectionResyncInstaller,
+    context: ProtocolContext = APP_PROTOCOL_CONTEXT
+  ): Promise<boolean> {
     const attempt = ++this.projectionResyncAttempt;
     // The authoritative snapshot owns every event through its sequence. Keep
     // later events closed until the caller has installed that snapshot.
     this.sequenceBroken = true;
-    const result = await this.request("projection.resync", {});
+    const result = await this.request("projection.resync", {}, [], { context });
     if (result.hostEpoch !== this.welcome?.hostEpoch) {
       throw new ProtocolRequestError({
         code: "STALE_HOST_EPOCH",
@@ -202,7 +211,13 @@ export class AgentPortClient {
         recoverable: false
       });
     }
-    const envelope = commandEnvelope(type, payload, identity.hostEpoch, options.idempotencyKey);
+    const envelope = commandEnvelope(
+      type,
+      payload,
+      options.context ?? APP_PROTOCOL_CONTEXT,
+      identity.hostEpoch,
+      options.idempotencyKey
+    );
     if (!isRequestEnvelope(envelope)) {
       throw new ProtocolRequestError({
         code: "INVALID_PAYLOAD",
@@ -228,6 +243,7 @@ export class AgentPortClient {
       }, timeoutFor(type, this.requestTimeoutMs));
       this.pending.set(envelope.requestId, {
         type,
+        context: envelope.context,
         resolve: resolve as (value: never) => void,
         reject,
         timeout
@@ -249,9 +265,13 @@ export class AgentPortClient {
     if (!isEnvelopeWithinByteLimit(data, this.negotiatedMaxEnvelopeBytes ?? this.maxEnvelopeBytes)) {
       this.teardown(new ProtocolRequestError({
         code: "RESOURCE_LIMIT_EXCEEDED",
-        message: "Agent Host sent an envelope larger than the negotiated limit.",
+        message: "The Pi runtime service sent an envelope larger than the negotiated limit.",
         recoverable: true
       }));
+      return;
+    }
+    if (isHandshakeRejected(data)) {
+      this.teardown(new ProtocolRequestError(data.error));
       return;
     }
     if (isHostWelcome(data)) {
@@ -277,7 +297,7 @@ export class AgentPortClient {
     if (invalidEvent?.hostEpoch === this.welcome.hostEpoch) {
       this.teardown(new ProtocolRequestError({
         code: "INVALID_PAYLOAD",
-        message: "Agent Host sent an invalid event envelope.",
+        message: "Pi 运行服务发送了无效的事件响应。",
         recoverable: true
       }));
       return;
@@ -287,7 +307,7 @@ export class AgentPortClient {
       if (invalid?.hostEpoch === this.welcome.hostEpoch && this.pending.has(invalid.requestId)) {
         this.teardown(new ProtocolRequestError({
           code: "INVALID_PAYLOAD",
-          message: "Agent Host returned an invalid correlated response.",
+          message: "Pi 运行服务返回了无法匹配当前请求的响应。",
           recoverable: true
         }));
       }
@@ -295,7 +315,15 @@ export class AgentPortClient {
     }
     if (data.hostEpoch !== this.welcome.hostEpoch) return;
     const pending = this.pending.get(data.requestId);
-    if (!pending || pending.type !== data.type) return;
+    if (!pending) return;
+    if (pending.type !== data.type || !protocolContextsEqual(pending.context, data.context)) {
+      this.teardown(new ProtocolRequestError({
+        code: "INVALID_PAYLOAD",
+        message: "Pi 运行服务返回了属于其他工作区或任务的响应。",
+        recoverable: true
+      }));
+      return;
+    }
     this.pending.delete(data.requestId);
     clearTimeout(pending.timeout);
     if (data.ok) pending.resolve(data.result as never);
@@ -305,13 +333,13 @@ export class AgentPortClient {
   private handleWelcome(welcome: HostWelcome): void {
     if (this.welcome || this.closed) return;
     if (welcome.appInstanceId !== this.appInstanceId) {
-      this.teardown(connectionError("Agent Host handshake used the wrong application identity."));
+      this.teardown(connectionError("Pi runtime service handshake used the wrong application identity."));
       return;
     }
     if (this.expectedHostEpoch !== undefined && welcome.hostEpoch !== this.expectedHostEpoch) {
       this.teardown(new ProtocolRequestError({
         code: "STALE_HOST_EPOCH",
-        message: "Agent Host handshake used an unexpected host generation.",
+        message: "Pi runtime service handshake used an unexpected service generation.",
         recoverable: true,
         details: { expectedHostEpoch: this.expectedHostEpoch, receivedHostEpoch: welcome.hostEpoch }
       }));

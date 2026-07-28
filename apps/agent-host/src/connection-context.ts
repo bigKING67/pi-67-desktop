@@ -2,9 +2,13 @@ import {
   DEFAULT_MAX_ENVELOPE_BYTES,
   correlateInvalidRequest,
   isEnvelopeWithinByteLimit,
+  isEventEnvelope,
+  isHandshakeCandidate,
   isRendererHello,
   isRequestEnvelope,
+  isResponseEnvelope,
   responseEnvelope,
+  handshakeRejectedEnvelope,
   welcomeEnvelope,
   type AgentCommandType,
   type CommandResults,
@@ -15,7 +19,19 @@ import {
   type RequestEnvelope
 } from "@pi67/protocol";
 
+const INVALID_HOST_RESPONSE_ERROR: ProtocolError = {
+  code: "INTERNAL",
+  message: "The Pi runtime service produced an invalid response.",
+  recoverable: true
+};
+const OVERSIZED_HOST_RESPONSE_ERROR: ProtocolError = {
+  code: "RESOURCE_LIMIT_EXCEEDED",
+  message: "The Pi runtime service response exceeds the negotiated envelope limit.",
+  recoverable: true
+};
+
 type PortListener = (event: unknown) => void;
+type ResponseAuthority = Pick<RequestEnvelope, "requestId" | "type" | "context">;
 
 export interface HostConnectionIdentity {
   appInstanceId?: string;
@@ -35,6 +51,7 @@ export class HostConnectionContext {
   private closed = false;
   private pendingResponses = 0;
   private negotiatedMaxEnvelopeBytes = DEFAULT_MAX_ENVELOPE_BYTES;
+  private readonly pendingRequests = new Map<string, ResponseAuthority>();
   private readonly seenRequestIds = new Set<string>();
   private readonly messageListener: PortListener = (event) => this.handleMessage(extractData(event));
   private readonly messageErrorListener: PortListener = () => this.retire("message-error");
@@ -59,49 +76,52 @@ export class HostConnectionContext {
     return !this.retired && !this.closed;
   }
 
-  beginResponse(): void {
+  beginResponse(request: ResponseAuthority): void {
+    this.pendingRequests.set(request.requestId, request);
     this.pendingResponses += 1;
   }
 
   sendSuccess<T extends AgentCommandType>(requestId: string, type: T, result: CommandResults[T]): void {
+    const authority = this.pendingAuthority(requestId, type);
+    if (!authority) return;
     const response = { ok: true, type, result } as CommandResponse<T>;
-    const envelope = responseEnvelope(requestId, this.identity.hostEpoch, response);
+    const envelope = responseEnvelope(requestId, this.identity.hostEpoch, authority.context, response);
+    if (!isResponseEnvelope(envelope)) {
+      this.sendSafeError(authority, INVALID_HOST_RESPONSE_ERROR, true);
+      return;
+    }
     if (!isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
-      this.sendError(requestId, type, {
-        code: "RESOURCE_LIMIT_EXCEEDED",
-        message: "The Agent Host response exceeds the negotiated envelope limit.",
-        recoverable: true
-      });
+      this.sendSafeError(authority, OVERSIZED_HOST_RESPONSE_ERROR, true);
       return;
     }
     this.sendResponse(
       envelope,
       type === "asset.read"
         ? [(result as CommandResults["asset.read"]).data]
-        : undefined
+        : undefined,
+      requestId
     );
   }
 
   sendError<T extends AgentCommandType>(requestId: string, type: T, error: ProtocolError): void {
+    const authority = this.pendingAuthority(requestId, type);
+    if (!authority) return;
     const response = { ok: false, type, error } as CommandResponse<T>;
-    const envelope = responseEnvelope(requestId, this.identity.hostEpoch, response);
-    if (isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
-      this.sendResponse(envelope);
+    const envelope = responseEnvelope(requestId, this.identity.hostEpoch, authority.context, response);
+    if (!isResponseEnvelope(envelope)) {
+      this.sendSafeError(authority, INVALID_HOST_RESPONSE_ERROR, true);
       return;
     }
-    this.sendResponse(responseEnvelope(requestId, this.identity.hostEpoch, {
-      ok: false,
-      type,
-      error: {
-        code: "RESOURCE_LIMIT_EXCEEDED",
-        message: "The Agent Host error exceeds the negotiated envelope limit.",
-        recoverable: true
-      }
-    }));
+    if (!isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
+      this.sendSafeError(authority, OVERSIZED_HOST_RESPONSE_ERROR, true);
+      return;
+    }
+    this.sendResponse(envelope, undefined, requestId);
   }
 
   postEvent(envelope: unknown): boolean {
     if (!this.handshaken || this.retired || this.closed) return false;
+    if (!isEventEnvelope(envelope)) return false;
     if (!isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)) {
       this.retire("event-envelope-too-large");
       return false;
@@ -146,7 +166,7 @@ export class HostConnectionContext {
     if (!isEnvelopeWithinByteLimit(data, this.negotiatedMaxEnvelopeBytes)) {
       const invalid = this.handshaken ? correlateInvalidRequest(data) : undefined;
       if (invalid) {
-        this.sendError(invalid.requestId, invalid.type, {
+        this.sendUntrackedError(invalid, {
           code: "RESOURCE_LIMIT_EXCEEDED",
           message: "The request exceeds the negotiated envelope limit.",
           recoverable: true
@@ -158,6 +178,13 @@ export class HostConnectionContext {
     }
     if (!this.handshaken) {
       if (!isRendererHello(data)) {
+        if (isHandshakeCandidate(data)) {
+          try {
+            this.port.postMessage(handshakeRejectedEnvelope());
+          } catch {
+            // The connection is closed below either way.
+          }
+        }
         this.close(true, "invalid-hello");
         return;
       }
@@ -173,11 +200,11 @@ export class HostConnectionContext {
     if (!isRequestEnvelope(data)) {
       const invalid = correlateInvalidRequest(data);
       if (invalid) {
-        this.sendError(invalid.requestId, invalid.type, invalid.hostEpoch === this.identity.hostEpoch
+        this.sendUntrackedError(invalid, invalid.hostEpoch === this.identity.hostEpoch
           ? { code: "INVALID_PAYLOAD", message: "The request payload is invalid.", recoverable: false }
           : {
               code: "STALE_HOST_EPOCH",
-              message: "The request targets a stale Agent Host generation.",
+              message: "The request targets a stale Pi runtime service generation.",
               recoverable: true,
               details: { expectedHostEpoch: this.identity.hostEpoch, receivedHostEpoch: invalid.hostEpoch }
             });
@@ -185,16 +212,16 @@ export class HostConnectionContext {
       return;
     }
     if (data.hostEpoch !== this.identity.hostEpoch) {
-      this.sendError(data.requestId, data.type, {
+      this.sendUntrackedError(data, {
         code: "STALE_HOST_EPOCH",
-        message: "The request targets a stale Agent Host generation.",
+        message: "The request targets a stale Pi runtime service generation.",
         recoverable: true,
         details: { expectedHostEpoch: this.identity.hostEpoch, receivedHostEpoch: data.hostEpoch }
       });
       return;
     }
     if (this.seenRequestIds.has(data.requestId)) {
-      this.sendError(data.requestId, data.type, {
+      this.sendUntrackedError(data, {
         code: "DUPLICATE_REQUEST",
         message: "The request ID has already been used on this connection.",
         recoverable: false
@@ -207,7 +234,7 @@ export class HostConnectionContext {
       if (oldest === undefined) break;
       this.seenRequestIds.delete(oldest);
     }
-    this.beginResponse();
+    this.beginResponse(data);
     this.onRequest(this, data);
   }
 
@@ -241,8 +268,40 @@ export class HostConnectionContext {
     }
   }
 
-  private sendResponse(envelope: unknown, transfer?: Transferable[]): void {
-    if (this.closed) return;
+  private sendUntrackedError(authority: ResponseAuthority, error: ProtocolError): void {
+    this.sendSafeError(authority, error, false);
+  }
+
+  private sendSafeError(
+    authority: ResponseAuthority,
+    error: ProtocolError,
+    tracked: boolean
+  ): void {
+    const envelope = responseEnvelope(authority.requestId, this.identity.hostEpoch, authority.context, {
+      ok: false,
+      type: authority.type,
+      error
+    });
+    if (
+      !isResponseEnvelope(envelope)
+      || !isEnvelopeWithinByteLimit(envelope, this.negotiatedMaxEnvelopeBytes)
+    ) {
+      debugConnection("response-fallback-invalid", { type: authority.type, error: "invalid-envelope" });
+      if (tracked) this.completeResponse(authority.requestId);
+      return;
+    }
+    this.sendResponse(envelope, undefined, tracked ? authority.requestId : undefined);
+  }
+
+  private sendResponse(
+    envelope: unknown,
+    transfer?: Transferable[],
+    trackedRequestId?: string
+  ): void {
+    if (this.closed) {
+      if (trackedRequestId !== undefined) this.completeResponse(trackedRequestId);
+      return;
+    }
     try {
       if (transfer && transfer.length > 0) this.port.postMessage(envelope, transfer);
       else this.port.postMessage(envelope);
@@ -253,9 +312,27 @@ export class HostConnectionContext {
       });
       this.retire("response-post-failed");
     } finally {
-      this.pendingResponses = Math.max(0, this.pendingResponses - 1);
-      if (this.retired && this.pendingResponses === 0) this.close();
+      if (trackedRequestId !== undefined) this.completeResponse(trackedRequestId);
     }
+  }
+
+  private pendingAuthority<T extends AgentCommandType>(
+    requestId: string,
+    type: T
+  ): ResponseAuthority | undefined {
+    const authority = this.pendingRequests.get(requestId);
+    if (!authority) return undefined;
+    if (authority.type !== type) {
+      this.sendSafeError(authority, INVALID_HOST_RESPONSE_ERROR, true);
+      return undefined;
+    }
+    return authority;
+  }
+
+  private completeResponse(requestId: string): void {
+    this.pendingRequests.delete(requestId);
+    this.pendingResponses = Math.max(0, this.pendingResponses - 1);
+    if (this.retired && this.pendingResponses === 0) this.close();
   }
 
   private addListener(type: "message" | "messageerror" | "close", listener: PortListener): void {

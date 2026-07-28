@@ -11,6 +11,7 @@ import type { ProjectionAgentEvent } from "./incremental-projection.js";
 import { reduceInteractiveEvent } from "./interactive-event-reducer.js";
 import { reduceOperationEvent } from "./operation-event-reducer.js";
 import { reduceRuntimeEvent } from "./runtime-event-reducer.js";
+import { handleProviderConfigurationChanged } from "../settings/provider-configuration-controller.js";
 
 export type RoutedAgentEvent = Exclude<AgentEvent, ProjectionAgentEvent>;
 
@@ -57,7 +58,9 @@ export function handleAgentEvent<TState extends AppEventState>(
       reduceInteractiveEvent(event, envelope, get);
       return;
     case "session.catalog.changed":
-      handleSessionCatalogChanged(event.payload.revision);
+      if (envelope.context.scope !== "app") {
+        handleSessionCatalogChanged(envelope.context.workspaceId, event.payload.revision);
+      }
       return;
     case "session.externalChangeDetected":
       publishNotification({
@@ -65,6 +68,11 @@ export function handleAgentEvent<TState extends AppEventState>(
         title: "Pi 会话已在外部修改",
         message: externalSessionChangeMessage(event.payload.reason)
       });
+      return;
+    case "provider.configuration.changed":
+      if (envelope.context.scope === "workspace") {
+        handleProviderConfigurationChanged(envelope.context.workspaceId, event.payload);
+      }
       return;
     case "resource.changed":
       publishNotification({ level: "info", title: "Pi 资源已重新加载" });

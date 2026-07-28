@@ -1,8 +1,11 @@
 import {
   createAgentSessionServices,
-  type AgentSessionServices
+  type AgentSessionServices,
+  type ModelRuntime,
+  type SettingsManager
 } from "@earendil-works/pi-coding-agent";
 import { restoreRuntimeApiKeys } from "./model-control.js";
+import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import {
   createDesktopSafetyExtension,
   type DesktopApprovalRequester,
@@ -12,7 +15,10 @@ import {
 interface DesktopSessionServicesOptions {
   cwd: string;
   agentDir: string;
-  runtimeApiKeys: ReadonlyMap<string, string>;
+  runtimeApiKeys?: ReadonlyMap<string, string>;
+  runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
+  settingsManager?: SettingsManager;
+  modelRuntime?: ModelRuntime;
   getSafety: () => SafetyPolicyState;
   requestApproval: DesktopApprovalRequester;
 }
@@ -23,6 +29,8 @@ export async function createDesktopSessionServices(
   const services = await createAgentSessionServices({
     cwd: options.cwd,
     agentDir: options.agentDir,
+    ...(options.settingsManager === undefined ? {} : { settingsManager: options.settingsManager }),
+    ...(options.modelRuntime === undefined ? {} : { modelRuntime: options.modelRuntime }),
     resourceLoaderOptions: {
       extensionFactories: [createDesktopSafetyExtension(options.getSafety, options.requestApproval)]
     },
@@ -30,6 +38,12 @@ export async function createDesktopSessionServices(
       resolveProjectTrust: async () => options.getSafety().trust === "trusted"
     }
   });
-  await restoreRuntimeApiKeys(services, options.runtimeApiKeys);
+  if (options.runtimeCredentialOverrides) {
+    await options.runtimeCredentialOverrides.applyTo((provider, apiKey) => (
+      services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false })
+    ));
+  } else {
+    await restoreRuntimeApiKeys(services, options.runtimeApiKeys ?? new Map());
+  }
   return services;
 }

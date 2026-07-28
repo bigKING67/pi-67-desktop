@@ -8,9 +8,12 @@ import {
 } from "./event-context.js";
 import {
   PROTOCOL_VERSION,
+  APP_PROTOCOL_CONTEXT,
   eventEnvelope,
   isEventEnvelope,
-  type EventEnvelope
+  type EventEnvelope,
+  type EventEnvelopeContext,
+  type ProtocolContext
 } from "./envelope.js";
 
 const SESSION_SCOPED_EVENTS = Object.entries(EVENT_CONTEXT_REQUIREMENTS)
@@ -44,11 +47,15 @@ describe("event context validation", () => {
       phase: "ready",
       detail: "ready",
       recoverable: true
-    }, { hostEpoch: 3, sequence: 1 }))).toBe(true);
+    }, { hostEpoch: 3, sequence: 1, context: APP_PROTOCOL_CONTEXT }))).toBe(true);
     expect(isEventEnvelope(eventEnvelope("session.catalog.changed", {
       revision: 4,
       reason: "reconciled"
-    }, { hostEpoch: 3, sequence: 2 }))).toBe(true);
+    }, {
+      hostEpoch: 3,
+      sequence: 2,
+      context: { scope: "workspace", workspaceId: "workspace-1" }
+    }))).toBe(true);
   });
 
   it("cross-checks bootstrap, payload Session identity and Operation identity", () => {
@@ -59,7 +66,7 @@ describe("event context validation", () => {
     expect(isEventEnvelope(ready)).toBe(true);
     expect(isEventEnvelope({
       ...ready,
-      sessionId: "session-other"
+      context: { ...ready.context, sessionId: "session-other" }
     })).toBe(false);
 
     const conversation = eventEnvelope("conversation.changed", {
@@ -98,7 +105,7 @@ describe("event context validation", () => {
     expect(isEventEnvelope(completed)).toBe(true);
     expect(isEventEnvelope({
       ...completed,
-      operationId: "operation-other"
+      context: { ...completed.context, operationId: "operation-other" }
     })).toBe(false);
   });
 
@@ -136,30 +143,47 @@ describe("event context validation", () => {
 
 function eventShape(
   type: AgentEventType,
-  context: Partial<Pick<EventEnvelope, "sessionId" | "sessionGeneration" | "operationId">> = {}
+  authority: { sessionId?: string; sessionGeneration?: number; operationId?: string } = {}
 ): EventEnvelope {
   return {
     protocolVersion: PROTOCOL_VERSION,
     kind: "event",
     hostEpoch: 3,
     sequence: 1,
+    context: {
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      ...authority
+    } as ProtocolContext,
+    taskSequence: 1,
     type,
-    payload: {} as never,
-    ...context
-  };
+    payload: {} as never
+  } as EventEnvelope;
 }
 
-function sessionContext() {
+function sessionContext(): EventEnvelopeContext {
   return {
     hostEpoch: 3,
     sequence: 1,
-    sessionId: "session-1",
-    sessionGeneration: 2
+    context: {
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1,
+      sessionId: "session-1",
+      sessionGeneration: 2
+    },
+    taskSequence: 1
   };
 }
 
-function operationContext() {
-  return { ...sessionContext(), operationId: "operation-1" };
+function operationContext(): EventEnvelopeContext {
+  return {
+    ...sessionContext(),
+    context: { ...sessionContext().context, operationId: "operation-1" }
+  } as EventEnvelopeContext;
 }
 
 function approvalPayload() {

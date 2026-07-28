@@ -9,7 +9,33 @@ import type {
 import type { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError } from "./protocol-error.js";
 
-export type RuntimeLoadedCommand = Exclude<AgentCommand, { type: "runtime.getStatus" | "queue.clear" }>;
+export type RuntimeLoadedCommand = Exclude<
+  AgentCommand,
+  {
+    type:
+      | "runtime.getStatus"
+      | "queue.clear"
+      | "task.close"
+      | "workspace.register"
+      | "workspace.unregister"
+      | "provider.list"
+      | "provider.setRuntimeKey"
+      | "provider.configuration.get"
+      | "provider.configuration.save"
+      | "provider.configuration.remove"
+      | "provider.credential.store"
+      | "provider.credential.remove"
+      | "model.default.set"
+      | "provider.configuration.reload"
+      | "extension.package.list"
+      | "extension.package.checkUpdates"
+      | "extension.package.install"
+      | "extension.package.update"
+      | "extension.package.setEnabled"
+      | "extension.package.restoreInheritance"
+      | "extension.package.uninstall";
+  }
+>;
 
 interface HostCommandDispatchContext {
   captureProjectionResync: (runtime: AgentRuntime) => CommandResults["projection.resync"];
@@ -20,6 +46,7 @@ interface HostCommandDispatchContext {
     runtime: AgentRuntime,
     options: Parameters<AgentRuntime["initialize"]>[0]
   ) => Promise<CommandResults["runtime.initialize"]>;
+  commitSessionWriter: (runtime: AgentRuntime) => Promise<void>;
   operations: () => OperationRegistry;
   completeInteractiveWait: (requestId: string) => void;
   sendEvent: (event: AgentEvent) => void;
@@ -66,11 +93,13 @@ export async function dispatchHostCommand(
     }
     case "session.create": {
       const snapshot = await runtime.createSession();
+      await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-create" } });
       return context.captureProjectionMutationAcknowledgement(runtime);
     }
     case "session.open": {
       const snapshot = await runtime.openSession(command.payload.path, command.payload.cwdOverride);
+      await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-open" } });
       return context.captureProjectionMutationAcknowledgement(runtime);
     }
@@ -86,9 +115,9 @@ export async function dispatchHostCommand(
         kind: "session-import",
         execute: async () => {
           const authorityBefore = runtime.getIdentity();
+          let snapshot;
           try {
-            const snapshot = await runtime.importSession(command.payload.path);
-            context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-import" } });
+            snapshot = await runtime.importSession(command.payload.path);
           } catch (error) {
             const authorityAfter = runtime.getIdentity();
             if (
@@ -98,6 +127,7 @@ export async function dispatchHostCommand(
                 || authorityAfter.sessionGeneration !== authorityBefore.sessionGeneration
               )
             ) {
+              await context.commitSessionWriter(runtime);
               try {
                 context.sendEvent({
                   type: "session.bootstrap",
@@ -107,7 +137,7 @@ export async function dispatchHostCommand(
                 context.operations().poisonSessionImportProjection();
                 throw new HostCommandError(
                   "RUNTIME_POISONED",
-                  "The imported Pi Session became authoritative, but Agent Host could not capture its projection.",
+                  "The imported Pi Session became authoritative, but the Pi runtime service could not capture its projection.",
                   true,
                   { hostReplacementRequired: true }
                 );
@@ -115,11 +145,14 @@ export async function dispatchHostCommand(
             }
             throw error;
           }
+          await context.commitSessionWriter(runtime);
+          context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-import" } });
         }
       });
     }
     case "session.fork": {
       const snapshot = await runtime.forkSession(command.payload.entryId);
+      await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-fork" } });
       return context.captureProjectionMutationAcknowledgement(runtime);
     }

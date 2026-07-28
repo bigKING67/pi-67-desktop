@@ -2,6 +2,7 @@ import type { SessionSnapshot } from "@pi67/domain";
 import { eventEnvelope, type CommandResults } from "@pi67/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { clearRendererQueue } from "../composer/queue-controller.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
@@ -330,12 +331,12 @@ function emitQueue(steeringQueue: string[], followUpQueue: string[]): void {
   const payload = { steeringQueue, followUpQueue };
   useAppStore.getState().receiveAgentEvent(
     { type: "queue.changed", payload },
-    eventEnvelope("queue.changed", payload, {
+    eventEnvelope("queue.changed", payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
       sessionGeneration: 3
-    })
+    }))
   );
 }
 
@@ -343,12 +344,12 @@ function emitUsage(tokens: number, cost: number, contextPercent: number): void {
   const payload = { tokens, cost, contextPercent };
   useAppStore.getState().receiveAgentEvent(
     { type: "usage.changed", payload },
-    eventEnvelope("usage.changed", payload, {
+    eventEnvelope("usage.changed", payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-1",
       sessionGeneration: 3
-    })
+    }))
   );
 }
 
@@ -365,12 +366,12 @@ function emitMeta(
   };
   useAppStore.getState().receiveAgentEvent(
     { type: "session.metaChanged", payload },
-    eventEnvelope("session.metaChanged", payload, {
+    eventEnvelope("session.metaChanged", payload, taskEventFixture({
       hostEpoch: 9,
       sequence: 3,
       sessionId: "session-1",
       sessionGeneration: 3
-    })
+    }))
   );
 }
 

@@ -10,6 +10,7 @@ import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { invalidateSessionImportBootstrapWatchdog } from "./session-import-bootstrap-watchdog.js";
 import {
   rendererSessionTransactionPolicy,
@@ -27,7 +28,10 @@ export function prepareRendererSessionTransaction(
       preserveRecoverySessionPath: policy.preserveRecoverySessionPath
     });
   }
-  if (policy.resetCatalog) useSessionCatalogStore.getState().reset();
+  if (policy.resetCatalog) {
+    const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
+    useSessionCatalogStore.getState().reset(workspaceId);
+  }
   if (policy.clearConversation) useConversationStore.getState().reset();
   else useConversationStore.getState().invalidateProjection();
   if (policy.resetChanges) useWorkspaceChangesStore.getState().reset("stale");

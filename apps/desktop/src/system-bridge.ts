@@ -11,15 +11,26 @@ import {
 import type { ManualUpdateState } from "./manual-update.js";
 import { redact } from "./redaction.js";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
+import {
+  addOrRefreshWorkspace,
+  removeWorkspaceRegistration,
+  repairWorkspaceRegistration,
+  reorderWorkspaceRegistrations,
+  replaceWorkbenchLayout,
+  WorkbenchStateStore
+} from "./workbench-state.js";
+import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
 
 const manualUpdateChannel = "unsigned-preview" as const;
 
 interface SystemBridgeOptions {
   connectAgentHost: () => void;
   getMainWindow: () => BrowserWindow | undefined;
+  workbenchState: WorkbenchStateStore;
 }
 
 export function registerSystemBridge(options: SystemBridgeOptions): void {
+  const workbenchState = options.workbenchState;
   let updateState: ManualUpdateState | undefined;
   let updateCheck: Promise<ManualUpdateState> | undefined;
 
@@ -29,19 +40,65 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     return updateState;
   };
 
+  const pickAndRegisterWorkspace = async (): Promise<NativeWorkspaceDescriptor | undefined> => {
+    const result = await dialog.showOpenDialog(options.getMainWindow()!, {
+      title: "选择 Pi 工作区",
+      properties: ["openDirectory", "createDirectory"]
+    });
+    const selectedPath = result.canceled ? undefined : result.filePaths[0];
+    if (!selectedPath) return undefined;
+    const selected = await createNativeWorkspaceDescriptor(selectedPath);
+    let registered: NativeWorkspaceDescriptor | undefined;
+    await workbenchState.update((state) => {
+      const updated = addOrRefreshWorkspace(state, selected);
+      registered = updated.workspace;
+      return updated.state;
+    });
+    return registered;
+  };
+
   ipcMain.handle("pi67:platform-info", () => ({
     platform: process.platform,
     architecture: process.arch,
     version: app.getVersion()
   }));
   ipcMain.handle("pi67:agent-host-connect", () => options.connectAgentHost());
-  ipcMain.handle("pi67:select-workspace", async () => {
+  ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
+  ipcMain.handle("pi67:workbench-layout-update", (_event, value: unknown) => (
+    workbenchState.update((state) => replaceWorkbenchLayout(state, value))
+  ));
+  ipcMain.handle("pi67:workspace-pick-and-add", pickAndRegisterWorkspace);
+  ipcMain.handle("pi67:workspace-repair", async (_event, workspaceId: unknown) => {
+    const id = assertWorkspaceId(workspaceId);
+    const state = (await workbenchState.load()).state;
+    const workspace = state.workspaces.find((candidate) => candidate.id === id);
+    if (!workspace) throw new Error("Workspace registration was not found.");
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
-      title: "选择 Pi 工作区",
+      title: `重新选择 ${workspace.displayName} 的目录`,
+      defaultPath: workspace.identity.canonicalPath,
       properties: ["openDirectory", "createDirectory"]
     });
-    return result.canceled ? undefined : result.filePaths[0];
+    const selectedPath = result.canceled ? undefined : result.filePaths[0];
+    if (!selectedPath) return undefined;
+    const selected = await createNativeWorkspaceDescriptor(selectedPath);
+    let repaired: NativeWorkspaceDescriptor | undefined;
+    await workbenchState.update((current) => {
+      const updated = repairWorkspaceRegistration(current, id, selected);
+      repaired = updated.workspace;
+      return updated.state;
+    });
+    return repaired;
   });
+  ipcMain.handle("pi67:workspace-remove", (_event, workspaceId: unknown) => (
+    workbenchState.update((state) => removeWorkspaceRegistration(state, assertWorkspaceId(workspaceId)))
+  ));
+  ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
+    workbenchState.update((state) => reorderWorkspaceRegistrations(state, assertWorkspaceIds(workspaceIds)))
+  ));
+  // Keep the legacy string bridge for older call sites while Workbench V2 uses descriptors.
+  ipcMain.handle("pi67:select-workspace", async () => (
+    (await pickAndRegisterWorkspace())?.identity.canonicalPath
+  ));
   ipcMain.handle("pi67:select-session-file", async () => {
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
       title: "导入 Pi JSONL session 到当前工作区",
@@ -120,4 +177,16 @@ function disabledManualUpdateState(currentVersion: string): ManualUpdateState {
 
 function errorManualUpdateState(currentVersion: string, detail: string): ManualUpdateState {
   return { phase: "error", channel: manualUpdateChannel, currentVersion, detail: detail.slice(0, 500) };
+}
+
+function assertWorkspaceId(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 200 || !/^[A-Za-z0-9._:-]+$/u.test(value)) {
+    throw new Error("Workspace id is invalid.");
+  }
+  return value;
+}
+
+function assertWorkspaceIds(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 100) throw new Error("Workspace order is invalid.");
+  return value.map(assertWorkspaceId);
 }

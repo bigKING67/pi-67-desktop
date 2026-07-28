@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_ASSET_READ_BYTES, MAX_RUNTIME_ASSET_BYTES } from "@pi67/domain";
 import {
+  APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isRequestEnvelope,
   isResponseEnvelope,
@@ -14,7 +15,7 @@ describe("asset protocol", () => {
       sessionGeneration: 3,
       offset: 0,
       length: MAX_ASSET_READ_BYTES
-    }, 2);
+    }, APP_PROTOCOL_CONTEXT, 2);
     expect(isRequestEnvelope(request)).toBe(true);
     expect(isRequestEnvelope({
       ...request,
@@ -33,7 +34,7 @@ describe("asset protocol", () => {
       data: new ArrayBuffer(3),
       done: true
     } as const;
-    const validResponse = responseEnvelope(request.requestId, 2, {
+    const validResponse = responseEnvelope(request.requestId, 2, request.context, {
       ok: true,
       type: "asset.read",
       result: validResult

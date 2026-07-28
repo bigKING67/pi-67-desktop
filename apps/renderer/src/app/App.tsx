@@ -10,6 +10,12 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { NotificationToasts } from "../notifications/NotificationToasts.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { createOperationFreshnessInstallation } from "../operation/operation-freshness-installation.js";
+import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import { WorkbenchProjectionBridge } from "../workbench/WorkbenchProjectionBridge.js";
+import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
+import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
+import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./App.module.css";
@@ -34,6 +40,8 @@ export function App() {
   const credentialDialogOpen = useShellStore((state) => state.credentialDialogOpen);
   const updateDialogOpen = useShellStore((state) => state.updateDialogOpen);
   const commandPaletteOpen = useShellStore((state) => state.commandPaletteOpen);
+  const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
+  const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [navigationVisible, setNavigationVisible] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
   const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
@@ -57,18 +65,21 @@ export function App() {
   }, [restoreNavigationTriggerFocus]);
 
   const toggleNavigation = useCallback(() => {
-    setNavigationVisible((visible) => {
-      const nextVisible = !visible;
-      if (nextVisible) setContextVisible(false);
-      else restoreNavigationTriggerFocus();
-      return nextVisible;
-    });
-  }, [restoreNavigationTriggerFocus, setContextVisible]);
+    const nextVisible = !navigationVisible;
+    setNavigationVisible(nextVisible);
+    if (nextVisible) setContextVisible(false);
+    else restoreNavigationTriggerFocus();
+  }, [navigationVisible, restoreNavigationTriggerFocus, setContextVisible]);
 
   useEffect(() => {
     const unsubscribe = agentConnectionController.subscribe({
-      onConnected: (identity) => useAppStore.getState().handleAgentConnected(identity),
+      onConnected: (identity) => {
+        useAppStore.getState().handleAgentConnected(identity);
+        void registerAvailableRendererWorkspaces();
+      },
       onEvent: (event, envelope) => {
+        const route = routeWorkbenchAgentEvent(event, envelope);
+        if (route === "background" || route === "stale") return;
         useAppStore.getState().receiveAgentEvent(event, envelope);
         freshnessInstallationRef.current?.observe(event, envelope);
       },
@@ -97,15 +108,28 @@ export function App() {
     useAppStore.getState().handlePowerResume();
   }), []);
 
+  useEffect(() => () => useTaskDraftStore.getState().dispose(), []);
+
   useEffect(() => {
     document.title = extensionTitle ? `${extensionTitle} - ${DEFAULT_APPLICATION_TITLE}` : DEFAULT_APPLICATION_TITLE;
   }, [extensionTitle]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === ",") {
+        event.preventDefault();
+        rendererWorkbenchStore.getState().openSettings();
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         useShellStore.getState().setCommandPaletteOpen(true);
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && ["n", "t"].includes(event.key.toLowerCase())) {
+        if (!workspace) return;
+        event.preventDefault();
+        void createRendererSession();
         return;
       }
       if (!workspace || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "b") return;
@@ -160,12 +184,13 @@ export function App() {
 
   return (
     <div className="application-shell" data-agent-connected={connected ? "true" : "false"}>
-      <TitleBar navigationAvailable={Boolean(workspace)} navigationVisible={navigationVisible} onToggleNavigation={toggleNavigation} />
-      {!workspace ? (
+      <WorkbenchProjectionBridge />
+      <TitleBar navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0} navigationVisible={navigationVisible} onToggleNavigation={toggleNavigation} />
+      {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" ? (
         <Welcome />
       ) : (
         <LazySurfaceBoundary
-          description="Pi Agent Host 可能仍在运行。重新加载只会重建 Renderer，并在连接恢复后重新同步当前会话投影。"
+          description="Pi 任务可能仍在后台运行。重新加载只会重建界面，并在连接恢复后重新同步当前任务。"
           kind="workspace"
           surface="workspace-shell"
           title="工作区界面未能加载"

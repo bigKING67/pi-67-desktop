@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isResponseEnvelope,
   responseEnvelope
@@ -21,8 +22,8 @@ describe("Session bootstrap acknowledgements", () => {
     ["session.open", { path: "/sessions/session-2.jsonl" }],
     ["session.fork", { entryId: "entry-2" }]
   ] as const)("validates a narrow %s response", (type, payload) => {
-    const request = commandEnvelope(type, payload, 5, `${type}-1`);
-    const acknowledgement = responseEnvelope(request.requestId, 5, {
+    const request = commandEnvelope(type, payload, APP_PROTOCOL_CONTEXT, 5, `${type}-1`);
+    const acknowledgement = responseEnvelope(request.requestId, 5, request.context, {
       ok: true,
       type,
       result: projectionAcknowledgement()

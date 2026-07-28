@@ -4,6 +4,7 @@ import {
   currentRendererSessionAuthority,
   type RendererSessionAuthorityState
 } from "../session/session-authority.js";
+import { eventSessionAuthority } from "./event-authority.js";
 
 export interface InteractiveAuthority {
   hostEpoch?: number;
@@ -35,13 +36,15 @@ export function matchesInteractiveEnvelope(
   request: InteractiveAuthority,
   envelope: EventEnvelope
 ): boolean {
+  const authority = eventSessionAuthority(envelope);
   return request.hostEpoch !== undefined
     && request.sessionId !== undefined
     && request.sessionGeneration !== undefined
+    && authority !== undefined
     && request.hostEpoch === envelope.hostEpoch
-    && request.sessionId === envelope.sessionId
-    && request.sessionGeneration === envelope.sessionGeneration
-    && request.operationId === envelope.operationId;
+    && request.sessionId === authority.sessionId
+    && request.sessionGeneration === authority.sessionGeneration
+    && request.operationId === authority.operationId;
 }
 
 function activeOperationId(operation: OperationView | undefined): string | undefined {

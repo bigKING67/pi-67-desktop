@@ -50,7 +50,7 @@ export async function resynchronizeProjection(
   const expectedHostEpoch = typeof expected === "number" ? expected : expected.hostEpoch;
   return agentConnectionController.resyncProjection((result) => {
     if (result.hostEpoch !== expectedHostEpoch) {
-      throw new Error("Agent Host 在状态重同步期间已被替换。");
+      throw new Error("Pi 运行服务在状态重同步期间已重启。");
     }
     return install(result);
   });
@@ -76,7 +76,7 @@ async function connectWithBoundedRetry(): Promise<AgentConnectionIdentity> {
       lastError = error;
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Agent Host 连接恢复失败。");
+  throw lastError instanceof Error ? lastError : new Error("Pi 运行服务连接恢复失败。");
 }
 
 function delay(milliseconds: number): Promise<void> {

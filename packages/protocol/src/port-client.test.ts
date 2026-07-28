@@ -1,43 +1,38 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RuntimeCapabilities } from "@pi67/domain";
 import {
   AgentPortClient,
-  CONTROL_MUTATION_ACK_TIMEOUT_MS,
-  type ProtocolPort
+  CONTROL_MUTATION_ACK_TIMEOUT_MS
 } from "./port-client.js";
-import { eventEnvelope, responseEnvelope, welcomeEnvelope, type RendererHello } from "./envelope.js";
-
-class FakePort implements ProtocolPort {
-  readonly sent: unknown[] = [];
-  readonly listeners = new Map<string, Set<(event: unknown) => void>>();
-  throwOnPost = false;
-  closed = false;
-
-  postMessage(message: unknown): void {
-    if (this.throwOnPost) throw new Error("port failed");
-    this.sent.push(message);
-  }
-
-  close(): void {
-    this.closed = true;
-  }
-
-  addEventListener(type: "message" | "messageerror" | "close", listener: (event: unknown) => void): void {
-    const listeners = this.listeners.get(type) ?? new Set();
-    listeners.add(listener);
-    this.listeners.set(type, listeners);
-  }
-
-  removeEventListener(type: "message" | "messageerror" | "close", listener: (event: unknown) => void): void {
-    this.listeners.get(type)?.delete(listener);
-  }
-
-  emit(type: "message" | "messageerror" | "close", data?: unknown): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(type === "message" ? { data } : {});
-  }
-}
+import {
+  APP_PROTOCOL_CONTEXT,
+  eventEnvelope,
+  handshakeRejectedEnvelope,
+  responseEnvelope,
+  type ProtocolContext,
+  type RendererHello
+} from "./envelope.js";
+import {
+  FakePort,
+  emptySnapshot,
+  hostWelcome,
+  projectionResyncResult,
+  runtimeCapabilities,
+  taskContext
+} from "./port-client-test-fixtures.js";
 
 describe("AgentPortClient", () => {
+  it("surfaces an explicit protocol mismatch handshake rejection", async () => {
+    const port = new FakePort();
+    const client = new AgentPortClient(port);
+    port.emit("message", handshakeRejectedEnvelope());
+
+    await expect(client.waitUntilReady()).rejects.toMatchObject({
+      code: "PROTOCOL_MISMATCH",
+      message: "Pi 运行服务版本不一致，请重启应用。"
+    });
+    expect(client.isClosed).toBe(true);
+  });
+
   it("handshakes before sending a typed request", async () => {
     const port = new FakePort();
     const client = new AgentPortClient(port);
@@ -47,9 +42,10 @@ describe("AgentPortClient", () => {
 
     const response = client.request("runtime.getStatus", {});
     await Promise.resolve();
-    const request = port.sent[1] as { requestId: string; hostEpoch: number };
+    const request = port.sent[1] as { requestId: string; hostEpoch: number; context: ProtocolContext };
     expect(request.hostEpoch).toBe(4);
-    port.emit("message", responseEnvelope(request.requestId, 4, {
+    expect(request.context).toEqual(APP_PROTOCOL_CONTEXT);
+    port.emit("message", responseEnvelope(request.requestId, 4, request.context, {
       ok: true,
       type: "runtime.getStatus",
       result: { initialized: true, loaded: true }
@@ -105,9 +101,9 @@ describe("AgentPortClient", () => {
       length: 3
     });
     await Promise.resolve();
-    const request = port.sent[1] as { requestId: string };
+    const request = port.sent[1] as { requestId: string; context: ProtocolContext };
     const data = Uint8Array.from([1, 2, 3]).buffer;
-    port.emit("message", responseEnvelope(request.requestId, 4, {
+    port.emit("message", responseEnvelope(request.requestId, 4, request.context, {
       ok: true,
       type: "asset.read",
       result: {
@@ -123,12 +119,83 @@ describe("AgentPortClient", () => {
     await expect(pending).resolves.toMatchObject({ assetId: "asset-1", data, done: true });
   });
 
+  it("fails closed when a correlated response does not echo its Workspace context", async () => {
+    const port = new FakePort();
+    const client = new AgentPortClient(port);
+    const hello = port.sent[0] as RendererHello;
+    port.emit("message", hostWelcome(hello, 4));
+    const context: ProtocolContext = { scope: "workspace", workspaceId: "workspace-1" };
+
+    const pending = client.request("runtime.getStatus", {}, [], { context });
+    await Promise.resolve();
+    const request = port.sent[1] as { requestId: string };
+    port.emit("message", responseEnvelope(request.requestId, 4, {
+      scope: "workspace",
+      workspaceId: "workspace-2"
+    }, {
+      ok: true,
+      type: "runtime.getStatus",
+      result: { initialized: true, loaded: true }
+    }));
+
+    await expect(pending).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(client.isClosed).toBe(true);
+    expect(port.closed).toBe(true);
+  });
+
+  it("fails closed when a correlated response carries a stale Task generation", async () => {
+    const port = new FakePort();
+    const client = new AgentPortClient(port);
+    const hello = port.sent[0] as RendererHello;
+    port.emit("message", hostWelcome(hello, 4));
+    const context = taskContext(3);
+
+    const pending = client.request("runtime.getStatus", {}, [], { context });
+    await Promise.resolve();
+    const request = port.sent[1] as { requestId: string };
+    port.emit("message", responseEnvelope(request.requestId, 4, taskContext(2), {
+      ok: true,
+      type: "runtime.getStatus",
+      result: { initialized: true, loaded: true }
+    }));
+
+    await expect(pending).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(client.isClosed).toBe(true);
+  });
+
+  it("tears down on a Task event with a non-positive taskSequence", async () => {
+    const port = new FakePort();
+    const client = new AgentPortClient(port);
+    const hello = port.sent[0] as RendererHello;
+    port.emit("message", hostWelcome(hello, 4));
+    const pending = client.request("runtime.getStatus", {});
+    await Promise.resolve();
+    const valid = eventEnvelope("runtime.statusChanged", {
+      phase: "ready",
+      detail: "ready",
+      recoverable: true
+    }, {
+      hostEpoch: 4,
+      sequence: 1,
+      context: taskContext(3),
+      taskSequence: 1
+    });
+
+    port.emit("message", { ...valid, taskSequence: 0 });
+
+    await expect(pending).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    expect(client.isClosed).toBe(true);
+    expect(port.closed).toBe(true);
+  });
+
   it("rejects all pending work immediately when the Port closes", async () => {
     const port = new FakePort();
     const client = new AgentPortClient(port);
     const hello = port.sent[0] as RendererHello;
     port.emit("message", hostWelcome(hello, 1));
-    const pending = client.request("session.catalog.query", { scope: "workspace" });
+    const pending = client.request("session.catalog.query", { scope: "workspace" }, [], {
+      context: { scope: "workspace", workspaceId: "workspace-1" }
+    });
     await Promise.resolve();
     port.emit("close");
     await expect(pending).rejects.toMatchObject({ code: "CONNECTION_CLOSED" });
@@ -148,7 +215,7 @@ describe("AgentPortClient", () => {
     port.emit("message", eventEnvelope("runtime.ready", {
       capabilities: runtimeCapabilities(),
       snapshot: emptySnapshot()
-    }, { hostEpoch: 1, sequence: 1 }));
+    }, { hostEpoch: 1, sequence: 1, context: APP_PROTOCOL_CONTEXT }));
 
     await expect(pending).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     expect(onEvent).not.toHaveBeenCalled();
@@ -178,10 +245,10 @@ describe("AgentPortClient", () => {
 
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "ready", recoverable: true
-    }, { hostEpoch: 2, sequence: 7 }));
+    }, { hostEpoch: 2, sequence: 7, context: APP_PROTOCOL_CONTEXT }));
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "still ready", recoverable: true
-    }, { hostEpoch: 2, sequence: 8 }));
+    }, { hostEpoch: 2, sequence: 8, context: APP_PROTOCOL_CONTEXT }));
     expect(onGap).toHaveBeenCalledOnce();
     expect(onGap).toHaveBeenCalledWith({ expected: 6, received: 7, hostEpoch: 2 });
     expect(onEvent).not.toHaveBeenCalled();
@@ -190,7 +257,7 @@ describe("AgentPortClient", () => {
     const resync = client.resyncProjection(install);
     await Promise.resolve();
     const request = port.sent.at(-1) as { requestId: string };
-    port.emit("message", responseEnvelope(request.requestId, 2, {
+    port.emit("message", responseEnvelope(request.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 8)
@@ -199,7 +266,7 @@ describe("AgentPortClient", () => {
     expect(install).toHaveBeenCalledWith(expect.objectContaining({ eventSequence: 8, hostEpoch: 2 }));
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "resynced", recoverable: true
-    }, { hostEpoch: 2, sequence: 9 }));
+    }, { hostEpoch: 2, sequence: 9, context: APP_PROTOCOL_CONTEXT }));
     expect(onEvent).toHaveBeenCalledOnce();
   });
 
@@ -215,7 +282,7 @@ describe("AgentPortClient", () => {
     const resync = client.resyncProjection(() => false);
     await Promise.resolve();
     const request = port.sent.at(-1) as { requestId: string };
-    port.emit("message", responseEnvelope(request.requestId, 2, {
+    port.emit("message", responseEnvelope(request.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 8)
@@ -224,7 +291,7 @@ describe("AgentPortClient", () => {
     await expect(resync).resolves.toBe(false);
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "must remain blocked", recoverable: true
-    }, { hostEpoch: 2, sequence: 9 }));
+    }, { hostEpoch: 2, sequence: 9, context: APP_PROTOCOL_CONTEXT }));
     expect(onEvent).not.toHaveBeenCalled();
   });
 
@@ -242,7 +309,7 @@ describe("AgentPortClient", () => {
     });
     await Promise.resolve();
     const request = port.sent.at(-1) as { requestId: string };
-    port.emit("message", responseEnvelope(request.requestId, 2, {
+    port.emit("message", responseEnvelope(request.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 8)
@@ -251,7 +318,7 @@ describe("AgentPortClient", () => {
     await expect(resync).rejects.toThrow("projection install failed");
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "must remain blocked", recoverable: true
-    }, { hostEpoch: 2, sequence: 9 }));
+    }, { hostEpoch: 2, sequence: 9, context: APP_PROTOCOL_CONTEXT }));
     expect(onEvent).not.toHaveBeenCalled();
   });
 
@@ -273,13 +340,13 @@ describe("AgentPortClient", () => {
     await Promise.resolve();
     const secondRequest = port.sent.at(-1) as { requestId: string };
 
-    port.emit("message", responseEnvelope(secondRequest.requestId, 2, {
+    port.emit("message", responseEnvelope(secondRequest.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 8)
     }));
     await expect(second).resolves.toBe(true);
-    port.emit("message", responseEnvelope(firstRequest.requestId, 2, {
+    port.emit("message", responseEnvelope(firstRequest.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 7)
@@ -290,7 +357,7 @@ describe("AgentPortClient", () => {
     expect(firstInstall).not.toHaveBeenCalled();
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "latest sequence", recoverable: true
-    }, { hostEpoch: 2, sequence: 9 }));
+    }, { hostEpoch: 2, sequence: 9, context: APP_PROTOCOL_CONTEXT }));
     expect(onEvent).toHaveBeenCalledOnce();
   });
 
@@ -307,7 +374,7 @@ describe("AgentPortClient", () => {
     const resync = client.resyncProjection(install);
     await Promise.resolve();
     const request = port.sent.at(-1) as { requestId: string };
-    port.emit("message", responseEnvelope(request.requestId, 2, {
+    port.emit("message", responseEnvelope(request.requestId, 2, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "projection.resync",
       result: projectionResyncResult(2, 4)
@@ -320,7 +387,7 @@ describe("AgentPortClient", () => {
     expect(install).not.toHaveBeenCalled();
     port.emit("message", eventEnvelope("runtime.statusChanged", {
       phase: "ready", detail: "must remain blocked", recoverable: true
-    }, { hostEpoch: 2, sequence: 6 }));
+    }, { hostEpoch: 2, sequence: 6, context: APP_PROTOCOL_CONTEXT }));
     expect(onEvent).not.toHaveBeenCalled();
   });
 
@@ -358,97 +425,8 @@ describe("AgentPortClient", () => {
       phase: "ready",
       detail: "中".repeat(30_000),
       recoverable: true
-    }, { hostEpoch: 1, sequence: 1 }));
+    }, { hostEpoch: 1, sequence: 1, context: APP_PROTOCOL_CONTEXT }));
     expect(client.isClosed).toBe(true);
     expect(port.closed).toBe(true);
   });
 });
-
-function hostWelcome(hello: RendererHello, hostEpoch: number, eventSequence = 0) {
-  return welcomeEnvelope({
-    appInstanceId: hello.appInstanceId,
-    hostInstanceId: "host-1",
-    hostEpoch,
-    sdkVersion: "0.81.1",
-    eventSequence,
-    capabilities: {
-      operations: true,
-      eventSequence: true,
-      structuredErrors: true,
-      transferableImages: true,
-      transferableAssets: true,
-      idempotentControlMutations: true
-    },
-    maxEnvelopeBytes: 2 * 1024 * 1024
-  });
-}
-
-function emptySnapshot() {
-  return {
-    sessionId: "session-1",
-    cwd: "/tmp",
-    streaming: false,
-    messages: [],
-    messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
-    tree: { nodes: [], truncated: false, total: 0 },
-    resources: []
-  };
-}
-
-function projectionResyncResult(hostEpoch: number, eventSequence: number) {
-  return {
-    snapshot: emptySnapshot(),
-    changes: { sessionId: "session-1", items: [], truncated: false, total: 0 },
-    extensionCatalog: { items: [], total: 0, truncated: false },
-    sessionCatalogStatus: sessionCatalogStatus(),
-    eventSequence,
-    hostEpoch,
-    sessionGeneration: 1
-  };
-}
-
-function runtimeCapabilities(): RuntimeCapabilities {
-  return {
-    sdkVersion: "0.81.1",
-    supportsFollowUp: true,
-    supportsSessionTree: true,
-    extensionUi: {
-      primitives: [],
-      attribution: "none" as const,
-      recognizedCompatibilityLevels: [],
-      adapterRegistry: {
-        available: false,
-        manifestSchemaVersions: [],
-        supportedSurfaces: [],
-        realtimeUiAttribution: false,
-        activeAdapterCount: 0
-      },
-      limitations: {
-        workingIndicator: "unsupported" as const,
-        editorMutation: "unsupported" as const,
-        customComponents: "tui-only" as const,
-        autocomplete: "tui-only" as const,
-        widgetPlacements: ["aboveEditor" as const, "belowEditor" as const]
-      }
-    }
-  };
-}
-
-function sessionCatalogStatus() {
-  return {
-    revision: 1,
-    itemCount: 0,
-    source: "sqlite" as const,
-    state: "ready" as const,
-    rebuilding: false,
-    reconciledAt: 1_700_000_000_000,
-    incomplete: false,
-    skippedCount: 0
-  };
-}

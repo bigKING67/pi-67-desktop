@@ -1,0 +1,176 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import type { PiProviderConfigurationChanged } from "@pi67/protocol";
+import { afterEach, describe, expect, it } from "vitest";
+import { PiConfigurationService } from "./pi-configuration-service.js";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
+
+describe("PiConfigurationService", () => {
+  it("projects built-in models and persists Provider, credential, and default mutations to Pi files", async () => {
+    const fixture = await createFixture();
+    try {
+      const initial = await fixture.service.get(fixture.cwd);
+      const builtin = initial.providers.find((provider) => (
+        provider.origin === "builtin" && provider.models.length > 0
+      ));
+      expect(builtin).toBeDefined();
+      expect(initial.providers.flatMap((provider) => provider.models).length).toBeGreaterThan(0);
+
+      const saved = await fixture.service.saveProvider(fixture.cwd, initial.revision, {
+        id: "pi67-test",
+        name: "Pi 67 Test",
+        baseUrl: "https://example.invalid/v1",
+        api: "openai-responses",
+        models: [{
+          id: "fixture-model",
+          name: "Fixture Model",
+          input: ["text"],
+          reasoning: false,
+          contextWindow: 16_384,
+          maxTokens: 4_096
+        }]
+      });
+      expect(saved.providers).toContainEqual(expect.objectContaining({
+        id: "pi67-test",
+        origin: "models.json",
+        models: [expect.objectContaining({ id: "fixture-model" })]
+      }));
+      expect(JSON.parse(await readFile(fixture.service.modelsPath, "utf8"))).toMatchObject({
+        providers: {
+          "pi67-test": {
+            baseUrl: "https://example.invalid/v1",
+            api: "openai-responses",
+            models: [{ id: "fixture-model" }]
+          }
+        }
+      });
+
+      const credentialValue = "fixture-persistent-credential";
+      const credentialSnapshot = await fixture.service.storeCredential(
+        fixture.cwd,
+        saved.revision,
+        "pi67-test",
+        credentialValue
+      );
+      expect(credentialSnapshot.credentials).toContainEqual({ provider: "pi67-test", type: "api_key" });
+      expect(JSON.stringify(credentialSnapshot)).not.toContain(credentialValue);
+      expect(await readFile(fixture.service.authPath, "utf8")).toContain(credentialValue);
+
+      const defaultSnapshot = await fixture.service.setDefaultModel(
+        fixture.cwd,
+        credentialSnapshot.revision,
+        "global",
+        { provider: builtin!.id, model: builtin!.models[0]!.id }
+      );
+      expect(defaultSnapshot.defaults.global).toEqual({
+        provider: builtin!.id,
+        model: builtin!.models[0]!.id
+      });
+      expect(Buffer.byteLength(JSON.stringify(defaultSnapshot), "utf8")).toBeLessThan(2 * 1024 * 1024);
+      expect(JSON.parse(await readFile(fixture.service.globalSettingsPath, "utf8"))).toMatchObject({
+        defaultProvider: builtin!.id,
+        defaultModel: builtin!.models[0]!.id
+      });
+    } finally {
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("keeps the last-known-good projection for invalid external JSON and rejects stale writes", async () => {
+    const fixture = await createFixture();
+    try {
+      const initial = await fixture.service.get(fixture.cwd);
+      const saved = await fixture.service.saveProvider(fixture.cwd, initial.revision, providerInput());
+      await writeFile(fixture.service.modelsPath, "{ invalid external JSONC\n", "utf8");
+
+      const invalid = await fixture.service.reload(fixture.cwd);
+      expect(invalid.syncState).toBe("invalid");
+      expect(invalid.providers).toEqual(saved.providers);
+      expect(invalid.diagnostics).toContainEqual(expect.objectContaining({ file: "models" }));
+      await expect(fixture.service.saveProvider(
+        fixture.cwd,
+        saved.revision,
+        providerInput("Changed")
+      )).rejects.toMatchObject({ code: "CONFIGURATION_CHANGED_EXTERNALLY" });
+      expect(await readFile(fixture.service.modelsPath, "utf8")).toBe("{ invalid external JSONC\n");
+    } finally {
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("discovers a project settings directory created after registration", async () => {
+    const fixture = await createFixture({ fallbackPollMs: 15, watchDebounceMs: 2 });
+    try {
+      const initial = await fixture.service.get(fixture.cwd);
+      const model = initial.providers.flatMap((provider) => (
+        provider.models.map((item) => ({ provider: provider.id, model: item.id }))
+      ))[0];
+      if (!model) throw new Error("The Pi runtime fixture requires at least one built-in model.");
+      const changes: PiProviderConfigurationChanged[] = [];
+      fixture.service.subscribe(fixture.cwd, (change) => changes.push(change));
+
+      const projectDirectory = join(fixture.cwd, ".pi");
+      await mkdir(projectDirectory);
+      await writeFile(join(projectDirectory, "settings.json"), `${JSON.stringify({
+        defaultProvider: model.provider,
+        defaultModel: model.model
+      }, null, 2)}\n`, "utf8");
+
+      await waitFor(() => changes.some((change) => (
+        change.source === "external"
+        && change.changedFiles.includes("project-settings")
+        && change.snapshot.defaults.project?.provider === model.provider
+        && change.snapshot.defaults.project?.model === model.model
+      )));
+      const current = await fixture.service.get(fixture.cwd);
+      expect(current.defaults.project).toEqual(model);
+      expect(current.defaults.effective).toEqual(model);
+    } finally {
+      await fixture.dispose();
+    }
+  }, 20_000);
+});
+
+async function createFixture(options: { fallbackPollMs?: number; watchDebounceMs?: number } = {}) {
+  const root = await mkdtemp(join(tmpdir(), "pi67-configuration-service-"));
+  temporaryDirectories.push(root);
+  const cwd = join(root, "workspace");
+  const agentDir = join(root, "agent");
+  await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+  const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: true });
+  const service = new PiConfigurationService(agentDir, options);
+  const unregister = service.registerWorkspace({ cwd, settingsManager, projectTrusted: true });
+  return {
+    cwd,
+    service,
+    async dispose() {
+      unregister();
+      await service.dispose();
+    }
+  };
+}
+
+function providerInput(name = "Pi 67 Test") {
+  return {
+    id: "pi67-test",
+    name,
+    baseUrl: "https://example.invalid/v1",
+    api: "openai-responses",
+    models: [{ id: "fixture-model", input: ["text" as const], reasoning: false }]
+  };
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs = 4_000): Promise<void> {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt >= timeoutMs) throw new Error("Timed out waiting for configuration change.");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}

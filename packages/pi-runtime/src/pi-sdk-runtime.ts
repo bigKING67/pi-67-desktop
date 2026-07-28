@@ -1,67 +1,54 @@
+import { getAgentDir, SessionManager, VERSION } from "@earendil-works/pi-coding-agent";
 import {
-  getAgentDir,
-  SessionManager,
-  VERSION
-} from "@earendil-works/pi-coding-agent";
-import {
-  type ApprovalMode,
-  type ConversationPage,
-  type DoctorReport,
-  type ExtensionCatalogResult,
-  type ExtensionUiCancellationReason,
-  type ModelSummary,
-  type ResourceSummary,
-  type RuntimeCapabilities,
-  type RuntimeIdentity,
-  type RuntimeOperationActivity,
-  type SessionCatalogPage,
-  type SessionCatalogQuery,
-  type SessionCatalogStatus,
-  type SessionControlResult,
-  type SessionModelCatalogResult,
-  type SessionResourceCatalogResult,
-  type SessionSnapshot,
-  type SessionTreeProjection,
+  type ApprovalMode, type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
+  type ExtensionUiCancellationReason, type ModelSummary, type ResourceSummary,
+  type RuntimeCapabilities, type RuntimeIdentity, type RuntimeOperationActivity,
+  type SessionCatalogPage, type SessionCatalogQuery, type SessionCatalogStatus,
+  type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
+  type SessionSnapshot, type SessionTreeProjection,
   type WorkspaceTrust
 } from "@pi67/domain";
 import type {
-  AgentEvent,
-  AssetReadResult,
-  CommandDescriptor,
-  RuntimeDiagnostics,
-  StreamDelta,
+  AgentEvent, AssetReadResult, CommandDescriptor, PiConfigurationReloadState,
+  RuntimeDiagnostics, StreamDelta,
   TransferImage
 } from "@pi67/protocol";
 import type { AgentRuntime, RuntimeInitializeOptions } from "./agent-runtime.js";
 import { bindSessionExtensionUi, createSessionExtensionUiBridge } from "./extension-ui-lifecycle.js";
-import {
-  conversationChangedEvent,
-  sessionMetaChangedEvent,
-  usageChangedEvent
-} from "./incremental-events.js";
+import { conversationChangedEvent, sessionMetaChangedEvent, usageChangedEvent } from "./incremental-events.js";
 import { convertTransferImages } from "./message-normalizer.js";
-import { configureRuntimeApiKey, selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
+import { selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
 import { createDoctorReport } from "./runtime-doctor.js";
+import { createRuntimeCredentialOverrideStore, type RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-metadata.js";
+import { PiRuntimeConfigurationReload } from "./pi-runtime-configuration-reload.js";
 import { RuntimeProjectionController } from "./runtime-projection-controller.js";
-import { createRuntimeSessionCatalog } from "./runtime-session-catalog.js";
+import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from "./runtime-session-catalog.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { clearSessionQueue } from "./session-queue.js";
 import type { SafetyPolicyState } from "./safety-extension.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import { discardStagedSessionImport, resolveManagedSessionPath, stageSessionImport } from "./session-import.js";
 import {
-  projectSessionControls,
-  projectSessionModelCatalog,
-  projectSessionModels,
-  projectSessionResources
+  projectSessionControls, projectSessionModelCatalog, projectSessionModels, projectSessionResources
 } from "./session-snapshot.js";
 import { StreamBatcher } from "./stream-batcher.js";
+import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+
+export interface PiSdkRuntimeOptions {
+  workspaceServices?: PiWorkspaceRuntimeServices;
+  runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
+}
 
 export class PiSdkRuntime implements AgentRuntime {
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly activityListeners = new Set<(activity: RuntimeOperationActivity) => void>();
-  private readonly runtimeApiKeys = new Map<string, string>();
+  private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
+  private readonly ownsRuntimeCredentialOverrides: boolean;
+  private readonly workspaceServices: PiWorkspaceRuntimeServices | undefined;
+  private runtimeCredentialUnsubscribe: (() => void) | undefined;
+  private configurationRuntimeUnsubscribe: (() => void) | undefined;
+  private readonly configurationReload: PiRuntimeConfigurationReload;
   private safety: SafetyPolicyState = { cwd: process.cwd(), trust: "unknown", approvalMode: "guided" };
   private agentDir = getAgentDir();
   private readonly externalSessionChangeGuard = new SessionExternalChangeGuard();
@@ -71,7 +58,11 @@ export class PiSdkRuntime implements AgentRuntime {
   private readonly sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
   private uiBridge: ReturnType<typeof createSessionExtensionUiBridge>;
 
-  constructor() {
+  constructor(options: PiSdkRuntimeOptions = {}) {
+    this.workspaceServices = options.workspaceServices;
+    this.ownsRuntimeCredentialOverrides = options.runtimeCredentialOverrides === undefined;
+    this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
+      ?? createRuntimeCredentialOverrideStore();
     this.uiBridge = createSessionExtensionUiBridge(
       (event) => this.emit(event),
       () => this.sessionBindings?.session?.sessionId
@@ -92,8 +83,9 @@ export class PiSdkRuntime implements AgentRuntime {
       emit: (event) => this.emit(event),
       externalChangeGuard: this.externalSessionChangeGuard,
       getAgentDir: () => this.agentDir,
-      getRuntimeApiKeys: () => this.runtimeApiKeys,
+      getRuntimeCredentialOverrides: () => this.runtimeCredentialOverrides,
       getSafety: () => this.safety,
+      getWorkspaceServices: () => this.workspaceServices,
       projections: this.projections,
       rebindExtensionUi: async (session) => {
         this.uiBridge.dispose();
@@ -106,14 +98,36 @@ export class PiSdkRuntime implements AgentRuntime {
       requestApproval: (request, options) => this.uiBridge.requestApproval(request, options),
       setSessionCwd: (cwd) => { this.safety = { ...this.safety, cwd }; }
     });
-    this.sessionCatalog = createRuntimeSessionCatalog(process.env.PI67_SESSION_CATALOG_DIR, {
+    this.configurationReload = new PiRuntimeConfigurationReload({
+      getSession: () => this.sessionBindings.session,
+      emit: (event) => this.emit(event)
+    });
+    const sessionCatalogTarget: RuntimeSessionCatalogTarget = {
       emit: (event) => this.emit(event),
       getAgentDir: () => this.agentDir,
       getConfiguredSessionDir: () => this.sessionBindings.settingsManager?.getSessionDir(),
       getWorkspaceCwd: () => this.safety.cwd,
       getSessionManager: () => this.sessionBindings.session?.sessionManager,
       getSessionMetadata: (manager) => this.projections.getMetadata(manager)
-    }, process.env.PI67_STORAGE_ROOT);
+    };
+    this.sessionCatalog = this.workspaceServices
+      ? this.workspaceServices.sessionCatalog.createBinding(sessionCatalogTarget)
+      : createRuntimeSessionCatalog(
+        process.env.PI67_SESSION_CATALOG_DIR,
+        sessionCatalogTarget,
+        process.env.PI67_STORAGE_ROOT
+      );
+    this.runtimeCredentialUnsubscribe = this.runtimeCredentialOverrides.subscribe(
+      async (provider, apiKey) => {
+        const services = this.sessionBindings.services;
+        if (!services) return;
+        await services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false });
+      }
+    );
+    this.configurationRuntimeUnsubscribe = this.workspaceServices?.configurationService?.registerRuntime(
+      this.workspaceServices.cwd,
+      this
+    );
   }
 
   getSdkVersion(): string { return VERSION; }
@@ -129,6 +143,7 @@ export class PiSdkRuntime implements AgentRuntime {
     return this.sessionBindings.runTransition(async () => {
       this.uiBridge.cancelAll("runtime-dispose");
       const nextAgentDir = options.agentDir ?? getAgentDir();
+      this.workspaceServices?.assertCompatible(options.cwd, nextAgentDir);
       const sessionPath = options.sessionPath
         ? await resolveManagedSessionPath(options.sessionPath, options.cwd, nextAgentDir)
         : undefined;
@@ -139,7 +154,9 @@ export class PiSdkRuntime implements AgentRuntime {
       await this.sessionBindings.disposeRuntime();
       this.agentDir = nextAgentDir;
       this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
+      this.workspaceServices?.setProjectTrusted(options.trust === "trusted");
       await this.sessionBindings.createInitial(options.cwd, sessionManager);
+      await this.configurationReload.apply();
       await this.sessionCatalog.upsertCurrent("session-updated");
       return this.getSnapshot();
     });
@@ -150,14 +167,23 @@ export class PiSdkRuntime implements AgentRuntime {
     this.uiBridge.cancelAll("runtime-dispose");
     await this.sessionBindings.settleAndDispose();
     await this.sessionCatalog.dispose();
+    this.runtimeCredentialUnsubscribe?.();
+    this.runtimeCredentialUnsubscribe = undefined;
+    this.configurationRuntimeUnsubscribe?.();
+    this.configurationRuntimeUnsubscribe = undefined;
     this.uiBridge.dispose();
-    this.runtimeApiKeys.clear();
+    if (this.ownsRuntimeCredentialOverrides) await this.runtimeCredentialOverrides.clear();
     this.listeners.clear();
     this.activityListeners.clear();
   }
 
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void {
     this.safety = { ...this.safety, trust, approvalMode };
+    this.workspaceServices?.setProjectTrusted(trust === "trusted");
+  }
+
+  async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
+    return this.configurationReload.request(revision);
   }
 
   querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage> { return this.sessionCatalog.query(query); }
@@ -178,6 +204,7 @@ export class PiSdkRuntime implements AgentRuntime {
       const result = await this.sessionBindings.requireRuntime().newSession();
       if (result.cancelled) throw new Error("A Pi extension cancelled the new session.");
       await this.sessionCatalog.upsertCurrent("session-created");
+      await this.configurationReload.apply();
       return this.getSnapshot();
     });
   }
@@ -194,6 +221,7 @@ export class PiSdkRuntime implements AgentRuntime {
       );
       if (result.cancelled) throw new Error("A Pi extension cancelled the session switch.");
       await this.sessionCatalog.upsertCurrent("session-updated");
+      await this.configurationReload.apply();
       return this.getSnapshot();
     });
   }
@@ -213,6 +241,7 @@ export class PiSdkRuntime implements AgentRuntime {
         if (result.cancelled) throw new Error("A Pi extension cancelled the session import.");
         switched = true;
         await this.sessionCatalog.upsertCurrent("session-imported");
+        await this.configurationReload.apply();
         return this.getSnapshot();
       } catch (error) {
         if (!switched) await discardStagedSessionImport(staged, error);
@@ -229,6 +258,7 @@ export class PiSdkRuntime implements AgentRuntime {
       const result = await this.sessionBindings.requireRuntime().fork(entryId, { position: "at" });
       if (result.cancelled) throw new Error("A Pi extension cancelled the session fork.");
       await this.sessionCatalog.upsertCurrent("session-created");
+      await this.configurationReload.apply();
       return this.getSnapshot();
     });
   }
@@ -244,7 +274,12 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async compact(instructions?: string): Promise<void> {
     await this.assertSessionWritable();
-    await this.sessionBindings.requireSession().compact(instructions);
+    await this.configurationReload.assertReady();
+    try {
+      await this.sessionBindings.requireSession().compact(instructions);
+    } finally {
+      await this.configurationReload.apply();
+    }
   }
   async setSessionName(name: string): Promise<void> {
     await this.assertSessionWritable();
@@ -256,6 +291,7 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async submitPrompt(text: string, images: TransferImage[] = []): Promise<void> {
     await this.assertSessionWritable();
+    await this.configurationReload.assertReady();
     const session = this.sessionBindings.requireSession();
     try {
       await session.prompt(text, {
@@ -264,16 +300,19 @@ export class PiSdkRuntime implements AgentRuntime {
       });
     } finally {
       await this.sessionCatalog.upsertCurrent("session-updated");
+      await this.configurationReload.apply();
     }
   }
 
   async steer(text: string, images: TransferImage[] = []): Promise<void> {
     await this.assertSessionWritable();
+    await this.configurationReload.assertReady();
     await this.sessionBindings.requireSession().steer(text, convertTransferImages(images));
   }
 
   async followUp(text: string, images: TransferImage[] = []): Promise<void> {
     await this.assertSessionWritable();
+    await this.configurationReload.assertReady();
     await this.sessionBindings.requireSession().followUp(text, convertTransferImages(images));
   }
 
@@ -286,14 +325,16 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async selectModel(provider: string, id: string): Promise<SessionControlResult> {
     await this.assertSessionWritable();
+    await this.configurationReload.apply();
     const session = this.sessionBindings.requireSession();
     await selectSessionModel(session, provider, id);
+    this.configurationReload.markModelSelected();
     return { sessionId: session.sessionId, controls: projectSessionControls(session) };
   }
 
   async setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionModelCatalogResult> {
     const session = this.sessionBindings.requireSession();
-    await configureRuntimeApiKey(session, this.runtimeApiKeys, provider, apiKey);
+    await this.runtimeCredentialOverrides.set(provider, apiKey);
     return {
       sessionId: session.sessionId,
       controls: projectSessionControls(session),
@@ -336,12 +377,14 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async invokeCommand(command: string): Promise<void> {
     await this.assertSessionWritable();
+    await this.configurationReload.assertReady();
     const normalized = command.startsWith("/") ? command : `/${command}`;
     const session = this.sessionBindings.requireSession();
     try {
       await session.prompt(normalized, session.isStreaming ? { streamingBehavior: "followUp" } : {});
     } finally {
       await this.sessionCatalog.upsertCurrent("session-updated");
+      await this.configurationReload.apply();
     }
   }
 

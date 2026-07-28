@@ -2,9 +2,9 @@ import type { OperationView, SessionSummary } from "@pi67/domain";
 import { formatRelativeTime } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
 
-export type SessionNavigationStatus = "active" | "running" | "waiting";
+type SessionNavigationStatus = "active" | "running" | "waiting";
 
-export interface SessionNavigationItem {
+interface SessionNavigationItem {
   session: SessionSummary;
   active: boolean;
   status?: SessionNavigationStatus;

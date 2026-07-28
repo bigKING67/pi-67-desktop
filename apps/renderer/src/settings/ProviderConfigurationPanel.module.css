@@ -1,0 +1,73 @@
+.panel { display: grid; width: min(1080px, 100%); gap: 18px; }
+.statusBar, .editorHeading, .sectionHeaderWithAction { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.statusBar { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
+.statusBar > span, .statusBar > div, .editorHeading > div { display: flex; align-items: center; gap: 8px; }
+.statusBar > span { color: var(--warning); }
+.statusBar > span[data-current="true"] { color: var(--success); }
+.statusBar small { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 10px; }
+.conflict, .invalid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--warning) 38%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--warning) 8%, var(--surface)); color: var(--warning); }
+.invalid { grid-template-columns: auto minmax(0, 1fr); }
+.conflict span, .invalid span, .editorHeading > span, .formSection header:not(.sectionHeaderWithAction), .sectionHeaderWithAction > span, .headersEditor > span, .fileList span { display: grid; gap: 2px; }
+.conflict small, .invalid small, .editorHeading small, .formSection header small, .headersEditor small, .secondarySection header small { color: var(--text-secondary); font-size: 11px; font-weight: 400; }
+.conflict button { min-height: 30px; padding: 0 10px; border: 1px solid currentColor; border-radius: 7px; background: transparent; color: inherit; font-size: 11px; }
+.workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 460px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.providerList { display: grid; align-content: start; gap: 4px; padding: 8px; border-right: 1px solid var(--border); background: var(--surface-muted); }
+.providerList button { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-secondary); text-align: left; }
+.providerList button:hover { background: var(--surface-hover); color: var(--text-primary); }
+.providerList .selectedProvider { border-color: var(--border-strong); background: var(--surface-raised); color: var(--text-primary); box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.providerList button span { display: grid; min-width: 0; gap: 2px; }
+.providerList strong, .providerList small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.providerList strong { font-size: 12px; }
+.providerList small { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 9px; }
+.providerList em { flex: 0 0 auto; color: var(--text-tertiary); font-size: 9px; font-style: normal; }
+.providerList em[data-configured="true"] { color: var(--success); }
+.providerList p { padding: 10px; color: var(--text-tertiary); font-size: 11px; }
+.editor { min-width: 0; padding: 18px; }
+.editorHeading { padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+.editorHeading > div { flex-wrap: wrap; justify-content: flex-end; }
+.dangerButton, .iconButton { display: inline-flex; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: 7px; background: transparent; color: var(--danger); }
+.dangerButton { min-height: 32px; gap: 6px; padding: 0 10px; }
+.iconButton { width: 30px; height: 30px; }
+.formStack { display: grid; gap: 16px; padding-top: 16px; }
+.formSection, .secondarySection { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.secondarySection > header { display: grid; gap: 3px; }
+.fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.field { display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; }
+.field input, .headerInputs input, .defaultField select { width: 100%; min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-muted); color: var(--text-primary); font-size: 12px; }
+.field input:focus, .headerInputs input:focus, .defaultField select:focus, .codeArea:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 16%, transparent); }
+.field input:disabled { color: var(--text-tertiary); }
+.field small { color: var(--text-tertiary); font-size: 9px; }
+.checkRow { display: flex; flex-wrap: wrap; gap: 14px; }
+.checkRow label { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 11px; }
+.modelList { display: grid; gap: 10px; }
+.modelCard { display: grid; gap: 11px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+.modelHeading { display: flex; align-items: center; justify-content: space-between; }
+.modelEmpty, .readOnlyNotice, .trustNotice { margin: 0; color: var(--text-tertiary); font-size: 11px; line-height: 1.5; }
+.readOnlyNotice { margin-top: 14px; padding: 12px; border-left: 3px solid var(--info); background: color-mix(in srgb, var(--info) 7%, transparent); }
+.headersEditor { display: grid; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.headerChips { display: flex; flex-wrap: wrap; gap: 5px; }
+.headerChips span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); font-family: var(--font-mono); font-size: 9px; }
+.headerChips button { border: 0; background: transparent; color: var(--text-tertiary); }
+.headerInputs { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(180px, 1fr) auto; gap: 7px; }
+.headerInputs button { min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text-primary); }
+.headerInputs button[data-disabled] { opacity: .45; }
+.codeArea { min-height: 120px; resize: vertical; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); color: var(--text-primary); font-family: var(--font-mono); font-size: 11px; line-height: 1.55; }
+.advancedDetails summary { cursor: pointer; color: var(--text-secondary); font-size: 11px; }
+.advancedDetails .codeArea { width: 100%; margin-top: 8px; }
+.defaultGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.defaultField, .effectiveDefault { display: grid; gap: 6px; color: var(--text-secondary); font-size: 11px; }
+.effectiveDefault { padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
+.effectiveDefault strong { overflow: hidden; color: var(--text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.fileList { display: grid; gap: 5px; }
+.fileList > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 8px 9px; border-bottom: 1px solid var(--border); }
+.fileList small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.fileList em { color: var(--danger); font-size: 10px; font-style: normal; }
+.fileList em[data-valid="true"] { color: var(--success); }
+.diagnostics { display: grid; gap: 5px; margin: 0; padding: 10px 10px 10px 28px; border-radius: 8px; background: color-mix(in srgb, var(--danger) 7%, transparent); color: var(--danger); font-size: 10px; }
+.diagnostics strong { margin-right: 6px; }
+.error { margin: 0; color: var(--danger); font-size: 11px; }
+.panelEmpty { display: grid; width: min(820px, 100%); min-height: 180px; place-content: center; justify-items: center; gap: 6px; padding: 24px; border: 1px dashed var(--border); border-radius: 12px; color: var(--text-tertiary); text-align: center; }
+.panelEmpty strong { color: var(--text-primary); font-size: 14px; }
+.panelEmpty span { max-width: 520px; font-size: 11px; line-height: 1.5; }
+@media (max-width: 920px) { .workspace { grid-template-columns: 180px minmax(0, 1fr); } .fieldGrid, .defaultGrid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .workspace { grid-template-columns: 1fr; } .providerList { grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--border); } .statusBar, .editorHeading, .sectionHeaderWithAction { align-items: flex-start; flex-direction: column; } .headerInputs { grid-template-columns: 1fr; } .conflict { grid-template-columns: auto minmax(0, 1fr); } .conflict button { grid-column: 1 / -1; } }

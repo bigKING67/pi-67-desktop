@@ -9,6 +9,7 @@ export interface ApplicationShutdownController {
 
 interface ApplicationShutdownOptions {
   stopAgentHost: () => Promise<unknown>;
+  markCleanExit?: () => Promise<unknown>;
   quit: () => void;
   onError?: (error: unknown) => void;
 }
@@ -27,9 +28,15 @@ export function createApplicationShutdownController(
       if (shutdownPromise) return;
 
       phase = "stopping";
+      let agentHostStopped = false;
       shutdownPromise = Promise.resolve()
         .then(() => options.stopAgentHost())
+        .then(() => { agentHostStopped = true; })
         .catch((error: unknown) => options.onError?.(error))
+        .then(async () => {
+          if (!agentHostStopped || !options.markCleanExit) return;
+          await options.markCleanExit().catch((error: unknown) => options.onError?.(error));
+        })
         .then(() => {
           phase = "ready-to-quit";
           options.quit();

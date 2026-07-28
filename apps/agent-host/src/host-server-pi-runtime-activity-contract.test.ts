@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PiSdkRuntime, type AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -16,6 +16,7 @@ import {
 } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -205,7 +206,8 @@ function connect(server: AgentHostServer, hostEpoch: number): FakePort {
     hostEpoch
   });
   port.emit({
-    protocolVersion: 2,
+    protocolVersion: 3,
+    protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${hostEpoch}`,
     appInstanceId: `app-${hostEpoch}`,

@@ -1,0 +1,50 @@
+.modal {
+  width: min(520px, calc(100vw - 40px));
+}
+
+.dialog {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.dialog h2,
+.dialog p {
+  margin: 0;
+}
+
+.dialog h2 {
+  font-size: 18px;
+}
+
+.dialog p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dialog code {
+  padding: 9px 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removeButton {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger);
+  color: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.removeButton[data-disabled] {
+  opacity: 0.55;
+}

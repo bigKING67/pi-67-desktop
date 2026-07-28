@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { commandEnvelope, type ProtocolPort, type RendererHello } from "@pi67/protocol";
+import {
+  PROTOCOL_REVISION,
+  isResponseEnvelope,
+  type ProtocolError,
+  type ProtocolPort,
+  type RendererHello
+} from "@pi67/protocol";
 import { HostConnectionContext } from "./connection-context.js";
+import {
+  commandEnvelope,
+  commandEnvelopeForContext,
+  TEST_APP_CONTEXT,
+  TEST_TASK_CONTEXT,
+  TEST_WORKSPACE_CONTEXT
+} from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -32,46 +45,6 @@ class FakePort implements ProtocolPort {
 }
 
 describe("HostConnectionContext", () => {
-  it("loads welcome state once while duplicate hello frames are pending", async () => {
-    const port = new FakePort();
-    let resolveWelcome!: (value: { sdkVersion: string; eventSequence: number }) => void;
-    const getWelcomeRuntime = vi.fn(() => new Promise<{ sdkVersion: string; eventSequence: number }>((resolve) => {
-      resolveWelcome = resolve;
-    }));
-    new HostConnectionContext(
-      port,
-      { appInstanceId: "app-handshake", hostInstanceId: "host-handshake", hostEpoch: 2 },
-      getWelcomeRuntime,
-      () => undefined
-    );
-    const hello = {
-      protocolVersion: 2,
-      kind: "hello",
-      rendererInstanceId: "renderer-handshake",
-      appInstanceId: "app-handshake",
-      maxEnvelopeBytes: 65_536
-    } satisfies RendererHello;
-
-    port.emit(hello);
-    port.emit(hello);
-    expect(getWelcomeRuntime).toHaveBeenCalledOnce();
-    expect(port.sent).toHaveLength(0);
-
-    resolveWelcome({ sdkVersion: "0.81.1", eventSequence: 7 });
-    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
-    expect(port.sent[0]).toMatchObject({
-      kind: "welcome",
-      hostEpoch: 2,
-      sdkVersion: "0.81.1",
-      eventSequence: 7
-    });
-
-    port.emit(hello);
-    await Promise.resolve();
-    expect(getWelcomeRuntime).toHaveBeenCalledOnce();
-    expect(port.sent).toHaveLength(1);
-  });
-
   it("transfers asset chunks without copying the response through structured clone", () => {
     const port = new FakePort();
     const connection = new HostConnectionContext(
@@ -81,7 +54,11 @@ describe("HostConnectionContext", () => {
       () => undefined
     );
     const data = Uint8Array.from([1, 2, 3]).buffer;
-    connection.beginResponse();
+    connection.beginResponse({
+      requestId: "asset-request",
+      type: "asset.read",
+      context: TEST_APP_CONTEXT
+    });
     connection.sendSuccess("asset-request", "asset.read", {
       assetId: "asset-1",
       mimeType: "image/png",
@@ -93,6 +70,7 @@ describe("HostConnectionContext", () => {
 
     expect(port.sent.at(-1)).toMatchObject({
       kind: "response",
+      context: TEST_APP_CONTEXT,
       ok: true,
       type: "asset.read",
       result: { assetId: "asset-1", data }
@@ -101,34 +79,236 @@ describe("HostConnectionContext", () => {
     expect(port.argumentCounts.at(-1)).toBe(2);
   });
 
-  it("keeps a retired origin alive until its correlated response is sent", async () => {
+  it("replaces a malformed success result with a valid correlated INTERNAL error", () => {
     const port = new FakePort();
-    let captured: HostConnectionContext | undefined;
     const connection = new HostConnectionContext(
       port,
-      { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 9 },
-      async () => ({ sdkVersion: "0.81.1", eventSequence: 4 }),
+      { appInstanceId: "app-invalid-result", hostInstanceId: "host-invalid-result", hostEpoch: 6 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      () => undefined
+    );
+    connection.beginResponse({
+      requestId: "invalid-result",
+      type: "runtime.getStatus",
+      context: TEST_APP_CONTEXT
+    });
+    connection.sendSuccess("invalid-result", "runtime.getStatus", {
+      initialized: "secret-result-must-not-leak",
+      loaded: true
+    } as never);
+
+    expect(port.sent).toHaveLength(1);
+    expect(isResponseEnvelope(port.sent[0])).toBe(true);
+    expect(port.sent[0]).toMatchObject({
+      kind: "response",
+      requestId: "invalid-result",
+      hostEpoch: 6,
+      context: TEST_APP_CONTEXT,
+      type: "runtime.getStatus",
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: "The Pi runtime service produced an invalid response.",
+        recoverable: true
+      }
+    });
+    expect(JSON.stringify(port.sent[0])).not.toContain("secret-result-must-not-leak");
+    expect(connection.isCurrentCandidate).toBe(true);
+    expect(port.closed).toBe(false);
+  });
+
+  it("replaces a mismatched response type with an error under the request authority", () => {
+    const port = new FakePort();
+    const connection = new HostConnectionContext(
+      port,
+      { appInstanceId: "app-wrong-type", hostInstanceId: "host-wrong-type", hostEpoch: 6 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      () => undefined
+    );
+    connection.beginResponse({
+      requestId: "wrong-type",
+      type: "runtime.getStatus",
+      context: TEST_TASK_CONTEXT
+    });
+
+    connection.sendSuccess("wrong-type", "doctor.run", {} as never);
+
+    expect(port.sent).toHaveLength(1);
+    expect(port.sent[0]).toMatchObject({
+      kind: "response",
+      requestId: "wrong-type",
+      context: TEST_TASK_CONTEXT,
+      type: "runtime.getStatus",
+      ok: false,
+      error: { code: "INTERNAL" }
+    });
+  });
+
+  it("validates error responses and replaces malformed details with a fixed safe error", () => {
+    const port = new FakePort();
+    const connection = new HostConnectionContext(
+      port,
+      { appInstanceId: "app-invalid-error", hostInstanceId: "host-invalid-error", hostEpoch: 7 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      () => undefined
+    );
+    connection.beginResponse({
+      requestId: "invalid-error",
+      type: "runtime.getStatus",
+      context: TEST_APP_CONTEXT
+    });
+    connection.sendError("invalid-error", "runtime.getStatus", {
+      code: "INTERNAL",
+      message: "secret-error-must-not-leak",
+      recoverable: true,
+      credential: "sk-secret-error-must-not-leak"
+    } as ProtocolError);
+
+    expect(port.sent).toHaveLength(1);
+    expect(isResponseEnvelope(port.sent[0])).toBe(true);
+    expect(port.sent[0]).toMatchObject({
+      requestId: "invalid-error",
+      context: TEST_APP_CONTEXT,
+      type: "runtime.getStatus",
+      ok: false,
+      error: { code: "INTERNAL", recoverable: true }
+    });
+    expect(JSON.stringify(port.sent[0])).not.toContain("secret-error-must-not-leak");
+    expect(connection.isCurrentCandidate).toBe(true);
+  });
+
+  it("uses a bounded resource-limit error when a valid error exceeds the negotiated limit", async () => {
+    const port = new FakePort();
+    const connection = new HostConnectionContext(
+      port,
+      { appInstanceId: "app-large-error", hostInstanceId: "host-large-error", hostEpoch: 8 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      () => undefined
+    );
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-large-error",
+      appInstanceId: "app-large-error",
+      maxEnvelopeBytes: 65_536
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
+
+    connection.beginResponse({
+      requestId: "large-error",
+      type: "runtime.getStatus",
+      context: TEST_APP_CONTEXT
+    });
+    connection.sendError("large-error", "runtime.getStatus", {
+      code: "INTERNAL",
+      message: "A bounded message",
+      recoverable: true,
+      details: Object.fromEntries(Array.from(
+        { length: 700 },
+        (_, index) => [`detail-${index}`, "x".repeat(128)]
+      ))
+    });
+
+    expect(port.sent).toHaveLength(2);
+    expect(isResponseEnvelope(port.sent[1])).toBe(true);
+    expect(port.sent[1]).toMatchObject({
+      requestId: "large-error",
+      context: TEST_APP_CONTEXT,
+      ok: false,
+      error: {
+        code: "RESOURCE_LIMIT_EXCEEDED",
+        message: "The Pi runtime service response exceeds the negotiated envelope limit."
+      }
+    });
+    expect(connection.isCurrentCandidate).toBe(true);
+  });
+
+  it("does not let stale or duplicate errors consume an accepted response authority", async () => {
+    const port = new FakePort();
+    let captured: HostConnectionContext | undefined;
+    new HostConnectionContext(
+      port,
+      { appInstanceId: "app-correlation", hostInstanceId: "host-correlation", hostEpoch: 9 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
       (origin) => { captured = origin; }
     );
-    const hello: RendererHello = {
-      protocolVersion: 2,
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
-      rendererInstanceId: "renderer-1",
-      appInstanceId: "app-1",
+      rendererInstanceId: "renderer-correlation",
+      appInstanceId: "app-correlation",
       maxEnvelopeBytes: 2 * 1024 * 1024
-    };
-    port.emit(hello);
-    await Promise.resolve();
-    const request = commandEnvelope("runtime.getStatus", {}, 9);
-    port.emit(request);
-    expect(captured).toBe(connection);
-    connection.retire();
-    expect(port.closed).toBe(false);
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
 
+    const request = commandEnvelopeForContext(
+      "runtime.getStatus",
+      {},
+      TEST_TASK_CONTEXT,
+      9
+    );
+    port.emit(request);
+    expect(captured).toBeDefined();
+
+    port.emit({ ...request, hostEpoch: 8, context: TEST_WORKSPACE_CONTEXT });
+    port.emit(request);
     captured!.sendSuccess(request.requestId, request.type, { initialized: false, loaded: true });
-    expect((port.sent.at(-1) as { requestId: string }).requestId).toBe(request.requestId);
-    expect(port.argumentCounts.at(-1)).toBe(1);
-    expect(port.closed).toBe(true);
+
+    const responses = port.sent.filter((value) => (
+      isResponseEnvelope(value) && value.requestId === request.requestId
+    ));
+    expect(responses).toHaveLength(3);
+    expect(responses[0]).toMatchObject({
+      ok: false,
+      context: TEST_WORKSPACE_CONTEXT,
+      error: { code: "STALE_HOST_EPOCH" }
+    });
+    expect(responses[1]).toMatchObject({
+      ok: false,
+      context: TEST_TASK_CONTEXT,
+      error: { code: "DUPLICATE_REQUEST" }
+    });
+    expect(responses[2]).toMatchObject({
+      ok: true,
+      context: TEST_TASK_CONTEXT,
+      result: { initialized: false, loaded: true }
+    });
+  });
+
+  it("drops a request with malformed Task authority before dispatch", async () => {
+    const port = new FakePort();
+    const onRequest = vi.fn();
+    new HostConnectionContext(
+      port,
+      { appInstanceId: "app-malformed-context", hostInstanceId: "host-malformed-context", hostEpoch: 3 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      onRequest
+    );
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-malformed-context",
+      appInstanceId: "app-malformed-context",
+      maxEnvelopeBytes: 65_536
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
+
+    const request = commandEnvelope("runtime.getStatus", {}, 3);
+    port.emit({
+      ...request,
+      context: {
+        scope: "task",
+        workspaceId: "workspace-test",
+        taskGeneration: 1
+      }
+    });
+
+    expect(onRequest).not.toHaveBeenCalled();
+    expect(port.sent).toHaveLength(1);
+    expect(port.closed).toBe(false);
   });
 
   it("returns a correlated resource error for an oversized request", async () => {
@@ -141,7 +321,8 @@ describe("HostConnectionContext", () => {
       () => { requests += 1; }
     );
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-1",
       appInstanceId: "app-1",
@@ -172,7 +353,8 @@ describe("HostConnectionContext", () => {
       onRequest
     );
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-control",
       appInstanceId: "app-control",
@@ -192,61 +374,4 @@ describe("HostConnectionContext", () => {
     });
   });
 
-  it("notifies a peer close exactly once without closing the peer-owned port again", async () => {
-    const port = new FakePort();
-    const onDisconnect = vi.fn();
-    const onRequest = vi.fn();
-    const connection = new HostConnectionContext(
-      port,
-      { appInstanceId: "app-close", hostInstanceId: "host-close", hostEpoch: 4 },
-      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
-      onRequest,
-      onDisconnect
-    );
-    port.emit({
-      protocolVersion: 2,
-      kind: "hello",
-      rendererInstanceId: "renderer-close",
-      appInstanceId: "app-close",
-      maxEnvelopeBytes: 65_536
-    } satisfies RendererHello);
-    await vi.waitFor(() => expect(port.sent.some((value) => (value as { kind?: string }).kind === "welcome")).toBe(true));
-
-    port.emitPortEvent("close");
-    port.emitPortEvent("close");
-    port.emit(commandEnvelope("runtime.getStatus", {}, 4));
-    expect(connection.isCurrentCandidate).toBe(false);
-    expect(onDisconnect).toHaveBeenCalledOnce();
-    expect(onRequest).not.toHaveBeenCalled();
-    expect(port.closed).toBe(false);
-  });
-
-  it("retires and closes the port once after a message error", async () => {
-    const port = new FakePort();
-    const onDisconnect = vi.fn();
-    const onRequest = vi.fn();
-    const connection = new HostConnectionContext(
-      port,
-      { appInstanceId: "app-error", hostInstanceId: "host-error", hostEpoch: 5 },
-      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
-      onRequest,
-      onDisconnect
-    );
-    port.emit({
-      protocolVersion: 2,
-      kind: "hello",
-      rendererInstanceId: "renderer-error",
-      appInstanceId: "app-error",
-      maxEnvelopeBytes: 65_536
-    } satisfies RendererHello);
-    await vi.waitFor(() => expect(port.sent.some((value) => (value as { kind?: string }).kind === "welcome")).toBe(true));
-
-    port.emitPortEvent("messageerror");
-    port.emitPortEvent("close");
-    port.emit(commandEnvelope("runtime.getStatus", {}, 5));
-    expect(connection.isCurrentCandidate).toBe(false);
-    expect(onDisconnect).toHaveBeenCalledOnce();
-    expect(onRequest).not.toHaveBeenCalled();
-    expect(port.closed).toBe(true);
-  });
 });

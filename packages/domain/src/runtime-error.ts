@@ -1,5 +1,6 @@
 export type RuntimeErrorCode =
   | "BUSY"
+  | "CONFIGURATION_CHANGED_EXTERNALLY"
   | "INTERNAL"
   | "INVALID_PAYLOAD"
   | "MODEL_NOT_FOUND"
@@ -7,7 +8,8 @@ export type RuntimeErrorCode =
   | "RUNTIME_NOT_READY"
   | "SESSION_CHANGED_EXTERNALLY"
   | "STALE_SESSION_CATALOG"
-  | "UNSUPPORTED";
+  | "UNSUPPORTED"
+  | "WORKSPACE_NOT_TRUSTED";
 
 export type RuntimeErrorDetails = Record<string, string | number | boolean>;
 
@@ -51,6 +53,7 @@ export function isRuntimeError(error: unknown): error is RuntimeError {
 
 function isRuntimeErrorCode(value: unknown): value is RuntimeErrorCode {
   return value === "BUSY"
+    || value === "CONFIGURATION_CHANGED_EXTERNALLY"
     || value === "INTERNAL"
     || value === "INVALID_PAYLOAD"
     || value === "MODEL_NOT_FOUND"
@@ -58,7 +61,8 @@ function isRuntimeErrorCode(value: unknown): value is RuntimeErrorCode {
     || value === "RUNTIME_NOT_READY"
     || value === "SESSION_CHANGED_EXTERNALLY"
     || value === "STALE_SESSION_CATALOG"
-    || value === "UNSUPPORTED";
+    || value === "UNSUPPORTED"
+    || value === "WORKSPACE_NOT_TRUSTED";
 }
 
 function isRuntimeErrorDetails(value: unknown): value is RuntimeErrorDetails {

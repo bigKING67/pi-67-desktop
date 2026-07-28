@@ -181,7 +181,7 @@ function operationTerminalPresentation(receipt: OperationSettled): {
       return {
         level: "warning",
         title: "任务已中断",
-        message: `${kind} · Agent Host 未能确认任务终态`
+        message: `${kind} · Pi 运行服务未能确认任务终态`
       };
   }
 }

@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class AssetPort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -55,7 +56,8 @@ describe("AgentHostServer assets", () => {
     const port = new AssetPort();
     server.attachPort(port, { appInstanceId: "app-assets", hostInstanceId: "host-assets", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-assets",
       appInstanceId: "app-assets",

@@ -21,7 +21,7 @@ function ensureDirectory(path: string, recursive: boolean): string {
   try {
     const before = lstatSync(requested);
     if (before.isSymbolicLink() || !before.isDirectory()) {
-      throw new Error("Agent Host storage path must be a real directory.");
+      throw new Error("Pi runtime service storage path must be a real directory.");
     }
   } catch (error) {
     if (!isNodeError(error, "ENOENT")) throw error;
@@ -29,7 +29,7 @@ function ensureDirectory(path: string, recursive: boolean): string {
   }
   const after = lstatSync(requested);
   if (after.isSymbolicLink() || !after.isDirectory()) {
-    throw new Error("Agent Host storage path must be a real directory.");
+    throw new Error("Pi runtime service storage path must be a real directory.");
   }
   return realpathSync.native(requested);
 }

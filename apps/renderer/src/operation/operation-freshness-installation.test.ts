@@ -1,5 +1,6 @@
 import { eventEnvelope } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { createOperationFreshnessInstallation } from "./operation-freshness-installation.js";
 
 describe("operation freshness installation", () => {
@@ -112,11 +113,11 @@ function heartbeatEnvelope() {
     operationId: "operation-1",
     observedAt: 105_000,
     lastActivityAt: 105_000
-  }, {
+  }, taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId: "session-1",
     sessionGeneration: 3,
     operationId: "operation-1"
-  });
+  }));
 }

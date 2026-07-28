@@ -2,6 +2,7 @@ import type { OperationFreshness } from "@pi67/domain";
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
 import type { AppState } from "../app/app-store.types.js";
+import { eventSessionAuthority } from "../connection/event-authority.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import {
   OperationFreshnessWatchdog,
@@ -27,7 +28,7 @@ export function installOperationFreshnessController(): () => void {
       void resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
         hostEpoch: authority.hostEpoch,
         operationId: authority.operationId,
-        recoveringDetail: "Agent Host 心跳超时，正在确认任务状态",
+        recoveringDetail: "Pi 运行服务心跳超时，正在确认任务状态",
         readyDetail: "任务状态已重新同步",
         failureTitle: "无法确认当前任务状态"
       });
@@ -79,13 +80,15 @@ function authorityForEnvelope(
   envelope: EventEnvelope
 ): OperationWatchdogAuthority | undefined {
   const operation = state.operation;
+  const eventAuthority = eventSessionAuthority(envelope);
   if (
     !state.connected
     || !operation
     || state.hostEpoch !== envelope.hostEpoch
-    || operation.operationId !== envelope.operationId
-    || operation.sessionId !== envelope.sessionId
-    || operation.sessionGeneration !== envelope.sessionGeneration
+    || eventAuthority === undefined
+    || operation.operationId !== eventAuthority.operationId
+    || operation.sessionId !== eventAuthority.sessionId
+    || operation.sessionGeneration !== eventAuthority.sessionGeneration
   ) return undefined;
   return {
     hostEpoch: envelope.hostEpoch,

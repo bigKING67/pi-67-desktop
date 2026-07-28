@@ -1,6 +1,7 @@
 import type { ExtensionUiRequestView, OperationView } from "@pi67/domain";
 import { eventEnvelope, type EventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
@@ -99,13 +100,13 @@ describe("handleAgentEvent operation activity authority", () => {
     }, eventEnvelope("operation.completed", {
       operationId: "operation-1",
       completedAt: 20
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 7,
       operationId: "operation-1"
-    }));
+    })));
 
     expect(useNotificationStore.getState().items[0]?.operation).toMatchObject({
       operationId: "operation-1",
@@ -134,13 +135,13 @@ describe("handleAgentEvent operation activity authority", () => {
     }, eventEnvelope("operation.completed", {
       operationId: "operation-1",
       completedAt: 20
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 7,
       operationId: "operation-1"
-    }));
+    })));
 
     expect(state.operation).toMatchObject({
       kind: "session-import",
@@ -165,13 +166,13 @@ describe("handleAgentEvent operation activity authority", () => {
     }, eventEnvelope("operation.completed", {
       operationId: "operation-1",
       completedAt: 20
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 2,
       sessionId: "session-2",
       sessionGeneration: 7,
       operationId: "operation-1"
-    }));
+    })));
 
     expect(state.operation).toEqual(operation);
     expect(useNotificationStore.getState().items).toEqual([]);
@@ -195,13 +196,13 @@ function envelope<T extends EventEnvelope["type"]>(
   payload: EventEnvelope<T>["payload"],
   hostEpoch = 9
 ): EventEnvelope<T> {
-  return eventEnvelope(type, payload, {
+  return eventEnvelope(type, payload, taskEventFixture({
     hostEpoch,
     sequence: 1,
     sessionId: "session-1",
     sessionGeneration: 3,
     operationId: "operation-1"
-  });
+  }));
 }
 
 function dispatch<TState extends ReturnType<typeof eventState>>(

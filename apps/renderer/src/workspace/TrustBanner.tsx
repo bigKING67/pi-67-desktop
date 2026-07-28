@@ -17,7 +17,7 @@ export function TrustBanner() {
   const buttonLabel = trustUpdating
     ? "正在加载 Pi 资源…"
     : !connected
-      ? "等待 Agent Host…"
+      ? "等待 Pi 运行服务…"
       : !hasSession || runtime.phase === "starting" || runtime.phase === "recovering"
         ? "等待 Pi 会话…"
         : runtime.phase === "failed"

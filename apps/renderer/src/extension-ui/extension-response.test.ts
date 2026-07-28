@@ -95,7 +95,7 @@ describe("respondToExtensionUi", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "Extension 请求已过期",
-      message: "Agent Host 未接受这次响应；请求已不再有效，没有输入被执行。"
+      message: "Pi 运行服务未接受这次响应；请求已不再有效，没有输入被执行。"
     });
   });
 

@@ -1,28 +1,31 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { WorkspaceId } from "@pi67/domain";
 import {
   Button,
   Input,
   SearchField
 } from "react-aria-components";
 import { messages } from "../localization/message-catalog.js";
-import { queryFirstSessionCatalog } from "./session-catalog-controller.js";
+import { queryWorkspaceSessionCatalogs } from "./session-catalog-controller.js";
 import styles from "./NavigationRail.module.css";
 
 export function useSessionCatalogSearch(
   connected: boolean,
-  catalogQuery: string
+  expandedWorkspaceIds: readonly WorkspaceId[],
+  searchableWorkspaceIds: readonly WorkspaceId[] = expandedWorkspaceIds
 ) {
   const [query, setQuery] = useState("");
+  const workspaceIds = query ? searchableWorkspaceIds : expandedWorkspaceIds;
 
   useEffect(() => {
-    if (!connected || query === catalogQuery) return;
+    if (!connected || workspaceIds.length === 0) return;
     const timer = window.setTimeout(
-      () => void queryFirstSessionCatalog({ query }),
+      () => void queryWorkspaceSessionCatalogs(workspaceIds, { query }),
       180
     );
     return () => window.clearTimeout(timer);
-  }, [catalogQuery, connected, query]);
+  }, [connected, query, workspaceIds]);
 
   return { query, setQuery };
 }

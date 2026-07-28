@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
-  commandEnvelope,
+  PROTOCOL_REVISION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
   type RendererHello
 } from "@pi67/protocol";
 import { AgentHostServer } from "./host-server.js";
+import { commandEnvelope } from "./protocol-test-fixtures.js";
 
 class FakePort implements ProtocolPort {
   readonly sent: unknown[] = [];
@@ -66,7 +67,8 @@ describe("AgentHostServer queue lane", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-queue", hostInstanceId: "host-queue", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 2,
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-queue",
       appInstanceId: "app-queue",

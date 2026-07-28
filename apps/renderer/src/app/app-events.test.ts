@@ -7,6 +7,7 @@ import type {
 import { eventEnvelope as createEventEnvelope, type EventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
+import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -96,9 +97,9 @@ describe("handleAgentEvent interactive authority", () => {
     expect(useExtensionUiStore.getState().requests.map((request) => request.requestId)).toEqual(["extension-1"]);
 
     dispatch(state, { type: "extension.ui.cancelled", payload: { requestIds: ["extension-1"], reason: "connection-close" } },
-      createEventEnvelope("extension.ui.cancelled", { requestIds: ["extension-1"], reason: "connection-close" }, {
+      createEventEnvelope("extension.ui.cancelled", { requestIds: ["extension-1"], reason: "connection-close" }, taskEventFixture({
         hostEpoch: 8, sequence: 2, sessionId: "session-1", sessionGeneration: 3, operationId: "operation-1"
-      }));
+      })));
     expect(useExtensionUiStore.getState().requests).toEqual([extension]);
 
     dispatch(state, {
@@ -132,13 +133,13 @@ describe("handleAgentEvent interactive authority", () => {
     const staleEnvelope = createEventEnvelope("approval.cancelled", {
       requests: [{ requestId: "approval-1", toolCallId: "tool-1" }],
       reason: "connection-close"
-    }, {
+    }, taskEventFixture({
       hostEpoch: 8,
       sequence: 2,
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1"
-    });
+    }));
     dispatch(state, {
       type: "approval.cancelled",
       payload: staleEnvelope.payload
@@ -263,12 +264,12 @@ describe("handleAgentEvent interactive authority", () => {
     }, createEventEnvelope("session.externalChangeDetected", {
       reason: "appended",
       recoverable: true
-    }, {
+    }, taskEventFixture({
       hostEpoch: 9,
       sequence: 4,
       sessionId: "session-old",
       sessionGeneration: 2
-    }));
+    })));
     expect(useNotificationStore.getState().items).toHaveLength(1);
     expect(JSON.stringify(useNotificationStore.getState().items)).not.toMatch(/[A-Z]:\\|\/Users\//u);
   });
@@ -365,23 +366,23 @@ function sessionSnapshot(): SessionSnapshot {
 }
 
 function eventEnvelopeFor<T extends EventEnvelope["type"]>(type: T, payload: unknown): EventEnvelope {
-  return createEventEnvelope(type, payload as never, {
+  return createEventEnvelope(type, payload as never, taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId: "session-1",
     sessionGeneration: 3,
     operationId: "operation-1"
-  });
+  }));
 }
 
 function eventEnvelope(type: EventEnvelope["type"]): EventEnvelope {
-  return createEventEnvelope(type, eventPayload(type), {
+  return createEventEnvelope(type, eventPayload(type), taskEventFixture({
     hostEpoch: 9,
     sequence: 1,
     sessionId: "session-1",
     sessionGeneration: 3,
     operationId: "operation-1"
-  });
+  }));
 }
 
 function eventPayload(type: EventEnvelope["type"]): never {

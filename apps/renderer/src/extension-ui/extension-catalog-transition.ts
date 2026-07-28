@@ -1,5 +1,6 @@
 import type { ExtensionCatalogResult, OperationView } from "@pi67/domain";
 import type { EventEnvelope } from "@pi67/protocol";
+import { eventSessionAuthority } from "../connection/event-authority.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import type { RendererSessionAuthorityState } from "../session/session-authority.js";
 import { useExtensionUiStore } from "./extension-ui-store.js";
@@ -9,22 +10,22 @@ export function stageRendererSessionExtensionCatalog(
   envelope: EventEnvelope,
   catalog: ExtensionCatalogResult
 ): boolean {
+  const eventAuthority = eventSessionAuthority(envelope);
   const authority = useSessionProjectionStore.getState().authority;
-  const importOperation = activeSessionImportOperation(state.operation, envelope.operationId);
+  const importOperation = activeSessionImportOperation(state.operation, eventAuthority?.operationId);
   if (
     !state.connected
     || (authority.phase === "active" && !importOperation)
     || state.hostEpoch === undefined
     || envelope.hostEpoch !== state.hostEpoch
-    || envelope.sessionId === undefined
-    || envelope.sessionGeneration === undefined
+    || eventAuthority === undefined
   ) return false;
   useExtensionUiStore.getState().stageCatalog({
     hostEpoch: envelope.hostEpoch,
-    sessionId: envelope.sessionId,
-    sessionGeneration: envelope.sessionGeneration,
+    sessionId: eventAuthority.sessionId,
+    sessionGeneration: eventAuthority.sessionGeneration,
     projectionRevision: authority.projectionRevision,
-    ...(envelope.operationId === undefined ? {} : { operationId: envelope.operationId }),
+    ...(eventAuthority.operationId === undefined ? {} : { operationId: eventAuthority.operationId }),
     catalog
   });
   return true;

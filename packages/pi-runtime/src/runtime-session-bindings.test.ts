@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
+import { createRuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 
@@ -45,8 +46,9 @@ function createBindings(): RuntimeSessionBindings {
     emit: vi.fn(),
     externalChangeGuard: new SessionExternalChangeGuard(),
     getAgentDir: () => "/tmp/pi67-agent",
-    getRuntimeApiKeys: () => new Map(),
+    getRuntimeCredentialOverrides: () => createRuntimeCredentialOverrideStore(),
     getSafety: () => ({ cwd: "/tmp/pi67-workspace", trust: "unknown", approvalMode: "guided" }),
+    getWorkspaceServices: () => undefined,
     projections: { reset: vi.fn() } as unknown as RuntimeProjectionController,
     rebindExtensionUi: vi.fn(async () => undefined),
     requestApproval: vi.fn(async () => false),

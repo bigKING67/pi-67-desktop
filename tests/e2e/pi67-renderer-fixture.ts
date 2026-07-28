@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { PROTOCOL_REVISION } from "../../packages/protocol/src/index.js";
 import {
   MOCK_EXTENSION_CATALOG,
   MOCK_EXTENSION_COMMANDS,
@@ -7,13 +8,16 @@ import {
 import { MOCK_SESSION_CATALOG_STATUS, mockSessionCatalogPage } from "./pi67-session-catalog-fixture.js";
 import {
   createMockSessionSnapshot,
-  installMockSessionControlCommandHandler,
-  type MockSessionControlCommandHandler
+  installMockSessionControlCommandHandler
 } from "./pi67-renderer-snapshot-fixture.js";
+import { installMockAssetReadHandler, type MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
+import { installMockCommandResponseHandler, type MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
+import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixture.js";
+import { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 import {
-  installMockAssetReadHandler,
-  type MockAssetReadHandler
-} from "./pi67-renderer-asset-fixture.js";
+  installMockPayloadSanitizer,
+  type MockPayloadSanitizer
+} from "./pi67-renderer-payload-sanitizer.js";
 import type {
   FixtureAgentState,
   FixtureMessage,
@@ -22,6 +26,7 @@ import type {
   TestPort
 } from "./pi67-renderer-fixture-types.js";
 export type { FixtureMessage, MockAgentOptions } from "./pi67-renderer-fixture-types.js";
+export { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 export {
   clearRecordedCommands,
   emitMockAgentEvent,
@@ -45,38 +50,57 @@ export async function attachMockAgent(
 ): Promise<void> {
   await page.evaluate(installMockSessionControlCommandHandler);
   await page.evaluate(installMockAssetReadHandler);
-  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureExtensionCommands, fixtureRuntimeCapabilities, fixtureSessionCatalogStatus, fixtureSessionCatalogPage, fixtureSnapshot }) => {
+  await page.evaluate(installMockSessionRotationHandler);
+  await page.evaluate(installMockPayloadSanitizer);
+  await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
+    fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
+    fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
+  });
+  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolRevision }) => {
     const testWindow = window as FixtureWindow;
-    const applyMockSessionControlCommand = (testWindow as FixtureWindow & {
-      __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
-    }).__pi67ApplyMockSessionControlCommand;
     const readMockAsset = (testWindow as FixtureWindow & {
       __pi67ReadMockAsset: MockAssetReadHandler;
     }).__pi67ReadMockAsset;
-
+    const resolveMockCommand = (testWindow as FixtureWindow & {
+      __pi67ResolveMockCommand: MockCommandResponseHandler;
+    }).__pi67ResolveMockCommand;
+    const sanitizeMockPayload = (testWindow as FixtureWindow & {
+      __pi67SanitizeMockPayload: MockPayloadSanitizer;
+    }).__pi67SanitizeMockPayload;
     const state: FixtureAgentState = {
       appInstanceId: "app-test",
+      ready: false,
       hostEpoch: fixtureOptions.hostEpoch ?? 1,
       sequence: 0,
+      taskSequence: 0,
+      workspaceId: "workspace-test",
+      taskId: "task-test",
+      taskGeneration: 1,
       sessionGeneration: 1,
+      sessionCounter: 0,
       operationCounter: 0,
       conversationMessages: fixtureMessages,
       workspaceChanges: { sessionId: "session-test", items: [], truncated: false, total: 0 },
       extensionCatalog: fixtureExtensionCatalog,
+      providerConfiguration: fixtureProviderConfiguration,
       sessionCatalogPage: fixtureSessionCatalogPage,
+      sessionCatalogPagesByWorkspace: fixtureSessionCatalogPagesByWorkspace,
       assets: fixtureOptions.assets ?? {},
       snapshot: fixtureSnapshot,
       responseDelays: fixtureResponseDelays,
       responseFailures: {},
       responseResults: {},
       commands: [],
+      taskStates: {},
       resyncOperations: {},
       ...(fixtureOptions.terminalDelayMs === undefined ? {} : { terminalDelayMs: fixtureOptions.terminalDelayMs }),
       autoStartOperation: fixtureOptions.autoStartOperation !== false,
-
       attachHost(hostEpoch) {
+        state.ready = false;
         state.hostEpoch = hostEpoch;
         state.sequence = 0;
+        state.taskSequence = 0;
+        for (const taskState of Object.values(state.taskStates)) taskState.taskSequence = 0;
         state.resyncOperations = {};
         const channel = new MessageChannel();
         const hostPort = channel.port2 as TestPort;
@@ -87,12 +111,15 @@ export async function attachMockAgent(
             appInstanceId?: string;
             requestId?: string;
             hostEpoch?: number;
+            context?: Record<string, unknown>;
             type?: string;
             payload?: Record<string, unknown>;
           };
           if (envelope.kind === "hello") {
+            state.ready = true;
             hostPort.postMessage({
-              protocolVersion: 2,
+              protocolVersion: 3,
+              protocolRevision: fixtureProtocolRevision,
               kind: "welcome",
               appInstanceId: state.appInstanceId,
               hostInstanceId: `host-${hostEpoch}`,
@@ -111,19 +138,35 @@ export async function attachMockAgent(
             });
             return;
           }
-          if (envelope.kind !== "request" || !envelope.requestId || !envelope.type || envelope.hostEpoch !== hostEpoch) return;
-          state.commands.push({ type: envelope.type, payload: sanitizedPayload(envelope.type, envelope.payload), hostEpoch });
+          if (envelope.kind !== "request" || !envelope.requestId || !envelope.type
+            || envelope.hostEpoch !== hostEpoch || !envelope.context) return;
+          if (envelope.context.scope === "task") {
+            activateTaskContext(envelope.context);
+          } else if (
+            envelope.context.scope === "workspace"
+            && typeof envelope.context.workspaceId === "string"
+          ) {
+            state.workspaceId = envelope.context.workspaceId;
+          }
+          state.commands.push({
+            type: envelope.type,
+            payload: sanitizeMockPayload(envelope.type, envelope.payload),
+            hostEpoch,
+            context: structuredClone(envelope.context)
+          });
           const failure = state.responseFailures[envelope.type];
           const preparedPage = envelope.type === "message.page" && !failure
-            ? resultFor(envelope.type, envelope.payload ?? {}, state, hostEpoch)
+            ? resolveMockCommand(envelope.type, envelope.payload ?? {}, state, hostEpoch)
             : undefined;
           const respond = () => {
+            if (envelope.context?.scope === "task") activateTaskContext(envelope.context);
             if (failure) {
               hostPort.postMessage({
-                protocolVersion: 2,
+                protocolVersion: 3,
                 kind: "response",
                 requestId: envelope.requestId,
                 hostEpoch,
+                context: envelope.context,
                 type: envelope.type,
                 ok: false,
                 error: failure
@@ -134,10 +177,11 @@ export async function attachMockAgent(
               const assetResponse = readMockAsset(envelope.payload ?? {}, state);
               if (!assetResponse.ok) {
                 hostPort.postMessage({
-                  protocolVersion: 2,
+                  protocolVersion: 3,
                   kind: "response",
                   requestId: envelope.requestId,
                   hostEpoch,
+                  context: envelope.context,
                   type: envelope.type,
                   ok: false,
                   error: assetResponse.error
@@ -145,10 +189,11 @@ export async function attachMockAgent(
                 return;
               }
               hostPort.postMessage({
-                protocolVersion: 2,
+                protocolVersion: 3,
                 kind: "response",
                 requestId: envelope.requestId,
                 hostEpoch,
+                context: envelope.context,
                 type: envelope.type,
                 ok: true,
                 result: assetResponse.result
@@ -161,8 +206,13 @@ export async function attachMockAgent(
             );
             let result = hasConfiguredResult
               ? state.responseResults[envelope.type!]
-              : preparedPage ?? resultFor(envelope.type!, envelope.payload ?? {}, state, hostEpoch);
+              : preparedPage ?? resolveMockCommand(envelope.type!, envelope.payload ?? {}, state, hostEpoch);
             if (envelope.type === "runtime.initialize" || envelope.type === "workspace.open") {
+              if (
+                envelope.type === "runtime.initialize"
+                && typeof envelope.payload?.sessionPath === "string"
+                && !hasConfiguredResult
+              ) testWindow.__pi67RotateMockSession(state, envelope.payload.sessionPath);
               emitThrough(hostPort, hostEpoch, {
                 type: "extension.catalog.changed",
                 payload: state.extensionCatalog
@@ -183,6 +233,16 @@ export async function attachMockAgent(
               || envelope.type === "session.open"
               || envelope.type === "session.fork"
             ) {
+              if (
+                envelope.type === "session.create"
+                && fixtureOptions.rotateSessionOnCreate === true
+                && !hasConfiguredResult
+              ) testWindow.__pi67RotateMockSession(state);
+              if (
+                envelope.type === "session.open"
+                && typeof envelope.payload?.path === "string"
+                && !hasConfiguredResult
+              ) testWindow.__pi67RotateMockSession(state, envelope.payload.path);
               emitThrough(hostPort, hostEpoch, {
                 type: "extension.catalog.changed",
                 payload: state.extensionCatalog
@@ -203,10 +263,11 @@ export async function attachMockAgent(
               }
             }
             hostPort.postMessage({
-              protocolVersion: 2,
+              protocolVersion: 3,
               kind: "response",
               requestId: envelope.requestId,
               hostEpoch,
+              context: envelope.context,
               type: envelope.type,
               ok: true,
               result
@@ -253,6 +314,7 @@ export async function attachMockAgent(
                 }, accepted.operationId);
               }, 0);
             }
+            saveActiveTaskState();
           };
           const delay = state.responseDelays[envelope.type] ?? 0;
           if (delay > 0) setTimeout(respond, delay);
@@ -266,25 +328,79 @@ export async function attachMockAgent(
           hostEpoch
         }, window.location.origin, [channel.port1]);
       },
-
       emit(event, emitOptions = {}) {
         const targetEpoch = emitOptions.hostEpoch ?? state.hostEpoch;
         const sequence = emitOptions.sequence
           ?? (targetEpoch === state.hostEpoch ? ++state.sequence : 1);
         if (targetEpoch === state.hostEpoch && sequence > state.sequence) state.sequence = sequence;
+        const taskSequence = emitOptions.taskSequence
+          ?? (targetEpoch === state.hostEpoch ? ++state.taskSequence : 1);
+        if (targetEpoch === state.hostEpoch && taskSequence > state.taskSequence) state.taskSequence = taskSequence;
+        const sessionId = emitOptions.sessionId ?? String(state.snapshot.sessionId);
+        const sessionGeneration = emitOptions.sessionGeneration ?? state.sessionGeneration;
+        const workspaceEvent = event.type === "provider.configuration.changed";
         state.activePort?.postMessage({
-          protocolVersion: 2,
+          protocolVersion: 3,
           kind: "event",
           hostEpoch: targetEpoch,
           sequence,
+          context: workspaceEvent
+            ? { scope: "workspace", workspaceId: state.workspaceId }
+            : {
+                scope: "task",
+                workspaceId: state.workspaceId,
+                taskId: state.taskId,
+                taskGeneration: state.taskGeneration,
+                sessionId,
+                sessionGeneration,
+                ...(emitOptions.operationId === undefined ? {} : { operationId: emitOptions.operationId })
+              },
+          ...(workspaceEvent ? {} : { taskSequence }),
           type: event.type,
-          payload: event.payload,
-          sessionId: emitOptions.sessionId ?? String(state.snapshot.sessionId),
-          sessionGeneration: emitOptions.sessionGeneration ?? state.sessionGeneration,
-          ...(emitOptions.operationId === undefined ? {} : { operationId: emitOptions.operationId })
+          payload: event.payload
         });
+        saveActiveTaskState();
       }
     };
+    function activateTaskContext(context: Record<string, unknown>): void {
+      if (typeof context.workspaceId !== "string" || typeof context.taskId !== "string") return;
+      if (fixtureOptions.isolateTaskSnapshots === true) {
+        saveActiveTaskState();
+      }
+      state.workspaceId = context.workspaceId;
+      state.taskId = context.taskId;
+      if (typeof context.taskGeneration === "number") state.taskGeneration = context.taskGeneration;
+      if (fixtureOptions.isolateTaskSnapshots !== true) return;
+      const saved = state.taskStates[activeTaskKey()];
+      if (saved) {
+        state.taskSequence = saved.taskSequence;
+        state.sessionGeneration = saved.sessionGeneration;
+        state.conversationMessages = saved.conversationMessages;
+        state.workspaceChanges = saved.workspaceChanges;
+        state.snapshot = saved.snapshot;
+        return;
+      }
+      state.taskSequence = 0;
+      state.conversationMessages = structuredClone(state.conversationMessages);
+      state.workspaceChanges = structuredClone(state.workspaceChanges);
+      state.snapshot = structuredClone(state.snapshot);
+      saveActiveTaskState();
+    }
+
+    function saveActiveTaskState(): void {
+      if (fixtureOptions.isolateTaskSnapshots !== true) return;
+      state.taskStates[activeTaskKey()] = {
+        taskSequence: state.taskSequence,
+        sessionGeneration: state.sessionGeneration,
+        conversationMessages: state.conversationMessages,
+        workspaceChanges: state.workspaceChanges,
+        snapshot: state.snapshot
+      };
+    }
+
+    function activeTaskKey(): string {
+      return `${state.workspaceId}\u0000${state.taskId}`;
+    }
 
     function emitThrough(port: TestPort, hostEpoch: number, event: { type: string; payload: unknown }, operationId?: string): void {
       if (hostEpoch !== state.hostEpoch || port !== state.activePort) return;
@@ -303,18 +419,6 @@ export async function attachMockAgent(
       };
     }
 
-    function acceptedOperation(current: FixtureAgentState, hostEpoch: number, cancellable: boolean): Record<string, unknown> {
-      const operationId = `operation-${++current.operationCounter}`;
-      return {
-        kind: "accepted",
-        operationId,
-        cancellable,
-        hostEpoch,
-        sessionId: String(current.snapshot.sessionId),
-        sessionGeneration: current.sessionGeneration
-      };
-    }
-
     function projectionMutationAcknowledgement(
       current: FixtureAgentState,
       hostEpoch: number
@@ -328,116 +432,6 @@ export async function attachMockAgent(
       };
     }
 
-    function resultFor(type: string, payload: Record<string, unknown>, current: FixtureAgentState, hostEpoch: number): unknown {
-      if (type === "runtime.getStatus") return { initialized: true, loaded: true };
-      if (type === "projection.resync") return {
-        snapshot: current.snapshot,
-        changes: current.workspaceChanges,
-        extensionCatalog: current.extensionCatalog,
-        sessionCatalogStatus: {
-          ...fixtureSessionCatalogStatus,
-          itemCount: current.sessionCatalogPage.itemCount
-        },
-        eventSequence: current.sequence,
-        hostEpoch,
-        sessionGeneration: current.sessionGeneration,
-        ...current.resyncOperations
-      };
-      if (type === "workspace.changes") return current.workspaceChanges;
-      if (type === "extension.catalog.list") return current.extensionCatalog;
-      if (type === "session.catalog.query") return current.sessionCatalogPage;
-      if (type === "message.page") return conversationPage(current, payload);
-      if (type === "session.tree") return current.snapshot.tree;
-      if (type === "command.list") return fixtureExtensionCommands;
-      if (
-        type === "model.list"
-        || type === "resource.list"
-      ) return [];
-      if (type === "prompt.submit" || type === "session.compact" || type === "command.invoke" || type === "session.import") {
-        return acceptedOperation(current, hostEpoch, type === "prompt.submit" || type === "session.compact");
-      }
-      if (type === "prompt.steer" || type === "prompt.followUp") return { accepted: true };
-      if (type === "queue.clear") {
-        const steeringCount = (current.snapshot.steeringQueue as unknown[]).length;
-        const followUpCount = (current.snapshot.followUpQueue as unknown[]).length;
-        current.snapshot = { ...current.snapshot, steeringQueue: [], followUpQueue: [] };
-        return { steeringCount, followUpCount, pendingCount: 0 };
-      }
-      if (type === "operation.abort") return { aborted: true, ...(typeof payload.operationId === "string" ? { operationId: payload.operationId } : {}) };
-      if (type === "extension.ui.respond" || type === "approval.respond") return { resolved: true };
-      if (type === "doctor.run") return {
-        generatedAt: Date.now(),
-        checks: [
-          { id: "platform", label: "Platform", status: "pass", detail: "darwin/arm64" },
-          { id: "node", label: "Embedded Node", status: "pass", detail: "24.18.0" },
-          { id: "pi-sdk", label: "Pi SDK", status: "pass", detail: "0.81.1" },
-          { id: "shell", label: "Pi shell", status: "pass", detail: "/bin/bash - GNU bash" },
-          { id: "git", label: "Git", status: "pass", detail: "git version 2.50.0" }
-        ]
-      };
-      if (type === "diagnostics.collect") return {
-        application: "Pi-67 Desktop",
-        piSdkVersion: "0.81.1",
-        platform: "darwin",
-        architecture: "arm64",
-        node: "24.18.0",
-        cwd: current.snapshot.cwd,
-        sessionConfigured: true,
-        sessionFileConfigured: true,
-        model: "openai/gpt-test",
-        extensionCount: 0,
-        extensionErrors: []
-      };
-      const controlCommand = applyMockSessionControlCommand(type, payload, current.snapshot);
-      if (controlCommand) {
-        current.snapshot = controlCommand.snapshot;
-        return controlCommand.result;
-      }
-      return current.snapshot;
-    }
-
-    function conversationPage(current: FixtureAgentState, payload: Record<string, unknown>): Record<string, unknown> {
-      const direction = payload.direction === "newer" ? "newer" : "older";
-      const limit = typeof payload.limit === "number" ? Math.min(200, Math.max(1, payload.limit)) : 100;
-      const cursor = typeof payload.cursor === "string" ? payload.cursor : undefined;
-      const cursorIndex = cursor === undefined
-        ? undefined
-        : current.conversationMessages.findIndex((message) => message.id === cursor);
-      const start = direction === "older"
-        ? Math.max(0, (cursorIndex ?? current.conversationMessages.length) - limit)
-        : cursorIndex === undefined ? 0 : cursorIndex + 1;
-      const end = direction === "older"
-        ? cursorIndex ?? current.conversationMessages.length
-        : Math.min(current.conversationMessages.length, start + limit);
-      const messages = current.conversationMessages.slice(start, end);
-      return {
-        sessionId: String(current.snapshot.sessionId),
-        messages,
-        ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
-      };
-    }
-
-    function pageMetadata(messages: FixtureMessage[], hasOlder: boolean, hasNewer: boolean): Record<string, unknown> {
-      return {
-        ...(messages[0] === undefined ? {} : { startCursor: messages[0].id }),
-        ...(messages.at(-1) === undefined ? {} : { endCursor: messages.at(-1)!.id }),
-        hasOlder,
-        hasNewer
-      };
-    }
-
-    function sanitizedPayload(type: string, payload: Record<string, unknown> | undefined): unknown {
-      if (type !== "prompt.submit" || !payload) return payload ?? {};
-      const images = Array.isArray(payload.images) ? payload.images : [];
-      return {
-        ...payload,
-        images: images.map((image) => {
-          const value = image as { name?: unknown; mimeType?: unknown; data?: ArrayBuffer };
-          return { name: value.name, mimeType: value.mimeType, bytes: value.data?.byteLength ?? 0 };
-        })
-      };
-    }
-
     testWindow.__pi67TestAgent = state;
     state.attachHost(state.hostEpoch);
   }, {
@@ -445,10 +439,19 @@ export async function attachMockAgent(
     fixtureResponseDelays: responseDelays,
     fixtureOptions: options,
     fixtureExtensionCatalog: MOCK_EXTENSION_CATALOG,
-    fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
     fixtureRuntimeCapabilities: MOCK_RUNTIME_CAPABILITIES,
-    fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS,
+    fixtureProviderConfiguration: options.providerConfigurationSnapshot
+      ?? createMockProviderConfigurationSnapshot(),
     fixtureSessionCatalogPage: mockSessionCatalogPage(options.sessionCatalogItems ?? []),
-    fixtureSnapshot: createMockSessionSnapshot(messages)
+    fixtureSessionCatalogPagesByWorkspace: Object.fromEntries(
+      Object.entries(options.sessionCatalogItemsByWorkspace ?? {}).map(([workspaceId, items]) => (
+        [workspaceId, mockSessionCatalogPage(items)]
+      ))
+    ),
+    fixtureSnapshot: createMockSessionSnapshot(messages),
+    fixtureProtocolRevision: PROTOCOL_REVISION
   });
+  await page.waitForFunction(() => (
+    window as unknown as FixtureWindow
+  ).__pi67TestAgent?.ready === true);
 }

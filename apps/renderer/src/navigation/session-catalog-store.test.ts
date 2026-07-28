@@ -1,6 +1,9 @@
 import type { SessionCatalogPage, SessionSummary } from "@pi67/domain";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useSessionCatalogStore } from "./session-catalog-store.js";
+import {
+  selectWorkspaceSessionCatalog,
+  useSessionCatalogStore
+} from "./session-catalog-store.js";
 
 const SESSION_ONE: SessionSummary = {
   id: "session-1",
@@ -37,6 +40,23 @@ describe("session catalog store", () => {
       revision: 1,
       query: "session",
       loading: false
+    });
+  });
+
+  it("keeps loading, rows, and pagination independent for each Workspace", () => {
+    const store = useSessionCatalogStore.getState();
+    const workspaceA = store.beginFirstPage("workspace-a");
+    const workspaceB = store.beginFirstPage("workspace-b", { query: "two" });
+    expect(store.finishFirstPage(workspaceA, page([SESSION_ONE]))).toBe(true);
+    expect(store.finishFirstPage(workspaceB, page([SESSION_TWO]))).toBe(true);
+
+    expect(selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), "workspace-a")).toMatchObject({
+      items: [SESSION_ONE],
+      query: ""
+    });
+    expect(selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), "workspace-b")).toMatchObject({
+      items: [SESSION_TWO],
+      query: "two"
     });
   });
 

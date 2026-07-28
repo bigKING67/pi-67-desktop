@@ -1,4 +1,5 @@
 import type { SessionTreeProjection } from "@pi67/domain";
+import { ProtocolRequestError } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
@@ -71,6 +72,43 @@ describe("session tree controller", () => {
       status: "stale"
     });
     expect(useNotificationStore.getState().items).toHaveLength(0);
+  });
+
+  it("retries one transient BUSY response without showing a warning", async () => {
+    const expected = tree("after-transition");
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockRejectedValueOnce(new ProtocolRequestError({
+        code: "BUSY",
+        message: "A session transition is in progress.",
+        recoverable: true,
+        retryAfterMs: 0,
+        details: { retryable: true }
+      }))
+      .mockResolvedValueOnce(expected as never);
+
+    await refreshSessionTree(AUTHORITY);
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(useSessionTreeStore.getState()).toMatchObject({ tree: expected, status: "ready" });
+    expect(useNotificationStore.getState().items).toHaveLength(0);
+  });
+
+  it("does not expose a raw Host BUSY message after the bounded retry", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new ProtocolRequestError({
+      code: "BUSY",
+      message: "A session transition is in progress.",
+      recoverable: true,
+      retryAfterMs: 0,
+      details: { retryable: true }
+    }));
+
+    await refreshSessionTree(AUTHORITY);
+
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "无法刷新会话树",
+      message: "Pi 正在完成其他会话操作，会话树将在下次状态变化时重新同步。"
+    });
   });
 
   it("reports a current refresh failure and preserves the last tree", async () => {

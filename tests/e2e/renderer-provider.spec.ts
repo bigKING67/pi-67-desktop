@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -10,8 +10,8 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await page.getByRole("button", { name: "打开更多菜单" }).click();
-  await page.getByRole("menu").getByRole("menuitem", { name: /运行环境诊断/u }).click();
+  const settings = await openSettingsSection(page, /^Runtime 与 Session/u);
+  await settings.getByRole("button", { name: /运行环境诊断/u }).click();
   const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
   await expect(doctorDialog).toBeVisible();
   await expect(doctorDialog.getByText(/运行检查以确认/u)).toBeVisible();
@@ -19,19 +19,19 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(page.getByText("当前运行环境的关键检查均已通过。")).toBeVisible();
   await expect(page.getByLabel("运行环境检查结果").getByText("Pi SDK")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("doctor-dialog.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "关闭" }).click();
+  await doctorDialog.getByRole("button", { name: "关闭", exact: true }).click();
 
   await openProviderDialog(page);
   const credentialDialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(credentialDialog.getByText("OpenAI", { exact: true }).first()).toBeVisible();
-  await expect(credentialDialog.getByText("来源：Pi AuthStorage")).toBeVisible();
+  await expect(credentialDialog.getByText("已持久化到 Pi auth.json")).toBeVisible();
   await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
   await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
   await expect(credentialDialog.getByText("尚未配置")).toBeVisible();
   const keyInput = page.getByLabel("Provider API 密钥", { exact: true });
   await keyInput.fill("test-secret-1234");
   await page.screenshot({ path: testInfo.outputPath("credential-dialog.png"), animations: "disabled" });
-  await credentialDialog.getByRole("button", { name: "启用本次运行密钥" }).click();
+  await credentialDialog.getByRole("button", { name: "仅本次运行" }).click();
   await expect(credentialDialog.getByText("来源：本次运行内存")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("test-secret-1234");
   await expect(keyInput).toHaveValue("");
@@ -60,6 +60,7 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: "显示会话导航" }).click();
   await openProviderDialog(page);
 
   const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
@@ -68,12 +69,26 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
     getComputedStyle(element).gridTemplateColumns
   ));
   expect(layoutColumns.split(" ")).toHaveLength(1);
-  await expect(dialog.getByRole("button", { name: "替换本次运行密钥" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "仅本次运行" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(680);
   await page.screenshot({ path: testInfo.outputPath("credential-dialog-narrow-dark.png"), animations: "disabled" });
 });
 
-async function openProviderDialog(page: import("@playwright/test").Page): Promise<void> {
-  await page.getByRole("button", { name: "打开更多菜单" }).click();
-  await page.getByRole("menu").getByRole("menuitem", { name: /Provider 与凭据/u }).click();
+async function openProviderDialog(page: Page): Promise<void> {
+  const settings = await openSettingsSection(page, /^Provider 与模型/u);
+  await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
+}
+
+async function openSettingsSection(page: Page, sectionName: RegExp) {
+  const settings = page.getByLabel("π 设置");
+  if (await settings.count() === 0) {
+    await page.getByRole("button", { name: "帮助与设置" }).click();
+    await page.getByRole("menu", { name: "帮助与设置" })
+      .getByRole("menuitem", { name: "设置", exact: true }).click();
+  }
+  await expect(settings).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: sectionName }).click();
+  return settings;
 }

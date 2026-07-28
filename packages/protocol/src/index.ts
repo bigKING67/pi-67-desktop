@@ -1,4 +1,7 @@
 export * from "./agent-messages.js";
 export * from "./envelope.js";
 export * from "./port-client.js";
+export * from "./provider-configuration-schemas.js";
+export * from "./protocol-revision.js";
+export * from "./protocol-revision-contract.js";
 export * from "./supervisor-messages.js";

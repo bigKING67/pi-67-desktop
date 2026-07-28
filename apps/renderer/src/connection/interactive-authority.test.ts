@@ -1,4 +1,5 @@
 import type { OperationView, SessionSnapshot } from "@pi67/domain";
+import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
@@ -7,6 +8,7 @@ import {
   matchesInteractiveEnvelope,
   type InteractiveAuthority
 } from "./interactive-authority.js";
+import { taskEventFixture } from "./protocol-test-fixtures.js";
 
 const operation: OperationView = {
   operationId: "operation-1",
@@ -28,17 +30,13 @@ const state = {
   hostEpoch: 9,
   operation
 };
-const envelope = {
-  protocolVersion: 2 as const,
-  kind: "event" as const,
+const envelope = eventEnvelope("resource.changed", { reason: "fixture" }, taskEventFixture({
   hostEpoch: 9,
   sequence: 1,
-  type: "resource.changed" as const,
-  payload: { reason: "fixture" },
   sessionId: "session-1",
   sessionGeneration: 3,
   operationId: "operation-1"
-};
+}));
 
 describe("interactive authority", () => {
   beforeEach(() => installSession(3));

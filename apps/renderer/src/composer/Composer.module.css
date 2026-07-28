@@ -15,7 +15,7 @@
 .dropIndicator {
   position: absolute;
   z-index: 4;
-  inset: 8px;
+  inset: var(--space-2);
   display: grid;
   place-items: center;
   border: 1px dashed color-mix(in srgb, var(--accent) 70%, var(--border));
@@ -60,7 +60,7 @@
   min-width: 0;
   height: 30px;
   gap: 5px;
-  padding-left: 8px;
+  padding-left: var(--space-2);
   border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface-muted);
@@ -80,7 +80,7 @@
   min-width: 0;
   max-width: 190px;
   height: 28px;
-  padding: 0 24px 0 0;
+  padding: 0 var(--space-5) 0 0;
   border: 0;
   outline: none;
   background: transparent;
@@ -131,14 +131,14 @@
 .queueHeader {
   min-height: 40px;
   gap: 6px;
-  padding: 4px 6px;
+  padding: var(--space-1) 6px;
 }
 
 .queueToggle {
   min-width: 0;
   flex: 1 1 auto;
-  gap: 8px;
-  padding: 4px 6px;
+  gap: var(--space-2);
+  padding: var(--space-1) 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -183,15 +183,15 @@
 
 .queueActions {
   flex: 0 0 auto;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .queueClearButton,
 .queueConfirmButton,
 .queueCancelButton {
   min-height: 28px;
-  gap: 4px;
-  padding: 0 8px;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface-raised);
@@ -208,13 +208,13 @@
   display: grid;
   max-height: min(320px, 34vh);
   gap: 10px;
-  padding: 8px 10px 10px;
+  padding: var(--space-2) 10px 10px;
   overflow-y: auto;
   border-top: 1px solid var(--border);
 }
 
 .queueGroup h3 {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-1);
   color: var(--text-tertiary);
   font-size: 10px;
   font-weight: 650;
@@ -233,7 +233,7 @@
 .queueGroup li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 5px 7px;
   border-radius: 5px;
   background: var(--surface-muted);

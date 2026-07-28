@@ -3,6 +3,7 @@ import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useAppStore } from "../app/app-store.js";
 import type { AppState } from "../app/app-store.types.js";
+import type { TaskProtocolContext } from "@pi67/protocol";
 import { runSessionResourceCatalogTransition } from "../app/session-transition.js";
 import {
   acceptRendererSessionResponse,
@@ -35,18 +36,24 @@ export async function selectSessionModel(
 
 export async function configureRuntimeProviderKey(
   provider: string,
-  apiKey: string
+  apiKey: string,
+  context?: TaskProtocolContext
 ): Promise<boolean> {
   const get = useAppStore.getState;
   try {
     const authority = requireSessionAuthority(get());
     const target = requireProjectionTarget(authority);
-    const result = await agentConnectionController.request("model.setRuntimeKey", { provider, apiKey });
+    const result = await agentConnectionController.request(
+      "model.setRuntimeKey",
+      { provider, apiKey },
+      [],
+      context ? { context } : {}
+    );
     if (!acceptRendererSessionResponse(get(), authority)) {
       publishNotification({
         level: "warning",
         title: messages.credentials.staleConfirmationTitle,
-        message: "Agent Host 或 Pi 会话已在确认期间替换，请重新提交。"
+        message: "Pi 运行服务或会话已在确认期间替换，请重新提交。"
       });
       return false;
     }
@@ -58,7 +65,7 @@ export async function configureRuntimeProviderKey(
       publishNotification({
         level: "warning",
         title: messages.credentials.stateNeedsConfirmationTitle,
-        message: "Agent Host 或 Pi 会话已在状态安装期间替换，请重新打开凭据面板确认。"
+        message: "Pi 运行服务或会话已在状态安装期间替换，请重新打开凭据面板确认。"
       });
       return false;
     }
