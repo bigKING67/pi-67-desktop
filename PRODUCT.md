@@ -24,7 +24,9 @@ session, configuration, resource, model, and extension contracts.
 
 ## Positioning
 
-Pi-67 Desktop is the graphical surface for Pi/pi-67. It is not a second agent,
+`π` is the user-visible graphical surface for Pi/pi-67. `Pi-67 Desktop` remains
+the technical release, package, application ID, protocol, and artifact identity.
+The product is not a second agent,
 a provider marketplace, an RPC wrapper, or a full IDE. It favors truthful
 state, fast interaction, safe recovery, and Pi compatibility over feature
 count.
@@ -50,6 +52,10 @@ count.
 - Both supported platforms can install, launch, and complete an offline SDK
   contract smoke from signed packages.
 - Existing users reuse `~/.pi/agent` without credential or session migration.
+- The user-visible application name and icon are `π` with the locked black-square
+  and white-mark assets. `com.pi67.desktop`, the `pi67` URL scheme, package names,
+  GitHub repository, executable names, and `Pi-67-Desktop-*` release artifacts
+  remain stable technical identities.
 - Desktop-created and TUI-created sessions can be resumed sequentially in the
   other interface.
 - Importing external JSONL keeps the selected source unchanged, creates a

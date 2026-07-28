@@ -1,6 +1,6 @@
 export const zhCNMessages = {
   common: {
-    appName: "Pi-67 Desktop",
+    appName: "π",
     cancel: "取消",
     close: "关闭",
     stop: "停止"
@@ -12,9 +12,9 @@ export const zhCNMessages = {
     hoursAgo: (count: number) => `${count} 小时前`
   },
   workspace: {
-    eyebrow: "Pi-67 Desktop",
-    heading: "开始一个 Pi 任务",
-    description: "选择一个工作区，继续已有 Pi 会话或开始新任务。",
+    eyebrow: "π",
+    heading: "开始一个 Pi 会话",
+    description: "选择一个工作区，继续已有 Pi 会话或开始新会话。",
     openAction: "选择工作区",
     existingConfiguration: "复用现有 Pi 配置和会话",
     existingConfigurationDetail: "无需迁移已有工作方式",

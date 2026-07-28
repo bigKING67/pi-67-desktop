@@ -29,6 +29,7 @@
     "performance:measure": "corepack pnpm run performance:prepare && node eng/performance/measure-session-projection.mjs && node eng/performance/measure-session-jsonl-tail.mjs && corepack pnpm run performance:renderer && corepack pnpm run performance:electron",
     "validate:provider-long-turn": "node eng/provider/measure-real-provider-long-turn.mjs",
     "icons:generate": "node eng/packaging/generate-icon.mjs",
+    "icons:generate:macos": "node eng/packaging/generate-macos-icon.mjs",
     "check:architecture": "node eng/quality/check-architecture.mjs",
     "check:dead-code": "knip",
     "check:structure": "node eng/quality/check-structure.mjs",

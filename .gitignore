@@ -19,3 +19,5 @@ test-results/
 *.trace
 *.png
 !eng/packaging/icon.png
+!eng/packaging/pi-icon-sources/png/*.png
+!apps/renderer/src/assets/pi-icon-64.png

@@ -14,7 +14,7 @@ interface CreateMainWindowOptions {
 export function createMainWindow(options: CreateMainWindowOptions): BrowserWindow {
   const isMac = process.platform === "darwin";
   const window = new BrowserWindow({
-    title: "Pi-67 Desktop",
+    title: "π",
     width: 1440,
     height: 920,
     minWidth: 680,

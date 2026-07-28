@@ -1,8 +1,11 @@
-# Pi-67 Desktop
+# π
 
-Pi-67 Desktop 是面向 Pi / pi-67 的本地优先桌面客户端。它保留 Pi 的配置、
+`π` 是面向 Pi / pi-67 的本地优先桌面客户端。它保留 Pi 的配置、
 模型、Skills、Prompts、Extensions 和 JSONL 会话语义，用图形界面提供会话树、
 流式消息、立即纠偏、完成后执行、回滚、压缩和常见 extension 交互。
+
+应用显示名称和图标使用 `π` 品牌；`Pi-67 Desktop` 继续作为仓库、包、可执行
+文件、URL scheme、安装产物和 Release 的技术身份，避免破坏已有升级与分发合同。
 
 当前仓库处于 alpha 实施阶段。GitHub Releases 可以提供明确标记的 unsigned
 preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Developer ID

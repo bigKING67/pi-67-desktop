@@ -60,6 +60,17 @@ completing a real session without learning terminal UI conventions first.
   empty states, low-contrast metadata, and generic AI visual motifs.
 - Light and dark modes share information architecture, spacing, type roles,
   component behavior, and motion.
+- The application mark uses the locked production asset: a pure white rotationally
+  symmetric `π` glyph on a pure black rounded square. Do not redraw, recolor,
+  decorate, or bake the display name into the icon. Product-facing text uses `π`;
+  technical release identifiers may retain `Pi-67 Desktop` where required.
+- The vector master, Windows icon, and in-product icons retain the full brand
+  canvas. The macOS ICNS is a platform-calibrated derivative: the unchanged mark
+  and black tile occupy `824px` inside a transparent `1024px` canvas, centered
+  with a `100px` safe area on every side. This prevents the Dock, Finder, and
+  Launchpad from rendering π roughly 24 percent larger than contemporary macOS
+  application icons; the safe area must not be applied back to Windows or
+  Renderer assets.
 - Appearance defaults to the operating system. A compact TitleBar menu lets
   users choose System, Light, or Dark without turning theme into primary UI.
 

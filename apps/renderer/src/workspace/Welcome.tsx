@@ -1,5 +1,6 @@
 import { FolderOpen, HardDrive, History } from "lucide-react";
 import { Button } from "react-aria-components";
+import piIconUrl from "../assets/pi-icon-64.png";
 import { messages } from "../localization/message-catalog.js";
 import { openRendererWorkspace } from "./workspace-open-controller.js";
 import styles from "./Welcome.module.css";
@@ -9,7 +10,7 @@ export function Welcome() {
     <main className={styles.screen}>
       <section className={styles.copy}>
         <div className={styles.identity}>
-          <span className={styles.mark} aria-hidden="true">π</span>
+          <img alt="" aria-hidden="true" className={styles.mark} src={piIconUrl} />
           <div>
             <span className={styles.eyebrow}>{messages.workspace.eyebrow}</span>
             <h1>{messages.workspace.heading}</h1>

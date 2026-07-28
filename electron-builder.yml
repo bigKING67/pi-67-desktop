@@ -1,4 +1,5 @@
 appId: com.pi67.desktop
+# Keep the release/bundle filename stable while platform display metadata uses the π brand.
 productName: Pi-67 Desktop
 icon: eng/packaging/icon.png
 asar: true
@@ -22,10 +23,12 @@ extraResources:
   - from: licenses
     to: licenses
 protocols:
-  - name: Pi-67 Desktop
+  - name: π
     schemes:
       - pi67
 win:
+  icon: eng/packaging/pi.ico
+  executableName: Pi-67 Desktop
   target:
     - target: nsis
       arch:
@@ -36,7 +39,11 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
+  shortcutName: π
+  uninstallDisplayName: π ${version}
 mac:
+  icon: eng/packaging/pi.icns
+  executableName: Pi-67 Desktop
   target:
     - target: dmg
       arch:
@@ -52,6 +59,8 @@ mac:
   notarize: true
   entitlements: eng/packaging/entitlements.mac.plist
   entitlementsInherit: eng/packaging/entitlements.mac.plist
+  extendInfo:
+    CFBundleDisplayName: π
 publish:
   provider: github
   owner: bigKING67
