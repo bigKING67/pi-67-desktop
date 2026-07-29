@@ -25,7 +25,7 @@ export async function loadExtensionPackages(workspaceId?: string): Promise<boole
     store.installList(target.id, result.items);
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法读取 Extensions", error);
+    return reportFailure(target.id, "无法读取 Pi 资源包", error);
   }
 }
 
@@ -44,12 +44,12 @@ export async function checkExtensionPackageUpdates(workspaceId?: string): Promis
     useExtensionPackageStore.getState().installUpdates(target.id, result.items);
     publishNotification({
       level: "info",
-      title: "Extension 更新检查完成",
+      title: "资源包更新检查完成",
       message: result.total === 0 ? "当前没有可用更新。" : `发现 ${result.total} 个可用更新。`
     });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法检查 Extension 更新", error);
+    return reportFailure(target.id, "无法检查资源包更新", error);
   }
 }
 
@@ -58,7 +58,7 @@ export async function installExtensionPackage(
   scope: ExtensionPackageScope,
   workspaceId?: string
 ): Promise<boolean> {
-  return mutate("extension.package.install", { source, scope }, scope, workspaceId, "Extension 已安装");
+  return mutate("extension.package.install", { source, scope }, scope, workspaceId, "资源包已安装");
 }
 
 export async function updateExtensionPackage(
@@ -66,7 +66,7 @@ export async function updateExtensionPackage(
   scope: ExtensionPackageScope,
   workspaceId?: string
 ): Promise<boolean> {
-  return mutate("extension.package.update", { source, scope }, scope, workspaceId, "Extension 已更新");
+  return mutate("extension.package.update", { source, scope }, scope, workspaceId, "资源包已更新");
 }
 
 export async function setExtensionPackageEnabled(
@@ -76,7 +76,13 @@ export async function setExtensionPackageEnabled(
   workspaceId?: string,
   resourceType: import("@pi67/domain").PackageResourceType = "extension"
 ): Promise<boolean> {
-  const label = resourceType === "skill" ? "Skill" : resourceType === "prompt" ? "Prompt" : "Extension";
+  const label = resourceType === "skill"
+    ? "技能"
+    : resourceType === "prompt"
+      ? "指令模板"
+      : resourceType === "theme"
+        ? "主题"
+        : "扩展";
   return mutate(
     "extension.package.setEnabled",
     { source, scope, enabled, resourceType },
@@ -95,7 +101,7 @@ export async function restoreExtensionPackageInheritance(
     { source },
     "project",
     workspaceId,
-    "Extension 已恢复继承"
+    "资源包已恢复继承"
   );
 }
 
@@ -109,7 +115,7 @@ export async function uninstallExtensionPackage(
     { source, scope },
     scope,
     workspaceId,
-    "Extension 已卸载"
+    "资源包已卸载"
   );
 }
 
@@ -144,7 +150,7 @@ async function mutate<T extends MutationType>(
     });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "Extension 操作失败", error);
+    return reportFailure(target.id, "资源包操作失败", error);
   }
 }
 
@@ -155,7 +161,7 @@ function preflightMutation(workspaceId: string, scope: ExtensionPackageScope): b
   if (scope === "project" && workspace.trust !== "trusted") {
     publishNotification({
       level: "error",
-      title: "项目 Extension 设置未更改",
+      title: "项目资源包设置未更改",
       message: "请先信任当前 Workspace。"
     });
     return false;
@@ -167,7 +173,7 @@ function preflightMutation(workspaceId: string, scope: ExtensionPackageScope): b
   if (busy) {
     publishNotification({
       level: "warning",
-      title: "Extension 操作暂不可用",
+      title: "资源包操作暂不可用",
       message: scope === "global"
         ? "请先完成或停止所有正在运行或等待输入的任务。"
         : "请先完成或停止当前 Workspace 中正在运行或等待输入的任务。"

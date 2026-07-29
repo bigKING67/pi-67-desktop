@@ -51,7 +51,52 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
     steeringQueue: [],
     followUpQueue: [],
     tree: { nodes: [], truncated: false, total: 0 },
-    resources: [{ kind: "skill", id: "design-craft", label: "design-craft", status: "ready" }],
+    resources: [{
+      kind: "skill",
+      id: "design-craft",
+      label: "design-craft",
+      path: "/Users/test/.agents/skills/design-craft/SKILL.md",
+      source: "~/.agents/skills",
+      scope: "user",
+      origin: "top-level",
+      status: "ready"
+    }, {
+      kind: "prompt",
+      id: "review",
+      label: "/review",
+      path: "/Users/test/.pi/agent/prompts/review.md",
+      source: "~/.pi/agent/prompts",
+      scope: "user",
+      origin: "top-level",
+      status: "ready"
+    }, {
+      kind: "extension",
+      id: "/Users/test/Projects/pi-demo/.pi/extensions/project-tools.ts",
+      label: ".pi/extensions/project-tools.ts",
+      path: "/Users/test/Projects/pi-demo/.pi/extensions/project-tools.ts",
+      source: ".pi/extensions",
+      scope: "project",
+      origin: "top-level",
+      status: "ready"
+    }, {
+      kind: "context",
+      id: "/Users/test/.pi/agent/AGENTS.md",
+      label: "AGENTS.md",
+      path: "/Users/test/.pi/agent/AGENTS.md",
+      source: "/Users/test/.pi/agent/AGENTS.md",
+      scope: "user",
+      origin: "top-level",
+      status: "ready"
+    }, {
+      kind: "context",
+      id: "/Users/test/Projects/pi-demo/AGENTS.md",
+      label: "AGENTS.md",
+      path: "/Users/test/Projects/pi-demo/AGENTS.md",
+      source: "/Users/test/Projects/pi-demo/AGENTS.md",
+      scope: "project",
+      origin: "top-level",
+      status: "ready"
+    }],
     stats: { tokens: 0, cost: 0, contextPercent: 0 }
   };
 }

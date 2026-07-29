@@ -211,7 +211,7 @@ describe("WorkbenchStateV2 persistence", () => {
         taskGeneration: 2,
         lastKnownLifecycle: "running" as const
       }],
-      settings: { section: "extensions" as const, scope: "project" as const, workspaceId: workspace.id }
+      settings: { section: "packages" as const, scope: "project" as const, workspaceId: workspace.id }
     };
 
     expect(replaceWorkbenchLayout(state, layout)).toMatchObject(layout);
@@ -221,6 +221,58 @@ describe("WorkbenchStateV2 persistence", () => {
       ...layout,
       settings: { section: "account", scope: "project", workspaceId: workspace.id }
     })).toThrow(/invalid/u);
+  });
+
+  it("normalizes the former V2 resources section to skills without resetting state", async () => {
+    const userData = await temporaryRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = descriptorFixture("workspace-1", "/workspace/first", "32");
+    await mkdir(directory);
+    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
+      version: 2,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
+      runtimeRecovery: [],
+      settings: { section: "resources", scope: "project", workspaceId: workspace.id },
+      cleanExit: true
+    }), { mode: 0o600 });
+
+    const loaded = await testStore(userData).load();
+    expect(loaded.recovery).toBeUndefined();
+    expect(loaded.state.settings).toEqual({
+      section: "skills",
+      scope: "project",
+      workspaceId: workspace.id
+    });
+  });
+
+  it("normalizes the combined prompts and rules section to prompts without resetting state", async () => {
+    const userData = await temporaryRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = descriptorFixture("workspace-1", "/workspace/first", "33");
+    await mkdir(directory);
+    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
+      version: 2,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
+      runtimeRecovery: [],
+      settings: { section: "prompts-rules", scope: "project", workspaceId: workspace.id },
+      cleanExit: true
+    }), { mode: 0o600 });
+
+    const loaded = await testStore(userData).load();
+    expect(loaded.recovery).toBeUndefined();
+    expect(loaded.state.settings).toEqual({
+      section: "prompts",
+      scope: "project",
+      workspaceId: workspace.id
+    });
   });
 
   it("marks formerly live recovery records stopped after a clean exit and lost after an unclean exit", () => {

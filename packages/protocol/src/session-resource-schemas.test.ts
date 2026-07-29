@@ -1,6 +1,8 @@
 import type { SessionSnapshot } from "@pi67/domain";
+import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import { isResponseEnvelope, responseEnvelope, type ProtocolContext } from "./envelope.js";
+import { ResourceSummarySchema } from "./session-resource-schemas.js";
 
 const TASK_CONTEXT: ProtocolContext = {
   scope: "task",
@@ -41,6 +43,23 @@ describe("Session resource response schemas", () => {
     expect(isResponseEnvelope(reload)).toBe(true);
     expect(isResponseEnvelope({ ...trust, result: legacySnapshot() })).toBe(false);
     expect(isResponseEnvelope({ ...reload, result: legacySnapshot() })).toBe(false);
+  });
+
+  it("accepts resolved Pi source metadata and rejects unknown scope values", () => {
+    const resource = {
+      kind: "prompt",
+      id: "review",
+      label: "/review",
+      path: "/workspace/.pi/prompts/review.md",
+      source: "npm:pi-review",
+      scope: "project",
+      origin: "package",
+      status: "ready"
+    };
+
+    expect(Value.Check(ResourceSummarySchema, resource)).toBe(true);
+    expect(Value.Check(ResourceSummarySchema, { ...resource, scope: "global" })).toBe(false);
+    expect(Value.Check(ResourceSummarySchema, { ...resource, packageName: "pi-review" })).toBe(false);
   });
 });
 

@@ -318,12 +318,14 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings owns `账户`, `通用`, `模型服务`, `扩展`, `技能`, `提示词`, `规则`,
-  `集成`, `运行服务`, `下载源与网络`, `更新与诊断`, and `关于`. Account,
+- Settings owns `账户`, `通用`, `模型服务`, `资源包`, `扩展`, `技能`,
+  `指令模板`, `规则与上下文`, `集成`, `运行服务`, `下载源与网络`,
+  `更新与诊断`, and `关于`. Account,
   General, managed Rules, Integrations, Download Sources/Network, Updates, and
   About are global-only and do not show a meaningless scope control. Model
-  services, Extensions, Skills, Prompts, and Runtime support explicit global or
-  current-Workspace project scope where Pi has that concept.
+  services, Packages, Extensions, Skills, Prompt Templates, Context Files, and
+  Runtime support explicit global or current-Workspace project scope where Pi
+  has that concept.
 - Every Settings category uses one centered document flow and the content region
   is its only vertical scroll owner. The document width is `min(1120px, 100%)`,
   with `32px` top, `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding;
@@ -336,44 +338,53 @@ loading error where the operation can produce those states
   giant outline or floating cards. **Editor / Notice** lets a textarea, long
   editor, or semantic notice be the surface and forbids another ordinary card
   around it. Section headings remain outside all three surfaces.
-- Provider, model, and Extension catalogs always use explicit drill-down rather
+- Provider, model, and Package catalogs always use explicit drill-down rather
   than automatic master-detail expansion: `Provider 目录 -> Provider 编辑 ->
-  模型目录 -> 模型详情` and `Extensions Catalog -> Extension 详情`. No viewport or
+  模型目录 -> 模型详情` and `Package Catalog -> Package 详情`. No viewport or
   container width makes those surfaces side by side. Labeled return actions
   restore query, filter, selected item, draft state, and catalog scroll position.
   This prevents Settings from becoming a third or fourth application column on
   either common or ultra-wide windows.
-- Prompt packages and Rules remain separate navigation targets. `提示词` owns
-  installable, filterable Prompt packages and their scope. `规则` owns managed
-  Desktop Rules plus the user-owned global `AGENTS.md` boundary; it does not
-  imply a project Rule editor that the current product does not provide.
+- Pi resources follow the final ResourceLoader classification rather than the
+  Package name or filesystem heuristics. `扩展` lists loaded executable
+  Extensions, `技能` lists resolved Skills, and `指令模板` lists `/name` Prompt
+  Templates. `规则与上下文` lists loaded `AGENTS.md` and `CLAUDE.md` Context
+  Files and keeps `SYSTEM.md` / `APPEND_SYSTEM.md` identified as separate system
+  prompt inputs. Global resources and current-project resources remain visibly
+  distinct, and project views label inherited global resources.
 - Product navigation calls the transient execution environment `运行服务`, not
   the literal translation `运行时`. Persistent Pi JSONL Sessions remain in the
   Workspace navigation unless a real, independently actionable Session-settings
   surface is introduced; Settings does not combine Runtime and Session merely
   because their implementation lifecycles are related.
-- Package-resource management separates bundled first-party and external sources,
-  shows source kind, scope, inheritance, installed state, and the selected resource
-  type's enabled state. Enable/disable changes only that Pi Package filter; it never
-  flattens object filters or removes sibling Extension, Skill, Prompt, or Theme
-  filters. Bundled packages can be enabled or disabled but are updated with the
+- `资源包` owns Package installation, update, and uninstall exactly once. A
+  multi-resource Package appears as one lifecycle row and identifies every
+  Extension, Skill, Prompt Template, or Theme it contributes. Per-resource
+  enable/disable changes only that Package filter; it never flattens object
+  filters or removes sibling resource filters. Update and uninstall remain
+  explicitly Package-wide operations. Bundled packages are updated with the
   application and cannot be independently uninstalled.
-- Extensions uses three local views: `已安装`, `发现`, and `当前会话`. Tabs,
+- Resource Packages use two local views: `已安装` and `发现扩展`. Tabs,
   page-level actions, search, and filters sit directly on the document canvas.
-  `已安装` groups bundled and external sources in one Catalog and moves package
+  `已安装` groups bundled and external sources in one Catalog and moves Package
   metadata and destructive operations into the selected drill-down detail rather
   than repeating action clusters on every row. The selected detail leads with a
-  bounded plain-text purpose from the installed local package manifest, lists
-  only declared resource types, and explicitly falls back when no description
-  exists; it never fetches or renders remote README/HTML. Destructive removal
+  bounded plain-text purpose based on the installed local package identity and
+  manifest. The Chinese locale uses reviewed identity-keyed copy for known Pi
+  packages, preserves package-authored Chinese descriptions, and uses an explicit
+  Chinese fallback for unknown non-Chinese metadata instead of exposing raw
+  English or machine-translating untrusted text. It lists only declared resource
+  types and never fetches or renders remote README/HTML. Destructive removal
   stays in an independent danger section below ordinary enable/update actions.
-  `发现` and `当前会话` are flat Catalog contents, not cards inside a shared frame.
-- Installing an Extension starts from one page-level action and opens a focused
+  `发现扩展` is flat Catalog content, not a card inside a shared frame. Extension,
+  Skill, Prompt Template, and Context pages consume the current Session resource
+  projection and never repeat Package update or uninstall controls.
+- Installing a Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
-  target scope, and Pi Runtime permissions. Recommended entries prefill the same
-  dialog and never bypass the one-shot installation confirmation. Runtime Catalog
-  evidence stays in `当前会话` because installed configuration and loaded surfaces
-  are different states.
+  target scope, and the fact that a Package may load executable Extension code.
+  Recommended Extensions prefill the same dialog and never bypass the one-shot
+  installation confirmation. Loaded-resource evidence remains separate because
+  installed configuration and the current Session projection are different states.
 - The Download Sources/Network section uses compact forms and status rows rather
   than a card marketplace. It shows the private Node/npm/Git versions, source mode,
   ordered mirror and official candidates, not-checked/reachable/unreachable state,

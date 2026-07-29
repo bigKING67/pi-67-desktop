@@ -2,7 +2,8 @@ import type {
   AgentSession,
   AgentSessionServices,
   LoadExtensionsResult,
-  ModelRuntime
+  ModelRuntime,
+  SourceInfo
 } from "@earendil-works/pi-coding-agent";
 import type {
   ModelSummary,
@@ -129,16 +130,37 @@ export function projectSessionResources(
 ): ResourceSummary[] {
   const resources: ResourceSummary[] = [];
   const loader = services?.resourceLoader;
-  if (!loader) return resources;
+  if (!loader || !services) return resources;
   for (const skill of loader.getSkills().skills) {
-    resources.push({ kind: "skill", id: skill.name, label: skill.name, path: skill.filePath, status: "ready" });
+    resources.push({
+      kind: "skill",
+      id: skill.name,
+      label: skill.name,
+      path: skill.filePath,
+      ...projectResourceSource(skill.sourceInfo),
+      status: "ready"
+    });
   }
   for (const prompt of loader.getPrompts().prompts) {
-    resources.push({ kind: "prompt", id: prompt.name, label: prompt.name, path: prompt.filePath, status: "ready" });
+    resources.push({
+      kind: "prompt",
+      id: prompt.name,
+      label: `/${prompt.name}`,
+      path: prompt.filePath,
+      ...projectResourceSource(prompt.sourceInfo),
+      status: "ready"
+    });
   }
   for (const extension of extensionsResult?.extensions ?? []) {
     if (extension.hidden) continue;
-    resources.push({ kind: "extension", id: extension.resolvedPath, label: extension.path, path: extension.resolvedPath, status: "ready" });
+    resources.push({
+      kind: "extension",
+      id: extension.resolvedPath,
+      label: extensionResourceLabel(extension.path, extension.sourceInfo),
+      path: extension.resolvedPath,
+      ...projectResourceSource(extension.sourceInfo),
+      status: "ready"
+    });
   }
   for (const error of extensionsResult?.errors ?? []) {
     resources.push({
@@ -150,7 +172,50 @@ export function projectSessionResources(
     });
   }
   for (const file of loader.getAgentsFiles().agentsFiles) {
-    resources.push({ kind: "context", id: file.path, label: file.path.split(/[\\/]/).pop() ?? file.path, path: file.path, status: "ready" });
+    const global = isPathWithin(file.path, services.agentDir);
+    resources.push({
+      kind: "context",
+      id: file.path,
+      label: file.path.split(/[\\/]/).pop() ?? file.path,
+      path: file.path,
+      source: file.path,
+      scope: global ? "user" : "project",
+      origin: "top-level",
+      status: "ready"
+    });
   }
   return resources;
+}
+
+function projectResourceSource(sourceInfo: SourceInfo): Pick<
+  ResourceSummary,
+  "source" | "scope" | "origin"
+> {
+  return {
+    source: sourceInfo.source,
+    scope: sourceInfo.scope,
+    origin: sourceInfo.origin
+  };
+}
+
+function extensionResourceLabel(resourcePath: string, sourceInfo: SourceInfo): string {
+  const fileName = resourcePath.split(/[\\/]/).pop() ?? resourcePath;
+  if (sourceInfo.origin !== "package" || !sourceInfo.source.startsWith("npm:")) return fileName;
+  const packageName = sourceInfo.source.slice(4).trim();
+  return packageName ? `${packageName} · ${fileName}` : fileName;
+}
+
+export function isPathWithin(
+  candidate: string,
+  directory: string,
+  platform = process.platform
+): boolean {
+  const normalize = (value: string) => {
+    const normalized = value.replaceAll("\\", "/").replace(/\/+$/u, "");
+    return platform === "win32" ? normalized.toLowerCase() : normalized;
+  };
+  const normalizedCandidate = normalize(candidate);
+  const normalizedDirectory = normalize(directory);
+  return normalizedCandidate === normalizedDirectory
+    || normalizedCandidate.startsWith(`${normalizedDirectory}/`);
 }

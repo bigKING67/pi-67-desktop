@@ -19,8 +19,6 @@ import {
   TabPanel,
   Tabs
 } from "react-aria-components";
-import { ExtensionCatalog } from "../extension-ui/ExtensionCatalog.js";
-import { useCommittedExtensionCatalog } from "../extension-ui/extension-ui-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
 import {
@@ -45,7 +43,7 @@ import {
 } from "./extension-management-model.js";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
-type ExtensionView = "installed" | "discover" | "runtime";
+type ExtensionView = "installed" | "discover";
 
 const FILTERS: ReadonlyArray<{ id: PackageFilter; label: string }> = [
   { id: "all", label: "全部" },
@@ -65,7 +63,6 @@ export function ExtensionManagementWorkspace() {
   const phase = useExtensionPackageStore((state) => state.phase);
   const packageError = useExtensionPackageStore((state) => state.error);
   const capability = useDesktopCapabilitySnapshot();
-  const catalog = useCommittedExtensionCatalog();
   const [view, setView] = useState<ExtensionView>("installed");
   const [filter, setFilter] = useState<PackageFilter>("all");
   const [query, setQuery] = useState("");
@@ -164,12 +161,11 @@ export function ExtensionManagementWorkspace() {
         }}
       >
         <div className={styles.commandBand}>
-          <TabList aria-label="Extension 管理视图" className={styles.tabList!}>
+          <TabList aria-label="Pi 资源包管理视图" className={styles.tabList!}>
             <Tab className={styles.tab!} id="installed">已安装 <span>{rows.length}</span></Tab>
             <Tab className={styles.tab!} id="discover">
-              发现 <span>{capability.snapshot?.recommendedExternal.length ?? 0}</span>
+              发现扩展 <span>{capability.snapshot?.recommendedExternal.length ?? 0}</span>
             </Tab>
-            <Tab className={styles.tab!} id="runtime">当前会话 <span>{catalog?.total ?? "-"}</span></Tab>
           </TabList>
           <div className={styles.primaryActions}>
             <Button
@@ -185,7 +181,7 @@ export function ExtensionManagementWorkspace() {
               isDisabled={!workspaceId || busy}
               onPress={() => openInstall()}
             >
-              <PackagePlus aria-hidden="true" size={14} />安装扩展
+              <PackagePlus aria-hidden="true" size={14} />安装资源包
             </Button>
           </div>
         </div>
@@ -199,14 +195,14 @@ export function ExtensionManagementWorkspace() {
             <label className={styles.packageSearch}>
               <Search aria-hidden="true" size={15} />
               <input
-                aria-label="搜索已安装扩展"
+                aria-label="搜索已安装资源包"
                 onChange={(event) => setQuery(event.currentTarget.value)}
                 placeholder="搜索名称、来源或作用域"
                 type="search"
                 value={query}
               />
             </label>
-            <div aria-label="筛选已安装扩展" className={styles.filters} role="group">
+            <div aria-label="筛选已安装资源包" className={styles.filters} role="group">
               {FILTERS.map((item) => (
                 <Button
                   aria-pressed={filter === item.id}
@@ -242,12 +238,12 @@ export function ExtensionManagementWorkspace() {
               workspaceName={workspace?.displayName}
               onPending={setPending}
               onRestore={(entry) => void restoreExtensionPackageInheritance(entry.source, workspaceId)}
-              onToggle={(entry, inherited) => void setExtensionPackageEnabled(
+              onToggle={(entry, inherited, resourceType) => void setExtensionPackageEnabled(
                 entry.source,
                 inherited ? "project" : entry.scope,
-                !packageResourceEnabled(entry),
+                !packageResourceEnabled(entry, resourceType),
                 workspaceId,
-                "extension"
+                resourceType
               )}
             />
           </div>
@@ -263,16 +259,6 @@ export function ExtensionManagementWorkspace() {
           />
         </TabPanel>
 
-        <TabPanel className={styles.tabPanel!} id="runtime">
-          <section className={styles.runtimeSurface}>
-            <header>
-              <span className={styles.eyebrow}>运行时投影</span>
-              <h2>当前 Session 实际加载的能力</h2>
-              <p>这里显示 Pi Runtime 已发现的 Commands、Tools 与 UI 能力，不等同于已安装目录。</p>
-            </header>
-            <ExtensionCatalog catalog={catalog} variant="flat" />
-          </section>
-        </TabPanel>
       </Tabs>
 
       {installOpen ? (
@@ -356,9 +342,9 @@ function InstallExtensionDialog({ source, scopeLabel, error, busy, onSourceChang
   return (
     <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label="安装 Extension" className={styles.dialog!}>
-          <span className="dialog-eyebrow">Pi Package</span>
-          <Heading slot="title">安装 Extension</Heading>
+        <Dialog aria-label="安装 Pi 资源包" className={styles.dialog!}>
+          <span className="dialog-eyebrow">Pi 资源包</span>
+          <Heading slot="title">安装 Pi 资源包</Heading>
           <p className={styles.dialogIntro}>输入 npm 包、Git URL 或本地目录。Pi 会在执行前验证来源格式。</p>
           <label className={styles.sourceField}>
             <span>npm 包、Git URL 或本地目录</span>
@@ -377,7 +363,7 @@ function InstallExtensionDialog({ source, scopeLabel, error, busy, onSourceChang
           </dl>
           <div className={styles.permissionNotice}>
             <ShieldCheck aria-hidden="true" size={17} />
-            <span>Extension 在 Pi 运行环境中拥有与 Agent 相同的运行权限，安装可能访问网络并加载代码。</span>
+            <span>Pi 资源包可能提供可执行扩展、技能或指令模板。可执行扩展拥有与 Agent 相同的运行权限，安装也可能访问网络。</span>
           </div>
           {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
           <div className="dialog-actions">
@@ -401,12 +387,12 @@ function PackageActionDialog({ action, error, onCancel, onConfirm }: {
   onConfirm: () => void;
 }) {
   const uninstall = action.kind === "uninstall";
-  const title = uninstall ? "卸载 Extension？" : "更新 Extension？";
+  const title = uninstall ? "卸载资源包？" : "更新资源包？";
   return (
     <ModalOverlay className="modal-overlay" isDismissable isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Modal className={`modal-surface ${styles.modal}`}>
         <Dialog aria-label={title} className={styles.dialog!}>
-          <span className="dialog-eyebrow">Pi Extension 管理</span>
+          <span className="dialog-eyebrow">Pi 资源包管理</span>
           <Heading slot="title">{title}</Heading>
           <dl className={styles.dialogFacts}>
             <div><dt>来源</dt><dd className={styles.codeValue}>{action.entry.source}</dd></div>
@@ -414,7 +400,7 @@ function PackageActionDialog({ action, error, onCancel, onConfirm }: {
           </dl>
           <p className={styles.dialogIntro}>{uninstall
             ? "npm/Git 安装内容会由 Pi 移除；本地目录只移除配置引用，不删除用户目录。"
-            : "更新可能访问网络并加载新的 Extension 代码。现有配置会保留在当前作用域。"}</p>
+            : "更新可能访问网络并加载新的资源包内容。现有配置会保留在当前作用域。"}</p>
           {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
           <div className="dialog-actions">
             <Button autoFocus className="secondary-button" onPress={onCancel}>取消</Button>

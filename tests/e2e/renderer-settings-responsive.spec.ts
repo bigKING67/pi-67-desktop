@@ -104,12 +104,12 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
     expect(bounds.width).toBeGreaterThan(0);
   }
 
-  await navigation.getByRole("button", { name: /^扩展/u }).click();
+  await navigation.getByRole("button", { name: /^资源包/u }).click();
   const extensionList = settings.getByTestId("extension-package-list-scroll");
   const extensionDetail = settings.getByTestId("extension-package-detail-scroll");
   for (const locator of [
     settings.getByRole("button", { name: "检查更新", exact: true }),
-    settings.getByRole("button", { name: "安装扩展", exact: true })
+    settings.getByRole("button", { name: "安装资源包", exact: true })
   ]) {
     await expect(locator).toBeVisible();
     const bounds = await locator.evaluate((element) => {
@@ -125,8 +125,8 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await extensionList.getByRole("button").first().click();
   await expect(extensionList).toBeHidden();
   await expect(extensionDetail).toBeVisible();
-  await expect(settings.getByRole("button", { name: "返回扩展列表" })).toBeVisible();
-  await settings.getByRole("button", { name: "返回扩展列表" }).click();
+  await expect(settings.getByRole("button", { name: "返回资源包列表" })).toBeVisible();
+  await settings.getByRole("button", { name: "返回资源包列表" }).click();
   await expect(extensionList).toBeVisible();
   await expect(extensionDetail).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1040);
@@ -173,7 +173,7 @@ test("centers a 1120 pixel Settings document and never expands management flows 
   await expect(modelList).toBeHidden();
   await expect(modelDetail).toBeVisible();
 
-  await navigation.getByRole("button", { name: /^扩展/u }).click();
+  await navigation.getByRole("button", { name: /^资源包/u }).click();
   const extensionList = settings.getByTestId("extension-package-list-scroll");
   const extensionDetail = settings.getByTestId("extension-package-detail-scroll");
   await expect(extensionList).toBeVisible();

@@ -2,6 +2,7 @@ import type {
   DesktopCapabilityPackageSummary,
   ExtensionPackageEntry,
   ExtensionPackageUpdate,
+  PackageResourceType,
   PackageSourceKind
 } from "@pi67/domain";
 
@@ -33,10 +34,9 @@ export function buildPackageRows(
   scope: "global" | "project"
 ): PackageRow[] {
   const bundled = bundledPackages
-    .filter((entry) => entry.resourceTypes.includes("extension"))
     .map((entry): BundledPackageRow => ({ kind: "bundled", key: `bundled:${entry.id}`, entry }));
   const configured = packagesForScope(items, scope)
-    .filter(({ entry }) => packageSupportsExtension(entry) && !isBundledEntry(entry))
+    .filter(({ entry }) => !isBundledEntry(entry))
     .map(({ entry, inherited }): ConfiguredPackageRow => ({
       kind: "configured",
       key: `configured:${entry.source}`,
@@ -68,18 +68,30 @@ export function filterPackageRows(rows: PackageRow[], filter: PackageFilter, que
   });
 }
 
-export function packageResourceEnabled(entry: ExtensionPackageEntry): boolean {
-  return entry.resourceStates?.find((state) => state.type === "extension")?.enabled ?? entry.enabled;
+export function packageResourceEnabled(
+  entry: ExtensionPackageEntry,
+  resourceType: PackageResourceType
+): boolean {
+  return entry.resourceStates?.find((state) => state.type === resourceType)?.enabled ?? entry.enabled;
+}
+
+export function packageResourceTypes(entry: ExtensionPackageEntry): PackageResourceType[] {
+  return entry.resourceTypes?.length ? entry.resourceTypes : ["extension"];
 }
 
 export function packageRowEnabled(row: PackageRow): boolean {
-  return row.kind === "bundled" ? row.entry.installed && row.entry.defaultEnabled : packageResourceEnabled(row.entry);
+  return row.kind === "bundled"
+    ? row.entry.installed && row.entry.defaultEnabled
+    : packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
 }
 
-export function packageRowState(row: PackageRow): "enabled" | "disabled" | "unavailable" | "bundled" {
+export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "unavailable" | "bundled" {
   if (row.kind === "bundled") return row.entry.installed ? "bundled" : "unavailable";
   if (!row.entry.installed) return "unavailable";
-  return packageResourceEnabled(row.entry) ? "enabled" : "disabled";
+  const states = packageResourceTypes(row.entry).map((type) => packageResourceEnabled(row.entry, type));
+  if (states.every(Boolean)) return "enabled";
+  if (states.some(Boolean)) return "partial";
+  return "disabled";
 }
 
 export function packageRowName(row: PackageRow): string {
@@ -147,10 +159,6 @@ function packagesForScope(items: ExtensionPackageEntry[], scope: "global" | "pro
     ...items.filter((entry) => entry.scope === "global" && !projectSources.has(entry.source))
       .map((entry) => ({ entry, inherited: true }))
   ];
-}
-
-function packageSupportsExtension(entry: ExtensionPackageEntry): boolean {
-  return entry.resourceTypes?.includes("extension") ?? true;
 }
 
 function isBundledEntry(entry: ExtensionPackageEntry): boolean {

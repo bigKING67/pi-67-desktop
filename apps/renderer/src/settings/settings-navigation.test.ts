@@ -18,10 +18,11 @@ describe("settings navigation", () => {
         label: "Pi",
         items: [
           { id: "providers", label: "模型服务" },
+          { id: "packages", label: "资源包" },
           { id: "extensions", label: "扩展" },
           { id: "skills", label: "技能" },
-          { id: "prompts", label: "提示词" },
-          { id: "rules", label: "规则" },
+          { id: "prompts", label: "指令模板" },
+          { id: "rules", label: "规则与上下文" },
           { id: "integrations", label: "集成" },
           { id: "runtime", label: "运行服务" },
           { id: "network", label: "下载源与网络" }
@@ -38,7 +39,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(12);
+    expect(SETTINGS_SECTIONS).toHaveLength(13);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -56,6 +57,6 @@ describe("settings navigation", () => {
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
-    expect(sectionSupportsProjectScope("rules")).toBe(false);
+    expect(sectionSupportsProjectScope("rules")).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import type { SettingsSection } from "@pi67/domain";
+import type { ResourceSummary, SettingsSection } from "@pi67/domain";
 import {
   ArrowLeft,
   DownloadCloud,
@@ -35,11 +35,9 @@ import {
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
-import { ExtensionPackageManager } from "./ExtensionPackageManager.js";
 import { ExtensionManagementWorkspace } from "./ExtensionManagementWorkspace.js";
 import {
   Browser67IntegrationPanel,
-  BundledCapabilityList,
   ManagedRulePanel
 } from "./DesktopCapabilityPanels.js";
 import { PackageNetworkPanel } from "./PackageNetworkPanel.js";
@@ -205,6 +203,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "account") return <AccountSettings />;
   if (section === "general") return <GeneralSettings />;
   if (section === "providers") return <ProviderSettings />;
+  if (section === "packages") return <PackageSettings />;
   if (section === "extensions") return <ExtensionSettings />;
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
@@ -268,48 +267,138 @@ function ProviderSettings() {
   return <ProviderConfigurationPanel />;
 }
 
-function ExtensionSettings() {
+function PackageSettings() {
   return <ExtensionManagementWorkspace />;
 }
 
-function SkillSettings() {
-  const resources = useSessionProjectionStore(selectSessionResources);
+function ExtensionSettings() {
   return (
-    <>
-      <BundledCapabilityList resourceType="skill" />
-      <ExtensionPackageManager resourceType="skill" />
-      <SettingsSectionBlock
-        actions={<Button className="secondary-button" onPress={() => void reloadSessionResources()}>
-          <RefreshCw aria-hidden="true" size={14} />重新加载 Pi 资源
-        </Button>}
-        title="当前会话已加载资源"
-        description="这是当前 Pi 会话的运行状态投影，不等同于已安装目录。"
-      >
-        {resources?.length ? <SettingsRows>{resources.map((resource) => (
-          <SettingsRow
-            key={`${resource.kind}-${resource.id}`}
-            leading={<span className={styles.resourceStatus} data-status={resource.status} />}
-            title={resource.label}
-            description={`${resource.kind}${resource.detail ? ` · ${resource.detail}` : ""}`}
-            value={resource.status === "ready" ? "已加载" : resource.status === "failed" ? "失败" : "检查中"}
-          />
-        ))}</SettingsRows> : <SettingsNotice>当前任务尚未同步可显示的 Pi 资源。</SettingsNotice>}
-      </SettingsSectionBlock>
-    </>
+    <SessionResourcePanel
+      kind="extension"
+      title="当前会话已加载的扩展"
+      description="Pi 当前实际加载的可执行扩展；资源包只作为来源，不在这里重复更新或卸载。"
+      empty="当前作用域没有加载可显示的扩展。"
+    />
+  );
+}
+
+function SkillSettings() {
+  return (
+    <SessionResourcePanel
+      kind="skill"
+      title="当前会话已加载的技能"
+      description="显示全局、当前项目及资源包实际提供的技能；每一行对应一个已解析技能。"
+      empty="当前作用域没有加载可显示的技能。"
+    />
   );
 }
 
 function PromptSettings() {
   return (
-    <>
-      <BundledCapabilityList resourceType="prompt" />
-      <ExtensionPackageManager resourceType="prompt" />
-    </>
+    <SessionResourcePanel
+      kind="prompt"
+      title="当前会话已加载的指令模板"
+      description="这些 Markdown 模板通过 /name 调用；它们与持续生效的 AGENTS.md 规则不是同一类资源。"
+      empty="当前作用域没有加载可显示的指令模板。"
+    />
   );
 }
 
 function RuleSettings() {
-  return <ManagedRulePanel />;
+  const scope = useWorkbenchStore((state) => state.settingsScope);
+  return (
+    <>
+      {scope === "global" ? <ManagedRulePanel /> : null}
+      <SessionResourcePanel
+        kind="context"
+        title="当前会话生效的规则与上下文"
+        description="Pi 从全局、当前目录及父目录加载 AGENTS.md 或 CLAUDE.md；项目视图同时标出继承的全局规则。"
+        empty="当前作用域没有加载可显示的 AGENTS.md 或 CLAUDE.md。"
+      />
+      <SettingsNotice className={styles.resourceNote!}>
+        AGENTS.md 与 CLAUDE.md 属于规则上下文；SYSTEM.md 与 APPEND_SYSTEM.md 才用于替换或追加系统提示词。
+      </SettingsNotice>
+    </>
+  );
+}
+
+function SessionResourcePanel({ kind, title, description, empty }: {
+  kind: ResourceSummary["kind"];
+  title: string;
+  description: string;
+  empty: string;
+}) {
+  const scope = useWorkbenchStore((state) => state.settingsScope);
+  const resources = useSessionProjectionStore(selectSessionResources);
+  const displayed = (resources ?? [])
+    .filter((resource) => resource.kind === kind)
+    .filter((resource) => scope === "project"
+      || resource.scope === undefined
+      || resource.scope === "user")
+    .sort(compareResources);
+  return (
+    <SettingsSectionBlock
+      actions={<Button className="secondary-button" onPress={() => void reloadSessionResources()}>
+        <RefreshCw aria-hidden="true" size={14} />重新加载
+      </Button>}
+      title={title}
+      description={description}
+    >
+      {displayed.length > 0 ? <SettingsRows>{displayed.map((resource) => (
+        <SettingsRow
+          key={`${resource.kind}-${resource.id}`}
+          leading={<span className={styles.resourceStatus} data-status={resource.status} />}
+          title={resource.label}
+          description={resourceMetadata(resource, scope)}
+          value={resourceStatusLabel(resource.status)}
+        >
+          {resource.path ? <code className={styles.resourcePath} title={resource.path}>{resource.path}</code> : null}
+        </SettingsRow>
+      ))}</SettingsRows> : (
+        <SettingsNotice>{resources === undefined ? "当前任务尚未同步可显示的 Pi 资源。" : empty}</SettingsNotice>
+      )}
+    </SettingsSectionBlock>
+  );
+}
+
+function compareResources(left: ResourceSummary, right: ResourceSummary): number {
+  return resourceScopeRank(left.scope) - resourceScopeRank(right.scope)
+    || left.label.localeCompare(right.label, "zh-CN");
+}
+
+function resourceScopeRank(scope: ResourceSummary["scope"]): number {
+  if (scope === "project") return 0;
+  if (scope === "temporary") return 1;
+  if (scope === "user") return 2;
+  return 3;
+}
+
+function resourceMetadata(resource: ResourceSummary, selectedScope: "global" | "project"): string {
+  const scope = resource.scope === "project"
+    ? "当前项目"
+    : resource.scope === "temporary"
+      ? "当前会话"
+      : resource.scope === "user"
+        ? selectedScope === "project" ? "继承自全局" : "全局"
+        : "作用域未知";
+  const origin = resource.origin === "package"
+    ? "来自资源包"
+    : resource.origin === "top-level"
+      ? "独立配置"
+      : undefined;
+  const source = resource.source
+    && resource.source !== resource.path
+    && !["auto", "local", "path"].includes(resource.source)
+    ? resource.source
+    : undefined;
+  return [scope, origin, source, resource.detail].filter(Boolean).join(" · ");
+}
+
+function resourceStatusLabel(status: ResourceSummary["status"]): string {
+  if (status === "ready") return "已加载";
+  if (status === "failed") return "失败";
+  if (status === "tui-only") return "仅终端";
+  return "部分可用";
 }
 
 function IntegrationSettings() {

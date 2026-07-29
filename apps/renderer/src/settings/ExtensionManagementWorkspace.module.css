@@ -298,6 +298,10 @@
   color: var(--danger);
 }
 
+.state[data-state="partial"] {
+  color: var(--warning);
+}
+
 .packageIdentity,
 .discoveryIdentity,
 .integrityNote span,
@@ -501,6 +505,11 @@
   color: var(--info);
 }
 
+.statusLine > span[data-state="warning"] {
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  color: var(--warning);
+}
+
 .statusLine > span[data-state="danger"] {
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
   color: var(--danger);
@@ -545,6 +554,37 @@
 .detailActions {
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.resourceControls {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.resourceControl {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.resourceControl > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.resourceControl strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.resourceControl small {
+  color: var(--text-tertiary);
+  font-size: 12px;
 }
 
 .integrityNote,

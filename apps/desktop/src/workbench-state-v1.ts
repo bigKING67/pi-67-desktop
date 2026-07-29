@@ -38,10 +38,19 @@ interface LegacyTaskState {
 
 interface LegacySettingsState {
   open: boolean;
-  section: Exclude<SettingsSection, "account">;
+  section: LegacySettingsSection;
   scope: "global" | "project";
   workspaceId?: string;
 }
+
+type LegacySettingsSection =
+  | "general"
+  | "providers"
+  | "extensions"
+  | "resources"
+  | "runtime"
+  | "updates"
+  | "about";
 
 type LegacySurface =
   | { kind: "task"; taskId: string }
@@ -277,11 +286,12 @@ function conversationForLegacyTask(task: LegacyTaskState): ConversationKey {
 }
 
 function migrateSettings(settings: LegacySettingsState): WorkbenchSettingsState {
-  const globalOnly = settings.section === "general" || settings.section === "updates" || settings.section === "about";
-  if (globalOnly || settings.scope === "global") return { section: settings.section, scope: "global" };
+  const section: SettingsSection = settings.section === "resources" ? "skills" : settings.section;
+  const globalOnly = section === "general" || section === "updates" || section === "about";
+  if (globalOnly || settings.scope === "global") return { section, scope: "global" };
   return settings.workspaceId
-    ? { section: settings.section, scope: "project", workspaceId: settings.workspaceId }
-    : { section: settings.section, scope: "global" };
+    ? { section, scope: "project", workspaceId: settings.workspaceId }
+    : { section, scope: "global" };
 }
 
 function shouldRecoverLegacyTask(lifecycle: TaskLifecycle): boolean {
@@ -294,7 +304,7 @@ function shouldRecoverLegacyTask(lifecycle: TaskLifecycle): boolean {
     || lifecycle === "lost";
 }
 
-function isLegacySettingsSection(value: unknown): value is Exclude<SettingsSection, "account"> {
+function isLegacySettingsSection(value: unknown): value is LegacySettingsSection {
   return typeof value === "string" && [
     "general",
     "providers",

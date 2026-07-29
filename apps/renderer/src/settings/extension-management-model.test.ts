@@ -4,8 +4,10 @@ import {
   buildPackageRows,
   filterPackageRows,
   inferSourceKind,
+  packageResourceEnabled,
   packageRowAccessibleName,
-  packageRowEnabled
+  packageRowEnabled,
+  packageRowState
 } from "./extension-management-model.js";
 
 const bundled: DesktopCapabilityPackageSummary = {
@@ -59,15 +61,34 @@ describe("Extension management view model", () => {
       "global"
     );
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(filterPackageRows(rows, "disabled", "").map((row) => row.key)).toEqual([
       "configured:https://example.test/beta.git"
     ]);
     expect(filterPackageRows(rows, "updates", "")).toHaveLength(1);
     expect(filterPackageRows(rows, "all", "ALPHA")).toHaveLength(1);
     expect(filterPackageRows(rows, "all", "delegated tasks")).toHaveLength(1);
-    expect(rows.map(packageRowEnabled)).toEqual([true, true, false]);
+    expect(rows.map(packageRowEnabled)).toEqual([true, true, false, true]);
     expect(packageRowAccessibleName(rows[1]!)).toContain("Alpha Delegator，npm:@example/alpha · 全局");
+  });
+
+  it("keeps a multi-resource package in one row with type-scoped states", () => {
+    const mixed: ExtensionPackageEntry = {
+      ...packageEntry("npm:pi-subagents", "global", true),
+      resourceTypes: ["extension", "skill", "prompt"],
+      resourceStates: [
+        { type: "extension" as const, enabled: true },
+        { type: "skill" as const, enabled: false },
+        { type: "prompt" as const, enabled: true }
+      ]
+    };
+
+    const rows = buildPackageRows([mixed], [], [], "global");
+
+    expect(rows).toHaveLength(1);
+    expect(packageRowState(rows[0]!)).toBe("partial");
+    expect(packageResourceEnabled(mixed, "extension")).toBe(true);
+    expect(packageResourceEnabled(mixed, "skill")).toBe(false);
   });
 
   it("recognizes npm, Git, POSIX paths, and Windows paths", () => {

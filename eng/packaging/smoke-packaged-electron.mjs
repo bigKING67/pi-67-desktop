@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   assertSingleShutdownQuitLifecycle,
   CONTROLLED_PROMPT_TEXT,
@@ -32,6 +32,46 @@ const {
 const childPidPath = join(userDataDirectory, "child.pid");
 const lifecyclePath = join(userDataDirectory, "lifecycle.txt");
 const packagedCredential = "pi67-packaged-reveal-fixture";
+const localizedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
+const packagedSkillDirectory = join(agentDir, "skills/packaged-skill");
+const packagedPromptDirectory = join(agentDir, "prompts");
+await Promise.all([
+  mkdir(localizedExtensionDirectory, { recursive: true }),
+  mkdir(packagedSkillDirectory, { recursive: true }),
+  mkdir(packagedPromptDirectory, { recursive: true })
+]);
+await Promise.all([
+  writeFile(join(agentDir, "settings.json"), `${JSON.stringify({
+    packages: ["npm:pi-subagents"]
+  }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
+  writeFile(join(localizedExtensionDirectory, "package.json"), `${JSON.stringify({
+    name: "pi-subagents",
+    version: "0.35.1",
+    description: "Pi extension for delegating tasks to subagents with chains, parallel execution, and TUI clarification",
+    type: "module",
+    pi: { extensions: ["index.js"] }
+  }, null, 2)}\n`, "utf8"),
+  writeFile(join(localizedExtensionDirectory, "index.js"), "export default function packagedLocalizationFixture() {}\n", "utf8"),
+  writeFile(join(packagedSkillDirectory, "SKILL.md"), [
+    "---",
+    "name: packaged-skill",
+    "description: Validates the packaged Skill resource projection.",
+    "---",
+    "",
+    "# Packaged Skill",
+    ""
+  ].join("\n"), "utf8"),
+  writeFile(join(packagedPromptDirectory, "packaged-review.md"), [
+    "---",
+    "description: Validates the packaged prompt-template resource projection.",
+    "---",
+    "",
+    "Review the packaged Settings resource projection.",
+    ""
+  ].join("\n"), "utf8"),
+  writeFile(join(agentDir, "AGENTS.md"), "Packaged global context fixture.\n", "utf8"),
+  writeFile(join(workspace, "AGENTS.md"), "Packaged project context fixture.\n", "utf8")
+]);
 await writeFile(join(agentDir, "auth.json"), `${JSON.stringify({
   anthropic: { type: "api_key", key: packagedCredential }
 }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
@@ -200,24 +240,60 @@ try {
   }
   await credentialDialog.getByRole("button", { name: "关闭", exact: true }).click();
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^扩展/u }).click();
+    .getByRole("button", { name: /^资源包/u }).click();
   const extensionWorkspace = workspaceSettings.getByTestId("extension-management-workspace");
   const extensionList = extensionWorkspace.getByTestId("extension-package-list-scroll");
   const extensionDetail = extensionWorkspace.getByTestId("extension-package-detail-scroll");
   await extensionList.waitFor({ state: "visible", timeout: 30_000 });
   if (await extensionDetail.isVisible()) {
-    throw new Error("Packaged Extension detail must not share the Extension Catalog surface.");
+    throw new Error("Packaged resource detail must not share the Package Catalog surface.");
   }
-  const packagedExtensionRow = extensionList.getByRole("button").first();
+  const packagedExtensionRow = extensionList.getByRole("button", { name: /^pi-subagents，/u });
   await packagedExtensionRow.waitFor({ state: "visible", timeout: 30_000 });
-  await capturePackagedScreenshot(window, "04-extension-catalog.png");
+  await capturePackagedScreenshot(window, "04-resource-package-catalog.png");
   await packagedExtensionRow.click();
   await extensionDetail.waitFor({ state: "visible", timeout: 15_000 });
   await extensionList.waitFor({ state: "hidden", timeout: 15_000 });
+  await extensionDetail.getByText("将任务委派给子代理，支持任务链、并行执行和交互式澄清。", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await extensionDetail.getByText("Pi extension for delegating tasks", { exact: false }).count()) {
+    throw new Error("Packaged resource detail exposed raw English manifest copy in the Chinese locale.");
+  }
   await assertNoWorkspaceChangesAuthorityWarning(window);
-  await capturePackagedScreenshot(window, "05-extension-detail.png");
-  await extensionWorkspace.getByRole("button", { name: "返回扩展列表" }).click();
+  await capturePackagedScreenshot(window, "05-resource-package-detail.png");
+  await extensionWorkspace.getByRole("button", { name: "返回资源包列表" }).click();
   await extensionList.waitFor({ state: "visible", timeout: 15_000 });
+  const settingsNavigation = workspaceSettings.getByRole("navigation", { name: "设置分类" });
+  await settingsNavigation.getByRole("button", { name: "扩展", exact: true }).click();
+  await workspaceSettings.getByRole("heading", { name: "当前会话已加载的扩展", exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await workspaceSettings.getByText("pi-subagents · index.js", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await workspaceSettings.getByRole("button", { name: /卸载/u }).count()) {
+    throw new Error("Packaged Extension resource page repeated Package uninstall controls.");
+  }
+  await capturePackagedScreenshot(window, "06-extension-resources.png");
+  await settingsNavigation.getByRole("button", { name: "技能", exact: true }).click();
+  await workspaceSettings.getByText("packaged-skill", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
+    throw new Error("Packaged Skill resource page repeated an Extension-only Package.");
+  }
+  await capturePackagedScreenshot(window, "07-skill-resources.png");
+  await settingsNavigation.getByRole("button", { name: "指令模板", exact: true }).click();
+  await workspaceSettings.getByText("/packaged-review", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
+    throw new Error("Packaged Prompt Template page repeated an Extension-only Package.");
+  }
+  await capturePackagedScreenshot(window, "08-prompt-template-resources.png");
+  await settingsNavigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
+  await workspaceSettings.getByRole("button", { name: `项目 · ${basename(workspace)}`, exact: true }).click();
+  await workspaceSettings.getByText(/(?:\/|\\)workspace(?:\/|\\)AGENTS\.md$/u)
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await workspaceSettings.getByText("继承自全局", { exact: false })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "09-rule-context-resources.png");
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({
     hasNodeProcess: "process" in globalThis,
@@ -232,7 +308,7 @@ try {
     .getByRole("button", { name: /^通用/u }).click();
   await workspaceSettings.getByRole("button", { name: /^浅色/u }).click();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
-  await capturePackagedScreenshot(window, "06-general-light.png");
+  await capturePackagedScreenshot(window, "10-general-light.png");
   await workspaceSettings.getByRole("button", { name: "返回工作台" }).click();
   await workspaceSettings.waitFor({ state: "hidden", timeout: 15_000 });
   try {

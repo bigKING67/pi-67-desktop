@@ -1,3 +1,5 @@
+import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
+
 export const zhCNMessages = {
   common: {
     appName: "π",
@@ -25,21 +27,25 @@ export const zhCNMessages = {
         label: "模型服务",
         summary: "配置模型服务、认证、可用模型与默认模型。"
       },
+      packages: {
+        label: "资源包",
+        summary: "统一安装、更新和卸载提供扩展、技能或指令模板的 Pi 资源包。"
+      },
       extensions: {
         label: "扩展",
-        summary: "安装、更新、启用、停用和卸载 Pi 扩展。"
+        summary: "查看当前 Pi 会话实际加载的可执行扩展及其配置来源。"
       },
       skills: {
         label: "技能",
-        summary: "管理内置与外部技能，并查看当前会话实际加载状态。"
+        summary: "查看来自全局、项目和资源包的实际技能。"
       },
       prompts: {
-        label: "提示词",
-        summary: "管理内置与外部提示词包及其作用域。"
+        label: "指令模板",
+        summary: "查看可通过 /name 调用的指令模板及其来源。"
       },
       rules: {
-        label: "规则",
-        summary: "查看桌面托管规则、全局上下文与 AGENTS.md 边界。"
+        label: "规则与上下文",
+        summary: "查看全局与项目 AGENTS.md、CLAUDE.md 以及桌面托管规则。"
       },
       integrations: {
         label: "集成",
@@ -62,7 +68,8 @@ export const zhCNMessages = {
         summary: "查看 π 的产品边界、版本与运行架构。"
       }
     },
-    emptySearchSuggestion: "尝试搜索主题、模型、技能、镜像或更新。"
+    emptySearchSuggestion: "尝试搜索主题、模型、技能、镜像或更新。",
+    extensionPackages: zhCNExtensionPackageMessages
   },
   dateTime: {
     unknown: "时间未知",

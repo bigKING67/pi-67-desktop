@@ -78,6 +78,9 @@ export interface ResourceSummary {
   id: string;
   label: string;
   path?: string;
+  source?: string;
+  scope?: "user" | "project" | "temporary";
+  origin?: "package" | "top-level";
   status: "ready" | "partial" | "tui-only" | "failed";
   detail?: string;
 }

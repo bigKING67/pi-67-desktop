@@ -14,6 +14,16 @@ export const ResourceSummarySchema = strictObject({
   id: Type.String(),
   label: Type.String(),
   path: Type.Optional(Type.String()),
+  source: Type.Optional(Type.String()),
+  scope: Type.Optional(Type.Union([
+    Type.Literal("user"),
+    Type.Literal("project"),
+    Type.Literal("temporary")
+  ])),
+  origin: Type.Optional(Type.Union([
+    Type.Literal("package"),
+    Type.Literal("top-level")
+  ])),
   status: Type.Union([
     Type.Literal("ready"),
     Type.Literal("partial"),

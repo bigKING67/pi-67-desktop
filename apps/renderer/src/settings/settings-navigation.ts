@@ -6,6 +6,7 @@ import {
   FileText,
   Info,
   Network,
+  PackageOpen,
   RefreshCw,
   Scale,
   SlidersHorizontal,
@@ -55,9 +56,15 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         icon: Bot
       },
       {
+        id: "packages",
+        ...messages.settings.sections.packages,
+        searchTerms: ["资源包", "安装", "更新", "卸载", "npm", "git", "path", "package"],
+        icon: PackageOpen
+      },
+      {
         id: "extensions",
         ...messages.settings.sections.extensions,
-        searchTerms: ["扩展", "插件", "安装", "更新", "启用", "停用", "卸载", "npm", "git", "path", "extension"],
+        searchTerms: ["扩展", "插件", ".pi/extensions", "extension", "resource"],
         icon: Blocks
       },
       {
@@ -69,13 +76,13 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "prompts",
         ...messages.settings.sections.prompts,
-        searchTerms: ["提示词", "模板", "提示词包", "prompt", "prompts", "package"],
+        searchTerms: ["指令模板", "提示词模板", ".pi/prompts", "prompt", "prompts", "slash command"],
         icon: FileText
       },
       {
         id: "rules",
         ...messages.settings.sections.rules,
-        searchTerms: ["规则", "agents", "rule", "rules", "全局上下文", "行为约束"],
+        searchTerms: ["规则", "上下文", "agents", "claude", "system", "rule", "rules", "行为约束"],
         icon: Scale
       },
       {
@@ -121,9 +128,11 @@ export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.items)
 
 export function sectionSupportsProjectScope(section: SettingsSection): boolean {
   return section === "providers"
+    || section === "packages"
     || section === "extensions"
     || section === "skills"
     || section === "prompts"
+    || section === "rules"
     || section === "runtime";
 }
 

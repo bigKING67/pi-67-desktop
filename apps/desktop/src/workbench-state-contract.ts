@@ -41,9 +41,14 @@ export type SettingsSection =
   | "account"
   | "general"
   | "providers"
+  | "packages"
   | "extensions"
-  | "resources"
+  | "skills"
+  | "prompts"
+  | "rules"
+  | "integrations"
   | "runtime"
+  | "network"
   | "updates"
   | "about";
 
@@ -260,9 +265,14 @@ function isSettingsSection(value: unknown): value is SettingsSection {
     "account",
     "general",
     "providers",
+    "packages",
     "extensions",
-    "resources",
+    "skills",
+    "prompts",
+    "rules",
+    "integrations",
     "runtime",
+    "network",
     "updates",
     "about"
   ].includes(value);
@@ -324,18 +334,23 @@ function parseWorkbenchSettings(
   workspaceIds: ReadonlySet<string>
 ): WorkbenchSettingsState | undefined {
   if (!isRecordWithAllowedKeys(value, ["section", "scope", "workspaceId"], ["section", "scope"])) return undefined;
-  if (!isSettingsSection(value.section)) return undefined;
+  const section = value.section === "resources"
+    ? "skills"
+    : value.section === "prompts-rules"
+      ? "prompts"
+      : value.section;
+  if (!isSettingsSection(section)) return undefined;
   if (value.scope === "global") {
     if (value.workspaceId !== undefined) return undefined;
   } else if (value.scope === "project") {
-    if (settingsSectionIsGlobalOnly(value.section) || !isKnownWorkspaceId(value.workspaceId, workspaceIds)) {
+    if (settingsSectionIsGlobalOnly(section) || !isKnownWorkspaceId(value.workspaceId, workspaceIds)) {
       return undefined;
     }
   } else {
     return undefined;
   }
   return {
-    section: value.section,
+    section,
     scope: value.scope,
     ...(typeof value.workspaceId === "string" ? { workspaceId: value.workspaceId } : {})
   };
@@ -387,7 +402,12 @@ function taskLifecycleWasLive(lifecycle: TaskLifecycle): boolean {
 }
 
 function settingsSectionIsGlobalOnly(section: SettingsSection): boolean {
-  return section === "account" || section === "general" || section === "updates" || section === "about";
+  return section === "account"
+    || section === "general"
+    || section === "integrations"
+    || section === "network"
+    || section === "updates"
+    || section === "about";
 }
 
 function isKnownWorkspaceId(value: unknown, workspaceIds: ReadonlySet<string>): value is string {

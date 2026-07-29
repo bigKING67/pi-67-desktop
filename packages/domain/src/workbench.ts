@@ -65,6 +65,7 @@ export type SettingsSection =
   | "account"
   | "general"
   | "providers"
+  | "packages"
   | "extensions"
   | "skills"
   | "prompts"
