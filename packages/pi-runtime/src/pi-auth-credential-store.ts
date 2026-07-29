@@ -19,6 +19,10 @@ export interface PiAuthCredentialMutationResult {
   writtenContent: string;
 }
 
+export type StoredApiKeyReveal =
+  | { status: "revealed"; apiKey: string }
+  | { status: "not-found" | "not-api-key" | "indirect" };
+
 /** Pi auth.json-compatible CredentialStore with explicit external reload support. */
 export class PiAuthCredentialStore implements CredentialStore {
   private data: CredentialData = {};
@@ -133,6 +137,20 @@ export function authContentRevision(content: string | undefined): string {
   return contentRevision(content);
 }
 
+export function revealStoredApiKey(
+  content: string | undefined,
+  providerId: string
+): StoredApiKeyReveal {
+  const credential = parseCredentialData(content)[providerId];
+  if (credential === undefined) return { status: "not-found" };
+  if (credential.type !== "api_key") return { status: "not-api-key" };
+  if (typeof credential.key !== "string" || credential.key.length === 0) {
+    return { status: "not-found" };
+  }
+  const apiKey = revealLiteralConfigValue(credential.key);
+  return apiKey === undefined ? { status: "indirect" } : { status: "revealed", apiKey };
+}
+
 function parseCredentialData(content: string | undefined): CredentialData {
   if (content === undefined || content.trim() === "") return {};
   const parsed: unknown = JSON.parse(content);
@@ -192,6 +210,34 @@ async function resolveConfigValue(value: string, env?: ProviderEnv): Promise<str
     index += (braced ? 3 : 1) + match[1].length;
   }
   return resolved;
+}
+
+function revealLiteralConfigValue(value: string): string | undefined {
+  if (value.startsWith("!")) return undefined;
+  let revealed = "";
+  for (let index = 0; index < value.length;) {
+    const character = value[index];
+    if (character !== "$") {
+      revealed += character;
+      index += 1;
+      continue;
+    }
+    const next = value[index + 1];
+    if (next === "$" || next === "!") {
+      revealed += next;
+      index += 2;
+      continue;
+    }
+    const braced = next === "{";
+    const suffix = braced ? value.slice(index + 2) : value.slice(index + 1);
+    const match = braced
+      ? suffix.match(/^([A-Za-z_][A-Za-z0-9_]*)\}/u)
+      : suffix.match(/^([A-Za-z_][A-Za-z0-9_]*)/u);
+    if (match?.[1]) return undefined;
+    revealed += "$";
+    index += 1;
+  }
+  return revealed;
 }
 
 function executeCredentialCommand(command: string): Promise<string | undefined> {

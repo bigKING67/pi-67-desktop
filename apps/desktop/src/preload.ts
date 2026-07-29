@@ -1,4 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type {
+  DesktopCapabilitySnapshot,
+  PackageNetworkSettings,
+  PackageNetworkSnapshot
+} from "@pi67/protocol";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
 import type {
   WorkbenchLayoutV2,
@@ -24,7 +29,9 @@ export interface PlatformInfo {
 
 const systemBridge = {
   getPlatformInfo: (): Promise<PlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
-  connectAgentHost: (): Promise<void> => ipcRenderer.invoke("pi67:agent-host-connect"),
+  connectAgentHost: (options?: { replaceCurrent?: boolean }): Promise<void> => (
+    ipcRenderer.invoke("pi67:agent-host-connect", options?.replaceCurrent === true)
+  ),
   loadWorkbenchState: (): Promise<WorkbenchStateV2> => ipcRenderer.invoke("pi67:workbench-load"),
   updateWorkbenchLayout: (layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
@@ -46,6 +53,23 @@ const systemBridge = {
   saveDiagnostics: (content: string): Promise<string | undefined> => ipcRenderer.invoke("pi67:save-diagnostics", content),
   showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("pi67:notify", { title, body }),
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
+  getPackageNetworkSnapshot: (): Promise<PackageNetworkSnapshot> => (
+    ipcRenderer.invoke("pi67:package-network-snapshot")
+  ),
+  savePackageNetworkSettings: (settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot> => (
+    ipcRenderer.invoke("pi67:package-network-save", settings)
+  ),
+  resetPackageNetworkSettings: (): Promise<PackageNetworkSnapshot> => (
+    ipcRenderer.invoke("pi67:package-network-reset")
+  ),
+  probePackageSources: (): Promise<PackageNetworkSnapshot> => (
+    ipcRenderer.invoke("pi67:package-network-probe")
+  ),
+  getDesktopCapabilitySnapshot: (): Promise<DesktopCapabilitySnapshot> => (
+    ipcRenderer.invoke("pi67:capability-snapshot")
+  ),
+  setupBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-setup"),
+  doctorBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-doctor"),
   getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
   onAgentHostFailed: (listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): (() => void) => {

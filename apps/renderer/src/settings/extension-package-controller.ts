@@ -22,7 +22,7 @@ export async function loadExtensionPackages(workspaceId?: string): Promise<boole
       [],
       { context: workspaceContext(target.id) }
     );
-    useExtensionPackageStore.getState().installList(target.id, result.items);
+    store.installList(target.id, result.items);
     return true;
   } catch (error) {
     return reportFailure(target.id, "无法读取 Extensions", error);
@@ -73,14 +73,16 @@ export async function setExtensionPackageEnabled(
   source: string,
   scope: ExtensionPackageScope,
   enabled: boolean,
-  workspaceId?: string
+  workspaceId?: string,
+  resourceType: import("@pi67/domain").PackageResourceType = "extension"
 ): Promise<boolean> {
+  const label = resourceType === "skill" ? "Skill" : resourceType === "prompt" ? "Prompt" : "Extension";
   return mutate(
     "extension.package.setEnabled",
-    { source, scope, enabled },
+    { source, scope, enabled, resourceType },
     scope,
     workspaceId,
-    enabled ? "Extension 已启用" : "Extension 已停用"
+    enabled ? `${label} 已启用` : `${label} 已停用`
   );
 }
 
@@ -129,7 +131,12 @@ async function mutate<T extends MutationType>(
       [],
       { context: workspaceContext(target.id) }
     ) as ExtensionPackageMutationResult;
-    useExtensionPackageStore.getState().installList(target.id, result.items);
+    const store = useExtensionPackageStore.getState();
+    store.installList(target.id, result.items);
+    if (
+      (type === "extension.package.update" || type === "extension.package.uninstall")
+      && "scope" in payload
+    ) store.removeUpdate(target.id, payload.source, payload.scope);
     publishNotification({
       level: "success",
       title: successTitle,

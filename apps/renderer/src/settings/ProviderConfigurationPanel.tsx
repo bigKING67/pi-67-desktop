@@ -1,7 +1,6 @@
 import type {
-  PiConfigurationHeaderMutation,
-  PiModelConfigurationInput,
   PiProviderConfigurationInput,
+  PiProviderConfigurationSnapshot,
   PiProviderConfigurationView
 } from "@pi67/protocol";
 import {
@@ -12,21 +11,34 @@ import {
   Plus,
   RefreshCw,
   Save,
-  Trash2
+  Search,
+  Trash2,
+  X
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, TextArea } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
+import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
+import { ProviderModelWorkspace } from "./ProviderModelWorkspace.js";
+import {
+  SettingsBackAction,
+  SettingsCatalog,
+  SettingsCatalogRow,
+  SettingsNotice,
+  SettingsToolbar
+} from "./SettingsPrimitives.js";
 import {
   loadProviderConfiguration,
   reloadProviderConfiguration,
   removeProviderConfiguration,
-  saveProviderConfiguration,
-  setDefaultModelConfiguration
+  saveProviderConfiguration
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 import styles from "./ProviderConfigurationPanel.module.css";
+
+type ProviderSection = "configuration" | "models" | "defaults" | "diagnostics";
 
 export function ProviderConfigurationPanel() {
   const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId ?? state.currentWorkspaceId);
@@ -39,14 +51,39 @@ export function ProviderConfigurationPanel() {
   const error = useProviderConfigurationStore((state) => state.error);
   const storeWorkspaceId = useProviderConfigurationStore((state) => state.workspaceId);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
+  const [providerQuery, setProviderQuery] = useState("");
+  const [section, setSection] = useState<ProviderSection>("models");
+  const [providerDetailOpen, setProviderDetailOpen] = useState(false);
+  const [pendingProviderId, setPendingProviderId] = useState<string | null>();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const catalogScrollTopRef = useRef(0);
+  const restoreCatalogScrollRef = useRef(false);
 
   useEffect(() => {
+    setProviderQuery("");
+    setSection("models");
+    setProviderDetailOpen(false);
+    setPendingProviderId(undefined);
+    catalogScrollTopRef.current = 0;
+    restoreCatalogScrollRef.current = false;
     if (!workspaceId) {
       useProviderConfigurationStore.getState().reset();
       return;
     }
     void loadProviderConfiguration(workspaceId);
   }, [workspaceId]);
+
+  useLayoutEffect(() => {
+    const scrollRegion = panelRef.current?.closest<HTMLElement>('[data-testid="settings-scroll-region"]');
+    if (!scrollRegion) return;
+    if (providerDetailOpen) {
+      scrollRegion.scrollTop = 0;
+      return;
+    }
+    if (!restoreCatalogScrollRef.current) return;
+    scrollRegion.scrollTop = catalogScrollTopRef.current;
+    restoreCatalogScrollRef.current = false;
+  }, [providerDetailOpen]);
 
   if (!workspaceId) {
     return <PanelEmpty title="先打开一个工作区" detail="Pi 配置命令需要明确的 Workspace authority。" />;
@@ -63,6 +100,13 @@ export function ProviderConfigurationPanel() {
   }
 
   const selectedView = snapshot.providers.find((provider) => provider.id === selectedProviderId);
+  const normalizedProviderQuery = providerQuery.trim().toLocaleLowerCase();
+  const filteredProviders = normalizedProviderQuery.length === 0
+    ? snapshot.providers
+    : snapshot.providers.filter((provider) => (
+      (provider.name ?? provider.id).toLocaleLowerCase().includes(normalizedProviderQuery)
+      || provider.id.toLocaleLowerCase().includes(normalizedProviderQuery)
+    ));
   const editable = selectedView?.origin === "models.json" || selectedProviderId === undefined;
   const canSave = editable
     && dirty
@@ -70,145 +114,220 @@ export function ProviderConfigurationPanel() {
     && Boolean(draft?.id.trim())
     && Boolean(draft?.models.length)
     && draft!.models.every((model) => model.id.trim().length > 0);
+  const enterProvider = (providerId: string | null) => {
+    setPendingProviderId(undefined);
+    if (providerId === null) {
+      if (selectedProviderId !== undefined || !draft) {
+        useProviderConfigurationStore.getState().startProvider();
+      }
+      setSection("configuration");
+    } else if (providerId !== selectedProviderId) {
+      useProviderConfigurationStore.getState().selectProvider(providerId);
+      setSection("models");
+    }
+    setProviderDetailOpen(true);
+  };
+  const requestProvider = (providerId: string | null) => {
+    const scrollRegion = panelRef.current?.closest<HTMLElement>('[data-testid="settings-scroll-region"]');
+    catalogScrollTopRef.current = scrollRegion?.scrollTop ?? 0;
+    restoreCatalogScrollRef.current = false;
+    const switchesDraft = providerId === null
+      ? selectedProviderId !== undefined
+      : providerId !== selectedProviderId;
+    if (dirty && switchesDraft) {
+      setPendingProviderId(providerId);
+      return;
+    }
+    enterProvider(providerId);
+  };
+  const closeProvider = () => {
+    restoreCatalogScrollRef.current = true;
+    setProviderDetailOpen(false);
+  };
 
   return (
-    <div className={styles.panel} data-testid="provider-configuration-panel">
+    <div
+      className={styles.panel}
+      data-testid="provider-configuration-panel"
+      data-view={providerDetailOpen ? "detail" : "catalog"}
+      ref={panelRef}
+    >
       <ConfigurationStatusBar
         snapshot={snapshot}
         busy={phase === "saving"}
-        onNew={() => useProviderConfigurationStore.getState().startProvider()}
+        onNew={() => requestProvider(null)}
         onReload={() => void reloadProviderConfiguration(workspaceId)}
       />
       {externalConflict ? (
-        <div className={styles.conflict} role="alert" data-testid="provider-configuration-conflict">
-          <AlertTriangle aria-hidden="true" size={17} />
-          <span>
-            <strong>Pi 配置已在外部修改</strong>
-            <small>你的未保存草稿仍被保留。当前草稿基于旧 revision，保存会被阻止。</small>
-          </span>
-          <Button onPress={() => useProviderConfigurationStore.getState().adoptExternal()}>
+        <SettingsNotice
+          tone="warning"
+          testId="provider-configuration-conflict"
+          actions={<Button className="secondary-button" onPress={() => useProviderConfigurationStore.getState().adoptExternal()}>
             放弃草稿并采用最新配置
-          </Button>
-        </div>
+          </Button>}
+        >
+          <strong>Pi 配置已在外部修改。</strong> 你的未保存草稿仍被保留；当前草稿基于旧 revision，保存会被阻止。
+        </SettingsNotice>
       ) : null}
       {snapshot.syncState === "invalid" ? (
-        <div className={styles.invalid} role="alert">
-          <AlertTriangle aria-hidden="true" size={17} />
-          <span><strong>Pi 配置文件当前无效</strong><small>Desktop 保留上一次安全投影，不会自动重写文件。</small></span>
-        </div>
+        <SettingsNotice tone="danger"><strong>Pi 配置文件当前无效。</strong> Desktop 保留上一次安全投影，不会自动重写文件。</SettingsNotice>
       ) : null}
-      <div className={styles.workspace}>
-        <aside className={styles.providerList} aria-label="Pi Provider 列表">
-          {snapshot.providers.map((provider) => (
-            <button
-              className={provider.id === selectedProviderId ? styles.selectedProvider : ""}
-              key={provider.id}
-              onClick={() => useProviderConfigurationStore.getState().selectProvider(provider.id)}
-              type="button"
-            >
-              <span><strong>{provider.name ?? provider.id}</strong><small>{provider.id}</small></span>
-              <em data-configured={provider.configured}>{provider.origin === "builtin" ? "内置" : `${provider.models.length} 模型`}</em>
-            </button>
-          ))}
-          {snapshot.providers.length === 0 ? <p>尚未发现 Provider。</p> : null}
-        </aside>
-        <main className={styles.editor}>
-          {draft ? (
-            <>
-              <div className={styles.editorHeading}>
-                <span>
-                  <strong>{selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建 Provider"}</strong>
-                  <small>{editable ? "保存会原子更新 Pi models.json" : "Pi 内置 Provider 只能管理凭据与默认模型"}</small>
-                </span>
-                <div>
-                  <Button className="secondary-button" onPress={() => setCredentialDialogOpen(true)}>
-                    <KeyRound aria-hidden="true" size={14} />管理凭据
-                  </Button>
-                  {selectedProviderId && editable ? (
-                    <Button className={styles.dangerButton!} onPress={() => void removeProviderConfiguration(selectedProviderId, workspaceId)}>
-                      <Trash2 aria-hidden="true" size={14} />移除
+      {pendingProviderId !== undefined ? (
+        <SettingsNotice
+          tone="warning"
+          actions={<>
+            <Button className="secondary-button" onPress={() => enterProvider(selectedProviderId ?? null)}>继续编辑当前草稿</Button>
+            <Button className="secondary-button" onPress={() => enterProvider(pendingProviderId)}>放弃草稿并切换</Button>
+          </>}
+        >
+          当前模型服务有未保存草稿。只有明确放弃后才能切换到其他模型服务。
+        </SettingsNotice>
+      ) : null}
+      {!providerDetailOpen ? (
+        <section className={styles.providerCatalog} aria-label="Pi Provider 导航">
+          <header className={styles.catalogIntro}>
+            <strong>模型服务目录</strong>
+            <small>选择一个模型服务后进入配置；目录和编辑器不会同时占用横向空间。</small>
+          </header>
+          <div className={styles.providerCatalogControls}>
+            <div className={styles.providerSearch}>
+              <Search aria-hidden="true" size={15} />
+              <Input
+                aria-label="搜索 Pi Provider"
+                autoComplete="off"
+                placeholder="搜索名称或 ID…"
+                value={providerQuery}
+                onChange={(event) => setProviderQuery(event.target.value)}
+              />
+              {providerQuery.length > 0 ? (
+                <Button
+                  aria-label="清除 Provider 搜索"
+                  className={styles.providerSearchClear!}
+                  onPress={() => setProviderQuery("")}
+                  type="button"
+                >
+                  <X aria-hidden="true" size={14} />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className={styles.providerList} data-testid="provider-configuration-list">
+            <SettingsCatalog label="Pi Provider 列表">
+              {filteredProviders.map((provider) => (
+                <SettingsCatalogRow
+                  description={provider.id}
+                  key={provider.id}
+                  onSelect={() => requestProvider(provider.id)}
+                  selected={provider.id === selectedProviderId}
+                  title={provider.name ?? provider.id}
+                  trailing={<span className={styles.providerMeta} data-configured={provider.configured}>
+                    {provider.origin === "builtin" ? "内置" : `${provider.models.length} 个模型`}
+                  </span>}
+                />
+              ))}
+              {snapshot.providers.length === 0 ? <p>尚未发现 Provider。</p> : null}
+              {snapshot.providers.length > 0 && filteredProviders.length === 0 ? (
+                <p className={styles.providerListEmpty}>没有匹配的 Provider。</p>
+              ) : null}
+            </SettingsCatalog>
+          </div>
+        </section>
+      ) : (
+        <main className={styles.editor} data-testid="provider-configuration-editor">
+            {draft ? (
+              <>
+                <div className={styles.editorHeading}>
+                  <SettingsBackAction label="返回模型服务列表" onPress={closeProvider}>模型服务</SettingsBackAction>
+                  <span>
+                    <strong>{selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}</strong>
+                    <small>{editable ? "保存会原子更新 Pi models.json" : "Pi 内置 Provider 只能管理凭据与默认模型"}</small>
+                  </span>
+                  <div>
+                    <Button className="secondary-button" onPress={() => setCredentialDialogOpen(true)}>
+                      <KeyRound aria-hidden="true" size={14} />管理凭据
                     </Button>
-                  ) : null}
-                  {editable ? (
-                    <Button className="primary-button" isDisabled={!canSave} onPress={() => void saveProviderConfiguration(workspaceId)}>
-                      <Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存到 Pi"}
-                    </Button>
-                  ) : null}
+                    {selectedProviderId && editable ? (
+                      <Button className={styles.dangerButton!} onPress={() => void removeProviderConfiguration(selectedProviderId, workspaceId)}>
+                        <Trash2 aria-hidden="true" size={14} />移除
+                      </Button>
+                    ) : null}
+                    {editable ? (
+                      <Button className="primary-button" isDisabled={!canSave} onPress={() => void saveProviderConfiguration(workspaceId)}>
+                        <Save aria-hidden="true" size={14} />{phase === "saving" ? "保存中…" : "保存到 Pi"}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              {editable ? <ProviderEditor draft={draft} selectedView={selectedView} /> : (
-                <div className={styles.readOnlyNotice}>内置 Provider 由 Pi 运行时提供，不在 models.json 中创建 Desktop 私有副本。</div>
-              )}
-            </>
-          ) : <PanelEmpty title="选择或新建 Provider" detail="常用字段使用表单，高级兼容项使用 JSON。" />}
+                <ProviderSectionTabs
+                  activeSection={section}
+                  modelCount={draft.models.length}
+                  onChange={setSection}
+                />
+                <div className={styles.editorBody} data-section={section}>
+                  {section === "configuration" ? (
+                    <ProviderConfigurationEditor draft={draft} editable={editable} selectedView={selectedView} />
+                  ) : null}
+                  {section === "models" ? (
+                    <ProviderModelWorkspace
+                      key={selectedProviderId ?? "new-provider"}
+                      defaults={snapshot.defaults}
+                      draft={draft}
+                      editable={editable}
+                      selectedView={selectedView}
+                    />
+                  ) : null}
+                  {section === "defaults" ? <ProviderDefaultModelEditor snapshot={snapshot} workspaceId={workspaceId} /> : null}
+                  {section === "diagnostics" ? <ConfigurationFiles snapshot={snapshot} /> : null}
+                </div>
+              </>
+            ) : <PanelEmpty title="选择或新建模型服务" detail="常用字段使用表单，高级兼容项使用 JSON。" />}
         </main>
-      </div>
-      <DefaultModelEditor snapshot={snapshot} workspaceId={workspaceId} />
-      <ConfigurationFiles snapshot={snapshot} />
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      )}
+      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
     </div>
   );
 }
 
-function ProviderEditor({
-  draft,
-  selectedView
+function ProviderSectionTabs({
+  activeSection,
+  modelCount,
+  onChange
 }: {
-  draft: PiProviderConfigurationInput;
-  selectedView: PiProviderConfigurationView | undefined;
+  activeSection: ProviderSection;
+  modelCount: number;
+  onChange: (section: ProviderSection) => void;
 }) {
-  const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
-    useProviderConfigurationStore.getState().updateDraft(mutation)
-  );
+  const items: Array<{ id: ProviderSection; label: string }> = [
+    { id: "configuration", label: "基本配置" },
+    { id: "models", label: `模型 ${modelCount}` },
+    { id: "defaults", label: "默认模型" },
+    { id: "diagnostics", label: "文件与诊断" }
+  ];
   return (
-    <div className={styles.formStack}>
-      <section className={styles.formSection}>
-        <header><strong>常用配置</strong><small>Provider ID、Endpoint 与协议直接对应 Pi models.json。</small></header>
-        <div className={styles.fieldGrid}>
-          <Field label="Provider ID" detail="写入 providers.<id>">
-            <Input disabled={selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
-          </Field>
-          <Field label="显示名称">
-            <Input value={draft.name ?? ""} onChange={(event) => updateOptionalProvider("name", event.target.value)} />
-          </Field>
-          <Field label="Base URL">
-            <Input value={draft.baseUrl ?? ""} onChange={(event) => updateOptionalProvider("baseUrl", event.target.value)} />
-          </Field>
-          <Field label="API 协议" detail="如 openai-responses / anthropic-messages">
-            <Input value={draft.api ?? ""} onChange={(event) => updateOptionalProvider("api", event.target.value)} />
-          </Field>
-        </div>
-        <div className={styles.checkRow}>
-          <label><input checked={draft.authHeader ?? false} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />使用 Authorization header</label>
-          <label><input checked={draft.oauth === "radius"} onChange={(event) => update((current) => {
-            const next = { ...current };
-            if (event.target.checked) next.oauth = "radius";
-            else delete next.oauth;
-            return next;
-          })} type="checkbox" />启用 Radius OAuth</label>
-        </div>
-        <HeaderMutationEditor existingNames={selectedView?.headerNames ?? []} />
-      </section>
-      <ModelEditor draft={draft} selectedView={selectedView} />
-      <section className={styles.formSection}>
-        <header><strong>Provider 高级 JSON</strong><small>仅接受 compat 与 modelOverrides；apiKey 和 headers 必须走专用写入路径。</small></header>
-        <TextArea
-          aria-label="Provider 高级 JSON"
-          className={styles.codeArea!}
-          spellCheck={false}
-          value={draft.advancedJson ?? "{}"}
-          onChange={(event) => update((current) => ({ ...current, advancedJson: event.target.value }))}
-        />
-      </section>
-    </div>
+    <nav aria-label="Provider 设置分区" className={styles.sectionTabs} role="tablist">
+      {items.map((item) => (
+        <button
+          aria-selected={activeSection === item.id}
+          className={activeSection === item.id ? styles.selectedSectionTab : ""}
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          role="tab"
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
-function ModelEditor({
+function ProviderConfigurationEditor({
   draft,
+  editable,
   selectedView
 }: {
   draft: PiProviderConfigurationInput;
+  editable: boolean;
   selectedView: PiProviderConfigurationView | undefined;
 }) {
   const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
@@ -216,173 +335,84 @@ function ModelEditor({
   );
   return (
     <section className={styles.formSection}>
-      <header className={styles.sectionHeaderWithAction}>
-        <span><strong>模型</strong><small>每个模型 ID 在当前 Provider 内必须唯一。</small></span>
-        <Button className="secondary-button" onPress={() => update((current) => ({
-          ...current,
-          models: [...current.models, { id: "", input: ["text"], reasoning: false, advancedJson: "{}" }]
-        }))}><Plus aria-hidden="true" size={14} />添加模型</Button>
+      <header className={styles.sectionIntro}>
+        <strong>基本配置</strong>
+        <small>{editable ? "Provider ID、Endpoint 与协议直接对应 Pi models.json。" : "Pi 内置 Provider 由运行时提供，Desktop 不创建私有副本。"}</small>
       </header>
-      <div className={styles.modelList}>
-        {draft.models.map((model, index) => (
-          <ModelCard
-            existingHeaderNames={selectedView?.models.find((candidate) => candidate.id === model.id)?.headerNames ?? []}
-            index={index}
-            key={`${index}-${model.id}`}
-            model={model}
-          />
-        ))}
-        {draft.models.length === 0 ? <p className={styles.modelEmpty}>至少添加一个模型后才能保存 Provider。</p> : null}
-      </div>
-    </section>
-  );
-}
-
-function ModelCard({ model, index, existingHeaderNames }: { model: PiModelConfigurationInput; index: number; existingHeaderNames: string[] }) {
-  const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
-    useProviderConfigurationStore.getState().updateDraft(mutation)
-  );
-  const patch = (next: Partial<PiModelConfigurationInput>) => update((current) => ({
-    ...current,
-    models: current.models.map((candidate, candidateIndex) => {
-      if (candidateIndex !== index) return candidate;
-      const model = { ...candidate, ...next };
-      for (const [key, value] of Object.entries(next)) {
-        if (value === undefined) delete model[key as keyof PiModelConfigurationInput];
-      }
-      return model;
-    })
-  }));
-  return (
-    <article className={styles.modelCard}>
-      <div className={styles.modelHeading}>
-        <strong>{model.name || model.id || `模型 ${index + 1}`}</strong>
-        <Button aria-label="移除模型" className={styles.iconButton!} onPress={() => update((current) => ({
-          ...current,
-          models: current.models.filter((_, candidateIndex) => candidateIndex !== index)
-        }))}><Trash2 aria-hidden="true" size={14} /></Button>
-      </div>
       <div className={styles.fieldGrid}>
-        <Field label="Model ID"><Input value={model.id} onChange={(event) => patch({ id: event.target.value })} /></Field>
-        <Field label="显示名称"><Input value={model.name ?? ""} onChange={(event) => patchOptionalModel(patch, "name", event.target.value)} /></Field>
-        <Field label="API 覆盖"><Input value={model.api ?? ""} onChange={(event) => patchOptionalModel(patch, "api", event.target.value)} /></Field>
-        <Field label="Base URL 覆盖"><Input value={model.baseUrl ?? ""} onChange={(event) => patchOptionalModel(patch, "baseUrl", event.target.value)} /></Field>
-        <Field label="Context Window"><Input inputMode="numeric" value={model.contextWindow?.toString() ?? ""} onChange={(event) => patchNumber(patch, "contextWindow", event.target.value)} /></Field>
-        <Field label="Max Tokens"><Input inputMode="numeric" value={model.maxTokens?.toString() ?? ""} onChange={(event) => patchNumber(patch, "maxTokens", event.target.value)} /></Field>
+        <Field label="Provider ID" {...(editable ? { detail: "写入 providers.<id>" } : {})}>
+          <Input disabled={!editable || selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
+        </Field>
+        <Field label="显示名称">
+          <Input disabled={!editable} value={draft.name ?? ""} onChange={(event) => updateOptionalProvider("name", event.target.value)} />
+        </Field>
+        <Field label="Base URL">
+          <Input disabled={!editable} value={draft.baseUrl ?? ""} onChange={(event) => updateOptionalProvider("baseUrl", event.target.value)} />
+        </Field>
+        <Field label="API 协议" detail="如 openai-responses / anthropic-messages">
+          <Input disabled={!editable} value={draft.api ?? ""} onChange={(event) => updateOptionalProvider("api", event.target.value)} />
+        </Field>
       </div>
       <div className={styles.checkRow}>
-        <label><input checked={model.input?.includes("text") ?? true} disabled type="checkbox" />文本输入</label>
-        <label><input checked={model.input?.includes("image") ?? false} onChange={(event) => patch({ input: event.target.checked ? ["text", "image"] : ["text"] })} type="checkbox" />图片输入</label>
-        <label><input checked={model.reasoning ?? false} onChange={(event) => patch({ reasoning: event.target.checked })} type="checkbox" />Reasoning</label>
+        <label><input checked={draft.authHeader ?? false} disabled={!editable} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />使用 Authorization header</label>
+        <label><input checked={draft.oauth === "radius"} disabled={!editable} onChange={(event) => update((current) => {
+          const next = { ...current };
+          if (event.target.checked) next.oauth = "radius";
+          else delete next.oauth;
+          return next;
+        })} type="checkbox" />启用 Radius OAuth</label>
       </div>
-      <HeaderMutationEditor existingNames={existingHeaderNames} modelIndex={index} />
       <details className={styles.advancedDetails}>
-        <summary>模型高级 JSON</summary>
+        <summary>自定义 Headers{selectedView?.headerNames.length ? ` · ${selectedView.headerNames.length} 项` : ""}</summary>
+        <ProviderHeaderMutationEditor existingNames={selectedView?.headerNames ?? []} readOnly={!editable} showTitle={false} />
+      </details>
+      <details className={styles.advancedDetails}>
+        <summary>Provider 高级 JSON{hasAdvancedJson(draft.advancedJson) ? " · 已配置" : ""}</summary>
+        <p>仅接受 compat 与 modelOverrides；apiKey 和 headers 必须走专用写入路径。</p>
         <TextArea
-          aria-label={`模型 ${model.id || index + 1} 高级 JSON`}
+          aria-label="Provider 高级 JSON"
           className={styles.codeArea!}
+          readOnly={!editable}
           spellCheck={false}
-          value={model.advancedJson ?? "{}"}
-          onChange={(event) => patch({ advancedJson: event.target.value })}
+          value={draft.advancedJson ?? "{}"}
+          onChange={(event) => update((current) => ({ ...current, advancedJson: event.target.value }))}
         />
       </details>
-    </article>
-  );
-}
-
-function HeaderMutationEditor({ existingNames, modelIndex }: { existingNames: string[]; modelIndex?: number }) {
-  const [name, setName] = useState("");
-  const [value, setValue] = useState("");
-  const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
-    useProviderConfigurationStore.getState().updateDraft(mutation)
-  );
-  const mutations = modelIndex === undefined
-    ? useProviderConfigurationStore.getState().draft?.headers ?? []
-    : useProviderConfigurationStore.getState().draft?.models[modelIndex]?.headers ?? [];
-  const visibleNames = useMemo(() => {
-    const removed = new Set(mutations.filter((item) => item.remove).map((item) => item.name));
-    return [...new Set([...existingNames, ...mutations.filter((item) => item.value).map((item) => item.name)])]
-      .filter((item) => !removed.has(item));
-  }, [existingNames, mutations]);
-  const apply = (mutation: PiConfigurationHeaderMutation) => update((draft) => {
-    const merge = (items: PiConfigurationHeaderMutation[] | undefined) => [
-      ...(items ?? []).filter((item) => item.name.toLocaleLowerCase() !== mutation.name.toLocaleLowerCase()),
-      mutation
-    ];
-    if (modelIndex === undefined) return { ...draft, headers: merge(draft.headers) };
-    return {
-      ...draft,
-      models: draft.models.map((model, index) => index === modelIndex ? { ...model, headers: merge(model.headers) } : model)
-    };
-  });
-  return (
-    <div className={styles.headersEditor}>
-      <span><strong>自定义 Headers</strong><small>界面只回显名称，值只在本次保存请求中发送。</small></span>
-      {visibleNames.length ? <div className={styles.headerChips}>{visibleNames.map((header) => (
-        <span key={header}>{header}<button aria-label={`移除 ${header}`} onClick={() => apply({ name: header, remove: true })} type="button">×</button></span>
-      ))}</div> : null}
-      <div className={styles.headerInputs}>
-        <Input aria-label="Header 名称" placeholder="Header 名称" value={name} onChange={(event) => setName(event.target.value)} />
-        <Input aria-label="Header 值" autoComplete="new-password" placeholder="写入值（不会回显）" type="password" value={value} onChange={(event) => setValue(event.target.value)} />
-        <Button isDisabled={!name.trim() || !value} onPress={() => {
-          apply({ name: name.trim(), value });
-          setName("");
-          setValue("");
-        }}>写入</Button>
-      </div>
-    </div>
-  );
-}
-
-function DefaultModelEditor({ snapshot, workspaceId }: { snapshot: NonNullable<ProviderConfigurationStateSnapshot>; workspaceId: string }) {
-  const options = snapshot.providers.flatMap((provider) => provider.models.map((model) => ({
-    key: `${provider.id}\u0000${model.id}`,
-    label: `${provider.name ?? provider.id} / ${model.name ?? model.id}`,
-    selection: { provider: provider.id, model: model.id }
-  })));
-  return (
-    <section className={styles.secondarySection}>
-      <header><strong>默认模型</strong><small>全局写入 ~/.pi/agent/settings.json；可信项目写入 &lt;workspace&gt;/.pi/settings.json。</small></header>
-      <div className={styles.defaultGrid}>
-        <DefaultSelect label="全局默认" value={selectionKey(snapshot.defaults.global)} options={options} onChange={(selection) => void setDefaultModelConfiguration("global", selection, workspaceId)} />
-        <DefaultSelect label="项目默认" disabled={!snapshot.defaults.projectTrusted} value={selectionKey(snapshot.defaults.project)} options={options} onChange={(selection) => void setDefaultModelConfiguration("project", selection, workspaceId)} />
-        <div className={styles.effectiveDefault}><span>当前生效</span><strong>{snapshot.defaults.effective ? `${snapshot.defaults.effective.provider} / ${snapshot.defaults.effective.model}` : "未设置"}</strong></div>
-      </div>
-      {!snapshot.defaults.projectTrusted ? <p className={styles.trustNotice}>信任当前 Workspace 后才能读取和修改项目级 Pi settings.json。</p> : null}
+      {!editable ? <div className={styles.readOnlyNotice}>可通过“管理凭据”写入认证信息；模型和 Provider 定义保持只读。</div> : null}
     </section>
   );
 }
 
-type ProviderConfigurationStateSnapshot = ReturnType<typeof useProviderConfigurationStore.getState>["snapshot"];
-
-function DefaultSelect({ label, value, options, disabled, onChange }: {
-  label: string;
-  value: string;
-  options: Array<{ key: string; label: string; selection: { provider: string; model: string } }>;
-  disabled?: boolean;
-  onChange: (selection: { provider: string; model: string } | undefined) => void;
-}) {
-  return <label className={styles.defaultField}><span>{label}</span><select disabled={disabled} value={value} onChange={(event) => onChange(options.find((option) => option.key === event.target.value)?.selection)}><option value="">未设置</option>{options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>;
-}
-
-function ConfigurationFiles({ snapshot }: { snapshot: NonNullable<ProviderConfigurationStateSnapshot> }) {
+function ConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSnapshot }) {
+  const validCount = snapshot.files.filter((file) => file.valid).length;
+  const [expanded, setExpanded] = useState(snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0);
   return (
     <section className={styles.secondarySection}>
-      <header><strong>Pi 文件同步</strong><small>文件是唯一真源；Desktop 监听外部修改并用 revision 防止覆盖。</small></header>
-      <div className={styles.fileList}>{snapshot.files.map((file) => (
-        <div key={file.kind}>
-          <FileJson2 aria-hidden="true" size={15} />
-          <span><strong>{file.kind}</strong><small title={file.path}>{file.path}</small></span>
-          <em data-valid={file.valid}>{file.valid ? "有效" : "无效"}</em>
-        </div>
-      ))}</div>
+      <header className={styles.sectionIntro}><strong>文件与诊断</strong><small>Pi 文件是唯一真源；正常状态保持紧凑，发生错误时自动展开。</small></header>
       {snapshot.diagnostics.length ? <ul className={styles.diagnostics}>{snapshot.diagnostics.map((item, index) => <li key={`${item.file}-${index}`}><strong>{item.file}</strong>{item.message}</li>)}</ul> : null}
+      <details className={styles.fileDetails} open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
+        <summary>
+          <span><FileJson2 aria-hidden="true" size={15} /><strong>Pi 文件同步</strong></span>
+          <em data-valid={validCount === snapshot.files.length}>{validCount}/{snapshot.files.length} 有效</em>
+        </summary>
+        <div className={styles.fileList}>{snapshot.files.map((file) => (
+          <div key={file.kind}>
+            <FileJson2 aria-hidden="true" size={15} />
+            <span><strong>{file.kind}</strong><small title={file.path}>{file.path}</small></span>
+            <em data-valid={file.valid}>{file.valid ? "有效" : "无效"}</em>
+          </div>
+        ))}</div>
+      </details>
     </section>
   );
 }
 
-function ConfigurationStatusBar({ snapshot, busy, onNew, onReload }: { snapshot: NonNullable<ProviderConfigurationStateSnapshot>; busy: boolean; onNew: () => void; onReload: () => void }) {
-  return <div className={styles.statusBar}><span data-current={snapshot.syncState === "current"}>{snapshot.syncState === "current" ? <Check aria-hidden="true" size={14} /> : <AlertTriangle aria-hidden="true" size={14} />}<strong>{snapshot.syncState === "current" ? "已与 Pi 文件同步" : "Pi 文件需要处理"}</strong><small>revision {snapshot.revision.slice(0, 10)}</small></span><div><Button className="secondary-button" isDisabled={busy} onPress={onReload}><RefreshCw aria-hidden="true" size={14} />重新加载</Button><Button className="secondary-button" isDisabled={busy} onPress={onNew}><Plus aria-hidden="true" size={14} />新建 Provider</Button></div></div>;
+function ConfigurationStatusBar({ snapshot, busy, onNew, onReload }: { snapshot: PiProviderConfigurationSnapshot; busy: boolean; onNew: () => void; onReload: () => void }) {
+  return <SettingsToolbar
+    className={styles.statusBar!}
+    status={<span className={styles.syncStatus} data-current={snapshot.syncState === "current"}>{snapshot.syncState === "current" ? <Check aria-hidden="true" size={14} /> : <AlertTriangle aria-hidden="true" size={14} />}<strong>{snapshot.syncState === "current" ? "已与 Pi 文件同步" : "Pi 文件需要处理"}</strong><small>revision {snapshot.revision.slice(0, 10)}</small></span>}
+    actions={<><Button className="secondary-button" isDisabled={busy} onPress={onReload}><RefreshCw aria-hidden="true" size={14} />重新加载</Button><Button className="secondary-button" isDisabled={busy} onPress={onNew}><Plus aria-hidden="true" size={14} />新建模型服务</Button></>}
+  />;
 }
 
 function Field({ label, detail, children }: { label: string; detail?: string; children: ReactNode }) {
@@ -402,15 +432,7 @@ function updateOptionalProvider(key: "name" | "baseUrl" | "api", value: string):
   });
 }
 
-function patchOptionalModel(update: (patch: Partial<PiModelConfigurationInput>) => void, key: "name" | "api" | "baseUrl", value: string): void {
-  update(value.trim() ? { [key]: value } : { [key]: undefined });
-}
-
-function patchNumber(update: (patch: Partial<PiModelConfigurationInput>) => void, key: "contextWindow" | "maxTokens", value: string): void {
-  const parsed = Number.parseInt(value, 10);
-  update(Number.isSafeInteger(parsed) && parsed > 0 ? { [key]: parsed } : { [key]: undefined });
-}
-
-function selectionKey(selection?: { provider: string; model: string }): string {
-  return selection ? `${selection.provider}\u0000${selection.model}` : "";
+function hasAdvancedJson(value: string | undefined): boolean {
+  const normalized = value?.trim();
+  return Boolean(normalized && normalized !== "{}");
 }

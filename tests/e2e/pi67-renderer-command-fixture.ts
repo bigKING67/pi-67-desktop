@@ -79,6 +79,11 @@ export function installMockCommandResponseHandler({
     if (type === "provider.configuration.get" || type === "provider.configuration.reload") {
       return current.providerConfiguration;
     }
+    if (type === "provider.credential.reveal") {
+      return payload.provider === "openai"
+        ? { provider: "openai", status: "revealed", apiKey: "fixture-persisted-openai-key" }
+        : { provider: String(payload.provider), status: "not-found" };
+    }
     if (type === "provider.configuration.save") {
       current.providerConfiguration = saveProviderConfiguration(current.providerConfiguration, payload);
       return current.providerConfiguration;

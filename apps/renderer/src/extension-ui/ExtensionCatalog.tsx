@@ -7,9 +7,15 @@ import type {
 import { messages } from "../localization/message-catalog.js";
 import styles from "./ExtensionCatalog.module.css";
 
-export function ExtensionCatalog({ catalog }: { catalog: ExtensionCatalogResult | undefined }) {
+export function ExtensionCatalog({ catalog, variant = "default" }: {
+  catalog: ExtensionCatalogResult | undefined;
+  variant?: "default" | "flat";
+}) {
   return (
-    <section aria-labelledby="extension-catalog-heading" className={styles.catalog}>
+    <section
+      aria-labelledby="extension-catalog-heading"
+      className={`${styles.catalog} ${variant === "flat" ? styles.flat : ""}`}
+    >
       <header className={styles.heading}>
         <span className="section-label" id="extension-catalog-heading">{messages.extensionCatalog.heading}</span>
         <strong>{catalog ? catalog.total : "-"}</strong>

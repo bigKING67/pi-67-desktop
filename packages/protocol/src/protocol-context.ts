@@ -71,6 +71,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "provider.configuration.save": "workspace",
   "provider.configuration.remove": "workspace",
   "provider.credential.store": "workspace",
+  "provider.credential.reveal": "workspace",
   "provider.credential.remove": "workspace",
   "model.default.set": "workspace",
   "provider.configuration.reload": "workspace",

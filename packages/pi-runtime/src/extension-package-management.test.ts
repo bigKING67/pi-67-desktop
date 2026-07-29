@@ -1,5 +1,8 @@
 import type { PackageSource } from "@earendil-works/pi-coding-agent";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ExtensionPackageManagement,
   type ExtensionPackageManagementServices
@@ -12,6 +15,10 @@ describe("ExtensionPackageManagement", () => {
   beforeEach(() => {
     fixture = servicesFixture();
     management = new ExtensionPackageManagement(fixture.services);
+  });
+
+  afterEach(() => {
+    delete process.env.PI67_MANAGED_CAPABILITIES_ROOT;
   });
 
   it("lists Pi-configured packages without exposing installation paths", () => {
@@ -28,21 +35,33 @@ describe("ExtensionPackageManagement", () => {
           scope: "global",
           enabled: true,
           filtered: false,
-          installed: true
+          installed: true,
+          sourceKind: "npm",
+          origin: "external",
+          resourceTypes: ["extension"],
+          resourceStates: [{ type: "extension", enabled: true }]
         },
         {
           source: "https://example.invalid/filtered.git",
           scope: "global",
           enabled: false,
           filtered: true,
-          installed: true
+          installed: true,
+          sourceKind: "git",
+          origin: "external",
+          resourceTypes: ["extension"],
+          resourceStates: [{ type: "extension", enabled: false }]
         },
         {
           source: "../local-extension",
           scope: "project",
           enabled: true,
           filtered: false,
-          installed: true
+          installed: true,
+          sourceKind: "path",
+          origin: "external",
+          resourceTypes: ["extension"],
+          resourceStates: [{ type: "extension", enabled: true }]
         }
       ],
       total: 3
@@ -64,6 +83,39 @@ describe("ExtensionPackageManagement", () => {
     });
     expect(fixture.removeAndPersist).toHaveBeenCalledWith("../local-extension", { local: true });
     expect(fixture.flush).toHaveBeenCalledTimes(2);
+  });
+
+  it("projects bounded local package metadata without exposing installed paths", () => {
+    const root = mkdtempSync(join(tmpdir(), "pi67-extension-metadata-"));
+    const packageRoot = join(root, "pi-subagents");
+    const source = "npm:pi-subagents";
+    try {
+      mkdirSync(packageRoot);
+      writeFileSync(join(packageRoot, "package.json"), JSON.stringify({
+        name: "pi-subagents\u0000",
+        version: "0.34.0",
+        description: `  Coordinates delegated\n tasks. ${"x".repeat(400)}  `,
+        pi: {
+          extensions: ["index.ts"],
+          skills: ["skills/**"]
+        }
+      }));
+      fixture.global.push(source);
+      fixture.installedPaths.set(`global:${source}`, packageRoot);
+
+      const result = management.list();
+      expect(result.items[0]).toMatchObject({
+        source,
+        displayName: "pi-subagents",
+        version: "0.34.0",
+        resourceTypes: ["extension", "skill"]
+      });
+      expect(result.items[0]?.description).toHaveLength(320);
+      expect(result.items[0]?.description).toMatch(/^Coordinates delegated tasks\./u);
+      expect(JSON.stringify(result)).not.toContain(packageRoot);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("changes only the Extension filter and can restore project inheritance", async () => {
@@ -93,6 +145,26 @@ describe("ExtensionPackageManagement", () => {
     expect(fixture.removeSourceFromSettings).toHaveBeenCalledWith("npm:shared-package", { local: true });
   });
 
+  it("changes one resource filter without flattening Pi package object settings", async () => {
+    fixture.global.push({
+      source: "npm:mixed-package",
+      extensions: ["extensions/**"],
+      skills: ["skills/**"],
+      prompts: ["prompts/**"],
+      themes: ["themes/**"]
+    });
+
+    await management.setEnabled("npm:mixed-package", "global", false, "skill");
+
+    expect(fixture.global).toEqual([{
+      source: "npm:mixed-package",
+      extensions: ["extensions/**"],
+      skills: [],
+      prompts: ["prompts/**"],
+      themes: ["themes/**"]
+    }]);
+  });
+
   it("reports Pi update candidates and rejects an unconfigured scoped update", async () => {
     fixture.global.push("npm:updatable");
     fixture.updates.push({
@@ -116,11 +188,25 @@ describe("ExtensionPackageManagement", () => {
     await expect(management.update("npm:updatable", "project"))
       .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
   });
+
+  it("allows resource filters but rejects independent update or uninstall for bundled packages", async () => {
+    const managedRoot = resolve("/managed/desktop-capabilities");
+    const source = resolve(managedRoot, "packages/pi67-core");
+    process.env.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
+    fixture.global.push(source);
+
+    await expect(management.setEnabled(source, "global", false, "skill")).resolves.toMatchObject({
+      changed: true
+    });
+    await expect(management.update(source, "global")).rejects.toMatchObject({ code: "UNSUPPORTED" });
+    await expect(management.uninstall(source, "global")).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  });
 });
 
 function servicesFixture() {
   const global: PackageSource[] = [];
   const project: PackageSource[] = [];
+  const installedPaths = new Map<string, string>();
   const updates: Array<{
     source: string;
     displayName: string;
@@ -133,13 +219,13 @@ function servicesFixture() {
       source: sourceOf(entry),
       scope: "user" as const,
       filtered: typeof entry === "object",
-      installedPath: `/installed/global/${sourceOf(entry)}`
+      installedPath: installedPaths.get(`global:${sourceOf(entry)}`) ?? `/installed/global/${sourceOf(entry)}`
     })),
     ...project.map((entry) => ({
       source: sourceOf(entry),
       scope: "project" as const,
       filtered: typeof entry === "object",
-      installedPath: `/installed/project/${sourceOf(entry)}`
+      installedPath: installedPaths.get(`project:${sourceOf(entry)}`) ?? `/installed/project/${sourceOf(entry)}`
     }))
   ]);
   const installAndPersist = vi.fn(async (source: string, options?: { local?: boolean }) => {
@@ -182,6 +268,7 @@ function servicesFixture() {
     services,
     global,
     project,
+    installedPaths,
     updates,
     installAndPersist,
     removeAndPersist,

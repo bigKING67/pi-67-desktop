@@ -1,4 +1,5 @@
 export * from "./agent-messages.js";
+export * from "./desktop-system-contract.js";
 export * from "./envelope.js";
 export * from "./port-client.js";
 export * from "./provider-configuration-schemas.js";

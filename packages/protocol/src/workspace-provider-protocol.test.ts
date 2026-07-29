@@ -30,7 +30,8 @@ describe("Workspace Provider protocol", () => {
     const queries = [
       "provider.list",
       "provider.configuration.get",
-      "provider.configuration.reload"
+      "provider.configuration.reload",
+      "provider.credential.reveal"
     ] as const;
     const mutations = [
       "provider.setRuntimeKey",
@@ -48,6 +49,33 @@ describe("Workspace Provider protocol", () => {
     }
     for (const type of queries) expect(isReplaySafeControlMutation(type)).toBe(false);
     for (const type of mutations) expect(isReplaySafeControlMutation(type)).toBe(true);
+  });
+
+  it("allows one bounded credential reveal response only for an explicit Workspace request", () => {
+    const revision = "a".repeat(64);
+    const request = commandEnvelope("provider.credential.reveal", {
+      expectedRevision: revision,
+      provider: "anthropic"
+    }, WORKSPACE_CONTEXT, 4);
+    expect(isRequestEnvelope(request)).toBe(true);
+    expect(isRequestEnvelope({ ...request, context: TASK_CONTEXT })).toBe(false);
+    expect(isReplaySafeControlMutation(request.type)).toBe(false);
+
+    const response = responseEnvelope("reveal-provider", 4, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "provider.credential.reveal",
+      result: {
+        provider: "anthropic",
+        status: "revealed",
+        apiKey: "explicit-one-shot-secret"
+      }
+    });
+    expect(isResponseEnvelope(response)).toBe(true);
+    if (!response.ok) throw new Error("Expected a credential reveal success response.");
+    expect(isResponseEnvelope({
+      ...response,
+      result: { ...response.result, extra: "not-allowed" }
+    })).toBe(false);
   });
 
   it("validates bounded credential input and non-secret Provider output", () => {

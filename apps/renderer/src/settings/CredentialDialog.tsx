@@ -1,5 +1,6 @@
 import type { ProviderSummary } from "@pi67/domain";
-import { Eye, EyeOff, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
+import type { PiCredentialRevealResult, PiCredentialSummary } from "@pi67/protocol";
+import { Eye, EyeOff, KeyRound, LockKeyhole, Search, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Heading, Input, Modal, ModalOverlay } from "react-aria-components";
 import { messages } from "../localization/message-catalog.js";
@@ -14,6 +15,7 @@ import {
 import {
   loadProviderConfiguration,
   removePersistentCredential,
+  revealPersistentCredential,
   storePersistentCredential
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
@@ -29,6 +31,7 @@ export function CredentialDialog() {
   const [providers, setProviders] = useState<ProviderSummary[] | undefined>(undefined);
   const providerList = useMemo(() => providers ?? [], [providers]);
   const [providerId, setProviderId] = useState("");
+  const [providerQuery, setProviderQuery] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
@@ -37,6 +40,7 @@ export function CredentialDialog() {
   useEffect(() => {
     if (!open) return;
     setApiKey("");
+    setProviderQuery("");
     setSubmitting(false);
     setLoadError(undefined);
     if (!workspaceId) {
@@ -70,6 +74,22 @@ export function CredentialDialog() {
         : providerList[0]?.id ?? "";
     });
   }, [open, providerList, selectedModel?.provider]);
+
+  const filteredProviderList = useMemo(() => {
+    const query = providerQuery.trim().toLocaleLowerCase();
+    if (query.length === 0) return providerList;
+    return providerList.filter((provider) => (
+      provider.label.toLocaleLowerCase().includes(query)
+      || provider.id.toLocaleLowerCase().includes(query)
+    ));
+  }, [providerList, providerQuery]);
+
+  useEffect(() => {
+    if (providerQuery.trim().length === 0 || filteredProviderList.length === 0) return;
+    if (!filteredProviderList.some((provider) => provider.id === providerId)) {
+      setProviderId(filteredProviderList[0]?.id ?? "");
+    }
+  }, [filteredProviderList, providerId, providerQuery]);
 
   if (!open) return null;
   const selectedProvider = providerList.find((provider) => provider.id === providerId);
@@ -110,35 +130,62 @@ export function CredentialDialog() {
               <p className="credential-empty" role="status">{messages.credentials.loading}</p>
             ) : providerList.length > 0 ? (
               <div className="provider-credential-layout">
-                <div className="provider-list" aria-label={messages.credentials.providerList}>
-                  {providerList.map((provider) => (
-                    <button
-                      aria-pressed={provider.id === providerId}
-                      className={provider.id === providerId ? "is-selected" : ""}
-                      key={provider.id}
-                      onClick={() => setProviderId(provider.id)}
+                <div className="provider-sidebar">
+                  <div className="provider-search">
+                    <Search aria-hidden="true" size={15} />
+                    <Input
+                      aria-label={messages.credentials.providerSearch}
+                      autoComplete="off"
+                      placeholder={messages.credentials.providerSearchPlaceholder}
+                      value={providerQuery}
+                      onChange={(event) => setProviderQuery(event.target.value)}
+                    />
+                    {providerQuery.length > 0 ? <Button
+                      aria-label={messages.credentials.clearProviderSearch}
+                      className="provider-search-clear"
+                      onPress={() => setProviderQuery("")}
                       type="button"
                     >
-                      <span>
-                        <strong>{provider.label}</strong>
-                        <small>{provider.id} · {messages.credentials.modelCount(provider.modelCount)}</small>
-                      </span>
-                      <em className={provider.configured ? "is-configured" : ""}>
-                        {provider.configured
-                          ? messages.credentials.configured
-                          : messages.credentials.unconfigured}
-                      </em>
-                    </button>
-                  ))}
+                      <X aria-hidden="true" size={14} />
+                    </Button> : null}
+                  </div>
+                  <div className="provider-list" aria-label={messages.credentials.providerList}>
+                    {filteredProviderList.map((provider) => (
+                      <button
+                        aria-pressed={provider.id === providerId}
+                        className={provider.id === providerId ? "is-selected" : ""}
+                        key={provider.id}
+                        onClick={() => setProviderId(provider.id)}
+                        type="button"
+                      >
+                        <span>
+                          <strong>{provider.label}</strong>
+                          <small>{provider.id} · {messages.credentials.modelCount(provider.modelCount)}</small>
+                        </span>
+                        <em className={provider.configured ? "is-configured" : ""}>
+                          {provider.configured
+                            ? messages.credentials.configured
+                            : messages.credentials.unconfigured}
+                        </em>
+                      </button>
+                    ))}
+                    {filteredProviderList.length === 0 ? (
+                      <p className="provider-list-empty">{messages.credentials.noProviderMatches}</p>
+                    ) : null}
+                  </div>
                 </div>
                 {selectedProvider ? (
                   <ProviderCredentialEditor
                     apiKey={apiKey}
                     key={selectedProvider.id}
-                    persistent={configuration?.credentials.some((credential) => credential.provider === providerId) ?? false}
+                    persistentCredential={configuration?.credentials.find((credential) => credential.provider === providerId)}
                     provider={selectedProvider}
                     submitting={submitting}
                     onApiKeyChange={setApiKey}
+                    onRevealPersistentCredential={() => {
+                      if (!workspaceId) throw new Error(messages.credentials.savedApiKeyRevealFailed);
+                      return revealPersistentCredential(workspaceId, providerId);
+                    }}
                   />
                 ) : null}
               </div>
@@ -201,17 +248,49 @@ export function CredentialDialog() {
 interface ProviderCredentialEditorProps {
   apiKey: string;
   provider: ProviderSummary;
-  persistent: boolean;
+  persistentCredential: PiCredentialSummary | undefined;
   submitting: boolean;
   onApiKeyChange: (value: string) => void;
+  onRevealPersistentCredential: () => Promise<PiCredentialRevealResult>;
 }
 
-function ProviderCredentialEditor({ apiKey, provider, persistent, submitting, onApiKeyChange }: ProviderCredentialEditorProps) {
+function ProviderCredentialEditor({
+  apiKey,
+  provider,
+  persistentCredential,
+  submitting,
+  onApiKeyChange,
+  onRevealPersistentCredential
+}: ProviderCredentialEditorProps) {
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [savedApiKey, setSavedApiKey] = useState<string | undefined>(undefined);
+  const [savedApiKeyVisible, setSavedApiKeyVisible] = useState(false);
+  const [revealPending, setRevealPending] = useState(false);
+  const [revealMessage, setRevealMessage] = useState<string | undefined>(undefined);
+  const persistent = persistentCredential !== undefined;
 
   useEffect(() => {
     if (apiKey.length === 0) setApiKeyVisible(false);
   }, [apiKey]);
+
+  useEffect(() => {
+    if (!persistent) {
+      setSavedApiKey(undefined);
+      setSavedApiKeyVisible(false);
+      setRevealMessage(undefined);
+    }
+  }, [persistent]);
+
+  useEffect(() => {
+    if (!savedApiKeyVisible) return;
+    const timeout = window.setTimeout(() => {
+      setSavedApiKeyVisible(false);
+      setSavedApiKey(undefined);
+    }, 15_000);
+    return () => window.clearTimeout(timeout);
+  }, [savedApiKeyVisible]);
+
+  const revealable = persistentCredential?.type === "api_key";
 
   return (
     <section className="provider-credential-editor" aria-label={messages.credentials.editorLabel(provider.label)}>
@@ -225,9 +304,50 @@ function ProviderCredentialEditor({ apiKey, provider, persistent, submitting, on
           : <KeyRound size={17} aria-label={messages.credentials.unconfigured} />}
       </div>
       <div className={`credential-current ${provider.configured ? "is-configured" : ""}`}>
-        <span>{messages.credentials.currentAuthentication}</span>
-        <code>{provider.configured ? "••••••••••••" : messages.credentials.notConfigured}</code>
+        <div className="credential-current-heading">
+          <span>{messages.credentials.currentAuthentication}</span>
+          {revealable ? <Button
+            aria-label={savedApiKeyVisible
+              ? messages.credentials.hideSavedApiKey
+              : messages.credentials.showSavedApiKey}
+            aria-pressed={savedApiKeyVisible}
+            className="credential-current-toggle"
+            isDisabled={submitting || revealPending}
+            onPress={() => {
+              if (savedApiKeyVisible) {
+                setSavedApiKeyVisible(false);
+                setSavedApiKey(undefined);
+                setRevealMessage(undefined);
+                return;
+              }
+              setRevealPending(true);
+              setRevealMessage(undefined);
+              void onRevealPersistentCredential().then((result) => {
+                if (result.status === "revealed") {
+                  setSavedApiKey(result.apiKey);
+                  setSavedApiKeyVisible(true);
+                  return;
+                }
+                setRevealMessage(revealStatusMessage(result.status));
+              }, () => {
+                setRevealMessage(messages.credentials.savedApiKeyRevealFailed);
+              }).finally(() => setRevealPending(false));
+            }}
+            type="button"
+          >
+            {savedApiKeyVisible
+              ? <EyeOff aria-hidden="true" size={16} />
+              : <Eye aria-hidden="true" size={16} />}
+          </Button> : null}
+        </div>
+        <code className={savedApiKeyVisible ? "is-revealed" : ""}>
+          {savedApiKeyVisible && savedApiKey !== undefined
+            ? savedApiKey
+            : provider.configured ? "••••••••••••" : messages.credentials.notConfigured}
+        </code>
         <small>{credentialStatusLabel(provider, persistent)}</small>
+        {revealPending ? <small role="status">{messages.credentials.revealingSavedApiKey}</small> : null}
+        {revealMessage ? <small className="credential-reveal-message" role="status">{revealMessage}</small> : null}
       </div>
       <div className="dialog-field">
         <label htmlFor="provider-api-key-input">{provider.configured
@@ -257,10 +377,16 @@ function ProviderCredentialEditor({ apiKey, provider, persistent, submitting, on
               : <Eye aria-hidden="true" size={16} />}
           </Button>
         </div>
-        <small>默认保存到 Pi auth.json；当前输入可临时显示，已保存值不会回填。也可选择“仅本次运行”。</small>
+        <small>默认保存到 Pi auth.json；新输入和已保存值都只会在你主动操作时临时显示。也可选择“仅本次运行”。</small>
       </div>
     </section>
   );
+}
+
+function revealStatusMessage(status: Exclude<PiCredentialRevealResult["status"], "revealed">): string {
+  if (status === "not-api-key") return messages.credentials.savedApiKeyNotApiKey;
+  if (status === "indirect") return messages.credentials.savedApiKeyIndirect;
+  return messages.credentials.savedApiKeyNotFound;
 }
 
 function credentialSourceLabel(provider: ProviderSummary): string {

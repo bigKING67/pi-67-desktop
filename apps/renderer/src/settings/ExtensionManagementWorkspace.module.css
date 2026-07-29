@@ -1,0 +1,1052 @@
+.workspace {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.tabs,
+.tabPanel {
+  min-width: 0;
+  outline: none;
+}
+
+.tabs {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.tabPanel {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.installedPanel {
+  display: grid;
+  container-type: inline-size;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.installedFeedback {
+  display: grid;
+}
+
+.commandBand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabList,
+.primaryActions,
+.filters,
+.detailActions,
+.statusLine {
+  display: flex;
+  align-items: center;
+}
+
+.tabList {
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.tab {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.tab span,
+.filterButton span {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-variant-ligatures: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.tab[data-selected] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+
+.tab[data-focus-visible],
+.filterButton[data-focus-visible],
+.packageButton[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.primaryActions {
+  flex: 0 0 auto;
+  gap: var(--space-2);
+}
+
+.installedToolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.packageSearch {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-tertiary);
+}
+
+.packageSearch:focus-within {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+  color: var(--text-secondary);
+}
+
+.packageSearch input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.packageSearch input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.packageSearch input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.filters {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.filterButton {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.filterButton[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.filterButton[aria-pressed="true"] {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.managementSurface {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(420px, 1.18fr);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.listPane,
+.listEmpty {
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-muted) 48%, var(--surface));
+}
+
+.listPane {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.listPane,
+.details,
+.tabPanel {
+  scrollbar-color: color-mix(in srgb, var(--text-tertiary) 55%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.listPane::-webkit-scrollbar,
+.details::-webkit-scrollbar,
+.tabPanel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.listPane::-webkit-scrollbar-thumb,
+.details::-webkit-scrollbar-thumb,
+.tabPanel::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-tertiary) 52%, transparent);
+  background-clip: padding-box;
+}
+
+.listPane::-webkit-scrollbar-thumb:hover,
+.details::-webkit-scrollbar-thumb:hover,
+.tabPanel::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+  background-clip: padding-box;
+}
+
+.packageList,
+.discoveryList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.packageList li {
+  display: grid;
+}
+
+.groupLabel {
+  padding: 14px 14px 7px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.packageButton {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.packageButton[data-hovered] {
+  background: var(--surface-hover);
+}
+
+.packageButton[data-selected] {
+  background: var(--surface-active);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--text-primary) 42%, transparent);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.state[data-state="enabled"],
+.state[data-state="bundled"] {
+  color: var(--success);
+}
+
+.state[data-state="unavailable"] {
+  color: var(--danger);
+}
+
+.packageIdentity,
+.discoveryIdentity,
+.integrityNote span,
+.dangerZone > span {
+  display: grid;
+  min-width: 0;
+}
+
+.packageIdentity {
+  gap: 3px;
+}
+
+.packageIdentity strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packageIdentity small {
+  display: flex;
+  min-width: 0;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.packageIdentity small > span {
+  flex: 0 0 auto;
+}
+
+.packageIdentity small > .packageSource {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.updateFlag {
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--info) 42%, var(--border));
+  border-radius: 5px;
+  color: var(--info);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.listEmpty,
+.detailEmpty {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 7px;
+  min-height: 320px;
+  padding: var(--space-5);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.listEmpty strong,
+.detailEmpty strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.listEmpty span,
+.detailEmpty span {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--space-5);
+  padding: 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.detailBackButton {
+  display: none;
+  min-height: 30px;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.detailBackButton[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.detailBackButton[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.detailHeader {
+  display: grid;
+  gap: 7px;
+}
+
+.eyebrow {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.detailHeader h2,
+.discoverSurface h2,
+.runtimeSurface h2,
+.discoverSurface p,
+.runtimeSurface p {
+  margin: 0;
+}
+
+.detailHeader h2,
+.discoverSurface h2,
+.runtimeSurface h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.detailDescription {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.capabilitySummary,
+.capabilityBadges {
+  display: flex;
+  align-items: center;
+}
+
+.capabilitySummary {
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.capabilityLabel {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.capabilityBadges {
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.capabilityBadges > span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.statusLine {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.statusLine > span {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.statusLine > span[data-state="ready"] {
+  background: color-mix(in srgb, var(--success) 10%, var(--surface));
+  color: var(--success);
+}
+
+.statusLine > span[data-state="update"] {
+  background: color-mix(in srgb, var(--info) 10%, var(--surface));
+  color: var(--info);
+}
+
+.statusLine > span[data-state="danger"] {
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+}
+
+.facts,
+.dialogFacts {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.facts > div,
+.dialogFacts > div {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.facts dt,
+.dialogFacts dt {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.facts dd,
+.dialogFacts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.codeValue {
+  font-family: var(--font-code);
+  font-variant-ligatures: none;
+}
+
+.detailActions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.integrityNote,
+.permissionNotice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: var(--space-3);
+  border-left: 3px solid var(--success);
+  background: color-mix(in srgb, var(--success) 7%, var(--surface));
+  color: var(--text-secondary);
+}
+
+.integrityNote strong,
+.dangerZone strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.integrityNote small,
+.dangerZone small {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dangerZone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.dangerButton,
+.confirmDanger {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 48%, var(--border));
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dangerButton[data-hovered] {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.confirmDanger {
+  background: var(--danger);
+  color: var(--text-on-danger);
+}
+
+.errorBanner,
+.dialogError {
+  margin: 0 0 var(--space-3);
+  padding: 9px 11px;
+  border-left: 3px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.installedFeedback .errorBanner {
+  margin: 0;
+}
+
+.discoverSurface,
+.runtimeSurface {
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.discoverSurface > header,
+.runtimeSurface > header {
+  display: grid;
+  gap: 6px;
+  padding: 24px 26px var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.discoverSurface > header p,
+.runtimeSurface > header p {
+  max-width: 680px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.discoveryList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 66px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 10px 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.discoveryIdentity strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.discoveryIdentity small {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-variant-ligatures: none;
+}
+
+.recommendedVersion,
+.installedLabel {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.installedLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--success);
+}
+
+.panelEmpty,
+.discoveryFootnote {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.panelEmpty {
+  padding: 28px 26px;
+}
+
+.discoveryFootnote {
+  padding: var(--space-3) 26px;
+  background: var(--surface-muted);
+}
+
+.runtimeSurface > section {
+  margin: 0;
+}
+
+.modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.dialog {
+  display: grid;
+  gap: var(--space-4);
+  padding: 22px;
+  outline: none;
+}
+
+.dialogIntro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sourceField {
+  display: grid;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.sourceField input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  outline: none;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+
+.sourceField input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.sourceField input:disabled {
+  opacity: 0.5;
+}
+
+.dialogFacts > div {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.permissionNotice {
+  border-left-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dialogError {
+  margin-bottom: 0;
+}
+
+@container (max-width: 900px) {
+  .managementSurface {
+    display: block;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .listPane,
+  .listEmpty,
+  .details,
+  .detailEmpty {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .listPane,
+  .listEmpty {
+    border-right: 0;
+  }
+
+  .managementSurface:not([data-detail-open="true"]) .details,
+  .managementSurface:not([data-detail-open="true"]) .detailEmpty {
+    display: none;
+  }
+
+  .managementSurface[data-detail-open="true"] .listPane,
+  .managementSurface[data-detail-open="true"] .listEmpty {
+    display: none;
+  }
+
+  .detailBackButton {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace,
+  .tabs {
+    height: auto;
+    min-height: 620px;
+  }
+
+  .commandBand,
+  .installedToolbar {
+    align-items: stretch;
+  }
+
+  .commandBand {
+    display: grid;
+  }
+
+  .tabList {
+    overflow-x: auto;
+  }
+
+  .primaryActions {
+    justify-content: flex-end;
+  }
+
+  .installedToolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filters {
+    justify-content: flex-start;
+  }
+
+  .details {
+    padding: var(--space-4);
+  }
+
+  .packageButton {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .updateFlag {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .dangerZone,
+  .discoveryList li {
+    align-items: flex-start;
+  }
+
+  .dangerZone {
+    display: grid;
+  }
+
+  .dangerButton {
+    justify-self: start;
+  }
+
+  .discoveryList li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-inline: var(--space-4);
+  }
+
+  .recommendedVersion {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .primaryActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .primaryActions > button {
+    width: 100%;
+  }
+
+  .facts > div,
+  .dialogFacts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Extension management follows the same catalog-to-detail document flow at every width. */
+.workspace,
+.tabs {
+  height: auto;
+  min-height: 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-rows: auto auto;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tabPanel,
+.installedPanel {
+  min-height: 0;
+  overflow: visible;
+}
+
+.installedPanel {
+  grid-template-rows: auto auto auto;
+}
+
+.commandBand {
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab[data-selected] {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.installedToolbar {
+  padding: 16px 0;
+  border-bottom: 0;
+}
+
+.installedPanel[data-detail-open="true"] .installedToolbar {
+  display: none;
+}
+
+.managementSurface {
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.listPane,
+.listEmpty {
+  min-height: 0;
+  overflow: visible;
+  border-right: 0;
+  background: transparent;
+  scrollbar-gutter: auto;
+}
+
+.managementSurface:not([data-detail-open="true"]) .details,
+.managementSurface:not([data-detail-open="true"]) .detailEmpty {
+  display: none;
+}
+
+.managementSurface[data-detail-open="true"] .listPane,
+.managementSurface[data-detail-open="true"] .listEmpty {
+  display: none;
+}
+
+.groupLabel {
+  padding: 18px 10px 8px;
+}
+
+.packageButton {
+  min-height: 72px;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  padding: 11px 10px;
+  border-radius: 9px;
+}
+
+.packageButton[data-selected] {
+  background: var(--surface-muted);
+  box-shadow: none;
+}
+
+.details {
+  min-height: 0;
+  gap: 24px;
+  padding: 0;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+
+.detailBackButton {
+  display: inline-flex;
+}
+
+.facts {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.facts > div {
+  padding: 12px 14px;
+}
+
+.capabilityBadges > span {
+  border-color: transparent;
+}
+
+.dangerZone {
+  margin-top: 16px;
+  padding-top: 20px;
+}
+
+.discoverSurface,
+.runtimeSurface {
+  background: transparent;
+}
+
+.discoverSurface > header,
+.runtimeSurface > header {
+  padding: 8px 0 16px;
+}
+
+.discoveryList li {
+  min-height: 72px;
+  padding: 10px 0;
+}
+
+.discoveryFootnote {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .workspace,
+  .tabs {
+    min-height: 0;
+  }
+
+  .details {
+    padding: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .packageButton {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .state,
+  .updateFlag {
+    grid-column: 1;
+    justify-self: start;
+  }
+}

@@ -7,6 +7,7 @@ import type {
   ExtensionPackageListResult,
   ExtensionPackageMutationResult,
   ExtensionPackageScope,
+  PackageResourceType,
   ExtensionPackageUpdatesResult,
   ModelSummary,
   OperationKind,
@@ -26,6 +27,7 @@ import type {
   WorkspaceTrust
 } from "@pi67/domain";
 import type {
+  PiCredentialRevealResult,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
 } from "./provider-configuration-schemas.js";
@@ -207,6 +209,7 @@ export interface CommandPayloads {
   };
   "provider.configuration.remove": { expectedRevision: string; provider: string };
   "provider.credential.store": { expectedRevision: string; provider: string; apiKey: string };
+  "provider.credential.reveal": { expectedRevision: string; provider: string };
   "provider.credential.remove": { expectedRevision: string; provider: string };
   "model.default.set": {
     expectedRevision: string;
@@ -225,7 +228,12 @@ export interface CommandPayloads {
   "extension.package.checkUpdates": Record<string, never>;
   "extension.package.install": { source: string; scope: ExtensionPackageScope };
   "extension.package.update": { source: string; scope: ExtensionPackageScope };
-  "extension.package.setEnabled": { source: string; scope: ExtensionPackageScope; enabled: boolean };
+  "extension.package.setEnabled": {
+    source: string;
+    scope: ExtensionPackageScope;
+    enabled: boolean;
+    resourceType?: PackageResourceType;
+  };
   "extension.package.restoreInheritance": { source: string };
   "extension.package.uninstall": { source: string; scope: ExtensionPackageScope };
   "extension.ui.respond": {
@@ -283,6 +291,7 @@ export interface CommandResults {
   "provider.configuration.save": PiProviderConfigurationSnapshot;
   "provider.configuration.remove": PiProviderConfigurationSnapshot;
   "provider.credential.store": PiProviderConfigurationSnapshot;
+  "provider.credential.reveal": PiCredentialRevealResult;
   "provider.credential.remove": PiProviderConfigurationSnapshot;
   "model.default.set": PiProviderConfigurationSnapshot;
   "provider.configuration.reload": PiProviderConfigurationSnapshot;

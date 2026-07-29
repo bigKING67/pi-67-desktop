@@ -1,0 +1,165 @@
+.modelSection,
+.modelCatalog {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.modelToolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.modelFilters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.modelFilters button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.modelFilters button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.modelFilters button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.modelFilters .selectedModelFilter {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.modelResultsSummary {
+  display: flex;
+  min-height: 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.modelResultsSummary small {
+  font-size: 10px;
+}
+
+.modelRows {
+  min-width: 0;
+}
+
+.modelCapabilities {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.modelEmpty,
+.modelDetailEmpty {
+  display: grid;
+  min-height: 180px;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.modelEmpty strong,
+.modelDetailEmpty strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.modelEmpty span,
+.modelDetailEmpty span {
+  max-width: 320px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.modelEmpty button {
+  margin-top: 6px;
+}
+
+.modelDetail {
+  min-width: 0;
+}
+
+.modelDetailContent {
+  display: grid;
+  min-width: 0;
+  gap: 20px;
+}
+
+.modelDetailHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modelDetailHeading > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.modelDetailHeading small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.modelDetailHeading strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelDetailHeading em {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+@media (max-width: 840px) {
+  .modelToolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .modelFilters {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .modelDetailHeading {
+    display: grid;
+  }
+
+  .modelCapabilities {
+    white-space: normal;
+  }
+}

@@ -57,6 +57,11 @@
 - Windows claims require real Windows evidence; macOS claims require real
   Apple Silicon evidence. Browser previews do not prove packaged Electron
   behavior.
+- On macOS Apple Silicon, after a completed user-visible change set passes its
+  relevant gates, run `corepack pnpm run preview:mac:unsigned` by default unless
+  the user asks not to relaunch. This must quit the old preview, package, smoke,
+  and open the repository artifact; `open` alone is not proof that new renderer
+  assets were loaded.
 - Never commit build output, installers, logs, databases, screenshots, traces,
   sessions, or credentials.
 - `commit` does not mean `push`; publishing, signing, GitHub releases, and

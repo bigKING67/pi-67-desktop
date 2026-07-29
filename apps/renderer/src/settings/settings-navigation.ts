@@ -1,0 +1,134 @@
+import type { SettingsSection } from "@pi67/domain";
+import {
+  Activity,
+  Blocks,
+  Bot,
+  FileText,
+  Info,
+  Network,
+  RefreshCw,
+  Scale,
+  SlidersHorizontal,
+  Sparkles,
+  Unplug,
+  UserRound
+} from "lucide-react";
+import { messages } from "../localization/message-catalog.js";
+
+export interface SettingsNavigationItem {
+  id: SettingsSection;
+  label: string;
+  summary: string;
+  searchTerms: readonly string[];
+  icon: typeof SlidersHorizontal;
+}
+
+export const SETTINGS_GROUPS: ReadonlyArray<{
+  label: string;
+  items: readonly SettingsNavigationItem[];
+}> = [
+  {
+    label: messages.settings.groups.personal,
+    items: [{
+      id: "account",
+      ...messages.settings.sections.account,
+      searchTerms: ["登录", "未登录", "同步", "企业", "本地模式", "account", "sign in"],
+      icon: UserRound
+    }]
+  },
+  {
+    label: messages.settings.groups.application,
+    items: [{
+      id: "general",
+      ...messages.settings.sections.general,
+      searchTerms: ["外观", "主题", "深色", "浅色", "系统", "语言", "交互", "appearance", "theme"],
+      icon: SlidersHorizontal
+    }]
+  },
+  {
+    label: messages.settings.groups.pi,
+    items: [
+      {
+        id: "providers",
+        ...messages.settings.sections.providers,
+        searchTerms: ["提供商", "服务商", "认证", "密钥", "思考级别", "provider", "model", "api key"],
+        icon: Bot
+      },
+      {
+        id: "extensions",
+        ...messages.settings.sections.extensions,
+        searchTerms: ["扩展", "插件", "安装", "更新", "启用", "停用", "卸载", "npm", "git", "path", "extension"],
+        icon: Blocks
+      },
+      {
+        id: "skills",
+        ...messages.settings.sections.skills,
+        searchTerms: ["技能", "资源", "上下文", "skill", "resource"],
+        icon: Sparkles
+      },
+      {
+        id: "prompts",
+        ...messages.settings.sections.prompts,
+        searchTerms: ["提示词", "模板", "提示词包", "prompt", "prompts", "package"],
+        icon: FileText
+      },
+      {
+        id: "rules",
+        ...messages.settings.sections.rules,
+        searchTerms: ["规则", "agents", "rule", "rules", "全局上下文", "行为约束"],
+        icon: Scale
+      },
+      {
+        id: "integrations",
+        ...messages.settings.sections.integrations,
+        searchTerms: ["browser67", "浏览器", "集成", "setup", "doctor", "integration"],
+        icon: Unplug
+      },
+      {
+        id: "runtime",
+        ...messages.settings.sections.runtime,
+        searchTerms: ["运行", "会话", "并发", "恢复", "诊断", "runtime", "session"],
+        icon: Activity
+      },
+      {
+        id: "network",
+        ...messages.settings.sections.network,
+        searchTerms: ["镜像", "npm", "git", "node", "下载", "网络", "registry", "github"],
+        icon: Network
+      }
+    ]
+  },
+  {
+    label: messages.settings.groups.support,
+    items: [
+      {
+        id: "updates",
+        ...messages.settings.sections.updates,
+        searchTerms: ["版本", "检查更新", "导出", "诊断", "update", "version", "doctor"],
+        icon: RefreshCw
+      },
+      {
+        id: "about",
+        ...messages.settings.sections.about,
+        searchTerms: ["版本", "架构", "pi", "jsonl", "electron", "about"],
+        icon: Info
+      }
+    ]
+  }
+];
+
+export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.items);
+
+export function sectionSupportsProjectScope(section: SettingsSection): boolean {
+  return section === "providers"
+    || section === "extensions"
+    || section === "skills"
+    || section === "prompts"
+    || section === "runtime";
+}
+
+export function matchesSettingsQuery(item: SettingsNavigationItem, query: string): boolean {
+  if (!query) return true;
+  return [item.label, item.summary, ...item.searchTerms]
+    .some((value) => value.toLocaleLowerCase("zh-CN").includes(query));
+}

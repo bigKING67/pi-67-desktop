@@ -24,6 +24,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "provider.configuration.save"
       | "provider.configuration.remove"
       | "provider.credential.store"
+      | "provider.credential.reveal"
       | "provider.credential.remove"
       | "model.default.set"
       | "provider.configuration.reload"

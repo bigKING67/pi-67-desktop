@@ -1,4 +1,4 @@
-import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
+import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -6,7 +6,22 @@ import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-r
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 
-export async function loadProviderConfiguration(workspaceId?: string): Promise<boolean> {
+const providerLoadFlights = new Map<string, Promise<boolean>>();
+
+export function loadProviderConfiguration(workspaceId?: string): Promise<boolean> {
+  const target = resolveWorkspace(workspaceId);
+  if (!target) return Promise.resolve(false);
+  const existing = providerLoadFlights.get(target.id);
+  if (existing) return existing;
+  const flight = performProviderConfigurationLoad(target.id);
+  providerLoadFlights.set(target.id, flight);
+  void flight.finally(() => {
+    if (providerLoadFlights.get(target.id) === flight) providerLoadFlights.delete(target.id);
+  }).catch(() => undefined);
+  return flight;
+}
+
+async function performProviderConfigurationLoad(workspaceId: string): Promise<boolean> {
   const target = resolveWorkspace(workspaceId);
   if (!target) return false;
   useProviderConfigurationStore.getState().beginLoad(target.id);
@@ -19,6 +34,10 @@ export async function loadProviderConfiguration(workspaceId?: string): Promise<b
   } catch (error) {
     return reportFailure(target.id, "无法读取 Pi Provider 配置", error);
   }
+}
+
+export function resetProviderConfigurationLoadState(): void {
+  providerLoadFlights.clear();
 }
 
 export async function saveProviderConfiguration(workspaceId?: string): Promise<boolean> {
@@ -74,6 +93,24 @@ export async function removePersistentCredential(
     expectedRevision: revision,
     provider
   }, "Pi 持久凭据已移除");
+}
+
+export async function revealPersistentCredential(
+  workspaceId: string,
+  provider: string
+): Promise<PiCredentialRevealResult> {
+  const state = useProviderConfigurationStore.getState();
+  if (state.workspaceId !== workspaceId || !state.baselineRevision) {
+    if (!await loadProviderConfiguration(workspaceId)) {
+      throw new Error("Pi Provider 配置尚未就绪。");
+    }
+  }
+  const revision = useProviderConfigurationStore.getState().baselineRevision;
+  if (!revision) throw new Error("Pi Provider 配置缺少有效 revision。");
+  return request(workspaceId, "provider.credential.reveal", {
+    expectedRevision: revision,
+    provider
+  });
 }
 
 export async function setDefaultModelConfiguration(

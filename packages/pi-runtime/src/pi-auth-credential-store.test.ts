@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   authContentRevision,
   PiAuthContentChangedError,
-  PiAuthCredentialStore
+  PiAuthCredentialStore,
+  revealStoredApiKey
 } from "./pi-auth-credential-store.js";
 
 const temporaryDirectories: string[] = [];
@@ -87,5 +88,28 @@ describe("PiAuthCredentialStore", () => {
       { providerId: "environment", type: "api_key" },
       { providerId: "unavailable", type: "api_key" }
     ]);
+  });
+
+  it("reveals only literal persisted API keys without expanding commands or environment references", () => {
+    const content = JSON.stringify({
+      literal: { type: "api_key", key: "literal-secret" },
+      escaped: { type: "api_key", key: "price-$$5-$!literal" },
+      environment: { type: "api_key", key: "$PI67_TEST_API_KEY" },
+      command: { type: "api_key", key: "!security find-generic-password" },
+      oauth: { type: "oauth", access: "oauth-secret" }
+    });
+
+    expect(revealStoredApiKey(content, "literal")).toEqual({
+      status: "revealed",
+      apiKey: "literal-secret"
+    });
+    expect(revealStoredApiKey(content, "escaped")).toEqual({
+      status: "revealed",
+      apiKey: "price-$5-!literal"
+    });
+    expect(revealStoredApiKey(content, "environment")).toEqual({ status: "indirect" });
+    expect(revealStoredApiKey(content, "command")).toEqual({ status: "indirect" });
+    expect(revealStoredApiKey(content, "oauth")).toEqual({ status: "not-api-key" });
+    expect(revealStoredApiKey(content, "missing")).toEqual({ status: "not-found" });
   });
 });

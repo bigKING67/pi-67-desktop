@@ -1,4 +1,6 @@
 export * from "./agent-runtime.js";
+export * from "./desktop-package-toolchain.js";
+export * from "./desktop-package-operation-runtime.js";
 export * from "./extension-capabilities.js";
 export * from "./extension-catalog.js";
 export * from "./extension-package-management.js";

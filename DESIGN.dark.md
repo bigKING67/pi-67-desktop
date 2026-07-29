@@ -1,5 +1,5 @@
 ---
-version: 3
+version: 4
 name: π Desktop Dark Calibration
 status: active
 platform: electron-web
@@ -60,6 +60,15 @@ spacing, component states, and motion as `DESIGN.md`.
   low-contrast luminance fill rather than the green runtime accent, and the
   removed Settings brand/description hero must not reappear as dark-theme-only
   chrome.
+- The right column remains one centered `1120px` maximum document with a single
+  vertical scroll owner. Grouped Settings use one quiet surface and row dividers;
+  Catalogs have no enclosing frame; Editors and semantic Notices are their own
+  surfaces. Dark mode must not reintroduce glowing cards, green selected Catalog
+  rows, or repeated borders merely to manufacture depth.
+- Provider, model, and Extension navigation remains drill-down at every width.
+  Ultra-wide dark windows do not automatically expose a second catalog or detail
+  column, and returning restores the same search, filter, selection, scroll, and
+  unsaved draft state as light mode.
 - Provider file status, revision conflict, invalid-file, pending reload, and
   model-reselection states use the same semantic success, warning, and danger
   roles as light mode. The API-key eye control may reveal only the current user

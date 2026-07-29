@@ -21,11 +21,19 @@ export type WorkspaceProviderCommandType =
   | "provider.configuration.save"
   | "provider.configuration.remove"
   | "provider.credential.store"
+  | "provider.credential.reveal"
   | "provider.credential.remove"
   | "model.default.set"
   | "provider.configuration.reload";
 type WorkspaceProviderCommand = AgentCommand<WorkspaceProviderCommandType>;
 type WorkspaceProviderResult = CommandResults[WorkspaceProviderCommandType];
+type WorkspaceProviderMutationCommandType = Exclude<WorkspaceProviderCommandType,
+  | "provider.list"
+  | "provider.configuration.get"
+  | "provider.configuration.reload"
+  | "provider.credential.reveal">;
+type WorkspaceProviderMutationCommand = AgentCommand<WorkspaceProviderMutationCommandType>;
+type WorkspaceProviderMutationResult = CommandResults[WorkspaceProviderMutationCommandType];
 type WorkspaceMutationCommandType = WorkspaceLifecycleCommandType
   | "provider.setRuntimeKey"
   | "provider.configuration.save"
@@ -108,6 +116,13 @@ export class WorkspaceCommandRouter {
     if (command.type === "provider.configuration.reload") {
       return requireConfigurationService(configuration).reload(workspace.cwd);
     }
+    if (command.type === "provider.credential.reveal") {
+      return requireConfigurationService(configuration).revealCredential(
+        workspace.cwd,
+        command.payload.expectedRevision,
+        command.payload.provider
+      );
+    }
     if (!idempotencyKey) {
       return Promise.reject(new HostCommandError(
         "INVALID_PAYLOAD",
@@ -116,11 +131,12 @@ export class WorkspaceCommandRouter {
       ));
     }
     try {
+      const mutationCommand = command as WorkspaceProviderMutationCommand;
       return this.runMutation(
         context.workspaceId,
         idempotencyKey,
-        command,
-        () => this.executeProviderMutation(workspace, command)
+        mutationCommand,
+        () => this.executeProviderMutation(workspace, mutationCommand)
       ) as Promise<WorkspaceProviderResult>;
     } catch (error) {
       return Promise.reject(error);
@@ -129,9 +145,8 @@ export class WorkspaceCommandRouter {
 
   private async executeProviderMutation(
     workspace: ReturnType<WorkspaceContextRegistry["require"]>,
-    command: AgentCommand<Exclude<WorkspaceProviderCommandType,
-      "provider.list" | "provider.configuration.get" | "provider.configuration.reload">>
-  ): Promise<WorkspaceProviderResult> {
+    command: WorkspaceProviderMutationCommand
+  ): Promise<WorkspaceProviderMutationResult> {
     if (command.type === "provider.setRuntimeKey") {
       await this.runtimeCredentialOverrides.set(command.payload.provider, command.payload.apiKey);
       return workspace.workspaceServices.providerCatalog.list();
@@ -300,6 +315,7 @@ export function isWorkspaceProviderCommand(
     || type === "provider.configuration.save"
     || type === "provider.configuration.remove"
     || type === "provider.credential.store"
+    || type === "provider.credential.reveal"
     || type === "provider.credential.remove"
     || type === "model.default.set"
     || type === "provider.configuration.reload";

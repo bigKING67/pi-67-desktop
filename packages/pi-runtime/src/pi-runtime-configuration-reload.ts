@@ -2,6 +2,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
 import type { AgentEvent, PiConfigurationReloadState } from "@pi67/protocol";
 import { sessionMetaChangedEvent } from "./incremental-events.js";
+import { reloadDesktopSettings } from "./desktop-package-toolchain.js";
 import {
   projectSessionControls,
   projectSessionModelCatalog
@@ -71,7 +72,7 @@ export class PiRuntimeConfigurationReload {
           : this.invalidatedModel;
         try {
           await session.modelRuntime.reloadConfig();
-          await session.settingsManager.reload();
+          await reloadDesktopSettings(session.settingsManager);
           session.setScopedModels(session.scopedModels.flatMap((entry) => {
             const refreshed = session.modelRuntime.getModel(entry.model.provider, entry.model.id);
             return refreshed ? [{ ...entry, model: refreshed }] : [];

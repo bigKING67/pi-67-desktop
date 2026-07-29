@@ -7,7 +7,7 @@
     ".": "./dist/index.mjs"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm --dts false --deps.never-bundle electron --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
+    "build": "tsdown src/index.ts src/package-worker.ts --format esm --dts false --deps.never-bundle electron --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core --deps.never-bundle @earendil-works/pi-ai",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

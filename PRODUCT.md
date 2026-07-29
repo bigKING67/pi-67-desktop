@@ -49,12 +49,28 @@ count.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
 7. Open the singleton Settings surface for account, application, global, or
    current-workspace Pi configuration without losing drafts or background work.
+8. Install and operate Pi Extensions, Skills, Prompts, Rules, and supported
+   integrations without requiring a system Node, npm, Git, pnpm, or Pi CLI.
 
 ## Success criteria
 
 - Both supported platforms can install, launch, and complete an offline SDK
   contract smoke from signed packages.
 - Existing users reuse `~/.pi/agent` without credential or session migration.
+- Windows x64 and macOS arm64 packages include pinned private Node, npm, and Git
+  toolchains. Package operations fail closed when the bundled toolchain is
+  missing or invalid and never fall back to unverified system executables.
+- Package downloads support public npm/Git mirrors with explicit official-source
+  fallback. A mirror changes transport only; npm integrity, a pinned Git commit,
+  deterministic content hashes, and application update signatures remain the
+  trust authority.
+- Pi-67 Core, browser67, design-craft, and the commerce-growth-os Skill suite ship
+  as pinned first-party capability snapshots. Desktop materializes verified
+  copies under the Pi agent directory, preserves existing Package object filters,
+  namespaces managed Rules, and never overwrites an existing global `AGENTS.md`.
+- Bundled browser67 source and Skills do not imply live browser readiness. Settings
+  distinguishes bundled source, dependency preparation, deterministic Doctor,
+  and real managed-browser readiness instead of collapsing them into one state.
 - One Electron window can register multiple workspaces. The navigation rail is
   the only Workspace and conversation switcher: each Workspace is a collapsible
   group containing active work, drafts, and Catalog-backed recent sessions.
@@ -115,9 +131,11 @@ count.
   SDK until a Workspace or Pi-runtime diagnostic action needs it.
 - Credential, prompt, source, and raw tool content never enters telemetry or
   default diagnostic logs.
-- Provider status may expose only non-secret metadata such as configured state,
-  credential source, and model count; complete credential values never cross
-  into the renderer.
+- Provider status snapshots expose only non-secret metadata such as configured
+  state, credential source, and model count. A complete credential may cross to
+  the renderer only in the result of an explicit one-shot reveal request for a
+  literal API key stored in Pi `auth.json`; it never enters snapshots, events,
+  projections, telemetry, diagnostics, logs, or persisted Desktop state.
 - Pi configuration files are the only source of truth: Desktop reads and writes
   `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
   `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
@@ -131,8 +149,9 @@ count.
   Removing the selected model clears the selection and blocks the next Prompt
   until the user chooses an available model.
 - Common Provider and model fields use bounded forms. Advanced JSON cannot carry
-  `apiKey` or header values; credential and header values are write-only and are
-  absent from snapshots, events, projections, logs, and diagnostics.
+  `apiKey` or header values; credential and header mutations are write-only.
+  Stored API keys remain absent from snapshots, events, projections, logs, and
+  diagnostics, with only the bounded one-shot reveal response exempted.
 - Release performance meets `docs/testing/performance.md`.
 - Prompt drafts and attachments are cleared only after the Agent Host accepts
   the operation for the same Host epoch, Session ID, and Session generation that

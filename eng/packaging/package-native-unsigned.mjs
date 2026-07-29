@@ -45,6 +45,10 @@ export function unsignedPackagingEnvironment(source) {
 export async function packageUnsignedNative(platform = process.platform, arch = process.arch) {
   const target = resolveUnsignedNativeTarget(platform, arch);
   await access(electronBuilderCli);
+  const { prepareDesktopToolchain } = await import("./prepare-toolchain.mjs");
+  const { prepareDesktopCapabilities } = await import("../capabilities/prepare-capabilities.mjs");
+  await prepareDesktopToolchain(platform, arch);
+  await prepareDesktopCapabilities();
   const exitCode = await run(process.execPath, [electronBuilderCli, ...target.arguments], {
     cwd: root,
     env: unsignedPackagingEnvironment(process.env)

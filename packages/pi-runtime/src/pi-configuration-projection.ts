@@ -20,6 +20,7 @@ import {
   projectProviderConfigurations
 } from "./pi-configuration-documents.js";
 import type { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
+import { reloadDesktopSettings } from "./desktop-package-toolchain.js";
 import { projectRuntimeProviders } from "./session-snapshot.js";
 
 interface RefreshPiConfigurationOptions {
@@ -29,6 +30,7 @@ interface RefreshPiConfigurationOptions {
   source: PiConfigurationChangeSource;
   emit: boolean;
   force: boolean;
+  runtimeReloadWaitMs: number;
   createValidationRuntime(): Promise<ModelRuntime>;
   requireModelRuntime(): Promise<ModelRuntime>;
 }
@@ -100,7 +102,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       }
     }
     if (diagnostics.length === 0) {
-      await state.settingsManager.reload();
+      await reloadDesktopSettings(state.settingsManager);
       for (const item of state.settingsManager.drainErrors()) {
         diagnostics.push({
           file: item.scope === "global" ? "global-settings" : "project-settings",
@@ -125,7 +127,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       && credentials
     ) {
       const reloads = await Promise.all([...state.runtimes].map((target) => (
-        target.requestConfigurationReload(bundle.revision)
+        requestBoundedRuntimeReload(target, bundle.revision, options.runtimeReloadWaitMs)
       )));
       taskReload = reloads.includes("pending")
         ? "pending"
@@ -170,5 +172,27 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       };
       state.listeners.forEach((listener) => listener(change));
     }
+  }
+}
+
+async function requestBoundedRuntimeReload(
+  target: { requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> },
+  revision: string,
+  waitMs: number
+): Promise<PiConfigurationReloadState> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const pending = new Promise<PiConfigurationReloadState>((resolve) => {
+    timer = setTimeout(() => resolve("pending"), waitMs);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([
+      target.requestConfigurationReload(revision),
+      pending
+    ]);
+  } catch {
+    return "pending";
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

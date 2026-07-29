@@ -1,6 +1,5 @@
 import {
   createRuntimeCredentialOverrideStore,
-  ExtensionPackageManagement,
   type AgentRuntime,
   type PiWorkspaceRuntimeServices,
   type PiSdkRuntimeOptions,
@@ -18,6 +17,7 @@ import {
 } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
 import { ExtensionPackageCommandRouter, type ExtensionPackageManagementPort } from "./extension-package-command-router.js";
+import { createWorkerBackedExtensionPackageManagement } from "./package-worker-client.js";
 import {
   dispatchHostCommand,
   type RuntimeLoadedCommand
@@ -123,10 +123,7 @@ export class AgentHostServer {
       getWorkspaceServices: (workspaceId) => this.workspaces.require(workspaceId).workspaceServices,
       listTasks: () => this.tasks.packageTaskViews(),
       createManagement: (services) => this.options.extensionPackageManagementFactory?.(services)
-        ?? new ExtensionPackageManagement({
-          packageManager: services.packageManager,
-          settingsManager: services.settingsManager
-        })
+        ?? createWorkerBackedExtensionPackageManagement(services)
     });
     this.events = new HostEventChannel({
       getConnection: () => this.currentConnection,

@@ -5,7 +5,9 @@ import {
   type ProtocolPort
 } from "@pi67/protocol";
 import { isAttachPortMessage } from "./connection-context.js";
+import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
 import { AgentHostServer } from "./host-server.js";
+import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -19,6 +21,10 @@ interface UtilityParentPort {
 
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
+
+await bootstrapDesktopCapabilities({
+  agentDir: resolveAgentDirectory(undefined)
+});
 
 const server = new AgentHostServer(undefined, {
   onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message)

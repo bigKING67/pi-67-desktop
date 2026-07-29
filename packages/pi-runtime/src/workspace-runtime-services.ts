@@ -5,6 +5,7 @@ import {
 import { RuntimeError } from "@pi67/domain";
 import type { PiConfigurationService } from "./pi-configuration-service.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
+import { applyDesktopPackageToolchain } from "./desktop-package-toolchain.js";
 import { createRuntimeSessionCatalogOwner, type RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import {
@@ -46,6 +47,7 @@ export function createPiWorkspaceRuntimeServices(
     projectTrusted: options.projectTrusted ?? false
   });
   settingsManager.setProjectTrusted(options.projectTrusted ?? settingsManager.isProjectTrusted());
+  applyDesktopPackageToolchain(settingsManager);
   const packageManager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
   const providerCatalog = createPiWorkspaceProviderCatalog({
     cwd,
@@ -109,4 +111,13 @@ export function createPiWorkspaceRuntimeServices(
       }
     }
   };
+}
+
+export function createInMemoryPiWorkspaceRuntimeServices(
+  options: Omit<CreatePiWorkspaceRuntimeServicesOptions, "settingsManager">
+): PiWorkspaceRuntimeServices {
+  return createPiWorkspaceRuntimeServices({
+    ...options,
+    settingsManager: SettingsManager.inMemory()
+  });
 }

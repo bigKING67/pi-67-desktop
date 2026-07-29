@@ -15,6 +15,7 @@ interface ExtensionPackageState {
   begin: (workspaceId: string, phase: Exclude<ExtensionPackagePhase, "idle" | "failed">) => void;
   installList: (workspaceId: string, items: ExtensionPackageEntry[]) => void;
   installUpdates: (workspaceId: string, updates: ExtensionPackageUpdate[]) => void;
+  removeUpdate: (workspaceId: string, source: string, scope: ExtensionPackageEntry["scope"]) => void;
   fail: (workspaceId: string, error: string) => void;
   reset: () => void;
 }
@@ -43,6 +44,13 @@ export const useExtensionPackageStore = create<ExtensionPackageState>((set, get)
   installUpdates(workspaceId, updates) {
     if (get().workspaceId !== workspaceId) return;
     set({ updates, phase: "idle", error: undefined });
+  },
+
+  removeUpdate(workspaceId, source, scope) {
+    if (get().workspaceId !== workspaceId) return;
+    set((state) => ({
+      updates: state.updates.filter((entry) => entry.source !== source || entry.scope !== scope)
+    }));
   },
 
   fail(workspaceId, error) {

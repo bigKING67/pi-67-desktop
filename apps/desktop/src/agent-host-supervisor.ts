@@ -13,6 +13,7 @@ import {
 } from "@pi67/protocol";
 import {
   agentHostEnvironment,
+  type AgentHostRuntimeEnvironment,
   type AgentHostStoragePaths
 } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
@@ -29,6 +30,7 @@ interface AgentHostSupervisorOptions {
   appInstanceId: string;
   expectedRendererOrigin: string;
   getStoragePaths: () => AgentHostStoragePaths;
+  getRuntimeEnvironment?: () => AgentHostRuntimeEnvironment;
   getMainWindow: () => BrowserWindow | undefined;
   rendererUrl: string;
   shutdownDeadlineMs?: number;
@@ -58,6 +60,7 @@ export class AgentHostSupervisor {
   #stopTimer: ReturnType<typeof setTimeout> | undefined;
   #stopHost: UtilityProcess | undefined;
   #shutdownComplete: AgentHostShutdownCompleteMessage | undefined;
+  #lastHandoffKey: string | undefined;
   readonly #shutdownDeadlineMs: number;
 
   constructor(options: AgentHostSupervisorOptions) {
@@ -65,10 +68,10 @@ export class AgentHostSupervisor {
     this.#shutdownDeadlineMs = shutdownDeadline(options.shutdownDeadlineMs);
   }
 
-  connect(): void {
+  connect(replaceCurrent = false): void {
     if (this.#stopping) return;
     if (this.#agentHost && this.#identity) {
-      this.attachPort();
+      this.attachPort(this.#options.getMainWindow(), replaceCurrent);
       return;
     }
     this.#startAgentHost();
@@ -105,9 +108,11 @@ export class AgentHostSupervisor {
     return this.#stopPromise;
   }
 
-  attachPort(window = this.#options.getMainWindow()): void {
+  attachPort(window = this.#options.getMainWindow(), replaceCurrent = false): void {
     if (this.#stopping || !this.#agentHost || !this.#identity || !window || window.isDestroyed()) return;
     if (!isExpectedRendererLocation(window.webContents.getURL(), this.#options.rendererUrl)) return;
+    const handoffKey = rendererDocumentHandoffKey(window, this.#identity.hostEpoch);
+    if (!handoffKey || (!replaceCurrent && handoffKey === this.#lastHandoffKey)) return;
 
     const { port1, port2 } = new MessageChannelMain();
     this.#agentHost.postMessage({
@@ -125,6 +130,7 @@ export class AgentHostSupervisor {
       },
       [port2]
     );
+    this.#lastHandoffKey = handoffKey;
   }
 
   #startAgentHost(): void {
@@ -133,7 +139,11 @@ export class AgentHostSupervisor {
     const host = utilityProcess.fork(this.#options.agentHostEntry, [], {
       serviceName: "Pi-67 Agent Host",
       stdio: "pipe",
-      env: agentHostEnvironment(process.env, this.#options.getStoragePaths())
+      env: agentHostEnvironment(
+        process.env,
+        this.#options.getStoragePaths(),
+        this.#options.getRuntimeEnvironment?.()
+      )
     });
     this.#identity = identity;
     this.#agentHost = host;
@@ -157,6 +167,7 @@ export class AgentHostSupervisor {
     }
     this.#agentHost = undefined;
     this.#identity = undefined;
+    this.#lastHandoffKey = undefined;
     if (this.#stopping) {
       if (this.#stopHost === host) {
         this.#completeStop(Boolean(this.#shutdownComplete) && code === 0, false);
@@ -229,6 +240,13 @@ export class AgentHostSupervisor {
       extensionRequestsCancelled: completion?.extensionRequestsCancelled ?? 0
     });
   }
+}
+
+function rendererDocumentHandoffKey(window: BrowserWindow, hostEpoch: number): string | undefined {
+  const webContents = window.webContents;
+  if (webContents.isDestroyed()) return undefined;
+  const frame = webContents.mainFrame;
+  return `${hostEpoch}:${webContents.id}:${frame.processId}:${frame.routingId}`;
 }
 
 function shutdownDeadline(value = DEFAULT_SHUTDOWN_DEADLINE_MS): number {

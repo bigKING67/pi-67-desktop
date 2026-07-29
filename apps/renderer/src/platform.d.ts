@@ -1,4 +1,7 @@
 import type {
+  PackageNetworkSettings,
+  PackageNetworkSnapshot,
+  DesktopCapabilitySnapshot,
   RuntimeRecoveryRecord,
   WorkbenchSettingsState,
   WorkbenchStateV2,
@@ -19,7 +22,7 @@ declare global {
     pi67: {
       system: {
         getPlatformInfo(): Promise<{ platform: "win32" | "darwin"; architecture: "x64" | "arm64"; version: string }>;
-        connectAgentHost(): Promise<void>;
+        connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
         loadWorkbenchState(): Promise<WorkbenchStateV2>;
         updateWorkbenchLayout(layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
@@ -31,6 +34,13 @@ declare global {
         saveDiagnostics(content: string): Promise<string | undefined>;
         showNotification(title: string, body: string): Promise<void>;
         requestOpenExternal(url: string): Promise<boolean>;
+        getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
+        savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
+        resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;
+        probePackageSources(): Promise<PackageNetworkSnapshot>;
+        getDesktopCapabilitySnapshot(): Promise<DesktopCapabilitySnapshot>;
+        setupBrowser67(): Promise<DesktopCapabilitySnapshot>;
+        doctorBrowser67(): Promise<DesktopCapabilitySnapshot>;
         getUpdateState(): Promise<unknown>;
         checkForUpdates(): Promise<unknown>;
         onAgentHostFailed(listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): () => void;

@@ -9,6 +9,10 @@ import {
   type BrowserWindow
 } from "electron";
 import type { ManualUpdateState } from "./manual-update.js";
+import type { DesktopToolchain } from "./desktop-toolchain.js";
+import type { DesktopCapabilityService } from "./desktop-capability-service.js";
+import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
+import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-source-probe.js";
 import { redact } from "./redaction.js";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
 import {
@@ -24,8 +28,11 @@ import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from 
 const manualUpdateChannel = "unsigned-preview" as const;
 
 interface SystemBridgeOptions {
-  connectAgentHost: () => void;
+  connectAgentHost: (replaceCurrent?: boolean) => void;
   getMainWindow: () => BrowserWindow | undefined;
+  desktopToolchain: DesktopToolchain;
+  desktopCapabilities: DesktopCapabilityService;
+  packageNetworkSettings: PackageNetworkSettingsStore;
   workbenchState: WorkbenchStateStore;
 }
 
@@ -62,7 +69,9 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     architecture: process.arch,
     version: app.getVersion()
   }));
-  ipcMain.handle("pi67:agent-host-connect", () => options.connectAgentHost());
+  ipcMain.handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
+    options.connectAgentHost(replaceCurrent === true)
+  ));
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
   ipcMain.handle("pi67:workbench-layout-update", (_event, value: unknown) => (
     workbenchState.update((state) => replaceWorkbenchLayout(state, value))
@@ -143,6 +152,48 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     return true;
   });
   ipcMain.handle("pi67:update-state", currentUpdateState);
+  ipcMain.handle("pi67:package-network-snapshot", async () => (
+    unprobedPackageNetworkSnapshot(
+      options.desktopToolchain,
+      await options.packageNetworkSettings.load()
+    )
+  ));
+  ipcMain.handle("pi67:package-network-save", async (_event, value: unknown) => (
+    unprobedPackageNetworkSnapshot(
+      options.desktopToolchain,
+      await options.packageNetworkSettings.save(value)
+    )
+  ));
+  ipcMain.handle("pi67:package-network-reset", async () => (
+    unprobedPackageNetworkSnapshot(
+      options.desktopToolchain,
+      await options.packageNetworkSettings.reset()
+    )
+  ));
+  ipcMain.handle("pi67:package-network-probe", async () => (
+    probePackageSources({
+      toolchain: options.desktopToolchain,
+      settings: await options.packageNetworkSettings.load(),
+      fetcher: (input, init) => net.fetch(input, init)
+    })
+  ));
+  ipcMain.handle("pi67:capability-snapshot", () => options.desktopCapabilities.snapshot());
+  ipcMain.handle("pi67:browser67-setup", async () => {
+    const result = await dialog.showMessageBox(options.getMainWindow()!, {
+      type: "question",
+      title: "准备 browser67 依赖",
+      message: "允许本次下载并准备 browser67 运行依赖？",
+      detail: "Desktop 将使用内置 Node/npm，并按照下载源设置依次尝试公共镜像和官方源。不会修改系统 Node、npm 或 Git。",
+      buttons: ["允许本次准备", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    return result.response === 0
+      ? options.desktopCapabilities.setupBrowser67()
+      : options.desktopCapabilities.snapshot();
+  });
+  ipcMain.handle("pi67:browser67-doctor", () => options.desktopCapabilities.doctorBrowser67());
   ipcMain.handle("pi67:update-check", async () => {
     if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
     if (updateCheck) return updateCheck;

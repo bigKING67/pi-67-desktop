@@ -1,5 +1,5 @@
 ---
-version: 3
+version: 4
 name: π Desktop Design Authority
 status: active
 platform: electron-web
@@ -314,18 +314,75 @@ loading error where the operation can produce those states
   result opens the owning category, `Cmd/Ctrl+F` focuses search while Settings is
   mounted, Escape clears a non-empty query, and an empty result state offers an
   explicit reset. A decorative or non-functional search field is not allowed.
-- Category rows are single-line and keep detailed explanations in the content
-  header or owning settings group. The content header presents one category
-  title and one bounded summary; global-only sections do not repeat a redundant
-  `全局设置` label, while project-aware sections retain the explicit scope switch.
-- Settings owns Account, General/Appearance, Provider/Models, Extensions,
-  Skills/Prompts, Runtime/Session, Updates, and Help/About. Account, General,
-  Updates, and Help/About are global-only and do not show a meaningless scope
-  control. Provider, Extensions, Skills/Prompts, and Runtime support explicit
-  global or current-Workspace project scope. Extension management exposes
-  source and scope plus install, update, enable, disable, restore inheritance,
-  and uninstall states only when the Pi package/runtime operation actually
-  supports them.
+- Category rows are single-line and keep detailed explanations in the owning
+  Settings document. The document begins with one category title and one bounded
+  summary; global-only sections do not repeat a redundant `全局设置` label, while
+  project-aware sections retain the explicit scope switch in the same header row.
+- Settings owns `账户`, `通用`, `模型服务`, `扩展`, `技能`, `提示词`, `规则`,
+  `集成`, `运行服务`, `下载源与网络`, `更新与诊断`, and `关于`. Account,
+  General, managed Rules, Integrations, Download Sources/Network, Updates, and
+  About are global-only and do not show a meaningless scope control. Model
+  services, Extensions, Skills, Prompts, and Runtime support explicit global or
+  current-Workspace project scope where Pi has that concept.
+- Every Settings category uses one centered document flow and the content region
+  is its only vertical scroll owner. The document width is `min(1120px, 100%)`,
+  with `32px` top, `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding;
+  narrow windows retain full-width content without document-level horizontal
+  overflow. Page title, summary, scope, and content share the same alignment.
+- Settings uses three intentional content grammars. **Grouped Settings** places
+  related `64px` minimum rows inside one `12px` rounded surface with only row
+  dividers; a row is never an independent card. **Catalog** places tabs, search,
+  filters, and `72px` minimum rows directly on the document canvas without one
+  giant outline or floating cards. **Editor / Notice** lets a textarea, long
+  editor, or semantic notice be the surface and forbids another ordinary card
+  around it. Section headings remain outside all three surfaces.
+- Provider, model, and Extension catalogs always use explicit drill-down rather
+  than automatic master-detail expansion: `Provider 目录 -> Provider 编辑 ->
+  模型目录 -> 模型详情` and `Extensions Catalog -> Extension 详情`. No viewport or
+  container width makes those surfaces side by side. Labeled return actions
+  restore query, filter, selected item, draft state, and catalog scroll position.
+  This prevents Settings from becoming a third or fourth application column on
+  either common or ultra-wide windows.
+- Prompt packages and Rules remain separate navigation targets. `提示词` owns
+  installable, filterable Prompt packages and their scope. `规则` owns managed
+  Desktop Rules plus the user-owned global `AGENTS.md` boundary; it does not
+  imply a project Rule editor that the current product does not provide.
+- Product navigation calls the transient execution environment `运行服务`, not
+  the literal translation `运行时`. Persistent Pi JSONL Sessions remain in the
+  Workspace navigation unless a real, independently actionable Session-settings
+  surface is introduced; Settings does not combine Runtime and Session merely
+  because their implementation lifecycles are related.
+- Package-resource management separates bundled first-party and external sources,
+  shows source kind, scope, inheritance, installed state, and the selected resource
+  type's enabled state. Enable/disable changes only that Pi Package filter; it never
+  flattens object filters or removes sibling Extension, Skill, Prompt, or Theme
+  filters. Bundled packages can be enabled or disabled but are updated with the
+  application and cannot be independently uninstalled.
+- Extensions uses three local views: `已安装`, `发现`, and `当前会话`. Tabs,
+  page-level actions, search, and filters sit directly on the document canvas.
+  `已安装` groups bundled and external sources in one Catalog and moves package
+  metadata and destructive operations into the selected drill-down detail rather
+  than repeating action clusters on every row. The selected detail leads with a
+  bounded plain-text purpose from the installed local package manifest, lists
+  only declared resource types, and explicitly falls back when no description
+  exists; it never fetches or renders remote README/HTML. Destructive removal
+  stays in an independent danger section below ordinary enable/update actions.
+  `发现` and `当前会话` are flat Catalog contents, not cards inside a shared frame.
+- Installing an Extension starts from one page-level action and opens a focused
+  confirmation dialog that identifies npm, Git, or local-directory sources, the
+  target scope, and Pi Runtime permissions. Recommended entries prefill the same
+  dialog and never bypass the one-shot installation confirmation. Runtime Catalog
+  evidence stays in `当前会话` because installed configuration and loaded surfaces
+  are different states.
+- The Download Sources/Network section uses compact forms and status rows rather
+  than a card marketplace. It shows the private Node/npm/Git versions, source mode,
+  ordered mirror and official candidates, not-checked/reachable/unreachable state,
+  latency, resolved Git revision when available, and explicit save/probe errors.
+- Integrations do not equate copied source with readiness. browser67 separately
+  reports `Bundled`, `Dependencies not prepared/Prepared`, and Doctor state. Setup
+  is an explicit one-shot network action through the Desktop private toolchain;
+  deterministic dependency and entrypoint checks may report Degraded until a real
+  browser extension and managed-browser connection are independently proven.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
   removes the task-only Inspector surface and its focus targets from the DOM.
   Returning to a Task restores only that Task's Inspector projection.
@@ -333,7 +390,7 @@ loading error where the operation can produce those states
   category navigation from a fixed left column to one horizontally reachable
   compact row above the content. Icons retain their visible category labels so
   navigation does not depend on memorizing symbols. The scope switch and current
-  section remain in a compact header, while the content owns vertical scrolling
+  section remain at the top of the same document, while the content owns vertical scrolling
   without introducing document-level or two-dimensional overflow.
 - Native directory selection is an explicit trust gesture for that Workspace's
   project resources. The UI does not ask for duplicate Workspace trust after a
@@ -363,8 +420,8 @@ loading error where the operation can produce those states
 
 ### Provider and model configuration
 
-- `Provider 与模型` is the graphical editor for Pi's native configuration, not
-  a parallel Desktop registry. Its file-status region names
+- `模型服务` is the graphical editor for Pi's native Provider and model
+  configuration, not a parallel Desktop registry. Its file-status region names
   `~/.pi/agent/models.json`, `auth.json`, `settings.json`, and the trusted
   Workspace `.pi/settings.json` as the current source of truth.
 - Built-in Pi Providers and models remain visible for credential and default
@@ -382,9 +439,15 @@ loading error where the operation can produce those states
   `仅本次运行` is secondary and clearly states that the value disappears with
   the runtime. If a persistent credential exists while a runtime override is
   active, the UI names both facts rather than implying the stored value is active.
-- The API-key field is masked by default and provides an accessible eye control
-  to reveal or hide only the value currently entered by the user. A persisted
-  credential is never read back from `auth.json` or refilled into that field.
+- The API-key input is masked by default and provides an accessible eye control
+  to reveal or hide only the value currently entered by the user. It never
+  refills from storage. The separate current-authentication row may provide a
+  second eye control for an explicitly requested one-shot reveal of a literal
+  API key stored in `auth.json`. OAuth entries, environment references, and
+  command-backed credentials are not expanded or executed for reveal. The
+  transient value clears when the Provider changes, the dialog closes, the user
+  hides it, or 15 seconds elapse, and it never enters snapshots, events, logs,
+  diagnostics, or persisted Renderer state.
 - Global default writes `~/.pi/agent/settings.json`; project default writes the
   trusted Workspace `.pi/settings.json`. Provider and model must be selected as
   one pair, while `未设置` removes that scope's pair.
@@ -398,9 +461,36 @@ loading error where the operation can produce those states
   a running Task until its current Operation settles. If the selected model was
   removed, the model control becomes unselected and the Composer explains that a
   new model is required before another Prompt can be sent.
-- The Provider list, editor, defaults, sync status, conflict state, and credential
-  dialog retain labeled actions, visible focus, keyboard order, and one-axis
-  scrolling at the 680px packaged-window minimum and at 200% zoom.
+- The Provider Catalog keeps search and sync actions above one flat result list.
+  Search matches both display name and Provider ID without switching or
+  discarding the active draft. Selecting a row replaces the Catalog with the
+  Provider editor at every width. Inside the editor, `基本配置`, `模型`, `默认模型`,
+  and `文件与诊断` are Provider-setting sections rather than Task tabs. They
+  prevent frequent controls, advanced compatibility fields, and diagnostics
+  from being presented as equally weighted cards.
+- Provider sync status, Provider Catalog, section tabs, and editor do not share
+  a bounded outer frame. `返回模型服务列表` restores the Catalog's search,
+  selection, and scroll position without discarding the Provider draft.
+- A Provider model Catalog uses readable rows and renders only one model detail
+  editor at a time. Search matches display name and Model ID; the initial bounded
+  filters are `全部`, image input, reasoning, and custom overrides. Filtering or
+  switching models preserves the Provider draft. Adding a model clears filters,
+  selects the new row, and focuses Model ID; removing the active model selects a
+  neighboring row. Header mutations and advanced JSON remain collapsed until
+  requested or an error requires attention.
+- Model Catalog and model detail are mutually exclusive at every editor width.
+  `返回模型列表` restores search, filters, selected item, and scroll position while
+  the Provider draft stays live. Large Provider and model catalogs remain in the
+  one-axis Settings document and never create two-dimensional scrolling.
+- Global and project default-model controls are searchable comboboxes rather
+  than native selects. They match Provider name/ID and model name/ID, expose a
+  bounded result window, support keyboard selection, and preserve an explicit
+  `未设置` action. File synchronization is a compact validity summary during
+  normal operation and expands paths or diagnostics on demand; invalid files or
+  diagnostics open that region automatically.
+- The defaults, sync status, conflict state, and credential dialog retain labeled
+  actions, visible focus, keyboard order, and one-axis scrolling at the 680px
+  packaged-window minimum and at 200% zoom.
 
 ### Runtime controls
 
@@ -570,8 +660,14 @@ loading error where the operation can produce those states
   covered and no known TUI custom surface remains; partial coverage stays `partial`.
 - TUI-only custom components show an actionable compatibility message.
 - The Provider dialog lists configured state, non-secret credential source, and
-  model count. A configured credential is represented as hidden rather than read
-  back; complete keys never enter renderer state.
+  model count. A configured credential remains hidden by default. Only an
+  explicit current-authentication eye action can request a literal stored API
+  key, and that one-shot value is bounded, transient, and excluded from all
+  normal Provider projections and persistence.
+- Provider configuration reads never wait indefinitely for an open Task to
+  hot-reload its model runtime. Fast reloads remain `applied`; a slow or failed
+  reload becomes `pending` after a bounded Agent Host wait and is retried by the
+  Task runtime without blocking the Settings snapshot.
 - Credential inputs never refill. Persistent storage in Pi `auth.json` is the
   primary path; an explicitly runtime-only key states that it is cleared when the
   Agent Host exits or restarts and remains available only across Desktop-created

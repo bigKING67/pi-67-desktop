@@ -6,6 +6,17 @@ const PackageSourceSchema = Type.String({
   pattern: "^(?![\\s\\S]*\\u0000)(?=[\\s\\S]*\\S)[\\s\\S]+$"
 });
 const PackageScopeSchema = Type.Union([Type.Literal("global"), Type.Literal("project")]);
+const PackageResourceTypeSchema = Type.Union([
+  Type.Literal("extension"),
+  Type.Literal("skill"),
+  Type.Literal("prompt"),
+  Type.Literal("theme")
+]);
+const PackageManifestTextSchema = (maximum: number) => Type.String({
+  minLength: 1,
+  maxLength: maximum,
+  pattern: "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])(?=[\\s\\S]*\\S)[\\s\\S]+$"
+});
 
 export const ExtensionPackageTargetSchema = strictObject({
   source: PackageSourceSchema,
@@ -15,7 +26,8 @@ export const ExtensionPackageTargetSchema = strictObject({
 export const ExtensionPackageEnabledTargetSchema = strictObject({
   source: PackageSourceSchema,
   scope: PackageScopeSchema,
-  enabled: Type.Boolean()
+  enabled: Type.Boolean(),
+  resourceType: Type.Optional(PackageResourceTypeSchema)
 });
 
 export const ExtensionPackageInheritanceTargetSchema = strictObject({
@@ -27,7 +39,21 @@ const ExtensionPackageEntrySchema = strictObject({
   scope: PackageScopeSchema,
   enabled: Type.Boolean(),
   filtered: Type.Boolean(),
-  installed: Type.Boolean()
+  installed: Type.Boolean(),
+  displayName: Type.Optional(PackageManifestTextSchema(200)),
+  version: Type.Optional(PackageManifestTextSchema(100)),
+  description: Type.Optional(PackageManifestTextSchema(320)),
+  sourceKind: Type.Optional(Type.Union([
+    Type.Literal("bundled"), Type.Literal("npm"), Type.Literal("git"), Type.Literal("path")
+  ])),
+  origin: Type.Optional(Type.Union([
+    Type.Literal("first-party"), Type.Literal("third-party"), Type.Literal("external")
+  ])),
+  resourceTypes: Type.Optional(Type.Array(PackageResourceTypeSchema, { maxItems: 4 })),
+  resourceStates: Type.Optional(Type.Array(strictObject({
+    type: PackageResourceTypeSchema,
+    enabled: Type.Boolean()
+  }), { maxItems: 4 }))
 });
 
 export const ExtensionPackageListResultSchema = strictObject({

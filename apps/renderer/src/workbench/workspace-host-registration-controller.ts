@@ -5,13 +5,30 @@ import { queryFirstSessionCatalog } from "../navigation/session-catalog-controll
 import { publishNotification } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 
+const registrationFlights = new Map<string, Promise<void>>();
+const registeredWorkspaces = new Set<string>();
+const catalogFlights = new Map<string, Promise<void>>();
+const queriedCatalogs = new Set<string>();
+
 export async function registerRendererWorkspaceWithHost(
   workspace: WorkspaceDescriptor,
   options: { queryCatalog?: boolean; refreshCatalog?: boolean } = {}
 ): Promise<boolean> {
   if (workspace.availability !== "available") return false;
-  await ensureAgentConnection();
-  await agentConnectionController.request(
+  const identity = await ensureAgentConnection();
+  const key = workspaceRegistrationKey(identity.hostEpoch, workspace);
+  await ensureWorkspaceRegistration(key, workspace);
+  if (options.queryCatalog !== false) {
+    await ensureWorkspaceCatalog(key, workspace.id, options.refreshCatalog === true);
+  }
+  return true;
+}
+
+async function ensureWorkspaceRegistration(key: string, workspace: WorkspaceDescriptor): Promise<void> {
+  if (registeredWorkspaces.has(key)) return;
+  const existing = registrationFlights.get(key);
+  if (existing) return existing;
+  const flight = agentConnectionController.request(
     "workspace.register",
     {
       cwd: workspace.identity.canonicalPath,
@@ -20,11 +37,50 @@ export async function registerRendererWorkspaceWithHost(
     },
     [],
     { context: { scope: "workspace", workspaceId: workspace.id } }
-  );
-  if (options.queryCatalog !== false) {
-    await queryFirstSessionCatalog(workspace.id, { refresh: options.refreshCatalog === true });
+  ).then(() => {
+    registeredWorkspaces.add(key);
+  });
+  registrationFlights.set(key, flight);
+  try {
+    await flight;
+  } finally {
+    if (registrationFlights.get(key) === flight) registrationFlights.delete(key);
   }
-  return true;
+}
+
+async function ensureWorkspaceCatalog(
+  key: string,
+  workspaceId: string,
+  refresh: boolean
+): Promise<void> {
+  if (!refresh && queriedCatalogs.has(key)) return;
+  const existing = catalogFlights.get(key);
+  if (existing) return existing;
+  const flight = queryFirstSessionCatalog(workspaceId, { refresh }).then((loaded) => {
+    if (loaded) queriedCatalogs.add(key);
+  });
+  catalogFlights.set(key, flight);
+  try {
+    await flight;
+  } finally {
+    if (catalogFlights.get(key) === flight) catalogFlights.delete(key);
+  }
+}
+
+function workspaceRegistrationKey(hostEpoch: number, workspace: WorkspaceDescriptor): string {
+  return JSON.stringify([
+    hostEpoch,
+    workspace.id,
+    workspace.identity.canonicalPath,
+    workspace.trust
+  ]);
+}
+
+export function resetWorkspaceHostRegistrationState(): void {
+  registrationFlights.clear();
+  registeredWorkspaces.clear();
+  catalogFlights.clear();
+  queriedCatalogs.clear();
 }
 
 export async function registerAvailableRendererWorkspaces(): Promise<void> {

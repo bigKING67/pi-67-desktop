@@ -53,6 +53,7 @@ import {
 } from "./session-resource-schemas.js";
 import { ProtocolErrorSchema } from "./protocol-error-schema.js";
 import {
+  PiCredentialRevealResultSchema,
   PiProviderConfigurationChangedSchema,
   PiProviderConfigurationSnapshotSchema
 } from "./provider-configuration-schemas.js";
@@ -242,6 +243,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "provider.configuration.save": PiProviderConfigurationSnapshotSchema,
   "provider.configuration.remove": PiProviderConfigurationSnapshotSchema,
   "provider.credential.store": PiProviderConfigurationSnapshotSchema,
+  "provider.credential.reveal": PiCredentialRevealResultSchema,
   "provider.credential.remove": PiProviderConfigurationSnapshotSchema,
   "model.default.set": PiProviderConfigurationSnapshotSchema,
   "provider.configuration.reload": PiProviderConfigurationSnapshotSchema,

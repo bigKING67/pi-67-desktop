@@ -22,6 +22,10 @@ export interface PiCredentialSummary {
   type: "api_key" | "oauth";
 }
 
+export type PiCredentialRevealResult =
+  | { provider: string; status: "revealed"; apiKey: string }
+  | { provider: string; status: "not-found" | "not-api-key" | "indirect" };
+
 export interface PiModelConfigurationView {
   id: string;
   name?: string;
@@ -175,6 +179,22 @@ const PiCredentialSummarySchema = strictObject({
   provider: IdentifierSchema,
   type: Type.Union([Type.Literal("api_key"), Type.Literal("oauth")])
 });
+
+export const PiCredentialRevealResultSchema = Type.Union([
+  strictObject({
+    provider: IdentifierSchema,
+    status: Type.Literal("revealed"),
+    apiKey: Type.String({ minLength: 1, maxLength: 16_384 })
+  }),
+  strictObject({
+    provider: IdentifierSchema,
+    status: Type.Union([
+      Type.Literal("not-found"),
+      Type.Literal("not-api-key"),
+      Type.Literal("indirect")
+    ])
+  })
+]);
 
 const CredentialSourceSchema = Type.Union([
   Type.Literal("stored"),

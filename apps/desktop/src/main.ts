@@ -8,6 +8,12 @@ import { createApplicationShutdownController } from "./application-shutdown.js";
 import { registerApplicationProtocol, registerAppSchemePrivileges } from "./app-protocol.js";
 import { createMainWindow } from "./main-window.js";
 import { registerPowerResumeRecovery } from "./power-resume.js";
+import { resolveDesktopToolchain } from "./desktop-toolchain.js";
+import {
+  DesktopCapabilityService,
+  resolveDesktopAgentDirectory
+} from "./desktop-capability-service.js";
+import { PackageNetworkSettingsStore } from "./package-network-settings.js";
 import { redact } from "./redaction.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
 import { registerSystemBridge } from "./system-bridge.js";
@@ -22,6 +28,13 @@ import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
 const agentHostEntry = normalize(join(currentDirectory, "../../agent-host/dist/index.mjs"));
+const toolchainRoot = app.isPackaged
+  ? join(process.resourcesPath, "toolchain")
+  : normalize(join(currentDirectory, "../../../artifacts/toolchain/current"));
+const capabilitiesRoot = app.isPackaged
+  ? join(process.resourcesPath, "capabilities")
+  : normalize(join(currentDirectory, "../../../artifacts/capabilities/current"));
+const desktopToolchain = resolveDesktopToolchain(toolchainRoot, app.isPackaged);
 const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER_DEV_URL);
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
 const supportedTarget = (process.platform === "win32" && process.arch === "x64")
@@ -36,11 +49,23 @@ if (!supportedTarget) {
 let mainWindow: BrowserWindow | undefined;
 let unregisterPowerResumeRecovery: (() => void) | undefined;
 let workbenchState: WorkbenchStateStore | undefined;
+let packageNetworkSettings: PackageNetworkSettingsStore | undefined;
+let desktopCapabilities: DesktopCapabilityService | undefined;
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
   appInstanceId: randomUUID(),
   expectedRendererOrigin,
   getStoragePaths: () => createAgentHostStoragePaths(app.getPath("userData")),
+  getRuntimeEnvironment: () => {
+    if (!packageNetworkSettings) throw new Error("Package network settings are not initialized.");
+    return {
+      toolchain: desktopToolchain,
+      capabilitiesRoot,
+      packageNetworkSettingsPath: packageNetworkSettings.requestedSettingsPath,
+      packaged: app.isPackaged,
+      electronExecutable: process.execPath
+    };
+  },
   getMainWindow: () => mainWindow,
   rendererUrl
 });
@@ -69,6 +94,13 @@ if (hasSingleInstanceLock) {
   void app.whenReady().then(async () => {
     registerApplicationProtocol(rendererDirectory);
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
+    packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
+    desktopCapabilities = new DesktopCapabilityService({
+      capabilitiesRoot,
+      agentDir: resolveDesktopAgentDirectory(),
+      toolchain: desktopToolchain,
+      packageNetworkSettings
+    });
     await workbenchState.update(beginWorkbenchRun);
     const persistedWorkbench = (await workbenchState.load()).state;
     const refreshedWorkspaces = await Promise.all(
@@ -76,8 +108,11 @@ if (hasSingleInstanceLock) {
     );
     await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
     registerSystemBridge({
-      connectAgentHost: () => agentHostSupervisor.connect(),
+      connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       getMainWindow: () => mainWindow,
+      desktopToolchain,
+      desktopCapabilities,
+      packageNetworkSettings,
       workbenchState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({

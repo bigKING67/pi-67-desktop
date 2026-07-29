@@ -5,6 +5,65 @@ export const zhCNMessages = {
     close: "关闭",
     stop: "停止"
   },
+  settings: {
+    groups: {
+      personal: "个人",
+      application: "应用",
+      pi: "Pi",
+      support: "支持"
+    },
+    sections: {
+      account: {
+        label: "账户",
+        summary: "管理登录状态、账户同步与本地数据边界。"
+      },
+      general: {
+        label: "通用",
+        summary: "调整外观、语言和桌面交互偏好。"
+      },
+      providers: {
+        label: "模型服务",
+        summary: "配置模型服务、认证、可用模型与默认模型。"
+      },
+      extensions: {
+        label: "扩展",
+        summary: "安装、更新、启用、停用和卸载 Pi 扩展。"
+      },
+      skills: {
+        label: "技能",
+        summary: "管理内置与外部技能，并查看当前会话实际加载状态。"
+      },
+      prompts: {
+        label: "提示词",
+        summary: "管理内置与外部提示词包及其作用域。"
+      },
+      rules: {
+        label: "规则",
+        summary: "查看桌面托管规则、全局上下文与 AGENTS.md 边界。"
+      },
+      integrations: {
+        label: "集成",
+        summary: "准备并诊断 browser67 等具有独立运行依赖的集成。"
+      },
+      runtime: {
+        label: "运行服务",
+        summary: "查看并发、恢复和 Pi 运行服务状态。"
+      },
+      network: {
+        label: "下载源与网络",
+        summary: "管理私有 Node/npm/Git、公共镜像、官方回退和源可达性。"
+      },
+      updates: {
+        label: "更新与诊断",
+        summary: "检查版本更新并导出脱敏运行诊断。"
+      },
+      about: {
+        label: "关于",
+        summary: "查看 π 的产品边界、版本与运行架构。"
+      }
+    },
+    emptySearchSuggestion: "尝试搜索主题、模型、技能、镜像或更新。"
+  },
   dateTime: {
     unknown: "时间未知",
     justNow: "刚刚",
@@ -173,9 +232,13 @@ export const zhCNMessages = {
   credentials: {
     title: "Provider 与凭据",
     eyebrow: "Pi Provider 状态",
-    privacyTitle: "已保存密钥不会自动读取或回填。",
-    privacyDetail: "当前输入默认隐藏，可点击小眼睛临时查看；保存时默认持久化到 Pi auth.json。",
+    privacyTitle: "已保存密钥仅在你主动查看时临时显示。",
+    privacyDetail: "默认保持隐藏；显示值不会进入快照、诊断或日志，并会在切换 Provider、关闭弹窗或 15 秒后清除。保存时默认持久化到 Pi auth.json。",
     providerList: "Pi Provider 列表",
+    providerSearch: "搜索 Provider",
+    providerSearchPlaceholder: "搜索名称或 ID…",
+    clearProviderSearch: "清除 Provider 搜索",
+    noProviderMatches: "没有匹配的 Provider",
     modelCount: (count: number) => `${count} 个模型`,
     configured: "已配置",
     unconfigured: "未配置",
@@ -195,8 +258,15 @@ export const zhCNMessages = {
     apiKeyLabel: "Provider API 密钥",
     showApiKey: "显示 API Key",
     hideApiKey: "隐藏 API Key",
+    showSavedApiKey: "临时显示已保存 API Key",
+    hideSavedApiKey: "隐藏已保存 API Key",
+    revealingSavedApiKey: "正在读取已保存 API Key…",
+    savedApiKeyNotFound: "当前没有可显示的持久 API Key。",
+    savedApiKeyNotApiKey: "当前保存的是 OAuth 凭据，不能作为 API Key 显示。",
+    savedApiKeyIndirect: "当前凭据由环境变量或命令提供，不能在这里直接显示。",
+    savedApiKeyRevealFailed: "无法临时显示已保存 API Key。",
     keyPlaceholder: "输入后发送到 Pi 运行服务",
-    keyPrivacyHelp: "至少 8 个字符。输入值不会进入会话快照、诊断或日志，也不会在关闭后回填。",
+    keyPrivacyHelp: "至少 8 个字符。新输入不会进入会话快照、诊断或日志；已保存值只在主动查看时短暂进入当前窗口。",
     temporaryOrPiConfiguration: "可保存到 Pi auth.json，或仅在本次运行中使用。",
     runtimeSource: "来源：本次运行内存",
     storedSource: "来源：Pi AuthStorage",

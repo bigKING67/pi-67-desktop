@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ExtensionPackageListResult } from "@pi67/domain";
 import { isReplaySafeControlMutation } from "./agent-messages.js";
 import {
   APP_PROTOCOL_CONTEXT,
@@ -44,7 +45,12 @@ describe("Extension package management protocol", () => {
     const mutations = [
       ["extension.package.install", { source: "npm:example", scope: "global" }],
       ["extension.package.update", { source: "npm:example", scope: "global" }],
-      ["extension.package.setEnabled", { source: "npm:example", scope: "project", enabled: false }],
+      ["extension.package.setEnabled", {
+        source: "npm:example",
+        scope: "project",
+        enabled: false,
+        resourceType: "skill"
+      }],
       ["extension.package.restoreInheritance", { source: "npm:example" }],
       ["extension.package.uninstall", { source: "npm:example", scope: "project" }]
     ] as const;
@@ -77,15 +83,33 @@ describe("Extension package management protocol", () => {
         scope: "global" as const,
         enabled: true,
         filtered: false,
-        installed: true
+        installed: true,
+        displayName: "example",
+        version: "1.2.3",
+        description: "Adds a bounded example capability to Pi.",
+        sourceKind: "npm",
+        origin: "external",
+        resourceTypes: ["extension", "skill"],
+        resourceStates: [
+          { type: "extension", enabled: true },
+          { type: "skill", enabled: false }
+        ]
       }],
       total: 1
-    };
+    } satisfies ExtensionPackageListResult;
     expect(isResponseEnvelope(responseEnvelope("list-1", 2, WORKSPACE_CONTEXT, {
       ok: true,
       type: "extension.package.list",
       result: listResult
     }))).toBe(true);
+    expect(isResponseEnvelope(responseEnvelope("list-invalid", 2, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "extension.package.list",
+      result: {
+        ...listResult,
+        items: [{ ...listResult.items[0]!, description: "x".repeat(321) }]
+      }
+    }))).toBe(false);
     expect(isResponseEnvelope(responseEnvelope("updates-1", 2, WORKSPACE_CONTEXT, {
       ok: true,
       type: "extension.package.checkUpdates",

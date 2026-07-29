@@ -1,3 +1,4 @@
+import type { TaskProtocolContext } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
@@ -9,6 +10,8 @@ import {
   useWorkspaceChangesStore,
   type WorkspaceChangesTarget
 } from "./workspace-changes-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 
 let refreshFlight: Promise<void> | undefined;
 
@@ -27,18 +30,31 @@ export function refreshWorkspaceChanges(): Promise<void> {
   if (store.status === "loading" && refreshFlight) return refreshFlight;
   const target = store.beginRefresh(useSessionProjectionStore.getState().authority);
   if (!target) return Promise.resolve();
+  const context = taskContextForTarget(target);
+  if (!context) {
+    store.failRefresh(target);
+    return Promise.resolve();
+  }
 
-  const promise = executeRefresh(target).finally(() => {
+  const promise = executeRefresh(target, context).finally(() => {
     if (refreshFlight === promise) refreshFlight = undefined;
   });
   refreshFlight = promise;
   return promise;
 }
 
-async function executeRefresh(target: WorkspaceChangesTarget): Promise<void> {
+async function executeRefresh(
+  target: WorkspaceChangesTarget,
+  context: TaskProtocolContext
+): Promise<void> {
   const store = useWorkspaceChangesStore.getState();
   try {
-    const projection = await agentConnectionController.request("workspace.changes", {});
+    const projection = await agentConnectionController.request(
+      "workspace.changes",
+      {},
+      [],
+      { context }
+    );
     if (projection.sessionId !== target.sessionId) {
       throw new Error("Workspace changes response belongs to a different Session.");
     }
@@ -51,6 +67,14 @@ async function executeRefresh(target: WorkspaceChangesTarget): Promise<void> {
       message: errorMessage(error)
     });
   }
+}
+
+function taskContextForTarget(target: WorkspaceChangesTarget): TaskProtocolContext | undefined {
+  const task = Object.values(rendererWorkbenchStore.getState().tasks).find((candidate) => (
+    candidate.sessionId === target.sessionId
+    && candidate.sessionGeneration === target.sessionGeneration
+  ));
+  return task ? workbenchProtocolContextForTask(task) : undefined;
 }
 
 function errorMessage(error: unknown): string {

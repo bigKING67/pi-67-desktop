@@ -35,7 +35,14 @@ export async function assertPackagedRuntimeAssets(artifact) {
   await Promise.all([
     access(artifact.executablePath),
     access(join(unpackedModules, clipboardModule)),
-    access(join(unpackedModules, "@silvia-odwyer/photon-node/photon_rs_bg.wasm"))
+    access(join(unpackedModules, "@silvia-odwyer/photon-node/photon_rs_bg.wasm")),
+    access(join(artifact.resourcesPath, "toolchain/manifest.json")),
+    access(join(artifact.resourcesPath, "capabilities/manifest.json")),
+    access(join(artifact.resourcesPath, "capabilities/catalog.json")),
+    access(join(artifact.resourcesPath, "capabilities/packages/pi67-core/package.json")),
+    access(join(artifact.resourcesPath, "capabilities/packages/browser67/package.json")),
+    access(join(artifact.resourcesPath, "capabilities/packages/design-craft/package.json")),
+    access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json"))
   ]);
 }
 

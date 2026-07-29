@@ -32,6 +32,7 @@ export interface MockDesktopBridgeOptions {
     scope: "global" | "project";
     workspaceId?: string;
   };
+  capabilityInitializingCalls?: number;
 }
 
 export const DEFAULT_MOCK_WORKSPACE: MockWorkspaceDescriptor = {
@@ -60,7 +61,8 @@ export async function installMockDesktopBridge(
     expandedWorkspaceIds: options.expandedWorkspaceIds ?? [],
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
-    settings: options.settings ?? { section: "general" as const, scope: "global" as const }
+    settings: options.settings ?? { section: "general" as const, scope: "global" as const },
+    capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0
   };
   await page.addInitScript((bridgeFixture) => {
     type FixtureWorkbenchState = {
@@ -75,6 +77,7 @@ export async function installMockDesktopBridge(
       cleanExit: boolean;
     };
     let pickerIndex = 0;
+    let capabilitySnapshotCalls = 0;
     let workbenchState: FixtureWorkbenchState = {
       version: 2 as const,
       workspaces: structuredClone(bridgeFixture.initialWorkspaces),
@@ -150,6 +153,47 @@ export async function installMockDesktopBridge(
           selectSessionFile: async () => "/Users/test/.pi/agent/sessions/demo.jsonl",
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
           showNotification: async () => undefined,
+          getPackageNetworkSnapshot: async () => packageNetworkSnapshot(),
+          savePackageNetworkSettings: async (settings: Record<string, unknown>) => ({
+            ...packageNetworkSnapshot(),
+            settings: structuredClone(settings)
+          }),
+          resetPackageNetworkSettings: async () => packageNetworkSnapshot(),
+          probePackageSources: async () => ({
+            ...packageNetworkSnapshot(),
+            checkedAt: 1_784_800_000_000,
+            sources: packageNetworkSnapshot().sources.map((source) => ({
+              ...source,
+              status: "reachable",
+              latencyMs: 36
+            }))
+          }),
+          getDesktopCapabilitySnapshot: async () => {
+            capabilitySnapshotCalls += 1;
+            const snapshot = capabilitySnapshot();
+            if (capabilitySnapshotCalls > bridgeFixture.capabilityInitializingCalls) return snapshot;
+            return {
+              ...snapshot,
+              phase: "initializing",
+              packages: snapshot.packages.map((entry) => ({ ...entry, installed: false })),
+              managedContext: { rules: "unavailable", agents: "unavailable" }
+            };
+          },
+          setupBrowser67: async () => ({
+            ...capabilitySnapshot(),
+            integrations: [{
+              id: "browser67",
+              displayName: "browser67",
+              bundled: true,
+              dependencyState: "prepared",
+              doctorState: "degraded",
+              detail: "依赖与命令入口已验证；真实 managed browser 连接仍需独立检查。",
+              preparedAt: 1_784_800_000_000,
+              checkedAt: 1_784_800_000_000,
+              registry: "https://registry.npmmirror.com"
+            }]
+          }),
+          doctorBrowser67: async () => capabilitySnapshot(),
           requestOpenExternal: async (url: string) => {
             const testWindow = window as unknown as {
               __pi67UpdateTest: { checks: number; openedUrls: string[]; allowOpen: boolean };
@@ -188,6 +232,64 @@ export async function installMockDesktopBridge(
       if (surface?.kind === "workspace") return surface.workspaceId;
       if (surface?.kind === "conversation") return surface.conversation.workspaceId;
       return undefined;
+    }
+
+    function packageNetworkSnapshot() {
+      return {
+        settings: { npmMode: "automatic", gitMode: "automatic", gitMirrors: ["gitclone", "ghproxy"] },
+        toolchain: {
+          ready: true,
+          packaged: false,
+          platform: "darwin",
+          architecture: "arm64",
+          nodeVersion: "24.18.0",
+          npmVersion: "12.0.1",
+          gitVersion: "2.53.0"
+        },
+        sources: [
+          { id: "npm-public-mirror", kind: "npm", role: "public-mirror", url: "https://registry.npmmirror.com", status: "not-checked" },
+          { id: "npm-official", kind: "npm", role: "official", url: "https://registry.npmjs.org", status: "not-checked" },
+          { id: "git-gitclone", kind: "git", role: "public-mirror", url: "https://gitclone.com/github.com/arpagon/pi-rewind.git", status: "not-checked" },
+          { id: "git-official", kind: "git", role: "official", url: "https://github.com/arpagon/pi-rewind.git", status: "not-checked" }
+        ]
+      };
+    }
+
+    function capabilitySnapshot() {
+      return {
+        phase: "ready",
+        catalogVersion: "2026.07.28.1",
+        packages: [{
+          id: "pi67-core",
+          displayName: "Pi-67 Core",
+          origin: "first-party",
+          bundled: true,
+          defaultEnabled: true,
+          version: "0.15.5",
+          commit: "6f03b61705b6fd882de408fbbf8353578bfce86d",
+          resourceTypes: ["extension", "skill", "prompt", "rule"],
+          installed: true
+        }, {
+          id: "browser67",
+          displayName: "browser67",
+          origin: "first-party",
+          bundled: true,
+          defaultEnabled: true,
+          version: "0.4.0",
+          commit: "952ef19255f4aa1de535e114dc395eec5c9f0819",
+          resourceTypes: ["skill", "integration"],
+          installed: true
+        }],
+        recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }],
+        managedContext: { rules: "installed", agents: "user-owned" },
+        integrations: [{
+          id: "browser67",
+          displayName: "browser67",
+          bundled: true,
+          dependencyState: "not-prepared",
+          doctorState: "not-checked"
+        }]
+      };
     }
   }, fixture);
 }

@@ -15,9 +15,9 @@ import {
 export async function queryFirstSessionCatalog(
   workspaceOrOptions: WorkspaceId | { query?: string; refresh?: boolean } = {},
   maybeOptions: { query?: string; refresh?: boolean } = {}
-): Promise<void> {
+): Promise<boolean> {
   const { workspaceId, options } = catalogRequestArguments(workspaceOrOptions, maybeOptions);
-  if (!workspaceId) return;
+  if (!workspaceId) return false;
   const store = useSessionCatalogStore.getState();
   const target = store.beginFirstPage(workspaceId, options);
   try {
@@ -26,9 +26,10 @@ export async function queryFirstSessionCatalog(
       query: target.query,
       ...(target.refresh ? { refresh: true } : {})
     });
-    store.finishFirstPage(target, page);
+    return store.finishFirstPage(target, page);
   } catch (error) {
     store.failFirstPage(target, errorMessage(error));
+    return false;
   }
 }
 

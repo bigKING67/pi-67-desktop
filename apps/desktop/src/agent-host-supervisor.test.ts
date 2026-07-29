@@ -28,7 +28,7 @@ describe("AgentHostSupervisor", () => {
     vi.useRealTimers();
   });
 
-  it("renews the MessagePort for an existing Host without forking another process", () => {
+  it("reuses the MessagePort for the same Renderer document", () => {
     const host = fakeUtilityProcess();
     const window = fakeWindow("app://pi67/index.html");
     electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
@@ -38,13 +38,42 @@ describe("AgentHostSupervisor", () => {
     host.emit("spawn");
     const firstHandoff = window.postMessage.mock.calls[0]?.[1] as { hostEpoch?: number } | undefined;
     supervisor.connect();
-    const secondHandoff = window.postMessage.mock.calls[1]?.[1] as { hostEpoch?: number } | undefined;
+
+    expect(electronMocks.fork).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledOnce();
+    expect(window.postMessage).toHaveBeenCalledOnce();
+    expect(firstHandoff?.hostEpoch).toBe(1);
+  });
+
+  it("hands off a new MessagePort after the Renderer document changes", () => {
+    const host = fakeUtilityProcess();
+    const window = fakeWindow("app://pi67/index.html");
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value);
+
+    supervisor.connect();
+    host.emit("spawn");
+    window.setRoutingId(23);
+    supervisor.connect();
 
     expect(electronMocks.fork).toHaveBeenCalledOnce();
     expect(host.postMessage).toHaveBeenCalledTimes(2);
     expect(window.postMessage).toHaveBeenCalledTimes(2);
-    expect(firstHandoff?.hostEpoch).toBe(1);
-    expect(secondHandoff?.hostEpoch).toBe(firstHandoff?.hostEpoch);
+  });
+
+  it("allows an explicit same-document MessagePort replacement", () => {
+    const host = fakeUtilityProcess();
+    const window = fakeWindow("app://pi67/index.html");
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value);
+
+    supervisor.connect();
+    host.emit("spawn");
+    supervisor.connect(true);
+
+    expect(electronMocks.fork).toHaveBeenCalledOnce();
+    expect(host.postMessage).toHaveBeenCalledTimes(2);
+    expect(window.postMessage).toHaveBeenCalledTimes(2);
   });
 
   it("does not bypass the supervised restart backoff when reconnect is requested", async () => {
@@ -66,6 +95,28 @@ describe("AgentHostSupervisor", () => {
     expect(electronMocks.fork).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(1);
     expect(electronMocks.fork).toHaveBeenCalledTimes(2);
+  });
+
+  it("hands off a new MessagePort when a restarted Host advances the epoch", async () => {
+    vi.useFakeTimers();
+    const firstHost = fakeUtilityProcess();
+    const secondHost = fakeUtilityProcess();
+    const window = fakeWindow("app://pi67/index.html");
+    electronMocks.fork
+      .mockReturnValueOnce(firstHost as unknown as UtilityProcess)
+      .mockReturnValueOnce(secondHost as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value);
+
+    supervisor.connect();
+    firstHost.emit("spawn");
+    firstHost.emit("exit", 1);
+    await vi.advanceTimersByTimeAsync(500);
+    secondHost.emit("spawn");
+
+    expect(window.postMessage).toHaveBeenCalledTimes(2);
+    expect(window.postMessage.mock.calls.map((call) => (
+      call[1] as { hostEpoch: number }
+    ).hostEpoch)).toEqual([1, 2]);
   });
 
   it("does not transfer a renewed Port to an unexpected renderer location", () => {
@@ -209,12 +260,19 @@ function createSupervisor(window: BrowserWindow, shutdownDeadlineMs?: number): A
 function fakeWindow(url: string) {
   const postMessage = vi.fn();
   const send = vi.fn();
+  const frame = { processId: 11, routingId: 22 };
   return {
     postMessage,
     send,
+    setRoutingId(routingId: number) {
+      frame.routingId = routingId;
+    },
     value: {
       isDestroyed: () => false,
       webContents: {
+        id: 7,
+        mainFrame: frame,
+        isDestroyed: () => false,
         getURL: () => url,
         postMessage,
         send

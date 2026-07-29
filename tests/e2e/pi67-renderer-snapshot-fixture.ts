@@ -35,7 +35,15 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
     ],
     providers: [
       { id: "openai", label: "OpenAI", configured: true, credentialSource: "stored", modelCount: 1 },
-      { id: "anthropic", label: "Anthropic", configured: false, modelCount: 1 }
+      { id: "anthropic", label: "Anthropic", configured: false, modelCount: 1 },
+      { id: "codex", label: "codex", configured: true, credentialSource: "stored", modelCount: 3 },
+      { id: "deepseek", label: "DeepSeek", configured: true, credentialSource: "stored", modelCount: 2 },
+      { id: "amazon-bedrock", label: "Amazon Bedrock", configured: false, modelCount: 109 },
+      { id: "ant-ling", label: "Ant Ling", configured: false, modelCount: 3 },
+      { id: "azure-openai-responses", label: "Azure OpenAI", configured: false, modelCount: 46 },
+      { id: "google", label: "Google", configured: false, modelCount: 18 },
+      { id: "mistral", label: "Mistral", configured: false, modelCount: 12 },
+      { id: "xai", label: "xAI", configured: false, modelCount: 7 }
     ],
     selectedModel: { provider: "openai", id: "gpt-test" },
     thinkingLevel: "medium",

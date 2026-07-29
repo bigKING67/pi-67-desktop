@@ -1,0 +1,56 @@
+{
+  "schema": "pi67.capability-sources-lock.v1",
+  "catalogVersion": "2026.07.28.1",
+  "sources": [
+    {
+      "id": "pi67-core",
+      "displayName": "Pi-67 Core",
+      "origin": "first-party",
+      "repository": "https://github.com/bigKING67/pi-67.git",
+      "commit": "6f03b61705b6fd882de408fbbf8353578bfce86d",
+      "localSibling": "../pi-67",
+      "version": "0.15.5"
+    },
+    {
+      "id": "browser67",
+      "displayName": "browser67",
+      "origin": "first-party",
+      "repository": "https://github.com/bigKING67/browser67.git",
+      "commit": "952ef19255f4aa1de535e114dc395eec5c9f0819",
+      "localSibling": "../browser67",
+      "version": "0.4.0"
+    },
+    {
+      "id": "design-craft",
+      "displayName": "design-craft",
+      "origin": "first-party",
+      "repository": "https://github.com/bigKING67/design-craft",
+      "commit": "38aaf83f14d96682063b330df0ac3cd4b1f17732",
+      "localSibling": "../design-craft",
+      "version": "0.5.1"
+    },
+    {
+      "id": "commerce-growth-os",
+      "displayName": "commerce-growth-os",
+      "origin": "first-party",
+      "repository": "https://github.com/bigKING67/commerce-growth-os.git",
+      "commit": "83186cb008f415965c50eca4a70dfa9471799095",
+      "localSibling": "../commerce-growth-os",
+      "version": "2.0.0"
+    }
+  ],
+  "recommendedExternal": [
+    { "id": "pi-subagents", "source": "npm:pi-subagents", "recommendedVersion": "0.34.0" },
+    { "id": "pi-observational-memory", "source": "npm:pi-observational-memory", "recommendedVersion": "3.0.2" },
+    { "id": "pi-fff", "source": "npm:@ff-labs/pi-fff", "recommendedVersion": "0.9.6" },
+    { "id": "pi-web-access", "source": "npm:pi-web-access", "recommendedVersion": "0.13.0" },
+    { "id": "pi-smart-fetch", "source": "npm:pi-smart-fetch", "recommendedVersion": "0.3.12" },
+    { "id": "pi-plan-mode", "source": "npm:@narumitw/pi-plan-mode", "recommendedVersion": "0.11.0" },
+    {
+      "id": "pi-rewind",
+      "source": "https://github.com/arpagon/pi-rewind.git",
+      "minimumCommit": "91611ad87992fb7b635a41ba68f67916ff6e6ae3"
+    },
+    { "id": "pi-mcp-adapter", "source": "npm:pi-mcp-adapter", "recommendedVersion": "2.10.0" }
+  ]
+}

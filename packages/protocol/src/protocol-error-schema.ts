@@ -15,7 +15,11 @@ export const ProtocolErrorSchema = strictObject({
     Type.Literal("OPERATION_NOT_FOUND"), Type.Literal("SESSION_CHANGED_EXTERNALLY"),
     Type.Literal("CONFIGURATION_CHANGED_EXTERNALLY"),
     Type.Literal("RUNTIME_NOT_READY"), Type.Literal("RUNTIME_POISONED"),
-    Type.Literal("MODEL_NOT_FOUND"), Type.Literal("WORKSPACE_NOT_TRUSTED"),
+    Type.Literal("MODEL_NOT_FOUND"), Type.Literal("NATIVE_BUILD_TOOLCHAIN_REQUIRED"),
+    Type.Literal("NO_REACHABLE_PACKAGE_SOURCE"), Type.Literal("PACKAGE_INTEGRITY_MISMATCH"),
+    Type.Literal("PACKAGE_RELOAD_REQUIRED"), Type.Literal("GIT_COMMIT_MISMATCH"),
+    Type.Literal("GIT_CONTENT_HASH_MISMATCH"), Type.Literal("TOOLCHAIN_INTEGRITY_FAILED"),
+    Type.Literal("TOOLCHAIN_MISSING"), Type.Literal("WORKSPACE_NOT_TRUSTED"),
     Type.Literal("PATH_OUTSIDE_WORKSPACE"), Type.Literal("RESOURCE_LIMIT_EXCEEDED"),
     Type.Literal("UNSUPPORTED"), Type.Literal("INTERNAL")
   ]),

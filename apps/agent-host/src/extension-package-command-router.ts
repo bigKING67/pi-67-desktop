@@ -192,7 +192,8 @@ export class ExtensionPackageCommandRouter {
         return management.setEnabled(
           command.payload.source,
           command.payload.scope,
-          command.payload.enabled
+          command.payload.enabled,
+          command.payload.resourceType
         );
       case "extension.package.restoreInheritance":
         return management.restoreProjectInheritance(command.payload.source);

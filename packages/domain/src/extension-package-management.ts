@@ -1,4 +1,12 @@
 export type ExtensionPackageScope = "global" | "project";
+export type PackageResourceType = "extension" | "skill" | "prompt" | "theme";
+export type PackageSourceKind = "bundled" | "npm" | "git" | "path";
+export type CapabilityOrigin = "first-party" | "third-party" | "external";
+
+export interface PackageResourceState {
+  type: PackageResourceType;
+  enabled: boolean;
+}
 
 export interface ExtensionPackageEntry {
   source: string;
@@ -6,6 +14,13 @@ export interface ExtensionPackageEntry {
   enabled: boolean;
   filtered: boolean;
   installed: boolean;
+  displayName?: string;
+  version?: string;
+  description?: string;
+  sourceKind?: PackageSourceKind;
+  origin?: CapabilityOrigin;
+  resourceTypes?: PackageResourceType[];
+  resourceStates?: PackageResourceState[];
 }
 
 export interface ExtensionPackageUpdate {

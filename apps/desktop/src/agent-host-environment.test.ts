@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { delimiter, dirname, join } from "node:path";
 import { agentHostEnvironment } from "./agent-host-environment.js";
 
 describe("Agent Host environment", () => {
@@ -34,5 +35,50 @@ describe("Agent Host environment", () => {
       capabilityProbeDirectory: "/outside",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
     })).toThrow("Main-owned userData layout");
+  });
+
+  it("hands only the verified private toolchain and package settings path to the Host", () => {
+    const toolchainRoot = join(process.platform === "win32" ? "C:\\app" : "/app", "resources", "toolchain");
+    const nodeExecutable = join(toolchainRoot, "node", process.platform === "win32" ? "node.exe" : "bin/node");
+    const npmCli = join(toolchainRoot, "npm", "bin", "npm-cli.js");
+    const gitExecutable = join(toolchainRoot, "git", process.platform === "win32" ? "cmd/git.exe" : "bin/git");
+    const environment = agentHostEnvironment({ PATH: "/usr/bin" }, {
+      storageRoot: "/app/user-data",
+      capabilityProbeDirectory: "/app/user-data",
+      sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
+    }, {
+      toolchain: {
+        root: toolchainRoot,
+        ready: true,
+        packaged: true,
+        platform: "darwin",
+        architecture: "arm64",
+        nodeVersion: "24.18.0",
+        npmVersion: "12.0.1",
+        gitVersion: "2.53.0",
+        nodeExecutable,
+        npmCli,
+        gitExecutable
+      },
+      capabilitiesRoot: "/app/resources/capabilities",
+      packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
+      packaged: true,
+      electronExecutable: "/app/Pi-67 Desktop"
+    });
+
+    expect(environment).toMatchObject({
+      PI67_PACKAGED: "1",
+      PI67_NODE_EXECUTABLE: nodeExecutable,
+      PI67_NPM_CLI: npmCli,
+      PI67_GIT_EXECUTABLE: gitExecutable,
+      PI67_CAPABILITIES_ROOT: "/app/resources/capabilities",
+      PI67_PACKAGE_NETWORK_SETTINGS: "/app/user-data/package-manager/network-settings.json",
+      npm_config_registry: "https://registry.npmmirror.com",
+      GIT_CONFIG_VALUE_0: "https://github.com/"
+    });
+    expect(environment.PATH?.split(delimiter).slice(0, 2)).toEqual([
+      dirname(nodeExecutable),
+      dirname(gitExecutable)
+    ]);
   });
 });

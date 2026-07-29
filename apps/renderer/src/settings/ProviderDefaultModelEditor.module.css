@@ -1,0 +1,216 @@
+.section {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.sectionIntro {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionIntro strong {
+  font-size: 13px;
+}
+
+.sectionIntro small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.defaultGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.defaultCombobox {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.defaultCombobox[data-disabled] {
+  opacity: .55;
+}
+
+.defaultComboboxControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  min-width: 0;
+}
+
+.defaultComboboxControl > svg {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.defaultComboboxControl input {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  padding: 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px 0 0 7px;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.defaultComboboxControl button {
+  min-height: 35px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-left: 0;
+  border-radius: 0 7px 7px 0;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+}
+
+.defaultComboboxControl input:focus,
+.defaultComboboxControl button:focus-visible {
+  z-index: 1;
+  border-color: var(--focus);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 16%, transparent);
+}
+
+.defaultModelPopover {
+  z-index: 80;
+  width: var(--trigger-width);
+  min-width: min(360px, calc(100vw - 24px));
+  max-width: min(520px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.defaultModelList {
+  max-height: min(360px, 52vh);
+  padding: 6px;
+  overflow-y: auto;
+  outline: none;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.defaultModelList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.defaultModelList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.defaultModelList::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+  background-clip: padding-box;
+}
+
+.defaultModelOption {
+  display: flex;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: default;
+  outline: none;
+}
+
+.defaultModelOption[data-focused],
+.defaultModelOption[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.defaultModelOption[data-selected] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+
+.defaultModelOption span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.defaultModelOption strong,
+.defaultModelOption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.defaultModelOption strong {
+  font-size: 11px;
+}
+
+.defaultModelOption small {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.defaultModelEmpty,
+.defaultModelLimit {
+  padding: 11px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.defaultModelLimit {
+  border-top: 1px solid var(--border);
+}
+
+.effectiveDefault {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.effectiveDefault strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.effectiveDefault small {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.trustNotice {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+@media (max-width: 920px) {
+  .defaultGrid {
+    grid-template-columns: 1fr;
+  }
+}

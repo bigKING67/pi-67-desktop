@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import type { PiProviderConfigurationChanged } from "@pi67/protocol";
+import type { PiConfigurationReloadState, PiProviderConfigurationChanged } from "@pi67/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { PiConfigurationService } from "./pi-configuration-service.js";
 
@@ -136,9 +136,45 @@ describe("PiConfigurationService", () => {
       await fixture.dispose();
     }
   }, 20_000);
+
+  it("returns Provider configuration while a Task model reload remains pending", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      runtimeReloadWaitMs: 5
+    });
+    const runtimeReload = deferred<PiConfigurationReloadState>();
+    let unregisterRuntime: (() => void) | undefined;
+    try {
+      await fixture.service.get(fixture.cwd);
+      const changes: PiProviderConfigurationChanged[] = [];
+      fixture.service.subscribe(fixture.cwd, (change) => changes.push(change));
+      unregisterRuntime = fixture.service.registerRuntime(fixture.cwd, {
+        requestConfigurationReload: () => runtimeReload.promise
+      });
+      await writeFile(fixture.service.modelsPath, `${JSON.stringify({ providers: {} }, null, 2)}\n`, "utf8");
+
+      const result = await Promise.race([
+        fixture.service.reload(fixture.cwd),
+        delay(1_000).then(() => "timed-out" as const)
+      ]);
+
+      expect(result).not.toBe("timed-out");
+      expect(result).toMatchObject({ syncState: "current" });
+      expect(changes.at(-1)?.taskReload).toBe("pending");
+    } finally {
+      runtimeReload.resolve("applied");
+      unregisterRuntime?.();
+      await fixture.dispose();
+    }
+  }, 20_000);
 });
 
-async function createFixture(options: { fallbackPollMs?: number; watchDebounceMs?: number } = {}) {
+async function createFixture(options: {
+  fallbackPollMs?: number;
+  watchDebounceMs?: number;
+  runtimeReloadWaitMs?: number;
+} = {}) {
   const root = await mkdtemp(join(tmpdir(), "pi67-configuration-service-"));
   temporaryDirectories.push(root);
   const cwd = join(root, "workspace");
@@ -173,4 +209,16 @@ async function waitFor(predicate: () => boolean, timeoutMs = 4_000): Promise<voi
     if (Date.now() - startedAt >= timeoutMs) throw new Error("Timed out waiting for configuration change.");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

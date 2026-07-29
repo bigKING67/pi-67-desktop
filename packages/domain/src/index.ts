@@ -4,6 +4,8 @@ export * from "./extension-compatibility.js";
 export * from "./extension-package-management.js";
 export * from "./runtime-state.js";
 export * from "./operation.js";
+export * from "./package-network.js";
+export * from "./desktop-capability.js";
 export * from "./projection-limits.js";
 export * from "./runtime-error.js";
 export * from "./safety-policy.js";

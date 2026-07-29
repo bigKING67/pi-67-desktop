@@ -1,61 +1,7 @@
-.manager {
-  display: grid;
-  width: min(820px, 100%);
-  gap: 14px;
-  margin-bottom: var(--space-5);
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-}
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.header h4,
-.header p,
-.empty,
-.error,
-.dialog p,
-.dialog dl {
-  margin: 0;
-}
-
-.header h4 {
-  font-size: 13px;
-}
-
-.header p,
-.empty,
-.error,
-.dialog p {
-  margin-top: 3px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.installRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: var(--space-2);
-}
-
-.installRow label {
-  display: grid;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-size: 10px;
-}
-
-.installRow input {
-  width: 100%;
+.sourceInput {
+  width: min(560px, 100%);
   min-height: 34px;
+  margin-top: 7px;
   padding: 0 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
@@ -66,33 +12,21 @@
   font-size: 11px;
 }
 
-.installRow input:focus-visible {
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
+.sourceInput:focus-visible {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
 }
 
-.installRow input:disabled {
+.sourceInput:disabled {
   opacity: 0.5;
 }
 
-.packageList {
-  display: grid;
-  gap: 5px;
-}
-
 .packageRow {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 50px;
-  padding: var(--space-2) 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-muted);
+  min-height: 64px;
 }
 
 .status {
+  display: block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -103,38 +37,11 @@
   background: var(--success);
 }
 
-.packageMeta {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.packageMeta strong {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-family: var(--font-code);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.packageMeta span {
-  color: var(--text-tertiary);
-  font-size: 10px;
-}
-
-.packageActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-1);
-}
-
-.packageActions button {
+.packageAction {
   display: inline-flex;
   min-height: 28px;
   align-items: center;
-  gap: var(--space-1);
+  gap: 4px;
   padding: 0 7px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -143,21 +50,17 @@
   font-size: 10px;
 }
 
-.packageActions button[data-hovered] {
+.packageAction[data-hovered] {
   border-color: var(--border-strong);
   background: var(--surface-hover);
   color: var(--text-primary);
 }
 
-.packageActions button[data-disabled] {
+.packageAction[data-disabled] {
   opacity: 0.42;
 }
 
-.packageActions .dangerButton {
-  color: var(--danger);
-}
-
-.error {
+.dangerButton {
   color: var(--danger);
 }
 
@@ -169,6 +72,17 @@
   display: grid;
   gap: 14px;
   outline: none;
+}
+
+.dialog p,
+.dialog dl {
+  margin: 0;
+}
+
+.dialog p {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .dialog dl {
@@ -184,7 +98,7 @@
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
   gap: 10px;
-  padding: var(--space-2) 10px;
+  padding: 8px 10px;
   background: var(--surface);
 }
 
@@ -211,23 +125,8 @@
   color: var(--text-on-danger);
 }
 
-@media (max-width: 1100px) {
-  .header,
-  .installRow {
-    align-items: stretch;
-    grid-template-columns: 1fr;
-  }
-
-  .header {
-    display: grid;
-  }
-
-  .packageRow {
-    grid-template-columns: 8px minmax(0, 1fr);
-  }
-
-  .packageActions {
-    grid-column: 2;
-    justify-content: flex-start;
+@media (max-width: 720px) {
+  .sourceInput {
+    width: 100%;
   }
 }

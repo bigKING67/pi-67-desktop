@@ -1,0 +1,158 @@
+import type {
+  DesktopCapabilityPackageSummary,
+  ExtensionPackageEntry,
+  ExtensionPackageUpdate,
+  PackageSourceKind
+} from "@pi67/domain";
+
+export type PackageFilter = "all" | "enabled" | "disabled" | "updates";
+export type ConfirmedAction =
+  | { kind: "update"; entry: ExtensionPackageEntry }
+  | { kind: "uninstall"; entry: ExtensionPackageEntry };
+
+interface ConfiguredPackageRow {
+  kind: "configured";
+  key: string;
+  entry: ExtensionPackageEntry;
+  inherited: boolean;
+  update: ExtensionPackageUpdate | undefined;
+}
+
+export interface BundledPackageRow {
+  kind: "bundled";
+  key: string;
+  entry: DesktopCapabilityPackageSummary;
+}
+
+export type PackageRow = ConfiguredPackageRow | BundledPackageRow;
+
+export function buildPackageRows(
+  items: ExtensionPackageEntry[],
+  bundledPackages: DesktopCapabilityPackageSummary[],
+  updates: ExtensionPackageUpdate[],
+  scope: "global" | "project"
+): PackageRow[] {
+  const bundled = bundledPackages
+    .filter((entry) => entry.resourceTypes.includes("extension"))
+    .map((entry): BundledPackageRow => ({ kind: "bundled", key: `bundled:${entry.id}`, entry }));
+  const configured = packagesForScope(items, scope)
+    .filter(({ entry }) => packageSupportsExtension(entry) && !isBundledEntry(entry))
+    .map(({ entry, inherited }): ConfiguredPackageRow => ({
+      kind: "configured",
+      key: `configured:${entry.source}`,
+      entry,
+      inherited,
+      update: updates.find((candidate) => candidate.source === entry.source && candidate.scope === entry.scope)
+    }));
+  return [...bundled, ...configured];
+}
+
+export function filterPackageRows(rows: PackageRow[], filter: PackageFilter, query: string): PackageRow[] {
+  const normalized = query.trim().toLocaleLowerCase("zh-CN");
+  return rows.filter((row) => {
+    if (filter === "enabled" && !packageRowEnabled(row)) return false;
+    if (filter === "disabled" && packageRowEnabled(row)) return false;
+    if (filter === "updates" && !(row.kind === "configured" && row.update)) return false;
+    if (!normalized) return true;
+    const haystack = row.kind === "bundled"
+      ? [row.entry.displayName, row.entry.id, row.entry.version, ...row.entry.resourceTypes]
+      : [
+          packageRowName(row),
+          row.entry.source,
+          row.entry.version ?? "",
+          row.entry.description ?? "",
+          sourceKindLabel(resolveSourceKind(row.entry)),
+          row.entry.scope
+        ];
+    return haystack.some((value) => value.toLocaleLowerCase("zh-CN").includes(normalized));
+  });
+}
+
+export function packageResourceEnabled(entry: ExtensionPackageEntry): boolean {
+  return entry.resourceStates?.find((state) => state.type === "extension")?.enabled ?? entry.enabled;
+}
+
+export function packageRowEnabled(row: PackageRow): boolean {
+  return row.kind === "bundled" ? row.entry.installed && row.entry.defaultEnabled : packageResourceEnabled(row.entry);
+}
+
+export function packageRowState(row: PackageRow): "enabled" | "disabled" | "unavailable" | "bundled" {
+  if (row.kind === "bundled") return row.entry.installed ? "bundled" : "unavailable";
+  if (!row.entry.installed) return "unavailable";
+  return packageResourceEnabled(row.entry) ? "enabled" : "disabled";
+}
+
+export function packageRowName(row: PackageRow): string {
+  if (row.kind === "bundled") return row.entry.displayName;
+  if (row.entry.displayName) return row.entry.displayName;
+  const source = row.entry.source;
+  if (source.startsWith("npm:")) return source.slice(4);
+  const normalized = source.replaceAll("\\", "/").replace(/\/+$/u, "");
+  const last = normalized.split("/").at(-1) ?? source;
+  return last.endsWith(".git") ? last.slice(0, -4) : last;
+}
+
+export function packageRowSummary(row: PackageRow): string {
+  if (row.kind === "bundled") return `${row.entry.version} · 随应用更新`;
+  const scope = row.inherited ? "继承自全局" : row.entry.scope === "global" ? "全局" : "当前项目";
+  return `${sourceKindLabel(resolveSourceKind(row.entry))} · ${scope}`;
+}
+
+export function packageRowAccessibleName(row: PackageRow): string {
+  if (row.kind === "bundled") return `${packageRowName(row)}，${packageRowSummary(row)}`;
+  const scope = row.inherited ? "继承自全局" : row.entry.scope === "global" ? "全局" : "当前项目";
+  return `${packageRowName(row)}，${row.entry.source} · ${scope}`;
+}
+
+export function resolveSourceKind(entry: ExtensionPackageEntry): PackageSourceKind {
+  return entry.sourceKind ?? inferSourceKind(entry.source);
+}
+
+export function inferSourceKind(source: string): PackageSourceKind {
+  const normalized = source.trim().toLocaleLowerCase("en-US");
+  if (normalized.startsWith("npm:")) return "npm";
+  if (
+    normalized.startsWith("git:")
+    || normalized.startsWith("git+")
+    || normalized.startsWith("git@")
+    || normalized.endsWith(".git")
+    || normalized.startsWith("http://")
+    || normalized.startsWith("https://")
+  ) return "git";
+  if (
+    normalized.startsWith("/")
+    || normalized.startsWith("./")
+    || normalized.startsWith("../")
+    || /^[a-z]:[\\/]/iu.test(normalized)
+  ) return "path";
+  return "npm";
+}
+
+export function sourceKindLabel(kind: PackageSourceKind): string {
+  if (kind === "bundled") return "随应用提供";
+  if (kind === "npm") return "npm";
+  if (kind === "git") return "Git";
+  return "本地目录";
+}
+
+function packagesForScope(items: ExtensionPackageEntry[], scope: "global" | "project") {
+  if (scope === "global") {
+    return items.filter((entry) => entry.scope === "global").map((entry) => ({ entry, inherited: false }));
+  }
+  const projectSources = new Set(
+    items.filter((entry) => entry.scope === "project").map((entry) => entry.source)
+  );
+  return [
+    ...items.filter((entry) => entry.scope === "project").map((entry) => ({ entry, inherited: false })),
+    ...items.filter((entry) => entry.scope === "global" && !projectSources.has(entry.source))
+      .map((entry) => ({ entry, inherited: true }))
+  ];
+}
+
+function packageSupportsExtension(entry: ExtensionPackageEntry): boolean {
+  return entry.resourceTypes?.includes("extension") ?? true;
+}
+
+function isBundledEntry(entry: ExtensionPackageEntry): boolean {
+  return entry.sourceKind === "bundled" || entry.origin === "first-party";
+}

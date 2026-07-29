@@ -5,7 +5,8 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   installExtensionPackage,
   loadExtensionPackages,
-  setExtensionPackageEnabled
+  setExtensionPackageEnabled,
+  updateExtensionPackage
 } from "./extension-package-controller.js";
 import { useExtensionPackageStore } from "./extension-package-store.js";
 
@@ -85,7 +86,7 @@ describe("Extension package controller", () => {
     )).resolves.toBe(true);
     expect(request).toHaveBeenCalledWith(
       "extension.package.setEnabled",
-      { source: "npm:example", scope: "project", enabled: false },
+      { source: "npm:example", scope: "project", enabled: false, resourceType: "extension" },
       [],
       { context: { scope: "workspace", workspaceId: "workspace-a" } }
     );
@@ -101,6 +102,21 @@ describe("Extension package controller", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       title: "项目 Extension 设置未更改"
     });
+  });
+
+  it("clears a consumed update after the package mutation succeeds", async () => {
+    const source = "npm:example";
+    const store = useExtensionPackageStore.getState();
+    store.begin("workspace-a", "checking");
+    store.installUpdates("workspace-a", [{ source, scope: "global", type: "npm", displayName: "example" }]);
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [{ source, scope: "global", enabled: true, filtered: false, installed: true }],
+      total: 1,
+      changed: true
+    } as never);
+
+    await expect(updateExtensionPackage(source, "global", "workspace-a")).resolves.toBe(true);
+    expect(useExtensionPackageStore.getState().updates).toEqual([]);
   });
 });
 

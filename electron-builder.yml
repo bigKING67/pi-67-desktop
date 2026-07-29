@@ -22,6 +22,10 @@ extraResources:
     to: THIRD_PARTY_NOTICES.md
   - from: licenses
     to: licenses
+  - from: artifacts/toolchain/current
+    to: toolchain
+  - from: artifacts/capabilities/current
+    to: capabilities
 protocols:
   - name: π
     schemes:

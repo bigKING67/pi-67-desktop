@@ -99,6 +99,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     provider: PiConfigurationProviderIdSchema,
     apiKey: Type.String({ minLength: 8, maxLength: 16_384 })
   }),
+  "provider.credential.reveal": strictObject({
+    expectedRevision: PiConfigurationExpectedRevisionSchema,
+    provider: PiConfigurationProviderIdSchema
+  }),
   "provider.credential.remove": strictObject({
     expectedRevision: PiConfigurationExpectedRevisionSchema,
     provider: PiConfigurationProviderIdSchema

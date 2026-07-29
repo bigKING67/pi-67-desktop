@@ -9,24 +9,19 @@ import type {
   PiConfigurationChangeSource,
   PiConfigurationFileKind,
   PiConfigurationReloadState,
+  PiCredentialRevealResult,
   PiDefaultModelSelection,
   PiProviderConfigurationChanged,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
 } from "@pi67/protocol";
-import {
-  withConfigurationFileLock,
-  writePrivateFileAtomically
-} from "./atomic-private-file.js";
-import {
-  removeProviderDocument,
-  saveProviderDocument,
-  setDefaultModelDocument
-} from "./pi-configuration-documents.js";
+import { withConfigurationFileLock, writePrivateFileAtomically } from "./atomic-private-file.js";
+import { removeProviderDocument, saveProviderDocument, setDefaultModelDocument } from "./pi-configuration-documents.js";
 import {
   authContentRevision,
   PiAuthContentChangedError,
   PiAuthCredentialStore,
+  revealStoredApiKey,
   type PiAuthCredentialMutationResult
 } from "./pi-auth-credential-store.js";
 import {
@@ -46,6 +41,7 @@ import { refreshPiConfigurationProjection } from "./pi-configuration-projection.
 
 const FALLBACK_POLL_MS = 2_000;
 const WATCH_DEBOUNCE_MS = 200;
+const RUNTIME_RELOAD_WAIT_MS = 1_000;
 
 export interface PiConfigurationReloadTarget {
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
@@ -60,6 +56,7 @@ export interface RegisterPiConfigurationWorkspaceOptions {
 export interface PiConfigurationServiceOptions {
   fallbackPollMs?: number;
   watchDebounceMs?: number;
+  runtimeReloadWaitMs?: number;
 }
 
 export class PiConfigurationService {
@@ -71,6 +68,7 @@ export class PiConfigurationService {
   private readonly credentials: PiAuthCredentialStore;
   private readonly workspaces = new Map<string, WorkspaceConfigurationState>();
   private readonly watcher: PiConfigurationWatcher;
+  private readonly runtimeReloadWaitMs: number;
   private modelRuntime: ModelRuntime | undefined;
   private operationTail: Promise<unknown> = Promise.resolve();
   private disposed = false;
@@ -86,6 +84,7 @@ export class PiConfigurationService {
       globalSettingsPath: this.globalSettingsPath
     };
     this.credentials = new PiAuthCredentialStore(this.authPath);
+    this.runtimeReloadWaitMs = boundedWaitMilliseconds(options.runtimeReloadWaitMs, RUNTIME_RELOAD_WAIT_MS);
     this.watcher = new PiConfigurationWatcher({
       agentDir: this.agentDir,
       fallbackPollMs: options.fallbackPollMs ?? FALLBACK_POLL_MS,
@@ -127,10 +126,7 @@ export class PiConfigurationService {
     this.watcher.schedule();
   }
 
-  subscribe(
-    cwd: string,
-    listener: (change: PiProviderConfigurationChanged) => void
-  ): () => void {
+  subscribe(cwd: string, listener: (change: PiProviderConfigurationChanged) => void): () => void {
     const state = this.requireWorkspace(cwd);
     state.listeners.add(listener);
     return () => state.listeners.delete(listener);
@@ -245,12 +241,20 @@ export class PiConfigurationService {
     ));
   }
 
-  setDefaultModel(
-    cwd: string,
-    expectedRevision: string,
-    scope: "global" | "project",
-    selection?: PiDefaultModelSelection
-  ): Promise<PiProviderConfigurationSnapshot> {
+  revealCredential(cwd: string, expectedRevision: string, providerId: string): Promise<PiCredentialRevealResult> {
+    return this.serial(async () => {
+      const state = this.requireWorkspace(cwd);
+      const bundle = await readWorkspaceConfigurationBundle(this.paths, state);
+      assertExpectedConfigurationRevision(bundle, expectedRevision);
+      return {
+        provider: providerId,
+        ...revealStoredApiKey(bundle.byKind.auth.content, providerId)
+      };
+    });
+  }
+
+  setDefaultModel(cwd: string, expectedRevision: string, scope: "global" | "project",
+    selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
     const state = this.requireWorkspace(cwd);
     if (scope === "project" && !state.projectTrusted) {
       return Promise.reject(new RuntimeError(
@@ -391,6 +395,7 @@ export class PiConfigurationService {
       source,
       emit,
       force,
+      runtimeReloadWaitMs: this.runtimeReloadWaitMs,
       createValidationRuntime: () => this.createPiValidationRuntime(),
       requireModelRuntime: () => this.requireModelRuntime()
     });
@@ -442,4 +447,12 @@ export class PiConfigurationService {
   private assertActive(): void {
     if (this.disposed) throw new RuntimeError("RUNTIME_NOT_READY", "Pi configuration service is disposed.");
   }
+}
+
+function boundedWaitMilliseconds(value: number | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Pi configuration runtime reload wait must be a finite non-negative number.");
+  }
+  return Math.floor(value);
 }

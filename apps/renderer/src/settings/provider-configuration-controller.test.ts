@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import {
   loadProviderConfiguration,
+  resetProviderConfigurationLoadState,
   saveProviderConfiguration,
   setDefaultModelConfiguration,
   storePersistentCredential
@@ -15,6 +17,8 @@ describe("provider configuration controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     rendererWorkbenchStore.getState().reset();
+    resetWorkspaceHostRegistrationState();
+    resetProviderConfigurationLoadState();
     useProviderConfigurationStore.getState().reset();
     useNotificationStore.getState().clear();
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -61,6 +65,31 @@ describe("provider configuration controller", () => {
       baselineRevision: configuration.revision,
       dirty: false
     });
+  });
+
+  it("shares one Provider load and one failure notification across concurrent mounts", async () => {
+    const pending = deferred<PiProviderConfigurationSnapshot>();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation((type) => {
+      if (type === "workspace.register") return Promise.resolve({ registered: true }) as never;
+      if (type === "provider.configuration.get") return pending.promise as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    const first = loadProviderConfiguration("workspace-a");
+    const second = loadProviderConfiguration("workspace-a");
+    expect(first).toBe(second);
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.configuration.get")
+    ).toHaveLength(1));
+
+    pending.reject(new Error("provider request timed out"));
+    await expect(first).resolves.toBe(false);
+    await expect(second).resolves.toBe(false);
+
+    expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
+    expect(useNotificationStore.getState().items.filter((item) => (
+      item.title === "无法读取 Pi Provider 配置"
+    ))).toHaveLength(1);
   });
 
   it("sends a persistent credential only through its write-only mutation", async () => {
@@ -175,4 +204,15 @@ function snapshot(
 
 function file(kind: PiProviderConfigurationSnapshot["files"][number]["kind"]) {
   return { kind, path: `/fixture/${kind}.json`, exists: true, valid: true };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  reject: (error: unknown) => void;
+} {
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((_resolve, rejectPromise) => {
+    reject = rejectPromise;
+  });
+  return { promise, reject };
 }

@@ -38,4 +38,18 @@ describe("renderer Provider command fixture", () => {
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toMatch(/workspace-secret|write-only|header-value/iu);
   });
+
+  it("accepts the explicit one-shot Provider reveal response without adding it to snapshots", () => {
+    const response = responseEnvelope("fixture-provider-reveal", 1, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "provider.credential.reveal",
+      result: {
+        provider: "openai",
+        status: "revealed",
+        apiKey: "fixture-persisted-openai-key"
+      }
+    });
+    expect(isResponseEnvelope(response)).toBe(true);
+    expect(JSON.stringify(createMockProviderConfigurationSnapshot())).not.toContain("fixture-persisted-openai-key");
+  });
 });

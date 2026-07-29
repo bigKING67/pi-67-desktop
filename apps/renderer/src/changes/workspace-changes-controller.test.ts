@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { refreshWorkspaceChanges } from "./workspace-changes-controller.js";
 import { useWorkspaceChangesStore } from "./workspace-changes-store.js";
 
@@ -20,6 +21,33 @@ describe("workspace changes controller", () => {
     useSessionProjectionStore.setState({ authority: { phase: "active", ...AUTHORITY } });
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     useWorkspaceChangesStore.getState().beginSession(AUTHORITY);
+    rendererWorkbenchStore.getState().reset();
+    rendererWorkbenchStore.getState().registerWorkspace({
+      id: "workspace-1",
+      displayName: "Workspace 1",
+      identity: { canonicalPath: "/work/one", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    rendererWorkbenchStore.getState().openTask({
+      id: "task-1",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-1",
+        sessionPath: "/sessions/one.jsonl"
+      },
+      workspaceId: "workspace-1",
+      sessionId: AUTHORITY.sessionId,
+      sessionGeneration: AUTHORITY.sessionGeneration,
+      taskGeneration: 2,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "Task 1",
+      sessionPath: "/sessions/one.jsonl",
+      hasDraft: false,
+      attachmentCount: 0
+    });
   });
 
   afterEach(() => {
@@ -32,7 +60,16 @@ describe("workspace changes controller", () => {
 
     await refreshWorkspaceChanges();
 
-    expect(request).toHaveBeenCalledWith("workspace.changes", {});
+    expect(request).toHaveBeenCalledWith("workspace.changes", {}, [], {
+      context: {
+        scope: "task",
+        workspaceId: "workspace-1",
+        taskId: "task-1",
+        taskGeneration: 2,
+        sessionId: "session-1",
+        sessionGeneration: 3
+      }
+    });
     expect(useWorkspaceChangesStore.getState()).toMatchObject({
       projection: expected,
       status: "ready"
@@ -89,6 +126,29 @@ describe("workspace changes controller", () => {
 
     expect(request).toHaveBeenCalledOnce();
     expect(useWorkspaceChangesStore.getState().projection?.items[0]?.toolCallId).toBe("tool-current");
+  });
+
+  it("uses the matching Task authority while Settings is the selected surface", async () => {
+    rendererWorkbenchStore.getState().openSettings("providers");
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+      projection("session-1", "tool-settings") as never
+    );
+
+    await refreshWorkspaceChanges();
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(useWorkspaceChangesStore.getState().projection?.items[0]?.toolCallId).toBe("tool-settings");
+  });
+
+  it("does not request Task-scoped changes when no matching Task authority exists", async () => {
+    rendererWorkbenchStore.getState().reset();
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await refreshWorkspaceChanges();
+
+    expect(request).not.toHaveBeenCalled();
+    expect(useWorkspaceChangesStore.getState().status).toBe("stale");
+    expect(useNotificationStore.getState().items).toHaveLength(0);
   });
 
   it("keeps the current projection stale and reports a current failure", async () => {

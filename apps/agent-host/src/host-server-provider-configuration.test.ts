@@ -128,6 +128,19 @@ describe("AgentHostServer Provider configuration", () => {
       expect(JSON.stringify(credentialResponse)).not.toContain(credentialValue);
       expect(await readFile(join(fixture.agentDir, "auth.json"), "utf8")).toContain(credentialValue);
 
+      const revealResponse = (await hostCommand(port, WORKSPACE, "provider.credential.reveal", {
+        expectedRevision: credentialResponse.result.revision,
+        provider: "pi67-host-test"
+      })).response;
+      expect(revealResponse).toMatchObject({
+        ok: true,
+        result: {
+          provider: "pi67-host-test",
+          status: "revealed",
+          apiKey: credentialValue
+        }
+      });
+
       const conflictingResponse = (await hostCommand(port, WORKSPACE, "provider.credential.store", {
         expectedRevision: savedResponse.result.revision,
         provider: "pi67-host-test",

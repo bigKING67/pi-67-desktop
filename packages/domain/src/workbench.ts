@@ -66,8 +66,12 @@ export type SettingsSection =
   | "general"
   | "providers"
   | "extensions"
-  | "resources"
+  | "skills"
+  | "prompts"
+  | "rules"
+  | "integrations"
   | "runtime"
+  | "network"
   | "updates"
   | "about";
 

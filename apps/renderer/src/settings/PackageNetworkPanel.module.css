@@ -1,0 +1,124 @@
+.stack {
+  display: grid;
+  min-width: 0;
+}
+
+.readiness {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.readiness[data-ready="true"] {
+  color: var(--success);
+}
+
+.form {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.form > label,
+.form fieldset {
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.form > label:last-child,
+.form fieldset:last-child {
+  border-bottom: 0;
+}
+
+.form label > span,
+.form legend {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.form select,
+.form input[type="text"],
+.form label > input:not([type="checkbox"]) {
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.form select:focus-visible,
+.form input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.form fieldset {
+  display: grid;
+  grid-template-columns: 170px repeat(2, max-content);
+}
+
+.form legend {
+  display: contents;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sourceStatus {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.sourceStatus[data-status="reachable"] {
+  background: var(--success);
+}
+
+.sourceStatus[data-status="unreachable"] {
+  background: var(--danger);
+}
+
+.checkedAt {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .form > label,
+  .form fieldset {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .form fieldset {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .form legend {
+    display: block;
+    width: 100%;
+  }
+}
