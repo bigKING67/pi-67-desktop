@@ -115,6 +115,7 @@ describe("session catalog store", () => {
       source: "sdk-fallback",
       state: "fallback",
       rebuilding: false,
+      degradedReason: "runtime-query",
       reconciledAt: 40,
       incomplete: true,
       skippedCount: 2
@@ -122,6 +123,7 @@ describe("session catalog store", () => {
     expect(catalog()).toMatchObject({
       catalogState: "fallback",
       source: "sdk-fallback",
+      degradedReason: "runtime-query",
       incomplete: true,
       skippedCount: 2,
       itemCount: 8,
@@ -133,6 +135,7 @@ describe("session catalog store", () => {
       incomplete: false,
       skippedCount: 0,
       itemCount: 0,
+      degradedReason: undefined,
       reconciledAt: undefined
     });
   });

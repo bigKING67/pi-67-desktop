@@ -6,11 +6,13 @@ import type {
   SessionCatalogStatus
 } from "@pi67/domain";
 import {
+  createRuntimeSessionCatalogOwner,
   createPiWorkspaceRuntimeServices,
   PiConfigurationServiceRegistry,
   type AgentRuntime,
   type CreatePiWorkspaceRuntimeServicesOptions,
-  type PiWorkspaceRuntimeServices
+  type PiWorkspaceRuntimeServices,
+  type RuntimeSessionCatalogOwner
 } from "@pi67/pi-runtime";
 import type { AgentEvent } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
@@ -30,7 +32,7 @@ export interface WorkspaceContextRecord {
 
 export interface RegisterWorkspaceContextOptions extends Omit<
   CreatePiWorkspaceRuntimeServicesOptions,
-  "settingsManager" | "projectTrusted"
+  "settingsManager" | "projectTrusted" | "sessionCatalogOwner"
 > {
   trust: Parameters<AgentRuntime["initialize"]>[0]["trust"];
   approvalMode: Parameters<AgentRuntime["initialize"]>[0]["approvalMode"];
@@ -42,6 +44,10 @@ export type WorkspaceServicesFactory = (
 
 export interface WorkspaceContextRegistryOptions {
   createServices?: WorkspaceServicesFactory;
+  createSessionCatalogOwner?: (
+    directory?: string,
+    storageRoot?: string
+  ) => RuntimeSessionCatalogOwner;
   configurationServices?: PiConfigurationServiceRegistry;
   emitWorkspaceEvent?: (workspaceId: string, event: AgentEvent) => void;
 }
@@ -50,11 +56,18 @@ export class WorkspaceContextRegistry {
   private readonly records = new Map<string, WorkspaceContextRecord>();
   private readonly workspaceIdsByCanonicalCwd = new Map<string, string>();
   private readonly createServices: WorkspaceServicesFactory;
+  private readonly createSessionCatalogOwner: NonNullable<
+    WorkspaceContextRegistryOptions["createSessionCatalogOwner"]
+  >;
   private readonly configurationServices: PiConfigurationServiceRegistry;
   private emitWorkspaceEvent: NonNullable<WorkspaceContextRegistryOptions["emitWorkspaceEvent"]>;
+  private sessionCatalogOwner: RuntimeSessionCatalogOwner | undefined;
+  private sessionCatalogStorageIdentity: SessionCatalogStorageIdentity | undefined;
 
   constructor(options: WorkspaceContextRegistryOptions = {}) {
     this.createServices = options.createServices ?? createPiWorkspaceRuntimeServices;
+    this.createSessionCatalogOwner = options.createSessionCatalogOwner
+      ?? createRuntimeSessionCatalogOwner;
     this.configurationServices = options.configurationServices ?? new PiConfigurationServiceRegistry();
     this.emitWorkspaceEvent = options.emitWorkspaceEvent ?? (() => undefined);
   }
@@ -80,6 +93,7 @@ export class WorkspaceContextRegistry {
         );
       }
       existing.workspaceServices.assertCompatible(canonicalCwd, options.agentDir);
+      this.requireSessionCatalogOwner(options);
       existing.workspaceServices.setProjectTrusted(options.trust === "trusted");
       existing.initialization = initializationFrom(options, existing.cwd, existing.agentDir);
       return existing;
@@ -93,11 +107,13 @@ export class WorkspaceContextRegistry {
         { registeredWorkspaceId: owner }
       );
     }
+    const sessionCatalogOwner = this.requireSessionCatalogOwner(options);
     const configurationService = this.configurationServices.acquire(options.agentDir);
     const workspaceServices = this.createServices({
       cwd: canonicalCwd,
       agentDir: options.agentDir,
       configurationService,
+      sessionCatalogOwner,
       projectTrusted: options.trust === "trusted",
       ...(options.runtimeCredentialOverrides === undefined
         ? {}
@@ -212,8 +228,66 @@ export class WorkspaceContextRegistry {
     } catch (error) {
       firstError ??= error;
     }
+    try {
+      await this.sessionCatalogOwner?.dispose();
+      this.sessionCatalogOwner = undefined;
+      this.sessionCatalogStorageIdentity = undefined;
+    } catch (error) {
+      firstError ??= error;
+    }
     if (firstError !== undefined) throw firstError;
   }
+
+  private requireSessionCatalogOwner(
+    options: Pick<RegisterWorkspaceContextOptions, "sessionCatalogDirectory" | "storageRoot">
+  ): RuntimeSessionCatalogOwner {
+    const identity = sessionCatalogStorageIdentity(options);
+    if (this.sessionCatalogOwner) {
+      if (!sameSessionCatalogStorageIdentity(this.sessionCatalogStorageIdentity, identity)) {
+        throw new HostCommandError(
+          "INVALID_PAYLOAD",
+          "All Workspaces in one Agent Host must share the same Session Catalog storage.",
+          false
+        );
+      }
+      return this.sessionCatalogOwner;
+    }
+    this.sessionCatalogStorageIdentity = identity;
+    this.sessionCatalogOwner = this.createSessionCatalogOwner(
+      options.sessionCatalogDirectory,
+      options.storageRoot
+    );
+    return this.sessionCatalogOwner;
+  }
+}
+
+interface SessionCatalogStorageIdentity {
+  directory: string | undefined;
+  storageRoot: string | undefined;
+}
+
+function sessionCatalogStorageIdentity(
+  options: Pick<RegisterWorkspaceContextOptions, "sessionCatalogDirectory" | "storageRoot">
+): SessionCatalogStorageIdentity {
+  return {
+    directory: normalizeOptionalPath(options.sessionCatalogDirectory),
+    storageRoot: normalizeOptionalPath(options.storageRoot)
+  };
+}
+
+function sameSessionCatalogStorageIdentity(
+  current: SessionCatalogStorageIdentity | undefined,
+  candidate: SessionCatalogStorageIdentity
+): boolean {
+  return current !== undefined
+    && current.directory === candidate.directory
+    && current.storageRoot === candidate.storageRoot;
+}
+
+function normalizeOptionalPath(path: string | undefined): string | undefined {
+  if (path === undefined) return undefined;
+  const absolute = resolve(path);
+  return process.platform === "win32" ? absolute.toLowerCase() : absolute;
 }
 
 function initializationFrom(

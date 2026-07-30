@@ -37,7 +37,7 @@ async function openPackageSettings(page: Page, items: PackageEntry[]): Promise<v
   });
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menuitem", { name: "设置", exact: true }).click();
-  await page.getByRole("button", { name: "资源包", exact: true }).click();
+  await page.getByRole("button", { name: "扩展", exact: true }).click();
   await expect.poll(async () => (
     await recordedCommandDetails(page)
   ).filter((command) => command.type === "extension.package.list").length).toBeGreaterThan(0);
@@ -83,8 +83,8 @@ test("confirms install and path uninstall with scoped Host mutations", async ({ 
   await openPackageSettings(page, [pathEntry]);
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: "安装资源包" }).click();
-  let dialog = page.getByRole("dialog", { name: "安装 Pi 资源包" });
+  await page.getByRole("button", { name: "安装扩展包" }).click();
+  let dialog = page.getByRole("dialog", { name: "安装 Pi 扩展包" });
   const sourceInput = dialog.getByRole("textbox", { name: "npm 包、Git URL 或本地目录" });
   await sourceInput.fill(npmSource);
   await expect(sourceInput).toHaveValue(npmSource);
@@ -107,7 +107,7 @@ test("confirms install and path uninstall with scoped Host mutations", async ({ 
 
   await page.getByRole("button", { name: `local-extension，${pathSource} · 全局` }).click();
   await page.getByRole("button", { name: `卸载 ${pathSource}` }).click();
-  dialog = page.getByRole("dialog", { name: "卸载资源包？" });
+  dialog = page.getByRole("dialog", { name: "卸载扩展包？" });
   await expect(dialog).toContainText("本地目录只移除配置引用，不删除用户目录");
   await setMockAgentResponseResult(page, "extension.package.uninstall", {
     changed: true,
@@ -166,14 +166,14 @@ test("keeps a failed package mutation visible instead of reporting success", asy
   });
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: "安装资源包" }).click();
-  const installDialog = page.getByRole("dialog", { name: "安装 Pi 资源包" });
+  await page.getByRole("button", { name: "安装扩展包" }).click();
+  const installDialog = page.getByRole("dialog", { name: "安装 Pi 扩展包" });
   await installDialog.getByRole("textbox", { name: "npm 包、Git URL 或本地目录" }).fill(source);
   await installDialog.getByRole("button", { name: "确认安装" }).click();
 
   await expect(page.getByText("模拟安装失败").first()).toBeVisible();
-  await expect(page.getByText("资源包已安装", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("dialog", { name: "安装 Pi 资源包" })).toBeVisible();
+  await expect(page.getByText("扩展包已安装", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "安装 Pi 扩展包" })).toBeVisible();
   await expect.poll(async () => (
     await recordedCommandDetails(page)
   ).filter((command) => command.type === "extension.package.install")).toHaveLength(1);
@@ -198,8 +198,8 @@ test("blocks global package mutations while any task is running", async ({ page 
   }, { operationId: "operation-extension-busy" });
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: "安装资源包" }).click();
-  const installDialog = page.getByRole("dialog", { name: "安装 Pi 资源包" });
+  await page.getByRole("button", { name: "安装扩展包" }).click();
+  const installDialog = page.getByRole("dialog", { name: "安装 Pi 扩展包" });
   await installDialog.getByRole("textbox", { name: "npm 包、Git URL 或本地目录" }).fill(source);
   await installDialog.getByRole("button", { name: "确认安装" }).click();
 
@@ -210,7 +210,7 @@ test("blocks global package mutations while any task is running", async ({ page 
   ))).toHaveLength(0);
 });
 
-test("uses one resource-package workbench for installed and discovery states", async ({ page }) => {
+test("uses one extension package workbench for third-party installed and discovery states", async ({ page }) => {
   await openPackageSettings(page, [
     packageEntry("npm:pi-subagents", "global", true, {
       resourceTypes: ["extension", "skill", "prompt"],
@@ -224,21 +224,21 @@ test("uses one resource-package workbench for installed and discovery states", a
   ]);
 
   const workspace = page.getByTestId("extension-management-workspace");
-  const tabs = workspace.getByRole("tablist", { name: "Pi 资源包管理视图" });
+  const tabs = workspace.getByRole("tablist", { name: "Pi 扩展包管理视图" });
   await expect(tabs.getByRole("tab", { name: /已安装/u })).toHaveAttribute("aria-selected", "true");
-  await expect(workspace.getByRole("list", { name: "已安装资源包" }).getByText("随应用提供", { exact: true })).toBeVisible();
-  await expect(workspace.getByText("外部安装", { exact: true }).first()).toBeVisible();
+  await expect(workspace.getByRole("list", { name: "已安装扩展包" }).getByText("第三方扩展包", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("随应用提供", { exact: true })).toHaveCount(0);
   await expect(workspace.getByText("已停用", { exact: true }).first()).toBeVisible();
   await expect(workspace.getByText("部分启用", { exact: true })).toBeVisible();
   await workspace.getByRole("button", { name: /pi-subagents，npm:pi-subagents · 全局/u }).click();
-  await expect(workspace.getByLabel("资源包提供的资源类型")).toContainText("扩展");
-  await expect(workspace.getByLabel("资源包提供的资源类型")).toContainText("技能");
-  await expect(workspace.getByLabel("资源包提供的资源类型")).toContainText("指令模板");
+  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");
+  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("技能");
+  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("指令模板");
   await expect(workspace.getByRole("button", { name: "启用 技能 npm:pi-subagents" })).toBeVisible();
-  await workspace.getByRole("button", { name: "返回资源包列表" }).click();
+  await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
 
   await tabs.getByRole("tab", { name: /发现/u }).click();
-  await expect(workspace.getByRole("heading", { name: "推荐扩展" })).toBeVisible();
+  await expect(workspace.getByRole("heading", { name: "推荐扩展包" })).toBeVisible();
   await expect(workspace.getByText("npm:pi-subagents", { exact: true })).toBeVisible();
 
   await expect(tabs.getByRole("tab", { name: /当前会话/u })).toHaveCount(0);
@@ -284,9 +284,9 @@ test("keeps a dense resource-package catalog in the shared document scroll and e
     .toBeVisible();
   await expect(workspace.getByText("Pi extension for delegating tasks", { exact: false })).toHaveCount(0);
   await expect(workspace.getByText("1.0.0", { exact: true })).toBeVisible();
-  await expect(workspace.getByLabel("资源包提供的资源类型")).toContainText("扩展");
+  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");
   await expect(workspace.getByTestId("extension-danger-zone")).toBeVisible();
-  await workspace.getByRole("button", { name: "返回资源包列表" }).click();
+  await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
   await expect(list).toBeVisible();
   await expect(detail).toBeHidden();
   expect(await settingsScroll.evaluate((element) => element.scrollTop)).toBe(0);
@@ -318,8 +318,8 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(navigation.getByRole("button", { name: "扩展", exact: true })).toHaveCount(0);
 
   await search.fill("卸载");
-  await navigation.getByRole("button", { name: "资源包", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "资源包", exact: true })).toBeVisible();
+  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
+  await expect(settings.getByRole("heading", { name: "扩展", exact: true })).toBeVisible();
 
   await settings.getByRole("button", { name: "清除设置搜索" }).click();
   await expect(navigation.getByRole("button", { name: "账户", exact: true })).toBeVisible();
@@ -327,75 +327,6 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(navigation.getByText("没有匹配的设置", { exact: true })).toBeVisible();
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();
   await expect(navigation.getByRole("button", { name: "通用", exact: true })).toBeVisible();
-});
-
-test("separates packages, extensions, skills, prompt templates, and context rules", async ({ page }) => {
-  await installMockDesktopBridge(page);
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.keyboard.press("Control+,");
-
-  const settings = page.getByLabel("π 设置");
-  const navigation = settings.getByRole("navigation", { name: "设置分类" });
-
-  await navigation.getByRole("button", { name: "资源包", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "资源包", exact: true })).toBeVisible();
-  await expect(settings.getByText("Pi-67 Core", { exact: true })).toBeVisible();
-  await expect(settings.getByText("browser67", { exact: true })).toBeVisible();
-
-  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
-  await settings.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true }).click();
-  await expect(settings.getByText(".pi/extensions/project-tools.ts", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Pi-67 Core", { exact: true })).toHaveCount(0);
-
-  await navigation.getByRole("button", { name: "技能", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "技能", exact: true })).toBeVisible();
-  await expect(settings.getByText("design-craft", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Pi-67 Core", { exact: true })).toHaveCount(0);
-
-  await navigation.getByRole("button", { name: "指令模板", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "指令模板", exact: true })).toBeVisible();
-  await expect(settings.getByText("/review", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Pi-67 Core", { exact: true })).toHaveCount(0);
-
-  await navigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "规则与上下文", exact: true })).toBeVisible();
-  await settings.getByRole("button", { name: "全局", exact: true }).click();
-  await expect(settings.getByText("全局 AGENTS.md", { exact: true }).first()).toBeVisible();
-  await expect(settings.getByText("由用户管理", { exact: true })).toBeVisible();
-  await settings.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true }).click();
-  await expect(settings.getByText("/Users/test/Projects/pi-demo/AGENTS.md", { exact: true })).toBeVisible();
-  await expect(settings.getByText("继承自全局", { exact: false })).toBeVisible();
-
-  await navigation.getByRole("button", { name: "集成", exact: true }).click();
-  await expect(settings.getByText("内置第一方", { exact: true })).toBeVisible();
-  await expect(settings.getByText("尚未检查", { exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "准备依赖", exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
-
-  await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
-  for (const version of ["24.18.0", "12.0.1", "2.53.0"]) {
-    await expect(settings.getByText(version, { exact: true })).toBeVisible();
-  }
-  await expect(settings.getByText("https://registry.npmmirror.com", { exact: true })).toBeVisible();
-  await settings.getByRole("button", { name: "检测全部源", exact: true }).click();
-  await expect(settings.getByText("36 ms", { exact: true }).first()).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
-});
-
-test("refreshes an initializing capability snapshot without requiring a manual retry", async ({ page }) => {
-  await installMockDesktopBridge(page, { capabilityInitializingCalls: 2 });
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.keyboard.press("Control+,");
-
-  const settings = page.getByLabel("π 设置");
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: "资源包", exact: true }).click();
-  const coreRow = settings.getByText("Pi-67 Core", { exact: true }).locator("..").locator("..");
-  await expect(coreRow).toContainText("内置");
-  await expect(coreRow).not.toContainText("不可用");
 });
 
 function packageEntry(

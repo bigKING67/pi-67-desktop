@@ -16,12 +16,10 @@ import {
   type RequestEnvelope
 } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
+import { forkSessionFromTask } from "./cross-task-session-fork.js";
 import { ExtensionPackageCommandRouter, type ExtensionPackageManagementPort } from "./extension-package-command-router.js";
 import { createWorkerBackedExtensionPackageManagement } from "./package-worker-client.js";
-import {
-  dispatchHostCommand,
-  type RuntimeLoadedCommand
-} from "./host-command-dispatcher.js";
+import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostRequestRouter } from "./host-request-router.js";
 import { HostSdkVersionLoader } from "./host-sdk-version-loader.js";
@@ -224,6 +222,12 @@ export class AgentHostServer {
           activeRuntime,
           options,
           () => this.taskLifecycle.commitWriterTransition(state, activeRuntime, writerReservation)
+        ),
+        forkSessionFromTask: (activeRuntime, payload) => forkSessionFromTask(
+          this.tasks,
+          state,
+          activeRuntime,
+          payload
         ),
         commitSessionWriter: (activeRuntime) => (
           this.taskLifecycle.commitWriterTransition(state, activeRuntime, writerReservation)

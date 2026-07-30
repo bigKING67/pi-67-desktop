@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   APP_PROTOCOL_CONTEXT,
   commandEnvelope,
+  isRequestEnvelope,
   isResponseEnvelope,
   responseEnvelope
 } from "./envelope.js";
@@ -41,6 +42,24 @@ describe("Session bootstrap acknowledgements", () => {
     expect(isResponseEnvelope({
       ...acknowledgement,
       result: { ...projectionAcknowledgement(), messages: [] }
+    })).toBe(false);
+  });
+
+  it("accepts only the supported Session fork positions", () => {
+    const before = commandEnvelope("session.fork", {
+      entryId: "entry-2",
+      position: "before"
+    }, APP_PROTOCOL_CONTEXT, 5);
+    const at = commandEnvelope("session.fork", {
+      entryId: "entry-2",
+      position: "at"
+    }, APP_PROTOCOL_CONTEXT, 5);
+
+    expect(isRequestEnvelope(before)).toBe(true);
+    expect(isRequestEnvelope(at)).toBe(true);
+    expect(isRequestEnvelope({
+      ...at,
+      payload: { entryId: "entry-2", position: "after" }
     })).toBe(false);
   });
 });

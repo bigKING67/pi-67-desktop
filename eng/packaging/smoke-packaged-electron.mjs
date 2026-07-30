@@ -21,6 +21,7 @@ import {
   verifyColdProviderRestoration,
   verifyInitialRuntimeSettings
 } from "./packaged-electron-smoke-scenarios.mjs";
+import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
@@ -215,7 +216,7 @@ try {
   }
   await credentialDialog.getByRole("button", { name: "关闭", exact: true }).click();
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^资源包/u }).click();
+    .getByRole("button", { name: "扩展", exact: true }).click();
   const extensionWorkspace = workspaceSettings.getByTestId("extension-management-workspace");
   const extensionList = extensionWorkspace.getByTestId("extension-package-list-scroll");
   const extensionDetail = extensionWorkspace.getByTestId("extension-package-detail-scroll");
@@ -236,25 +237,40 @@ try {
   }
   await assertNoWorkspaceChangesAuthorityWarning(window);
   await capturePackagedScreenshot(window, "05-resource-package-detail.png");
-  await extensionWorkspace.getByRole("button", { name: "返回资源包列表" }).click();
+  await extensionWorkspace.getByRole("button", { name: "返回扩展包列表" }).click();
   await extensionList.waitFor({ state: "visible", timeout: 15_000 });
   const settingsNavigation = workspaceSettings.getByRole("navigation", { name: "设置分类" });
-  await settingsNavigation.getByRole("button", { name: "扩展", exact: true }).click();
-  await workspaceSettings.getByRole("heading", { name: "当前会话已加载的扩展", exact: true })
+  const extensionSettingsWorkspace = workspaceSettings.getByTestId("extension-settings-workspace");
+  await extensionSettingsWorkspace.getByRole("tab", { name: "内置扩展", exact: true }).click();
+  await extensionSettingsWorkspace.getByText("pi-hy-memory", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await workspaceSettings.getByText("pi-subagents · index.js", { exact: true })
+  await extensionSettingsWorkspace.getByText("xtalpi-pi-tools", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await workspaceSettings.getByRole("button", { name: /卸载/u }).count()) {
-    throw new Error("Packaged Extension resource page repeated Package uninstall controls.");
+  await capturePackagedScreenshot(window, "06-bundled-extensions.png");
+  await extensionSettingsWorkspace.getByRole("tab", { name: "本地扩展", exact: true }).click();
+  const localExtensionPanel = extensionSettingsWorkspace.getByRole("tabpanel", { name: "本地扩展", exact: true });
+  await localExtensionPanel.getByText("shutdown-fixture.ts", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await localExtensionPanel.getByText("pi-subagents · index.js", { exact: true }).count()) {
+    throw new Error("Packaged third-party Extension was duplicated in the local Extension view.");
   }
-  await capturePackagedScreenshot(window, "06-extension-resources.png");
+  if (await localExtensionPanel.getByRole("button", { name: /卸载/u }).count()) {
+    throw new Error("Packaged local Extension view repeated Package uninstall controls.");
+  }
+  await capturePackagedScreenshot(window, "06-local-extensions.png");
   await settingsNavigation.getByRole("button", { name: "技能", exact: true }).click();
-  await workspaceSettings.getByText("packaged-skill", { exact: true })
+  const skillSettingsWorkspace = workspaceSettings.getByTestId("skill-settings-workspace");
+  const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局技能", exact: true });
+  await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
-    throw new Error("Packaged Skill resource page repeated an Extension-only Package.");
+  if (await globalSkillPanel.getByText("pi-subagents", { exact: true }).count()) {
+    throw new Error("Packaged global Skill view repeated an Extension-only Package.");
   }
-  await capturePackagedScreenshot(window, "07-skill-resources.png");
+  await capturePackagedScreenshot(window, "07-global-skills.png");
+  await assertPackagedSkillSuites(
+    skillSettingsWorkspace,
+    (fileName) => capturePackagedScreenshot(window, fileName)
+  );
   await settingsNavigation.getByRole("button", { name: "指令模板", exact: true }).click();
   await workspaceSettings.getByText("/packaged-review", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });

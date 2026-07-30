@@ -338,7 +338,9 @@ function parseWorkbenchSettings(
     ? "skills"
     : value.section === "prompts-rules"
       ? "prompts"
-      : value.section;
+      : value.section === "packages"
+        ? "extensions"
+        : value.section;
   if (!isSettingsSection(section)) return undefined;
   if (value.scope === "global") {
     if (value.workspaceId !== undefined) return undefined;

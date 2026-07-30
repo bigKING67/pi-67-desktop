@@ -56,7 +56,8 @@ export interface AgentRuntime {
   createSession(): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
   importSession(path: string): Promise<SessionSnapshot>;
-  forkSession(entryId: string): Promise<SessionSnapshot>;
+  forkSession(entryId: string, position?: "before" | "at"): Promise<SessionSnapshot>;
+  forkSessionFrom(sourcePath: string, entryId: string): Promise<SessionSnapshot>;
   rollback(entryId: string, summarize?: boolean): Promise<void>;
   compact(instructions?: string): Promise<void>;
   setSessionName(name: string): Promise<void>;

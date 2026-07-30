@@ -30,6 +30,7 @@ export function routeWorkbenchAgentEvent(
     case "runtime.ready":
     case "session.bootstrap": {
       const snapshot = event.type === "runtime.ready" ? event.payload.snapshot : event.payload.snapshot;
+      const sessionName = snapshot.sessionName?.trim();
       workbench.updateTask(task.id, {
         ...(snapshot.sessionPath ? {
           conversation: { kind: "session" as const, workspaceId: task.workspaceId, sessionPath: snapshot.sessionPath }
@@ -37,7 +38,10 @@ export function routeWorkbenchAgentEvent(
         sessionId: snapshot.sessionId,
         ...(sessionContext ? { sessionGeneration: sessionContext.sessionGeneration } : {}),
         ...(snapshot.sessionPath ? { sessionPath: snapshot.sessionPath } : {}),
-        title: snapshot.sessionName?.trim() || messages.runtime.workbench.unnamedSession,
+        title: sessionName
+          || task.pendingTitle
+          || messages.runtime.workbench.unnamedSession,
+        ...(sessionName ? { pendingTitle: undefined } : {}),
         lifecycle: "idle",
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true }
       });
@@ -77,7 +81,10 @@ export function routeWorkbenchAgentEvent(
       workbench.updateTask(task.id, { lifecycle: "lost", runtime: { phase: "failed", detail: event.payload.reason, recoverable: true } });
       break;
     case "session.metaChanged":
-      workbench.updateTask(task.id, { title: event.payload.sessionName?.trim() || messages.runtime.workbench.unnamedSession });
+      workbench.updateTask(task.id, {
+        title: event.payload.sessionName?.trim() || messages.runtime.workbench.unnamedSession,
+        ...(event.payload.sessionName?.trim() ? { pendingTitle: undefined } : {})
+      });
       break;
     default:
       break;

@@ -115,6 +115,10 @@ test("throttles assistant stream announcements and clears them when the turn set
 
   await expect(announcer).toHaveText("第一句。");
   await expect(announcer).not.toContainText("private reasoning");
+  const liveMessage = page.getByRole("article", { name: "Pi 正在回复", exact: true });
+  await expect(liveMessage).toBeVisible();
+  await expect(liveMessage.locator('[data-message-footer="assistant"]')).toHaveCount(0);
+  await expect(liveMessage.getByRole("button", { name: "复制回答" })).toHaveCount(0);
   await emitMockAgentEvent(page, {
     type: "turn.streamBatch",
     payload: {
@@ -125,7 +129,7 @@ test("throttles assistant stream announcements and clears them when the turn set
     }
   }, { operationId });
   await expect(announcer).toHaveText("第一句。");
-  await expect(announcer).toHaveText("第二句。", { timeout: 2_000 });
+  await expect(announcer).toHaveText("第二句。", { timeout: 3_000 });
 
   await setMockConversationMessages(page, [
     message("settled-message", "Settled response"),

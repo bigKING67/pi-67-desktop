@@ -16,10 +16,11 @@ describe("composer prefill events", () => {
     target.dispatchEvent(new Event("pi67:composer-prefill"));
     target.dispatchEvent(new CustomEvent("pi67:composer-prefill", { detail: 67 }));
     requestComposerPrefill("检查当前改动");
+    requestComposerPrefill("修改历史问题");
 
-    expect(received).toEqual(["检查当前改动"]);
+    expect(received).toEqual(["检查当前改动", "修改历史问题"]);
     unsubscribe();
     requestComposerPrefill("不应继续投递");
-    expect(received).toEqual(["检查当前改动"]);
+    expect(received).toHaveLength(2);
   });
 });

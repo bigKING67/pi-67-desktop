@@ -119,6 +119,19 @@ export class CommandScheduler {
     });
   }
 
+  runExclusiveIfIdle<T>(task: () => Promise<T>): Promise<T> {
+    if (this.closed) return Promise.reject(connectionClosed());
+    if (!this.isIdle() || this.hasActiveTurn()) {
+      return Promise.reject(busy("The source Task must be idle before its Session can be copied."));
+    }
+    this.exclusiveRunning = true;
+    return Promise.resolve()
+      .then(task)
+      .finally(() => {
+        this.exclusiveRunning = false;
+      });
+  }
+
   clearQueue<T>(task: () => Promise<T>): Promise<{ pendingCount: number; result: T }> {
     if (this.closed) return Promise.reject(connectionClosed());
     this.queueGeneration += 1;

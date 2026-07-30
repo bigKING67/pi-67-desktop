@@ -16,6 +16,66 @@ describe("operationSubmissionIdentity", () => {
     expect(first.fingerprint).toBe(second.fingerprint);
   });
 
+  it.each([
+    [{ entryId: "entry-before", position: "before" as const }, "before" as const],
+    [{ entryId: "entry-default" }, "at" as const]
+  ])("forwards the requested Session fork position and defaults legacy callers to at", async (payload, expectedPosition) => {
+    const snapshot = { sessionId: "session-forked" } as never;
+    const acknowledgement = { accepted: true } as never;
+    const forkSession = vi.fn(async () => snapshot);
+    const context = {
+      commitSessionWriter: vi.fn().mockResolvedValue(undefined),
+      sendEvent: vi.fn(),
+      captureProjectionMutationAcknowledgement: vi.fn(() => acknowledgement)
+    };
+
+    await expect(dispatchHostCommand(
+      { forkSession } as unknown as AgentRuntime,
+      { type: "session.fork", payload },
+      context as never
+    )).resolves.toBe(acknowledgement);
+
+    expect(forkSession).toHaveBeenCalledWith(payload.entryId, expectedPosition);
+    expect(context.sendEvent).toHaveBeenCalledWith({
+      type: "session.bootstrap",
+      payload: { snapshot, reason: "session-fork" }
+    });
+  });
+
+  it("forks from source Task authority and commits only the target writer", async () => {
+    const snapshot = { sessionId: "session-target" } as never;
+    const acknowledgement = { accepted: true } as never;
+    const runtime = { getIdentity: vi.fn() } as unknown as AgentRuntime;
+    const payload = {
+      sourceTaskId: "task-source",
+      sourceTaskGeneration: 3,
+      sourceSessionId: "session-source",
+      sourceSessionGeneration: 5,
+      entryId: "assistant-entry-8"
+    } as const;
+    const context = {
+      forkSessionFromTask: vi.fn(async () => snapshot),
+      commitSessionWriter: vi.fn().mockResolvedValue(undefined),
+      sendEvent: vi.fn(),
+      captureProjectionMutationAcknowledgement: vi.fn(() => acknowledgement)
+    };
+
+    await expect(dispatchHostCommand(
+      runtime,
+      { type: "session.forkFromTask", payload },
+      context as never
+    )).resolves.toBe(acknowledgement);
+
+    expect(context.forkSessionFromTask).toHaveBeenCalledWith(runtime, payload);
+    expect(context.commitSessionWriter).toHaveBeenCalledOnce();
+    expect(context.commitSessionWriter).toHaveBeenCalledWith(runtime);
+    expect(context.sendEvent).toHaveBeenCalledWith({
+      type: "session.bootstrap",
+      payload: { snapshot, reason: "session-fork" }
+    });
+    expect(context.captureProjectionMutationAcknowledgement).toHaveBeenCalledWith(runtime);
+  });
+
   it("changes the fingerprint when canonical operation content changes", () => {
     expect(identity("session.import", {
       submissionId: "import-1",

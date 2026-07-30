@@ -232,10 +232,50 @@ loading error where the operation can produce those states
   header is omitted because position and surface already communicate ownership,
   while the message article retains an explicit accessible user label. Pi and
   Tool output remain left-aligned, wide editorial content with visible authors.
+- Every settled User or Pi message exposes one low-emphasis action footer without
+  widening the 820px reading track or creating document-level horizontal scroll.
+  Pi answers place `复制回答` and `在新任务中继续` before the timestamp; User
+  messages place the timestamp before `复制消息` and `编辑消息`. Action
+  targets remain at least 28px, are keyboard-focusable, have named tooltips, and
+  stay discoverable without depending exclusively on hover.
+- Message timestamps are stable source timestamps and always render the complete
+  local `YYYY-MM-DD HH:mm` value. Full seconds and the local UTC offset belong in
+  the native time tooltip; relative labels such as `刚刚` never replace the date
+  in the Transcript. Missing source time is identified as unknown rather than
+  synthesized from React mount time.
+- `复制回答` includes only final text parts: it excludes thinking, images, and raw
+  Tool payloads. Copy success is announced inline; Clipboard failure remains
+  observable through the message action state and notification history. Tool
+  details keep their own bounded copy contract.
+- `编辑消息` is an in-place interaction owned by the historical User card.
+  Activating it focuses a bounded textarea in that card and sends no Host command;
+  cancel has no side effect and restores focus to the same action. `发送修改` first
+  derives an append-only-safe Pi Session immediately before the source entry, waits
+  for authoritative `session.bootstrap`, and submits the edited Prompt directly.
+  The current Workbench Task identity stays stable, the bottom Composer is neither
+  focused nor prefilled, and the product UI does not expose branch terminology.
+  If Session preparation succeeds but Prompt acceptance fails, the same inline
+  editor remains recoverable for retry or cancellation back to the source Session.
+  Existing Composer text or attachments block edit rather than being overwritten.
+  Image-bearing historical prompts remain copyable but explicitly unavailable for
+  lossy edit until attachment replay has an authoritative contract.
+- `在新任务中继续` immediately creates and selects a distinct provisional
+  Workbench Task, then copies the source Pi Session context through the selected
+  Assistant entry into that target Task. The source Task, source Session, and their
+  writer authority remain unchanged. The target bootstrap is accepted only under
+  the new Task authority; failure removes the provisional target, reactivates the
+  source, and never replaces source history. New and source Tasks can continue
+  independently after the copy commits.
+- Per-message model identifiers are not persistent visual chrome. The Pi/Tool
+  author and semantic states such as `已停止` or an error remain visible. Pending
+  User bubbles may expose copy and source time but not historical edit; live
+  Assistant output and ordinary Tool/System rows expose no settled-message footer.
 - A new-turn Prompt appears as an in-memory pending user bubble as soon as the
   Agent Host acknowledges it. The empty state disappears before the first Pi
-  token; operation status supplements this feedback and never replaces the
-  submitted message. Pi JSONL remains authoritative: the matching Operation's
+  token. The current Turn's inline activity follows that bubble in the Virtuoso
+  footer and precedes live Assistant output; it never replaces the submitted
+  message or occupies a separate Workspace-level row. Pi JSONL remains
+  authoritative: the matching Operation's
   user-entry projection replaces the pending bubble without flicker or duplicate
   content. Failed uncommitted Prompts remain visible with an explicit error, and
   pending state never crosses Host, Session, generation, or projection authority.
@@ -349,14 +389,14 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings owns `账户`, `通用`, `模型服务`, `资源包`, `扩展`, `技能`,
+- Settings owns `账户`, `通用`, `模型服务`, `扩展`, `技能`,
   `指令模板`, `规则与上下文`, `集成`, `运行服务`, `下载源与网络`,
   `更新与诊断`, and `关于`. Account,
   General, managed Rules, Integrations, Download Sources/Network, Updates, and
   About are global-only and do not show a meaningless scope control. Model
-  services, Packages, Extensions, Skills, Prompt Templates, Context Files, and
-  Runtime support explicit global or current-Workspace project scope where Pi
-  has that concept.
+  services, the Extension workspace, Prompt Templates, Context Files, and Runtime
+  support explicit global or current-Workspace project scope where Pi has that
+  concept. Skills own source tabs instead of repeating the page-level scope switch.
 - Every Settings category uses one centered document flow and the content region
   is its only vertical scroll owner. The document width is `min(1120px, 100%)`,
   with `32px` top, `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding;
@@ -377,29 +417,57 @@ loading error where the operation can produce those states
   This prevents Settings from becoming a third or fourth application column on
   either common or ultra-wide windows.
 - Pi resources follow the final ResourceLoader classification rather than the
-  Package name or filesystem heuristics. `扩展` lists loaded executable
-  Extensions, `技能` lists resolved Skills, and `指令模板` lists `/name` Prompt
-  Templates. `规则与上下文` lists loaded `AGENTS.md` and `CLAUDE.md` Context
-  Files and keeps `SYSTEM.md` / `APPEND_SYSTEM.md` identified as separate system
-  prompt inputs. Global resources and current-project resources remain visibly
-  distinct, and project views label inherited global resources.
+  Package name or filesystem heuristics. The single `扩展` workspace owns three
+  explicit views: `扩展包`, `内置扩展`, and `本地扩展`. `本地扩展` consumes only
+  top-level Extension resources from global or project extension directories and
+  explicit `settings.json` paths; Package-attributed Extensions never repeat there.
+  `技能` owns three explicit views: `全局技能`, `项目技能`, and `内置技能`.
+  Global and project views consume only top-level Skill resources for their exact
+  scope; Package-attributed Skills never repeat there. `指令模板` lists `/name`
+  Prompt Templates.
+  `规则与上下文` lists loaded `AGENTS.md` and `CLAUDE.md` Context Files and keeps
+  `SYSTEM.md` / `APPEND_SYSTEM.md` identified as separate system prompt inputs.
+  Global resources and current-project resources remain visibly distinct, and
+  project views label inherited global resources.
 - Product navigation calls the transient execution environment `运行服务`, not
   the literal translation `运行时`. Persistent Pi JSONL Sessions remain in the
   Workspace navigation unless a real, independently actionable Session-settings
   surface is introduced; Settings does not combine Runtime and Session merely
   because their implementation lifecycles are related.
-- `资源包` owns Package installation, update, and uninstall exactly once. A
+- The `扩展` workspace's `扩展包` view owns third-party Package installation,
+  update, and uninstall exactly once. A
   multi-resource Package appears as one lifecycle row and identifies every
   Extension, Skill, Prompt Template, or Theme it contributes. Per-resource
   enable/disable changes only that Package filter; it never flattens object
   filters or removes sibling resource filters. Update and uninstall remain
-  explicitly Package-wide operations. Bundled packages are updated with the
-  application and cannot be independently uninstalled.
-- Resource Packages use two local views: `已安装` and `发现扩展`. Tabs,
+  explicitly Package-wide operations. Third-party Package Extensions remain in
+  their Package detail and never duplicate into `内置扩展` or `本地扩展`.
+  Third-party Package Skills likewise remain in Package detail and never duplicate
+  into `全局技能`, `项目技能`, or `内置技能`.
+- `内置扩展` lists user-visible Extension entries shipped by Pi-67 Desktop.
+  The catalog exposes individual bounded identities rather than presenting an
+  entire first-party capability Package as one Extension. These entries report
+  installed readiness and application-owned versioning; they update with the
+  application and cannot be independently installed or uninstalled. Hidden
+  policy and safety Extensions remain internal system components.
+- `内置技能` first lists a bounded set of user-facing Skill suites, then opens one
+  selected suite in an independent drill-down detail with search and a labeled
+  return action. Suite rows own the repeated count, readiness, application-update,
+  and source summary; individual detail rows retain the real Skill identity,
+  bounded purpose, owning capability Package, and version without repeating a
+  misleading loaded state. Suite membership is an explicit build-time manifest
+  validated against every first-party Skill in the Desktop capability catalog;
+  Renderer prefix matching, Package-name guessing, and `extensions` or `skills`
+  directory heuristics are forbidden. `全局技能` and `项目技能` remain user-owned,
+  exact-scope top-level resource lists rather than suite catalogs. Project Skills
+  are unavailable until the current Workspace is available and trusted. The UI
+  does not guess same-name precedence: current task resolution remains Pi
+  ResourceLoader authority.
+- Pi Packages use two local views: `已安装` and `发现扩展包`. Tabs,
   page-level actions, search, and filters sit directly on the document canvas.
-  `已安装` groups bundled and external sources in one Catalog and moves Package
-  metadata and destructive operations into the selected drill-down detail rather
-  than repeating action clusters on every row. The selected detail leads with a
+  `已安装` lists configured third-party sources and moves Package metadata and
+  destructive operations into the selected drill-down detail rather than
+  repeating action clusters on every row. The selected detail leads with a
   bounded plain-text purpose based on the installed local package identity and
   manifest. The Chinese locale uses reviewed identity-keyed copy for known Pi
   packages, preserves package-authored Chinese descriptions, and uses an explicit
@@ -407,13 +475,14 @@ loading error where the operation can produce those states
   English or machine-translating untrusted text. It lists only declared resource
   types and never fetches or renders remote README/HTML. Destructive removal
   stays in an independent danger section below ordinary enable/update actions.
-  `发现扩展` is flat Catalog content, not a card inside a shared frame. Extension,
-  Skill, Prompt Template, and Context pages consume the current Session resource
-  projection and never repeat Package update or uninstall controls.
+  `发现扩展包` is flat Catalog content, not a card inside a shared frame. Local
+  Extension, global/project Skill, Prompt Template, and Context views consume the
+  current Session resource projection and never repeat Package update or uninstall
+  controls.
 - Installing a Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
   target scope, and the fact that a Package may load executable Extension code.
-  Recommended Extensions prefill the same dialog and never bypass the one-shot
+  Recommended Packages prefill the same dialog and never bypass the one-shot
   installation confirmation. Loaded-resource evidence remains separate because
   installed configuration and the current Session projection are different states.
 - The Download Sources/Network section uses compact forms and status rows rather
@@ -542,13 +611,16 @@ loading error where the operation can produce those states
   selector. An empty configured-model set names that next action explicitly.
 - Thinking levels use readable product labels such as `思考：关闭` and
   `思考：高`; raw SDK enum values are not the primary user-facing copy.
-- Operation status names import and compaction instead of collapsing every long
-  task into a generic running label. `停止` is visible only when the accepted
-  Operation declares a real Host-owned abort path; Session import stays visibly
-  running until it completes or fails.
+- Inline Turn activity names import and compaction instead of collapsing every
+  long task into a generic running label. It belongs to the Transcript reading
+  track in the order `user -> activity -> live Assistant`; the conversation shell
+  has no independent Operation status row. `停止` belongs to the Composer's
+  rightmost main-action position and is visible only when the accepted Operation
+  declares a real Host-owned abort path; Session import stays visibly running
+  until it completes or fails.
 - Turn activity is Host-owned and evidence-based: Pi `thinking_*` renders as
-  `Pi 正在分析`, `text_*` as `Pi 正在回复`, Tool execution as
-  `Pi 正在使用工具`, and compaction as `正在压缩上下文`. Provider wait,
+  `正在思考`, `text_*` as `正在回复`, Tool execution as
+  `正在使用工具`, and compaction as `正在压缩上下文`. Provider wait,
   retry, and other unproven phases retain the generic running label rather than
   being mislabeled as thinking. Approval and blocking Extension input temporarily
   overlay that base activity, then restore it when the Host resolves or cancels
@@ -566,8 +638,10 @@ loading error where the operation can produce those states
   closed instead of silently repeating work. Prompt attachments stay in the Composer
   and require an explicit retry because transferred image buffers cannot be replayed.
 - A delayed or replayed acknowledgement cannot turn a completed, failed, cancelled,
-  or lost Operation back into accepted/running. The Operation status bar renders the
-  typed terminal receipt directly and never restores a stop action for settled work.
+  or lost Operation back into accepted/running. Failed, cancelled, lost, and recovery
+  states remain inline and observable. Successful completion yields to the Assistant
+  transcript and terminal notification rather than leaving a permanent completion
+  bar, and settled work never restores a stop action.
 - Product-facing status names the affected Task or `Pi 运行服务`; ordinary UI
   does not expose the internal utility-process term `Agent Host`.
 
@@ -596,6 +670,9 @@ loading error where the operation can produce those states
 ### Composer
 
 - Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
+- During a cancellable Turn, `停止` is the rightmost primary action. A non-empty
+  steer or follow-up draft keeps a quieter adjacent `发送` action; with no draft,
+  only `停止` remains. Stop availability never depends on draft validity.
 - Enter sends and Shift+Enter inserts a new line. IME composition confirmation,
   including Chromium `isComposing` and legacy `keyCode 229`, never submits the
   draft; the user sends only with a later non-composition Enter.
@@ -630,6 +707,14 @@ loading error where the operation can produce those states
   in the Agent Host rather than filtering an eagerly transferred full array.
   Cold rebuild shows `正在建立 Session 目录…`; fallback or incomplete discovery is
   visible and must not be presented as an authoritative empty result.
+- The Agent Host owns one Session Catalog owner and SQLite connection for all
+  Workspace bindings that share the Main-owned storage identity. Workspace and
+  Task services dispose only their bindings; competing SQLite owners must never
+  treat another Workspace in the same Host as an external writer.
+- `sdk-fallback` during ordinary rebuilding does not by itself produce a fallback
+  warning. The warning is reserved for the typed `fallback` state; the Renderer
+  retains its typed degraded reason for bounded user copy without exposing internal
+  reason codes.
 - Pagination cursors are bound to the Catalog revision plus source, workspace,
   scope, normalized search, and sort contract. Query changes, revision changes,
   or Host epoch replacement clear old pages; stale results cannot append across

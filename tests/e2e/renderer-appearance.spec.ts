@@ -190,7 +190,7 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   await expect(shortUserMessage).toContainText("你好");
   await expect(shortUserMessage.getByText("你", { exact: true })).toHaveCount(0);
   await expect(piMessage.getByText("Pi", { exact: true })).toBeVisible();
-  await expect(piMessage.locator("code")).toHaveText("deepseek-v4-pro");
+  await expect(piMessage.getByText("deepseek-v4-pro", { exact: true })).toHaveCount(0);
 
   const [shortBox, longBox, piBox] = await Promise.all([
     shortUserMessage.boundingBox(),

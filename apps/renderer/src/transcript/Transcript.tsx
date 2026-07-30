@@ -1,10 +1,13 @@
 import type { SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Virtuoso, type Components } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { selectSessionId } from "../session/session-projection-selectors.js";
+import {
+  selectSessionGeneration,
+  selectSessionId
+} from "../session/session-projection-selectors.js";
 import { requestComposerPrefill } from "../composer/composer-events.js";
 import { loadOlderConversation } from "../conversation/conversation-controller.js";
 import {
@@ -12,12 +15,30 @@ import {
   useCommittedConversationProjection
 } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
+import { messages as messagesCatalog } from "../localization/message-catalog.js";
+import { hasVisibleTurnActivity, TurnActivity } from "../operation/TurnActivity.js";
+import {
+  continueRendererSessionFrom,
+  editRendererUserMessage,
+  restoreRendererMessageEdit,
+  sessionForkActionBlockedReason,
+  submitRendererEditedMessage
+} from "../session/session-lifecycle-controller.js";
+import {
+  selectedWorkbenchTask,
+  useWorkbenchStore
+} from "../workbench/workbench-store.js";
 import { MessageCard } from "./MessageCard.js";
+import { editableUserMessageText } from "./message-actions.js";
 import styles from "./Transcript.module.css";
 
 export function Transcript() {
+  const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
+  const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
   const sessionId = useSessionProjectionStore(selectSessionId);
+  const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const runtime = useAppStore((state) => state.runtime);
+  const operation = useAppStore((state) => state.operation);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const {
     messages,
@@ -33,8 +54,23 @@ export function Transcript() {
   const liveText = useMemo(() => textChunks.join(""), [textChunks]);
   const liveThinking = useMemo(() => thinkingChunks.join(""), [thinkingChunks]);
   const hasLiveTurn = Boolean(liveText || liveThinking);
+  const hasTurnActivity = hasVisibleTurnActivity(
+    runtime.phase,
+    operation,
+    sessionId,
+    sessionGeneration
+  );
+  const currentEdit = messageEdit?.taskId === selectedTask?.id ? messageEdit : undefined;
+  const transcriptMessages = useMemo(() => (
+    currentEdit && !messages.some((message) => message.id === currentEdit.message.id)
+      ? [...messages, currentEdit.message]
+      : messages
+  ), [currentEdit, messages]);
+  const messageActionDisabledReason = currentEdit
+    ? messagesCatalog.transcript.finishMessageEdit
+    : sessionForkActionBlockedReason();
 
-  if (!sessionId || sessionTransitionPending) {
+  if (!sessionId || (sessionTransitionPending && !currentEdit)) {
     if (runtime.phase === "failed") {
       return (
         <div className={styles.error} role="alert">
@@ -47,7 +83,7 @@ export function Transcript() {
     return <div className={styles.loading}><span className="loading-line" />{runtime.detail}</div>;
   }
 
-  if (messages.length === 0 && !pendingUserTurn && !hasLiveTurn) {
+  if (transcriptMessages.length === 0 && !pendingUserTurn && !hasLiveTurn && !hasTurnActivity) {
     return (
       <div className={styles.empty}>
         <div className={styles.emptyIcon}><MessageSquareText size={22} /></div>
@@ -66,7 +102,8 @@ export function Transcript() {
     <div
       className={styles.region}
       data-has-live-turn={hasLiveTurn}
-      data-message-count={messages.length}
+      data-has-turn-activity={hasTurnActivity}
+      data-message-count={transcriptMessages.length}
       data-pending-user-turn={pendingUserTurn ? "true" : "false"}
       data-session-id={sessionId}
       data-transcript-region="true"
@@ -77,6 +114,7 @@ export function Transcript() {
         components={TRANSCRIPT_COMPONENTS}
         context={{
           hasLiveTurn,
+          hasTurnActivity,
           pendingUserTurn,
           liveText,
           liveThinking,
@@ -85,16 +123,102 @@ export function Transcript() {
           conversationError,
           loadOlderMessages: loadOlderConversation
         }}
-        data={messages}
+        data={transcriptMessages}
         computeItemKey={(_index, message) => message.id}
         firstItemIndex={firstItemIndex}
-        followOutput={streaming ? "auto" : false}
+        followOutput={streaming || hasTurnActivity ? "auto" : false}
         increaseViewportBy={{ top: 500, bottom: 800 }}
-        initialTopMostItemIndex={Math.max(0, messages.length - 1)}
-        itemContent={(_index, message) => <MessageCard message={message} />}
+        initialTopMostItemIndex={Math.max(0, transcriptMessages.length - 1)}
+        itemContent={(_index, message) => (
+          <MessageCard
+            actionDisabledReason={messageActionDisabledReason}
+            edit={currentEdit?.message.id === message.id ? {
+              value: currentEdit.value,
+              phase: currentEdit.phase,
+              ...(currentEdit.error === undefined ? {} : { error: currentEdit.error }),
+              onChange: (value) => setMessageEdit((current) => current?.taskId === currentEdit.taskId
+                ? { ...current, value, error: undefined }
+                : current),
+              onCancel: () => void cancelMessageEdit(currentEdit),
+              onSubmit: () => void submitMessageEdit(currentEdit)
+            } : undefined}
+            message={message}
+            onContinue={message.role === "assistant"
+              ? () => continueRendererSessionFrom(message.id)
+              : undefined}
+            onEditStart={message.role === "user"
+              ? () => beginMessageEdit(message)
+              : undefined}
+          />
+        )}
       />
     </div>
   );
+
+  function beginMessageEdit(message: SessionMessageView): void {
+    const text = editableUserMessageText(message);
+    if (!selectedTask?.sessionPath || !text) return;
+    setMessageEdit({
+      taskId: selectedTask.id,
+      sourceSessionPath: selectedTask.sessionPath,
+      message,
+      value: text,
+      phase: "editing"
+    });
+  }
+
+  async function submitMessageEdit(edit: InlineMessageEditState): Promise<void> {
+    if (edit.phase === "submitting" || !edit.value.trim()) return;
+    setMessageEdit((current) => current?.taskId === edit.taskId
+      ? { ...current, phase: "submitting", error: undefined }
+      : current);
+    const result = edit.phase === "prepared"
+      ? await submitRendererEditedMessage(edit.taskId, edit.value)
+      : await editRendererUserMessage(edit.taskId, edit.message.id, edit.value);
+    if (result.status === "accepted") {
+      setMessageEdit((current) => current?.taskId === edit.taskId ? undefined : current);
+      return;
+    }
+    setMessageEdit((current) => current?.taskId === edit.taskId ? {
+      ...current,
+      phase: result.status === "prepared" ? "prepared" : "editing",
+      error: result.status === "prepared"
+        ? `${messagesCatalog.transcript.editPreparedRetry} ${result.error}`
+        : result.error
+    } : current);
+  }
+
+  async function cancelMessageEdit(edit: InlineMessageEditState): Promise<void> {
+    if (edit.phase === "submitting") return;
+    if (edit.phase === "prepared") {
+      setMessageEdit((current) => current?.taskId === edit.taskId
+        ? { ...current, phase: "submitting", error: undefined }
+        : current);
+      if (!await restoreRendererMessageEdit(edit.taskId, edit.sourceSessionPath)) {
+        setMessageEdit((current) => current?.taskId === edit.taskId ? {
+          ...current,
+          phase: "prepared",
+          error: messagesCatalog.transcript.restoreEditFailed
+        } : current);
+        return;
+      }
+    }
+    setMessageEdit((current) => current?.taskId === edit.taskId ? undefined : current);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(edit.message.id)}"] [aria-label="${messagesCatalog.transcript.editMessage}"]`
+      )?.focus();
+    });
+  }
+}
+
+interface InlineMessageEditState {
+  taskId: string;
+  sourceSessionPath: string;
+  message: SessionMessageView;
+  value: string;
+  phase: "editing" | "submitting" | "prepared";
+  error?: string | undefined;
 }
 
 const STARTER_PROMPTS = [
@@ -105,6 +229,7 @@ const STARTER_PROMPTS = [
 
 interface TranscriptContext {
   hasLiveTurn: boolean;
+  hasTurnActivity: boolean;
   pendingUserTurn: PendingUserTurn | undefined;
   liveText: string;
   liveThinking: string;
@@ -138,7 +263,7 @@ function OlderMessagesHeader({ context }: { context: TranscriptContext }) {
 }
 
 function LiveTurnFooter({ context }: { context: TranscriptContext }) {
-  if (!context.pendingUserTurn && !context.hasLiveTurn) return null;
+  if (!context.pendingUserTurn && !context.hasTurnActivity && !context.hasLiveTurn) return null;
   return (
     <>
       {context.pendingUserTurn ? (
@@ -152,6 +277,7 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
           message={context.pendingUserTurn.message}
         />
       ) : null}
+      {context.hasTurnActivity ? <TurnActivity /> : null}
       {context.hasLiveTurn
         ? <MessageCard message={liveMessage(context.liveText, context.liveThinking)} streaming />
         : null}

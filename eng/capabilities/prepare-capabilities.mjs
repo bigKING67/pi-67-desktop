@@ -11,9 +11,14 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import {
+  compileBundledSkillSuites,
+  parseSkillMetadata
+} from "./bundled-skill-suites.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
+const skillSuitesPath = resolve(repositoryRoot, "eng/capabilities/bundled-skill-suites.json");
 const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
 const sourceCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/sources");
 const toolchainManifestPath = resolve(repositoryRoot, "artifacts/toolchain/current/manifest.json");
@@ -31,6 +36,7 @@ const COMMERCE_SKILLS = new Set([
 
 export async function prepareDesktopCapabilities() {
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  const skillSuiteDefinition = JSON.parse(await readFile(skillSuitesPath, "utf8"));
   assertLock(lock);
   const git = await bundledGitExecutable();
   await rm(outputRoot, { recursive: true, force: true });
@@ -48,12 +54,14 @@ export async function prepareDesktopCapabilities() {
     sources.get("commerce-growth-os"),
     lock.sources.find((item) => item.id === "commerce-growth-os")
   ));
+  const bundledSkillSuites = compileBundledSkillSuites(skillSuiteDefinition, entries);
 
   const catalog = {
     schema: "pi67.capability-catalog.v1",
     catalogVersion: lock.catalogVersion,
     generatedFrom: entries.map(({ packagePath: _packagePath, resourceTypes: _resourceTypes, ...entry }) => entry),
     entries,
+    bundledSkillSuites,
     recommendedExternal: lock.recommendedExternal
   };
   await writeFile(join(outputRoot, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
@@ -103,7 +111,16 @@ async function preparePi67Core(sourceRoot, source) {
       prompts
     }
   });
-  return catalogEntry(source, "packages/pi67-core", ["extension", "skill", "prompt", "rule"]);
+  return catalogEntry(
+    source,
+    "packages/pi67-core",
+    ["extension", "skill", "prompt", "rule"],
+    extensions.map((extensionPath) => {
+      const id = basename(extensionPath);
+      return { id, displayName: id };
+    }),
+    await bundledSkillEntries(destination, skillNames.map((name) => `skills/${name}`))
+  );
 }
 
 async function prepareBrowser67(sourceRoot, source) {
@@ -118,7 +135,17 @@ async function prepareBrowser67(sourceRoot, source) {
     "extension",
     "skills"
   ]);
-  return catalogEntry(source, "packages/browser67", ["skill", "integration"]);
+  const skillPaths = (await readdir(join(destination, "skills"), { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `skills/${entry.name}`)
+    .sort();
+  return catalogEntry(
+    source,
+    "packages/browser67",
+    ["skill", "integration"],
+    [],
+    await bundledSkillEntries(destination, skillPaths)
+  );
 }
 
 async function prepareDesignCraft(sourceRoot, source) {
@@ -132,7 +159,13 @@ async function prepareDesignCraft(sourceRoot, source) {
     "VERSION",
     "package.json"
   ]);
-  return catalogEntry(source, "packages/design-craft", ["skill"]);
+  return catalogEntry(
+    source,
+    "packages/design-craft",
+    ["skill"],
+    [],
+    await bundledSkillEntries(destination, ["skills/design-craft"])
+  );
 }
 
 async function prepareCommerceGrowthOs(sourceRoot, source) {
@@ -164,10 +197,27 @@ async function prepareCommerceGrowthOs(sourceRoot, source) {
     private: true,
     pi: { skills: skillPaths }
   });
-  return catalogEntry(source, "packages/commerce-growth-os", ["skill"]);
+  return catalogEntry(
+    source,
+    "packages/commerce-growth-os",
+    ["skill"],
+    [],
+    await bundledSkillEntries(destination, skillPaths)
+  );
 }
 
-function catalogEntry(source, packagePath, resourceTypes) {
+async function bundledSkillEntries(destination, skillPaths) {
+  return Promise.all(skillPaths.map(async (skillPath) => {
+    const id = basename(skillPath);
+    const metadata = parseSkillMetadata(await readFile(join(destination, skillPath, "SKILL.md"), "utf8"));
+    if (metadata.name !== id) {
+      throw new Error(`Bundled Skill identity does not match its directory: ${skillPath}`);
+    }
+    return { id, displayName: metadata.name, description: metadata.description };
+  }));
+}
+
+function catalogEntry(source, packagePath, resourceTypes, bundledExtensions = [], bundledSkills = []) {
   return {
     id: source.id,
     displayName: source.displayName,
@@ -178,7 +228,9 @@ function catalogEntry(source, packagePath, resourceTypes) {
     repository: source.repository,
     commit: source.commit,
     packagePath,
-    resourceTypes
+    resourceTypes,
+    bundledExtensions,
+    bundledSkills
   };
 }
 

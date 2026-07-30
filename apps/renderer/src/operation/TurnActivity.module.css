@@ -1,0 +1,84 @@
+.activity {
+  display: flex;
+  width: min(820px, calc(100% - 48px));
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 12px 0 14px;
+  color: var(--text-tertiary);
+}
+
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.copy strong {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.45;
+}
+
+.copy small {
+  overflow-wrap: anywhere;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.waiting-input .icon,
+.quiet .icon,
+.stalled .icon,
+.lost .icon {
+  color: var(--warning);
+}
+
+.failed,
+.cancelled,
+.lost,
+.quiet,
+.stalled {
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--warning) 62%, var(--border));
+}
+
+.failed {
+  border-left-color: color-mix(in srgb, var(--danger) 68%, var(--border));
+}
+
+.failed .icon {
+  color: var(--danger);
+}
+
+.recovering {
+  align-items: center;
+  color: var(--accent);
+}
+
+.spinning {
+  animation: turn-activity-spin 1s linear infinite;
+}
+
+@keyframes turn-activity-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .activity {
+    width: calc(100% - 28px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning { animation: none; }
+}

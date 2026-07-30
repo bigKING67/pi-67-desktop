@@ -1,0 +1,98 @@
+.workspace {
+  display: grid;
+  min-width: 0;
+  gap: 22px;
+}
+
+.tabList {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-1);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 630;
+}
+
+.tab[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.tab[data-selected] {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+
+.tab[data-selected]::after {
+  position: absolute;
+  right: 10px;
+  bottom: -9px;
+  left: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  content: "";
+}
+
+.tab[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.tabPanel {
+  min-width: 0;
+  outline: none;
+}
+
+.packagePanel {
+  min-height: 440px;
+}
+
+.bundledStatus {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.bundledStatus[data-status="ready"] {
+  background: var(--success);
+}
+
+.bundledStatus[data-status="unavailable"] {
+  background: var(--warning);
+}
+
+.scopeNotice {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 700px) {
+  .tabList {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+  }
+}

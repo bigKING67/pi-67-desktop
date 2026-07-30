@@ -9,7 +9,6 @@ import { useAppStore } from "./app-store.js";
 import { Composer } from "../composer/Composer.js";
 import { ContextPane } from "../context/ContextPane.js";
 import { NavigationRail } from "../navigation/NavigationRail.js";
-import { OperationStatusBar } from "../operation/OperationStatusBar.js";
 import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
 import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import {
@@ -154,7 +153,6 @@ export function WorkspaceShell({
           <TrustBanner />
           <StreamingAnnouncer />
           <Transcript />
-          <OperationStatusBar />
           <Composer />
         </section>
       ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (

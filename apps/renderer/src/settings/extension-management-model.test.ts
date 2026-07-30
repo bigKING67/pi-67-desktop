@@ -1,4 +1,4 @@
-import type { DesktopCapabilityPackageSummary, ExtensionPackageEntry } from "@pi67/domain";
+import type { ExtensionPackageEntry } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
   buildPackageRows,
@@ -10,39 +10,30 @@ import {
   packageRowState
 } from "./extension-management-model.js";
 
-const bundled: DesktopCapabilityPackageSummary = {
-  id: "pi67-core",
-  displayName: "Pi-67 Core",
-  origin: "first-party",
-  bundled: true,
-  defaultEnabled: true,
-  version: "0.15.5",
-  commit: "6f03b61705b6fd882de408fbbf8353578bfce86d",
-  resourceTypes: ["extension", "skill"],
-  installed: true
-};
-
 describe("Extension management view model", () => {
-  it("groups bundled entries with project overrides and inherited global packages", () => {
+  it("keeps bundled capabilities out while preserving project overrides and inherited packages", () => {
     const globalOverride = packageEntry("npm:overridden", "global", true);
     const projectOverride = packageEntry("npm:overridden", "project", false);
     const inherited = packageEntry("npm:inherited", "global", true);
+    const bundled: ExtensionPackageEntry = {
+      ...packageEntry("/managed/pi67-core", "global", true),
+      origin: "first-party",
+      sourceKind: "bundled"
+    };
 
     const rows = buildPackageRows(
-      [globalOverride, projectOverride, inherited],
-      [bundled],
+      [globalOverride, projectOverride, inherited, bundled],
       [{ source: inherited.source, scope: "global", type: "npm", displayName: "inherited" }],
       "project"
     );
 
     expect(rows.map((row) => row.key)).toEqual([
-      "bundled:pi67-core",
       "configured:npm:overridden",
       "configured:npm:inherited"
     ]);
-    expect(rows[1]).toMatchObject({ kind: "configured", inherited: false, entry: projectOverride });
-    expect(rows[2]).toMatchObject({ kind: "configured", inherited: true, entry: inherited });
-    expect(rows[2]?.kind === "configured" ? rows[2].update?.displayName : undefined).toBe("inherited");
+    expect(rows[0]).toMatchObject({ kind: "configured", inherited: false, entry: projectOverride });
+    expect(rows[1]).toMatchObject({ kind: "configured", inherited: true, entry: inherited });
+    expect(rows[1]?.update?.displayName).toBe("inherited");
   });
 
   it("keeps resource filtering, search, state, and updates explicit", () => {
@@ -56,20 +47,19 @@ describe("Extension management view model", () => {
     const skillOnly = { ...packageEntry("npm:skill-only", "global", true), resourceTypes: ["skill" as const] };
     const rows = buildPackageRows(
       [enabled, disabled, skillOnly],
-      [bundled],
       [{ source: disabled.source, scope: "global", type: "git", displayName: "beta" }],
       "global"
     );
 
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
     expect(filterPackageRows(rows, "disabled", "").map((row) => row.key)).toEqual([
       "configured:https://example.test/beta.git"
     ]);
     expect(filterPackageRows(rows, "updates", "")).toHaveLength(1);
     expect(filterPackageRows(rows, "all", "ALPHA")).toHaveLength(1);
     expect(filterPackageRows(rows, "all", "delegated tasks")).toHaveLength(1);
-    expect(rows.map(packageRowEnabled)).toEqual([true, true, false, true]);
-    expect(packageRowAccessibleName(rows[1]!)).toContain("Alpha Delegator，npm:@example/alpha · 全局");
+    expect(rows.map(packageRowEnabled)).toEqual([true, false, true]);
+    expect(packageRowAccessibleName(rows[0]!)).toContain("Alpha Delegator，npm:@example/alpha · 全局");
   });
 
   it("keeps a multi-resource package in one row with type-scoped states", () => {
@@ -83,7 +73,7 @@ describe("Extension management view model", () => {
       ]
     };
 
-    const rows = buildPackageRows([mixed], [], [], "global");
+    const rows = buildPackageRows([mixed], [], "global");
 
     expect(rows).toHaveLength(1);
     expect(packageRowState(rows[0]!)).toBe("partial");

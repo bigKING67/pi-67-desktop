@@ -13,20 +13,19 @@ import {
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 
-export function SessionResourcePanel({ kind, title, description, empty }: {
+export function SessionResourcePanel({ kind, origin, resourceScope, scope: requestedScope, title, description, empty }: {
   kind: ResourceSummary["kind"];
+  origin?: ResourceSummary["origin"];
+  resourceScope?: ResourceSummary["scope"];
+  scope?: "global" | "project";
   title: string;
   description: string;
   empty: string;
 }) {
-  const scope = useWorkbenchStore((state) => state.settingsScope);
+  const settingsScope = useWorkbenchStore((state) => state.settingsScope);
+  const scope = requestedScope ?? settingsScope;
   const resources = useSessionProjectionStore(selectSessionResources);
-  const displayed = (resources ?? [])
-    .filter((resource) => resource.kind === kind)
-    .filter((resource) => scope === "project"
-      || resource.scope === undefined
-      || resource.scope === "user")
-    .sort(compareResources);
+  const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope);
   return (
     <SettingsSectionBlock
       actions={<Button className="secondary-button" onPress={() => void reloadSessionResources()}>
@@ -52,6 +51,22 @@ export function SessionResourcePanel({ kind, title, description, empty }: {
   );
 }
 
+export function filterSessionResources(
+  resources: readonly ResourceSummary[],
+  kind: ResourceSummary["kind"],
+  scope: "global" | "project",
+  origin?: ResourceSummary["origin"],
+  resourceScope?: ResourceSummary["scope"]
+): ResourceSummary[] {
+  return resources
+    .filter((resource) => resource.kind === kind)
+    .filter((resource) => origin === undefined || resource.origin === origin)
+    .filter((resource) => resourceScope === undefined
+      ? scope === "project" || resource.scope === undefined || resource.scope === "user"
+      : resource.scope === resourceScope)
+    .sort(compareResources);
+}
+
 function compareResources(left: ResourceSummary, right: ResourceSummary): number {
   return resourceScopeRank(left.scope) - resourceScopeRank(right.scope)
     || left.label.localeCompare(right.label, "zh-CN");
@@ -73,7 +88,7 @@ function resourceMetadata(resource: ResourceSummary, selectedScope: "global" | "
         ? selectedScope === "project" ? "继承自全局" : "全局"
         : "作用域未知";
   const origin = resource.origin === "package"
-    ? "来自资源包"
+    ? "来自扩展包"
     : resource.origin === "top-level"
       ? "独立配置"
       : undefined;

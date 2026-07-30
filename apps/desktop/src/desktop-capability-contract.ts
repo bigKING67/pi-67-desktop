@@ -13,7 +13,17 @@ export const INTEGRATION_STATE_SCHEMA = "pi67.desktop-integration-state.v1";
 
 export interface BundledCapabilityCatalog {
   catalogVersion: string;
-  entries: Array<Omit<DesktopCapabilityPackageSummary, "installed"> & { packagePath: string }>;
+  entries: Array<Omit<DesktopCapabilityPackageSummary, "installed"> & {
+    packagePath: string;
+    bundledExtensions: Array<{ id: string; displayName: string }>;
+    bundledSkills: Array<{ id: string; displayName: string; description: string }>;
+  }>;
+  bundledSkillSuites: Array<{
+    id: string;
+    displayName: string;
+    description: string;
+    members: Array<{ packageId: string; skillId: string }>;
+  }>;
   recommendedExternal: DesktopRecommendedPackage[];
 }
 
@@ -40,12 +50,43 @@ export function snapshotFromCatalog(
   browser: DesktopIntegrationStatus
 ): DesktopCapabilitySnapshot {
   const installed = new Map(state?.packages.map((entry) => [entry.id, entry.installed]) ?? []);
+  const bundledSkills = catalog.entries.flatMap((entry) => entry.bundledSkills.map((skill) => ({
+    ...skill,
+    packageId: entry.id,
+    packageDisplayName: entry.displayName,
+    version: entry.version,
+    installed: installed.get(entry.id) === true
+  })));
+  const bundledSkillsByKey = new Map(bundledSkills.map((skill) => [
+    bundledSkillKey(skill.packageId, skill.id),
+    skill
+  ]));
   return {
     phase: "initializing",
     catalogVersion: catalog.catalogVersion,
-    packages: catalog.entries.map(({ packagePath: _packagePath, ...entry }) => ({
-      ...entry,
+    packages: catalog.entries.map(({
+      packagePath: _packagePath,
+      bundledExtensions: _bundledExtensions,
+      bundledSkills: _bundledSkills,
+      ...entry
+    }) => ({ ...entry, installed: installed.get(entry.id) === true })),
+    bundledExtensions: catalog.entries.flatMap((entry) => entry.bundledExtensions.map((extension) => ({
+      ...extension,
+      packageId: entry.id,
+      packageDisplayName: entry.displayName,
+      version: entry.version,
       installed: installed.get(entry.id) === true
+    }))),
+    bundledSkills,
+    bundledSkillSuites: catalog.bundledSkillSuites.map((suite) => ({
+      id: suite.id,
+      displayName: suite.displayName,
+      description: suite.description,
+      skills: suite.members.map((member) => {
+        const skill = bundledSkillsByKey.get(bundledSkillKey(member.packageId, member.skillId));
+        if (!skill) throw new Error("Desktop bundled Skill suite member is unavailable.");
+        return skill;
+      })
     })),
     recommendedExternal: catalog.recommendedExternal,
     managedContext: {
@@ -60,6 +101,9 @@ export function emptyCapabilitySnapshot(detail: string): DesktopCapabilitySnapsh
   return {
     phase: "error",
     packages: [],
+    bundledExtensions: [],
+    bundledSkills: [],
+    bundledSkillSuites: [],
     recommendedExternal: [],
     managedContext: { rules: "unavailable", agents: "unavailable" },
     integrations: [],
@@ -90,6 +134,12 @@ export function parseBundledCatalog(value: unknown): BundledCapabilityCatalog {
       if (!isResourceType(type)) throw new Error("Desktop capability resource type is invalid.");
       return type;
     });
+    const bundledExtensions = item.bundledExtensions === undefined
+      ? []
+      : parseBundledExtensions(item.bundledExtensions);
+    const bundledSkills = item.bundledSkills === undefined
+      ? []
+      : parseBundledSkills(item.bundledSkills);
     return {
       id: item.id,
       displayName: item.displayName,
@@ -99,13 +149,113 @@ export function parseBundledCatalog(value: unknown): BundledCapabilityCatalog {
       version: item.version,
       commit: item.commit,
       packagePath: item.packagePath,
-      resourceTypes
+      resourceTypes,
+      bundledExtensions,
+      bundledSkills
     };
   });
   const recommendedExternal = Array.isArray(value.recommendedExternal)
     ? value.recommendedExternal.map(parseRecommendedPackage)
     : [];
-  return { catalogVersion: value.catalogVersion, entries, recommendedExternal };
+  const bundledSkillSuites = parseBundledSkillSuites(value.bundledSkillSuites, entries);
+  return { catalogVersion: value.catalogVersion, entries, bundledSkillSuites, recommendedExternal };
+}
+
+function parseBundledExtensions(value: unknown): Array<{ id: string; displayName: string }> {
+  if (!Array.isArray(value) || value.length > 128) {
+    throw new Error("Desktop bundled extension entries are invalid.");
+  }
+  const extensions = value.map((item) => {
+    if (
+      !isRecord(item)
+      || !isId(item.id)
+      || typeof item.displayName !== "string"
+      || item.displayName.length === 0
+      || item.displayName.length > 200
+    ) throw new Error("Desktop bundled extension entry is invalid.");
+    return { id: item.id, displayName: item.displayName };
+  });
+  if (new Set(extensions.map((entry) => entry.id)).size !== extensions.length) {
+    throw new Error("Desktop bundled extension entries are duplicated.");
+  }
+  return extensions;
+}
+
+function parseBundledSkills(value: unknown): Array<{ id: string; displayName: string; description: string }> {
+  if (!Array.isArray(value) || value.length > 256) {
+    throw new Error("Desktop bundled skill entries are invalid.");
+  }
+  const skills = value.map((item) => {
+    if (
+      !isRecord(item)
+      || !isId(item.id)
+      || typeof item.displayName !== "string"
+      || item.displayName.length === 0
+      || item.displayName.length > 200
+      || typeof item.description !== "string"
+      || item.description.length === 0
+      || item.description.length > 2_000
+    ) throw new Error("Desktop bundled skill entry is invalid.");
+    return { id: item.id, displayName: item.displayName, description: item.description };
+  });
+  if (new Set(skills.map((entry) => entry.id)).size !== skills.length) {
+    throw new Error("Desktop bundled skill entries are duplicated.");
+  }
+  return skills;
+}
+
+function parseBundledSkillSuites(
+  value: unknown,
+  entries: BundledCapabilityCatalog["entries"]
+): BundledCapabilityCatalog["bundledSkillSuites"] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 32) {
+    throw new Error("Desktop bundled Skill suite entries are invalid.");
+  }
+  const availableSkills = new Set(entries.flatMap((entry) => (
+    entry.bundledSkills.map((skill) => bundledSkillKey(entry.id, skill.id))
+  )));
+  const assignedSkills = new Set<string>();
+  const suites = value.map((item) => {
+    if (
+      !isRecord(item)
+      || !isId(item.id)
+      || typeof item.displayName !== "string"
+      || item.displayName.length === 0
+      || item.displayName.length > 100
+      || typeof item.description !== "string"
+      || item.description.length === 0
+      || item.description.length > 500
+      || !Array.isArray(item.members)
+      || item.members.length === 0
+      || item.members.length > 256
+    ) throw new Error("Desktop bundled Skill suite entry is invalid.");
+    const members = item.members.map((member) => {
+      if (!isRecord(member) || !isId(member.packageId) || !isId(member.skillId)) {
+        throw new Error("Desktop bundled Skill suite member is invalid.");
+      }
+      const key = bundledSkillKey(member.packageId, member.skillId);
+      if (!availableSkills.has(key) || assignedSkills.has(key)) {
+        throw new Error("Desktop bundled Skill suite coverage is invalid.");
+      }
+      assignedSkills.add(key);
+      return { packageId: member.packageId, skillId: member.skillId };
+    });
+    return {
+      id: item.id,
+      displayName: item.displayName,
+      description: item.description,
+      members
+    };
+  });
+  if (
+    new Set(suites.map((suite) => suite.id)).size !== suites.length
+    || assignedSkills.size !== availableSkills.size
+  ) throw new Error("Desktop bundled Skill suite coverage is invalid.");
+  return suites;
+}
+
+function bundledSkillKey(packageId: string, skillId: string): string {
+  return `${packageId}:${skillId}`;
 }
 
 export function parseManagedState(value: unknown): ManagedCapabilityState {

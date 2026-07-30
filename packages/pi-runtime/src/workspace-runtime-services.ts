@@ -22,6 +22,7 @@ export interface CreatePiWorkspaceRuntimeServicesOptions {
   configurationService?: PiConfigurationService;
   sessionCatalogDirectory?: string;
   storageRoot?: string;
+  sessionCatalogOwner?: RuntimeSessionCatalogOwner;
 }
 
 export interface PiWorkspaceRuntimeServices {
@@ -57,7 +58,8 @@ export function createPiWorkspaceRuntimeServices(
       ? {}
       : { runtimeCredentialOverrides: options.runtimeCredentialOverrides })
   });
-  const sessionCatalog = createRuntimeSessionCatalogOwner(
+  const ownsSessionCatalog = options.sessionCatalogOwner === undefined;
+  const sessionCatalog = options.sessionCatalogOwner ?? createRuntimeSessionCatalogOwner(
     options.sessionCatalogDirectory,
     options.storageRoot
   );
@@ -102,9 +104,13 @@ export function createPiWorkspaceRuntimeServices(
         try {
           await settingsManager.flush();
         } finally {
-          try {
-            await sessionCatalog.dispose();
-          } finally {
+          if (ownsSessionCatalog) {
+            try {
+              await sessionCatalog.dispose();
+            } finally {
+              unregisterConfiguration?.();
+            }
+          } else {
             unregisterConfiguration?.();
           }
         }

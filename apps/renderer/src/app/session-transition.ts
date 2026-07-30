@@ -29,6 +29,7 @@ type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppS
 export interface SessionBootstrapTransitionOptions {
   detail: string;
   refreshSessionCatalogFor?: WorkspaceId;
+  preserveCurrentProjectionDuringRequest?: boolean;
   request: () => Promise<ProjectionMutationAcknowledgement>;
   onError: (error: unknown) => void;
 }
@@ -52,19 +53,22 @@ export async function runSessionBootstrapTransition(
   get: StoreGet,
   set: StoreSet,
   options: SessionBootstrapTransitionOptions
-): Promise<void> {
-  if (get().sessionTransitionPending) return;
-  prepareRendererSessionTransaction("session-replaced");
+): Promise<boolean> {
+  if (get().sessionTransitionPending) return false;
+  if (!options.preserveCurrentProjectionDuringRequest) {
+    prepareRendererSessionTransaction("session-replaced");
+  }
   set({
-    ...clearedTransientState(),
+    ...(options.preserveCurrentProjectionDuringRequest ? {} : clearedTransientState()),
     sessionTransitionPending: true,
+    sessionBootstrapTransitionPending: true,
     runtime: transitionRuntime(options.detail)
   });
   const target = captureRendererSessionTransition(get());
   if (!target) {
-    set({ sessionTransitionPending: false });
+    set({ sessionTransitionPending: false, sessionBootstrapTransitionPending: false });
     options.onError(new Error("Renderer Session authority is not connected."));
-    return;
+    return false;
   }
   let committed = false;
   try {
@@ -73,21 +77,22 @@ export async function runSessionBootstrapTransition(
     if (disposition === "missing-bootstrap") {
       throw new Error("Pi 运行服务未发送 authoritative session.bootstrap 事件。");
     }
-    if (disposition === "stale") return;
+    if (disposition === "stale") return false;
     committed = true;
   } catch (error) {
     const disposition = classifyRendererSessionBootstrap(get(), target);
     if (disposition === "committed") committed = true;
-    if (disposition === "stale") return;
+    if (disposition === "stale") return false;
     if (!committed) {
-      set({ sessionTransitionPending: false });
+      set({ sessionTransitionPending: false, sessionBootstrapTransitionPending: false });
       options.onError(error);
-      return;
+      return false;
     }
   }
   if (committed && options.refreshSessionCatalogFor) {
     await queryFirstSessionCatalog(options.refreshSessionCatalogFor, { refresh: true });
   }
+  return committed;
 }
 
 export async function runSessionResourceCatalogTransition(

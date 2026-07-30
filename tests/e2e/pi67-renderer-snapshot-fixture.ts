@@ -61,6 +61,24 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
       origin: "top-level",
       status: "ready"
     }, {
+      kind: "skill",
+      id: "project-review",
+      label: "project-review",
+      path: "/Users/test/Projects/pi-demo/.agents/skills/project-review/SKILL.md",
+      source: ".agents/skills",
+      scope: "project",
+      origin: "top-level",
+      status: "ready"
+    }, {
+      kind: "skill",
+      id: "package-skill",
+      label: "package-skill",
+      path: "/Users/test/.pi/agent/npm/node_modules/pi-subagents/skills/package-skill/SKILL.md",
+      source: "npm:pi-subagents",
+      scope: "user",
+      origin: "package",
+      status: "ready"
+    }, {
       kind: "prompt",
       id: "review",
       label: "/review",

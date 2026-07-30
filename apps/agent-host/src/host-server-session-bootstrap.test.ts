@@ -34,6 +34,11 @@ describe("AgentHostServer session bootstrap", () => {
     let sessionId = "session-workspace";
     let sessionGeneration = 1;
     const currentSnapshot = () => ({ ...emptySnapshot(), sessionId });
+    const forkSession = vi.fn(async (_entryId: string, _position?: "before" | "at") => {
+      sessionId = "session-forked";
+      sessionGeneration += 1;
+      return currentSnapshot();
+    });
     const runtime = {
       getSdkVersion: () => "0.81.1",
       getExtensionUiCapabilities: () => ({
@@ -62,11 +67,7 @@ describe("AgentHostServer session bootstrap", () => {
         sessionGeneration += 1;
         return currentSnapshot();
       },
-      forkSession: async () => {
-        sessionId = "session-forked";
-        sessionGeneration += 1;
-        return currentSnapshot();
-      },
+      forkSession,
       getIdentity: () => ({ sessionId, sessionGeneration }),
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -130,7 +131,7 @@ describe("AgentHostServer session bootstrap", () => {
       eventSequence: eventSequenceAt(port, bootstrapIndex)
     });
 
-    const fork = commandEnvelope("session.fork", { entryId: "entry-2" }, 6);
+    const fork = commandEnvelope("session.fork", { entryId: "entry-2", position: "before" }, 6);
     port.emit(fork);
     await waitForResponse(port, fork.requestId);
     const forkBootstrapIndex = port.sent.findIndex((value, index) => (
@@ -152,6 +153,7 @@ describe("AgentHostServer session bootstrap", () => {
       sessionGeneration: 3,
       eventSequence: eventSequenceAt(port, forkBootstrapIndex)
     });
+    expect(forkSession).toHaveBeenCalledWith("entry-2", "before");
     await server.shutdown();
   });
 

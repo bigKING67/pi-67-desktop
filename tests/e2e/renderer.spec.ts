@@ -226,7 +226,8 @@ test("imports an external Pi session instead of opening the source file in place
   await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "导入 Pi Session" }).click();
   await expect.poll(async () => (await recordedCommands(page)).includes("session.import")).toBe(true);
-  await expect(page.locator('[data-operation-lifecycle="completed"]')).toContainText("任务已完成");
+  await expect(page.locator("[data-turn-activity]")).toHaveCount(0);
+  await expect(page.locator("[data-notification-id]").filter({ hasText: "任务已完成" })).toBeVisible();
   const importCommand = (await recordedCommandDetails(page)).find((command) => command.type === "session.import");
   expect(importCommand?.payload).toMatchObject({
     submissionId: expect.stringMatching(/^session-import-/u),
@@ -334,27 +335,28 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "thinking" } }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "Pi 正在分析" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在思考" })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "responding" } }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "Pi 正在回复" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在回复" })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "tool", toolCallId: "tool-1", toolKind: "shell" } }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "Pi 正在使用工具" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在使用工具" })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "approval", requestId: "approval-1" } }
   }, { operationId });
-  const operationStatus = page.getByRole("status").filter({ hasText: "需要你的确认" });
+  const operationStatus = page.locator("[data-turn-activity]").filter({ hasText: "需要你的确认" });
   await expect(operationStatus).toBeVisible();
-  await operationStatus.getByRole("button", { name: "停止" }).click();
+  await expect(operationStatus.getByRole("button", { name: "停止" })).toHaveCount(0);
+  await page.getByTestId("composer-region").getByRole("button", { name: "停止" }).click();
   await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
     command === "operation.abort"
   ))).toEqual(["operation.abort"]);
@@ -365,12 +367,12 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "compaction" } }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "正在压缩上下文" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在压缩上下文" })).toBeVisible();
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: null }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "Pi 正在执行任务" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在处理" })).toBeVisible();
   await emitMockAgentEvent(page, {
     type: "operation.failed",
     payload: {
@@ -379,7 +381,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
       error: { code: "INTERNAL", message: "测试失败", recoverable: true }
     }
   }, { operationId });
-  await expect(page.getByRole("status").filter({ hasText: "任务失败" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "任务失败" })).toBeVisible();
 
   const importOperationId = "operation-import-status-test";
   await emitMockAgentEvent(page, {
@@ -396,9 +398,10 @@ test("projects operation activities and sends an operation-scoped abort", async 
       }
     }
   }, { operationId: importOperationId });
-  const importStatus = page.getByRole("status").filter({ hasText: "正在导入 Pi 会话" });
+  const importStatus = page.locator("[data-turn-activity]").filter({ hasText: "正在导入 Pi 会话" });
   await expect(importStatus).toBeVisible();
   await expect(importStatus.getByRole("button", { name: "停止" })).toHaveCount(0);
+  await expect(page.getByTestId("composer-region").getByRole("button", { name: "停止" })).toHaveCount(0);
 });
 
 test("resynchronizes the projection after an event sequence gap without guessing the missing event", async ({ page }) => {

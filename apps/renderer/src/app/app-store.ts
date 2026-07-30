@@ -23,6 +23,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   trust: "unknown",
   trustUpdating: false,
   sessionTransitionPending: false,
+  sessionBootstrapTransitionPending: false,
   approvalMode: "guided",
   operation: undefined,
   operationDetail: undefined,

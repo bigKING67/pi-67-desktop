@@ -10,6 +10,16 @@ const notificationDateTime = new Intl.DateTimeFormat(appLocale, {
   hour: "2-digit",
   minute: "2-digit"
 });
+const messageDateTimeTitle = new Intl.DateTimeFormat(appLocale, {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  timeZoneName: "longOffset",
+  hour12: false
+});
 
 export function formatRelativeTime(timestamp: number, now = Date.now()): string {
   if (!Number.isFinite(timestamp)) return messages.dateTime.unknown;
@@ -23,4 +33,24 @@ export function formatRelativeTime(timestamp: number, now = Date.now()): string 
 
 export function formatNotificationDateTime(timestamp: number): string {
   return notificationDateTime.format(timestamp);
+}
+
+export function formatMessageDateTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return messages.dateTime.unknown;
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join("-") + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function formatMessageDateTimeTitle(timestamp: number): string {
+  return Number.isFinite(new Date(timestamp).getTime())
+    ? messageDateTimeTitle.format(timestamp)
+    : messages.dateTime.unknown;
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, "0");
 }

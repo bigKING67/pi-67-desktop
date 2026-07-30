@@ -47,6 +47,10 @@ interface HostCommandDispatchContext {
     runtime: AgentRuntime,
     options: Parameters<AgentRuntime["initialize"]>[0]
   ) => Promise<CommandResults["runtime.initialize"]>;
+  forkSessionFromTask: (
+    runtime: AgentRuntime,
+    payload: Extract<AgentCommand, { type: "session.forkFromTask" }>["payload"]
+  ) => Promise<ReturnType<AgentRuntime["getSnapshot"]>>;
   commitSessionWriter: (runtime: AgentRuntime) => Promise<void>;
   operations: () => OperationRegistry;
   completeInteractiveWait: (requestId: string) => void;
@@ -152,7 +156,16 @@ export async function dispatchHostCommand(
       });
     }
     case "session.fork": {
-      const snapshot = await runtime.forkSession(command.payload.entryId);
+      const snapshot = await runtime.forkSession(
+        command.payload.entryId,
+        command.payload.position ?? "at"
+      );
+      await context.commitSessionWriter(runtime);
+      context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-fork" } });
+      return context.captureProjectionMutationAcknowledgement(runtime);
+    }
+    case "session.forkFromTask": {
+      const snapshot = await context.forkSessionFromTask(runtime, command.payload);
       await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-fork" } });
       return context.captureProjectionMutationAcknowledgement(runtime);

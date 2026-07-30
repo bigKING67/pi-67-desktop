@@ -7,23 +7,17 @@ import {
   CircleOff,
   Download,
   RefreshCw,
-  ShieldCheck,
   Trash2
 } from "lucide-react";
 import { Button } from "react-aria-components";
 import { messages } from "../localization/message-catalog.js";
-import type {
-  BundledPackageRow,
-  ConfirmedAction,
-  PackageRow
-} from "./extension-management-model.js";
+import type { ConfirmedAction, PackageRow } from "./extension-management-model.js";
 import {
   packageResourceEnabled,
   packageResourceTypes,
   packageRowAccessibleName,
   packageRowName,
   packageRowState,
-  packageRowSummary,
   resolveSourceKind,
   sourceKindLabel
 } from "./extension-management-model.js";
@@ -36,28 +30,24 @@ export function PackageList({ rows, selectedKey, loading, onSelect }: {
   onSelect: (key: string) => void;
 }) {
   if (loading && rows.length === 0) {
-    return <div className={styles.listEmpty} role="status"><RefreshCw aria-hidden="true" size={16} />正在读取资源包…</div>;
+    return <div className={styles.listEmpty} role="status"><RefreshCw aria-hidden="true" size={16} />正在读取扩展包…</div>;
   }
   if (rows.length === 0) {
     return (
       <div className={styles.listEmpty} role="status">
         <Box aria-hidden="true" size={18} />
-        <strong>没有匹配的资源包</strong>
+        <strong>没有匹配的扩展包</strong>
         <span>调整搜索或筛选条件后重试。</span>
       </div>
     );
   }
-  let currentGroup: string | undefined;
   return (
     <div className={styles.listPane} data-testid="extension-package-list-scroll">
-      <ul aria-label="已安装资源包" className={styles.packageList}>
+      <ul aria-label="已安装扩展包" className={styles.packageList}>
+        <li><span className={styles.groupLabel}>第三方扩展包</span></li>
         {rows.map((row) => {
-          const group = row.kind === "bundled" ? "随应用提供" : "外部安装";
-          const showGroup = currentGroup !== group;
-          currentGroup = group;
           return (
             <li key={row.key}>
-              {showGroup ? <span className={styles.groupLabel}>{group}</span> : null}
               <Button
                 aria-label={packageRowAccessibleName(row)}
                 aria-pressed={selectedKey === row.key}
@@ -70,7 +60,7 @@ export function PackageList({ rows, selectedKey, loading, onSelect }: {
                   <strong>{packageRowName(row)}</strong>
                   <PackageRowMeta row={row} />
                 </span>
-                {row.kind === "configured" && row.update ? <span className={styles.updateFlag}>可更新</span> : null}
+                {row.update ? <span className={styles.updateFlag}>可更新</span> : null}
               </Button>
             </li>
           );
@@ -93,12 +83,11 @@ export function PackageDetails({ row, workspaceName, updatesChecked, onBack, onP
     return (
       <div className={styles.detailEmpty}>
         <Box aria-hidden="true" size={20} />
-        <strong>选择一个资源包查看详情</strong>
+        <strong>选择一个扩展包查看详情</strong>
         <span>来源、作用域、提供的资源和安全操作会显示在这里。</span>
       </div>
     );
   }
-  if (row.kind === "bundled") return <BundledPackageDetails row={row} onBack={onBack} />;
   const resourceTypes = packageResourceTypes(row.entry);
   const state = packageRowState(row);
   const status = state === "enabled" ? "已启用" : state === "partial" ? "部分启用" : "已停用";
@@ -173,7 +162,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, onBack, onP
       </div>
       {!row.inherited ? (
         <div className={styles.dangerZone} data-testid="extension-danger-zone">
-          <span><strong>移除资源包</strong><small>将同时移除这个资源包提供的扩展、技能、指令模板和主题；本地目录只移除配置引用。</small></span>
+          <span><strong>移除扩展包</strong><small>将同时移除这个扩展包提供的扩展、技能、指令模板和主题；本地目录只移除配置引用。</small></span>
           <Button
             aria-label={`卸载 ${row.entry.source}`}
             className={styles.dangerButton!}
@@ -186,7 +175,6 @@ export function PackageDetails({ row, workspaceName, updatesChecked, onBack, onP
 }
 
 function PackageRowMeta({ row }: { row: PackageRow }) {
-  if (row.kind === "bundled") return <small>{packageRowSummary(row)}</small>;
   return (
     <small>
       <span className={styles.packageSource}>{row.entry.source}</span>
@@ -209,57 +197,20 @@ function PackageState({ row }: { row: PackageRow }) {
   if (state === "unavailable") {
     return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>缺失</span></span>;
   }
-  return <span className={styles.state} data-state="bundled"><ShieldCheck aria-hidden="true" size={15} /><span>内置</span></span>;
-}
-
-function BundledPackageDetails({ row, onBack }: { row: BundledPackageRow; onBack: () => void }) {
-  return (
-    <section
-      aria-label={`${row.entry.displayName} 详情`}
-      className={styles.details}
-      data-testid="extension-package-detail-scroll"
-    >
-      <DetailBackButton onBack={onBack} />
-      <header className={styles.detailHeader}>
-        <span className={styles.eyebrow}>随应用提供</span>
-        <h2>{row.entry.displayName}</h2>
-        <div className={styles.statusLine}>
-          <span data-state={row.entry.installed ? "ready" : "danger"}>
-            {row.entry.installed ? "已安装" : "安装内容缺失"}
-          </span>
-          <span>官方内置</span>
-        </div>
-      </header>
-      <p className={styles.detailDescription}>
-        随 π 应用提供的核心能力包，为 Desktop 提供经过固定版本校验的资源。
-      </p>
-      <CapabilitySummary resourceTypes={row.entry.resourceTypes} />
-      <dl className={styles.facts}>
-        <Fact label="版本" value={row.entry.version} code />
-        <Fact label="固定版本" value={row.entry.commit.slice(0, 12)} code />
-        <Fact label="资源" value={row.entry.resourceTypes.map(resourceTypeLabel).join(" · ")} />
-        <Fact label="默认状态" value={row.entry.defaultEnabled ? "启用" : "停用"} />
-        <Fact label="更新方式" value="随 π 应用更新" />
-      </dl>
-      <div className={styles.integrityNote}>
-        <ShieldCheck aria-hidden="true" size={18} />
-        <span><strong>固定供应链身份</strong><small>应用按 Git commit 和 tree SHA-256 校验并替换内置基线，不能独立卸载。</small></span>
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function DetailBackButton({ onBack }: { onBack: () => void }) {
   return (
-    <Button aria-label="返回资源包列表" className={styles.detailBackButton!} onPress={onBack}>
-      <ArrowLeft aria-hidden="true" size={14} />资源包列表
+    <Button aria-label="返回扩展包列表" className={styles.detailBackButton!} onPress={onBack}>
+      <ArrowLeft aria-hidden="true" size={14} />扩展包列表
     </Button>
   );
 }
 
 function CapabilitySummary({ resourceTypes }: { resourceTypes: readonly string[] }) {
   return (
-    <div className={styles.capabilitySummary} aria-label="资源包提供的资源类型">
+    <div className={styles.capabilitySummary} aria-label="扩展包提供的资源类型">
       <span className={styles.capabilityLabel}>提供能力</span>
       <span className={styles.capabilityBadges}>
         {resourceTypes.map((type) => <span key={type}>{resourceTypeLabel(type)}</span>)}

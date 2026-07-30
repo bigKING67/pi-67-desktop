@@ -8,6 +8,8 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { activateRendererTask } from "../workbench/task-activation-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { useSessionProjectionStore } from "./session-projection-store.js";
 import {
   createRendererSession,
   openRendererSession,
@@ -30,10 +32,12 @@ const activateTask = vi.mocked(activateRendererTask);
 describe("session lifecycle controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    runBootstrap.mockReset().mockResolvedValue(undefined);
+    runBootstrap.mockReset().mockResolvedValue(true);
     runIncremental.mockReset().mockResolvedValue(undefined);
     activateTask.mockReset().mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
+    useTaskDraftStore.getState().dispose();
+    useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     useAppStore.setState(useAppStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace(workspace());

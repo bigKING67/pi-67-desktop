@@ -1,4 +1,7 @@
 import type { Page } from "@playwright/test";
+type SessionCatalogSource = "sqlite" | "sdk-fallback";
+type SessionCatalogState = "ready" | "rebuilding" | "fallback" | "unavailable";
+type SessionCatalogDegradedReason = "busy" | "unavailable" | "runtime-load" | "storage-prepare" | "storage-inspect" | "database-open" | "database-verify" | "schema-prepare" | "recovery-prepare" | "recovery-open" | "recovery-verify" | "recovery-schema" | "runtime-query";
 
 export interface FixtureSessionSummary {
   id: string;
@@ -10,13 +13,12 @@ export interface FixtureSessionSummary {
   parentSessionPath?: string;
 }
 
-type FixtureSessionCatalogSource = "sqlite" | "sdk-fallback";
-type FixtureSessionCatalogState = "ready" | "rebuilding" | "fallback" | "unavailable";
 export interface FixtureSessionCatalogStatus {
   revision: number;
-  source: FixtureSessionCatalogSource;
-  state: FixtureSessionCatalogState;
+  source: SessionCatalogSource;
+  state: SessionCatalogState;
   rebuilding: boolean;
+  degradedReason?: SessionCatalogDegradedReason;
   reconciledAt?: number;
   itemCount: number;
   incomplete: boolean;
@@ -42,9 +44,10 @@ const FIXTURE_QUERY_KEY = "0".repeat(64);
 export interface SessionCatalogFixtureOptions {
   items?: FixtureSessionSummary[];
   revision?: number;
-  source?: FixtureSessionCatalogSource;
-  state?: FixtureSessionCatalogState;
+  source?: SessionCatalogSource;
+  state?: SessionCatalogState;
   rebuilding?: boolean;
+  degradedReason?: SessionCatalogDegradedReason;
   reconciledAt?: number;
   incomplete?: boolean;
   skippedCount?: number;
@@ -99,16 +102,7 @@ export async function installSessionCatalogFixture(
       messageCount: number;
       parentSessionPath?: string;
     };
-    type CatalogPatch = {
-      items?: CatalogItem[];
-      revision?: number;
-      source?: "sqlite" | "sdk-fallback";
-      state?: "ready" | "rebuilding" | "fallback" | "unavailable";
-      rebuilding?: boolean;
-      reconciledAt?: number;
-      incomplete?: boolean;
-      skippedCount?: number;
-    };
+    type CatalogPatch = Omit<SessionCatalogFixtureOptions, "items"> & { items?: CatalogItem[] };
     type CatalogRequest = {
       scope?: string;
       search?: string;
@@ -116,8 +110,9 @@ export async function installSessionCatalogFixture(
       limit?: number;
       refresh?: boolean;
     };
-    type CatalogFixtureState = Required<Omit<CatalogPatch, "reconciledAt">> & {
+    type CatalogFixtureState = Required<Omit<CatalogPatch, "reconciledAt" | "degradedReason">> & {
       reconciledAt?: number;
+      degradedReason?: SessionCatalogDegradedReason;
       requests: Array<{ hostEpoch: number; payload: CatalogRequest }>;
       staleCursorResponses: number;
       pendingRefresh?: CatalogPatch;
@@ -149,6 +144,7 @@ export async function installSessionCatalogFixture(
       source: fixture.source,
       state: fixture.state,
       rebuilding: fixture.rebuilding,
+      ...(fixture.degradedReason === undefined ? {} : { degradedReason: fixture.degradedReason }),
       ...(fixture.reconciledAt === undefined ? {} : { reconciledAt: fixture.reconciledAt }),
       incomplete: fixture.incomplete,
       skippedCount: fixture.skippedCount,
@@ -265,6 +261,7 @@ export async function installSessionCatalogFixture(
       if (patch.source !== undefined) target.source = patch.source;
       if (patch.state !== undefined) target.state = patch.state;
       if (patch.rebuilding !== undefined) target.rebuilding = patch.rebuilding;
+      if (patch.degradedReason !== undefined) target.degradedReason = patch.degradedReason;
       if (patch.reconciledAt !== undefined) target.reconciledAt = patch.reconciledAt;
       if (patch.incomplete !== undefined) target.incomplete = patch.incomplete;
       if (patch.skippedCount !== undefined) target.skippedCount = patch.skippedCount;
@@ -300,6 +297,7 @@ export async function installSessionCatalogFixture(
         source: target.source,
         state: target.state,
         rebuilding: target.rebuilding,
+        ...(target.degradedReason === undefined ? {} : { degradedReason: target.degradedReason }),
         ...(target.reconciledAt === undefined ? {} : { reconciledAt: target.reconciledAt }),
         incomplete: target.incomplete,
         skippedCount: target.skippedCount
@@ -313,6 +311,7 @@ export async function installSessionCatalogFixture(
         source: target.source,
         state: target.state,
         rebuilding: target.rebuilding,
+        ...(target.degradedReason === undefined ? {} : { degradedReason: target.degradedReason }),
         ...(target.reconciledAt === undefined ? {} : { reconciledAt: target.reconciledAt }),
         incomplete: target.incomplete,
         skippedCount: target.skippedCount
@@ -420,6 +419,7 @@ function normalizedOptions(options: SessionCatalogFixtureOptions) {
     source: options.source ?? MOCK_SESSION_CATALOG_STATUS.source,
     state: options.state ?? MOCK_SESSION_CATALOG_STATUS.state,
     rebuilding: options.rebuilding ?? MOCK_SESSION_CATALOG_STATUS.rebuilding,
+    ...(options.degradedReason === undefined ? {} : { degradedReason: options.degradedReason }),
     ...(options.reconciledAt === undefined
       ? { reconciledAt: MOCK_SESSION_CATALOG_STATUS.reconciledAt }
       : { reconciledAt: options.reconciledAt }),

@@ -64,6 +64,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "workspace.register": "workspace",
   "workspace.unregister": "workspace",
   "session.catalog.query": "workspace",
+  "session.forkFromTask": "task",
   "provider.list": "workspace",
   "provider.setRuntimeKey": "workspace",
   "provider.configuration.get": "workspace",

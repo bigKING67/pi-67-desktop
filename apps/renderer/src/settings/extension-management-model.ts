@@ -1,5 +1,4 @@
 import type {
-  DesktopCapabilityPackageSummary,
   ExtensionPackageEntry,
   ExtensionPackageUpdate,
   PackageResourceType,
@@ -11,7 +10,7 @@ export type ConfirmedAction =
   | { kind: "update"; entry: ExtensionPackageEntry }
   | { kind: "uninstall"; entry: ExtensionPackageEntry };
 
-interface ConfiguredPackageRow {
+export interface PackageRow {
   kind: "configured";
   key: string;
   entry: ExtensionPackageEntry;
@@ -19,32 +18,20 @@ interface ConfiguredPackageRow {
   update: ExtensionPackageUpdate | undefined;
 }
 
-export interface BundledPackageRow {
-  kind: "bundled";
-  key: string;
-  entry: DesktopCapabilityPackageSummary;
-}
-
-export type PackageRow = ConfiguredPackageRow | BundledPackageRow;
-
 export function buildPackageRows(
   items: ExtensionPackageEntry[],
-  bundledPackages: DesktopCapabilityPackageSummary[],
   updates: ExtensionPackageUpdate[],
   scope: "global" | "project"
 ): PackageRow[] {
-  const bundled = bundledPackages
-    .map((entry): BundledPackageRow => ({ kind: "bundled", key: `bundled:${entry.id}`, entry }));
-  const configured = packagesForScope(items, scope)
+  return packagesForScope(items, scope)
     .filter(({ entry }) => !isBundledEntry(entry))
-    .map(({ entry, inherited }): ConfiguredPackageRow => ({
+    .map(({ entry, inherited }): PackageRow => ({
       kind: "configured",
       key: `configured:${entry.source}`,
       entry,
       inherited,
       update: updates.find((candidate) => candidate.source === entry.source && candidate.scope === entry.scope)
     }));
-  return [...bundled, ...configured];
 }
 
 export function filterPackageRows(rows: PackageRow[], filter: PackageFilter, query: string): PackageRow[] {
@@ -52,18 +39,16 @@ export function filterPackageRows(rows: PackageRow[], filter: PackageFilter, que
   return rows.filter((row) => {
     if (filter === "enabled" && !packageRowEnabled(row)) return false;
     if (filter === "disabled" && packageRowEnabled(row)) return false;
-    if (filter === "updates" && !(row.kind === "configured" && row.update)) return false;
+    if (filter === "updates" && !row.update) return false;
     if (!normalized) return true;
-    const haystack = row.kind === "bundled"
-      ? [row.entry.displayName, row.entry.id, row.entry.version, ...row.entry.resourceTypes]
-      : [
-          packageRowName(row),
-          row.entry.source,
-          row.entry.version ?? "",
-          row.entry.description ?? "",
-          sourceKindLabel(resolveSourceKind(row.entry)),
-          row.entry.scope
-        ];
+    const haystack = [
+      packageRowName(row),
+      row.entry.source,
+      row.entry.version ?? "",
+      row.entry.description ?? "",
+      sourceKindLabel(resolveSourceKind(row.entry)),
+      row.entry.scope
+    ];
     return haystack.some((value) => value.toLocaleLowerCase("zh-CN").includes(normalized));
   });
 }
@@ -80,13 +65,10 @@ export function packageResourceTypes(entry: ExtensionPackageEntry): PackageResou
 }
 
 export function packageRowEnabled(row: PackageRow): boolean {
-  return row.kind === "bundled"
-    ? row.entry.installed && row.entry.defaultEnabled
-    : packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
+  return packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
 }
 
-export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "unavailable" | "bundled" {
-  if (row.kind === "bundled") return row.entry.installed ? "bundled" : "unavailable";
+export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "unavailable" {
   if (!row.entry.installed) return "unavailable";
   const states = packageResourceTypes(row.entry).map((type) => packageResourceEnabled(row.entry, type));
   if (states.every(Boolean)) return "enabled";
@@ -95,7 +77,6 @@ export function packageRowState(row: PackageRow): "enabled" | "partial" | "disab
 }
 
 export function packageRowName(row: PackageRow): string {
-  if (row.kind === "bundled") return row.entry.displayName;
   if (row.entry.displayName) return row.entry.displayName;
   const source = row.entry.source;
   if (source.startsWith("npm:")) return source.slice(4);
@@ -104,14 +85,7 @@ export function packageRowName(row: PackageRow): string {
   return last.endsWith(".git") ? last.slice(0, -4) : last;
 }
 
-export function packageRowSummary(row: PackageRow): string {
-  if (row.kind === "bundled") return `${row.entry.version} · 随应用更新`;
-  const scope = row.inherited ? "继承自全局" : row.entry.scope === "global" ? "全局" : "当前项目";
-  return `${sourceKindLabel(resolveSourceKind(row.entry))} · ${scope}`;
-}
-
 export function packageRowAccessibleName(row: PackageRow): string {
-  if (row.kind === "bundled") return `${packageRowName(row)}，${packageRowSummary(row)}`;
   const scope = row.inherited ? "继承自全局" : row.entry.scope === "global" ? "全局" : "当前项目";
   return `${packageRowName(row)}，${row.entry.source} · ${scope}`;
 }

@@ -176,7 +176,7 @@ function WorkspaceConversationGroup({
   const visibleRecent = showAll ? recent : boundedRecent(recent, selectedIdentity, RECENT_SESSION_LIMIT);
   const canShowMore = recent.length > RECENT_SESSION_LIMIT || catalog.hasMore;
   const catalogUnavailable = catalog.catalogState === "unavailable";
-  const catalogFallback = catalog.catalogState === "fallback" || catalog.source === "sdk-fallback";
+  const catalogFallback = catalog.catalogState === "fallback";
   const catalogIncompleteEmpty = catalog.incomplete && rows.length === 0;
 
   return (
@@ -230,6 +230,7 @@ function WorkspaceConversationGroup({
         <div className={styles.workspaceConversations}>
           {priority.map((row) => (
             <ConversationRow
+              disabled={sessionTransitionPending}
               key={row.identity}
               row={row}
               selected={row.identity === selectedIdentity}
@@ -239,13 +240,14 @@ function WorkspaceConversationGroup({
           {priority.length > 0 && visibleRecent.length > 0 ? <div className={styles.conversationDivider} /> : null}
           {visibleRecent.map((row) => (
             <ConversationRow
+              disabled={sessionTransitionPending}
               key={row.identity}
               row={row}
               selected={row.identity === selectedIdentity}
               selectedRow={selectedRow}
             />
           ))}
-          {catalog.rebuilding ? (
+          {catalog.rebuilding && !catalogFallback ? (
             <p aria-live="polite" className={styles.catalogNotice} role="status">
               {messages.navigation.catalogRebuilding}
             </p>
@@ -255,7 +257,11 @@ function WorkspaceConversationGroup({
             </p>
           ) : null}
           {catalogFallback && !catalogUnavailable ? (
-            <p className={styles.catalogNotice} role="status">{messages.navigation.catalogFallback}</p>
+            <p className={styles.catalogNotice} role="status">
+              {catalog.degradedReason === "runtime-query"
+                ? messages.navigation.catalogFallbackRecovering
+                : messages.navigation.catalogFallback}
+            </p>
           ) : null}
           {catalog.incomplete ? (
             <p className={styles.catalogNotice} role="status">
@@ -299,11 +305,13 @@ function WorkspaceConversationGroup({
 function ConversationRow({
   row,
   selected,
-  selectedRow
+  selectedRow,
+  disabled
 }: {
   row: ConversationRowModel;
   selected: boolean;
   selectedRow: MutableRefObject<HTMLElement | null>;
+  disabled: boolean;
 }) {
   const StatusIcon = row.status === "running" ? LoaderCircle : row.status === "waiting" ? Clock3 : Circle;
   const task = row.task;
@@ -314,6 +322,7 @@ function ConversationRow({
         className={`${styles.conversationItem} ${selected ? styles.activeConversation : ""}`}
         data-conversation-id={row.identity}
         data-testid="conversation-row"
+        disabled={disabled}
         onClick={() => void openConversation(row)}
         ref={(element) => {
           if (selected) selectedRow.current = element;

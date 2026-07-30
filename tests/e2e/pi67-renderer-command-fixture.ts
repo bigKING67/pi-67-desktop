@@ -38,7 +38,12 @@ export function installMockCommandResponseHandler({
       ?? current.sessionCatalogPage;
     if (type === "runtime.getStatus") return { initialized: true, loaded: true };
     if (type === "runtime.initialize" || type === "workspace.open") return {};
-    if (type === "session.create" || type === "session.open" || type === "session.fork") return {};
+    if (
+      type === "session.create"
+      || type === "session.open"
+      || type === "session.fork"
+      || type === "session.forkFromTask"
+    ) return {};
     if (type === "workspace.register") return { registered: true };
     if (type === "workspace.unregister") return { unregistered: true };
     if (type === "projection.resync") return {

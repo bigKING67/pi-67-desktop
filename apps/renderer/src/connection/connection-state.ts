@@ -37,7 +37,8 @@ export function handleConnected(
     hostEpoch: identity.hostEpoch,
     connected: true,
     trustUpdating: false,
-    sessionTransitionPending: shouldRecover
+    sessionTransitionPending: shouldRecover,
+    sessionBootstrapTransitionPending: false
   });
   if (!shouldRecover || !state.workspace) return;
   recoverConnectedRendererProjection(get, set, {
@@ -60,6 +61,7 @@ export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void
     connected: false,
     trustUpdating: false,
     sessionTransitionPending: false,
+    sessionBootstrapTransitionPending: false,
     runtime: workspace
       ? { phase: "recovering", detail: messages.runtime.connection.runtimeConnectionRecovering, recoverable: true }
       : INITIAL_RUNTIME_STATE
@@ -101,6 +103,7 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
     connected: false,
     trustUpdating: false,
     sessionTransitionPending: false,
+    sessionBootstrapTransitionPending: false,
     runtime: {
       phase: state.recoverable ? "recovering" : "failed",
       detail: state.recoverable

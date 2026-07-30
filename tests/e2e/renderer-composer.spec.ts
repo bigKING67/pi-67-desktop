@@ -31,9 +31,30 @@ test("shows the accepted user message without waiting for the first Pi token", a
   await expect(pendingMessage).toHaveCount(1);
   await expect(pendingMessage).toContainText("执行一个耗时九十秒的任务");
   await expect(pendingMessage).toHaveAttribute("data-delivery-status", "accepted");
+  await expect(pendingMessage.getByRole("button", { name: "复制消息" })).toBeVisible();
+  await expect(pendingMessage.getByRole("button", { name: "编辑消息" })).toHaveCount(0);
   await expect(page.getByText("从一个具体任务开始", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("article", { name: "Pi 正在回复", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("status").filter({ hasText: /任务已接收|Pi 正在执行任务/u })).toBeVisible();
+  const activity = page.locator("[data-turn-activity]");
+  await expect(activity).toContainText(/正在准备|正在处理/u);
+  const composerRegion = page.getByTestId("composer-region");
+  await expect(composerRegion.getByRole("button", { name: "停止" })).toBeVisible();
+  await expect(composerRegion.getByRole("button", { name: "发送", exact: true })).toHaveCount(0);
+  const geometry = await page.evaluate(() => {
+    const user = document.querySelector<HTMLElement>('[data-message-id="pending-user:operation-1"]');
+    const turnActivity = document.querySelector<HTMLElement>("[data-turn-activity]");
+    const composer = document.querySelector<HTMLElement>('[data-testid="composer-region"]');
+    if (!user || !turnActivity || !composer) return undefined;
+    return {
+      userBottom: user.getBoundingClientRect().bottom,
+      activityTop: turnActivity.getBoundingClientRect().top,
+      activityBottom: turnActivity.getBoundingClientRect().bottom,
+      composerTop: composer.getBoundingClientRect().top
+    };
+  });
+  expect(geometry).toBeDefined();
+  expect(geometry!.activityTop).toBeGreaterThanOrEqual(geometry!.userBottom);
+  expect(geometry!.composerTop).toBeGreaterThanOrEqual(geometry!.activityBottom);
   await expect(page.getByText(/acknowledgement timed out/u)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth))
     .toBe(await page.evaluate(() => document.documentElement.clientWidth));
@@ -44,7 +65,7 @@ test("shows the accepted user message without waiting for the first Pi token", a
     text: "执行一个耗时九十秒的任务"
   });
   await page.screenshot({
-    path: "artifacts/visual-review/prompt-accepted-before-first-token.png",
+    path: "artifacts/visual-review/turn-activity-inline.png",
     animations: "disabled"
   });
 });
@@ -268,7 +289,7 @@ test("keeps the draft and rotates submission identity when the Session changes b
   await expect(page.getByText("消息未发送。草稿和附件已保留。")).toBeVisible();
   await expect(composer).toHaveValue("这份草稿只能由发送时的会话确认");
   await expect(preview).toHaveAttribute("src", /^blob:/u);
-  await expect(page.getByRole("status").filter({ hasText: "Pi 正在执行任务" })).toHaveCount(0);
+  await expect(page.locator("[data-turn-activity]")).toHaveCount(0);
 
   await setMockAgentResponseDelay(page, "prompt.submit", 0);
   await page.getByRole("button", { name: "发送", exact: true }).click();

@@ -222,6 +222,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "session.open": ProjectionMutationAcknowledgementSchema,
   "session.import": operationSubmissionResultSchema(Type.Literal("session-import")),
   "session.fork": ProjectionMutationAcknowledgementSchema,
+  "session.forkFromTask": ProjectionMutationAcknowledgementSchema,
   "session.rollback": ProjectionMutationAcknowledgementSchema,
   "session.compact": operationSubmissionResultSchema(Type.Literal("compaction")),
   "session.name": ProjectionMutationAcknowledgementSchema,

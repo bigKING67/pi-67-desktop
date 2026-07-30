@@ -67,6 +67,9 @@ export async function attachMockAgent(
     const sanitizeMockPayload = (testWindow as FixtureWindow & {
       __pi67SanitizeMockPayload: MockPayloadSanitizer;
     }).__pi67SanitizeMockPayload;
+    const sessionBootstrapCommands = new Set(["session.create", "session.open", "session.fork", "session.forkFromTask"]);
+    const sessionForkCommands = new Set(["session.fork", "session.forkFromTask"]);
+    const sessionBootstrapReasons: Record<string, string> = { "session.create": "session-create", "session.open": "session-open", "session.fork": "session-fork", "session.forkFromTask": "session-fork" };
     const state: FixtureAgentState = {
       appInstanceId: "app-test",
       ready: false,
@@ -228,11 +231,7 @@ export async function attachMockAgent(
                 result = projectionMutationAcknowledgement(state, hostEpoch);
               }
             }
-            if (
-              envelope.type === "session.create"
-              || envelope.type === "session.open"
-              || envelope.type === "session.fork"
-            ) {
+            if (sessionBootstrapCommands.has(envelope.type!)) {
               if (
                 envelope.type === "session.create"
                 && fixtureOptions.rotateSessionOnCreate === true
@@ -243,6 +242,13 @@ export async function attachMockAgent(
                 && typeof envelope.payload?.path === "string"
                 && !hasConfiguredResult
               ) testWindow.__pi67RotateMockSession(state, envelope.payload.path);
+              if (sessionForkCommands.has(envelope.type!) && !hasConfiguredResult) {
+                testWindow.__pi67ForkMockSession(
+                  state,
+                  envelope.payload?.entryId,
+                  envelope.type === "session.fork" ? envelope.payload?.position : "at"
+                );
+              }
               emitThrough(hostPort, hostEpoch, {
                 type: "extension.catalog.changed",
                 payload: state.extensionCatalog
@@ -251,11 +257,7 @@ export async function attachMockAgent(
                 type: "session.bootstrap",
                 payload: {
                   snapshot: state.snapshot,
-                  reason: envelope.type === "session.create"
-                    ? "session-create"
-                    : envelope.type === "session.open"
-                      ? "session-open"
-                      : "session-fork"
+                  reason: sessionBootstrapReasons[envelope.type!]
                 }
               });
               if (!hasConfiguredResult) {

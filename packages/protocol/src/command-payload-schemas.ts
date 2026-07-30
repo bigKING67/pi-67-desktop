@@ -57,7 +57,17 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "session.create": EmptyPayloadSchema,
   "session.open": strictObject({ path: PathSchema, cwdOverride: Type.Optional(PathSchema) }),
   "session.import": strictObject({ submissionId: SubmissionIdSchema, path: PathSchema }),
-  "session.fork": strictObject({ entryId: Type.String({ minLength: 1 }) }),
+  "session.fork": strictObject({
+    entryId: Type.String({ minLength: 1 }),
+    position: Type.Optional(Type.Union([Type.Literal("before"), Type.Literal("at")]))
+  }),
+  "session.forkFromTask": strictObject({
+    sourceTaskId: Type.String({ minLength: 1, maxLength: 512 }),
+    sourceTaskGeneration: Type.Integer({ minimum: 1 }),
+    sourceSessionId: Type.String({ minLength: 1, maxLength: 512 }),
+    sourceSessionGeneration: Type.Integer({ minimum: 1 }),
+    entryId: Type.String({ minLength: 1 })
+  }),
   "session.rollback": strictObject({ entryId: Type.String({ minLength: 1 }), summarize: Type.Optional(Type.Boolean()) }),
   "session.compact": strictObject({ submissionId: SubmissionIdSchema, instructions: Type.Optional(PromptSchema) }),
   "session.name": strictObject({ name: Type.String({ minLength: 1, maxLength: 256 }) }),

@@ -354,6 +354,36 @@
   background: var(--accent-strong);
 }
 
+.secondarySendButton {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.secondarySendButton:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.stopButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  gap: 7px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--danger) 78%, var(--border));
+  border-radius: var(--radius-control);
+  background: var(--danger);
+  color: var(--canvas);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.stopButton:hover {
+  background: color-mix(in srgb, var(--danger) 86%, var(--text-primary));
+}
+
 .sendButton[data-disabled] {
   cursor: not-allowed;
   opacity: 0.45;

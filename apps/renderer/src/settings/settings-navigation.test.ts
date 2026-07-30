@@ -18,7 +18,6 @@ describe("settings navigation", () => {
         label: "Pi",
         items: [
           { id: "providers", label: "模型服务" },
-          { id: "packages", label: "资源包" },
           { id: "extensions", label: "扩展" },
           { id: "skills", label: "技能" },
           { id: "prompts", label: "指令模板" },
@@ -39,7 +38,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(13);
+    expect(SETTINGS_SECTIONS).toHaveLength(12);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -53,6 +52,12 @@ describe("settings navigation", () => {
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "extension")).toBe(true);
+    expect(extension && matchesSettingsQuery(extension, "扩展包")).toBe(true);
+    expect(extension && matchesSettingsQuery(extension, "本地扩展")).toBe(true);
+    const skill = items.find((item) => item.id === "skills");
+    expect(skill && matchesSettingsQuery(skill, "内置技能")).toBe(true);
+    expect(skill && matchesSettingsQuery(skill, ".agents/skills")).toBe(true);
+    expect(sectionSupportsProjectScope("skills")).toBe(false);
     expect(prompt && matchesSettingsQuery(prompt, "prompts")).toBe(true);
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);

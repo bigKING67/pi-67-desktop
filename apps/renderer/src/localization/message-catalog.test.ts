@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatNotificationDateTime, formatRelativeTime } from "./date-time.js";
+import {
+  formatMessageDateTime,
+  formatMessageDateTimeTitle,
+  formatNotificationDateTime,
+  formatRelativeTime
+} from "./date-time.js";
 import { appLocale, messages, type MessageCatalog } from "./message-catalog.js";
 
 describe("Renderer message catalog", () => {
@@ -22,5 +27,16 @@ describe("Renderer message catalog", () => {
     expect(formatRelativeTime(now - 3 * 3_600_000, now)).toBe("3 小时前");
     expect(formatRelativeTime(Number.NaN, now)).toBe("时间未知");
     expect(formatNotificationDateTime(now)).toMatch(/7.*26.*10.*00/u);
+  });
+
+  it("formats transcript timestamps with an always-visible local date and time", () => {
+    const timestamp = new Date(2026, 6, 30, 15, 42, 18).getTime();
+
+    expect(formatMessageDateTime(timestamp)).toBe("2026-07-30 15:42");
+    expect(formatMessageDateTimeTitle(timestamp)).toMatch(/2026.*7.*30.*15.*42.*18/u);
+    expect(formatMessageDateTime(Number.NaN)).toBe("时间未知");
+    expect(formatMessageDateTimeTitle(Number.NaN)).toBe("时间未知");
+    expect(formatMessageDateTime(1e20)).toBe("时间未知");
+    expect(formatMessageDateTimeTitle(1e20)).toBe("时间未知");
   });
 });

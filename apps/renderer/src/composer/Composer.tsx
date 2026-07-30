@@ -1,4 +1,4 @@
-import { ArrowUp, ImagePlus, ListPlus, Send } from "lucide-react";
+import { ArrowUp, ImagePlus, ListPlus, Send, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
@@ -33,10 +33,13 @@ import {
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import { EMPTY_TASK_DRAFT, useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { abortActiveOperation } from "../operation/operation-controller.js";
+import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
+  const operation = useAppStore((state) => state.operation);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const widgets = useExtensionUiStore((state) => state.widgets);
   const activeTaskId = useWorkbenchStore((state) => selectedWorkbenchTask(state)?.id);
@@ -55,7 +58,14 @@ export function Composer() {
   const fileInput = useRef<HTMLInputElement>(null);
   const textInput = useRef<HTMLTextAreaElement>(null);
   const streaming = useCommittedConversationStreaming();
-  const canSend = !submitting && (text.trim().length > 0 || attachments.length > 0);
+  const hasDraft = text.trim().length > 0 || attachments.length > 0;
+  const canSend = !submitting && hasDraft;
+  const canStop = Boolean(
+    operation?.cancellable
+    && isActiveOperationLifecycle(operation.lifecycle)
+    && operation.sessionId === sessionId
+    && operation.sessionGeneration === sessionGeneration
+  );
   const widgetItems = Object.values(widgets);
 
   const setText = (value: string) => {
@@ -276,9 +286,20 @@ export function Composer() {
           </div>
           <div className={styles.actions}>
             <ComposerRuntimeControls submitting={submitting} />
-            <Button className={styles.sendButton!} isDisabled={!canSend} onPress={() => void submit()}>
-              <Send size={15} />{submitting ? messages.composer.sending : messages.composer.send}
-            </Button>
+            {!canStop || hasDraft ? (
+              <Button
+                className={`${styles.sendButton} ${canStop ? styles.secondarySendButton : ""}`}
+                isDisabled={!canSend}
+                onPress={() => void submit()}
+              >
+                <Send size={15} />{submitting ? messages.composer.sending : messages.composer.send}
+              </Button>
+            ) : null}
+            {canStop ? (
+              <Button className={styles.stopButton!} onPress={() => void abortActiveOperation()}>
+                <Square aria-hidden="true" size={12} />{messages.common.stop}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

@@ -26,6 +26,7 @@ export interface AppState {
   trust: WorkspaceTrust;
   trustUpdating: boolean;
   sessionTransitionPending: boolean;
+  sessionBootstrapTransitionPending: boolean;
   approvalMode: ApprovalMode;
   operation: OperationView | undefined;
   operationDetail: string | undefined;

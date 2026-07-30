@@ -1,8 +1,11 @@
-import { mkdir, mkdtemp, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { SessionCatalogPage, SessionCatalogStatus } from "@pi67/domain";
-import type { PiWorkspaceRuntimeServices } from "@pi67/pi-runtime";
+import type {
+  PiWorkspaceRuntimeServices,
+  RuntimeSessionCatalogOwner
+} from "@pi67/pi-runtime";
 import { describe, expect, it, vi } from "vitest";
 import {
   WorkspaceContextRegistry,
@@ -201,7 +204,141 @@ describe("WorkspaceContextRegistry", () => {
     expect(registry.values().map((record) => record.workspaceId)).toEqual(["workspace-2"]);
     expect(registry.workspaceIdForCwd("/workspace-2")).toBe("workspace-2");
   });
+
+  it("injects one Agent Host Session Catalog owner into every Workspace and disposes it last", async () => {
+    const first = fakeServicesFactory();
+    const second = fakeServicesFactory();
+    const factories: WorkspaceServicesFactory[] = [first.createServices, second.createServices];
+    const createServices = vi.fn((options: Parameters<WorkspaceServicesFactory>[0]) => (
+      factories.shift()!(options)
+    ));
+    const ownerDispose = vi.fn(async () => undefined);
+    const sharedOwner = {
+      createBinding: vi.fn(),
+      status: vi.fn(),
+      dispose: ownerDispose
+    } as unknown as RuntimeSessionCatalogOwner;
+    const createSessionCatalogOwner = vi.fn(() => sharedOwner);
+    const registry = new WorkspaceContextRegistry({
+      createServices,
+      createSessionCatalogOwner
+    });
+
+    registry.register("workspace-1", {
+      cwd: "/workspace-1",
+      agentDir: "/agent",
+      trust: "trusted",
+      approvalMode: "guided",
+      sessionCatalogDirectory: "/storage/projections/session-catalog",
+      storageRoot: "/storage"
+    });
+    registry.register("workspace-2", {
+      cwd: "/workspace-2",
+      agentDir: "/agent",
+      trust: "trusted",
+      approvalMode: "guided",
+      sessionCatalogDirectory: "/storage/projections/session-catalog",
+      storageRoot: "/storage"
+    });
+
+    expect(createSessionCatalogOwner).toHaveBeenCalledOnce();
+    expect(createServices.mock.calls[0]?.[0].sessionCatalogOwner).toBe(sharedOwner);
+    expect(createServices.mock.calls[1]?.[0].sessionCatalogOwner).toBe(sharedOwner);
+
+    await registry.unregister("workspace-1");
+    expect(ownerDispose).not.toHaveBeenCalled();
+    await registry.disposeAll();
+    expect(ownerDispose).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a Workspace that attempts to replace the Agent Host catalog storage", () => {
+    const fixture = fakeServicesFactory();
+    const registry = new WorkspaceContextRegistry({ createServices: fixture.createServices });
+    registry.register("workspace-1", {
+      cwd: "/workspace-1",
+      agentDir: "/agent",
+      trust: "trusted",
+      approvalMode: "guided",
+      sessionCatalogDirectory: "/storage-a/projections/session-catalog",
+      storageRoot: "/storage-a"
+    });
+
+    expect(() => registry.register("workspace-2", {
+      cwd: "/workspace-2",
+      agentDir: "/agent",
+      trust: "trusted",
+      approvalMode: "guided",
+      sessionCatalogDirectory: "/storage-b/projections/session-catalog",
+      storageRoot: "/storage-b"
+    })).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
+    expect(fixture.createServices).toHaveBeenCalledOnce();
+  });
+
+  it("keeps two real Workspace catalog bindings on SQLite after either Workspace reconciles", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi67-shared-workspace-catalog-")));
+    const storageRoot = join(root, "storage");
+    const sessionCatalogDirectory = join(storageRoot, "projections", "session-catalog");
+    const agentDir = join(root, "agent");
+    const workspaceA = join(root, "workspace-a");
+    const workspaceB = join(root, "workspace-b");
+    await Promise.all([
+      mkdir(sessionCatalogDirectory, { recursive: true }),
+      mkdir(join(agentDir, "sessions"), { recursive: true }),
+      mkdir(workspaceA),
+      mkdir(workspaceB)
+    ]);
+    const registry = new WorkspaceContextRegistry();
+
+    try {
+      for (const [workspaceId, cwd] of [["workspace-a", workspaceA], ["workspace-b", workspaceB]] as const) {
+        registry.register(workspaceId, {
+          cwd,
+          agentDir,
+          trust: "trusted",
+          approvalMode: "guided",
+          sessionCatalogDirectory,
+          storageRoot
+        });
+      }
+
+      await registry.queryCatalog("workspace-a", { scope: "workspace", limit: 50, refresh: true });
+      await waitForReadyCatalog(registry, "workspace-a");
+      await registry.queryCatalog("workspace-b", { scope: "workspace", limit: 50, refresh: true });
+      await waitForReadyCatalog(registry, "workspace-b");
+
+      const firstAfterPeerWrite = await registry.queryCatalog("workspace-a", {
+        scope: "workspace",
+        limit: 50
+      });
+      expect(firstAfterPeerWrite).toMatchObject({
+        source: "sqlite",
+        state: "ready",
+        rebuilding: false
+      });
+      expect(firstAfterPeerWrite.degradedReason).toBeUndefined();
+      expect(registry.statusFor("workspace-b")).toMatchObject({
+        source: "sqlite",
+        state: "ready",
+        rebuilding: false
+      });
+    } finally {
+      await registry.disposeAll();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
+
+async function waitForReadyCatalog(
+  registry: WorkspaceContextRegistry,
+  workspaceId: string
+): Promise<void> {
+  await vi.waitFor(() => {
+    const status = registry.statusFor(workspaceId);
+    if (status.source !== "sqlite" || status.state !== "ready" || status.rebuilding) {
+      throw new Error(`Catalog did not become ready: ${JSON.stringify(status)}`);
+    }
+  }, { timeout: 5_000, interval: 25 });
+}
 
 function fakeServicesFactory(options: { servicesDisposeError?: Error } = {}) {
   const disposalOrder: string[] = [];

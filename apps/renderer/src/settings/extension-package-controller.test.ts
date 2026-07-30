@@ -60,7 +60,7 @@ describe("Extension package controller", () => {
     await expect(installExtensionPackage("npm:example", "global", "workspace-a")).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
-      title: "资源包操作暂不可用"
+      title: "扩展包操作暂不可用"
     });
   });
 
@@ -100,7 +100,7 @@ describe("Extension package controller", () => {
     await expect(installExtensionPackage("npm:example", "project", "workspace-a")).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
-      title: "项目资源包设置未更改"
+      title: "项目扩展包设置未更改"
     });
   });
 

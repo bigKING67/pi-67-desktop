@@ -4,7 +4,10 @@ import type { FixtureSessionSummary } from "./pi67-session-catalog-fixture.js";
 export interface FixtureMessage {
   id: string;
   role: string;
+  createdAt?: number;
   model?: string;
+  stopped?: boolean;
+  error?: string;
   parts: Array<{
     type: string;
     text?: string;
@@ -138,5 +141,10 @@ export interface FixtureAgentState {
 
 export type FixtureWindow = Window & typeof globalThis & {
   __pi67TestAgent?: FixtureAgentState;
-  __pi67RotateMockSession(current: FixtureAgentState, sessionPath?: string): void;
+  __pi67RotateMockSession(
+    current: FixtureAgentState,
+    sessionPath?: string,
+    messages?: FixtureMessage[]
+  ): void;
+  __pi67ForkMockSession(current: FixtureAgentState, entryId: unknown, position: unknown): void;
 };

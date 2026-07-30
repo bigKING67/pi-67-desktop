@@ -1,6 +1,7 @@
 import {
   MAX_SESSION_CATALOG_SEARCH_CHARS,
   type SessionCatalogCursor,
+  type SessionCatalogDegradedReason,
   type SessionCatalogPage,
   type SessionCatalogSource,
   type SessionCatalogState,
@@ -20,6 +21,7 @@ export interface WorkspaceSessionCatalogState {
   loading: boolean;
   loadingMore: boolean;
   rebuilding: boolean;
+  degradedReason: SessionCatalogDegradedReason | undefined;
   source: SessionCatalogSource | undefined;
   catalogState: SessionCatalogState | undefined;
   incomplete: boolean;
@@ -165,6 +167,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
       } : {}),
       revision: status.revision,
       rebuilding: status.rebuilding,
+      degradedReason: status.degradedReason,
       source: status.source,
       catalogState: status.state,
       incomplete: status.incomplete,
@@ -222,6 +225,7 @@ function emptyCatalogState(requestRevision = 0): WorkspaceSessionCatalogState {
     loading: false,
     loadingMore: false,
     rebuilding: false,
+    degradedReason: undefined,
     source: undefined,
     catalogState: undefined,
     incomplete: false,
@@ -241,6 +245,7 @@ function pageState(page: SessionCatalogPage): Omit<WorkspaceSessionCatalogState,
     hasMore: page.hasMore,
     revision: page.revision,
     rebuilding: page.rebuilding,
+    degradedReason: page.degradedReason,
     source: page.source,
     catalogState: page.state,
     incomplete: page.incomplete,

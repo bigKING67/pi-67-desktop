@@ -214,7 +214,10 @@ describe("WorkbenchStateV2 persistence", () => {
       settings: { section: "packages" as const, scope: "project" as const, workspaceId: workspace.id }
     };
 
-    expect(replaceWorkbenchLayout(state, layout)).toMatchObject(layout);
+    expect(replaceWorkbenchLayout(state, layout)).toMatchObject({
+      ...layout,
+      settings: { ...layout.settings, section: "extensions" }
+    });
     expect(() => replaceWorkbenchLayout(state, { ...layout, credential: "secret" })).toThrow(/invalid/u);
     expect(() => replaceWorkbenchLayout(state, { ...layout, expandedWorkspaceIds: ["unknown"] })).toThrow(/invalid/u);
     expect(() => replaceWorkbenchLayout(state, {
@@ -270,6 +273,31 @@ describe("WorkbenchStateV2 persistence", () => {
     expect(loaded.recovery).toBeUndefined();
     expect(loaded.state.settings).toEqual({
       section: "prompts",
+      scope: "project",
+      workspaceId: workspace.id
+    });
+  });
+
+  it("normalizes the former package category into the unified extension workspace", async () => {
+    const userData = await temporaryRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = descriptorFixture("workspace-1", "/workspace/first", "34");
+    await mkdir(directory);
+    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
+      version: 2,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "settings" },
+      runtimeRecovery: [],
+      settings: { section: "packages", scope: "project", workspaceId: workspace.id },
+      cleanExit: true
+    }), { mode: 0o600 });
+
+    const loaded = await testStore(userData).load();
+    expect(loaded.state.settings).toEqual({
+      section: "extensions",
       scope: "project",
       workspaceId: workspace.id
     });

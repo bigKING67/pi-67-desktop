@@ -188,7 +188,14 @@ export interface CommandPayloads {
   "session.create": Record<string, never>;
   "session.open": { path: string; cwdOverride?: string };
   "session.import": { submissionId: string; path: string };
-  "session.fork": { entryId: string };
+  "session.fork": { entryId: string; position?: "before" | "at" };
+  "session.forkFromTask": {
+    sourceTaskId: string;
+    sourceTaskGeneration: number;
+    sourceSessionId: string;
+    sourceSessionGeneration: number;
+    entryId: string;
+  };
   "session.rollback": { entryId: string; summarize?: boolean };
   "session.compact": { submissionId: string; instructions?: string };
   "session.name": { name: string };
@@ -274,6 +281,7 @@ export interface CommandResults {
   "session.open": ProjectionMutationAcknowledgement;
   "session.import": OperationSubmissionResult;
   "session.fork": ProjectionMutationAcknowledgement;
+  "session.forkFromTask": ProjectionMutationAcknowledgement;
   "session.rollback": ProjectionMutationAcknowledgement;
   "session.compact": OperationSubmissionResult;
   "session.name": ProjectionMutationAcknowledgement;
@@ -326,6 +334,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "session.create",
   "session.open",
   "session.fork",
+  "session.forkFromTask",
   "session.rollback",
   "session.name",
   "model.select",

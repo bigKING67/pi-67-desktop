@@ -78,6 +78,7 @@ export async function submitRendererPrompt(
       const preview = userMessagePreview(text, images.length > 0);
       rendererWorkbenchStore.getState().updateTask(selectedTaskId, {
         lifecycle: "accepted",
+        pendingTitle: undefined,
         ...(preview ? { recentUserMessagePreview: preview } : {})
       });
     }

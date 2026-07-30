@@ -167,9 +167,8 @@ html[data-platform="darwin"] .title-bar {
   grid-template-areas:
     "trust"
     "transcript"
-    "operation"
     "composer";
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--surface);
 }
 

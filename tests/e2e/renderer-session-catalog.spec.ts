@@ -23,12 +23,14 @@ test.beforeEach(async ({ page }) => {
 test("shows a cold rebuilding catalog and loads its first ready page", async ({ page }) => {
   await openCatalogWorkspace(page, {
     revision: 1,
+    source: "sdk-fallback",
     state: "rebuilding",
     rebuilding: true,
     items: []
   });
 
   await expect(page.getByText("正在建立 Session 目录…")).toBeVisible();
+  await expect(page.getByText(/Session 索引暂时不可用|Session 索引正在恢复/u)).toHaveCount(0);
   await expect.poll(async () => (await sessionCatalogRequests(page))[0]).toEqual({
     hostEpoch: 1,
     payload: { scope: "workspace", limit: 50, refresh: true }
@@ -37,6 +39,7 @@ test("shows a cold rebuilding catalog and loads its first ready page", async ({ 
   await updateSessionCatalogFixture(page, {
     revision: 2,
     state: "ready",
+    source: "sqlite",
     rebuilding: false,
     items: [session(1, "重建后的会话")]
   });
@@ -168,11 +171,13 @@ test("shows fallback, incomplete, and unavailable catalog states explicitly", as
     revision: 2,
     source: "sdk-fallback",
     state: "fallback",
+    degradedReason: "runtime-query",
     incomplete: true,
     skippedCount: 2
   });
   await emitSessionCatalogChanged(page, 2, "source-changed");
-  await expect(page.getByText(/正在使用安全回退目录/u)).toBeVisible();
+  await expect(page.getByText("Session 索引正在恢复，当前临时使用 Pi Session 扫描结果。")).toBeVisible();
+  await expect(page.getByText("runtime-query", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/2 个 Session 无法读取/u)).toBeVisible();
 
   await updateSessionCatalogFixture(page, {

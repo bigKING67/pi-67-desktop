@@ -1,0 +1,106 @@
+{
+  "schema": "pi67.bundled-skill-suites.v1",
+  "suites": [
+    {
+      "id": "lark-cli",
+      "displayName": "飞书 Lark CLI",
+      "description": "飞书文档、消息、日历、任务、会议和开放平台能力。",
+      "members": [
+        { "packageId": "pi67-core", "skillId": "lark-approval" },
+        { "packageId": "pi67-core", "skillId": "lark-apps" },
+        { "packageId": "pi67-core", "skillId": "lark-attendance" },
+        { "packageId": "pi67-core", "skillId": "lark-base" },
+        { "packageId": "pi67-core", "skillId": "lark-calendar" },
+        { "packageId": "pi67-core", "skillId": "lark-contact" },
+        { "packageId": "pi67-core", "skillId": "lark-doc" },
+        { "packageId": "pi67-core", "skillId": "lark-drive" },
+        { "packageId": "pi67-core", "skillId": "lark-event" },
+        { "packageId": "pi67-core", "skillId": "lark-im" },
+        { "packageId": "pi67-core", "skillId": "lark-mail" },
+        { "packageId": "pi67-core", "skillId": "lark-markdown" },
+        { "packageId": "pi67-core", "skillId": "lark-minutes" },
+        { "packageId": "pi67-core", "skillId": "lark-note" },
+        { "packageId": "pi67-core", "skillId": "lark-okr" },
+        { "packageId": "pi67-core", "skillId": "lark-openapi-explorer" },
+        { "packageId": "pi67-core", "skillId": "lark-shared" },
+        { "packageId": "pi67-core", "skillId": "lark-sheets" },
+        { "packageId": "pi67-core", "skillId": "lark-skill-maker" },
+        { "packageId": "pi67-core", "skillId": "lark-slides" },
+        { "packageId": "pi67-core", "skillId": "lark-task" },
+        { "packageId": "pi67-core", "skillId": "lark-vc" },
+        { "packageId": "pi67-core", "skillId": "lark-vc-agent" },
+        { "packageId": "pi67-core", "skillId": "lark-whiteboard" },
+        { "packageId": "pi67-core", "skillId": "lark-wiki" },
+        { "packageId": "pi67-core", "skillId": "lark-workflow-meeting-summary" },
+        { "packageId": "pi67-core", "skillId": "lark-workflow-standup-report" }
+      ]
+    },
+    {
+      "id": "ai-berkshire-investment-suite",
+      "displayName": "AI Berkshire 投资研究",
+      "description": "公司研究、财务分析和组合管理能力。",
+      "members": [
+        { "packageId": "pi67-core", "skillId": "bottleneck-hunter" },
+        { "packageId": "pi67-core", "skillId": "deep-company-series" },
+        { "packageId": "pi67-core", "skillId": "dyp-ask" },
+        { "packageId": "pi67-core", "skillId": "earnings-review" },
+        { "packageId": "pi67-core", "skillId": "earnings-team" },
+        { "packageId": "pi67-core", "skillId": "financial-data" },
+        { "packageId": "pi67-core", "skillId": "income-investment" },
+        { "packageId": "pi67-core", "skillId": "industry-funnel" },
+        { "packageId": "pi67-core", "skillId": "industry-research" },
+        { "packageId": "pi67-core", "skillId": "investment-checklist" },
+        { "packageId": "pi67-core", "skillId": "investment-memo-craft" },
+        { "packageId": "pi67-core", "skillId": "investment-research" },
+        { "packageId": "pi67-core", "skillId": "investment-team" },
+        { "packageId": "pi67-core", "skillId": "management-deep-dive" },
+        { "packageId": "pi67-core", "skillId": "news-pulse" },
+        { "packageId": "pi67-core", "skillId": "portfolio-review" },
+        { "packageId": "pi67-core", "skillId": "private-company-research" },
+        { "packageId": "pi67-core", "skillId": "quality-screen" },
+        { "packageId": "pi67-core", "skillId": "thesis-drift" },
+        { "packageId": "pi67-core", "skillId": "thesis-tracker" },
+        { "packageId": "pi67-core", "skillId": "wechat-article" }
+      ]
+    },
+    {
+      "id": "commerce-growth-os",
+      "displayName": "Commerce Growth OS",
+      "description": "电商经营、品牌、内容、增长和经营分析能力。",
+      "members": [
+        { "packageId": "commerce-growth-os", "skillId": "brand-strategy-communications" },
+        { "packageId": "commerce-growth-os", "skillId": "commerce-analytics" },
+        { "packageId": "commerce-growth-os", "skillId": "commerce-commercial-strategy" },
+        { "packageId": "commerce-growth-os", "skillId": "commerce-growth-os" },
+        { "packageId": "commerce-growth-os", "skillId": "commerce-operations" },
+        { "packageId": "commerce-growth-os", "skillId": "consumer-marketing-os" },
+        { "packageId": "commerce-growth-os", "skillId": "content-creative-social-marketing" },
+        { "packageId": "commerce-growth-os", "skillId": "growth-performance-lifecycle-marketing" }
+      ]
+    },
+    {
+      "id": "browser67",
+      "displayName": "browser67",
+      "description": "真实浏览器操作、诊断和 JavaScript 逆向能力。",
+      "members": [
+        { "packageId": "browser67", "skillId": "browser67" },
+        { "packageId": "browser67", "skillId": "js-reverse" },
+        { "packageId": "browser67", "skillId": "tmwd-browser-mcp" }
+      ]
+    },
+    {
+      "id": "design-output-tools",
+      "displayName": "设计与输出工具",
+      "description": "产品设计、视觉方向和完整输出能力。",
+      "members": [
+        { "packageId": "design-craft", "skillId": "design-craft" },
+        { "packageId": "pi67-core", "skillId": "full-output-enforcement" },
+        { "packageId": "pi67-core", "skillId": "high-end-visual-design" },
+        { "packageId": "pi67-core", "skillId": "industrial-brutalist-ui" },
+        { "packageId": "pi67-core", "skillId": "minimalist-ui" },
+        { "packageId": "pi67-core", "skillId": "redesign-existing-projects" },
+        { "packageId": "pi67-core", "skillId": "stitch-design-taste" }
+      ]
+    }
+  ]
+}

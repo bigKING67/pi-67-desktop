@@ -1,7 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
-  installMockDesktopBridge
+  installMockDesktopBridge,
+  setMockAgentResponseResult
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 
@@ -33,11 +34,29 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(contentHeader).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
 
-  await navigation.getByRole("button", { name: /扩展/u }).click();
+  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
   await expect(page.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true })).toBeVisible();
   const scrollRegion = settings.getByTestId("settings-scroll-region");
   await scrollRegion.evaluate((element) => { element.scrollTop = element.scrollHeight; });
   expect(await scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+
+  await navigation.getByRole("button", { name: "技能", exact: true }).click();
+  const skillTabs = settings.getByRole("tablist", { name: "技能来源分类" });
+  await expect(skillTabs).toBeVisible();
+  await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
+  const skillTabBounds = await skillTabs.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right };
+  });
+  expect(skillTabBounds.left).toBeGreaterThanOrEqual(0);
+  expect(skillTabBounds.right).toBeLessThanOrEqual(520);
+  await skillTabs.getByRole("tab", { name: "内置技能", exact: true }).click();
+  const bundledPanel = settings.getByRole("tabpanel", { name: "内置技能", exact: true });
+  await expect(bundledPanel.getByTestId("bundled-skill-suite-row")).toHaveCount(5);
+  await bundledPanel.getByTestId("bundled-skill-suite-row").filter({ hasText: "browser67" }).click();
+  await expect(bundledPanel.getByRole("searchbox", { name: "搜索 browser67 技能" })).toBeVisible();
+  await expect(bundledPanel.getByRole("button", { name: "返回内置技能套件" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
   await navigation.getByRole("button", { name: /更新与诊断/u }).click();
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);
@@ -72,6 +91,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await installMockDesktopBridge(page, { pickerQueue: [longWorkspace] });
   await page.goto("/");
   await attachMockAgent(page);
+  await installPackageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
@@ -104,12 +124,12 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
     expect(bounds.width).toBeGreaterThan(0);
   }
 
-  await navigation.getByRole("button", { name: /^资源包/u }).click();
+  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
   const extensionList = settings.getByTestId("extension-package-list-scroll");
   const extensionDetail = settings.getByTestId("extension-package-detail-scroll");
   for (const locator of [
     settings.getByRole("button", { name: "检查更新", exact: true }),
-    settings.getByRole("button", { name: "安装资源包", exact: true })
+    settings.getByRole("button", { name: "安装扩展包", exact: true })
   ]) {
     await expect(locator).toBeVisible();
     const bounds = await locator.evaluate((element) => {
@@ -125,8 +145,8 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await extensionList.getByRole("button").first().click();
   await expect(extensionList).toBeHidden();
   await expect(extensionDetail).toBeVisible();
-  await expect(settings.getByRole("button", { name: "返回资源包列表" })).toBeVisible();
-  await settings.getByRole("button", { name: "返回资源包列表" }).click();
+  await expect(settings.getByRole("button", { name: "返回扩展包列表" })).toBeVisible();
+  await settings.getByRole("button", { name: "返回扩展包列表" }).click();
   await expect(extensionList).toBeVisible();
   await expect(extensionDetail).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1040);
@@ -137,6 +157,7 @@ test("centers a 1120 pixel Settings document and never expands management flows 
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
+  await installPackageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
@@ -173,7 +194,7 @@ test("centers a 1120 pixel Settings document and never expands management flows 
   await expect(modelList).toBeHidden();
   await expect(modelDetail).toBeVisible();
 
-  await navigation.getByRole("button", { name: /^资源包/u }).click();
+  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
   const extensionList = settings.getByTestId("extension-package-list-scroll");
   const extensionDetail = settings.getByTestId("extension-package-detail-scroll");
   await expect(extensionList).toBeVisible();
@@ -187,3 +208,18 @@ test("centers a 1120 pixel Settings document and never expands management flows 
     scrollWidth: document.documentElement.scrollWidth
   }))).toEqual({ clientWidth: 1476, scrollWidth: 1476 });
 });
+
+async function installPackageFixture(page: Page): Promise<void> {
+  await setMockAgentResponseResult(page, "extension.package.list", {
+    items: [{
+      source: "npm:pi-subagents",
+      scope: "global",
+      enabled: true,
+      filtered: false,
+      installed: true,
+      displayName: "pi-subagents",
+      resourceTypes: ["extension"]
+    }],
+    total: 1
+  });
+}

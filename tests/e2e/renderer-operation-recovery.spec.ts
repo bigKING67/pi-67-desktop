@@ -31,9 +31,10 @@ test("restores the interrupted Operation terminal after a sequence-gap resync", 
   }, { sequence: 100, operationId: "operation-1" });
 
   await expect.poll(async () => (await recordedCommands(page)).includes("projection.resync")).toBe(true);
-  await expect(page.locator('[data-operation-lifecycle="completed"]')).toContainText("任务已完成");
+  await expect(page.locator("[data-turn-activity]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "停止" })).toHaveCount(0);
   await expect(page.locator('[data-runtime-phase="ready"]')).toBeVisible();
+  await expect(page.locator("[data-notification-id]").filter({ hasText: "任务已完成" })).toHaveCount(1);
 
   await emitMockAgentEvent(page, {
     type: "operation.completed",

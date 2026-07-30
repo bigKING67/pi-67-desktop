@@ -4,6 +4,9 @@ export const zhCNRuntimeMessages = {
     creating: "正在创建 Pi 新会话",
     createFailed: "无法创建 Pi 会话",
     starting: "正在启动 Pi 会话",
+    forking: "正在准备 Pi 会话",
+    forkFailed: "无法准备 Pi 会话",
+    forkRecovered: "会话状态已重新同步，可继续使用。",
     rollingBack: "正在回退 Pi 会话",
     rolledBack: "Pi 会话已回退",
     rollbackFailed: "无法回退 Pi 会话"

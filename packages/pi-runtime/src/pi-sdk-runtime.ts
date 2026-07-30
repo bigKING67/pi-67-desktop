@@ -24,11 +24,12 @@ import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-met
 import { PiRuntimeConfigurationReload } from "./pi-runtime-configuration-reload.js";
 import { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from "./runtime-session-catalog.js";
+import { RuntimeSessionTransitions } from "./runtime-session-transitions.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { clearSessionQueue } from "./session-queue.js";
 import type { SafetyPolicyState } from "./safety-extension.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
-import { discardStagedSessionImport, resolveManagedSessionPath, stageSessionImport } from "./session-import.js";
+import { resolveManagedSessionPath } from "./session-import.js";
 import {
   projectSessionControls, projectSessionModelCatalog, projectSessionModels, projectSessionResources
 } from "./session-snapshot.js";
@@ -56,6 +57,7 @@ export class PiSdkRuntime implements AgentRuntime {
   private readonly projections: RuntimeProjectionController;
   private readonly sessionBindings: RuntimeSessionBindings;
   private readonly sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
+  private readonly sessionTransitions: RuntimeSessionTransitions;
   private uiBridge: ReturnType<typeof createSessionExtensionUiBridge>;
 
   constructor(options: PiSdkRuntimeOptions = {}) {
@@ -117,6 +119,26 @@ export class PiSdkRuntime implements AgentRuntime {
         sessionCatalogTarget,
         process.env.PI67_STORAGE_ROOT
       );
+    this.sessionTransitions = new RuntimeSessionTransitions({
+      getCwd: () => this.safety.cwd,
+      getAgentDir: () => this.agentDir,
+      getSessionDirectory: () => this.sessionBindings.requireSession().sessionManager.getSessionDir(),
+      getActiveSessionPath: () => this.getIdentity().sessionPath,
+      prepare: async () => {
+        this.uiBridge.cancelAll("session-transition");
+        this.streamBatcher.drop();
+        await this.assertSessionWritable();
+      },
+      switchSession: (path, cwdOverride) => this.sessionBindings.requireRuntime().switchSession(
+        path,
+        cwdOverride ? { cwdOverride } : undefined
+      ),
+      commit: async (reason) => {
+        await this.sessionCatalog.upsertCurrent(reason);
+        await this.configurationReload.apply();
+        return this.getSnapshot();
+      }
+    });
     this.runtimeCredentialUnsubscribe = this.runtimeCredentialOverrides.subscribe(
       async (provider, apiKey) => {
         const services = this.sessionBindings.services;
@@ -210,57 +232,30 @@ export class PiSdkRuntime implements AgentRuntime {
   }
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
-    return this.sessionBindings.runTransition(async () => {
-      this.uiBridge.cancelAll("session-transition");
-      this.streamBatcher.drop();
-      await this.assertSessionWritable();
-      const managedPath = await resolveManagedSessionPath(path, cwdOverride ?? this.safety.cwd, this.agentDir);
-      const result = await this.sessionBindings.requireRuntime().switchSession(
-        managedPath,
-        cwdOverride ? { cwdOverride } : undefined
-      );
-      if (result.cancelled) throw new Error("A Pi extension cancelled the session switch.");
-      await this.sessionCatalog.upsertCurrent("session-updated");
-      await this.configurationReload.apply();
-      return this.getSnapshot();
-    });
+    return this.sessionBindings.runTransition(() => this.sessionTransitions.open(path, cwdOverride));
   }
 
   async importSession(path: string): Promise<SessionSnapshot> {
-    return this.sessionBindings.runTransition(async () => {
-      this.uiBridge.cancelAll("session-transition");
-      this.streamBatcher.drop();
-      await this.assertSessionWritable();
-      const sessionDirectory = this.sessionBindings.requireSession().sessionManager.getSessionDir();
-      const staged = await stageSessionImport(path, sessionDirectory, this.safety.cwd);
-      let switched = false;
-      try {
-        const result = await this.sessionBindings.requireRuntime().switchSession(staged.path, {
-          cwdOverride: staged.sessionManager.getCwd()
-        });
-        if (result.cancelled) throw new Error("A Pi extension cancelled the session import.");
-        switched = true;
-        await this.sessionCatalog.upsertCurrent("session-imported");
-        await this.configurationReload.apply();
-        return this.getSnapshot();
-      } catch (error) {
-        if (!switched) await discardStagedSessionImport(staged, error);
-        throw error;
-      }
-    });
+    return this.sessionBindings.runTransition(() => this.sessionTransitions.import(path));
   }
 
-  async forkSession(entryId: string): Promise<SessionSnapshot> {
+  async forkSession(entryId: string, position: "before" | "at" = "at"): Promise<SessionSnapshot> {
     await this.assertSessionWritable();
     return this.sessionBindings.runTransition(async () => {
       this.uiBridge.cancelAll("session-transition");
       this.streamBatcher.drop();
-      const result = await this.sessionBindings.requireRuntime().fork(entryId, { position: "at" });
+      const result = await this.sessionBindings.requireRuntime().fork(entryId, { position });
       if (result.cancelled) throw new Error("A Pi extension cancelled the session fork.");
       await this.sessionCatalog.upsertCurrent("session-created");
       await this.configurationReload.apply();
       return this.getSnapshot();
     });
+  }
+
+  async forkSessionFrom(sourcePath: string, entryId: string): Promise<SessionSnapshot> {
+    return this.sessionBindings.runTransition(
+      () => this.sessionTransitions.forkFrom(sourcePath, entryId)
+    );
   }
 
   async rollback(entryId: string, summarize = false): Promise<void> {

@@ -31,16 +31,16 @@ export const zhCNMessages = {
         summary: "配置模型服务、认证、可用模型与默认模型。"
       },
       packages: {
-        label: "资源包",
-        summary: "统一安装、更新和卸载提供扩展、技能或指令模板的 Pi 资源包。"
+        label: "扩展包",
+        summary: "安装和管理通过 npm、Git 或本地目录提供的 Pi 扩展包。"
       },
       extensions: {
         label: "扩展",
-        summary: "查看当前 Pi 会话实际加载的可执行扩展及其配置来源。"
+        summary: "安装扩展包，并管理 Pi-67 Desktop 内置扩展和本地扩展。"
       },
       skills: {
         label: "技能",
-        summary: "查看来自全局、项目和资源包的实际技能。"
+        summary: "分别查看用户维护的全局技能、当前项目技能和随 Desktop 提供的内置技能。"
       },
       prompts: {
         label: "指令模板",
@@ -79,6 +79,31 @@ export const zhCNMessages = {
     justNow: "刚刚",
     minutesAgo: (count: number) => `${count} 分钟前`,
     hoursAgo: (count: number) => `${count} 小时前`
+  },
+  transcript: {
+    copyAnswer: "复制回答",
+    copyMessage: "复制消息",
+    copied: "已复制",
+    copyFailed: "复制失败，请重试",
+    noCopyText: "这条消息没有可复制的文字",
+    continueInNewTask: "在新任务中继续",
+    continueInNewTaskDetail: "保留当前任务，并在新任务中带着此前上下文继续",
+    continuedTaskTitle: (title: string) => `接续：${title}`,
+    continueFailed: "无法创建接续任务",
+    continueCleanupFailed: (detail: string) => `新任务清理失败：${detail}`,
+    editMessage: "编辑消息",
+    editMessageDetail: "在原位置修改，发送后重新生成后续回答",
+    editInputLabel: "编辑用户消息",
+    editSend: "发送修改",
+    editSending: "正在发送修改",
+    editPreparedRetry: "会话已准备好，但修改内容尚未发送。请重试或取消。",
+    restoringEditedMessage: "正在恢复编辑前的会话",
+    restoreEditFailed: "无法取消消息修改",
+    finishMessageEdit: "请先完成或取消当前消息修改",
+    editImageUnavailable: "包含图片的历史消息暂不支持编辑",
+    actionWhileRunning: "当前任务结束或停止后可用",
+    actionWhileTransitioning: "正在切换会话，请稍候",
+    actionUnavailable: "当前会话暂不可用"
   },
   workspace: {
     eyebrow: "π",
@@ -141,7 +166,8 @@ export const zhCNMessages = {
     noMatches: "没有匹配的会话。",
     noSessions: "还没有保存的 Pi 会话。",
     catalogRetry: "Session 目录暂不可用，可稍后刷新重试。",
-    catalogFallback: "正在使用安全回退目录；下次启动可能重新扫描 Pi Session。",
+    catalogFallback: "Session 索引暂时不可用，当前使用 Pi Session 扫描结果。",
+    catalogFallbackRecovering: "Session 索引正在恢复，当前临时使用 Pi Session 扫描结果。",
     skippedSessions: (count: number) => `${count} 个 Session 无法读取，当前结果可能不完整。`,
     catalogIncomplete: "Session 目录结果可能不完整。",
     groupRunning: "正在运行",
@@ -376,6 +402,7 @@ export const zhCNMessages = {
     selectedImageReadFailed: "无法读取所选图片。",
     dropImages: "释放以添加图片",
     submissionFailed: "消息未发送。草稿和附件已保留。",
+    editBlockedByDraft: "输入框已有草稿或附件，请先发送或清空后再编辑历史消息。",
     pendingAttachments: "待发送附件",
     removeAttachment: (name: string) => `移除附件：${name}`,
     inputLabel: "给 Pi 发送消息",

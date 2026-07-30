@@ -28,6 +28,12 @@ describe("Desktop capability service", () => {
     expect(await service.snapshot()).toMatchObject({
       phase: "ready",
       packages: [{ id: "browser67", installed: true }],
+      bundledExtensions: [{ id: "browser-bridge", packageId: "browser67", installed: true }],
+      bundledSkills: [{ id: "browser67", packageId: "browser67", installed: true }],
+      bundledSkillSuites: [{
+        id: "browser67",
+        skills: [{ id: "browser67", packageId: "browser67", installed: true }]
+      }],
       integrations: [{ dependencyState: "not-prepared", doctorState: "not-checked" }]
     });
     const prepared = await service.setupBrowser67();
@@ -307,7 +313,19 @@ async function createFixture() {
       version: "0.4.0",
       commit: "1".repeat(40),
       packagePath: "packages/browser67",
-      resourceTypes: ["skill", "integration"]
+      resourceTypes: ["skill", "integration"],
+      bundledExtensions: [{ id: "browser-bridge", displayName: "browser-bridge" }],
+      bundledSkills: [{
+        id: "browser67",
+        displayName: "browser67",
+        description: "Controls the managed browser runtime."
+      }]
+    }],
+    bundledSkillSuites: [{
+      id: "browser67",
+      displayName: "browser67",
+      description: "Managed browser skills.",
+      members: [{ packageId: "browser67", skillId: "browser67" }]
     }],
     recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }]
   }), "utf8");

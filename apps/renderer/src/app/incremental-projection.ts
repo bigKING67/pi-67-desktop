@@ -42,6 +42,10 @@ export function handleProjectionEvent(
 ): event is ProjectionAgentEvent {
   switch (event.type) {
     case "runtime.ready":
+      // A lazily created target Task emits runtime.ready for its empty initial
+      // Session before the requested create/open/fork bootstrap. Keep that
+      // implementation detail from briefly replacing the intended projection.
+      if (get().sessionBootstrapTransitionPending) return true;
       if (!installAuthoritativeSnapshot(
         event.payload.snapshot,
         envelope,
@@ -161,7 +165,7 @@ function bootstrapReadyDetail(
     case "session-open":
       return "Pi 会话已恢复";
     case "session-fork":
-      return "Pi 分支会话已就绪";
+      return "Pi 会话已准备好";
     case "session-import":
       return "Pi 导入会话已就绪";
   }
@@ -188,6 +192,7 @@ function installAuthoritativeSnapshot(
   })) return false;
   set((state) => state.connected && state.hostEpoch === envelope.hostEpoch ? {
       sessionTransitionPending: false,
+      sessionBootstrapTransitionPending: false,
       trustUpdating: false,
       ...reboundSessionImportOperation(state.operation, envelope),
       ...(readyDetail === undefined

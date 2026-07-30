@@ -1,8 +1,27 @@
 import type { SessionMessageView } from "@pi67/domain";
-import { Bot, Wrench } from "lucide-react";
+import {
+  Bot,
+  Check,
+  Copy,
+  LoaderCircle,
+  MessageSquarePlus,
+  Pencil,
+  TriangleAlert,
+  Wrench
+} from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { isImeConfirmationKey } from "../input/ime-keyboard.js";
+import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
+import { messages } from "../localization/message-catalog.js";
+import { publishNotification } from "../notifications/notification-store.js";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
 import { MarkdownView } from "./MarkdownView.js";
+import {
+  editableUserMessageText,
+  messageTextForCopy,
+  userMessageContainsImage
+} from "./message-actions.js";
 import styles from "./MessageCard.module.css";
 
 interface LocalMessageImage {
@@ -16,16 +35,33 @@ interface MessageCardProps {
   streaming?: boolean;
   deliveryStatus?: "accepted" | "failed";
   localImages?: LocalMessageImage[];
+  actionDisabledReason?: string | undefined;
+  onContinue?: (() => Promise<boolean>) | undefined;
+  onEditStart?: (() => void) | undefined;
+  edit?: {
+    value: string;
+    phase: "editing" | "submitting" | "prepared";
+    error?: string | undefined;
+    onChange: (value: string) => void;
+    onCancel: () => void;
+    onSubmit: () => void;
+  } | undefined;
 }
 
 export function MessageCard({
   message,
   streaming = false,
   deliveryStatus,
-  localImages = []
+  localImages = [],
+  actionDisabledReason,
+  onContinue,
+  onEditStart,
+  edit
 }: MessageCardProps) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
+  const isAssistant = message.role === "assistant";
+  const isSettled = !streaming && deliveryStatus === undefined;
   const ariaLabel = streaming
     ? "Pi 正在回复"
     : isUser
@@ -35,13 +71,14 @@ export function MessageCard({
         : "Pi 消息";
   return (
     <article
-      className={`${styles.card} ${isUser ? styles.user : ""}`}
+      className={`${styles.card} ${isUser ? styles.user : ""} ${edit ? styles.userEditing : ""}`}
       aria-busy={streaming || undefined}
       aria-label={ariaLabel}
       data-delivery-status={deliveryStatus}
       data-message-id={message.id}
       data-testid="message-card"
       data-render-mode={streaming ? "streaming" : "settled"}
+      data-edit-phase={edit?.phase}
     >
       {isUser ? null : (
         <header className={styles.header}>
@@ -49,14 +86,11 @@ export function MessageCard({
             {isTool ? <Wrench size={14} /> : <Bot size={14} />}
             {isTool ? "工具" : "Pi"}
           </span>
-          <span className={styles.meta}>
-            {message.model ? <code>{message.model}</code> : null}
-            {message.stopped ? "已停止" : null}
-          </span>
+          {message.stopped ? <span className={styles.meta}>已停止</span> : null}
         </header>
       )}
       <div className={styles.content} data-testid="message-content">
-        {message.parts.map((part, index) => {
+        {edit ? <InlineUserMessageEditor edit={edit} /> : message.parts.map((part, index) => {
           if (part.type === "thinking") {
             return (
               <details className={styles.thinking} key={`${message.id}-thinking-${index}`}>
@@ -79,20 +113,268 @@ export function MessageCard({
           if (part.type === "tool-call") return <ToolCard key={part.id} tool={part} />;
           return null;
         })}
-        {localImages.map((image) => (
+        {!edit ? localImages.map((image) => (
           <AssetImage
             key={`${message.id}-local-image-${image.objectUrl}`}
             mimeType={image.mimeType}
             name={image.name}
             objectUrl={image.objectUrl}
           />
-        ))}
+        )) : null}
       </div>
-      {message.error ? (
+      {!edit && message.error ? (
         <div className={styles.error} role={deliveryStatus === "failed" ? "alert" : undefined}>
           {message.error}
         </div>
       ) : null}
+      {!edit && !streaming && (isUser || isAssistant) ? (
+        <MessageFooter
+          actionDisabledReason={actionDisabledReason}
+          isSettled={isSettled}
+          message={message}
+          onContinue={onContinue}
+          onEditStart={onEditStart}
+        />
+      ) : null}
     </article>
+  );
+}
+
+function InlineUserMessageEditor({ edit }: {
+  edit: NonNullable<MessageCardProps["edit"]>;
+}) {
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const submitting = edit.phase === "submitting";
+
+  useEffect(() => {
+    const element = textarea.current;
+    if (!element) return;
+    element.focus();
+    element.select();
+  }, []);
+
+  useLayoutEffect(() => {
+    const element = textarea.current;
+    if (!element) return;
+    element.style.height = "0px";
+    element.style.height = `${Math.min(element.scrollHeight, 260)}px`;
+  }, [edit.value]);
+
+  return (
+    <div className={styles.inlineEditor}>
+      <textarea
+        aria-label={messages.transcript.editInputLabel}
+        disabled={submitting}
+        ref={textarea}
+        rows={1}
+        value={edit.value}
+        onChange={(event) => edit.onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (isImeConfirmationKey(event.nativeEvent)) return;
+          if (event.key === "Escape") {
+            event.preventDefault();
+            edit.onCancel();
+            return;
+          }
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            if (!submitting && edit.value.trim()) edit.onSubmit();
+          }
+        }}
+      />
+      {edit.error ? <p className={styles.inlineEditError} role="alert">{edit.error}</p> : null}
+      <div className={styles.inlineEditActions}>
+        <button disabled={submitting} type="button" onClick={edit.onCancel}>
+          {messages.common.cancel}
+        </button>
+        <button
+          className={styles.inlineEditSubmit}
+          disabled={submitting || !edit.value.trim()}
+          type="button"
+          onClick={edit.onSubmit}
+        >
+          {submitting ? <LoaderCircle aria-hidden="true" className={styles.spinning} size={13} /> : null}
+          {submitting ? messages.transcript.editSending : messages.transcript.editSend}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type CopyState = "idle" | "copied" | "failed";
+type MessageAction = "continue";
+
+function MessageFooter({
+  message,
+  isSettled,
+  actionDisabledReason,
+  onContinue,
+  onEditStart
+}: {
+  message: SessionMessageView;
+  isSettled: boolean;
+  actionDisabledReason?: string | undefined;
+  onContinue?: (() => Promise<boolean>) | undefined;
+  onEditStart?: (() => void) | undefined;
+}) {
+  const isUser = message.role === "user";
+  const copyText = messageTextForCopy(message);
+  const editText = editableUserMessageText(message);
+  const containsImage = userMessageContainsImage(message);
+  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [pendingAction, setPendingAction] = useState<MessageAction>();
+  const resetCopyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const actionId = useId();
+  const copyLabel = copyState === "copied"
+    ? messages.transcript.copied
+    : copyState === "failed"
+      ? messages.transcript.copyFailed
+      : isUser
+        ? messages.transcript.copyMessage
+        : messages.transcript.copyAnswer;
+
+  useEffect(() => () => {
+    if (resetCopyTimer.current !== undefined) clearTimeout(resetCopyTimer.current);
+  }, []);
+
+  async function copyMessage() {
+    if (!copyText) return;
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(copyText);
+      setCopyState("copied");
+    } catch (error) {
+      setCopyState("failed");
+      publishNotification({
+        level: "error",
+        title: messages.transcript.copyFailed,
+        message: error instanceof Error ? error.message : messages.runtime.unknownError
+      });
+    }
+    if (resetCopyTimer.current !== undefined) clearTimeout(resetCopyTimer.current);
+    resetCopyTimer.current = setTimeout(() => setCopyState("idle"), 1_800);
+  }
+
+  async function runAction(action: MessageAction, callback: () => Promise<boolean>) {
+    if (pendingAction) return;
+    setPendingAction(action);
+    try {
+      await callback();
+    } finally {
+      setPendingAction(undefined);
+    }
+  }
+
+  const timestamp = <MessageTimestamp timestamp={message.createdAt} />;
+  const copyControl = (
+    <MessageActionControl
+      disabled={!copyText}
+      icon={copyState === "copied"
+        ? <Check aria-hidden="true" size={14} />
+        : copyState === "failed"
+          ? <TriangleAlert aria-hidden="true" size={14} />
+          : <Copy aria-hidden="true" size={14} />}
+      id={`${actionId}-copy`}
+      label={copyText ? copyLabel : messages.transcript.noCopyText}
+      onClick={() => void copyMessage()}
+      state={copyState}
+    />
+  );
+
+  if (isUser) {
+    const editDisabledReason = containsImage
+      ? messages.transcript.editImageUnavailable
+      : !editText
+        ? messages.transcript.noCopyText
+        : actionDisabledReason;
+    return (
+      <footer className={`${styles.footer} ${styles.userFooter}`} data-message-footer="user">
+        {timestamp}
+        {copyControl}
+        {isSettled && onEditStart ? (
+          <MessageActionControl
+            ariaLabel={messages.transcript.editMessage}
+            disabled={Boolean(editDisabledReason) || pendingAction !== undefined}
+            icon={<Pencil aria-hidden="true" size={14} />}
+            id={`${actionId}-edit`}
+            label={editDisabledReason ?? messages.transcript.editMessageDetail}
+            onClick={onEditStart}
+            state="idle"
+          />
+        ) : null}
+      </footer>
+    );
+  }
+
+  return (
+    <footer className={styles.footer} data-message-footer="assistant">
+      {copyControl}
+      {isSettled && onContinue ? (
+        <MessageActionControl
+          ariaLabel={messages.transcript.continueInNewTask}
+          disabled={Boolean(actionDisabledReason) || pendingAction !== undefined}
+          icon={pendingAction === "continue"
+            ? <LoaderCircle aria-hidden="true" className={styles.spinning} size={14} />
+            : <MessageSquarePlus aria-hidden="true" size={14} />}
+          id={`${actionId}-continue`}
+          label={actionDisabledReason ?? messages.transcript.continueInNewTaskDetail}
+          onClick={() => void runAction("continue", onContinue)}
+          state={pendingAction === "continue" ? "pending" : "idle"}
+        />
+      ) : null}
+      {timestamp}
+    </footer>
+  );
+}
+
+function MessageActionControl({
+  id,
+  label,
+  ariaLabel = label,
+  icon,
+  disabled,
+  onClick,
+  state
+}: {
+  id: string;
+  label: string;
+  ariaLabel?: string;
+  icon: React.ReactNode;
+  disabled: boolean;
+  onClick: () => void;
+  state: string;
+}) {
+  return (
+    <span className={styles.actionControl} data-action-state={state}>
+      <button
+        aria-describedby={`${id}-tooltip`}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        type="button"
+        onClick={onClick}
+      >
+        {icon}
+      </button>
+      <span className={styles.tooltip} id={`${id}-tooltip`} role="tooltip">{label}</span>
+    </span>
+  );
+}
+
+function MessageTimestamp({ timestamp }: { timestamp: number | undefined }) {
+  if (timestamp === undefined) {
+    return <span className={styles.timestamp}>{messages.dateTime.unknown}</span>;
+  }
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) {
+    return <span className={styles.timestamp}>{messages.dateTime.unknown}</span>;
+  }
+  return (
+    <time
+      className={styles.timestamp}
+      dateTime={date.toISOString()}
+      title={formatMessageDateTimeTitle(timestamp)}
+    >
+      {formatMessageDateTime(timestamp)}
+    </time>
   );
 }

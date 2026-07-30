@@ -11,6 +11,7 @@ export * from "./pi-configuration-service.js";
 export * from "./pi-configuration-service-registry.js";
 export * from "./pi-sdk-runtime.js";
 export * from "./runtime-credential-overrides.js";
+export * from "./runtime-session-catalog.js";
 export * from "./safety-extension.js";
 export * from "./session-catalog.js";
 export * from "./session-projection-index.js";

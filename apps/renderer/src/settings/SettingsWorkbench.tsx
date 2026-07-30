@@ -31,7 +31,7 @@ import {
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
-import { ExtensionManagementWorkspace } from "./ExtensionManagementWorkspace.js";
+import { ExtensionSettingsWorkspace } from "./ExtensionSettingsWorkspace.js";
 import {
   Browser67IntegrationPanel,
   ManagedRulePanel
@@ -39,6 +39,7 @@ import {
 import { PackageNetworkPanel } from "./PackageNetworkPanel.js";
 import { ProviderConfigurationPanel } from "./ProviderConfigurationPanel.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
+import { SkillSettingsWorkspace } from "./SkillSettingsWorkspace.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -55,6 +56,7 @@ import {
 
 export function SettingsWorkbench() {
   const section = useWorkbenchStore((state) => state.settingsSection);
+  const activeSection = section === "packages" ? "extensions" : section;
   const scope = useWorkbenchStore((state) => state.settingsScope);
   const [query, setQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -63,13 +65,17 @@ export function SettingsWorkbench() {
   const workspace = useWorkbenchStore((state) => (
     currentWorkspaceId ? state.workspaces[currentWorkspaceId] : undefined
   ));
-  const currentSection = SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]!;
+  const currentSection = SETTINGS_SECTIONS.find((item) => item.id === activeSection) ?? SETTINGS_SECTIONS[0]!;
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const visibleGroups = SETTINGS_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
   })).filter((group) => group.items.length > 0);
-  const projectScopeAvailable = sectionSupportsProjectScope(section);
+  const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
+
+  useEffect(() => {
+    if (section === "packages") rendererWorkbenchStore.getState().selectSettingsSection("extensions");
+  }, [section]);
 
   useEffect(() => {
     if (!projectScopeAvailable && scope !== "global") {
@@ -82,7 +88,7 @@ export function SettingsWorkbench() {
     if (!scrollRegion) return;
     scrollRegion.scrollTop = 0;
     scrollRegion.scrollLeft = 0;
-  }, [section]);
+  }, [activeSection]);
 
   useEffect(() => {
     const focusSettingsSearch = (event: KeyboardEvent) => {
@@ -139,8 +145,8 @@ export function SettingsWorkbench() {
                   const Icon = item.icon;
                   return (
                     <Button
-                      aria-current={section === item.id ? "page" : false}
-                      className={`${styles.navigationItem} ${section === item.id ? styles.selected : ""}`}
+                      aria-current={activeSection === item.id ? "page" : false}
+                      className={`${styles.navigationItem} ${activeSection === item.id ? styles.selected : ""}`}
                       key={item.id}
                       onPress={() => {
                         const store = rendererWorkbenchStore.getState();
@@ -187,7 +193,7 @@ export function SettingsWorkbench() {
               </div> : undefined}
             />
             <div className={styles.pageContent}>
-              <SettingsSectionContent section={section} />
+              <SettingsSectionContent section={activeSection} />
             </div>
           </div>
         </div>
@@ -200,8 +206,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "account") return <AccountSettings />;
   if (section === "general") return <GeneralSettings />;
   if (section === "providers") return <ProviderSettings />;
-  if (section === "packages") return <PackageSettings />;
-  if (section === "extensions") return <ExtensionSettings />;
+  if (section === "packages" || section === "extensions") return <ExtensionSettings />;
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
   if (section === "rules") return <RuleSettings />;
@@ -264,30 +269,12 @@ function ProviderSettings() {
   return <ProviderConfigurationPanel />;
 }
 
-function PackageSettings() {
-  return <ExtensionManagementWorkspace />;
-}
-
 function ExtensionSettings() {
-  return (
-    <SessionResourcePanel
-      kind="extension"
-      title="当前会话已加载的扩展"
-      description="Pi 当前实际加载的可执行扩展；资源包只作为来源，不在这里重复更新或卸载。"
-      empty="当前作用域没有加载可显示的扩展。"
-    />
-  );
+  return <ExtensionSettingsWorkspace />;
 }
 
 function SkillSettings() {
-  return (
-    <SessionResourcePanel
-      kind="skill"
-      title="当前会话已加载的技能"
-      description="显示全局、当前项目及资源包实际提供的技能；每一行对应一个已解析技能。"
-      empty="当前作用域没有加载可显示的技能。"
-    />
-  );
+  return <SkillSettingsWorkspace />;
 }
 
 function PromptSettings() {

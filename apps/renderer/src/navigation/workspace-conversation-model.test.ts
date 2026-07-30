@@ -54,4 +54,32 @@ describe("workspace conversation model", () => {
     expect(conversationRows("workspace-test", [task], [session], "重新检查")).toHaveLength(1);
     expect(conversationRows("workspace-test", [task], [session], "稳定的 Pi 会话名")).toHaveLength(1);
   });
+
+  it("keeps a continuation Task distinguishable until its first new Prompt", () => {
+    const task: RendererWorkbenchTask = {
+      id: "task-continuation",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-test",
+        sessionPath: "/sessions/continuation.jsonl"
+      },
+      workspaceId: "workspace-test",
+      sessionId: "session-continuation",
+      taskGeneration: 1,
+      sessionGeneration: 2,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "接续：原任务",
+      pendingTitle: "接续：原任务",
+      recentUserMessagePreview: "原任务的最后一条问题",
+      sessionPath: "/sessions/continuation.jsonl",
+      hasDraft: false,
+      attachmentCount: 0
+    };
+
+    expect(conversationRows("workspace-test", [task], [], "")[0]).toMatchObject({
+      title: "接续：原任务",
+      meta: "接续：原任务"
+    });
+  });
 });

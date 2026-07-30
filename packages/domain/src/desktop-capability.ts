@@ -13,6 +13,32 @@ export interface DesktopCapabilityPackageSummary {
   installed: boolean;
 }
 
+export interface DesktopBundledExtensionSummary {
+  id: string;
+  displayName: string;
+  packageId: string;
+  packageDisplayName: string;
+  version: string;
+  installed: boolean;
+}
+
+export interface DesktopBundledSkillSummary {
+  id: string;
+  displayName: string;
+  description: string;
+  packageId: string;
+  packageDisplayName: string;
+  version: string;
+  installed: boolean;
+}
+
+export interface DesktopBundledSkillSuiteSummary {
+  id: string;
+  displayName: string;
+  description: string;
+  skills: DesktopBundledSkillSummary[];
+}
+
 export interface DesktopRecommendedPackage {
   id: string;
   source: string;
@@ -41,6 +67,9 @@ export interface DesktopCapabilitySnapshot {
   phase: "initializing" | "ready" | "degraded" | "error";
   catalogVersion?: string;
   packages: DesktopCapabilityPackageSummary[];
+  bundledExtensions: DesktopBundledExtensionSummary[];
+  bundledSkills: DesktopBundledSkillSummary[];
+  bundledSkillSuites: DesktopBundledSkillSuiteSummary[];
   recommendedExternal: DesktopRecommendedPackage[];
   managedContext: DesktopManagedContextStatus;
   integrations: DesktopIntegrationStatus[];

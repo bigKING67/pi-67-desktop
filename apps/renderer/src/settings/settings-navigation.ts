@@ -6,7 +6,6 @@ import {
   FileText,
   Info,
   Network,
-  PackageOpen,
   RefreshCw,
   Scale,
   SlidersHorizontal,
@@ -56,21 +55,41 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         icon: Bot
       },
       {
-        id: "packages",
-        ...messages.settings.sections.packages,
-        searchTerms: ["资源包", "安装", "更新", "卸载", "npm", "git", "path", "package"],
-        icon: PackageOpen
-      },
-      {
         id: "extensions",
         ...messages.settings.sections.extensions,
-        searchTerms: ["扩展", "插件", ".pi/extensions", "extension", "resource"],
+        searchTerms: [
+          "扩展包",
+          "内置扩展",
+          "本地扩展",
+          "已加载扩展",
+          "资源包",
+          "插件",
+          "安装",
+          "更新",
+          "卸载",
+          ".pi/extensions",
+          "npm",
+          "git",
+          "path",
+          "package",
+          "extension",
+          "resource"
+        ],
         icon: Blocks
       },
       {
         id: "skills",
         ...messages.settings.sections.skills,
-        searchTerms: ["技能", "资源", "上下文", "skill", "resource"],
+        searchTerms: [
+          "技能",
+          "全局技能",
+          "项目技能",
+          "内置技能",
+          ".agents/skills",
+          ".pi/skills",
+          "skill",
+          "resource"
+        ],
         icon: Sparkles
       },
       {
@@ -130,7 +149,6 @@ export function sectionSupportsProjectScope(section: SettingsSection): boolean {
   return section === "providers"
     || section === "packages"
     || section === "extensions"
-    || section === "skills"
     || section === "prompts"
     || section === "rules"
     || section === "runtime";

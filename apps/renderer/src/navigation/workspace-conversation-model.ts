@@ -35,7 +35,7 @@ export function conversationRows(
     const stableTitle = ["未命名会话", "未命名任务"].includes(task.title) && session
       ? session.name
       : task.title;
-    const title = task.recentUserMessagePreview ?? stableTitle;
+    const title = task.pendingTitle ?? task.recentUserMessagePreview ?? stableTitle;
     const meta = session
       ? task.recentUserMessagePreview
         ? `${stableTitle} · ${sessionMeta(session)}`

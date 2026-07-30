@@ -6,8 +6,9 @@ import {
   DefaultPackageManager,
   SettingsManager
 } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
+import type { RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
 import { createRuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import { createPiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 
@@ -147,6 +148,31 @@ describe("Pi Workspace runtime services", () => {
       await runtime.dispose();
       await workspaceServices.dispose();
     }
+  });
+
+  it("leaves an injected Agent Host Session Catalog owner alive when Workspace services dispose", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-shared-catalog-owner-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+    const dispose = vi.fn(async () => undefined);
+    const sessionCatalogOwner = {
+      createBinding: vi.fn(),
+      status: vi.fn(),
+      dispose
+    } as unknown as RuntimeSessionCatalogOwner;
+    const workspaceServices = createPiWorkspaceRuntimeServices({
+      cwd,
+      agentDir,
+      settingsManager: SettingsManager.inMemory(),
+      sessionCatalogOwner
+    });
+
+    await workspaceServices.dispose();
+
+    expect(workspaceServices.sessionCatalog).toBe(sessionCatalogOwner);
+    expect(dispose).not.toHaveBeenCalled();
   });
 });
 

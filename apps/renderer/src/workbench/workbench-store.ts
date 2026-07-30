@@ -25,6 +25,7 @@ export interface RendererWorkbenchTask {
   lifecycle: TaskLifecycle;
   runtime: RuntimeStatus;
   title: string;
+  pendingTitle?: string | undefined;
   recentUserMessagePreview?: string;
   sessionPath?: string;
   hasDraft: boolean;
