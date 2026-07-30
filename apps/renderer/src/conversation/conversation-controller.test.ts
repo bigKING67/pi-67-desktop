@@ -106,6 +106,26 @@ describe("conversation controller", () => {
     await Promise.resolve();
     expect(useLiveTurnStore.getState().textChunks.join("")).toBe("new live result");
   });
+
+  it("keeps streaming and live Pi text active during a user-entry acknowledgement refresh", async () => {
+    useConversationStore.getState().setStreaming(true, AUTHORITY);
+    useLiveTurnStore.getState().begin(operation(), AUTHORITY.hostEpoch);
+    useLiveTurnStore.getState().append({ text: "first Pi token", thinking: "" }, {
+      hostEpoch: AUTHORITY.hostEpoch,
+      sessionId: AUTHORITY.sessionId,
+      sessionGeneration: AUTHORITY.sessionGeneration,
+      operationId: "operation-a"
+    });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+      page("session-a", 0, 3, false) as never
+    );
+
+    refreshConversation(userAppendedEvent("session-a"), AUTHORITY, "operation-a");
+    await vi.waitFor(() => expect(useConversationStore.getState().messages).toHaveLength(3));
+
+    expect(useConversationStore.getState().streaming).toBe(true);
+    expect(useLiveTurnStore.getState().textChunks.join("")).toBe("first Pi token");
+  });
 });
 
 function installConversation(
@@ -175,6 +195,10 @@ function operation(operationId = "operation-a"): OperationView {
 
 function settledEvent(sessionId: string): Extract<AgentEvent, { type: "conversation.changed" }> {
   return { type: "conversation.changed", payload: { sessionId, reason: "settled" } };
+}
+
+function userAppendedEvent(sessionId: string): Extract<AgentEvent, { type: "conversation.changed" }> {
+  return { type: "conversation.changed", payload: { sessionId, reason: "user-appended" } };
 }
 
 function deferred<T>(): {

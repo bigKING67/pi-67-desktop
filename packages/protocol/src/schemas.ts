@@ -288,7 +288,12 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   }),
   "conversation.changed": strictObject({
     sessionId: Type.String(),
-    reason: Type.Union([Type.Literal("settled"), Type.Literal("compacted"), Type.Literal("rolled-back")])
+    reason: Type.Union([
+      Type.Literal("user-appended"),
+      Type.Literal("settled"),
+      Type.Literal("compacted"),
+      Type.Literal("rolled-back")
+    ])
   }),
   "queue.changed": strictObject({
     steeringQueue: Type.Array(Type.String()),

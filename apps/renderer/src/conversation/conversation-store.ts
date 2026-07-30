@@ -22,8 +22,30 @@ export interface ConversationRequestTarget extends ConversationAuthority {
   contentRevision: number;
 }
 
+interface RecentConversationProjectionOptions {
+  preserveOlder: boolean;
+  settleStreaming: boolean;
+  operationId?: string;
+}
+
+interface PendingUserAttachment {
+  id: string;
+  file: File;
+  previewUrl: string;
+}
+
+export interface PendingUserTurn {
+  submissionId: string;
+  operationId: string;
+  authority: ConversationAuthority;
+  message: SessionMessageView;
+  attachments: PendingUserAttachment[];
+  status: "accepted" | "failed";
+}
+
 export interface ConversationProjectionView {
   messages: SessionMessageView[];
+  pendingUserTurn: PendingUserTurn | undefined;
   page: MessagePageMetadata;
   streaming: boolean;
   loadingOlder: boolean;
@@ -35,6 +57,7 @@ interface ConversationState {
   authority: ConversationAuthority | undefined;
   contentRevision: number;
   messages: SessionMessageView[];
+  pendingUserTurn: PendingUserTurn | undefined;
   page: MessagePageMetadata;
   streaming: boolean;
   loadingOlder: boolean;
@@ -60,14 +83,17 @@ interface ConversationState {
   replaceRecent: (
     target: ConversationRequestTarget,
     page: ConversationPage,
-    preserveOlder: boolean
+    options: RecentConversationProjectionOptions
   ) => boolean;
+  installPendingUserTurn: (turn: PendingUserTurn) => boolean;
+  markPendingUserTurnFailed: (operationId: string, error: string) => boolean;
   setStreaming: (streaming: boolean, authority: ConversationAuthority) => boolean;
 }
 
 const EMPTY_PAGE: MessagePageMetadata = { hasOlder: false, hasNewer: false };
 const EMPTY_CONVERSATION_PROJECTION: ConversationProjectionView = {
   messages: [],
+  pendingUserTurn: undefined,
   page: EMPTY_PAGE,
   streaming: false,
   loadingOlder: false,
@@ -79,6 +105,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   authority: undefined,
   contentRevision: 0,
   messages: [],
+  pendingUserTurn: undefined,
   page: EMPTY_PAGE,
   streaming: false,
   loadingOlder: false,
@@ -87,39 +114,48 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   replaceSnapshot(snapshot, authority) {
     if (snapshot.sessionId !== authority.sessionId) return false;
+    const pendingUserTurn = get().pendingUserTurn;
     set((state) => ({
       authority,
       contentRevision: state.contentRevision + 1,
       messages: snapshot.messages,
+      pendingUserTurn: undefined,
       page: snapshot.messagePage,
       streaming: snapshot.streaming,
       loadingOlder: false,
       firstItemIndex: INITIAL_CONVERSATION_INDEX,
       error: undefined
     }));
+    revokePendingAttachments(pendingUserTurn);
     return matchesAuthority(get().authority, authority);
   },
 
   invalidateProjection() {
+    const pendingUserTurn = get().pendingUserTurn;
     set((state) => ({
       contentRevision: state.contentRevision + 1,
+      pendingUserTurn: undefined,
       streaming: false,
       loadingOlder: false,
       error: undefined
     }));
+    revokePendingAttachments(pendingUserTurn);
   },
 
   reset() {
+    const pendingUserTurn = get().pendingUserTurn;
     set((state) => ({
       authority: undefined,
       contentRevision: state.contentRevision + 1,
       messages: [],
+      pendingUserTurn: undefined,
       page: EMPTY_PAGE,
       streaming: false,
       loadingOlder: false,
       firstItemIndex: INITIAL_CONVERSATION_INDEX,
       error: undefined
     }));
+    revokePendingAttachments(pendingUserTurn);
   },
 
   capture(authority) {
@@ -180,19 +216,53 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     set({ loadingOlder: false, error });
   },
 
-  replaceRecent(target, page, preserveOlder) {
+  replaceRecent(target, page, options) {
     const state = get();
     if (!matchesTarget(state, target) || page.sessionId !== target.sessionId) return false;
-    const projection = preserveOlder
+    const projection = options.preserveOlder
       ? mergeRecentPage(state.messages, state.page, page)
       : { messages: page.messages, page: metadataFromPage(page), resetIndex: true };
+    const pendingConfirmed = confirmsPendingUserTurn(
+      state.pendingUserTurn,
+      state.messages,
+      page,
+      options.operationId
+    );
     set({
       messages: projection.messages,
+      ...(pendingConfirmed ? { pendingUserTurn: undefined } : {}),
       page: projection.page,
-      streaming: false,
+      streaming: options.settleStreaming ? false : state.streaming,
       loadingOlder: false,
       ...(projection.resetIndex ? { firstItemIndex: INITIAL_CONVERSATION_INDEX } : {}),
       error: undefined
+    });
+    if (pendingConfirmed) revokePendingAttachments(state.pendingUserTurn);
+    return true;
+  },
+
+  installPendingUserTurn(turn) {
+    const state = get();
+    if (!matchesAuthority(state.authority, turn.authority)) return false;
+    if (
+      state.pendingUserTurn?.submissionId === turn.submissionId
+      && state.pendingUserTurn.operationId === turn.operationId
+    ) return true;
+    const replaced = state.pendingUserTurn;
+    set({ pendingUserTurn: turn });
+    revokePendingAttachments(replaced);
+    return true;
+  },
+
+  markPendingUserTurnFailed(operationId, error) {
+    const pendingUserTurn = get().pendingUserTurn;
+    if (!pendingUserTurn || pendingUserTurn.operationId !== operationId) return false;
+    set({
+      pendingUserTurn: {
+        ...pendingUserTurn,
+        status: "failed",
+        message: { ...pendingUserTurn.message, error: `发送失败：${error}` }
+      }
     });
     return true;
   },
@@ -208,6 +278,7 @@ export function selectCommittedConversationProjection(
   state: Pick<ConversationState,
     | "authority"
     | "messages"
+    | "pendingUserTurn"
     | "page"
     | "streaming"
     | "loadingOlder"
@@ -290,4 +361,20 @@ function metadataFromPage(page: ConversationPage): MessagePageMetadata {
     hasOlder: page.hasOlder,
     hasNewer: page.hasNewer
   };
+}
+
+function confirmsPendingUserTurn(
+  pending: PendingUserTurn | undefined,
+  currentMessages: SessionMessageView[],
+  page: ConversationPage,
+  operationId: string | undefined
+): boolean {
+  if (!pending || pending.operationId !== operationId) return false;
+  const currentIds = new Set(currentMessages.map((message) => message.id));
+  return page.messages.some((message) => message.role === "user" && !currentIds.has(message.id));
+}
+
+function revokePendingAttachments(pending: PendingUserTurn | undefined): void {
+  if (!pending) return;
+  for (const attachment of pending.attachments) URL.revokeObjectURL(attachment.previewUrl);
 }

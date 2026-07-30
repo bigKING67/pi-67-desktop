@@ -7,7 +7,10 @@ import { useSessionProjectionStore } from "../session/session-projection-store.j
 import { selectSessionId } from "../session/session-projection-selectors.js";
 import { requestComposerPrefill } from "../composer/composer-events.js";
 import { loadOlderConversation } from "../conversation/conversation-controller.js";
-import { useCommittedConversationProjection } from "../conversation/conversation-store.js";
+import {
+  type PendingUserTurn,
+  useCommittedConversationProjection
+} from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { MessageCard } from "./MessageCard.js";
 import styles from "./Transcript.module.css";
@@ -18,6 +21,7 @@ export function Transcript() {
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const {
     messages,
+    pendingUserTurn,
     page,
     streaming,
     loadingOlder,
@@ -43,7 +47,7 @@ export function Transcript() {
     return <div className={styles.loading}><span className="loading-line" />{runtime.detail}</div>;
   }
 
-  if (messages.length === 0 && !hasLiveTurn) {
+  if (messages.length === 0 && !pendingUserTurn && !hasLiveTurn) {
     return (
       <div className={styles.empty}>
         <div className={styles.emptyIcon}><MessageSquareText size={22} /></div>
@@ -63,6 +67,7 @@ export function Transcript() {
       className={styles.region}
       data-has-live-turn={hasLiveTurn}
       data-message-count={messages.length}
+      data-pending-user-turn={pendingUserTurn ? "true" : "false"}
       data-session-id={sessionId}
       data-transcript-region="true"
     >
@@ -72,6 +77,7 @@ export function Transcript() {
         components={TRANSCRIPT_COMPONENTS}
         context={{
           hasLiveTurn,
+          pendingUserTurn,
           liveText,
           liveThinking,
           hasOlder: page.hasOlder,
@@ -99,6 +105,7 @@ const STARTER_PROMPTS = [
 
 interface TranscriptContext {
   hasLiveTurn: boolean;
+  pendingUserTurn: PendingUserTurn | undefined;
   liveText: string;
   liveThinking: string;
   hasOlder: boolean;
@@ -131,8 +138,25 @@ function OlderMessagesHeader({ context }: { context: TranscriptContext }) {
 }
 
 function LiveTurnFooter({ context }: { context: TranscriptContext }) {
-  if (!context.hasLiveTurn) return null;
-  return <MessageCard message={liveMessage(context.liveText, context.liveThinking)} streaming />;
+  if (!context.pendingUserTurn && !context.hasLiveTurn) return null;
+  return (
+    <>
+      {context.pendingUserTurn ? (
+        <MessageCard
+          deliveryStatus={context.pendingUserTurn.status}
+          localImages={context.pendingUserTurn.attachments.map((attachment) => ({
+            mimeType: attachment.file.type,
+            name: attachment.file.name,
+            objectUrl: attachment.previewUrl
+          }))}
+          message={context.pendingUserTurn.message}
+        />
+      ) : null}
+      {context.hasLiveTurn
+        ? <MessageCard message={liveMessage(context.liveText, context.liveThinking)} streaming />
+        : null}
+    </>
+  );
 }
 
 function liveMessage(text: string, thinking: string): SessionMessageView {

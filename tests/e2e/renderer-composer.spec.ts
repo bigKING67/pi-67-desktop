@@ -2,18 +2,20 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
+  emitMockAgentEvent,
   installMockDesktopBridge,
   recordedCommandDetails,
   replaceMockSessionProjection,
   setMockAgentResponseDelay,
-  setMockAgentResponseFailure
+  setMockAgentResponseFailure,
+  setMockConversationMessages
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
 
-test("clears the composer on prompt acknowledgement without waiting for a long operation", async ({ page }) => {
+test("shows the accepted user message without waiting for the first Pi token", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page, [], {}, { terminalDelayMs: 90_000 });
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -25,14 +27,87 @@ test("clears the composer on prompt acknowledgement without waiting for a long o
 
   await expect(composer).toHaveValue("");
   await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit"]);
+  const pendingMessage = page.getByRole("article", { name: "用户消息", exact: true });
+  await expect(pendingMessage).toHaveCount(1);
+  await expect(pendingMessage).toContainText("执行一个耗时九十秒的任务");
+  await expect(pendingMessage).toHaveAttribute("data-delivery-status", "accepted");
+  await expect(page.getByText("从一个具体任务开始", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("article", { name: "Pi 正在回复", exact: true })).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: /任务已接收|Pi 正在执行任务/u })).toBeVisible();
   await expect(page.getByText(/acknowledgement timed out/u)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(await page.evaluate(() => document.documentElement.clientWidth));
   const [command] = await scenarioCommands(page);
   expect(command?.payload).toMatchObject({
     submissionId: expect.stringMatching(UUID_PATTERN),
     delivery: "new-turn",
     text: "执行一个耗时九十秒的任务"
   });
+  await page.screenshot({
+    path: "artifacts/visual-review/prompt-accepted-before-first-token.png",
+    animations: "disabled"
+  });
+});
+
+test("reconciles the accepted bubble with the authoritative Pi user entry without duplication", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { terminalDelayMs: 90_000 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await clearRecordedCommands(page);
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("你是谁");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  const userMessage = page.getByRole("article", { name: "用户消息", exact: true });
+  await expect(userMessage).toHaveCount(1);
+  await expect(userMessage).toHaveAttribute("data-message-id", "pending-user:operation-1");
+
+  await setMockConversationMessages(page, [{
+    id: "authoritative-user-1",
+    role: "user",
+    parts: [{ type: "text", text: "你是谁" }]
+  }]);
+  await emitMockAgentEvent(page, {
+    type: "conversation.changed",
+    payload: { sessionId: "session-test", reason: "user-appended" }
+  }, { operationId: "operation-1" });
+
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit", "message.page"]);
+  await expect(userMessage).toHaveCount(1);
+  await expect(userMessage).toHaveAttribute("data-message-id", "authoritative-user-1");
+  await expect(userMessage).not.toHaveAttribute("data-delivery-status", "accepted");
+  await expect(userMessage).toContainText("你是谁");
+  await expect(composer).toHaveAttribute("placeholder", /补充方向/u);
+});
+
+test("keeps an accepted Prompt visible when its Operation fails before projection", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { terminalDelayMs: 90_000 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("保留这条失败的消息");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+  const userMessage = page.getByRole("article", { name: "用户消息", exact: true });
+  await expect(userMessage).toHaveAttribute("data-delivery-status", "accepted");
+
+  await emitMockAgentEvent(page, {
+    type: "operation.failed",
+    payload: {
+      operationId: "operation-1",
+      failedAt: Date.now(),
+      error: { code: "INTERNAL", message: "Pi runtime stopped", recoverable: true }
+    }
+  }, { operationId: "operation-1" });
+
+  await expect(composer).toHaveValue("");
+  await expect(userMessage).toHaveAttribute("data-delivery-status", "failed");
+  await expect(userMessage.getByRole("alert")).toHaveText("发送失败：Pi runtime stopped");
+  await expect(page.getByText("从一个具体任务开始", { exact: true })).toHaveCount(0);
+
+  await replaceMockSessionProjection(page, "session-b", []);
+  await expect(userMessage).toHaveCount(0);
+  await expect(page.getByText("从一个具体任务开始", { exact: true })).toBeVisible();
 });
 
 test("keeps IME candidate confirmation separate from prompt submission", async ({ page }) => {
@@ -204,7 +279,11 @@ test("keeps the draft and rotates submission identity when the Session changes b
   expect(retrySubmissionId).toBeTruthy();
   expect(retrySubmissionId).not.toBe(firstSubmissionId);
   await expect(composer).toHaveValue("");
-  await expect(preview).toHaveCount(0);
+  const acceptedMessage = page.getByRole("article", { name: "用户消息", exact: true });
+  await expect(acceptedMessage).toContainText("这份草稿只能由发送时的会话确认");
+  await expect(acceptedMessage.getByRole("img", { name: "session-bound.png" }))
+    .toHaveAttribute("src", /^blob:/u);
+  await expect(page.getByLabel("待发送附件")).toHaveCount(0);
 });
 
 const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([

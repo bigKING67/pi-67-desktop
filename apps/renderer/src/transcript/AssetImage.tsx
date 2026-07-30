@@ -5,9 +5,10 @@ import { conversationAssetController } from "../conversation/conversation-asset-
 import styles from "./AssetImage.module.css";
 
 interface AssetImageProps {
-  asset: AssetReference | undefined;
+  asset?: AssetReference | undefined;
   mimeType: string;
   name: string | undefined;
+  objectUrl?: string;
 }
 
 type AssetImageState =
@@ -15,11 +16,12 @@ type AssetImageState =
   | { status: "ready"; objectUrl: string }
   | { status: "error" };
 
-export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
+export function AssetImage({ asset, mimeType, name, objectUrl }: AssetImageProps) {
   const [retry, setRetry] = useState(0);
   const [state, setState] = useState<AssetImageState>({ status: "loading" });
 
   useEffect(() => {
+    if (objectUrl) return;
     if (!asset) return;
     let active = true;
     setState({ status: "loading" });
@@ -33,8 +35,9 @@ export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
       active = false;
       lease.release();
     };
-  }, [asset, retry]);
+  }, [asset, objectUrl, retry]);
 
+  if (objectUrl) return <ProjectedImage name={name} objectUrl={objectUrl} />;
   if (!asset) {
     return (
       <div className={styles.imagePlaceholder} role="status">
@@ -43,15 +46,7 @@ export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
     );
   }
   if (state.status === "ready") {
-    return (
-      <img
-        alt={name ?? "会话图片"}
-        className={styles.image}
-        decoding="async"
-        loading="lazy"
-        src={state.objectUrl}
-      />
-    );
+    return <ProjectedImage name={name} objectUrl={state.objectUrl} />;
   }
   if (state.status === "error") {
     return (
@@ -68,5 +63,17 @@ export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
     <div aria-label={`正在加载${name ?? mimeType}图片`} className={styles.imagePlaceholder} role="status">
       图片加载中
     </div>
+  );
+}
+
+function ProjectedImage({ name, objectUrl }: { name: string | undefined; objectUrl: string }) {
+  return (
+    <img
+      alt={name ?? "会话图片"}
+      className={styles.image}
+      decoding="async"
+      loading="lazy"
+      src={objectUrl}
+    />
   );
 }

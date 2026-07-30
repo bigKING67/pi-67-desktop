@@ -340,7 +340,11 @@ describe("renderer projection state", () => {
     );
 
     await expect(submitRendererPrompt("already delivered", [], "send", "submission-1"))
-      .resolves.toEqual({ accepted: true, operationId: "operation-settled-prompt" });
+      .resolves.toEqual({
+        accepted: true,
+        operationId: "operation-settled-prompt",
+        retainsAttachmentPreviews: false
+      });
     expect(useAppStore.getState().operation).toMatchObject({
       operationId: "operation-settled-prompt",
       lifecycle: "completed",

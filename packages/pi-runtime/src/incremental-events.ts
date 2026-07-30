@@ -3,7 +3,7 @@ import type { AgentEvent } from "@pi67/protocol";
 
 export function conversationChangedEvent(
   session: AgentSession,
-  reason: "settled" | "compacted" | "rolled-back"
+  reason: "user-appended" | "settled" | "compacted" | "rolled-back"
 ): AgentEvent<"conversation.changed"> {
   return { type: "conversation.changed", payload: { sessionId: session.sessionId, reason } };
 }

@@ -32,7 +32,10 @@ export interface EventPayloads {
     snapshot: SessionSnapshot;
     reason: "session-create" | "session-open" | "session-fork" | "session-import";
   };
-  "conversation.changed": { sessionId: string; reason: "settled" | "compacted" | "rolled-back" };
+  "conversation.changed": {
+    sessionId: string;
+    reason: "user-appended" | "settled" | "compacted" | "rolled-back";
+  };
   "queue.changed": { steeringQueue: string[]; followUpQueue: string[] };
   "session.metaChanged": {
     streaming: boolean;

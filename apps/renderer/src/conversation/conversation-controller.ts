@@ -50,9 +50,15 @@ export function refreshConversation(
     const applied = useConversationStore.getState().replaceRecent(
       target,
       page,
-      event.payload.reason === "settled"
+      {
+        preserveOlder: event.payload.reason === "settled" || event.payload.reason === "user-appended",
+        settleStreaming: event.payload.reason !== "user-appended",
+        ...(operationId === undefined ? {} : { operationId })
+      }
     );
-    if (applied) useLiveTurnStore.getState().settle(operationId);
+    if (applied && event.payload.reason !== "user-appended") {
+      useLiveTurnStore.getState().settle(operationId);
+    }
   }).catch((error: unknown) => {
     if (revision === recentPageRevision) {
       useConversationStore.getState().finishOlder(target, `无法刷新会话消息：${errorMessage(error)}`);

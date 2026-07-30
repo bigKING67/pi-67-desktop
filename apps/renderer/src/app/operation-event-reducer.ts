@@ -115,6 +115,9 @@ function finishOperation<TState extends AppEventState>(
   authority: RendererSessionAuthority
 ): void {
   useLiveTurnStore.getState().finish(operationId, lifecycle);
+  if (lifecycle !== "completed") {
+    useConversationStore.getState().markPendingUserTurnFailed(operationId, detail);
+  }
   useConversationStore.getState().setStreaming(false, authority);
   set((state) => state.operation?.operationId === operationId ? {
     operation: {

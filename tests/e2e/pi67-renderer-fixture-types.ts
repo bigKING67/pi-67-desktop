@@ -4,6 +4,7 @@ import type { FixtureSessionSummary } from "./pi67-session-catalog-fixture.js";
 export interface FixtureMessage {
   id: string;
   role: string;
+  model?: string;
   parts: Array<{
     type: string;
     text?: string;

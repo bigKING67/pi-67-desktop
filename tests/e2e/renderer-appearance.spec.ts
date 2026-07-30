@@ -156,6 +156,89 @@ test("keeps long code horizontally navigable without a persistent scrollbar", as
   await page.screenshot({ path: testInfo.outputPath("long-code-without-scrollbar.png"), animations: "disabled" });
 });
 
+test("renders user messages as compact right-aligned bubbles", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  await attachMockAgent(page, [
+    {
+      id: "short-user-message",
+      role: "user",
+      parts: [{ type: "text", text: "你好" }]
+    },
+    {
+      id: "assistant-message",
+      role: "assistant",
+      model: "deepseek-v4-pro",
+      parts: [{ type: "text", text: "你好！有什么我可以帮你的吗？" }]
+    },
+    {
+      id: "long-user-message",
+      role: "user",
+      parts: [{
+        type: "text",
+        text: "请检查当前工作区的前端实现，优先确认真实调用链、异常恢复和响应式布局，再给出可以直接验证的修改方案。不要为了形式上的高级架构增加无收益的抽象，也不要把需要基准测试验证的性能猜测写成已经存在的问题。"
+      }]
+    }
+  ]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const userMessages = page.getByRole("article", { name: "用户消息", exact: true });
+  const shortUserMessage = userMessages.nth(0);
+  const longUserMessage = userMessages.nth(1);
+  const piMessage = page.getByRole("article", { name: "Pi 消息", exact: true });
+  await expect(userMessages).toHaveCount(2);
+  await expect(shortUserMessage).toContainText("你好");
+  await expect(shortUserMessage.getByText("你", { exact: true })).toHaveCount(0);
+  await expect(piMessage.getByText("Pi", { exact: true })).toBeVisible();
+  await expect(piMessage.locator("code")).toHaveText("deepseek-v4-pro");
+
+  const [shortBox, longBox, piBox] = await Promise.all([
+    shortUserMessage.boundingBox(),
+    longUserMessage.boundingBox(),
+    piMessage.boundingBox()
+  ]);
+  expect(shortBox).not.toBeNull();
+  expect(longBox).not.toBeNull();
+  expect(piBox).not.toBeNull();
+  if (!shortBox || !longBox || !piBox) throw new Error("Message geometry is unavailable");
+
+  expect(shortBox.width).toBeLessThan(piBox.width / 2);
+  expect(Math.abs(shortBox.x + shortBox.width - (piBox.x + piBox.width))).toBeLessThanOrEqual(1);
+  expect(shortBox.x).toBeGreaterThan(piBox.x);
+  expect(longBox.width).toBeLessThanOrEqual(682);
+  expect(Math.abs(longBox.x + longBox.width - (piBox.x + piBox.width))).toBeLessThanOrEqual(1);
+  expect(longBox.x).toBeGreaterThan(piBox.x);
+
+  const documentWidth = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth
+  }));
+  expect(documentWidth.scroll).toBe(documentWidth.client);
+  await page.screenshot({
+    path: "artifacts/visual-review/user-message-bubble-after.png",
+    animations: "disabled"
+  });
+
+  await page.setViewportSize({ width: 720, height: 920 });
+  await expect(shortUserMessage).toBeVisible();
+  const [narrowUserBox, narrowPiBox] = await Promise.all([
+    shortUserMessage.boundingBox(),
+    piMessage.boundingBox()
+  ]);
+  expect(narrowUserBox).not.toBeNull();
+  expect(narrowPiBox).not.toBeNull();
+  if (!narrowUserBox || !narrowPiBox) throw new Error("Narrow message geometry is unavailable");
+  expect(Math.abs(narrowUserBox.x + narrowUserBox.width - (narrowPiBox.x + narrowPiBox.width)))
+    .toBeLessThanOrEqual(1);
+  expect(narrowUserBox.x).toBeGreaterThan(narrowPiBox.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({
+    path: "artifacts/visual-review/user-message-bubble-after-narrow.png",
+    animations: "disabled"
+  });
+});
+
 test("keeps unsigned preview checks and external downloads user initiated", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);

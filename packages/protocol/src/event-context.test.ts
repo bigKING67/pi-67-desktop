@@ -78,6 +78,15 @@ describe("event context validation", () => {
       ...conversation,
       payload: { ...conversation.payload, sessionId: "session-other" }
     })).toBe(false);
+    const userAppended = eventEnvelope("conversation.changed", {
+      sessionId: "session-1",
+      reason: "user-appended"
+    }, operationContext());
+    expect(isEventEnvelope(userAppended)).toBe(true);
+    expect(isEventEnvelope({
+      ...userAppended,
+      payload: { ...userAppended.payload, reason: "entry-appended" }
+    })).toBe(false);
 
     const started = eventEnvelope("operation.started", {
       operation: {

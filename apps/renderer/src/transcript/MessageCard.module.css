@@ -6,11 +6,12 @@
 }
 
 .user {
-  width: min(760px, calc(100% - 80px));
-  margin-top: 10px;
-  padding: 14px var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
+  width: fit-content;
+  max-width: min(680px, calc(100% - 48px));
+  margin: 10px max(24px, calc(50% - 410px)) 10px auto;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 16px;
   background: var(--surface-muted);
 }
 
@@ -73,8 +74,14 @@
 }
 
 @media (max-width: 760px) {
-  .card,
-  .user {
+  .card {
     width: calc(100% - 28px);
+  }
+
+  .user {
+    width: fit-content;
+    max-width: calc(100% - 28px);
+    margin: 8px 14px 8px auto;
+    padding: 10px 12px;
   }
 }

@@ -226,6 +226,23 @@ loading error where the operation can produce those states
 - Settled messages and the live turn are separate render paths; the live turn
   occupies the Virtuoso footer and joins history only after it settles.
 - Streaming text is coalesced; token-level React commits are forbidden.
+- User messages use a compact, content-width bubble aligned to the right edge of
+  the 820px Transcript reading track. Short messages never expand to the maximum
+  width; long prompts, code, and attachments remain bounded. The visible author
+  header is omitted because position and surface already communicate ownership,
+  while the message article retains an explicit accessible user label. Pi and
+  Tool output remain left-aligned, wide editorial content with visible authors.
+- A new-turn Prompt appears as an in-memory pending user bubble as soon as the
+  Agent Host acknowledges it. The empty state disappears before the first Pi
+  token; operation status supplements this feedback and never replaces the
+  submitted message. Pi JSONL remains authoritative: the matching Operation's
+  user-entry projection replaces the pending bubble without flicker or duplicate
+  content. Failed uncommitted Prompts remain visible with an explicit error, and
+  pending state never crosses Host, Session, generation, or projection authority.
+- Draft attachment Blob URLs transfer to the pending bubble on acknowledgement.
+  They are revoked only after authoritative reconciliation, failure disposal, or
+  authority replacement; the renderer never copies their binary payload merely
+  to keep the acknowledgement state visible.
 - Long code uses a bounded 520px viewport, worker-based highlighting, internally
   virtualized lines, and a full-content copy action. Long lines preserve their
   source layout and remain horizontally navigable without a persistent scrollbar;

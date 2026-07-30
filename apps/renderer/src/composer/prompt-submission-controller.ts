@@ -13,16 +13,18 @@ import {
 } from "../app/prompt-submission-authority.js";
 import { userMessagePreview } from "../workbench/recent-user-message.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/workbench-store.js";
+import type { DraftAttachment } from "./composer-attachments.js";
 
 export type PromptSubmissionResult =
-  | { accepted: true; operationId: string }
+  | { accepted: true; operationId: string; retainsAttachmentPreviews: boolean }
   | { accepted: false; error: string };
 
 export async function submitRendererPrompt(
   text: string,
   images: TransferImage[],
   behavior: "send" | "steer" | "followUp",
-  submissionId: string
+  submissionId: string,
+  attachments: readonly DraftAttachment[] = []
 ): Promise<PromptSubmissionResult> {
   if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   const delivery = behavior === "steer"
@@ -50,6 +52,28 @@ export async function submitRendererPrompt(
       delivery
     }, images.map((image) => image.data));
     const result = applyAcceptedPrompt(accepted, expectedAuthority);
+    const taskStillSelected = selectedTaskId !== undefined
+      && selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === selectedTaskId;
+    const terminalError = settledPromptError(accepted);
+    const retainsAttachmentPreviews = result.accepted
+      && delivery === "new-turn"
+      && taskStillSelected
+      && useConversationStore.getState().installPendingUserTurn({
+        submissionId,
+        operationId: result.operationId,
+        authority: expectedAuthority,
+        message: {
+          id: `pending-user:${result.operationId}`,
+          role: "user",
+          parts: text ? [{ type: "text", text }] : [],
+          createdAt: Date.now(),
+          ...(terminalError === undefined
+            ? {}
+            : { error: `发送失败：${terminalError}` })
+        },
+        attachments: attachments.map((attachment) => ({ ...attachment })),
+        status: terminalError === undefined ? "accepted" : "failed"
+      });
     if (result.accepted && selectedTaskId) {
       const preview = userMessagePreview(text, images.length > 0);
       rendererWorkbenchStore.getState().updateTask(selectedTaskId, {
@@ -57,7 +81,9 @@ export async function submitRendererPrompt(
         ...(preview ? { recentUserMessagePreview: preview } : {})
       });
     }
-    return result;
+    return result.accepted
+      ? { ...result, retainsAttachmentPreviews }
+      : result;
   } catch (error) {
     const detail = errorMessage(error);
     publishNotification({
@@ -86,7 +112,7 @@ function applyAcceptedPrompt(
     "prompt",
     "任务已结束",
     expectedAuthority
-  )) return { accepted: true, operationId: accepted.operationId };
+  )) return { accepted: true, operationId: accepted.operationId, retainsAttachmentPreviews: false };
 
   const operation = operationFromSubmission(accepted, "prompt");
   useLiveTurnStore.getState().begin(operation, current.hostEpoch);
@@ -97,7 +123,12 @@ function applyAcceptedPrompt(
     operationProgress: undefined,
     runtime: { phase: "busy", detail: "Pi 正在执行任务", recoverable: true }
   });
-  return { accepted: true, operationId: accepted.operationId };
+  return { accepted: true, operationId: accepted.operationId, retainsAttachmentPreviews: false };
+}
+
+function settledPromptError(result: OperationSubmissionResult): string | undefined {
+  if (result.kind !== "settled" || result.lifecycle === "completed") return undefined;
+  return result.lifecycle === "failed" ? result.error.message : result.reason;
 }
 
 function errorMessage(error: unknown): string {

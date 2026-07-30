@@ -50,7 +50,6 @@ export function Composer() {
   const [submissionError, setSubmissionError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
-  const attachmentsRef = useRef<DraftAttachment[]>([]);
   const attachmentDragDepth = useRef(0);
   const submissionIdRef = useRef<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -81,10 +80,6 @@ export function Composer() {
   }), []);
 
   useEffect(() => {
-    attachmentsRef.current = attachments;
-  }, [attachments]);
-
-  useEffect(() => {
     submissionIdRef.current = undefined;
   }, [hostEpoch, sessionGeneration, sessionId]);
 
@@ -110,7 +105,8 @@ export function Composer() {
         nextText,
         images,
         streaming ? streamBehavior : "send",
-        submissionId
+        submissionId,
+        nextAttachments
       );
       if (!result.accepted) {
         setSubmissionError(result.error);
@@ -118,7 +114,7 @@ export function Composer() {
       }
       setText("");
       submissionIdRef.current = undefined;
-      revokeDraftAttachments(nextAttachments);
+      if (!result.retainsAttachmentPreviews) revokeDraftAttachments(nextAttachments);
       useTaskDraftStore.getState().setAttachments(activeTaskId, []);
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : messages.composer.attachmentReadFailed);

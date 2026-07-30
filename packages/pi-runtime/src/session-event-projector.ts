@@ -75,6 +75,13 @@ export class SessionEventProjector {
     }
 
     const session = this.target.getSession();
+    if (
+      event.type === "entry_appended"
+      && event.entry.type === "message"
+      && event.entry.message.role === "user"
+    ) {
+      this.target.emit(conversationChangedEvent(session, "user-appended"));
+    }
     if (event.type === "queue_update") this.target.emit(queueChangedEvent(session));
     if (event.type === "thinking_level_changed") this.target.emit(sessionMetaChangedEvent(session));
     if (event.type === "agent_settled") {

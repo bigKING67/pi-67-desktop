@@ -1,5 +1,5 @@
 import type { ConversationPage, SessionSnapshot } from "@pi67/domain";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INITIAL_CONVERSATION_INDEX,
   selectCommittedConversationProjection,
@@ -65,7 +65,10 @@ describe("conversation store", () => {
     const target = useConversationStore.getState().currentTarget(active(AUTHORITY))!;
     const recent = page("session-a", 3, 8, false);
 
-    expect(useConversationStore.getState().replaceRecent(target, recent, true)).toBe(true);
+    expect(useConversationStore.getState().replaceRecent(target, recent, {
+      preserveOlder: true,
+      settleStreaming: true
+    })).toBe(true);
     expect(useConversationStore.getState().messages.map((message) => message.id)).toEqual([
       "session-a-0",
       "session-a-1",
@@ -130,6 +133,105 @@ describe("conversation store", () => {
       page("session-a", -1, 0, false)
     )).toBe(false);
   });
+
+  it("shows an accepted user Turn only under its exact Conversation authority", () => {
+    useConversationStore.getState().replaceSnapshot(snapshot("session-a", 0, false), AUTHORITY);
+    const pending = pendingUserTurn("operation-a", AUTHORITY);
+
+    expect(useConversationStore.getState().installPendingUserTurn(pending)).toBe(true);
+    expect(selectCommittedConversationProjection(
+      useConversationStore.getState(),
+      active(AUTHORITY)
+    ).pendingUserTurn).toMatchObject({
+      operationId: "operation-a",
+      status: "accepted",
+      message: { id: "pending-user:operation-a", role: "user" }
+    });
+    expect(useConversationStore.getState().installPendingUserTurn({
+      ...pending,
+      operationId: "operation-stale",
+      authority: { ...AUTHORITY, sessionGeneration: AUTHORITY.sessionGeneration + 1 }
+    })).toBe(false);
+  });
+
+  it("reconciles a pending user Turn only when its Operation projects a new user message", () => {
+    useConversationStore.getState().replaceSnapshot(snapshot("session-a", 1, false), AUTHORITY);
+    useConversationStore.getState().setStreaming(true, AUTHORITY);
+    expect(useConversationStore.getState().installPendingUserTurn(
+      pendingUserTurn("operation-a", AUTHORITY)
+    )).toBe(true);
+    const target = useConversationStore.getState().currentTarget(active(AUTHORITY))!;
+
+    expect(useConversationStore.getState().replaceRecent(
+      target,
+      page("session-a", 0, 2, false),
+      { preserveOlder: true, settleStreaming: false, operationId: "operation-a" }
+    )).toBe(true);
+    expect(useConversationStore.getState().pendingUserTurn).toBeDefined();
+    expect(useConversationStore.getState().streaming).toBe(true);
+
+    const authoritativeUser = {
+      id: "session-a-user-1",
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "Run the task" }]
+    };
+    expect(useConversationStore.getState().replaceRecent(
+      target,
+      {
+        sessionId: "session-a",
+        messages: [message("session-a", 0), authoritativeUser],
+        startCursor: "session-a-0",
+        endCursor: authoritativeUser.id,
+        hasOlder: false,
+        hasNewer: false
+      },
+      { preserveOlder: true, settleStreaming: false, operationId: "operation-a" }
+    )).toBe(true);
+    expect(useConversationStore.getState().pendingUserTurn).toBeUndefined();
+    expect(useConversationStore.getState().streaming).toBe(true);
+    expect(useConversationStore.getState().messages.filter((item) => item.role === "user"))
+      .toEqual([authoritativeUser]);
+  });
+
+  it("keeps an uncommitted Prompt visible on terminal failure", () => {
+    useConversationStore.getState().replaceSnapshot(snapshot("session-a", 0, false), AUTHORITY);
+    useConversationStore.getState().installPendingUserTurn(pendingUserTurn("operation-a", AUTHORITY));
+
+    expect(useConversationStore.getState().markPendingUserTurnFailed(
+      "operation-a",
+      "Pi runtime stopped"
+    )).toBe(true);
+    expect(useConversationStore.getState().pendingUserTurn).toMatchObject({
+      status: "failed",
+      message: { error: "发送失败：Pi runtime stopped" }
+    });
+    expect(useConversationStore.getState().markPendingUserTurnFailed(
+      "operation-other",
+      "stale"
+    )).toBe(false);
+  });
+
+  it("releases pending attachment previews when authority is replaced", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    useConversationStore.getState().replaceSnapshot(snapshot("session-a", 0, false), AUTHORITY);
+    useConversationStore.getState().installPendingUserTurn({
+      ...pendingUserTurn("operation-a", AUTHORITY),
+      attachments: [{
+        id: "attachment-a",
+        file: new File(["image"], "prompt.png", { type: "image/png" }),
+        previewUrl: "blob:prompt-a"
+      }]
+    });
+
+    useConversationStore.getState().replaceSnapshot(
+      snapshot("session-b", 0, false),
+      authority("session-b", 4, 2)
+    );
+
+    expect(revoke).toHaveBeenCalledOnce();
+    expect(revoke).toHaveBeenCalledWith("blob:prompt-a");
+    expect(useConversationStore.getState().pendingUserTurn).toBeUndefined();
+  });
 });
 
 function authority(
@@ -185,5 +287,20 @@ function message(sessionId: string, index: number) {
     id: `${sessionId}-${index}`,
     role: "assistant" as const,
     parts: [{ type: "text" as const, text: `message ${index}` }]
+  };
+}
+
+function pendingUserTurn(operationId: string, authorityValue: SessionProjectionAuthority) {
+  return {
+    submissionId: `submission:${operationId}`,
+    operationId,
+    authority: authorityValue,
+    message: {
+      id: `pending-user:${operationId}`,
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "Run the task" }]
+    },
+    attachments: [],
+    status: "accepted" as const
   };
 }
