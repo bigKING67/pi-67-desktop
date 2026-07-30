@@ -44,6 +44,7 @@
     "preview:mac:unsigned": "node eng/packaging/preview-macos-unsigned.mjs",
     "prepare:toolchain": "node eng/packaging/prepare-toolchain.mjs",
     "prepare:capabilities": "node eng/capabilities/prepare-capabilities.mjs",
+    "check:capability-freshness": "node eng/capabilities/check-capability-freshness.mjs",
     "package:win": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --mac dmg zip --arm64",
     "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",

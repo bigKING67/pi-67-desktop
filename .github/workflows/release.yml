@@ -66,6 +66,15 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
+      - name: Verify first-party capability freshness
+        run: node eng/capabilities/check-capability-freshness.mjs --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: capability-freshness-signed-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/capability-freshness.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify release tag contract
         shell: bash
         env:

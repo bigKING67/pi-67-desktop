@@ -268,7 +268,7 @@ export async function installMockDesktopBridge(
         description: "读取、创建和编辑飞书云文档。",
         packageId: "pi67-core",
         packageDisplayName: "Pi-67 Core",
-        version: "0.15.5",
+        version: "0.15.8",
         installed: true
       }, {
         id: "lark-calendar",
@@ -276,7 +276,7 @@ export async function installMockDesktopBridge(
         description: "管理飞书日历、日程、忙闲状态和会议室。",
         packageId: "pi67-core",
         packageDisplayName: "Pi-67 Core",
-        version: "0.15.5",
+        version: "0.15.8",
         installed: true
       }, {
         id: "investment-research",
@@ -284,7 +284,7 @@ export async function installMockDesktopBridge(
         description: "投资研究综合分析框架。",
         packageId: "pi67-core",
         packageDisplayName: "Pi-67 Core",
-        version: "0.15.5",
+        version: "0.15.8",
         installed: true
       }, {
         id: "commerce-growth-os",
@@ -292,7 +292,7 @@ export async function installMockDesktopBridge(
         description: "全域电商经营综合诊断和增长方案。",
         packageId: "commerce-growth-os",
         packageDisplayName: "commerce-growth-os",
-        version: "2.0.0",
+        version: "2.2.0",
         installed: true
       }, {
         id: "browser67",
@@ -316,7 +316,7 @@ export async function installMockDesktopBridge(
         description: "产品界面和交互设计工程能力。",
         packageId: "design-craft",
         packageDisplayName: "design-craft",
-        version: "0.5.1",
+        version: "0.5.6",
         installed: true
       }, {
         id: "minimalist-ui",
@@ -324,20 +324,20 @@ export async function installMockDesktopBridge(
         description: "简洁的编辑式界面设计方向。",
         packageId: "pi67-core",
         packageDisplayName: "Pi-67 Core",
-        version: "0.15.5",
+        version: "0.15.8",
         installed: true
       }];
       return {
         phase: "ready",
-        catalogVersion: "2026.07.28.1",
+        catalogVersion: "2026.07.30.2",
         packages: [{
           id: "pi67-core",
           displayName: "Pi-67 Core",
           origin: "first-party",
           bundled: true,
           defaultEnabled: true,
-          version: "0.15.5",
-          commit: "6f03b61705b6fd882de408fbbf8353578bfce86d",
+          version: "0.15.8",
+          commit: "59b96004fa42b3c5311d84ecafd33475fcb889c1",
           resourceTypes: ["extension", "skill", "prompt", "rule"],
           installed: true
         }, {
@@ -356,8 +356,8 @@ export async function installMockDesktopBridge(
           origin: "first-party",
           bundled: true,
           defaultEnabled: true,
-          version: "0.5.1",
-          commit: "f".repeat(40),
+          version: "0.5.6",
+          commit: "9a90f15ea9e4dd6104cbd2ba2976e8603fee396e",
           resourceTypes: ["skill"],
           installed: true
         }, {
@@ -366,8 +366,8 @@ export async function installMockDesktopBridge(
           origin: "first-party",
           bundled: true,
           defaultEnabled: true,
-          version: "2.0.0",
-          commit: "e".repeat(40),
+          version: "2.2.0",
+          commit: "1c28f48ef002ce7dea18bbf5746eb9b4c2876971",
           resourceTypes: ["skill"],
           installed: true
         }],
@@ -381,7 +381,7 @@ export async function installMockDesktopBridge(
           displayName: id,
           packageId: "pi67-core",
           packageDisplayName: "Pi-67 Core",
-          version: "0.15.5",
+          version: "0.15.8",
           installed: true
         })),
         bundledSkills,
