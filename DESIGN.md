@@ -237,7 +237,9 @@ loading error where the operation can produce those states
   Pi answers place `复制回答` and `在新任务中继续` before the timestamp; User
   messages place the timestamp before `复制消息` and `编辑消息`. Action
   targets remain at least 28px, are keyboard-focusable, have named tooltips, and
-  stay discoverable without depending exclusively on hover.
+  stay discoverable without depending exclusively on hover. Tooltips prefer the
+  space below their action and use overlay collision handling; they never cover
+  the message content merely to stay attached to the footer.
 - Message timestamps are stable source timestamps and always render the complete
   local `YYYY-MM-DD HH:mm` value. Full seconds and the local UTC offset belong in
   the native time tooltip; relative labels such as `刚刚` never replace the date
@@ -572,13 +574,18 @@ loading error where the operation can produce those states
   a running Task until its current Operation settles. If the selected model was
   removed, the model control becomes unselected and the Composer explains that a
   new model is required before another Prompt can be sent.
-- The Provider Catalog keeps search and sync actions above one flat result list.
-  Search matches both display name and Provider ID without switching or
-  discarding the active draft. Selecting a row replaces the Catalog with the
-  Provider editor at every width. Inside the editor, `基本配置`, `模型`, `默认模型`,
-  and `文件与诊断` are Provider-setting sections rather than Task tabs. They
-  prevent frequent controls, advanced compatibility fields, and diagnostics
-  from being presented as equally weighted cards.
+- The Provider Catalog owns three task views with visible counts: `已配置` shows
+  every Provider with effective authentication, `可配置` shows unconfigured Pi
+  built-ins, and `自定义` shows definitions owned by `models.json`. These are
+  task views rather than mutually exclusive storage folders, so a configured
+  custom Provider intentionally appears in both `已配置` and `自定义`. Search is
+  retained while switching views and matches both display name and Provider ID.
+  `重新加载` remains global while `新建模型服务` belongs to the custom view.
+  Selecting a row replaces the Catalog with the Provider editor at every width.
+  Inside the editor, `基本配置`, `模型`, `默认模型`, and `文件与诊断` are
+  Provider-setting sections rather than Task tabs. They prevent frequent
+  controls, advanced compatibility fields, and diagnostics from being presented
+  as equally weighted cards.
 - Provider sync status, Provider Catalog, section tabs, and editor do not share
   a bounded outer frame. `返回模型服务列表` restores the Catalog's search,
   selection, and scroll position without discarding the Provider draft.
@@ -669,6 +676,13 @@ loading error where the operation can produce those states
 
 ### Composer
 
+- The Composer region owns the visual boundary below the Transcript. It reserves
+  `32px` above the editor shell on ordinary desktop windows and may compact to
+  `24px` when viewport height is at most `760px`; the last virtualized message
+  never receives an ad hoc bottom margin to create this separation. The inset
+  remains present for settled history, pending Prompts, Turn activity, and live
+  Assistant output so the next input reads as a stable action zone rather than
+  another message card.
 - Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
 - During a cancellable Turn, `停止` is the rightmost primary action. A non-empty
   steer or follow-up draft keeps a quieter adjacent `发送` action; with no draft,

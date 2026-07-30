@@ -139,6 +139,12 @@ try {
     throw new Error("Packaged Provider editor must not share the Provider Catalog surface.");
   }
   await assertNoWorkspaceChangesAuthorityWarning(window);
+  const providerCatalogTabs = providerPanel.getByRole("tablist", { name: "模型服务分类" });
+  const availableProvidersTab = providerCatalogTabs.getByRole("tab", { name: /^可配置 \d+$/u });
+  await availableProvidersTab.click();
+  if ((await availableProvidersTab.getAttribute("aria-selected")) !== "true") {
+    throw new Error("Packaged Provider Catalog did not switch to the configurable task view.");
+  }
   await capturePackagedScreenshot(window, "01-provider-catalog.png");
   const settingsScrollRegion = workspaceSettings.getByTestId("settings-scroll-region");
   const [providerListLayout, settingsScrollLayout] = await Promise.all([
@@ -163,6 +169,8 @@ try {
       settings: settingsScrollLayout
     })}`);
   }
+  const configuredProvidersTab = providerCatalogTabs.getByRole("tab", { name: /^已配置 \d+$/u });
+  await configuredProvidersTab.click();
   await configurationProviderSearch.fill("anthropic");
   const packagedProviderRow = configurationProviderList.getByRole("button", { name: /^Anthropic\b/u });
   await packagedProviderRow.waitFor({ state: "visible", timeout: 15_000 });

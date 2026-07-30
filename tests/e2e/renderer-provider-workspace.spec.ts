@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("keeps Provider and model catalogs single-layer while search preserves the active draft", async ({ page }) => {
+test("organizes Provider task views while search and drill-down preserve the active draft", async ({ page }, testInfo) => {
   const providerConfigurationSnapshot = createMockProviderConfigurationSnapshot();
   const anthropic = providerConfigurationSnapshot.providers.find((provider) => provider.id === "anthropic")!;
   const openai = providerConfigurationSnapshot.providers.find((provider) => provider.id === "openai")!;
@@ -89,14 +89,29 @@ test("keeps Provider and model catalogs single-layer while search preserves the 
   const modelList = panel.getByTestId("provider-model-list");
   const modelDetail = panel.getByTestId("provider-model-detail");
   const settingsScroll = settings.getByTestId("settings-scroll-region");
+  const configuredTab = panel.getByRole("tab", { name: "已配置 2" });
+  const availableTab = panel.getByRole("tab", { name: `可配置 ${providerCatalog.length - 1}` });
+  const customTab = panel.getByRole("tab", { name: "自定义 1" });
 
   await expect(search).toBeVisible();
-  await expect(providerList.getByRole("button")).toHaveCount(providerCatalog.length + 1);
+  await expect(configuredTab).toHaveAttribute("aria-selected", "true");
+  await expect(providerList.getByRole("button")).toHaveCount(2);
+  await expect(providerList.getByRole("button", { name: /Anthropic.*已配置.*自定义/u })).toBeVisible();
+  await customTab.click();
+  await expect(providerList.getByRole("button")).toHaveCount(1);
+  await expect(providerList.getByRole("button", { name: /Anthropic/u })).toBeVisible();
+  await availableTab.click();
+  await expect(providerList.getByRole("button")).toHaveCount(providerCatalog.length - 1);
   await expect(editor).toBeHidden();
   expect(await providerList.evaluate((element) => getComputedStyle(element).overflowY)).toBe("visible");
   expect(await settingsScroll.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
     await settingsScroll.evaluate((element) => element.clientHeight)
   );
+  await page.screenshot({
+    path: testInfo.outputPath("provider-catalog-views.png"),
+    animations: "disabled"
+  });
+  await configuredTab.click();
   await search.fill("anthropic");
   await providerList.getByRole("button", { name: /Anthropic/u }).click();
   await expect(providerList).toBeHidden();
@@ -135,15 +150,38 @@ test("keeps Provider and model catalogs single-layer while search preserves the 
   await panel.getByRole("button", { name: "返回模型服务列表" }).click();
   await expect(providerList).toBeVisible();
   await search.fill("deep");
+  await expect(providerList.getByText("“已配置”中没有匹配的模型服务", { exact: true })).toBeVisible();
+  await availableTab.click();
   await expect(providerList.getByRole("button")).toHaveCount(1);
   await expect(providerList.getByRole("button", { name: /DeepSeek/u })).toBeVisible();
   await panel.getByRole("button", { name: "清除 Provider 搜索" }).click();
-  await expect(providerList.getByRole("button")).toHaveCount(providerCatalog.length + 1);
+  await expect(providerList.getByRole("button")).toHaveCount(providerCatalog.length - 1);
   await search.fill("missing-provider-fixture");
-  await expect(providerList.getByText("没有匹配的 Provider。", { exact: true })).toBeVisible();
+  await expect(providerList.getByText("“可配置”中没有匹配的模型服务", { exact: true })).toBeVisible();
+  await configuredTab.click();
   await search.fill("anthropic");
   await providerList.getByRole("button", { name: /Anthropic/u }).click();
   await expect(providerName).toHaveValue("Unsaved Anthropic Name");
+});
+
+test("defaults to configurable Providers when no service is currently configured", async ({ page }) => {
+  const providerConfigurationSnapshot = createMockProviderConfigurationSnapshot();
+  providerConfigurationSnapshot.providers = providerConfigurationSnapshot.providers.map((provider) => ({
+    ...provider,
+    configured: false
+  }));
+
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("π 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: /^模型服务/u }).click();
+  const panel = settings.getByTestId("provider-configuration-panel");
+
+  await expect(panel.getByRole("tab", { name: "可配置 2" })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByTestId("provider-configuration-list").getByRole("button")).toHaveCount(2);
 });
 
 test("uses a list-to-detail model flow in a narrow Settings workspace", async ({ page }) => {
@@ -242,6 +280,8 @@ test("edits Pi Provider files, selects built-in defaults, and preserves a stale 
   await expect(page.getByRole("option", { name: /Claude Test/u })).toBeVisible();
   await page.keyboard.press("Escape");
 
+  await panel.getByRole("button", { name: "返回模型服务列表" }).click();
+  await panel.getByRole("tab", { name: "自定义 0" }).click();
   await panel.getByRole("button", { name: "新建模型服务" }).click();
   await expect(panel.getByRole("tab", { name: "基本配置" })).toHaveAttribute("aria-selected", "true");
   await panel.getByLabel("Provider ID").fill("host-custom");

@@ -8,24 +8,24 @@ import {
   Check,
   FileJson2,
   KeyRound,
-  Plus,
   RefreshCw,
   Save,
-  Search,
-  Trash2,
-  X
+  Trash2
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, TextArea } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
+import {
+  defaultProviderCatalogView,
+  ProviderCatalog,
+  type ProviderCatalogView
+} from "./ProviderCatalog.js";
 import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
 import { ProviderModelWorkspace } from "./ProviderModelWorkspace.js";
 import {
   SettingsBackAction,
-  SettingsCatalog,
-  SettingsCatalogRow,
   SettingsNotice,
   SettingsToolbar
 } from "./SettingsPrimitives.js";
@@ -52,19 +52,23 @@ export function ProviderConfigurationPanel() {
   const storeWorkspaceId = useProviderConfigurationStore((state) => state.workspaceId);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
   const [providerQuery, setProviderQuery] = useState("");
+  const [providerCatalogView, setProviderCatalogView] = useState<ProviderCatalogView>("configured");
   const [section, setSection] = useState<ProviderSection>("models");
   const [providerDetailOpen, setProviderDetailOpen] = useState(false);
   const [pendingProviderId, setPendingProviderId] = useState<string | null>();
   const panelRef = useRef<HTMLDivElement>(null);
   const catalogScrollTopRef = useRef(0);
+  const catalogViewWorkspaceRef = useRef<string | undefined>(undefined);
   const restoreCatalogScrollRef = useRef(false);
 
   useEffect(() => {
     setProviderQuery("");
+    setProviderCatalogView("configured");
     setSection("models");
     setProviderDetailOpen(false);
     setPendingProviderId(undefined);
     catalogScrollTopRef.current = 0;
+    catalogViewWorkspaceRef.current = undefined;
     restoreCatalogScrollRef.current = false;
     if (!workspaceId) {
       useProviderConfigurationStore.getState().reset();
@@ -72,6 +76,13 @@ export function ProviderConfigurationPanel() {
     }
     void loadProviderConfiguration(workspaceId);
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId || !snapshot || storeWorkspaceId !== workspaceId) return;
+    if (catalogViewWorkspaceRef.current === workspaceId) return;
+    catalogViewWorkspaceRef.current = workspaceId;
+    setProviderCatalogView(defaultProviderCatalogView(snapshot.providers));
+  }, [snapshot, storeWorkspaceId, workspaceId]);
 
   useLayoutEffect(() => {
     const scrollRegion = panelRef.current?.closest<HTMLElement>('[data-testid="settings-scroll-region"]');
@@ -100,13 +111,6 @@ export function ProviderConfigurationPanel() {
   }
 
   const selectedView = snapshot.providers.find((provider) => provider.id === selectedProviderId);
-  const normalizedProviderQuery = providerQuery.trim().toLocaleLowerCase();
-  const filteredProviders = normalizedProviderQuery.length === 0
-    ? snapshot.providers
-    : snapshot.providers.filter((provider) => (
-      (provider.name ?? provider.id).toLocaleLowerCase().includes(normalizedProviderQuery)
-      || provider.id.toLocaleLowerCase().includes(normalizedProviderQuery)
-    ));
   const editable = selectedView?.origin === "models.json" || selectedProviderId === undefined;
   const canSave = editable
     && dirty
@@ -155,7 +159,6 @@ export function ProviderConfigurationPanel() {
       <ConfigurationStatusBar
         snapshot={snapshot}
         busy={phase === "saving"}
-        onNew={() => requestProvider(null)}
         onReload={() => void reloadProviderConfiguration(workspaceId)}
       />
       {externalConflict ? (
@@ -184,54 +187,17 @@ export function ProviderConfigurationPanel() {
         </SettingsNotice>
       ) : null}
       {!providerDetailOpen ? (
-        <section className={styles.providerCatalog} aria-label="Pi Provider 导航">
-          <header className={styles.catalogIntro}>
-            <strong>模型服务目录</strong>
-            <small>选择一个模型服务后进入配置；目录和编辑器不会同时占用横向空间。</small>
-          </header>
-          <div className={styles.providerCatalogControls}>
-            <div className={styles.providerSearch}>
-              <Search aria-hidden="true" size={15} />
-              <Input
-                aria-label="搜索 Pi Provider"
-                autoComplete="off"
-                placeholder="搜索名称或 ID…"
-                value={providerQuery}
-                onChange={(event) => setProviderQuery(event.target.value)}
-              />
-              {providerQuery.length > 0 ? (
-                <Button
-                  aria-label="清除 Provider 搜索"
-                  className={styles.providerSearchClear!}
-                  onPress={() => setProviderQuery("")}
-                  type="button"
-                >
-                  <X aria-hidden="true" size={14} />
-                </Button>
-              ) : null}
-            </div>
-          </div>
-          <div className={styles.providerList} data-testid="provider-configuration-list">
-            <SettingsCatalog label="Pi Provider 列表">
-              {filteredProviders.map((provider) => (
-                <SettingsCatalogRow
-                  description={provider.id}
-                  key={provider.id}
-                  onSelect={() => requestProvider(provider.id)}
-                  selected={provider.id === selectedProviderId}
-                  title={provider.name ?? provider.id}
-                  trailing={<span className={styles.providerMeta} data-configured={provider.configured}>
-                    {provider.origin === "builtin" ? "内置" : `${provider.models.length} 个模型`}
-                  </span>}
-                />
-              ))}
-              {snapshot.providers.length === 0 ? <p>尚未发现 Provider。</p> : null}
-              {snapshot.providers.length > 0 && filteredProviders.length === 0 ? (
-                <p className={styles.providerListEmpty}>没有匹配的 Provider。</p>
-              ) : null}
-            </SettingsCatalog>
-          </div>
-        </section>
+        <ProviderCatalog
+          busy={phase === "saving"}
+          onNew={() => requestProvider(null)}
+          onQueryChange={setProviderQuery}
+          onSelect={requestProvider}
+          onViewChange={setProviderCatalogView}
+          providers={snapshot.providers}
+          query={providerQuery}
+          selectedProviderId={selectedProviderId}
+          view={providerCatalogView}
+        />
       ) : (
         <main className={styles.editor} data-testid="provider-configuration-editor">
             {draft ? (
@@ -407,11 +373,11 @@ function ConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSna
   );
 }
 
-function ConfigurationStatusBar({ snapshot, busy, onNew, onReload }: { snapshot: PiProviderConfigurationSnapshot; busy: boolean; onNew: () => void; onReload: () => void }) {
+function ConfigurationStatusBar({ snapshot, busy, onReload }: { snapshot: PiProviderConfigurationSnapshot; busy: boolean; onReload: () => void }) {
   return <SettingsToolbar
     className={styles.statusBar!}
     status={<span className={styles.syncStatus} data-current={snapshot.syncState === "current"}>{snapshot.syncState === "current" ? <Check aria-hidden="true" size={14} /> : <AlertTriangle aria-hidden="true" size={14} />}<strong>{snapshot.syncState === "current" ? "已与 Pi 文件同步" : "Pi 文件需要处理"}</strong><small>revision {snapshot.revision.slice(0, 10)}</small></span>}
-    actions={<><Button className="secondary-button" isDisabled={busy} onPress={onReload}><RefreshCw aria-hidden="true" size={14} />重新加载</Button><Button className="secondary-button" isDisabled={busy} onPress={onNew}><Plus aria-hidden="true" size={14} />新建模型服务</Button></>}
+    actions={<Button className="secondary-button" isDisabled={busy} onPress={onReload}><RefreshCw aria-hidden="true" size={14} />重新加载</Button>}
   />;
 }
 

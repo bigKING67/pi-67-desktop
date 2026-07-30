@@ -69,6 +69,9 @@ spacing, component states, and motion as `DESIGN.md`.
   Ultra-wide dark windows do not automatically expose a second catalog or detail
   column, and returning restores the same search, filter, selection, scroll, and
   unsaved draft state as light mode.
+- Provider task-view tabs use neutral selected surfaces and explicit counts;
+  configured state may use the semantic success role, but custom source and model
+  counts remain secondary text rather than additional glowing badges.
 - Provider file status, revision conflict, invalid-file, pending reload, and
   model-reselection states use the same semantic success, warning, and danger
   roles as light mode. The API-key eye control may reveal only the current user
@@ -77,5 +80,7 @@ spacing, component states, and motion as `DESIGN.md`.
 - Disabled controls use explicit tokens rather than blanket opacity.
 - Focus, semantic state, diff foregrounds, and code syntax colors must be
   checked in the rendered dark theme.
+- Transcript action tooltips use the same raised neutral surface below message
+  actions as light mode and never create an opaque patch over the answer text.
 - Avoid pure black, pure white, neon outlines, glowing cards, and transparent
   layers over busy transcript content.

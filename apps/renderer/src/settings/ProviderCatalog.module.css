@@ -1,0 +1,208 @@
+.providerCatalog {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.catalogIntro {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.catalogIntro strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.catalogIntro small {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.catalogCommandBand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.catalogTabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.catalogTabs button {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 630;
+}
+
+.catalogTabs button span {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.catalogTabs button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.catalogTabs button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.catalogTabs .selectedCatalogTab {
+  background: var(--surface-active);
+  color: var(--text-primary);
+}
+
+.providerCatalogControls {
+  display: grid;
+  width: min(520px, 100%);
+}
+
+.providerSearch {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.providerSearch > svg {
+  position: absolute;
+  left: 11px;
+  z-index: 1;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.providerSearch input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.providerSearch input:focus {
+  border-color: var(--focus);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 16%, transparent);
+}
+
+.providerSearchClear {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.providerSearchClear[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.providerSearchClear[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.providerList {
+  display: grid;
+  min-width: 0;
+}
+
+.providerMeta {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.providerMeta strong {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.providerMeta strong[data-configured="true"] {
+  color: var(--success);
+}
+
+.providerMeta small {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.providerListEmpty {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.providerListEmpty strong {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.providerListEmpty small {
+  max-width: 480px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .catalogCommandBand {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .catalogTabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .catalogTabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .catalogCommandBand > button {
+    width: max-content;
+  }
+}

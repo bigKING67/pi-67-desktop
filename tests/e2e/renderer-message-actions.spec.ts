@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
@@ -45,19 +45,38 @@ test("shows complete timestamps and calm message actions without model chrome or
   const continueButton = assistantMessage.getByRole("button", { name: "在新任务中继续" });
   await continueButton.focus();
   await expect(continueButton).toBeFocused();
-  const continueTooltip = assistantMessage.getByRole("tooltip", {
+  const continueTooltip = page.getByRole("tooltip", {
     name: "保留当前任务，并在新任务中带着此前上下文继续"
   });
   await expect(continueTooltip).toBeVisible();
-  expect((await continueTooltip.boundingBox())?.x).toBeGreaterThanOrEqual(0);
+  const continueTooltipBox = await continueTooltip.boundingBox();
+  const assistantContentBox = await assistantMessage.getByTestId("message-content").boundingBox();
+  const assistantFooterBox = await assistantMessage.locator('[data-message-footer="assistant"]').boundingBox();
+  if (!continueTooltipBox || !assistantContentBox || !assistantFooterBox) {
+    throw new Error("Assistant message action geometry was unavailable");
+  }
+  expect(continueTooltipBox.x).toBeGreaterThanOrEqual(0);
+  expect(continueTooltipBox.y).toBeGreaterThanOrEqual(assistantFooterBox.y + assistantFooterBox.height);
+  expect(rectanglesOverlap(continueTooltipBox, assistantContentBox)).toBe(false);
   const editButton = userMessage.getByRole("button", { name: "编辑消息" });
   await editButton.focus();
-  const editTooltip = userMessage.getByRole("tooltip", {
+  const editTooltip = page.getByRole("tooltip", {
     name: "在原位置修改，发送后重新生成后续回答"
   });
   await expect(editTooltip).toBeVisible();
   const editTooltipBox = await editTooltip.boundingBox();
-  expect(editTooltipBox && editTooltipBox.x + editTooltipBox.width).toBeLessThanOrEqual(680);
+  const userContentBox = await userMessage.getByTestId("message-content").boundingBox();
+  const userFooterBox = await userMessage.locator('[data-message-footer="user"]').boundingBox();
+  if (!editTooltipBox || !userContentBox || !userFooterBox) {
+    throw new Error("User message action geometry was unavailable");
+  }
+  expect(editTooltipBox.x + editTooltipBox.width).toBeLessThanOrEqual(680);
+  expect(editTooltipBox.y).toBeGreaterThanOrEqual(userFooterBox.y + userFooterBox.height);
+  expect(rectanglesOverlap(editTooltipBox, userContentBox)).toBe(false);
+  await page.screenshot({
+    path: testInfo.outputPath("message-tooltip-below.png"),
+    animations: "disabled"
+  });
   await expect(page.getByText("claude-opus-4-6", { exact: true })).toHaveCount(0);
   expect((await userMessage.getByTestId("message-content").boundingBox())?.width)
     .toBeLessThan(140);
@@ -88,6 +107,77 @@ test("shows complete timestamps and calm message actions without model chrome or
     document.documentElement.scrollWidth <= document.documentElement.clientWidth
   ))).toBe(true);
 });
+
+test("keeps a stable breathing zone between the Transcript and Composer", async ({ page }, testInfo) => {
+  const createdAt = Date.UTC(2026, 6, 30, 7, 42, 18);
+  await page.setViewportSize({ width: 1200, height: 820 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  await attachMockAgent(page, [{
+    id: "user-composer-spacing",
+    role: "user",
+    createdAt,
+    parts: [{ type: "text", text: "请给出一份完整的实施说明。" }]
+  }, {
+    id: "assistant-composer-spacing",
+    role: "assistant",
+    createdAt: createdAt + 60_000,
+    parts: [{
+      type: "text",
+      text: Array.from(
+        { length: 14 },
+        (_, index) => `第 ${index + 1} 段：说明目标、约束、实施步骤和验收方式。`
+      ).join("\n\n")
+    }]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const assistantMessage = page.locator('[data-message-id="assistant-composer-spacing"]');
+  await assistantMessage.locator('[data-message-footer="assistant"]').scrollIntoViewIfNeeded();
+  await expect(assistantMessage).toBeVisible();
+  await expectComposerBoundaryGap(page, 30, 34);
+  await page.screenshot({
+    path: testInfo.outputPath("transcript-composer-spacing.png"),
+    animations: "disabled"
+  });
+
+  await page.setViewportSize({ width: 1200, height: 700 });
+  await assistantMessage.locator('[data-message-footer="assistant"]').scrollIntoViewIfNeeded();
+  await expectComposerBoundaryGap(page, 22, 26);
+});
+
+async function expectComposerBoundaryGap(
+  page: Page,
+  minimum: number,
+  maximum: number
+): Promise<void> {
+  const geometry = await page.evaluate(() => {
+    const transcript = document.querySelector<HTMLElement>('[data-transcript-region="true"]');
+    const composer = document.querySelector<HTMLElement>('[data-testid="composer-shell"]');
+    if (!transcript || !composer) return undefined;
+    const transcriptBox = transcript.getBoundingClientRect();
+    const composerBox = composer.getBoundingClientRect();
+    return {
+      gap: composerBox.top - transcriptBox.bottom,
+      composerBottom: composerBox.bottom,
+      viewportHeight: window.innerHeight
+    };
+  });
+  expect(geometry).toBeDefined();
+  expect(geometry!.gap).toBeGreaterThanOrEqual(minimum);
+  expect(geometry!.gap).toBeLessThanOrEqual(maximum);
+  expect(geometry!.composerBottom).toBeLessThanOrEqual(geometry!.viewportHeight);
+}
+
+function rectanglesOverlap(
+  left: { x: number; y: number; width: number; height: number },
+  right: { x: number; y: number; width: number; height: number }
+): boolean {
+  return left.x < right.x + right.width
+    && left.x + left.width > right.x
+    && left.y < right.y + right.height
+    && left.y + left.height > right.y;
+}
 
 test("edits a historical user message in place and forks only when the modification is sent", async ({ page }) => {
   const createdAt = Date.UTC(2026, 6, 30, 7, 42, 18);

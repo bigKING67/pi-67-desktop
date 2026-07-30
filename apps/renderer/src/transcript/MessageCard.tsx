@@ -9,7 +9,8 @@ import {
   TriangleAlert,
   Wrench
 } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
@@ -224,7 +225,6 @@ function MessageFooter({
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [pendingAction, setPendingAction] = useState<MessageAction>();
   const resetCopyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const actionId = useId();
   const copyLabel = copyState === "copied"
     ? messages.transcript.copied
     : copyState === "failed"
@@ -274,9 +274,9 @@ function MessageFooter({
         : copyState === "failed"
           ? <TriangleAlert aria-hidden="true" size={14} />
           : <Copy aria-hidden="true" size={14} />}
-      id={`${actionId}-copy`}
       label={copyText ? copyLabel : messages.transcript.noCopyText}
       onClick={() => void copyMessage()}
+      placement={isUser ? "bottom end" : "bottom start"}
       state={copyState}
     />
   );
@@ -296,9 +296,9 @@ function MessageFooter({
             ariaLabel={messages.transcript.editMessage}
             disabled={Boolean(editDisabledReason) || pendingAction !== undefined}
             icon={<Pencil aria-hidden="true" size={14} />}
-            id={`${actionId}-edit`}
             label={editDisabledReason ?? messages.transcript.editMessageDetail}
             onClick={onEditStart}
+            placement="bottom end"
             state="idle"
           />
         ) : null}
@@ -316,9 +316,9 @@ function MessageFooter({
           icon={pendingAction === "continue"
             ? <LoaderCircle aria-hidden="true" className={styles.spinning} size={14} />
             : <MessageSquarePlus aria-hidden="true" size={14} />}
-          id={`${actionId}-continue`}
           label={actionDisabledReason ?? messages.transcript.continueInNewTaskDetail}
           onClick={() => void runAction("continue", onContinue)}
+          placement="bottom start"
           state={pendingAction === "continue" ? "pending" : "idle"}
         />
       ) : null}
@@ -328,34 +328,35 @@ function MessageFooter({
 }
 
 function MessageActionControl({
-  id,
   label,
   ariaLabel = label,
   icon,
   disabled,
   onClick,
+  placement,
   state
 }: {
-  id: string;
   label: string;
   ariaLabel?: string;
   icon: React.ReactNode;
   disabled: boolean;
   onClick: () => void;
+  placement: "bottom start" | "bottom end";
   state: string;
 }) {
   return (
     <span className={styles.actionControl} data-action-state={state}>
-      <button
-        aria-describedby={`${id}-tooltip`}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        type="button"
-        onClick={onClick}
-      >
-        {icon}
-      </button>
-      <span className={styles.tooltip} id={`${id}-tooltip`} role="tooltip">{label}</span>
+      <TooltipTrigger closeDelay={80} delay={300}>
+        <Button
+          aria-label={ariaLabel}
+          className={styles.actionButton!}
+          isDisabled={disabled}
+          onPress={onClick}
+        >
+          {icon}
+        </Button>
+        <Tooltip className={styles.tooltip!} offset={6} placement={placement}>{label}</Tooltip>
+      </TooltipTrigger>
     </span>
   );
 }

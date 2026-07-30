@@ -2,7 +2,7 @@
   position: relative;
   z-index: 4;
   grid-area: composer;
-  padding: var(--space-2) 20px var(--space-4);
+  padding: var(--space-6) 20px var(--space-4);
   background: linear-gradient(180deg, transparent, var(--surface) 16%);
   contain: layout style;
 }
@@ -524,6 +524,12 @@
 @media (max-width: 1040px) {
   .region {
     z-index: 31;
+  }
+}
+
+@media (max-height: 760px) {
+  .region {
+    padding-top: var(--space-5);
   }
 }
 
