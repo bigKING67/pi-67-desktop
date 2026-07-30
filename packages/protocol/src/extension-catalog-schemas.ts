@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   MAX_EXTENSION_CATALOG_DETAIL_CHARS,
   MAX_EXTENSION_CATALOG_ITEMS,

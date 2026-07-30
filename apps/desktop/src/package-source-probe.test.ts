@@ -48,4 +48,67 @@ describe("Package public source probes", () => {
     expect(snapshot.sources.find((source) => source.id === "git-ghproxy")?.detail)
       .toBe("mirror unavailable secret detail");
   });
+
+  it("keeps fetch failures, unavailable Git, and invalid revisions explicit", async () => {
+    const unavailableToolchain: DesktopToolchain = {
+      root: toolchain.root,
+      ready: false,
+      packaged: toolchain.packaged,
+      platform: toolchain.platform,
+      architecture: toolchain.architecture
+    };
+    const snapshot = await probePackageSources({
+      toolchain: unavailableToolchain,
+      settings: defaultPackageNetworkSettings(),
+      fetcher: async () => {
+        throw "network offline\nprivate detail";
+      },
+      gitRunner: async () => "not-a-revision",
+      now: () => 9
+    });
+
+    expect(snapshot.checkedAt).toBe(9);
+    expect(snapshot.sources.filter((source) => source.kind === "npm")).toEqual([
+      expect.objectContaining({ status: "unreachable", detail: "network offline private detail" }),
+      expect.objectContaining({ status: "unreachable", detail: "network offline private detail" })
+    ]);
+    expect(snapshot.sources.filter((source) => source.kind === "git")).toEqual([
+      expect.objectContaining({ status: "not-checked", detail: "Desktop private Git is unavailable." }),
+      expect.objectContaining({ status: "not-checked", detail: "Desktop private Git is unavailable." }),
+      expect.objectContaining({ status: "not-checked", detail: "Desktop private Git is unavailable." })
+    ]);
+
+    const missingGitExecutable: DesktopToolchain = {
+      root: toolchain.root,
+      ready: true,
+      packaged: toolchain.packaged,
+      platform: toolchain.platform,
+      architecture: toolchain.architecture
+    };
+    expect((await probePackageSources({
+      toolchain: missingGitExecutable,
+      settings: {
+        npmMode: "offline",
+        gitMode: "official-only",
+        gitMirrors: []
+      },
+      fetcher: async () => new Response(null, { status: 200 })
+    })).sources).toEqual([
+      expect.objectContaining({ status: "not-checked", detail: "Desktop private Git is unavailable." })
+    ]);
+
+    const invalidRevision = await probePackageSources({
+      toolchain,
+      settings: {
+        npmMode: "offline",
+        gitMode: "official-only",
+        gitMirrors: []
+      },
+      fetcher: async () => new Response(null, { status: 200 }),
+      gitRunner: async () => "not-a-revision"
+    });
+    expect(invalidRevision.sources).toEqual([
+      expect.not.objectContaining({ resolvedRevision: expect.anything() })
+    ]);
+  });
 });

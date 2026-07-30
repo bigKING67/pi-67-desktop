@@ -63,7 +63,7 @@ export async function configureWorkspaceProviderKey(
     publishNotification({
       level: "error",
       title: messages.credentials.enableFailedTitle,
-      message: error instanceof Error ? error.message : "未知错误"
+      message: error instanceof Error ? error.message : messages.runtime.unknownError
     });
     return undefined;
   }

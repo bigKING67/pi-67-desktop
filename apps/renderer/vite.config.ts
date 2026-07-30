@@ -34,6 +34,11 @@ export default defineConfig(({ command }) => ({
     target: "chrome150",
     outDir: "dist",
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
+    rolldownOptions: {
+      treeshake: {
+        moduleSideEffects: (id) => !id.includes("/node_modules/typebox/")
+      }
+    }
   }
 }));

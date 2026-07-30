@@ -44,48 +44,35 @@ interface SessionCatalogNextPageTarget {
   cursor: SessionCatalogCursor;
 }
 
-interface SessionCatalogUiState extends WorkspaceSessionCatalogState {
+interface SessionCatalogUiState {
   byWorkspace: Record<WorkspaceId, WorkspaceSessionCatalogState>;
-  lastWorkspaceId: WorkspaceId | undefined;
-  beginFirstPage: {
-    (workspaceId: WorkspaceId, options?: { query?: string; refresh?: boolean }): SessionCatalogFirstPageTarget;
-    (options?: { query?: string; refresh?: boolean }): SessionCatalogFirstPageTarget;
-  };
+  beginFirstPage: (
+    workspaceId: WorkspaceId,
+    options?: { query?: string; refresh?: boolean }
+  ) => SessionCatalogFirstPageTarget;
   finishFirstPage: (target: SessionCatalogFirstPageTarget, page: SessionCatalogPage) => boolean;
   failFirstPage: (target: SessionCatalogFirstPageTarget, error: string) => boolean;
-  beginNextPage: (workspaceId?: WorkspaceId) => SessionCatalogNextPageTarget | undefined;
+  beginNextPage: (workspaceId: WorkspaceId) => SessionCatalogNextPageTarget | undefined;
   finishNextPage: (target: SessionCatalogNextPageTarget, page: SessionCatalogPage) => boolean;
   failNextPage: (target: SessionCatalogNextPageTarget, error: string) => boolean;
   cancelNextPage: (target: SessionCatalogNextPageTarget) => boolean;
-  applyStatus: {
-    (workspaceId: WorkspaceId, status: SessionCatalogStatus): void;
-    (status: SessionCatalogStatus): void;
-  };
-  invalidateRevision: {
-    (workspaceId: WorkspaceId, revision: number): boolean;
-    (revision: number): boolean;
-  };
+  applyStatus: (workspaceId: WorkspaceId, status: SessionCatalogStatus) => void;
+  invalidateRevision: (workspaceId: WorkspaceId, revision: number) => boolean;
   reset: (workspaceId?: WorkspaceId) => void;
 }
 
-const LEGACY_WORKSPACE_ID = "__active-workspace__";
 const EMPTY_WORKSPACE_CATALOG = emptyCatalogState();
+let nextRequestRevision = 1;
 
 export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) => ({
-  ...emptyCatalogState(),
   byWorkspace: {},
-  lastWorkspaceId: undefined,
 
-  beginFirstPage(
-    workspaceOrOptions: WorkspaceId | { query?: string; refresh?: boolean } = {},
-    maybeOptions: { query?: string; refresh?: boolean } = {}
-  ) {
-    const { workspaceId, options } = firstPageArguments(workspaceOrOptions, maybeOptions);
+  beginFirstPage(workspaceId, options = {}) {
     const current = catalogForWorkspace(get(), workspaceId);
     const query = normalizeSessionCatalogQuery(options.query ?? current.query);
-    const requestRevision = current.requestRevision + 1;
+    const requestRevision = claimRequestRevision();
     const replacingQuery = query !== current.query;
-    installWorkspaceCatalog(set, get, workspaceId, {
+    installWorkspaceCatalog(set, workspaceId, {
       ...current,
       ...(replacingQuery ? { items: [], total: 0, nextCursor: undefined, hasMore: false } : {}),
       query,
@@ -99,7 +86,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
 
   finishFirstPage(target, page) {
     if (!isCurrentRequest(get(), target)) return false;
-    installWorkspaceCatalog(set, get, target.workspaceId, {
+    installWorkspaceCatalog(set, target.workspaceId, {
       ...pageState(page),
       query: target.query,
       loading: false,
@@ -112,7 +99,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
   failFirstPage(target, error) {
     if (!isCurrentRequest(get(), target)) return false;
     const current = catalogForWorkspace(get(), target.workspaceId);
-    installWorkspaceCatalog(set, get, target.workspaceId, {
+    installWorkspaceCatalog(set, target.workspaceId, {
       ...current,
       loading: false,
       loadingMore: false,
@@ -121,11 +108,11 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
     return true;
   },
 
-  beginNextPage(workspaceId = LEGACY_WORKSPACE_ID) {
+  beginNextPage(workspaceId) {
     const current = catalogForWorkspace(get(), workspaceId);
     if (current.loading || current.loadingMore || !current.hasMore || !current.nextCursor) return undefined;
-    const requestRevision = current.requestRevision + 1;
-    installWorkspaceCatalog(set, get, workspaceId, {
+    const requestRevision = claimRequestRevision();
+    installWorkspaceCatalog(set, workspaceId, {
       ...current,
       loadingMore: true,
       error: undefined,
@@ -137,7 +124,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
   finishNextPage(target, page) {
     if (!isCurrentRequest(get(), target)) return false;
     const current = catalogForWorkspace(get(), target.workspaceId);
-    installWorkspaceCatalog(set, get, target.workspaceId, {
+    installWorkspaceCatalog(set, target.workspaceId, {
       ...pageState(page),
       items: mergeByPath(current.items, page.items),
       query: current.query,
@@ -151,26 +138,21 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
   failNextPage(target, error) {
     if (!isCurrentRequest(get(), target)) return false;
     const current = catalogForWorkspace(get(), target.workspaceId);
-    installWorkspaceCatalog(set, get, target.workspaceId, { ...current, loadingMore: false, error });
+    installWorkspaceCatalog(set, target.workspaceId, { ...current, loadingMore: false, error });
     return true;
   },
 
   cancelNextPage(target) {
     if (!isCurrentRequest(get(), target)) return false;
     const current = catalogForWorkspace(get(), target.workspaceId);
-    installWorkspaceCatalog(set, get, target.workspaceId, { ...current, loadingMore: false });
+    installWorkspaceCatalog(set, target.workspaceId, { ...current, loadingMore: false });
     return true;
   },
 
-  applyStatus(
-    workspaceOrStatus: WorkspaceId | SessionCatalogStatus,
-    maybeStatus?: SessionCatalogStatus
-  ) {
-    const workspaceId = typeof workspaceOrStatus === "string" ? workspaceOrStatus : LEGACY_WORKSPACE_ID;
-    const status = typeof workspaceOrStatus === "string" ? maybeStatus! : workspaceOrStatus;
+  applyStatus(workspaceId, status) {
     const current = catalogForWorkspace(get(), workspaceId);
     const revisionChanged = current.revision !== status.revision;
-    installWorkspaceCatalog(set, get, workspaceId, {
+    installWorkspaceCatalog(set, workspaceId, {
       ...current,
       ...(revisionChanged ? {
         items: [],
@@ -189,17 +171,15 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
       skippedCount: status.skippedCount,
       itemCount: status.itemCount,
       reconciledAt: status.reconciledAt,
-      requestRevision: revisionChanged ? current.requestRevision + 1 : current.requestRevision
+      requestRevision: revisionChanged ? claimRequestRevision() : current.requestRevision
     });
   },
 
-  invalidateRevision(workspaceOrRevision: WorkspaceId | number, maybeRevision?: number) {
-    const workspaceId = typeof workspaceOrRevision === "string" ? workspaceOrRevision : LEGACY_WORKSPACE_ID;
-    const revision = typeof workspaceOrRevision === "string" ? maybeRevision! : workspaceOrRevision;
+  invalidateRevision(workspaceId, revision) {
     const current = catalogForWorkspace(get(), workspaceId);
     if (current.revision === revision && !current.rebuilding) return false;
     if (current.revision !== revision) {
-      installWorkspaceCatalog(set, get, workspaceId, {
+      installWorkspaceCatalog(set, workspaceId, {
         ...current,
         items: [],
         total: 0,
@@ -209,7 +189,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
         loading: false,
         loadingMore: false,
         error: undefined,
-        requestRevision: current.requestRevision + 1
+        requestRevision: claimRequestRevision()
       });
     }
     return true;
@@ -217,15 +197,10 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
 
   reset(workspaceId) {
     if (workspaceId) {
-      const current = catalogForWorkspace(get(), workspaceId);
-      installWorkspaceCatalog(set, get, workspaceId, emptyCatalogState(current.requestRevision + 1));
+      installWorkspaceCatalog(set, workspaceId, emptyCatalogState(claimRequestRevision()));
       return;
     }
-    set((current) => ({
-      ...emptyCatalogState(current.requestRevision + 1),
-      byWorkspace: {},
-      lastWorkspaceId: undefined
-    }));
+    set({ byWorkspace: {} });
   }
 }));
 
@@ -277,47 +252,17 @@ function pageState(page: SessionCatalogPage): Omit<WorkspaceSessionCatalogState,
 }
 
 function catalogForWorkspace(state: SessionCatalogUiState, workspaceId: WorkspaceId): WorkspaceSessionCatalogState {
-  if (workspaceId !== LEGACY_WORKSPACE_ID) return state.byWorkspace[workspaceId] ?? EMPTY_WORKSPACE_CATALOG;
-  return pickCatalogSnapshot(state);
+  return state.byWorkspace[workspaceId] ?? EMPTY_WORKSPACE_CATALOG;
 }
 
 function installWorkspaceCatalog(
   set: (partial: Partial<SessionCatalogUiState> | ((state: SessionCatalogUiState) => Partial<SessionCatalogUiState>)) => void,
-  get: () => SessionCatalogUiState,
   workspaceId: WorkspaceId,
   catalog: WorkspaceSessionCatalogState
 ): void {
-  if (workspaceId === LEGACY_WORKSPACE_ID) {
-    set({ ...catalog, lastWorkspaceId: undefined });
-    return;
-  }
-  set({
-    ...catalog,
-    byWorkspace: { ...get().byWorkspace, [workspaceId]: catalog },
-    lastWorkspaceId: workspaceId
-  });
-}
-
-function pickCatalogSnapshot(state: SessionCatalogUiState): WorkspaceSessionCatalogState {
-  const {
-    items, total, nextCursor, hasMore, revision, query, loading, loadingMore,
-    rebuilding, source, catalogState, incomplete, skippedCount, itemCount,
-    reconciledAt, error, requestRevision
-  } = state;
-  return {
-    items, total, nextCursor, hasMore, revision, query, loading, loadingMore,
-    rebuilding, source, catalogState, incomplete, skippedCount, itemCount,
-    reconciledAt, error, requestRevision
-  };
-}
-
-function firstPageArguments(
-  workspaceOrOptions: WorkspaceId | { query?: string; refresh?: boolean },
-  maybeOptions: { query?: string; refresh?: boolean }
-): { workspaceId: WorkspaceId; options: { query?: string; refresh?: boolean } } {
-  return typeof workspaceOrOptions === "string"
-    ? { workspaceId: workspaceOrOptions, options: maybeOptions }
-    : { workspaceId: LEGACY_WORKSPACE_ID, options: workspaceOrOptions };
+  set((state) => ({
+    byWorkspace: { ...state.byWorkspace, [workspaceId]: catalog }
+  }));
 }
 
 function mergeByPath(current: SessionSummary[], next: SessionSummary[]): SessionSummary[] {
@@ -334,4 +279,10 @@ function isCurrentRequest(
   target: SessionCatalogFirstPageTarget | SessionCatalogNextPageTarget
 ): boolean {
   return catalogForWorkspace(state, target.workspaceId).requestRevision === target.requestRevision;
+}
+
+function claimRequestRevision(): number {
+  const revision = nextRequestRevision;
+  nextRequestRevision += 1;
+  return revision;
 }

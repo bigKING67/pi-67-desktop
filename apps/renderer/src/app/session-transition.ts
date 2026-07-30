@@ -1,6 +1,7 @@
 import type {
   RuntimeStatus,
-  SessionResourceCatalogResult
+  SessionResourceCatalogResult,
+  WorkspaceId
 } from "@pi67/domain";
 import type { ProjectionMutationAcknowledgement } from "@pi67/protocol";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
@@ -27,7 +28,7 @@ type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppS
 
 export interface SessionBootstrapTransitionOptions {
   detail: string;
-  refreshSessionCatalog?: boolean;
+  refreshSessionCatalogFor?: WorkspaceId;
   request: () => Promise<ProjectionMutationAcknowledgement>;
   onError: (error: unknown) => void;
 }
@@ -84,8 +85,8 @@ export async function runSessionBootstrapTransition(
       return;
     }
   }
-  if (committed && options.refreshSessionCatalog) {
-    await queryFirstSessionCatalog({ refresh: true });
+  if (committed && options.refreshSessionCatalogFor) {
+    await queryFirstSessionCatalog(options.refreshSessionCatalogFor, { refresh: true });
   }
 }
 

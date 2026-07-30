@@ -1,10 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
   installMockDesktopBridge,
   recordedCommandDetails,
-  recordedCommands,
   replaceMockSessionProjection,
   setMockAgentResponseDelay,
   setMockAgentResponseFailure
@@ -25,11 +24,15 @@ test("clears the composer on prompt acknowledgement without waiting for a long o
   await page.getByRole("button", { name: "发送", exact: true }).click();
 
   await expect(composer).toHaveValue("");
-  await expect.poll(() => recordedCommands(page)).toEqual(["prompt.submit"]);
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit"]);
   await expect(page.getByRole("status").filter({ hasText: /任务已接收|Pi 正在执行任务/u })).toBeVisible();
   await expect(page.getByText(/acknowledgement timed out/u)).toHaveCount(0);
-  const [command] = await recordedCommandDetails(page);
-  expect(command?.payload).toMatchObject({ delivery: "new-turn", text: "执行一个耗时九十秒的任务" });
+  const [command] = await scenarioCommands(page);
+  expect(command?.payload).toMatchObject({
+    submissionId: expect.stringMatching(UUID_PATTERN),
+    delivery: "new-turn",
+    text: "执行一个耗时九十秒的任务"
+  });
 });
 
 test("keeps IME candidate confirmation separate from prompt submission", async ({ page }) => {
@@ -54,7 +57,7 @@ test("keeps IME candidate confirmation separate from prompt submission", async (
   });
   expect(compositionResult).toEqual({ defaultPrevented: false, dispatched: true });
   await expect(composer).toHaveValue("微软拼音候选确认后再发送");
-  expect(await recordedCommands(page)).toEqual([]);
+  expect(await scenarioCommandTypes(page)).toEqual([]);
 
   const legacyImeResult = await composer.evaluate((element) => {
     const enter = new KeyboardEvent("keydown", {
@@ -68,11 +71,13 @@ test("keeps IME candidate confirmation separate from prompt submission", async (
   });
   expect(legacyImeResult).toEqual({ defaultPrevented: false, dispatched: true });
   await expect(composer).toHaveValue("微软拼音候选确认后再发送");
-  expect(await recordedCommands(page)).toEqual([]);
+  expect(await scenarioCommandTypes(page)).toEqual([]);
 
   await composer.press("Enter");
-  await expect.poll(() => recordedCommands(page)).toEqual(["prompt.submit"]);
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit"]);
   await expect(composer).toHaveValue("");
+  const [command] = await scenarioCommands(page);
+  expect(command?.payload).toMatchObject({ submissionId: expect.stringMatching(UUID_PATTERN) });
 });
 
 test("adds pasted and dropped images without duplicating attachment state", async ({ page }) => {
@@ -89,7 +94,7 @@ test("adds pasted and dropped images without duplicating attachment state", asyn
   await expect(page.getByRole("alert").filter({ hasText: "pasted.png 已经添加。" })).toBeVisible();
   await page.getByRole("button", { name: "移除附件：pasted.png" }).click();
 
-  const composerShell = page.locator(".composer-shell");
+  const composerShell = page.getByTestId("composer-shell");
   await composerShell.evaluate((element) => {
     const transfer = new DataTransfer();
     transfer.items.add(new File([new Uint8Array([1, 2, 3, 4])], "dropped.webp", {
@@ -117,7 +122,7 @@ test("preserves text and object URL attachments when prompt submission is reject
   await page.getByRole("button", { name: "选择工作区" }).click();
   await setMockAgentResponseFailure(page, "prompt.submit", {
     code: "RUNTIME_NOT_READY",
-    message: "Agent Host 正在恢复",
+    message: "Pi 运行服务正在恢复",
     recoverable: true
   });
   await clearRecordedCommands(page);
@@ -137,15 +142,17 @@ test("preserves text and object URL attachments when prompt submission is reject
   await expect(preview).toHaveAttribute("src", /^blob:/u);
   await expect(page.getByText("消息未发送。草稿和附件已保留。")).toBeVisible();
   await expect(page.getByRole("alert").filter({ hasText: "Pi 未能接收消息" })).toHaveCount(1);
-  const [command] = await recordedCommandDetails(page);
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit"]);
+  const [command] = await scenarioCommands(page);
   expect(command?.payload).toMatchObject({
+    submissionId: expect.stringMatching(UUID_PATTERN),
     text: "不要丢失这份草稿",
     images: [{ name: "draft.png", mimeType: "image/png", bytes: 8 }]
   });
 
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  await expect.poll(async () => (await recordedCommandDetails(page)).length).toBe(2);
-  const [firstAttempt, retryAttempt] = await recordedCommandDetails(page);
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit", "prompt.submit"]);
+  const [firstAttempt, retryAttempt] = await scenarioCommands(page);
   const firstSubmissionId = (firstAttempt?.payload as { submissionId?: string } | undefined)?.submissionId;
   const retrySubmissionId = (retryAttempt?.payload as { submissionId?: string } | undefined)?.submissionId;
   expect(firstSubmissionId).toBeTruthy();
@@ -153,8 +160,12 @@ test("preserves text and object URL attachments when prompt submission is reject
 
   await composer.fill("草稿修改后应创建新的提交身份");
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  await expect.poll(async () => (await recordedCommandDetails(page)).length).toBe(3);
-  const thirdAttempt = (await recordedCommandDetails(page))[2];
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual([
+    "prompt.submit",
+    "prompt.submit",
+    "prompt.submit"
+  ]);
+  const thirdAttempt = (await scenarioCommands(page))[2];
   const thirdSubmissionId = (thirdAttempt?.payload as { submissionId?: string } | undefined)?.submissionId;
   expect(thirdSubmissionId).not.toBe(firstSubmissionId);
 });
@@ -174,10 +185,8 @@ test("keeps the draft and rotates submission identity when the Session changes b
   const preview = page.getByRole("img", { name: "session-bound.png" });
   await composer.fill("这份草稿只能由发送时的会话确认");
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  await expect.poll(async () => (
-    await recordedCommandDetails(page)
-  ).filter((command) => command.type === "prompt.submit").length).toBe(1);
-  const firstPrompt = (await recordedCommandDetails(page)).find((command) => command.type === "prompt.submit");
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit"]);
+  const [firstPrompt] = await scenarioCommands(page);
   const firstSubmissionId = (firstPrompt?.payload as { submissionId?: string } | undefined)?.submissionId;
 
   await replaceMockSessionProjection(page, "session-b", []);
@@ -188,10 +197,8 @@ test("keeps the draft and rotates submission identity when the Session changes b
 
   await setMockAgentResponseDelay(page, "prompt.submit", 0);
   await page.getByRole("button", { name: "发送", exact: true }).click();
-  await expect.poll(async () => (
-    await recordedCommandDetails(page)
-  ).filter((command) => command.type === "prompt.submit").length).toBe(2);
-  const promptCommands = (await recordedCommandDetails(page)).filter((command) => command.type === "prompt.submit");
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["prompt.submit", "prompt.submit"]);
+  const promptCommands = await scenarioCommands(page);
   const retrySubmissionId = (promptCommands[1]?.payload as { submissionId?: string } | undefined)?.submissionId;
   expect(firstSubmissionId).toBeTruthy();
   expect(retrySubmissionId).toBeTruthy();
@@ -199,6 +206,23 @@ test("keeps the draft and rotates submission identity when the Session changes b
   await expect(composer).toHaveValue("");
   await expect(preview).toHaveCount(0);
 });
+
+const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
+  "workspace.open",
+  "workspace.register",
+  "workspace.changes",
+  "session.catalog.query"
+]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+async function scenarioCommands(page: Page): Promise<Awaited<ReturnType<typeof recordedCommandDetails>>> {
+  return (await recordedCommandDetails(page))
+    .filter((command) => !WORKBENCH_SETUP_OR_READ_COMMANDS.has(command.type));
+}
+
+async function scenarioCommandTypes(page: Page): Promise<string[]> {
+  return (await scenarioCommands(page)).map((command) => command.type);
+}
 
 async function dispatchClipboardImage(
   composer: import("@playwright/test").Locator,

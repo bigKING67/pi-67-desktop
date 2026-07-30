@@ -1,9 +1,8 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 
-const ProtocolErrorDetailsSchema = Type.Record(
-  Type.String(),
-  Type.Union([Type.String(), Type.Number(), Type.Boolean()])
-);
+const ProtocolErrorDetailsSchema = Type.Object({}, {
+  additionalProperties: Type.Union([Type.String(), Type.Number(), Type.Boolean()])
+});
 
 export const ProtocolErrorSchema = strictObject({
   code: Type.Union([

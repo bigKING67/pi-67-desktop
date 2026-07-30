@@ -30,7 +30,7 @@ describe("node:sqlite Agent Host capability", () => {
 
     expect(result).toEqual({
       available: false,
-      detail: "node:sqlite is unavailable in the Agent Host runtime.",
+      detail: "node:sqlite is unavailable in the Pi runtime service.",
       storage: "memory"
     });
     expect(JSON.stringify(result)).not.toContain(sensitiveDetail);

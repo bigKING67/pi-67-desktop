@@ -1,4 +1,7 @@
+import { zhCNCommandPaletteMessages } from "./zh-cn-command-palette.js";
 import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
+import { zhCNOperationMessages } from "./zh-cn-operation.js";
+import { zhCNRuntimeMessages } from "./zh-cn-runtime.js";
 
 export const zhCNMessages = {
   common: {
@@ -125,7 +128,6 @@ export const zhCNMessages = {
     loadingMore: "正在加载更多…",
     search: "搜索会话",
     clearSearch: "清除会话搜索",
-    moreActions: "更多会话操作",
     refresh: "刷新会话",
     importSession: "导入 Pi Session",
     sessionList: "Pi 会话",
@@ -153,56 +155,7 @@ export const zhCNMessages = {
     ),
     shortMessageCount: (count: number) => `${count} 条`
   },
-  commandPalette: {
-    title: "命令面板",
-    searchLabel: "搜索会话、Extension 命令和应用操作",
-    searchPlaceholder: "搜索会话、Extension 命令或应用操作…",
-    results: "命令面板结果",
-    current: "当前",
-    sessionCatalogUnavailable: "Session 目录暂时不可用",
-    noMatches: "没有匹配结果",
-    sessionCatalogRecovery: "应用操作仍可使用；稍后重试会话搜索。",
-    searchSuggestion: "尝试会话名称、`/command` 或设置名称。",
-    keyboardHelp: "选择",
-    keyboardOpen: "打开",
-    keyboardClose: "关闭",
-    extensionLoadFailedWithFallback: "Extension 命令加载失败，会话和应用操作仍可使用。",
-    searchingSessions: "正在搜索 Session 目录…",
-    loadingExtensions: "正在加载 Extension 命令…",
-    hostUnavailable: "Pi 运行服务尚未连接，应用设置仍可使用。",
-    searchScope: (sessionCount: number, extensionCount: number) => (
-      `搜索范围：前 ${sessionCount} 个会话、前 ${extensionCount} 个 Extension 命令。`
-    ),
-    topResults: (count: number) => `仅显示相关度最高的 ${count} 项。`,
-    searchForMore: "输入关键词可搜索更多结果。",
-    currentSources: "结果仅来自当前会话、Pi 命令和应用设置。",
-    groupRecent: "最近使用",
-    groupSessions: "会话",
-    groupExtensions: "Extension 命令",
-    groupActions: "应用操作",
-    groupSettings: "设置与维护",
-    currentSession: "当前会话",
-    currentSessionDetail: (count: number) => `当前会话 · ${count} 条消息`,
-    sessionDetail: (count: number, relativeTime: string) => `${count} 条消息 · ${relativeTime}`,
-    reloadResources: "重新加载 Pi 资源",
-    reloadResourcesDetail: "Skills、Prompts、Extensions 和上下文文件",
-    compactSession: "压缩当前会话",
-    compactSessionDetail: "使用 Pi compaction 释放上下文空间",
-    credentials: "Provider 与凭据",
-    credentialsDetail: "查看认证状态，配置本次运行密钥",
-    updates: "检查更新",
-    updatesDetail: "查看 Unsigned Preview 更新状态",
-    diagnostics: "导出脱敏诊断",
-    diagnosticsDetail: "不包含凭据、Prompt 和源码正文",
-    hostNotConnected: "Pi 运行服务尚未连接",
-    sessionTransitionPending: "会话正在切换或恢复",
-    sessionNotReady: "Pi 会话身份尚未就绪",
-    operationActive: "当前任务结束后可用",
-    extensionFallbackDescription: "Pi Extension 命令",
-    sessionSearchFallback: "Session 目录查询失败，正在显示最近会话中的本地匹配。",
-    invalidExtensionCommands: "Extension 命令返回了无效或重复的命令标识。",
-    extensionCommandsLoadFailed: "Extension 命令加载失败。"
-  },
+  commandPalette: zhCNCommandPaletteMessages,
   doctor: {
     title: "运行环境诊断",
     menuDetail: "检查内置 Node、Pi SDK、SQLite、Shell 和 Git",
@@ -472,27 +425,6 @@ export const zhCNMessages = {
       fallback: (level: string) => `思考：${level}`
     }
   },
-  operation: {
-    failed: "任务失败",
-    lost: "任务已中断",
-    cancelled: "任务已停止",
-    completed: "任务已完成",
-    needsApproval: "需要你的确认",
-    waitingInput: "等待你的输入",
-    usingTool: "Pi 正在使用工具",
-    compacting: "正在压缩上下文",
-    responding: "Pi 正在回复",
-    thinking: "Pi 正在分析",
-    importingSession: "正在导入 Pi 会话",
-    accepted: "任务已接收",
-    running: "Pi 正在执行任务",
-    quiet: "任务暂时没有新活动",
-    quietDetail: "Pi 运行服务仍在响应，可以继续等待或停止任务",
-    stalled: "Pi 运行服务心跳延迟",
-    stalledDetail: "正在确认任务仍由当前 Host 执行",
-    recovering: "正在恢复任务状态",
-    recoveringDetail: "正在从 Pi 运行服务重新同步权威状态",
-    monitorUnavailableTitle: "任务状态监控未能加载",
-    monitorUnavailableDetail: "当前工作区仍可使用，但长任务心跳异常可能无法自动触发状态恢复。"
-  }
+  runtime: zhCNRuntimeMessages,
+  operation: zhCNOperationMessages
 } as const;

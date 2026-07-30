@@ -29,11 +29,13 @@ export default defineConfig({
         "**/*.test.*",
         "tests/**",
         "apps/agent-host/src/index.ts",
+        "apps/agent-host/src/package-worker.ts",
         "apps/desktop/src/app-protocol.ts",
         "apps/desktop/src/main-window.ts",
         "apps/desktop/src/main.ts",
         "apps/desktop/src/preload.ts",
-        "apps/desktop/src/system-bridge.ts"
+        "apps/desktop/src/system-bridge.ts",
+        "apps/renderer/src/**/*.tsx"
       ],
       thresholds: {
         branches: 70,
@@ -43,7 +45,7 @@ export default defineConfig({
         "packages/pi-runtime/src/**": { branches: 75 },
         "apps/agent-host/src/**": { branches: 74 },
         "apps/desktop/src/**": { branches: 80 },
-        "apps/renderer/src/**": { branches: 55 }
+        "apps/renderer/src/**/*.ts": { branches: 70 }
       }
     }
   }

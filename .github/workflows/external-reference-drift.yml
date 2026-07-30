@@ -1,0 +1,133 @@
+name: External reference drift
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Reference scope to audit
+        required: true
+        default: S1
+        type: choice
+        options:
+          - S0
+          - S1
+          - S2
+          - S3
+          - all
+          - repository
+      repository_id:
+        description: Catalog ID when scope is repository
+        required: false
+        type: string
+  schedule:
+    - cron: "23 4 * * 1"
+    - cron: "47 4 1 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-s0:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '23 4 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && inputs.scope == 'S0')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - name: Audit S0 specification references
+        run: node eng/quality/audit-external-reference-drift.mjs --tier S0 --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-reference-drift-s0
+          path: artifacts/quality/external-reference-drift.json
+          if-no-files-found: error
+          retention-days: 30
+
+  audit-s1:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '47 4 1 * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.scope == 'S1')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - name: Audit S1 product references
+        run: node eng/quality/audit-external-reference-drift.mjs --tier S1 --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-reference-drift-s1
+          path: artifacts/quality/external-reference-drift.json
+          if-no-files-found: error
+          retention-days: 30
+
+  audit-all:
+    if: github.event_name == 'workflow_dispatch' && inputs.scope == 'all'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - name: Audit every registered reference
+        run: node eng/quality/audit-external-reference-drift.mjs --all --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-reference-drift-all
+          path: artifacts/quality/external-reference-drift.json
+          if-no-files-found: error
+          retention-days: 30
+
+  audit-feature-tier:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.scope == 'S2' || inputs.scope == 'S3')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - name: Audit selected feature tier
+        env:
+          PI67_REFERENCE_TIER: ${{ inputs.scope }}
+        run: node eng/quality/audit-external-reference-drift.mjs --tier "$PI67_REFERENCE_TIER" --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-reference-drift-feature-tier
+          path: artifacts/quality/external-reference-drift.json
+          if-no-files-found: error
+          retention-days: 30
+
+  audit-repository:
+    if: github.event_name == 'workflow_dispatch' && inputs.scope == 'repository'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+      - name: Audit selected reference
+        env:
+          PI67_REFERENCE_ID: ${{ inputs.repository_id }}
+        run: node eng/quality/audit-external-reference-drift.mjs --id "$PI67_REFERENCE_ID" --json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-reference-drift-selected
+          path: artifacts/quality/external-reference-drift.json
+          if-no-files-found: error
+          retention-days: 30

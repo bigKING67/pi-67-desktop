@@ -1,7 +1,10 @@
 import { createHighlighterCore } from "shiki/core";
 import { createOnigurumaEngine } from "shiki/engine/oniguruma";
 import githubDark from "shiki/themes/github-dark-default.mjs";
-import type { HighlightToken } from "./code-highlighter.js";
+import {
+  createCodeHighlighterWorkerCore,
+  type WorkerHighlightRequest
+} from "./code-highlighter-worker-core.js";
 
 const highlighter = createHighlighterCore({
   themes: [githubDark],
@@ -33,8 +36,6 @@ const LANGUAGE_LOADERS = {
 } as const;
 
 type SupportedLanguage = keyof typeof LANGUAGE_LOADERS;
-const loadedLanguages = new Set<SupportedLanguage>();
-const pendingLanguages = new Map<SupportedLanguage, Promise<void>>();
 
 const LANGUAGE_ALIASES: Readonly<Record<string, SupportedLanguage>> = {
   bash: "bash",
@@ -70,14 +71,30 @@ const LANGUAGE_ALIASES: Readonly<Record<string, SupportedLanguage>> = {
   yml: "yaml"
 };
 
-interface HighlightRequest {
-  id: number;
-  code: string;
-  language?: string;
-}
+const core = createCodeHighlighterWorkerCore({
+  aliases: LANGUAGE_ALIASES,
+  async loadLanguage(language) {
+    const loader = LANGUAGE_LOADERS[language as SupportedLanguage];
+    if (!loader) throw new Error(`Unsupported syntax-highlighting language: ${language}`);
+    const module = await loader();
+    const instance = await highlighter;
+    await instance.loadLanguage(...module.default);
+  },
+  async tokenize(code, language) {
+    const instance = await highlighter;
+    const result = instance.codeToTokens(code, {
+      lang: language as SupportedLanguage,
+      theme: "github-dark-default"
+    });
+    return result.tokens.map((line) => line.map((token) => ({
+      content: token.content,
+      ...(token.color === undefined ? {} : { color: token.color })
+    })));
+  }
+});
 
-globalThis.addEventListener("message", (event: MessageEvent<HighlightRequest>) => {
-  void highlightCode(event.data).then((lines) => {
+globalThis.addEventListener("message", (event: MessageEvent<WorkerHighlightRequest>) => {
+  void core.highlight(event.data).then((lines) => {
     globalThis.postMessage({
       id: event.data.id,
       ok: true,
@@ -92,31 +109,3 @@ globalThis.addEventListener("message", (event: MessageEvent<HighlightRequest>) =
     });
   });
 });
-
-async function highlightCode(request: HighlightRequest): Promise<HighlightToken[][]> {
-  const instance = await highlighter;
-  const normalizedLanguage = request.language ? LANGUAGE_ALIASES[request.language.toLowerCase()] : undefined;
-  if (!normalizedLanguage) return request.code.split("\n").map((content) => [{ content }]);
-  await ensureLanguage(normalizedLanguage);
-  const result = instance.codeToTokens(request.code, {
-    lang: normalizedLanguage,
-    theme: "github-dark-default"
-  });
-  return result.tokens.map((line) => line.map((token) => ({
-    content: token.content,
-    ...(token.color === undefined ? {} : { color: token.color })
-  })));
-}
-
-async function ensureLanguage(language: SupportedLanguage): Promise<void> {
-  if (loadedLanguages.has(language)) return;
-  const existing = pendingLanguages.get(language);
-  if (existing) return existing;
-  const loading = LANGUAGE_LOADERS[language]().then(async (module) => {
-    const instance = await highlighter;
-    await instance.loadLanguage(...module.default);
-    loadedLanguages.add(language);
-  }).finally(() => pendingLanguages.delete(language));
-  pendingLanguages.set(language, loading);
-  return loading;
-}

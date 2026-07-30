@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { HighlightToken } from "./code-highlighter.js";
+import styles from "./MarkdownView.module.css";
 
 interface MarkdownViewProps {
   children: string;
@@ -12,7 +13,7 @@ interface MarkdownViewProps {
 export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) {
   const streaming = mode === "streaming";
   return (
-    <div className="markdown-body" data-markdown-mode={mode}>
+    <div className={styles.body} data-markdown-mode={mode}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -20,7 +21,7 @@ export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) 
             const target = safeExternalHref(href);
             return target ? (
               <a
-                className="markdown-link"
+                className={styles.link}
                 href={target}
                 rel="noreferrer noopener"
                 onClick={(event) => {
@@ -30,7 +31,7 @@ export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) 
               >
                 {linkChildren}
               </a>
-            ) : <span className="markdown-link is-disabled">{linkChildren}</span>;
+            ) : <span className={`${styles.link} ${styles.disabled}`}>{linkChildren}</span>;
           },
           code: ({ className, children: codeChildren }) => {
             const code = codeText(codeChildren).replace(/\n$/, "");
@@ -51,8 +52,8 @@ export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) 
 
 function StreamingCodeBlock({ code, language }: { code: string; language?: string }) {
   return (
-    <div className="code-block" data-highlight-state="streaming">
-      <div className="code-header"><span>{language ?? "text"}</span><button type="button" onClick={() => void navigator.clipboard.writeText(code)}>复制</button></div>
+    <div className={styles.codeBlock} data-highlight-state="streaming" data-testid="code-block">
+      <div className={styles.codeHeader}><span>{language ?? "text"}</span><button type="button" onClick={() => void navigator.clipboard.writeText(code)}>复制</button></div>
       <pre><code>{code}</code></pre>
     </div>
   );
@@ -78,13 +79,14 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
 
   return (
     <div
-      className="code-block"
+      className={styles.codeBlock}
       data-highlight-state={highlight.state}
+      data-testid="code-block"
       aria-busy={highlight.state === "loading"}
       {...(highlight.error === undefined ? {} : { "data-highlight-error": highlight.error })}
       {...(highlight.state === "ready" ? { "data-highlighted-line-count": highlight.lines.length } : {})}
     >
-      <div className="code-header"><span>{language ?? "text"}</span><button type="button" onClick={() => void navigator.clipboard.writeText(code)}>复制</button></div>
+      <div className={styles.codeHeader}><span>{language ?? "text"}</span><button type="button" onClick={() => void navigator.clipboard.writeText(code)}>复制</button></div>
       {highlight.lines.length > VIRTUAL_CODE_THRESHOLD
         ? <VirtualCodeLines lines={highlight.lines} {...(language === undefined ? {} : { language })} />
         : (
@@ -119,7 +121,7 @@ function VirtualCodeLines({ lines, language }: { lines: HighlightToken[][]; lang
 
   return (
     <pre
-      className="code-virtualized"
+      className={styles.virtualized}
       aria-label={`${language ?? "text"} code, ${lines.length} lines`}
       onScroll={(event) => {
         if (animationFrame.current !== undefined) return;
@@ -133,11 +135,11 @@ function VirtualCodeLines({ lines, language }: { lines: HighlightToken[][]; lang
       tabIndex={0}
     >
       <span
-        className="code-virtual-space"
+        className={styles.virtualSpace}
         style={{ height: `${lines.length * VIRTUAL_CODE_LINE_HEIGHT}px`, minWidth: `${longestLine}ch` }}
       >
         <span
-          className="code-virtual-window"
+          className={styles.virtualWindow}
           style={{ transform: `translateY(${start * VIRTUAL_CODE_LINE_HEIGHT}px)` }}
         >
           {lines.slice(start, end).map((line, index) => renderCodeLine(line, start + index, true))}
@@ -149,7 +151,12 @@ function VirtualCodeLines({ lines, language }: { lines: HighlightToken[][]; lang
 
 function renderCodeLine(line: HighlightToken[], lineIndex: number, virtual: boolean): ReactNode {
   return (
-    <span className={`code-line${virtual ? " is-virtual" : ""}`} key={lineIndex}>
+    <span
+      className={`${styles.codeLine} ${virtual ? styles.virtualLine : ""}`}
+      data-code-line={lineIndex}
+      data-testid="code-line"
+      key={lineIndex}
+    >
       {line.map((token, tokenIndex) => (
         <span key={tokenIndex} style={token.color ? { color: token.color } : undefined}>{token.content}</span>
       ))}

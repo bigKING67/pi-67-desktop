@@ -65,7 +65,7 @@ test("navigates bounded results while the accessible combobox keeps focus", asyn
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+k");
 
-  const search = page.getByLabel("搜索会话、Extension 命令和应用操作");
+  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
   await expect(search).toBeFocused();
   await search.press("ArrowDown");
   await expect(search).toBeFocused();
@@ -89,12 +89,41 @@ test("navigates bounded results while the accessible combobox keeps focus", asyn
   await expect(search).toBeFocused();
 });
 
+test("keeps visible keyboard focus on the Composer and command palette search", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  const composerShell = page.getByTestId("composer-shell");
+  const unfocusedComposer = await composerShell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { borderColor: style.borderColor, boxShadow: style.boxShadow };
+  });
+  await composer.focus();
+  const focusedComposer = await composerShell.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { borderColor: style.borderColor, boxShadow: style.boxShadow };
+  });
+  expect(focusedComposer.borderColor).not.toBe(unfocusedComposer.borderColor);
+  expect(focusedComposer.boxShadow).not.toBe("none");
+
+  await page.keyboard.press("Control+k");
+  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
+  await expect(search).toBeFocused();
+  const searchFocus = await search.locator("..").evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+  });
+  expect(searchFocus).toEqual({ outlineStyle: "solid", outlineWidth: "2px" });
+});
+
 test("does not execute a selected action while Windows IME confirmation is active", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+k");
-  const search = page.getByLabel("搜索会话、Extension 命令和应用操作");
+  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
   await search.fill("inspect");
   await expect(page.getByRole("option", { name: /\/inspect/u })).toBeVisible();
   await expect(search).toHaveValue("inspect");
@@ -132,9 +161,9 @@ test("keeps Session search failures observable instead of presenting an authorit
   });
   await page.keyboard.press("Control+k");
 
-  await page.getByLabel("搜索会话、Extension 命令和应用操作").fill("definitely-missing-session");
-  await expect(page.getByRole("status").filter({ hasText: "Session 目录查询失败" })).toBeVisible();
-  await expect(page.getByText("Session 目录暂时不可用", { exact: true })).toBeVisible();
+  await page.getByLabel("搜索会话、扩展命令和应用操作").fill("definitely-missing-session");
+  await expect(page.getByRole("status").filter({ hasText: "会话目录查询失败" })).toBeVisible();
+  await expect(page.getByText("会话目录暂时不可用", { exact: true })).toBeVisible();
 });
 
 test("matches Host scheduler availability while an operation is active", async ({ page }) => {

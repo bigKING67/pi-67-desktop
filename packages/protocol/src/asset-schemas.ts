@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   MAX_ASSET_ID_CHARS,
   MAX_ASSET_READ_BYTES,

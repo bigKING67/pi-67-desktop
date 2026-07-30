@@ -10,6 +10,7 @@ import { loadOlderConversation } from "../conversation/conversation-controller.j
 import { useCommittedConversationProjection } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { MessageCard } from "./MessageCard.js";
+import styles from "./Transcript.module.css";
 
 export function Transcript() {
   const sessionId = useSessionProjectionStore(selectSessionId);
@@ -32,23 +33,23 @@ export function Transcript() {
   if (!sessionId || sessionTransitionPending) {
     if (runtime.phase === "failed") {
       return (
-        <div className="transcript-error" role="alert">
+        <div className={styles.error} role="alert">
           <CircleAlert size={22} />
           <strong>Pi session 创建失败</strong>
           <span>{runtime.detail}</span>
         </div>
       );
     }
-    return <div className="transcript-loading"><span className="loading-line" />{runtime.detail}</div>;
+    return <div className={styles.loading}><span className="loading-line" />{runtime.detail}</div>;
   }
 
   if (messages.length === 0 && !hasLiveTurn) {
     return (
-      <div className="transcript-empty">
-        <div className="empty-icon"><MessageSquareText size={22} /></div>
+      <div className={styles.empty}>
+        <div className={styles.emptyIcon}><MessageSquareText size={22} /></div>
         <h2>从一个具体任务开始</h2>
         <p>描述目标、相关文件和验收标准。Pi 会使用当前工作区、模型和已加载资源。</p>
-        <div className="starter-prompts">
+        <div className={styles.starterPrompts}>
           {STARTER_PROMPTS.map((prompt) => (
             <button key={prompt} type="button" onClick={() => requestComposerPrefill(prompt)}>{prompt}</button>
           ))}
@@ -59,10 +60,11 @@ export function Transcript() {
 
   return (
     <div
-      className="transcript-region"
+      className={styles.region}
       data-has-live-turn={hasLiveTurn}
       data-message-count={messages.length}
       data-session-id={sessionId}
+      data-transcript-region="true"
     >
       {/* Explicit paging avoids Virtuoso chaining requests while a prepend preserves the top anchor. */}
       <Virtuoso
@@ -113,9 +115,10 @@ const TRANSCRIPT_COMPONENTS: Components<SessionMessageView, TranscriptContext> =
 function OlderMessagesHeader({ context }: { context: TranscriptContext }) {
   if (!context.hasOlder && !context.loadingOlder && !context.conversationError) return null;
   return (
-    <div className="transcript-pagination" role="status">
+    <div className={styles.pagination} role="status">
       <button
         className="small-button"
+        data-testid="load-older-messages"
         disabled={context.loadingOlder}
         onClick={() => void context.loadOlderMessages()}
         type="button"

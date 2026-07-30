@@ -1,10 +1,9 @@
 import { useAppStore } from "../app/app-store.js";
-import { runSessionBootstrapTransition } from "../app/session-transition.js";
-import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 
 export async function activateRendererTask(taskId: string): Promise<boolean> {
@@ -54,7 +53,6 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
   if (!task || !workspace || !task.sessionPath || !workbench.selectTask(taskId)) return false;
-  const taskGeneration = task.taskGeneration;
   workbench.updateTask(task.id, {
     lifecycle: "initializing",
     runtime: { phase: "starting", detail: `正在恢复任务：${task.title}`, recoverable: true }
@@ -77,32 +75,8 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
       if (recovery === "failed") markTaskRecoveryFailed(task.id);
       return false;
     }
-    await runSessionBootstrapTransition(useAppStore.getState, useAppStore.setState, {
-      detail: `正在恢复任务：${task.title}`,
-      refreshSessionCatalog: true,
-      request: () => agentConnectionController.request(
-        "runtime.initialize",
-        {
-          cwd: workspace.identity.canonicalPath,
-          sessionPath: task.sessionPath!,
-          trust: workspace.trust,
-          approvalMode: "guided"
-        },
-        [],
-        {
-          context: {
-            scope: "task",
-            workspaceId: workspace.id,
-            taskId: task.id,
-            taskGeneration
-          }
-        }
-      ),
-      onError: (error) => {
-        markTaskRecoveryFailed(task.id, error);
-      }
-    });
-    return rendererWorkbenchStore.getState().tasks[task.id]?.lifecycle !== "lost";
+    workbench.removeRuntimeTask(task.id);
+    return openRendererWorkspaceDescriptor(workspace, task.sessionPath);
   } catch (error) {
     markTaskRecoveryFailed(task.id, error);
     return false;

@@ -47,10 +47,7 @@
   font-weight: 700;
 }
 
-.title-actions,
-.composer-actions,
-.composer-tools,
-.stream-mode {
+.title-actions {
   display: flex;
   align-items: center;
 }
@@ -195,9 +192,7 @@ html[data-platform="darwin"] .title-bar {
 
 .primary-button,
 .secondary-button,
-.small-button,
-.send-button,
-.stop-button {
+.small-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -209,18 +204,15 @@ html[data-platform="darwin"] .title-bar {
   font-weight: 650;
 }
 
-.primary-button,
-.send-button {
+.primary-button {
   border: 1px solid var(--accent-strong);
   background: var(--accent);
   color: var(--canvas);
 }
 
-.primary-button:hover,
-.send-button:hover { background: var(--accent-strong); }
+.primary-button:hover { background: var(--accent-strong); }
 .primary-button[data-disabled],
-.secondary-button[data-disabled],
-.send-button[data-disabled] {
+.secondary-button[data-disabled] {
   cursor: not-allowed;
   opacity: 0.45;
 }

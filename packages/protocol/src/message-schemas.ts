@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   MAX_PROJECTED_MESSAGE_PARTS,
   MAX_PROJECTED_TEXT_BYTES

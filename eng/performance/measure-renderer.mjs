@@ -19,7 +19,10 @@ import {
   createTypeScriptMarkdown,
   measureCodeHighlight
 } from "./renderer-code-highlight.mjs";
-import { attachMockAgent } from "./renderer-agent-fixture.mjs";
+import {
+  attachMockAgent,
+  installPerformanceSystemBridge
+} from "./renderer-agent-fixture.mjs";
 import {
   createRendererMemoryMetrics,
   createRendererMemoryProbe,
@@ -70,7 +73,7 @@ try {
       console.error(`Renderer performance page error: ${error.message}`);
     });
     const memory = await createRendererMemoryProbe(context, page);
-    await installSystemBridge(page);
+    await installPerformanceSystemBridge(page);
     await page.goto(previewUrl, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible" });
     welcomeHeapSamples.push((await memory.sample()).usedHeapMiB);
@@ -270,39 +273,6 @@ function assertWithinProjectionBudget(markdown, label) {
   }
 }
 
-async function installSystemBridge(page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(window, "pi67", {
-      configurable: false,
-      value: {
-        system: {
-          getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "performance" }),
-          connectAgentHost: async () => undefined,
-          selectWorkspace: async () => "/tmp/pi67-performance-workspace",
-          selectSessionFile: async () => undefined,
-          saveDiagnostics: async () => undefined,
-          showNotification: async () => undefined,
-          requestOpenExternal: async () => false,
-          getUpdateState: async () => ({
-            phase: "disabled",
-            channel: "unsigned-preview",
-            currentVersion: "performance",
-            detail: "Performance fixture"
-          }),
-          checkForUpdates: async () => ({
-            phase: "disabled",
-            channel: "unsigned-preview",
-            currentVersion: "performance",
-            detail: "Performance fixture"
-          }),
-          onAgentHostFailed: () => () => undefined,
-          onPowerResume: () => () => undefined
-        }
-      }
-    });
-  });
-}
-
 async function measureProjection(page) {
   return page.evaluate(() => new Promise((resolve, reject) => {
     const button = document.querySelector('[data-testid="workspace-open-action"]');
@@ -314,12 +284,19 @@ async function measureProjection(page) {
     button.click();
     const deadline = started + 5_000;
     const observe = () => {
-      if (document.querySelector(".message-card") && document.querySelector(".composer-shell")) {
+      if (document.querySelector('[data-testid="message-card"]') && document.querySelector('[data-testid="composer-shell"]')) {
         requestAnimationFrame(() => resolve(performance.now() - started));
         return;
       }
       if (performance.now() >= deadline) {
-        reject(new Error("1,000-message projection timed out."));
+        const testIds = [...document.querySelectorAll("[data-testid]")]
+          .map((element) => element.getAttribute("data-testid"))
+          .filter(Boolean)
+          .slice(0, 40);
+        reject(new Error(
+          `1,000-message projection timed out: url=${location.href}, testIds=${JSON.stringify(testIds)}, `
+          + `body=${document.body.innerText.slice(0, 500)}`
+        ));
         return;
       }
       requestAnimationFrame(observe);
@@ -329,7 +306,7 @@ async function measureProjection(page) {
 }
 
 async function measureComposerPaint(page, index) {
-  return page.locator(".composer-shell textarea").evaluate((element, sampleIndex) => new Promise((resolve) => {
+  return page.locator('[data-testid="composer-shell"] textarea').evaluate((element, sampleIndex) => new Promise((resolve) => {
     const textarea = element;
     requestAnimationFrame(() => {
       const started = performance.now();
@@ -349,7 +326,7 @@ async function measureScroll(page) {
       reject(new Error("Virtualized transcript scroller is unavailable."));
       return;
     }
-    const renderedMessages = document.querySelectorAll(".message-card").length;
+    const renderedMessages = document.querySelectorAll('[data-testid="message-card"]').length;
     if (renderedMessages >= 1_000) {
       reject(new Error(`Transcript rendered ${renderedMessages} message cards instead of virtualizing.`));
       return;
@@ -381,7 +358,7 @@ async function measureScroll(page) {
 async function measureStreamingRate(page) {
   return page.evaluate(() => new Promise((resolve, reject) => {
     const control = globalThis.__pi67Performance;
-    const transcript = document.querySelector(".transcript-region");
+    const transcript = document.querySelector('[data-transcript-region="true"]');
     if (!control || !transcript) {
       reject(new Error("Streaming performance fixture is unavailable."));
       return;
@@ -392,8 +369,8 @@ async function measureStreamingRate(page) {
       let updates = 0;
       let visibleText = "";
       const observer = new MutationObserver(() => {
-        const messages = transcript.querySelectorAll(".message-card");
-        const currentText = messages.item(messages.length - 1)?.querySelector(".message-content")?.textContent ?? "";
+        const messages = transcript.querySelectorAll('[data-testid="message-card"]');
+        const currentText = messages.item(messages.length - 1)?.querySelector('[data-testid="message-content"]')?.textContent ?? "";
         if (currentText.includes("token-") && currentText !== visibleText) {
           visibleText = currentText;
           updates += 1;

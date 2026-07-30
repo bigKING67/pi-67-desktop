@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const TrustSchema = Type.Union([

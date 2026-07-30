@@ -30,7 +30,7 @@ meaningless zero-coverage unit modules.
 | `packages/pi-runtime` | 75% | 80% |
 | `apps/agent-host` testable modules | 74% | 80% |
 | `apps/desktop` testable modules | 80% | 80% or higher |
-| `apps/renderer` `.ts` logic | 55% | 75% |
+| `apps/renderer` `.ts` logic | 70% | 75% |
 
 The floors intentionally match the first verified baseline closely enough to
 stop regressions. They must only move upward. New branches in a governed scope

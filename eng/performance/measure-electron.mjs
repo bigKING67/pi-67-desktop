@@ -104,7 +104,7 @@ for (let index = 0; index < samples; index += 1) {
     });
     const fixture = await createPerformanceSessionFixture({ cwd: workspace, sessionDir, messageCount: 1_000 });
     const codeFixture = await createPerformanceCodeSessionFixture({ cwd: workspace, sessionDir, lineCount: 500 });
-    const cleanLaunch = await launch(profile, agentDir);
+    const cleanLaunch = await launch(profile, agentDir, true);
     activeApplication = cleanLaunch.application;
     cleanProfileLaunchSamples.push(cleanLaunch.durationMs);
     const resourceCollector = await createRendererResourceCollector(cleanLaunch.window, join(root, "apps/renderer/dist"));
@@ -183,7 +183,7 @@ for (let index = 0; index < samples; index += 1) {
     ));
     activeApplication = undefined;
 
-    const warmLaunch = await launch(profile, agentDir);
+    const warmLaunch = await launch(profile, agentDir, false);
     activeApplication = warmLaunch.application;
     warmLaunchSamples.push(warmLaunch.durationMs);
     recordWelcomeMemory(await measureWorkingSet(warmLaunch.application, false));
@@ -261,7 +261,7 @@ function resolvePackagedExecutable() {
   throw new Error(`Packaged performance harness does not support ${process.platform}/${process.arch}.`);
 }
 
-async function launch(profile, agentDir) {
+async function launch(profile, agentDir, expectWelcome) {
   const started = performance.now();
   const application = await electron.launch({
     executablePath,
@@ -272,8 +272,16 @@ async function launch(profile, agentDir) {
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     const workspaceAction = window.getByRole("button", { name: "选择工作区" });
-    await workspaceAction.waitFor({ state: "visible", timeout: 15_000 });
-    await waitUntilEnabled(workspaceAction, 15_000);
+    if (expectWelcome) {
+      await workspaceAction.waitFor({ state: "visible", timeout: 15_000 });
+      await waitUntilEnabled(workspaceAction, 15_000);
+    } else {
+      await Promise.any([
+        workspaceAction.waitFor({ state: "visible", timeout: 15_000 }),
+        window.getByTestId("workspace-add").waitFor({ state: "visible", timeout: 15_000 })
+      ]);
+      if (await workspaceAction.isVisible()) await waitUntilEnabled(workspaceAction, 15_000);
+    }
     return { application, window, durationMs: performance.now() - started };
   } catch (error) {
     await application.close();
@@ -335,14 +343,25 @@ async function measureAgentHostRecovery(application, window) {
   const before = processRoles(application.process().pid);
   const agentHost = before.get("agentHost");
   if (!agentHost) throw new Error("Agent Host process was not found.");
+  const projectionBefore = await window.locator('[data-transcript-region="true"]').evaluate((region) => ({
+    sessionId: region.getAttribute("data-session-id"),
+    messageCount: Number(region.getAttribute("data-message-count") ?? 0)
+  })).catch(() => undefined);
   const started = performance.now();
   process.kill(agentHost.pid, "SIGKILL");
-  await window.locator("[data-notification-id]", { hasText: "Agent Host 已退出" }).waitFor({
+  await window.locator("[data-notification-id]", { hasText: "Pi 运行服务已退出" }).waitFor({
     state: "visible",
     timeout: 10_000
   });
   await waitForReplacementAgentHost(application.process().pid, agentHost.pid, 10_000);
   await waitForRuntimeReady(window, 30_000);
+  if (projectionBefore?.sessionId) {
+    await window.waitForFunction(({ sessionId, messageCount }) => {
+      const region = document.querySelector('[data-transcript-region="true"]');
+      return region?.getAttribute("data-session-id") === sessionId
+        && Number(region.getAttribute("data-message-count") ?? 0) === messageCount;
+    }, projectionBefore, { timeout: 30_000 });
+  }
   return performance.now() - started;
 }
 

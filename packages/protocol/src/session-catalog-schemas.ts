@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   MAX_SESSION_CATALOG_ID_CHARS,
   MAX_SESSION_CATALOG_NAME_CHARS,

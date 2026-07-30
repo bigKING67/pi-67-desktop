@@ -78,7 +78,7 @@ export function UpdateDialog() {
             <Heading slot="title">Unsigned Preview 手动更新</Heading>
             <UpdateSummary update={update} pending={pending} action={action} />
             <div className="update-network-note">
-              检查更新只会请求 Pi-67 Desktop 的公开 GitHub Release 元数据，不会发送工作区、会话、模型、Provider 或凭据数据。
+              检查更新只会请求 π 的公开 GitHub Release 元数据，不会发送工作区、会话、模型、Provider 或凭据数据。
             </div>
             {actionError ? <div className="update-action-error" role="alert">{actionError}</div> : null}
             <div className="dialog-actions">
@@ -125,7 +125,7 @@ function UpdateSummary({ update, pending, action }: {
 
 function updateTitle(update: UpdateState, pending: boolean, action?: UpdateAction): string {
   if (pending) return action === "open" ? "正在打开 GitHub 下载页" : "正在检查更新";
-  if (update.phase === "available") return `发现 Pi-67 Desktop ${update.version}`;
+  if (update.phase === "available") return `发现 π ${update.version}`;
   if (update.phase === "current") return "未发现可用新版本";
   if (update.phase === "disabled") return "开发构建不检查更新";
   if (update.phase === "error") return "更新检查未完成";

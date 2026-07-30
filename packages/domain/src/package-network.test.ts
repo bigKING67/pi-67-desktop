@@ -71,4 +71,67 @@ describe("Package network source policy", () => {
     })).toBeUndefined();
     expect(defaultPackageNetworkSettings()).not.toBe(DEFAULT_PACKAGE_NETWORK_SETTINGS);
   });
+
+  it.each([
+    undefined,
+    null,
+    [],
+    { npmMode: "automatic", gitMode: "automatic", gitMirrors: [], extra: true },
+    { npmMode: "invalid", gitMode: "automatic", gitMirrors: [] },
+    { npmMode: "automatic", gitMode: "invalid", gitMirrors: [] },
+    { npmMode: "automatic", gitMode: "automatic", gitMirrors: "gitclone" },
+    { npmMode: "automatic", gitMode: "automatic", gitMirrors: ["invalid"] },
+    { npmMode: "automatic", gitMode: "automatic", gitMirrors: ["gitclone", "ghproxy", "gitclone"] },
+    { npmMode: "custom", gitMode: "automatic", gitMirrors: [] },
+    { npmMode: "automatic", npmCustomRegistry: "http://registry.example.test", gitMode: "automatic", gitMirrors: [] },
+    { npmMode: "automatic", npmCustomRegistry: "https://example.test?q=1", gitMode: "automatic", gitMirrors: [] },
+    { npmMode: "automatic", gitMode: "automatic", gitMirrors: [], gitCustomMirrorPrefix: "not a URL" }
+  ])("rejects an invalid package source document: %j", (value) => {
+    expect(parsePackageNetworkSettings(value)).toBeUndefined();
+  });
+
+  it("projects every explicit npm and Git source mode", () => {
+    expect(npmRegistryCandidates({
+      npmMode: "custom",
+      npmCustomRegistry: "https://registry.example.test/",
+      gitMode: "offline",
+      gitMirrors: []
+    })).toEqual([{ id: "npm-custom", role: "custom", url: "https://registry.example.test" }]);
+    expect(npmRegistryCandidates({
+      npmMode: "mirror-only",
+      gitMode: "offline",
+      gitMirrors: []
+    })).toHaveLength(1);
+    expect(npmRegistryCandidates({
+      npmMode: "official-only",
+      gitMode: "offline",
+      gitMirrors: []
+    })[0]?.id).toBe("npm-official");
+
+    const customGit = gitSourceCandidates({
+      npmMode: "offline",
+      gitMode: "mirror-only",
+      gitMirrors: [],
+      gitCustomMirrorPrefix: "https://mirror.example.test/"
+    });
+    expect(customGit).toEqual([{
+      id: "git-custom",
+      role: "custom",
+      transportUrl: "https://mirror.example.test/https://github.com/arpagon/pi-rewind.git",
+      insteadOfPrefix: "https://mirror.example.test/https://github.com/"
+    }]);
+    expect(gitSourceCandidates({
+      npmMode: "offline",
+      gitMode: "official-only",
+      gitMirrors: ["gitclone"]
+    })).toEqual([{
+      id: "git-official",
+      role: "official",
+      transportUrl: "https://github.com/arpagon/pi-rewind.git"
+    }]);
+    expect(gitSourceCandidates(DEFAULT_PACKAGE_NETWORK_SETTINGS, "https://example.test/not-github"))
+      .toEqual(expect.not.arrayContaining([expect.objectContaining({ id: "git-gitclone" })]));
+    expect(gitSourceCandidates(DEFAULT_PACKAGE_NETWORK_SETTINGS, "invalid URL"))
+      .toEqual(expect.not.arrayContaining([expect.objectContaining({ id: "git-gitclone" })]));
+  });
 });

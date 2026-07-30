@@ -47,6 +47,7 @@ export class AgentConnectionController {
   private client: AgentPortClient | undefined;
   private identityValue: AgentConnectionIdentity | undefined;
   private generation = 0;
+  private receivedPort = false;
   private disposed = false;
 
   constructor(private readonly handoffTarget = createBrowserHandoffTarget()) {
@@ -59,6 +60,10 @@ export class AgentConnectionController {
 
   get hasOpenPort(): boolean {
     return !this.disposed && this.client !== undefined && !this.client.isClosed;
+  }
+
+  get hasReceivedPort(): boolean {
+    return this.receivedPort;
   }
 
   subscribe(subscriber: ConnectionSubscriber): () => void {
@@ -223,6 +228,7 @@ export class AgentConnectionController {
       port.close();
       return;
     }
+    this.receivedPort = true;
     const generation = ++this.generation;
     this.client?.dispose();
     this.client = undefined;

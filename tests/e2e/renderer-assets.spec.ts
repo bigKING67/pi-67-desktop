@@ -74,7 +74,7 @@ test("shows a retryable state when an asset handle is unavailable", async ({ pag
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await expect(page.getByText("图片未能从 Agent Host 加载。")).toBeVisible();
+  await expect(page.getByText("图片未能从 Pi 运行服务加载。")).toBeVisible();
   await expect.poll(async () => (
     await recordedCommands(page)
   ).filter((command) => command === "asset.read").length).toBe(1);

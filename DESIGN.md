@@ -291,6 +291,18 @@ loading error where the operation can produce those states
 - Selecting a conversation automatically expands its Workspace and keeps the row
   visible. A collapsed Workspace with background work shows running and waiting
   counts on its group header without relying on color alone.
+- A selected idle, stopped, or lost conversation never inherits a stale live
+  projection merely because its Session ID still matches. Until Pi reacquires
+  runtime authority, the center surface shows an explicit `打开会话` or `恢复任务`
+  action and does not mount the Transcript, Composer, or Inspector projection.
+- If recovery confirms that the current Host has no Runtime for a persisted Task,
+  Desktop retains the Pi JSONL Session identity but rotates the stale Task
+  authority before initialization; an obsolete Task ID is never replayed into a
+  new Host instance.
+- If the failed preflight resync has intentionally closed the event stream,
+  successful Session initialization is followed by an authoritative projection
+  resync before the live surface mounts. The initialization acknowledgement alone
+  never substitutes for the Session snapshot.
 - At most four Tasks may be accepted, running, waiting for safety approval, or
   waiting for blocking Extension input. Reaching the limit explains which state
   is preserved and that an existing Task must settle or stop before another send.

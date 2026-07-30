@@ -21,7 +21,7 @@ test("keeps live turns in the Virtuoso footer and defers code highlighting until
   await attachMockAgent(page, [message("settled-message", "Settled response")]);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const transcript = page.locator(".transcript-region");
+  const transcript = page.locator('[data-transcript-region="true"]');
   await expect(transcript).toHaveAttribute("data-message-count", "1");
   await expect(transcript).toHaveAttribute("data-has-live-turn", "false");
 
@@ -59,12 +59,83 @@ test("keeps live turns in the Virtuoso footer and defers code highlighting until
   await expect(liveTurn).toHaveCount(1);
   await expect(liveTurn).toHaveAttribute("aria-busy", "true");
   await expect(liveTurn.locator('[data-markdown-mode="streaming"]')).toBeVisible();
-  await expect(liveTurn.locator('.code-block[data-highlight-state="streaming"]')).toBeVisible();
-  await expect(liveTurn.locator('.code-block[data-highlight-state="loading"]')).toHaveCount(0);
-  await expect(liveTurn.locator('.code-block[data-highlight-state="ready"]')).toHaveCount(0);
+  await expect(liveTurn.locator('[data-highlight-state="streaming"]')).toBeVisible();
+  await expect(liveTurn.locator('[data-highlight-state="loading"]')).toHaveCount(0);
+  await expect(liveTurn.locator('[data-highlight-state="ready"]')).toHaveCount(0);
 
   const loadedResources = await page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name));
   expect(loadedResources.some(isHighlightResource)).toBe(false);
+});
+
+test("keeps the committed transcript visible across a Settings round trip", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [message("settings-round-trip", "Settings round-trip transcript")]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await expect(page.getByText("Settings round-trip transcript", { exact: true })).toBeVisible();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
+  await expect(page.getByLabel("π 设置")).toBeVisible();
+  await page.getByRole("button", { name: "返回工作台" }).click();
+
+  const transcript = page.locator('[data-transcript-region="true"]');
+  await expect(transcript).toHaveAttribute("data-message-count", "1");
+  await expect(page.getByText("Settings round-trip transcript", { exact: true })).toBeVisible();
+});
+
+test("throttles assistant stream announcements and clears them when the turn settles", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [message("settled-message", "Settled response")]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const operationId = "operation-streaming-announcer";
+  const announcer = page.locator('[data-streaming-announcer="true"]');
+  await emitMockAgentEvent(page, {
+    type: "operation.started",
+    payload: {
+      operation: {
+        operationId,
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-test",
+        sessionGeneration: 1,
+        startedAt: Date.now()
+      }
+    }
+  }, { operationId });
+  await emitMockAgentEvent(page, {
+    type: "turn.streamBatch",
+    payload: {
+      events: [
+        { assistantMessageEvent: { type: "thinking_delta", delta: "private reasoning" } },
+        { assistantMessageEvent: { type: "text_delta", delta: "第一句。" } }
+      ]
+    }
+  }, { operationId });
+
+  await expect(announcer).toHaveText("第一句。");
+  await expect(announcer).not.toContainText("private reasoning");
+  await emitMockAgentEvent(page, {
+    type: "turn.streamBatch",
+    payload: {
+      events: [
+        { assistantMessageEvent: { type: "thinking_delta", delta: "more private reasoning" } },
+        { assistantMessageEvent: { type: "text_delta", delta: "第二句。" } }
+      ]
+    }
+  }, { operationId });
+  await expect(announcer).toHaveText("第一句。");
+  await expect(announcer).toHaveText("第二句。", { timeout: 2_000 });
+
+  await setMockConversationMessages(page, [
+    message("settled-message", "Settled response"),
+    message("settled-stream", "第一句。第二句。")
+  ]);
+  await emitMockAgentEvent(page, {
+    type: "conversation.changed",
+    payload: { sessionId: "session-test", reason: "settled" }
+  }, { operationId });
+  await expect(announcer).toBeEmpty();
 });
 
 test("loads older messages by stable cursor without duplicating the recent projection", async ({ page }) => {
@@ -73,7 +144,7 @@ test("loads older messages by stable cursor without duplicating the recent proje
   await attachMockAgent(page, messages);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const transcript = page.locator(".transcript-region");
+  const transcript = page.locator('[data-transcript-region="true"]');
   await expect(transcript).toHaveAttribute("data-message-count", "100");
   await page.getByRole("button", { name: "加载更早消息" }).click();
   await expect(transcript).toHaveAttribute("data-message-count", "200");
@@ -88,7 +159,7 @@ test("loads older messages by stable cursor without duplicating the recent proje
     { direction: "older", cursor: "entry-105", limit: 100 },
     { direction: "older", cursor: "entry-5", limit: 100 }
   ]);
-  expect(await transcript.locator(".message-card").count()).toBeLessThan(205);
+  expect(await transcript.locator("[data-render-mode]").count()).toBeLessThan(205);
 });
 
 test("starts a bootstrapped session at the recent end without loading an older page", async ({ page }) => {
@@ -100,7 +171,7 @@ test("starts a bootstrapped session at the recent end without loading an older p
   const messages = Array.from({ length: 1_000 }, (_, index) => message(`entry-${index}`, `Message ${index}`));
   await replaceMockSessionProjection(page, "session-imported", messages);
 
-  const transcript = page.locator(".transcript-region");
+  const transcript = page.locator('[data-transcript-region="true"]');
   await expect(transcript).toHaveAttribute("data-message-count", "100");
   await expect(page.getByText("Message 999", { exact: true })).toBeVisible();
   await page.waitForTimeout(250);
@@ -125,7 +196,7 @@ test("applies narrow conversation, queue, metadata, tree and usage projections",
     type: "conversation.changed",
     payload: { sessionId: "session-test", reason: "settled" }
   }, { operationId: "operation-settled" });
-  await expect(page.locator(".transcript-region")).toHaveAttribute("data-message-count", "2");
+  await expect(page.locator('[data-transcript-region="true"]')).toHaveAttribute("data-message-count", "2");
   await expect(page.getByText("After narrow refresh")).toBeVisible();
   await expect(page.getByText("temporary live text")).toHaveCount(0);
 
@@ -152,7 +223,8 @@ test("applies narrow conversation, queue, metadata, tree and usage projections",
       selectedModel: { provider: "openai", id: "gpt-test" }
     }
   });
-  await expect(page.getByText("增量投影会话", { exact: true })).toBeVisible();
+  await expect(page.locator(".brand-lockup").getByText("增量投影会话", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("conversation-row").filter({ hasText: "增量投影会话" })).toBeVisible();
   await expect(page.getByLabel("Pi 思考级别")).toHaveValue("high");
 
   await emitMockAgentEvent(page, {
@@ -187,7 +259,7 @@ test("discards a delayed conversation page after the session generation changes"
   await expect(page.getByText("New session only")).toBeVisible();
   await page.waitForTimeout(250);
   await expect(page.getByText("Stale delayed result")).toHaveCount(0);
-  await expect(page.locator(".transcript-region")).toHaveAttribute("data-message-count", "1");
+  await expect(page.locator('[data-transcript-region="true"]')).toHaveAttribute("data-message-count", "1");
 });
 
 test("projects live changes, preserves write truth boundaries and restores changes on resync", async ({ page }) => {
@@ -204,6 +276,8 @@ test("projects live changes, preserves write truth boundaries and restores chang
     }]
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("tab", { name: "修改" }).click();
+  await expect(page.getByText(/本会话记录/u)).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "workspace.changeChanged",
@@ -223,9 +297,6 @@ test("projects live changes, preserves write truth boundaries and restores chang
       }
     }
   });
-  await page.getByRole("tab", { name: "上下文" }).click();
-  await page.getByText("查看详情", { exact: true }).click();
-  await page.getByRole("button", { name: "查看修改记录" }).click();
   await expect(page.getByRole("tab", { name: "修改" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("src/live.ts", { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("Unified patch 预览")).toContainText("+new");

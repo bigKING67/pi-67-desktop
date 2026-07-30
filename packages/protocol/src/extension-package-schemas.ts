@@ -1,4 +1,4 @@
-import { Type } from "typebox";
+import { Type } from "./typebox-schema.js";
 
 const PackageSourceSchema = Type.String({
   minLength: 1,

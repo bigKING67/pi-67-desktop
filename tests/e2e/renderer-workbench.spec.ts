@@ -36,6 +36,60 @@ async function openWorkbench(
   await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
 }
 
+test("restores persisted Workspace authority without asking for the Workspace again", async ({ page }) => {
+  const sessionPath = "/Users/test/.pi/agent/sessions/persisted.jsonl";
+  await installMockDesktopBridge(page, {
+    initialWorkspaces: [DEFAULT_MOCK_WORKSPACE],
+    expandedWorkspaceIds: [DEFAULT_MOCK_WORKSPACE.id],
+    currentWorkspaceId: DEFAULT_MOCK_WORKSPACE.id,
+    selectedSurface: {
+      kind: "conversation",
+      conversation: {
+        kind: "session",
+        workspaceId: DEFAULT_MOCK_WORKSPACE.id,
+        sessionPath
+      }
+    }
+  });
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, {
+    sessionCatalogItemsByWorkspace: {
+      [DEFAULT_MOCK_WORKSPACE.id]: [{
+        id: "session-persisted",
+        path: sessionPath,
+        cwd: DEFAULT_MOCK_WORKSPACE.identity.canonicalPath,
+        name: "已保存的会话",
+        modifiedAt: 1_800_000_000_000,
+        messageCount: 8
+      }]
+    }
+  });
+
+  await expect(page.getByText("等待选择工作区", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("当前状态：会话待打开")).toBeVisible();
+  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /已保存的会话/u })).toBeVisible();
+  await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
+  await expect.poll(async () => {
+    const commands = await recordedCommandDetails(page);
+    return commands.filter((command) => command.type === "workspace.register").length;
+  }).toBe(1);
+  await expect.poll(async () => {
+    const commands = await recordedCommandDetails(page);
+    return commands.filter((command) => command.type === "session.catalog.query").length;
+  }).toBeGreaterThanOrEqual(1);
+
+  await page.getByRole("button", { name: "打开会话", exact: true }).click();
+  await expect(page.getByLabel("Pi conversation")).toBeVisible();
+  await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
+  await expect(page.getByLabel("当前状态：Pi SDK 已就绪")).toBeVisible();
+  await expect.poll(async () => {
+    const commands = await recordedCommandDetails(page);
+    return commands.filter((command) => command.type === "runtime.initialize").length;
+  }).toBe(1);
+});
+
 test("uses the left workspace conversation list instead of horizontal task tabs", async ({ page }) => {
   await openWorkbench(page);
 

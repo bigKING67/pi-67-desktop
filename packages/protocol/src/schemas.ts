@@ -1,4 +1,4 @@
-import { Type, type TProperties, type TSchema } from "typebox";
+import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
 import { MAX_TREE_NODES } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
 import {

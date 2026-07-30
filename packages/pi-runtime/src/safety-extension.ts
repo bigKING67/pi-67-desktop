@@ -50,21 +50,21 @@ export function createDesktopSafetyExtension(
         try {
           intent = await classifyToolIntent(pi, event.toolName, event.input, state.cwd);
         } catch {
-          return { block: true, reason: "Pi-67 Desktop could not establish a safe canonical target." };
+          return { block: true, reason: "π could not establish a safe canonical target." };
         }
 
         const decision = decideApproval(intent, state.trust, state.approvalMode);
         if (decision.allow) return undefined;
         if (!decision.approvalRequired) return { block: true, reason: decision.reason };
-        if (!ctx.hasUI) return { block: true, reason: "Pi-67 Desktop approval UI is unavailable." };
+        if (!ctx.hasUI) return { block: true, reason: "π approval UI is unavailable." };
 
         const target = boundUtf8(intent.target, MAX_APPROVAL_TARGET_BYTES);
         const cwd = boundUtf8(state.cwd, MAX_APPROVAL_CWD_BYTES);
         if (target.truncated || cwd.truncated) {
-          return { block: true, reason: "Pi-67 Desktop will not approve a target that cannot be displayed in full." };
+          return { block: true, reason: "π will not approve a target that cannot be displayed in full." };
         }
         if (ctx.signal?.aborted) {
-          return { block: true, reason: "Pi-67 Desktop approval was cancelled before the tool could run." };
+          return { block: true, reason: "π approval was cancelled before the tool could run." };
         }
         try {
           const allowed = await requestApproval({
@@ -80,11 +80,11 @@ export function createDesktopSafetyExtension(
             scope: "single-tool-call"
           }, ctx.signal === undefined ? {} : { signal: ctx.signal });
           if (ctx.signal?.aborted) {
-            return { block: true, reason: "Pi-67 Desktop approval was cancelled before the tool could run." };
+            return { block: true, reason: "π approval was cancelled before the tool could run." };
           }
           return allowed ? undefined : { block: true, reason: `Blocked by user: ${intent.category}` };
         } catch {
-          return { block: true, reason: "Pi-67 Desktop approval was unavailable and failed closed." };
+          return { block: true, reason: "π approval was unavailable and failed closed." };
         }
       });
     }

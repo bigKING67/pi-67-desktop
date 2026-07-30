@@ -3,7 +3,7 @@ import {
   MAX_WORKSPACE_CHANGE_PATCH_BYTES,
   MAX_WORKSPACE_CHANGE_PATH_BYTES
 } from "@pi67/domain";
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 
 const WorkspaceChangeBaseSchema = {
   toolCallId: Type.String({ minLength: 1, maxLength: 512 }),

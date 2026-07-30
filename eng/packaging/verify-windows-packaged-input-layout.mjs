@@ -297,7 +297,7 @@ async function waitForFocus(window, label) {
 async function observeLayout(window) {
   return window.evaluate(() => {
     const rect = (element) => element ? rectangle(element.getBoundingClientRect()) : null;
-    const composer = document.querySelector(".composer-shell");
+    const composer = document.querySelector('[data-testid="composer-shell"]');
     const contextDrawer = document.querySelector(".context-pane");
     const navigationDrawer = document.querySelector(".navigation-rail");
     const send = [...document.querySelectorAll("button")]

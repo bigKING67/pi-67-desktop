@@ -19,6 +19,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   hostEpoch: undefined,
   connected: false,
   runtime: INITIAL_RUNTIME_STATE,
+  workspace: undefined,
   trust: "unknown",
   trustUpdating: false,
   sessionTransitionPending: false,

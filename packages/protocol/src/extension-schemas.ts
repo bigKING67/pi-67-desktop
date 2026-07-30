@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 
 export const MAX_EXTENSION_UI_IDENTIFIER_LENGTH = 512;
 export const MAX_EXTENSION_PACKAGE_LENGTH = 512;

@@ -8,10 +8,14 @@ import {
   useExtensionUiStore
 } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
-import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import {
+  selectWorkspaceSessionCatalog,
+  useSessionCatalogStore
+} from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   installRendererSessionResync,
   replaceRendererSessionSnapshot
@@ -28,6 +32,15 @@ describe("renderer session transaction", () => {
     useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
+    rendererWorkbenchStore.getState().reset();
+    rendererWorkbenchStore.getState().registerWorkspace({
+      id: "workspace-1",
+      displayName: "Workspace",
+      identity: { canonicalPath: "/workspace", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
   });
 
   it("invalidates every session projection before a same-Host resync", () => {
@@ -39,7 +52,7 @@ describe("renderer session transaction", () => {
     expect(useLiveTurnStore.getState().authority).toBeUndefined();
     expect(useApprovalStore.getState().requests).toEqual([]);
     expect(useExtensionUiStore.getState()).toMatchObject({ requests: [], catalog: undefined });
-    expect(useSessionCatalogStore.getState().items).toEqual([]);
+    expect(catalog().items).toEqual([]);
     expect(useSessionTreeStore.getState()).toMatchObject({
       authority: undefined,
       tree: { nodes: [], truncated: false, total: 0 },
@@ -58,7 +71,7 @@ describe("renderer session transaction", () => {
 
     expect(useConversationStore.getState().messages).toHaveLength(1);
     expect(useWorkspaceChangesStore.getState().projection?.items).toHaveLength(1);
-    expect(useSessionCatalogStore.getState().items).toHaveLength(1);
+    expect(catalog().items).toHaveLength(1);
     expect(useSessionTreeStore.getState().tree.nodes).toHaveLength(1);
     expect(useLiveTurnStore.getState().authority).toBeUndefined();
     expect(useApprovalStore.getState().requests).toEqual([]);
@@ -108,7 +121,7 @@ describe("renderer session transaction", () => {
       sessionGeneration: 3
     };
     const target = useSessionProjectionStore.getState().captureTransition(appState())!;
-    const installed = installRendererSessionResync(appState(), result, 9, target);
+    const installed = installRendererSessionResync(appState(), result, 9, target, "workspace-1");
 
     expect(installed).toBe(true);
     expect(useSessionProjectionStore.getState().authority).toMatchObject({
@@ -121,11 +134,28 @@ describe("renderer session transaction", () => {
       useExtensionUiStore.getState().catalog,
       useSessionProjectionStore.getState().authority
     )).toEqual(result.extensionCatalog);
-    expect(useSessionCatalogStore.getState()).toMatchObject({ revision: 2, catalogState: "ready" });
+    expect(catalog()).toMatchObject({ revision: 2, catalogState: "ready" });
     expect(useSessionTreeStore.getState()).toMatchObject({
       authority: { sessionId: "session-1", sessionGeneration: 3 },
       status: "ready"
     });
+  });
+
+  it("does not install catalog status when resync has no Workspace authority", () => {
+    rendererWorkbenchStore.getState().reset();
+    const result = {
+      snapshot: snapshot("session-1"),
+      changes: changes("session-1"),
+      extensionCatalog: { items: [], total: 0, truncated: false },
+      sessionCatalogStatus: catalogStatus(),
+      eventSequence: 8,
+      hostEpoch: 9,
+      sessionGeneration: 3
+    };
+    const target = useSessionProjectionStore.getState().captureTransition(appState())!;
+
+    expect(installRendererSessionResync(appState(), result, 9, target, undefined)).toBe(true);
+    expect(useSessionCatalogStore.getState().byWorkspace).toEqual({});
   });
 
   it("stops an old snapshot transaction when the canonical Store subscriber starts a newer one", () => {
@@ -228,7 +258,7 @@ describe("renderer session transaction", () => {
       prepareRendererSessionTransaction("host-replaced");
     });
 
-    const installed = installRendererSessionResync(appState(), result, 9, target);
+    const installed = installRendererSessionResync(appState(), result, 9, target, "workspace-1");
     unsubscribe();
 
     expect(installed).toBe(false);
@@ -278,7 +308,7 @@ function seedFeatureStores(): void {
   useExtensionUiStore.getState().upsertRequest({ requestId: "extension-1", kind: "confirm", blocking: true });
   useExtensionUiStore.getState().installCatalog(authority, { items: [], total: 0, truncated: false });
   useSessionCatalogStore.getState().finishFirstPage(
-    useSessionCatalogStore.getState().beginFirstPage(),
+    useSessionCatalogStore.getState().beginFirstPage("workspace-1"),
     { ...catalogStatus(), items: [{
       id: "session-1",
       path: "/sessions/session-1.jsonl",
@@ -288,6 +318,10 @@ function seedFeatureStores(): void {
       messageCount: 1
     }], total: 1, hasMore: false }
   );
+}
+
+function catalog() {
+  return selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), "workspace-1");
 }
 
 function appState() {

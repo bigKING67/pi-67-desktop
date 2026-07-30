@@ -163,13 +163,26 @@ export class RuntimeSessionBindings {
     this.activeSettingsManager = this.activeServices.settingsManager;
     this.activeExtensions = this.activeServices.resourceLoader.getExtensions();
     this.options.setSessionCwd(session.sessionManager.getCwd());
-    await this.options.projections.bind(session, this.activeExtensions);
-    await this.options.rebindExtensionUi(session);
-    this.options.emit({ type: "extension.catalog.changed", payload: this.options.projections.getCatalog() });
-    this.sessionUnsubscribe = session.subscribe((event) => {
+    const unsubscribe = session.subscribe((event) => {
       this.options.projections.observe(session, event);
     });
-    await this.options.externalChangeGuard.bind(session, this.generation, this.options.emit);
+    this.sessionUnsubscribe = unsubscribe;
+    try {
+      // Subscribe before the first await so async session_start mutations cannot
+      // land between the initial projection snapshot and event observation.
+      await this.options.projections.bind(session, this.activeExtensions);
+      await this.options.rebindExtensionUi(session);
+      this.options.emit({ type: "extension.catalog.changed", payload: this.options.projections.getCatalog() });
+      await this.options.externalChangeGuard.bind(session, this.generation, this.options.emit);
+    } catch (error) {
+      if (this.sessionUnsubscribe === unsubscribe) {
+        unsubscribe();
+        this.sessionUnsubscribe = undefined;
+      }
+      this.options.externalChangeGuard.detach();
+      this.options.projections.reset();
+      throw error;
+    }
   }
 
   private detachSessionBindings(): void {

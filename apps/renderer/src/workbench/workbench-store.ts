@@ -366,15 +366,6 @@ export function selectedWorkbenchTask(state: RendererWorkbenchState): RendererWo
     : undefined;
 }
 
-export function rendererWorkspaceId(path: string): WorkspaceId {
-  let hash = 0x811c9dc5;
-  for (const codePoint of path) {
-    hash ^= codePoint.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `workspace-${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
 function emptyWorkbenchState() {
   return {
     workspaces: {},

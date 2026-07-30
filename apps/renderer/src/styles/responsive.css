@@ -2,9 +2,6 @@
 @media (max-width: 1040px) {
   .workspace-grid,
   .workspace-grid.has-context { grid-template-columns: 226px minmax(520px, 1fr); }
-  .composer-region {
-    z-index: 31;
-  }
   .context-drawer-scrim {
     position: fixed;
     z-index: 29;
@@ -23,9 +20,6 @@
   .navigation-rail { display: none; }
   .runtime-controls { display: none; }
   .title-actions { padding-right: 120px; }
-  .message-card,
-  .message-card.role-user { width: calc(100% - 28px); }
-  .composer-region { padding-inline: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

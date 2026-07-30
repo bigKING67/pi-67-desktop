@@ -1,10 +1,9 @@
 import type {
-  DesktopCapabilityResourceType,
   DesktopCapabilitySnapshot,
   DesktopIntegrationStatus
 } from "@pi67/domain";
 import { Download, RefreshCw, Stethoscope } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import styles from "./DesktopCapabilityPanels.module.css";
 import {
@@ -13,42 +12,6 @@ import {
   SettingsRows,
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
-
-export function BundledCapabilityList({ resourceType }: {
-  resourceType: DesktopCapabilityResourceType;
-}) {
-  const { snapshot, phase, error, refresh } = useDesktopCapabilitySnapshot();
-  const packages = useMemo(() => snapshot?.packages.filter((entry) => (
-    entry.resourceTypes.includes(resourceType)
-  )) ?? [], [resourceType, snapshot]);
-  return (
-    <SettingsSectionBlock
-      actions={<Button className="secondary-button" isDisabled={phase === "loading"} onPress={() => void refresh()}>
-        <RefreshCw aria-hidden="true" size={14} />刷新
-      </Button>}
-      description="随安装包提供的第一方能力由固定 Git commit 和 tree SHA-256 约束，应用更新时替换基线。"
-      title="内置能力"
-    >
-      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
-      {phase === "loading" && !snapshot ? <SettingsNotice>正在读取内置能力状态…</SettingsNotice> : null}
-      {packages.length === 0 && phase !== "loading" ? <SettingsNotice>没有匹配的内置能力。</SettingsNotice> : null}
-      {packages.length > 0 ? <SettingsRows>
-        {packages.map((entry) => (
-          <SettingsRow
-            key={entry.id}
-            leading={<span
-              className={styles.status}
-              data-status={snapshot?.phase === "initializing" ? "warning" : entry.installed ? "ready" : "failed"}
-            />}
-            title={entry.displayName}
-            description={`${entry.version} · ${entry.commit.slice(0, 10)} · first-party`}
-            value={snapshot?.phase === "initializing" ? "准备中" : entry.installed ? "内置" : "不可用"}
-          />
-        ))}
-      </SettingsRows> : null}
-    </SettingsSectionBlock>
-  );
-}
 
 export function ManagedRulePanel() {
   const { snapshot, phase, error, refresh } = useDesktopCapabilitySnapshot();

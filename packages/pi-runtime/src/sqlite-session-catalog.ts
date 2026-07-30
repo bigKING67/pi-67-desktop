@@ -65,7 +65,7 @@ export class SessionCatalogChangedExternallyError extends Error {
   readonly recoverable = true;
 
   constructor() {
-    super("Session Catalog changed outside the active Agent Host.");
+    super("Session Catalog changed outside the active Pi runtime service.");
   }
 }
 

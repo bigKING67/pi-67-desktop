@@ -1,4 +1,4 @@
-import { Type, type TProperties, type TSchema } from "typebox";
+import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
 import type { AgentCommandType } from "./agent-messages.js";
 import { ApprovalRespondSchema } from "./approval-schemas.js";
 import { AssetReadPayloadSchema } from "./asset-schemas.js";

@@ -33,18 +33,18 @@ export async function measureCodeHighlight(page, { markdown, messageId, expected
     const deadline = started + 15_000;
     control.showMarkdown(fixtureMarkdown, fixtureMessageId);
     const observe = () => {
-      const codeBlock = document.querySelector(".code-block");
+      const codeBlock = document.querySelector('[data-testid="code-block"]');
       if (codeBlock?.getAttribute("data-highlight-state") === "fallback") {
         longTaskObserver?.disconnect();
         reject(new Error(`Code highlighting fell back to plain text: ${codeBlock.getAttribute("data-highlight-error") ?? "unknown error"}.`));
         return;
       }
-      const renderedLineCount = document.querySelectorAll(".code-line").length;
+      const renderedLineCount = document.querySelectorAll('[data-testid="code-line"]').length;
       const highlightedLineCount = Number(codeBlock?.getAttribute("data-highlighted-line-count") ?? 0);
       const virtualWindowValid = lineCount <= 200
         ? renderedLineCount === lineCount
         : renderedLineCount > 0 && renderedLineCount < lineCount;
-      if (highlightedLineCount === lineCount && virtualWindowValid && document.querySelector(".composer-shell")) {
+      if (highlightedLineCount === lineCount && virtualWindowValid && document.querySelector('[data-testid="composer-shell"]')) {
         requestAnimationFrame(() => requestAnimationFrame(() => {
           longTaskObserver?.disconnect();
           resolve({
@@ -60,7 +60,7 @@ export async function measureCodeHighlight(page, { markdown, messageId, expected
       if (performance.now() >= deadline) {
         longTaskObserver?.disconnect();
         const fallbackLength = codeBlock?.querySelector("pre > code")?.textContent?.length ?? 0;
-        const messageLength = document.querySelector(".message-card .message-content")?.textContent?.length ?? 0;
+        const messageLength = document.querySelector('[data-testid="message-card"] [data-testid="message-content"]')?.textContent?.length ?? 0;
         const fixtureDiagnostics = typeof control.diagnostics === "function" ? control.diagnostics() : undefined;
         reject(new Error(
           `Code highlight timed out: highlighted=${highlightedLineCount}, rendered=${renderedLineCount}, expected=${lineCount}, `

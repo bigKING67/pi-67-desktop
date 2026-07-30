@@ -73,8 +73,8 @@ export function handleProjectionEvent(
       }
       activateRendererSessionChanges(get());
       void refreshWorkspaceChanges();
-      if (event.payload.reason === "session-import") {
-        void queryFirstSessionCatalog({ refresh: true });
+      if (event.payload.reason === "session-import" && bootstrapAuthority) {
+        void queryFirstSessionCatalog(bootstrapAuthority.workspaceId, { refresh: true });
       }
       return true;
     case "workspace.changeChanged": {

@@ -14,10 +14,10 @@ import { createRendererSession } from "../session/session-lifecycle-controller.j
 import { WorkbenchProjectionBridge } from "../workbench/WorkbenchProjectionBridge.js";
 import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
-import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
 import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
+import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
@@ -78,10 +78,9 @@ export function App() {
         void registerAvailableRendererWorkspaces();
       },
       onEvent: (event, envelope) => {
-        const route = routeWorkbenchAgentEvent(event, envelope);
-        if (route === "background" || route === "stale") return;
-        useAppStore.getState().receiveAgentEvent(event, envelope);
-        freshnessInstallationRef.current?.observe(event, envelope);
+        applyRendererAgentEvent(event, envelope, (projectedEvent, projectedEnvelope) => {
+          freshnessInstallationRef.current?.observe(projectedEvent, projectedEnvelope);
+        });
       },
       onSequenceGap: (gap) => useAppStore.getState().handleSequenceGap(gap),
       onTeardown: (error) => useAppStore.getState().handleAgentTeardown(error)

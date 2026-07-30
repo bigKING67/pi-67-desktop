@@ -3,10 +3,14 @@ import type {
   WorkbenchSettingsState,
   WorkbenchSurface
 } from "@pi67/domain";
+import { useAppStore } from "../app/app-store.js";
+import { INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { messages } from "../localization/message-catalog.js";
 import { registerAvailableRendererWorkspaces } from "./workspace-host-registration-controller.js";
 import {
   rendererWorkbenchStore,
+  selectedWorkbenchTask,
   taskForConversation,
   type RendererWorkbenchState
 } from "./workbench-store.js";
@@ -53,11 +57,12 @@ async function initialize(): Promise<void> {
   try {
     const state = await window.pi67.system.loadWorkbenchState();
     rendererWorkbenchStore.getState().hydrate(state);
+    bindPersistedRendererWorkbenchAuthority();
     await registerAvailableRendererWorkspaces();
   } catch (error) {
     publishNotification({
       level: "error",
-      title: "无法恢复工作台",
+      title: messages.runtime.workbench.restoreFailedTitle,
       message: errorMessage(error)
     });
   }
@@ -65,6 +70,53 @@ async function initialize(): Promise<void> {
     if (persistenceFingerprint(state) === persistenceFingerprint(previous)) return;
     schedulePersistence();
   });
+}
+
+export function bindPersistedRendererWorkbenchAuthority(
+  state = rendererWorkbenchStore.getState()
+): boolean {
+  const workspaceId = state.currentWorkspaceId;
+  const workspace = workspaceId ? state.workspaces[workspaceId] : undefined;
+  if (!workspace) {
+    useAppStore.setState({
+      workspace: undefined,
+      trust: "unknown",
+      sessionTransitionPending: false,
+      runtime: INITIAL_RUNTIME_STATE
+    });
+    return false;
+  }
+
+  if (workspace.availability !== "available") {
+    useAppStore.setState({
+      workspace: undefined,
+      trust: workspace.trust,
+      sessionTransitionPending: false,
+      runtime: {
+        phase: "failed",
+        detail: workspace.availability === "identity-changed"
+          ? messages.runtime.workbench.workspaceIdentityChanged
+          : messages.runtime.workbench.workspaceUnavailable,
+        recoverable: true
+      }
+    });
+    return false;
+  }
+
+  const selectedTask = selectedWorkbenchTask(state);
+  const runtime = selectedTask?.runtime ?? (
+    state.selectedSurface?.kind === "conversation"
+      ? { phase: "stopped" as const, detail: messages.runtime.workbench.sessionPendingOpen, recoverable: true }
+      : { phase: "stopped" as const, detail: messages.runtime.workbench.workspaceRestored, recoverable: true }
+  );
+  useAppStore.setState({
+    workspace: workspace.identity.canonicalPath,
+    trust: workspace.trust,
+    trustUpdating: false,
+    sessionTransitionPending: false,
+    runtime
+  });
+  return true;
 }
 
 function schedulePersistence(): void {
@@ -84,7 +136,7 @@ async function persist(revision: number): Promise<void> {
     if (revision !== persistenceRevision) return;
     publishNotification({
       level: "warning",
-      title: "工作台布局未保存",
+      title: messages.runtime.workbench.layoutNotSavedTitle,
       message: errorMessage(error)
     });
   }
@@ -115,7 +167,7 @@ function persistenceFingerprint(state: RendererWorkbenchState): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "未知错误";
+  return error instanceof Error ? error.message : messages.runtime.unknownError;
 }
 
 interface WorkbenchLayoutV2 {

@@ -2,7 +2,7 @@ import type { AssetReference } from "@pi67/domain";
 import { RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { conversationAssetController } from "../conversation/conversation-asset-controller.js";
-import styles from "./MessageCard.module.css";
+import styles from "./AssetImage.module.css";
 
 interface AssetImageProps {
   asset: AssetReference | undefined;
@@ -46,7 +46,7 @@ export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
     return (
       <img
         alt={name ?? "会话图片"}
-        className="message-image"
+        className={styles.image}
         decoding="async"
         loading="lazy"
         src={state.objectUrl}
@@ -56,7 +56,7 @@ export function AssetImage({ asset, mimeType, name }: AssetImageProps) {
   if (state.status === "error") {
     return (
       <div className={`${styles.imagePlaceholder} ${styles.imageError}`} role="alert">
-        <span>图片未能从 Agent Host 加载。</span>
+        <span>图片未能从 Pi 运行服务加载。</span>
         <button className={styles.imageRetry} onClick={() => setRetry((value) => value + 1)} type="button">
           <RotateCw aria-hidden="true" size={13} />
           重试

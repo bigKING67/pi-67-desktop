@@ -1,0 +1,92 @@
+.region {
+  grid-area: transcript;
+  min-height: 0;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+}
+
+.loading,
+.error,
+.empty {
+  grid-area: transcript;
+  display: grid;
+  min-height: 0;
+  place-content: center;
+  justify-items: center;
+  padding: 48px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.error {
+  gap: 7px;
+  color: var(--danger);
+}
+
+.error strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.error span {
+  max-width: 560px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.empty {
+  height: 100%;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  color: var(--accent);
+}
+
+.empty h2 {
+  margin: 0 0 7px;
+  color: var(--text-primary);
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.empty p {
+  max-width: 470px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.starterPrompts {
+  display: flex;
+  max-width: 650px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 22px;
+}
+
+.starterPrompts button {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.starterPrompts button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}

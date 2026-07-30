@@ -70,7 +70,9 @@ async function connectWithBoundedRetry(): Promise<AgentConnectionIdentity> {
     }
     if (delayMs > 0) await delay(delayMs);
     try {
-      await window.pi67.system.connectAgentHost();
+      await window.pi67.system.connectAgentHost({
+        replaceCurrent: agentConnectionController.hasReceivedPort
+      });
       return await agentConnectionController.waitForConnection(CONNECTION_ATTEMPT_TIMEOUT_MS);
     } catch (error) {
       lastError = error;

@@ -1,23 +1,26 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import {
-  assertSingleShutdownQuitLifecycle,
-  CONTROLLED_PROMPT_TEXT,
   isProcessAlive,
-  readPositiveProcessId,
-  resetControlledShutdownLifecycle,
-  waitForProcessExit,
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
-import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
   createPackagedTestDirectories,
   installWorkspaceDialogResult,
   launchPackagedApplication,
-  resolvePackagedArtifact
+  resolvePackagedArtifact,
+  setPackagedContentSize
 } from "./packaged-electron-fixture.mjs";
+import {
+  captureProcessOutput,
+  inspectRendererSurface,
+  openSettingsSection,
+  runControlledShutdownScenario,
+  verifyColdProviderRestoration,
+  verifyInitialRuntimeSettings
+} from "./packaged-electron-smoke-scenarios.mjs";
 
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
@@ -82,6 +85,7 @@ await writeControlledShutdownExtension({
 });
 let application;
 let childPid;
+const shutdownState = { childPid: undefined };
 let packagedProcessOutput = () => "";
 
 try {
@@ -98,41 +102,9 @@ try {
     throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
   }
   await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "00-welcome-system.png");
   await window.evaluate(() => window.pi67.system.connectAgentHost());
-  const initialSettings = await openSettingsSection(window, /^运行服务/u);
-  await initialSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^下载源与网络/u }).click();
-  await initialSettings.getByText("24.18.0", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
-  await initialSettings.getByText("12.0.1", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
-  await initialSettings.getByText("2.53.0", { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
-  await initialSettings.getByText("https://registry.npmmirror.com", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await initialSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^运行服务/u }).click();
-  await initialSettings.getByRole("button", { name: /运行环境诊断/u }).click();
-  const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
-  await doctorDialog.waitFor({ state: "visible", timeout: 15_000 });
-  await doctorDialog.getByRole("button", { name: "运行检查" }).click();
-  const doctorResults = doctorDialog.getByLabel("运行环境检查结果");
-  const doctorError = doctorDialog.locator(".doctor-error");
-  await doctorResults.or(doctorError).waitFor({ state: "visible", timeout: 30_000 });
-  if (await doctorError.isVisible()) {
-    throw new Error([
-      `Packaged Agent Host Doctor failed: ${(await doctorError.textContent())?.trim() ?? "unknown error"}`,
-      packagedProcessOutput() || "No packaged process diagnostics were emitted."
-    ].join("\n"));
-  }
-  await doctorResults.getByText("Pi SDK").waitFor({ state: "visible", timeout: 30_000 });
-  const sqliteCheck = doctorResults.locator(".doctor-check").filter({ hasText: "内置 SQLite" });
-  await sqliteCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sqliteCheck.getByText(/temporary-file create\/open\/close\/reopen verified\./u)
-    .waitFor({ state: "visible", timeout: 30_000 });
-  const sessionCatalogCheck = doctorResults.locator(".doctor-check").filter({ hasText: "Session 目录" });
-  await sessionCatalogCheck.getByText("需注意", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v1; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
-  await doctorDialog.getByRole("button", { name: "关闭" }).click();
-  await initialSettings.getByRole("button", { name: "返回工作台" }).click();
-  await initialSettings.waitFor({ state: "hidden", timeout: 15_000 });
+  await verifyInitialRuntimeSettings(window, packagedProcessOutput);
   await installWorkspaceDialogResult(application, workspace);
   await window.getByRole("button", { name: "选择工作区" }).click();
   await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
@@ -147,6 +119,9 @@ try {
   }
   const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
   await workspaceSettings.getByRole("button", { name: /运行环境诊断/u }).click();
+  const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
+  const sessionCatalogCheck = doctorDialog.getByLabel("运行环境检查结果")
+    .locator(".doctor-check").filter({ hasText: "Session 目录" });
   await doctorDialog.getByRole("button", { name: /重新运行检查/u }).click();
   await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
   await sessionCatalogCheck.getByText(/schema v1; ready/u).waitFor({ state: "visible", timeout: 30_000 });
@@ -317,6 +292,7 @@ try {
     const returnedSurface = await inspectRendererSurface(window);
     throw new Error(`Packaged Settings did not return to the conversation: ${JSON.stringify(returnedSurface)}`, { cause: error });
   }
+  await capturePackagedWorkbenchVisualEvidence(application, window);
   await window.reload();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
   const restoredConversation = window.getByLabel("Pi conversation");
@@ -361,40 +337,7 @@ try {
   } catch (error) {
     throw new Error(`Packaged Workspace did not restore after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
-  const coldProviderSettings = await openSettingsSection(window, /^模型服务/u);
-  const coldProviderPanel = coldProviderSettings.getByTestId("provider-configuration-panel");
-  const coldProviderList = coldProviderPanel.getByTestId("provider-configuration-list");
-  await coldProviderPanel.getByRole("textbox", { name: "搜索 Pi Provider" }).waitFor({ state: "visible", timeout: 30_000 });
-  await coldProviderList.getByRole("button").first().click();
-  await coldProviderPanel.getByTestId("provider-configuration-editor").waitFor({ state: "visible", timeout: 30_000 });
-  await coldProviderList.waitFor({ state: "hidden", timeout: 30_000 });
-  const coldModelTab = coldProviderPanel.getByRole("tablist", { name: "Provider 设置分区" })
-    .getByRole("tab", { name: /^模型 \d+$/u });
-  await coldModelTab.waitFor({ state: "visible", timeout: 30_000 });
-  if ((await coldModelTab.getAttribute("aria-selected")) !== "true") {
-    throw new Error("Packaged cold restart did not restore the Provider model catalog surface.");
-  }
-  const coldProviderModelList = coldProviderPanel.getByTestId("provider-model-list");
-  const coldProviderModelRow = coldProviderModelList.getByTestId("provider-model-row").first();
-  await coldProviderModelRow.waitFor({ state: "visible", timeout: 30_000 });
-  if ((await coldProviderPanel.getByLabel("Model ID").count()) !== 0) {
-    throw new Error("Packaged cold restart mounted a model editor before selection.");
-  }
-  await coldProviderModelRow.click();
-  await coldProviderPanel.getByTestId("provider-model-detail").waitFor({ state: "visible", timeout: 30_000 });
-  await coldProviderModelList.waitFor({ state: "hidden", timeout: 30_000 });
-  if ((await coldProviderPanel.getByLabel("Model ID").count()) !== 1) {
-    throw new Error("Packaged cold restart did not render one selected model editor.");
-  }
-  await window.getByRole("button", { name: /打开通知中心/u }).click();
-  const coldNotifications = window.getByRole("dialog", { name: "通知中心" });
-  await coldNotifications.waitFor({ state: "visible", timeout: 15_000 });
-  if (await coldNotifications.getByText("无法读取 Pi Provider 配置", { exact: true }).count()) {
-    throw new Error(`Packaged Provider load timed out after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`);
-  }
-  await window.keyboard.press("Escape");
-  await coldProviderSettings.getByRole("button", { name: "返回工作台" }).click();
-  await coldProviderSettings.waitFor({ state: "hidden", timeout: 15_000 });
+  await verifyColdProviderRestoration(window);
 
   if (!(await coldConversation.isVisible())) {
     await window.keyboard.press(process.platform === "darwin" ? "Meta+N" : "Control+N");
@@ -406,91 +349,81 @@ try {
   }
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
 
-  await application.evaluate(({ powerMonitor }) => powerMonitor.emit("resume"));
-  await window.getByLabel("当前状态：系统恢复后 Pi 状态已重新同步")
-    .waitFor({ state: "visible", timeout: 30_000 });
-  // Renderer reload can reattach or reinitialize the Task Runtime. Scope the
-  // exactly-once shutdown probe to final app quit.
-  await resetControlledShutdownLifecycle(lifecyclePath);
-  await startControlledPrompt(window);
-  await window.locator('[data-testid="conversation-row"]')
-    .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
-  await window.locator(".brand-lockup").getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
-    .waitFor({ state: "visible", timeout: 10_000 });
-  childPid = await readPositiveProcessId(childPidPath);
-  if (!isProcessAlive(childPid)) throw new Error("Controlled Extension child exited before packaged shutdown.");
-  const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
-    .filter((metric) => metric.type === "Utility")
-    .map((metric) => metric.pid));
-  if (utilityPids.length === 0) throw new Error("Packaged Agent Host utility process was not observable.");
-
-  const closeStartedAt = Date.now();
-  await application.close();
+  const closeDurationMs = await runControlledShutdownScenario({
+    application,
+    childPidPath,
+    lifecyclePath,
+    shutdownState,
+    window
+  });
+  childPid = shutdownState.childPid;
   application = undefined;
-  const closeDurationMs = Date.now() - closeStartedAt;
-  if (closeDurationMs > 5_000) {
-    throw new Error(`Packaged application shutdown exceeded 5000ms: ${closeDurationMs}ms.`);
-  }
-  await waitForProcessExit(childPid);
-  for (const pid of utilityPids) await waitForProcessExit(pid);
-  await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
   console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();
+    childPid ??= shutdownState.childPid;
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   } finally {
     await cleanupPackagedTestDirectories(userDataDirectory);
   }
 }
 
-function captureProcessOutput(process) {
-  let output = "";
-  const capture = (chunk) => {
-    if (output.length >= 8_192) return;
-    output += String(chunk).slice(0, 8_192 - output.length);
-  };
-  process.stdout?.on("data", capture);
-  process.stderr?.on("data", capture);
-  return () => output;
-}
-
-async function openSettingsSection(window, sectionName) {
-  await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("π 设置");
-  await settings.waitFor({ state: "visible", timeout: 15_000 });
-  const settingsLayout = await settings.evaluate((element) => ({
-    columns: getComputedStyle(element).gridTemplateColumns,
-    width: element.getBoundingClientRect().width
-  }));
-  if (settingsLayout.columns.trim().split(/\s+/u).length !== 2) {
-    throw new Error(`Expected two-column packaged Settings at ${settingsLayout.width}px, received ${settingsLayout.columns}.`);
-  }
-  if (await window.getByRole("complementary", { name: "会话导航" }).count()) {
-    throw new Error("Packaged Settings must not retain the workspace navigation column.");
-  }
-  if (await window.getByTestId("inspector-toggle").count()) {
-    throw new Error("Packaged Settings must not retain the Inspector toggle.");
-  }
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: sectionName }).click();
-  return settings;
-}
-
-function inspectRendererSurface(window) {
-  return window.evaluate(() => ({
-    bodyText: document.body.innerText.slice(0, 2_000),
-    conversationCount: document.querySelectorAll('[aria-label="Pi conversation"]').length,
-    conversationRowCount: document.querySelectorAll('[data-testid="conversation-row"]').length,
-    settingsVisible: Boolean(document.querySelector('[data-testid="settings-workbench"]')),
-    title: document.title,
-    url: location.href
-  }));
-}
-
 async function capturePackagedScreenshot(window, fileName) {
   if (!packagedScreenshotDirectory) return;
   await window.screenshot({ path: join(packagedScreenshotDirectory, fileName) });
+}
+
+async function capturePackagedWorkbenchVisualEvidence(application, window) {
+  if (!packagedScreenshotDirectory) return;
+  const conversation = window.getByLabel("Pi conversation");
+  const composer = window.getByLabel("给 Pi 发送消息");
+  await conversation.waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "11-workbench-light.png");
+
+  await composer.focus();
+  await capturePackagedScreenshot(window, "12-composer-focus-light.png");
+  await window.getByRole("button", { name: "打开命令面板" }).click();
+  const commandPalette = window.getByRole("dialog", { name: "命令面板" });
+  await commandPalette.waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "13-command-palette-light.png");
+  await window.keyboard.press("Escape");
+  await commandPalette.waitFor({ state: "hidden", timeout: 15_000 });
+  await window.mouse.move(720, 460);
+  await window.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+
+  await setPackagedContentSize(application, 1040, 720);
+  await waitForTwoPaints(window);
+  await capturePackagedScreenshot(window, "14-workbench-1040-light.png");
+  await setPackagedContentSize(application, 760, 720);
+  await waitForTwoPaints(window);
+  await capturePackagedScreenshot(window, "15-workbench-760-light.png");
+  await setPackagedContentSize(application, 1440, 920);
+  await waitForTwoPaints(window);
+
+  const darkSettings = await openSettingsSection(window, /^通用/u);
+  await darkSettings.getByRole("button", { name: /^深色/u }).click();
+  await window.locator('html[data-theme-preference="dark"][data-theme="dark"]').waitFor({ state: "attached" });
+  await capturePackagedScreenshot(window, "16-general-dark.png");
+  await darkSettings.getByRole("button", { name: "返回工作台" }).click();
+  await darkSettings.waitFor({ state: "hidden", timeout: 15_000 });
+  await conversation.waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "17-workbench-dark.png");
+
+  const lightSettings = await openSettingsSection(window, /^通用/u);
+  await lightSettings.getByRole("button", { name: /^浅色/u }).click();
+  await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
+  await lightSettings.getByRole("button", { name: "返回工作台" }).click();
+  await lightSettings.waitFor({ state: "hidden", timeout: 15_000 });
+  await conversation.waitFor({ state: "visible", timeout: 15_000 });
+}
+
+async function waitForTwoPaints(window) {
+  await window.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
 }
 
 async function assertNoWorkspaceChangesAuthorityWarning(window) {

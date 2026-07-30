@@ -9,6 +9,7 @@ overrides:
   '@earendil-works/pi-ai': 0.81.1
   '@earendil-works/pi-coding-agent': 0.81.1
   '@earendil-works/pi-tui': 0.81.1
+  brace-expansion@5: 5.0.8
 
 importers:
 
@@ -24,12 +25,12 @@ importers:
         specifier: workspace:*
         version: link:apps/renderer
     devDependencies:
-      '@playwright/test':
-        specifier: 1.61.1
-        version: 1.61.1
       '@pi67/protocol':
         specifier: workspace:*
         version: link:packages/protocol
+      '@playwright/test':
+        specifier: 1.61.1
+        version: 1.61.1
       '@types/node':
         specifier: 24.10.1
         version: 24.10.1
@@ -1919,9 +1920,9 @@ packages:
   brace-expansion@2.1.2:
     resolution: {integrity: sha512-w5JZcKgdhDOgOwm8H+KgbosopHMuGcl6qbulwjtz3SM7I7P3yW1eAjzMPLrIE+NQ9vjgANKHWeMHnrT0OXW1oA==}
 
-  brace-expansion@5.0.7:
-    resolution: {integrity: sha512-7oFy703dxfY3/NLxC1fh2SUCQ0H9rmAY+5EpDVfXjUTTs+HEwR2nYaqLv+GWcTsumwxPfiz6CzCNkwXwBUwqCA==}
-    engines: {node: 18 || 20 || >=22}
+  brace-expansion@5.0.8:
+    resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
+    engines: {node: 20 || >=22}
 
   browserslist@4.28.7:
     resolution: {integrity: sha512-JxV13hNrFxqjOc8alRbq9dK1MM79NEXYpma2B2J4wAtpWS5zIEIKqWPGCl7N4o7Uc7B7itylh7SuDujATRyyTw==}
@@ -5330,7 +5331,7 @@ snapshots:
     dependencies:
       balanced-match: 1.0.2
 
-  brace-expansion@5.0.7:
+  brace-expansion@5.0.8:
     dependencies:
       balanced-match: 4.0.4
 
@@ -6554,7 +6555,7 @@ snapshots:
 
   minimatch@10.2.5:
     dependencies:
-      brace-expansion: 5.0.7
+      brace-expansion: 5.0.8
 
   minimatch@3.1.5:
     dependencies:

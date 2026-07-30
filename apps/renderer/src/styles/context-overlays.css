@@ -61,7 +61,7 @@
 .metric-list { display: grid; gap: 1px; margin: 0 0 18px; }
 .metric-list > div { display: flex; justify-content: space-between; padding: 8px 2px; border-bottom: 1px solid var(--border); }
 .metric-list dt { color: var(--text-secondary); }
-.metric-list dd { margin: 0; font-family: var(--font-code); font-size: 11px; font-variant-ligatures: none; }
+.metric-list dd { margin: 0; font-family: var(--font-code); font-size: 11px; font-variant-ligatures: none; font-variant-numeric: tabular-nums; }
 
 .status-list > div,
 .resource-row { display: grid; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }

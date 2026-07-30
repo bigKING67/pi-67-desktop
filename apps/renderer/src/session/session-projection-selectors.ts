@@ -12,7 +12,6 @@ export const selectHasSession = (state: SessionProjectionState) => (
 export const selectSessionPath = (state: SessionProjectionState) => state.identity?.sessionPath;
 export const selectSessionName = (state: SessionProjectionState) => state.identity?.sessionName;
 export const selectSessionModels = (state: SessionProjectionState) => state.modelCatalog?.models;
-export const selectSessionProviders = (state: SessionProjectionState) => state.modelCatalog?.providers;
 export const selectSelectedModel = (state: SessionProjectionState) => state.controls?.selectedModel;
 export const selectThinkingLevel = (state: SessionProjectionState) => state.controls?.thinkingLevel;
 export const selectAvailableThinkingLevels = (state: SessionProjectionState) => (

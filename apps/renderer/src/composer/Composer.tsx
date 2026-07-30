@@ -145,11 +145,12 @@ export function Composer() {
   };
 
   return (
-    <footer className={`composer-region ${styles.region}`}>
+    <footer className={styles.region} data-testid="composer-region">
       <ExtensionWidgets items={widgetItems} placement="aboveEditor" />
       <ComposerQueuePanel />
       <div
-        className={`composer-shell ${styles.shell} ${attachmentDragActive ? styles.dropActive : ""}`}
+        className={`${styles.shell} ${attachmentDragActive ? styles.dropActive : ""}`}
+        data-testid="composer-shell"
         onDragEnter={(event) => {
           if (!transferContainsFiles(event.dataTransfer)) return;
           event.preventDefault();
@@ -178,17 +179,17 @@ export function Composer() {
         {attachmentDragActive ? (
           <div className={styles.dropIndicator} role="status">{messages.composer.dropImages}</div>
         ) : null}
-        {attachmentError ? <div className="attachment-error" role="alert">{attachmentError}</div> : null}
+        {attachmentError ? <div className={styles.attachmentError} role="alert">{attachmentError}</div> : null}
         {submissionError ? (
-          <div className="attachment-error" role="alert">
+          <div className={styles.attachmentError} role="alert">
             <strong>{messages.composer.submissionFailed}</strong>
             <span>{submissionError}</span>
           </div>
         ) : null}
         {attachments.length > 0 ? (
-          <div className="attachment-row" aria-label={messages.composer.pendingAttachments}>
+          <div className={styles.attachmentRow} aria-label={messages.composer.pendingAttachments}>
             {attachments.map((attachment) => (
-              <article className="attachment-item" key={attachment.id}>
+              <article className={styles.attachmentItem} key={attachment.id}>
                 <img alt={attachment.file.name} src={attachment.previewUrl} />
                 <span><strong>{attachment.file.name}</strong><small>{formatAttachmentFileSize(attachment.file.size)}</small></span>
                 <button
@@ -231,8 +232,8 @@ export function Composer() {
             }
           }}
         />
-        <div className={`composer-toolbar ${styles.toolbar}`}>
-          <div className={`composer-tools ${styles.tools}`}>
+        <div className={styles.toolbar}>
+          <div className={styles.tools}>
             <input
               ref={fileInput}
               aria-label={messages.composer.chooseImageAttachment}
@@ -249,10 +250,10 @@ export function Composer() {
             />
             <Button className={`icon-button ${styles.attachmentButton}`} aria-label={messages.composer.addImage} isDisabled={submitting} onPress={() => fileInput.current?.click()}><ImagePlus size={16} /></Button>
             {streaming ? (
-              <div className={`stream-mode ${styles.streamMode}`} aria-label={messages.composer.streamingDelivery}>
+              <div className={styles.streamMode} aria-label={messages.composer.streamingDelivery}>
                 <button
                   aria-pressed={streamBehavior === "steer"}
-                  className={streamBehavior === "steer" ? "is-active" : ""}
+                  className={streamBehavior === "steer" ? styles.streamModeActive : ""}
                   disabled={submitting}
                   title={messages.composer.steerDetail}
                   type="button"
@@ -264,7 +265,7 @@ export function Composer() {
                 ><ArrowUp size={13} />{messages.composer.steer}</button>
                 <button
                   aria-pressed={streamBehavior === "followUp"}
-                  className={streamBehavior === "followUp" ? "is-active" : ""}
+                  className={streamBehavior === "followUp" ? styles.streamModeActive : ""}
                   disabled={submitting}
                   title={messages.composer.followUpDetail}
                   type="button"
@@ -275,11 +276,11 @@ export function Composer() {
                   }}
                 ><ListPlus size={13} />{messages.composer.followUp}</button>
               </div>
-            ) : <span className={`composer-hint ${styles.hint}`}>{messages.composer.keyboardHint}</span>}
+            ) : <span className={styles.hint}>{messages.composer.keyboardHint}</span>}
           </div>
-          <div className={`composer-actions ${styles.actions}`}>
+          <div className={styles.actions}>
             <ComposerRuntimeControls submitting={submitting} />
-            <Button className="send-button" isDisabled={!canSend} onPress={() => void submit()}>
+            <Button className={styles.sendButton!} isDisabled={!canSend} onPress={() => void submit()}>
               <Send size={15} />{submitting ? messages.composer.sending : messages.composer.send}
             </Button>
           </div>

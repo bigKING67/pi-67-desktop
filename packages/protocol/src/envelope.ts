@@ -1,5 +1,4 @@
-import { Type, type Static } from "typebox";
-import { Value } from "typebox/value";
+import { Type, Value, type Static } from "./typebox-schema.js";
 import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES
 } from "@pi67/domain";

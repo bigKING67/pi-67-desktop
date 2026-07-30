@@ -73,6 +73,17 @@ describe("connection recovery", () => {
     await expect(first).resolves.toEqual(identity);
     await expect(second).resolves.toEqual(identity);
     expect(connectAgentHost).toHaveBeenCalledTimes(2);
+    expect(connectAgentHost).toHaveBeenNthCalledWith(1, { replaceCurrent: false });
+    expect(connectAgentHost).toHaveBeenNthCalledWith(2, { replaceCurrent: false });
     expect(waitForConnection).toHaveBeenCalledTimes(2);
+  });
+
+  it("forces a same-document replacement after a previous Port was observed", async () => {
+    vi.spyOn(agentConnectionController, "hasReceivedPort", "get").mockReturnValue(true);
+    vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(identity);
+
+    await expect(ensureAgentConnection()).resolves.toEqual(identity);
+
+    expect(connectAgentHost).toHaveBeenCalledWith({ replaceCurrent: true });
   });
 });

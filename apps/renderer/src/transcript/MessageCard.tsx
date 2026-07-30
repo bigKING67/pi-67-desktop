@@ -3,32 +3,34 @@ import { Bot, UserRound, Wrench } from "lucide-react";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
 import { MarkdownView } from "./MarkdownView.js";
+import styles from "./MessageCard.module.css";
 
 export function MessageCard({ message, streaming = false }: { message: SessionMessageView; streaming?: boolean }) {
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
   return (
     <article
-      className={`message-card role-${message.role}`}
+      className={`${styles.card} ${isUser ? styles.user : ""}`}
       aria-busy={streaming || undefined}
       aria-label={streaming ? "Pi 正在回复" : `${message.role} message`}
+      data-testid="message-card"
       data-render-mode={streaming ? "streaming" : "settled"}
     >
-      <header className="message-header">
-        <span className="message-author">
+      <header className={styles.header}>
+        <span className={styles.author}>
           {isUser ? <UserRound size={14} /> : isTool ? <Wrench size={14} /> : <Bot size={14} />}
           {isUser ? "你" : isTool ? "工具" : "Pi"}
         </span>
-        <span className="message-meta">
+        <span className={styles.meta}>
           {message.model ? <code>{message.model}</code> : null}
           {message.stopped ? "已停止" : null}
         </span>
       </header>
-      <div className="message-content">
+      <div className={styles.content} data-testid="message-content">
         {message.parts.map((part, index) => {
           if (part.type === "thinking") {
             return (
-              <details className="thinking-block" key={`${message.id}-thinking-${index}`}>
+              <details className={styles.thinking} key={`${message.id}-thinking-${index}`}>
                 <summary>推理过程</summary>
                 <MarkdownView mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>
               </details>
@@ -49,7 +51,7 @@ export function MessageCard({ message, streaming = false }: { message: SessionMe
           return null;
         })}
       </div>
-      {message.error ? <div className="message-error">{message.error}</div> : null}
+      {message.error ? <div className={styles.error}>{message.error}</div> : null}
     </article>
   );
 }

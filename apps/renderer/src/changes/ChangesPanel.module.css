@@ -22,14 +22,14 @@
 .detailHeading > div { display: grid; min-width: 0; gap: 2px; }
 .detailHeading > div > span { color: var(--text-tertiary); font-size: 10px; font-weight: 650; text-transform: uppercase; }
 .detailHeading code { overflow: hidden; font-family: var(--font-code); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.stats { display: flex; gap: 6px; font-family: var(--font-code); font-size: 11px; }
+.stats { display: flex; gap: 6px; font-family: var(--font-code); font-size: 11px; font-variant-numeric: tabular-nums; }
 .stats b { color: var(--success); }
 .stats i { color: var(--danger); font-style: normal; font-weight: 700; }
 .patch { display: grid; max-height: min(42vh, 420px); margin: 0; overflow: auto; border: 1px solid var(--code-border); border-radius: var(--radius-control); background: var(--code-surface); color: var(--code-text); font-family: var(--font-code); font-size: 10px; line-height: 1.55; }
 .patch span { display: block; min-width: max-content; padding-inline: 10px; white-space: pre; }
 .patchMeta { color: var(--code-muted); }
-.added { background: color-mix(in srgb, var(--diff-added) 40%, transparent); color: #9be9a8; }
-.removed { background: color-mix(in srgb, var(--diff-removed) 38%, transparent); color: #ffb3ad; }
+.added { background: color-mix(in srgb, var(--diff-added) 40%, transparent); color: var(--code-diff-added-text); }
+.removed { background: color-mix(in srgb, var(--diff-removed) 38%, transparent); color: var(--code-diff-removed-text); }
 .context { color: var(--code-text); }
 @keyframes changes-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }

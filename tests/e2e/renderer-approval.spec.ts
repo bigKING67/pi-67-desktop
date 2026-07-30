@@ -74,7 +74,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await page.getByRole("button", { name: "仅允许本次" }).click();
   await expect(page.getByRole("heading", { name: "需要单次授权" })).toHaveCount(0);
   await expect(page.getByText("工具授权请求已过期", { exact: true })).toBeVisible();
-  await expect(page.getByText("Agent Host 未接受这次授权响应，工具将保持阻止状态。", { exact: true })).toBeVisible();
+  await expect(page.getByText("Pi 运行服务未接受这次授权响应，工具将保持阻止状态。", { exact: true })).toBeVisible();
 });
 
 test("renders suspicious approval bytes safely and keeps decisions reachable at constrained height", async ({ page }) => {

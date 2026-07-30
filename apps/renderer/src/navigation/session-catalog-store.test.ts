@@ -23,6 +23,7 @@ const SESSION_TWO: SessionSummary = {
   messageCount: 4
 };
 const QUERY_KEY = "0".repeat(64);
+const WORKSPACE_ID = "workspace-a";
 
 describe("session catalog store", () => {
   beforeEach(() => {
@@ -31,10 +32,10 @@ describe("session catalog store", () => {
 
   it("normalizes and installs a first-page projection", () => {
     const store = useSessionCatalogStore.getState();
-    const target = store.beginFirstPage({ query: " session " });
+    const target = store.beginFirstPage(WORKSPACE_ID, { query: " session " });
     expect(store.finishFirstPage(target, page([SESSION_ONE]))).toBe(true);
 
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       items: [SESSION_ONE],
       total: 1,
       revision: 1,
@@ -68,20 +69,21 @@ describe("session catalog store", () => {
     });
     const second = page([SESSION_ONE, SESSION_TWO], { total: 2 });
     const store = useSessionCatalogStore.getState();
-    store.finishFirstPage(store.beginFirstPage(), first);
-    const nextTarget = store.beginNextPage();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), first);
+    const nextTarget = store.beginNextPage(WORKSPACE_ID);
     expect(nextTarget).toBeDefined();
     expect(store.finishNextPage(nextTarget!, second)).toBe(true);
 
-    expect(useSessionCatalogStore.getState().items).toEqual([SESSION_ONE, SESSION_TWO]);
-    expect(useSessionCatalogStore.getState().hasMore).toBe(false);
+    expect(catalog().items).toEqual([SESSION_ONE, SESSION_TWO]);
+    expect(catalog().hasMore).toBe(false);
   });
 
   it("clears loaded pages and invalidates pending requests when status revision changes", () => {
-    useSessionCatalogStore.setState({ ...pageState(page([SESSION_ONE])), query: "" });
-    const pending = useSessionCatalogStore.getState().beginFirstPage();
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), page([SESSION_ONE]));
+    const pending = store.beginFirstPage(WORKSPACE_ID);
 
-    useSessionCatalogStore.getState().applyStatus({
+    store.applyStatus(WORKSPACE_ID, {
       revision: 2,
       itemCount: 2,
       source: "sqlite",
@@ -92,7 +94,7 @@ describe("session catalog store", () => {
       skippedCount: 0
     });
 
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       items: [],
       total: 0,
       revision: 2,
@@ -102,13 +104,12 @@ describe("session catalog store", () => {
       itemCount: 2,
       reconciledAt: 30
     });
-    expect(useSessionCatalogStore.getState().finishFirstPage(pending, page([SESSION_TWO]))).toBe(false);
-    expect(useSessionCatalogStore.getState().items).toEqual([]);
+    expect(store.finishFirstPage(pending, page([SESSION_TWO]))).toBe(false);
+    expect(catalog().items).toEqual([]);
   });
 
   it("retains incomplete status and clears it on reset", () => {
-    useSessionCatalogStore.setState({ revision: 3 });
-    useSessionCatalogStore.getState().applyStatus({
+    useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, {
       revision: 3,
       itemCount: 8,
       source: "sdk-fallback",
@@ -118,7 +119,7 @@ describe("session catalog store", () => {
       incomplete: true,
       skippedCount: 2
     });
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       catalogState: "fallback",
       source: "sdk-fallback",
       incomplete: true,
@@ -127,8 +128,8 @@ describe("session catalog store", () => {
       reconciledAt: 40
     });
 
-    useSessionCatalogStore.getState().reset();
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    useSessionCatalogStore.getState().reset(WORKSPACE_ID);
+    expect(catalog()).toMatchObject({
       incomplete: false,
       skippedCount: 0,
       itemCount: 0,
@@ -137,12 +138,12 @@ describe("session catalog store", () => {
   });
 
   it("does not present old rows as results for a failed new search", () => {
-    useSessionCatalogStore.setState({ ...pageState(page([SESSION_ONE])), query: "old" });
     const store = useSessionCatalogStore.getState();
-    const target = store.beginFirstPage({ query: "new" });
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID, { query: "old" }), page([SESSION_ONE]));
+    const target = store.beginFirstPage(WORKSPACE_ID, { query: "new" });
     expect(store.failFirstPage(target, "catalog unavailable")).toBe(true);
 
-    expect(useSessionCatalogStore.getState()).toMatchObject({
+    expect(catalog()).toMatchObject({
       query: "new",
       items: [],
       total: 0,
@@ -152,12 +153,38 @@ describe("session catalog store", () => {
   });
 
   it("invalidates changed revisions but ignores an unchanged ready revision", () => {
-    useSessionCatalogStore.setState({ ...pageState(page([SESSION_ONE])), revision: 3, rebuilding: false });
-    expect(useSessionCatalogStore.getState().invalidateRevision(3)).toBe(false);
-    expect(useSessionCatalogStore.getState().items).toEqual([SESSION_ONE]);
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), page([SESSION_ONE], { revision: 3 }));
+    expect(store.invalidateRevision(WORKSPACE_ID, 3)).toBe(false);
+    expect(catalog().items).toEqual([SESSION_ONE]);
 
-    expect(useSessionCatalogStore.getState().invalidateRevision(4)).toBe(true);
-    expect(useSessionCatalogStore.getState()).toMatchObject({ revision: 4, items: [], total: 0 });
+    expect(store.invalidateRevision(WORKSPACE_ID, 4)).toBe(true);
+    expect(catalog()).toMatchObject({ revision: 4, items: [], total: 0 });
+  });
+
+  it("resets one Workspace without changing another", () => {
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage("workspace-a"), page([SESSION_ONE]));
+    store.finishFirstPage(store.beginFirstPage("workspace-b"), page([SESSION_TWO]));
+
+    store.reset("workspace-a");
+
+    expect(catalog("workspace-a").items).toEqual([]);
+    expect(catalog("workspace-b").items).toEqual([SESSION_TWO]);
+  });
+
+  it("clears every Workspace and rejects requests from before the reset", () => {
+    const store = useSessionCatalogStore.getState();
+    const staleTarget = store.beginFirstPage("workspace-a");
+    store.finishFirstPage(store.beginFirstPage("workspace-b"), page([SESSION_TWO]));
+
+    store.reset();
+    const currentTarget = store.beginFirstPage("workspace-a");
+
+    expect(store.finishFirstPage(staleTarget, page([SESSION_ONE]))).toBe(false);
+    expect(store.finishFirstPage(currentTarget, page([SESSION_TWO]))).toBe(true);
+    expect(Object.keys(useSessionCatalogStore.getState().byWorkspace)).toEqual(["workspace-a"]);
+    expect(catalog("workspace-a").items).toEqual([SESSION_TWO]);
   });
 });
 
@@ -177,16 +204,6 @@ function page(items: SessionSummary[], overrides: Partial<SessionCatalogPage> = 
   };
 }
 
-function pageState(value: SessionCatalogPage) {
-  return {
-    items: value.items,
-    total: value.total,
-    nextCursor: value.nextCursor,
-    hasMore: value.hasMore,
-    revision: value.revision,
-    rebuilding: value.rebuilding,
-    source: value.source,
-    catalogState: value.state,
-    error: undefined
-  };
+function catalog(workspaceId = WORKSPACE_ID) {
+  return selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), workspaceId);
 }

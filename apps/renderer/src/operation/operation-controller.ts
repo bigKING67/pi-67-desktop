@@ -9,6 +9,7 @@ import {
 import { useAppStore } from "../app/app-store.js";
 import { operationFromSubmission } from "../app/app-state-projection.js";
 import { applySettledSubmission } from "../app/operation-submission.js";
+import { messages } from "../localization/message-catalog.js";
 
 export async function abortActiveOperation(): Promise<void> {
   const operationId = useAppStore.getState().operation?.operationId;
@@ -16,7 +17,7 @@ export async function abortActiveOperation(): Promise<void> {
   try {
     await agentConnectionController.request("operation.abort", { operationId });
   } catch (error) {
-    publishActionError(error, "无法停止当前任务");
+    publishActionError(error, messages.operation.abortFailedTitle);
   }
 }
 
@@ -26,26 +27,26 @@ export async function compactRendererSession(): Promise<void> {
     const accepted = await agentConnectionController.request("session.compact", {
       submissionId: createMessageId("compaction")
     });
-    if (!acceptSubmission(accepted, authority, "上下文压缩确认已过期")) return;
+    if (!acceptSubmission(accepted, authority, messages.operation.compactionAcknowledgementStale)) return;
     if (applySettledSubmission(
       useAppStore.setState,
       accepted,
       "compaction",
-      "上下文压缩已结束",
+      messages.operation.compactionSettled,
       authority
     )) return;
     useAppStore.setState({
       operation: operationFromSubmission(accepted, "compaction"),
-      operationDetail: "正在压缩上下文",
+      operationDetail: messages.operation.compactionStarting,
       operationProgress: undefined
     });
   } catch (error) {
-    publishActionError(error, "无法启动会话压缩");
+    publishActionError(error, messages.operation.compactionStartFailedTitle);
   }
 }
 
 export async function listRuntimeCommands(): Promise<CommandDescriptor[]> {
-  if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
+  if (!agentConnectionController.identity) throw new Error(messages.operation.runtimeDisconnected);
   return agentConnectionController.request("command.list", {});
 }
 
@@ -56,27 +57,27 @@ export async function invokeRuntimeCommand(command: string): Promise<void> {
       submissionId: createMessageId("command"),
       command
     });
-    if (!acceptSubmission(accepted, authority, `命令 /${command} 确认已过期`)) return;
+    if (!acceptSubmission(accepted, authority, messages.operation.commandAcknowledgementStale(command))) return;
     if (applySettledSubmission(
       useAppStore.setState,
       accepted,
       "command",
-      `命令 /${command} 已结束`,
+      messages.operation.commandSettled(command),
       authority
     )) return;
     useAppStore.setState({
       operation: operationFromSubmission(accepted, "command"),
-      operationDetail: `命令 /${command} 已接收`,
+      operationDetail: messages.operation.commandAccepted(command),
       operationProgress: undefined
     });
   } catch (error) {
-    publishActionError(error, "无法执行 Pi 命令");
+    publishActionError(error, messages.operation.commandFailedTitle);
   }
 }
 
 function requireSessionAuthority(): RendererSessionAuthority {
   const authority = currentRendererSessionAuthority(useAppStore.getState());
-  if (!authority) throw new Error("Pi 会话身份尚未就绪。");
+  if (!authority) throw new Error(messages.operation.sessionAuthorityUnavailable);
   return authority;
 }
 
@@ -95,7 +96,7 @@ function acceptSubmission(
   publishNotification({
     level: "warning",
     title: warningTitle,
-    message: "Pi 运行服务或会话已在请求期间替换，旧确认已忽略。"
+    message: messages.operation.staleAcknowledgement
   });
   return false;
 }
@@ -105,5 +106,5 @@ function publishActionError(error: unknown, title: string): void {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "未知错误";
+  return error instanceof Error ? error.message : messages.runtime.unknownError;
 }

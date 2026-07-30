@@ -1,5 +1,6 @@
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { eventTaskAuthority } from "../connection/event-authority.js";
+import { messages } from "../localization/message-catalog.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
@@ -36,9 +37,9 @@ export function routeWorkbenchAgentEvent(
         sessionId: snapshot.sessionId,
         ...(sessionContext ? { sessionGeneration: sessionContext.sessionGeneration } : {}),
         ...(snapshot.sessionPath ? { sessionPath: snapshot.sessionPath } : {}),
-        title: snapshot.sessionName?.trim() || "未命名会话",
+        title: snapshot.sessionName?.trim() || messages.runtime.workbench.unnamedSession,
         lifecycle: "idle",
-        runtime: { phase: "ready", detail: "Pi 会话已就绪", recoverable: true }
+        runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true }
       });
       break;
     }
@@ -52,7 +53,7 @@ export function routeWorkbenchAgentEvent(
       });
       break;
     case "operation.started":
-      workbench.updateTask(task.id, { lifecycle: "running", runtime: { phase: "busy", detail: "Pi 正在执行任务", recoverable: true } });
+      workbench.updateTask(task.id, { lifecycle: "running", runtime: { phase: "busy", detail: messages.operation.running, recoverable: true } });
       break;
     case "operation.activityChanged":
       workbench.updateTask(task.id, {
@@ -64,7 +65,7 @@ export function routeWorkbenchAgentEvent(
       });
       break;
     case "operation.completed":
-      workbench.updateTask(task.id, { lifecycle: "completed", runtime: { phase: "ready", detail: "任务已完成", recoverable: true } });
+      workbench.updateTask(task.id, { lifecycle: "completed", runtime: { phase: "ready", detail: messages.operation.completed, recoverable: true } });
       break;
     case "operation.failed":
       workbench.updateTask(task.id, { lifecycle: "failed", runtime: { phase: "failed", detail: event.payload.error.message, recoverable: event.payload.error.recoverable } });
@@ -76,7 +77,7 @@ export function routeWorkbenchAgentEvent(
       workbench.updateTask(task.id, { lifecycle: "lost", runtime: { phase: "failed", detail: event.payload.reason, recoverable: true } });
       break;
     case "session.metaChanged":
-      workbench.updateTask(task.id, { title: event.payload.sessionName?.trim() || "未命名会话" });
+      workbench.updateTask(task.id, { title: event.payload.sessionName?.trim() || messages.runtime.workbench.unnamedSession });
       break;
     default:
       break;

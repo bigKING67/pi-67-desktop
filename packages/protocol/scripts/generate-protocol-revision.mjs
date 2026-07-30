@@ -15,8 +15,19 @@ const revision = createHash("sha256")
   .update(protocol.canonicalProtocolRevisionMaterial(), "utf8")
   .digest("hex");
 const previous = await readFile(revisionFile, "utf8");
-if (!/^export const PROTOCOL_REVISION = "[0-9a-f]{64}" as const;\n$/u.test(previous)) {
+const revisionMatch = /^export const PROTOCOL_REVISION = "([0-9a-f]{64})" as const;\n$/u.exec(previous);
+if (!revisionMatch) {
   throw new Error("Refusing to replace an unexpected protocol-revision.ts shape.");
+}
+if (process.argv.includes("--check")) {
+  if (revisionMatch[1] !== revision) {
+    throw new Error(
+      `Protocol revision is stale: expected ${revision}, received ${revisionMatch[1]}. `
+      + "Run `corepack pnpm --filter @pi67/protocol run generate:revision` and commit the schema and revision together."
+    );
+  }
+  process.stdout.write(`${revision}\n`);
+  process.exit(0);
 }
 await writeFile(
   revisionFile,

@@ -362,7 +362,11 @@ function WorkspaceMenu({
 }) {
   return (
     <MenuTrigger>
-      <Button className={styles.workspaceQuickAction!} aria-label={`${workspace.displayName} 工作区菜单`}>
+      <Button
+        className={styles.workspaceQuickAction!}
+        aria-label={`${workspace.displayName} 工作区菜单`}
+        data-testid="workspace-menu-trigger"
+      >
         <Ellipsis aria-hidden="true" size={14} />
       </Button>
       <Popover className={styles.menuPopover!} placement="bottom end" offset={5}>

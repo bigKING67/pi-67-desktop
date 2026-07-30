@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   SessionControlsViewSchema,
   SessionModelCatalogViewSchema

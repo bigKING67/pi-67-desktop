@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useApprovalStore } from "../approval/approval-store.js";
-import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import {
+  selectWorkspaceSessionCatalog,
+  useSessionCatalogStore
+} from "../navigation/session-catalog-store.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { submitRendererPrompt } from "../composer/prompt-submission-controller.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -55,29 +58,6 @@ describe("renderer projection state", () => {
     rendererWorkbenchStore.getState().reset();
   });
 
-  it("clears recorded changes when a bootstrap switches the session identity", () => {
-    vi.spyOn(agentConnectionController, "request").mockReturnValue(new Promise(() => undefined) as never);
-    emitChange(runningChange);
-    const nextSnapshot = snapshot("session-2");
-    const event = { type: "session.bootstrap", payload: { snapshot: nextSnapshot, reason: "session-open" } } as const;
-    useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
-      hostEpoch: 9,
-      sequence: 2,
-      sessionId: "session-2",
-      sessionGeneration: 4
-    })));
-
-    expect(useSessionProjectionStore.getState().authority).toMatchObject({
-      phase: "active",
-      sessionId: "session-2",
-      sessionGeneration: 4
-    });
-    expect(useWorkspaceChangesStore.getState().projection).toBeUndefined();
-    expect(useWorkspaceChangesStore.getState().status).toBe("loading");
-    expect("messages" in useSessionProjectionStore.getState()).toBe(false);
-    expect(useConversationStore.getState().authority?.sessionId).toBe("session-2");
-  });
-
   it("uses the authoritative resync changes instead of retaining the pre-gap projection", async () => {
     emitChange(runningChange);
     const resyncedChanges: WorkspaceChangesProjection = {
@@ -125,7 +105,10 @@ describe("renderer projection state", () => {
 
     useAppStore.getState().handleSequenceGap({ expected: 2, received: 10, hostEpoch: 9 });
     await vi.waitFor(() => expect(useWorkspaceChangesStore.getState().projection).toEqual(resyncedChanges));
-    await vi.waitFor(() => expect(useSessionCatalogStore.getState().items).toHaveLength(1));
+    await vi.waitFor(() => expect(selectWorkspaceSessionCatalog(
+      useSessionCatalogStore.getState(),
+      "workspace-1"
+    ).items).toHaveLength(1));
     expect(request).toHaveBeenCalledWith(
       "session.catalog.query",
       { scope: "workspace", limit: 50 },

@@ -1,5 +1,5 @@
 import { MAX_APPROVAL_CWD_BYTES, MAX_APPROVAL_TARGET_BYTES } from "@pi67/domain";
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 import {
   ExtensionUiCancellationReasonSchema,
   MAX_EXTENSION_UI_CANCELLED_REQUESTS

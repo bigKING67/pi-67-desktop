@@ -4,6 +4,8 @@ import { clearedTransientState, INITIAL_RUNTIME_STATE } from "../app/app-state-p
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-identity.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   beginRendererConnectionLoss,
   prepareRendererHostReplacement,
@@ -41,6 +43,7 @@ export function handleConnected(
   recoverConnectedRendererProjection(get, set, {
     identity,
     workspace: state.workspace,
+    workspaceId: workspaceIdForCanonicalPath(rendererWorkbenchStore.getState(), state.workspace),
     trust: state.trust,
     approvalMode: state.approvalMode,
     sameHost
@@ -58,7 +61,7 @@ export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void
     trustUpdating: false,
     sessionTransitionPending: false,
     runtime: workspace
-      ? { phase: "recovering", detail: "Pi 运行服务连接已中断，正在等待恢复", recoverable: true }
+      ? { phase: "recovering", detail: messages.runtime.connection.runtimeConnectionRecovering, recoverable: true }
       : INITIAL_RUNTIME_STATE
   });
   if (!workspace) return;
@@ -66,11 +69,11 @@ export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void
 }
 
 export function handleSequenceGap(get: StoreGet, set: StoreSet, gap: SequenceGap): void {
-  void resynchronizeRendererProjection(get, set, {
-    hostEpoch: gap.hostEpoch,
-    recoveringDetail: "检测到状态事件缺口，正在重新同步",
-    readyDetail: "Pi 状态已重新同步",
-    failureTitle: "无法重新同步 Pi 状态"
+    void resynchronizeRendererProjection(get, set, {
+      hostEpoch: gap.hostEpoch,
+      recoveringDetail: messages.runtime.connection.resyncGap,
+      readyDetail: messages.runtime.connection.resyncGapReady,
+      failureTitle: messages.runtime.connection.resyncGapFailed
   });
 }
 
@@ -80,9 +83,9 @@ export function handlePowerResume(get: StoreGet, set: StoreSet): void {
   if (state.connected && state.hostEpoch !== undefined) {
     void resynchronizeRendererProjection(get, set, {
       hostEpoch: state.hostEpoch,
-      recoveringDetail: "系统已恢复，正在重新同步 Pi 状态",
-      readyDetail: "系统恢复后 Pi 状态已重新同步",
-      failureTitle: "系统恢复后无法同步 Pi 状态"
+      recoveringDetail: messages.runtime.connection.resyncPower,
+      readyDetail: messages.runtime.connection.resyncPowerReady,
+      failureTitle: messages.runtime.connection.resyncPowerFailed
     });
     return;
   }
@@ -101,15 +104,15 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
     runtime: {
       phase: state.recoverable ? "recovering" : "failed",
       detail: state.recoverable
-        ? `Pi 运行服务已退出，正在进行第 ${state.attempt ?? 1} 次恢复`
-        : "Pi 运行服务连续退出，自动恢复已停止",
+        ? messages.runtime.connection.hostExitedRecovering(state.attempt ?? 1)
+        : messages.runtime.connection.hostExitedStopped,
       recoverable: state.recoverable,
       ...(state.attempt === undefined ? {} : { attempt: state.attempt })
     }
   });
   publishNotification({
     level: "warning",
-    title: "Pi 运行服务已退出",
+    title: messages.runtime.connection.hostExitedTitle,
     message: messages.credentials.clearedAfterHostReplacement
   });
 }

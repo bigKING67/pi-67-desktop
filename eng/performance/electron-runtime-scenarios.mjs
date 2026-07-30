@@ -5,6 +5,7 @@ import {
   readPositiveProcessId,
   waitForProcessExit
 } from "../packaging/controlled-shutdown-fixture.ts";
+import { locateWorkspaceSessionImportAction } from "./packaged-workspace-menu.mjs";
 
 export async function initializePackagedRuntime(application, window, workspace) {
   await application.evaluate(({ dialog }, selectedPath) => {
@@ -97,32 +98,57 @@ export async function measureRealPiSessionProjection(application, window, sessio
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
   }, sessionPath);
   await window.getByRole("tab", { name: "会话" }).click();
-  await window.getByRole("button", { name: "更多会话操作" }).click();
-  return withTimeout(window.evaluate((messageCount) => new Promise((resolve, reject) => {
-    const action = [...document.querySelectorAll('[role="menuitem"]')]
-      .find((element) => element.textContent?.includes("导入 Pi Session"));
-    if (!(action instanceof HTMLElement)) {
-      reject(new Error("Pi session file action is unavailable."));
-      return;
-    }
+  const action = await locateWorkspaceSessionImportAction(window);
+  return withTimeout(action.evaluate((importAction, messageCount) => new Promise((resolve, reject) => {
     const started = performance.now();
     const deadline = started + 15_000;
-    action.click();
+    let maxTranscriptMessageCount = 0;
+    let fixtureMessageWasVisible = false;
+    const projectionTimeline = [];
+    let previousProjectionKey = "";
+    importAction.click();
     const observe = () => {
       const treeEntryCount = Number(document.querySelector(".session-tree")?.getAttribute("data-entry-count") ?? 0);
       const renderedTreeNodeCount = document.querySelectorAll(".tree-node").length;
-      const transcriptMessageCount = Number(document.querySelector(".transcript-region")?.getAttribute("data-message-count") ?? 0);
-      const fixtureMessageVisible = document.querySelector(".message-card .message-content")?.textContent
+      const transcriptMessageCount = Number(document.querySelector('[data-transcript-region="true"]')?.getAttribute("data-message-count") ?? 0);
+      const fixtureMessageVisible = document.querySelector('[data-testid="message-card"] [data-testid="message-content"]')?.textContent
         ?.includes("Pi-67 restore fixture") ?? false;
+      maxTranscriptMessageCount = Math.max(maxTranscriptMessageCount, transcriptMessageCount);
+      fixtureMessageWasVisible ||= fixtureMessageVisible;
+      const projectionKey = `${transcriptMessageCount}:${treeEntryCount}:${renderedTreeNodeCount}:${fixtureMessageVisible}`;
+      if (projectionKey !== previousProjectionKey && projectionTimeline.length < 24) {
+        projectionTimeline.push({
+          elapsedMs: Math.round(performance.now() - started),
+          transcriptMessageCount,
+          treeEntryCount,
+          renderedTreeNodeCount,
+          fixtureMessageVisible
+        });
+        previousProjectionKey = projectionKey;
+      }
       const treeVirtualized = renderedTreeNodeCount > 0 && renderedTreeNodeCount < treeEntryCount;
-      if (transcriptMessageCount === messageCount && treeVirtualized && fixtureMessageVisible && document.querySelector(".composer-shell")) {
+      if (transcriptMessageCount === messageCount && treeVirtualized && fixtureMessageVisible && document.querySelector('[data-testid="composer-shell"]')) {
         requestAnimationFrame(() => resolve(performance.now() - started));
         return;
       }
       if (performance.now() >= deadline) {
+        const diagnostic = {
+          composerVisible: Boolean(document.querySelector('[data-testid="composer-shell"]')),
+          conversationVisible: Boolean(document.querySelector(".conversation-region")),
+          transcriptSessionId: document.querySelector('[data-transcript-region="true"]')?.getAttribute("data-session-id"),
+          maxTranscriptMessageCount,
+          fixtureMessageWasVisible,
+          projectionTimeline,
+          statusText: [...document.querySelectorAll('[role="status"], [role="alert"], [aria-label^="当前状态："]')]
+            .map((element) => element.textContent?.trim())
+            .filter(Boolean)
+            .slice(0, 12),
+          bodyText: document.body.innerText.slice(0, 800)
+        };
         reject(new Error(
           `Pi session projection timed out: transcriptMessages=${transcriptMessageCount}, treeEntries=${treeEntryCount}, `
-          + `renderedTreeNodes=${renderedTreeNodeCount}, fixtureMessageVisible=${fixtureMessageVisible}.`
+          + `renderedTreeNodes=${renderedTreeNodeCount}, fixtureMessageVisible=${fixtureMessageVisible}, `
+          + `diagnostic=${JSON.stringify(diagnostic)}.`
         ));
         return;
       }

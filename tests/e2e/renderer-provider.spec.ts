@@ -10,7 +10,7 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const settings = await openSettingsSection(page, /^Runtime 与 Session/u);
+  const settings = await openSettingsSection(page, /^运行服务/u);
   await settings.getByRole("button", { name: /运行环境诊断/u }).click();
   const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
   await expect(doctorDialog).toBeVisible();
@@ -24,8 +24,26 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await openProviderDialog(page);
   const credentialDialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(credentialDialog.getByText("OpenAI", { exact: true }).first()).toBeVisible();
+  const providerSearch = credentialDialog.getByRole("textbox", { name: "搜索 Provider" });
+  await expect(providerSearch).toBeVisible();
+  await providerSearch.fill("anthro");
+  await expect(credentialDialog.getByRole("button", { name: /Anthropic/u })).toBeVisible();
+  await expect(credentialDialog.getByRole("button", { name: /^OpenAI\b/u })).toHaveCount(0);
+  await credentialDialog.getByRole("button", { name: "清除 Provider 搜索" }).click();
+  await credentialDialog.getByRole("button", { name: /^OpenAI\b/u }).click();
   await expect(credentialDialog.getByText("已持久化到 Pi auth.json")).toBeVisible();
   await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
+  await credentialDialog.getByRole("button", { name: "临时显示已保存 API Key" }).click();
+  await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toBeVisible();
+  await credentialDialog.getByRole("button", { name: "隐藏已保存 API Key" }).click();
+  await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toHaveCount(0);
+  await credentialDialog.getByRole("button", { name: "临时显示已保存 API Key" }).click();
+  await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toBeVisible();
+  await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
+  await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toHaveCount(0);
+  await credentialDialog.getByRole("button", { name: /^OpenAI\b/u }).click();
+  await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("credential-dialog-saved.png"), animations: "disabled" });
   await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
   await expect(credentialDialog.getByText("尚未配置")).toBeVisible();
   const keyInput = page.getByLabel("Provider API 密钥", { exact: true });
@@ -65,6 +83,19 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
 
   const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(dialog).toBeVisible();
+  const providerList = dialog.getByLabel("Pi Provider 列表");
+  expect(await providerList.evaluate((element) => getComputedStyle(element).overflowY)).toBe("scroll");
+  const scrollState = await providerList.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollTop: element.scrollTop
+    };
+  });
+  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
+  expect(scrollState.scrollTop).toBeGreaterThan(0);
+  await expect(dialog.getByRole("button", { name: /^xAI\b/u })).toBeVisible();
   const layoutColumns = await dialog.locator(".provider-credential-layout").evaluate((element) => (
     getComputedStyle(element).gridTemplateColumns
   ));
@@ -75,7 +106,12 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
 });
 
 async function openProviderDialog(page: Page): Promise<void> {
-  const settings = await openSettingsSection(page, /^Provider 与模型/u);
+  const settings = await openSettingsSection(page, /^模型服务/u);
+  const editor = settings.getByTestId("provider-configuration-editor");
+  if (!(await editor.isVisible())) {
+    await settings.getByRole("button", { name: /^OpenAI\b/u }).click();
+  }
+  await expect(editor).toBeVisible();
   await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
 }
 

@@ -1,5 +1,7 @@
+import { PROTOCOL_REVISION } from "../../packages/protocol/dist/index.mjs";
+
 export async function attachMockAgent(page, messageCount) {
-  await page.evaluate((count) => {
+  await page.evaluate(({ count, protocolRevision }) => {
     let messages = Array.from({ length: count }, (_, index) => ({
       id: `message-${index}`,
       role: index % 2 === 0 ? "user" : "assistant",
@@ -74,31 +76,35 @@ export async function attachMockAgent(page, messageCount) {
     const hostEpoch = 1;
     const operationId = "performance-operation";
     let messageSequence = 0;
+    let activeTaskContext;
     const requests = [];
     const sendEvent = (type, payload, eventOperationId) => {
       messageSequence += 1;
+      const context = activeTaskContext ?? { scope: "app" };
       channel.port2.postMessage({
-        protocolVersion: 2,
+        protocolVersion: 3,
         kind: "event",
         hostEpoch,
         sequence: messageSequence,
+        context: eventOperationId === undefined || context.scope !== "task"
+          ? context
+          : { ...context, operationId: eventOperationId },
+        ...(context.scope === "task" ? { taskSequence: messageSequence } : {}),
         type,
-        payload,
-        sessionId: snapshot.sessionId,
-        sessionGeneration: 1,
-        ...(eventOperationId === undefined ? {} : { operationId: eventOperationId })
+        payload
       });
     };
     channel.port2.onmessage = (event) => {
       const envelope = event.data;
       if (envelope?.kind === "hello") {
         channel.port2.postMessage({
-          protocolVersion: 2,
+          protocolVersion: 3,
           kind: "welcome",
           appInstanceId,
           hostInstanceId: "performance-host",
           hostEpoch,
           sdkVersion: "performance",
+          protocolRevision,
           eventSequence: messageSequence,
           capabilities: {
             operations: true,
@@ -115,7 +121,9 @@ export async function attachMockAgent(page, messageCount) {
       if (envelope?.kind !== "request" || !envelope.requestId) return;
       const type = envelope.type;
       requests.push(type);
-      let result = type === "session.tree"
+      let result = type === "workspace.register"
+        ? { registered: true }
+        : type === "session.tree"
         ? snapshot.tree
         : type === "session.catalog.query"
           ? { ...sessionCatalogStatus, items: [], total: 0, hasMore: false }
@@ -129,6 +137,13 @@ export async function attachMockAgent(page, messageCount) {
               ? { snapshot, changes, sessionCatalogStatus, eventSequence: messageSequence, hostEpoch, sessionGeneration: 1 }
               : snapshot;
       if (type === "runtime.initialize" || type === "workspace.open") {
+        activeTaskContext = envelope.context?.scope === "task"
+          ? {
+              ...envelope.context,
+              sessionId: snapshot.sessionId,
+              sessionGeneration: 1
+            }
+          : undefined;
         sendEvent("runtime.ready", {
           capabilities: runtimeCapabilities,
           snapshot
@@ -136,10 +151,11 @@ export async function attachMockAgent(page, messageCount) {
         result = projectionMutationAcknowledgement();
       }
       channel.port2.postMessage({
-        protocolVersion: 2,
+        protocolVersion: 3,
         kind: "response",
         requestId: envelope.requestId,
         hostEpoch,
+        context: envelope.context,
         type,
         ok: true,
         result
@@ -203,6 +219,13 @@ export async function attachMockAgent(page, messageCount) {
           }
         };
         changes = { sessionId: snapshot.sessionId, items: [], truncated: false, total: 0 };
+        if (activeTaskContext?.scope === "task") {
+          activeTaskContext = {
+            ...activeTaskContext,
+            sessionId: snapshot.sessionId,
+            sessionGeneration: 1
+          };
+        }
         sendEvent("session.bootstrap", { snapshot, reason: "session-open" });
       },
       diagnostics() {
@@ -255,5 +278,73 @@ export async function attachMockAgent(page, messageCount) {
       window.location.origin,
       [channel.port1]
     );
-  }, messageCount);
+  }, { count: messageCount, protocolRevision: PROTOCOL_REVISION });
+}
+
+export async function installPerformanceSystemBridge(page) {
+  await page.addInitScript(() => {
+    const workspace = {
+      id: "workspace-performance",
+      displayName: "pi67-performance-workspace",
+      identity: {
+        canonicalPath: "/tmp/pi67-performance-workspace",
+        assurance: "path-only"
+      },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    };
+    let workbenchState = {
+      version: 2,
+      workspaces: [],
+      workspaceOrder: [],
+      expandedWorkspaceIds: [],
+      runtimeRecovery: [],
+      settings: { section: "general", scope: "global" },
+      cleanExit: false
+    };
+    Object.defineProperty(window, "pi67", {
+      configurable: false,
+      value: {
+        system: {
+          getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "performance" }),
+          connectAgentHost: async () => undefined,
+          loadWorkbenchState: async () => structuredClone(workbenchState),
+          updateWorkbenchLayout: async (layout) => {
+            workbenchState = { ...workbenchState, ...structuredClone(layout) };
+            return structuredClone(workbenchState);
+          },
+          pickAndAddWorkspace: async () => {
+            workbenchState = {
+              ...workbenchState,
+              workspaces: [workspace],
+              workspaceOrder: [workspace.id],
+              expandedWorkspaceIds: [workspace.id],
+              currentWorkspaceId: workspace.id
+            };
+            return structuredClone(workspace);
+          },
+          selectWorkspace: async () => "/tmp/pi67-performance-workspace",
+          selectSessionFile: async () => undefined,
+          saveDiagnostics: async () => undefined,
+          showNotification: async () => undefined,
+          requestOpenExternal: async () => false,
+          getUpdateState: async () => ({
+            phase: "disabled",
+            channel: "unsigned-preview",
+            currentVersion: "performance",
+            detail: "Performance fixture"
+          }),
+          checkForUpdates: async () => ({
+            phase: "disabled",
+            channel: "unsigned-preview",
+            currentVersion: "performance",
+            detail: "Performance fixture"
+          }),
+          onAgentHostFailed: () => () => undefined,
+          onPowerResume: () => () => undefined
+        }
+      }
+    });
+  });
 }

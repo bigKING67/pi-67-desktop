@@ -10,6 +10,44 @@ test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
 
+test("loads Settings only on first open and restores the workbench", async ({ page }) => {
+  let settingsModuleRequests = 0;
+  page.on("request", (request) => {
+    if (/\/src\/settings\/SettingsWorkbench\.tsx(?:\?|$)/u.test(request.url())) {
+      settingsModuleRequests += 1;
+    }
+  });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  expect(settingsModuleRequests).toBe(0);
+  await page.keyboard.press("Control+,");
+  await expect(page.getByLabel("π 设置")).toBeVisible();
+  expect(settingsModuleRequests).toBe(1);
+
+  await page.getByRole("button", { name: "返回工作台" }).click();
+  await expect(page.getByLabel("Pi conversation")).toBeVisible();
+  await page.keyboard.press("Control+,");
+  await expect(page.getByLabel("π 设置")).toBeVisible();
+  expect(settingsModuleRequests).toBe(1);
+});
+
+test("keeps Settings load failure recoverable without stopping the workspace", async ({ page }) => {
+  await page.route(/\/src\/settings\/SettingsWorkbench\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.keyboard.press("Control+,");
+
+  const failure = page.getByRole("alert", { name: "设置界面未能加载" });
+  await expect(failure).toBeVisible();
+  await expect(failure).toContainText("后台任务仍会继续运行");
+  await failure.getByRole("button", { name: "关闭" }).click();
+  await expect(page.getByLabel("Pi conversation")).toBeVisible();
+  await expect(page.locator('.application-shell[data-agent-connected="true"]')).toBeVisible();
+});
+
 test("keeps a failed lazy WorkspaceShell observable without tearing down the Agent connection", async ({ page }) => {
   await page.route(/\/src\/app\/WorkspaceShell\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
   await page.goto("/");

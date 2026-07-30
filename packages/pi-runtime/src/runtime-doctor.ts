@@ -52,7 +52,7 @@ function isHealthySessionCatalog(status: SessionCatalogStatus | undefined): bool
 }
 
 function formatSessionCatalogStatus(status: SessionCatalogStatus | undefined): string {
-  if (!status) return "Session Catalog is not configured in this Agent Host runtime.";
+  if (!status) return "Session Catalog is not configured in this Pi runtime service.";
   const reconciled = status.reconciledAt === undefined ? "not reconciled" : "reconciled";
   const completeness = status.incomplete ? "incomplete" : "complete";
   const degraded = status.degradedReason === undefined ? "" : `; degraded ${status.degradedReason}`;

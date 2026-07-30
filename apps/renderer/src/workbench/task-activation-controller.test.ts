@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectionRecoveryDisposition } from "../connection/projection-recovery-controller.js";
 import { useAppStore } from "../app/app-store.js";
-import { runSessionBootstrapTransition } from "../app/session-transition.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
+import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 import { resumeRendererTask } from "./task-activation-controller.js";
 
-vi.mock("../app/session-transition.js", () => ({
-  runSessionBootstrapTransition: vi.fn()
+vi.mock("../workspace/workspace-open-controller.js", () => ({
+  openRendererWorkspaceDescriptor: vi.fn()
 }));
 
 vi.mock("../connection/projection-recovery-controller.js", () => ({
@@ -16,13 +16,13 @@ vi.mock("../connection/projection-recovery-controller.js", () => ({
 }));
 
 const resynchronize = vi.mocked(resynchronizeRendererProjection);
-const bootstrap = vi.mocked(runSessionBootstrapTransition);
+const openWorkspace = vi.mocked(openRendererWorkspaceDescriptor);
 
 describe("task activation controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resynchronize.mockReset();
-    bootstrap.mockReset();
+    openWorkspace.mockReset();
     rendererWorkbenchStore.getState().reset();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -71,42 +71,38 @@ describe("task activation controller", () => {
       expect.objectContaining({ hostEpoch: 9, deferRuntimeNotReady: true })
     );
     expect(request).not.toHaveBeenCalled();
-    expect(bootstrap).not.toHaveBeenCalled();
+    expect(openWorkspace).not.toHaveBeenCalled();
     expect(rendererWorkbenchStore.getState().tasks["task-a"]?.taskGeneration).toBe(3);
   });
 
-  it("initializes the saved Session with the same generation when the Host has no Runtime", async () => {
+  it("rotates stale Task authority before initializing the saved Session", async () => {
     resynchronize.mockResolvedValue("runtime-not-ready");
-    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
-      accepted: true,
-      hostEpoch: 9,
-      sessionId: "session-a",
-      sessionGeneration: 4,
-      eventSequence: 1
-    } as never);
-    bootstrap.mockImplementation(async (_get, _set, options) => {
-      await options.request();
+    openWorkspace.mockImplementation(async () => {
+      expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeUndefined();
+      expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+        kind: "conversation",
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-a",
+          sessionPath: "/sessions/a.jsonl"
+        }
+      });
+      return true;
     });
 
     await expect(resumeRendererTask("task-a")).resolves.toBe(true);
 
-    expect(request).toHaveBeenCalledWith(
-      "runtime.initialize",
-      {
-        cwd: "/work/a",
-        sessionPath: "/sessions/a.jsonl",
-        trust: "trusted",
-        approvalMode: "guided"
-      },
-      [],
-      { context: {
-        scope: "task",
-        workspaceId: "workspace-a",
-        taskId: "task-a",
-        taskGeneration: 3
-      } }
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      "/sessions/a.jsonl"
     );
-    expect(rendererWorkbenchStore.getState().tasks["task-a"]?.taskGeneration).toBe(3);
+  });
+
+  it("reports failure when the saved Session cannot be initialized", async () => {
+    resynchronize.mockResolvedValue("runtime-not-ready");
+    openWorkspace.mockResolvedValue(false);
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
   });
 
   it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
@@ -118,7 +114,7 @@ describe("task activation controller", () => {
       await expect(resumeRendererTask("task-a")).resolves.toBe(false);
 
       expect(request).not.toHaveBeenCalled();
-      expect(bootstrap).not.toHaveBeenCalled();
+      expect(openWorkspace).not.toHaveBeenCalled();
       expect(rendererWorkbenchStore.getState().tasks["task-a"]?.taskGeneration).toBe(3);
     }
   );

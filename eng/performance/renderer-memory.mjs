@@ -103,19 +103,20 @@ export async function loadAllOlderMessages(page, expectedCount) {
     await page.locator('[data-testid="virtuoso-scroller"]').evaluate((element) => {
       element.scrollTop = 0;
     });
+    await page.getByTestId("load-older-messages").click();
     try {
       await page.waitForFunction((previous) => {
-        const region = document.querySelector(".transcript-region");
+        const region = document.querySelector('[data-transcript-region="true"]');
         return Number(region?.getAttribute("data-message-count") ?? 0) > previous;
       }, before, { timeout: 10_000 });
     } catch (error) {
       const diagnostics = await page.evaluate(() => {
-        const region = document.querySelector(".transcript-region");
+        const region = document.querySelector('[data-transcript-region="true"]');
         const scroller = document.querySelector('[data-testid="virtuoso-scroller"]');
         return {
           messageCount: Number(region?.getAttribute("data-message-count") ?? 0),
           transcriptError: region?.querySelector('[role="alert"]')?.textContent ?? undefined,
-          loadOlderLabel: region?.querySelector(".transcript-pagination button")?.textContent ?? undefined,
+          loadOlderLabel: region?.querySelector('[data-testid="load-older-messages"]')?.textContent ?? undefined,
           scrollTop: scroller instanceof HTMLElement ? scroller.scrollTop : undefined,
           fixture: globalThis.__pi67Performance?.diagnostics()
         };
@@ -132,7 +133,7 @@ export async function switchPerformanceSessions(page, count, messageCount) {
       globalThis.__pi67Performance?.switchSession(nextMarker, nextMessageCount);
     }, { nextMarker: marker, nextMessageCount: messageCount });
     await page.waitForFunction(({ expected, expectedMessageCount }) => {
-      const region = document.querySelector(".transcript-region");
+      const region = document.querySelector('[data-transcript-region="true"]');
       return region?.getAttribute("data-session-id") === `performance-${expected}`
         && Number(region.getAttribute("data-message-count") ?? 0) === Math.min(100, expectedMessageCount);
     }, { expected: marker, expectedMessageCount: messageCount });
@@ -140,7 +141,7 @@ export async function switchPerformanceSessions(page, count, messageCount) {
 }
 
 function transcriptMessageCount(page) {
-  return page.locator(".transcript-region").evaluate((element) => (
+  return page.locator('[data-transcript-region="true"]').evaluate((element) => (
     Number(element.getAttribute("data-message-count") ?? 0)
   ));
 }

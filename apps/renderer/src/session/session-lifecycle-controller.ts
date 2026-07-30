@@ -1,6 +1,7 @@
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { createMessageId } from "@pi67/protocol";
 import { publishNotification } from "../notifications/notification-store.js";
+import { messages } from "../localization/message-catalog.js";
 import { useAppStore } from "../app/app-store.js";
 import type { AppState } from "../app/app-store.types.js";
 import {
@@ -17,17 +18,17 @@ export async function createRendererSession(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (!get().workspace || get().sessionTransitionPending) return;
-  const taskId = beginPendingTask();
-  if (!taskId) return;
+  const task = beginPendingTask();
+  if (!task) return;
   await runSessionBootstrapTransition(get, set, {
-    detail: "正在创建 Pi 新会话",
-    refreshSessionCatalog: true,
+    detail: messages.runtime.session.creating,
+    refreshSessionCatalogFor: task.workspaceId,
     onError: (error) => {
-      rendererWorkbenchStore.getState().updateTask(taskId, {
+      rendererWorkbenchStore.getState().updateTask(task.id, {
         lifecycle: "failed",
-        runtime: { phase: "failed", detail: "无法创建 Pi 会话", recoverable: true }
+        runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
       });
-      reportSessionError(error, set, "无法创建 Pi 会话");
+      reportSessionError(error, set, messages.runtime.session.createFailed);
     },
     request: () => agentConnectionController.request("session.create", {})
   });
@@ -44,18 +45,18 @@ export async function openRendererSession(
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (get().sessionTransitionPending) return;
-  const taskId = beginPendingTask(path);
-  if (!taskId) return;
+  const task = beginPendingTask(path);
+  if (!task) return;
   const workspace = get().workspace;
   await runSessionBootstrapTransition(get, set, {
-    detail: "正在恢复 Pi 会话",
-    refreshSessionCatalog: true,
+    detail: messages.runtime.connection.restoringSession,
+    refreshSessionCatalogFor: task.workspaceId,
     onError: (error) => {
-      rendererWorkbenchStore.getState().updateTask(taskId, {
+      rendererWorkbenchStore.getState().updateTask(task.id, {
         lifecycle: "failed",
-        runtime: { phase: "failed", detail: "无法恢复 Pi 会话", recoverable: true }
+        runtime: { phase: "failed", detail: messages.runtime.connection.restoreSessionFailed, recoverable: true }
       });
-      reportSessionError(error, set, "无法恢复 Pi 会话");
+      reportSessionError(error, set, messages.runtime.connection.restoreSessionFailed);
     },
     request: () => agentConnectionController.request("session.open", {
       path,
@@ -64,7 +65,7 @@ export async function openRendererSession(
   });
 }
 
-function beginPendingTask(sessionPath?: string): string | undefined {
+function beginPendingTask(sessionPath?: string): RendererWorkbenchTask | undefined {
   const workbench = rendererWorkbenchStore.getState();
   const workspaceId = workbench.currentWorkspaceId;
   if (!workspaceId || !workbench.workspaces[workspaceId]) return undefined;
@@ -78,30 +79,30 @@ function beginPendingTask(sessionPath?: string): string | undefined {
     sessionId: `pending:${taskId}`,
     taskGeneration: 1,
     lifecycle: "initializing",
-    runtime: { phase: "starting", detail: "正在启动 Pi 会话", recoverable: true },
-    title: "未命名会话",
+    runtime: { phase: "starting", detail: messages.runtime.session.starting, recoverable: true },
+    title: messages.runtime.workbench.unnamedSession,
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
     attachmentCount: 0
   };
   const result = workbench.openTask(task);
-  return result === "workspace-missing" ? undefined : taskId;
+  return result === "workspace-missing" ? undefined : task;
 }
 
 export async function rollbackRendererSession(entryId: string): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   await runIncrementalSessionTransition(get, set, {
-    detail: "正在回退 Pi 会话",
-    readyDetail: "Pi 会话已回退",
+    detail: messages.runtime.session.rollingBack,
+    readyDetail: messages.runtime.session.rolledBack,
     refreshChanges: true,
-    onError: (error) => reportSessionError(error, set, "无法回退 Pi 会话"),
+    onError: (error) => reportSessionError(error, set, messages.runtime.session.rollbackFailed),
     request: () => agentConnectionController.request("session.rollback", { entryId })
   });
 }
 
 function reportSessionError(error: unknown, set: StoreSet, title: string): void {
-  const detail = error instanceof Error ? error.message : "未知错误";
+  const detail = error instanceof Error ? error.message : messages.runtime.unknownError;
   publishNotification({ level: "error", title, message: detail });
   set({ runtime: { phase: "failed", detail: `${title}：${detail}`, recoverable: true } });
 }

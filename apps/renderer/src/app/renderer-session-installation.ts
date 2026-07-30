@@ -1,4 +1,4 @@
-import type { SessionSnapshot } from "@pi67/domain";
+import type { SessionSnapshot, WorkspaceId } from "@pi67/domain";
 import type { ProjectionResyncResult } from "@pi67/protocol";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
@@ -21,7 +21,6 @@ import {
   resetRendererSessionInteractiveState
 } from "./renderer-session-transaction.js";
 import { resetConversationRequests } from "../conversation/conversation-controller.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 
 interface RendererSessionInstallationOptions {
   sessionGeneration?: number;
@@ -45,7 +44,8 @@ export function installRendererSessionResync(
   state: RendererSessionAuthorityState,
   result: ProjectionResyncResult,
   hostEpoch: number,
-  transitionTarget: SessionProjectionTransitionTarget
+  transitionTarget: SessionProjectionTransitionTarget,
+  workspaceId: WorkspaceId | undefined
 ): boolean {
   if (
     result.hostEpoch !== hostEpoch
@@ -66,11 +66,8 @@ export function installRendererSessionResync(
           result.changes
         )) return false;
         if (!isCurrent()) return false;
-        const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
         if (workspaceId) {
           useSessionCatalogStore.getState().applyStatus(workspaceId, result.sessionCatalogStatus);
-        } else {
-          useSessionCatalogStore.getState().applyStatus(result.sessionCatalogStatus);
         }
         return isCurrent();
       }

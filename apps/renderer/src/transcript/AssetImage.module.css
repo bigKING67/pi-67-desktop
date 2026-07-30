@@ -1,0 +1,48 @@
+.imagePlaceholder {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.imageError {
+  color: var(--danger);
+}
+
+.imageRetry {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-self: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.imageRetry:hover {
+  background: var(--surface-hover);
+}
+
+.imageRetry:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.image {
+  max-width: min(100%, 620px);
+  max-height: 480px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  object-fit: contain;
+}

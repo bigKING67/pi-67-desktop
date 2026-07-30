@@ -1,5 +1,4 @@
-import { Type, type Static } from "typebox";
-import { Value } from "typebox/value";
+import { Type, Value, type Static } from "./typebox-schema.js";
 import { strictObject } from "./schemas.js";
 
 const OperationIdSchema = Type.String({ minLength: 1, maxLength: 512 });

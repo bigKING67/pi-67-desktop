@@ -30,7 +30,7 @@ export async function probeNodeSqliteCapability(
   } catch {
     return {
       available: false,
-      detail: "node:sqlite is unavailable in the Agent Host runtime.",
+      detail: "node:sqlite is unavailable in the Pi runtime service.",
       storage
     };
   }
@@ -80,7 +80,7 @@ export async function probeNodeSqliteCapability(
     }
     return {
       available: false,
-      detail: "node:sqlite database lifecycle probe failed in the Agent Host runtime.",
+      detail: "node:sqlite database lifecycle probe failed in the Pi runtime service.",
       storage
     };
   }

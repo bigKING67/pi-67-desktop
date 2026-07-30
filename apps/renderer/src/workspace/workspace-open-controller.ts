@@ -1,7 +1,10 @@
 import type { WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
-import { invalidateProjectionRecoveryGeneration } from "../connection/projection-recovery-controller.js";
+import {
+  invalidateProjectionRecoveryGeneration,
+  resynchronizeRendererProjection
+} from "../connection/projection-recovery-controller.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
@@ -16,11 +19,11 @@ import { prepareRendererSessionTransaction } from "../app/renderer-session-trans
 import { invalidateWorkspaceTrustRequests } from "./workspace-trust-controller.js";
 import {
   rendererWorkbenchStore,
-  rendererWorkspaceId,
   selectedWorkbenchTask,
   taskForConversation,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
+import { rendererWorkspaceId } from "../workbench/renderer-workspace-identity.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 
@@ -42,7 +45,7 @@ export async function openRendererWorkspace(): Promise<void> {
 export async function openRendererWorkspaceDescriptor(
   descriptor: WorkspaceDescriptor,
   sessionPath?: string
-): Promise<void> {
+): Promise<boolean> {
   if (descriptor.availability !== "available") {
     publishNotification({
       level: "warning",
@@ -51,11 +54,11 @@ export async function openRendererWorkspaceDescriptor(
         ? "目录身份已变化，请重新选择并确认工作区目录。"
         : "请重新选择工作区目录后再打开任务。"
     });
-    return;
+    return false;
   }
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
-  if (get().sessionTransitionPending) return;
+  if (get().sessionTransitionPending) return false;
   rendererWorkbenchStore.getState().selectWorkspace(descriptor.id);
   const task = ensureWorkspaceRuntimeTask(descriptor, sessionPath);
   const workspace = descriptor.identity.canonicalPath;
@@ -104,31 +107,43 @@ export async function openRendererWorkspaceDescriptor(
       acknowledgement
     );
     if (disposition === "missing-bootstrap") {
+      if (sessionPath) {
+        const recovery = await resynchronizeRendererProjection(get, set, {
+          hostEpoch: acknowledgement.hostEpoch,
+          recoveringDetail: "正在同步会话状态",
+          readyDetail: "Pi 会话已恢复",
+          failureTitle: "无法打开会话"
+        });
+        return recovery === "committed";
+      }
       throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
     }
     if (disposition === "committed" && get().workspace === workspace) {
       await queryFirstSessionCatalog(descriptor.id);
     }
+    return disposition === "committed";
   } catch (error) {
-    if (get().workspace !== workspace) return;
+    if (get().workspace !== workspace) return false;
     if (target) {
       const disposition = classifyRendererSessionBootstrap(get(), target);
       if (disposition === "committed") {
         await queryFirstSessionCatalog(descriptor.id);
-        return;
+        return true;
       }
-      if (disposition === "stale") return;
+      if (disposition === "stale") return false;
     }
     const detail = errorMessage(error);
+    const failureTitle = sessionPath ? "无法打开会话" : "无法打开工作区";
     set({
       sessionTransitionPending: false,
       runtime: {
         phase: "failed",
-        detail: `无法打开工作区：${detail}`,
+        detail: `${failureTitle}：${detail}`,
         recoverable: true
       }
     });
-    publishNotification({ level: "error", title: "无法打开工作区", message: detail });
+    publishNotification({ level: "error", title: failureTitle, message: detail });
+    return false;
   }
 }
 

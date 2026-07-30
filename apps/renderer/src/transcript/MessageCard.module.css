@@ -1,40 +1,80 @@
-.imagePlaceholder {
-  gap: 8px;
-  display: grid;
-  min-height: 72px;
-  place-items: center;
-  padding: 12px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
+.card {
+  width: min(820px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 18px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
+}
+
+.user {
+  width: min(760px, calc(100% - 80px));
+  margin-top: 10px;
+  padding: 14px var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+}
+
+.header,
+.author,
+.meta {
+  display: flex;
+  align-items: center;
+}
+
+.header {
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.author {
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.meta {
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.meta code {
+  font-family: var(--font-code);
+  font-variant-ligatures: none;
+}
+
+.content {
+  min-width: 0;
+}
+
+.error {
+  margin-top: 10px;
+  padding: var(--space-2) 10px;
+  border-left: 2px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.thinking {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) 10px;
+  border-left: 2px solid var(--border-strong);
   color: var(--text-secondary);
   font-size: 12px;
-  text-align: center;
 }
 
-.imageError {
-  color: var(--danger);
+.thinking summary {
+  margin-bottom: 6px;
+  color: var(--text-tertiary);
+  cursor: default;
+  font-family: var(--font-code);
+  font-size: 10px;
 }
 
-.imageRetry {
-  display: inline-flex;
-  align-items: center;
-  justify-self: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface-raised);
-  color: var(--text-primary);
-  font: inherit;
-  cursor: pointer;
-}
-
-.imageRetry:hover {
-  background: var(--surface-hover);
-}
-
-.imageRetry:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+@media (max-width: 760px) {
+  .card,
+  .user {
+    width: calc(100% - 28px);
+  }
 }

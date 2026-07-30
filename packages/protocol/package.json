@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "tsdown src/index.ts --format esm --dts",
+    "check:revision": "pnpm run build && node scripts/generate-protocol-revision.mjs --check",
     "generate:revision": "pnpm run build && node scripts/generate-protocol-revision.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

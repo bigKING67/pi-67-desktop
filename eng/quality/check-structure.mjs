@@ -12,12 +12,17 @@ const requiredPaths = [
   "DESIGN.md",
   "DESIGN.dark.md",
   "pnpm-lock.yaml",
+  "references.catalog.json",
+  "references.lock.json",
   ".github/workflows/ci.yml",
+  ".github/workflows/external-reference-drift.yml",
   ".github/workflows/release.yml",
   "docs/adr/0001-electron-sdk-runtime.md",
   "docs/architecture/processes-and-protocol.md",
   "docs/compatibility/pi-sdk.md",
+  "docs/provenance/external-references.md",
   "docs/provenance/peak-code-reference.md",
+  "licenses/provenance.json",
   "docs/release/signing.md",
   "docs/testing/performance.md"
 ];

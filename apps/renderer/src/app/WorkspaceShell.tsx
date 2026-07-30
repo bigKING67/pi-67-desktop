@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef } from "react";
 import type { WorkspaceDescriptor } from "@pi67/domain";
 import {
+  rendererWorkbenchStore,
   selectedWorkbenchTask,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
@@ -17,14 +18,18 @@ import {
 } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionId } from "../session/session-projection-selectors.js";
-import { SettingsWorkbench } from "../settings/SettingsWorkbench.js";
 import { Transcript } from "../transcript/Transcript.js";
 import { TrustBanner } from "../workspace/TrustBanner.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { resumeRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./WorkspaceShell.module.css";
+
+const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
+  default: module.SettingsWorkbench
+})));
 
 interface WorkspaceShellProps {
   contextVisible: boolean;
@@ -66,7 +71,7 @@ export function WorkspaceShell({
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const settingsSelected = selectedSurface?.kind === "settings";
   const taskSelected = selectedSurface?.kind === "conversation";
-  const liveTaskSelected = taskSelected && selectedTask?.sessionId === liveSessionId;
+  const liveTaskSelected = taskSelected && canRenderLiveTask(selectedTask, liveSessionId);
   const taskRecoveryPending = Boolean(
     taskSelected
     && selectedWorkspace?.identity.canonicalPath === liveWorkspacePath
@@ -116,7 +121,19 @@ export function WorkspaceShell({
   }, [navigationIsDrawer, navigationVisible, onCloseNavigation, settingsSelected]);
 
   if (settingsSelected) {
-    return <main className={styles.applicationSurface}><SettingsWorkbench /></main>;
+    return (
+      <LazySurfaceBoundary
+        description="设置模块发生错误。后台任务仍会继续运行，可以返回工作台或重新加载界面。"
+        kind="workspace"
+        onDismiss={() => rendererWorkbenchStore.getState().closeSettings()}
+        surface="settings-workbench"
+        title="设置界面未能加载"
+      >
+        <Suspense fallback={<SettingsLoadingState />}>
+          <main className={styles.applicationSurface}><SettingsWorkbench /></main>
+        </Suspense>
+      </LazySurfaceBoundary>
+    );
   }
 
   return (
@@ -170,6 +187,20 @@ export function WorkspaceShell({
   );
 }
 
+export function canRenderLiveTask(
+  task: RendererWorkbenchTask | undefined,
+  liveSessionId: string | undefined
+): boolean {
+  return Boolean(
+    task
+    && liveSessionId
+    && task.sessionId === liveSessionId
+    && task.runtime.phase !== "stopped"
+    && task.lifecycle !== "lost"
+    && task.lifecycle !== "stopped"
+  );
+}
+
 function StoppedConversationState({ sessionName, sessionPath, workspace }: {
   sessionName: string | undefined;
   sessionPath: string;
@@ -193,6 +224,19 @@ function StoppedConversationState({ sessionName, sessionPath, workspace }: {
         >打开会话</button>
       </div>
     </section>
+  );
+}
+
+function SettingsLoadingState() {
+  return (
+    <main aria-busy="true" className={styles.applicationSurface}>
+      <section className={styles.emptyWorkspace} role="status">
+        <div>
+          <span className="loading-line" />
+          <h2>正在加载设置</h2>
+        </div>
+      </section>
+    </main>
   );
 }
 

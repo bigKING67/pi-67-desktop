@@ -12,10 +12,10 @@ import {
 } from "../session/session-projection-selectors.js";
 import {
   rendererWorkbenchStore,
-  rendererWorkspaceId,
   selectedWorkbenchTask,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
+import { rendererWorkspaceId } from "./renderer-workspace-identity.js";
 import { latestUserMessagePreview } from "./recent-user-message.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 
@@ -136,7 +136,15 @@ export function workbenchTaskFromProjection({
   sessionName,
   sessionPath
 }: WorkbenchTaskProjectionInput): RendererWorkbenchTask {
-  const effectiveUserMessagePreview = recentUserMessagePreview ?? existing?.recentUserMessagePreview;
+  const projectionMatchesExistingSession = existing?.sessionId === sessionId
+    && (
+      existing.sessionGeneration === undefined
+      || sessionGeneration === undefined
+      || existing.sessionGeneration === sessionGeneration
+    );
+  const effectiveUserMessagePreview = projectionMatchesExistingSession
+    ? existing.recentUserMessagePreview ?? recentUserMessagePreview
+    : recentUserMessagePreview;
   return {
     id: existing?.id ?? `${workspaceId}:${sessionId}`,
     conversation: sessionPath

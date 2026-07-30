@@ -4,7 +4,7 @@ import type {
   WorkspaceChangesProjection,
   WorkspaceDescriptor
 } from "@pi67/domain";
-import { eventEnvelope } from "@pi67/protocol";
+import { eventEnvelope, type ProjectionResyncResult } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
@@ -199,6 +199,47 @@ describe("App Store workspace open authority", () => {
       runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
     });
   });
+
+  it("resynchronizes after Session initialization when runtime.ready was blocked", async () => {
+    const descriptor: WorkspaceDescriptor = {
+      id: "workspace-resync",
+      displayName: "resync",
+      identity: { canonicalPath: "/workspace-resync", assurance: "path-only" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    };
+    const sessionPath = "/sessions/resync-target.jsonl";
+    const readySnapshot = {
+      ...snapshot("session-resync-target"),
+      cwd: descriptor.identity.canonicalPath,
+      sessionPath
+    };
+    rendererWorkbenchStore.getState().registerWorkspace(descriptor);
+    vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "runtime.initialize") {
+        return projectionAcknowledgement(readySnapshot.sessionId, 1) as never;
+      }
+      if (type === "session.catalog.query") return emptyCatalogPage() as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+    const resync = vi.spyOn(agentConnectionController, "resyncProjection")
+      .mockImplementation(async (install) => install(projectionResyncResult(readySnapshot, 1)));
+
+    await expect(openRendererWorkspaceDescriptor(descriptor, sessionPath)).resolves.toBe(true);
+
+    expect(resync).toHaveBeenCalledOnce();
+    expect(useSessionProjectionStore.getState().authority).toMatchObject({
+      phase: "active",
+      sessionId: readySnapshot.sessionId,
+      sessionGeneration: 1
+    });
+    expect(useAppStore.getState()).toMatchObject({
+      workspace: descriptor.identity.canonicalPath,
+      sessionTransitionPending: false,
+      runtime: { phase: "ready", detail: "Pi 会话已恢复" }
+    });
+  });
 });
 
 function resetStores(): void {
@@ -297,5 +338,28 @@ function emptyCatalogPage() {
     items: [],
     total: 0,
     hasMore: false
+  };
+}
+
+function projectionResyncResult(
+  value: SessionSnapshot,
+  sessionGeneration: number
+): ProjectionResyncResult {
+  return {
+    snapshot: value,
+    changes: emptyChanges(value.sessionId),
+    extensionCatalog: { items: [], total: 0, truncated: false },
+    sessionCatalogStatus: {
+      revision: 1,
+      itemCount: 0,
+      source: "sqlite",
+      state: "ready",
+      rebuilding: false,
+      incomplete: false,
+      skippedCount: 0
+    },
+    eventSequence: 3,
+    hostEpoch: 9,
+    sessionGeneration
   };
 }

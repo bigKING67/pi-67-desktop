@@ -6,7 +6,7 @@ import {
   Settings2,
   UserRound
 } from "lucide-react";
-import { useMemo, useState, type RefObject } from "react";
+import { lazy, Suspense, useMemo, useState, type RefObject } from "react";
 import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
@@ -22,7 +22,11 @@ import {
   SessionCatalogSearch,
   useSessionCatalogSearch
 } from "./SessionCatalogSearch.js";
-import { WorkspaceRemovalDialog } from "./WorkspaceRemovalDialog.js";
+
+const WorkspaceRemovalDialog = lazy(async () => {
+  const module = await import("./WorkspaceRemovalDialog.js");
+  return { default: module.WorkspaceRemovalDialog };
+});
 
 export function NavigationRail({
   containerRef
@@ -91,10 +95,12 @@ export function NavigationRail({
       </footer>
 
       {removalWorkspace ? (
-        <WorkspaceRemovalDialog
-          workspace={removalWorkspace}
-          onDismiss={() => setRemovalWorkspaceId(undefined)}
-        />
+        <Suspense fallback={<span className="sr-only" role="status">正在打开移除工作区确认</span>}>
+          <WorkspaceRemovalDialog
+            workspace={removalWorkspace}
+            onDismiss={() => setRemovalWorkspaceId(undefined)}
+          />
+        </Suspense>
       ) : null}
     </aside>
   );

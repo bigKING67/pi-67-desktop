@@ -64,33 +64,27 @@ export class SessionProjectionIndex {
   }
 
   getLeafId(): string | null {
-    const state = this.requireBoundState();
-    syncBranch(state);
-    return state.leafId;
+    return this.synchronizeState().leafId;
   }
 
   getBranch(): SessionEntry[] {
-    const state = this.requireBoundState();
-    syncBranch(state);
-    return state.branch;
+    return this.synchronizeState().branch;
   }
 
   findBranchEntryIndex(id: string): number | undefined {
-    const state = this.requireBoundState();
-    syncBranch(state);
-    return state.branchIndex.get(id);
+    return this.synchronizeState().branchIndex.get(id);
   }
 
   getTree(): SessionTreeNode[] {
-    return this.requireBoundState().tree;
+    return this.synchronizeState().tree;
   }
 
   getMetadata(manager: SessionManager): SessionProjectionMetadata {
-    return this.requireState(manager).metadata;
+    return this.synchronizeState(manager).metadata;
   }
 
   getStats(session: AgentSession): SessionStats {
-    const state = this.requireState(session.sessionManager);
+    const state = this.synchronizeState(session.sessionManager);
     const usage = state.usage;
     const contextUsage = session.getContextUsage();
     return {
@@ -114,6 +108,18 @@ export class SessionProjectionIndex {
     if (state.manager !== manager || state.sessionId !== manager.getSessionId()) {
       throw new Error("Session projection index is not bound to the active Pi Session.");
     }
+    return state;
+  }
+
+  private synchronizeState(manager?: SessionManager): ProjectionState {
+    const state = manager === undefined ? this.requireBoundState() : this.requireState(manager);
+    const nextLeafId = state.manager.getLeafId();
+    if (nextLeafId !== null && !state.entriesById.has(nextLeafId)) {
+      const refreshed = buildState(state.manager, state.manager.getEntries());
+      this.state = refreshed;
+      return refreshed;
+    }
+    syncBranch(state, nextLeafId);
     return state;
   }
 
@@ -168,8 +174,7 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
   }
 }
 
-function syncBranch(state: ProjectionState): void {
-  const nextLeafId = state.manager.getLeafId();
+function syncBranch(state: ProjectionState, nextLeafId = state.manager.getLeafId()): void {
   if (nextLeafId === state.leafId) return;
   state.leafId = nextLeafId;
   rebuildBranch(state);

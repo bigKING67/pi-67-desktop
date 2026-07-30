@@ -6,18 +6,15 @@ import {
 } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   normalizeSessionCatalogQuery,
   useSessionCatalogStore
 } from "./session-catalog-store.js";
 
 export async function queryFirstSessionCatalog(
-  workspaceOrOptions: WorkspaceId | { query?: string; refresh?: boolean } = {},
-  maybeOptions: { query?: string; refresh?: boolean } = {}
+  workspaceId: WorkspaceId,
+  options: { query?: string; refresh?: boolean } = {}
 ): Promise<boolean> {
-  const { workspaceId, options } = catalogRequestArguments(workspaceOrOptions, maybeOptions);
-  if (!workspaceId) return false;
   const store = useSessionCatalogStore.getState();
   const target = store.beginFirstPage(workspaceId, options);
   try {
@@ -33,8 +30,7 @@ export async function queryFirstSessionCatalog(
   }
 }
 
-export async function loadMoreSessionCatalog(workspaceId = currentWorkspaceId()): Promise<void> {
-  if (!workspaceId) return;
+export async function loadMoreSessionCatalog(workspaceId: WorkspaceId): Promise<void> {
   const store = useSessionCatalogStore.getState();
   const target = store.beginNextPage(workspaceId);
   if (!target) return;
@@ -51,16 +47,9 @@ export async function loadMoreSessionCatalog(workspaceId = currentWorkspaceId())
 }
 
 export function handleSessionCatalogChanged(
-  workspaceOrRevision: WorkspaceId | number,
-  maybeRevision?: number
+  workspaceId: WorkspaceId,
+  revision: number
 ): void {
-  const workspaceId = typeof workspaceOrRevision === "string"
-    ? workspaceOrRevision
-    : currentWorkspaceId();
-  const revision = typeof workspaceOrRevision === "string"
-    ? maybeRevision
-    : workspaceOrRevision;
-  if (!workspaceId || revision === undefined) return;
   const store = useSessionCatalogStore.getState();
   const catalog = store.byWorkspace[workspaceId];
   if (store.invalidateRevision(workspaceId, revision)) {
@@ -69,13 +58,12 @@ export function handleSessionCatalogChanged(
 }
 
 export function querySessionCatalogPage(options: {
-  workspaceId?: WorkspaceId;
+  workspaceId: WorkspaceId;
   query?: string;
   cursor?: SessionCatalogCursor;
   refresh?: boolean;
-} = {}): Promise<SessionCatalogPage> {
-  const workspaceId = options.workspaceId ?? currentWorkspaceId();
-  if (!workspaceId) return Promise.reject(new Error("没有可查询的工作区。"));
+}): Promise<SessionCatalogPage> {
+  const { workspaceId } = options;
   const query = normalizeSessionCatalogQuery(options.query ?? "");
   return agentConnectionController.request("session.catalog.query", {
     scope: "workspace",
@@ -95,17 +83,4 @@ export async function queryWorkspaceSessionCatalogs(
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "无法加载 Session 目录";
-}
-
-function catalogRequestArguments(
-  workspaceOrOptions: WorkspaceId | { query?: string; refresh?: boolean },
-  maybeOptions: { query?: string; refresh?: boolean }
-): { workspaceId: WorkspaceId | undefined; options: { query?: string; refresh?: boolean } } {
-  return typeof workspaceOrOptions === "string"
-    ? { workspaceId: workspaceOrOptions, options: maybeOptions }
-    : { workspaceId: currentWorkspaceId(), options: workspaceOrOptions };
-}
-
-function currentWorkspaceId(): WorkspaceId | undefined {
-  return rendererWorkbenchStore.getState().currentWorkspaceId;
 }

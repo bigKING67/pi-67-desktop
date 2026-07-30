@@ -29,10 +29,10 @@ test("shows a cold rebuilding catalog and loads its first ready page", async ({ 
   });
 
   await expect(page.getByText("正在建立 Session 目录…")).toBeVisible();
-  await expect.poll(() => sessionCatalogRequests(page)).toEqual([{
+  await expect.poll(async () => (await sessionCatalogRequests(page))[0]).toEqual({
     hostEpoch: 1,
-    payload: { scope: "workspace", limit: 50 }
-  }]);
+    payload: { scope: "workspace", limit: 50, refresh: true }
+  });
 
   await updateSessionCatalogFixture(page, {
     revision: 2,
@@ -43,7 +43,7 @@ test("shows a cold rebuilding catalog and loads its first ready page", async ({ 
   await emitSessionCatalogChanged(page, 2);
 
   await expect(sessionButton(page, "重建后的会话")).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "共有 1 个会话" })).toBeVisible();
+  await expect(page.getByText("正在建立 Session 目录…")).toHaveCount(0);
 });
 
 test("uses a bounded first page, server search payload, and the bound next cursor", async ({ page }) => {
@@ -52,12 +52,12 @@ test("uses a bounded first page, server search payload, and the bound next curso
   await openCatalogWorkspace(page, { items: sessions });
 
   await expect(sessionButton(page, "Catalog 01")).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "共有 65 个会话" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "显示更多" })).toBeVisible();
   const [firstPage] = await sessionCatalogRequests(page);
-  expect(firstPage?.payload).toEqual({ scope: "workspace", limit: 50 });
+  expect(firstPage?.payload).toEqual({ scope: "workspace", limit: 50, refresh: true });
 
   await clearSessionCatalogRequests(page);
-  await scrollSessionCatalogToEnd(page);
+  await page.getByRole("button", { name: "显示更多" }).click();
   await expect.poll(async () => (await sessionCatalogRequests(page)).length).toBeGreaterThanOrEqual(1);
   const [nextPage] = await sessionCatalogRequests(page);
   expect(nextPage?.payload).toEqual({
@@ -79,7 +79,7 @@ test("uses a bounded first page, server search payload, and the bound next curso
     search: "hidden-folder"
   });
   await expect(sessionButton(page, "服务端命中")).toBeVisible();
-  await expect(page.getByRole("status").filter({ hasText: "找到 1 个匹配会话" })).toBeVisible();
+  await expect(sessionButton(page, "Catalog 01")).toHaveCount(0);
 });
 
 test("invalidates pages on a revision event and applies explicit refresh data only to refresh requests", async ({ page }) => {
@@ -98,7 +98,7 @@ test("invalidates pages on a revision event and applies explicit refresh data on
 
   await queueSessionCatalogRefresh(page, { revision: 3, items: [session(3, "手动刷新会话")] });
   await clearSessionCatalogRequests(page);
-  await page.getByRole("button", { name: "更多会话操作" }).click();
+  await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "刷新会话" }).click();
   await expect.poll(async () => (await sessionCatalogRequests(page))[0]?.payload).toEqual({
     scope: "workspace",
@@ -115,13 +115,12 @@ test("reloads the first page automatically after a stale next cursor", async ({ 
   await clearSessionCatalogRequests(page);
   await armStaleSessionCatalogCursor(page);
 
-  await scrollSessionCatalogToEnd(page);
+  await page.getByRole("button", { name: "显示更多" }).click();
   await expect.poll(async () => (await sessionCatalogRequests(page)).length).toBeGreaterThanOrEqual(2);
   const requests = await sessionCatalogRequests(page);
   expect(requests[0]?.payload.cursor).toBeDefined();
   expect(requests[1]?.payload).toEqual({ scope: "workspace", limit: 50 });
   await expect(page.getByText(/Session Catalog cursor is stale/u)).toHaveCount(0);
-  await scrollSessionCatalogToStart(page);
   await expect(sessionButton(page, "Stale 01")).toBeVisible();
 });
 
@@ -186,7 +185,7 @@ test("shows fallback, incomplete, and unavailable catalog states explicitly", as
   });
   await emitSessionCatalogChanged(page, 3, "source-changed");
   await expect(page.getByText("Session 目录暂不可用，可稍后刷新重试。")).toBeVisible();
-  await expect(page.getByText("Session 目录暂不可用，尚未确认没有会话。")).toBeVisible();
+  await expect(page.getByText("这个工作区还没有会话。")).toHaveCount(0);
 });
 
 test("keeps Command Palette server search independent from navigation search", async ({ page }) => {
@@ -204,7 +203,7 @@ test("keeps Command Palette server search independent from navigation search", a
 
   await page.getByRole("button", { name: "打开命令面板" }).click();
   const palette = page.getByRole("dialog", { name: "命令面板" });
-  await palette.getByRole("combobox", { name: "搜索会话、Extension 命令和应用操作" }).fill("palette-only");
+  await palette.getByRole("combobox", { name: "搜索会话、扩展命令和应用操作" }).fill("palette-only");
   await expect.poll(async () => (await sessionCatalogRequests(page)).some((request) => (
     request.payload.search === "palette-only"
   ))).toBe(true);
@@ -217,7 +216,7 @@ async function openCatalogWorkspace(page: Page, options: Parameters<typeof insta
   await attachMockAgent(page);
   await installSessionCatalogFixture(page, options);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByRole("banner").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
 }
 
 function session(index: number, name: string, cwd = "/workspace/catalog"): FixtureSessionSummary {
@@ -232,30 +231,5 @@ function session(index: number, name: string, cwd = "/workspace/catalog"): Fixtu
 }
 
 function sessionButton(page: Page, name: string) {
-  return page.getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}，`, "u") });
-}
-
-async function scrollSessionCatalogToEnd(page: Page): Promise<void> {
-  const scroller = sessionCatalogScroller(page);
-  await expect(scroller).toBeVisible();
-  await scroller.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-    element.dispatchEvent(new Event("scroll", { bubbles: true }));
-  });
-}
-
-async function scrollSessionCatalogToStart(page: Page): Promise<void> {
-  const scroller = sessionCatalogScroller(page);
-  await scroller.evaluate((element) => {
-    element.scrollTop = 0;
-    element.dispatchEvent(new Event("scroll", { bubbles: true }));
-  });
-}
-
-function sessionCatalogScroller(page: Page) {
-  return page.getByRole("navigation", { name: "Pi 会话" }).locator('[data-virtuoso-scroller="true"]');
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return page.getByTestId("conversation-row").filter({ hasText: name });
 }

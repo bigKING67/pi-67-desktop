@@ -1,0 +1,119 @@
+.body {
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.68;
+  overflow-wrap: anywhere;
+}
+
+.body > :first-child { margin-top: 0; }
+.body > :last-child { margin-bottom: 0; }
+
+.body h1,
+.body h2,
+.body h3 {
+  margin: 1.25em 0 0.5em;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.body h1 { font-size: 20px; }
+.body h2 { font-size: 17px; }
+.body h3 { font-size: 15px; }
+.body p { margin: 0.7em 0; }
+
+.body ul,
+.body ol { padding-left: 1.5em; }
+
+.body blockquote {
+  margin: 1em 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.body :not(pre) > code {
+  padding: 0.12em 0.35em;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-muted);
+  font-family: var(--font-code);
+  font-size: 0.88em;
+}
+
+.link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  background: transparent;
+  color: var(--accent);
+}
+
+.disabled {
+  color: var(--text-tertiary);
+  border-bottom-color: var(--border);
+}
+
+.codeBlock {
+  margin: var(--space-3) 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--code-surface);
+}
+
+.codeHeader {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--code-border);
+  color: var(--code-muted);
+  font-family: var(--font-code);
+  font-size: 10px;
+}
+
+.codeHeader button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+.codeBlock pre {
+  max-height: 520px;
+  margin: 0;
+  padding: var(--space-3) 14px;
+  overflow: auto;
+  color: var(--code-text);
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-variant-ligatures: contextual;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.codeLine { display: inline; }
+
+.codeBlock pre.virtualized {
+  height: 520px;
+  max-height: none;
+}
+
+.virtualSpace {
+  position: relative;
+  display: block;
+}
+
+.virtualWindow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+
+.codeLine.virtualLine {
+  display: block;
+  height: 19.2px;
+}

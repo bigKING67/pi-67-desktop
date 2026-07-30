@@ -79,7 +79,7 @@ describe("createDesktopSafetyExtension", () => {
       input: { command: "pwd" }
     }, { hasUI: true })).resolves.toEqual({
       block: true,
-      reason: "Pi-67 Desktop approval was unavailable and failed closed."
+      reason: "π approval was unavailable and failed closed."
     });
   });
 
@@ -119,7 +119,7 @@ describe("createDesktopSafetyExtension", () => {
       input: { command: "pwd" }
     }, { hasUI: false })).resolves.toEqual({
       block: true,
-      reason: "Pi-67 Desktop approval UI is unavailable."
+      reason: "π approval UI is unavailable."
     });
     expect(requestApproval).not.toHaveBeenCalled();
   });

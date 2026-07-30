@@ -7,6 +7,10 @@
 应用显示名称和图标使用 `π` 品牌；`Pi-67 Desktop` 继续作为仓库、包、可执行
 文件、URL scheme、安装产物和 Release 的技术身份，避免破坏已有升级与分发合同。
 
+工作台不使用水平任务标签。左栏按 Workspace 分组显示活动任务、草稿和最近
+Session，点击会话直接切换中央工作面；最多四个真正运行或等待输入的 Pi Runtime
+可以在切换会话后继续后台运行，普通 Session 历史由可重建 Catalog 分页承载。
+
 当前仓库处于 alpha 实施阶段。GitHub Releases 可以提供明确标记的 unsigned
 preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Developer ID
 签名和 Apple notarization。
@@ -88,9 +92,9 @@ Electron Main
 
 开发环境只允许 Vite 在 `127.0.0.1:5173` 提供静态资源和 HMR。
 
-## Protocol v2 与运行模型
+## Protocol v3 与运行模型
 
-跨进程控制面使用同仓 clean-break 的 Protocol v2：
+跨进程控制面使用同仓 clean-break 的 Protocol v3：
 
 - `hello` / `welcome` 协商 `appInstanceId`、`hostInstanceId`、`hostEpoch`、事件序列和消息上限；
 - 每个 command、response 和 event 都有 TypeBox schema；Session/Operation 事件还交叉校验 envelope 与
@@ -159,6 +163,16 @@ corepack pnpm run package:smoke
 它验证目标平台原生依赖、隔离 user-data、`app://pi67`、主题持久化、sandbox、按需
 Agent Host，以及活跃受控 Extension command 关闭时的 `session_shutdown(reason="quit")`、
 child process / utility process 回收和五秒关闭预算；但不生成可发布的签名产物。
+
+macOS Apple Silicon 本地视觉验收可以使用一键预览入口：
+
+```bash
+corepack pnpm run preview:mac:unsigned
+```
+
+它会依次退出仍在运行的 `Pi-67 Desktop`、重新生成 unsigned 包、运行 packaged smoke，
+然后只在所有步骤通过后打开仓库内的最新 `.app`。成功输出包含 `app.asar` 的修改时间、
+大小和 SHA-256，避免 `open` 只激活仍在内存中的旧 Renderer。
 
 可重复性能测量会构建当前平台的 unsigned unpacked application，并把本机报告写入 ignored 的
 `artifacts/performance/`：

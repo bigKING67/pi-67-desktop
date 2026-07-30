@@ -391,6 +391,40 @@ single-owner lock；文件替换、恶意重写 version cookie、多 utility-pro
 
 ## Renderer state flow
 
+### Agent event projection map
+
+`apps/renderer/src/app/renderer-agent-event-controller.ts` is the single entry for a validated
+Agent event after connection sequence checks:
+
+```text
+validated Host event + envelope
+  -> applyRendererAgentEvent
+      -> workbench Task summary router (all registered Tasks)
+      -> selected live App/Session projection (active or unscoped events only)
+      -> feature stores owned by the live projection
+      -> projection-freshness observer (accepted live events only)
+```
+
+The Workbench Store owns the bounded multi-Workspace/Task index used by navigation. It may retain
+background Task lifecycle and runtime summaries, but it must not own a background transcript or a
+second full Session projection. App, Session, Conversation, Live Turn and their feature stores own
+detail for the selected Task only. A Task-scoped event rejected as `background` or `stale` must not
+reach the selected live projection.
+
+The two views are intentionally allowed to differ only at explicit transition boundaries: a lost
+Workbench Task may coexist briefly with a recovering live projection, and Settings keeps its return
+Task active while the Settings surface is selected. Outside those windows, active events are applied
+to the Task summary before the live projection so a new authoritative `session.bootstrap` can update
+Task identity before installing Session detail. `WorkbenchProjectionBridge` remains a compatibility
+projection for workspace registration and non-event-derived Session metadata such as name/path and
+recent user-message preview; it is not an alternative Agent event reducer.
+
+Session authority remains
+`hostEpoch + sessionId + sessionGeneration + projectionRevision`. Installation, control transition,
+import watchdog and resync details stay in their existing focused modules; this map is the stable
+entrypoint for callers and does not collapse those distinct recovery responsibilities into a broad
+facade.
+
 ```text
 MessagePort
   -> AgentConnectionController

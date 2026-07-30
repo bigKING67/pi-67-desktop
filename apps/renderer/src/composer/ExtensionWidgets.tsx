@@ -9,7 +9,7 @@ export function ExtensionWidgets({
   placement: ExtensionWidgetItem["placement"];
 }) {
   return items.filter((item) => item.placement === placement).map((item) => (
-    <div className={`extension-widget ${styles.extensionWidget}`} key={item.id}>
+    <div className={styles.extensionWidget} key={item.id}>
       <strong>{item.key}</strong>
       <span>{item.message}</span>
     </div>

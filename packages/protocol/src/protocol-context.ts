@@ -1,5 +1,4 @@
-import { Type } from "typebox";
-import { Value } from "typebox/value";
+import { Type, Value } from "./typebox-schema.js";
 import type { AgentCommandType } from "./agent-messages.js";
 import { strictObject } from "./schemas.js";
 

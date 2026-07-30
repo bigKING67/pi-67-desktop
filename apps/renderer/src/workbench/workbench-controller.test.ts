@@ -1,9 +1,23 @@
 import type { WorkspaceDescriptor } from "@pi67/domain";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useAppStore } from "../app/app-store.js";
 import { createRendererWorkbenchStore } from "./workbench-store.js";
-import { workbenchLayout } from "./workbench-controller.js";
+import {
+  bindPersistedRendererWorkbenchAuthority,
+  workbenchLayout
+} from "./workbench-controller.js";
 
 describe("renderer workbench persistence boundary", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      workspace: undefined,
+      trust: "unknown",
+      trustUpdating: false,
+      sessionTransitionPending: false,
+      runtime: { phase: "idle", detail: "等待选择工作区", recoverable: true }
+    });
+  });
+
   it("serializes metadata without drafts, attachments, runtime details, or credentials", () => {
     const store = createRendererWorkbenchStore();
     store.getState().registerWorkspace(workspace());
@@ -78,6 +92,75 @@ describe("renderer workbench persistence boundary", () => {
         conversation: { sessionPath: "/sessions/one.jsonl" }
       },
       settings: { section: "runtime", scope: "global" }
+    });
+  });
+
+  it("binds a persisted Workspace and Session to the App runtime authority without replaying it", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().hydrate({
+      version: 2,
+      workspaces: [workspace()],
+      workspaceOrder: ["workspace-1"],
+      expandedWorkspaceIds: ["workspace-1"],
+      currentWorkspaceId: "workspace-1",
+      selectedSurface: {
+        kind: "conversation",
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-1",
+          sessionPath: "/sessions/persisted.jsonl"
+        }
+      },
+      runtimeRecovery: [],
+      settings: { section: "general", scope: "global" },
+      cleanExit: false
+    });
+
+    expect(bindPersistedRendererWorkbenchAuthority(store.getState())).toBe(true);
+    expect(useAppStore.getState()).toMatchObject({
+      workspace: "/workspace/one",
+      trust: "trusted",
+      sessionTransitionPending: false,
+      runtime: { phase: "stopped", detail: "会话待打开", recoverable: true }
+    });
+  });
+
+  it("preserves the explicit interrupted-task recovery state on cold start", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().hydrate({
+      version: 2,
+      workspaces: [workspace()],
+      workspaceOrder: ["workspace-1"],
+      expandedWorkspaceIds: ["workspace-1"],
+      currentWorkspaceId: "workspace-1",
+      selectedSurface: {
+        kind: "conversation",
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-1",
+          sessionPath: "/sessions/interrupted.jsonl"
+        }
+      },
+      runtimeRecovery: [{
+        taskId: "task-interrupted",
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-1",
+          sessionPath: "/sessions/interrupted.jsonl"
+        },
+        sessionId: "session-interrupted",
+        taskGeneration: 4,
+        lastKnownLifecycle: "running"
+      }],
+      settings: { section: "general", scope: "global" },
+      cleanExit: false
+    });
+
+    expect(bindPersistedRendererWorkbenchAuthority(store.getState())).toBe(true);
+    expect(useAppStore.getState().runtime).toEqual({
+      phase: "failed",
+      detail: "上次运行已中断",
+      recoverable: true
     });
   });
 });

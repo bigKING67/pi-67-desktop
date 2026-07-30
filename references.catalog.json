@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "repositories": [
+    {
+      "id": "pi",
+      "url": "https://github.com/earendil-works/pi",
+      "role": "specification",
+      "tier": "S0",
+      "reviewState": "contract-managed",
+      "defaultReuse": "dependency",
+      "reviewCadence": "pi-release-and-weekly",
+      "reviewTriggers": [
+        "pi-sdk-upgrade",
+        "session-contract",
+        "extension-contract",
+        "model-provider-auth",
+        "windows-shell-behavior"
+      ],
+      "constraints": [
+        "The pinned Pi packages are the only agent runtime contract",
+        "Runtime versions remain owned by the package manifest and workspace overrides",
+        "Every Pi SDK upgrade uses a dedicated pull request and platform evidence"
+      ]
+    },
+    {
+      "id": "peakcode",
+      "url": "https://github.com/PeakCode-AI/PeakCode",
+      "role": "lineage-reference",
+      "tier": "S1",
+      "reviewState": "reviewed",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "monthly-and-feature",
+      "reviewTriggers": [
+        "workspace-navigation",
+        "session-navigation",
+        "desktop-lifecycle",
+        "transcript-composer-inspector"
+      ],
+      "constraints": [
+        "Peak Code is not a merge upstream and must not be added as a Git remote",
+        "Do not import multi-provider, localhost backend, business WebSocket, or telemetry behavior",
+        "Do not copy branding, fonts, screenshots, binary assets, or directory structure"
+      ]
+    },
+    {
+      "id": "pi-app",
+      "url": "https://github.com/justhil/pi-app",
+      "role": "product-reference",
+      "tier": "S1",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "monthly-and-feature",
+      "reviewTriggers": [
+        "extension-ui",
+        "session-tree",
+        "composer",
+        "tool-cards"
+      ],
+      "constraints": [
+        "Pi SDK remains the only runtime",
+        "Renderer code must not gain Node or filesystem access",
+        "Extension adapters remain declarative and source-pinned"
+      ]
+    },
+    {
+      "id": "pi-gui",
+      "url": "https://github.com/minghinmatthewlam/pi-gui",
+      "role": "product-reference",
+      "tier": "S1",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "monthly-and-feature",
+      "reviewTriggers": [
+        "conversation-timeline",
+        "thread-navigation",
+        "recorded-changes",
+        "workspace-navigation"
+      ],
+      "constraints": [
+        "Pi JSONL remains the conversation source of truth",
+        "Recorded Changes must not be presented as a complete Git diff",
+        "Multi-agent UI concepts require an explicit Pi runtime contract"
+      ]
+    },
+    {
+      "id": "openpi",
+      "url": "https://github.com/heyhuynhgiabuu/openpi",
+      "role": "architecture-reference",
+      "tier": "S1",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "monthly-and-feature",
+      "reviewTriggers": [
+        "electron-boundary",
+        "command-palette",
+        "files-and-changes",
+        "desktop-workbench"
+      ],
+      "constraints": [
+        "The Agent Host utility process owns the Pi SDK",
+        "Electron Main must not become a second agent runtime",
+        "The sandboxed renderer uses only the narrow validated preload bridge"
+      ]
+    },
+    {
+      "id": "apple-pi",
+      "url": "https://github.com/dodo-reach/apple-pi",
+      "role": "ux-reference",
+      "tier": "S1",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "monthly-and-feature",
+      "reviewTriggers": [
+        "session-catalog",
+        "session-resume",
+        "session-fork",
+        "project-session-navigation"
+      ],
+      "constraints": [
+        "Do not transplant SwiftUI implementation code",
+        "Embedded terminal and SSH remain outside the v1 product boundary",
+        "macOS-only behavior is not Windows evidence"
+      ]
+    },
+    {
+      "id": "liveagent",
+      "url": "https://github.com/Stack-Cairn/LiveAgent",
+      "role": "feature-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "event-sequencing",
+        "recovery-replay",
+        "future-remote-companion"
+      ],
+      "constraints": [
+        "Do not import its custom agent runtime",
+        "Business WebSocket, Gateway, and remote WebUI remain outside v1",
+        "Protocol ideas must be rewritten for the Pi-67 MessagePort contract"
+      ]
+    },
+    {
+      "id": "picot",
+      "url": "https://github.com/shixin-guo/picot",
+      "role": "feature-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "windows-installer",
+        "runtime-packaging",
+        "update-validation"
+      ],
+      "constraints": [
+        "Do not migrate the product to Tauri",
+        "Windows ARM64 remains outside the supported release matrix",
+        "Packaging evidence must be reproduced in the Electron artifacts"
+      ]
+    },
+    {
+      "id": "pi-desktop",
+      "url": "https://github.com/gustavonline/pi-desktop",
+      "role": "contrast-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "capability-model",
+        "extension-first-mapping",
+        "runtime-lifecycle-comparison"
+      ],
+      "constraints": [
+        "Pi RPC and system Pi fallback are rejected architecture choices",
+        "Do not migrate the product to Tauri or Lit",
+        "Capability comparisons cannot override the embedded SDK ADR"
+      ]
+    },
+    {
+      "id": "pilot",
+      "url": "https://github.com/espennilsen/pilot",
+      "role": "feature-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "staged-edits",
+        "change-review",
+        "task-board",
+        "managed-terminal"
+      ],
+      "constraints": [
+        "Do not bypass project trust or one-shot tool approval",
+        "Do not write through renderer-owned filesystem paths",
+        "Staged edit semantics require a Pi-67 domain and protocol design"
+      ]
+    },
+    {
+      "id": "pi-agent-dashboard",
+      "url": "https://github.com/BlackBeltTechnology/pi-agent-dashboard",
+      "role": "future-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "remote-companion",
+        "mobile-layout",
+        "disconnect-recovery"
+      ],
+      "constraints": [
+        "Remote Gateway, tunnel, and browser control require a separate product decision",
+        "Do not add an application TCP listener or business WebSocket in v1",
+        "Remote surfaces must not expose credentials, prompts, or raw tool payloads"
+      ]
+    },
+    {
+      "id": "wmux",
+      "url": "https://github.com/amirlehmam/wmux",
+      "role": "future-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "windows-conpty",
+        "terminal-output-performance",
+        "terminal-layout"
+      ],
+      "constraints": [
+        "A general terminal is a v1 non-goal",
+        "ConPTY behavior requires real Windows x64 evidence",
+        "Named Pipe RPC must not replace the Agent Host MessagePort protocol"
+      ]
+    },
+    {
+      "id": "pi-session-manager",
+      "url": "https://github.com/Dwsy/pi-session-manager",
+      "role": "feature-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "session-library",
+        "session-search",
+        "large-catalog-navigation"
+      ],
+      "constraints": [
+        "Pi JSONL remains authoritative and the application index remains disposable",
+        "SQLite must not store prompts, transcripts, thinking, tools, source, or patches",
+        "Unnamed sessions must not derive persisted names from prompt content"
+      ]
+    },
+    {
+      "id": "pi-sandbox",
+      "url": "https://github.com/carderne/pi-sandbox",
+      "role": "security-reference",
+      "tier": "S2",
+      "reviewState": "candidate",
+      "defaultReuse": "reimplement-preferred",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "sandbox-policy",
+        "temporary-approval",
+        "filesystem-process-isolation"
+      ],
+      "constraints": [
+        "Platform-specific mechanisms require separate Windows and macOS designs",
+        "Project trust remains distinct from one-shot approval",
+        "Security fallback must fail closed and remain observable"
+      ]
+    },
+    {
+      "id": "pi-ui",
+      "url": "https://github.com/marcbaque/pi-ui",
+      "role": "minimal-reference",
+      "tier": "S3",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "minimal-session-flow",
+        "tool-streaming-spot-check"
+      ],
+      "constraints": [
+        "Minimal examples are not architecture authority",
+        "Do not trade bounded recovery or process isolation for implementation size",
+        "Observed source behavior still requires local runtime verification"
+      ]
+    },
+    {
+      "id": "tabby",
+      "url": "https://github.com/Eugeny/tabby",
+      "role": "future-reference",
+      "tier": "S3",
+      "reviewState": "candidate",
+      "defaultReuse": "architecture-only",
+      "reviewCadence": "feature-triggered",
+      "reviewTriggers": [
+        "terminal-profile",
+        "ssh",
+        "ime-unicode-input",
+        "terminal-shortcuts"
+      ],
+      "constraints": [
+        "A general terminal and SSH client are v1 non-goals",
+        "Do not import terminal plugins or unrelated provider integrations",
+        "Platform claims require reproduction in supported Pi-67 packages"
+      ]
+    }
+  ]
+}

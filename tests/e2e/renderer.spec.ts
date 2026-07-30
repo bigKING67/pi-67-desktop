@@ -15,8 +15,8 @@ test.beforeEach(async ({ page }) => {
 test("opens a trusted Pi workspace through the MessagePort contract", async ({ page }, testInfo) => {
   await page.goto("/");
   await attachMockAgent(page);
-  await expect(page.getByRole("heading", { name: "开始一个 Pi 任务" })).toBeVisible();
-  await expect(page.getByText("选择一个工作区，继续已有 Pi 会话或开始新任务。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "开始一个 Pi 会话" })).toBeVisible();
+  await expect(page.getByText("选择一个工作区，继续已有 Pi 会话或开始新会话。")).toBeVisible();
   await expect(page.getByText("复用现有 Pi 配置和会话")).toBeVisible();
   await expect(page.getByText("数据保存在本机")).toBeVisible();
   await expect(page.getByText(/Pi SDK|Agent Host|内部服务器|agent runtime/u)).toHaveCount(0);
@@ -24,54 +24,52 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   expect((await page.locator(".brand-lockup").boundingBox())?.x).toBeGreaterThanOrEqual(78);
   await page.screenshot({ path: testInfo.outputPath("welcome-before.png"), animations: "disabled" });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByRole("banner").getByText("pi-demo", { exact: true })).toBeVisible();
-  await expect(page.getByRole("status").getByText("工作区尚未信任")).toBeVisible();
-  await expect(page.getByLabel("Pi conversation")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "会话", exact: true })).toBeVisible();
-  await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
-  await expect(page.locator(".title-actions").getByRole("button", { name: /外观：/u })).toHaveCount(0);
-  await page.getByRole("button", { name: "打开更多菜单" }).click();
-  await expect(page.getByRole("menu").getByRole("menuitem", { name: /外观：跟随系统，当前选择/u })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: /信任并加载资源/u }).click();
+  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
-
+  await expect(page.getByLabel("Pi conversation")).toBeVisible();
+  await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
+  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
+  await expect(page.locator(".title-actions").getByRole("button", { name: /外观：/u })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "打开更多菜单" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
+  await expect(page.locator(".title-actions button").last()).toHaveAttribute("data-testid", "inspector-toggle");
   const conversationBottom = await page.getByLabel("Pi conversation").evaluate((element) => element.getBoundingClientRect().bottom);
-  const composerBottom = await page.locator(".composer-region").evaluate((element) => element.getBoundingClientRect().bottom);
+  const composerBottom = await page.getByTestId("composer-region").evaluate((element) => element.getBoundingClientRect().bottom);
   expect(Math.abs(conversationBottom - composerBottom)).toBeLessThanOrEqual(1);
 
   await page.screenshot({ path: testInfo.outputPath("workspace-after.png"), animations: "disabled" });
 });
 
-test("gives the first on-demand Agent Host connection one initialization owner", async ({ page }) => {
+test("gives the first on-demand Pi runtime connection one initialization owner", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await expect(page.getByRole("banner").getByText("pi-demo", { exact: true })).toBeVisible();
-  const trustButton = page.locator(".trust-banner .secondary-button");
-  await expect(trustButton).toBeDisabled();
-  await expect(trustButton).toContainText("等待 Agent Host");
+  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "开始一个新会话" })).toBeVisible();
+  await expect(page.getByText("等待选择工作区", { exact: true })).toBeVisible();
 
   await attachMockAgent(page);
 
-  await expect.poll(() => recordedCommands(page)).toEqual(["workspace.open", "workspace.changes", "session.catalog.query"]);
-  await expect(trustButton).toBeEnabled();
-  await expect(trustButton).toContainText("信任并加载资源");
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "workspace.register"
+  )).length).toBeGreaterThanOrEqual(1);
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "workspace.open"
+  ))).toHaveLength(1);
+  await expect(page.getByLabel("Pi conversation")).toBeVisible();
 });
 
-test("serializes trust updates without stacking clicks", async ({ page }) => {
+test("treats a native-picker workspace as trusted without a second confirmation", async ({ page }) => {
   await page.goto("/");
-  await attachMockAgent(page, [], { "workspace.setTrust": 200 });
+  await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByText("从一个具体任务开始")).toBeVisible();
-  await clearRecordedCommands(page);
-
-  const trustButton = page.locator(".trust-banner .secondary-button");
-  await expect(trustButton).toContainText("信任并加载资源");
-  await trustButton.click();
-  await expect(trustButton).toBeDisabled();
-  await expect(trustButton).toContainText("正在加载 Pi 资源");
-  await expect.poll(() => recordedCommands(page)).toEqual(["workspace.setTrust"]);
+  await expect.poll(() => recordedCommandDetails(page)).toContainEqual(expect.objectContaining({
+    type: "workspace.open",
+    payload: expect.objectContaining({ trust: "trusted" })
+  }));
+  expect(await recordedCommands(page)).not.toContain("workspace.setTrust");
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
 });
 
@@ -138,7 +136,7 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await navigationToggle.click();
   await expect(navigation).toBeVisible();
   await expect(page.getByRole("button", { name: "隐藏会话导航" })).toHaveAttribute("aria-expanded", "true");
-  await expect(navigation.getByRole("button", { name: "切换工作区" })).toBeFocused();
+  await expect(navigation.getByRole("button", { name: "添加或创建工作区" })).toBeFocused();
 
   await page.getByRole("button", { name: "关闭会话导航" }).click();
   await expect(navigation).not.toBeVisible();
@@ -167,7 +165,7 @@ test("fills the composer from a starter prompt without sending it", async ({ pag
   const composer = page.getByLabel("给 Pi 发送消息");
   await expect(composer).toHaveValue("检查当前 Git 改动并找出风险");
   await expect(composer).toBeFocused();
-  expect(await recordedCommands(page)).toEqual([]);
+  expect((await recordedCommands(page)).filter((command) => command === "prompt.submit")).toEqual([]);
 });
 
 test("opens Markdown external links through the desktop bridge with link semantics", async ({ page }) => {
@@ -221,11 +219,11 @@ test("imports an external Pi session instead of opening the source file in place
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByRole("banner").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
   await expect.poll(async () => (await recordedCommands(page)).includes("session.catalog.query")).toBe(true);
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: "更多会话操作" }).click();
+  await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "导入 Pi Session" }).click();
   await expect.poll(async () => (await recordedCommands(page)).includes("session.import")).toBe(true);
   await expect(page.locator('[data-operation-lifecycle="completed"]')).toContainText("任务已完成");
@@ -242,7 +240,7 @@ test("imports an external Pi session instead of opening the source file in place
     testWindow.pi67.system.selectSessionFile = async () => undefined;
   });
   await clearRecordedCommands(page);
-  await page.getByRole("button", { name: "更多会话操作" }).click();
+  await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "导入 Pi Session" }).click();
   await page.waitForTimeout(50);
   expect(await recordedCommands(page)).not.toContain("session.import");
@@ -250,17 +248,25 @@ test("imports an external Pi session instead of opening the source file in place
 
 test("serializes new-session transitions and keeps one terminal notification across Toast and history", async ({ page }) => {
   await page.goto("/");
-  await attachMockAgent(page, [], { "session.create": 200 });
+  await attachMockAgent(page, [], { "session.create": 1_000 }, {
+    isolateTaskSnapshots: true,
+    rotateSessionOnCreate: true
+  });
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
 
-  const createButton = page.getByRole("button", { name: "新建 Session" });
+  const createButton = page.getByRole("button", { name: "在 pi-demo 新建会话" });
   await createButton.click();
   await expect(createButton).toBeDisabled();
-  await expect(page.getByLabel("Pi conversation").getByText("正在创建 Pi 新会话")).toBeVisible();
-  await expect.poll(() => recordedCommands(page)).toEqual(["session.create", "workspace.changes", "session.catalog.query"]);
+  await expect(page.locator('[data-runtime-phase="starting"]')).toContainText("正在创建 Pi 新会话");
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "session.create"
+  ))).toHaveLength(1);
+  await expect(page.locator('[data-runtime-phase="ready"]')).toContainText("Pi 新会话已就绪");
 
   const operationId = "operation-notice-test";
+  const sessionId = "session-created-1";
+  const sessionGeneration = 2;
   await emitMockAgentEvent(page, {
     type: "operation.started",
     payload: {
@@ -269,12 +275,12 @@ test("serializes new-session transitions and keeps one terminal notification acr
         kind: "prompt",
         lifecycle: "running",
         cancellable: true,
-        sessionId: "session-test",
-        sessionGeneration: 1,
+        sessionId,
+        sessionGeneration,
         startedAt: Date.now()
       }
     }
-  }, { operationId });
+  }, { operationId, sessionId, sessionGeneration });
   const failure = {
     type: "operation.failed",
     payload: {
@@ -283,8 +289,8 @@ test("serializes new-session transitions and keeps one terminal notification acr
       error: { code: "INTERNAL", message: "重复错误", recoverable: true }
     }
   };
-  await emitMockAgentEvent(page, failure, { operationId });
-  await emitMockAgentEvent(page, failure, { operationId });
+  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionGeneration });
+  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionGeneration });
   const toast = page.locator("[data-notification-id]").filter({ hasText: "任务失败" });
   await expect(toast).toHaveCount(1);
   await toast.getByText("任务失败").click();
@@ -349,8 +355,11 @@ test("projects operation activities and sends an operation-scoped abort", async 
   const operationStatus = page.getByRole("status").filter({ hasText: "需要你的确认" });
   await expect(operationStatus).toBeVisible();
   await operationStatus.getByRole("button", { name: "停止" }).click();
-  await expect.poll(() => recordedCommands(page)).toEqual(["operation.abort"]);
-  expect((await recordedCommandDetails(page))[0]?.payload).toEqual({ operationId });
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "operation.abort"
+  ))).toEqual(["operation.abort"]);
+  expect((await recordedCommandDetails(page)).find((command) => command.type === "operation.abort")?.payload)
+    .toEqual({ operationId });
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
@@ -395,7 +404,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
 test("resynchronizes the projection after an event sequence gap without guessing the missing event", async ({ page }) => {
   await page.goto("/");
   // Keep the recovery state observable long enough for Chromium's accessibility tree to update.
-  await attachMockAgent(page, [], { "projection.resync": 500 });
+  await attachMockAgent(page, [], { "projection.resync": 1_500 });
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
 
@@ -405,7 +414,9 @@ test("resynchronizes the projection after an event sequence gap without guessing
   }, { sequence: 100 });
   await expect(page.getByRole("status").filter({ hasText: "检测到状态事件缺口" })).toBeVisible();
   await expect(page.getByText("Pi 资源已重新加载", { exact: true })).toHaveCount(0);
-  await expect.poll(() => recordedCommands(page)).toEqual(["projection.resync"]);
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "projection.resync"
+  ))).toEqual(["projection.resync"]);
   await expect(page.getByText("Pi 状态已重新同步")).toBeVisible();
 
   await emitMockAgentEvent(page, {

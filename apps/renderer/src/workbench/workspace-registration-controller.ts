@@ -92,11 +92,14 @@ export async function repairAndOpenRendererWorkspace(workspaceId: string): Promi
   const repaired = await window.pi67.system.repairWorkspace(workspaceId);
   if (!repaired) return false;
   const workbench = rendererWorkbenchStore.getState();
+  const selectedTaskBeforeRepair = selectedWorkbenchTask(workbench);
   workbench.registerWorkspace(repaired);
   workbench.selectWorkspace(repaired.id);
   await registerRendererWorkspaceWithHost(repaired, { refreshCatalog: true });
-  const task = selectedWorkbenchTask(rendererWorkbenchStore.getState());
-  if (task?.sessionPath) return resumeRendererTask(task.id);
+  if (
+    selectedTaskBeforeRepair?.workspaceId === repaired.id
+    && selectedTaskBeforeRepair.sessionPath
+  ) return resumeRendererTask(selectedTaskBeforeRepair.id);
   await openRendererWorkspaceDescriptor(repaired);
   return useAppStore.getState().workspace === repaired.identity.canonicalPath;
 }

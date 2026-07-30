@@ -77,12 +77,12 @@ test("clears stale Extension UI and restores the session after Host epoch replac
     }
   }, { operationId });
   await expect(page.getByRole("dialog", { name: "旧 Host 请求" })).toBeVisible();
-  await expect.poll(() => page.title()).toBe("旧 Host 标题 - Pi-67 Desktop");
+  await expect.poll(() => page.title()).toBe("旧 Host 标题 - π");
   await expect(page.getByText("旧 Host 状态")).toBeVisible();
 
   await replaceMockAgentHost(page, 2);
   await expect(page.getByRole("dialog", { name: "旧 Host 请求" })).toHaveCount(0);
-  await expect.poll(() => page.title()).toBe("Pi-67 Desktop");
+  await expect.poll(() => page.title()).toBe("π");
   await expect(page.getByText("旧 Host 状态")).toHaveCount(0);
   await expect.poll(async () => (await recordedCommands(page)).filter((type) => type === "runtime.initialize").length).toBe(1);
   await expect(page.getByText("Pi 会话已恢复")).toBeVisible();

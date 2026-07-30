@@ -6,6 +6,7 @@ import { clearedTransientState } from "../app/app-state-projection.js";
 import type { AppState } from "../app/app-store.types.js";
 import { prepareRendererSessionTransaction } from "../app/renderer-session-transaction.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
+import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
   acceptRendererSessionTransitionResponse,
@@ -23,6 +24,9 @@ import {
   failProjectionRecovery,
   installResynchronizedProjection
 } from "./projection-resync-installation.js";
+import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-identity.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import type { WorkspaceId } from "@pi67/domain";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -45,6 +49,7 @@ export type ProjectionRecoveryDisposition =
 interface ConnectedProjectionRecoveryInput {
   identity: AgentConnectionIdentity;
   workspace: string;
+  workspaceId: WorkspaceId | undefined;
   trust: AppState["trust"];
   approvalMode: AppState["approvalMode"];
   sameHost: boolean;
@@ -66,11 +71,11 @@ export function recoverConnectedRendererProjection(
   );
   set({
     ...clearedTransientState(),
-    runtime: { phase: "recovering", detail: "正在恢复 Pi 会话", recoverable: true }
+    runtime: { phase: "recovering", detail: messages.runtime.connection.restoringSession, recoverable: true }
   });
   const transitionTarget = captureRendererSessionTransition(get());
   if (!transitionTarget) {
-    failProjectionRecovery(get, set, input.identity.hostEpoch, revision, "无法恢复 Pi 会话", new Error(
+    failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, new Error(
       "Renderer Session transition authority is not connected."
     ));
     return;
@@ -84,10 +89,11 @@ export function recoverConnectedRendererProjection(
         input.identity.hostEpoch,
         revision,
         transitionTarget,
-        "Pi 会话已恢复"
+        messages.runtime.connection.sessionRestored,
+        input.workspaceId
       )
     )).catch((error: unknown) => {
-      failProjectionRecovery(get, set, input.identity.hostEpoch, revision, "无法恢复 Pi 会话", error, transitionTarget);
+      failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, error, transitionTarget);
     });
     return;
   }
@@ -105,21 +111,21 @@ export function recoverConnectedRendererProjection(
     );
     if (disposition === "committed") {
       projectionRecoveryLedger.clearInterruptedOperation();
-      void queryFirstSessionCatalog();
+      if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       return;
     }
     if (disposition === "stale") return;
-    throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
+    throw new Error(messages.runtime.connection.missingRuntimeReady);
   }).catch((error: unknown) => {
     if (
       projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)
       && classifyRendererSessionBootstrap(get(), transitionTarget) === "committed"
     ) {
       projectionRecoveryLedger.clearInterruptedOperation();
-      void queryFirstSessionCatalog();
+      if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       return;
     }
-    failProjectionRecovery(get, set, input.identity.hostEpoch, revision, "无法恢复 Pi 会话", error, transitionTarget);
+    failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, error, transitionTarget);
   });
 }
 
@@ -138,7 +144,7 @@ export function recoverAgentConnectionAfterTeardown(
 ): void {
   publishNotification({
     level: "warning",
-    title: "Pi 运行服务连接已中断",
+    title: messages.runtime.connection.runtimeConnectionInterrupted,
     message: sourceError.message
   });
   void ensureAgentConnection().catch((reconnectError: unknown) => {
@@ -151,13 +157,13 @@ export function recoverAgentConnectionAfterTeardown(
     set({
       runtime: {
         phase: "failed",
-        detail: `无法恢复 Pi 运行服务连接：${errorMessage(reconnectError)}`,
+        detail: messages.runtime.connection.restoreConnectionFailedDetail(errorMessage(reconnectError)),
         recoverable: true
       }
     });
     publishNotification({
       level: "error",
-      title: "无法恢复 Pi 运行服务连接",
+      title: messages.runtime.connection.restoreConnectionFailed,
       message: errorMessage(reconnectError)
     });
   });
@@ -171,7 +177,7 @@ export function recoverAgentConnectionAfterPowerResume(
   const revision = invalidateProjectionRecoveryGeneration();
   set({
     sessionTransitionPending: true,
-    runtime: { phase: "recovering", detail: "系统已恢复，正在重新连接 Pi 运行服务", recoverable: true }
+    runtime: { phase: "recovering", detail: messages.runtime.connection.systemReconnect, recoverable: true }
   });
   void ensureAgentConnection().catch((error: unknown) => {
     const state = get();
@@ -185,13 +191,13 @@ export function recoverAgentConnectionAfterPowerResume(
       sessionTransitionPending: false,
       runtime: {
         phase: "failed",
-        detail: `系统恢复后无法连接 Pi 运行服务：${detail}`,
+        detail: messages.runtime.connection.systemReconnectFailedDetail(detail),
         recoverable: true
       }
     });
     publishNotification({
       level: "error",
-      title: "系统恢复后无法连接 Pi 运行服务",
+      title: messages.runtime.connection.systemReconnectFailed,
       message: detail
     });
   });
@@ -203,6 +209,11 @@ export async function resynchronizeRendererProjection(
   options: ProjectionRecoveryOptions
 ): Promise<ProjectionRecoveryDisposition> {
   const revision = invalidateProjectionRecoveryGeneration();
+  const workspace = get().workspace;
+  const workbench = rendererWorkbenchStore.getState();
+  const workspaceId = workspace
+    ? workspaceIdForCanonicalPath(workbench, workspace)
+    : workbench.currentWorkspaceId;
   projectionRecoveryLedger.captureInterruptedOperation(get(), options.operationId);
   prepareRendererSessionTransaction("projection-resync");
   set({
@@ -226,7 +237,8 @@ export async function resynchronizeRendererProjection(
         options.hostEpoch,
         revision,
         transitionTarget,
-        options.readyDetail
+        options.readyDetail,
+        workspaceId
       )
     ));
     return committed ? "committed" : "stale";
@@ -258,7 +270,7 @@ export function prepareRendererHostReplacement(): void {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "未知错误";
+  return error instanceof Error ? error.message : messages.runtime.unknownError;
 }
 
 function deferProjectionRecoveryForBootstrap(

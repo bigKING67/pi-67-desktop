@@ -1,5 +1,4 @@
-import { Type, type TProperties } from "typebox";
-import { Value } from "typebox/value";
+import { Type, Value, type TProperties } from "./typebox-schema.js";
 import { PROTOCOL_REVISION } from "./protocol-revision.js";
 import { DEFAULT_MAX_ENVELOPE_BYTES, PROTOCOL_VERSION } from "./protocol-version.js";
 

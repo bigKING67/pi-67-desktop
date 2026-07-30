@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties } from "./typebox-schema.js";
 
 export type PiConfigurationFileKind = "models" | "auth" | "global-settings" | "project-settings";
 export type PiConfigurationChangeSource = "desktop" | "external" | "manual";

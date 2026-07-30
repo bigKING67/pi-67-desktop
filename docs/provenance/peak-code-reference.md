@@ -2,6 +2,9 @@
 
 参考仓库：`PeakCode-AI/PeakCode`
 
+治理记录：`references.catalog.json#peakcode`、`references.lock.json#peakcode`。Peak Code
+不是可 merge 的 Git upstream，仓库不为它增加持久 Remote 或 Submodule。
+
 固定参考 commit：
 
 ```text

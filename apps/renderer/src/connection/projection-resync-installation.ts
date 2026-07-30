@@ -7,6 +7,7 @@ import type { AppState } from "../app/app-store.types.js";
 import { installRendererSessionResync } from "../app/renderer-session-installation.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
+import { messages } from "../localization/message-catalog.js";
 import {
   publishNotification,
   recordOperationTerminal
@@ -16,6 +17,7 @@ import {
   type RendererSessionTransitionTarget
 } from "../session/session-authority.js";
 import { projectionRecoveryLedger } from "./projection-recovery-ledger.js";
+import type { WorkspaceId } from "@pi67/domain";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -27,7 +29,8 @@ export function installResynchronizedProjection(
   hostEpoch: number,
   revision: number,
   transitionTarget: RendererSessionTransitionTarget,
-  readyDetail: string
+  readyDetail: string,
+  workspaceId: WorkspaceId | undefined
 ): boolean {
   if (!projectionRecoveryLedger.isCurrent(get(), hostEpoch, revision)) return false;
   if (!acceptRendererSessionTransitionResponse(get(), transitionTarget)) return false;
@@ -45,7 +48,7 @@ export function installResynchronizedProjection(
     ? terminalRecoveryDetail(recoveredTerminal)
     : undefined;
   const current = get();
-  if (!installRendererSessionResync(current, result, hostEpoch, transitionTarget)) {
+  if (!installRendererSessionResync(current, result, hostEpoch, transitionTarget, workspaceId)) {
     throw new Error("Projection resync result is stale or internally inconsistent.");
   }
   set((next) => projectionRecoveryLedger.isCurrent(next, hostEpoch, revision) ? {
@@ -53,7 +56,7 @@ export function installResynchronizedProjection(
     operationDetail: terminalDetail,
     sessionTransitionPending: false,
     runtime: result.activeOperation
-      ? { phase: "busy", detail: "Pi 正在执行任务", recoverable: true }
+      ? { phase: "busy", detail: messages.operation.running, recoverable: true }
       : recoveredTerminal
         ? terminalRecoveryRuntime(recoveredTerminal, terminalDetail!)
         : { phase: "ready", detail: readyDetail, recoverable: true }
@@ -63,7 +66,7 @@ export function installResynchronizedProjection(
   }
   if (recoveredTerminal) recordOperationTerminal(recoveredTerminal);
   projectionRecoveryLedger.clearInterruptedOperation();
-  void queryFirstSessionCatalog();
+  if (workspaceId) void queryFirstSessionCatalog(workspaceId);
   return true;
 }
 
@@ -93,7 +96,7 @@ export function failProjectionRecovery(
 function terminalRecoveryDetail(terminal: OperationSettled): string {
   switch (terminal.lifecycle) {
     case "completed":
-      return "任务已完成";
+      return messages.operation.completed;
     case "failed":
       return terminal.error.message;
     case "cancelled":
@@ -119,5 +122,5 @@ function terminalRecoveryRuntime(
 }
 
 function recoveryErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "未知错误";
+  return error instanceof Error ? error.message : messages.runtime.unknownError;
 }

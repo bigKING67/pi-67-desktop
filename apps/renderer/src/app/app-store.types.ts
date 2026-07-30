@@ -22,7 +22,7 @@ export interface AppState {
   hostEpoch: number | undefined;
   connected: boolean;
   runtime: RuntimeStatus;
-  workspace?: string;
+  workspace: string | undefined;
   trust: WorkspaceTrust;
   trustUpdating: boolean;
   sessionTransitionPending: boolean;
