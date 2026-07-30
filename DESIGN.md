@@ -227,9 +227,11 @@ loading error where the operation can produce those states
   occupies the Virtuoso footer and joins history only after it settles.
 - Streaming text is coalesced; token-level React commits are forbidden.
 - Long code uses a bounded 520px viewport, worker-based highlighting, internally
-  virtualized lines, and a full-content copy action. Tool summaries and recorded
-  Edit Patch previews remain bounded; complete Tool Output and workspace Diff
-  require future explicit data and expansion contracts.
+  virtualized lines, and a full-content copy action. Long lines preserve their
+  source layout and remain horizontally navigable without a persistent scrollbar;
+  they never widen the Transcript or application document. Tool summaries and
+  recorded Edit Patch previews remain bounded; complete Tool Output and workspace
+  Diff require future explicit data and expansion contracts.
 - Markdown never executes raw HTML.
 - Session images never render a cross-process data URL. A generation-bound asset
   reference loads only while its virtualized message is mounted, shows explicit

@@ -122,6 +122,40 @@ test("keeps Shiki deferred and permits only its WASM engine when code is present
   }
 });
 
+test("keeps long code horizontally navigable without a persistent scrollbar", async ({ page }, testInfo) => {
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  const longLine = `const enabledTools = new Set(savedTools.filter((tool: string) => allToolNames.includes(tool))); // ${"long-code-path-".repeat(18)}`;
+  await attachMockAgent(page, [{
+    id: "long-code-message",
+    role: "assistant",
+    parts: [{ type: "text", text: `\`\`\`typescript\n${longLine}\n\`\`\`` }]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const codeBlock = page.getByTestId("code-block");
+  const codeViewport = codeBlock.locator("pre");
+  await expect(codeBlock).toHaveAttribute("data-highlight-state", "ready", { timeout: 15_000 });
+  const metrics = await codeViewport.evaluate((element) => {
+    const initialScrollLeft = element.scrollLeft;
+    element.scrollLeft = 80;
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      scrollLeft: element.scrollLeft,
+      initialScrollLeft,
+      horizontalScrollbarHeight: getComputedStyle(element, "::-webkit-scrollbar").height,
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth
+    };
+  });
+  expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+  expect(metrics.scrollLeft).toBeGreaterThan(metrics.initialScrollLeft);
+  expect(metrics.horizontalScrollbarHeight).toBe("0px");
+  expect(metrics.documentScrollWidth).toBe(metrics.documentClientWidth);
+  await page.screenshot({ path: testInfo.outputPath("long-code-without-scrollbar.png"), animations: "disabled" });
+});
+
 test("keeps unsigned preview checks and external downloads user initiated", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);
