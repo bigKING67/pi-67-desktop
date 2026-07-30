@@ -397,7 +397,7 @@ export class PiConfigurationService {
       force,
       runtimeReloadWaitMs: this.runtimeReloadWaitMs,
       createValidationRuntime: () => this.createPiValidationRuntime(),
-      requireModelRuntime: () => this.requireModelRuntime()
+      installModelRuntime: (runtime) => { this.modelRuntime = runtime; }
     });
   }
 

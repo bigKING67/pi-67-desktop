@@ -87,6 +87,11 @@ describe("provider configuration controller", () => {
     await expect(second).resolves.toBe(false);
 
     expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      workspaceId: "workspace-a",
+      phase: "failed",
+      error: "provider request timed out"
+    });
     expect(useNotificationStore.getState().items.filter((item) => (
       item.title === "无法读取 Pi Provider 配置"
     ))).toHaveLength(1);

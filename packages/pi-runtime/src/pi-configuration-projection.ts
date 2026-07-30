@@ -32,7 +32,7 @@ interface RefreshPiConfigurationOptions {
   force: boolean;
   runtimeReloadWaitMs: number;
   createValidationRuntime(): Promise<ModelRuntime>;
-  requireModelRuntime(): Promise<ModelRuntime>;
+  installModelRuntime(runtime: ModelRuntime): void;
 }
 
 export async function refreshPiConfigurationProjection(options: RefreshPiConfigurationOptions): Promise<void> {
@@ -49,6 +49,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
   const globalDiagnostics: Array<{ file: PiConfigurationFileKind; message: string }> = [];
   let modelsDocument: ReturnType<typeof parseModelsDocument> | undefined;
   let globalSettings: ReturnType<typeof parseSettingsDocument> | undefined;
+  let refreshedRuntime: ModelRuntime | undefined;
   try {
     modelsDocument = parseModelsDocument(global.byKind.models.content);
   } catch (error) {
@@ -67,7 +68,8 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       const probe = await options.createValidationRuntime();
       const error = probe.getError();
       if (error) throw new Error(error);
-      await (await options.requireModelRuntime()).reloadConfig();
+      options.installModelRuntime(probe);
+      refreshedRuntime = probe;
     } catch (error) {
       globalDiagnostics.push({
         file: "models",
@@ -77,7 +79,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
   }
 
   const globalValid = globalDiagnostics.length === 0 && modelsDocument !== undefined && globalSettings !== undefined;
-  const runtime = globalValid ? await options.requireModelRuntime() : undefined;
+  const runtime = globalValid ? refreshedRuntime : undefined;
   const runtimeProviders = runtime ? projectRuntimeProviders(runtime) : undefined;
   const runtimeModels = runtime?.getModels();
   const credentials = globalValid

@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SettingsManager } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiConfigurationReloadState, PiProviderConfigurationChanged } from "@pi67/protocol";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiConfigurationService } from "./pi-configuration-service.js";
 
 const temporaryDirectories: string[] = [];
@@ -165,6 +165,33 @@ describe("PiConfigurationService", () => {
     } finally {
       runtimeReload.resolve("applied");
       unregisterRuntime?.();
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("installs the offline validation runtime without starting an unbounded SDK reload", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000
+    });
+    const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
+    const releaseReload = deferred<void>();
+    const createRuntime = vi.spyOn(ModelRuntime, "create").mockResolvedValue(runtime);
+    const reloadConfig = vi.spyOn(runtime, "reloadConfig").mockReturnValue(releaseReload.promise);
+    try {
+      const result = await Promise.race([
+        fixture.service.get(fixture.cwd),
+        delay(1_000).then(() => "timed-out" as const)
+      ]);
+
+      expect(result).not.toBe("timed-out");
+      expect(result).toMatchObject({ syncState: "current" });
+      expect(createRuntime).toHaveBeenCalledOnce();
+      expect(reloadConfig).not.toHaveBeenCalled();
+    } finally {
+      releaseReload.resolve();
+      createRuntime.mockRestore();
+      reloadConfig.mockRestore();
       await fixture.dispose();
     }
   }, 20_000);
