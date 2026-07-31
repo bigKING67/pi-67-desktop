@@ -15,6 +15,7 @@ interface ToolchainManifest {
     node: string;
     npmCli: string;
     git: string;
+    gitExecPath: string;
   };
 }
 
@@ -23,6 +24,7 @@ export interface DesktopToolchain extends DesktopToolchainStatus {
   nodeExecutable?: string;
   npmCli?: string;
   gitExecutable?: string;
+  gitExecPath?: string;
 }
 
 export function resolveDesktopToolchain(
@@ -52,7 +54,12 @@ export function resolveDesktopToolchain(
     const nodeExecutable = containedPath(root, manifest.paths.node);
     const npmCli = containedPath(root, manifest.paths.npmCli);
     const gitExecutable = containedPath(root, manifest.paths.git);
-    if (![nodeExecutable, npmCli, gitExecutable].every(existsSync)) {
+    const gitExecPath = containedPath(root, manifest.paths.gitExecPath);
+    const gitRemoteHttps = resolve(
+      gitExecPath,
+      platform === "win32" ? "git-remote-https.exe" : "git-remote-https"
+    );
+    if (![nodeExecutable, npmCli, gitExecutable, gitExecPath, gitRemoteHttps].every(existsSync)) {
       throw new Error("One or more private toolchain files are missing.");
     }
     return {
@@ -63,7 +70,8 @@ export function resolveDesktopToolchain(
       gitVersion: manifest.versions.git,
       nodeExecutable,
       npmCli,
-      gitExecutable
+      gitExecutable,
+      gitExecPath
     };
   } catch (error) {
     return {
@@ -75,7 +83,14 @@ export function resolveDesktopToolchain(
 }
 
 export function publicToolchainStatus(toolchain: DesktopToolchain): DesktopToolchainStatus {
-  const { root: _root, nodeExecutable: _node, npmCli: _npm, gitExecutable: _git, ...status } = toolchain;
+  const {
+    root: _root,
+    nodeExecutable: _node,
+    npmCli: _npm,
+    gitExecutable: _git,
+    gitExecPath: _gitExecPath,
+    ...status
+  } = toolchain;
   return status;
 }
 

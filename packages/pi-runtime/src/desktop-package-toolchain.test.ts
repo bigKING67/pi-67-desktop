@@ -8,6 +8,7 @@ const environment = {
   PI67_NODE_EXECUTABLE: "/app/toolchain/node/bin/node",
   PI67_NPM_CLI: "/app/toolchain/npm/bin/npm-cli.js",
   PI67_GIT_EXECUTABLE: "/app/toolchain/git/bin/git",
+  PI67_GIT_EXEC_PATH: "/app/toolchain/git/libexec/git-core",
   PI67_MANAGED_CAPABILITIES_ROOT: "/app/agent/desktop-capabilities",
   PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
     "/app/agent/desktop-capabilities/packages/pi67-core",

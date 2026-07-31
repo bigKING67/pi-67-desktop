@@ -42,6 +42,11 @@ describe("Agent Host environment", () => {
     const nodeExecutable = join(toolchainRoot, "node", process.platform === "win32" ? "node.exe" : "bin/node");
     const npmCli = join(toolchainRoot, "npm", "bin", "npm-cli.js");
     const gitExecutable = join(toolchainRoot, "git", process.platform === "win32" ? "cmd/git.exe" : "bin/git");
+    const gitExecPath = join(
+      toolchainRoot,
+      "git",
+      ...(process.platform === "win32" ? ["mingw64", "libexec", "git-core"] : ["libexec", "git-core"])
+    );
     const environment = agentHostEnvironment({ PATH: "/usr/bin" }, {
       storageRoot: "/app/user-data",
       capabilityProbeDirectory: "/app/user-data",
@@ -58,7 +63,8 @@ describe("Agent Host environment", () => {
         gitVersion: "2.53.0",
         nodeExecutable,
         npmCli,
-        gitExecutable
+        gitExecutable,
+        gitExecPath
       },
       capabilitiesRoot: "/app/resources/capabilities",
       packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
@@ -71,10 +77,12 @@ describe("Agent Host environment", () => {
       PI67_NODE_EXECUTABLE: nodeExecutable,
       PI67_NPM_CLI: npmCli,
       PI67_GIT_EXECUTABLE: gitExecutable,
+      PI67_GIT_EXEC_PATH: gitExecPath,
       PI67_CAPABILITIES_ROOT: "/app/resources/capabilities",
       PI67_PACKAGE_NETWORK_SETTINGS: "/app/user-data/package-manager/network-settings.json",
       npm_config_registry: "https://registry.npmmirror.com",
-      GIT_CONFIG_VALUE_0: "https://github.com/"
+      GIT_CONFIG_VALUE_0: "https://github.com/",
+      GIT_EXEC_PATH: gitExecPath
     });
     expect(environment.PATH?.split(delimiter).slice(0, 2)).toEqual([
       dirname(nodeExecutable),

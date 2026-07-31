@@ -15,7 +15,7 @@ export interface PackageSourceProbeOptions {
   toolchain: DesktopToolchain;
   settings: PackageNetworkSettings;
   fetcher: (input: string, init: RequestInit) => Promise<Response>;
-  gitRunner?: (executable: string, url: string) => Promise<string>;
+  gitRunner?: (executable: string, url: string, gitExecPath: string) => Promise<string>;
   now?: () => number;
 }
 
@@ -103,7 +103,7 @@ async function probeGitSource(
   toolchain: DesktopToolchain,
   runner: NonNullable<PackageSourceProbeOptions["gitRunner"]>
 ): Promise<PackageSourceHealth> {
-  if (!toolchain.ready || !toolchain.gitExecutable) {
+  if (!toolchain.ready || !toolchain.gitExecutable || !toolchain.gitExecPath) {
     return {
       id: source.id,
       kind: "git",
@@ -115,7 +115,7 @@ async function probeGitSource(
   }
   const startedAt = performance.now();
   try {
-    const revision = await runner(toolchain.gitExecutable, source.transportUrl);
+    const revision = await runner(toolchain.gitExecutable, source.transportUrl, toolchain.gitExecPath);
     return {
       id: source.id,
       kind: "git",
@@ -138,14 +138,15 @@ async function probeGitSource(
   }
 }
 
-function runGitProbe(executable: string, url: string): Promise<string> {
+function runGitProbe(executable: string, url: string, gitExecPath: string): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(executable, ["ls-remote", "--exit-code", url, "HEAD"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
         GIT_TERMINAL_PROMPT: "0",
-        GCM_INTERACTIVE: "never"
+        GCM_INTERACTIVE: "never",
+        GIT_EXEC_PATH: gitExecPath
       }
     });
     let stdout = "";

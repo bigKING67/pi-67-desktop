@@ -39,9 +39,11 @@ export function agentHostEnvironment(
   const nodeExecutable = requireToolPath(runtime.toolchain.nodeExecutable, "Node");
   const npmCli = requireToolPath(runtime.toolchain.npmCli, "npm CLI");
   const gitExecutable = requireToolPath(runtime.toolchain.gitExecutable, "Git");
+  const gitExecPath = requireToolPath(runtime.toolchain.gitExecPath, "Git exec-path");
   environment.PI67_NODE_EXECUTABLE = nodeExecutable;
   environment.PI67_NPM_CLI = npmCli;
   environment.PI67_GIT_EXECUTABLE = gitExecutable;
+  environment.PI67_GIT_EXEC_PATH = gitExecPath;
   environment.PATH = [dirname(nodeExecutable), dirname(gitExecutable), source.PATH]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(delimiter);
@@ -50,6 +52,7 @@ export function agentHostEnvironment(
   environment.NPM_CONFIG_REGISTRY = "https://registry.npmmirror.com";
   environment.GIT_TERMINAL_PROMPT = "0";
   environment.GCM_INTERACTIVE = "never";
+  environment.GIT_EXEC_PATH = gitExecPath;
   environment.GIT_CONFIG_COUNT = "1";
   environment.GIT_CONFIG_KEY_0 = "url.https://gitclone.com/github.com/.insteadOf";
   environment.GIT_CONFIG_VALUE_0 = "https://github.com/";

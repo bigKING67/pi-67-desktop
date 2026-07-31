@@ -170,13 +170,15 @@ function privateToolchain(): { node: string; npmCli: string; git: string } {
   const node = process.env.PI67_NODE_EXECUTABLE;
   const npmCli = process.env.PI67_NPM_CLI;
   const git = process.env.PI67_GIT_EXECUTABLE;
-  if (!node || !npmCli || !git) {
+  const gitExecPath = process.env.PI67_GIT_EXEC_PATH;
+  if (!node || !npmCli || !git || !gitExecPath || !isAbsolute(gitExecPath)) {
     throw coded("TOOLCHAIN_MISSING", "Pi-67 Desktop private package toolchain is unavailable.", false);
   }
   const existingPath = process.env.PATH;
   process.env.PATH = [dirname(node), dirname(git), existingPath].filter(Boolean).join(process.platform === "win32" ? ";" : ":");
   process.env.GIT_TERMINAL_PROMPT = "0";
   process.env.GCM_INTERACTIVE = "never";
+  process.env.GIT_EXEC_PATH = gitExecPath;
   return { node, npmCli, git };
 }
 

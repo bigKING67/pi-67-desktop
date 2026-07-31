@@ -14,7 +14,8 @@ const toolchain: DesktopToolchain = {
   gitVersion: "2.53.0",
   nodeExecutable: "/private/toolchain/node/bin/node",
   npmCli: "/private/toolchain/npm/bin/npm-cli.js",
-  gitExecutable: "/private/toolchain/git/bin/git"
+  gitExecutable: "/private/toolchain/git/bin/git",
+  gitExecPath: "/private/toolchain/git/libexec/git-core"
 };
 
 describe("Package public source probes", () => {
@@ -33,7 +34,8 @@ describe("Package public source probes", () => {
       fetcher: async (url) => new Response(JSON.stringify({ ok: true }), {
         status: String(url).includes("npmmirror") ? 200 : 503
       }),
-      gitRunner: async (_executable, url) => {
+      gitRunner: async (_executable, url, gitExecPath) => {
+        expect(gitExecPath).toBe("/private/toolchain/git/libexec/git-core");
         if (url.includes("ghproxy")) throw new Error("mirror unavailable\nsecret detail");
         return "91611ad87992fb7b635a41ba68f67916ff6e6ae3";
       },

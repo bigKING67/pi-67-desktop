@@ -53,7 +53,13 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
   }
 
   const paths = toolPaths(stagingRoot, platform);
-  await Promise.all([access(paths.node), access(paths.npmCli), access(paths.git)]);
+  await Promise.all([
+    access(paths.node),
+    access(paths.npmCli),
+    access(paths.git),
+    access(paths.gitExecPath),
+    access(paths.gitRemoteHttps)
+  ]);
   if (platform !== "win32") {
     await Promise.all([chmod(paths.node, 0o755), chmod(paths.git, 0o755)]);
   }
@@ -78,7 +84,8 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
     paths: {
       node: relativeToolPath(stagingRoot, paths.node),
       npmCli: relativeToolPath(stagingRoot, paths.npmCli),
-      git: relativeToolPath(stagingRoot, paths.git)
+      git: relativeToolPath(stagingRoot, paths.git),
+      gitExecPath: relativeToolPath(stagingRoot, paths.gitExecPath)
     },
     archives: {
       node: { fileName: nodeArtifact.fileName, sha256: nodeArtifact.sha256 },
@@ -157,12 +164,16 @@ function toolPaths(root, platform) {
     ? {
         node: join(root, "node", "node.exe"),
         npmCli: join(root, "npm", "bin", "npm-cli.js"),
-        git: join(root, "git", "cmd", "git.exe")
+        git: join(root, "git", "cmd", "git.exe"),
+        gitExecPath: join(root, "git", "mingw64", "libexec", "git-core"),
+        gitRemoteHttps: join(root, "git", "mingw64", "libexec", "git-core", "git-remote-https.exe")
       }
     : {
         node: join(root, "node", "bin", "node"),
         npmCli: join(root, "npm", "bin", "npm-cli.js"),
-        git: join(root, "git", "bin", "git")
+        git: join(root, "git", "bin", "git"),
+        gitExecPath: join(root, "git", "libexec", "git-core"),
+        gitRemoteHttps: join(root, "git", "libexec", "git-core", "git-remote-https")
       };
 }
 

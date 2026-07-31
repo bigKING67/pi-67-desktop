@@ -9,6 +9,7 @@ export interface DesktopPackageToolchain {
   readonly nodeExecutable?: string;
   readonly npmCli?: string;
   readonly gitExecutable?: string;
+  readonly gitExecPath?: string;
   readonly networkSettingsPath?: string;
   readonly electronExecutable?: string;
   readonly ready: boolean;
@@ -23,6 +24,7 @@ export function resolveDesktopPackageToolchain(
   const nodeExecutable = nonEmpty(environment.PI67_NODE_EXECUTABLE);
   const npmCli = nonEmpty(environment.PI67_NPM_CLI);
   const gitExecutable = nonEmpty(environment.PI67_GIT_EXECUTABLE);
+  const gitExecPath = nonEmpty(environment.PI67_GIT_EXEC_PATH);
   const networkSettingsPath = nonEmpty(environment.PI67_PACKAGE_NETWORK_SETTINGS);
   const electronExecutable = nonEmpty(environment.PI67_ELECTRON_EXECUTABLE);
   return {
@@ -32,6 +34,7 @@ export function resolveDesktopPackageToolchain(
     ...(nodeExecutable === undefined ? {} : { nodeExecutable }),
     ...(npmCli === undefined ? {} : { npmCli }),
     ...(gitExecutable === undefined ? {} : { gitExecutable }),
+    ...(gitExecPath === undefined ? {} : { gitExecPath }),
     ...(networkSettingsPath === undefined ? {} : { networkSettingsPath }),
     ...(electronExecutable === undefined ? {} : { electronExecutable }),
     ready: !desktop || (
@@ -39,6 +42,11 @@ export function resolveDesktopPackageToolchain(
       && nodeExecutable !== undefined
       && npmCli !== undefined
       && gitExecutable !== undefined
+      && gitExecPath !== undefined
+      && isContainedAbsolutePath(nodeExecutable, root)
+      && isContainedAbsolutePath(npmCli, root)
+      && isContainedAbsolutePath(gitExecutable, root)
+      && isContainedAbsolutePath(gitExecPath, root)
     )
   };
 }

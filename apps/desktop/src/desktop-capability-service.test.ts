@@ -348,7 +348,8 @@ async function createFixture() {
     gitVersion: "2.53.0",
     nodeExecutable: join(root, "toolchain", "node"),
     npmCli: join(root, "toolchain", "npm-cli.js"),
-    gitExecutable: join(root, "toolchain", "git")
+    gitExecutable: join(root, "toolchain", "git"),
+    gitExecPath: join(root, "toolchain", "git-core")
   };
   return { capabilitiesRoot, agentDir, packageRoot, toolchain, packageNetworkSettings };
 }
