@@ -36,7 +36,7 @@ async function openWorkbench(
   await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
 }
 
-test("restores persisted Workspace authority without asking for the Workspace again", async ({ page }) => {
+test("restores persisted Workspace authority without asking for the Workspace again", async ({ page }, testInfo) => {
   const sessionPath = "/Users/test/.pi/agent/sessions/persisted.jsonl";
   await installMockDesktopBridge(page, {
     initialWorkspaces: [DEFAULT_MOCK_WORKSPACE],
@@ -71,6 +71,9 @@ test("restores persisted Workspace authority without asking for the Workspace ag
   await expect(page.getByRole("button", { name: /已保存的会话/u })).toBeVisible();
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
+  await expect(page.getByTestId("title-context-current")).toHaveText("已保存的会话");
+  await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
+  await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
   await expect.poll(async () => {
     const commands = await recordedCommandDetails(page);
     return commands.filter((command) => command.type === "workspace.register").length;
@@ -79,6 +82,13 @@ test("restores persisted Workspace authority without asking for the Workspace ag
     const commands = await recordedCommandDetails(page);
     return commands.filter((command) => command.type === "session.catalog.query").length;
   }).toBeGreaterThanOrEqual(1);
+
+  await page.getByRole("button", { name: "隐藏会话导航" }).click();
+  await expect(page.getByTestId("title-context-workspace")).toHaveText(DEFAULT_MOCK_WORKSPACE.displayName);
+  await expect(page.getByTestId("title-context-current")).toHaveText("已保存的会话");
+  await page.screenshot({ path: testInfo.outputPath("title-context-collapsed.png"), animations: "disabled" });
+  await page.getByRole("button", { name: "显示会话导航" }).click();
+  await page.screenshot({ path: testInfo.outputPath("title-context-expanded.png"), animations: "disabled" });
 
   await page.getByRole("button", { name: "打开会话", exact: true }).click();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
@@ -109,7 +119,8 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByTestId("inspector-toggle")).toHaveCount(0);
   await expect(page.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
-  await expect(page.locator(".brand-lockup")).toContainText(/π.*设置/u);
+  await expect(page.getByTestId("title-context-current")).toHaveText("设置");
+  await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
 
   const settingsColumns = await page.getByTestId("settings-workbench").evaluate((element) => ({
     width: element.getBoundingClientRect().width,
@@ -196,11 +207,13 @@ test("keeps independent session catalogs for multiple workspaces and switches th
   ]));
 
   await piGroup.getByRole("button", { name: /Pi 工作台方案/u }).click();
-  await expect(page.locator(".brand-lockup")).toContainText(DEFAULT_MOCK_WORKSPACE.displayName);
+  await expect(page.getByTestId("title-context-current")).toHaveText("Pi 工作台方案");
+  await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
 
   await docsGroup.getByRole("button", { name: /Docs 发布说明/u }).click();
-  await expect(page.locator(".brand-lockup")).toContainText(docsWorkspace.displayName);
+  await expect(page.getByTestId("title-context-current")).toHaveText("Docs 发布说明");
+  await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect.poll(async () => (
     await recordedCommandDetails(page)

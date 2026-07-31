@@ -36,29 +36,30 @@
 }
 
 .location strong,
-.sessionName {
+.workspaceName {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.location strong {
-  flex: 0 1 auto;
+.currentTitle {
+  flex: 1 1 auto;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 680;
+}
+
+.workspaceName {
+  flex: 0 1 auto;
+  max-width: min(220px, 24vw);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 540;
 }
 
 .locationSeparator {
   flex: 0 0 auto;
   color: var(--text-tertiary);
   font-weight: 450;
-}
-
-.sessionName {
-  flex: 1 1 auto;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 540;
 }
 
 .actions {
@@ -177,8 +178,7 @@
     gap: 6px;
   }
 
-  .location,
-  .sessionName,
+  .workspaceName,
   .locationSeparator {
     display: none;
   }

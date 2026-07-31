@@ -96,6 +96,17 @@ completing a real session without learning terminal UI conventions first.
 +----------------------+--------------------------------------+----------------+
 ```
 
+- The navigation rail is the single persistent product-brand location inside
+  the conversation workbench. The TitleBar is current-context UI, not a second
+  brand lockup: while navigation is visible it shows the selected conversation
+  title, or the Workspace name when no conversation is selected; while navigation
+  is hidden it shows `Workspace / conversation` so location remains recoverable.
+  Catalog-only stopped conversations use their Catalog title before they are
+  opened. The π mark appears in the TitleBar only when no Workspace context exists.
+- Settings uses the plain TitleBar context `设置`. Compact widths may omit the
+  Workspace prefix, but preserve the current surface title until the existing
+  narrow-window action layout requires hiding the whole context lockup.
+
 Application-level surfaces use a separate wide-window shell:
 
 ```text

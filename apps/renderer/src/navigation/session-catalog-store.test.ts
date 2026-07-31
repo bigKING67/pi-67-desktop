@@ -1,6 +1,7 @@
 import type { SessionCatalogPage, SessionSummary } from "@pi67/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  selectConversationSessionSummary,
   selectWorkspaceSessionCatalog,
   useSessionCatalogStore
 } from "./session-catalog-store.js";
@@ -59,6 +60,22 @@ describe("session catalog store", () => {
       items: [SESSION_TWO],
       query: "two"
     });
+  });
+
+  it("resolves the selected persisted conversation from its Workspace catalog", () => {
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), page([SESSION_ONE]));
+
+    expect(selectConversationSessionSummary(useSessionCatalogStore.getState(), {
+      kind: "session",
+      workspaceId: WORKSPACE_ID,
+      sessionPath: SESSION_ONE.path
+    })).toEqual(SESSION_ONE);
+    expect(selectConversationSessionSummary(useSessionCatalogStore.getState(), {
+      kind: "provisional",
+      workspaceId: WORKSPACE_ID,
+      draftId: "draft-1"
+    })).toBeUndefined();
   });
 
   it("appends a keyset page without duplicating paths", () => {

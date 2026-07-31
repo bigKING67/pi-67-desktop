@@ -221,7 +221,7 @@ async function openCatalogWorkspace(page: Page, options: Parameters<typeof insta
   await attachMockAgent(page);
   await installSessionCatalogFixture(page, options);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
 }
 
 function session(index: number, name: string, cwd = "/workspace/catalog"): FixtureSessionSummary {

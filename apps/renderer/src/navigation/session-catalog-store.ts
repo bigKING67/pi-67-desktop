@@ -1,5 +1,6 @@
 import {
   MAX_SESSION_CATALOG_SEARCH_CHARS,
+  type ConversationKey,
   type SessionCatalogCursor,
   type SessionCatalogDegradedReason,
   type SessionCatalogPage,
@@ -212,6 +213,16 @@ export function selectWorkspaceSessionCatalog(
   workspaceId: WorkspaceId
 ): WorkspaceSessionCatalogState {
   return state.byWorkspace[workspaceId] ?? EMPTY_WORKSPACE_CATALOG;
+}
+
+export function selectConversationSessionSummary(
+  state: SessionCatalogUiState,
+  conversation: ConversationKey | undefined
+): SessionSummary | undefined {
+  if (conversation?.kind !== "session") return undefined;
+  return selectWorkspaceSessionCatalog(state, conversation.workspaceId).items.find((session) => (
+    session.path === conversation.sessionPath
+  ));
 }
 
 function emptyCatalogState(requestRevision = 0): WorkspaceSessionCatalogState {

@@ -7,6 +7,10 @@ import {
   rendererConversationIdentity,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
+import {
+  conversationPrimaryTitle,
+  conversationStableTitle
+} from "../workbench/conversation-title.js";
 import { formatSessionRelativeTime } from "./session-navigation.js";
 
 export interface ConversationRowModel {
@@ -32,10 +36,8 @@ export function conversationRows(
     const session = task.sessionPath ? sessionByPath.get(task.sessionPath) : undefined;
     if (task.sessionPath) sessionByPath.delete(task.sessionPath);
     const status = taskStatus(task);
-    const stableTitle = ["未命名会话", "未命名任务"].includes(task.title) && session
-      ? session.name
-      : task.title;
-    const title = task.pendingTitle ?? task.recentUserMessagePreview ?? stableTitle;
+    const stableTitle = conversationStableTitle(task, session);
+    const title = conversationPrimaryTitle(task, session);
     const meta = session
       ? task.recentUserMessagePreview
         ? `${stableTitle} · ${sessionMeta(session)}`

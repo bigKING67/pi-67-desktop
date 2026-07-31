@@ -1,4 +1,4 @@
-import type { OperationView, RuntimeStatus } from "@pi67/domain";
+import type { OperationView, RuntimeStatus, SessionSummary } from "@pi67/domain";
 import {
   Circle,
   CircleAlert,
@@ -18,13 +18,23 @@ import type { ReactNode } from "react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
+import {
+  selectConversationSessionSummary,
+  useSessionCatalogStore
+} from "../navigation/session-catalog-store.js";
 import { NotificationCenter } from "../notifications/NotificationCenter.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { selectSessionId, selectSessionName } from "../session/session-projection-selectors.js";
+import {
+  selectSessionId,
+  selectSessionName,
+  selectSessionPath
+} from "../session/session-projection-selectors.js";
 import { useShellStore } from "./shell-store.js";
+import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
 import {
   selectedWorkbenchTask,
-  useWorkbenchStore
+  useWorkbenchStore,
+  type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import styles from "./TitleBar.module.css";
 
@@ -39,6 +49,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const workspace = useAppStore((state) => state.workspace);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionId = useSessionProjectionStore(selectSessionId);
+  const sessionPath = useSessionProjectionStore(selectSessionPath);
   const operation = useAppStore((state) => state.operation);
   const operationDetail = useAppStore((state) => state.operationDetail);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
@@ -46,13 +57,29 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const setContextVisible = useShellStore((state) => state.setContextVisible);
   const setCommandPaletteOpen = useShellStore((state) => state.setCommandPaletteOpen);
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
-  const settingsSelected = useWorkbenchStore((state) => state.selectedSurface?.kind === "settings");
-  const selectedWorkspace = useWorkbenchStore((state) => (
-    selectedTask ? state.workspaces[selectedTask.workspaceId] : state.currentWorkspaceId
-      ? state.workspaces[state.currentWorkspaceId]
-      : undefined
+  const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
+  const settingsSelected = selectedSurface?.kind === "settings";
+  const selectedConversation = selectedSurface?.kind === "conversation"
+    ? selectedSurface.conversation
+    : undefined;
+  const selectedWorkspace = useWorkbenchStore((state) => {
+    if (state.selectedSurface?.kind === "conversation") {
+      return state.workspaces[state.selectedSurface.conversation.workspaceId];
+    }
+    if (state.selectedSurface?.kind === "workspace") {
+      return state.workspaces[state.selectedSurface.workspaceId];
+    }
+    return state.currentWorkspaceId ? state.workspaces[state.currentWorkspaceId] : undefined;
+  });
+  const selectedCatalogSession = useSessionCatalogStore((state) => (
+    selectConversationSessionSummary(state, selectedConversation)
   ));
   const selectedTaskIsLive = Boolean(selectedTask && sessionId && selectedTask.sessionId === sessionId);
+  const selectedConversationIsLive = selectedTaskIsLive || Boolean(
+    selectedConversation?.kind === "session"
+    && sessionPath
+    && selectedConversation.sessionPath === sessionPath
+  );
   const selectedTaskOwnsLiveWorkspace = Boolean(
     selectedTask
     && selectedWorkspace?.identity.canonicalPath === workspace
@@ -65,13 +92,22 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
     selectedTaskIsLive ? operation : undefined,
     selectedTaskIsLive ? operationDetail : undefined
   );
-  const workspaceName = settingsSelected
-    ? "π"
-    : selectedWorkspace?.displayName ?? basename(workspace ?? "");
-  const activeSessionName = settingsSelected
-    ? "设置"
-    : selectedTask?.recentUserMessagePreview || selectedTask?.title || sessionName?.trim()
-      || (sessionId ? messages.shell.sessionFallback(sessionId.slice(0, 8)) : undefined);
+  const workspaceName = selectedWorkspace?.displayName ?? basename(workspace ?? "");
+  const activeSessionName = settingsSelected ? undefined : selectedConversationTitle({
+    selectedTask,
+    selectedCatalogSession,
+    selectedConversationIsLive,
+    sessionName,
+    sessionId
+  });
+  const currentTitle = settingsSelected ? "设置" : activeSessionName || workspaceName || "π";
+  const contextWorkspaceName = !settingsSelected && !navigationVisible && activeSessionName && workspaceName
+    ? workspaceName
+    : undefined;
+  const fullContextTitle = contextWorkspaceName
+    ? `${contextWorkspaceName} / ${currentTitle}`
+    : currentTitle;
+  const showBrandMark = !settingsSelected && !navigationAvailable && currentTitle === "π";
 
   return (
     <header className={`title-bar ${styles.header}`}>
@@ -92,16 +128,28 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
               : messages.shell.showNavigation}</ControlTooltip>
           </Button>
         ) : null}
-        <div className={`brand-lockup ${styles.brand}`} title={workspace ?? "π"}>
-          <img alt="" aria-hidden="true" className={`brand-mark ${styles.brandMark}`} src={piIconUrl} />
-          <span className={styles.location}>
-            <strong>{workspaceName || "π"}</strong>
-            {activeSessionName ? (
+        <div className={`brand-lockup ${styles.brand}`} title={fullContextTitle}>
+          {showBrandMark ? (
+            <img
+              alt=""
+              aria-hidden="true"
+              className={`brand-mark ${styles.brandMark}`}
+              data-testid="title-brand-mark"
+              src={piIconUrl}
+            />
+          ) : null}
+          <span className={styles.location} data-testid="title-context">
+            {contextWorkspaceName ? (
               <>
+                <span className={styles.workspaceName} data-testid="title-context-workspace">
+                  {contextWorkspaceName}
+                </span>
                 <span className={styles.locationSeparator} aria-hidden="true">/</span>
-                <span className={styles.sessionName}>{activeSessionName}</span>
               </>
             ) : null}
+            <strong className={styles.currentTitle} data-testid="title-context-current">
+              {currentTitle}
+            </strong>
           </span>
         </div>
       </div>
@@ -147,6 +195,27 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
       </div>
     </header>
   );
+}
+
+function selectedConversationTitle({
+  selectedTask,
+  selectedCatalogSession,
+  selectedConversationIsLive,
+  sessionName,
+  sessionId
+}: {
+  selectedTask: RendererWorkbenchTask | undefined;
+  selectedCatalogSession: SessionSummary | undefined;
+  selectedConversationIsLive: boolean;
+  sessionName: string | undefined;
+  sessionId: string | undefined;
+}): string | undefined {
+  if (selectedTask) return conversationPrimaryTitle(selectedTask, selectedCatalogSession);
+  const catalogTitle = selectedCatalogSession?.name.trim();
+  if (catalogTitle) return catalogTitle;
+  if (!selectedConversationIsLive) return undefined;
+  return sessionName?.trim()
+    || (sessionId ? messages.shell.sessionFallback(sessionId.slice(0, 8)) : undefined);
 }
 
 function ControlTooltip({ id, children }: { id: string; children: ReactNode }) {

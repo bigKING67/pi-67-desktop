@@ -12,7 +12,7 @@ import { NavigationRail } from "../navigation/NavigationRail.js";
 import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
 import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import {
-  selectWorkspaceSessionCatalog,
+  selectConversationSessionSummary,
   useSessionCatalogStore
 } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -56,13 +56,10 @@ export function WorkspaceShell({
         : state.currentWorkspaceId ? state.workspaces[state.currentWorkspaceId] : undefined
   ));
   const selectedSession = useSessionCatalogStore((state) => {
-    if (selectedSurface?.kind !== "conversation" || selectedSurface.conversation.kind !== "session") {
-      return undefined;
-    }
-    const conversation = selectedSurface.conversation;
-    return selectWorkspaceSessionCatalog(state, conversation.workspaceId).items.find((session) => (
-      session.path === conversation.sessionPath
-    ));
+    const conversation = selectedSurface?.kind === "conversation"
+      ? selectedSurface.conversation
+      : undefined;
+    return selectConversationSessionSummary(state, conversation);
   });
   const liveSessionId = useSessionProjectionStore(selectSessionId);
   const liveWorkspacePath = useAppStore((state) => state.workspace);

@@ -24,7 +24,8 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   expect((await page.locator(".brand-lockup").boundingBox())?.x).toBeGreaterThanOrEqual(78);
   await page.screenshot({ path: testInfo.outputPath("welcome-before.png"), animations: "disabled" });
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
+  await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
@@ -45,7 +46,7 @@ test("gives the first on-demand Pi runtime connection one initialization owner",
   await page.goto("/");
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "开始一个新会话" })).toBeVisible();
   await expect(page.getByText("等待选择工作区", { exact: true })).toBeVisible();
@@ -219,7 +220,7 @@ test("imports an external Pi session instead of opening the source file in place
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.locator(".brand-lockup strong").getByText("pi-demo", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
   await expect.poll(async () => (await recordedCommands(page)).includes("session.catalog.query")).toBe(true);
   await clearRecordedCommands(page);
 
