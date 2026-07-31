@@ -340,19 +340,22 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "thinking" } }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在思考" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在分析问题" })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "responding" } }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在回复" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在组织回复" })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "tool", toolCallId: "tool-1", toolKind: "shell" } }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在使用工具" })).toBeVisible();
+  const shellStep = page.locator("[data-turn-activity]").filter({ hasText: "正在执行命令" });
+  await expect(shellStep).toBeVisible();
+  await expect(shellStep).toContainText("分析问题");
+  await expect(shellStep).toContainText("组织回复");
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
@@ -377,7 +380,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId, activity: null }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在处理" })).toBeVisible();
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在继续处理" })).toBeVisible();
   await emitMockAgentEvent(page, {
     type: "operation.failed",
     payload: {
@@ -387,6 +390,45 @@ test("projects operation activities and sends an operation-scoped abort", async 
     }
   }, { operationId });
   await expect(page.locator("[data-turn-activity]").filter({ hasText: "任务失败" })).toBeVisible();
+
+  const completedOperationId = "operation-completed-timeline";
+  const completedStartedAt = Date.now() - 3_000;
+  await emitMockAgentEvent(page, {
+    type: "operation.started",
+    payload: {
+      operation: {
+        operationId: completedOperationId,
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-test",
+        sessionGeneration: 1,
+        startedAt: completedStartedAt
+      }
+    }
+  }, { operationId: completedOperationId });
+  await emitMockAgentEvent(page, {
+    type: "operation.activityChanged",
+    payload: { operationId: completedOperationId, activity: { kind: "thinking" } }
+  }, { operationId: completedOperationId });
+  await emitMockAgentEvent(page, {
+    type: "operation.activityChanged",
+    payload: {
+      operationId: completedOperationId,
+      activity: { kind: "tool", toolCallId: "completed-tool", toolKind: "read" }
+    }
+  }, { operationId: completedOperationId });
+  await emitMockAgentEvent(page, {
+    type: "operation.completed",
+    payload: { operationId: completedOperationId, completedAt: completedStartedAt + 3_000 }
+  }, { operationId: completedOperationId });
+  const completedTimeline = page.locator(
+    "[data-turn-activity][data-operation-lifecycle='completed']"
+  );
+  await expect(completedTimeline).toContainText("执行过程 · 3 个步骤 · 3 秒");
+  await completedTimeline.getByText("执行过程 · 3 个步骤 · 3 秒", { exact: true }).click();
+  await expect(completedTimeline).toContainText("分析问题");
+  await expect(completedTimeline).toContainText("读取文件");
 
   const importOperationId = "operation-import-status-test";
   await emitMockAgentEvent(page, {

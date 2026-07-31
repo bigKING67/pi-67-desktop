@@ -16,7 +16,12 @@ import {
 } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { messages as messagesCatalog } from "../localization/message-catalog.js";
-import { hasVisibleTurnActivity, TurnActivity } from "../operation/TurnActivity.js";
+import {
+  hasVisibleOperationTimeline,
+  hasVisibleTurnActivity,
+  TurnActivity
+} from "../operation/TurnActivity.js";
+import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
 import {
   continueRendererSessionFrom,
   editRendererUserMessage,
@@ -39,6 +44,7 @@ export function Transcript() {
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const runtime = useAppStore((state) => state.runtime);
   const operation = useAppStore((state) => state.operation);
+  const operationTimeline = useOperationActivityTimelineStore((state) => state.timeline);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const {
     messages,
@@ -54,12 +60,8 @@ export function Transcript() {
   const liveText = useMemo(() => textChunks.join(""), [textChunks]);
   const liveThinking = useMemo(() => thinkingChunks.join(""), [thinkingChunks]);
   const hasLiveTurn = Boolean(liveText || liveThinking);
-  const hasTurnActivity = hasVisibleTurnActivity(
-    runtime.phase,
-    operation,
-    sessionId,
-    sessionGeneration
-  );
+  const hasTurnActivity = hasVisibleTurnActivity(runtime.phase, operation, sessionId, sessionGeneration)
+    || hasVisibleOperationTimeline(operationTimeline, operation, sessionId, sessionGeneration);
   const currentEdit = messageEdit?.taskId === selectedTask?.id ? messageEdit : undefined;
   const transcriptMessages = useMemo(() => (
     currentEdit && !messages.some((message) => message.id === currentEdit.message.id)

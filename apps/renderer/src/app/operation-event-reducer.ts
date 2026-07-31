@@ -8,6 +8,7 @@ import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import {
   recordOperationTerminal
 } from "../notifications/notification-store.js";
+import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
 import type { RendererSessionAuthority } from "../session/session-authority.js";
 import { eventSessionAuthority } from "../connection/event-authority.js";
 import type { AppEventState, EventStoreGet, EventStoreSet } from "./app-event-state.js";
@@ -25,6 +26,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.started":
       useLiveTurnStore.getState().begin(event.payload.operation, envelope.hostEpoch);
+      useOperationActivityTimelineStore.getState().begin(event.payload.operation);
       set({
         operation: event.payload.operation,
         operationDetail: undefined,
@@ -35,15 +37,29 @@ export function reduceOperationEvent<TState extends AppEventState>(
     case "operation.heartbeat":
       return true;
     case "operation.activityChanged":
+      useOperationActivityTimelineStore.getState().recordActivity(
+        event.payload.operationId,
+        event.payload.activity
+      );
       updateOperation(set, event.payload.operationId, event.payload.activity);
       return true;
     case "operation.progress":
+      useOperationActivityTimelineStore.getState().updateProgress(
+        event.payload.operationId,
+        formatProgress(event.payload)
+      );
       set((state) => state.operation?.operationId === event.payload.operationId
         ? { operationProgress: formatProgress(event.payload) } as Partial<TState>
         : {} as Partial<TState>);
       return true;
     case "operation.completed":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        useOperationActivityTimelineStore.getState().finish(
+          event.payload.operationId,
+          "completed",
+          undefined,
+          event.payload.completedAt
+        );
         recordRealtimeOperationTerminal(get(), envelope, {
           operationId: event.payload.operationId,
           lifecycle: "completed",
@@ -54,6 +70,12 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.failed":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        useOperationActivityTimelineStore.getState().finish(
+          event.payload.operationId,
+          "failed",
+          event.payload.error.message,
+          event.payload.failedAt
+        );
         recordRealtimeOperationTerminal(get(), envelope, {
           operationId: event.payload.operationId,
           lifecycle: "failed",
@@ -65,6 +87,12 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.cancelled":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        useOperationActivityTimelineStore.getState().finish(
+          event.payload.operationId,
+          "cancelled",
+          event.payload.reason,
+          event.payload.cancelledAt
+        );
         recordRealtimeOperationTerminal(get(), envelope, {
           operationId: event.payload.operationId,
           lifecycle: "cancelled",
@@ -76,6 +104,12 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.lost":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        useOperationActivityTimelineStore.getState().finish(
+          event.payload.operationId,
+          "lost",
+          event.payload.reason,
+          event.payload.lostAt
+        );
         recordRealtimeOperationTerminal(get(), envelope, {
           operationId: event.payload.operationId,
           lifecycle: "lost",

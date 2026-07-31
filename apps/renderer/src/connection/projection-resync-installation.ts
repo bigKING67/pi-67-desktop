@@ -7,6 +7,7 @@ import type { AppState } from "../app/app-store.types.js";
 import { installRendererSessionResync } from "../app/renderer-session-installation.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
+import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
 import { messages } from "../localization/message-catalog.js";
 import {
   publishNotification,
@@ -63,6 +64,9 @@ export function installResynchronizedProjection(
   } : {});
   if (result.activeOperation) {
     useLiveTurnStore.getState().begin(result.activeOperation, hostEpoch);
+    useOperationActivityTimelineStore.getState().restoreFromProjection(result.activeOperation);
+  } else {
+    useOperationActivityTimelineStore.getState().reset();
   }
   if (recoveredTerminal) recordOperationTerminal(recoveredTerminal);
   projectionRecoveryLedger.clearInterruptedOperation();

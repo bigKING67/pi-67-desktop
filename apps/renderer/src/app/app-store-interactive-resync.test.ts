@@ -9,6 +9,7 @@ import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
+import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
@@ -88,6 +89,10 @@ describe("renderer interactive projection resync", () => {
     expect(useExtensionUiStore.getState().requests).toEqual([]);
     expect(useAppStore.getState().operation).toEqual(activeOperation);
     expect(useAppStore.getState().runtime.phase).toBe("busy");
+    expect(useOperationActivityTimelineStore.getState().timeline?.steps).toMatchObject([{
+      activity: activeOperation.activity,
+      status: "running"
+    }]);
   });
 
   it("allows only the latest Renderer recovery attempt to install its projection", async () => {
@@ -155,6 +160,7 @@ function resetStores(): void {
   useLiveTurnStore.setState(useLiveTurnStore.getInitialState(), true);
   useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
   useNotificationStore.setState(useNotificationStore.getInitialState(), true);
+  useOperationActivityTimelineStore.setState(useOperationActivityTimelineStore.getInitialState(), true);
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
   useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
 }

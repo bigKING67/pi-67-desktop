@@ -288,8 +288,10 @@ loading error where the operation can produce those states
   Assistant output and ordinary Tool/System rows expose no settled-message footer.
 - A new-turn Prompt appears as an in-memory pending user bubble as soon as the
   Agent Host acknowledges it. The empty state disappears before the first Pi
-  token. The current Turn's inline activity follows that bubble in the Virtuoso
-  footer and precedes live Assistant output; it never replaces the submitted
+  token. The current Turn's inline execution timeline follows that bubble in the
+  Virtuoso footer and precedes live Assistant output. It accumulates only real
+  Host-authored activity transitions, shows at most the latest four steps inline,
+  and keeps earlier steps behind one disclosure; it never replaces the submitted
   message or occupies a separate Workspace-level row. Pi JSONL remains
   authoritative: the matching Operation's
   user-entry projection replaces the pending bubble without flicker or duplicate
@@ -632,20 +634,31 @@ loading error where the operation can produce those states
   selector. An empty configured-model set names that next action explicitly.
 - Thinking levels use readable product labels such as `思考：关闭` and
   `思考：高`; raw SDK enum values are not the primary user-facing copy.
-- Inline Turn activity names import and compaction instead of collapsing every
-  long task into a generic running label. It belongs to the Transcript reading
+- Inline Turn activity is a bounded execution timeline rather than one generic
+  spinner. It names import and compaction, maps Tool presentation kinds to reading,
+  search, edit, command, managed-task, subtask, image, Extension, or generic work,
+  and retains completed transitions while the current Operation remains selected.
+  It belongs to the Transcript reading
   track in the order `user -> activity -> live Assistant`; the conversation shell
   has no independent Operation status row. `停止` belongs to the Composer's
   rightmost main-action position and is visible only when the accepted Operation
   declares a real Host-owned abort path; Session import stays visibly running
   until it completes or fails.
 - Turn activity is Host-owned and evidence-based: Pi `thinking_*` renders as
-  `正在思考`, `text_*` as `正在回复`, Tool execution as
-  `正在使用工具`, and compaction as `正在压缩上下文`. Provider wait,
+  `正在分析问题`, `text_*` as `正在组织回复`, Tool execution uses its verified
+  presentation kind, and compaction renders as `正在压缩上下文`. A Host-authored
+  clear transition becomes `正在继续处理` rather than inventing a more specific
+  phase. Provider wait,
   retry, and other unproven phases retain the generic running label rather than
   being mislabeled as thinking. Approval and blocking Extension input temporarily
   overlay that base activity, then restore it when the Host resolves or cancels
   the request.
+- The live timeline keeps at most 64 transient steps and never persists Prompt,
+  command text, raw Tool input/output, credentials, or source bodies. Completion
+  collapses it to `执行过程 · N 个步骤 · duration`; failure, cancellation, loss,
+  quiet, stalled, and recovery remain expanded and actionable. A projection resync
+  may restart the disposable timeline from the one current Host activity; it never
+  fabricates missing earlier steps or competes with Pi JSONL as conversation truth.
 - If Pi cannot acknowledge `停止` within the Host watchdog, the Turn becomes lost
   and the runtime remains visibly recovering until a replacement Host restores an
   authoritative projection. The UI never returns to ready or enables a new Turn

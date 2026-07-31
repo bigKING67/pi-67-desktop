@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasVisibleOperationTimeline,
   hasVisibleTurnActivity,
   isActiveOperationLifecycle,
   operationPresentation
 } from "./TurnActivity.js";
+import { createOperationActivityTimeline } from "./operation-activity-timeline-store.js";
 
 describe("TurnActivity projection", () => {
   it("shows a non-terminal quiet warning while preserving an active lifecycle", () => {
@@ -28,6 +30,19 @@ describe("TurnActivity projection", () => {
     expect(presentation.label).not.toBe("任务失败");
   });
 
+  it("names the real tool presentation kind instead of collapsing all tools", () => {
+    expect(operationPresentation("prompt", "running", {
+      kind: "tool",
+      toolCallId: "tool-shell",
+      toolKind: "shell"
+    }, undefined, undefined).label).toBe("正在执行命令");
+    expect(operationPresentation("prompt", "running", {
+      kind: "tool",
+      toolCallId: "tool-search",
+      toolKind: "search"
+    }, undefined, undefined).label).toBe("正在搜索项目");
+  });
+
   it("hides completed activity but keeps terminal failures and recovery visible", () => {
     const completed = {
       operationId: "operation-completed",
@@ -42,5 +57,21 @@ describe("TurnActivity projection", () => {
     expect(hasVisibleTurnActivity("ready", { ...completed, lifecycle: "failed" })).toBe(true);
     expect(hasVisibleTurnActivity("recovering", completed)).toBe(true);
     expect(hasVisibleTurnActivity("recovering", completed, "new-session", 2)).toBe(false);
+  });
+
+  it("keeps a matching completed timeline available as a collapsed summary", () => {
+    const completed = {
+      operationId: "operation-completed",
+      kind: "prompt" as const,
+      lifecycle: "completed" as const,
+      cancellable: false,
+      sessionId: "session",
+      sessionGeneration: 1,
+      startedAt: 1
+    };
+    const timeline = createOperationActivityTimeline(completed);
+
+    expect(hasVisibleOperationTimeline(timeline, completed, "session", 1)).toBe(true);
+    expect(hasVisibleOperationTimeline(timeline, completed, "other", 1)).toBe(false);
   });
 });

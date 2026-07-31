@@ -8,6 +8,7 @@ import {
 } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
@@ -36,7 +37,10 @@ export function prepareRendererSessionTransaction(
   else useConversationStore.getState().invalidateProjection();
   if (policy.resetChanges) useWorkspaceChangesStore.getState().reset("stale");
   if (policy.resetTree) useSessionTreeStore.getState().reset("stale");
-  if (policy.resetLiveTurn) useLiveTurnStore.getState().reset();
+  if (policy.resetLiveTurn) {
+    useLiveTurnStore.getState().reset();
+    useOperationActivityTimelineStore.getState().reset();
+  }
   if (policy.resetInteractive) resetRendererSessionInteractiveState();
   if (policy.resetExtensionCatalog) resetExtensionUiCatalogState();
 }
