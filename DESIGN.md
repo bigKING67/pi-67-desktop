@@ -73,6 +73,7 @@ completing a real session without learning terminal UI conventions first.
 - The application mark uses the locked production asset: a pure white rotationally
   symmetric `π` glyph on a pure black rounded square. Do not redraw, recolor,
   decorate, or bake the display name into the icon. Product-facing text uses `π`;
+  the navigation rail pairs the mark with the compact `Pi-67` wordmark, while
   technical release identifiers may retain `Pi-67 Desktop` where required.
 - The vector master, Windows icon, and in-product icons retain the full brand
   canvas. The macOS ICNS is a platform-calibrated derivative: the unchanged mark
@@ -97,7 +98,9 @@ completing a real session without learning terminal UI conventions first.
 ```
 
 - The navigation rail is the single persistent product-brand location inside
-  the conversation workbench. The TitleBar is current-context UI, not a second
+  the conversation workbench. Its brand lockup is one non-wrapping row containing
+  the locked π mark and `Pi-67`; `会话工作台` remains assistive context rather than
+  a visible subtitle. The TitleBar is current-context UI, not a second
   brand lockup: while navigation is visible it shows the selected conversation
   title, or the Workspace name when no conversation is selected; while navigation
   is hidden it shows `Workspace / conversation` so location remains recoverable.

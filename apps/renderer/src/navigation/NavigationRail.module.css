@@ -32,20 +32,15 @@
   border-radius: var(--radius-control);
 }
 
-.railBrand span {
-  display: grid;
-  min-width: 0;
-}
-
 .railBrand strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.railBrand small {
-  color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspaces {

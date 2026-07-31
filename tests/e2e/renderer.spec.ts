@@ -30,6 +30,10 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
   await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  const navigationBrand = page.getByTestId("navigation-brand");
+  await expect(navigationBrand).toHaveAccessibleName("Pi-67 会话工作台");
+  await expect(navigationBrand.getByText("Pi-67", { exact: true })).toBeVisible();
+  await expect(navigationBrand.locator("small")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.locator(".title-actions").getByRole("button", { name: /外观：/u })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打开更多菜单" })).toHaveCount(0);

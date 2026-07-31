@@ -59,9 +59,9 @@ export function NavigationRail({
       aria-label={messages.navigation.region}
     >
       <header className={styles.railHeader}>
-        <div className={styles.railBrand} aria-label="π 工作台">
+        <div className={styles.railBrand} aria-label="Pi-67 会话工作台" data-testid="navigation-brand">
           <img alt="" aria-hidden="true" src={piIconUrl} />
-          <span><strong>π</strong><small>会话工作台</small></span>
+          <strong>Pi-67</strong>
         </div>
         <Button
           className={styles.workspaceAdd!}
