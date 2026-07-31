@@ -329,7 +329,7 @@ export async function installMockDesktopBridge(
       }];
       return {
         phase: "ready",
-        catalogVersion: "2026.07.30.2",
+        catalogVersion: "2026.07.31.2",
         packages: [{
           id: "pi67-core",
           displayName: "Pi-67 Core",
@@ -337,7 +337,7 @@ export async function installMockDesktopBridge(
           bundled: true,
           defaultEnabled: true,
           version: "0.15.8",
-          commit: "59b96004fa42b3c5311d84ecafd33475fcb889c1",
+          commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
           resourceTypes: ["extension", "skill", "prompt", "rule"],
           installed: true
         }, {
