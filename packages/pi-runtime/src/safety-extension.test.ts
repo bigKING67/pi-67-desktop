@@ -45,8 +45,9 @@ describe("createDesktopSafetyExtension", () => {
     expect(requestApproval).toHaveBeenCalledWith({
       toolCallId: "tool-call-exact-67",
       toolName: "bash",
-      category: "ambiguous-command",
-      reason: "执行无法安全分类的命令",
+      toolSource: "Pi 内置",
+      category: "workspace-command",
+      reason: "执行工作区内的非破坏性命令",
       targetKind: "command",
       target: "git status --short",
       targetTruncated: false,
@@ -68,7 +69,7 @@ describe("createDesktopSafetyExtension", () => {
       input: { command: "pwd" }
     }, { hasUI: true })).resolves.toEqual({
       block: true,
-      reason: "工具已注册，但用户未批准本次一次性授权：执行无法安全分类的命令。这不表示工具不可用；不要自动重试。"
+      reason: "工具已注册，但用户未批准本次一次性授权：执行工作区内的非破坏性命令。这不表示工具不可用；不要自动重试。"
     });
   });
 
@@ -91,18 +92,18 @@ describe("createDesktopSafetyExtension", () => {
     });
   });
 
-  it("auto-allows verified pi-web-access read contracts", async () => {
+  it("auto-allows bounded workspace commands in balanced mode", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
-    const handler = safetyHandler(
-      trustedPolicy(),
-      requestApproval,
-      () => [packageTool("web_search", "npm:pi-web-access@0.17.0")]
-    );
+    const handler = safetyHandler({
+      ...trustedPolicy(),
+      approvalMode: "balanced",
+      taskToolMode: "auto"
+    }, requestApproval);
 
     await expect(handler({
-      toolCallId: "tool-call-web-search",
-      toolName: "web_search",
-      input: { queries: ["杭州天气", "杭州今日气温"] }
+      toolCallId: "tool-call-workspace-command",
+      toolName: "bash",
+      input: { command: "git status --short" }
     }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();
   });
@@ -139,7 +140,7 @@ describe("createDesktopSafetyExtension", () => {
       toolName: "read_attachment",
       input: { setId: "set_a", operation: "read_text", attachmentId: "attachment_a" }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
-    expect(requestApproval).toHaveBeenCalledTimes(2);
+    expect(requestApproval).toHaveBeenCalledTimes(1);
   });
 
   it("auto-allows canonical safety classification for verified Desktop web aliases", async () => {
@@ -187,7 +188,7 @@ describe("createDesktopSafetyExtension", () => {
       input: { url: "file:///Users/test/private.mov" }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
     expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
-      category: "ambiguous-command",
+      category: "unverified-tool",
       target: "fetch_content"
     }), expect.any(Object));
   });
@@ -205,10 +206,7 @@ describe("createDesktopSafetyExtension", () => {
       toolName: "web_search",
       input: { query: "杭州天气" }
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
-    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
-      category: "ambiguous-command",
-      target: "web_search"
-    }), expect.any(Object));
+    expect(requestApproval).not.toHaveBeenCalled();
   });
 
   it("fails closed when the approval requester throws", async () => {
@@ -296,7 +294,7 @@ describe("createDesktopSafetyExtension", () => {
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
     expect(requestApproval).toHaveBeenLastCalledWith(expect.objectContaining({
       toolCallId: "tool-call-overridden-read",
-      category: "ambiguous-command",
+      category: "unverified-tool",
       targetKind: "tool",
       target: "read"
     }), expect.any(Object));
@@ -309,7 +307,7 @@ describe("createDesktopSafetyExtension", () => {
     }, { hasUI: true })).resolves.toMatchObject({ block: true });
     expect(requestApproval).toHaveBeenLastCalledWith(expect.objectContaining({
       toolCallId: "tool-call-malformed-read",
-      category: "ambiguous-command",
+      category: "unverified-tool",
       targetKind: "tool"
     }), expect.any(Object));
   });
@@ -337,24 +335,32 @@ describe("createDesktopSafetyExtension", () => {
 });
 
 function trustedPolicy(): SafetyPolicyState {
-  return { cwd: "/workspace", trust: "trusted", approvalMode: "guided" };
+  return {
+    cwd: "/workspace",
+    trust: "trusted",
+    approvalMode: "guided",
+    taskToolMode: "ask"
+  };
 }
 
 function safetyHandler(
   policy: SafetyPolicyState,
   requestApproval: DesktopApprovalRequester,
-  getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => [],
-  getActiveTools: () => string[] = () => getAllTools().map((tool) => tool.name)
+  getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => [builtinTool("bash")],
+  getActiveTools?: () => string[]
 ): SafetyHandler {
   let handler: SafetyHandler | undefined;
   const api = {
     getAllTools,
-    getActiveTools,
+    getActiveTools: getActiveTools ?? (() => getAllTools().map((tool) => tool.name)),
     on(event: string, candidate: SafetyHandler) {
       if (event === "tool_call") handler = candidate;
     }
   } as unknown as ExtensionAPI;
-  const extension = createDesktopSafetyExtension(() => policy, requestApproval);
+  const extension = createDesktopSafetyExtension(
+    () => policy,
+    requestApproval
+  );
   if (!("factory" in extension)) throw new Error("Expected the named Desktop safety extension factory.");
   void extension.factory(api);
   if (!handler) throw new Error("Desktop safety extension did not register a tool_call handler.");

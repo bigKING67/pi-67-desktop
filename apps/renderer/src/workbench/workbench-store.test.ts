@@ -162,6 +162,7 @@ function task(id: string, workspaceId: string, lifecycle: TaskLifecycle): Render
     title: id,
     sessionPath: `/sessions/${id}.jsonl`,
     hasDraft: false,
+    toolMode: "auto",
     attachmentCount: 0
   };
 }

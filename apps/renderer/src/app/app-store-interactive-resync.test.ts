@@ -35,6 +35,7 @@ describe("renderer interactive projection resync", () => {
       requestId: "approval-gap",
       toolCallId: "tool-gap",
       toolName: "edit",
+      toolSource: "Pi 内置",
       category: "workspace-write",
       reason: "Confirm edit",
       targetKind: "path",
@@ -81,6 +82,7 @@ describe("renderer interactive projection resync", () => {
       eventSequence: 10,
       hostEpoch: 9,
       sessionGeneration: 3,
+      taskToolMode: "auto",
       activeOperation
     });
     await vi.waitFor(() => expect(useAppStore.getState().sessionTransitionPending).toBe(false));
@@ -215,7 +217,8 @@ function resyncResult(eventSequence: number): ProjectionResyncResult {
     sessionCatalogStatus: readyCatalogStatus(),
     eventSequence,
     hostEpoch: 9,
-    sessionGeneration: 3
+    sessionGeneration: 3,
+    taskToolMode: "auto"
   };
 }
 

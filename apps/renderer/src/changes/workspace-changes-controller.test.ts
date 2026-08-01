@@ -46,6 +46,7 @@ describe("workspace changes controller", () => {
       title: "Task 1",
       sessionPath: "/sessions/one.jsonl",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
   });

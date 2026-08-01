@@ -81,7 +81,8 @@ describe("renderer projection state", () => {
       },
       eventSequence: 10,
       hostEpoch: 9,
-      sessionGeneration: 3
+      sessionGeneration: 3,
+      taskToolMode: "auto"
     });
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
       revision: 2,
@@ -147,6 +148,7 @@ describe("renderer projection state", () => {
       eventSequence: 8,
       hostEpoch: 9,
       sessionGeneration: 3,
+      taskToolMode: "auto",
       activeOperation
     });
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(emptyCatalogPage() as never);
@@ -174,7 +176,8 @@ describe("renderer projection state", () => {
       sessionCatalogStatus: readyCatalogStatus(),
       eventSequence: 11,
       hostEpoch: 9,
-      sessionGeneration: 3
+      sessionGeneration: 3,
+      taskToolMode: "auto"
     });
     vi.spyOn(agentConnectionController, "request").mockResolvedValue(emptyCatalogPage() as never);
 
@@ -251,6 +254,7 @@ describe("renderer projection state", () => {
         eventSequence: 9,
         hostEpoch: 9,
         sessionGeneration: 3,
+        taskToolMode: "auto",
         latestOperationTerminal: terminalReceipt(running.operationId, "command")
       });
       vi.spyOn(agentConnectionController, "request").mockResolvedValue(emptyCatalogPage() as never);

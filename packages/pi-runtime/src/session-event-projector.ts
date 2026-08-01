@@ -1,6 +1,7 @@
 import type { AgentSession, AgentSessionEvent, SessionStats } from "@earendil-works/pi-coding-agent";
 import type {
   RuntimeOperationActivity,
+  ToolAuthorizationProjection,
   ToolPresentationKind,
   WorkspaceChangeView
 } from "@pi67/domain";
@@ -26,6 +27,7 @@ interface SessionEventProjectionTarget {
   pushStream: (delta: StreamDelta) => void;
   flushStream: () => void;
   bindToolExecutionStart: (toolCallId: string, toolName: string) => ToolPresentationKind;
+  getToolAuthorization: (toolCallId: string) => ToolAuthorizationProjection | undefined;
   completeToolExecution: (toolCallId: string) => void;
   settleActiveToolExecutions: () => void;
 }
@@ -43,11 +45,21 @@ export class SessionEventProjector {
     this.activity.reset();
   }
 
+  recordToolAuthorization(
+    toolCallId: string,
+    authorization: ToolAuthorizationProjection
+  ): void {
+    this.activity.recordToolAuthorization(toolCallId, authorization);
+  }
+
   handle(event: AgentSessionEvent): void {
     const toolKind = event.type === "tool_execution_start"
       ? this.target.bindToolExecutionStart(event.toolCallId, event.toolName)
       : undefined;
-    this.activity.handle(event, toolKind);
+    const authorization = event.type === "tool_execution_start" || event.type === "tool_execution_end"
+      ? this.target.getToolAuthorization(event.toolCallId)
+      : undefined;
+    this.activity.handle(event, toolKind, authorization);
     if (event.type === "tool_execution_start") {
       const change = projectLiveWorkspaceChangeStart(event);
       if (change) {

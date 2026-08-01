@@ -18,7 +18,10 @@ import type {
   SessionSnapshot,
   SessionTreeProjection,
   WorkspaceChangesProjection,
-  WorkspaceTrust
+  WorkspaceTrust,
+  TaskToolMode,
+  ApprovalResponseDecision,
+  ApprovalResolution
 } from "@pi67/domain";
 import type {
   AgentEvent,
@@ -46,7 +49,9 @@ export interface AgentRuntime {
   dispose(): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;
-  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void;
+  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode;
+  getTaskToolMode(): TaskToolMode;
+  setTaskToolMode(mode: TaskToolMode): TaskToolMode;
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
   querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
   getSessionCatalogStatus(): SessionCatalogStatus;
@@ -84,7 +89,11 @@ export interface AgentRuntime {
   getCommands(): SlashCommandCatalogResult;
   getExtensionCatalog(): ExtensionCatalogResult;
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean;
-  resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean;
+  resolveApproval(
+    requestId: string,
+    toolCallId: string,
+    decision: ApprovalResponseDecision
+  ): ApprovalResolution;
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[];
   collectDiagnostics(): Promise<RuntimeDiagnostics>;
   runDoctor(): Promise<DoctorReport>;

@@ -28,6 +28,7 @@ describe("runtime crash event", () => {
       requestId: "approval-1",
       toolCallId: "tool-1",
       toolName: "bash",
+      toolSource: "Pi 内置",
       category: "ambiguous-command",
       reason: "Confirm",
       targetKind: "command",

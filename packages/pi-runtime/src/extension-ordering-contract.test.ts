@@ -39,7 +39,7 @@ describe("Pi extension ordering contract", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval
     });
     const { session } = await createAgentSessionFromServices({
@@ -106,7 +106,7 @@ describe("Pi extension ordering contract", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval
     });
     const { session } = await createAgentSessionFromServices({
@@ -132,7 +132,7 @@ describe("Pi extension ordering contract", () => {
       expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
         toolCallId: "tool-call-overridden-read",
         toolName: "read",
-        category: "ambiguous-command",
+        category: "unverified-tool",
         targetKind: "tool",
         target: "read"
       }), expect.any(Object));

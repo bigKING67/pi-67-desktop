@@ -277,6 +277,7 @@ function importResyncResult(): ProjectionResyncResult {
     eventSequence: 2,
     hostEpoch: 9,
     sessionGeneration: 7,
+    taskToolMode: "auto",
     latestOperationTerminal: completedReceipt()
   };
 }

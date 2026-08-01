@@ -32,6 +32,7 @@ const approval: ApprovalRequestView = {
   requestId: "approval-1",
   toolCallId: "tool-1",
   toolName: "bash",
+  toolSource: "Pi 内置",
   category: "ambiguous-command",
   reason: "需要确认",
   targetKind: "command",
@@ -124,11 +125,11 @@ describe("handleAgentEvent interactive authority", () => {
 
     dispatch(state, {
       type: "approval.resolved",
-      payload: { requestId: "approval-1", toolCallId: "tool-wrong", allowed: false }
+      payload: { requestId: "approval-1", toolCallId: "tool-wrong", decision: "deny" }
     }, eventEnvelopeFor("approval.resolved", {
       requestId: "approval-1",
       toolCallId: "tool-wrong",
-      allowed: false
+      decision: "deny"
     }));
     expect(useApprovalStore.getState().requests).toEqual([approval]);
 
@@ -150,11 +151,11 @@ describe("handleAgentEvent interactive authority", () => {
 
     dispatch(state, {
       type: "approval.resolved",
-      payload: { requestId: "approval-1", toolCallId: "tool-1", allowed: false }
+      payload: { requestId: "approval-1", toolCallId: "tool-1", decision: "deny" }
     }, eventEnvelopeFor("approval.resolved", {
       requestId: "approval-1",
       toolCallId: "tool-1",
-      allowed: false
+      decision: "deny"
     }));
     expect(useApprovalStore.getState().requests).toEqual([]);
     expect(state.operation).toEqual(operation);

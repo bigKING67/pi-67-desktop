@@ -42,6 +42,7 @@ describe("workspace conversation model", () => {
       recentUserMessagePreview: "重新检查双栏设置的响应式问题",
       sessionPath: session.path,
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     };
 
@@ -74,6 +75,7 @@ describe("workspace conversation model", () => {
       recentUserMessagePreview: "原任务的最后一条问题",
       sessionPath: "/sessions/continuation.jsonl",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     };
 

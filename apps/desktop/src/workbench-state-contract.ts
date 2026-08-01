@@ -47,6 +47,7 @@ export type SettingsSection =
   | "skills"
   | "prompts"
   | "rules"
+  | "mcp"
   | "integrations"
   | "runtime"
   | "network"
@@ -271,6 +272,7 @@ function isSettingsSection(value: unknown): value is SettingsSection {
     "skills",
     "prompts",
     "rules",
+    "mcp",
     "integrations",
     "runtime",
     "network",
@@ -407,6 +409,7 @@ function taskLifecycleWasLive(lifecycle: TaskLifecycle): boolean {
 function settingsSectionIsGlobalOnly(section: SettingsSection): boolean {
   return section === "account"
     || section === "general"
+    || section === "mcp"
     || section === "integrations"
     || section === "network"
     || section === "updates"

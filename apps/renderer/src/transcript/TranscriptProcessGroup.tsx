@@ -1,4 +1,9 @@
-import type { OperationKind, OperationView, ToolCallPart } from "@pi67/domain";
+import type {
+  OperationKind,
+  OperationView,
+  ToolAuthorizationProjection,
+  ToolCallPart
+} from "@pi67/domain";
 import { Check, ChevronRight, CircleX, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -33,15 +38,16 @@ export function TranscriptProcessGroup({
 }) {
   const failed = row.failed || interrupted;
   const completionReady = completed && row.hasFinalAnswer;
-  const [open, setOpen] = useState(running || failed || (completed && !row.hasFinalAnswer));
+  const [open, setOpen] = useState(running || interrupted || (completed && !row.hasFinalAnswer));
   const previousRunning = useRef(running);
-  const previousFailed = useRef(failed);
+  const previousInterrupted = useRef(interrupted);
   const previousCompletionReady = useRef(completionReady);
   const supplementalThinking = uncommittedLiveThinking(row.items, liveThinking);
   const supplementalTimeline = useMemo(
     () => projectSupplementalTimeline(row.items, timeline, Boolean(liveThinking)),
     [liveThinking, row.items, timeline]
   );
+  const toolAuthorizations = useMemo(() => projectToolAuthorizations(timeline), [timeline]);
   const stepCount = Math.max(
     1,
     row.items.length + supplementalTimeline.length + (supplementalThinking ? 1 : 0)
@@ -49,12 +55,12 @@ export function TranscriptProcessGroup({
 
   useEffect(() => {
     if (!previousRunning.current && running) setOpen(true);
-    if (!previousFailed.current && failed) setOpen(true);
+    if (!previousInterrupted.current && interrupted) setOpen(true);
     if (!previousCompletionReady.current && completionReady) setOpen(false);
     previousRunning.current = running;
-    previousFailed.current = failed;
+    previousInterrupted.current = interrupted;
     previousCompletionReady.current = completionReady;
-  }, [completionReady, failed, running]);
+  }, [completionReady, interrupted, running]);
 
   const label = running && operation
     ? operationPresentation(
@@ -102,7 +108,15 @@ export function TranscriptProcessGroup({
       </summary>
       {hasBody ? (
         <ol className={styles.steps} aria-label="模型执行步骤">
-          {row.items.map((item) => <ProcessItem item={item} key={item.key} />)}
+          {row.items.map((item) => (
+            <ProcessItem
+              {...(item.kind === "tool" && toolAuthorizations.has(item.call.id)
+                ? { authorization: toolAuthorizations.get(item.call.id)! }
+                : {})}
+              item={item}
+              key={item.key}
+            />
+          ))}
           {supplementalThinking ? (
             <li className={styles.step} data-process-step="reasoning">
               <Reasoning text={supplementalThinking} streaming />
@@ -110,7 +124,10 @@ export function TranscriptProcessGroup({
           ) : null}
           {supplementalTimeline.map((item) => item.kind === "tool" ? (
             <li className={styles.step} data-process-step="tool" key={item.key}>
-              <ToolCard tool={item.tool} />
+              <ToolCard
+                {...(item.authorization === undefined ? {} : { authorization: item.authorization })}
+                tool={item.tool}
+              />
             </li>
           ) : (
             <li
@@ -136,7 +153,13 @@ export function TranscriptProcessGroup({
   );
 }
 
-function ProcessItem({ item }: { item: TranscriptProcessItem }) {
+function ProcessItem({
+  item,
+  authorization
+}: {
+  item: TranscriptProcessItem;
+  authorization?: ToolAuthorizationProjection;
+}) {
   if (item.kind === "reasoning") {
     return (
       <li className={styles.step} data-process-step="reasoning">
@@ -165,6 +188,7 @@ function ProcessItem({ item }: { item: TranscriptProcessItem }) {
     return (
       <li className={styles.step} data-process-step="tool">
         <ToolCard
+          {...(authorization === undefined ? {} : { authorization })}
           {...(item.result === undefined ? {} : { result: item.result })}
           tool={item.call}
         />
@@ -205,7 +229,12 @@ function uncommittedLiveThinking(items: readonly TranscriptProcessItem[], liveTh
 }
 
 type SupplementalTimelineItem =
-  | { kind: "tool"; key: string; tool: ToolCallPart }
+  | {
+    kind: "tool";
+    key: string;
+    tool: ToolCallPart;
+    authorization?: ToolAuthorizationProjection;
+  }
   | {
     kind: "status";
     key: string;
@@ -235,7 +264,10 @@ function projectSupplementalTimeline(
           id: step.activity.toolCallId,
           name: step.activity.toolName,
           status: step.activity.status
-        }
+        },
+        ...(step.activity.authorization === undefined
+          ? {}
+          : { authorization: step.activity.authorization })
       }];
     }
     if (hasPersistedContent) return [];
@@ -249,6 +281,18 @@ function projectSupplementalTimeline(
       status: step.status
     }];
   });
+}
+
+function projectToolAuthorizations(
+  timeline: OperationActivityTimeline | undefined
+): ReadonlyMap<string, ToolAuthorizationProjection> {
+  const result = new Map<string, ToolAuthorizationProjection>();
+  for (const step of timeline?.steps ?? []) {
+    if (step.activity?.kind === "tool" && step.activity.authorization) {
+      result.set(step.activity.toolCallId, step.activity.authorization);
+    }
+  }
+  return result;
 }
 
 function timelineStepLabel(operationKind: OperationKind, step: OperationTimelineStep): string {

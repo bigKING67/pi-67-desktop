@@ -117,6 +117,7 @@ function taskRuntime(initialSessionId: string, createdSessionId: string) {
       initialize,
       createSession,
       getIdentity: () => ({ sessionId, sessionGeneration }),
+      getTaskToolMode: () => "auto" as const,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
     } as unknown as AgentRuntime

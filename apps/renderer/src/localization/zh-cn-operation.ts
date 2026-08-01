@@ -26,6 +26,11 @@ export const zhCNOperationMessages = {
   timelineSteps: (count: number) => `${count} 个步骤`,
   timelineEarlier: (count: number) => `查看更早的 ${count} 个步骤`,
   timelineCompleted: (count: number, duration: string) => `执行过程 · ${count} 个步骤 · ${duration}`,
+  autoAuthorizationReasons: {
+    "configured-source": "AUTO · 已配置来源",
+    "read-only": "AUTO · 只读",
+    "workspace-write": "AUTO · Workspace 内写入"
+  },
   quiet: "暂时没有新活动",
   quietDetail: "Pi 运行服务仍在响应，可以继续等待或停止任务",
   stalled: "正在确认任务状态",

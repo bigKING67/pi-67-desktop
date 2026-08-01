@@ -13,6 +13,7 @@ import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixtu
 import { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 import { createMockContextFiles, installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import { installMockPayloadSanitizer, type MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
+import { installMockOperationFactories, type MockOperationViewFactory, type MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
 import type {
   FixtureAgentState,
   FixtureMessage,
@@ -47,6 +48,7 @@ export async function attachMockAgent(
   await page.evaluate(installMockAssetReadHandler);
   await page.evaluate(installMockSessionRotationHandler);
   await page.evaluate(installMockPayloadSanitizer);
+  await page.evaluate(installMockOperationFactories);
   await page.evaluate(installMockContextFileCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
@@ -63,6 +65,8 @@ export async function attachMockAgent(
     const sanitizeMockPayload = (testWindow as FixtureWindow & {
       __pi67SanitizeMockPayload: MockPayloadSanitizer;
     }).__pi67SanitizeMockPayload;
+    const operationView = (testWindow as FixtureWindow & { __pi67MockOperationView: MockOperationViewFactory }).__pi67MockOperationView;
+    const projectionMutationAcknowledgement = (testWindow as FixtureWindow & { __pi67MockProjectionAcknowledgement: MockProjectionAcknowledgementFactory }).__pi67MockProjectionAcknowledgement;
     const sessionBootstrapCommands = new Set(["session.create", "session.open", "session.fork", "session.forkFromTask"]);
     const sessionForkCommands = new Set(["session.fork", "session.forkFromTask"]);
     const sessionBootstrapReasons: Record<string, string> = { "session.create": "session-create", "session.open": "session-open", "session.fork": "session-fork", "session.forkFromTask": "session-fork" };
@@ -76,6 +80,7 @@ export async function attachMockAgent(
       taskId: "task-test",
       taskGeneration: 1,
       sessionGeneration: 1,
+      taskToolMode: "auto",
       sessionCounter: 0,
       operationCounter: 0,
       conversationMessages: fixtureMessages,
@@ -221,7 +226,8 @@ export async function attachMockAgent(
                 type: "runtime.ready",
                 payload: {
                   capabilities: fixtureRuntimeCapabilities,
-                  snapshot: state.snapshot
+                  snapshot: state.snapshot,
+                  taskToolMode: state.taskToolMode
                 }
               });
               if (!hasConfiguredResult) {
@@ -271,6 +277,21 @@ export async function attachMockAgent(
               ok: true,
               result
             });
+            if (envelope.type === "task.toolMode.set") {
+              emitThrough(hostPort, hostEpoch, {
+                type: "task.toolMode.changed",
+                payload: { mode: state.taskToolMode, reason: "user-selected" }
+              });
+            }
+            if (
+              envelope.type === "approval.respond"
+              && envelope.payload?.decision === "enable-task-yolo-and-allow"
+            ) {
+              emitThrough(hostPort, hostEpoch, {
+                type: "task.toolMode.changed",
+                payload: { mode: state.taskToolMode, reason: "approval-enabled-yolo" }
+              }, typeof envelope.payload.operationId === "string" ? envelope.payload.operationId : undefined);
+            }
             if (envelope.type === "prompt.submit") {
               const accepted = result as { operationId: string };
               state.snapshot = { ...state.snapshot, streaming: true };
@@ -374,12 +395,14 @@ export async function attachMockAgent(
       if (saved) {
         state.taskSequence = saved.taskSequence;
         state.sessionGeneration = saved.sessionGeneration;
+        state.taskToolMode = saved.taskToolMode;
         state.conversationMessages = saved.conversationMessages;
         state.workspaceChanges = saved.workspaceChanges;
         state.snapshot = saved.snapshot;
         return;
       }
       state.taskSequence = 0;
+      state.taskToolMode = "auto";
       state.conversationMessages = structuredClone(state.conversationMessages);
       state.workspaceChanges = structuredClone(state.workspaceChanges);
       state.snapshot = structuredClone(state.snapshot);
@@ -391,6 +414,7 @@ export async function attachMockAgent(
       state.taskStates[activeTaskKey()] = {
         taskSequence: state.taskSequence,
         sessionGeneration: state.sessionGeneration,
+        taskToolMode: state.taskToolMode,
         conversationMessages: state.conversationMessages,
         workspaceChanges: state.workspaceChanges,
         snapshot: state.snapshot
@@ -404,31 +428,6 @@ export async function attachMockAgent(
     function emitThrough(port: TestPort, hostEpoch: number, event: { type: string; payload: unknown }, operationId?: string): void {
       if (hostEpoch !== state.hostEpoch || port !== state.activePort) return;
       state.emit(event, { hostEpoch, ...(operationId === undefined ? {} : { operationId }) });
-    }
-
-    function operationView(operationId: string, kind: string, lifecycle: string, current: FixtureAgentState): Record<string, unknown> {
-      return {
-        operationId,
-        kind,
-        lifecycle,
-        cancellable: kind === "prompt" || kind === "compaction",
-        sessionId: String(current.snapshot.sessionId),
-        sessionGeneration: current.sessionGeneration,
-        startedAt: Date.now()
-      };
-    }
-
-    function projectionMutationAcknowledgement(
-      current: FixtureAgentState,
-      hostEpoch: number
-    ): Record<string, unknown> {
-      return {
-        accepted: true,
-        hostEpoch,
-        sessionId: String(current.snapshot.sessionId),
-        sessionGeneration: current.sessionGeneration,
-        eventSequence: current.sequence
-      };
     }
 
     testWindow.__pi67TestAgent = state;

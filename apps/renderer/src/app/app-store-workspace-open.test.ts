@@ -55,7 +55,7 @@ describe("App Store workspace open authority", () => {
     vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "workspace.open") {
         const readySnapshot = snapshot("session-2");
-        const payload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot };
+        const payload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
           eventEnvelope("runtime.ready", payload, taskEventFixture({
@@ -126,6 +126,7 @@ describe("App Store workspace open authority", () => {
       runtime: { phase: "ready", detail: "Pi 会话已就绪", recoverable: true },
       title: "Existing task",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
     const sessionPath = "/sessions/catalog-target.jsonl";
@@ -140,7 +141,7 @@ describe("App Store workspace open authority", () => {
           cwd: descriptor.identity.canonicalPath,
           sessionPath,
           trust: "trusted",
-          approvalMode: "guided"
+          approvalMode: "balanced"
         });
         const context = options?.context;
         if (!context || context.scope !== "task") throw new Error("Expected Task context.");
@@ -150,7 +151,7 @@ describe("App Store workspace open authority", () => {
           cwd: descriptor.identity.canonicalPath,
           sessionPath
         };
-        const readyPayload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot };
+        const readyPayload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
         const envelope = eventEnvelope("runtime.ready", readyPayload, taskEventFixture({
           hostEpoch: 9,
           sequence: 2,
@@ -360,6 +361,7 @@ function projectionResyncResult(
     },
     eventSequence: 3,
     hostEpoch: 9,
-    sessionGeneration
+    sessionGeneration,
+    taskToolMode: "auto"
   };
 }

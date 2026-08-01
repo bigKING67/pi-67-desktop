@@ -132,6 +132,12 @@ const RuntimeStatusSchema = strictObject({
   attempt: Type.Optional(Type.Number())
 });
 
+const TaskToolModeSchema = Type.Union([
+  Type.Literal("ask"),
+  Type.Literal("auto"),
+  Type.Literal("yolo")
+]);
+
 const RuntimeCapabilitiesSchema = strictObject({
   sdkVersion: Type.String(),
   supportsFollowUp: Type.Literal(true),
@@ -225,6 +231,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
     eventSequence: Type.Integer({ minimum: 0 }),
     hostEpoch: Type.Integer({ minimum: 0 }),
     sessionGeneration: Type.Integer({ minimum: 0 }),
+    taskToolMode: TaskToolModeSchema,
     activeOperation: Type.Optional(OperationViewSchema),
     latestOperationTerminal: Type.Optional(OperationSettledSchema)
   }),
@@ -235,6 +242,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.setTrust": SessionResourceCatalogResultSchema,
   "workspace.changes": WorkspaceChangesProjectionSchema,
   "task.close": strictObject({ closed: Type.Literal(true), stopped: Type.Boolean() }),
+  "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogPageSchema,
   "session.tree": SessionTreeProjectionSchema,
   "message.page": ConversationPageSchema,
@@ -289,7 +297,10 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "skill.pack.update": SkillPackMutationResultSchema,
   "skill.pack.restore": SkillPackMutationResultSchema,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
-  "approval.respond": strictObject({ resolved: Type.Boolean() }),
+  "approval.respond": strictObject({
+    resolved: Type.Boolean(),
+    taskToolMode: TaskToolModeSchema
+  }),
   "diagnostics.collect": RuntimeDiagnosticsSchema,
   "doctor.run": DoctorReportSchema
 };
@@ -303,7 +314,11 @@ const StreamDeltaSchema = strictObject({
 
 export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "runtime.statusChanged": RuntimeStatusSchema,
-  "runtime.ready": strictObject({ capabilities: RuntimeCapabilitiesSchema, snapshot: SessionSnapshotSchema }),
+  "runtime.ready": strictObject({
+    capabilities: RuntimeCapabilitiesSchema,
+    snapshot: SessionSnapshotSchema,
+    taskToolMode: TaskToolModeSchema
+  }),
   "runtime.crashed": strictObject({ detail: Type.String(), recoverable: Type.Boolean() }),
   "session.bootstrap": strictObject({
     snapshot: SessionSnapshotSchema,
@@ -367,6 +382,15 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "approval.requested": ApprovalRequestSchema,
   "approval.resolved": ApprovalResolvedSchema,
   "approval.cancelled": ApprovalCancelledSchema,
+  "task.toolMode.changed": strictObject({
+    mode: TaskToolModeSchema,
+    reason: Type.Union([
+      Type.Literal("user-selected"),
+      Type.Literal("approval-enabled-yolo"),
+      Type.Literal("trust-revoked"),
+      Type.Literal("runtime-reset")
+    ])
+  }),
   "extension.ui.requested": ExtensionUiRequestSchema,
   "extension.ui.updated": ExtensionUiRequestSchema,
   "extension.ui.resolved": ExtensionUiResolvedSchema,

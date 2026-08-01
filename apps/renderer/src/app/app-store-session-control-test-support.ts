@@ -115,7 +115,8 @@ export function resyncResult(
     },
     eventSequence: 3,
     hostEpoch: 9,
-    sessionGeneration: 3
+    sessionGeneration: 3,
+    taskToolMode: "auto"
   };
 }
 

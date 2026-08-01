@@ -138,6 +138,23 @@ export function recordOperationTimelineActivity(
     return settleToolTimelineStep(timeline, activity, observedAt);
   }
   if (
+    activity?.kind === "tool"
+    && activity.status === "running"
+    && current?.status === "running"
+    && current.activity?.kind === "tool"
+    && current.activity.toolCallId === activity.toolCallId
+  ) {
+    if (sameTimelineActivity(current.activity, activity)) return timeline;
+    return {
+      ...timeline,
+      steps: timeline.steps.map((step) => step === current ? {
+        ...step,
+        activity,
+        detail: toolActivityDetail(activity)
+      } : step)
+    };
+  }
+  if (
     activity === null
     && current?.activity?.kind === "tool"
     && current.activity.status !== "running"
@@ -202,9 +219,17 @@ function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" 
   const result = activity.status === "running"
     ? "执行中"
     : activity.status === "completed" ? "执行成功" : "执行失败";
-  return activity.aliasTarget === undefined
-    ? result
-    : `已兼容转发到 ${activity.aliasTarget} · ${result}`;
+  return [
+    activity.authorization === undefined
+      ? undefined
+      : activity.authorization.reason === "configured-source"
+        ? "AUTO · 已配置来源"
+        : activity.authorization.reason === "read-only"
+          ? "AUTO · 只读"
+          : "AUTO · Workspace 内写入",
+    activity.aliasTarget === undefined ? undefined : `已兼容转发到 ${activity.aliasTarget}`,
+    result
+  ].filter((value): value is string => value !== undefined).join(" · ");
 }
 
 export function updateOperationTimelineProgress(
@@ -278,7 +303,9 @@ function sameTimelineActivity(
       && left.toolName === right.toolName
       && left.toolKind === right.toolKind
       && left.status === right.status
-      && left.aliasTarget === right.aliasTarget;
+      && left.aliasTarget === right.aliasTarget
+      && left.authorization?.mode === right.authorization?.mode
+      && left.authorization?.reason === right.authorization?.reason;
   }
   if (left.kind === "approval" && right.kind === "approval") return left.requestId === right.requestId;
   if (left.kind === "extension-input" && right.kind === "extension-input") {

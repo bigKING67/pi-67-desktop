@@ -10,6 +10,7 @@ export * from "./extension-ui-bridge.js";
 export * from "./message-projection.js";
 export * from "./pi-configuration-service.js";
 export * from "./pi-configuration-service-registry.js";
+export * from "./pi-web-access-result-extension.js";
 export * from "./pi-sdk-runtime.js";
 export * from "./prompt-attachment.js";
 export * from "./prompt-attachment-extension.js";

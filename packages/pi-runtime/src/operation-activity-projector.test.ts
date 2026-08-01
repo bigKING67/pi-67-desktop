@@ -169,6 +169,108 @@ describe("OperationActivityProjector", () => {
     ]);
     expect(JSON.stringify(activities)).not.toContain("provider payload");
   });
+
+  it("carries only the bounded AUTO authorization reason through the live Tool outcome", () => {
+    const activities: RuntimeOperationActivity[] = [];
+    const projector = new OperationActivityProjector((activity) => activities.push(activity));
+
+    projector.handle(event({
+      type: "tool_execution_start",
+      toolCallId: "configured-tool",
+      toolName: "subagent",
+      args: { prompt: "must not enter activity" }
+    }), "subagent", { mode: "auto", reason: "configured-source" });
+    projector.handle(event({
+      type: "tool_execution_end",
+      toolCallId: "configured-tool",
+      toolName: "subagent",
+      result: { content: [{ type: "text", text: "must not enter activity" }] },
+      isError: false
+    }));
+
+    expect(activities).toEqual([
+      expect.objectContaining({
+        kind: "tool",
+        status: "running",
+        authorization: { mode: "auto", reason: "configured-source" }
+      }),
+      expect.objectContaining({
+        kind: "tool",
+        status: "completed",
+        authorization: { mode: "auto", reason: "configured-source" }
+      })
+    ]);
+    expect(JSON.stringify(activities)).not.toContain("must not enter activity");
+  });
+
+  it("publishes an AUTO reason recorded after Pi starts the Tool and preserves it at completion", () => {
+    const activities: RuntimeOperationActivity[] = [];
+    const projector = new OperationActivityProjector((activity) => activities.push(activity));
+
+    projector.handle(event({
+      type: "tool_execution_start",
+      toolCallId: "late-authorization",
+      toolName: "grep",
+      args: { query: "must not enter activity" }
+    }), "search");
+    projector.recordToolAuthorization("late-authorization", { mode: "auto", reason: "read-only" });
+    projector.handle(event({
+      type: "tool_execution_end",
+      toolCallId: "late-authorization",
+      toolName: "grep",
+      result: { content: [{ type: "text", text: "must not enter activity" }] },
+      isError: false
+    }));
+
+    expect(activities).toEqual([
+      {
+        kind: "tool",
+        toolCallId: "late-authorization",
+        toolName: "grep",
+        toolKind: "search",
+        status: "running"
+      },
+      expect.objectContaining({
+        kind: "tool",
+        status: "running",
+        authorization: { mode: "auto", reason: "read-only" }
+      }),
+      expect.objectContaining({
+        kind: "tool",
+        status: "completed",
+        authorization: { mode: "auto", reason: "read-only" }
+      })
+    ]);
+    expect(JSON.stringify(activities)).not.toContain("must not enter activity");
+  });
+
+  it("uses the Tool-end authorization as a fallback when active state has no reason", () => {
+    const activities: RuntimeOperationActivity[] = [];
+    const projector = new OperationActivityProjector((activity) => activities.push(activity));
+
+    projector.handle(event({
+      type: "tool_execution_start",
+      toolCallId: "end-fallback",
+      toolName: "read",
+      args: {}
+    }), "read");
+    projector.handle(event({
+      type: "tool_execution_end",
+      toolCallId: "end-fallback",
+      toolName: "read",
+      result: {},
+      isError: false
+    }), "generic", { mode: "auto", reason: "read-only" });
+
+    expect(activities.at(-1)).toEqual({
+      kind: "tool",
+      toolCallId: "end-fallback",
+      toolName: "read",
+      toolKind: "read",
+      status: "completed",
+      authorization: { mode: "auto", reason: "read-only" }
+    });
+  });
 });
 
 function event(value: object): AgentSessionEvent {

@@ -44,7 +44,7 @@ describe("Desktop tool routing Extension integration", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval
     });
     const aliases = createDesktopToolAliasBinding();
@@ -182,7 +182,7 @@ describe("Desktop tool routing Extension integration", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval
     });
     const aliases = createDesktopToolAliasBinding();

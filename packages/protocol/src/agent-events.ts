@@ -12,6 +12,8 @@ import type {
   SessionCatalogChangedEvent,
   SessionModelCatalogResult,
   SessionSnapshot,
+  TaskToolMode,
+  ApprovalResponseDecision,
   WorkspaceChangeView
 } from "@pi67/domain";
 import type { ProtocolError } from "./protocol-error.js";
@@ -26,7 +28,11 @@ export interface StreamDelta {
 
 export interface EventPayloads {
   "runtime.statusChanged": RuntimeStatus;
-  "runtime.ready": { capabilities: RuntimeCapabilities; snapshot: SessionSnapshot };
+  "runtime.ready": {
+    capabilities: RuntimeCapabilities;
+    snapshot: SessionSnapshot;
+    taskToolMode: TaskToolMode;
+  };
   "runtime.crashed": { detail: string; recoverable: boolean };
   "session.bootstrap": {
     snapshot: SessionSnapshot;
@@ -63,10 +69,18 @@ export interface EventPayloads {
   "operation.lost": { operationId: string; lostAt: number; reason: string };
   "workspace.changeChanged": { sessionId: string; change: WorkspaceChangeView };
   "approval.requested": ApprovalRequestView;
-  "approval.resolved": { requestId: string; toolCallId: string; allowed: boolean };
+  "approval.resolved": {
+    requestId: string;
+    toolCallId: string;
+    decision: ApprovalResponseDecision;
+  };
   "approval.cancelled": {
     requests: Array<{ requestId: string; toolCallId: string }>;
     reason: ExtensionUiCancellationReason;
+  };
+  "task.toolMode.changed": {
+    mode: TaskToolMode;
+    reason: "user-selected" | "approval-enabled-yolo" | "trust-revoked" | "runtime-reset";
   };
   "extension.ui.requested": ExtensionUiRequestView;
   "extension.ui.updated": ExtensionUiRequestView;

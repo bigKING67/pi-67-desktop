@@ -17,6 +17,8 @@ interface HostEventChannelDependencies {
   getProtocolContext: () => ProtocolContext;
 }
 
+const MAX_INTERACTIVE_OPERATION_AUTHORITIES = 512;
+
 export interface HostEventSendAuthority {
   runtime: AgentRuntime | undefined;
   operations: OperationRegistry | undefined;
@@ -26,6 +28,7 @@ export interface HostEventSendAuthority {
 export class HostEventChannel {
   private sequence = 0;
   private readonly taskSequences = new TaskEventSequenceRegistry();
+  private readonly interactiveOperationIds = new Map<string, string>();
   private readonly outbox: Array<{ event: AgentEvent; authority: HostEventSendAuthority }> = [];
   private draining = false;
 
@@ -73,7 +76,9 @@ export class HostEventChannel {
     const runtime = authority.runtime;
     const identity = runtime?.getIdentity() ?? { sessionGeneration: 0 };
     const operations = authority.operations;
-    const operationId = operationIdFor(event) ?? operations?.activeAccepted()?.operationId;
+    const operationId = operationIdFor(event)
+      ?? this.interactiveOperationIdFor(event, authority.context)
+      ?? operations?.activeAccepted()?.operationId;
     const hostEpoch = this.dependencies.getHostEpoch();
     const protocolContext = enrichTaskContext(
       authority.context,
@@ -121,13 +126,49 @@ export class HostEventChannel {
     if (protocolContext.scope === "task" && nextTaskSequence !== undefined) {
       this.taskSequences.commit(protocolContext, nextTaskSequence);
     }
+    this.recordInteractiveOperation(event, authority.context, operationId);
     const delivered = this.dependencies.getConnection()?.postEvent(envelope) ?? false;
+    this.clearTerminalInteractiveOperations(event, authority.context);
 
     if (blockingInteractiveRequest && !delivered) {
       rejectInteractiveRequest(runtime, event);
       operations?.completeInteractiveWait(event.payload.requestId);
     }
     return true;
+  }
+
+  private interactiveOperationIdFor(event: AgentEvent, context: ProtocolContext): string | undefined {
+    const requestIds = terminalInteractiveRequestIds(event);
+    if (requestIds.length === 0) return undefined;
+    const operationIds = new Set(requestIds.flatMap((requestId) => {
+      const operationId = this.interactiveOperationIds.get(interactiveRequestKey(context, requestId));
+      return operationId === undefined ? [] : [operationId];
+    }));
+    return operationIds.size === 1 ? operationIds.values().next().value : undefined;
+  }
+
+  private recordInteractiveOperation(
+    event: AgentEvent,
+    context: ProtocolContext,
+    operationId: string | undefined
+  ): void {
+    if (operationId === undefined) return;
+    const requestId = requestedInteractiveRequestId(event);
+    if (requestId === undefined) return;
+    const key = interactiveRequestKey(context, requestId);
+    this.interactiveOperationIds.delete(key);
+    this.interactiveOperationIds.set(key, operationId);
+    while (this.interactiveOperationIds.size > MAX_INTERACTIVE_OPERATION_AUTHORITIES) {
+      const oldest = this.interactiveOperationIds.keys().next().value;
+      if (oldest === undefined) break;
+      this.interactiveOperationIds.delete(oldest);
+    }
+  }
+
+  private clearTerminalInteractiveOperations(event: AgentEvent, context: ProtocolContext): void {
+    for (const requestId of terminalInteractiveRequestIds(event)) {
+      this.interactiveOperationIds.delete(interactiveRequestKey(context, requestId));
+    }
   }
 }
 
@@ -216,8 +257,8 @@ function rejectInteractiveRequest(
       runtime?.cancelInteractiveRequests("abort");
       return;
     }
-    if (runtime?.resolveApproval(requestId, toolCallId, false) === false) {
-      runtime.cancelInteractiveRequests("abort");
+    if (runtime?.resolveApproval(requestId, toolCallId, "deny").resolved !== true) {
+      runtime?.cancelInteractiveRequests("abort");
     }
   } else {
     if (runtime?.resolveExtensionUi(requestId, undefined, true) === false) {
@@ -259,6 +300,38 @@ function operationIdFor(event: AgentEvent): string | undefined {
     return typeof payload?.operationId === "string" ? payload.operationId : undefined;
   }
   return undefined;
+}
+
+function requestedInteractiveRequestId(event: AgentEvent): string | undefined {
+  return event.type === "approval.requested" || event.type === "extension.ui.requested"
+    ? event.payload.requestId
+    : undefined;
+}
+
+function terminalInteractiveRequestIds(event: AgentEvent): string[] {
+  if (event.type === "approval.resolved" || event.type === "extension.ui.resolved") {
+    return [event.payload.requestId];
+  }
+  if (event.type === "approval.cancelled") {
+    return event.payload.requests.map((request) => request.requestId);
+  }
+  return event.type === "extension.ui.cancelled" ? event.payload.requestIds : [];
+}
+
+function interactiveRequestKey(context: ProtocolContext, requestId: string): string {
+  if (context.scope === "task") {
+    return JSON.stringify([
+      context.scope,
+      context.workspaceId,
+      context.taskId,
+      context.taskGeneration,
+      requestId
+    ]);
+  }
+  if (context.scope === "workspace") {
+    return JSON.stringify([context.scope, context.workspaceId, requestId]);
+  }
+  return JSON.stringify([context.scope, requestId]);
 }
 
 function hasEventShape(event: AgentEvent): boolean {

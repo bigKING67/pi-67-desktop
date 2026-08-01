@@ -321,6 +321,7 @@ function createRuntime(): {
     subscribe: () => () => undefined,
     getIdentity: () => ({ sessionId: snapshot.sessionId, sessionGeneration: 1 }),
     getSnapshot: () => snapshot,
+    getTaskToolMode: () => "auto" as const,
     getResources: () => [],
     getExtensionCatalog: () => ({ items: [], total: 0, truncated: false }),
     getSessionCatalogStatus: () => ({

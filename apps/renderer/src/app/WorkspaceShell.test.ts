@@ -43,6 +43,7 @@ function task(overrides: Pick<RendererWorkbenchTask, "lifecycle" | "runtime">): 
     taskGeneration: 1,
     title: "A",
     hasDraft: false,
+    toolMode: "auto",
     attachmentCount: 0,
     ...overrides
   };

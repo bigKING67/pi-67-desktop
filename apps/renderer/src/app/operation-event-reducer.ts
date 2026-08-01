@@ -1,9 +1,13 @@
 import type {
+  ApprovalRequestView,
+  ExtensionUiRequestView,
   OperationActivity,
   OperationLifecycle
 } from "@pi67/domain";
 import type { AgentEvent, EventEnvelope, OperationSettled } from "@pi67/protocol";
+import { useApprovalStore } from "../approval/approval-store.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
+import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import {
   recordOperationTerminal
@@ -54,6 +58,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.completed":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
         useOperationActivityTimelineStore.getState().finish(
           event.payload.operationId,
           "completed",
@@ -70,6 +75,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.failed":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
         useOperationActivityTimelineStore.getState().finish(
           event.payload.operationId,
           "failed",
@@ -87,6 +93,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.cancelled":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
         useOperationActivityTimelineStore.getState().finish(
           event.payload.operationId,
           "cancelled",
@@ -104,6 +111,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       return true;
     case "operation.lost":
       if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
+        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
         useOperationActivityTimelineStore.getState().finish(
           event.payload.operationId,
           "lost",
@@ -122,6 +130,32 @@ export function reduceOperationEvent<TState extends AppEventState>(
     default:
       return false;
   }
+}
+
+function clearOperationInteractiveRequests(
+  authority: RendererSessionAuthority,
+  operationId: string
+): void {
+  const approvalIds = useApprovalStore.getState().requests
+    .filter((request) => matchesOperationInteractiveAuthority(request, authority, operationId))
+    .map((request) => request.requestId);
+  useApprovalStore.getState().removeRequests(approvalIds);
+
+  const extensionIds = useExtensionUiStore.getState().requests
+    .filter((request) => matchesOperationInteractiveAuthority(request, authority, operationId))
+    .map((request) => request.requestId);
+  useExtensionUiStore.getState().cancelRequests(extensionIds);
+}
+
+function matchesOperationInteractiveAuthority(
+  request: ApprovalRequestView | ExtensionUiRequestView,
+  authority: RendererSessionAuthority,
+  operationId: string
+): boolean {
+  return request.hostEpoch === authority.hostEpoch
+    && request.sessionId === authority.sessionId
+    && request.sessionGeneration === authority.sessionGeneration
+    && request.operationId === operationId;
 }
 
 function updateOperation<TState extends AppEventState>(

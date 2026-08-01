@@ -15,7 +15,8 @@ export function runtimeReadyEvent(
         supportsSessionTree: true,
         extensionUi: runtime.getExtensionUiCapabilities()
       },
-      snapshot
+      snapshot,
+      taskToolMode: runtime.getTaskToolMode()
     }
   };
 }

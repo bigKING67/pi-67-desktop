@@ -57,6 +57,41 @@ describe("workbench event routing", () => {
     });
   });
 
+  it("routes Tool mode changes to the addressed background Task only", () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: "workspace-a",
+      displayName: "A",
+      identity: { canonicalPath: "/work/a", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask(task("active"));
+    workbench.openTask(task("background"));
+    workbench.selectTask("active");
+    const payload = { mode: "yolo" as const, reason: "user-selected" as const };
+
+    expect(routeWorkbenchAgentEvent(
+      { type: "task.toolMode.changed", payload },
+      eventEnvelope("task.toolMode.changed", payload, taskEventFixture({
+        hostEpoch: 9,
+        sequence: 1,
+        workspaceId: "workspace-a",
+        taskId: "background",
+        taskGeneration: 1,
+        sessionId: "session-background",
+        sessionGeneration: 2
+      }))
+    )).toBe("background");
+
+    expect(rendererWorkbenchStore.getState().tasks.active?.toolMode).toBe("auto");
+    expect(rendererWorkbenchStore.getState().tasks.background?.toolMode).toBe("yolo");
+    expect(rendererWorkbenchStore.getState().selectedSurface).toMatchObject({
+      conversation: { sessionPath: "/sessions/active.jsonl" }
+    });
+  });
+
   it("rejects a stale task generation", () => {
     const workbench = rendererWorkbenchStore.getState();
     workbench.registerWorkspace({
@@ -136,6 +171,7 @@ function task(id: string) {
     runtime: { phase: "ready" as const, detail: "ready", recoverable: true },
     title: id,
     hasDraft: false,
+    toolMode: "auto" as const,
     attachmentCount: 0
   };
 }

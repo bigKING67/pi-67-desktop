@@ -118,7 +118,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
-      sessionGeneration: 3
+      sessionGeneration: 3,
+      taskToolMode: "auto" as const
     };
     const target = useSessionProjectionStore.getState().captureTransition(appState())!;
     const installed = installRendererSessionResync(appState(), result, 9, target, "workspace-1");
@@ -150,7 +151,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
-      sessionGeneration: 3
+      sessionGeneration: 3,
+      taskToolMode: "auto" as const
     };
     const target = useSessionProjectionStore.getState().captureTransition(appState())!;
 
@@ -248,7 +250,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
-      sessionGeneration: 3
+      sessionGeneration: 3,
+      taskToolMode: "auto" as const
     };
     const target = useSessionProjectionStore.getState().captureTransition(appState())!;
     let superseded = false;
@@ -296,6 +299,7 @@ function seedFeatureStores(): void {
     requestId: "approval-1",
     toolCallId: "tool-1",
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "ambiguous-command",
     reason: "Confirm",
     targetKind: "command",

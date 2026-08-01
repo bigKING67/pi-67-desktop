@@ -163,6 +163,7 @@ function installActiveTask(): void {
     title: "A",
     sessionPath: "/sessions/a.jsonl",
     hasDraft: false,
+    toolMode: "auto",
     attachmentCount: 0
   });
   useAppStore.setState({ connected: true, hostEpoch: 9, workspace: "/work/a" });

@@ -16,6 +16,9 @@ export interface RuntimeStatus {
 
 export type WorkspaceTrust = "unknown" | "trusted" | "untrusted";
 export type ApprovalMode = "guided" | "balanced";
+export const DEFAULT_APPROVAL_MODE: ApprovalMode = "balanced";
+export type TaskToolMode = "ask" | "auto" | "yolo";
+export const DEFAULT_TASK_TOOL_MODE: TaskToolMode = "auto";
 
 export interface WorkspaceState {
   path: string;

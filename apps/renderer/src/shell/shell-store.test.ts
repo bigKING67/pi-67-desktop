@@ -8,6 +8,11 @@ describe("shell store", () => {
 
   it("starts with the workspace inspector visible on changes", () => {
     expect(useShellStore.getState()).toMatchObject({
+      navigationVisible: true,
+      sessionSearchFocusRevision: 0,
+      sessionSearchHandledRevision: 0,
+      modelPickerRequestRevision: 0,
+      modelPickerHandledRevision: 0,
       contextVisible: true,
       contextTab: "changes",
       commandPaletteOpen: false,
@@ -15,6 +20,31 @@ describe("shell store", () => {
       credentialDialogOpen: false,
       updateDialogOpen: false
     });
+  });
+
+  it("opens the Session Catalog and requests focus without coupling it to the model picker", () => {
+    const shell = useShellStore.getState();
+    shell.setNavigationVisible(false);
+    shell.openSessionCatalog();
+
+    expect(useShellStore.getState()).toMatchObject({
+      navigationVisible: true,
+      sessionSearchFocusRevision: 1,
+      sessionSearchHandledRevision: 0,
+      modelPickerRequestRevision: 0
+    });
+    shell.acknowledgeSessionSearchFocus(1);
+    expect(useShellStore.getState().sessionSearchHandledRevision).toBe(1);
+  });
+
+  it("publishes repeatable model picker requests", () => {
+    const shell = useShellStore.getState();
+    shell.requestModelPicker();
+    shell.requestModelPicker();
+
+    expect(useShellStore.getState().modelPickerRequestRevision).toBe(2);
+    shell.acknowledgeModelPickerRequest(2);
+    expect(useShellStore.getState().modelPickerHandledRevision).toBe(2);
   });
 
   it("updates context visibility without changing the selected tab or palette", () => {

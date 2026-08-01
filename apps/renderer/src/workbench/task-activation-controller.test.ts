@@ -48,6 +48,7 @@ describe("task activation controller", () => {
       title: "Task A",
       sessionPath: "/sessions/a.jsonl",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
     vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({

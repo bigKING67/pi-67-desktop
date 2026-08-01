@@ -33,6 +33,7 @@ describe("renderer workbench persistence boundary", () => {
       title: "Private title",
       recentUserMessagePreview: "Private latest user prompt",
       hasDraft: true,
+      toolMode: "yolo",
       attachmentCount: 2
     });
 
@@ -44,6 +45,7 @@ describe("renderer workbench persistence boundary", () => {
     expect(serialized).not.toContain("private runtime detail");
     expect(serialized).not.toContain("hasDraft");
     expect(serialized).not.toContain("attachmentCount");
+    expect(serialized).not.toContain("yolo");
   });
 
   it("persists recovery metadata for every admitted top-level Session Task", () => {
@@ -65,6 +67,7 @@ describe("renderer workbench persistence boundary", () => {
         runtime: { phase: "busy", detail: "running", recoverable: true },
         title: `Task ${index}`,
         hasDraft: false,
+        toolMode: "auto",
         attachmentCount: 0
       });
     }
@@ -86,6 +89,7 @@ describe("renderer workbench persistence boundary", () => {
       runtime: { phase: "stopped", detail: "stopped", recoverable: true },
       title: "Two",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
     store.setState({ currentWorkspaceId: "workspace-1" });
@@ -108,6 +112,7 @@ describe("renderer workbench persistence boundary", () => {
       runtime: { phase: "busy", detail: "running", recoverable: true },
       title: "One",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
     store.getState().openSettings("runtime");

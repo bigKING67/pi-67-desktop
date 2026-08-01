@@ -46,7 +46,7 @@ describe("Desktop prompt attachment Extension integration", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval,
       promptAttachmentAccess: access
     });

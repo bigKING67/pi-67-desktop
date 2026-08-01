@@ -86,7 +86,8 @@ export function projectionResyncResult(hostEpoch: number, eventSequence: number)
     sessionCatalogStatus: sessionCatalogStatus(),
     eventSequence,
     hostEpoch,
-    sessionGeneration: 1
+    sessionGeneration: 1,
+    taskToolMode: "auto" as const
   };
 }
 

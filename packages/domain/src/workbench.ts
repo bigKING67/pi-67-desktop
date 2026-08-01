@@ -70,6 +70,7 @@ export type SettingsSection =
   | "skills"
   | "prompts"
   | "rules"
+  | "mcp"
   | "integrations"
   | "runtime"
   | "network"

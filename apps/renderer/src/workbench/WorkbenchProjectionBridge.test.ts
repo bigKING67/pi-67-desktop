@@ -20,6 +20,7 @@ describe("WorkbenchProjectionBridge", () => {
       recentUserMessagePreview: "最后一次用户消息",
       sessionPath: "/work/a/session-a.jsonl",
       hasDraft: true,
+      toolMode: "auto",
       attachmentCount: 2
     };
 
@@ -55,6 +56,7 @@ describe("WorkbenchProjectionBridge", () => {
       recentUserMessagePreview: "刚刚接受的用户消息",
       sessionPath: "/work/a/session-a.jsonl",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     };
 
@@ -93,6 +95,7 @@ describe("WorkbenchProjectionBridge", () => {
       runtime: { phase: "ready", detail: "ready", recoverable: true },
       title: "Task B",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     };
 

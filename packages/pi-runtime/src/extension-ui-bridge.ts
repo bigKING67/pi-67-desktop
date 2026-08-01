@@ -8,6 +8,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type {
   ApprovalRequestDetails,
+  ApprovalResponseDecision,
   ExtensionUiCancellationReason,
   ExtensionUiRequestView
 } from "@pi67/domain";
@@ -141,15 +142,46 @@ export class DesktopExtensionUiBridge {
     return true;
   }
 
-  resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean {
+  resolveApproval(
+    requestId: string,
+    toolCallId: string,
+    decision: ApprovalResponseDecision
+  ): boolean {
     const pending = this.pending.get(requestId);
     if (!pending || pending.purpose !== "approval" || pending.toolCallId !== toolCallId) return false;
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
     pending.abort?.();
+    const allowed = decision !== "deny";
     pending.resolve({ status: allowed ? "allowed" : "denied" });
-    this.emit({ type: "approval.resolved", payload: { requestId, toolCallId, allowed } });
+    this.emit({ type: "approval.resolved", payload: { requestId, toolCallId, decision } });
     return true;
+  }
+
+  hasPendingApproval(requestId: string, toolCallId: string): boolean {
+    const pending = this.pending.get(requestId);
+    return pending?.purpose === "approval" && pending.toolCallId === toolCallId;
+  }
+
+  allowAllPendingApprovals(): string[] {
+    const resolved: string[] = [];
+    for (const [requestId, pending] of this.pending) {
+      if (pending.purpose !== "approval") continue;
+      this.pending.delete(requestId);
+      clearTimeout(pending.timer);
+      pending.abort?.();
+      pending.resolve({ status: "allowed" });
+      resolved.push(requestId);
+      this.emit({
+        type: "approval.resolved",
+        payload: {
+          requestId,
+          toolCallId: pending.toolCallId,
+          decision: "enable-task-yolo-and-allow"
+        }
+      });
+    }
+    return resolved;
   }
 
   requestApproval(

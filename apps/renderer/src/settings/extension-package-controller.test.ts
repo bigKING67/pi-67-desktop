@@ -193,6 +193,7 @@ function task(id: string, workspaceId: string, lifecycle: "running") {
     runtime: { phase: "busy" as const, detail: "running", recoverable: true },
     title: id,
     hasDraft: false,
+    toolMode: "auto" as const,
     attachmentCount: 0
   };
 }

@@ -1,4 +1,4 @@
-import type { WorkspaceDescriptor } from "@pi67/domain";
+import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import {
@@ -71,7 +71,7 @@ export async function openRendererWorkspaceDescriptor(
     trust: descriptor.trust,
     trustUpdating: false,
     sessionTransitionPending: true,
-    approvalMode: "guided",
+    approvalMode: DEFAULT_APPROVAL_MODE,
     runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
   });
   let target: RendererSessionTransitionTarget | undefined;
@@ -86,7 +86,7 @@ export async function openRendererWorkspaceDescriptor(
           cwd: workspace,
           sessionPath,
           trust: descriptor.trust,
-          approvalMode: "guided"
+          approvalMode: DEFAULT_APPROVAL_MODE
         },
         [],
         { context: workbenchProtocolContextForTask(task) }
@@ -96,7 +96,7 @@ export async function openRendererWorkspaceDescriptor(
         {
           cwd: workspace,
           trust: descriptor.trust,
-          approvalMode: "guided"
+          approvalMode: DEFAULT_APPROVAL_MODE
         },
         [],
         { context: workbenchProtocolContextForTask(task) }
@@ -193,7 +193,8 @@ function openWorkspaceRuntimeTask(
     title: "未命名会话",
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
-    attachmentCount: 0
+    attachmentCount: 0,
+    toolMode: "auto"
   };
   const opened = workbench.openTask(task);
   if (opened !== "opened" && opened !== "selected") {

@@ -22,6 +22,7 @@ describe("SessionEventProjector", () => {
       pushStream: vi.fn(),
       flushStream: vi.fn(),
       bindToolExecutionStart: vi.fn(() => "generic" as const),
+      getToolAuthorization: vi.fn(),
       completeToolExecution: vi.fn(),
       settleActiveToolExecutions: vi.fn()
     });
@@ -40,7 +41,71 @@ describe("SessionEventProjector", () => {
       { type: "tree.changed", payload: { reason: "session-entry" } }
     ]);
   });
+
+  it("projects a late AUTO reason before clearing it at Tool completion", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "session-event-projector-tool" });
+    const session = { sessionId: manager.getSessionId() } as AgentSession;
+    const activities = vi.fn();
+    const authorization = { mode: "auto", reason: "read-only" } as const;
+    const getToolAuthorization = vi.fn()
+      .mockReturnValueOnce(undefined)
+      .mockReturnValueOnce(authorization);
+    const completeToolExecution = vi.fn();
+    const projector = new SessionEventProjector({
+      getSession: () => session,
+      getStats: () => ({}) as SessionStats,
+      emit: vi.fn(),
+      emitActivity: activities,
+      pushStream: vi.fn(),
+      flushStream: vi.fn(),
+      bindToolExecutionStart: vi.fn(() => "search" as const),
+      getToolAuthorization,
+      completeToolExecution,
+      settleActiveToolExecutions: vi.fn()
+    });
+
+    projector.handle(toolEvent({
+      type: "tool_execution_start",
+      toolCallId: "tool-1",
+      toolName: "grep",
+      args: {}
+    }));
+    projector.recordToolAuthorization("tool-1", authorization);
+    projector.handle(toolEvent({
+      type: "tool_execution_end",
+      toolCallId: "tool-1",
+      toolName: "grep",
+      result: {},
+      isError: false
+    }));
+
+    expect(activities.mock.calls.map(([activity]) => activity)).toEqual([
+      { kind: "tool", toolCallId: "tool-1", toolName: "grep", toolKind: "search", status: "running" },
+      {
+        kind: "tool",
+        toolCallId: "tool-1",
+        toolName: "grep",
+        toolKind: "search",
+        status: "running",
+        authorization
+      },
+      {
+        kind: "tool",
+        toolCallId: "tool-1",
+        toolName: "grep",
+        toolKind: "search",
+        status: "completed",
+        authorization
+      }
+    ]);
+    expect(getToolAuthorization).toHaveBeenCalledTimes(2);
+    expect(completeToolExecution).toHaveBeenCalledWith("tool-1");
+  });
 });
+
+function toolEvent(value: object): AgentSessionEvent {
+  return value as AgentSessionEvent;
+}
 
 function appended(entry: SessionEntry): AgentSessionEvent {
   return { type: "entry_appended", entry };

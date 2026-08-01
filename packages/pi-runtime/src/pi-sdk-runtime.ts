@@ -1,12 +1,13 @@
 import { getAgentDir, SessionManager, VERSION } from "@earendil-works/pi-coding-agent";
 import {
-  type ApprovalMode, type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
+  type ApprovalMode, type ApprovalResolution, type ApprovalResponseDecision,
+  type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
   type ExtensionUiCancellationReason, type ModelSummary, type ResourceSummary,
   type RuntimeCapabilities, type RuntimeIdentity, type RuntimeOperationActivity,
   type SessionCatalogPage, type SessionCatalogQuery, type SessionCatalogStatus,
   type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
   type SessionSnapshot, type SessionTreeProjection,
-  type WorkspaceTrust
+  type WorkspaceTrust, type TaskToolMode
 } from "@pi67/domain";
 import type {
   AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
@@ -25,16 +26,17 @@ import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from ".
 import { RuntimeSessionTransitions } from "./runtime-session-transitions.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { clearSessionQueue } from "./session-queue.js";
-import type { SafetyPolicyState } from "./safety-extension.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import { resolveManagedSessionPath } from "./session-import.js";
-import {
-  projectSessionControls, projectSessionModelCatalog, projectSessionModels, projectSessionResources
-} from "./session-snapshot.js";
+import { projectSessionControls, projectSessionModelCatalog, projectSessionModels, projectSessionResources } from "./session-snapshot.js";
+import { refreshLoadedResourceReadAccess } from "./loaded-resource-read-access.js";
+import { refreshConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import { StreamBatcher } from "./stream-batcher.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 import type { PreparedPromptAttachmentSet, PromptAttachmentAccess } from "./prompt-attachment.js";
 import { RuntimePromptAttachments } from "./runtime-prompt-attachments.js";
+import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js";
+import { ToolAuthorizationTracker } from "./tool-authorization-tracker.js";
 
 export interface PiSdkRuntimeOptions {
   workspaceServices?: PiWorkspaceRuntimeServices;
@@ -53,7 +55,8 @@ export class PiSdkRuntime implements AgentRuntime {
   private runtimeCredentialUnsubscribe: (() => void) | undefined;
   private configurationRuntimeUnsubscribe: (() => void) | undefined;
   private readonly configurationReload: PiRuntimeConfigurationReload;
-  private safety: SafetyPolicyState = { cwd: process.cwd(), trust: "unknown", approvalMode: "guided" };
+  private readonly toolSafety = new RuntimeToolSafetyController();
+  private readonly toolAuthorizations = new ToolAuthorizationTracker();
   private agentDir = getAgentDir();
   private readonly externalSessionChangeGuard = new SessionExternalChangeGuard();
   private readonly streamBatcher: StreamBatcher<StreamDelta>;
@@ -82,6 +85,9 @@ export class PiSdkRuntime implements AgentRuntime {
       getSessionGeneration: () => this.sessionBindings.sessionGeneration,
       emit: (event) => this.emit(event),
       emitActivity: (activity) => this.emitOperationActivity(activity),
+      getToolAuthorization: (toolCallId) => this.toolAuthorizations.get(toolCallId),
+      completeToolAuthorization: (toolCallId) => this.toolAuthorizations.complete(toolCallId),
+      resetToolAuthorizations: () => this.toolAuthorizations.reset(),
       pushStream: (delta) => this.streamBatcher.push(delta),
       flushStream: () => this.streamBatcher.flush()
     });
@@ -91,7 +97,7 @@ export class PiSdkRuntime implements AgentRuntime {
       externalChangeGuard: this.externalSessionChangeGuard,
       getAgentDir: () => this.agentDir,
       getRuntimeCredentialOverrides: () => this.runtimeCredentialOverrides,
-      getSafety: () => this.safety,
+      getSafety: () => this.toolSafety.policy,
       getWorkspaceServices: () => this.workspaceServices,
       getPromptAttachmentAccess: () => this.promptAttachmentAccess,
       projections: this.projections,
@@ -104,7 +110,12 @@ export class PiSdkRuntime implements AgentRuntime {
         await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
       },
       requestApproval: (request, options) => this.uiBridge.requestApproval(request, options),
-      setSessionCwd: (cwd) => { this.safety = { ...this.safety, cwd }; }
+      recordToolAuthorization: (toolCallId, reason) => {
+        this.toolAuthorizations.record(toolCallId, reason);
+        const authorization = this.toolAuthorizations.get(toolCallId);
+        if (authorization) this.projections.recordToolAuthorization(toolCallId, authorization);
+      },
+      setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd)
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,
@@ -114,7 +125,7 @@ export class PiSdkRuntime implements AgentRuntime {
       emit: (event) => this.emit(event),
       getAgentDir: () => this.agentDir,
       getConfiguredSessionDir: () => this.sessionBindings.settingsManager?.getSessionDir(),
-      getWorkspaceCwd: () => this.safety.cwd,
+      getWorkspaceCwd: () => this.toolSafety.policy.cwd,
       getSessionManager: () => this.sessionBindings.session?.sessionManager,
       getSessionMetadata: (manager) => this.projections.getMetadata(manager)
     };
@@ -126,7 +137,7 @@ export class PiSdkRuntime implements AgentRuntime {
         process.env.PI67_STORAGE_ROOT
       );
     this.sessionTransitions = new RuntimeSessionTransitions({
-      getCwd: () => this.safety.cwd,
+      getCwd: () => this.toolSafety.policy.cwd,
       getAgentDir: () => this.agentDir,
       getSessionDirectory: () => this.sessionBindings.requireSession().sessionManager.getSessionDir(),
       getActiveSessionPath: () => this.getIdentity().sessionPath,
@@ -166,7 +177,6 @@ export class PiSdkRuntime implements AgentRuntime {
   subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void {
     this.activityListeners.add(listener); return () => this.activityListeners.delete(listener);
   }
-
   async initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot> {
     return this.sessionBindings.runTransition(async () => {
       this.uiBridge.cancelAll("runtime-dispose");
@@ -181,7 +191,7 @@ export class PiSdkRuntime implements AgentRuntime {
       // target workspace policy before target services or extensions are loaded.
       await this.sessionBindings.disposeRuntime();
       this.agentDir = nextAgentDir;
-      this.safety = { cwd: options.cwd, trust: options.trust, approvalMode: options.approvalMode };
+      this.toolSafety.initialize(options.cwd, options.trust, options.approvalMode);
       this.workspaceServices?.setProjectTrusted(options.trust === "trusted");
       await this.sessionBindings.createInitial(options.cwd, sessionManager);
       await this.configurationReload.apply();
@@ -205,11 +215,14 @@ export class PiSdkRuntime implements AgentRuntime {
     this.activityListeners.clear();
   }
 
-  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): void {
-    this.safety = { ...this.safety, trust, approvalMode };
+  setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
+    const mode = this.toolSafety.setWorkspacePolicy(trust, approvalMode);
     this.workspaceServices?.setProjectTrusted(trust === "trusted");
+    return mode;
   }
 
+  getTaskToolMode(): TaskToolMode { return this.toolSafety.getTaskToolMode(); }
+  setTaskToolMode(mode: TaskToolMode): TaskToolMode { return this.toolSafety.setTaskToolMode(mode); }
   async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
     return this.configurationReload.request(revision);
   }
@@ -240,7 +253,6 @@ export class PiSdkRuntime implements AgentRuntime {
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
     return this.sessionBindings.runTransition(() => this.sessionTransitions.open(path, cwdOverride));
   }
-
   async importSession(path: string): Promise<SessionSnapshot> {
     return this.sessionBindings.runTransition(() => this.sessionTransitions.import(path));
   }
@@ -360,6 +372,12 @@ export class PiSdkRuntime implements AgentRuntime {
       this.projections.resetExtensionAdapters();
       const generationBeforeReload = this.sessionBindings.sessionGeneration;
       await this.sessionBindings.requireSession().reload();
+      if (this.sessionBindings.services) {
+        await Promise.all([
+          refreshLoadedResourceReadAccess(this.sessionBindings.services.resourceLoader),
+          refreshConfiguredCapabilityCatalog(this.sessionBindings.services.resourceLoader)
+        ]);
+      }
       if (this.sessionBindings.sessionGeneration === generationBeforeReload) {
         const extensions = this.sessionBindings.refreshExtensions();
         await this.projections.refreshExtensionAdapters(this.sessionBindings.requireSession(), extensions);
@@ -393,15 +411,19 @@ export class PiSdkRuntime implements AgentRuntime {
   }
 
   getCommands(): SlashCommandCatalogResult { return this.projections.getCommands(); }
-
   getExtensionCatalog(): ExtensionCatalogResult { return this.projections.getCatalog(); }
-
   getWorkspaceChanges() {
     return this.projections.getWorkspaceChanges(this.sessionBindings.requireSession());
   }
 
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean { return this.uiBridge.resolve(requestId, value, cancelled); }
-  resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean { return this.uiBridge.resolveApproval(requestId, toolCallId, allowed); }
+  resolveApproval(
+    requestId: string,
+    toolCallId: string,
+    decision: ApprovalResponseDecision
+  ): ApprovalResolution {
+    return this.toolSafety.resolveApproval(this.uiBridge, requestId, toolCallId, decision);
+  }
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[] { return this.uiBridge.cancelAll(reason); }
 
   async collectDiagnostics(): Promise<RuntimeDiagnostics> {
@@ -418,37 +440,15 @@ export class PiSdkRuntime implements AgentRuntime {
     return report;
   }
 
-  getSnapshot(): SessionSnapshot {
-    return this.projections.getSnapshot(
-      this.sessionBindings.requireSession(),
-      this.sessionBindings.services,
-      this.sessionBindings.extensions
-    );
-  }
-
-  getModels(): ModelSummary[] {
-    return projectSessionModels(this.sessionBindings.requireSession());
-  }
-
-  getResources(): ResourceSummary[] {
-    return projectSessionResources(
-      this.sessionBindings.services,
-      this.sessionBindings.extensions
-    );
-  }
-
-  getIdentity(): RuntimeIdentity {
-    return projectRuntimeIdentity(this.sessionBindings.runtime, this.sessionBindings.sessionGeneration);
-  }
-
-  flushStream(): void {
-    this.streamBatcher.flush();
-  }
+  getSnapshot(): SessionSnapshot { return this.projections.getSnapshot(this.sessionBindings.requireSession(), this.sessionBindings.services, this.sessionBindings.extensions); }
+  getModels(): ModelSummary[] { return projectSessionModels(this.sessionBindings.requireSession()); }
+  getResources(): ResourceSummary[] { return projectSessionResources(this.sessionBindings.services, this.sessionBindings.extensions); }
+  getIdentity(): RuntimeIdentity { return projectRuntimeIdentity(this.sessionBindings.runtime, this.sessionBindings.sessionGeneration); }
+  flushStream(): void { this.streamBatcher.flush(); }
 
   private assertSessionWritable(): Promise<void> {
     return this.externalSessionChangeGuard.assertUnchanged(this.sessionBindings.session);
   }
-
   private emit(event: AgentEvent): void {
     this.listeners.forEach((listener) => listener(event));
   }

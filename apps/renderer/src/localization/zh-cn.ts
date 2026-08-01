@@ -51,9 +51,13 @@ export const zhCNMessages = {
         label: "规则与上下文",
         summary: "查看全局与项目 AGENTS.md、CLAUDE.md 以及桌面托管规则。"
       },
+      mcp: {
+        label: "MCP 服务",
+        summary: "管理外部 MCP 服务的连接端点、认证凭据与本机配置状态。"
+      },
       integrations: {
-        label: "集成",
-        summary: "准备并诊断 browser67 等具有独立运行依赖的集成。"
+        label: "浏览器集成",
+        summary: "准备并诊断 browser67 的依赖、扩展和真实受管浏览器连接。"
       },
       runtime: {
         label: "运行服务",
@@ -278,11 +282,12 @@ export const zhCNMessages = {
     title: "需要单次授权",
     suspiciousTitle: "检测到危险或不可见字符",
     suspiciousDescription: (count: number) => (
-      `工具名称、目标或工作目录中有 ${count} 个可疑字符。相关内容已改用安全转义视图；实际请求不会被改写。`
+      `工具名称、来源、目标或工作目录中有 ${count} 个可疑字符。相关内容已改用安全转义视图；实际请求不会被改写。`
     ),
     suspiciousTypes: (labels: string) => `类型：${labels}`,
     tool: "工具",
     toolName: "工具名称",
+    toolSource: "工具来源",
     risk: "风险",
     command: "命令",
     path: "路径",
@@ -293,9 +298,11 @@ export const zhCNMessages = {
     approvalScope: "授权范围",
     singleToolCall: "仅此 Tool Call",
     denialNotice: "拒绝或关闭当前会话会阻止这次工具调用，不会自动允许后续同类操作。",
+    yoloNotice: "本任务开启 YOLO 后，已等待和后续产生的工具会自动执行；任务停止或应用重启后恢复 AUTO。",
     submitting: "正在提交…",
     deny: "拒绝",
     allowOnce: "仅允许本次",
+    enableTaskYolo: "本任务开启 YOLO",
     requestTimeoutTitle: "工具授权请求已超时",
     requestTimeoutMessage: "未收到有效响应，工具保持阻止。",
     responseTimeout: {
@@ -311,7 +318,10 @@ export const zhCNMessages = {
     suspiciousLiteral: (count: number) => `安全转义视图 · ${count} 个可疑字符`,
     risks: {
       "workspace-read": "读取工作区",
+      "resource-read": "读取当前会话已加载的 Pi 资源",
       "workspace-write": "修改工作区",
+      "workspace-command": "执行工作区内的非破坏性命令",
+      "capability-read": "检查当前会话已加载的工具能力",
       "external-path": "访问工作区之外的路径",
       "bulk-delete": "批量删除",
       "destructive-shell": "破坏性 Shell 命令",
@@ -321,6 +331,12 @@ export const zhCNMessages = {
       "download-and-execute": "下载并执行",
       "network-read": "读取外部网络信息",
       "network-side-effect": "产生网络副作用",
+      "configured-operation": "执行当前任务已配置的工具能力",
+      "persistent-state-write": "新增或更新持久化状态",
+      "persistent-state-delete": "删除持久化状态",
+      "external-submit": "向外部目标提交内容或操作",
+      "credential-or-auth": "使用或修改凭据与授权状态",
+      "unverified-tool": "工具来源或参数契约尚未验证",
       "ambiguous-command": "无法安全分类"
     },
     securityCategories: {

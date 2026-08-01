@@ -78,7 +78,7 @@ test("keeps the title controls limited to configured models and readable thinkin
   const modelList = page.getByRole("listbox");
   await expect(modelList.getByRole("option")).toHaveCount(2);
   await expect(modelList.getByRole("option", { name: /Claude Test/u })).toHaveCount(0);
-  await expect(modelList.getByRole("option", { name: /GPT Test/u })).toContainText("openai · openai/gpt-test");
+  await expect(modelList.getByRole("option", { name: /GPT Test/u })).toContainText("openai/gpt-test");
   const thinkingSelect = page.getByLabel("Pi 思考级别");
   await expect(thinkingSelect.locator('option[value="off"]')).toHaveText("思考：关闭");
   await expect(thinkingSelect.locator('option[value="medium"]')).toHaveText("思考：中");

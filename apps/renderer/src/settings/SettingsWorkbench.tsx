@@ -245,7 +245,8 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
   if (section === "rules") return <RuleSettingsWorkspace />;
-  if (section === "integrations") return <IntegrationSettings />;
+  if (section === "mcp") return <TeamMcpPanel />;
+  if (section === "integrations") return <Browser67IntegrationPanel />;
   if (section === "runtime") return <RuntimeSettings />;
   if (section === "network") return <PackageNetworkPanel />;
   if (section === "updates") return <UpdateSettings />;
@@ -320,15 +321,6 @@ function PromptSettings() {
       description="这些 Markdown 模板通过 /name 调用；它们与持续生效的 AGENTS.md 规则不是同一类资源。"
       empty="当前作用域没有加载可显示的指令模板。"
     />
-  );
-}
-
-function IntegrationSettings() {
-  return (
-    <>
-      <TeamMcpPanel />
-      <Browser67IntegrationPanel />
-    </>
   );
 }
 

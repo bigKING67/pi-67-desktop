@@ -22,7 +22,15 @@ export const OperationActivitySchema = Type.Union([
     status: Type.Union([
       Type.Literal("running"), Type.Literal("completed"), Type.Literal("failed")
     ]),
-    aliasTarget: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
+    aliasTarget: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+    authorization: Type.Optional(strictObject({
+      mode: Type.Literal("auto"),
+      reason: Type.Union([
+        Type.Literal("configured-source"),
+        Type.Literal("read-only"),
+        Type.Literal("workspace-write")
+      ])
+    }))
   }),
   strictObject({ kind: Type.Literal("approval"), requestId: Type.String() }),
   strictObject({ kind: Type.Literal("extension-input"), requestId: Type.String() }),

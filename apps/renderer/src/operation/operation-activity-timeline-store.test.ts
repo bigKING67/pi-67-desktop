@@ -123,6 +123,63 @@ describe("operation activity timeline", () => {
     expect(afterClear).toBe(timeline);
   });
 
+  it("projects only the bounded Runtime-authored AUTO reason into Tool detail", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto",
+      toolName: "read",
+      toolKind: "read",
+      status: "running",
+      authorization: { mode: "auto", reason: "read-only" }
+    }, 20);
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto",
+      toolName: "read",
+      toolKind: "read",
+      status: "completed",
+      authorization: { mode: "auto", reason: "read-only" }
+    }, 30);
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      activity: {
+        authorization: { mode: "auto", reason: "read-only" }
+      },
+      detail: "AUTO · 只读 · 执行成功",
+      status: "completed"
+    });
+  });
+
+  it("adds a late AUTO reason to the running Tool without creating a duplicate step", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-late",
+      toolName: "read",
+      toolKind: "read",
+      status: "running"
+    }, 20);
+    const beforeAuthorization = timeline;
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-late",
+      toolName: "read",
+      toolKind: "read",
+      status: "running",
+      authorization: { mode: "auto", reason: "read-only" }
+    }, 30);
+
+    expect(timeline.steps).toHaveLength(beforeAuthorization.steps.length);
+    expect(timeline.nextStepSequence).toBe(beforeAuthorization.nextStepSequence);
+    expect(timeline.steps.at(-1)).toMatchObject({
+      startedAt: 20,
+      status: "running",
+      detail: "AUTO · 只读 · 执行中",
+      activity: { authorization: { mode: "auto", reason: "read-only" } }
+    });
+  });
+
   it("matches only the current operation authority", () => {
     const current = operation();
     const timeline = createOperationActivityTimeline(current);

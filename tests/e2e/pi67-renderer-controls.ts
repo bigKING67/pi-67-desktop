@@ -171,12 +171,15 @@ export async function emitMockAgentEvent(
   event: unknown,
   options: MockEventOptions = {}
 ): Promise<void> {
-  await page.evaluate(({ agentEvent, eventOptions }) => {
+  await page.evaluate(async ({ agentEvent, eventOptions }) => {
     const state = (window as unknown as {
       __pi67TestAgent: {
         emit(event: { type: string; payload: unknown }, options: MockEventOptions): void;
       };
     }).__pi67TestAgent;
     state.emit(agentEvent as { type: string; payload: unknown }, eventOptions);
+    // MessagePort delivery is asynchronous; wait through one paint so callers
+    // can safely emit authority-dependent events in sequence.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   }, { agentEvent: event, eventOptions: options });
 }

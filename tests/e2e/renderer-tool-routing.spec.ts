@@ -50,6 +50,50 @@ test("shows a Claude-style Bash alias as failed and keeps the exact-tool recover
   await expect(page.getByText("Tool execution failed.", { exact: true })).toHaveCount(0);
 });
 
+test("collapses a recovered Tool failure after a final answer", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [
+    {
+      id: "user-recovered-tool",
+      role: "user",
+      parts: [{ type: "text", text: "查找资料后回答" }]
+    },
+    {
+      id: "assistant-recovered-tool-call",
+      role: "assistant",
+      parts: [{
+        type: "tool-call",
+        id: "recovered-tool-call",
+        name: "get_search_content",
+        status: "failed"
+      }]
+    },
+    {
+      id: "recovered-tool-call",
+      role: "tool",
+      toolName: "get_search_content",
+      error: "Stored result was unavailable.",
+      parts: [{ type: "text", text: "结果引用已过期。" }]
+    },
+    {
+      id: "assistant-recovered-final",
+      role: "assistant",
+      parts: [{ type: "text", text: "已通过其他只读来源完成回答。" }]
+    }
+  ]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const process = page.getByTestId("transcript-process-group");
+  await expect(process).toBeVisible();
+  await expect(process).toContainText("执行过程有失败");
+  await expect(process).not.toHaveAttribute("open", "");
+  await expect(page.getByText("已通过其他只读来源完成回答。", { exact: true })).toBeVisible();
+  await expect(page.getByText("结果引用已过期。", { exact: true })).not.toBeVisible();
+
+  await process.locator(":scope > summary").click();
+  await expect(page.getByText("结果引用已过期。", { exact: true })).toBeVisible();
+});
+
 test("does not render an empty reasoning disclosure when the provider exposes only a signature", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page, [{
@@ -230,4 +274,99 @@ test("expands the current execution process and collapses it when the operation 
   await expect(process).not.toHaveAttribute("open", "");
   await expect(process).toContainText("执行过程");
   await expect(page.getByText("export const ready = true;", { exact: true })).not.toBeVisible();
+});
+
+test("shows Runtime-authored AUTO reasons while running and preserves them after collapse", async ({ page }) => {
+  const operationId = "operation-auto-reasons";
+  await page.setViewportSize({ width: 720, height: 760 });
+  await page.goto("/");
+  await attachMockAgent(page, [
+    {
+      id: "user-auto-reasons",
+      role: "user",
+      parts: [{ type: "text", text: "检查配置、源码和写入路径" }]
+    },
+    {
+      id: "assistant-auto-reasons",
+      role: "assistant",
+      parts: [
+        { type: "thinking", text: "先读取配置，再执行 Workspace 内写入。" },
+        { type: "text", text: "检查完成。" }
+      ]
+    }
+  ]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const process = page.getByTestId("transcript-process-group");
+  await expect(process).not.toHaveAttribute("open", "");
+  await emitMockAgentEvent(page, {
+    type: "operation.started",
+    payload: {
+      operation: {
+        operationId,
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-test",
+        sessionGeneration: 1,
+        startedAt: Date.now()
+      }
+    }
+  }, { operationId });
+
+  const activities = [
+    {
+      toolCallId: "configured-tool",
+      toolName: "subagent",
+      toolKind: "subagent",
+      authorization: { mode: "auto", reason: "configured-source" }
+    },
+    {
+      toolCallId: "read-tool",
+      toolName: "read",
+      toolKind: "read",
+      authorization: { mode: "auto", reason: "read-only" }
+    },
+    {
+      toolCallId: "write-tool",
+      toolName: "edit",
+      toolKind: "edit",
+      authorization: { mode: "auto", reason: "workspace-write" }
+    }
+  ] as const;
+  for (const activity of activities) {
+    await emitMockAgentEvent(page, {
+      type: "operation.activityChanged",
+      payload: {
+        operationId,
+        activity: { kind: "tool", status: "running", ...activity }
+      }
+    }, { operationId });
+  }
+
+  const autoReasons = process.locator('[data-tool-authorization="auto"]');
+  await expect(process).toHaveAttribute("open", "");
+  await expect(autoReasons).toHaveCount(3);
+  await expect(process.getByText("AUTO · 已配置来源", { exact: true })).toBeVisible();
+  await expect(process.getByText("AUTO · 只读", { exact: true })).toBeVisible();
+  await expect(process.getByText("AUTO · Workspace 内写入", { exact: true })).toBeVisible();
+
+  await emitMockAgentEvent(page, {
+    type: "operation.activityChanged",
+    payload: { operationId, activity: { kind: "approval", requestId: "dangerous-operation" } }
+  }, { operationId });
+  await expect(process.getByText("等待你确认后继续执行。", { exact: true })).toBeVisible();
+  await expect(autoReasons).toHaveCount(3);
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  ))).toBe(true);
+
+  await emitMockAgentEvent(page, {
+    type: "operation.completed",
+    payload: { operationId, completedAt: Date.now() }
+  }, { operationId });
+  await expect(process).not.toHaveAttribute("open", "");
+  await process.locator(":scope > summary").click();
+  await expect(autoReasons).toHaveCount(3);
+  await expect(process.getByText("AUTO · Workspace 内写入", { exact: true })).toBeVisible();
 });

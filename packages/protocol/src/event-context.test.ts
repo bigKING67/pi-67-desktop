@@ -61,7 +61,8 @@ describe("event context validation", () => {
   it("cross-checks bootstrap, payload Session identity and Operation identity", () => {
     const ready = eventEnvelope("runtime.ready", {
       capabilities: runtimeCapabilities(),
-      snapshot: emptySnapshot()
+      snapshot: emptySnapshot(),
+      taskToolMode: "auto"
     }, sessionContext());
     expect(isEventEnvelope(ready)).toBe(true);
     expect(isEventEnvelope({
@@ -204,6 +205,7 @@ function approvalPayload() {
     operationId: "operation-1",
     toolCallId: "tool-1",
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "destructive-shell" as const,
     reason: "Shell commands require confirmation.",
     targetKind: "command" as const,

@@ -55,8 +55,9 @@ count.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
 7. Open the singleton Settings surface for account, application, global, or
    current-workspace Pi configuration without losing drafts or background work.
-8. Install and operate Pi Extensions, Skills, Prompts, Rules, and supported
-   integrations without requiring a system Node, npm, Git, pnpm, or Pi CLI.
+8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
+   external MCP services; and prepare supported browser integrations without
+   requiring a system Node, npm, Git, pnpm, or Pi CLI.
 
 ## Success criteria
 
@@ -132,6 +133,10 @@ count.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
+- MCP credentials and browser capability readiness are independent Settings tasks.
+  `MCP 服务` owns external service endpoints, local credential configuration, and
+  connection identity; `浏览器集成` owns browser-specific dependency preparation
+  and runtime diagnostics. They never share one mixed Settings document.
 - Bundled browser67 source and Skills do not imply live browser readiness. Settings
   distinguishes bundled source, dependency preparation, deterministic Doctor,
   and real managed-browser readiness instead of collapsing them into one state.
@@ -159,12 +164,99 @@ count.
   exposes a deliberate stop action; ordinary history remains discoverable from
   the rebuildable Session Catalog and no UI action deletes Pi JSONL in v1.
 - A workspace added through the native directory picker is trusted for project
-  resource loading. That trust never replaces one-shot approval for destructive,
-  system, workspace-external, or external side-effect Tool actions. Verified
-  read-only `web_search` and HTTP(S) `fetch_content` calls from the explicitly
-  enabled `pi-web-access` Package are the narrow exception: they run without a
-  per-call dialog, while malformed inputs, local-file fetches, unknown aliases,
-  and same-name Tools from any other source remain fail-closed.
+  resource loading. Project trust and the current Task Runtime's Tool execution
+  mode remain distinct: trust is a prerequisite for `YOLO`, not an implicit
+  request to enable it.
+- Every Task Runtime created through the current Desktop default starts in
+  `AUTO`; an explicit legacy `guided` initialization maps to `ASK` rather than
+  silently broadening its former policy. The mode is memory-only, belongs to
+  that exact Task Runtime, is not written to Workbench state, Pi settings, or
+  Session JSONL, and resets to the current default after Task stop, Runtime
+  disposal, application restart, or Workspace trust revocation. Switching Tasks
+  shows each live Runtime's independent mode.
+- `ASK` automatically permits canonical Workspace reads, current-Session loaded
+  resource reads, capability inspection, and verified read-only web operations;
+  configured operations, persistent writes, Workspace writes and commands, and
+  higher-risk effects request a one-shot decision. `AUTO` additionally permits
+  canonical Workspace writes, bounded local inspection/test/build commands,
+  ordinary operations from the Task's effective configured Package or MCP
+  sources, and non-destructive persistent-state writes. `YOLO` permits every
+  registered Tool in that trusted Task Runtime, including workspace-external,
+  destructive, system, and network-side-effect calls.
+- AUTO trusts an effective configured source, not an arbitrary registered Tool
+  name. At Session resource load, Desktop builds a bounded in-memory capability
+  catalog from the effective Task-local Package settings plus that Task's valid
+  `mcp.json` and `mcp-cache.json`. The catalog retains only Package/server/Tool
+  identity, MCP transport, direct-Tool mapping, and schema digest; it excludes
+  command, args, environment, URL, credential, Tool input, and Tool result data.
+  Resource reload atomically rebuilds the catalog, while the Tool Call hot path
+  performs only in-memory lookups. Duplicate Package, server, nested Tool, or
+  Direct Tool identities remain fail-closed.
+- Bounded Workspace reads and writes, conservatively classified local
+  inspection/test/build commands, and exact read access to the Skills, Prompt
+  files, context files, and visible Extension files already loaded by that
+  Session may run according to the selected mode without duplicate dialogs.
+  Loaded Skill directories grant only read/search/list access within the
+  canonical directory; other loaded resources grant only exact-file read/search,
+  never write or symlink escape. Verified `pi-web-access` read-only calls cover
+  `web_search`, `source_check`, HTTP(S) `fetch_content`, and bounded
+  `get_search_content` retrieval from the current in-memory result store; these
+  are the network/read-capability exception. When a verified search, source
+  check, or fetch successfully stores a result, Desktop exposes the Package's
+  existing bounded result reference to the model so a following
+  `get_search_content` call can address it. This projection neither performs a
+  second network request nor broadens Tool authority. External paths,
+  persistent-state deletion, upload or external submit, authentication or
+  credential actions, dependency changes, destructive commands, publishing,
+  remote Git, system changes, and external writes retain one-shot approval in
+  AUTO. Calls that approval cannot make valid -- including unregistered or
+  ambiguous Tools, reserved Tool identity mismatches, malformed MCP routing, and
+  unverifiable opaque cursors -- are rejected with a corrective message and no
+  approval dialog. Verified
+  `@ff-labs/pi-fff@0.10.1` `grep`/`find` and `ffgrep`/`fffind` calls inherit this
+  path policy only when their Package identity and input contract are exact:
+  when pi-fff runs in `override` mode, `grep` and `find` are the FFF-backed live
+  names rather than native fallbacks, and Desktop tells the model to use and
+  describe those exact names accordingly. In the default named mode the live
+  names remain `ffgrep` and `fffind`.
+  Workspace-local roots run normally, workspace-external and symlink-escaped
+  roots expose the canonical path for one-shot approval, and opaque pagination
+  cursors fail closed outside `YOLO` because their original root cannot be
+  proven.
+- While the verified managed `pi67-core` Package is active, the Task-local Pi
+  settings view force-excludes the four legacy auto-discovered copies under
+  `~/.pi/agent/extensions` (`pi-hy-memory`, `pi-rules-loader`,
+  `pi-vision-bridge`, and `xtalpi-pi-tools`). The legacy files and user settings
+  are not deleted or rewritten; the managed Package becomes the single runtime
+  source. If managed `pi67-core` is absent, Desktop applies no exclusion. This
+  prevents duplicate Tool registrations, duplicate rule notifications, and
+  duplicate-source ambiguity without taking ownership of unrelated user
+  Extensions. Individual Tool capabilities still follow their own Safety
+  Profile; deduplication does not grant authority by itself.
+- Verified `pi-mcp-adapter@2.10.0` and `2.11.0` metadata operations remain a
+  read-only capability: status, cached server Tool lists, bounded
+  search/describe, and current-Session UI-message inspection run in `ASK` and
+  `AUTO`. In AUTO, connecting a server already present in effective `mcp.json`
+  and invoking a nested Tool present in the effective cache follow that Tool's
+  actual side-effect classification; ASK still requests a one-shot decision for
+  connect and configured operations. Adding a server, OAuth/authentication,
+  credential changes, or permission expansion remains a confirmation boundary.
+  An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
+  unsupported Package identity, or duplicate `mcp` source is rejected without a
+  meaningless approval. A proxy call
+  that mistakenly addresses the current verified direct `pi-fff` Tool is not an
+  authorization decision: Desktop rejects it without opening Approval and tells
+  the model to use the active direct name (`find`/`grep` in override mode or
+  `fffind`/`ffgrep` in named mode). The corrected Workspace-local read then follows
+  the normal `ASK`/`AUTO` path policy.
+- Configured Memory reads and search/list/recall operations are read-only;
+  remember/add/learn/propose/flush are non-destructive persistent writes and run
+  in AUTO; forget/delete/purge remain one-shot decisions. Configured browser
+  passive inspection, extraction, wait, screenshot, and download operations run
+  in AUTO subject to canonical path checks, while JavaScript execution, native
+  input, clipboard mutation, upload, and authentication remain higher-risk.
+  Task-scoped JS-Reverse instrumentation, including hook removal and finalization,
+  is a configured operation rather than persistent user-data deletion.
 - Restored Workspace registrations are checked against their persisted filesystem
   identity before project resources load. A missing or replaced directory stays
   inactive until the user explicitly repairs it through the native directory
@@ -228,9 +320,18 @@ count.
   submitted it. Transport failure, Host replacement, or a concurrent Session
   switch preserves the draft and rotates the retry submission identity.
 - The Composer exposes one `+` attachment action and one in-editor `/` catalog.
-  The catalog presents Pi-resolved Extension commands, Prompt Templates, and
-  Skills such as `/plan` and `/skill:design-craft`; selection inserts the command
-  into the draft and never bypasses normal send, queue, or IME behavior.
+  The catalog presents four explicit groups: `Pi 内置`, `扩展命令`, `提示词`, and
+  `技能`. The first Desktop-native set is `/new`, `/model`, `/compact`, `/resume`,
+  `/tree`, `/reload`, and `/settings`; these call existing Renderer/Workbench
+  Controllers rather than Runtime `command.invoke`. Pi-resolved Extension
+  commands, Prompt Templates, and Skills such as `/plan` and
+  `/skill:design-craft` retain their current Runtime or Prompt paths. Click and
+  Tab insert, Arrow keys only move selection, and an exact command plus Enter
+  executes it; a partial token plus Enter completes it. IME confirmation does
+  neither. Unsupported known Pi TUI builtins stay visible as an inline Desktop
+  compatibility error and are never sent to the model, while an unreserved
+  unknown `/name` remains an ordinary Prompt for compatibility. Runtime catalog
+  loading or failure never removes the Desktop-native group.
 - A draft supports at most 20 local attachments, 100 MiB per file, and 250 MiB
   total. Pathless clipboard files have a stricter 16 MiB boundary. Main stages
   regular files into a private disposable root and sends only opaque references
@@ -319,7 +420,26 @@ count.
   workspace diff, and it never invents a historical diff for write results.
 - Safety approval is a dedicated, fail-closed single-Tool-Call flow bound to
   Host epoch, session generation, operation, request, and Pi `toolCallId`;
-  ordinary Extension confirmation cannot impersonate it.
+  ordinary Extension confirmation cannot impersonate it. Skill selection and
+  model routing do not create a separate authorization step: each actual Tool
+  Call is classified at execution time against the current trusted Workspace,
+  active Session resources, verified Tool identity, and requested side effect.
+  An authoritative Operation terminal invalidates any still-rendered interactive
+  request for that exact Operation without granting or retrying the Tool.
+- An automatically admitted Tool exposes one bounded Host/Runtime-authored reason
+  in its execution row: `AUTO · 已配置来源`, `AUTO · 只读`, or
+  `AUTO · Workspace 内写入`. Renderer code never infers this reason and Pi JSONL
+  is not rewritten to persist it; raw Tool args, results, prompts, source paths,
+  URLs, and credentials never enter this projection.
+- The approval dialog names the verified Tool source and offers `拒绝`,
+  `仅允许本次`, and `本任务开启 YOLO`. The third action atomically allows the
+  current and other pending Safety Approval requests in the same Runtime, but it
+  never resolves ordinary Extension `ctx.ui` requests. Composer-initiated YOLO
+  selection requires a second confirmation in the same upward menu.
+- Tool mode never weakens Workspace trust, Extension UI separation, operating
+  system permissions, Electron sandbox and preload boundaries, credential
+  isolation, update/signing rules, or any capability outside the current Pi
+  Task Runtime.
 
 ## Accessibility and localization
 

@@ -187,6 +187,7 @@ function task(id: string, sessionPath: string) {
     title: id,
     sessionPath,
     hasDraft: false,
+    toolMode: "auto" as const,
     attachmentCount: 0
   };
 }

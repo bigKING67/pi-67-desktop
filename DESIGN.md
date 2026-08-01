@@ -1,5 +1,5 @@
 ---
-version: 4
+version: 5
 name: π Desktop Design Authority
 status: active
 platform: electron-web
@@ -286,6 +286,12 @@ loading error where the operation can produce those states
   process data. The final Assistant answer remains an ordinary editorial Markdown
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
+- An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
+  `AUTO · 已配置来源`, `AUTO · 只读`, or `AUTO · Workspace 内写入`. The reason
+  is a fixed enum projected by Host/Runtime authority, stays on the same unwrapped
+  header line without becoming a badge, and remains visible when a completed
+  process is reopened. It never competes with the Tool name, compact summary, or
+  terminal status, and Renderer does not derive it from Tool names or arguments.
 - A raw Tool Result uses an inset log surface rather than Assistant prose: the Tool
   identity and terminal state remain visible, text uses a whitespace-preserving
   monospace viewport with independent horizontal and vertical overflow, long output
@@ -438,10 +444,11 @@ loading error where the operation can produce those states
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
 - Settings owns `账户`, `通用`, `模型服务`, `扩展`, `技能`,
-  `指令模板`, `规则与上下文`, `集成`, `运行服务`, `下载源与网络`,
-  `更新与诊断`, and `关于`. Account,
-  General, managed Rules, Integrations, Download Sources/Network, Updates, and
-  About are global-only and do not show a meaningless scope control. Model
+  `指令模板`, `规则与上下文`, `MCP 服务`, `浏览器集成`, `运行服务`,
+  `下载源与网络`, `更新与诊断`, and `关于`. Account,
+  General, managed Rules, MCP Services, Browser Integration, Download
+  Sources/Network, Updates, and About are global-only and do not show a
+  meaningless scope control. Model
   services, the Extension workspace, Prompt Templates, Context Files, and Runtime
   support explicit global or current-Workspace project scope where Pi has that
   concept. Skills own source tabs instead of repeating the page-level scope switch.
@@ -622,11 +629,17 @@ loading error where the operation can produce those states
   than a card marketplace. It shows the private Node/npm/Git versions, source mode,
   ordered mirror and official candidates, not-checked/reachable/unreachable state,
   latency, resolved Git revision when available, and explicit save/probe errors.
-- Integrations do not equate copied source with readiness. browser67 separately
-  reports `Bundled`, `Dependencies not prepared/Prepared`, and Doctor state. Setup
-  is an explicit one-shot network action through the Desktop private toolchain;
-  deterministic dependency and entrypoint checks may report Degraded until a real
-  browser extension and managed-browser connection are independently proven.
+- `MCP 服务` and `浏览器集成` are separate first-level Settings categories rather
+  than tabs or vertically stacked sections in one generic Integration document.
+  The MCP page owns external service endpoints, local credential configuration,
+  and connection identity. Its current single `Tavily Bridge` service remains a
+  flat Settings section until another independently manageable MCP service exists.
+- Browser integrations do not equate copied source with readiness. browser67
+  separately reports `Bundled`, `Dependencies not prepared/Prepared`, and Doctor
+  state. Setup is an explicit one-shot network action through the Desktop private
+  toolchain; deterministic dependency and entrypoint checks may report Degraded
+  until a real browser extension and managed-browser connection are independently
+  proven.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
   removes the task-only Inspector surface and its focus targets from the DOM.
   Returning to a Task restores only that Task's Inspector projection.
@@ -856,14 +869,38 @@ loading error where the operation can produce those states
 - The leftmost Composer utility action is a plain `+` with an accessible
   `添加附件` name. It opens the native file picker and is the only toolbar entry
   for file attachment; it is not styled or labeled as a gallery action.
+- Immediately after `+`, the Composer shows one compact `ASK` / `AUTO` / `YOLO`
+  Tool-mode control for the selected Task Runtime. Its menu opens upward, keeps
+  all three options and their short consequences visible, uses neutral styling
+  for `ASK`, restrained accent for `AUTO`, and semantic warning styling rather
+  than destructive red for `YOLO`. It remains usable during a running Operation
+  so the user can correct later Tool decisions without stopping the Turn.
+- `ASK` and `AUTO` switch directly after an authoritative Host acknowledgement;
+  the resting control never changes optimistically. Selecting `YOLO` replaces
+  the same menu content with a second confirmation naming workspace-external,
+  deletion, system, and network scope. An untrusted Workspace disables that
+  option with `仅可信工作区可开启` instead of waiting for a Host error.
+- Tool mode belongs to the exact live Task Runtime. Switching conversations
+  displays that Task's independent value; session transition or missing Session
+  authority disables the control. Workbench persistence and recovered Task
+  placeholders always omit the value and return to `AUTO` under the current
+  Desktop default.
 - Typing `/` as the draft's first token opens a bounded, keyboard-operated
-  catalog above the Composer. Pi-resolved Extension commands, Prompt Templates,
-  and Skills retain distinct source labels; `/plan` and `/skill:<name>` are normal
-  examples rather than hard-coded exceptions. Arrow keys move the active row,
-  Enter or Tab inserts it into the textarea, Escape dismisses it, and IME
-  confirmation never selects or sends. Selection does not execute a command;
-  Extension commands execute only through the normal send action, while Prompt
-  Templates and Skills remain Pi prompt input.
+  catalog above the Composer. It always groups `Pi 内置`, `扩展命令`, `提示词`,
+  and `技能` in that order. Runtime loading, failure, or disconnection is a quiet
+  status below available Desktop actions rather than a replacement for the list.
+  `/new`, `/model`, `/compact`, `/resume`, `/tree`, `/reload`, and `/settings`
+  are Renderer-owned actions using the same feature Controllers as the rest of
+  Desktop; they never become `command.invoke` calls or model Prompts. Pi-resolved
+  Extension commands, Prompt Templates, and Skills retain distinct source labels;
+  `/plan` and `/skill:<name>` remain normal Runtime entries rather than hard-coded
+  exceptions. Arrow keys move the active row without mutating the textarea. Click
+  and Tab insert. Enter executes an exact command, but completes a partial token;
+  Escape dismisses, and IME confirmation never selects, executes, or sends.
+  Unsupported known Pi TUI builtins produce an inline compatibility error and
+  never reach the model; unreserved unknown Slash text remains a normal Prompt.
+  A successful Desktop action clears only its command text from the originating
+  Task draft and preserves attachments. A blocked or failed action preserves both.
 - Attachments are named, previewed, and removable before sending. The same
   validation and staging lifecycle owns file-picker, clipboard paste, and
   drag/drop input; duplicate file projections are rejected instead of mounting
@@ -957,7 +994,7 @@ loading error where the operation can produce those states
   change the active option without preventing the user from continuing to type.
 - IME candidate confirmation follows the same `isComposing` and legacy
   `keyCode 229` boundary as Composer and never executes the active result.
-- Session, Extension, compaction, and resource actions reflect the Agent Host
+- Session, Extension, Pi Desktop, compaction, and resource actions reflect the Agent Host
   scheduler before execution. A running Operation, Session transition, missing
   Session authority, or disconnected Host produces an explicit disabled reason
   instead of closing the Palette and relying on a later `BUSY` error.
@@ -967,6 +1004,10 @@ loading error where the operation can produce those states
 - Extension command identities are bounded and unique before they become action
   IDs. Search projects at most 60 result options, reports real match truncation,
   and keeps recent actions only in process memory.
+- The Command Palette and Composer consume the same Pi Desktop action registry.
+  Runtime commands with a Pi builtin name are excluded so a Package cannot shadow
+  the native action. `/model` returns to the Workbench and opens the real model
+  popover; `/resume` opens navigation and focuses Session Catalog search.
 
 ### Extension UI and approval
 
@@ -975,17 +1016,31 @@ loading error where the operation can produce those states
   shared `ctx.ui` primitives, so those dialogs use the truthful generic label
   `Pi extension` instead of guessing a package.
 - Safety Approval is a dedicated dialog and protocol, not an Extension `confirm`.
-  It names the exact command/path, cwd, risk category, one-Tool-Call scope, reason,
-  and denial behavior without rendering the target as Markdown or HTML.
-- Verified `pi-web-access` `web_search` and HTTP(S) `fetch_content` calls are
-  classified as read-only web capabilities. In a trusted Workspace they run
-  without a per-call approval dialog because enabling the Package is the user's
-  durable capability choice; their exact Tool identity and query or URL remain
-  visible in the execution process. `WebSearch`, `WebFetch`, and the model-common
-  lowercase `web_fetch` are deterministic Desktop aliases of those exact native
-  Tools. Malformed input, local-file fetches, unknown aliases, and same-name Tools
-  from other Packages stay fail-closed as ambiguous. Network writes, uploads,
-  command execution, and other external side effects retain one-shot approval.
+  It names the exact Tool and verified source, command/path, cwd, risk category,
+  one-Tool-Call scope, reason, and denial behavior without rendering the target
+  as Markdown or HTML. Approval is shown only for a valid call whose classified
+  side effect requires a decision. Unregistered, ambiguous, reserved-identity
+  mismatch, malformed MCP routing, and other calls that authorization cannot
+  repair are blocked with inline correction instead of opening a dialog.
+- Verified `pi-web-access` `web_search`, `source_check`, HTTP(S)
+  `fetch_content`, and bounded `get_search_content` calls are classified as
+  read-only web capabilities. In a trusted Workspace they run without a
+  per-call approval dialog because enabling the Package is the user's durable
+  capability choice; their exact Tool identity and query, URL, claim, or result
+  reference remain visible in the execution process. `WebSearch`, `WebFetch`,
+  and the model-common lowercase `web_fetch` are deterministic Desktop aliases
+  of the exact search/fetch Tools. Malformed input, local-file fetches, unknown
+  aliases, and same-name Tools from other Packages stay fail-closed as
+  unverified. Network writes, uploads, command execution, and other external side
+  effects retain one-shot approval.
+- A hidden Desktop interop extension handles the verified Package's successful
+  Tool Result only when the result already carries its in-memory store ID in
+  structured `details`. If the user-visible result text omits that bounded ID,
+  Desktop appends one plain-text `responseId` instruction for the next
+  `get_search_content` call. It does not inspect the store, repeat the request,
+  persist the ID separately, or modify authorization. Failed results, malformed
+  IDs, retrieval results, duplicate Tool names, and same-name Tools from another
+  Package are left untouched.
 - One automatic `web_search` call owns Package-level Provider routing. When the
   Package exhausts configured Providers or reports missing credentials, Desktop
   marks that Tool Result failed and tells the model not to generate a sequence of
@@ -993,12 +1048,84 @@ loading error where the operation can produce those states
   URL may use one `fetch_content` recovery; otherwise the answer identifies the
   missing search configuration. This prevents redundant calls without treating
   Package installation as Provider readiness.
+- New trusted Workspaces default to `AUTO` (`balanced`). Exact Workspace
+  read/write Tools, exact current-Session loaded resource reads, verified
+  read-only web Tools, ordinary effective configured Package/MCP operations,
+  non-destructive persistent writes, and conservatively classified local
+  inspection/test/build Shell commands proceed without repetitive approval.
+  The effective capability catalog is rebuilt from Task-local Package settings
+  and bounded `mcp.json`/`mcp-cache.json` metadata at resource load/reload; Tool
+  Calls perform in-memory identity lookups and never expose command, env, URL,
+  credential, args, results, or source paths. Skill directories authorize only canonical
+  `read`/`grep`/`find`/`ls` targets within that directory; loaded Prompt, context,
+  and visible Extension resources authorize only canonical exact-file reads.
+  Reload atomically replaces those grants. Symlink escape, arbitrary home files,
+  persistent deletion, upload or external submit, credentials/authentication,
+  dependencies, destructive or ambiguous Shell, publish, remote Git, system
+  changes, and external writes retain the dedicated one-shot flow.
+- Verified `@ff-labs/pi-fff@0.10.1` `grep`/`find` and fallback
+  `ffgrep`/`fffind` names share one source-and-contract profile. Workspace-local
+  paths and globs follow normal read policy; `~`, absolute, `../`, and symlink
+  escapes display the canonical external path before one-shot approval. An
+  opaque pagination cursor is not approvable in `ASK` or `AUTO` because Desktop
+  cannot prove the original root; the model is instructed to restart without
+  the cursor. When pi-fff registers the override names, Desktop's per-turn Tool
+  guidance explicitly states that live `find` and `grep` are FFF-backed, so the
+  answer must not call them native fallbacks or report pi-fff missing. In named
+  mode the same guidance points to live `fffind` and `ffgrep`. Duplicate sources
+  and unsupported versions stay unverified.
+- The Desktop-only Pi settings projection gives verified managed `pi67-core`
+  runtime precedence over its legacy auto-discovered copies. It adds exact
+  force-exclusions for `pi-hy-memory`, `pi-rules-loader`, `pi-vision-bridge`,
+  and `xtalpi-pi-tools` only while the managed Package path is active. No file
+  or persisted setting is mutated, unrelated Extensions are untouched, and
+  removing managed `pi67-core` restores normal legacy discovery. The visible
+  result is one Tool source, one rule activation notification, and no conflict
+  diagnostic for the same first-party extension.
+- Verified `pi-mcp-adapter@2.10.0` and `2.11.0` `mcp` proxy calls distinguish
+  local capability discovery from execution. Empty status, cached server lists,
+  bounded search/describe, and current-Session UI-message reads use the
+  read-only capability category in `ASK` and `AUTO`. AUTO connects an already
+  configured server and runs a cached nested Tool according to its classified
+  side effect; ASK requests one-shot approval for connect and configured
+  operations. New server setup, OAuth/authentication, credentials, and permission
+  expansion remain confirmation boundaries. Missing or ambiguous servers/Tools,
+  malformed args, duplicate sources, and unsupported versions are corrective
+  errors rather than approvable actions. When a proxy call instead targets the currently verified
+  direct `pi-fff` capability, Desktop treats it as a routing error rather than a
+  user authorization decision: it opens no dialog, names the active direct Tool,
+  and lets the model retry through the ordinary Workspace path classifier.
+- Configured Memory read/list/recall calls run as reads; add/remember/learn/
+  propose/flush run as non-destructive persistent writes in AUTO; delete/forget/
+  purge require one-shot approval. Configured browser passive scan, wait,
+  extraction, screenshot, and download run in AUTO subject to path containment;
+  execute-JS, native input, clipboard mutation, upload, and authentication remain
+  higher-risk. JS-Reverse task instrumentation and hook cleanup remain ordinary
+  configured operations rather than filename-based delete guesses.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
-  details scroll independently while both decision actions remain visible.
+  details scroll independently while all three decision actions remain visible.
+- Approval actions are ordered `拒绝`, `仅允许本次`, `本任务开启 YOLO`, with
+  default focus on `拒绝`. The YOLO action atomically permits the current and all
+  other pending Safety Approval requests owned by the same Task Runtime and
+  changes its mode; ordinary Extension `ctx.ui` requests remain pending. A stale
+  Host, Session generation, Operation, request, or Tool call cannot enable the
+  mode. The mode never changes OS permission, Electron sandbox/preload,
+  credential, update/signing, or Workspace trust boundaries.
 - Approval is displayed and answered only while Host epoch, session generation,
-  Operation, request, and Pi `toolCallId` remain authoritative. Stale, aborted,
+  Operation, request, and Pi `toolCallId` remain authoritative. Terminal
+  resolved/cancelled events may clear the exact stored request after the
+  Operation settles, but only when their Host, Session, generation, Operation,
+  request, and Tool Call identities still match. The Host preserves the opening
+  Operation identity on late terminal events. As a final lifecycle invariant, an
+  accepted Operation terminal also removes every still-rendered Approval or
+  Extension request with the same Host, Session generation, and Operation; this
+  only dismisses stale UI and never allows or retries the Tool. Stale, aborted,
   disconnected, undisplayable, or oversized requests fail closed.
+- A completed Operation with a visible final answer collapses its process even
+  when an intermediate Tool step failed and the model recovered. Its summary
+  still reports the failed step and reopening preserves the full failure detail.
+  Failed, cancelled, lost, or no-final-answer Operations remain expanded.
 - Common extension select/confirm/input/editor requests use accessible dialogs.
 - Status, text widget, title, and compatibility updates obey the same Host,
   Session generation, and Operation authority as blocking requests. Undefined
@@ -1113,6 +1240,10 @@ loading error where the operation can produce those states
   action registration, pure search projection, selection, recency, and result
   rendering. Palette-specific layout has one CSS Module authority rather than a
   parallel global compatibility rule set.
+- `pi-actions/` owns the shared static Desktop action registry, availability
+  requirements, and existing Controller dispatch. `composer/` owns Slash parsing,
+  grouping, exact-Enter routing, and Runtime catalog merge; Host Protocol
+  `SlashCommandSource` remains limited to Extension, Prompt, and Skill sources.
 - Connection, session, conversation, composer, extension, notification, and
   layout stores may be separated further when their mutation ownership is
   fully independent. The current modularized app store is not described as a

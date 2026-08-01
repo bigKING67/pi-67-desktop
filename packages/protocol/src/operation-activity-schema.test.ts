@@ -41,11 +41,19 @@ describe("operation activity protocol", () => {
         toolName: "WebSearch",
         toolKind: "search",
         status: "failed",
-        aliasTarget: "web_search"
+        aliasTarget: "web_search",
+        authorization: { mode: "auto", reason: "read-only" }
       }
     }, eventContext());
 
     expect(isEventEnvelope(tool)).toBe(true);
+    expect(isEventEnvelope({
+      ...tool,
+      payload: {
+        ...tool.payload,
+        activity: { ...tool.payload.activity, authorization: { mode: "auto", reason: "unknown" } }
+      }
+    })).toBe(false);
     expect(isEventEnvelope({
       ...tool,
       payload: {

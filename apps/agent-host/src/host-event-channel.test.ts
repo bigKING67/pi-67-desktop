@@ -106,7 +106,7 @@ describe("HostEventChannel", () => {
 
   it("fails an invalid approval request closed without publishing or beginning a wait", () => {
     const fixture = createFixture();
-    fixture.resolveApproval.mockReturnValue(false);
+    fixture.resolveApproval.mockReturnValue({ resolved: false, taskToolMode: "auto" });
 
     fixture.channel.send({
       type: "approval.requested",
@@ -119,7 +119,7 @@ describe("HostEventChannel", () => {
     expect(fixture.resolveApproval).toHaveBeenCalledWith(
       "approval-invalid",
       "tool-invalid",
-      false
+      "deny"
     );
     expect(fixture.cancelInteractiveRequests).toHaveBeenCalledWith("abort");
     expect(fixture.channel.eventSequence).toBe(0);
@@ -242,6 +242,34 @@ describe("HostEventChannel", () => {
     ]);
     expect(fixture.resolveApproval).not.toHaveBeenCalled();
   });
+
+  it("keeps a terminal Approval event bound to the Operation that opened it", () => {
+    const fixture = createFixture();
+
+    fixture.channel.send({
+      type: "approval.requested",
+      payload: approvalRequest("approval-terminal", "tool-terminal")
+    });
+    fixture.setActiveOperationId(undefined);
+    fixture.channel.send({
+      type: "approval.cancelled",
+      payload: {
+        requests: [{ requestId: "approval-terminal", toolCallId: "tool-terminal" }],
+        reason: "abort"
+      }
+    });
+
+    expect(fixture.postEvent.mock.calls.map(([envelope]) => envelope)).toMatchObject([
+      {
+        type: "approval.requested",
+        context: { operationId: "operation-events" }
+      },
+      {
+        type: "approval.cancelled",
+        context: { operationId: "operation-events" }
+      }
+    ]);
+  });
 });
 
 function createFixture(
@@ -251,9 +279,10 @@ function createFixture(
   const observeEventActivity = vi.fn(() => true);
   const beginInteractiveWait = vi.fn(() => true);
   const completeInteractiveWait = vi.fn(() => true);
-  const resolveApproval = vi.fn(() => true);
+  const resolveApproval = vi.fn(() => ({ resolved: true, taskToolMode: "auto" as const }));
   const resolveExtensionUi = vi.fn(() => true);
   const cancelInteractiveRequests = vi.fn(() => []);
+  let activeOperationId: string | undefined = "operation-events";
   const runtime = {
     getIdentity: () => ({ sessionId: "session-events", sessionGeneration: 3 }),
     resolveApproval,
@@ -261,7 +290,7 @@ function createFixture(
     cancelInteractiveRequests
   } as unknown as AgentRuntime;
   const operations = {
-    activeAccepted: () => ({ operationId: "operation-events" }),
+    activeAccepted: () => activeOperationId === undefined ? undefined : { operationId: activeOperationId },
     observeEventActivity,
     beginInteractiveWait,
     completeInteractiveWait
@@ -285,7 +314,10 @@ function createFixture(
     completeInteractiveWait,
     resolveApproval,
     resolveExtensionUi,
-    cancelInteractiveRequests
+    cancelInteractiveRequests,
+    setActiveOperationId: (operationId: string | undefined) => {
+      activeOperationId = operationId;
+    }
   };
 }
 
@@ -294,6 +326,7 @@ function approvalRequest(requestId: string, toolCallId: string) {
     requestId,
     toolCallId,
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "ambiguous-command" as const,
     reason: "Confirm command",
     targetKind: "command" as const,

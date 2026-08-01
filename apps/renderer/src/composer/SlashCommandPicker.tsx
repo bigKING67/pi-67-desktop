@@ -1,7 +1,15 @@
-import type { SlashCommandDescriptor } from "@pi67/protocol";
 import { Command, FileText, Sparkles } from "lucide-react";
+import { messages } from "../localization/message-catalog.js";
+import type { ComposerSlashItem } from "./composer-slash-commands.js";
 import type { ComposerSlashCatalogState } from "./use-composer-slash-catalog.js";
 import styles from "./Composer.module.css";
+
+const SOURCE_ORDER: readonly ComposerSlashItem["source"][] = [
+  "desktop-action",
+  "extension",
+  "prompt",
+  "skill"
+];
 
 export function SlashCommandPicker({
   state,
@@ -11,51 +19,74 @@ export function SlashCommandPicker({
   onSelect
 }: {
   state: ComposerSlashCatalogState;
-  commands: readonly SlashCommandDescriptor[];
+  commands: readonly ComposerSlashItem[];
   activeIndex: number;
   onActiveIndexChange: (index: number) => void;
-  onSelect: (command: SlashCommandDescriptor) => void;
+  onSelect: (command: ComposerSlashItem) => void;
 }) {
   return (
     <div className={styles.slashPicker} data-testid="composer-slash-picker">
       <header>
-        <strong>指令与技能</strong>
-        <span>输入名称筛选</span>
+        <strong>{messages.composer.slashPickerTitle}</strong>
+        <span>{messages.composer.slashPickerFilterHint}</span>
       </header>
-      {state.status === "loading" ? <p role="status">正在加载 Pi 指令…</p> : null}
-      {state.status === "failed" ? <p role="alert">无法加载指令目录，请稍后重试。</p> : null}
-      {state.status === "unavailable" ? <p role="status">Pi 运行服务连接后可使用指令。</p> : null}
-      {state.status === "ready" && commands.length === 0 ? <p>没有匹配的指令或技能。</p> : null}
-      {state.status === "ready" && commands.length > 0 ? (
+      {commands.length > 0 ? (
         <div className={styles.slashCommandList} id="composer-slash-command-list" role="listbox">
-          {commands.map((command, index) => {
-            const Icon = command.source === "extension" ? Command : command.source === "prompt" ? FileText : Sparkles;
+          {SOURCE_ORDER.map((source) => {
+            const firstIndex = commands.findIndex((command) => command.source === source);
+            if (firstIndex < 0) return null;
+            const sourceCommands = commands.filter((command) => command.source === source);
+            const headingId = `composer-slash-group-${source}`;
             return (
-              <button
-                aria-selected={index === activeIndex}
-                className={index === activeIndex ? styles.slashCommandActive : undefined}
-                id={slashCommandOptionId(index)}
-                key={`${command.source}:${command.name}`}
-                role="option"
-                type="button"
-                onMouseEnter={() => onActiveIndexChange(index)}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => onSelect(command)}
-              >
-                <Icon aria-hidden="true" size={15} />
-                <span>
-                  <strong>/{command.name}</strong>
-                  <small>{command.description ?? sourceLabel(command.source)}</small>
-                </span>
-                <em>{sourceLabel(command.source)}</em>
-              </button>
+              <div aria-labelledby={headingId} className={styles.slashCommandGroup} key={source} role="group">
+                <div className={styles.slashCommandGroupHeading} id={headingId}>{sourceLabel(source)}</div>
+                {sourceCommands.map((command) => {
+                  const index = commands.indexOf(command);
+                  const Icon = command.source === "desktop-action"
+                    ? command.icon
+                    : command.source === "extension"
+                      ? Command
+                      : command.source === "prompt"
+                        ? FileText
+                        : Sparkles;
+                  return (
+                    <button
+                      aria-selected={index === activeIndex}
+                      className={index === activeIndex ? styles.slashCommandActive : undefined}
+                      id={slashCommandOptionId(index)}
+                      key={`${command.source}:${command.name}`}
+                      role="option"
+                      type="button"
+                      onMouseEnter={() => onActiveIndexChange(index)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => onSelect(command)}
+                    >
+                      <Icon aria-hidden="true" size={15} />
+                      <span>
+                        <strong>/{command.name}{command.source === "desktop-action" && command.argumentHint
+                          ? ` ${command.argumentHint}`
+                          : ""}</strong>
+                        <small>{command.description ?? sourceLabel(command.source)}</small>
+                      </span>
+                      <em>{sourceLabel(command.source)}</em>
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
+      ) : <p>{messages.composer.slashEmpty}</p>}
+      {state.runtimeStatus === "loading" ? (
+        <p className={styles.slashRuntimeStatus} role="status">{messages.composer.slashRuntimeLoading}</p>
       ) : null}
-      {state.status === "ready" && state.catalog.truncated ? (
-        <footer>指令较多，当前显示目录的前 {state.catalog.items.length} 项。</footer>
+      {state.runtimeStatus === "failed" ? (
+        <p className={styles.slashRuntimeStatus} role="alert">{messages.composer.slashRuntimeFailed}</p>
       ) : null}
+      {state.runtimeStatus === "unavailable" ? (
+        <p className={styles.slashRuntimeStatus} role="status">{messages.composer.slashRuntimeUnavailable}</p>
+      ) : null}
+      {state.catalog.truncated ? <footer>扩展目录较多，继续输入名称可缩小范围。</footer> : null}
     </div>
   );
 }
@@ -64,8 +95,9 @@ export function slashCommandOptionId(index: number): string {
   return `composer-slash-command-${index}`;
 }
 
-function sourceLabel(source: SlashCommandDescriptor["source"]): string {
-  if (source === "extension") return "指令";
-  if (source === "prompt") return "提示词";
-  return "技能";
+function sourceLabel(source: ComposerSlashItem["source"]): string {
+  if (source === "desktop-action") return messages.composer.slashGroups.builtin;
+  if (source === "extension") return messages.composer.slashGroups.extension;
+  if (source === "prompt") return messages.composer.slashGroups.prompt;
+  return messages.composer.slashGroups.skill;
 }

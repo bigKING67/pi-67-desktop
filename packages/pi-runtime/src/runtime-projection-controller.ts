@@ -13,6 +13,7 @@ import type {
   RuntimeOperationActivity,
   SessionSnapshot,
   SessionTreeProjection,
+  ToolAuthorizationProjection,
   WorkspaceChangesProjection
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, SlashCommandCatalogResult, StreamDelta } from "@pi67/protocol";
@@ -31,6 +32,9 @@ interface RuntimeProjectionTarget {
   getSessionGeneration: () => number;
   emit: (event: AgentEvent) => void;
   emitActivity: (activity: RuntimeOperationActivity) => void;
+  getToolAuthorization: (toolCallId: string) => ToolAuthorizationProjection | undefined;
+  completeToolAuthorization: (toolCallId: string) => void;
+  resetToolAuthorizations: () => void;
   pushStream: (delta: StreamDelta) => void;
   flushStream: () => void;
 }
@@ -58,8 +62,10 @@ export class RuntimeProjectionController {
           target.getSession().getAllTools()
         );
       },
+      getToolAuthorization: target.getToolAuthorization,
       completeToolExecution: (toolCallId) => {
         this.adapters.completeToolExecution(target.getSessionGeneration(), toolCallId);
+        target.completeToolAuthorization(toolCallId);
       },
       settleActiveToolExecutions: () => {
         this.adapters.settleActiveToolExecutions(target.getSessionGeneration());
@@ -79,6 +85,7 @@ export class RuntimeProjectionController {
     this.events.reset();
     this.adapters.reset();
     this.assets.reset(this.target.getSessionGeneration());
+    this.target.resetToolAuthorizations();
   }
 
   resetExtensionAdapters(): void { this.adapters.reset(); }
@@ -93,6 +100,13 @@ export class RuntimeProjectionController {
   observe(session: AgentSession, event: AgentSessionEvent): void {
     this.session.observe(session.sessionManager, event);
     this.events.handle(event);
+  }
+
+  recordToolAuthorization(
+    toolCallId: string,
+    authorization: ToolAuthorizationProjection
+  ): void {
+    this.events.recordToolAuthorization(toolCallId, authorization);
   }
 
   getMetadata(manager: SessionManager): SessionProjectionMetadata { return this.session.getMetadata(manager); }

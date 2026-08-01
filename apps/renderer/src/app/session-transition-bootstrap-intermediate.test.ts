@@ -56,7 +56,8 @@ describe("session bootstrap intermediate runtime", () => {
     const initialSnapshot = snapshot("session-target-initial");
     const readyPayload = {
       capabilities: runtimeCapabilities(),
-      snapshot: initialSnapshot
+      snapshot: initialSnapshot,
+      taskToolMode: "auto" as const
     };
     useAppStore.getState().receiveAgentEvent(
       { type: "runtime.ready", payload: readyPayload },

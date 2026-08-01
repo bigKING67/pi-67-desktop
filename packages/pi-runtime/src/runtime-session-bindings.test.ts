@@ -47,12 +47,18 @@ function createBindings(): RuntimeSessionBindings {
     externalChangeGuard: new SessionExternalChangeGuard(),
     getAgentDir: () => "/tmp/pi67-agent",
     getRuntimeCredentialOverrides: () => createRuntimeCredentialOverrideStore(),
-    getSafety: () => ({ cwd: "/tmp/pi67-workspace", trust: "unknown", approvalMode: "guided" }),
+    getSafety: () => ({
+      cwd: "/tmp/pi67-workspace",
+      trust: "unknown",
+      approvalMode: "guided",
+      taskToolMode: "ask"
+    }),
     getWorkspaceServices: () => undefined,
     getPromptAttachmentAccess: () => undefined,
     projections: { reset: vi.fn() } as unknown as RuntimeProjectionController,
     rebindExtensionUi: vi.fn(async () => undefined),
     requestApproval: vi.fn(async () => ({ status: "denied" as const })),
+    recordToolAuthorization: vi.fn(),
     setSessionCwd: vi.fn()
   });
 }

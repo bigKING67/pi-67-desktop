@@ -25,11 +25,12 @@ export async function abortActiveOperation(): Promise<void> {
   }
 }
 
-export async function compactRendererSession(): Promise<void> {
+export async function compactRendererSession(instructions?: string): Promise<void> {
   try {
     const authority = requireSessionAuthority();
     const accepted = await agentConnectionController.request("session.compact", {
-      submissionId: createMessageId("compaction")
+      submissionId: createMessageId("compaction"),
+      ...(instructions ? { instructions } : {})
     });
     if (!acceptSubmission(accepted, authority, messages.operation.compactionAcknowledgementStale)) return;
     if (applySettledSubmission(

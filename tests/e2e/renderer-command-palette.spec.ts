@@ -204,11 +204,12 @@ test("matches Host scheduler availability while an operation is active", async (
       }
     }
   }, { operationId });
+  await expect(page.getByRole("button", { name: "停止" })).toBeVisible();
   await page.keyboard.press("Control+k");
 
   await expect(page.getByRole("option", { name: /Other Session 当前任务结束后可用/u })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("option", { name: /\/inspect 当前任务结束后可用/u })).toHaveAttribute("aria-disabled", "true");
-  const compact = page.getByRole("option", { name: /压缩当前会话 当前任务结束后可用/u });
+  const compact = page.getByRole("option", { name: /\/compact.*当前任务结束或停止后可用/u });
   await expect(compact).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("option", { name: /运行环境诊断/u })).not.toHaveAttribute("aria-disabled", "true");
 

@@ -214,7 +214,8 @@ describe("AgentPortClient", () => {
     await Promise.resolve();
     port.emit("message", eventEnvelope("runtime.ready", {
       capabilities: runtimeCapabilities(),
-      snapshot: emptySnapshot()
+      snapshot: emptySnapshot(),
+      taskToolMode: "auto"
     }, { hostEpoch: 1, sequence: 1, context: APP_PROTOCOL_CONTEXT }));
 
     await expect(pending).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });

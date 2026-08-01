@@ -1,18 +1,69 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
   emitMockAgentEvent,
   installMockDesktopBridge,
-  recordedCommandDetails,
   replaceMockSessionProjection,
   setMockAgentResponseDelay,
   setMockAgentResponseFailure,
   setMockConversationMessages
 } from "./pi67-renderer-fixture.js";
+import {
+  scenarioCommands,
+  scenarioCommandTypes
+} from "./pi67-renderer-scenario-commands.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
+});
+
+test("switches ASK/AUTO directly and confirms current-Task YOLO in the upward Composer menu", async ({ page }) => {
+  await page.setViewportSize({ width: 720, height: 480 });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await clearRecordedCommands(page);
+
+  const addAttachment = page.getByRole("button", { name: "添加附件" });
+  const modeButton = page.getByRole("button", { name: "工具执行模式：AUTO" });
+  await expect(modeButton).toBeVisible();
+  const [addBox, modeBox] = await Promise.all([addAttachment.boundingBox(), modeButton.boundingBox()]);
+  expect(addBox).not.toBeNull();
+  expect(modeBox).not.toBeNull();
+  expect(modeBox?.x).toBeGreaterThan(addBox?.x ?? 0);
+
+  await modeButton.click();
+  const menu = page.getByRole("dialog", { name: "工具执行模式" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("radio", { name: /ASK/u })).toBeVisible();
+  await expect(menu.getByRole("radio", { name: /AUTO/u })).toHaveAttribute("aria-checked", "true");
+  await expect(menu.getByRole("radio", { name: /YOLO/u })).toBeVisible();
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).not.toBeNull();
+  expect((menuBox?.y ?? 0) + (menuBox?.height ?? 0)).toBeLessThanOrEqual(modeBox?.y ?? 0);
+
+  await menu.getByRole("radio", { name: /ASK/u }).click();
+  await expect(page.getByRole("button", { name: "工具执行模式：ASK" })).toBeVisible();
+  await expect.poll(async () => (await scenarioCommands(page)).at(-1)).toMatchObject({
+    type: "task.toolMode.set",
+    payload: { mode: "ask" }
+  });
+
+  await clearRecordedCommands(page);
+  await page.getByRole("button", { name: "工具执行模式：ASK" }).click();
+  await page.getByRole("radio", { name: /YOLO/u }).click();
+  await expect(page.getByText("为当前任务开启 YOLO？", { exact: true })).toBeVisible();
+  expect(await scenarioCommandTypes(page)).toEqual([]);
+  await page.getByRole("button", { name: "开启 YOLO" }).click();
+
+  await expect(page.getByRole("button", { name: "工具执行模式：YOLO" })).toBeVisible();
+  await expect.poll(async () => (await scenarioCommands(page)).at(-1)).toMatchObject({
+    type: "task.toolMode.set",
+    payload: { mode: "yolo" }
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(await page.evaluate(() => document.documentElement.clientWidth));
 });
 
 test("shows the accepted user message without waiting for the first Pi token", async ({ page }) => {
@@ -359,23 +410,7 @@ test("keeps the draft and rotates submission identity when the Session changes b
   await expect(page.getByLabel("待发送附件")).toHaveCount(0);
 });
 
-const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
-  "workspace.open",
-  "workspace.register",
-  "workspace.changes",
-  "command.list",
-  "session.catalog.query"
-]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-async function scenarioCommands(page: Page): Promise<Awaited<ReturnType<typeof recordedCommandDetails>>> {
-  return (await recordedCommandDetails(page))
-    .filter((command) => !WORKBENCH_SETUP_OR_READ_COMMANDS.has(command.type));
-}
-
-async function scenarioCommandTypes(page: Page): Promise<string[]> {
-  return (await scenarioCommands(page)).map((command) => command.type);
-}
 
 async function dispatchClipboardImage(
   composer: import("@playwright/test").Locator,

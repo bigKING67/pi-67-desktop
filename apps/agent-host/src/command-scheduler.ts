@@ -55,6 +55,7 @@ export function commandClassFor(command: AgentCommand): CommandClass {
   if (
     command.type === "operation.abort"
     || command.type === "queue.clear"
+    || command.type === "task.toolMode.set"
     || command.type === "approval.respond"
     || command.type === "extension.ui.respond"
   ) return "interrupt";

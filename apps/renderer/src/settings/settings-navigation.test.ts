@@ -22,7 +22,8 @@ describe("settings navigation", () => {
           { id: "skills", label: "技能" },
           { id: "prompts", label: "指令模板" },
           { id: "rules", label: "规则与上下文" },
-          { id: "integrations", label: "集成" },
+          { id: "mcp", label: "MCP 服务" },
+          { id: "integrations", label: "浏览器集成" },
           { id: "runtime", label: "运行服务" },
           { id: "network", label: "下载源与网络" }
         ]
@@ -38,7 +39,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(12);
+    expect(SETTINGS_SECTIONS).toHaveLength(13);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -48,6 +49,8 @@ describe("settings navigation", () => {
     const extension = items.find((item) => item.id === "extensions");
     const prompt = items.find((item) => item.id === "prompts");
     const rule = items.find((item) => item.id === "rules");
+    const mcp = items.find((item) => item.id === "mcp");
+    const browserIntegration = items.find((item) => item.id === "integrations");
     const runtime = items.find((item) => item.id === "runtime");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
@@ -62,8 +65,15 @@ describe("settings navigation", () => {
     expect(sectionSupportsProjectScope("skills")).toBe(false);
     expect(prompt && matchesSettingsQuery(prompt, "prompts")).toBe(true);
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
+    expect(mcp && matchesSettingsQuery(mcp, "tavily")).toBe(true);
+    expect(mcp && matchesSettingsQuery(mcp, "client token")).toBe(true);
+    expect(browserIntegration && matchesSettingsQuery(browserIntegration, "browser67")).toBe(true);
+    expect(browserIntegration && matchesSettingsQuery(browserIntegration, "doctor")).toBe(true);
+    expect(browserIntegration && matchesSettingsQuery(browserIntegration, "tavily")).toBe(false);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
     expect(sectionSupportsProjectScope("rules")).toBe(false);
+    expect(sectionSupportsProjectScope("mcp")).toBe(false);
+    expect(sectionSupportsProjectScope("integrations")).toBe(false);
   });
 });

@@ -122,7 +122,7 @@ export function createDesktopToolRoutingExtension(): InlineExtension {
         searchRoutingExhausted = false;
         recoveryFetchStarted = false;
         const activeTools = getActiveToolNames(pi);
-        const guidance = createToolRoutingGuidance(activeTools);
+        const guidance = createToolRoutingGuidance(pi, activeTools);
         return guidance ? { systemPrompt: `${event.systemPrompt}\n\n${guidance}` } : undefined;
       });
 
@@ -260,19 +260,53 @@ function reconcileDesktopToolAliases(session: AgentSession): void {
   }
 }
 
-function createToolRoutingGuidance(activeTools: ReadonlySet<string>): string | undefined {
+function createToolRoutingGuidance(
+  pi: ExtensionAPI,
+  activeTools: ReadonlySet<string>
+): string | undefined {
   const aliases = EXECUTABLE_TOOL_ALIASES.filter((spec) => (
     activeTools.has(spec.alias) && activeTools.has(spec.canonical)
   ));
-  if (aliases.length === 0) return undefined;
+  const piFffGuidance = createPiFffNamingGuidance(pi, activeTools);
+  if (aliases.length === 0 && piFffGuidance === undefined) return undefined;
   const mappings = aliases.map((spec) => `\`${spec.alias}\`→\`${spec.canonical}\``).join(", ");
   return [
     "## Pi Desktop tool compatibility",
-    `Prefer native Pi tool names and schemas. Desktop also accepts these deterministic aliases: ${mappings}.`,
+    aliases.length > 0
+      ? `Prefer native Pi tool names and schemas. Desktop also accepts these deterministic aliases: ${mappings}.`
+      : undefined,
+    piFffGuidance,
     activeTools.has("WebSearch")
       ? "For current web lookups, prefer `web_search`; the `WebSearch` alias is forwarded to it with `workflow: \"none\"` by default. One automatic `web_search` call already checks the configured and available providers. If it reports that routing is exhausted or a provider is unconfigured, do not probe Brave, Tavily, OpenAI, SearXNG, or other named providers one by one, and do not inspect web-search.json because it may contain credentials. Use one batched `fetch_content` call only when exact URLs are already known; otherwise explain the missing search configuration."
       : undefined
   ].filter((line): line is string => line !== undefined).join("\n");
+}
+
+function createPiFffNamingGuidance(
+  pi: ExtensionAPI,
+  activeTools: ReadonlySet<string>
+): string | undefined {
+  let tools: ReturnType<ExtensionAPI["getAllTools"]>;
+  try {
+    tools = pi.getAllTools();
+  } catch {
+    return undefined;
+  }
+  const hasPiFffTool = (name: string) => {
+    if (!activeTools.has(name)) return false;
+    const matches = tools.filter((tool) => tool.name === name);
+    if (matches.length !== 1) return false;
+    const source = matches[0]!.sourceInfo;
+    return source.origin === "package"
+      && /^npm:@ff-labs\/pi-fff(?:@0\.10\.1)?$/u.test(source.source);
+  };
+  if (hasPiFffTool("find") && hasPiFffTool("grep")) {
+    return "`@ff-labs/pi-fff` is active in override naming mode: the live `find` and `grep` tools are FFF-backed, not Pi built-ins. Call these exact live tools directly; never look them up or invoke them through `mcp`. When asked to use pi-fff, explain the override; do not describe them as native fallbacks or claim pi-fff is unavailable.";
+  }
+  if (hasPiFffTool("fffind") && hasPiFffTool("ffgrep")) {
+    return "`@ff-labs/pi-fff` is active with its explicit live names `fffind` and `ffgrep`. Call those exact live tools directly, never through `mcp`, when the task requests pi-fff.";
+  }
+  return undefined;
 }
 
 function isVerifiedWebSearchCall(pi: ExtensionAPI, toolName: string): boolean {

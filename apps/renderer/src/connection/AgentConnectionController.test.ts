@@ -429,7 +429,8 @@ function projectionResyncResult(hostEpoch: number, eventSequence: number) {
     },
     eventSequence,
     hostEpoch,
-    sessionGeneration: 1
+    sessionGeneration: 1,
+    taskToolMode: "auto" as const
   };
 }
 

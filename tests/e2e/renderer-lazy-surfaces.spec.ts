@@ -106,6 +106,7 @@ test("fails closed when the lazy approval surface cannot load", async ({ page })
       hostEpoch: 1,
       toolCallId: "tool-lazy-failure",
       toolName: "bash",
+      toolSource: "Pi 内置",
       category: "git-external-action",
       reason: "访问或修改远程 Git 状态",
       targetKind: "command",

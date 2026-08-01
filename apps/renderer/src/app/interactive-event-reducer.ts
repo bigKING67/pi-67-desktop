@@ -8,6 +8,7 @@ import { currentApprovalTerminalRequestIds, type ApprovalTerminalIdentity } from
 import { useApprovalStore } from "../approval/approval-store.js";
 import {
   hasCurrentInteractiveAuthority,
+  hasCurrentInteractiveSessionAuthority,
   matchesInteractiveEnvelope
 } from "../connection/interactive-authority.js";
 import { stageRendererSessionExtensionCatalog } from "../extension-ui/extension-catalog-transition.js";
@@ -151,7 +152,9 @@ function clearExtensionRequests<TState extends AppEventState>(
   get: EventStoreGet<TState>
 ): number {
   const ids = useExtensionUiStore.getState().requests.flatMap((request) => (
-    requestIds.includes(request.requestId) && isCurrentInteractivePayload(get(), request, envelope)
+    requestIds.includes(request.requestId)
+      && hasCurrentInteractiveSessionAuthority(get(), request)
+      && matchesInteractiveEnvelope(request, envelope)
       ? [request.requestId]
       : []
   ));

@@ -19,17 +19,17 @@ describe("approval protocol schemas", () => {
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1",
-      allowed: true
+      decision: "allow-once"
     }, taskContext(), 4);
     const response = responseEnvelope(request.requestId, 4, request.context, {
       ok: true,
       type: "approval.respond",
-      result: { resolved: true }
+      result: { resolved: true, taskToolMode: "auto" }
     });
     const resolved = eventEnvelope("approval.resolved", {
       requestId: "approval-1",
       toolCallId: "tool-call-1",
-      allowed: true
+      decision: "allow-once"
     }, eventContext(10, 2));
     const cancelled = eventEnvelope("approval.cancelled", {
       requests: [{ requestId: "approval-1", toolCallId: "tool-call-1" }],
@@ -41,6 +41,43 @@ describe("approval protocol schemas", () => {
     expect(isEventEnvelope(cancelled)).toBe(true);
     expect(isRequestEnvelope(request)).toBe(true);
     expect(isResponseEnvelope(response)).toBe(true);
+  });
+
+  it("validates strict Task Tool mode commands, events, and YOLO approval results", () => {
+    const setMode = commandEnvelope(
+      "task.toolMode.set",
+      { mode: "yolo" },
+      taskContext(),
+      4
+    );
+    const changed = eventEnvelope("task.toolMode.changed", {
+      mode: "yolo",
+      reason: "user-selected"
+    }, eventContext(12, 4));
+    const approval = commandEnvelope("approval.respond", {
+      requestId: "approval-1",
+      toolCallId: "tool-call-1",
+      sessionId: "session-1",
+      sessionGeneration: 3,
+      operationId: "operation-1",
+      decision: "enable-task-yolo-and-allow"
+    }, taskContext(), 4);
+    const result = responseEnvelope(approval.requestId, 4, approval.context, {
+      ok: true,
+      type: "approval.respond",
+      result: { resolved: true, taskToolMode: "yolo" }
+    });
+
+    expect(isRequestEnvelope(setMode)).toBe(true);
+    expect(isEventEnvelope(changed)).toBe(true);
+    expect(isRequestEnvelope(approval)).toBe(true);
+    expect(isResponseEnvelope(result)).toBe(true);
+    expect(isRequestEnvelope({ ...setMode, payload: { mode: "unsafe" } })).toBe(false);
+    expect(isRequestEnvelope({ ...setMode, payload: { ...setMode.payload, persistent: true } })).toBe(false);
+    expect(isEventEnvelope({
+      ...changed,
+      payload: { ...changed.payload, reason: "legacy" }
+    })).toBe(false);
   });
 
   it("rejects missing authority, invalid scope and unknown approval fields", () => {
@@ -62,7 +99,7 @@ describe("approval protocol schemas", () => {
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1",
-      allowed: true
+      decision: "allow-once"
     }, taskContext(), 4);
     const { operationId: _responseOperationId, ...withoutResponseOperation } = request.payload;
     expect(isRequestEnvelope({ ...request, payload: withoutResponseOperation })).toBe(false);
@@ -70,10 +107,14 @@ describe("approval protocol schemas", () => {
       ...request,
       payload: { ...request.payload, toolCallId: "" }
     })).toBe(false);
+    expect(isRequestEnvelope({
+      ...request,
+      payload: { ...request.payload, decision: undefined, allowed: true }
+    })).toBe(false);
     const resolved = eventEnvelope("approval.resolved", {
       requestId: "approval-1",
       toolCallId: "tool-call-1",
-      allowed: true
+      decision: "allow-once"
     }, eventContext(10, 2));
     const { toolCallId: _resolvedToolCallId, ...resolvedWithoutTool } = resolved.payload;
     expect(isEventEnvelope({ ...resolved, payload: resolvedWithoutTool })).toBe(false);
@@ -163,7 +204,8 @@ describe("workspace change protocol schemas", () => {
         },
         eventSequence: 12,
         hostEpoch: 2,
-        sessionGeneration: 4
+        sessionGeneration: 4,
+        taskToolMode: "auto"
       }
     });
     expect(isResponseEnvelope(response)).toBe(true);
@@ -207,6 +249,7 @@ function approvalPayload() {
     hostEpoch: 4,
     toolCallId: "tool-call-1",
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "git-external-action" as const,
     reason: "访问或修改远程 Git 状态",
     targetKind: "command" as const,

@@ -225,6 +225,18 @@ describe("WorkbenchStateV2 persistence", () => {
       ...layout,
       settings: { section: "account", scope: "project", workspaceId: workspace.id }
     })).toThrow(/invalid/u);
+    expect(replaceWorkbenchLayout(state, {
+      ...layout,
+      settings: { section: "mcp", scope: "global" }
+    }).settings).toEqual({ section: "mcp", scope: "global" });
+    expect(() => replaceWorkbenchLayout(state, {
+      ...layout,
+      settings: { section: "mcp", scope: "project", workspaceId: workspace.id }
+    })).toThrow(/invalid/u);
+    expect(replaceWorkbenchLayout(state, {
+      ...layout,
+      settings: { section: "integrations", scope: "global" }
+    }).settings).toEqual({ section: "integrations", scope: "global" });
 
     const boundedRecovery = Array.from({ length: MAX_RUNTIME_RECOVERY_RECORDS }, (_, index) => ({
       taskId: `task-${index}`,

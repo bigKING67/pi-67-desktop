@@ -78,10 +78,31 @@ export async function dispatchHostCommand(
     case "workspace.open":
       return context.initializeRuntime(runtime, command.payload);
     case "workspace.setTrust":
-      runtime.setWorkspacePolicy(command.payload.trust, command.payload.approvalMode);
-      return runtime.reloadResources();
+      {
+        const previousMode = runtime.getTaskToolMode();
+        const taskToolMode = runtime.setWorkspacePolicy(
+          command.payload.trust,
+          command.payload.approvalMode
+        );
+        const result = await runtime.reloadResources();
+        if (taskToolMode !== previousMode) {
+          context.sendEvent({
+            type: "task.toolMode.changed",
+            payload: { mode: taskToolMode, reason: "trust-revoked" }
+          });
+        }
+        return result;
+      }
     case "workspace.changes":
       return runtime.getWorkspaceChanges();
+    case "task.toolMode.set": {
+      const mode = runtime.setTaskToolMode(command.payload.mode);
+      context.sendEvent({
+        type: "task.toolMode.changed",
+        payload: { mode, reason: "user-selected" }
+      });
+      return { mode };
+    }
     case "session.catalog.query":
       return runtime.querySessionCatalog(command.payload);
     case "session.tree":
@@ -284,15 +305,25 @@ export async function dispatchHostCommand(
       );
     case "approval.respond":
       assertInteractiveResponseContext(runtime, context.operations(), command.payload);
-      return interactiveResponse(
-        command.payload.requestId,
-        runtime.resolveApproval(
+      {
+        const previousMode = runtime.getTaskToolMode();
+        const resolution = runtime.resolveApproval(
           command.payload.requestId,
           command.payload.toolCallId,
-          command.payload.allowed
-        ),
-        context.completeInteractiveWait
-      );
+          command.payload.decision
+        );
+        if (resolution.resolved) context.completeInteractiveWait(command.payload.requestId);
+        if (resolution.taskToolMode !== previousMode) {
+          context.sendEvent({
+            type: "task.toolMode.changed",
+            payload: {
+              mode: resolution.taskToolMode,
+              reason: "approval-enabled-yolo"
+            }
+          });
+        }
+        return resolution;
+      }
     case "diagnostics.collect":
       return runtime.collectDiagnostics();
     case "doctor.run":

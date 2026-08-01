@@ -23,6 +23,7 @@ describe("AgentHostServer extension UI", () => {
       initialize: async () => emptySnapshot(),
       getIdentity: () => ({ sessionId: "session-extension", sessionGeneration: 4 }),
       getSnapshot: () => emptySnapshot(),
+      getTaskToolMode: () => "auto" as const,
       submitPrompt: async () => {
         emit?.({
           type: "extension.ui.requested",

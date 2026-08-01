@@ -34,6 +34,7 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "approval.requested": { session: true, operation: true },
   "approval.resolved": { session: true, operation: true },
   "approval.cancelled": { session: true, operation: true },
+  "task.toolMode.changed": { session: true, operation: false },
   "extension.ui.requested": { session: true, operation: false },
   "extension.ui.updated": { session: true, operation: false },
   "extension.ui.resolved": { session: true, operation: false },

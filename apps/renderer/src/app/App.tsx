@@ -31,6 +31,8 @@ const UpdateDialog = lazy(() => import("../updates/UpdateDialog.js").then((modul
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
   const connected = useAppStore((state) => state.connected);
+  const navigationVisible = useShellStore((state) => state.navigationVisible);
+  const setNavigationVisible = useShellStore((state) => state.setNavigationVisible);
   const contextVisible = useShellStore((state) => state.contextVisible);
   const setContextVisible = useShellStore((state) => state.setContextVisible);
   const extensionTitle = useExtensionUiStore((state) => state.title);
@@ -43,7 +45,6 @@ export function App() {
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
-  const [navigationVisible, setNavigationVisible] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
   const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
   if (!freshnessInstallationRef.current) {
     freshnessInstallationRef.current = createOperationFreshnessInstallation({
@@ -62,14 +63,14 @@ export function App() {
   const closeNavigation = useCallback((restoreFocus = true) => {
     setNavigationVisible(false);
     if (restoreFocus) restoreNavigationTriggerFocus();
-  }, [restoreNavigationTriggerFocus]);
+  }, [restoreNavigationTriggerFocus, setNavigationVisible]);
 
   const toggleNavigation = useCallback(() => {
     const nextVisible = !navigationVisible;
     setNavigationVisible(nextVisible);
     if (nextVisible) setContextVisible(false);
     else restoreNavigationTriggerFocus();
-  }, [navigationVisible, restoreNavigationTriggerFocus, setContextVisible]);
+  }, [navigationVisible, restoreNavigationTriggerFocus, setContextVisible, setNavigationVisible]);
 
   useEffect(() => {
     const unsubscribe = agentConnectionController.subscribe({
@@ -86,7 +87,7 @@ export function App() {
       onTeardown: (error) => useAppStore.getState().handleAgentTeardown(error)
     });
     return unsubscribe;
-  }, []);
+  }, [setNavigationVisible]);
 
   useEffect(() => {
     const installation = freshnessInstallationRef.current;
@@ -160,7 +161,7 @@ export function App() {
 
   useEffect(() => {
     if (navigationIsDrawer && contextVisible) setNavigationVisible(false);
-  }, [contextVisible, navigationIsDrawer]);
+  }, [contextVisible, navigationIsDrawer, setNavigationVisible]);
 
   useEffect(() => {
     if (!workspace) return;

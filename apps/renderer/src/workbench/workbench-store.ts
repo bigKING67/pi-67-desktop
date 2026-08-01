@@ -5,6 +5,7 @@ import {
   type RuntimeRecoveryRecord,
   type RuntimeStatus,
   type SettingsSection,
+  type TaskToolMode,
   type TaskId,
   type TaskLifecycle,
   type WorkbenchStateV2,
@@ -30,6 +31,7 @@ export interface RendererWorkbenchTask {
   sessionPath?: string;
   hasDraft: boolean;
   attachmentCount: number;
+  toolMode: TaskToolMode;
 }
 
 type TaskOpenResult = "opened" | "selected" | "workspace-missing";
@@ -395,7 +397,8 @@ function taskFromRecovery(record: RuntimeRecoveryRecord): RendererWorkbenchTask 
     title: "未命名会话",
     ...(record.conversation.kind === "session" ? { sessionPath: record.conversation.sessionPath } : {}),
     hasDraft: record.conversation.kind === "provisional",
-    attachmentCount: 0
+    attachmentCount: 0,
+    toolMode: "auto"
   };
 }
 

@@ -156,12 +156,12 @@ test("replaces old pages after sequence-gap resync reports a ready revision", as
   await clearSessionCatalogRequests(page);
   await emitSessionCatalogSequenceGap(page);
 
-  await expect(sessionButton(page, "Resync 新会话")).toBeVisible();
-  await expect(sessionButton(page, "Resync 旧会话")).toHaveCount(0);
   await expect.poll(() => sessionCatalogRequests(page)).toEqual([{
     hostEpoch: 1,
     payload: { scope: "workspace", limit: 50 }
   }]);
+  await expect(sessionButton(page, "Resync 新会话")).toBeVisible();
+  await expect(sessionButton(page, "Resync 旧会话")).toHaveCount(0);
 });
 
 test("shows fallback, incomplete, and unavailable catalog states explicitly", async ({ page }) => {

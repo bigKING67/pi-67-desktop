@@ -91,6 +91,7 @@ describe("Skill Pack controller", () => {
       runtime: { phase: "busy", detail: "running", recoverable: true },
       title: "running",
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     });
     const request = vi.spyOn(agentConnectionController, "request");

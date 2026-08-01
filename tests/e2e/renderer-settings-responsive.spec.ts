@@ -90,6 +90,18 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(contextDetail.getByTestId("context-file-preview")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
+  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "显示输入内容" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "保存", exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "清除", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
+
+  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
+  await expect(settings.getByRole("button", { name: "准备依赖", exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
+
   await navigation.getByRole("button", { name: /更新与诊断/u }).click();
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.getByRole("button", { name: /^检查更新/u })).toBeVisible();

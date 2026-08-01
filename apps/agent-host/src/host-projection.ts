@@ -22,6 +22,7 @@ export function captureProjectionResync(
     eventSequence,
     hostEpoch,
     sessionGeneration: identity.sessionGeneration,
+    taskToolMode: runtime.getTaskToolMode(),
     ...(activeOperation === undefined ? {} : { activeOperation }),
     ...(latestOperationTerminal === undefined ? {} : { latestOperationTerminal })
   };

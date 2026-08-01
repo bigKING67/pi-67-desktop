@@ -27,7 +27,8 @@
 }
 
 .reason,
-.denial {
+.denial,
+.yoloNotice {
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.55;
@@ -124,6 +125,39 @@
   font-size: 11px;
 }
 
+.yoloNotice {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  font-size: 11px;
+}
+
+.yoloButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 48%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.yoloButton[data-hovered] {
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+}
+
+.yoloButton[data-focus-visible] {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.yoloButton[data-disabled] {
+  opacity: 0.5;
+}
+
 .actions {
   flex: none;
   padding: 14px 20px 20px;
@@ -155,6 +189,7 @@
   }
 
   .actions {
+    flex-wrap: wrap;
     padding: 12px 16px 16px;
   }
 }

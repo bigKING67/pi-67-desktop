@@ -64,6 +64,23 @@ describe("createDesktopToolRoutingExtension", () => {
     expect(routingHandlers([]).beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
   });
 
+  it("explains pi-fff override and explicit naming from the live Package source", () => {
+    const override = routingHandlers(["read", "grep", "find"], undefined, ["grep", "find"])
+      .beforeAgentStart({ systemPrompt: "base" });
+    expect(override?.systemPrompt).toContain("override naming mode");
+    expect(override?.systemPrompt).toContain("live `find` and `grep` tools are FFF-backed");
+    expect(override?.systemPrompt).toContain("never look them up or invoke them through `mcp`");
+    expect(override?.systemPrompt).toContain("do not describe them as native fallbacks");
+
+    const explicit = routingHandlers(["read", "ffgrep", "fffind"], undefined, ["ffgrep", "fffind"])
+      .beforeAgentStart({ systemPrompt: "base" });
+    expect(explicit?.systemPrompt).toContain("explicit live names `fffind` and `ffgrep`");
+    expect(explicit?.systemPrompt).toContain("never through `mcp`");
+
+    expect(routingHandlers(["read", "grep", "find"])
+      .beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
+  });
+
   it("turns an unknown Agent result into a recoverable exact-tool instruction", () => {
     const handlers = routingHandlers(["web_search", "subagent"]);
     const result = handlers.messageEnd({
@@ -295,7 +312,11 @@ function missingToolMessage(toolName: string): Parameters<MessageEndHandler>[0] 
   };
 }
 
-function routingHandlers(activeTools: string[], webSearchSource = "npm:pi-web-access@0.17.0"): {
+function routingHandlers(
+  activeTools: string[],
+  webSearchSource = "npm:pi-web-access@0.17.0",
+  piFffTools: readonly string[] = []
+): {
   beforeAgentStart: BeforeAgentStartHandler;
   messageEnd: MessageEndHandler;
   toolCall: ToolCallHandler;
@@ -307,7 +328,14 @@ function routingHandlers(activeTools: string[], webSearchSource = "npm:pi-web-ac
     getActiveTools: () => activeTools,
     getAllTools: () => activeTools.map((name) => ({
       name,
-      sourceInfo: name === "web_search"
+      sourceInfo: piFffTools.includes(name)
+        ? {
+            source: "npm:@ff-labs/pi-fff@0.10.1",
+            path: "/package/pi-fff/src/index.ts",
+            scope: "user",
+            origin: "package"
+          }
+        : name === "web_search"
         ? { source: webSearchSource, path: "/package/index.ts", scope: "user", origin: "package" }
         : name === "fetch_content"
           ? { source: webSearchSource, path: "/package/index.ts", scope: "user", origin: "package" }

@@ -13,6 +13,7 @@ import {
   recoverSessionImportTerminalWithoutBootstrap
 } from "./session-import-bootstrap-recovery.js";
 import type { AppState } from "./app-store.types.js";
+import { DEFAULT_APPROVAL_MODE } from "@pi67/domain";
 
 export const useAppStore = create<AppState>((set, get) => ({
   connectionIdentity: undefined,
@@ -24,7 +25,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   trustUpdating: false,
   sessionTransitionPending: false,
   sessionBootstrapTransitionPending: false,
-  approvalMode: "guided",
+  approvalMode: DEFAULT_APPROVAL_MODE,
   operation: undefined,
   operationDetail: undefined,
   operationProgress: undefined,

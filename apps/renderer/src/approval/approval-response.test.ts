@@ -31,6 +31,7 @@ const request: ApprovalRequestView = {
   requestId: "approval-1",
   toolCallId: "tool-1",
   toolName: "bash",
+  toolSource: "Pi 内置",
   category: "ambiguous-command",
   reason: "需要确认",
   targetKind: "command",
@@ -55,24 +56,24 @@ beforeEach(() => installSession(3));
 
 describe("approvalResponsePayload", () => {
   it("binds a response to the exact host, session, operation and tool call", () => {
-    expect(approvalResponsePayload(state, request, true)).toEqual({
+    expect(approvalResponsePayload(state, request, "allow-once")).toEqual({
       requestId: "approval-1",
       toolCallId: "tool-1",
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1",
-      allowed: true
+      decision: "allow-once"
     });
   });
 
   it("rejects stale authority context instead of guessing from current UI state", () => {
     const { operationId: _operationId, ...requestWithoutOperation } = request;
-    expect(approvalResponsePayload({ ...state, hostEpoch: 10 }, request, true)).toBeUndefined();
+    expect(approvalResponsePayload({ ...state, hostEpoch: 10 }, request, "allow-once")).toBeUndefined();
     installSession(4);
-    expect(approvalResponsePayload(state, request, true)).toBeUndefined();
+    expect(approvalResponsePayload(state, request, "allow-once")).toBeUndefined();
     installSession(3);
-    expect(approvalResponsePayload({ ...state, operation: { ...operation, operationId: "operation-2" } }, request, true)).toBeUndefined();
-    expect(approvalResponsePayload(state, requestWithoutOperation, true)).toBeUndefined();
+    expect(approvalResponsePayload({ ...state, operation: { ...operation, operationId: "operation-2" } }, request, "allow-once")).toBeUndefined();
+    expect(approvalResponsePayload(state, requestWithoutOperation, "allow-once")).toBeUndefined();
   });
 });
 
@@ -115,7 +116,7 @@ describe("respondToSafetyApproval", () => {
   it("removes an approval only after the authoritative Host accepts its response", async () => {
     requestAgent.mockResolvedValue({ resolved: true });
 
-    await expect(respondToSafetyApproval(() => state, request.requestId, false)).resolves.toBe(true);
+    await expect(respondToSafetyApproval(() => state, request.requestId, "deny")).resolves.toBe(true);
 
     expect(requestAgent).toHaveBeenCalledWith("approval.respond", {
       requestId: "approval-1",
@@ -123,7 +124,7 @@ describe("respondToSafetyApproval", () => {
       sessionId: "session-1",
       sessionGeneration: 3,
       operationId: "operation-1",
-      allowed: false
+      decision: "deny"
     });
     expect(useApprovalStore.getState().requests).toEqual([]);
     expect(useNotificationStore.getState().items).toEqual([]);
@@ -132,7 +133,7 @@ describe("respondToSafetyApproval", () => {
   it("reports a fail-closed result instead of silently treating resolved false as success", async () => {
     requestAgent.mockResolvedValue({ resolved: false });
 
-    await expect(respondToSafetyApproval(() => state, request.requestId, true)).resolves.toBe(false);
+    await expect(respondToSafetyApproval(() => state, request.requestId, "allow-once")).resolves.toBe(false);
 
     expect(useApprovalStore.getState().requests).toEqual([]);
     expect(useNotificationStore.getState().items).toEqual([
@@ -147,12 +148,12 @@ describe("respondToSafetyApproval", () => {
   it("keeps the approval visible when transport submission fails", async () => {
     requestAgent.mockRejectedValue(new Error("connection closed"));
 
-    await expect(respondToSafetyApproval(() => state, request.requestId, true)).resolves.toBe(false);
+    await expect(respondToSafetyApproval(() => state, request.requestId, "allow-once")).resolves.toBe(false);
 
     expect(useApprovalStore.getState().requests).toEqual([request]);
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
-      title: "无法提交本次授权",
+      title: "无法提交工具授权",
       message: "connection closed。授权请求仍保留，可以重试。"
     });
   });
@@ -162,7 +163,7 @@ describe("respondToSafetyApproval", () => {
     requestAgent.mockRejectedValue(error);
     recoverTimeout.mockResolvedValue(true);
 
-    await expect(respondToSafetyApproval(() => state, request.requestId, true)).resolves.toBe(false);
+    await expect(respondToSafetyApproval(() => state, request.requestId, "allow-once")).resolves.toBe(false);
 
     expect(recoverTimeout).toHaveBeenCalledWith(error, {
       kind: "approval",
@@ -176,7 +177,7 @@ describe("respondToSafetyApproval", () => {
     await expect(respondToSafetyApproval(
       () => ({ ...state, hostEpoch: 10 }),
       request.requestId,
-      true
+      "allow-once"
     )).resolves.toBe(false);
 
     expect(requestAgent).not.toHaveBeenCalled();
@@ -193,7 +194,7 @@ describe("respondToSafetyApproval", () => {
       resolveResponse = resolve;
     }));
 
-    const pending = respondToSafetyApproval(() => state, request.requestId, false);
+    const pending = respondToSafetyApproval(() => state, request.requestId, "deny");
     await vi.waitFor(() => expect(requestAgent).toHaveBeenCalledOnce());
     const replacement = { ...request, reason: "新 Host 的授权请求" };
     useApprovalStore.getState().reset();

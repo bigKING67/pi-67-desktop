@@ -332,7 +332,8 @@ function beginPendingTask(
     ...(options.title ? { pendingTitle: options.title } : {}),
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
-    attachmentCount: 0
+    attachmentCount: 0,
+    toolMode: "auto"
   };
   const result = workbench.openTask(task);
   return result === "workspace-missing" ? undefined : task;

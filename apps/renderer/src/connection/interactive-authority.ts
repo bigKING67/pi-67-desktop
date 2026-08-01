@@ -21,6 +21,14 @@ export function hasCurrentInteractiveAuthority(
   state: InteractiveAuthorityState,
   request: InteractiveAuthority
 ): boolean {
+  return hasCurrentInteractiveSessionAuthority(state, request)
+    && request.operationId === activeOperationId(state.operation);
+}
+
+export function hasCurrentInteractiveSessionAuthority(
+  state: InteractiveAuthorityState,
+  request: InteractiveAuthority
+): boolean {
   const authority = currentRendererSessionAuthority(state);
   return authority !== undefined
     && request.hostEpoch !== undefined
@@ -28,8 +36,7 @@ export function hasCurrentInteractiveAuthority(
     && request.sessionGeneration !== undefined
     && request.hostEpoch === authority.hostEpoch
     && request.sessionId === authority.sessionId
-    && request.sessionGeneration === authority.sessionGeneration
-    && request.operationId === activeOperationId(state.operation);
+    && request.sessionGeneration === authority.sessionGeneration;
 }
 
 export function matchesInteractiveEnvelope(

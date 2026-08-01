@@ -83,6 +83,7 @@ class FakeRuntime {
       }),
       initialize: this.initialize,
       getSnapshot: () => this.snapshot(),
+      getTaskToolMode: () => "auto" as const,
       getSessionTree: this.getSessionTree,
       getWorkspaceChanges: () => ({
         sessionId: `session-${this.id}`,

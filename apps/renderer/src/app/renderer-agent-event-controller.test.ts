@@ -124,6 +124,7 @@ function task(id: "active" | "background") {
     runtime: { phase: "ready" as const, detail: "ready", recoverable: true },
     title: id,
     hasDraft: false,
+    toolMode: "auto" as const,
     attachmentCount: 0
   };
 }

@@ -13,7 +13,11 @@ import { RuntimeError, type ExtensionUiCancellationReason } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
-import type { SafetyPolicyState, DesktopApprovalRequester } from "./safety-extension.js";
+import type {
+  DesktopApprovalRequester,
+  DesktopToolAuthorizationRecorder,
+  SafetyPolicyState
+} from "./safety-extension.js";
 import { createDesktopSessionServices } from "./session-services.js";
 import type { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
@@ -35,6 +39,7 @@ interface RuntimeSessionBindingsOptions {
   projections: RuntimeProjectionController;
   rebindExtensionUi: (session: AgentSession) => Promise<void>;
   requestApproval: DesktopApprovalRequester;
+  recordToolAuthorization: DesktopToolAuthorizationRecorder;
   setSessionCwd: (cwd: string) => void;
 }
 
@@ -171,6 +176,7 @@ export class RuntimeSessionBindings {
       ...(modelRuntime === undefined ? {} : { modelRuntime }),
       getSafety: this.options.getSafety,
       requestApproval: this.options.requestApproval,
+      recordToolAuthorization: this.options.recordToolAuthorization,
       ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess })
     });
   }

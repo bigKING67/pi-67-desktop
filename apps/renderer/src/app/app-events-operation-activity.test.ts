@@ -1,6 +1,7 @@
-import type { ExtensionUiRequestView, OperationView } from "@pi67/domain";
+import type { ApprovalRequestView, ExtensionUiRequestView, OperationView } from "@pi67/domain";
 import { eventEnvelope, type EventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
+import { useApprovalStore } from "../approval/approval-store.js";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -29,8 +30,28 @@ const extension: ExtensionUiRequestView = {
   operationId: "operation-1"
 };
 
+const approval: ApprovalRequestView = {
+  requestId: "approval-1",
+  toolCallId: "tool-1",
+  toolName: "grep",
+  toolSource: "Pi 内置",
+  category: "ambiguous-command",
+  reason: "需要确认",
+  targetKind: "tool",
+  target: "grep",
+  targetTruncated: false,
+  cwd: "/workspace",
+  cwdTruncated: false,
+  scope: "single-tool-call",
+  hostEpoch: 9,
+  sessionId: "session-1",
+  sessionGeneration: 3,
+  operationId: "operation-1"
+};
+
 describe("handleAgentEvent operation activity authority", () => {
   beforeEach(() => {
+    useApprovalStore.setState(useApprovalStore.getInitialState(), true);
     useExtensionUiStore.setState(useExtensionUiStore.getInitialState(), true);
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
@@ -78,6 +99,33 @@ describe("handleAgentEvent operation activity authority", () => {
       payload: { requestId: "extension-1", cancelled: false }
     }, envelope("extension.ui.resolved", { requestId: "extension-1", cancelled: false }));
     expect(useExtensionUiStore.getState().requests).toEqual([]);
+  });
+
+  it("clears exact pending interactive requests when their Operation settles", () => {
+    const state = eventState();
+    const otherApproval = {
+      ...approval,
+      requestId: "approval-other",
+      toolCallId: "tool-other",
+      operationId: "operation-other"
+    };
+    const otherExtension = {
+      ...extension,
+      requestId: "extension-other",
+      operationId: "operation-other"
+    };
+    useApprovalStore.getState().upsertRequest(approval);
+    useApprovalStore.getState().upsertRequest(otherApproval);
+    useExtensionUiStore.getState().upsertRequest(extension);
+    useExtensionUiStore.getState().upsertRequest(otherExtension);
+
+    dispatch(state, {
+      type: "operation.completed",
+      payload: { operationId: "operation-1", completedAt: 20 }
+    }, envelope("operation.completed", { operationId: "operation-1", completedAt: 20 }));
+
+    expect(useApprovalStore.getState().requests).toEqual([otherApproval]);
+    expect(useExtensionUiStore.getState().requests).toEqual([otherExtension]);
   });
 
   it("records an imported Session terminal under the rebound event authority", () => {

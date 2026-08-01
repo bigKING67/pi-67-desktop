@@ -23,6 +23,7 @@ const approval: ApprovalRequestView = {
   requestId: "approval-1",
   toolCallId: "tool-1",
   toolName: "bash",
+  toolSource: "Pi 内置",
   category: "ambiguous-command",
   reason: "需要确认",
   targetKind: "command",

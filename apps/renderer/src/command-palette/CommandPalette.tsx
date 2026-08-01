@@ -5,14 +5,15 @@ import { useAppStore } from "../app/app-store.js";
 import { runRuntimeDoctor, saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { messages } from "../localization/message-catalog.js";
-import {
-  compactRendererSession,
-  invokeRuntimeCommand
-} from "../operation/operation-controller.js";
-import { reloadSessionResources } from "../session/session-control-controller.js";
+import { publishNotification } from "../notifications/notification-store.js";
+import { invokeRuntimeCommand } from "../operation/operation-controller.js";
+import { executePiDesktopAction } from "../pi-actions/pi-desktop-actions.js";
 import { openRendererSession } from "../session/session-lifecycle-controller.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { selectSessionPath } from "../session/session-projection-selectors.js";
+import {
+  selectSessionModels,
+  selectSessionPath
+} from "../session/session-projection-selectors.js";
 import { useShellStore } from "../shell/shell-store.js";
 import {
   buildPaletteActions,
@@ -48,8 +49,10 @@ export function CommandPalette() {
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
   const operation = useAppStore((state) => state.operation);
+  const workspace = useAppStore((state) => state.workspace);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const activeSessionPath = useSessionProjectionStore(selectSessionPath);
+  const models = useSessionProjectionStore(selectSessionModels);
   const sessionReady = useSessionProjectionStore((state) => state.authority.phase === "active");
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState<string>();
@@ -67,11 +70,34 @@ export function CommandPalette() {
       sessionTransitionPending,
       operation
     }),
+    desktopActionContext: {
+      connected,
+      workspaceAvailable: Boolean(workspace),
+      sessionReady,
+      sessionTransitionPending,
+      activeOperation: Boolean(operation && ["submitting", "accepted", "running", "waiting-input"].includes(operation.lifecycle)),
+      configuredModels: models ?? []
+    },
     handlers: {
       openSession: openRendererSession,
       invokeCommand: (command) => void invokeRuntimeCommand(command),
-      reloadResources: reloadSessionResources,
-      compactSession: compactRendererSession,
+      executeDesktopAction: async (descriptor) => {
+        const result = await executePiDesktopAction(descriptor, "", {
+          connected,
+          workspaceAvailable: Boolean(workspace),
+          sessionReady,
+          sessionTransitionPending,
+          activeOperation: Boolean(operation && ["submitting", "accepted", "running", "waiting-input"].includes(operation.lifecycle)),
+          configuredModels: models ?? []
+        });
+        if (result.status === "blocked") {
+          publishNotification({
+            level: "warning",
+            title: `无法执行 /${descriptor.name}`,
+            message: result.message
+          });
+        }
+      },
       openProvider: () => setCredentialDialogOpen(true),
       runDoctor: runRuntimeDoctor,
       openUpdate: () => setUpdateDialogOpen(true),
@@ -82,11 +108,13 @@ export function CommandPalette() {
     connected,
     extensionCommands.commands,
     operation,
+    models,
     sessionReady,
     sessionSearch.sessions,
     sessionTransitionPending,
     setCredentialDialogOpen,
-    setUpdateDialogOpen
+    setUpdateDialogOpen,
+    workspace
   ]);
 
   const projection = useMemo(

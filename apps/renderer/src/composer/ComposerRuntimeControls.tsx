@@ -1,5 +1,5 @@
 import { Brain, ChevronDown, Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Button as AriaButton,
   ListBox,
@@ -42,6 +42,10 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
   const modelSelection = useModelSelectionStore();
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
+  const modelPickerRequestRevision = useShellStore((state) => state.modelPickerRequestRevision);
+  const modelPickerHandledRevision = useShellStore((state) => state.modelPickerHandledRevision);
+  const acknowledgeModelPickerRequest = useShellStore((state) => state.acknowledgeModelPickerRequest);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const streaming = useCommittedConversationStreaming();
   useEffect(() => {
     if (modelSelection.status !== "confirmed") return;
@@ -52,6 +56,11 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
     }, MODEL_CONFIRMATION_VISIBLE_MS);
     return () => window.clearTimeout(timeout);
   }, [modelSelection.revision, modelSelection.status]);
+  useEffect(() => {
+    if (modelPickerRequestRevision <= modelPickerHandledRevision) return;
+    setModelPickerOpen(true);
+    acknowledgeModelPickerRequest(modelPickerRequestRevision);
+  }, [acknowledgeModelPickerRequest, modelPickerHandledRevision, modelPickerRequestRevision]);
   if (!sessionId) return null;
 
   const selectedModelValue = selectedModel
@@ -75,8 +84,10 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
       <div className={styles.modelRuntimeControl}>
         <Select
           aria-label={messages.composer.modelLabel}
+          isOpen={modelPickerOpen}
           isDisabled={disabled || modelSelection.status === "pending"}
           selectedKey={modelValue || null}
+          onOpenChange={setModelPickerOpen}
           onSelectionChange={(key) => {
             if (key === null) return;
             const value = String(key);
@@ -105,7 +116,7 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
                   <span>
                     <strong>{model.label}</strong>
                     <small>
-                      {model.provider} · {model.provider}/{model.id}
+                      {model.provider}/{model.id}
                       {model.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}
                     </small>
                   </span>

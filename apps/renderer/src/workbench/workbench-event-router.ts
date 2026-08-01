@@ -43,10 +43,14 @@ export function routeWorkbenchAgentEvent(
           || messages.runtime.workbench.unnamedSession,
         ...(sessionName ? { pendingTitle: undefined } : {}),
         lifecycle: "idle",
-        runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true }
+        runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },
+        ...(event.type === "runtime.ready" ? { toolMode: event.payload.taskToolMode } : {})
       });
       break;
     }
+    case "task.toolMode.changed":
+      workbench.updateTask(task.id, { toolMode: event.payload.mode });
+      break;
     case "runtime.statusChanged":
       workbench.updateTask(task.id, { runtime: event.payload });
       break;

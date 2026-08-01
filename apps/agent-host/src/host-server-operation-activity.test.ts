@@ -1,4 +1,9 @@
-import type { ExtensionUiCancellationReason, RuntimeOperationActivity } from "@pi67/domain";
+import type {
+  ApprovalResponseDecision,
+  ExtensionUiCancellationReason,
+  RuntimeOperationActivity,
+  TaskToolMode
+} from "@pi67/domain";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
@@ -56,7 +61,7 @@ describe("AgentHostServer operation activity", () => {
       sessionId: "session-activity",
       sessionGeneration: 4,
       operationId,
-      allowed: true
+      decision: "allow-once"
     }, 12);
     port.emit(approval);
     await expectSuccessfulResponse(port, approval.requestId);
@@ -159,7 +164,7 @@ describe("AgentHostServer operation activity", () => {
     expect(runtime.resolvedApprovals).toEqual([{
       requestId: "approval-resync",
       toolCallId: "tool-2",
-      allowed: false
+      decision: "deny"
     }]);
     expect(runtime.resolvedExtensions).toEqual([{
       requestId: "extension-resync",
@@ -207,7 +212,11 @@ class ActivityRuntime {
   private pendingApproval: { requestId: string; toolCallId: string } | undefined;
   private pendingExtensionRequestId: string | undefined;
   readonly cancelReasons: string[] = [];
-  readonly resolvedApprovals: Array<{ requestId: string; toolCallId: string; allowed: boolean }> = [];
+  readonly resolvedApprovals: Array<{
+    requestId: string;
+    toolCallId: string;
+    decision: "deny" | "allow-once" | "enable-task-yolo-and-allow";
+  }> = [];
   readonly resolvedExtensions: Array<{ requestId: string; value: string | boolean | undefined; cancelled: boolean }> = [];
 
   asRuntime(): AgentRuntime {
@@ -219,6 +228,8 @@ class ActivityRuntime {
         return () => undefined;
       },
       getIdentity: () => ({ sessionId: "session-activity", sessionGeneration: 4 }),
+      getTaskToolMode: () => "auto",
+      setTaskToolMode: (mode: TaskToolMode) => mode,
       getSnapshot: () => snapshot(),
       getWorkspaceChanges: () => ({ sessionId: "session-activity", items: [], truncated: false, total: 0 }),
       getExtensionCatalog: () => ({ items: [], total: 0, truncated: false }),
@@ -232,12 +243,21 @@ class ActivityRuntime {
         skippedCount: 0
       }),
       submitPrompt: () => new Promise<void>((resolve) => { this.finish = resolve; }),
-      resolveApproval: (requestId: string, toolCallId: string, allowed: boolean) => {
+      resolveApproval: (
+        requestId: string,
+        toolCallId: string,
+        decision: ApprovalResponseDecision
+      ) => {
         const pending = this.pendingApproval;
-        if (pending?.requestId !== requestId || pending.toolCallId !== toolCallId) return false;
+        if (pending?.requestId !== requestId || pending?.toolCallId !== toolCallId) {
+          return { resolved: false, taskToolMode: "auto" };
+        }
         this.pendingApproval = undefined;
-        this.resolvedApprovals.push({ requestId, toolCallId, allowed });
-        return true;
+        this.resolvedApprovals.push({ requestId, toolCallId, decision });
+        return {
+          resolved: true,
+          taskToolMode: decision === "enable-task-yolo-and-allow" ? "yolo" : "auto"
+        };
       },
       resolveExtensionUi: (requestId: string, value?: string | boolean, cancelled = false) => {
         if (this.pendingExtensionRequestId !== requestId) return false;
@@ -254,7 +274,7 @@ class ActivityRuntime {
         this.pendingExtensionRequestId = undefined;
         const requestIds: string[] = [];
         if (approval) {
-          this.resolvedApprovals.push({ ...approval, allowed: false });
+          this.resolvedApprovals.push({ ...approval, decision: "deny" });
           requestIds.push(approval.requestId);
           this.event({
             type: "approval.cancelled",
@@ -384,6 +404,7 @@ function approvalRequest(requestId: string, toolCallId: string) {
     requestId,
     toolCallId,
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "ambiguous-command" as const,
     reason: "需要确认",
     targetKind: "command" as const,

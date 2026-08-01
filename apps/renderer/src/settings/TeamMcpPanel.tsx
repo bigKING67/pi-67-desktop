@@ -147,8 +147,8 @@ export function TeamMcpPanel() {
       actions={<Button className="secondary-button" isDisabled={busy} onPress={() => void refresh()}>
         <RefreshCw aria-hidden="true" size={14} />刷新
       </Button>}
-      description="这是团队自建 Tavily Bridge（MCP 中转）的 Client Token，不是 Tavily 官方 tvly-… Key，也不会配置到 pi-web-access。"
-      title="团队搜索中转（Tavily Bridge）"
+      description="团队搜索 MCP · 通过自建中转连接。这里配置的是 Client Token，不是 Tavily 官方 tvly-… Key，也不会写入 pi-web-access。"
+      title="Tavily Bridge"
     >
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       {notice ? <SettingsNotice tone="info">{notice}</SettingsNotice> : null}

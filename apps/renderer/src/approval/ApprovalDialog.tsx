@@ -1,4 +1,8 @@
-import type { ApprovalTargetKind, RiskCategory } from "@pi67/domain";
+import type {
+  ApprovalResponseDecision,
+  ApprovalTargetKind,
+  RiskCategory
+} from "@pi67/domain";
 import { useEffect, useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
@@ -14,34 +18,37 @@ import {
 
 export function ApprovalDialog() {
   const request = useApprovalStore((state) => state.requests[0]);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingDecision, setSubmittingDecision] = useState<ApprovalResponseDecision>();
 
-  useEffect(() => setSubmitting(false), [request?.requestId]);
+  useEffect(() => setSubmittingDecision(undefined), [request?.requestId]);
   if (!request) return null;
 
   const toolName = analyzeSecurityLiteral(request.toolName);
+  const toolSource = analyzeSecurityLiteral(request.toolSource);
   const target = analyzeSecurityLiteral(request.target);
   const cwd = analyzeSecurityLiteral(request.cwd);
   const suspiciousCharacterCount = toolName.suspiciousCharacterCount
+    + toolSource.suspiciousCharacterCount
     + target.suspiciousCharacterCount
     + cwd.suspiciousCharacterCount;
   const suspiciousCategories = uniqueCategories([
     ...toolName.categories,
+    ...toolSource.categories,
     ...target.categories,
     ...cwd.categories
   ]);
 
-  const submit = async (allowed: boolean) => {
-    if (submitting) return;
-    setSubmitting(true);
+  const submit = async (decision: ApprovalResponseDecision) => {
+    if (submittingDecision) return;
+    setSubmittingDecision(decision);
     const resolved = await respondToSafetyApproval(
       () => useAppStore.getState(),
       request.requestId,
-      allowed
+      decision
     );
     if (!resolved && useApprovalStore.getState().requests.some(
       (candidate) => candidate.requestId === request.requestId
-    )) setSubmitting(false);
+    )) setSubmittingDecision(undefined);
   };
 
   return (
@@ -71,6 +78,16 @@ export function ApprovalDialog() {
                     <SecurityLiteral analysis={toolName} kind="tool-name" label={messages.approval.toolName} />
                   </dd>
                 </div>
+                <div>
+                  <dt>{messages.approval.toolSource}</dt>
+                  <dd>
+                    <SecurityLiteral
+                      analysis={toolSource}
+                      kind="tool-name"
+                      label={messages.approval.toolSource}
+                    />
+                  </dd>
+                </div>
                 <div><dt>{messages.approval.risk}</dt><dd>{riskLabel(request.category)}</dd></div>
                 <div>
                   <dt>{targetKindLabel(request.targetKind)}</dt>
@@ -95,13 +112,23 @@ export function ApprovalDialog() {
                 <div><dt>{messages.approval.approvalScope}</dt><dd>{messages.approval.singleToolCall}</dd></div>
               </dl>
               <p className={styles.denial}>{messages.approval.denialNotice}</p>
+              <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>
             </div>
             <div className={`dialog-actions ${styles.actions}`}>
-              <Button autoFocus className="secondary-button" isDisabled={submitting} onPress={() => void submit(false)}>
-                {submitting ? messages.approval.submitting : messages.approval.deny}
+              <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined} onPress={() => void submit("deny")}>
+                {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
               </Button>
-              <Button className="primary-button" isDisabled={submitting} onPress={() => void submit(true)}>
-                {messages.approval.allowOnce}
+              <Button className="primary-button" isDisabled={submittingDecision !== undefined} onPress={() => void submit("allow-once")}>
+                {submittingDecision === "allow-once" ? messages.approval.submitting : messages.approval.allowOnce}
+              </Button>
+              <Button
+                className={styles.yoloButton!}
+                isDisabled={submittingDecision !== undefined}
+                onPress={() => void submit("enable-task-yolo-and-allow")}
+              >
+                {submittingDecision === "enable-task-yolo-and-allow"
+                  ? messages.approval.submitting
+                  : messages.approval.enableTaskYolo}
               </Button>
             </div>
           </div>

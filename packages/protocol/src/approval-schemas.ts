@@ -9,7 +9,10 @@ const ApprovalIdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
 
 const RiskCategorySchema = Type.Union([
   Type.Literal("workspace-read"),
+  Type.Literal("resource-read"),
   Type.Literal("workspace-write"),
+  Type.Literal("workspace-command"),
+  Type.Literal("capability-read"),
   Type.Literal("external-path"),
   Type.Literal("bulk-delete"),
   Type.Literal("destructive-shell"),
@@ -19,6 +22,12 @@ const RiskCategorySchema = Type.Union([
   Type.Literal("download-and-execute"),
   Type.Literal("network-read"),
   Type.Literal("network-side-effect"),
+  Type.Literal("configured-operation"),
+  Type.Literal("persistent-state-write"),
+  Type.Literal("persistent-state-delete"),
+  Type.Literal("external-submit"),
+  Type.Literal("credential-or-auth"),
+  Type.Literal("unverified-tool"),
   Type.Literal("ambiguous-command")
 ]);
 
@@ -30,6 +39,7 @@ export const ApprovalRequestSchema = strictObject({
   hostEpoch: Type.Integer({ minimum: 0 }),
   toolCallId: Type.String({ minLength: 1, maxLength: 512 }),
   toolName: Type.String({ minLength: 1, maxLength: 256 }),
+  toolSource: Type.String({ minLength: 1, maxLength: 512 }),
   category: RiskCategorySchema,
   reason: Type.String({ minLength: 1, maxLength: 512 }),
   targetKind: Type.Union([Type.Literal("command"), Type.Literal("path"), Type.Literal("tool")]),
@@ -46,7 +56,11 @@ export const ApprovalRespondSchema = strictObject({
   sessionId: ApprovalIdentifierSchema,
   sessionGeneration: Type.Integer({ minimum: 0 }),
   operationId: ApprovalIdentifierSchema,
-  allowed: Type.Boolean()
+  decision: Type.Union([
+    Type.Literal("deny"),
+    Type.Literal("allow-once"),
+    Type.Literal("enable-task-yolo-and-allow")
+  ])
 });
 
 const ApprovalTerminalIdentitySchema = strictObject({
@@ -57,7 +71,11 @@ const ApprovalTerminalIdentitySchema = strictObject({
 export const ApprovalResolvedSchema = strictObject({
   requestId: ApprovalIdentifierSchema,
   toolCallId: ApprovalIdentifierSchema,
-  allowed: Type.Boolean()
+  decision: Type.Union([
+    Type.Literal("deny"),
+    Type.Literal("allow-once"),
+    Type.Literal("enable-task-yolo-and-allow")
+  ])
 });
 
 export const ApprovalCancelledSchema = strictObject({

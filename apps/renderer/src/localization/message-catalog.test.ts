@@ -18,6 +18,7 @@ describe("Renderer message catalog", () => {
     expect(catalog.extensionCatalog.countSummary(1, 2)).toBe("1 命令 · 2 工具");
     expect(catalog.operation.completed).toBe("任务已完成");
     expect(catalog.approval.risks["network-read"]).toBe("读取外部网络信息");
+    expect(catalog.approval.risks["capability-read"]).toBe("检查当前会话已加载的工具能力");
   });
 
   it("centralizes relative and notification date formatting", () => {

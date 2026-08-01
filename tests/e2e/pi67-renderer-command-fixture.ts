@@ -60,6 +60,7 @@ export function installMockCommandResponseHandler({
       eventSequence: current.sequence,
       hostEpoch,
       sessionGeneration: current.sessionGeneration,
+      taskToolMode: current.taskToolMode,
       ...current.resyncOperations
     };
     if (type === "workspace.changes") return current.workspaceChanges;
@@ -171,7 +172,18 @@ export function installMockCommandResponseHandler({
         ...(typeof payload.operationId === "string" ? { operationId: payload.operationId } : {})
       };
     }
-    if (type === "extension.ui.respond" || type === "approval.respond") return { resolved: true };
+    if (type === "extension.ui.respond") return { resolved: true };
+    if (type === "approval.respond") {
+      if (payload.decision === "enable-task-yolo-and-allow") current.taskToolMode = "yolo";
+      return { resolved: true, taskToolMode: current.taskToolMode };
+    }
+    if (type === "task.toolMode.set") {
+      if (payload.mode !== "ask" && payload.mode !== "auto" && payload.mode !== "yolo") {
+        throw new Error("Invalid mock task tool mode.");
+      }
+      current.taskToolMode = payload.mode;
+      return { mode: current.taskToolMode };
+    }
     if (type === "task.close") return { closed: true, stopped: payload.mode === "stop" };
     if (type === "doctor.run") return {
       generatedAt: Date.now(),

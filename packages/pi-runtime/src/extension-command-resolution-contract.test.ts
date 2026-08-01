@@ -30,7 +30,7 @@ describe("Pi extension command resolution contract", () => {
       cwd,
       agentDir,
       runtimeApiKeys: new Map(),
-      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
+      getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided", taskToolMode: "ask" }),
       requestApproval: async () => ({ status: "denied" })
     });
     const { session } = await createAgentSessionFromServices({

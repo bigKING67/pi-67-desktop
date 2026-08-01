@@ -12,6 +12,7 @@ describe("ApprovalRequestSchema", () => {
       hostEpoch: 1,
       toolCallId: "tool-call-1",
       toolName: "web_search",
+      toolSource: "pi-web-access@0.17.0",
       category: "network-read",
       reason: "访问外部网络获取信息",
       targetKind: "tool",
@@ -23,6 +24,14 @@ describe("ApprovalRequestSchema", () => {
     };
 
     expect(Value.Check(ApprovalRequestSchema, request)).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "resource-read" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "workspace-command" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "capability-read" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "configured-operation" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "persistent-state-write" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "persistent-state-delete" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "external-submit" })).toBe(true);
+    expect(Value.Check(ApprovalRequestSchema, { ...request, category: "credential-or-auth" })).toBe(true);
     expect(Value.Check(ApprovalRequestSchema, { ...request, category: "unknown-risk" })).toBe(false);
   });
 });

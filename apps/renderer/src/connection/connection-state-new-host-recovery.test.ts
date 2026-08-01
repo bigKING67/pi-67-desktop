@@ -69,7 +69,7 @@ describe("new Host Session recovery", () => {
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "runtime.initialize") {
         const restoredSnapshot = snapshot();
-        const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot };
+        const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot, taskToolMode: "auto" as const };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
           eventEnvelope("runtime.ready", payload, taskEventFixture({
@@ -106,7 +106,7 @@ describe("new Host Session recovery", () => {
     vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "runtime.initialize") {
         const restoredSnapshot = snapshot();
-        const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot };
+        const payload = { capabilities: RUNTIME_CAPABILITIES, snapshot: restoredSnapshot, taskToolMode: "auto" as const };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
           eventEnvelope("runtime.ready", payload, taskEventFixture({

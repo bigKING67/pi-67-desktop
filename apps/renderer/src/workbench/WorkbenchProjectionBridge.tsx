@@ -166,7 +166,8 @@ export function workbenchTaskFromProjection({
       : {}),
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: existing?.hasDraft ?? false,
-    attachmentCount: existing?.attachmentCount ?? 0
+    attachmentCount: existing?.attachmentCount ?? 0,
+    toolMode: existing?.toolMode ?? "auto"
   };
 }
 

@@ -6,14 +6,14 @@ import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionGeneration,
-  selectSessionId
+  selectSessionId,
+  selectSessionModels
 } from "../session/session-projection-selectors.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
 import { subscribeToComposerPrefill } from "./composer-events.js";
 import { submitRendererPrompt } from "./prompt-submission-controller.js";
 import { ExtensionWidgets } from "./ExtensionWidgets.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
-import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { messages } from "../localization/message-catalog.js";
 import styles from "./Composer.module.css";
 import {
@@ -36,21 +36,32 @@ import { abortActiveOperation } from "../operation/operation-controller.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import {
-  exactSlashCommand,
   filterSlashCommands,
   insertSlashCommand,
   isSlashInvocation,
+  resolveSlashSubmission,
   slashQueryFromDraft
 } from "./composer-slash-commands.js";
-import { SlashCommandPicker, slashCommandOptionId } from "./SlashCommandPicker.js";
+import { SlashCommandPicker } from "./SlashCommandPicker.js";
 import { useComposerSlashCatalog } from "./use-composer-slash-catalog.js";
+import { ComposerTextarea } from "./ComposerTextarea.js";
+import {
+  executePiDesktopAction,
+  type PiDesktopActionContext
+} from "../pi-actions/pi-desktop-actions.js";
+import { ToolModeSelector } from "./ToolModeSelector.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
   const operation = useAppStore((state) => state.operation);
+  const workspace = useAppStore((state) => state.workspace);
+  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
+  const resourcesRevision = useSessionProjectionStore((state) => state.revisions.resources);
+  const models = useSessionProjectionStore(selectSessionModels) ?? [];
+  const sessionReady = useSessionProjectionStore((state) => state.authority.phase === "active");
   const widgets = useExtensionUiStore((state) => state.widgets);
   const activeTaskId = useWorkbenchStore((state) => selectedWorkbenchTask(state)?.id);
   const draft = useTaskDraftStore((state) => (
@@ -80,14 +91,22 @@ export function Composer() {
     && operation.sessionGeneration === sessionGeneration
   );
   const widgetItems = Object.values(widgets);
-  const slashCatalog = useComposerSlashCatalog({ connected, hostEpoch, sessionId });
+  const slashCatalog = useComposerSlashCatalog({ connected, hostEpoch, resourcesRevision, sessionId });
   const slashQuery = useMemo(() => slashQueryFromDraft(text), [text]);
   const slashCommands = useMemo(() => (
-    slashQuery && slashCatalog.status === "ready"
+    slashQuery
       ? filterSlashCommands(slashCatalog.catalog, slashQuery)
       : []
   ), [slashCatalog, slashQuery]);
   const slashPickerOpen = slashQuery !== undefined && dismissedSlashDraft !== text;
+  const piDesktopActionContext: PiDesktopActionContext = {
+    connected,
+    workspaceAvailable: Boolean(workspace),
+    sessionReady,
+    sessionTransitionPending,
+    activeOperation: Boolean(operation && isActiveOperationLifecycle(operation.lifecycle)),
+    configuredModels: models
+  };
 
   const setText = (value: string) => {
     if (activeTaskId) useTaskDraftStore.getState().setText(activeTaskId, value);
@@ -116,7 +135,7 @@ export function Composer() {
 
   useEffect(() => {
     setSlashActiveIndex(0);
-  }, [slashCatalog.status, text]);
+  }, [slashCatalog.runtimeStatus, text]);
 
   useEffect(() => {
     if (!activeTaskId) return;
@@ -131,16 +150,35 @@ export function Composer() {
     const nextText = text.trim();
     const nextAttachments = attachments;
     if (isSlashInvocation(nextText)) {
-      if (slashCatalog.status !== "ready") {
-        setSubmissionError(messages.composer.slashCatalogUnavailable);
+      const slashRoute = resolveSlashSubmission(nextText, slashCatalog.catalog);
+      if (slashRoute.kind === "desktop-action") {
+        setSubmitting(true);
+        setSubmissionError(undefined);
+        try {
+          const result = await executePiDesktopAction(
+            slashRoute.action,
+            slashRoute.arguments,
+            piDesktopActionContext
+          );
+          if (result.status === "blocked") {
+            setSubmissionError(result.message);
+            return;
+          }
+          setText("");
+          submissionIdRef.current = undefined;
+        } catch (error) {
+          setSubmissionError(error instanceof Error ? error.message : messages.composer.commandFailed);
+        } finally {
+          setSubmitting(false);
+        }
         return;
       }
-      const slashCommand = exactSlashCommand(nextText, slashCatalog.catalog);
-      if (!slashCommand && slashCatalog.catalog.truncated) {
-        setSubmissionError(messages.composer.slashCatalogTruncated);
+      if (slashRoute.kind === "unsupported-pi-builtin") {
+        setDismissedSlashDraft(nextText);
+        setSubmissionError(messages.composer.unsupportedPiBuiltin(slashRoute.name));
         return;
       }
-      if (slashCommand?.source === "extension") {
+      if (slashRoute.kind === "extension") {
         if (streaming) {
           setSubmissionError(messages.composer.commandUnavailableWhileRunning);
           return;
@@ -154,7 +192,7 @@ export function Composer() {
         try {
           const submissionId = submissionIdRef.current ?? crypto.randomUUID();
           submissionIdRef.current = submissionId;
-          if (!await invokeRuntimeCommand(nextText.replace(/^\//u, ""), submissionId)) {
+          if (!await invokeRuntimeCommand(slashRoute.command, submissionId)) {
             setSubmissionError(messages.composer.commandFailed);
             return;
           }
@@ -288,68 +326,29 @@ export function Composer() {
             ))}
           </div>
         ) : null}
-        <textarea
-          ref={textInput}
-          aria-activedescendant={slashPickerOpen && slashCommands.length > 0
-            ? slashCommandOptionId(Math.min(slashActiveIndex, slashCommands.length - 1))
-            : undefined}
-          aria-autocomplete="list"
-          aria-controls={slashPickerOpen ? "composer-slash-command-list" : undefined}
-          aria-expanded={slashPickerOpen}
-          aria-label={messages.composer.inputLabel}
+        <ComposerTextarea
           disabled={submitting}
-          value={text}
-          placeholder={streaming
-            ? messages.composer.streamingPlaceholder
-            : messages.composer.idlePlaceholder}
-          onChange={(event) => {
+          inputRef={textInput}
+          slashActiveIndex={slashActiveIndex}
+          slashCatalog={slashCatalog.catalog}
+          slashCommands={slashCommands}
+          slashPickerOpen={slashPickerOpen}
+          streaming={streaming}
+          text={text}
+          onAddAttachments={(files) => void addAttachments(files)}
+          onSlashActiveIndexChange={setSlashActiveIndex}
+          onSlashComplete={(command) => {
+            submissionIdRef.current = undefined;
+            setSubmissionError(undefined);
+            setText(insertSlashCommand(text, command));
+          }}
+          onSlashDismiss={() => setDismissedSlashDraft(text)}
+          onSubmit={() => void submit()}
+          onTextChange={(value) => {
             submissionIdRef.current = undefined;
             setSubmissionError(undefined);
             setDismissedSlashDraft(undefined);
-            setText(event.target.value);
-          }}
-          onPaste={(event) => {
-            const files = filesFromTransfer(event.clipboardData);
-            if (files.length === 0) return;
-            event.preventDefault();
-            void addAttachments(files);
-          }}
-          onKeyDown={(event) => {
-            if (slashPickerOpen && !isImeConfirmationKey(event.nativeEvent)) {
-              if (event.key === "ArrowDown" && slashCommands.length > 0) {
-                event.preventDefault();
-                setSlashActiveIndex((current) => (current + 1) % slashCommands.length);
-                return;
-              }
-              if (event.key === "ArrowUp" && slashCommands.length > 0) {
-                event.preventDefault();
-                setSlashActiveIndex((current) => (current - 1 + slashCommands.length) % slashCommands.length);
-                return;
-              }
-              if ((event.key === "Enter" || event.key === "Tab") && slashCommands.length > 0) {
-                event.preventDefault();
-                const command = slashCommands[Math.min(slashActiveIndex, slashCommands.length - 1)];
-                if (command) {
-                  submissionIdRef.current = undefined;
-                  setSubmissionError(undefined);
-                  setText(insertSlashCommand(text, command));
-                }
-                return;
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setDismissedSlashDraft(text);
-                return;
-              }
-            }
-            if (
-              event.key === "Enter"
-              && !event.shiftKey
-              && !isImeConfirmationKey(event.nativeEvent)
-            ) {
-              event.preventDefault();
-              void submit();
-            }
+            setText(value);
           }}
         />
         <div className={styles.toolbar}>
@@ -368,6 +367,7 @@ export function Composer() {
               }}
             />
             <Button className={`icon-button ${styles.attachmentButton}`} aria-label={messages.composer.addAttachment} isDisabled={submitting || stagingAttachments} onPress={() => fileInput.current?.click()}><Plus size={17} /></Button>
+            <ToolModeSelector />
             {streaming ? (
               <div className={styles.streamMode} aria-label={messages.composer.streamingDelivery}>
                 <button

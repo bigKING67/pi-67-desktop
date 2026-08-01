@@ -35,7 +35,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
     sessionId: "session-test",
     sessionGeneration: 1,
     operationId,
-    allowed: false
+    decision: "deny"
   });
 
   await emitMockAgentEvent(page, approvalRequest(operationId, "approval-allow", "git fetch origin"), { operationId });
@@ -49,8 +49,23 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
     sessionId: "session-test",
     sessionGeneration: 1,
     operationId,
-    allowed: true
+    decision: "allow-once"
   });
+
+  await emitMockAgentEvent(page, approvalRequest(operationId, "approval-yolo", "git push yolo"), { operationId });
+  await page.getByRole("button", { name: "本任务开启 YOLO" }).click();
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).find((command) => command.type === "approval.respond"
+    && (command.payload as { requestId?: string }).requestId === "approval-yolo")?.payload).toEqual({
+    requestId: "approval-yolo",
+    toolCallId: "tool-approval-yolo",
+    sessionId: "session-test",
+    sessionGeneration: 1,
+    operationId,
+    decision: "enable-task-yolo-and-allow"
+  });
+  await expect(page.getByRole("button", { name: "工具执行模式：YOLO" })).toBeVisible();
 
   const stale = approvalRequest(operationId, "approval-stale", "git push stale");
   await emitMockAgentEvent(page, {
@@ -70,7 +85,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   }, { operationId });
   await expect(page.getByRole("heading", { name: "需要单次授权" })).toHaveCount(0);
 
-  await setMockAgentResponseResult(page, "approval.respond", { resolved: false });
+  await setMockAgentResponseResult(page, "approval.respond", { resolved: false, taskToolMode: "yolo" });
   await emitMockAgentEvent(page, approvalRequest(operationId, "approval-expired", "git push expired"), { operationId });
   await page.getByRole("button", { name: "仅允许本次" }).click();
   await expect(page.getByRole("heading", { name: "需要单次授权" })).toHaveCount(0);
@@ -96,6 +111,7 @@ test("renders a host-authored network-read approval when one is required", async
       hostEpoch: 1,
       toolCallId: "tool-web-search",
       toolName: "custom_network_reader",
+      toolSource: "custom-network@1.0.0",
       category: "network-read",
       reason: "访问外部网络获取信息",
       targetKind: "tool",
@@ -111,7 +127,9 @@ test("renders a host-authored network-read approval when one is required", async
   await expect(page.getByText("读取外部网络信息", { exact: true })).toBeVisible();
   await expect(page.getByText("杭州天气", { exact: true })).toBeVisible();
   await expect(page.getByText("custom_network_reader", { exact: true })).toBeVisible();
+  await expect(page.getByText("custom-network@1.0.0", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "仅允许本次" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
 });
 
 test("renders suspicious approval bytes safely and keeps decisions reachable at constrained height", async ({ page }) => {
@@ -155,12 +173,15 @@ test("renders suspicious approval bytes safely and keeps decisions reachable at 
 
   const reject = page.getByRole("button", { name: "拒绝" });
   const allow = page.getByRole("button", { name: "仅允许本次" });
+  const yolo = page.getByRole("button", { name: "本任务开启 YOLO" });
   await expect(reject).toBeFocused();
   await expect(reject).toBeVisible();
   await expect(allow).toBeVisible();
-  const [rejectBox, allowBox, scrollMetrics] = await Promise.all([
+  await expect(yolo).toBeVisible();
+  const [rejectBox, allowBox, yoloBox, scrollMetrics] = await Promise.all([
     reject.boundingBox(),
     allow.boundingBox(),
+    yolo.boundingBox(),
     page.locator('[data-approval-scroll-region="true"]').evaluate((element) => ({
       clientHeight: element.clientHeight,
       scrollHeight: element.scrollHeight
@@ -168,8 +189,10 @@ test("renders suspicious approval bytes safely and keeps decisions reachable at 
   ]);
   expect(rejectBox).not.toBeNull();
   expect(allowBox).not.toBeNull();
+  expect(yoloBox).not.toBeNull();
   expect((rejectBox?.y ?? 0) + (rejectBox?.height ?? 0)).toBeLessThanOrEqual(360);
   expect((allowBox?.y ?? 0) + (allowBox?.height ?? 0)).toBeLessThanOrEqual(360);
+  expect((yoloBox?.y ?? 0) + (yoloBox?.height ?? 0)).toBeLessThanOrEqual(360);
   expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight);
 
   const scrollRegion = page.locator('[data-approval-scroll-region="true"]');
@@ -205,7 +228,7 @@ test("renders suspicious approval bytes safely and keeps decisions reachable at 
     sessionId: "session-test",
     sessionGeneration: 1,
     operationId,
-    allowed: false
+    decision: "deny"
   });
 });
 
@@ -237,6 +260,7 @@ function approvalRequest(operationId: string, requestId: string, target: string)
       hostEpoch: 1,
       toolCallId: `tool-${requestId}`,
       toolName: "bash",
+      toolSource: "Pi 内置",
       category: "git-external-action",
       reason: "访问或修改远程 Git 状态",
       targetKind: "command",

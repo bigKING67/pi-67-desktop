@@ -49,7 +49,7 @@ describe("provider configuration controller", () => {
     await expect(loadProviderConfiguration("workspace-a")).resolves.toBe(true);
     expect(request).toHaveBeenNthCalledWith(1,
       "workspace.register",
-      { cwd: "/work/a", trust: "trusted", approvalMode: "guided" },
+      { cwd: "/work/a", trust: "trusted", approvalMode: "balanced" },
       [],
       { context: { scope: "workspace", workspaceId: "workspace-a" } }
     );

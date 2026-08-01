@@ -1,5 +1,10 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { OperationActivity, RuntimeOperationActivity, ToolPresentationKind } from "@pi67/domain";
+import type {
+  OperationActivity,
+  RuntimeOperationActivity,
+  ToolAuthorizationProjection,
+  ToolPresentationKind
+} from "@pi67/domain";
 import { desktopToolAliasTarget } from "./tool-routing-extension.js";
 
 const MAX_ACTIVE_TOOLS = 64;
@@ -16,7 +21,24 @@ export class OperationActivityProjector {
     this.current = undefined;
   }
 
-  handle(event: AgentSessionEvent, toolKind: ToolPresentationKind = "generic"): void {
+  recordToolAuthorization(
+    toolCallId: string,
+    authorization: ToolAuthorizationProjection
+  ): void {
+    const active = this.activeTools.get(toolCallId);
+    if (!active) return;
+    const updated = { ...active, authorization };
+    this.activeTools.set(toolCallId, updated);
+    if (this.current?.kind === "tool" && this.current.toolCallId === toolCallId) {
+      this.publish(updated);
+    }
+  }
+
+  handle(
+    event: AgentSessionEvent,
+    toolKind: ToolPresentationKind = "generic",
+    authorization?: ToolAuthorizationProjection
+  ): void {
     switch (event.type) {
       case "agent_start":
       case "turn_start":
@@ -48,7 +70,8 @@ export class OperationActivityProjector {
           toolName,
           toolKind,
           status: "running",
-          ...(aliasTarget === undefined ? {} : { aliasTarget })
+          ...(aliasTarget === undefined ? {} : { aliasTarget }),
+          ...(authorization === undefined ? {} : { authorization })
         } as const;
         this.activeTools.delete(event.toolCallId);
         this.activeTools.set(event.toolCallId, activity);
@@ -61,13 +84,15 @@ export class OperationActivityProjector {
         this.activeTools.delete(event.toolCallId);
         const toolName = active?.toolName ?? safeToolName(event.toolName);
         const aliasTarget = active?.aliasTarget ?? desktopToolAliasTarget(toolName);
+        const resolvedAuthorization = active?.authorization ?? authorization;
         this.publish({
           kind: "tool",
           toolCallId: event.toolCallId,
           toolName,
           toolKind: active?.toolKind ?? "generic",
           status: event.isError ? "failed" : "completed",
-          ...(aliasTarget === undefined ? {} : { aliasTarget })
+          ...(aliasTarget === undefined ? {} : { aliasTarget }),
+          ...(resolvedAuthorization === undefined ? {} : { authorization: resolvedAuthorization })
         });
         const next = lastActiveTool(this.activeTools);
         if (next) this.publish(next);
@@ -122,7 +147,9 @@ function sameActivity(
       && left.toolName === right.toolName
       && left.toolKind === right.toolKind
       && left.status === right.status
-      && left.aliasTarget === right.aliasTarget;
+      && left.aliasTarget === right.aliasTarget
+      && left.authorization?.mode === right.authorization?.mode
+      && left.authorization?.reason === right.authorization?.reason;
   }
   return true;
 }

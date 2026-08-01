@@ -52,9 +52,7 @@ export interface SessionCatalogFixtureOptions {
   incomplete?: boolean;
   skippedCount?: number;
 }
-
 export type SessionCatalogFixturePatch = SessionCatalogFixtureOptions;
-
 export interface SessionCatalogRequestRecord {
   hostEpoch: number;
   payload: {
@@ -124,6 +122,7 @@ export async function installSessionCatalogFixture(
       hostEpoch: number;
       sequence: number;
       sessionGeneration: number;
+      taskToolMode: "ask" | "auto" | "yolo";
       snapshot: Record<string, unknown>;
       workspaceChanges: Record<string, unknown>;
       extensionCatalog: Record<string, unknown>;
@@ -197,7 +196,8 @@ export async function installSessionCatalogFixture(
               sessionCatalogStatus: catalogStatus(catalog),
               eventSequence: agent.sequence,
               hostEpoch: agent.hostEpoch,
-              sessionGeneration: agent.sessionGeneration
+              sessionGeneration: agent.sessionGeneration,
+              taskToolMode: agent.taskToolMode
             }
           });
           return;

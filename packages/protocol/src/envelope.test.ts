@@ -174,7 +174,8 @@ describe("protocol v3 envelopes", () => {
           }
         }
       },
-      snapshot: emptySnapshot()
+      snapshot: emptySnapshot(),
+      taskToolMode: "auto"
     }, taskEventContext(1, 1, 1));
     expect(isEventEnvelope(ready)).toBe(true);
     expect(isEventEnvelope({
@@ -397,7 +398,8 @@ describe("protocol v3 envelopes", () => {
           }
         }
       },
-      snapshot: oversized
+      snapshot: oversized,
+      taskToolMode: "auto"
     }, taskEventContext(1, 1, 1));
     expect(isEventEnvelope(ready)).toBe(false);
   });

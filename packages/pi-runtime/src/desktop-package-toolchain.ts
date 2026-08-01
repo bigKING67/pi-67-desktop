@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { PackageSource, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
 
@@ -14,6 +14,13 @@ interface DesktopReloadHook {
 }
 
 const desktopReloadHooks = new WeakMap<object, DesktopReloadHook>();
+
+const PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS = [
+  "-extensions/pi-hy-memory/index.ts",
+  "-extensions/pi-rules-loader/index.ts",
+  "-extensions/pi-vision-bridge/index.ts",
+  "-extensions/xtalpi-pi-tools/index.ts"
+] as const;
 
 export interface DesktopPackageToolchain {
   readonly desktop: boolean;
@@ -130,9 +137,11 @@ export function createDesktopPackageSettingsView(
       if (property === "getGlobalSettings") {
         return () => {
           const settings = target.getGlobalSettings();
+          const packages = desktopCapabilityPackages(settings.packages ?? [], environment);
           return {
             ...settings,
-            packages: desktopCapabilityPackages(settings.packages ?? [], environment)
+            packages,
+            extensions: desktopExtensionOverrides(settings.extensions ?? [], packages, environment)
           };
         };
       }
@@ -145,6 +154,22 @@ export function createDesktopPackageSettingsView(
       return typeof value === "function" ? value.bind(target) : value;
     }
   });
+}
+
+function desktopExtensionOverrides(
+  configured: string[],
+  packages: PackageSource[],
+  environment: NodeJS.ProcessEnv
+): string[] {
+  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
+  if (!managedRoot || !isAbsolute(managedRoot)) return configured;
+  const pi67CoreRoot = join(managedRoot, "packages", "pi67-core");
+  const hasManagedPi67Core = packages.some((entry) => {
+    const source = typeof entry === "string" ? entry : entry.source;
+    return isSameAbsolutePath(source, pi67CoreRoot);
+  });
+  if (!hasManagedPi67Core) return configured;
+  return [...new Set([...configured, ...PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS])];
 }
 
 function releaseDesktopReloadHook(
@@ -211,10 +236,15 @@ function withoutDesktopCapabilityPackages(
 
 function isSameOrContainedAbsolutePath(candidate: string, root: string): boolean {
   if (!isAbsolute(candidate)) return false;
+  return isSameAbsolutePath(candidate, root) || isContainedAbsolutePath(candidate, root);
+}
+
+function isSameAbsolutePath(candidate: string, expected: string): boolean {
+  if (!isAbsolute(candidate) || !isAbsolute(expected)) return false;
   const normalize = process.platform === "win32"
     ? (value: string) => resolve(value).toLowerCase()
     : (value: string) => resolve(value);
-  return normalize(candidate) === normalize(root) || isContainedAbsolutePath(candidate, root);
+  return normalize(candidate) === normalize(expected);
 }
 
 function isContainedAbsolutePath(candidate: string, root: string): boolean {

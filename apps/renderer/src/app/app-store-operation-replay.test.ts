@@ -49,12 +49,15 @@ describe("renderer Operation submission replay", () => {
   });
 
   it("applies a lost compaction receipt as recoverable interruption", async () => {
-    vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
       terminalReceipt("operation-lost", "compaction", "lost") as never
     );
 
-    await compactRendererSession();
+    await compactRendererSession("keep decisions");
 
+    expect(request).toHaveBeenCalledWith("session.compact", expect.objectContaining({
+      instructions: "keep decisions"
+    }));
     expect(useAppStore.getState().operation).toMatchObject({
       operationId: "operation-lost",
       lifecycle: "lost",

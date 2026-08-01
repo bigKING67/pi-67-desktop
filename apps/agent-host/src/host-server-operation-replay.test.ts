@@ -225,6 +225,7 @@ async function createHarness(overrides: Partial<AgentRuntime>): Promise<{
     subscribe: () => () => undefined,
     getIdentity: () => ({ sessionId: "session-operation-replay", sessionGeneration: 7 }),
     getSnapshot: () => emptySnapshot(),
+    getTaskToolMode: () => "auto" as const,
     getWorkspaceChanges: () => ({
       sessionId: "session-operation-replay",
       items: [],

@@ -39,9 +39,10 @@ describe("AgentHostServer safety approval", () => {
   it("binds approval responses to the active Host, session, operation and tool call", async () => {
     let emit: ((event: AgentEvent) => void) | undefined;
     let finishPrompt!: () => void;
-    const resolveApproval = vi.fn((requestId: string, toolCallId: string) => (
-      requestId === "approval-request-1" && toolCallId === "tool-call-1"
-    ));
+    const resolveApproval = vi.fn((requestId: string, toolCallId: string) => ({
+      resolved: requestId === "approval-request-1" && toolCallId === "tool-call-1",
+      taskToolMode: "auto" as const
+    }));
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: (listener: (event: AgentEvent) => void) => {
@@ -49,6 +50,7 @@ describe("AgentHostServer safety approval", () => {
         return () => undefined;
       },
       getIdentity: () => ({ sessionId: "session-approval", sessionGeneration: 7 }),
+      getTaskToolMode: () => "auto",
       submitPrompt: () => new Promise<void>((resolve) => {
         finishPrompt = resolve;
         emit?.({
@@ -57,6 +59,7 @@ describe("AgentHostServer safety approval", () => {
             requestId: "approval-request-1",
             toolCallId: "tool-call-1",
             toolName: "bash",
+            toolSource: "Pi 内置",
             category: "git-external-action",
             reason: "访问或修改远程 Git 状态",
             targetKind: "command",
@@ -118,7 +121,7 @@ describe("AgentHostServer safety approval", () => {
       sessionId: "session-approval",
       sessionGeneration: 6,
       operationId,
-      allowed: true
+      decision: "allow-once"
     }, 12);
     port.emitMessage(staleSession);
     await expectResponse(port, staleSession.requestId, { ok: false, error: { code: "STALE_SESSION_GENERATION" } });
@@ -129,7 +132,7 @@ describe("AgentHostServer safety approval", () => {
       sessionId: "session-approval",
       sessionGeneration: 7,
       operationId: "operation-stale",
-      allowed: true
+      decision: "allow-once"
     }, 12);
     port.emitMessage(staleOperation);
     await expectResponse(port, staleOperation.requestId, { ok: false, error: { code: "STALE_OPERATION" } });
@@ -140,7 +143,7 @@ describe("AgentHostServer safety approval", () => {
       sessionId: "session-approval",
       sessionGeneration: 7,
       operationId,
-      allowed: true
+      decision: "allow-once"
     }, 12);
     port.emitMessage(wrongTool);
     await expectResponse(port, wrongTool.requestId, { ok: true, result: { resolved: false } });
@@ -151,7 +154,7 @@ describe("AgentHostServer safety approval", () => {
       sessionId: "session-approval",
       sessionGeneration: 7,
       operationId,
-      allowed: true
+      decision: "allow-once"
     }, 12);
     port.emitMessage(current);
     await expectResponse(port, current.requestId, { ok: true, result: { resolved: true } });
@@ -163,7 +166,7 @@ describe("AgentHostServer safety approval", () => {
 
   it("fails an approval closed instead of publishing it without active operation authority", async () => {
     let emit: ((event: AgentEvent) => void) | undefined;
-    const resolveApproval = vi.fn(() => true);
+    const resolveApproval = vi.fn(() => ({ resolved: true, taskToolMode: "auto" as const }));
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: (listener: (event: AgentEvent) => void) => {
@@ -187,6 +190,7 @@ describe("AgentHostServer safety approval", () => {
         requestId: "approval-without-operation",
         toolCallId: "tool-call-idle",
         toolName: "bash",
+        toolSource: "Pi 内置",
         category: "ambiguous-command",
         reason: "执行无法安全分类的命令",
         targetKind: "command",
@@ -198,7 +202,7 @@ describe("AgentHostServer safety approval", () => {
       }
     });
 
-    expect(resolveApproval).toHaveBeenCalledWith("approval-without-operation", "tool-call-idle", false);
+    expect(resolveApproval).toHaveBeenCalledWith("approval-without-operation", "tool-call-idle", "deny");
     expect(port.sent.some((value) => isEventEnvelope(value) && value.type === "approval.requested")).toBe(false);
     await server.shutdown();
   });
@@ -239,7 +243,7 @@ describe("AgentHostServer safety approval", () => {
   it("denies a new approval immediately when its active operation has no deliverable connection", async () => {
     let emit: ((event: AgentEvent) => void) | undefined;
     let finishPrompt!: () => void;
-    const resolveApproval = vi.fn(() => true);
+    const resolveApproval = vi.fn(() => ({ resolved: true, taskToolMode: "auto" as const }));
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: (listener: (event: AgentEvent) => void) => {
@@ -277,6 +281,7 @@ describe("AgentHostServer safety approval", () => {
         requestId: "approval-after-close",
         toolCallId: "tool-call-after-close",
         toolName: "bash",
+        toolSource: "Pi 内置",
         category: "ambiguous-command",
         reason: "执行无法安全分类的命令",
         targetKind: "command",
@@ -288,7 +293,7 @@ describe("AgentHostServer safety approval", () => {
       }
     });
 
-    expect(resolveApproval).toHaveBeenCalledWith("approval-after-close", "tool-call-after-close", false);
+    expect(resolveApproval).toHaveBeenCalledWith("approval-after-close", "tool-call-after-close", "deny");
     expect(port.sent.some((value) => isEventEnvelope(value)
       && value.type === "approval.requested"
       && (value as EventEnvelope<"approval.requested">).payload.requestId === "approval-after-close")).toBe(false);
@@ -305,6 +310,7 @@ describe("AgentHostServer safety approval", () => {
         requestId: "approval-before-handshake",
         toolCallId: "tool-call-before-handshake",
         toolName: "bash",
+        toolSource: "Pi 内置",
         category: "ambiguous-command",
         reason: "执行无法安全分类的命令",
         targetKind: "command",
@@ -318,7 +324,7 @@ describe("AgentHostServer safety approval", () => {
     expect(resolveApproval).toHaveBeenCalledWith(
       "approval-before-handshake",
       "tool-call-before-handshake",
-      false
+      "deny"
     );
     expect(unhandshaken.sent).toEqual([]);
     finishPrompt();

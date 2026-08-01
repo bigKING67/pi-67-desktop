@@ -6,12 +6,17 @@ import {
   HeartPulse,
   KeyRound,
   MessageSquareText,
-  PackageOpen,
-  RefreshCw,
-  Scissors
+  PackageOpen
 } from "lucide-react";
 import { formatRelativeTime } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
+import {
+  isPiTuiBuiltinName,
+  PI_DESKTOP_ACTIONS,
+  piDesktopActionUnavailableReason,
+  type PiDesktopActionContext,
+  type PiDesktopActionDescriptor
+} from "../pi-actions/pi-desktop-actions.js";
 import {
   MAX_EXTENSION_CANDIDATES,
   MAX_SESSION_CANDIDATES,
@@ -28,8 +33,7 @@ export interface PaletteAvailability {
 export interface PaletteActionHandlers {
   openSession: (path: string) => Promise<void> | void;
   invokeCommand: (name: string) => Promise<void> | void;
-  reloadResources: () => Promise<void> | void;
-  compactSession: () => Promise<void> | void;
+  executeDesktopAction: (action: PiDesktopActionDescriptor) => Promise<void> | void;
   openProvider: () => void;
   runDoctor: () => Promise<void> | void;
   openUpdate: () => void;
@@ -41,6 +45,7 @@ interface BuildPaletteActionsOptions {
   extensionCommands: readonly SlashCommandDescriptor[];
   activeSessionPath: string | undefined;
   availability: PaletteAvailability;
+  desktopActionContext: PiDesktopActionContext;
   handlers: PaletteActionHandlers;
 }
 
@@ -88,6 +93,7 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
     };
   });
   const extensionActions = options.extensionCommands
+    .filter((command) => !isPiTuiBuiltinName(command.name))
     .slice(0, MAX_EXTENSION_CANDIDATES)
     .map((command): PaletteAction => ({
       id: `extension:${command.name}`,
@@ -99,27 +105,22 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
       ...(sessionMutationReason ? { disabled: true, disabledReason: sessionMutationReason } : {}),
       run: () => options.handlers.invokeCommand(command.name)
     }));
+  const desktopActions = PI_DESKTOP_ACTIONS.map((descriptor): PaletteAction => {
+    const disabledReason = piDesktopActionUnavailableReason(descriptor, options.desktopActionContext);
+    return mutationAction({
+      id: `pi:${descriptor.name}`,
+      label: `/${descriptor.name}`,
+      detail: descriptor.description,
+      keywords: `pi desktop builtin ${descriptor.name} ${descriptor.description}`,
+      icon: descriptor.icon,
+      ...(disabledReason ? { disabledReason } : {}),
+      run: () => options.handlers.executeDesktopAction(descriptor)
+    });
+  });
   return [
     ...sessionActions,
     ...extensionActions,
-    mutationAction({
-      id: "action:reload",
-      label: messages.commandPalette.reloadResources,
-      detail: messages.commandPalette.reloadResourcesDetail,
-      keywords: "reload refresh resources skills prompts extensions context",
-      icon: RefreshCw,
-      ...(sessionMutationReason ? { disabledReason: sessionMutationReason } : {}),
-      run: options.handlers.reloadResources
-    }),
-    mutationAction({
-      id: "action:compact",
-      label: messages.commandPalette.compactSession,
-      detail: messages.commandPalette.compactSessionDetail,
-      keywords: "compact context token",
-      icon: Scissors,
-      ...(sessionMutationReason ? { disabledReason: sessionMutationReason } : {}),
-      run: options.handlers.compactSession
-    }),
+    ...desktopActions,
     {
       id: "settings:provider",
       group: "settings",

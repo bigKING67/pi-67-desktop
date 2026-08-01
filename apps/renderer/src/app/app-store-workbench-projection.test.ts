@@ -124,6 +124,7 @@ function openWorkbenchTask(taskId: string, sessionId: string, sessionGeneration:
     runtime: { phase: "ready", detail: "Pi 会话已就绪", recoverable: true },
     title: sessionId,
     hasDraft: false,
+    toolMode: "auto",
     attachmentCount: 0
   });
 }

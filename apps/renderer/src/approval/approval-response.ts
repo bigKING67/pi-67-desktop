@@ -1,4 +1,4 @@
-import type { ApprovalRequestView } from "@pi67/domain";
+import type { ApprovalRequestView, ApprovalResponseDecision } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import {
   hasCurrentInteractiveAuthority,
@@ -11,12 +11,12 @@ import { useApprovalStore } from "./approval-store.js";
 export async function respondToSafetyApproval(
   getAuthority: () => InteractiveAuthorityState,
   requestId: string,
-  allowed: boolean
+  decision: ApprovalResponseDecision
 ): Promise<boolean> {
   const request = useApprovalStore.getState().requests.find(
     (candidate) => candidate.requestId === requestId
   );
-  const payload = request ? approvalResponsePayload(getAuthority(), request, allowed) : undefined;
+  const payload = request ? approvalResponsePayload(getAuthority(), request, decision) : undefined;
   if (!request || !payload) {
     if (request) useApprovalStore.getState().removeRequestIfCurrent(request);
     publishNotification({
@@ -45,7 +45,7 @@ export async function respondToSafetyApproval(
     })) return false;
     publishNotification({
       level: "error",
-      title: allowed ? "无法提交本次授权" : "无法提交拒绝结果",
+      title: decision === "deny" ? "无法提交拒绝结果" : "无法提交工具授权",
       message: `${errorMessage(error)}。授权请求仍保留，可以重试。`
     });
     return false;
@@ -55,7 +55,7 @@ export async function respondToSafetyApproval(
 export function approvalResponsePayload(
   state: InteractiveAuthorityState,
   request: ApprovalRequestView,
-  allowed: boolean
+  decision: ApprovalResponseDecision
 ) {
   if (
     request.sessionId === undefined
@@ -71,7 +71,7 @@ export function approvalResponsePayload(
     sessionId: request.sessionId,
     sessionGeneration: request.sessionGeneration,
     operationId: request.operationId,
-    allowed
+    decision
   };
 }
 

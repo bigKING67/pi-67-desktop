@@ -79,6 +79,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "context.file.read": "workspace",
   "context.file.save": "workspace",
   "task.close": "task",
+  "task.toolMode.set": "task",
   "extension.package.list": "workspace",
   "extension.package.checkUpdates": "workspace",
   "extension.package.install": "workspace",

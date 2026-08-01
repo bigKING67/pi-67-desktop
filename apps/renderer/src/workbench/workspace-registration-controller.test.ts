@@ -240,6 +240,7 @@ function task(options: { runtimePhase: "busy" | "stopped" }) {
     title: "A",
     sessionPath: "/sessions/a.jsonl",
     hasDraft: false,
+    toolMode: "auto" as const,
     attachmentCount: 0
   };
 }

@@ -316,6 +316,7 @@ function forkRuntime(initialIdentity: {
     initialize: async () => fixture.snapshot(),
     getSnapshot: () => fixture.snapshot(),
     getIdentity: () => ({ ...fixture.identity }),
+    getTaskToolMode: () => "auto" as const,
     forkSessionFrom: async () => fixture.snapshot(),
     cancelInteractiveRequests: () => [],
     dispose: async () => undefined

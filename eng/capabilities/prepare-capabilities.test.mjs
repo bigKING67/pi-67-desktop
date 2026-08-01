@@ -13,7 +13,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.07.31.2");
+    expect(lock.catalogVersion).toBe("2026.08.01.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",

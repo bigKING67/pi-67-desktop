@@ -18,7 +18,8 @@ describe("command palette actions", () => {
     expect(byId(actions, "settings:provider").disabled).toBeUndefined();
     expect(byId(actions, "settings:update").disabled).toBeUndefined();
     expect(byId(actions, "settings:doctor")).toMatchObject({ disabled: true, disabledReason: "Pi 运行服务尚未连接" });
-    expect(byId(actions, "action:compact")).toMatchObject({ disabled: true, disabledReason: "Pi 运行服务尚未连接" });
+    expect(byId(actions, "pi:compact")).toMatchObject({ disabled: true, disabledReason: "Pi 运行服务尚未连接。" });
+    expect(byId(actions, "pi:settings").disabled).toBeUndefined();
   });
 
   it("matches the Host scheduler by disabling turn and exclusive actions during an active operation", () => {
@@ -26,9 +27,32 @@ describe("command palette actions", () => {
 
     expect(byId(actions, "session:/sessions/other.jsonl")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
     expect(byId(actions, "extension:inspect")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
-    expect(byId(actions, "action:reload")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
-    expect(byId(actions, "action:compact")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
+    expect(byId(actions, "pi:reload")).toMatchObject({ disabled: true, disabledReason: "当前任务结束或停止后可用。" });
+    expect(byId(actions, "pi:compact")).toMatchObject({ disabled: true, disabledReason: "当前任务结束或停止后可用。" });
     expect(byId(actions, "settings:doctor").disabled).toBeUndefined();
+  });
+
+  it("reserves Pi builtin names for Desktop actions instead of Extension aliases", () => {
+    const actions = buildPaletteActions({
+      sessions: [],
+      extensionCommands: [
+        { name: "model", source: "extension" },
+        { name: "inspect", source: "extension" }
+      ],
+      activeSessionPath: undefined,
+      availability: paletteAvailability({
+        connected: true,
+        sessionReady: true,
+        sessionTransitionPending: false,
+        operation: undefined
+      }),
+      desktopActionContext: desktopContext(true, undefined),
+      handlers: handlers()
+    });
+
+    expect(actions.filter((action) => action.label === "/model")).toHaveLength(1);
+    expect(byId(actions, "extension:inspect")).toBeDefined();
+    expect(actions.find((action) => action.id === "extension:model")).toBeUndefined();
   });
 
   it("marks the current Session without making it the enabled selection", () => {
@@ -50,8 +74,20 @@ function build(connected: boolean, activeOperation: OperationView | undefined) {
       sessionTransitionPending: false,
       operation: activeOperation
     }),
+    desktopActionContext: desktopContext(connected, activeOperation),
     handlers: handlers()
   });
+}
+
+function desktopContext(connected: boolean, activeOperation: OperationView | undefined) {
+  return {
+    connected,
+    workspaceAvailable: true,
+    sessionReady: connected,
+    sessionTransitionPending: false,
+    activeOperation: Boolean(activeOperation),
+    configuredModels: [{ provider: "openai", id: "gpt", configured: true }]
+  };
 }
 
 function byId(actions: ReturnType<typeof build>, id: string) {
@@ -76,8 +112,7 @@ function handlers(): PaletteActionHandlers {
   return {
     openSession: vi.fn(),
     invokeCommand: vi.fn(),
-    reloadResources: vi.fn(),
-    compactSession: vi.fn(),
+    executeDesktopAction: vi.fn(),
     openProvider: vi.fn(),
     runDoctor: vi.fn(),
     openUpdate: vi.fn(),

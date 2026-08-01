@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WorkspaceId } from "@pi67/domain";
 import {
   Button,
@@ -31,12 +31,25 @@ export function useSessionCatalogSearch(
 }
 
 export function SessionCatalogSearch({
+  focusRevision,
+  handledRevision,
   query,
+  onFocusHandled,
   onQueryChange
 }: {
+  focusRevision: number;
+  handledRevision: number;
   query: string;
+  onFocusHandled: (revision: number) => void;
   onQueryChange: (query: string) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusRevision <= handledRevision) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+    onFocusHandled(focusRevision);
+  }, [focusRevision, handledRevision, onFocusHandled]);
+
   return (
     <SearchField
       aria-label={messages.navigation.search}
@@ -45,7 +58,7 @@ export function SessionCatalogSearch({
       onChange={onQueryChange}
     >
       <Search aria-hidden="true" size={14} />
-      <Input className={styles.searchInput!} placeholder={messages.navigation.search} />
+      <Input ref={inputRef} className={styles.searchInput!} placeholder={messages.navigation.search} />
       {query ? (
         <Button
           className={styles.clearButton!}

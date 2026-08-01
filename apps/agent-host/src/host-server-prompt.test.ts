@@ -41,6 +41,7 @@ describe("AgentHostServer prompt routing", () => {
       subscribe: () => () => undefined,
       getIdentity: () => ({ sessionId: "session-1", sessionGeneration: 3 }),
       getSnapshot: () => emptySnapshot(),
+      getTaskToolMode: () => "auto" as const,
       getWorkspaceChanges: () => emptyChanges(),
       getExtensionCatalog: () => emptyCatalog(),
       getSessionCatalogStatus: () => ({ revision: 0, itemCount: 0, source: "sqlite", state: "ready", rebuilding: false, incomplete: false, skippedCount: 0 }),

@@ -20,8 +20,9 @@ describe("CommandScheduler", () => {
       sessionId: "session-1",
       sessionGeneration: 1,
       operationId: "operation-1",
-      allowed: false
+      decision: "deny"
     }))).toBe("interrupt");
+    expect(commandClassFor(command("task.toolMode.set", { mode: "yolo" }))).toBe("interrupt");
     expect(commandClassFor(command("runtime.getStatus", {}))).toBe("query");
     expect(commandClassFor(command("extension.catalog.list", {}))).toBe("query");
     expect(commandClassFor(command("projection.resync", {}))).toBe("recovery");

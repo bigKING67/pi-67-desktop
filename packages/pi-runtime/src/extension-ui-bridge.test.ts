@@ -113,13 +113,17 @@ describe("DesktopExtensionUiBridge", () => {
     });
     expect(events.some((event) => event.type === "extension.ui.requested")).toBe(false);
     if (request?.type !== "approval.requested") throw new Error("Expected a safety approval request.");
-    expect(bridge.resolveApproval(request.payload.requestId, "wrong-tool-call", true)).toBe(false);
-    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", true)).toBe(true);
-    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", true)).toBe(false);
+    expect(bridge.resolveApproval(request.payload.requestId, "wrong-tool-call", "allow-once")).toBe(false);
+    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", "allow-once")).toBe(true);
+    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", "allow-once")).toBe(false);
     await expect(result).resolves.toEqual({ status: "allowed" });
     expect(events.at(-1)).toEqual({
       type: "approval.resolved",
-      payload: { requestId: request.payload.requestId, toolCallId: "tool-call-1", allowed: true }
+      payload: {
+        requestId: request.payload.requestId,
+        toolCallId: "tool-call-1",
+        decision: "allow-once"
+      }
     });
   });
 
@@ -186,6 +190,50 @@ describe("DesktopExtensionUiBridge", () => {
     expect(bridge.cancelAll("connection-close")).toEqual([]);
   });
 
+  it("allows all pending safety approvals for YOLO without resolving Extension UI requests", async () => {
+    const events: AgentEvent[] = [];
+    const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
+    const extensionResult = bridge.context.input("Extension input");
+    const firstApproval = bridge.requestApproval(approvalDetails("tool-call-first"));
+    const secondApproval = bridge.requestApproval(approvalDetails("tool-call-second"));
+    const extensionRequest = events.find((event) => event.type === "extension.ui.requested");
+    const approvals = events.filter((event) => event.type === "approval.requested");
+    if (extensionRequest?.type !== "extension.ui.requested") {
+      throw new Error("Expected an Extension UI request.");
+    }
+    const firstRequest = approvals[0];
+    const secondRequest = approvals[1];
+    if (firstRequest?.type !== "approval.requested" || secondRequest?.type !== "approval.requested") {
+      throw new Error("Expected two safety approval requests.");
+    }
+
+    expect(bridge.resolveApproval(
+      firstRequest.payload.requestId,
+      firstRequest.payload.toolCallId,
+      "enable-task-yolo-and-allow"
+    )).toBe(true);
+    expect(bridge.allowAllPendingApprovals()).toEqual([secondRequest.payload.requestId]);
+    await expect(firstApproval).resolves.toEqual({ status: "allowed" });
+    await expect(secondApproval).resolves.toEqual({ status: "allowed" });
+
+    expect(bridge.resolve(extensionRequest.payload.requestId, "kept-separate")).toBe(true);
+    await expect(extensionResult).resolves.toBe("kept-separate");
+    expect(events.filter((event) => event.type === "approval.resolved")).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          toolCallId: "tool-call-first",
+          decision: "enable-task-yolo-and-allow"
+        })
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          toolCallId: "tool-call-second",
+          decision: "enable-task-yolo-and-allow"
+        })
+      })
+    ]);
+  });
+
   it("emits approval cancellation rather than resolution when its signal aborts", async () => {
     const events: AgentEvent[] = [];
     const bridge = new DesktopExtensionUiBridge((event) => events.push(event));
@@ -203,7 +251,7 @@ describe("DesktopExtensionUiBridge", () => {
         reason: "abort"
       }
     });
-    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-abort", true)).toBe(false);
+    expect(bridge.resolveApproval(request.payload.requestId, "tool-call-abort", "allow-once")).toBe(false);
     expect(events.some((event) => event.type === "approval.resolved")).toBe(false);
   });
 
@@ -256,6 +304,7 @@ function approvalDetails(toolCallId: string) {
   return {
     toolCallId,
     toolName: "bash",
+    toolSource: "Pi 内置",
     category: "ambiguous-command" as const,
     reason: "执行无法安全分类的命令",
     targetKind: "command" as const,

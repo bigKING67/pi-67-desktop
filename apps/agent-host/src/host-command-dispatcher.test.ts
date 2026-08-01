@@ -156,6 +156,47 @@ describe("operationSubmissionIdentity", () => {
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 
+  it("sets the current Task Tool mode and publishes the authoritative change", async () => {
+    const setTaskToolMode = vi.fn(() => "yolo" as const);
+    const sendEvent = vi.fn();
+    const runtime = { setTaskToolMode } as unknown as AgentRuntime;
+
+    await expect(dispatchHostCommand(
+      runtime,
+      { type: "task.toolMode.set", payload: { mode: "yolo" } },
+      { sendEvent } as never
+    )).resolves.toEqual({ mode: "yolo" });
+
+    expect(setTaskToolMode).toHaveBeenCalledWith("yolo");
+    expect(sendEvent).toHaveBeenCalledWith({
+      type: "task.toolMode.changed",
+      payload: { mode: "yolo", reason: "user-selected" }
+    });
+  });
+
+  it("publishes the AUTO reset when Workspace trust revocation drops YOLO", async () => {
+    const reloadResult = { resources: [] } as never;
+    const setWorkspacePolicy = vi.fn(() => "auto" as const);
+    const runtime = {
+      getTaskToolMode: vi.fn(() => "yolo" as const),
+      setWorkspacePolicy,
+      reloadResources: vi.fn(async () => reloadResult)
+    } as unknown as AgentRuntime;
+    const sendEvent = vi.fn();
+
+    await expect(dispatchHostCommand(
+      runtime,
+      { type: "workspace.setTrust", payload: { trust: "unknown", approvalMode: "balanced" } },
+      { sendEvent } as never
+    )).resolves.toBe(reloadResult);
+
+    expect(setWorkspacePolicy).toHaveBeenCalledWith("unknown", "balanced");
+    expect(sendEvent).toHaveBeenCalledWith({
+      type: "task.toolMode.changed",
+      payload: { mode: "auto", reason: "trust-revoked" }
+    });
+  });
+
   it("claims prompt attachments before accepting the operation", async () => {
     const order: string[] = [];
     const attachments = {

@@ -1,5 +1,11 @@
-import { SettingsManager } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  createAgentSessionServices,
+  SettingsManager
+} from "@earendil-works/pi-coding-agent";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyDesktopPackageToolchain,
   createDesktopPackageSettingsView,
@@ -21,6 +27,14 @@ const environment = {
     "/app/agent/desktop-capabilities/packages/design-craft"
   ])
 };
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map((path) => (
+    rm(path, { recursive: true, force: true })
+  )));
+});
 
 describe("Pi SettingsManager Desktop package toolchain override", () => {
   it("applies private Node + npm without persisting a user npmCommand", () => {
@@ -70,7 +84,10 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
   });
 
   it("exposes managed Packages only through the Pi session view and never persists them", () => {
-    const settingsManager = SettingsManager.inMemory({ packages: ["npm:user-package"] });
+    const settingsManager = SettingsManager.inMemory({
+      packages: ["npm:user-package"],
+      extensions: ["extensions/user-tool/index.ts", "-extensions/xtalpi-pi-tools/index.ts"]
+    });
     const setPackages = vi.spyOn(settingsManager, "setPackages");
     const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
 
@@ -79,7 +96,18 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       "/app/agent/desktop-capabilities/packages/pi67-core",
       "/app/agent/desktop-capabilities/packages/design-craft"
     ]);
+    expect(sessionView.getGlobalSettings().extensions).toEqual([
+      "extensions/user-tool/index.ts",
+      "-extensions/xtalpi-pi-tools/index.ts",
+      "-extensions/pi-hy-memory/index.ts",
+      "-extensions/pi-rules-loader/index.ts",
+      "-extensions/pi-vision-bridge/index.ts"
+    ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(["npm:user-package"]);
+    expect(settingsManager.getGlobalSettings().extensions).toEqual([
+      "extensions/user-tool/index.ts",
+      "-extensions/xtalpi-pi-tools/index.ts"
+    ]);
 
     sessionView.setPackages([
       "npm:user-package",
@@ -96,6 +124,64 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       "npm:user-package",
       { source: "/external/user-package", autoload: false }
     ]);
+  });
+
+  it("keeps legacy first-party extensions when the managed Pi-67 Core Package is absent", () => {
+    const settingsManager = SettingsManager.inMemory({ extensions: ["extensions/pi-hy-memory/index.ts"] });
+    const sessionView = createDesktopPackageSettingsView(settingsManager, {
+      ...environment,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
+        "/app/agent/desktop-capabilities/packages/design-craft"
+      ])
+    });
+
+    expect(sessionView.getGlobalSettings().extensions).toEqual([
+      "extensions/pi-hy-memory/index.ts"
+    ]);
+  });
+
+  it("loads the managed Pi-67 Core extension once instead of the identical legacy copy", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-managed-extension-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const managedRoot = join(agentDir, "desktop-capabilities");
+    const managedPackage = join(managedRoot, "packages", "pi67-core");
+    const legacyExtension = join(agentDir, "extensions", "pi-hy-memory");
+    const managedExtension = join(managedPackage, "extensions", "pi-hy-memory");
+    await Promise.all([
+      mkdir(cwd, { recursive: true }),
+      mkdir(legacyExtension, { recursive: true }),
+      mkdir(managedExtension, { recursive: true })
+    ]);
+    const extensionSource = `export default function extension(pi) {
+      pi.registerTool({
+        name: "hy_memory_search",
+        label: "Memory search",
+        description: "fixture",
+        parameters: { type: "object", properties: {} },
+        execute: async () => ({ content: [{ type: "text", text: "ok" }] })
+      });
+    }`;
+    await Promise.all([
+      writeFile(join(legacyExtension, "index.ts"), extensionSource),
+      writeFile(join(managedExtension, "index.ts"), extensionSource),
+      writeFile(join(managedPackage, "package.json"), JSON.stringify({
+        name: "pi67-core",
+        version: "0.15.8",
+        pi: { extensions: ["./extensions/pi-hy-memory/index.ts"] }
+      }))
+    ]);
+    const settingsManager = createDesktopPackageSettingsView(SettingsManager.inMemory(), {
+      PI67_DESKTOP: "1",
+      PI67_MANAGED_CAPABILITIES_ROOT: managedRoot,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([managedPackage])
+    });
+    const services = await createAgentSessionServices({ cwd, agentDir, settingsManager });
+
+    expect(services.resourceLoader.getExtensions().extensions.map((extension) => extension.resolvedPath))
+      .toEqual([join(managedExtension, "index.ts")]);
+    expect(services.resourceLoader.getExtensions().errors).toEqual([]);
   });
 
   it("fails closed for a Desktop Host without the bundled toolchain", () => {

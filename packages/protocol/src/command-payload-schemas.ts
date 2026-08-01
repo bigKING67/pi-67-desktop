@@ -24,6 +24,11 @@ import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas
 const EmptyPayloadSchema = strictObject({});
 const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
 const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("balanced")]);
+const TaskToolModeSchema = Type.Union([
+  Type.Literal("ask"),
+  Type.Literal("auto"),
+  Type.Literal("yolo")
+]);
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const PromptSchema = Type.String({ maxLength: 2_000_000 });
 const SubmissionIdSchema = Type.String({ minLength: 1, maxLength: 512 });
@@ -50,6 +55,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: ApprovalModeSchema }),
   "workspace.changes": EmptyPayloadSchema,
   "task.close": strictObject({ mode: Type.Union([Type.Literal("stop"), Type.Literal("dispose")]) }),
+  "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogQuerySchema,
   "session.tree": EmptyPayloadSchema,
   "message.page": strictObject({

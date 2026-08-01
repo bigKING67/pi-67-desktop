@@ -48,6 +48,35 @@ describe("OperationActivityController", () => {
       payload: { operationId: "operation-1", activity: null }
     });
   });
+
+  it("forwards a late AUTO reason for the current running Tool", () => {
+    const events: AgentEvent[] = [];
+    const controller = new OperationActivityController((event) => events.push(event));
+    const target = operationTarget();
+    const runningTool = {
+      kind: "tool" as const,
+      toolCallId: "tool-auto",
+      toolName: "read",
+      toolKind: "read" as const,
+      status: "running" as const
+    };
+
+    expect(controller.updateBase(target, runningTool)).toBe(true);
+    expect(controller.updateBase(target, {
+      ...runningTool,
+      authorization: { mode: "auto", reason: "read-only" }
+    })).toBe(true);
+    expect(events.at(-1)).toEqual({
+      type: "operation.activityChanged",
+      payload: {
+        operationId: "operation-1",
+        activity: {
+          ...runningTool,
+          authorization: { mode: "auto", reason: "read-only" }
+        }
+      }
+    });
+  });
 });
 
 function operationTarget(): OperationActivityTarget {

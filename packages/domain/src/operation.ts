@@ -22,6 +22,16 @@ export type ToolPresentationKind =
   | "extension"
   | "generic";
 
+export type ToolAutoAuthorizationReason =
+  | "configured-source"
+  | "read-only"
+  | "workspace-write";
+
+export interface ToolAuthorizationProjection {
+  mode: "auto";
+  reason: ToolAutoAuthorizationReason;
+}
+
 export type OperationActivity =
   | { kind: "thinking" }
   | { kind: "responding" }
@@ -32,6 +42,7 @@ export type OperationActivity =
       toolKind: ToolPresentationKind;
       status: "running" | "completed" | "failed";
       aliasTarget?: string;
+      authorization?: ToolAuthorizationProjection;
     }
   | { kind: "approval"; requestId: string }
   | { kind: "extension-input"; requestId: string }

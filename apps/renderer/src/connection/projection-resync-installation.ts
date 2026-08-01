@@ -19,6 +19,10 @@ import {
 } from "../session/session-authority.js";
 import { projectionRecoveryLedger } from "./projection-recovery-ledger.js";
 import type { WorkspaceId } from "@pi67/domain";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask
+} from "../workbench/workbench-store.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -51,6 +55,19 @@ export function installResynchronizedProjection(
   const current = get();
   if (!installRendererSessionResync(current, result, hostEpoch, transitionTarget, workspaceId)) {
     throw new Error("Projection resync result is stale or internally inconsistent.");
+  }
+  const selectedTask = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+  if (
+    selectedTask
+    && selectedTask.sessionId === result.snapshot.sessionId
+    && (
+      selectedTask.sessionGeneration === undefined
+      || selectedTask.sessionGeneration === result.sessionGeneration
+    )
+  ) {
+    rendererWorkbenchStore.getState().updateTask(selectedTask.id, {
+      toolMode: result.taskToolMode
+    });
   }
   set((next) => projectionRecoveryLedger.isCurrent(next, hostEpoch, revision) ? {
     operation: recoveredOperation,

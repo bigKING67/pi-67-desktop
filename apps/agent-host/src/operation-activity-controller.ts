@@ -86,7 +86,9 @@ function sameActivity(left: OperationActivity | null, right: OperationActivity |
       && left.toolName === right.toolName
       && left.toolKind === right.toolKind
       && left.status === right.status
-      && left.aliasTarget === right.aliasTarget;
+      && left.aliasTarget === right.aliasTarget
+      && left.authorization?.mode === right.authorization?.mode
+      && left.authorization?.reason === right.authorization?.reason;
   }
   if (left.kind === "approval" && right.kind === "approval") return left.requestId === right.requestId;
   if (left.kind === "extension-input" && right.kind === "extension-input") {

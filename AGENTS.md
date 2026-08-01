@@ -40,10 +40,17 @@
   prompts, source bodies, or raw tool payloads by default.
 - Project trust controls project resources. It is distinct from one-shot tool
   approval.
+- New trusted Workspaces default to `balanced`: bounded Workspace reads/writes,
+  current-Session loaded-resource reads, verified read-only web Tools, and
+  conservatively classified local checks may run without a duplicate dialog.
+  Unknown Shell/third-party Tools and destructive, system, external-path, upload,
+  publish, dependency, or remote side effects remain one-shot approvals.
 - Extensions cannot inject HTML, JavaScript, or React components into the
   renderer. TUI-only custom UI must fail explicitly instead of hanging.
 - Destructive, external, system, or workspace-external actions require an
-  explicit one-shot approval.
+  explicit one-shot approval. The only Workspace-external read exception is the
+  canonical file or Skill directory already loaded by that exact Session's Pi
+  `ResourceLoader`; it never grants write or arbitrary home-directory access.
 
 ## Design and quality
 
@@ -54,6 +61,9 @@
 - Keep streaming batched, transcripts virtualized, and async work cancellable.
 - Add targeted tests for protocol, policy, Pi SDK, recovery, and visible UI
   changes. Do not infer runtime quality from source alone.
+- Renderer-owned Pi Desktop Slash actions must call the existing feature
+  Controllers. Do not send `/new`, `/model`, `/compact`, `/resume`, `/tree`,
+  `/reload`, or `/settings` through `command.invoke` or as model Prompts.
 - Windows claims require real Windows evidence; macOS claims require real
   Apple Silicon evidence. Browser previews do not prove packaged Electron
   behavior.

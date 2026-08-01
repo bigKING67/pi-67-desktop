@@ -115,6 +115,7 @@ export interface FixtureResyncOperations {
 interface FixtureTaskState {
   taskSequence: number;
   sessionGeneration: number;
+  taskToolMode: "ask" | "auto" | "yolo";
   conversationMessages: FixtureMessage[];
   workspaceChanges: { sessionId: string; items: unknown[]; truncated: boolean; total: number };
   snapshot: Record<string, unknown>;
@@ -131,6 +132,7 @@ export interface FixtureAgentState {
   taskId: string;
   taskGeneration: number;
   sessionGeneration: number;
+  taskToolMode: "ask" | "auto" | "yolo";
   sessionCounter: number;
   operationCounter: number;
   conversationMessages: FixtureMessage[];

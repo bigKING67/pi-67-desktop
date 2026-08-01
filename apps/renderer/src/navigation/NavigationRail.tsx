@@ -49,6 +49,9 @@ export function NavigationRail({
     searchableWorkspaceIds
   );
   const [removalWorkspaceId, setRemovalWorkspaceId] = useState<string>();
+  const sessionSearchFocusRevision = useShellStore((state) => state.sessionSearchFocusRevision);
+  const sessionSearchHandledRevision = useShellStore((state) => state.sessionSearchHandledRevision);
+  const acknowledgeSessionSearchFocus = useShellStore((state) => state.acknowledgeSessionSearchFocus);
   const removalWorkspace = removalWorkspaceId ? workspaces[removalWorkspaceId] : undefined;
 
   return (
@@ -74,7 +77,13 @@ export function NavigationRail({
       </header>
 
       <div className={styles.actions}>
-        <SessionCatalogSearch query={query} onQueryChange={setQuery} />
+        <SessionCatalogSearch
+          focusRevision={sessionSearchFocusRevision}
+          handledRevision={sessionSearchHandledRevision}
+          query={query}
+          onFocusHandled={acknowledgeSessionSearchFocus}
+          onQueryChange={setQuery}
+        />
       </div>
 
       <WorkspaceConversationList

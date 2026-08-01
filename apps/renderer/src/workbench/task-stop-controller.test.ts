@@ -33,6 +33,7 @@ describe("task stop controller", () => {
       title: "Task A",
       sessionPath: "/sessions/a.jsonl",
       hasDraft: true,
+      toolMode: "auto",
       attachmentCount: 0
     });
     useTaskDraftStore.getState().setText("task-a", "keep this draft");

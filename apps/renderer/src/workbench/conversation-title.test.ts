@@ -23,6 +23,7 @@ describe("conversation title", () => {
       title: "未命名会话",
       sessionPath: session.path,
       hasDraft: false,
+      toolMode: "auto",
       attachmentCount: 0
     };
 

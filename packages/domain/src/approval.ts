@@ -1,10 +1,18 @@
 import type { RiskCategory } from "./safety-policy.js";
+import type { TaskToolMode } from "./runtime-state.js";
 
 export type ApprovalTargetKind = "command" | "path" | "tool";
+export type ApprovalResponseDecision = "deny" | "allow-once" | "enable-task-yolo-and-allow";
+
+export interface ApprovalResolution {
+  resolved: boolean;
+  taskToolMode: TaskToolMode;
+}
 
 export interface ApprovalRequestDetails {
   toolCallId: string;
   toolName: string;
+  toolSource: string;
   category: RiskCategory;
   reason: string;
   targetKind: ApprovalTargetKind;

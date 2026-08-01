@@ -1,4 +1,8 @@
-import type { SessionMessageView, ToolCallPart } from "@pi67/domain";
+import type {
+  SessionMessageView,
+  ToolAuthorizationProjection,
+  ToolCallPart
+} from "@pi67/domain";
 import {
   AlertCircle,
   CheckCircle2,
@@ -17,6 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useCommittedWorkspaceChange } from "../changes/workspace-changes-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { messages } from "../localization/message-catalog.js";
 import { AssetImage } from "../transcript/AssetImage.js";
 import { messageTextForCopy } from "../transcript/message-actions.js";
 import styles from "./ToolCard.module.css";
@@ -46,10 +51,12 @@ type CopyState = "idle" | "copied" | "failed";
 
 export function ToolCard({
   tool,
-  result
+  result,
+  authorization
 }: {
   tool: ToolCallPart;
   result?: SessionMessageView;
+  authorization?: ToolAuthorizationProjection;
 }) {
   const change = useCommittedWorkspaceChange(tool.id);
   const setContextTab = useShellStore((state) => state.setContextTab);
@@ -87,7 +94,7 @@ export function ToolCard({
   return (
     <details
       className={`${styles.card} ${styles[`status-${effectiveStatus}`]}`}
-      aria-label={`${presentation.title}，${statusLabel}`}
+      aria-label={`${presentation.title}，${statusLabel}${authorization ? `，${authorizationLabel(authorization)}` : ""}`}
       data-presenter={presentation.presenterId}
       data-tool-status={effectiveStatus}
       open={open}
@@ -105,6 +112,15 @@ export function ToolCard({
             <code>{toolName}</code>
           </span>
           <span className={styles.compact}>{presentation.compact}</span>
+          {authorization ? (
+            <span
+              className={styles.authorization}
+              data-tool-authorization="auto"
+              data-tool-authorization-reason={authorization.reason}
+            >
+              {authorizationLabel(authorization)}
+            </span>
+          ) : null}
         </div>
         <span className={styles.status}>
           <StatusIcon className={effectiveStatus === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
@@ -192,4 +208,8 @@ export function ToolCard({
       ) : null}
     </details>
   );
+}
+
+function authorizationLabel(authorization: ToolAuthorizationProjection): string {
+  return messages.operation.autoAuthorizationReasons[authorization.reason];
 }

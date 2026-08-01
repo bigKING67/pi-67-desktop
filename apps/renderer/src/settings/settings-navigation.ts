@@ -4,13 +4,14 @@ import {
   Blocks,
   Bot,
   FileText,
+  Globe,
   Info,
   Network,
   RefreshCw,
   Scale,
+  Server,
   SlidersHorizontal,
   Sparkles,
-  Unplug,
   UserRound
 } from "lucide-react";
 import { messages } from "../localization/message-catalog.js";
@@ -110,22 +111,33 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         icon: Scale
       },
       {
+        id: "mcp",
+        ...messages.settings.sections.mcp,
+        searchTerms: [
+          "mcp",
+          "tavily",
+          "client token",
+          "认证",
+          "端点",
+          "中转",
+          "搜索服务"
+        ],
+        icon: Server
+      },
+      {
         id: "integrations",
         ...messages.settings.sections.integrations,
         searchTerms: [
           "browser67",
           "浏览器",
-          "集成",
+          "依赖",
+          "准备",
+          "诊断",
           "setup",
           "doctor",
-          "integration",
-          "tavily",
-          "mcp",
-          "搜索",
-          "token",
-          "中转"
+          "integration"
         ],
-        icon: Unplug
+        icon: Globe
       },
       {
         id: "runtime",

@@ -143,6 +143,7 @@ function resyncResult(overrides: Partial<ProjectionResyncResult> = {}): Projecti
     eventSequence: 10,
     hostEpoch: 9,
     sessionGeneration: 3,
+    taskToolMode: "auto",
     ...overrides
   };
 }

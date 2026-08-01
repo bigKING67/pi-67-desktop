@@ -69,6 +69,7 @@ describe("AgentHostServer session bootstrap", () => {
       },
       forkSession,
       getIdentity: () => ({ sessionId, sessionGeneration }),
+      getTaskToolMode: () => "auto" as const,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
     } as unknown as AgentRuntime;
@@ -167,6 +168,7 @@ describe("AgentHostServer session bootstrap", () => {
       subscribe: () => () => undefined,
       getIdentity: () => ({ sessionId, sessionGeneration }),
       getSnapshot: currentSnapshot,
+      getTaskToolMode: () => "auto" as const,
       getWorkspaceChanges: () => ({ sessionId, items: [], truncated: false, total: 0 }),
       getExtensionCatalog: () => ({ items: [], total: 0, truncated: false }),
       getSessionCatalogStatus: () => ({

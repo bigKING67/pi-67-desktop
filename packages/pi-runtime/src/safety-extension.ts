@@ -1,4 +1,5 @@
 import { realpath } from "node:fs/promises";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import {
@@ -11,6 +12,8 @@ import {
   type ApprovalMode,
   type ExtensionUiCancellationReason,
   type RiskCategory,
+  type TaskToolMode,
+  type ToolAutoAuthorizationReason,
   type ToolIntent,
   type WorkspaceTrust
 } from "@pi67/domain";
@@ -21,11 +24,28 @@ import {
 } from "./tool-routing-extension.js";
 import { boundUtf8 } from "./utf8-boundary.js";
 import { isVerifiedDesktopAttachmentTool } from "./prompt-attachment-extension.js";
+import type { LoadedResourceReadAccess } from "./loaded-resource-read-access.js";
+import { classifyPiMcpAdapterIntent } from "./pi-mcp-adapter-safety.js";
+import type { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
+import { classifyConfiguredToolIntent } from "./configured-tool-safety.js";
+import {
+  createToolSafetyProfileResolver,
+  type ToolSafetyProfile
+} from "./tool-safety-profile.js";
+import {
+  asToolInputRecord,
+  hasBuiltinInputContract,
+  hasPiFffInputContract,
+  hasPiWebAccessReadContract,
+  networkReadTarget,
+  stringField
+} from "./tool-input-contracts.js";
 
 export interface SafetyPolicyState {
   cwd: string;
   trust: WorkspaceTrust;
   approvalMode: ApprovalMode;
+  taskToolMode: TaskToolMode;
 }
 
 export type DesktopApprovalDecision =
@@ -38,21 +58,30 @@ export type DesktopApprovalRequester = (
   options: { signal?: AbortSignal }
 ) => Promise<DesktopApprovalDecision>;
 
+export type DesktopToolAuthorizationRecorder = (
+  toolCallId: string,
+  reason: ToolAutoAuthorizationReason
+) => void;
+
 export const DESKTOP_SAFETY_EXTENSION_PATH = "<inline:pi67-desktop-safety>";
 
 const PATH_TOOLS = new Set(["read", "write", "edit", "grep", "find", "ls"]);
 const WRITE_TOOLS = new Set(["write", "edit"]);
-const PI_WEB_ACCESS_SOURCE_PATTERN = /^npm:pi-web-access(?:@|$)/u;
-const PI_WEB_ACCESS_NETWORK_READ_TOOLS = new Set(["web_search", "fetch_content"]);
 
 interface ClassifiedToolIntent extends ToolIntent {
   targetKind: ApprovalTargetKind;
+  sourceLabel: string;
+  nonApprovableReason?: string;
 }
 
 export function createDesktopSafetyExtension(
   getState: () => SafetyPolicyState,
-  requestApproval: DesktopApprovalRequester
+  requestApproval: DesktopApprovalRequester,
+  loadedResourceReadAccess?: LoadedResourceReadAccess,
+  configuredCapabilities?: ConfiguredCapabilityCatalog,
+  recordToolAuthorization?: DesktopToolAuthorizationRecorder
 ): InlineExtension {
+  const resolveToolProfile = createToolSafetyProfileResolver(configuredCapabilities);
   return {
     name: "pi67-desktop-safety",
     hidden: true,
@@ -60,15 +89,32 @@ export function createDesktopSafetyExtension(
       pi.on("tool_call", async (event, ctx) => {
         if (isVerifiedDesktopAttachmentTool(pi, event.toolName, event.input)) return undefined;
         const state = getState();
+        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         let intent: ClassifiedToolIntent;
         try {
-          intent = await classifyToolIntent(pi, event.toolName, event.input, state.cwd);
+          intent = await classifyToolIntent(
+            pi,
+            event.toolName,
+            event.input,
+            state.cwd,
+            loadedResourceReadAccess,
+            resolveToolProfile,
+            configuredCapabilities
+          );
         } catch {
           return { block: true, reason: "π could not establish a safe canonical target." };
         }
+        if (intent.nonApprovableReason) {
+          return { block: true, reason: intent.nonApprovableReason };
+        }
 
-        const decision = decideApproval(intent, state.trust, state.approvalMode);
-        if (decision.allow) return undefined;
+        const approvalMode: ApprovalMode = state.taskToolMode === "ask" ? "guided" : "balanced";
+        const decision = decideApproval(intent, state.trust, approvalMode);
+        if (decision.allow) {
+          const authorizationReason = autoAuthorizationReason(intent.category);
+          if (authorizationReason) recordToolAuthorization?.(event.toolCallId, authorizationReason);
+          return undefined;
+        }
         if (!decision.approvalRequired) return { block: true, reason: decision.reason };
         if (!ctx.hasUI) return { block: true, reason: "π approval UI is unavailable." };
 
@@ -84,6 +130,7 @@ export function createDesktopSafetyExtension(
           const approval = await requestApproval({
             toolCallId: event.toolCallId,
             toolName: intent.toolName,
+            toolSource: intent.sourceLabel,
             category: intent.category,
             reason: decision.reason,
             targetKind: intent.targetKind,
@@ -112,6 +159,20 @@ export function createDesktopSafetyExtension(
   };
 }
 
+function autoAuthorizationReason(category: RiskCategory): ToolAutoAuthorizationReason | undefined {
+  if (
+    category === "workspace-read"
+    || category === "resource-read"
+    || category === "capability-read"
+    || category === "network-read"
+  ) return "read-only";
+  if (category === "workspace-write") return "workspace-write";
+  if (category === "configured-operation" || category === "persistent-state-write") {
+    return "configured-source";
+  }
+  return undefined;
+}
+
 function approvalCancellationReason(
   reason: ExtensionUiCancellationReason | "unavailable"
 ): string {
@@ -125,9 +186,12 @@ async function classifyToolIntent(
   pi: ExtensionAPI,
   toolName: string,
   input: unknown,
-  workspace: string
+  workspace: string,
+  loadedResourceReadAccess: LoadedResourceReadAccess | undefined,
+  resolveToolProfile: ReturnType<typeof createToolSafetyProfileResolver>,
+  configuredCapabilities: ConfiguredCapabilityCatalog | undefined
 ): Promise<ClassifiedToolIntent> {
-  const record = asRecord(input);
+  const record = asToolInputRecord(input);
   const alias = resolveDesktopToolAliasCall(toolName, record);
   if (alias && isVerifiedDesktopToolAlias(
     alias.alias,
@@ -135,135 +199,196 @@ async function classifyToolIntent(
     pi.getAllTools(),
     new Set(pi.getActiveTools())
   )) {
-    return classifyToolIntent(pi, alias.canonical, alias.input, workspace);
+    return classifyToolIntent(
+      pi,
+      alias.canonical,
+      alias.input,
+      workspace,
+      loadedResourceReadAccess,
+      resolveToolProfile,
+      configuredCapabilities
+    );
   }
-  if (toolName === "bash") {
+  const profile = await resolveToolProfile(pi, toolName);
+  if (toolName === "bash" && profile.kind === "builtin") {
     const command = stringField(record, "command") ?? "";
-    return { toolName, category: classifyShellCommand(command), target: command, targetKind: "command" };
+    return {
+      toolName,
+      category: classifyShellCommand(command),
+      target: command,
+      targetKind: "command",
+      sourceLabel: profile.sourceLabel
+    };
   }
 
-  if (PATH_TOOLS.has(toolName) && isCurrentBuiltinTool(pi, toolName) && hasBuiltinInputContract(toolName, record)) {
-    const rawPath = stringField(record, "path") ?? workspace;
-    const canonical = await canonicalizePotentialPath(rawPath, workspace);
-    const canonicalWorkspace = await realpath(resolve(workspace));
-    const contained = isContained(canonical, canonicalWorkspace);
-    const category: RiskCategory = contained
-      ? WRITE_TOOLS.has(toolName) ? "workspace-write" : "workspace-read"
-      : "external-path";
-    return { toolName, category, target: canonical, targetKind: "path" };
+  if (
+    profile.kind === "builtin"
+    && PATH_TOOLS.has(toolName)
+    && hasBuiltinInputContract(toolName, record)
+  ) {
+    return classifyPathTool(
+      profile,
+      toolName,
+      stringField(record, "path") ?? workspace,
+      workspace,
+      loadedResourceReadAccess
+    );
   }
 
-  if (isPiWebAccessTool(pi, toolName) && hasPiWebAccessReadContract(toolName, record)) {
+  if (profile.kind === "pi-fff" && hasPiFffInputContract(profile.canonicalToolName, record)) {
+    if (stringField(record, "cursor") !== undefined) {
+      return {
+        toolName,
+        category: "unverified-tool",
+        target: `${toolName} cursor`,
+        targetKind: "tool",
+        sourceLabel: profile.sourceLabel,
+        nonApprovableReason: "无法验证分页游标对应的搜索根目录；请不带 cursor 重新执行搜索。"
+      };
+    }
+    return classifyPathTool(
+      profile,
+      profile.canonicalToolName,
+      stringField(record, "path") ?? workspace,
+      workspace,
+      loadedResourceReadAccess
+    );
+  }
+
+  if (profile.kind === "pi-web-access" && hasPiWebAccessReadContract(toolName, record)) {
     return {
       toolName,
       category: "network-read",
       target: networkReadTarget(record, toolName),
-      targetKind: "tool"
+      targetKind: "tool",
+      sourceLabel: profile.sourceLabel
     };
   }
 
-  return { toolName, category: "ambiguous-command", target: toolName, targetKind: "tool" };
+  if (profile.kind === "pi-mcp-adapter") {
+    const directToolCorrection = await classifyPiFffMcpMisroute(
+      pi,
+      profile,
+      record,
+      resolveToolProfile
+    );
+    if (directToolCorrection) return directToolCorrection;
+    if (!configuredCapabilities) {
+      return {
+        toolName,
+        category: "unverified-tool",
+        target: toolName,
+        targetKind: "tool",
+        sourceLabel: profile.sourceLabel,
+        nonApprovableReason: "当前 Task 的有效 MCP 能力目录不可用；请重新加载 Pi 资源后重试。"
+      };
+    }
+    let activeTools: ReadonlySet<string> = new Set();
+    try {
+      activeTools = new Set(pi.getActiveTools());
+    } catch {
+      // The configured MCP catalog still remains authoritative for proxy calls.
+    }
+    return classifyPiMcpAdapterIntent(profile, input, {
+      catalog: configuredCapabilities,
+      workspace,
+      ...(loadedResourceReadAccess === undefined ? {} : { loadedResourceReadAccess }),
+      isDirectTool: (candidate) => candidate !== "mcp" && activeTools.has(candidate)
+    });
+  }
+
+  if (
+    profile.kind === "configured-package"
+    || profile.kind === "managed-package"
+    || profile.kind === "configured-mcp"
+  ) {
+    return classifyConfiguredToolIntent({
+      toolName,
+      input: record,
+      workspace,
+      sourceLabel: profile.sourceLabel,
+      ...(loadedResourceReadAccess === undefined ? {} : { loadedResourceReadAccess }),
+      ...(profile.kind === "configured-mcp"
+        ? { serverName: profile.serverName, remoteToolName: profile.remoteToolName }
+        : {})
+    });
+  }
+
+  return {
+    toolName,
+    category: "unverified-tool",
+    target: toolName,
+    targetKind: "tool",
+    sourceLabel: profile.sourceLabel,
+    ...(!("nonApprovableReason" in profile) || profile.nonApprovableReason === undefined
+      ? {}
+      : { nonApprovableReason: profile.nonApprovableReason })
+  };
 }
 
-function isPiWebAccessTool(pi: ExtensionAPI, toolName: string): boolean {
-  if (!PI_WEB_ACCESS_NETWORK_READ_TOOLS.has(toolName)) return false;
+async function classifyPiFffMcpMisroute(
+  pi: ExtensionAPI,
+  profile: Extract<ToolSafetyProfile, { kind: "pi-mcp-adapter" }>,
+  record: Record<string, unknown>,
+  resolveToolProfile: ReturnType<typeof createToolSafetyProfileResolver>
+): Promise<ClassifiedToolIntent | undefined> {
+  const requestedTool = stringField(record, "tool");
+  if (requestedTool !== "fffind" && requestedTool !== "ffgrep") return undefined;
+  if (record.server !== undefined) return undefined;
+  if (!Object.keys(record).every((key) => key === "tool" || key === "args")) return undefined;
+
+  let activeTools: ReadonlySet<string>;
   try {
-    const matches = pi.getAllTools().filter((tool) => tool.name === toolName);
-    const source = matches.length === 1 ? matches[0]?.sourceInfo : undefined;
-    return source?.origin === "package"
-      && PI_WEB_ACCESS_SOURCE_PATTERN.test(source.source);
+    activeTools = new Set(pi.getActiveTools());
   } catch {
-    return false;
+    return undefined;
   }
-}
 
-function hasPiWebAccessReadContract(toolName: string, record: Record<string, unknown>): boolean {
-  if (toolName === "web_search") {
-    return stringField(record, "query") !== undefined || nonEmptyStringArray(record.queries) !== undefined;
+  const canonicalTool = requestedTool === "fffind" ? "find" : "grep";
+  for (const directTool of [requestedTool, canonicalTool]) {
+    if (!activeTools.has(directTool)) continue;
+    const directProfile = await resolveToolProfile(pi, directTool);
+    if (
+      directProfile.kind !== "pi-fff"
+      || directProfile.canonicalToolName !== canonicalTool
+    ) continue;
+    return {
+      toolName: profile.toolName,
+      category: "unverified-tool",
+      target: requestedTool,
+      targetKind: "tool",
+      sourceLabel: profile.sourceLabel,
+      nonApprovableReason: `无需用户授权：@ff-labs/pi-fff 当前注册为直接 Tool \`${directTool}\`，不要通过 \`mcp\` 调用 \`${requestedTool}\`；请直接调用 \`${directTool}\`。`
+    };
   }
-  if (toolName !== "fetch_content") return false;
-  const singleUrl = stringField(record, "url");
-  const urls = [
-    ...(singleUrl === undefined ? [] : [singleUrl]),
-    ...(nonEmptyStringArray(record.urls) ?? [])
-  ];
-  return urls.length > 0 && urls.every(isExternalWebUrl);
+  return undefined;
 }
 
-function nonEmptyStringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const items = value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
-  return items.length > 0 ? items : undefined;
-}
-
-function isExternalWebUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (url.protocol === "http:" || url.protocol === "https:")
-      && url.username === ""
-      && url.password === "";
-  } catch {
-    return false;
-  }
-}
-
-function networkReadTarget(record: Record<string, unknown>, fallback: string): string {
-  for (const key of ["query", "url", "responseId"] as const) {
-    const value = stringField(record, key);
-    if (value) return value;
-  }
-  for (const key of ["queries", "urls"] as const) {
-    const value = record[key];
-    if (!Array.isArray(value)) continue;
-    const items = value.filter((item): item is string => typeof item === "string" && item.trim() !== "");
-    if (items.length > 0) return items.join("\n");
-  }
-  return fallback;
-}
-
-function isCurrentBuiltinTool(pi: ExtensionAPI, toolName: string): boolean {
-  try {
-    const matches = pi.getAllTools().filter((tool) => tool.name === toolName);
-    const source = matches.length === 1 ? matches[0]?.sourceInfo : undefined;
-    return source?.source === "builtin"
-      && source.path === `<builtin:${toolName}>`
-      && source.scope === "temporary"
-      && source.origin === "top-level";
-  } catch {
-    return false;
-  }
-}
-
-function hasBuiltinInputContract(toolName: string, record: Record<string, unknown>): boolean {
-  const path = stringField(record, "path");
-  if (toolName === "read") return path !== undefined;
-  if (toolName === "write") return path !== undefined && typeof record.content === "string";
-  if (toolName === "edit") {
-    return path !== undefined
-      && Array.isArray(record.edits)
-      && record.edits.length > 0
-      && record.edits.every(isEditReplacement);
-  }
-  if (toolName === "grep" || toolName === "find") {
-    return stringField(record, "pattern") !== undefined && optionalPathIsValid(record);
-  }
-  return toolName === "ls" && optionalPathIsValid(record);
-}
-
-function isEditReplacement(value: unknown): boolean {
-  const record = asRecord(value);
-  return typeof record.oldText === "string" && typeof record.newText === "string";
-}
-
-function optionalPathIsValid(record: Record<string, unknown>): boolean {
-  return record.path === undefined || stringField(record, "path") !== undefined;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-}
-
-function stringField(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+async function classifyPathTool(
+  profile: Extract<ToolSafetyProfile, { kind: "builtin" | "pi-fff" }>,
+  capabilityName: string,
+  rawPath: string,
+  workspace: string,
+  loadedResourceReadAccess?: LoadedResourceReadAccess
+): Promise<ClassifiedToolIntent> {
+  const expandedPath = rawPath === "~"
+    ? homedir()
+    : rawPath.startsWith("~/")
+      ? resolve(homedir(), rawPath.slice(2))
+      : rawPath;
+  const canonical = await canonicalizePotentialPath(expandedPath, workspace);
+  const canonicalWorkspace = await realpath(resolve(workspace));
+  const contained = isContained(canonical, canonicalWorkspace);
+  const category: RiskCategory = contained
+    ? WRITE_TOOLS.has(capabilityName) ? "workspace-write" : "workspace-read"
+    : loadedResourceReadAccess?.allows(capabilityName, canonical)
+      ? "resource-read"
+      : "external-path";
+  return {
+    toolName: profile.toolName,
+    category,
+    target: canonical,
+    targetKind: "path",
+    sourceLabel: profile.sourceLabel
+  };
 }

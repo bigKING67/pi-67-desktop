@@ -2,10 +2,107 @@ import { describe, expect, it } from "vitest";
 import { classifyShellCommand, decideApproval } from "./safety-policy.js";
 
 describe("classifyShellCommand", () => {
-  it("does not auto-classify shell commands as safe workspace reads", () => {
-    for (const command of ["pwd", "git status --short", "ls -la", "find . -type f", "rg TODO"]) {
+  it("classifies bounded inspection commands as workspace commands", () => {
+    for (const command of [
+      "pwd",
+      "git status --short",
+      "ls -la src",
+      "find . -type f",
+      "rg -n TODO apps packages",
+      "head -40 README.md",
+      "diff before.txt after.txt"
+    ]) {
+      expect(classifyShellCommand(command)).toBe("workspace-command");
+    }
+  });
+
+  it("classifies the bounded project verification command families", () => {
+    for (const command of [
+      "corepack pnpm test",
+      "pnpm test",
+      "npm run typecheck",
+      "yarn lint",
+      "cargo check",
+      "cargo test",
+      "cargo build",
+      "cargo clippy",
+      "go test",
+      "go build",
+      "go vet",
+      "dotnet test",
+      "dotnet build",
+      "pytest",
+      "uv run pytest",
+      "python -m pytest",
+      "python3 -m pytest",
+      "tsc --noEmit"
+    ]) expect(classifyShellCommand(command), command).toBe("workspace-command");
+  });
+
+  it("rejects unsupported project runners and mutating command variants", () => {
+    for (const command of [
+      "",
+      "corepack bun test",
+      "corepack pnpm publish",
+      "pnpm deploy",
+      "npm run publish",
+      "cargo publish",
+      "go run main.go",
+      "dotnet publish",
+      "uv run script.py",
+      "python -m http.server",
+      "python3 script.py",
+      "tsc",
+      "git commit",
+      "pwd src"
+    ]) expect(classifyShellCommand(command), command).toBe("ambiguous-command");
+  });
+
+  it("keeps unsupported composition and arbitrary interpreters ambiguous", () => {
+    for (const command of [
+      "git status && touch output",
+      "node -e 'console.log(1)'",
+      "cat ../outside.txt",
+      "rg --pre sh TODO .",
+      "find . -fprint output.txt",
+      "git diff --output=patch.txt",
+      "sort input.txt -o output.txt",
+      "uniq input.txt output.txt"
+    ]) {
       expect(classifyShellCommand(command)).toBe("ambiguous-command");
     }
+  });
+
+  it("rejects read-command escape flags and external path tokens", () => {
+    for (const command of [
+      "rg --pre=sh TODO .",
+      "rg --hostname-bin host TODO .",
+      "rg --hostname-bin=host TODO .",
+      "find . -exec=sh",
+      "find . -okdir=sh",
+      "sort input.txt --output=output.txt",
+      "git diff --ext-diff",
+      "git diff --textconv",
+      "git grep --open-files-in-pager",
+      "git grep --open-files-in-pager=less",
+      "git show --output output.txt",
+      "ls ../outside",
+      "stat /outside"
+    ]) expect(classifyShellCommand(command), command).toBe("ambiguous-command");
+  });
+
+  it("allows non-mutating file arguments while keeping uniq output ambiguous", () => {
+    for (const command of [
+      "grep -n TODO src/a.ts src/b.ts",
+      "tail -20 logs/current.log",
+      "wc -l src/a.ts",
+      "file package.json",
+      "stat package.json",
+      "du -sh apps packages",
+      "sort input.txt",
+      "uniq input.txt"
+    ]) expect(classifyShellCommand(command), command).toBe("workspace-command");
+    expect(classifyShellCommand("uniq input.txt output.txt")).toBe("ambiguous-command");
   });
 
   it("detects destructive and external commands", () => {
@@ -31,14 +128,33 @@ describe("decideApproval", () => {
     expect(decideApproval(intent, "trusted", "balanced").allow).toBe(true);
   });
 
-  it("requires one-shot approval for every Bash command in a trusted workspace", () => {
+  it("allows only bounded Bash commands in balanced mode", () => {
+    const safe = { toolName: "bash", category: "workspace-command", target: "git status" } as const;
+    expect(decideApproval(safe, "trusted", "guided")).toMatchObject({ allow: false, approvalRequired: true });
+    expect(decideApproval(safe, "trusted", "balanced")).toMatchObject({ allow: true, approvalRequired: false });
+    for (const category of ["ambiguous-command", "git-external-action"] as const) {
+      expect(decideApproval({ toolName: "bash", category, target: "unknown" }, "trusted", "balanced")).toMatchObject({
+        allow: false,
+        approvalRequired: true
+      });
+    }
+  });
+
+  it("allows current-session loaded resource reads without per-call approval", () => {
+    expect(decideApproval({
+      toolName: "read",
+      category: "resource-read",
+      target: "/loaded/SKILL.md"
+    }, "trusted", "balanced")).toMatchObject({ allow: true, approvalRequired: false });
+  });
+
+  it("allows verified current-session capability inspection without per-call approval", () => {
     for (const mode of ["guided", "balanced"] as const) {
-      for (const category of ["workspace-read", "ambiguous-command", "git-external-action"] as const) {
-        expect(decideApproval({ toolName: "bash", category, target: "git status" }, "trusted", mode)).toMatchObject({
-          allow: false,
-          approvalRequired: true
-        });
-      }
+      expect(decideApproval({
+        toolName: "mcp",
+        category: "capability-read",
+        target: "fffind"
+      }, "trusted", mode)).toMatchObject({ allow: true, approvalRequired: false });
     }
   });
 
@@ -52,6 +168,37 @@ describe("decideApproval", () => {
         allow: true,
         approvalRequired: false,
         reason: "Verified read-only web capability."
+      });
+    }
+  });
+
+  it("allows configured operations and non-destructive state writes only in balanced mode", () => {
+    for (const category of ["configured-operation", "persistent-state-write"] as const) {
+      const intent = { toolName: "configured-tool", category, target: "configured-tool" };
+      expect(decideApproval(intent, "trusted", "balanced")).toMatchObject({
+        allow: true,
+        approvalRequired: false
+      });
+      expect(decideApproval(intent, "trusted", "guided")).toMatchObject({
+        allow: false,
+        approvalRequired: true
+      });
+    }
+  });
+
+  it("keeps destructive state, external submission, and credential actions behind approval", () => {
+    for (const category of [
+      "persistent-state-delete",
+      "external-submit",
+      "credential-or-auth"
+    ] as const) {
+      expect(decideApproval({
+        toolName: "configured-tool",
+        category,
+        target: "configured-tool"
+      }, "trusted", "balanced")).toMatchObject({
+        allow: false,
+        approvalRequired: true
       });
     }
   });

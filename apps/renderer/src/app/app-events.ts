@@ -77,6 +77,8 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "resource.changed":
       publishNotification({ level: "info", title: "Pi 资源已重新加载", toast: false });
       return;
+    case "task.toolMode.changed":
+      return;
     default:
       assertNever(event);
   }

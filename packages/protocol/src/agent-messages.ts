@@ -28,6 +28,9 @@ import type {
   SkillPackListResult,
   SkillPackMutationResult,
   SessionTreeProjection,
+  TaskToolMode,
+  ApprovalResponseDecision,
+  ApprovalResolution,
   WorkspaceChangesProjection,
   WorkspaceTrust
 } from "@pi67/domain";
@@ -138,6 +141,7 @@ export interface ProjectionResyncResult {
   eventSequence: number;
   hostEpoch: number;
   sessionGeneration: number;
+  taskToolMode: TaskToolMode;
   activeOperation?: OperationView;
   latestOperationTerminal?: OperationSettled;
 }
@@ -207,6 +211,7 @@ export interface CommandPayloads {
   "workspace.setTrust": { trust: WorkspaceTrust; approvalMode: ApprovalMode };
   "workspace.changes": Record<string, never>;
   "task.close": { mode: "stop" | "dispose" };
+  "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogQuery;
   "session.tree": Record<string, never>;
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
@@ -289,7 +294,7 @@ export interface CommandPayloads {
     sessionId: string;
     sessionGeneration: number;
     operationId: string;
-    allowed: boolean;
+    decision: ApprovalResponseDecision;
   };
   "diagnostics.collect": Record<string, never>;
   "doctor.run": Record<string, never>;
@@ -306,6 +311,7 @@ export interface CommandResults {
   "workspace.setTrust": SessionResourceCatalogResult;
   "workspace.changes": WorkspaceChangesProjection;
   "task.close": TaskCloseResult;
+  "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogPageResult;
   "session.tree": SessionTreeProjection;
   "message.page": ConversationPage;
@@ -356,7 +362,7 @@ export interface CommandResults {
   "skill.pack.update": SkillPackMutationResult;
   "skill.pack.restore": SkillPackMutationResult;
   "extension.ui.respond": { resolved: boolean };
-  "approval.respond": { resolved: boolean };
+  "approval.respond": ApprovalResolution;
   "diagnostics.collect": RuntimeDiagnostics;
   "doctor.run": DoctorReport;
 }
