@@ -1,4 +1,4 @@
-import type { SessionMessageView } from "@pi67/domain";
+import type { OperationView, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Virtuoso, type Components } from "react-virtuoso";
@@ -21,7 +21,12 @@ import {
   hasVisibleTurnActivity,
   TurnActivity
 } from "../operation/TurnActivity.js";
-import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
+import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
+import {
+  timelineMatchesOperation,
+  type OperationActivityTimeline,
+  useOperationActivityTimelineStore
+} from "../operation/operation-activity-timeline-store.js";
 import {
   continueRendererSessionFrom,
   editRendererUserMessage,
@@ -34,7 +39,13 @@ import {
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import { MessageCard } from "./MessageCard.js";
+import { TranscriptProcessGroup } from "./TranscriptProcessGroup.js";
 import { editableUserMessageText } from "./message-actions.js";
+import {
+  hasProcessGroupAfterLatestUser,
+  projectTranscriptRows,
+  type TranscriptRow
+} from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
 
 export function Transcript() {
@@ -60,14 +71,48 @@ export function Transcript() {
   const liveText = useMemo(() => textChunks.join(""), [textChunks]);
   const liveThinking = useMemo(() => thinkingChunks.join(""), [thinkingChunks]);
   const hasLiveTurn = Boolean(liveText || liveThinking);
-  const hasTurnActivity = hasVisibleTurnActivity(runtime.phase, operation, sessionId, sessionGeneration)
-    || hasVisibleOperationTimeline(operationTimeline, operation, sessionId, sessionGeneration);
   const currentEdit = messageEdit?.taskId === selectedTask?.id ? messageEdit : undefined;
   const transcriptMessages = useMemo(() => (
     currentEdit && !messages.some((message) => message.id === currentEdit.message.id)
       ? [...messages, currentEdit.message]
       : messages
   ), [currentEdit, messages]);
+  const transcriptRows = useMemo(() => projectTranscriptRows(transcriptMessages), [transcriptMessages]);
+  const hasCurrentProcessGroup = !pendingUserTurn && hasProcessGroupAfterLatestUser(transcriptRows);
+  const currentProcessGroupKey = hasCurrentProcessGroup
+    ? [...transcriptRows].reverse().find((row) => row.kind === "process-group")?.key
+    : undefined;
+  const operationMatchesSession = operation !== undefined
+    && operation.sessionId === sessionId
+    && operation.sessionGeneration === sessionGeneration;
+  const matchingOperationTimeline = timelineMatchesOperation(
+    operationTimeline,
+    operation,
+    sessionId,
+    sessionGeneration
+  ) ? operationTimeline : undefined;
+  const currentProcessRunning = operationMatchesSession
+    && isActiveOperationLifecycle(operation.lifecycle);
+  const currentProcessInterrupted = operationMatchesSession
+    && (operation.lifecycle === "failed" || operation.lifecycle === "cancelled" || operation.lifecycle === "lost");
+  const hasTurnActivity = !hasCurrentProcessGroup && (
+    hasVisibleTurnActivity(runtime.phase, operation, sessionId, sessionGeneration)
+    || (
+      hasVisibleOperationTimeline(operationTimeline, operation, sessionId, sessionGeneration)
+    )
+  );
+  const liveProcess = hasTurnActivity
+    && operationMatchesSession
+    && (operation.kind === "prompt" || operation.kind === "command")
+    ? {
+      row: liveProcessRow(operation, currentProcessInterrupted, Boolean(liveText)),
+      operation,
+      timeline: matchingOperationTimeline,
+      running: currentProcessRunning,
+      interrupted: currentProcessInterrupted,
+      completed: operation.lifecycle === "completed"
+    }
+    : undefined;
   const messageActionDisabledReason = currentEdit
     ? messagesCatalog.transcript.finishMessageEdit
     : sessionForkActionBlockedReason();
@@ -77,7 +122,7 @@ export function Transcript() {
       return (
         <div className={styles.error} role="alert">
           <CircleAlert size={22} />
-          <strong>Pi session 创建失败</strong>
+          <strong>无法创建会话</strong>
           <span>{runtime.detail}</span>
         </div>
       );
@@ -123,36 +168,57 @@ export function Transcript() {
           hasOlder: page.hasOlder,
           loadingOlder,
           conversationError,
+          liveProcess,
           loadOlderMessages: loadOlderConversation
         }}
-        data={transcriptMessages}
-        computeItemKey={(_index, message) => message.id}
-        firstItemIndex={firstItemIndex}
+        data={transcriptRows}
+        computeItemKey={(_index, row) => row.key}
+        firstItemIndex={firstItemIndex + transcriptMessages.length - transcriptRows.length}
         followOutput={streaming || hasTurnActivity ? "auto" : false}
         increaseViewportBy={{ top: 500, bottom: 800 }}
-        initialTopMostItemIndex={Math.max(0, transcriptMessages.length - 1)}
-        itemContent={(_index, message) => (
-          <MessageCard
-            actionDisabledReason={messageActionDisabledReason}
-            edit={currentEdit?.message.id === message.id ? {
-              value: currentEdit.value,
-              phase: currentEdit.phase,
-              ...(currentEdit.error === undefined ? {} : { error: currentEdit.error }),
-              onChange: (value) => setMessageEdit((current) => current?.taskId === currentEdit.taskId
-                ? { ...current, value, error: undefined }
-                : current),
-              onCancel: () => void cancelMessageEdit(currentEdit),
-              onSubmit: () => void submitMessageEdit(currentEdit)
-            } : undefined}
-            message={message}
-            onContinue={message.role === "assistant"
-              ? () => continueRendererSessionFrom(message.id)
-              : undefined}
-            onEditStart={message.role === "user"
-              ? () => beginMessageEdit(message)
-              : undefined}
-          />
-        )}
+        initialTopMostItemIndex={Math.max(0, transcriptRows.length - 1)}
+        itemContent={(_index, row) => {
+          if (row.kind === "process-group") {
+            const current = row.key === currentProcessGroupKey;
+            const currentOperation = current && operationMatchesSession ? operation : undefined;
+            return (
+              <TranscriptProcessGroup
+                completed={currentOperation ? currentOperation.lifecycle === "completed" : true}
+                interrupted={current && currentProcessInterrupted}
+                liveThinking={current ? liveThinking : ""}
+                row={row}
+                running={current && currentProcessRunning}
+                {...(currentOperation === undefined ? {} : { operation: currentOperation })}
+                {...(!current || matchingOperationTimeline === undefined
+                  ? {}
+                  : { timeline: matchingOperationTimeline })}
+              />
+            );
+          }
+          const message = row.message;
+          return (
+            <MessageCard
+              actionDisabledReason={messageActionDisabledReason}
+              edit={currentEdit?.message.id === message.id ? {
+                value: currentEdit.value,
+                phase: currentEdit.phase,
+                ...(currentEdit.error === undefined ? {} : { error: currentEdit.error }),
+                onChange: (value) => setMessageEdit((current) => current?.taskId === currentEdit.taskId
+                  ? { ...current, value, error: undefined }
+                  : current),
+                onCancel: () => void cancelMessageEdit(currentEdit),
+                onSubmit: () => void submitMessageEdit(currentEdit)
+              } : undefined}
+              message={message}
+              onContinue={message.role === "assistant"
+                ? () => continueRendererSessionFrom(message.id)
+                : undefined}
+              onEditStart={message.role === "user"
+                ? () => beginMessageEdit(message)
+                : undefined}
+            />
+          );
+        }}
       />
     </div>
   );
@@ -238,10 +304,20 @@ interface TranscriptContext {
   hasOlder: boolean;
   loadingOlder: boolean;
   conversationError: string | undefined;
+  liveProcess: LiveProcessPresentation | undefined;
   loadOlderMessages: () => Promise<void>;
 }
 
-const TRANSCRIPT_COMPONENTS: Components<SessionMessageView, TranscriptContext> = {
+interface LiveProcessPresentation {
+  row: Extract<TranscriptRow, { kind: "process-group" }>;
+  operation: OperationView;
+  timeline: OperationActivityTimeline | undefined;
+  running: boolean;
+  interrupted: boolean;
+  completed: boolean;
+}
+
+const TRANSCRIPT_COMPONENTS: Components<TranscriptRow, TranscriptContext> = {
   Header: OlderMessagesHeader,
   Footer: LiveTurnFooter
 };
@@ -271,29 +347,58 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
       {context.pendingUserTurn ? (
         <MessageCard
           deliveryStatus={context.pendingUserTurn.status}
-          localImages={context.pendingUserTurn.attachments.map((attachment) => ({
-            mimeType: attachment.file.type,
-            name: attachment.file.name,
-            objectUrl: attachment.previewUrl
-          }))}
+          localImages={context.pendingUserTurn.attachments.flatMap((attachment) => (
+            attachment.kind === "image" && attachment.previewUrl
+              ? [{
+                  mimeType: attachment.mimeType,
+                  name: attachment.name,
+                  objectUrl: attachment.previewUrl
+                }]
+              : []
+          ))}
           message={context.pendingUserTurn.message}
         />
       ) : null}
-      {context.hasTurnActivity ? <TurnActivity /> : null}
-      {context.hasLiveTurn
-        ? <MessageCard message={liveMessage(context.liveText, context.liveThinking)} streaming />
+      {context.liveProcess ? (
+        <TranscriptProcessGroup
+          completed={context.liveProcess.completed}
+          interrupted={context.liveProcess.interrupted}
+          liveThinking={context.liveThinking}
+          operation={context.liveProcess.operation}
+          row={context.liveProcess.row}
+          running={context.liveProcess.running}
+          {...(context.liveProcess.timeline === undefined
+            ? {}
+            : { timeline: context.liveProcess.timeline })}
+        />
+      ) : context.hasTurnActivity ? <TurnActivity /> : null}
+      {context.liveText
+        ? <MessageCard message={liveMessage(context.liveText)} streaming />
         : null}
     </>
   );
 }
 
-function liveMessage(text: string, thinking: string): SessionMessageView {
+function liveMessage(text: string): SessionMessageView {
   return {
     id: "live-assistant-message",
     role: "assistant",
-    parts: [
-      ...(thinking ? [{ type: "thinking" as const, text: thinking }] : []),
-      ...(text ? [{ type: "text" as const, text }] : [])
-    ]
+    parts: [{ type: "text", text }]
+  };
+}
+
+function liveProcessRow(
+  operation: OperationView,
+  interrupted: boolean,
+  hasFinalAnswer: boolean
+): Extract<TranscriptRow, { kind: "process-group" }> {
+  return {
+    kind: "process-group",
+    key: `${operation.operationId}:live-process`,
+    items: [],
+    stepCount: 1,
+    toolCount: 0,
+    failed: interrupted,
+    hasFinalAnswer
   };
 }

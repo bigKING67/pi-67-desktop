@@ -13,6 +13,7 @@ import {
   writeFile
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { managedSkillPackPackagePaths } from "./managed-skill-pack-state.js";
 
 const MANIFEST_SCHEMA = "pi67.desktop-capabilities.v1";
 const CATALOG_SCHEMA = "pi67.capability-catalog.v1";
@@ -98,7 +99,7 @@ export async function bootstrapDesktopCapabilities(
 
   await mkdir(agentDir, { recursive: true, mode: 0o700 });
   await mkdir(managedRoot, { recursive: true, mode: 0o700 });
-  const packagePaths: string[] = [];
+  const bundledPackagePaths: string[] = [];
   for (const entry of catalog.entries) {
     const integrity = manifestById.get(entry.id)!;
     const source = containedPath(capabilitiesRoot, entry.packagePath, "Capability package path");
@@ -108,10 +109,10 @@ export async function bootstrapDesktopCapabilities(
       throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
     }
     await replaceDirectoryIfChanged(source, destination, integrity.treeSha256, managedRoot, createToken);
-    packagePaths.push(destination);
+    bundledPackagePaths.push(destination);
   }
 
-  const pi67Core = packagePaths[catalog.entries.findIndex((entry) => entry.id === "pi67-core")];
+  const pi67Core = bundledPackagePaths[catalog.entries.findIndex((entry) => entry.id === "pi67-core")];
   const rules = pi67Core && existsSync(join(pi67Core, "rules"))
     ? await materializeRules(join(pi67Core, "rules"), join(agentDir, "rules", "pi67-desktop"), agentDir, createToken)
     : "unavailable";
@@ -135,6 +136,10 @@ export async function bootstrapDesktopCapabilities(
   }, createToken);
   if (process.platform !== "win32") await chmod(managedRoot, 0o700);
 
+  const packagePaths = [
+    ...await managedSkillPackPackagePaths(agentDir),
+    ...bundledPackagePaths
+  ];
   environment.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
   environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(packagePaths);
   return {

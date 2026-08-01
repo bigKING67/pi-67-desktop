@@ -1,0 +1,236 @@
+.group {
+  width: min(820px, calc(100% - 48px));
+  min-width: 0;
+  margin: 0 auto;
+  padding: 8px 0 12px;
+  color: var(--text-tertiary);
+}
+
+.group > summary {
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+  grid-template-columns: 16px minmax(0, auto) 16px;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px 4px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.group > summary:hover {
+  color: var(--text-secondary);
+}
+
+.group > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.statusIcon {
+  display: inline-flex;
+  color: var(--success);
+}
+
+.failed .statusIcon,
+.failed .summaryCopy strong {
+  color: var(--danger);
+}
+
+.summaryCopy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.summaryCopy strong {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryCopy small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.chevron {
+  transition: transform 120ms ease-out;
+}
+
+.spinning {
+  animation: process-group-spin 1s linear infinite;
+}
+
+.group[open] .chevron {
+  transform: rotate(90deg);
+}
+
+@keyframes process-group-spin {
+  to { transform: rotate(360deg); }
+}
+
+.steps {
+  display: grid;
+  gap: 9px;
+  margin: 8px 0 0;
+  padding: 0 0 2px 25px;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  min-width: 0;
+}
+
+.step::before {
+  position: absolute;
+  z-index: 1;
+  top: 11px;
+  left: -21px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--canvas);
+  border-radius: 50%;
+  background: var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border);
+  content: "";
+}
+
+.step:not(:last-child)::after {
+  position: absolute;
+  top: 19px;
+  bottom: -15px;
+  left: -18px;
+  width: 1px;
+  background: color-mix(in srgb, var(--border) 82%, transparent);
+  content: "";
+}
+
+.step[data-process-step="tool"]::before,
+.step[data-process-step="orphan-tool-result"]::before {
+  background: color-mix(in srgb, var(--accent) 72%, var(--border));
+}
+
+.step[data-process-step="status"]::before {
+  background: var(--warning);
+}
+
+.reasoning,
+.narration {
+  min-width: 0;
+  padding: 1px 0 3px;
+}
+
+.reasoning > span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reasoning > div,
+.narration > div {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.62;
+}
+
+.narration > div {
+  color: var(--text-primary);
+}
+
+.statusNotice {
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 9px;
+  border-left: 2px solid var(--warning);
+  background: color-mix(in srgb, var(--warning) 6%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.timelineStatus {
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+  gap: 1px;
+  padding: 2px 0 3px;
+}
+
+.timelineStatus strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 580;
+  line-height: 1.45;
+}
+
+.timelineStatus small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.step[data-step-status="running"]::before {
+  background: var(--accent);
+}
+
+.step[data-step-status="failed"]::before {
+  background: var(--danger);
+}
+
+.step[data-step-status="cancelled"]::before,
+.step[data-step-status="lost"]::before {
+  background: var(--warning);
+}
+
+.failed .step[data-process-step="status"]::before {
+  background: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .group {
+    width: calc(100% - 28px);
+  }
+
+  .summaryCopy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .steps {
+    padding-left: 22px;
+  }
+
+  .step::before {
+    left: -19px;
+  }
+
+  .step:not(:last-child)::after {
+    left: -16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .spinning {
+    transition: none;
+    animation: none;
+  }
+}

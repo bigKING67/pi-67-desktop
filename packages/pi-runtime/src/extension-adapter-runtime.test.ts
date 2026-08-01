@@ -40,15 +40,20 @@ describe("ExtensionAdapterRuntime", () => {
       adapter: { adapterId: "verified-adapter", commandCount: 1, toolCount: 1 },
       assessment: { overall: "adapter" }
     });
-    expect(runtime.getCommands()).toEqual([{
-      name: "inspect",
-      description: "Inspect runtime",
-      adapter: {
-        adapterId: "verified-adapter",
-        package: "@verified/example",
-        label: "检查"
-      }
-    }]);
+    expect(runtime.getCommands()).toEqual({
+      items: [{
+        name: "inspect",
+        source: "extension",
+        description: "Inspect runtime",
+        adapter: {
+          adapterId: "verified-adapter",
+          package: "@verified/example",
+          label: "检查"
+        }
+      }],
+      total: 1,
+      truncated: false
+    });
 
     const runtimeTools = fixture.session.getAllTools();
     expect(runtime.bindToolExecutionStart(3, "call-1", "read_artifact", runtimeTools)).toBe("read");
@@ -64,7 +69,7 @@ describe("ExtensionAdapterRuntime", () => {
     runtime.reset();
     expect(runtime.getCapabilities().adapterRegistry.activeAdapterCount).toBe(0);
     expect(runtime.getCatalog()).toEqual({ items: [], total: 0, truncated: false });
-    expect(runtime.getCommands()).toEqual([]);
+    expect(runtime.getCommands()).toEqual({ items: [], total: 0, truncated: false });
     expect(runtime.getToolAdapter(3, "call-1")).toBeUndefined();
   });
 
@@ -74,16 +79,21 @@ describe("ExtensionAdapterRuntime", () => {
 
     expect(await runtime.refresh(1, fixture.extensions, fixture.session)).toBe(true);
     expect(runtime.getCapabilities().adapterRegistry.activeAdapterCount).toBe(1);
-    expect(runtime.getCommands()).toEqual([{
-      name: "rewind",
-      description: "Rewind file changes and/or conversation to a checkpoint",
-      adapter: {
-        adapterId: "pi-rewind-0.5.0",
-        package: "pi-rewind",
-        label: "Rewind",
-        description: "Restore files and/or conversation to a checkpoint."
-      }
-    }]);
+    expect(runtime.getCommands()).toEqual({
+      items: [{
+        name: "rewind",
+        source: "extension",
+        description: "Rewind file changes and/or conversation to a checkpoint",
+        adapter: {
+          adapterId: "pi-rewind-0.5.0",
+          package: "pi-rewind",
+          label: "Rewind",
+          description: "Restore files and/or conversation to a checkpoint."
+        }
+      }],
+      total: 1,
+      truncated: false
+    });
     expect(runtime.getCatalog().items[0]).toMatchObject({
       adapter: {
         adapterId: "pi-rewind-0.5.0",
@@ -109,7 +119,7 @@ describe("ExtensionAdapterRuntime", () => {
 
     expect(await runtime.refresh(2, fixture.extensions, fixture.session)).toBe(true);
     expect(runtime.getCapabilities().adapterRegistry.activeAdapterCount).toBe(1);
-    expect(runtime.getCommands()).toEqual([]);
+    expect(runtime.getCommands()).toEqual({ items: [], total: 0, truncated: false });
     expect(runtime.getCatalog().items[0]).toMatchObject({
       adapter: {
         adapterId: "feniix-pi-sequential-thinking-5.0.3",

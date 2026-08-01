@@ -141,7 +141,6 @@ describe("session message actions controller", () => {
     );
     expect(submitPrompt).toHaveBeenCalledWith(
       "修改这条历史问题",
-      [],
       "send",
       expect.stringMatching(/^submission-/u)
     );

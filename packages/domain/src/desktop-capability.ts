@@ -32,10 +32,34 @@ export interface DesktopBundledSkillSummary {
   installed: boolean;
 }
 
+export type DesktopBundledSkillSuiteVersionSource =
+  | "unversioned"
+  | "skill-pack"
+  | "capability-package"
+  | "multiple-sources";
+
+export type DesktopBundledSkillSuiteUpdatePolicy =
+  | "hybrid"
+  | "capability-package"
+  | "source-specific";
+
+export type DesktopBundledSkillSuiteUpdateManager =
+  | "lark-cli"
+  | "pi67-skill-pack-registry"
+  | "desktop-capability"
+  | "source-specific";
+
 export interface DesktopBundledSkillSuiteSummary {
   id: string;
   displayName: string;
   description: string;
+  versionSource: DesktopBundledSkillSuiteVersionSource;
+  bundledVersion?: string;
+  upstream?: string;
+  sourceCommit?: string;
+  updatePolicy: DesktopBundledSkillSuiteUpdatePolicy;
+  updateManager: DesktopBundledSkillSuiteUpdateManager;
+  independentUpdateState: "available" | "planned" | "not-applicable";
   skills: DesktopBundledSkillSummary[];
 }
 

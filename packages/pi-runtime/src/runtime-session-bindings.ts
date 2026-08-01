@@ -17,6 +17,11 @@ import type { SafetyPolicyState, DesktopApprovalRequester } from "./safety-exten
 import { createDesktopSessionServices } from "./session-services.js";
 import type { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import {
+  createDesktopToolAliasBinding,
+  type DesktopToolAliasBinding
+} from "./tool-routing-extension.js";
+import type { PromptAttachmentAccess } from "./prompt-attachment.js";
 
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
@@ -26,6 +31,7 @@ interface RuntimeSessionBindingsOptions {
   getRuntimeCredentialOverrides: () => RuntimeCredentialOverrideStore;
   getSafety: () => SafetyPolicyState;
   getWorkspaceServices: () => PiWorkspaceRuntimeServices | undefined;
+  getPromptAttachmentAccess: () => PromptAttachmentAccess | undefined;
   projections: RuntimeProjectionController;
   rebindExtensionUi: (session: AgentSession) => Promise<void>;
   requestApproval: DesktopApprovalRequester;
@@ -38,6 +44,7 @@ export class RuntimeSessionBindings {
   private activeServices: AgentSessionServices | undefined;
   private activeSettingsManager: SettingsManager | undefined;
   private activeExtensions: LoadExtensionsResult | undefined;
+  private activeToolAliases: DesktopToolAliasBinding | undefined;
   private sessionUnsubscribe: (() => void) | undefined;
   private transition: Promise<unknown> | undefined;
   private generation = 0;
@@ -53,20 +60,25 @@ export class RuntimeSessionBindings {
 
   refreshExtensions(): LoadExtensionsResult | undefined {
     this.activeExtensions = this.activeServices?.resourceLoader.getExtensions();
+    this.activeToolAliases?.reconcile();
     return this.activeExtensions;
   }
 
   async createInitial(cwd: string, sessionManager?: SessionManager): Promise<void> {
     const services = await this.createServices(cwd);
+    const toolAliases = createDesktopToolAliasBinding();
     const result = sessionManager
-      ? await createAgentSessionFromServices({ services, sessionManager })
+      ? await createAgentSessionFromServices({ services, sessionManager, customTools: toolAliases.tools })
       : await createAgentSession({
         cwd,
         agentDir: this.options.getAgentDir(),
         modelRuntime: services.modelRuntime,
         settingsManager: services.settingsManager,
-        resourceLoader: services.resourceLoader
+        resourceLoader: services.resourceLoader,
+        customTools: toolAliases.tools
       });
+    toolAliases.bind(result.session);
+    this.activeToolAliases = toolAliases;
     const runtime = new AgentSessionRuntime(
       result.session,
       services,
@@ -99,6 +111,7 @@ export class RuntimeSessionBindings {
     this.activeServices = undefined;
     this.activeSettingsManager = undefined;
     this.activeExtensions = undefined;
+    this.activeToolAliases = undefined;
   }
 
   requireSession(): AgentSession {
@@ -130,17 +143,22 @@ export class RuntimeSessionBindings {
   private createRuntimeFactory(): CreateAgentSessionRuntimeFactory {
     return async ({ cwd, sessionManager, sessionStartEvent }) => {
       const services = await this.createServices(cwd);
+      const toolAliases = createDesktopToolAliasBinding();
       const result = await createAgentSessionFromServices({
         services,
         sessionManager,
+        customTools: toolAliases.tools,
         ...(sessionStartEvent ? { sessionStartEvent } : {})
       });
+      toolAliases.bind(result.session);
+      this.activeToolAliases = toolAliases;
       return { ...result, services, diagnostics: services.diagnostics };
     };
   }
 
   private async createServices(cwd: string): Promise<AgentSessionServices> {
     const workspaceServices = this.options.getWorkspaceServices();
+    const promptAttachmentAccess = this.options.getPromptAttachmentAccess();
     workspaceServices?.assertCompatible(cwd, this.options.getAgentDir());
     const modelRuntime = await workspaceServices?.configurationService?.createModelRuntime();
     return createDesktopSessionServices({
@@ -152,7 +170,8 @@ export class RuntimeSessionBindings {
         : { settingsManager: workspaceServices.settingsManager }),
       ...(modelRuntime === undefined ? {} : { modelRuntime }),
       getSafety: this.options.getSafety,
-      requestApproval: this.options.requestApproval
+      requestApproval: this.options.requestApproval,
+      ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess })
     });
   }
 

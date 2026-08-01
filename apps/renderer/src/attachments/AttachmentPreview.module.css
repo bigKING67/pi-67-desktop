@@ -1,0 +1,85 @@
+.root {
+  display: inline-flex;
+  width: 218px;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.thumbnail,
+.icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 5px;
+}
+
+.thumbnail {
+  object-fit: cover;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--surface-raised) 82%, var(--accent) 18%);
+  color: var(--text-secondary);
+}
+
+.identity {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.identity strong,
+.identity small {
+  overflow: hidden;
+  font-family: var(--font-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.identity small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.remove {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.remove:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}

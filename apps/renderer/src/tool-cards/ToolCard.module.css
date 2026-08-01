@@ -1,48 +1,71 @@
 .card {
-  margin: 10px 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface-muted) 74%, transparent);
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
   color: var(--text-secondary);
+}
+
+.card[open] {
+  width: 100%;
 }
 
 .header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 9px;
-  min-height: 48px;
-  padding: 9px 10px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 36px;
+  grid-template-columns: 20px minmax(0, auto) auto 14px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 78%, transparent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.header::-webkit-details-marker {
+  display: none;
+}
+
+.header:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.header:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .kindIcon {
   display: grid;
+  width: 20px;
+  height: 20px;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--text-secondary);
+  color: var(--accent);
 }
 
 .identity {
-  display: grid;
+  display: flex;
   min-width: 0;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .titleRow {
   display: flex;
-  align-items: baseline;
-  gap: 7px;
   min-width: 0;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .titleRow strong {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 640;
+  white-space: nowrap;
 }
 
 .titleRow code {
@@ -50,7 +73,7 @@
   overflow: hidden;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 11px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -58,11 +81,12 @@
 .compact {
   display: block;
   min-width: 0;
+  max-width: 360px;
   overflow: hidden;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -70,10 +94,9 @@
 .status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding-top: 3px;
+  gap: 4px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -81,47 +104,41 @@
   color: var(--success);
 }
 
-.status-failed {
+.status-failed .header {
   border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
 }
 
 .status-failed .status,
+.status-failed .kindIcon,
 .failureDetail,
 .copyError {
   color: var(--danger);
 }
 
-.status-running .status {
+.status-running .status,
+.status-running .kindIcon {
   color: var(--accent);
 }
 
-.details {
-  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-}
-
-.details > summary {
-  width: fit-content;
-  padding: 7px 10px;
+.chevron {
   color: var(--text-tertiary);
-  cursor: default;
-  font-size: 11px;
-  list-style-position: inside;
+  transition: transform 120ms ease-out;
 }
 
-.details > summary:hover {
-  color: var(--text-primary);
-}
-
-.details > summary:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
+.card[open] .chevron {
+  transform: rotate(90deg);
 }
 
 .detailBody {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 10px;
-  padding: 2px 10px 10px;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-muted) 52%, transparent);
 }
 
 .detailList {
@@ -137,9 +154,11 @@
 }
 
 .detailList dt,
-.rawSummary > span {
+.rawSummary > span,
+.result > span {
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 620;
 }
 
 .detailList dd {
@@ -148,8 +167,9 @@
 }
 
 .detailList code,
-.rawSummary pre {
-  color: var(--text-primary);
+.rawSummary pre,
+.result pre {
+  color: var(--text-secondary);
   font-family: var(--font-code);
   font-size: 11px;
   line-height: 1.55;
@@ -157,24 +177,41 @@
   white-space: pre-wrap;
 }
 
-.rawSummary {
+.rawSummary,
+.result {
   display: grid;
+  min-width: 0;
   gap: 5px;
 }
 
-.rawSummary pre {
+.rawSummary pre,
+.result pre {
   max-height: 220px;
   margin: 0;
-  padding: 8px;
+  padding: 8px 9px;
   overflow: auto;
   border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
   border-radius: 6px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--canvas) 82%, var(--surface));
+  tab-size: 2;
+  white-space: pre;
 }
 
-.failureDetail {
+.result .resultExpanded {
+  max-height: none;
+}
+
+.failureDetail,
+.emptyResult,
+.pendingResult {
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.emptyResult,
+.pendingResult {
+  color: var(--text-tertiary);
 }
 
 .limitations {
@@ -183,28 +220,30 @@
   margin: 0;
   padding-left: 17px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.5;
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-height: 27px;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .copyButton {
   display: inline-flex;
+  min-height: 27px;
   align-items: center;
   gap: 5px;
-  min-height: 27px;
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
   color: var(--text-secondary);
+  font-size: 10px;
 }
 
 .copyButton[data-hovered] {
@@ -217,6 +256,11 @@
   background: var(--surface-active);
 }
 
+.copyButton[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .spinning {
   animation: tool-card-spin 0.9s linear infinite;
 }
@@ -227,12 +271,25 @@
 
 @media (max-width: 560px) {
   .header {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 20px minmax(0, 1fr) 14px;
+  }
+
+  .identity {
+    display: grid;
+    gap: 1px;
   }
 
   .status {
     grid-column: 2;
-    padding-top: 0;
+  }
+
+  .chevron {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .compact {
+    max-width: 100%;
   }
 
   .detailList > div {
@@ -244,5 +301,9 @@
 @media (prefers-reduced-motion: reduce) {
   .spinning {
     animation: none;
+  }
+
+  .chevron {
+    transition: none;
   }
 }

@@ -2,6 +2,7 @@ import type { SourceInfo, ToolInfo } from "@earendil-works/pi-coding-agent";
 import type { ToolPresentationKind } from "@pi67/domain";
 import { isValidExtensionSurfaceName } from "@pi67/extension-compat";
 import type { ToolAdapterView } from "./extension-adapter-projection.js";
+import { desktopToolAliasTarget } from "./tool-routing-extension.js";
 
 export const TOOL_ATTRIBUTION_LIMITS = Object.freeze({
   runtimeTools: 1_024,
@@ -169,11 +170,24 @@ function toolPresentationKind(
   adapter: ToolAdapterView | undefined
 ): ToolPresentationKind {
   if (isConfirmedBuiltinTool(toolName, sourceInfo)) return builtinToolPresentationKind(toolName);
+  const aliasTarget = confirmedDesktopAliasTarget(toolName, sourceInfo);
+  if (aliasTarget) return builtinToolPresentationKind(aliasTarget);
   if (!adapter) return "generic";
   if (adapter.presentation === "command") return "shell";
   if (adapter.presentation === "read") return "read";
   if (adapter.presentation === "change") return "edit";
   return "generic";
+}
+
+function confirmedDesktopAliasTarget(toolName: string, sourceInfo: SourceInfo | undefined): string | undefined {
+  const target = desktopToolAliasTarget(toolName);
+  return target
+    && sourceInfo?.source === "sdk"
+    && sourceInfo.path === `<sdk:${toolName}>`
+    && sourceInfo.scope === "temporary"
+    && sourceInfo.origin === "top-level"
+    ? target
+    : undefined;
 }
 
 function isConfirmedBuiltinTool(toolName: string, sourceInfo: SourceInfo | undefined): boolean {
@@ -188,6 +202,7 @@ function builtinToolPresentationKind(toolName: string): ToolPresentationKind {
   if (toolName === "grep" || toolName === "find" || toolName === "ls") return "search";
   if (toolName === "edit" || toolName === "write") return "edit";
   if (toolName === "bash") return "shell";
+  if (toolName === "web_search" || toolName === "fetch_content") return "search";
   return "generic";
 }
 

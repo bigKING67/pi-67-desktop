@@ -17,6 +17,7 @@ describe("Renderer message catalog", () => {
     expect(catalog.approval.suspiciousDescription(2)).toContain("2 个可疑字符");
     expect(catalog.extensionCatalog.countSummary(1, 2)).toBe("1 命令 · 2 工具");
     expect(catalog.operation.completed).toBe("任务已完成");
+    expect(catalog.approval.risks["network-read"]).toBe("读取外部网络信息");
   });
 
   it("centralizes relative and notification date formatting", () => {

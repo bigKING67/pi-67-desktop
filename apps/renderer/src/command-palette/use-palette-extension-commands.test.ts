@@ -1,8 +1,8 @@
-import type { CommandDescriptor } from "@pi67/protocol";
+import type { SlashCommandCatalogResult, SlashCommandDescriptor } from "@pi67/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtimeCommands = vi.hoisted(() => ({
-  list: vi.fn<() => Promise<CommandDescriptor[]>>()
+  list: vi.fn<() => Promise<SlashCommandCatalogResult>>()
 }));
 
 const hookRuntime = vi.hoisted(() => {
@@ -138,8 +138,8 @@ describe("usePaletteExtensionCommands", () => {
   });
 
   it("binds results to the current Host epoch and ignores an overlapping stale response", async () => {
-    const stale = deferred<CommandDescriptor[]>();
-    const current = deferred<CommandDescriptor[]>();
+    const stale = deferred<SlashCommandCatalogResult>();
+    const current = deferred<SlashCommandCatalogResult>();
     runtimeCommands.list.mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise);
 
     render({ open: true, connected: true, hostEpoch: 10 });
@@ -147,39 +147,40 @@ describe("usePaletteExtensionCommands", () => {
     render({ open: true, connected: true, hostEpoch: 11 });
     expect(runtimeCommands.list).toHaveBeenCalledTimes(2);
 
-    current.resolve([{ name: "current-command" }]);
+    current.resolve(catalog([{ name: "current-command", source: "extension" }]));
     await settlePromiseCallbacks();
     expect(render({ open: true, connected: true, hostEpoch: 11 })).toEqual({
       status: "ready",
-      commands: [{ name: "current-command" }]
+      commands: [{ name: "current-command", source: "extension" }]
     });
 
-    stale.resolve([{ name: "stale-command" }]);
+    stale.resolve(catalog([{ name: "stale-command", source: "extension" }]));
     await settlePromiseCallbacks();
     expect(render({ open: true, connected: true, hostEpoch: 11 })).toEqual({
       status: "ready",
-      commands: [{ name: "current-command" }]
+      commands: [{ name: "current-command", source: "extension" }]
     });
   });
 
   it("prevents an in-flight request from updating state after effect cleanup", async () => {
-    const pending = deferred<CommandDescriptor[]>();
+    const pending = deferred<SlashCommandCatalogResult>();
     runtimeCommands.list.mockReturnValueOnce(pending.promise);
 
     render({ open: true, connected: true, hostEpoch: 22 });
     const revisionBeforeUnmount = hookRuntime.revision;
     hookRuntime.unmount();
-    pending.resolve([{ name: "late-command" }]);
+    pending.resolve(catalog([{ name: "late-command", source: "extension" }]));
     await settlePromiseCallbacks();
 
     expect(hookRuntime.revision).toBe(revisionBeforeUnmount);
   });
 
   it("limits the normalized command catalog to the bounded candidate contract", async () => {
-    runtimeCommands.list.mockResolvedValueOnce(Array.from(
+    const commands = Array.from(
       { length: MAX_EXTENSION_CANDIDATES + 25 },
-      (_, index): CommandDescriptor => ({ name: `command-${index}` })
-    ));
+      (_, index): SlashCommandDescriptor => ({ name: `command-${index}`, source: "extension" })
+    );
+    runtimeCommands.list.mockResolvedValueOnce(catalog(commands));
 
     render({ open: true, connected: true, hostEpoch: 30 });
     await settlePromiseCallbacks();
@@ -190,3 +191,7 @@ describe("usePaletteExtensionCommands", () => {
     expect(state.commands.at(-1)?.name).toBe(`command-${MAX_EXTENSION_CANDIDATES - 1}`);
   });
 });
+
+function catalog(items: SlashCommandDescriptor[]): SlashCommandCatalogResult {
+  return { items, total: items.length, truncated: false };
+}

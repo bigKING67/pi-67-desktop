@@ -25,14 +25,14 @@ describe("createDesktopSafetyExtension", () => {
   it("keeps the internal policy extension out of user-facing catalogs", () => {
     const extension = createDesktopSafetyExtension(
       () => trustedPolicy(),
-      vi.fn<DesktopApprovalRequester>().mockResolvedValue(false)
+      vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" })
     );
     expect(extension).toMatchObject({ name: "pi67-desktop-safety", hidden: true });
   });
 
   it("passes the exact tool call identity and structured command context to one-shot approval", async () => {
     const signal = new AbortController().signal;
-    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue(true);
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "allowed" });
     const handler = safetyHandler(trustedPolicy(), requestApproval);
 
     await expect(handler({
@@ -57,7 +57,10 @@ describe("createDesktopSafetyExtension", () => {
   });
 
   it("blocks when the user rejects the request", async () => {
-    const handler = safetyHandler(trustedPolicy(), vi.fn<DesktopApprovalRequester>().mockResolvedValue(false));
+    const handler = safetyHandler(
+      trustedPolicy(),
+      vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" })
+    );
 
     await expect(handler({
       toolCallId: "tool-call-rejected",
@@ -65,8 +68,147 @@ describe("createDesktopSafetyExtension", () => {
       input: { command: "pwd" }
     }, { hasUI: true })).resolves.toEqual({
       block: true,
-      reason: "Blocked by user: ambiguous-command"
+      reason: "工具已注册，但用户未批准本次一次性授权：执行无法安全分类的命令。这不表示工具不可用；不要自动重试。"
     });
+  });
+
+  it("distinguishes a system-cancelled approval from an explicit user denial", async () => {
+    const handler = safetyHandler(
+      trustedPolicy(),
+      vi.fn<DesktopApprovalRequester>().mockResolvedValue({
+        status: "cancelled",
+        reason: "projection-resync"
+      })
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-cancelled",
+      toolName: "bash",
+      input: { command: "pwd" }
+    }, { hasUI: true })).resolves.toEqual({
+      block: true,
+      reason: "授权请求因 Desktop 状态变化而取消（projection-resync），工具未执行；这不是用户拒绝。"
+    });
+  });
+
+  it("auto-allows verified pi-web-access read contracts", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = safetyHandler(
+      trustedPolicy(),
+      requestApproval,
+      () => [packageTool("web_search", "npm:pi-web-access@0.17.0")]
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-web-search",
+      toolName: "web_search",
+      input: { queries: ["杭州天气", "杭州今日气温"] }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("auto-allows only the exact internal Desktop attachment Tool and its bounded input", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = safetyHandler(
+      trustedPolicy(),
+      requestApproval,
+      () => [desktopAttachmentTool()]
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-attachment-read",
+      toolName: "read_attachment",
+      input: { setId: "set_a", operation: "read_text", attachmentId: "attachment_a" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("keeps malformed or ambiguous same-name attachment Tools behind approval", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    let tools = [desktopAttachmentTool()];
+    const handler = safetyHandler(trustedPolicy(), requestApproval, () => tools);
+
+    await expect(handler({
+      toolCallId: "tool-call-malformed-attachment",
+      toolName: "read_attachment",
+      input: { setId: "../outside", operation: "read_text", attachmentId: "attachment_a" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    tools = [desktopAttachmentTool(), extensionTool("read_attachment")];
+    await expect(handler({
+      toolCallId: "tool-call-ambiguous-attachment",
+      toolName: "read_attachment",
+      input: { setId: "set_a", operation: "read_text", attachmentId: "attachment_a" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-allows canonical safety classification for verified Desktop web aliases", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = safetyHandler(
+      trustedPolicy(),
+      requestApproval,
+      () => [
+        sdkTool("WebSearch"),
+        packageTool("web_search", "npm:pi-web-access@0.17.0"),
+        sdkTool("web_fetch"),
+        packageTool("fetch_content", "npm:pi-web-access@0.17.0")
+      ],
+      () => ["WebSearch", "web_search", "web_fetch", "fetch_content"]
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-web-search-alias",
+      toolName: "WebSearch",
+      input: { query: "杭州天气", workflow: "none" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "tool-call-web-fetch-alias",
+      toolName: "web_fetch",
+      input: {
+        url: "https://weather.example.invalid/hangzhou",
+        format: "markdown",
+        maxChars: 20_000
+      }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("keeps malformed or local pi-web-access fetches behind approval", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const handler = safetyHandler(
+      trustedPolicy(),
+      requestApproval,
+      () => [packageTool("fetch_content", "npm:pi-web-access@0.17.0")]
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-local-web-fetch",
+      toolName: "fetch_content",
+      input: { url: "file:///Users/test/private.mov" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      category: "ambiguous-command",
+      target: "fetch_content"
+    }), expect.any(Object));
+  });
+
+  it("does not grant pi-web-access network classification to same-name third-party tools", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const handler = safetyHandler(
+      trustedPolicy(),
+      requestApproval,
+      () => [packageTool("web_search", "npm:unrelated-extension@1.0.0")]
+    );
+
+    await expect(handler({
+      toolCallId: "tool-call-unverified-web-search",
+      toolName: "web_search",
+      input: { query: "杭州天气" }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      category: "ambiguous-command",
+      target: "web_search"
+    }), expect.any(Object));
   });
 
   it("fails closed when the approval requester throws", async () => {
@@ -86,7 +228,7 @@ describe("createDesktopSafetyExtension", () => {
   it("fails closed when the operation aborts before or while approval resolves", async () => {
     const alreadyAborted = new AbortController();
     alreadyAborted.abort();
-    const earlyRequester = vi.fn<DesktopApprovalRequester>().mockResolvedValue(true);
+    const earlyRequester = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "allowed" });
     const earlyHandler = safetyHandler(trustedPolicy(), earlyRequester);
 
     await expect(earlyHandler({
@@ -99,7 +241,7 @@ describe("createDesktopSafetyExtension", () => {
     const racingAbort = new AbortController();
     const racingRequester = vi.fn<DesktopApprovalRequester>().mockImplementation(async () => {
       racingAbort.abort();
-      return true;
+      return { status: "allowed" };
     });
     const racingHandler = safetyHandler(trustedPolicy(), racingRequester);
     await expect(racingHandler({
@@ -127,7 +269,7 @@ describe("createDesktopSafetyExtension", () => {
   it("auto-allows only the current Pi builtin structured read contract", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-safety-builtin-"));
     temporaryDirectories.push(root);
-    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue(false);
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const handler = safetyHandler(
       { ...trustedPolicy(), cwd: root },
       requestApproval,
@@ -143,7 +285,7 @@ describe("createDesktopSafetyExtension", () => {
   });
 
   it("requires approval for same-name overrides and malformed builtin input", async () => {
-    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue(false);
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     let source = extensionTool("read");
     const handler = safetyHandler(trustedPolicy(), requestApproval, () => [source]);
 
@@ -201,11 +343,13 @@ function trustedPolicy(): SafetyPolicyState {
 function safetyHandler(
   policy: SafetyPolicyState,
   requestApproval: DesktopApprovalRequester,
-  getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => []
+  getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => [],
+  getActiveTools: () => string[] = () => getAllTools().map((tool) => tool.name)
 ): SafetyHandler {
   let handler: SafetyHandler | undefined;
   const api = {
     getAllTools,
+    getActiveTools,
     on(event: string, candidate: SafetyHandler) {
       if (event === "tool_call") handler = candidate;
     }
@@ -215,6 +359,18 @@ function safetyHandler(
   void extension.factory(api);
   if (!handler) throw new Error("Desktop safety extension did not register a tool_call handler.");
   return handler;
+}
+
+function sdkTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
+  return {
+    ...builtinTool(name),
+    sourceInfo: {
+      path: `<sdk:${name}>`,
+      source: "sdk",
+      scope: "temporary",
+      origin: "top-level"
+    }
+  };
 }
 
 function builtinTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
@@ -238,6 +394,33 @@ function extensionTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[nu
       path: `/extensions/${name}.ts`,
       source: "extension",
       scope: "user",
+      origin: "top-level"
+    }
+  };
+}
+
+function packageTool(
+  name: string,
+  source: string
+): ReturnType<ExtensionAPI["getAllTools"]>[number] {
+  return {
+    ...builtinTool(name),
+    sourceInfo: {
+      path: source,
+      source,
+      scope: "user",
+      origin: "package"
+    }
+  };
+}
+
+function desktopAttachmentTool(): ReturnType<ExtensionAPI["getAllTools"]>[number] {
+  return {
+    ...builtinTool("read_attachment"),
+    sourceInfo: {
+      path: "<inline:pi67-desktop-attachments>",
+      source: "inline",
+      scope: "temporary",
       origin: "top-level"
     }
   };

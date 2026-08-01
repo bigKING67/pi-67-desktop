@@ -1,19 +1,24 @@
-import type { ToolCallPart } from "@pi67/domain";
+import type { SessionMessageView, ToolCallPart } from "@pi67/domain";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronRight,
   Clock3,
   Copy,
   FilePenLine,
   FileSearch,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   Terminal,
   Wrench
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useCommittedWorkspaceChange } from "../changes/workspace-changes-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { AssetImage } from "../transcript/AssetImage.js";
+import { messageTextForCopy } from "../transcript/message-actions.js";
 import styles from "./ToolCard.module.css";
 import {
   createToolCopyText,
@@ -39,21 +44,40 @@ const STATUS_ICONS = {
 
 type CopyState = "idle" | "copied" | "failed";
 
-export function ToolCard({ tool }: { tool: ToolCallPart }) {
+export function ToolCard({
+  tool,
+  result
+}: {
+  tool: ToolCallPart;
+  result?: SessionMessageView;
+}) {
   const change = useCommittedWorkspaceChange(tool.id);
   const setContextTab = useShellStore((state) => state.setContextTab);
   const setContextVisible = useShellStore((state) => state.setContextVisible);
   const presentation = presentToolCall(tool, change);
   const KindIcon = KIND_ICONS[presentation.kind];
-  const StatusIcon = STATUS_ICONS[tool.status];
-  const statusLabel = TOOL_STATUS_LABELS[tool.status];
+  const failed = tool.status === "failed" || Boolean(result?.error);
+  const effectiveStatus = failed ? "failed" : tool.status;
+  const StatusIcon = STATUS_ICONS[effectiveStatus];
+  const statusLabel = TOOL_STATUS_LABELS[effectiveStatus];
   const toolName = getToolDisplayName(tool.name);
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const [open, setOpen] = useState(failed);
+  const [expanded, setExpanded] = useState(false);
+  const previousFailed = useRef(failed);
+  const resultText = result === undefined ? undefined : messageTextForCopy(result);
+  const hasLongResult = (resultText?.length ?? 0) > 800;
+
+  useEffect(() => {
+    if (!previousFailed.current && failed) setOpen(true);
+    previousFailed.current = failed;
+  }, [failed]);
 
   async function copyDetails() {
     try {
       if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(createToolCopyText(tool, presentation));
+      const callText = createToolCopyText(tool, presentation);
+      await navigator.clipboard.writeText(resultText ? `${callText}\n\n工具结果\n${resultText}` : callText);
       setCopyState("copied");
     } catch {
       setCopyState("failed");
@@ -61,13 +85,19 @@ export function ToolCard({ tool }: { tool: ToolCallPart }) {
   }
 
   return (
-    <section
-      className={`${styles.card} ${styles[`status-${tool.status}`]}`}
+    <details
+      className={`${styles.card} ${styles[`status-${effectiveStatus}`]}`}
       aria-label={`${presentation.title}，${statusLabel}`}
       data-presenter={presentation.presenterId}
-      data-tool-status={tool.status}
+      data-tool-status={effectiveStatus}
+      open={open}
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+        if (!nextOpen) setExpanded(false);
+      }}
     >
-      <div className={styles.header}>
+      <summary className={styles.header}>
         <span className={styles.kindIcon} aria-hidden="true"><KindIcon size={15} /></span>
         <div className={styles.identity}>
           <span className={styles.titleRow}>
@@ -77,13 +107,13 @@ export function ToolCard({ tool }: { tool: ToolCallPart }) {
           <span className={styles.compact}>{presentation.compact}</span>
         </div>
         <span className={styles.status}>
-          <StatusIcon className={tool.status === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
+          <StatusIcon className={effectiveStatus === "running" ? styles.spinning : undefined} size={14} aria-hidden="true" />
           {statusLabel}
         </span>
-      </div>
+        <ChevronRight aria-hidden="true" className={styles.chevron} size={14} />
+      </summary>
 
-      <details className={styles.details}>
-        <summary>查看详情</summary>
+      {open ? (
         <div className={styles.detailBody}>
           {presentation.details.length > 0 ? (
             <dl className={styles.detailList}>
@@ -98,18 +128,49 @@ export function ToolCard({ tool }: { tool: ToolCallPart }) {
 
           {presentation.summary ? (
             <div className={styles.rawSummary}>
-              <span>有界调用摘要</span>
+              <span>调用参数</span>
               <pre>{presentation.summary}</pre>
             </div>
           ) : tool.status === "failed" ? (
             <p className={styles.failureDetail}>工具报告执行失败，但当前投影没有失败详情。</p>
           ) : null}
 
+          {result ? (
+            <div className={styles.result}>
+              <span>工具结果</span>
+              {resultText ? (
+                <pre className={expanded ? styles.resultExpanded : undefined}>{resultText}</pre>
+              ) : result.error ? (
+                <p className={styles.failureDetail}>{result.error}</p>
+              ) : (
+                <p className={styles.emptyResult}>工具没有返回可显示的文本内容。</p>
+              )}
+              {result.parts.map((part, index) => part.type === "image" ? (
+                <AssetImage
+                  asset={part.asset}
+                  key={`${result.id}-tool-image-${index}`}
+                  mimeType={part.mimeType}
+                  name={part.name}
+                />
+              ) : null)}
+            </div>
+          ) : effectiveStatus === "running" || effectiveStatus === "pending" ? (
+            <p className={styles.pendingResult}>等待工具返回结果。</p>
+          ) : (
+            <p className={styles.emptyResult}>当前会话记录中尚未找到对应的工具结果。</p>
+          )}
+
           <ul className={styles.limitations} aria-label="当前可用信息说明">
             {presentation.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}
           </ul>
 
           <div className={styles.actions}>
+            {hasLongResult ? (
+              <Button className={styles.copyButton!} onPress={() => setExpanded((value) => !value)}>
+                {expanded ? <Minimize2 size={13} aria-hidden="true" /> : <Maximize2 size={13} aria-hidden="true" />}
+                {expanded ? "收起结果" : "展开全部"}
+              </Button>
+            ) : null}
             {change ? (
               <Button className={styles.copyButton!} onPress={() => {
                 setContextTab("changes");
@@ -128,7 +189,7 @@ export function ToolCard({ tool }: { tool: ToolCallPart }) {
             </span>
           </div>
         </div>
-      </details>
-    </section>
+      ) : null}
+    </details>
   );
 }

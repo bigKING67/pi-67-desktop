@@ -32,7 +32,7 @@ import {
 } from "./extension-package-controller.js";
 import { useExtensionPackageStore } from "./extension-package-store.js";
 import { PackageDetails, PackageList } from "./ExtensionPackageBrowser.js";
-import type { ConfirmedAction, PackageFilter } from "./extension-management-model.js";
+import type { ConfirmedAction, PackageFilter, PackageRow } from "./extension-management-model.js";
 import {
   buildPackageRows,
   filterPackageRows,
@@ -44,6 +44,8 @@ import {
 import styles from "./ExtensionManagementWorkspace.module.css";
 
 type ExtensionView = "installed" | "discover";
+type PackageFocusTarget = { action: "details" | "update"; key: string }
+  | { action: "detail-back" | "updates-filter" };
 
 const FILTERS: ReadonlyArray<{ id: PackageFilter; label: string }> = [
   { id: "all", label: "全部" },
@@ -73,6 +75,7 @@ export function ExtensionManagementWorkspace({ capability }: {
   const [installOpen, setInstallOpen] = useState(false);
   const [installSource, setInstallSource] = useState("");
   const [pending, setPending] = useState<ConfirmedAction>();
+  const [focusTarget, setFocusTarget] = useState<PackageFocusTarget>();
   const workspaceRef = useRef<HTMLElement>(null);
   const catalogScrollTopRef = useRef(0);
   const restoreCatalogScrollRef = useRef(false);
@@ -112,6 +115,18 @@ export function ExtensionManagementWorkspace({ capability }: {
   const disabledCount = rows.length - enabledCount;
   const updateCount = rows.filter((row) => row.update !== undefined).length;
 
+  useEffect(() => {
+    if (!focusTarget || pending) return;
+    const action = focusTarget.action === "updates-filter" ? "filter" : focusTarget.action;
+    const candidates = workspaceRef.current?.querySelectorAll<HTMLElement>(`[data-package-focus-action="${action}"]`);
+    const target = focusTarget.action === "details" || focusTarget.action === "update"
+      ? Array.from(candidates ?? []).find((element) => element.dataset.packageFocusKey === focusTarget.key)
+      : candidates?.item(0);
+    if (!target) return;
+    target.focus();
+    setFocusTarget(undefined);
+  }, [focusTarget, pending, visibleRows]);
+
   const checkUpdates = async () => {
     if (!workspaceId) return;
     const completed = await checkExtensionPackageUpdates(workspaceId);
@@ -130,11 +145,15 @@ export function ExtensionManagementWorkspace({ capability }: {
     setView("installed");
   };
   const confirmPackageAction = async () => {
-    if (!pending || !workspaceId) return;
+    if (!pending || !workspaceId || phase === "mutating") return;
+    const nextFocus = pending.kind === "update" ? packageFocusAfterUpdate(visibleRows, filter, pending.entry, detailOpen) : undefined;
     const completed = pending.kind === "update"
       ? await updateExtensionPackage(pending.entry.source, pending.entry.scope, workspaceId)
       : await uninstallExtensionPackage(pending.entry.source, pending.entry.scope, workspaceId);
-    if (completed) setPending(undefined);
+    if (completed) {
+      setFocusTarget(nextFocus);
+      setPending(undefined);
+    }
   };
   const openDetails = (key: string) => {
     const scrollRegion = workspaceRef.current?.closest<HTMLElement>('[data-testid="settings-scroll-region"]');
@@ -207,6 +226,7 @@ export function ExtensionManagementWorkspace({ capability }: {
                 <Button
                   aria-pressed={filter === item.id}
                   className={styles.filterButton!}
+                  data-package-focus-action={item.id === "updates" ? "filter" : undefined}
                   key={item.id}
                   onPress={() => setFilter(item.id)}
                 >
@@ -228,8 +248,10 @@ export function ExtensionManagementWorkspace({ capability }: {
             <PackageList
               loading={phase === "loading" || capability.phase === "loading"}
               onSelect={openDetails}
+              onUpdate={(entry) => setPending({ kind: "update", entry })}
               rows={visibleRows}
               selectedKey={selectedKey}
+              updateDisabled={busy}
             />
             <PackageDetails
               onBack={closeDetails}
@@ -245,6 +267,7 @@ export function ExtensionManagementWorkspace({ capability }: {
                 workspaceId,
                 resourceType
               )}
+              updateDisabled={busy}
             />
           </div>
         </TabPanel>
@@ -275,6 +298,7 @@ export function ExtensionManagementWorkspace({ capability }: {
       {pending ? (
         <PackageActionDialog
           action={pending}
+          busy={phase === "mutating"}
           error={phase === "failed" ? packageError : undefined}
           onCancel={() => setPending(undefined)}
           onConfirm={() => void confirmPackageAction()}
@@ -380,16 +404,17 @@ function InstallExtensionDialog({ source, scopeLabel, error, busy, onSourceChang
   );
 }
 
-function PackageActionDialog({ action, error, onCancel, onConfirm }: {
+function PackageActionDialog({ action, error, busy, onCancel, onConfirm }: {
   action: ConfirmedAction;
   error: string | undefined;
+  busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const uninstall = action.kind === "uninstall";
   const title = uninstall ? "卸载扩展包？" : "更新扩展包？";
   return (
-    <ModalOverlay className="modal-overlay" isDismissable isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
+    <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Modal className={`modal-surface ${styles.modal}`}>
         <Dialog aria-label={title} className={styles.dialog!}>
           <span className="dialog-eyebrow">Pi 扩展包管理</span>
@@ -403,13 +428,31 @@ function PackageActionDialog({ action, error, onCancel, onConfirm }: {
             : "更新可能访问网络并加载新的扩展包内容。现有配置会保留在当前作用域。"}</p>
           {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
           <div className="dialog-actions">
-            <Button autoFocus className="secondary-button" onPress={onCancel}>取消</Button>
-            <Button className={uninstall ? styles.confirmDanger! : "primary-button"} onPress={onConfirm}>
-              {uninstall ? "确认卸载" : "确认更新"}
+            <Button autoFocus className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
+            <Button
+              className={uninstall ? styles.confirmDanger! : "primary-button"}
+              isDisabled={busy}
+              onPress={onConfirm}
+            >
+              {busy ? uninstall ? "卸载中…" : "更新中…" : uninstall ? "确认卸载" : "确认更新"}
             </Button>
           </div>
         </Dialog>
       </Modal>
     </ModalOverlay>
   );
+}
+
+function packageFocusAfterUpdate(
+  rows: PackageRow[], filter: PackageFilter, entry: ExtensionPackageEntry, detailOpen: boolean
+): PackageFocusTarget {
+  if (detailOpen) return { action: "detail-back" };
+  const index = rows.findIndex((row) => (
+    row.entry.source === entry.source && row.entry.scope === entry.scope
+  ));
+  if (filter !== "updates") {
+    return { action: "details", key: rows[index]?.key ?? rows[0]?.key ?? "" };
+  }
+  const next = rows[index + 1] ?? rows[index - 1];
+  return next ? { action: "update", key: next.key } : { action: "updates-filter" };
 }

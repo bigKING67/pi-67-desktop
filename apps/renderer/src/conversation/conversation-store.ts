@@ -4,6 +4,7 @@ import type {
   SessionMessageView,
   SessionSnapshot
 } from "@pi67/domain";
+import type { StagedPromptAttachment } from "@pi67/protocol";
 import { create } from "zustand";
 import {
   matchesCommittedSessionProjection,
@@ -28,10 +29,8 @@ interface RecentConversationProjectionOptions {
   operationId?: string;
 }
 
-interface PendingUserAttachment {
-  id: string;
-  file: File;
-  previewUrl: string;
+interface PendingUserAttachment extends StagedPromptAttachment {
+  previewUrl?: string;
 }
 
 export interface PendingUserTurn {
@@ -376,5 +375,7 @@ function confirmsPendingUserTurn(
 
 function revokePendingAttachments(pending: PendingUserTurn | undefined): void {
   if (!pending) return;
-  for (const attachment of pending.attachments) URL.revokeObjectURL(attachment.previewUrl);
+  for (const attachment of pending.attachments) {
+    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+  }
 }

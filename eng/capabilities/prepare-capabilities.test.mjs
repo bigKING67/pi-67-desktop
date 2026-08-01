@@ -5,11 +5,12 @@ import {
   compileBundledSkillSuites,
   parseSkillMetadata
 } from "./bundled-skill-suites.mjs";
+import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 
 describe("Desktop first-party capability source lock", () => {
-  it("pins four first-party repositories and the recommended external package set", async () => {
+  it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
     expect(lock.catalogVersion).toBe("2026.07.31.2");
@@ -20,6 +21,19 @@ describe("Desktop first-party capability source lock", () => {
       "commerce-growth-os"
     ]);
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
+    expect(lock.skillPacks).toEqual([{
+      name: "ai-berkshire-investment-suite",
+      adapter: "pi67-ai-berkshire-v1",
+      adapterSourceId: "pi67-core",
+      repository: "https://github.com/xbtlin/ai-berkshire",
+      ref: "refs/heads/main",
+      commit: "66e556262d6486a9819286252e5c9f90a4cfa386",
+      localSibling: "../ai-berkshire",
+      version: "1.0.1",
+      manifestSha256: "ce79fbc1c20d8da9e6a3171dc267df50470fe89c52db577ff441c8c582556ab0",
+      bundleSha256: "7438834d7e26b0043332c886503cfdf45ac3dab5d1e46def95ce2b899f08d018"
+    }]);
+    expect(() => assertPi67SkillPackSource(lock.skillPacks[0])).not.toThrow();
     expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual([
       "pi-subagents",
       "pi-observational-memory",
@@ -30,6 +44,20 @@ describe("Desktop first-party capability source lock", () => {
       "pi-rewind",
       "pi-mcp-adapter"
     ]);
+  });
+
+  it("rejects a branch-tracked Skill Pack without immutable generated hashes", () => {
+    expect(() => assertPi67SkillPackSource({
+      name: "ai-berkshire-investment-suite",
+      adapter: "pi67-ai-berkshire-v1",
+      adapterSourceId: "pi67-core",
+      repository: "https://github.com/xbtlin/ai-berkshire",
+      ref: "refs/heads/main",
+      commit: "1".repeat(40),
+      version: "1.0.1",
+      manifestSha256: "invalid",
+      bundleSha256: "2".repeat(64)
+    })).toThrow(/source is invalid/u);
   });
 
   it("declares five explicit suites covering all 66 bundled Skill identities", async () => {
@@ -47,6 +75,13 @@ describe("Desktop first-party capability source lock", () => {
     ]);
     expect(definition.suites.map((suite) => suite.members.length)).toEqual([27, 21, 8, 3, 7]);
     expect(definition.suites.flatMap((suite) => suite.members)).toHaveLength(66);
+    expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")).toMatchObject({
+      versionSource: { kind: "pi67-skill-pack", packName: "ai-berkshire-investment-suite" },
+      upstream: "https://github.com/xbtlin/ai-berkshire",
+      updatePolicy: "hybrid",
+      updateManager: "pi67-skill-pack-registry",
+      independentUpdateState: "available"
+    });
   });
 
   it("extracts bounded single-line and folded Skill descriptions", () => {
@@ -79,7 +114,16 @@ describe("Desktop first-party capability source lock", () => {
     }];
     const suite = (members) => ({
       schema: "pi67.bundled-skill-suites.v1",
-      suites: [{ id: "core", displayName: "Core", description: "Core skills", members }]
+      suites: [{
+        id: "core",
+        displayName: "Core",
+        description: "Core skills",
+        versionSource: { kind: "unversioned" },
+        updatePolicy: "source-specific",
+        updateManager: "source-specific",
+        independentUpdateState: "not-applicable",
+        members
+      }]
     });
     expect(() => compileBundledSkillSuites(suite([
       { packageId: "core", skillId: "one" }
@@ -88,5 +132,63 @@ describe("Desktop first-party capability source lock", () => {
       { packageId: "core", skillId: "one" },
       { packageId: "core", skillId: "one" }
     ]), entries)).toThrow(/duplicated/u);
+  });
+
+  it("resolves suite versions from capability packages and pi-67 Skill Pack provenance", () => {
+    const entries = [{
+      id: "core",
+      version: "0.15.8",
+      repository: "https://github.com/example/core",
+      commit: "1".repeat(40),
+      bundledSkills: [{ id: "one", displayName: "one", description: "One" }]
+    }, {
+      id: "browser",
+      version: "0.4.0",
+      repository: "https://github.com/example/browser",
+      commit: "2".repeat(40),
+      bundledSkills: [{ id: "two", displayName: "two", description: "Two" }]
+    }];
+    const definition = {
+      schema: "pi67.bundled-skill-suites.v1",
+      suites: [{
+        id: "pack",
+        displayName: "Pack",
+        description: "Pack skills",
+        versionSource: { kind: "pi67-skill-pack", packName: "pack" },
+        upstream: "https://github.com/example/pack",
+        updatePolicy: "hybrid",
+        updateManager: "pi67-skill-pack-registry",
+        independentUpdateState: "planned",
+        members: [{ packageId: "core", skillId: "one" }]
+      }, {
+        id: "browser",
+        displayName: "Browser",
+        description: "Browser skills",
+        versionSource: { kind: "capability-package", packageId: "browser" },
+        updatePolicy: "capability-package",
+        updateManager: "desktop-capability",
+        independentUpdateState: "not-applicable",
+        members: [{ packageId: "browser", skillId: "two" }]
+      }]
+    };
+    expect(compileBundledSkillSuites(definition, entries, {
+      skillPacks: [{
+        name: "pack",
+        version: "1.0.0",
+        sourceCommit: "3".repeat(40)
+      }]
+    })).toMatchObject([{
+      id: "pack",
+      versionSource: "skill-pack",
+      bundledVersion: "1.0.0",
+      upstream: "https://github.com/example/pack",
+      sourceCommit: "3".repeat(40)
+    }, {
+      id: "browser",
+      versionSource: "capability-package",
+      bundledVersion: "0.4.0",
+      upstream: "https://github.com/example/browser",
+      sourceCommit: "2".repeat(40)
+    }]);
   });
 });

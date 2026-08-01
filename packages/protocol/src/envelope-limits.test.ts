@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAX_TRANSFER_IMAGE_BYTES,
-  MAX_TRANSFER_IMAGE_COUNT,
-  MAX_TRANSFER_IMAGE_TOTAL_BYTES
-} from "./agent-messages.js";
-import {
   APP_PROTOCOL_CONTEXT,
   commandEnvelope,
   isEnvelopeWithinByteLimit,
@@ -12,34 +7,20 @@ import {
 } from "./envelope.js";
 
 describe("protocol envelope limits", () => {
-  it("rejects image payloads that cannot safely cross the Host boundary", () => {
-    const submit = (images: Array<{ name: string; mimeType: string; data: ArrayBuffer }>) => commandEnvelope("prompt.submit", {
+  it("accepts only bounded opaque attachment references across the Host boundary", () => {
+    const submit = (attachments: Array<{ id: string }>) => commandEnvelope("prompt.submit", {
       submissionId: "submission-1",
       text: "inspect",
       delivery: "new-turn",
-      images
+      attachments
     }, APP_PROTOCOL_CONTEXT, 1);
     expect(isRequestEnvelope(submit([
-      { name: "screen.png", mimeType: "image/png", data: new ArrayBuffer(32) }
+      { id: "attachment_123" }
     ]))).toBe(true);
-
-    const typedArray = submit([{ name: "screen.png", mimeType: "image/png", data: new ArrayBuffer(32) }]);
-    (typedArray.payload.images![0] as { data: unknown }).data = new Uint8Array(32);
-    expect(isRequestEnvelope(typedArray)).toBe(false);
-    expect(isRequestEnvelope(submit([
-      { name: "vector.svg", mimeType: "image/svg+xml", data: new ArrayBuffer(32) }
-    ]))).toBe(false);
-    expect(isRequestEnvelope(submit([
-      { name: "large.png", mimeType: "image/png", data: new ArrayBuffer(MAX_TRANSFER_IMAGE_BYTES + 1) }
-    ]))).toBe(false);
-    expect(isRequestEnvelope(submit(Array.from({ length: MAX_TRANSFER_IMAGE_COUNT + 1 }, (_, index) => ({
-      name: `${index}.png`, mimeType: "image/png", data: new ArrayBuffer(1)
+    expect(isRequestEnvelope(submit(Array.from({ length: 21 }, (_, index) => ({
+      id: `attachment_${index}`
     }))))).toBe(false);
-
-    const perImageBytes = Math.floor(MAX_TRANSFER_IMAGE_TOTAL_BYTES / 4) + 1;
-    expect(isRequestEnvelope(submit(Array.from({ length: 4 }, (_, index) => ({
-      name: `${index}.png`, mimeType: "image/png", data: new ArrayBuffer(perImageBytes)
-    }))))).toBe(false);
+    expect(isRequestEnvelope(submit([{ id: "../outside" }]))).toBe(false);
   });
 
   it("enforces UTF-8 envelope bytes without charging transferred ArrayBuffer contents", () => {

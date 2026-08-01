@@ -13,7 +13,16 @@ import {
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 
-export function SessionResourcePanel({ kind, origin, resourceScope, scope: requestedScope, title, description, empty }: {
+export function SessionResourcePanel({
+  kind,
+  origin,
+  resourceScope,
+  scope: requestedScope,
+  title,
+  description,
+  empty,
+  excludeIds
+}: {
   kind: ResourceSummary["kind"];
   origin?: ResourceSummary["origin"];
   resourceScope?: ResourceSummary["scope"];
@@ -21,11 +30,13 @@ export function SessionResourcePanel({ kind, origin, resourceScope, scope: reque
   title: string;
   description: string;
   empty: string;
+  excludeIds?: ReadonlySet<string>;
 }) {
   const settingsScope = useWorkbenchStore((state) => state.settingsScope);
   const scope = requestedScope ?? settingsScope;
   const resources = useSessionProjectionStore(selectSessionResources);
-  const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope);
+  const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope)
+    .filter((resource) => !excludeIds?.has(resource.id));
   return (
     <SettingsSectionBlock
       actions={<Button className="secondary-button" onPress={() => void reloadSessionResources()}>

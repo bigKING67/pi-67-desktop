@@ -3,18 +3,13 @@ import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES
 } from "@pi67/domain";
 import {
-  ALLOWED_IMAGE_MIME_TYPES,
   isReplaySafeControlMutation,
-  MAX_TRANSFER_IMAGE_BYTES,
-  MAX_TRANSFER_IMAGE_COUNT,
-  MAX_TRANSFER_IMAGE_TOTAL_BYTES,
   type AgentCommandType,
   type AgentEvent,
   type AgentEventType,
   type CommandPayloads,
   type CommandResponse,
-  type EventPayloads,
-  type TransferImage
+  type EventPayloads
 } from "./agent-messages.js";
 import { isValidAssetReadResult } from "./asset-schemas.js";
 import {
@@ -193,7 +188,7 @@ export function isRequestEnvelope(value: unknown): value is RequestEnvelope {
   if (!schema || !Value.Check(schema, envelope.payload)) return false;
   if (isReplaySafeControlMutation(type) !== (typeof envelope.idempotencyKey === "string")) return false;
   if (!hasValidCommandContext(type, envelope.context as ProtocolContext)) return false;
-  return !isPromptCommand(type) || hasValidTransferImages(envelope.payload);
+  return true;
 }
 
 export function correlateInvalidRequest(value: unknown): {
@@ -359,28 +354,4 @@ export function responseEnvelope<T extends AgentCommandType>(
     ok: false,
     error: response.error
   };
-}
-
-function isPromptCommand(type: AgentCommandType): boolean {
-  return type === "prompt.submit" || type === "prompt.steer" || type === "prompt.followUp";
-}
-
-function hasValidTransferImages(payload: unknown): boolean {
-  if (typeof payload !== "object" || payload === null) return false;
-  const images = (payload as { images?: unknown }).images;
-  return images === undefined || isTransferImageArray(images);
-}
-
-function isTransferImageArray(value: unknown): value is TransferImage[] {
-  if (!Array.isArray(value) || value.length > MAX_TRANSFER_IMAGE_COUNT) return false;
-  let totalBytes = 0;
-  for (const image of value) {
-    if (typeof image !== "object" || image === null) return false;
-    const candidate = image as Partial<TransferImage>;
-    if (!ALLOWED_IMAGE_MIME_TYPES.some((mimeType) => mimeType === candidate.mimeType)) return false;
-    if (!(candidate.data instanceof ArrayBuffer) || candidate.data.byteLength > MAX_TRANSFER_IMAGE_BYTES) return false;
-    totalBytes += candidate.data.byteLength;
-    if (totalBytes > MAX_TRANSFER_IMAGE_TOTAL_BYTES) return false;
-  }
-  return true;
 }

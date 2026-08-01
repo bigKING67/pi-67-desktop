@@ -1,4 +1,5 @@
 import { zhCNCommandPaletteMessages } from "./zh-cn-command-palette.js";
+import { zhCNComposerMessages } from "./zh-cn-composer.js";
 import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
 import { zhCNOperationMessages } from "./zh-cn-operation.js";
 import { zhCNRuntimeMessages } from "./zh-cn-runtime.js";
@@ -40,7 +41,7 @@ export const zhCNMessages = {
       },
       skills: {
         label: "技能",
-        summary: "分别查看用户维护的全局技能、当前项目技能和随 Desktop 提供的内置技能。"
+        summary: "按可用范围查看技能；全局页统一汇总内置、受管和本地技能，项目页只显示当前项目专属技能。"
       },
       prompts: {
         label: "指令模板",
@@ -100,7 +101,7 @@ export const zhCNMessages = {
     restoringEditedMessage: "正在恢复编辑前的会话",
     restoreEditFailed: "无法取消消息修改",
     finishMessageEdit: "请先完成或取消当前消息修改",
-    editImageUnavailable: "包含图片的历史消息暂不支持编辑",
+    editAttachmentUnavailable: "包含附件的历史消息暂不支持编辑",
     actionWhileRunning: "当前任务结束或停止后可用",
     actionWhileTransitioning: "正在切换会话，请稍候",
     actionUnavailable: "当前会话暂不可用"
@@ -318,6 +319,7 @@ export const zhCNMessages = {
       "dependency-change": "修改依赖",
       "git-external-action": "远程 Git 操作",
       "download-and-execute": "下载并执行",
+      "network-read": "读取外部网络信息",
       "network-side-effect": "产生网络副作用",
       "ambiguous-command": "无法安全分类"
     },
@@ -360,6 +362,10 @@ export const zhCNMessages = {
     waiting: "等待 Extension 目录同步。",
     empty: "未发现用户 Extension。Desktop 内部安全扩展不会显示在这里。",
     countSummary: (commandCount: number, toolCount: number) => `${commandCount} 命令 · ${toolCount} 工具`,
+    registeredTools: "已注册工具",
+    moreTools: (count: number) => `另 ${count} 个`,
+    executable: "可执行",
+    executableWithLimitedPresentation: "执行可用 · 展示受限",
     adapterSummary: (packageName: string, version: string, commandCount: number, toolCount: number) => (
       `声明式 Adapter · ${packageName}@${version} · ${commandCount} 命令 / ${toolCount} 工具`
     ),
@@ -397,61 +403,7 @@ export const zhCNMessages = {
     packageOrigin: "Package",
     topLevelOrigin: "直接加载"
   },
-  composer: {
-    attachmentReadFailed: "无法读取附件。",
-    selectedImageReadFailed: "无法读取所选图片。",
-    dropImages: "释放以添加图片",
-    submissionFailed: "消息未发送。草稿和附件已保留。",
-    editBlockedByDraft: "输入框已有草稿或附件，请先发送或清空后再编辑历史消息。",
-    pendingAttachments: "待发送附件",
-    removeAttachment: (name: string) => `移除附件：${name}`,
-    inputLabel: "给 Pi 发送消息",
-    streamingPlaceholder: "补充方向，或安排在当前任务完成后执行...",
-    idlePlaceholder: "描述目标、相关文件和验收标准...",
-    chooseImageAttachment: "选择图片附件",
-    addImage: "添加图片",
-    streamingDelivery: "运行中消息处理方式",
-    steerDetail: "发送给正在执行的 Pi，可能改变当前计划",
-    steer: "立即纠偏",
-    followUpDetail: "当前任务结束后再发送",
-    followUp: "完成后执行",
-    keyboardHint: "Enter 发送 · Shift+Enter 换行",
-    sending: "发送中",
-    send: "发送",
-    queue: "消息队列",
-    queueSummary: (steeringCount: number, followUpCount: number) => (
-      `${steeringCount} 条立即纠偏 · ${followUpCount} 条完成后执行`
-    ),
-    collapseQueue: "收起队列内容",
-    inspectQueue: "查看已排队的消息",
-    clearingQueue: "正在清空",
-    confirmClearQueue: "确认清空",
-    clearQueue: "清空全部",
-    hiddenQueueItems: (count: number) => (
-      `另有 ${count} 条消息未挂载，以保持输入和滚动流畅。`
-    ),
-    emptyQueueItem: "（空消息）",
-    queueItemTruncated: "内容已截断",
-    runtimeSettings: "本次发送设置",
-    modelTitle: "选择本次任务使用的 Pi 模型",
-    modelLabel: "Pi 模型",
-    selectModel: "选择模型",
-    noAvailableModels: "没有可用模型",
-    unauthenticatedModel: "（当前模型未认证）",
-    configureProvider: "配置 Provider…",
-    thinkingTitle: "设置 Pi 的思考级别",
-    thinkingLabel: "Pi 思考级别",
-    thinking: {
-      off: "思考：关闭",
-      minimal: "思考：最低",
-      low: "思考：低",
-      medium: "思考：中",
-      high: "思考：高",
-      xhigh: "思考：很高",
-      max: "思考：最高",
-      fallback: (level: string) => `思考：${level}`
-    }
-  },
+  composer: zhCNComposerMessages,
   runtime: zhCNRuntimeMessages,
   operation: zhCNOperationMessages
 } as const;

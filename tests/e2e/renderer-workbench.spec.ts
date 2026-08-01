@@ -15,6 +15,7 @@ import type { FixtureSessionSummary } from "./pi67-session-catalog-fixture.js";
 import type { MockAgentOptions } from "./pi67-renderer-fixture-types.js";
 
 const PRIMARY_MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
+const EXPECTED_MAX_RUNNING_TASKS = 8;
 
 async function openWorkbench(
   page: Page,
@@ -260,11 +261,11 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
   await expect(page.getByRole("button", { name: "返回工作台" })).toBeVisible();
 });
 
-test("rejects a fifth running task without discarding its draft", async ({ page }) => {
+test("rejects a task above the shared running limit without discarding its draft", async ({ page }) => {
   await openWorkbench(page);
   await markCurrentTaskRunning(page, 0, "session-test", 1);
 
-  for (let index = 1; index < 4; index += 1) {
+  for (let index = 1; index < EXPECTED_MAX_RUNNING_TASKS; index += 1) {
     await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
     await expect.poll(async () => (
       await recordedCommandDetails(page)
@@ -275,16 +276,19 @@ test("rejects a fifth running task without discarding its draft", async ({ page 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
   await expect.poll(async () => (
     await recordedCommandDetails(page)
-  ).filter((command) => command.type === "session.create")).toHaveLength(4);
+  ).filter((command) => command.type === "session.create")).toHaveLength(EXPECTED_MAX_RUNNING_TASKS);
   await clearRecordedCommands(page);
 
   const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
-  await composer.fill("保留这个第五个任务的草稿");
+  await composer.fill("保留这个超出并发上限任务的草稿");
   await composer.press("Enter");
 
-  await expect(page.getByText("已有 4 个任务正在运行或等待输入。请先完成或停止一个任务。", { exact: true }))
+  await expect(page.getByText(
+    `已有 ${EXPECTED_MAX_RUNNING_TASKS} 个会话任务正在运行或等待交互。请先完成或停止一个任务。`,
+    { exact: true }
+  ))
     .toBeVisible();
-  await expect(composer).toHaveValue("保留这个第五个任务的草稿");
+  await expect(composer).toHaveValue("保留这个超出并发上限任务的草稿");
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "prompt.submit"))
     .toHaveLength(0);
 });
@@ -306,7 +310,7 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
     /archive|delete|hide/u.test(command.type)
   ))).toHaveLength(0);
   await expect(page.getByRole("heading", { name: "Pi 会话", exact: true })).toBeVisible();
-  await expect(page.getByText("这个会话当前没有运行任务。打开后会继续使用原有 Pi JSONL Session。", {
+  await expect(page.getByText("会话未在运行，打开后可继续。", {
     exact: true
   })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();

@@ -31,7 +31,7 @@ export function ExtensionCatalog({ catalog, variant = "default" }: {
               <div className={styles.itemHeading}>
                 <strong title={item.path}>{item.label}</strong>
                 <span className={styles.overall} data-status={item.assessment.overall}>
-                  {overallLabel(item.assessment.overall)}
+                  {overallLabel(item.assessment.overall, item.commandCount + item.toolCount)}
                 </span>
               </div>
               <div className={styles.meta}>
@@ -48,20 +48,31 @@ export function ExtensionCatalog({ catalog, variant = "default" }: {
                   )}
                 </p>
               ) : null}
+              {item.toolNames && item.toolNames.length > 0 ? (
+                <div className={styles.toolNames}>
+                  <span>{messages.extensionCatalog.registeredTools}</span>
+                  <div>
+                    {item.toolNames.map((toolName) => <code key={toolName}>{toolName}</code>)}
+                    {item.toolCount > item.toolNames.length ? (
+                      <small>{messages.extensionCatalog.moreTools(item.toolCount - item.toolNames.length)}</small>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               <p>{item.assessment.detail}</p>
               <dl className={styles.surfaces}>
                 {item.assessment.surfaces.map((surface) => (
                   <div
                     aria-label={messages.extensionCatalog.surfaceAria(
                       surfaceLabel(surface.surface),
-                      surfaceStatusLabel(surface.status),
+                      surfaceStatusLabel(surface.surface, surface.status),
                       surface.detail
                     )}
                     key={surface.surface}
                     title={surface.detail}
                   >
                     <dt>{surfaceLabel(surface.surface)}</dt>
-                    <dd data-status={surface.status}>{surfaceStatusLabel(surface.status)}</dd>
+                    <dd data-status={surface.status}>{surfaceStatusLabel(surface.surface, surface.status)}</dd>
                   </div>
                 ))}
               </dl>
@@ -76,7 +87,10 @@ export function ExtensionCatalog({ catalog, variant = "default" }: {
   );
 }
 
-function overallLabel(status: ExtensionCatalogCompatibility): string {
+function overallLabel(status: ExtensionCatalogCompatibility, executableSurfaceCount: number): string {
+  if (status === "partial" && executableSurfaceCount > 0) {
+    return messages.extensionCatalog.executableWithLimitedPresentation;
+  }
   return messages.extensionCatalog.overall[status];
 }
 
@@ -84,7 +98,11 @@ function surfaceLabel(surface: ExtensionSurface): string {
   return messages.extensionCatalog.surfaces[surface];
 }
 
-function surfaceStatusLabel(status: ExtensionSurfaceCompatibility): string {
+function surfaceStatusLabel(
+  surface: ExtensionSurface,
+  status: ExtensionSurfaceCompatibility
+): string {
+  if (surface === "tools" && status === "partial") return messages.extensionCatalog.executable;
   return messages.extensionCatalog.surfaceStatuses[status];
 }
 

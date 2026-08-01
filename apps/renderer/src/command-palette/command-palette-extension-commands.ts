@@ -1,13 +1,14 @@
 import type { ExtensionCommandAdapterView } from "@pi67/domain";
-import type { CommandDescriptor } from "@pi67/protocol";
+import type { SlashCommandCatalogResult, SlashCommandDescriptor } from "@pi67/protocol";
 import { MAX_EXTENSION_CANDIDATES } from "./command-palette-model.js";
 
 export function normalizePaletteExtensionCommands(
-  values: readonly CommandDescriptor[]
-): CommandDescriptor[] | undefined {
-  const commands: CommandDescriptor[] = [];
+  catalog: SlashCommandCatalogResult
+): SlashCommandDescriptor[] | undefined {
+  if (!Number.isSafeInteger(catalog.total) || catalog.total < catalog.items.length) return undefined;
+  const commands: SlashCommandDescriptor[] = [];
   const names = new Set<string>();
-  for (const value of values.slice(0, MAX_EXTENSION_CANDIDATES)) {
+  for (const value of catalog.items.filter((item) => item.source === "extension").slice(0, MAX_EXTENSION_CANDIDATES)) {
     const name = boundedRequiredString(value.name, 160);
     if (!name || names.has(name)) return undefined;
     names.add(name);
@@ -19,6 +20,7 @@ export function normalizePaletteExtensionCommands(
     if (value.adapter !== undefined && !adapter) return undefined;
     commands.push({
       name,
+      source: "extension",
       ...(description ? { description } : {}),
       ...(adapter ? { adapter } : {})
     });

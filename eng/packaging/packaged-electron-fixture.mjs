@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,18 +33,57 @@ export async function assertPackagedRuntimeAssets(artifact) {
     ? "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node"
     : "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node";
   const unpackedModules = join(artifact.resourcesPath, "app.asar.unpacked/node_modules");
+  const canvasModule = artifact.platform === "darwin"
+    ? "@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node"
+    : "@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node";
   await Promise.all([
     access(artifact.executablePath),
     access(join(unpackedModules, clipboardModule)),
     access(join(unpackedModules, "@silvia-odwyer/photon-node/photon_rs_bg.wasm")),
+    access(join(unpackedModules, canvasModule)),
     access(join(artifact.resourcesPath, "toolchain/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/catalog.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/pi67-core/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/design-craft/package.json")),
-    access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json"))
+    access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json")),
+    assertPackagedAsarPaths(artifact, [
+      "apps/agent-host/dist/prompt-attachment-worker.mjs",
+      "node_modules/mediainfo.js/dist/MediaInfoModule.wasm",
+      "node_modules/officeparser/package.json",
+      "node_modules/tesseract.js/src/worker-script/node/index.js",
+      "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+      "node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz",
+      "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz"
+    ])
   ]);
+}
+
+function assertPackagedAsarPaths(artifact, paths) {
+  const script = [
+    "const { accessSync } = require('node:fs');",
+    "const { join } = require('node:path');",
+    "const root = process.argv[1];",
+    "for (const path of JSON.parse(process.argv[2])) accessSync(join(root, 'app.asar', path));"
+  ].join(" ");
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(artifact.executablePath, [
+      "-e",
+      script,
+      artifact.resourcesPath,
+      JSON.stringify(paths)
+    ], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: "inherit"
+    });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (signal) reject(new Error(`Packaged attachment asset probe terminated by ${signal}.`));
+      else if (code !== 0) reject(new Error(`Packaged attachment asset probe exited ${code ?? 1}.`));
+      else resolvePromise();
+    });
+  });
 }
 
 export async function createPackagedTestDirectories(prefix, workspaceName = "workspace") {

@@ -189,6 +189,42 @@ describe("ExtensionPackageManagement", () => {
       .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
   });
 
+  it("reports an npm update only when the targeted package version changes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pi67-extension-update-"));
+    const packageRoot = join(root, "pi-settings");
+    const source = "npm:@example/pi-settings";
+    try {
+      mkdirSync(packageRoot);
+      writeFileSync(join(packageRoot, "package.json"), JSON.stringify({
+        name: "Pi Settings",
+        version: "1.2.3"
+      }));
+      fixture.global.push(source);
+      fixture.installedPaths.set(`global:${source}`, packageRoot);
+      fixture.update.mockImplementationOnce(async () => {
+        writeFileSync(join(packageRoot, "package.json"), JSON.stringify({
+          name: "Pi Settings",
+          version: "1.3.0"
+        }));
+      });
+
+      await expect(management.update(source, "global")).resolves.toMatchObject({
+        changed: true,
+        items: [expect.objectContaining({
+          displayName: "Pi Settings",
+          version: "1.3.0"
+        })]
+      });
+
+      fixture.update.mockResolvedValueOnce(undefined);
+      await expect(management.update(source, "global")).resolves.toMatchObject({
+        changed: false
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("allows resource filters but rejects independent update or uninstall for bundled packages", async () => {
     const managedRoot = resolve("/managed/desktop-capabilities");
     const source = resolve(managedRoot, "packages/pi67-core");

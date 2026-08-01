@@ -1,13 +1,22 @@
 export type MockPayloadSanitizer = (
   type: string,
   payload: Record<string, unknown> | undefined
-) => unknown;
+) => Promise<unknown>;
 
 export function installMockPayloadSanitizer(): void {
   (window as typeof window & {
     __pi67SanitizeMockPayload?: MockPayloadSanitizer;
-  }).__pi67SanitizeMockPayload = (type, payload) => {
+  }).__pi67SanitizeMockPayload = async (type, payload) => {
     if (!payload) return {};
+    if (type === "context.file.save") {
+      const { content, ...metadata } = payload;
+      const bytes = new TextEncoder().encode(typeof content === "string" ? content : "");
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const sha256 = [...new Uint8Array(digest)]
+        .map((value) => value.toString(16).padStart(2, "0"))
+        .join("");
+      return { ...metadata, content: { byteLength: bytes.byteLength, sha256 } };
+    }
     if (
       type === "model.setRuntimeKey"
       || type === "provider.setRuntimeKey"
@@ -35,12 +44,12 @@ export function installMockPayloadSanitizer(): void {
       };
     }
     if (type !== "prompt.submit") return payload;
-    const images = Array.isArray(payload.images) ? payload.images : [];
+    const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
     return {
       ...payload,
-      images: images.map((image) => {
-        const value = image as { name?: unknown; mimeType?: unknown; data?: ArrayBuffer };
-        return { name: value.name, mimeType: value.mimeType, bytes: value.data?.byteLength ?? 0 };
+      attachments: attachments.map((attachment) => {
+        const value = attachment as { id?: unknown };
+        return { id: value.id };
       })
     };
   };

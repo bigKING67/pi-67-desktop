@@ -116,7 +116,7 @@ describe("DesktopExtensionUiBridge", () => {
     expect(bridge.resolveApproval(request.payload.requestId, "wrong-tool-call", true)).toBe(false);
     expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", true)).toBe(true);
     expect(bridge.resolveApproval(request.payload.requestId, "tool-call-1", true)).toBe(false);
-    await expect(result).resolves.toBe(true);
+    await expect(result).resolves.toEqual({ status: "allowed" });
     expect(events.at(-1)).toEqual({
       type: "approval.resolved",
       payload: { requestId: request.payload.requestId, toolCallId: "tool-call-1", allowed: true }
@@ -131,7 +131,7 @@ describe("DesktopExtensionUiBridge", () => {
 
     await expect(bridge.requestApproval(approvalDetails("tool-call-aborted"), {
       signal: controller.signal
-    })).resolves.toBe(false);
+    })).resolves.toEqual({ status: "cancelled", reason: "abort" });
     expect(events).toEqual([]);
     expect(bridge.cancelAll("connection-close")).toEqual([]);
   });
@@ -144,7 +144,7 @@ describe("DesktopExtensionUiBridge", () => {
     if (request?.type !== "approval.requested") throw new Error("Expected a safety approval request.");
 
     expect(bridge.cancelAll("connection-close")).toEqual([request.payload.requestId]);
-    await expect(result).resolves.toBe(false);
+    await expect(result).resolves.toEqual({ status: "cancelled", reason: "connection-close" });
     expect(events.at(-1)).toEqual({
       type: "approval.cancelled",
       payload: {
@@ -170,7 +170,7 @@ describe("DesktopExtensionUiBridge", () => {
       approvalRequest.payload.requestId
     ]);
     await expect(extensionResult).resolves.toBeUndefined();
-    await expect(approvalResult).resolves.toBe(false);
+    await expect(approvalResult).resolves.toEqual({ status: "cancelled", reason: "connection-close" });
     expect(events).toContainEqual({
       type: "extension.ui.cancelled",
       payload: { requestIds: [extensionRequest.payload.requestId], reason: "connection-close" }
@@ -195,7 +195,7 @@ describe("DesktopExtensionUiBridge", () => {
     if (request?.type !== "approval.requested") throw new Error("Expected a safety approval request.");
 
     controller.abort();
-    await expect(result).resolves.toBe(false);
+    await expect(result).resolves.toEqual({ status: "cancelled", reason: "abort" });
     expect(events.at(-1)).toEqual({
       type: "approval.cancelled",
       payload: {

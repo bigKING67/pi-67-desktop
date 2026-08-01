@@ -13,37 +13,6 @@ import {
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 
-export function ManagedRulePanel() {
-  const { snapshot, phase, error, refresh } = useDesktopCapabilitySnapshot();
-  return (
-    <SettingsSectionBlock
-      actions={<Button className="secondary-button" isDisabled={phase === "loading"} onPress={() => void refresh()}>
-        <RefreshCw aria-hidden="true" size={14} />刷新
-      </Button>}
-      description="桌面托管规则写入专属子目录。已有全局 AGENTS.md 保持用户所有，不会被应用覆盖。"
-      title="托管规则与全局上下文"
-    >
-      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
-      <SettingsRows>
-        <SettingsRow
-          leading={<span className={styles.status} data-status={snapshot?.managedContext.rules === "installed" ? "ready" : "failed"} />}
-          title="桌面规则"
-          description="递归加载到 Pi 的 rules 目录，使用 pi67-desktop 命名空间。"
-          value={snapshot?.managedContext.rules === "installed" ? "已安装" : "不可用"}
-        />
-        <SettingsRow
-          leading={<span className={styles.status} data-status={snapshot?.managedContext.agents === "unavailable" ? "failed" : "ready"} />}
-          title="全局 AGENTS.md"
-          description={snapshot?.managedContext.agents === "user-owned"
-            ? "检测到已有用户配置，Desktop 未覆盖。"
-            : "仅在首次安装且文件不存在时写入。"}
-          value={agentsLabel(snapshot)}
-        />
-      </SettingsRows>
-    </SettingsSectionBlock>
-  );
-}
-
 export function Browser67IntegrationPanel() {
   const { snapshot, setSnapshot, phase, error, setError, refresh } = useDesktopCapabilitySnapshot();
   const [operation, setOperation] = useState<"setup" | "doctor">();
@@ -149,11 +118,4 @@ function dependencyLabel(integration: DesktopIntegrationStatus | undefined): str
   if (integration.dependencyState === "prepared") return "已准备";
   if (integration.dependencyState === "not-prepared") return "未准备";
   return "失败";
-}
-
-function agentsLabel(snapshot: DesktopCapabilitySnapshot | undefined): string {
-  if (!snapshot) return "检查中";
-  if (snapshot.managedContext.agents === "user-owned") return "由用户管理";
-  if (snapshot.managedContext.agents === "installed") return "已安装";
-  return "不可用";
 }

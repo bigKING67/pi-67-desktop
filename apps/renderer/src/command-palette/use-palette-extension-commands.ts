@@ -1,17 +1,17 @@
-import type { CommandDescriptor } from "@pi67/protocol";
+import type { SlashCommandDescriptor } from "@pi67/protocol";
 import { useEffect, useState } from "react";
 import { messages } from "../localization/message-catalog.js";
 import { listRuntimeCommands } from "../operation/operation-controller.js";
 import { normalizePaletteExtensionCommands } from "./command-palette-extension-commands.js";
 
 export type PaletteExtensionCommandState =
-  | { status: "idle"; commands: CommandDescriptor[] }
-  | { status: "loading"; commands: CommandDescriptor[] }
-  | { status: "ready"; commands: CommandDescriptor[] }
-  | { status: "unavailable"; commands: CommandDescriptor[] }
-  | { status: "failed"; commands: CommandDescriptor[]; error: string };
+  | { status: "idle"; commands: SlashCommandDescriptor[] }
+  | { status: "loading"; commands: SlashCommandDescriptor[] }
+  | { status: "ready"; commands: SlashCommandDescriptor[] }
+  | { status: "unavailable"; commands: SlashCommandDescriptor[] }
+  | { status: "failed"; commands: SlashCommandDescriptor[]; error: string };
 
-const EMPTY_COMMANDS: CommandDescriptor[] = [];
+const EMPTY_COMMANDS: SlashCommandDescriptor[] = [];
 
 export function usePaletteExtensionCommands(options: {
   open: boolean;

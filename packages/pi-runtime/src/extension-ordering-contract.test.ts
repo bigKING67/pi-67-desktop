@@ -34,7 +34,7 @@ describe("Pi extension ordering contract", () => {
       }
     `, "utf8");
 
-    const requestApproval = vi.fn(async () => false);
+    const requestApproval = vi.fn(async () => ({ status: "denied" as const }));
     const services = await createDesktopSessionServices({
       cwd,
       agentDir,
@@ -57,7 +57,10 @@ describe("Pi extension ordering contract", () => {
         input: { command: "pwd" }
       });
 
-      expect(result).toMatchObject({ block: true, reason: "Blocked by user: git-external-action" });
+      expect(result).toMatchObject({
+        block: true,
+        reason: expect.stringContaining("用户未批准本次一次性授权")
+      });
       expect(requestApproval).toHaveBeenCalledOnce();
       expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
         toolCallId: "tool-call-mutated",
@@ -98,7 +101,7 @@ describe("Pi extension ordering contract", () => {
       }
     `, "utf8");
 
-    const requestApproval = vi.fn(async () => false);
+    const requestApproval = vi.fn(async () => ({ status: "denied" as const }));
     const services = await createDesktopSessionServices({
       cwd,
       agentDir,
@@ -122,7 +125,10 @@ describe("Pi extension ordering contract", () => {
         input: {}
       });
 
-      expect(result).toMatchObject({ block: true, reason: "Blocked by user: ambiguous-command" });
+      expect(result).toMatchObject({
+        block: true,
+        reason: expect.stringContaining("用户未批准本次一次性授权")
+      });
       expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
         toolCallId: "tool-call-overridden-read",
         toolName: "read",

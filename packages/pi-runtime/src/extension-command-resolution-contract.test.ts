@@ -31,7 +31,7 @@ describe("Pi extension command resolution contract", () => {
       agentDir,
       runtimeApiKeys: new Map(),
       getSafety: () => ({ cwd, trust: "trusted", approvalMode: "guided" }),
-      requestApproval: async () => false
+      requestApproval: async () => ({ status: "denied" })
     });
     const { session } = await createAgentSessionFromServices({
       services,
@@ -39,9 +39,10 @@ describe("Pi extension command resolution contract", () => {
     });
     try {
       const extensions = services.resourceLoader.getExtensions();
-      expect(projectExtensionCommands(extensions)).toEqual([
-        { name: "duplicate:1", description: "Alpha command" },
-        { name: "duplicate:2", description: "Beta command" }
+      const commands = projectExtensionCommands(extensions);
+      expect(commands.items.filter((item) => item.source === "extension")).toEqual([
+        { name: "duplicate:1", description: "Alpha command", source: "extension" },
+        { name: "duplicate:2", description: "Beta command", source: "extension" }
       ]);
       const catalog = projectExtensionCatalog(extensions);
       expect(catalog.items.map((item) => item.label)).toEqual(expect.arrayContaining([
@@ -49,6 +50,11 @@ describe("Pi extension command resolution contract", () => {
         expect.stringContaining("beta.ts")
       ]));
       expect(catalog.items.some((item) => item.id.includes("pi67-desktop-safety"))).toBe(false);
+      expect(catalog.items.some((item) => item.id.includes("pi67-desktop-tool-routing"))).toBe(false);
+      expect(extensions.extensions.map((extension) => extension.path)).toEqual(expect.arrayContaining([
+        "<inline:pi67-desktop-tool-routing>",
+        "<inline:pi67-desktop-safety>"
+      ]));
     } finally {
       session.dispose();
     }

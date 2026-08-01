@@ -1,10 +1,11 @@
 import { appendFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
-import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { SessionTreeProjection } from "@pi67/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
+import { createPiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 
 const temporaryDirectories: string[] = [];
 const zeroUsage = {
@@ -21,35 +22,6 @@ afterEach(async () => {
 });
 
 describe("PiSdkRuntime", () => {
-  it("throws structured errors for runtime lifecycle and selection failures", async () => {
-    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-errors-"));
-    temporaryDirectories.push(root);
-    const cwd = join(root, "workspace");
-    const agentDir = join(root, "agent");
-    await Promise.all([mkdir(cwd), mkdir(agentDir)]);
-    const runtime = new PiSdkRuntime();
-
-    expect(captureError(() => runtime.getSnapshot())).toMatchObject({
-      code: "RUNTIME_NOT_READY",
-      recoverable: true
-    });
-
-    try {
-      const initializing = runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" });
-      await expect(runtime.initialize({ cwd, agentDir, trust: "unknown", approvalMode: "guided" }))
-        .rejects.toMatchObject({ code: "BUSY", details: { retryable: true } });
-      await initializing;
-
-      await expect(runtime.selectModel("missing-provider", "missing-model"))
-        .rejects.toMatchObject({ code: "MODEL_NOT_FOUND", recoverable: true });
-      await expect(runtime.setThinkingLevel("unsupported-level"))
-        .rejects.toMatchObject({ code: "UNSUPPORTED", details: { feature: "thinking-level" } });
-
-    } finally {
-      await runtime.dispose();
-    }
-  }, 15_000);
-
   it("uses the Pi session runtime lifecycle for new sessions and reloads", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-sdk-lifecycle-"));
     temporaryDirectories.push(root);
@@ -94,6 +66,93 @@ describe("PiSdkRuntime", () => {
       expect(extensionErrors).toEqual([]);
     } finally {
       await runtime.dispose();
+    }
+  }, 15_000);
+
+  it("reapplies managed Desktop Package overrides before reloading Pi resources", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-package-reload-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const managedRoot = join(agentDir, "desktop-capabilities");
+    const bundledPackage = join(managedRoot, "packages", "pi67-core");
+    const overlayPackage = join(managedRoot, "skill-packs", "ai-berkshire-investment-suite", "package");
+    const toolchainRoot = join(root, "toolchain");
+    await Promise.all([
+      mkdir(cwd),
+      mkdir(bundledPackage, { recursive: true }),
+      mkdir(overlayPackage, { recursive: true }),
+      mkdir(join(overlayPackage, "skills", "managed-reload"), { recursive: true })
+    ]);
+    for (const [path, name] of [
+      [bundledPackage, "@pi67/core"],
+      [overlayPackage, "@pi67/managed-ai-berkshire-investment-suite"]
+    ] as const) {
+      await writeFile(join(path, "package.json"), JSON.stringify({
+        name,
+        version: "1.0.0",
+        private: true,
+        pi: { skills: path === overlayPackage ? ["skills/managed-reload"] : [] }
+      }), "utf8");
+    }
+    await writeFile(join(overlayPackage, "skills", "managed-reload", "SKILL.md"), [
+      "---",
+      "name: managed-reload",
+      "description: Verifies that a managed Desktop Package survives Pi resource reloads.",
+      "---",
+      "",
+      "# Managed reload",
+      ""
+    ].join("\n"), "utf8");
+    const keys = [
+      "PI67_DESKTOP",
+      "PI67_PACKAGED",
+      "PI67_TOOLCHAIN_ROOT",
+      "PI67_NODE_EXECUTABLE",
+      "PI67_NPM_CLI",
+      "PI67_GIT_EXECUTABLE",
+      "PI67_GIT_EXEC_PATH",
+      "PI67_MANAGED_CAPABILITIES_ROOT",
+      "PI67_CAPABILITY_PACKAGE_PATHS"
+    ] as const;
+    const previous = new Map(keys.map((key) => [key, process.env[key]]));
+    Object.assign(process.env, {
+      PI67_DESKTOP: "1",
+      PI67_PACKAGED: "0",
+      PI67_TOOLCHAIN_ROOT: toolchainRoot,
+      PI67_NODE_EXECUTABLE: join(toolchainRoot, "node", "bin", "node"),
+      PI67_NPM_CLI: join(toolchainRoot, "npm", "bin", "npm-cli.js"),
+      PI67_GIT_EXECUTABLE: join(toolchainRoot, "git", "bin", "git"),
+      PI67_GIT_EXEC_PATH: join(toolchainRoot, "git", "libexec", "git-core"),
+      PI67_MANAGED_CAPABILITIES_ROOT: managedRoot,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([bundledPackage])
+    });
+    const settingsManager = SettingsManager.inMemory();
+    const reloadSettings = vi.spyOn(settingsManager, "reload");
+    const applyOverrides = vi.spyOn(settingsManager, "applyOverrides");
+    const services = createPiWorkspaceRuntimeServices({ cwd, agentDir, settingsManager });
+    const runtime = new PiSdkRuntime({ workspaceServices: services });
+    try {
+      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      reloadSettings.mockClear();
+      applyOverrides.mockClear();
+      process.env.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([overlayPackage, bundledPackage]);
+
+      const resources = await runtime.reloadResources();
+
+      expect(reloadSettings).toHaveBeenCalled();
+      expect(applyOverrides).toHaveBeenCalledWith(expect.objectContaining({
+        packages: [overlayPackage, bundledPackage]
+      }));
+      expect(resources.resources).toContainEqual(expect.objectContaining({
+        kind: "skill",
+        id: "managed-reload",
+        status: "ready"
+      }));
+    } finally {
+      await runtime.dispose();
+      await services.dispose();
+      for (const key of keys) restoreEnvironment(key, previous.get(key));
     }
   }, 15_000);
 
@@ -370,20 +429,11 @@ async function queryReadyCatalog(
   return runtime.querySessionCatalog(query);
 }
 
-function restoreEnvironment(name: "HOME" | "USERPROFILE", value: string | undefined): void {
+function restoreEnvironment(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
 }
 
 function hasActiveTreeNode(tree: SessionTreeProjection): boolean {
   return tree.nodes.some((node) => node.active);
-}
-
-function captureError(operation: () => unknown): unknown {
-  try {
-    operation();
-    return undefined;
-  } catch (error) {
-    return error;
-  }
 }

@@ -12,9 +12,10 @@ import type {
   ExtensionUiRequestView
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
+import type { DesktopApprovalDecision } from "./safety-extension.js";
 
 interface PendingUiRequestBase {
-  resolve: (value: string | boolean | undefined) => void;
+  resolve: (value: string | boolean | DesktopApprovalDecision | undefined) => void;
   timer: ReturnType<typeof setTimeout>;
   abort?: () => void;
 }
@@ -146,13 +147,21 @@ export class DesktopExtensionUiBridge {
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
     pending.abort?.();
-    pending.resolve(allowed);
+    pending.resolve({ status: allowed ? "allowed" : "denied" });
     this.emit({ type: "approval.resolved", payload: { requestId, toolCallId, allowed } });
     return true;
   }
 
-  requestApproval(details: ApprovalRequestDetails, opts?: ExtensionUIDialogOptions): Promise<boolean> {
-    return this.openRequest("approval", details, opts).then(Boolean);
+  requestApproval(
+    details: ApprovalRequestDetails,
+    opts?: ExtensionUIDialogOptions
+  ): Promise<DesktopApprovalDecision> {
+    if (opts?.signal?.aborted) return Promise.resolve({ status: "cancelled", reason: "abort" });
+    return this.openRequest("approval", details, opts).then((result) => (
+      isApprovalDecision(result)
+        ? result
+        : { status: "cancelled", reason: "unavailable" }
+    ));
   }
 
   cancelAll(reason: ExtensionUiCancellationReason): string[] {
@@ -164,7 +173,7 @@ export class DesktopExtensionUiBridge {
       if (request.purpose === "approval") approvalRequests.push({ requestId, toolCallId: request.toolCallId });
       else extensionIds.push(requestId);
     }
-    for (const requestId of requestIds) this.settleCancelled(requestId);
+    for (const requestId of requestIds) this.settleCancelled(requestId, reason);
     if (extensionIds.length > 0) {
       this.emit({ type: "extension.ui.cancelled", payload: { requestIds: extensionIds, reason } });
     }
@@ -199,14 +208,18 @@ export class DesktopExtensionUiBridge {
     purpose: "approval",
     details: ApprovalRequestDetails,
     opts?: ExtensionUIDialogOptions
-  ): Promise<string | boolean | undefined>;
+  ): Promise<DesktopApprovalDecision>;
   private openRequest(
     purpose: "extension" | "approval",
     details: Pick<ExtensionUiRequestView, "kind" | "title" | "message" | "placeholder" | "options" | "blocking">
       | ApprovalRequestDetails,
     opts?: ExtensionUIDialogOptions
-  ): Promise<string | boolean | undefined> {
-    if (opts?.signal?.aborted) return Promise.resolve(undefined);
+  ): Promise<string | boolean | DesktopApprovalDecision | undefined> {
+    if (opts?.signal?.aborted) {
+      return Promise.resolve(purpose === "approval"
+        ? { status: "cancelled", reason: "abort" }
+        : undefined);
+    }
     const requestId = `${purpose}-ui-${Date.now().toString(36)}-${++this.sequence}`;
     const timeout = Math.max(1_000, Math.min(opts?.timeout ?? 300_000, 300_000));
     return new Promise((resolve) => {
@@ -285,7 +298,7 @@ export class DesktopExtensionUiBridge {
   private cancel(requestId: string, reason: Extract<ExtensionUiCancellationReason, "timeout" | "abort">): boolean {
     const pending = this.pending.get(requestId);
     if (!pending) return false;
-    if (!this.settleCancelled(requestId)) return false;
+    if (!this.settleCancelled(requestId, reason)) return false;
     if (pending.purpose === "approval") {
       this.emit({
         type: "approval.cancelled",
@@ -297,15 +310,33 @@ export class DesktopExtensionUiBridge {
     return true;
   }
 
-  private settleCancelled(requestId: string): boolean {
+  private settleCancelled(requestId: string, reason: ExtensionUiCancellationReason): boolean {
     const pending = this.pending.get(requestId);
     if (!pending) return false;
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
     pending.abort?.();
-    pending.resolve(undefined);
+    pending.resolve(pending.purpose === "approval"
+      ? { status: "cancelled", reason }
+      : undefined);
     return true;
   }
+}
+
+function isApprovalDecision(value: unknown): value is DesktopApprovalDecision {
+  if (typeof value !== "object" || value === null || !("status" in value)) return false;
+  if (value.status === "allowed" || value.status === "denied") return true;
+  if (value.status !== "cancelled" || !("reason" in value)) return false;
+  return [
+    "session-transition",
+    "resource-reload",
+    "runtime-dispose",
+    "connection-close",
+    "projection-resync",
+    "timeout",
+    "abort",
+    "unavailable"
+  ].includes(String(value.reason));
 }
 
 export class DesktopUnsupportedUiError extends Error {

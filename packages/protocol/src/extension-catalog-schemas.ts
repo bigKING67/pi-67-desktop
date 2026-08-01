@@ -4,6 +4,8 @@ import {
   MAX_EXTENSION_CATALOG_ITEMS,
   MAX_EXTENSION_CATALOG_LABEL_CHARS,
   MAX_EXTENSION_CATALOG_PATH_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAMES,
   MAX_EXTENSION_SURFACE_DETAIL_CHARS,
   MAX_EXTENSION_ADAPTER_DESCRIPTION_CHARS,
   MAX_EXTENSION_ADAPTER_ID_CHARS,
@@ -95,7 +97,11 @@ const ExtensionCatalogItemSchema = strictObject({
   adapter: Type.Optional(ExtensionAdapterMatchSchema),
   assessment: ExtensionCompatibilityAssessmentSchema,
   commandCount: Type.Integer({ minimum: 0, maximum: 100_000 }),
-  toolCount: Type.Integer({ minimum: 0, maximum: 100_000 })
+  toolCount: Type.Integer({ minimum: 0, maximum: 100_000 }),
+  toolNames: Type.Optional(Type.Array(
+    Type.String({ minLength: 1, maxLength: MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS }),
+    { maxItems: MAX_EXTENSION_CATALOG_TOOL_NAMES, uniqueItems: true }
+  ))
 });
 
 export const ExtensionCatalogSchema = strictObject({

@@ -4,11 +4,11 @@ import type {
   OperationKind,
   OperationLifecycle,
   OperationView,
-  RuntimePhase,
-  ToolPresentationKind
+  RuntimePhase
 } from "@pi67/domain";
 import {
   Check,
+  ChevronRight,
   CircleAlert,
   CircleDashed,
   CircleX,
@@ -16,7 +16,7 @@ import {
   Square,
   Wrench
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -151,7 +151,14 @@ export function operationPresentation(
   if (activity?.kind === "approval") return { icon: <CircleAlert aria-hidden="true" size={14} />, label: messages.operation.needsApproval };
   if (activity?.kind === "extension-input") return { icon: <CircleAlert aria-hidden="true" size={14} />, label: messages.operation.waitingInput };
   if (activity?.kind === "compaction") return { icon: <RefreshCw aria-hidden="true" className={styles.spinning} size={14} />, label: messages.operation.compacting };
-  if (activity?.kind === "tool") return { icon: <Wrench aria-hidden="true" size={14} />, label: activeToolLabel(activity.toolKind) };
+  if (activity?.kind === "tool") {
+    return {
+      icon: <Wrench aria-hidden="true" size={14} />,
+      label: activity.status === "running"
+        ? messages.operation.callingNamedTool(activity.toolName)
+        : messages.operation.calledNamedTool(activity.toolName)
+    };
+  }
   if (activity?.kind === "responding") return { icon: <CircleDashed aria-hidden="true" className={styles.spinning} size={14} />, label: messages.operation.responding };
   if (activity?.kind === "thinking") return { icon: <CircleDashed aria-hidden="true" className={styles.spinning} size={14} />, label: messages.operation.thinking };
   if (kind === "session-import") return { icon: <CircleDashed aria-hidden="true" className={styles.spinning} size={14} />, label: messages.operation.importingSession, ...(detail ? { detail } : {}) };
@@ -173,12 +180,23 @@ function OperationTimeline({
   detail: string | undefined;
   progress: string | undefined;
 }) {
+  const autoExpanded = timeline.lifecycle !== "completed";
+  const [open, setOpen] = useState(autoExpanded);
+  const previousAutoExpanded = useRef(autoExpanded);
+
+  useEffect(() => {
+    if (previousAutoExpanded.current !== autoExpanded) setOpen(autoExpanded);
+    previousAutoExpanded.current = autoExpanded;
+  }, [autoExpanded]);
+
   if (timeline.lifecycle === "completed") {
     return (
       <details
         className={`${styles.timeline} ${styles.timelineSettled}`}
         data-operation-lifecycle="completed"
         data-turn-activity="true"
+        open={open}
+        onToggle={(event) => setOpen(event.currentTarget.open)}
       >
         <summary>
           <Check aria-hidden="true" size={14} />
@@ -192,7 +210,7 @@ function OperationTimeline({
     );
   }
 
-  const terminalPresentation = operationPresentation(
+  const currentPresentation = operationPresentation(
     operation.kind,
     operation.lifecycle,
     operation.activity,
@@ -207,40 +225,46 @@ function OperationTimeline({
   const earlierSteps = earlierCount > 0 ? timeline.steps.slice(0, earlierCount) : [];
 
   return (
-    <section
+    <details
       aria-label="当前任务执行过程"
-      aria-live="polite"
-      className={`${styles.timeline} ${terminal ? styles.timelineTerminal : ""}`}
+      className={`${styles.timeline} ${styles.timelineDisclosure} ${terminal ? styles.timelineTerminal : ""}`}
       data-operation-freshness={freshness}
       data-operation-lifecycle={operation.lifecycle}
       data-turn-activity="true"
-      role="status"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <header className={styles.timelineHeader}>
-        <strong>{terminal ? terminalPresentation.label : messages.operation.timelineTitle}</strong>
-        <small>{messages.operation.timelineSteps(timeline.steps.length)}</small>
-      </header>
-      {freshness && freshness !== "fresh" ? (
-        <div className={styles.timelineNotice}>
-          <span className={styles.icon}>{terminalPresentation.icon}</span>
-          <span className={styles.copy}>
-            <strong>{terminalPresentation.label}</strong>
-            {terminalPresentation.detail ? <small>{terminalPresentation.detail}</small> : null}
-          </span>
-        </div>
-      ) : null}
-      {earlierSteps.length > 0 ? (
-        <details className={styles.timelineEarlier}>
-          <summary>{messages.operation.timelineEarlier(earlierSteps.length)}</summary>
-          <TimelineSteps operationKind={timeline.operationKind} steps={earlierSteps} />
-        </details>
-      ) : null}
-      <TimelineSteps
-        operationKind={timeline.operationKind}
-        progress={progress}
-        steps={recentSteps}
-      />
-    </section>
+      <summary aria-live="polite">
+        <span className={styles.icon}>{currentPresentation.icon}</span>
+        <span className={styles.timelineSummaryCopy}>
+          <strong>{currentPresentation.label}</strong>
+          <small>{messages.operation.timelineSteps(timeline.steps.length)}</small>
+        </span>
+        <ChevronRight aria-hidden="true" className={styles.timelineChevron} size={14} />
+      </summary>
+      <div className={styles.timelineBody}>
+        {(freshness && freshness !== "fresh") || (terminal && currentPresentation.detail) ? (
+          <div className={styles.timelineNotice}>
+            <span className={styles.icon}>{currentPresentation.icon}</span>
+            <span className={styles.copy}>
+              <strong>{currentPresentation.label}</strong>
+              {currentPresentation.detail ? <small>{currentPresentation.detail}</small> : null}
+            </span>
+          </div>
+        ) : null}
+        {earlierSteps.length > 0 ? (
+          <details className={styles.timelineEarlier}>
+            <summary>{messages.operation.timelineEarlier(earlierSteps.length)}</summary>
+            <TimelineSteps operationKind={timeline.operationKind} steps={earlierSteps} />
+          </details>
+        ) : null}
+        <TimelineSteps
+          operationKind={timeline.operationKind}
+          progress={progress}
+          steps={recentSteps}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -276,21 +300,6 @@ function TimelineSteps({
   );
 }
 
-function activeToolLabel(kind: ToolPresentationKind): string {
-  switch (kind) {
-    case "read": return messages.operation.readingFiles;
-    case "search": return messages.operation.searchingProject;
-    case "edit": return messages.operation.editingFiles;
-    case "shell": return messages.operation.runningCommand;
-    case "managed-process": return messages.operation.runningTask;
-    case "subagent": return messages.operation.coordinatingTask;
-    case "image": return messages.operation.processingImage;
-    case "extension": return messages.operation.callingExtension;
-    case "approval": return messages.operation.needsApproval;
-    case "generic": return messages.operation.usingTool;
-  }
-}
-
 function timelineStepLabel(
   operationKind: OperationKind,
   step: OperationTimelineStep,
@@ -307,6 +316,11 @@ function timelineStepLabel(
     return operationKind === "command" ? "准备命令" : "准备任务";
   }
   if (step.activity === null) return active ? messages.operation.running : "继续处理";
+  if (step.activity.kind === "tool") {
+    return active
+      ? messages.operation.callingNamedTool(step.activity.toolName)
+      : messages.operation.calledNamedTool(step.activity.toolName);
+  }
   if (active) return operationPresentation(operationKind, "running", step.activity, undefined, undefined).label;
   switch (step.activity.kind) {
     case "thinking": return "分析问题";
@@ -314,22 +328,6 @@ function timelineStepLabel(
     case "compaction": return "压缩上下文";
     case "approval": return "等待确认";
     case "extension-input": return "等待扩展输入";
-    case "tool": return settledToolLabel(step.activity.toolKind);
-  }
-}
-
-function settledToolLabel(kind: ToolPresentationKind): string {
-  switch (kind) {
-    case "read": return "读取文件";
-    case "search": return "搜索项目";
-    case "edit": return "修改文件";
-    case "shell": return "执行命令";
-    case "managed-process": return "运行任务";
-    case "subagent": return "协调子任务";
-    case "image": return "处理图片";
-    case "approval": return "等待确认";
-    case "extension": return "调用扩展";
-    case "generic": return "执行工具";
   }
 }
 

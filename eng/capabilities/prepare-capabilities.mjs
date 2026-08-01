@@ -1,28 +1,30 @@
 import { createHash } from "node:crypto";
-import { lstatSync } from "node:fs";
 import {
   mkdir,
   readFile,
   readdir,
   rm,
-  stat,
   writeFile
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
 import {
-  compileBundledSkillSuites,
-  parseSkillMetadata
-} from "./bundled-skill-suites.mjs";
+  resolveBundledGitToolchain,
+  resolveExactCapabilitySource
+} from "./capability-source-resolver.mjs";
+import {
+  assertPi67SkillPackSource,
+  preparePi67SkillPackOverlay
+} from "./pi67-skill-pack-overlay.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
 const skillSuitesPath = resolve(repositoryRoot, "eng/capabilities/bundled-skill-suites.json");
 const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
 const sourceCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/sources");
+const generatedSkillPackRoot = resolve(repositoryRoot, "artifacts/capabilities/generated/skill-packs");
 const toolchainManifestPath = resolve(repositoryRoot, "artifacts/toolchain/current/manifest.json");
-const MAX_GIT_OUTPUT_BYTES = 8_192;
 const COMMERCE_SKILLS = new Set([
   "commerce-growth-os",
   "commerce-commercial-strategy",
@@ -38,23 +40,58 @@ export async function prepareDesktopCapabilities() {
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   const skillSuiteDefinition = JSON.parse(await readFile(skillSuitesPath, "utf8"));
   assertLock(lock);
-  const git = await bundledGitExecutable();
+  const git = await resolveBundledGitToolchain(toolchainManifestPath);
   await rm(outputRoot, { recursive: true, force: true });
   await mkdir(join(outputRoot, "packages"), { recursive: true });
 
   const sources = new Map();
   for (const source of lock.sources) {
-    sources.set(source.id, await resolveExactSource(source, git));
+    sources.set(source.id, await resolveExactCapabilitySource({
+      source,
+      repositoryRoot,
+      sourceCacheRoot,
+      git
+    }));
+  }
+  const skillPackOverlays = [];
+  for (const definition of lock.skillPacks) {
+    const upstreamSourceRoot = await resolveExactCapabilitySource({
+      source: {
+        id: `skill-pack-${definition.name}`,
+        repository: definition.repository,
+        commit: definition.commit,
+        localSibling: definition.localSibling
+      },
+      repositoryRoot,
+      sourceCacheRoot,
+      git
+    });
+    skillPackOverlays.push(await preparePi67SkillPackOverlay({
+      definition,
+      pi67SourceRoot: sources.get(definition.adapterSourceId),
+      upstreamSourceRoot,
+      outputRoot: join(generatedSkillPackRoot, definition.name)
+    }));
   }
   const entries = [];
-  entries.push(await preparePi67Core(sources.get("pi67-core"), lock.sources.find((item) => item.id === "pi67-core")));
+  entries.push(await preparePi67Core(
+    sources.get("pi67-core"),
+    lock.sources.find((item) => item.id === "pi67-core"),
+    skillPackOverlays
+  ));
   entries.push(await prepareBrowser67(sources.get("browser67"), lock.sources.find((item) => item.id === "browser67")));
   entries.push(await prepareDesignCraft(sources.get("design-craft"), lock.sources.find((item) => item.id === "design-craft")));
   entries.push(await prepareCommerceGrowthOs(
     sources.get("commerce-growth-os"),
     lock.sources.find((item) => item.id === "commerce-growth-os")
   ));
-  const bundledSkillSuites = compileBundledSkillSuites(skillSuiteDefinition, entries);
+  const overlayNames = new Set(skillPackOverlays.map((pack) => pack.name));
+  const skillPacks = [
+    ...(await readPi67SkillPackMetadata(sources.get("pi67-core")))
+      .filter((pack) => !overlayNames.has(pack.name)),
+    ...skillPackOverlays.map(({ sourceRoot: _sourceRoot, skills: _skills, ...pack }) => pack)
+  ].sort((left, right) => left.name.localeCompare(right.name));
+  const bundledSkillSuites = compileBundledSkillSuites(skillSuiteDefinition, entries, { skillPacks });
 
   const catalog = {
     schema: "pi67.capability-catalog.v1",
@@ -78,19 +115,31 @@ export async function prepareDesktopCapabilities() {
   return { catalog, manifest };
 }
 
-async function preparePi67Core(sourceRoot, source) {
+async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
   const destination = join(outputRoot, "packages", source.id);
   await mkdir(join(destination, "skills"), { recursive: true });
   await copyAllowed(sourceRoot, destination, ["extensions", "prompts", "rules", "AGENTS.md", "README.md", "VERSION"]);
-  const skillNames = (await readdir(join(sourceRoot, "shared-skills"), { withFileTypes: true }))
+  const overlaySkillRoots = new Map();
+  for (const overlay of skillPackOverlays) {
+    for (const skillName of overlay.skills) {
+      if (COMMERCE_SKILLS.has(skillName) || overlaySkillRoots.has(skillName)) {
+        throw new Error(`Bundled Skill Pack overlay is invalid: ${skillName}`);
+      }
+      overlaySkillRoots.set(skillName, overlay.sourceRoot);
+    }
+  }
+  const sourceSkillNames = (await readdir(join(sourceRoot, "shared-skills"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory() && !COMMERCE_SKILLS.has(entry.name))
     .map((entry) => entry.name)
     .sort();
+  const skillNames = [...new Set([...sourceSkillNames, ...overlaySkillRoots.keys()])]
+    .sort((left, right) => left.localeCompare(right));
   for (const skillName of skillNames) {
+    const skillSourceRoot = overlaySkillRoots.get(skillName) ?? join(sourceRoot, "shared-skills");
     await copyEntry(
-      join(sourceRoot, "shared-skills", skillName),
+      join(skillSourceRoot, skillName),
       join(destination, "skills", skillName),
-      sourceRoot
+      skillSourceRoot
     );
   }
   const extensions = (await readdir(join(destination, "extensions"), { withFileTypes: true }))
@@ -234,73 +283,6 @@ function catalogEntry(source, packagePath, resourceTypes, bundledExtensions = []
   };
 }
 
-async function resolveExactSource(source, git) {
-  const local = resolve(repositoryRoot, source.localSibling);
-  if (await isExactCleanRepository(local, source.commit, git)) return local;
-  const destination = join(sourceCacheRoot, source.id);
-  await rm(destination, { recursive: true, force: true });
-  await mkdir(dirname(destination), { recursive: true });
-  let lastError;
-  const transports = [
-    ...(await repositoryContainsCommit(local, source.commit, git) ? [local] : []),
-    ...gitTransportCandidates(source.repository)
-  ];
-  for (const url of transports) {
-    try {
-      await run(git, ["clone", "--no-checkout", url, destination]);
-      await run(git, ["-C", destination, "checkout", "--detach", source.commit]);
-      if (await capture(git, ["-C", destination, "rev-parse", "HEAD"]) !== source.commit) {
-        throw new Error("checked out commit did not match the lock");
-      }
-      return destination;
-    } catch (error) {
-      lastError = error;
-      await rm(destination, { recursive: true, force: true });
-    }
-  }
-  throw new Error(`Unable to obtain locked capability source ${source.id}: ${errorMessage(lastError)}`);
-}
-
-async function repositoryContainsCommit(path, commit, git) {
-  try {
-    if (!lstatSync(path).isDirectory()) return false;
-    return await capture(git, ["-C", path, "rev-parse", "--verify", `${commit}^{commit}`]) === commit;
-  } catch {
-    return false;
-  }
-}
-
-async function isExactCleanRepository(path, commit, git) {
-  try {
-    if (!lstatSync(path).isDirectory()) return false;
-    const head = await capture(git, ["-C", path, "rev-parse", "HEAD"]);
-    if (head !== commit) return false;
-    return (await capture(git, ["-C", path, "status", "--porcelain=v1", "--untracked-files=all"])) === "";
-  } catch {
-    return false;
-  }
-}
-
-function gitTransportCandidates(canonical) {
-  const parsed = new URL(canonical);
-  const path = parsed.pathname.replace(/^\/+|\/+$/gu, "");
-  return [
-    `https://gitclone.com/github.com/${path}`,
-    `https://ghproxy.net/${canonical}`,
-    canonical
-  ];
-}
-
-async function bundledGitExecutable() {
-  const manifest = JSON.parse(await readFile(toolchainManifestPath, "utf8"));
-  const path = resolve(dirname(toolchainManifestPath), manifest.paths?.git ?? "");
-  if (!isContained(path, dirname(toolchainManifestPath))) {
-    throw new Error("Bundled Git escaped the Desktop toolchain root.");
-  }
-  await stat(path);
-  return path;
-}
-
 async function copyAllowed(sourceRoot, destinationRoot, paths) {
   for (const path of paths) {
     assertRelativePath(path, "capability allowlist path");
@@ -361,7 +343,11 @@ async function treeSha256(root) {
 }
 
 function assertLock(lock) {
-  if (lock.schema !== "pi67.capability-sources-lock.v1" || !Array.isArray(lock.sources)) {
+  if (
+    lock.schema !== "pi67.capability-sources-lock.v1"
+    || !Array.isArray(lock.sources)
+    || !Array.isArray(lock.skillPacks)
+  ) {
     throw new Error("Capability source lock is invalid.");
   }
   const ids = lock.sources.map((source) => source.id);
@@ -371,6 +357,14 @@ function assertLock(lock) {
       throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
     }
     assertLocalSibling(source.localSibling, "capability local sibling");
+  }
+  const packNames = lock.skillPacks.map((pack) => pack?.name);
+  if (new Set(packNames).size !== packNames.length || packNames.length !== 1) {
+    throw new Error("Bundled Skill Pack source ids are invalid.");
+  }
+  for (const pack of lock.skillPacks) {
+    assertPi67SkillPackSource(pack);
+    assertLocalSibling(pack.localSibling, "Skill Pack local sibling");
   }
 }
 
@@ -411,46 +405,8 @@ function lstatPromise(path) {
   return import("node:fs/promises").then(({ lstat }) => lstat(path));
 }
 
-function capture(command, arguments_) {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, arguments_, { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += String(chunk); });
-    child.stderr.on("data", (chunk) => { stderr += String(chunk); });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolvePromise(stdout.trim());
-      else reject(new Error(`${basename(command)} exited with ${signal ?? code}: ${(stderr || stdout).trim()}`));
-    });
-  });
-}
-
-function run(command, arguments_) {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, arguments_, { stdio: ["ignore", "pipe", "pipe"] });
-    let output = "";
-    const captureOutput = (chunk) => {
-      if (output.length < MAX_GIT_OUTPUT_BYTES) {
-        output += String(chunk).slice(0, MAX_GIT_OUTPUT_BYTES - output.length);
-      }
-    };
-    child.stdout.on("data", captureOutput);
-    child.stderr.on("data", captureOutput);
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolvePromise();
-      else reject(new Error(`${basename(command)} exited with ${signal ?? code}: ${output.trim()}`));
-    });
-  });
-}
-
 function isNodeError(error, code) {
   return error instanceof Error && "code" in error && error.code === code;
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

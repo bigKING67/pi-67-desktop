@@ -263,6 +263,34 @@ loading error where the operation can produce those states
   Tool payloads. Copy success is announced inline; Clipboard failure remains
   observable through the message action state and notification history. Tool
   details keep their own bounded copy contract.
+- A non-empty visible Thinking part renders as reasoning text inside the turn's
+  execution process rather than as a second nested disclosure. Provider-only
+  signatures, encrypted reasoning, and whitespace-only placeholders never create
+  an empty process step.
+- An Assistant turn that settles with an empty content array is not rendered as
+  unsupported content. It remains a visible model-response failure with a retry,
+  model-switch, and Provider-configuration recovery path; aborted empty turns keep
+  their distinct stopped state.
+- Consecutive reasoning Assistant parts, Tool Calls, and Tool Results form one
+  `执行过程 · N 个步骤` disclosure in the Transcript. Within it, reasoning is continuous
+  secondary prose and each Tool Call is paired with its correlated Tool Result as
+  one compact logical step; the call and result are never rendered as duplicate peer
+  cards. An unmatched legacy Tool Result remains one explicitly inspectable
+  compatibility step. This includes visible reasoning carried beside final text in
+  one Assistant record: the reasoning belongs to the process while the text remains
+  the final answer. The current process is expanded while work is running and
+  collapses automatically only after the Operation completes with a visible final
+  answer. Failure, cancellation, loss, and completion without a final answer remain
+  expanded for diagnosis. Expanding a settled group restores every reasoning part,
+  bounded Tool step, and bounded Tool Result in source order; collapse never removes
+  process data. The final Assistant answer remains an ordinary editorial Markdown
+  message outside that process surface. Pi JSONL remains the conversation source of
+  truth; this hierarchy is a disposable Renderer projection.
+- A raw Tool Result uses an inset log surface rather than Assistant prose: the Tool
+  identity and terminal state remain visible, text uses a whitespace-preserving
+  monospace viewport with independent horizontal and vertical overflow, long output
+  stays height-bounded until `展开全部`, and result copy is independent from
+  `复制回答`. Tool output is never parsed as trusted HTML.
 - `编辑消息` is an in-place interaction owned by the historical User card.
   Activating it focuses a bounded textarea in that card and sends no Host command;
   cancel has no side effect and restores focus to the same action. `发送修改` first
@@ -380,9 +408,11 @@ loading error where the operation can produce those states
   successful Session initialization is followed by an authoritative projection
   resync before the live surface mounts. The initialization acknowledgement alone
   never substitutes for the Session snapshot.
-- At most four Tasks may be accepted, running, waiting for safety approval, or
-  waiting for blocking Extension input. Reaching the limit explains which state
-  is preserved and that an existing Task must settle or stop before another send.
+- At most eight top-level Session Tasks may be accepted, running, waiting for
+  safety approval, or waiting for blocking Extension input. Subagents launched
+  inside one Task do not consume additional top-level slots. Reaching the limit
+  explains which state is preserved and that an existing Task must settle or stop
+  before another send.
 - There is no tab close `x`, local hide, archive, or delete control in v1. A live
   row menu exposes `停止任务`; stopping releases the Runtime but never deletes the
   Pi JSONL Session. Idle and settled history stays discoverable through Catalog.
@@ -439,14 +469,43 @@ loading error where the operation can produce those states
   explicit views: `扩展包`, `内置扩展`, and `本地扩展`. `本地扩展` consumes only
   top-level Extension resources from global or project extension directories and
   explicit `settings.json` paths; Package-attributed Extensions never repeat there.
-  `技能` owns three explicit views: `全局技能`, `项目技能`, and `内置技能`.
-  Global and project views consume only top-level Skill resources for their exact
-  scope; Package-attributed Skills never repeat there. `指令模板` lists `/name`
+  `技能` owns two availability views: `全局可用` and `项目专属`. `全局可用`
+  groups Desktop-owned `内置技能套件`, standalone updater-owned `受管技能套件`,
+  and exact-scope `本地全局技能` on one page; source and update ownership remain
+  visible within those sections instead of competing with availability as peer tabs.
+  When a managed Pack shares a `suiteId` with an immutable bundled suite, Renderer
+  merges its current/latest version, effective source, update, and restore state into
+  that single suite row and detail instead of rendering a second Pack identity. The project
+  view consumes only top-level Skills owned by the current project. Package-
+  attributed Skills never repeat in either view. Verified updater-owned members
+  may be summarized once at Pack level, while all remaining user-scope Skills stay
+  in `本地全局技能`. `指令模板` lists `/name`
   Prompt Templates.
-  `规则与上下文` lists loaded `AGENTS.md` and `CLAUDE.md` Context Files and keeps
-  `SYSTEM.md` / `APPEND_SYSTEM.md` identified as separate system prompt inputs.
-  Global resources and current-project resources remain visibly distinct, and
-  project views label inherited global resources.
+  `规则与上下文` owns its own `全局可用` / `项目专属` tabs instead of the generic
+  Settings scope control. Each scope adds a quieter counted category selector and
+  renders only that category as a flat Catalog. The global selector offers `全局规则`,
+  `桌面托管`, and `系统提示词`; the project selector offers `项目规则`, `继承规则`,
+  and `系统提示词`. The user-owned global or project rules category is the default,
+  and switching scope preserves the last category chosen within each scope. Desktop-managed Markdown remains
+  visible per file but read-only. Controlled user-global files and regular files in
+  a trusted Workspace are editable; Workspace-external inherited files are read-only.
+  Missing canonical `AGENTS.md`, `SYSTEM.md`, and `APPEND_SYSTEM.md` entries appear as
+  explicit creation candidates, while arbitrary names, paths, rename, and delete are
+  absent. Existing `CLAUDE.md` variants may be edited but never gain a create action.
+  Selecting a row opens one full-width drill-down with a labeled return action,
+  path/source/scope/load state, bounded UTF-8 byte count, and `源码` / `预览` modes.
+  Read-only source uses the same editor geometry without mutation controls. Preview
+  never executes raw HTML or loads remote Markdown images; blocked images render an
+  inert labeled placeholder. Editor and preview own bounded scrolling and never add
+  document-level horizontal overflow, including the 520x400 compact surface.
+  Editable files expose cancel and `保存并重新加载`, plus `Cmd/Ctrl+S`. Switching file,
+  scope, Settings category, or returning to the Workbench while dirty opens exactly
+  one discard guard. Saving is disabled during reload, on oversized UTF-8 content,
+  or after an external revision conflict. A conflict keeps the draft visible and
+  requires an explicit latest-file reload; a successful save updates the revision,
+  catalog, and Pi reload status without placing Markdown content in notifications,
+  Session projection, or persisted Workbench state. Returning to a catalog restores
+  its prior scroll position.
 - Product navigation calls the transient execution environment `运行服务`, not
   the literal translation `运行时`. Persistent Pi JSONL Sessions remain in the
   Workspace navigation unless a real, independently actionable Session-settings
@@ -461,26 +520,70 @@ loading error where the operation can produce those states
   explicitly Package-wide operations. Third-party Package Extensions remain in
   their Package detail and never duplicate into `内置扩展` or `本地扩展`.
   Third-party Package Skills likewise remain in Package detail and never duplicate
-  into `全局技能`, `项目技能`, or `内置技能`.
+  into `全局可用` or `项目专属`.
 - `内置扩展` lists user-visible Extension entries shipped by Pi-67 Desktop.
   The catalog exposes individual bounded identities rather than presenting an
   entire first-party capability Package as one Extension. These entries report
   installed readiness and application-owned versioning; they update with the
   application and cannot be independently installed or uninstalled. Hidden
   policy and safety Extensions remain internal system components.
-- `内置技能` first lists a bounded set of user-facing Skill suites, then opens one
+- `全局可用` begins with a bounded set of user-facing `内置技能套件`, then opens one
   selected suite in an independent drill-down detail with search and a labeled
-  return action. Suite rows own the repeated count, readiness, application-update,
-  and source summary; individual detail rows retain the real Skill identity,
+  return action. Suite rows own the repeated count, readiness, and content-owned
+  baseline version; they never use the carrying capability Package version as a
+  substitute. The detail begins with `内置基线`, `更新方式`, and verified upstream
+  provenance before listing members. Individual detail rows retain the real Skill identity,
   bounded purpose, owning capability Package, and version without repeating a
-  misleading loaded state. Suite membership is an explicit build-time manifest
+  misleading loaded state. A Pi-67 Skill Pack version resolves from its registry
+  and lock. AI Berkshire is regenerated at build time from a separately pinned
+  upstream commit using the adapter from the locked Pi-67 Core source; the expected
+  Pack version, source-manifest hash, and bundle hash must all match before its Skills
+  may overlay the immutable Core baseline. A single capability suite resolves from the locked capability Package,
+  a multi-source aggregation says `N 个内置来源`, and an unversioned upstream says
+  `未独立版本化` rather than inventing SemVer. Suite membership is an explicit build-time manifest
   validated against every first-party Skill in the Desktop capability catalog;
   Renderer prefix matching, Package-name guessing, and `extensions` or `skills`
-  directory heuristics are forbidden. `全局技能` and `项目技能` remain user-owned,
-  exact-scope top-level resource lists rather than suite catalogs. Project Skills
-  are unavailable until the current Workspace is available and trusted. The UI
-  does not guess same-name precedence: current task resolution remains Pi
-  ResourceLoader authority.
+  directory heuristics are forbidden. `本地全局技能` remains an exact user-scope
+  top-level projection: verified updater-owned members are excluded after being
+  summarized once at Pack level, while loose Skills remain individually user-owned.
+  `项目专属` remains a project-owned exact-scope list and is unavailable until the current Workspace is
+  available and trusted. Project and loose Skills never gain an update action from
+  a folder name, README URL, or guessed repository. The UI does not guess same-name
+  precedence: current task resolution remains Pi ResourceLoader authority.
+- Managed global Skill Packs use `套件 -> 套件详情 -> 单个技能`; a Pack with a
+  bundled baseline stays in the single `内置技能套件` identity, while only standalone
+  Packs appear in `受管技能套件`. The page owns one explicit `检查技能更新` action
+  and never checks the network merely because
+  Settings opened. Each Pack row identifies owner, installed/latest version, member
+  count, local synchronization state, and a separately focusable `更新` action only
+  when the owning updater verifies an automatic update. Row detail and update are
+  sibling controls inside one shared hover surface. The update action opens a
+  one-shot Pack-wide confirmation naming source, current and target versions,
+  affected Skills, and local state; it never mutates silently. A detected local
+  modification or unverifiable updater disables automatic overwrite and remains
+  visibly actionable as a recovery state. Before a check, an updater-owned suite says
+  `尚未检查`; after a successful check it says `已是最新` or `可更新`. A newer legacy
+  registry record that is not independently installable says `暂无可安装更新`, while an
+  older record is labeled `Registry 记录版本` rather than `最新兼容版本`. Lark official Skills update through the
+  installed Lark CLI as one Pack. When all official Skills already match the latest
+  reported Skill version, a lagging CLI version is an update state rather than local
+  drift; unproven drift remains `技能不同步` and blocks overwrite. Lark detail labels
+  `当前 CLI`, `官方 Skills`, and `最新稳定版本` separately and attributes member rows
+  to `Lark CLI 官方 Skills`, never to the capability Package carrying the immutable
+  baseline. A mutation pins one external CLI installation across check/update/check;
+  failure rechecks that same source or invalidates the stale success state. Extension Package
+  Skills remain in Package detail,
+  bundled Skill suites retain an immutable Desktop baseline, and Desktop never
+  performs a live `git pull` of an arbitrary Skill repository. AI Berkshire records
+  `https://github.com/xbtlin/ai-berkshire` plus its locked source commit. Its independent
+  update state is `available`: the confirmation installs only registry-declared Skills
+  as a separate Pi Package Overlay, exposes bundled/effective/latest versions, reloads
+  every Workspace, rolls back activation on reload failure, and offers a confirmed
+  `恢复内置版本` action. A legacy `bundled-release-only` registry entry without an
+  installable upstream may report an older non-installable version as current history,
+  but cannot enable staging or relax independent-update provenance. browser67
+  updates only as a complete capability Package; aggregated design tools update by
+  their individual sources.
 - Pi Packages use two local views: `已安装` and `发现扩展包`. Tabs,
   page-level actions, search, and filters sit directly on the document canvas.
   `已安装` lists configured third-party sources and moves Package metadata and
@@ -491,8 +594,20 @@ loading error where the operation can produce those states
   packages, preserves package-authored Chinese descriptions, and uses an explicit
   Chinese fallback for unknown non-Chinese metadata instead of exposing raw
   English or machine-translating untrusted text. It lists only declared resource
-  types and never fetches or renders remote README/HTML. Destructive removal
-  stays in an independent danger section below ordinary enable/update actions.
+  types and never fetches or renders remote README/HTML. The installed catalog row
+  keeps its primary trigger for Package detail, while an independently focusable
+  `更新` action appears only when that Package has a verified available update.
+  The shared row container owns hover and selected surfaces across both controls,
+  while focus remains visible on the exact detail or update trigger. The action
+  uses pointer, hover, pressed, focus-visible, and disabled states and opens the
+  same one-shot Package-wide confirmation instead of updating silently.
+  A successful mutation produces one Package-specific floating result containing
+  the display name, available version transition, scope, and completed resource
+  reload. Routine `resource.changed` and informational Extension notifications stay
+  in Notification history without creating additional floating toasts; warning and
+  error Extension notifications remain immediately visible.
+  Destructive removal stays in an independent danger section below ordinary
+  enable/update actions.
   `发现扩展包` is flat Catalog content, not a card inside a shared frame. Local
   Extension, global/project Skill, Prompt Template, and Context views consume the
   current Session resource projection and never repeat Package update or uninstall
@@ -634,10 +749,23 @@ loading error where the operation can produce those states
   selector. An empty configured-model set names that next action explicitly.
 - Thinking levels use readable product labels such as `思考：关闭` and
   `思考：高`; raw SDK enum values are not the primary user-facing copy.
+- Model selection is an explicit Renderer-owned mutation state rather than an
+  optimistic projection write. While one target is pending, the selector keeps
+  that target visible, disables duplicate selection, and exposes `正在切换到…`
+  through visible and live-region feedback. A matching authoritative event or
+  acknowledgement confirms it with a short-lived success state; a stale narrow response performs one scoped
+  projection resync before failing visibly. Session replacement discards the old
+  mutation, and selecting the already-authoritative model never calls Pi again.
+- The collapsed model trigger shows only the readable model name and truncates
+  it on one line. Provider and the complete `provider/model-id` appear only in
+  the open list, where they disambiguate equal labels without widening the
+  resting Composer.
 - Inline Turn activity is a bounded execution timeline rather than one generic
-  spinner. It names import and compaction, maps Tool presentation kinds to reading,
-  search, edit, command, managed-task, subtask, image, Extension, or generic work,
-  and retains completed transitions while the current Operation remains selected.
+  spinner. It names import and compaction, displays the bounded real Tool name,
+  maps verified Tool presentation kinds to reading, search, edit, command,
+  managed-task, subtask, image, Extension, or generic work, and retains completed
+  transitions while the current Operation remains selected. A deterministic Desktop
+  compatibility alias names both the requested alias and its verified native Pi target.
   It belongs to the Transcript reading
   track in the order `user -> activity -> live Assistant`; the conversation shell
   has no independent Operation status row. `停止` belongs to the Composer's
@@ -646,7 +774,9 @@ loading error where the operation can produce those states
   until it completes or fails.
 - Turn activity is Host-owned and evidence-based: Pi `thinking_*` renders as
   `正在分析问题`, `text_*` as `正在组织回复`, Tool execution uses its verified
-  presentation kind, and compaction renders as `正在压缩上下文`. A Host-authored
+  name, presentation kind, and terminal success/failure event, and compaction renders
+  as `正在压缩上下文`. A failed Tool step never becomes a green completed step merely
+  because Pi proceeds to another activity. A Host-authored
   clear transition becomes `正在继续处理` rather than inventing a more specific
   phase. Provider wait,
   retry, and other unproven phases retain the generic running label rather than
@@ -654,9 +784,14 @@ loading error where the operation can produce those states
   overlay that base activity, then restore it when the Host resolves or cancels
   the request.
 - The live timeline keeps at most 64 transient steps and never persists Prompt,
-  command text, raw Tool input/output, credentials, or source bodies. Completion
-  collapses it to `执行过程 · N 个步骤 · duration`; failure, cancellation, loss,
-  quiet, stalled, and recovery remain expanded and actionable. A projection resync
+  command text, raw Tool input/output, credentials, or source bodies. Running and
+  interrupted timelines are expanded by default so the current state and recent
+  steps stay visible; the user may still collapse them. As Pi JSONL messages arrive,
+  their persisted reasoning and Tool identities replace matching transient Host
+  steps without duplication. Completion with a visible final answer automatically
+  collapses to `执行过程 · N 个步骤 · duration`, and reopening restores the recorded
+  steps. Completion without a final answer, failure, cancellation, loss, quiet,
+  stalled, and recovery remain expanded, visually distinct, and actionable. A projection resync
   may restart the disposable timeline from the one current Host activity; it never
   fabricates missing earlier steps or competes with Pi JSONL as conversation truth.
 - If Pi cannot acknowledge `停止` within the Host watchdog, the Turn becomes lost
@@ -718,19 +853,54 @@ loading error where the operation can produce those states
   including Chromium `isComposing` and legacy `keyCode 229`, never submits the
   draft; the user sends only with a later non-composition Enter.
 - While streaming, users choose steer or follow-up queue behavior explicitly.
+- The leftmost Composer utility action is a plain `+` with an accessible
+  `添加附件` name. It opens the native file picker and is the only toolbar entry
+  for file attachment; it is not styled or labeled as a gallery action.
+- Typing `/` as the draft's first token opens a bounded, keyboard-operated
+  catalog above the Composer. Pi-resolved Extension commands, Prompt Templates,
+  and Skills retain distinct source labels; `/plan` and `/skill:<name>` are normal
+  examples rather than hard-coded exceptions. Arrow keys move the active row,
+  Enter or Tab inserts it into the textarea, Escape dismisses it, and IME
+  confirmation never selects or sends. Selection does not execute a command;
+  Extension commands execute only through the normal send action, while Prompt
+  Templates and Skills remain Pi prompt input.
 - Attachments are named, previewed, and removable before sending. The same
-  validation and Object URL lifecycle owns file-picker, clipboard paste, and
+  validation and staging lifecycle owns file-picker, clipboard paste, and
   drag/drop input; duplicate file projections are rejected instead of mounting
-  repeated previews.
+  repeated previews. Images own short-lived Object URLs for preview. Ordinary
+  files render the same bounded metadata card without retaining a Renderer `File`
+  or mounting an image placeholder.
 - Draft text and attachments clear only after the Host returns an accepted
   Operation whose Host epoch, Session ID, and Session generation still match the
   authority captured at send time. Transport failure retains the original draft,
-  attachment Object URLs, and stable submission ID for an idempotent retry;
+  image Object URLs, opaque attachment references, and stable submission ID for
+  an idempotent retry;
   Host or Session authority changes retain the draft but rotate that ID before
   the next attempt.
-- Image attachments accept PNG, JPEG, WebP, and GIF only, with an eight-image,
-  10 MiB per-image, and 30 MiB per-message boundary. Rejections remain visible
-  beside the composer instead of being truncated silently.
+- One draft accepts at most 20 attachments, 100 MiB per file, and 250 MiB total;
+  a pathless clipboard fallback is capped at 16 MiB. Rejections remain visible
+  beside the Composer instead of being truncated silently. Main streams regular
+  path-backed files into a private `0700` staging root, hashes them, records a
+  bounded manifest, rejects links and changed files, and exposes only opaque IDs
+  plus name/type/size/kind metadata to Renderer and Protocol. The Agent Host
+  atomically claims and revalidates the staged set before returning Operation
+  acceptance. Claim failure creates no accepted Operation.
+- Images enter Pi as native `ImageContent`. Ordinary files are announced by one
+  hidden `pi67.desktop-attachments.v1` custom message and remain inspectable only
+  through the Desktop-owned hidden `read_attachment` Tool. That Tool is
+  authorization-exempt only when Pi attributes the exact inline source and the
+  input contract is valid; a third-party same-name Tool or malformed input follows
+  normal safety policy. The Transcript drops the hidden control message, merges
+  bounded metadata into the immediately following User turn, and never projects
+  paths, source bodies, raw bytes, or control content. Historical messages with
+  attachments keep copy but disable lossy in-place editing.
+- Attachment parsing runs outside the Runtime event loop in at most two worker
+  threads, with one OCR task at a time, a 16-task admission boundary, 60-second
+  ordinary and 120-second OCR deadlines, cancellation, and worker replacement on
+  error or exit. Text/Office/PDF/archive/media/binary operations are bounded;
+  archive entry count, expanded bytes, compression ratio, and traversal are
+  validated, Tool output stops at 32 KiB, and OCR uses packaged Chinese and
+  English data without network fallback.
 - Queue content is currently inspectable with bounded previews and can be
   cleared atomically after confirmation. Agent Host delivery is strict FIFO and
   bounded to 32 admitted commands by default; capacity exhaustion is an explicit
@@ -807,6 +977,22 @@ loading error where the operation can produce those states
 - Safety Approval is a dedicated dialog and protocol, not an Extension `confirm`.
   It names the exact command/path, cwd, risk category, one-Tool-Call scope, reason,
   and denial behavior without rendering the target as Markdown or HTML.
+- Verified `pi-web-access` `web_search` and HTTP(S) `fetch_content` calls are
+  classified as read-only web capabilities. In a trusted Workspace they run
+  without a per-call approval dialog because enabling the Package is the user's
+  durable capability choice; their exact Tool identity and query or URL remain
+  visible in the execution process. `WebSearch`, `WebFetch`, and the model-common
+  lowercase `web_fetch` are deterministic Desktop aliases of those exact native
+  Tools. Malformed input, local-file fetches, unknown aliases, and same-name Tools
+  from other Packages stay fail-closed as ambiguous. Network writes, uploads,
+  command execution, and other external side effects retain one-shot approval.
+- One automatic `web_search` call owns Package-level Provider routing. When the
+  Package exhausts configured Providers or reports missing credentials, Desktop
+  marks that Tool Result failed and tells the model not to generate a sequence of
+  Brave, Tavily, OpenAI, SearXNG, or other Provider-specific probes. A known exact
+  URL may use one `fetch_content` recovery; otherwise the answer identifies the
+  missing search configuration. This prevents redundant calls without treating
+  Package installation as Provider readiness.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
   details scroll independently while both decision actions remain visible.
@@ -823,6 +1009,17 @@ loading error where the operation can produce those states
   tools, shared UI primitives, and TUI-only custom surfaces, and uses `unknown`
   whenever the SDK does not provide enough evidence. Command or Tool support
   never implies that a shared `ctx.ui` call has authoritative package attribution.
+  Registered Tool names remain visible as bounded code labels so a discovered
+  Package cannot be mistaken for a differently named model Tool call. Partial
+  presentation coverage says `执行可用 · 展示受限`; a Tool surface without a
+  dedicated Adapter says `可执行`, not that Tool execution itself is partial.
+- Before every Agent turn, Desktop reinforces the bounded exact active Tool-name
+  contract and advertises only verified deterministic compatibility aliases.
+  `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, `WebSearch`, and `WebFetch`
+  translate through explicit schemas and then execute the verified native Pi Tool;
+  they never bypass Safety or trust a same-name third-party Tool. Unsupported
+  semantic aliases such as `Agent` remain fail-safe and receive one precise native
+  Tool/schema recovery hint instead of an invented default subagent.
 - A verified Adapter row shows package, installed version, and matched command/tool
   counts. `adapter` is shown only when every discovered executable surface is
   covered and no known TUI custom surface remains; partial coverage stays `partial`.

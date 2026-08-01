@@ -68,6 +68,7 @@ export interface ExtensionCatalogItem {
   assessment: ExtensionCompatibilityAssessment;
   commandCount: number;
   toolCount: number;
+  toolNames?: string[];
 }
 
 export interface ExtensionCatalogResult {

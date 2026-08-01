@@ -1,4 +1,5 @@
 export {
+  MAX_RUNNING_TASKS,
   defaultPackageNetworkSettings,
   gitSourceCandidates,
   npmRegistryCandidates,

@@ -21,3 +21,6 @@ test-results/
 !eng/packaging/icon.png
 !eng/packaging/pi-icon-sources/png/*.png
 !apps/renderer/src/assets/pi-icon-64.png
+
+# Team Tavily Bridge client token is injected at package time (never commit).
+apps/desktop/resources/team-mcp/tavily-bridge.token

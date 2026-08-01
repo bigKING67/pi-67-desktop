@@ -5,6 +5,11 @@
       "id": "lark-cli",
       "displayName": "飞书 Lark CLI",
       "description": "飞书文档、消息、日历、任务、会议和开放平台能力。",
+      "versionSource": { "kind": "unversioned" },
+      "upstream": "https://github.com/larksuite/cli",
+      "updatePolicy": "hybrid",
+      "updateManager": "lark-cli",
+      "independentUpdateState": "available",
       "members": [
         { "packageId": "pi67-core", "skillId": "lark-approval" },
         { "packageId": "pi67-core", "skillId": "lark-apps" },
@@ -39,6 +44,14 @@
       "id": "ai-berkshire-investment-suite",
       "displayName": "AI Berkshire 投资研究",
       "description": "公司研究、财务分析和组合管理能力。",
+      "versionSource": {
+        "kind": "pi67-skill-pack",
+        "packName": "ai-berkshire-investment-suite"
+      },
+      "upstream": "https://github.com/xbtlin/ai-berkshire",
+      "updatePolicy": "hybrid",
+      "updateManager": "pi67-skill-pack-registry",
+      "independentUpdateState": "available",
       "members": [
         { "packageId": "pi67-core", "skillId": "bottleneck-hunter" },
         { "packageId": "pi67-core", "skillId": "deep-company-series" },
@@ -67,6 +80,13 @@
       "id": "commerce-growth-os",
       "displayName": "Commerce Growth OS",
       "description": "电商经营、品牌、内容、增长和经营分析能力。",
+      "versionSource": {
+        "kind": "capability-package",
+        "packageId": "commerce-growth-os"
+      },
+      "updatePolicy": "hybrid",
+      "updateManager": "pi67-skill-pack-registry",
+      "independentUpdateState": "planned",
       "members": [
         { "packageId": "commerce-growth-os", "skillId": "brand-strategy-communications" },
         { "packageId": "commerce-growth-os", "skillId": "commerce-analytics" },
@@ -82,6 +102,13 @@
       "id": "browser67",
       "displayName": "browser67",
       "description": "真实浏览器操作、诊断和 JavaScript 逆向能力。",
+      "versionSource": {
+        "kind": "capability-package",
+        "packageId": "browser67"
+      },
+      "updatePolicy": "capability-package",
+      "updateManager": "desktop-capability",
+      "independentUpdateState": "not-applicable",
       "members": [
         { "packageId": "browser67", "skillId": "browser67" },
         { "packageId": "browser67", "skillId": "js-reverse" },
@@ -92,6 +119,10 @@
       "id": "design-output-tools",
       "displayName": "设计与输出工具",
       "description": "产品设计、视觉方向和完整输出能力。",
+      "versionSource": { "kind": "multiple-sources" },
+      "updatePolicy": "source-specific",
+      "updateManager": "source-specific",
+      "independentUpdateState": "not-applicable",
       "members": [
         { "packageId": "design-craft", "skillId": "design-craft" },
         { "packageId": "pi67-core", "skillId": "full-output-enforcement" },

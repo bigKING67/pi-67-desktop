@@ -1,5 +1,11 @@
+import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
-import { applyDesktopPackageToolchain, reloadDesktopSettings } from "./desktop-package-toolchain.js";
+import {
+  applyDesktopPackageToolchain,
+  createDesktopPackageSettingsView,
+  installDesktopPackageToolchainReloadHook,
+  reloadDesktopSettings
+} from "./desktop-package-toolchain.js";
 
 const environment = {
   PI67_DESKTOP: "1",
@@ -40,6 +46,56 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     await reloadDesktopSettings({ reload, applyOverrides, getPackages: () => [] }, environment);
     expect(reload).toHaveBeenCalledOnce();
     expect(applyOverrides).toHaveBeenCalledOnce();
+  });
+
+  it("keeps runtime-only overrides across nested Pi reloads and restores the original method", async () => {
+    const originalReload = vi.fn(async () => undefined);
+    const settingsManager = {
+      reload: originalReload,
+      applyOverrides: vi.fn(),
+      getPackages: () => []
+    };
+    const releaseFirst = installDesktopPackageToolchainReloadHook(settingsManager, environment);
+    const wrappedReload = settingsManager.reload;
+    const releaseSecond = installDesktopPackageToolchainReloadHook(settingsManager, environment);
+
+    await settingsManager.reload();
+
+    expect(originalReload).toHaveBeenCalledOnce();
+    expect(settingsManager.applyOverrides).toHaveBeenCalledTimes(3);
+    releaseSecond();
+    expect(settingsManager.reload).toBe(wrappedReload);
+    releaseFirst();
+    expect(settingsManager.reload).toBe(originalReload);
+  });
+
+  it("exposes managed Packages only through the Pi session view and never persists them", () => {
+    const settingsManager = SettingsManager.inMemory({ packages: ["npm:user-package"] });
+    const setPackages = vi.spyOn(settingsManager, "setPackages");
+    const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
+
+    expect(sessionView.getGlobalSettings().packages).toEqual([
+      "npm:user-package",
+      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/design-craft"
+    ]);
+    expect(settingsManager.getGlobalSettings().packages).toEqual(["npm:user-package"]);
+
+    sessionView.setPackages([
+      "npm:user-package",
+      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/skill-packs/stale-overlay/package",
+      { source: "/external/user-package", autoload: false }
+    ]);
+
+    expect(setPackages).toHaveBeenCalledWith([
+      "npm:user-package",
+      { source: "/external/user-package", autoload: false }
+    ]);
+    expect(settingsManager.getGlobalSettings().packages).toEqual([
+      "npm:user-package",
+      { source: "/external/user-package", autoload: false }
+    ]);
   });
 
   it("fails closed for a Desktop Host without the bundled toolchain", () => {

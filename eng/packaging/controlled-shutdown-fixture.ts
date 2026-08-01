@@ -4,6 +4,7 @@ const POLL_INTERVAL_MS = 50;
 const CONTROLLED_PROVIDER_ID = "pi67-controlled";
 const CONTROLLED_MODEL_ID = "hold-open";
 export const CONTROLLED_MODEL_VALUE = `${CONTROLLED_PROVIDER_ID}/${CONTROLLED_MODEL_ID}`;
+export const CONTROLLED_MODEL_LABEL = "Controlled Runtime";
 export const CONTROLLED_PROMPT_TEXT = "Keep the controlled Pi runtime active.";
 
 interface ControlledShutdownExtensionOptions {
@@ -74,7 +75,7 @@ export async function writeControlledShutdownExtension({
         api: "openai-responses",
         models: [{
           id: ${JSON.stringify(CONTROLLED_MODEL_ID)},
-          name: "Controlled Runtime",
+          name: ${JSON.stringify(CONTROLLED_MODEL_LABEL)},
           reasoning: false,
           input: ["text"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

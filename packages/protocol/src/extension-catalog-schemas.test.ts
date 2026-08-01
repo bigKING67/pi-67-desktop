@@ -3,6 +3,8 @@ import {
   MAX_EXTENSION_CATALOG_ITEMS,
   MAX_EXTENSION_CATALOG_LABEL_CHARS,
   MAX_EXTENSION_CATALOG_PATH_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAMES,
   MAX_EXTENSION_SURFACE_DETAIL_CHARS
 } from "@pi67/domain";
 import { Value } from "typebox/value";
@@ -43,6 +45,12 @@ describe("ExtensionCatalogSchema", () => {
           ? { ...surface, detail: text(MAX_EXTENSION_SURFACE_DETAIL_CHARS + 1) }
           : surface)
       }
+    }))).toBe(false);
+    expect(Value.Check(ExtensionCatalogSchema, catalog({}, {
+      toolNames: Array.from({ length: MAX_EXTENSION_CATALOG_TOOL_NAMES + 1 }, (_, index) => `tool-${index}`)
+    }))).toBe(false);
+    expect(Value.Check(ExtensionCatalogSchema, catalog({}, {
+      toolNames: [text(MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS + 1)]
     }))).toBe(false);
     expect(Value.Check(ExtensionCatalogSchema, {
       ...catalog(),
@@ -97,6 +105,7 @@ function item(overrides: Record<string, unknown> = {}) {
     },
     commandCount: 1,
     toolCount: 1,
+    toolNames: ["read_artifact"],
     ...overrides
   };
 }

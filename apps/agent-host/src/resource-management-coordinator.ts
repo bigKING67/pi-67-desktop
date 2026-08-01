@@ -1,0 +1,195 @@
+import type { AgentRuntime } from "@pi67/pi-runtime";
+import { HostCommandError } from "./protocol-error.js";
+
+export interface ResourceManagementTaskView {
+  readonly taskKey: string;
+  readonly workspaceId: string;
+  readonly runtime: AgentRuntime | undefined;
+  readonly initialized: boolean;
+  isIdle(): boolean;
+}
+
+interface ActiveMutation {
+  readonly scope: "global" | "project";
+  readonly workspaceId: string;
+}
+
+export interface ResourceManagementCoordinatorOptions {
+  listTasks(): ResourceManagementTaskView[];
+  maxConcurrentQueries?: number;
+}
+
+export interface ResourceMutationTransaction<T> {
+  readonly result: T;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+
+const DEFAULT_MAX_CONCURRENT_QUERIES = 4;
+
+export class ResourceManagementCoordinator {
+  private readonly activeQueries = new Map<string, number>();
+  private readonly maxConcurrentQueries: number;
+  private activeMutation: ActiveMutation | undefined;
+
+  constructor(private readonly options: ResourceManagementCoordinatorOptions) {
+    const maximum = options.maxConcurrentQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES;
+    if (!Number.isSafeInteger(maximum) || maximum < 1) {
+      throw new RangeError("maxConcurrentQueries must be a positive integer.");
+    }
+    this.maxConcurrentQueries = maximum;
+  }
+
+  runQuery<T>(workspaceId: string, query: () => Promise<T>): Promise<T> {
+    this.assertQueryAllowed(workspaceId);
+    const active = this.activeQueries.get(workspaceId) ?? 0;
+    if (active >= this.maxConcurrentQueries) {
+      return Promise.reject(busy("Too many resource management queries are already running."));
+    }
+    this.activeQueries.set(workspaceId, active + 1);
+    return Promise.resolve()
+      .then(query)
+      .finally(() => {
+        const remaining = (this.activeQueries.get(workspaceId) ?? 1) - 1;
+        if (remaining <= 0) this.activeQueries.delete(workspaceId);
+        else this.activeQueries.set(workspaceId, remaining);
+      });
+  }
+
+  runMutation<T>(
+    workspaceId: string,
+    scope: ActiveMutation["scope"],
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.runExclusiveMutation(workspaceId, scope, async (affectedTasks) => {
+      const result = await operation();
+      await reloadAffectedTasks(affectedTasks);
+      return result;
+    });
+  }
+
+  runTransactionalMutation<T>(
+    workspaceId: string,
+    scope: ActiveMutation["scope"],
+    operation: () => Promise<ResourceMutationTransaction<T>>
+  ): Promise<T> {
+    return this.runExclusiveMutation(workspaceId, scope, async (affectedTasks) => {
+      let transaction: ResourceMutationTransaction<T> | undefined;
+      try {
+        transaction = await operation();
+        await reloadAffectedTasks(affectedTasks);
+        await transaction.commit();
+        return transaction.result;
+      } catch (error) {
+        if (transaction) {
+          try {
+            await transaction.rollback();
+          } catch (rollbackError) {
+            throw recoveryFailure(
+              "rollback",
+              "Managed resource mutation failed and its rollback also failed.",
+              error,
+              rollbackError
+            );
+          }
+          try {
+            await reloadAffectedTasks(affectedTasks);
+          } catch (restoreReloadError) {
+            throw recoveryFailure(
+              "reload-restored-resources",
+              "Managed resources were rolled back, but Pi Tasks could not reload the restored resources.",
+              error,
+              restoreReloadError
+            );
+          }
+        }
+        throw error;
+      }
+    });
+  }
+
+  assertTaskCommandAllowed(workspaceId: string): void {
+    if (!this.activeMutation) return;
+    if (this.activeMutation.scope === "project" && this.activeMutation.workspaceId !== workspaceId) return;
+    throw busy("Managed resources are being changed for this Task Workspace.");
+  }
+
+  private assertQueryAllowed(workspaceId: string): void {
+    if (!this.activeMutation) return;
+    if (this.activeMutation.scope === "project" && this.activeMutation.workspaceId !== workspaceId) return;
+    throw busy("Managed resource settings are being changed for this Workspace.");
+  }
+
+  private assertNoConflictingQueries(workspaceId: string, scope: ActiveMutation["scope"]): void {
+    const hasQueries = scope === "global"
+      ? this.activeQueries.size > 0
+      : (this.activeQueries.get(workspaceId) ?? 0) > 0;
+    if (hasQueries) throw busy("Wait for managed resource queries to finish before changing resources.");
+  }
+
+  private affectedTasks(workspaceId: string, scope: ActiveMutation["scope"]): ResourceManagementTaskView[] {
+    return this.options.listTasks().filter((task) => (
+      scope === "global" || task.workspaceId === workspaceId
+    ));
+  }
+
+
+  private runExclusiveMutation<T>(
+    workspaceId: string,
+    scope: ActiveMutation["scope"],
+    operation: (affectedTasks: ResourceManagementTaskView[]) => Promise<T>
+  ): Promise<T> {
+    if (this.activeMutation) throw busy("Another managed resource mutation is already running.");
+    this.assertNoConflictingQueries(workspaceId, scope);
+    const affectedTasks = this.affectedTasks(workspaceId, scope);
+    const busyTask = affectedTasks.find((task) => !task.isIdle());
+    if (busyTask) {
+      throw new HostCommandError(
+        "BUSY",
+        scope === "global"
+          ? "Stop all running or waiting Pi Tasks before changing global managed resources."
+          : "Stop running or waiting Pi Tasks in this Workspace before changing managed resources.",
+        true,
+        { retryable: true, taskKey: busyTask.taskKey, scope }
+      );
+    }
+    this.activeMutation = { scope, workspaceId };
+    return Promise.resolve()
+      .then(() => operation(affectedTasks))
+      .finally(() => {
+        this.activeMutation = undefined;
+      });
+  }
+}
+
+async function reloadAffectedTasks(tasks: ResourceManagementTaskView[]): Promise<void> {
+  let firstError: unknown;
+  for (const task of tasks) {
+    if (!task.initialized || !task.runtime) continue;
+    try {
+      await task.runtime.reloadResources();
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) throw firstError;
+}
+
+function busy(message: string): HostCommandError {
+  return new HostCommandError("BUSY", message, true, { retryable: true });
+}
+
+function recoveryFailure(
+  stage: "rollback" | "reload-restored-resources",
+  message: string,
+  operationError: unknown,
+  recoveryError: unknown
+): HostCommandError {
+  return new HostCommandError(
+    "RUNTIME_POISONED",
+    message,
+    false,
+    { recoveryStage: stage, resourceStateConsistent: false },
+    { cause: new AggregateError([operationError, recoveryError], message) }
+  );
+}

@@ -15,7 +15,7 @@ import type {
   SessionTreeProjection,
   WorkspaceChangesProjection
 } from "@pi67/domain";
-import type { AgentEvent, AssetReadResult, CommandDescriptor, StreamDelta } from "@pi67/protocol";
+import type { AgentEvent, AssetReadResult, SlashCommandCatalogResult, StreamDelta } from "@pi67/protocol";
 import { ExtensionAdapterRuntime } from "./extension-adapter-runtime.js";
 import type { ImageAssetSource } from "./message-normalizer.js";
 import { projectMessagePage, type MessagePageOptions } from "./message-projection.js";
@@ -100,7 +100,7 @@ export class RuntimeProjectionController {
   getTree(): SessionTreeProjection { return projectSessionTree(this.session); }
   getCapabilities(): RuntimeCapabilities["extensionUi"] { return this.adapters.getCapabilities(); }
   getCatalog(): ExtensionCatalogResult { return this.adapters.getCatalog(); }
-  getCommands(): CommandDescriptor[] { return this.adapters.getCommands(); }
+  getCommands(): SlashCommandCatalogResult { return this.adapters.getCommands(); }
 
   getMessagePage(options: MessagePageOptions): ConversationPage {
     return projectMessagePage(

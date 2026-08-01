@@ -13,11 +13,16 @@ export const OperationActivitySchema = Type.Union([
   strictObject({
     kind: Type.Literal("tool"),
     toolCallId: Type.String(),
+    toolName: Type.String({ minLength: 1, maxLength: 128 }),
     toolKind: Type.Union([
       Type.Literal("read"), Type.Literal("search"), Type.Literal("edit"), Type.Literal("shell"),
       Type.Literal("managed-process"), Type.Literal("subagent"), Type.Literal("image"),
       Type.Literal("approval"), Type.Literal("extension"), Type.Literal("generic")
-    ])
+    ]),
+    status: Type.Union([
+      Type.Literal("running"), Type.Literal("completed"), Type.Literal("failed")
+    ]),
+    aliasTarget: Type.Optional(Type.String({ minLength: 1, maxLength: 128 }))
   }),
   strictObject({ kind: Type.Literal("approval"), requestId: Type.String() }),
   strictObject({ kind: Type.Literal("extension-input"), requestId: Type.String() }),

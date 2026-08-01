@@ -1,4 +1,5 @@
 export * from "./agent-runtime.js";
+export * from "./context-file-management.js";
 export * from "./desktop-package-toolchain.js";
 export * from "./desktop-package-operation-runtime.js";
 export * from "./extension-capabilities.js";
@@ -10,6 +11,8 @@ export * from "./message-projection.js";
 export * from "./pi-configuration-service.js";
 export * from "./pi-configuration-service-registry.js";
 export * from "./pi-sdk-runtime.js";
+export * from "./prompt-attachment.js";
+export * from "./prompt-attachment-extension.js";
 export * from "./runtime-credential-overrides.js";
 export * from "./runtime-session-catalog.js";
 export * from "./safety-extension.js";

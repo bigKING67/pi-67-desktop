@@ -1,0 +1,345 @@
+import type { ResourceSummary, SkillPackEntry } from "@pi67/domain";
+import { ChevronRight, Layers3, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Dialog, Modal, ModalOverlay } from "react-aria-components";
+import { selectSessionResources } from "../session/session-projection-selectors.js";
+import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import { SessionResourcePanel } from "./SessionResourcePanel.js";
+import {
+  checkSkillPackUpdates,
+  loadSkillPacks,
+  restoreSkillPack,
+  updateSkillPack
+} from "./skill-pack-controller.js";
+import { useSkillPackStore } from "./skill-pack-store.js";
+import {
+  SettingsBackAction,
+  SettingsNotice,
+  SettingsRow,
+  SettingsRows,
+  SettingsSectionBlock
+} from "./SettingsPrimitives.js";
+import styles from "./SkillSettingsWorkspace.module.css";
+
+type SkillPackMutationAction = "update" | "restore";
+
+export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSelectPack, onBack }: {
+  selectedPackId?: string;
+  excludedSuiteIds?: ReadonlySet<string>;
+  onSelectPack: (id: string) => void;
+  onBack: () => void;
+}) {
+  const settingsWorkspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
+  const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
+  const workspaceId = settingsWorkspaceId ?? currentWorkspaceId;
+  const resources = useSessionProjectionStore(selectSessionResources) ?? [];
+  const { items, phase, error, workspaceId: loadedWorkspaceId } = useSkillPackStore();
+  const [query, setQuery] = useState("");
+  const [pending, setPending] = useState<{ action: SkillPackMutationAction; pack: SkillPackEntry }>();
+  const allManagedPacks = useMemo(
+    () => items.filter((entry) => entry.updateOwner === "managed-pack" && entry.installed),
+    [items]
+  );
+  const managedPacks = useMemo(
+    () => allManagedPacks.filter((entry) => !excludedSuiteIds?.has(entry.suiteId)),
+    [allManagedPacks, excludedSuiteIds]
+  );
+  const selectedPack = managedPacks.find((entry) => entry.id === selectedPackId);
+  const managedSkillIds = useMemo(
+    () => new Set(allManagedPacks.flatMap((entry) => entry.skillIds)),
+    [allManagedPacks]
+  );
+  const busy = phase === "loading" || phase === "checking" || phase === "updating" || phase === "restoring";
+  const updateCount = managedPacks.filter((entry) => entry.updateStatus === "update-available").length;
+
+  useEffect(() => {
+    if (!workspaceId) useSkillPackStore.getState().reset();
+    else if (loadedWorkspaceId !== workspaceId) void loadSkillPacks(workspaceId);
+  }, [loadedWorkspaceId, workspaceId]);
+
+  if (selectedPack) {
+    return (
+      <>
+        <ManagedSkillPackDetail
+          busy={busy}
+          pack={selectedPack}
+          query={query}
+          resources={resources}
+          onBack={() => {
+            setQuery("");
+            onBack();
+          }}
+          onQueryChange={setQuery}
+          onRestore={(pack) => setPending({ action: "restore", pack })}
+          onUpdate={(pack) => setPending({ action: "update", pack })}
+        />
+        {pending ? (
+          <SkillPackMutationDialog
+            action={pending.action}
+            busy={phase === "updating" || phase === "restoring"}
+            error={phase === "failed" ? error : undefined}
+            pack={pending.pack}
+            onCancel={() => setPending(undefined)}
+            onConfirm={async () => {
+              const completed = pending.action === "update"
+                ? await updateSkillPack(pending.pack.id, workspaceId)
+                : await restoreSkillPack(pending.pack.id, workspaceId);
+              if (completed) setPending(undefined);
+            }}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <div className={styles.managedGlobalSkills}>
+      {managedPacks.length > 0 ? <SettingsSectionBlock
+        actions={<Button
+          className="secondary-button"
+          isDisabled={!workspaceId || busy}
+          onPress={() => void checkSkillPackUpdates(workspaceId)}
+        >
+          <RefreshCw
+            aria-hidden="true"
+            className={phase === "checking" ? styles.spinning : undefined}
+            size={14}
+          />
+          {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查技能更新"}
+        </Button>}
+        title="受管技能套件"
+        description="由可信更新器维护并对所有项目可用；一个套件只检查和更新一次。"
+      >
+        {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+        <div aria-label="受管技能套件" className={styles.packCatalog} role="list">
+          {managedPacks.map((pack) => (
+            <ManagedSkillPackRow
+              busy={busy}
+              key={pack.id}
+              pack={pack}
+              onSelect={() => {
+                setQuery("");
+                onSelectPack(pack.id);
+              }}
+              onUpdate={() => setPending({ action: "update", pack })}
+            />
+          ))}
+        </div>
+        <SettingsNotice className={styles.scopeNotice!}>
+          扩展包携带的技能仍由“扩展包”管理；这里只更新明确记录了上游、兼容合同和更新器的全局套件。
+        </SettingsNotice>
+      </SettingsSectionBlock> : null}
+
+      <SessionResourcePanel
+        description="由用户在本机维护并适用于所有项目；没有受管上游的技能不会被 Desktop 自动覆盖。"
+        empty={managedPacks.length > 0
+          ? "其他全局技能均已归入受管技能套件。"
+          : "尚未发现全局技能。可以将技能放入 ~/.agents/skills 或 ~/.pi/agent/skills。"}
+        excludeIds={managedSkillIds}
+        kind="skill"
+        origin="top-level"
+        resourceScope="user"
+        scope="global"
+        title="本地全局技能"
+      />
+
+      {pending ? (
+        <SkillPackMutationDialog
+          action={pending.action}
+          busy={phase === "updating" || phase === "restoring"}
+          error={phase === "failed" ? error : undefined}
+          pack={pending.pack}
+          onCancel={() => setPending(undefined)}
+          onConfirm={async () => {
+            const completed = pending.action === "update"
+              ? await updateSkillPack(pending.pack.id, workspaceId)
+              : await restoreSkillPack(pending.pack.id, workspaceId);
+            if (completed) setPending(undefined);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ManagedSkillPackRow({ pack, busy, onSelect, onUpdate }: {
+  pack: SkillPackEntry;
+  busy: boolean;
+  onSelect: () => void;
+  onUpdate: () => void;
+}) {
+  const status = skillPackStatus(pack);
+  return (
+    <div className={styles.packRow} data-update={pack.updateStatus === "update-available" || undefined} role="listitem">
+      <button className={styles.packIdentity} data-testid="managed-skill-pack-row" onClick={onSelect} type="button">
+        <span className={styles.suiteIcon} data-status={status.tone}>
+          <Layers3 aria-hidden="true" size={16} />
+        </span>
+        <span className={styles.packCopy}>
+          <strong>{pack.displayName}</strong>
+          <small>{pack.description}</small>
+          <span>{skillPackMeta(pack)}</span>
+        </span>
+        <span className={styles.packStatus} data-status={status.tone}>{status.label}</span>
+        <ChevronRight aria-hidden="true" size={15} />
+      </button>
+      {pack.updateStatus === "update-available" && pack.canUpdate ? (
+        <Button
+          className={styles.packUpdateButton!}
+          data-testid="managed-skill-pack-update"
+          isDisabled={busy}
+          onPress={onUpdate}
+        >
+          更新
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function ManagedSkillPackDetail({ pack, query, resources, busy, onBack, onQueryChange, onRestore, onUpdate }: {
+  pack: SkillPackEntry;
+  query: string;
+  resources: ResourceSummary[];
+  busy: boolean;
+  onBack: () => void;
+  onQueryChange: (query: string) => void;
+  onRestore: (pack: SkillPackEntry) => void;
+  onUpdate: (pack: SkillPackEntry) => void;
+}) {
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
+  const resourceById = useMemo(() => new Map(resources
+    .filter((resource) => resource.kind === "skill")
+    .map((resource) => [resource.id, resource])), [resources]);
+  const skills = useMemo(() => pack.skillIds.filter((skillId) => (
+    !normalizedQuery || skillId.toLocaleLowerCase("zh-CN").includes(normalizedQuery)
+  )), [normalizedQuery, pack.skillIds]);
+  const status = skillPackStatus(pack);
+  return (
+    <div className={styles.suiteDetail!} data-testid="managed-skill-pack-detail">
+      <SettingsBackAction label="返回全局可用技能" onPress={onBack}>返回全局可用</SettingsBackAction>
+      <SettingsSectionBlock
+        actions={<span className={styles.detailActions}>
+          <span className={styles.detailStatus} data-status={status.tone}>{status.label}</span>
+          {pack.updateStatus === "update-available" && pack.canUpdate ? (
+            <Button className="primary-button" isDisabled={busy} onPress={() => onUpdate(pack)}>更新套件</Button>
+          ) : null}
+          {pack.canRestore ? (
+            <Button className="secondary-button" isDisabled={busy} onPress={() => onRestore(pack)}>恢复内置版本</Button>
+          ) : null}
+        </span>}
+        title={pack.displayName}
+        description={skillPackMeta(pack)}
+      >
+        <label className={styles.skillSearch!}>
+          <Search aria-hidden="true" size={15} />
+          <input
+            aria-label={`搜索 ${pack.displayName} 技能`}
+            onChange={(event) => onQueryChange(event.currentTarget.value)}
+            placeholder="搜索技能名称"
+            type="search"
+            value={query}
+          />
+        </label>
+        {pack.detail ? (
+          <SettingsNotice tone={pack.updateStatus === "modified" || pack.updateStatus === "unavailable" ? "warning" : "info"}>
+            {pack.detail}
+          </SettingsNotice>
+        ) : null}
+        {skills.length > 0 ? <SettingsRows className={styles.skillRows!}>{skills.map((skillId) => {
+          const resource = resourceById.get(skillId);
+          return (
+            <SettingsRow
+              key={skillId}
+              description={resource?.path ? "当前由全局受管套件提供" : "套件成员尚未被当前 Pi 资源投影解析"}
+              title={resource?.label ?? skillId}
+              value={resource ? "已加载" : "未加载"}
+            >
+              {resource?.path ? <code className={styles.skillPath} title={resource.path}>{resource.path}</code> : null}
+            </SettingsRow>
+          );
+        })}</SettingsRows> : (
+          <SettingsNotice className={styles.emptyResult!}>没有匹配的技能。</SettingsNotice>
+        )}
+        <SettingsNotice className={styles.scopeNotice!}>
+          该套件对所有项目可用。更新以整个套件为单位，并在完成后重新加载 Pi 资源。
+        </SettingsNotice>
+      </SettingsSectionBlock>
+    </div>
+  );
+}
+
+export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, onConfirm }: {
+  action: SkillPackMutationAction;
+  pack: SkillPackEntry;
+  busy: boolean;
+  error: string | undefined;
+  onCancel: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
+      <Modal className={`modal-surface ${styles.modal}`}>
+        <Dialog aria-label={action === "update" ? "更新技能套件" : "恢复内置技能套件"} className={styles.dialog!}>
+          <h2>{action === "update" ? "更新技能套件？" : "恢复内置版本？"}</h2>
+          <p>{action === "update"
+            ? "更新会修改所有项目可用的受管技能，并在完成后重新加载所有 Workspace 中的 Pi 资源。"
+            : "恢复会移除受管 Overlay，重新启用随 Desktop 发布的不可变内置基线，并重新加载所有 Workspace 中的 Pi 资源。"}</p>
+          <dl className={styles.updateSummary}>
+            <div><dt>套件</dt><dd>{pack.displayName}</dd></div>
+            <div><dt>来源</dt><dd>{pack.source ?? "受管来源"}</dd></div>
+            <div><dt>当前版本</dt><dd>{pack.installedVersion ?? "未知"}</dd></div>
+            <div><dt>目标版本</dt><dd>{action === "update"
+              ? pack.latestVersion ?? "最新稳定版"
+              : pack.baselineVersion ?? "内置基线"}</dd></div>
+            <div><dt>影响技能</dt><dd>{pack.skillIds.length} 个</dd></div>
+            <div><dt>本地状态</dt><dd>{pack.localState === "clean" ? "未发现修改" : "需要检查"}</dd></div>
+          </dl>
+          {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
+          <div className={styles.dialogActions}>
+            <Button className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
+            <Button
+              className="primary-button"
+              isDisabled={busy || (action === "update" ? !pack.canUpdate : !pack.canRestore)}
+              onPress={() => void onConfirm()}
+            >
+              {busy ? (action === "update" ? "更新中…" : "恢复中…") : (action === "update" ? "确认更新" : "确认恢复")}
+            </Button>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
+  );
+}
+
+function skillPackStatus(pack: SkillPackEntry): {
+  tone: "ready" | "partial" | "unavailable";
+  label: string;
+} {
+  if (pack.updateStatus === "current") return { tone: "ready", label: "已是最新" };
+  if (pack.updateStatus === "update-available") {
+    return { tone: "partial", label: pack.canUpdate ? "可更新" : "需手动更新" };
+  }
+  if (pack.updateStatus === "modified") return { tone: "unavailable", label: "有本地修改" };
+  if (pack.updateStatus === "unavailable") return { tone: "unavailable", label: "检查失败" };
+  if (pack.updateStatus === "application-managed") return { tone: "ready", label: "随应用更新" };
+  return { tone: "partial", label: "尚未检查" };
+}
+
+function skillPackMeta(pack: SkillPackEntry): string {
+  const installed = pack.installedVersion ? `已安装 ${pack.installedVersion}` : `${pack.installedSkillCount} 个已安装`;
+  const latest = pack.latestVersion && pack.latestVersion !== pack.installedVersion
+    ? `最新 ${pack.latestVersion}`
+    : undefined;
+  return [
+    `${pack.skillIds.length} 个技能`,
+    installed,
+    latest,
+    pack.manager === "lark-cli"
+      ? "由 Lark CLI 管理"
+      : pack.effectiveSource === "managed"
+        ? "Pi-67 registry Overlay"
+        : "Desktop 内置基线"
+  ].filter(Boolean).join(" · ");
+}

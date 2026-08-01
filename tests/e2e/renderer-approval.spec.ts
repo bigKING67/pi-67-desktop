@@ -17,6 +17,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByLabel("π 工作台")).toBeVisible();
   await clearRecordedCommands(page);
   const operationId = "operation-approval-context";
   await startApprovalOperation(page, operationId);
@@ -77,11 +78,48 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await expect(page.getByText("Pi 运行服务未接受这次授权响应，工具将保持阻止状态。", { exact: true })).toBeVisible();
 });
 
+test("renders a host-authored network-read approval when one is required", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByLabel("π 工作台")).toBeVisible();
+  const operationId = "operation-web-search-approval";
+  await startApprovalOperation(page, operationId);
+
+  await emitMockAgentEvent(page, {
+    type: "approval.requested",
+    payload: {
+      requestId: "approval-web-search",
+      sessionId: "session-test",
+      sessionGeneration: 1,
+      operationId,
+      hostEpoch: 1,
+      toolCallId: "tool-web-search",
+      toolName: "custom_network_reader",
+      category: "network-read",
+      reason: "访问外部网络获取信息",
+      targetKind: "tool",
+      target: "杭州天气",
+      targetTruncated: false,
+      cwd: "/Users/test/Projects/pi-demo",
+      cwdTruncated: false,
+      scope: "single-tool-call"
+    }
+  }, { operationId });
+
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible();
+  await expect(page.getByText("读取外部网络信息", { exact: true })).toBeVisible();
+  await expect(page.getByText("杭州天气", { exact: true })).toBeVisible();
+  await expect(page.getByText("custom_network_reader", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "仅允许本次" })).toBeVisible();
+});
+
 test("renders suspicious approval bytes safely and keeps decisions reachable at constrained height", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByLabel("π 工作台")).toBeVisible();
   await clearRecordedCommands(page);
   const operationId = "operation-approval-security-literal";
   await startApprovalOperation(page, operationId);

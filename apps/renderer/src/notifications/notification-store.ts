@@ -38,6 +38,7 @@ export interface PublishNotificationInput {
   level: NotificationLevel;
   title: string;
   message?: string;
+  toast?: boolean;
 }
 
 interface NotificationState {
@@ -66,7 +67,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       && createdAt - item.createdAt < GENERIC_NOTIFICATION_DEDUPE_WINDOW_MS
     ));
     if (duplicate) return;
-    set((state) => appendNotification(state, prepared));
+    set((state) => appendNotification(state, prepared, input.toast !== false));
   },
 
   recordOperationTerminal(receipt) {
@@ -104,12 +105,15 @@ export function recordOperationTerminal(receipt: OperationSettled): void {
 
 function appendNotification(
   state: Pick<NotificationState, "items" | "toastIds">,
-  item: NotificationItem
+  item: NotificationItem,
+  showToast = true
 ): Pick<NotificationState, "items" | "toastIds"> {
   const items = [...state.items, item].slice(-MAX_NOTIFICATION_HISTORY);
   const retainedIds = new Set(items.map((candidate) => candidate.id));
-  const toastIds = [...state.toastIds.filter((id) => retainedIds.has(id)), item.id]
-    .slice(-MAX_VISIBLE_TOASTS);
+  const retainedToastIds = state.toastIds.filter((id) => retainedIds.has(id));
+  const toastIds = showToast
+    ? [...retainedToastIds, item.id].slice(-MAX_VISIBLE_TOASTS)
+    : retainedToastIds;
   return { items, toastIds };
 }
 

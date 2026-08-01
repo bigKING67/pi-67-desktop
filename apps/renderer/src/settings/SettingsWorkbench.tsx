@@ -1,4 +1,4 @@
-import type { SettingsSection } from "@pi67/domain";
+import { MAX_RUNNING_TASKS, type SettingsSection } from "@pi67/domain";
 import {
   ArrowLeft,
   DownloadCloud,
@@ -32,14 +32,15 @@ import {
 } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
 import { ExtensionSettingsWorkspace } from "./ExtensionSettingsWorkspace.js";
-import {
-  Browser67IntegrationPanel,
-  ManagedRulePanel
-} from "./DesktopCapabilityPanels.js";
+import { Browser67IntegrationPanel } from "./DesktopCapabilityPanels.js";
 import { PackageNetworkPanel } from "./PackageNetworkPanel.js";
+import { TeamMcpPanel } from "./TeamMcpPanel.js";
 import { ProviderConfigurationPanel } from "./ProviderConfigurationPanel.js";
+import { ContextFileDiscardDialog } from "./ContextFileDiscardDialog.js";
+import { RuleSettingsWorkspace } from "./RuleSettingsWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import { SkillSettingsWorkspace } from "./SkillSettingsWorkspace.js";
+import { useContextFileStore } from "./context-file-store.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -72,6 +73,30 @@ export function SettingsWorkbench() {
     items: group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
   })).filter((group) => group.items.length > 0);
   const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
+  const contextFileDirty = useContextFileStore((state) => state.dirty);
+  const contextFileName = useContextFileStore((state) => state.selectedItem?.name);
+  const contextFileSaving = useContextFileStore((state) => state.phase === "saving");
+  const [pendingNavigation, setPendingNavigation] = useState<
+    { kind: "close" } | { kind: "section"; section: SettingsSection }
+  >();
+
+  const performNavigation = (navigation: NonNullable<typeof pendingNavigation>) => {
+    const store = rendererWorkbenchStore.getState();
+    if (navigation.kind === "close") {
+      store.closeSettings();
+      return;
+    }
+    store.selectSettingsSection(navigation.section);
+    if (!sectionSupportsProjectScope(navigation.section)) store.setSettingsScope("global");
+  };
+
+  const requestNavigation = (navigation: NonNullable<typeof pendingNavigation>) => {
+    if (activeSection === "rules" && contextFileDirty) {
+      setPendingNavigation(navigation);
+      return;
+    }
+    performNavigation(navigation);
+  };
 
   useEffect(() => {
     if (section === "packages") rendererWorkbenchStore.getState().selectSettingsSection("extensions");
@@ -101,13 +126,14 @@ export function SettingsWorkbench() {
   }, []);
 
   return (
+    <>
     <section aria-label="π 设置" className={styles.workbench} data-testid="settings-workbench">
       <aside className={styles.sidebar}>
         <div className={styles.sidebarControls}>
           <Button
             aria-label="返回工作台"
             className={styles.backButton!}
-            onPress={() => rendererWorkbenchStore.getState().closeSettings()}
+            onPress={() => requestNavigation({ kind: "close" })}
           >
             <ArrowLeft aria-hidden="true" size={16} />
             <span>返回工作台</span>
@@ -148,11 +174,7 @@ export function SettingsWorkbench() {
                       aria-current={activeSection === item.id ? "page" : false}
                       className={`${styles.navigationItem} ${activeSection === item.id ? styles.selected : ""}`}
                       key={item.id}
-                      onPress={() => {
-                        const store = rendererWorkbenchStore.getState();
-                        store.selectSettingsSection(item.id);
-                        if (!sectionSupportsProjectScope(item.id)) store.setSettingsScope("global");
-                      }}
+                      onPress={() => requestNavigation({ kind: "section", section: item.id })}
                     >
                       <Icon aria-hidden="true" size={16} />
                       <span>{item.label}</span>
@@ -199,6 +221,19 @@ export function SettingsWorkbench() {
         </div>
       </div>
     </section>
+    <ContextFileDiscardDialog
+      busy={contextFileSaving}
+      fileName={contextFileName}
+      open={pendingNavigation !== undefined}
+      onCancel={() => setPendingNavigation(undefined)}
+      onDiscard={() => {
+        const navigation = pendingNavigation;
+        useContextFileStore.getState().discardDraft();
+        setPendingNavigation(undefined);
+        if (navigation) performNavigation(navigation);
+      }}
+    />
+    </>
   );
 }
 
@@ -209,7 +244,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "packages" || section === "extensions") return <ExtensionSettings />;
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
-  if (section === "rules") return <RuleSettings />;
+  if (section === "rules") return <RuleSettingsWorkspace />;
   if (section === "integrations") return <IntegrationSettings />;
   if (section === "runtime") return <RuntimeSettings />;
   if (section === "network") return <PackageNetworkPanel />;
@@ -288,26 +323,13 @@ function PromptSettings() {
   );
 }
 
-function RuleSettings() {
-  const scope = useWorkbenchStore((state) => state.settingsScope);
+function IntegrationSettings() {
   return (
     <>
-      {scope === "global" ? <ManagedRulePanel /> : null}
-      <SessionResourcePanel
-        kind="context"
-        title="当前会话生效的规则与上下文"
-        description="Pi 从全局、当前目录及父目录加载 AGENTS.md 或 CLAUDE.md；项目视图同时标出继承的全局规则。"
-        empty="当前作用域没有加载可显示的 AGENTS.md 或 CLAUDE.md。"
-      />
-      <SettingsNotice className={styles.resourceNote!}>
-        AGENTS.md 与 CLAUDE.md 属于规则上下文；SYSTEM.md 与 APPEND_SYSTEM.md 才用于替换或追加系统提示词。
-      </SettingsNotice>
+      <TeamMcpPanel />
+      <Browser67IntegrationPanel />
     </>
   );
-}
-
-function IntegrationSettings() {
-  return <Browser67IntegrationPanel />;
 }
 
 function RuntimeSettings() {
@@ -315,7 +337,11 @@ function RuntimeSettings() {
   return (
     <SettingsSectionBlock title="Pi 运行服务" description="每个活动任务拥有独立的 Pi 运行服务；切换工作区或会话不会停止后台任务。">
       <SettingsRows>
-        <SettingsRow title="同时运行的任务" description="全应用 accepted、running 和等待输入状态共享同一运行名额。" value="最多 4 个" />
+        <SettingsRow
+          title="同时运行的会话任务"
+          description="正在执行、等待审批或等待交互的独立会话任务都会占用名额；任务内部的子代理不单独占用。"
+          value={`最多 ${MAX_RUNNING_TASKS} 个`}
+        />
         <SettingsRow title="可浏览的本地会话" description="会话目录按需加载，Pi JSONL 始终是唯一真源。" value="不设上限" />
         <SettingsRow title="单个会话写入实例" description="同一 Session 路径不会同时绑定两个 live writer。" value="1 个" />
         <SettingsRow

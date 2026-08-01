@@ -14,6 +14,8 @@ import type { DesktopCapabilityService } from "./desktop-capability-service.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-source-probe.js";
 import { redact } from "./redaction.js";
+import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
+import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
 import {
   addOrRefreshWorkspace,
@@ -29,10 +31,13 @@ const manualUpdateChannel = "unsigned-preview" as const;
 
 interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
+  restartAgentHost?: () => void;
   getMainWindow: () => BrowserWindow | undefined;
   desktopToolchain: DesktopToolchain;
   desktopCapabilities: DesktopCapabilityService;
   packageNetworkSettings: PackageNetworkSettingsStore;
+  teamMcpSettings: TeamMcpSettingsStore;
+  promptAttachments: PromptAttachmentStagingService;
   workbenchState: WorkbenchStateStore;
 }
 
@@ -71,6 +76,12 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
   }));
   ipcMain.handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
     options.connectAgentHost(replaceCurrent === true)
+  ));
+  ipcMain.handle("pi67:prompt-attachments-stage", (_event, value: unknown) => (
+    options.promptAttachments.stage(value)
+  ));
+  ipcMain.handle("pi67:prompt-attachments-release", (_event, value: unknown) => (
+    options.promptAttachments.release(value)
   ));
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
   ipcMain.handle("pi67:workbench-layout-update", (_event, value: unknown) => (
@@ -194,6 +205,19 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
       : options.desktopCapabilities.snapshot();
   });
   ipcMain.handle("pi67:browser67-doctor", () => options.desktopCapabilities.doctorBrowser67());
+  ipcMain.handle("pi67:team-mcp-status", () => options.teamMcpSettings.status());
+  ipcMain.handle("pi67:team-mcp-reveal", () => options.teamMcpSettings.revealToken());
+  ipcMain.handle("pi67:team-mcp-save", async (_event, value: unknown) => {
+    const status = await options.teamMcpSettings.saveToken(value);
+    // Restart Agent Host so TAVILY_BRIDGE_MCP_TOKEN is re-read from userData.
+    (options.restartAgentHost ?? (() => options.connectAgentHost(true)))();
+    return status;
+  });
+  ipcMain.handle("pi67:team-mcp-clear", async () => {
+    const status = await options.teamMcpSettings.clearToken();
+    (options.restartAgentHost ?? (() => options.connectAgentHost(true)))();
+    return status;
+  });
   ipcMain.handle("pi67:update-check", async () => {
     if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
     if (updateCheck) return updateCheck;

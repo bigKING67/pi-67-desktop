@@ -23,12 +23,13 @@ import type {
 import type {
   AgentEvent,
   AssetReadResult,
-  CommandDescriptor,
+  SlashCommandCatalogResult,
   PiConfigurationReloadState,
+  PromptAttachmentRef,
   RuntimeDiagnostics,
-  TransferImage
 } from "@pi67/protocol";
 import type { RuntimeQueueClearResult } from "./session-queue.js";
+import type { PreparedPromptAttachmentSet } from "./prompt-attachment.js";
 
 export interface RuntimeInitializeOptions {
   cwd: string;
@@ -61,9 +62,13 @@ export interface AgentRuntime {
   rollback(entryId: string, summarize?: boolean): Promise<void>;
   compact(instructions?: string): Promise<void>;
   setSessionName(name: string): Promise<void>;
-  submitPrompt(text: string, images?: TransferImage[]): Promise<void>;
-  steer(text: string, images?: TransferImage[]): Promise<void>;
-  followUp(text: string, images?: TransferImage[]): Promise<void>;
+  preparePromptAttachments(
+    submissionId: string,
+    refs: readonly PromptAttachmentRef[]
+  ): Promise<PreparedPromptAttachmentSet | undefined>;
+  submitPrompt(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
+  steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
+  followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
   clearQueue(): RuntimeQueueClearResult;
   abort(): Promise<void>;
   selectModel(provider: string, id: string): Promise<SessionControlResult>;
@@ -76,7 +81,7 @@ export interface AgentRuntime {
   getSnapshot(): SessionSnapshot;
   getModels(): ModelSummary[];
   getResources(): ResourceSummary[];
-  getCommands(): CommandDescriptor[];
+  getCommands(): SlashCommandCatalogResult;
   getExtensionCatalog(): ExtensionCatalogResult;
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean;
   resolveApproval(requestId: string, toolCallId: string, allowed: boolean): boolean;

@@ -1,4 +1,5 @@
-import type { OperationSubmissionResult, TransferImage } from "@pi67/protocol";
+import { MAX_RUNNING_TASKS } from "@pi67/domain";
+import type { OperationSubmissionResult } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -21,7 +22,6 @@ export type PromptSubmissionResult =
 
 export async function submitRendererPrompt(
   text: string,
-  images: TransferImage[],
   behavior: "send" | "steer" | "followUp",
   submissionId: string,
   attachments: readonly DraftAttachment[] = []
@@ -34,7 +34,7 @@ export async function submitRendererPrompt(
   const workbench = rendererWorkbenchStore.getState();
   const selectedTaskId = selectedWorkbenchTask(workbench)?.id;
   if (selectedTaskId && workbench.canStartTask(selectedTaskId) === "run-limit") {
-    const detail = "已有 4 个任务正在运行或等待输入。请先完成或停止一个任务。";
+    const detail = `已有 ${MAX_RUNNING_TASKS} 个会话任务正在运行或等待交互。请先完成或停止一个任务。`;
     publishNotification({ level: "warning", title: "已达到并发上限", message: `${detail} 草稿和附件已保留。` });
     return { accepted: false, error: detail };
   }
@@ -48,9 +48,11 @@ export async function submitRendererPrompt(
     const accepted = await agentConnectionController.request("prompt.submit", {
       submissionId,
       text,
-      ...(images.length === 0 ? {} : { images }),
+      ...(attachments.length === 0
+        ? {}
+        : { attachments: attachments.map((attachment) => ({ id: attachment.id })) }),
       delivery
-    }, images.map((image) => image.data));
+    });
     const result = applyAcceptedPrompt(accepted, expectedAuthority);
     const taskStillSelected = selectedTaskId !== undefined
       && selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === selectedTaskId;
@@ -65,7 +67,20 @@ export async function submitRendererPrompt(
         message: {
           id: `pending-user:${result.operationId}`,
           role: "user",
-          parts: text ? [{ type: "text", text }] : [],
+          parts: [
+            ...(text ? [{ type: "text" as const, text }] : []),
+            ...attachments.flatMap((attachment) => {
+              if (attachment.kind === "image") return [];
+              return [{
+                type: "attachment" as const,
+                id: attachment.id,
+                name: attachment.name,
+                mimeType: attachment.mimeType,
+                byteLength: attachment.byteLength,
+                kind: attachment.kind
+              }];
+            })
+          ],
           createdAt: Date.now(),
           ...(terminalError === undefined
             ? {}
@@ -75,7 +90,7 @@ export async function submitRendererPrompt(
         status: terminalError === undefined ? "accepted" : "failed"
       });
     if (result.accepted && selectedTaskId) {
-      const preview = userMessagePreview(text, images.length > 0);
+      const preview = userMessagePreview(text, attachments.length > 0);
       rendererWorkbenchStore.getState().updateTask(selectedTaskId, {
         lifecycle: "accepted",
         pendingTitle: undefined,

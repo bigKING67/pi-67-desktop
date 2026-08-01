@@ -54,6 +54,27 @@
   border-bottom-color: var(--border);
 }
 
+.blockedImage {
+  display: inline-grid;
+  max-width: 100%;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.blockedImage small {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .codeBlock {
   margin: var(--space-3) 0;
   overflow: hidden;

@@ -1,4 +1,5 @@
 import { isAbsolute } from "node:path";
+import { MAX_RUNNING_TASKS } from "@pi67/protocol";
 import {
   MAX_WORKSPACE_ID_LENGTH,
   MAX_WORKSPACE_PATH_LENGTH,
@@ -13,7 +14,7 @@ export const WORKBENCH_STATE_FILENAME = "state-v2.json";
 export const LEGACY_WORKBENCH_STATE_FILENAME = "state-v1.json";
 export const MAX_WORKBENCH_STATE_BYTES = 512 * 1024;
 export const MAX_WORKSPACES = 100;
-export const MAX_RUNTIME_RECOVERY_RECORDS = 4;
+export const MAX_RUNTIME_RECOVERY_RECORDS = MAX_RUNNING_TASKS;
 
 const MAX_TASK_ID_LENGTH = 200;
 const MAX_SESSION_ID_LENGTH = 1_024;

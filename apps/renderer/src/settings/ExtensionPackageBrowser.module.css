@@ -1,0 +1,84 @@
+.packageRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 72px;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+}
+
+.packageRow:has(.packageButton[data-hovered]),
+.packageRow:has(.packageUpdateAction[data-hovered]),
+.packageRow:has(.packageButton[data-focus-visible]),
+.packageRow:has(.packageUpdateAction[data-focus-visible]) {
+  background: var(--surface-hover);
+}
+
+.packageRow:has(.packageButton[data-pressed]),
+.packageRow[data-selected] {
+  background: var(--surface-muted);
+}
+
+.packageButton {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  width: 100%;
+  min-height: 72px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 9px 0 0 9px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.packageButton[data-focus-visible] {
+  z-index: 1;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.packageUpdateAction {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  gap: 5px;
+  margin-right: 10px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--info) 42%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--info) 5%, transparent);
+  color: var(--info);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.packageUpdateAction[data-hovered],
+.packageUpdateAction[data-pressed] {
+  border-color: color-mix(in srgb, var(--info) 68%, var(--border));
+  background: color-mix(in srgb, var(--info) 12%, var(--surface));
+}
+
+.packageUpdateAction[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.packageUpdateAction[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .packageButton {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

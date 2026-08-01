@@ -69,7 +69,11 @@ export class ExtensionPackageManagement {
     const before = this.list();
     // Pi's public API reconciles every configured entry matching this package identity.
     await this.services.packageManager.update(normalizedSource);
-    return { ...this.list(), changed: before.items.length > 0 };
+    const after = this.list();
+    return {
+      ...after,
+      changed: packageUpdateChanged(before, after, normalizedSource, scope)
+    };
   }
 
   async setEnabled(
@@ -179,6 +183,23 @@ function mutationResult(
   after: ExtensionPackageListResult
 ): ExtensionPackageMutationResult {
   return { ...after, changed: JSON.stringify(before.items) !== JSON.stringify(after.items) };
+}
+
+function packageUpdateChanged(
+  before: ExtensionPackageListResult,
+  after: ExtensionPackageListResult,
+  source: string,
+  scope: ExtensionPackageScope
+): boolean {
+  const previous = before.items.find((entry) => entry.source === source && entry.scope === scope);
+  const current = after.items.find((entry) => entry.source === source && entry.scope === scope);
+  if (!previous || !current) return JSON.stringify(previous) !== JSON.stringify(current);
+  if (previous.version && current.version && previous.sourceKind === "npm") {
+    return previous.version !== current.version;
+  }
+  if (JSON.stringify(previous) !== JSON.stringify(current)) return true;
+  // Git revisions and packages without a manifest version are not represented in the list projection.
+  return previous.sourceKind === "git" || previous.version === undefined;
 }
 
 function packagesForScope(

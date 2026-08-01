@@ -5,7 +5,7 @@ import {
 import { RuntimeError } from "@pi67/domain";
 import type { PiConfigurationService } from "./pi-configuration-service.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
-import { applyDesktopPackageToolchain } from "./desktop-package-toolchain.js";
+import { installDesktopPackageToolchainReloadHook } from "./desktop-package-toolchain.js";
 import { createRuntimeSessionCatalogOwner, type RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import {
@@ -48,7 +48,7 @@ export function createPiWorkspaceRuntimeServices(
     projectTrusted: options.projectTrusted ?? false
   });
   settingsManager.setProjectTrusted(options.projectTrusted ?? settingsManager.isProjectTrusted());
-  applyDesktopPackageToolchain(settingsManager);
+  const releaseDesktopReloadHook = installDesktopPackageToolchainReloadHook(settingsManager);
   const packageManager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
   const providerCatalog = createPiWorkspaceProviderCatalog({
     cwd,
@@ -104,14 +104,13 @@ export function createPiWorkspaceRuntimeServices(
         try {
           await settingsManager.flush();
         } finally {
-          if (ownsSessionCatalog) {
-            try {
+          try {
+            if (ownsSessionCatalog) {
               await sessionCatalog.dispose();
-            } finally {
-              unregisterConfiguration?.();
             }
-          } else {
+          } finally {
             unregisterConfiguration?.();
+            releaseDesktopReloadHook();
           }
         }
       }

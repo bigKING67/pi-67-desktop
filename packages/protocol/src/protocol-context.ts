@@ -75,6 +75,9 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "provider.credential.remove": "workspace",
   "model.default.set": "workspace",
   "provider.configuration.reload": "workspace",
+  "context.file.list": "workspace",
+  "context.file.read": "workspace",
+  "context.file.save": "workspace",
   "task.close": "task",
   "extension.package.list": "workspace",
   "extension.package.checkUpdates": "workspace",
@@ -82,7 +85,11 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "extension.package.update": "workspace",
   "extension.package.setEnabled": "workspace",
   "extension.package.restoreInheritance": "workspace",
-  "extension.package.uninstall": "workspace"
+  "extension.package.uninstall": "workspace",
+  "skill.pack.list": "workspace",
+  "skill.pack.checkUpdates": "workspace",
+  "skill.pack.update": "workspace",
+  "skill.pack.restore": "workspace"
 };
 
 export function hasValidCommandContext(

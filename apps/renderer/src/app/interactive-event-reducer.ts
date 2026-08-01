@@ -39,7 +39,8 @@ export function reduceInteractiveEvent<TState extends AppEventState>(
         publishNotification({
           level: event.payload.level ?? "info",
           title: "Extension 通知",
-          message: event.payload.message
+          message: event.payload.message,
+          toast: event.payload.level === "warning" || event.payload.level === "error"
         });
         return true;
       }

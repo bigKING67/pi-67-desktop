@@ -10,6 +10,7 @@ import type {
 } from "./pi67-renderer-fixture-types.js";
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
+import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 
 interface MockCommandResponseFixture {
   fixtureExtensionCommands: unknown;
@@ -29,9 +30,11 @@ export function installMockCommandResponseHandler({
 }: MockCommandResponseFixture): void {
   const testWindow = window as FixtureWindow & {
     __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
+    __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
   const applyMockSessionControlCommand = testWindow.__pi67ApplyMockSessionControlCommand;
+  const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
 
   const resolveMockCommand: MockCommandResponseHandler = (type, payload, current, hostEpoch) => {
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
@@ -70,6 +73,29 @@ export function installMockCommandResponseHandler({
       || type === "extension.package.restoreInheritance"
       || type === "extension.package.uninstall"
     ) return { changed: true, items: [], total: 0 };
+    const contextFileResult = resolveMockContextFileCommand(type, payload, current);
+    if (contextFileResult !== undefined) return contextFileResult;
+    if (type === "skill.pack.list") return {
+      items: mockSkillPacks("not-checked", "bundled"),
+      total: 2
+    };
+    if (type === "skill.pack.checkUpdates") return {
+      items: mockSkillPacks("update-available", "bundled"),
+      total: 2,
+      checkedAt: Date.now()
+    };
+    if (type === "skill.pack.update") return {
+      items: mockSkillPacks("current", payload.id === "ai-berkshire-investment-suite" ? "managed" : "bundled"),
+      total: 2,
+      checkedAt: Date.now(),
+      changed: true
+    };
+    if (type === "skill.pack.restore") return {
+      items: mockSkillPacks("not-checked", "bundled"),
+      total: 2,
+      checkedAt: Date.now(),
+      changed: true
+    };
     if (type === "session.catalog.query") return sessionCatalogPage;
     if (type === "message.page") return conversationPage(current, payload);
     if (type === "session.tree") return current.snapshot.tree;
@@ -192,6 +218,70 @@ export function installMockCommandResponseHandler({
       sessionId: String(current.snapshot.sessionId),
       sessionGeneration: current.sessionGeneration
     };
+  }
+
+  function mockSkillPacks(
+    status: "not-checked" | "update-available" | "current",
+    aiSource: "bundled" | "managed"
+  ) {
+    const lark = {
+      id: "lark-cli-global",
+      suiteId: "lark-cli",
+      displayName: "飞书 Lark CLI",
+      description: "飞书文档、消息、日历、任务、会议和开放平台能力。",
+      manager: "lark-cli",
+      updateOwner: "managed-pack",
+      updateStatus: status,
+      localState: status === "not-checked" ? "unknown" : "clean",
+      provenance: "verified",
+      installed: true,
+      installedSkillCount: 2,
+      skillIds: ["lark-doc", "lark-calendar"],
+      canUpdate: status === "update-available",
+      effectiveSource: "managed",
+      canRestore: false,
+      ...(status === "not-checked" ? {} : {
+        installedVersion: status === "current" ? "1.0.80" : "1.0.65",
+        installedSkillVersion: "1.0.80",
+        latestVersion: "1.0.80"
+      }),
+      source: "@larksuite/cli",
+      detail: status === "current"
+        ? "当前 CLI 与官方 Skills 均为 1.0.80。"
+        : status === "update-available"
+          ? "当前 CLI 1.0.65 待更新；官方 Skills 已是 1.0.80。"
+          : "点击检查更新后，由 Lark CLI 验证版本和官方技能同步状态。"
+    };
+    const aiBerkshire = {
+      id: "ai-berkshire-investment-suite",
+      suiteId: "ai-berkshire-investment-suite",
+      displayName: "AI Berkshire 投资研究",
+      description: "公司研究、财务分析和组合管理能力。",
+      manager: "pi67-desktop",
+      updateOwner: "managed-pack",
+      updateStatus: status,
+      localState: "clean",
+      provenance: "verified",
+      installed: true,
+      installedSkillCount: 1,
+      skillIds: ["investment-research"],
+      canUpdate: status === "update-available",
+      effectiveSource: aiSource,
+      canRestore: aiSource === "managed",
+      baselineVersion: "1.0.1",
+      installedVersion: aiSource === "managed" ? "1.0.2" : "1.0.1",
+      ...(status === "not-checked" ? {} : {
+        latestVersion: "1.0.2",
+        registryCommit: "7".repeat(40)
+      }),
+      source: "https://github.com/xbtlin/ai-berkshire",
+      detail: aiSource === "managed"
+        ? "当前使用 Pi-67 官方 registry 安装的受管 Overlay。"
+        : status === "update-available"
+          ? "Pi-67 官方 registry 已发布兼容版本 1.0.2，确认后将安装为独立 Overlay。"
+          : "当前使用随 Desktop 发布的不可变内置基线。"
+    };
+    return [lark, aiBerkshire];
   }
 
   function conversationPage(

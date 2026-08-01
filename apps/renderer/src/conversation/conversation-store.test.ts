@@ -218,7 +218,10 @@ describe("conversation store", () => {
       ...pendingUserTurn("operation-a", AUTHORITY),
       attachments: [{
         id: "attachment-a",
-        file: new File(["image"], "prompt.png", { type: "image/png" }),
+        name: "prompt.png",
+        mimeType: "image/png",
+        byteLength: 5,
+        kind: "image",
         previewUrl: "blob:prompt-a"
       }]
     });

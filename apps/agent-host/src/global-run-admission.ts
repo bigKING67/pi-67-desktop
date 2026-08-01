@@ -1,3 +1,4 @@
+import { MAX_RUNNING_TASKS } from "@pi67/domain";
 import { createMessageId } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
 
@@ -19,7 +20,7 @@ interface AdmissionRecord extends RunAdmissionLease {
 export class GlobalRunAdmission {
   private readonly records = new Map<string, AdmissionRecord>();
 
-  constructor(private readonly maximum = 4) {
+  constructor(private readonly maximum = MAX_RUNNING_TASKS) {
     if (!Number.isSafeInteger(maximum) || maximum < 1) {
       throw new RangeError("maximum must be a positive integer.");
     }

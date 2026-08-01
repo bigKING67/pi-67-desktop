@@ -82,7 +82,11 @@ function sameActivity(left: OperationActivity | null, right: OperationActivity |
   if (left === null || right === null) return left === right;
   if (left.kind !== right.kind) return false;
   if (left.kind === "tool" && right.kind === "tool") {
-    return left.toolCallId === right.toolCallId && left.toolKind === right.toolKind;
+    return left.toolCallId === right.toolCallId
+      && left.toolName === right.toolName
+      && left.toolKind === right.toolKind
+      && left.status === right.status
+      && left.aliasTarget === right.aliasTarget;
   }
   if (left.kind === "approval" && right.kind === "approval") return left.requestId === right.requestId;
   if (left.kind === "extension-input" && right.kind === "extension-input") {

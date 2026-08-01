@@ -9,6 +9,7 @@ import {
   createEmptyWorkbenchState,
   finishWorkbenchRun,
   LEGACY_WORKBENCH_STATE_FILENAME,
+  MAX_RUNTIME_RECOVERY_RECORDS,
   MAX_WORKBENCH_STATE_BYTES,
   removeWorkspaceRegistration,
   repairWorkspaceRegistration,
@@ -223,6 +224,34 @@ describe("WorkbenchStateV2 persistence", () => {
     expect(() => replaceWorkbenchLayout(state, {
       ...layout,
       settings: { section: "account", scope: "project", workspaceId: workspace.id }
+    })).toThrow(/invalid/u);
+
+    const boundedRecovery = Array.from({ length: MAX_RUNTIME_RECOVERY_RECORDS }, (_, index) => ({
+      taskId: `task-${index}`,
+      conversation: {
+        kind: "session" as const,
+        workspaceId: workspace.id,
+        sessionPath: `/sessions/task-${index}.jsonl`
+      },
+      sessionId: `session-${index}`,
+      taskGeneration: 1,
+      lastKnownLifecycle: "running" as const
+    }));
+    expect(replaceWorkbenchLayout(state, { ...layout, runtimeRecovery: boundedRecovery }).runtimeRecovery)
+      .toHaveLength(MAX_RUNTIME_RECOVERY_RECORDS);
+    expect(() => replaceWorkbenchLayout(state, {
+      ...layout,
+      runtimeRecovery: [...boundedRecovery, {
+        taskId: "task-over-limit",
+        conversation: {
+          kind: "session",
+          workspaceId: workspace.id,
+          sessionPath: "/sessions/task-over-limit.jsonl"
+        },
+        sessionId: "session-over-limit",
+        taskGeneration: 1,
+        lastKnownLifecycle: "running"
+      }]
     })).toThrow(/invalid/u);
   });
 

@@ -40,8 +40,14 @@ count.
 2. Manage Pi Providers, models, default selections, and credentials from
    Settings. Credentials persist to Pi `auth.json` by default; an explicit
    runtime-only key remains available for temporary use.
-3. Follow streaming reasoning, tools, file changes, and follow-up work without
-   losing the current task.
+3. Follow streaming reasoning, tools, intermediate results, file changes, and
+   follow-up work without losing the current task. One turn owns one execution
+   process: visible reasoning stays readable in sequence, each Tool Call and its
+   Tool Result form one inspectable step, and the final answer remains outside the
+   process as the primary result. The process stays expanded while work is active,
+   collapses only after successful completion has a visible final answer, and
+   remains fully inspectable on demand. Failure, cancellation, loss, or a missing
+   final answer keeps the process expanded for diagnosis.
 4. Use skills, prompts, extension commands, session tree, rollback, and compact
    from a coherent graphical interface.
 5. Diagnose shell, configuration, extension, update, and runtime failures
@@ -68,6 +74,64 @@ count.
   as pinned first-party capability snapshots. Desktop materializes verified
   copies under the Pi agent directory, preserves existing Package object filters,
   namespaces managed Rules, and never overwrites an existing global `AGENTS.md`.
+- Settings manages rules and context as Markdown files in two availability scopes.
+  Each scope uses a counted secondary category selector and renders only the selected
+  category as a flat Catalog. `全局可用` separates user-owned global context,
+  Desktop-managed rules, and global system-prompt inputs; `项目专属` separates
+  Workspace context, inherited context, and project system-prompt inputs. User-owned
+  global or project rules are the default category in their scope. Every file opens
+  into a source/preview detail. Desktop-managed files and files inherited from outside the Workspace are
+  read-only; regular files in the controlled global root or a trusted Workspace are
+  editable. Creation is limited to the canonical `AGENTS.md`, `SYSTEM.md`, and
+  `APPEND_SYSTEM.md` locations. Existing `CLAUDE.md` variants remain editable where
+  controlled, but Desktop does not create them and exposes no arbitrary path,
+  rename, or delete operation. Saves compare an opaque content revision, write
+  atomically, and reload every initialized Pi Task affected by the global or project
+  scope. A reload failure rolls the file back and reloads the restored baseline;
+  an external revision conflict preserves the unsaved draft instead of overwriting
+  it. Markdown bodies and drafts remain renderer-memory-only and never enter Session
+  projection, Workbench persistence, notifications, diagnostics, or default logs.
+- Global Skills with an explicit owning updater and verified suite manifest may be
+  checked and updated once per Skill Pack. Lark delegates the version check and
+  update to the installed `lark-cli`. A complete official Skill set already at the
+  latest reported Skill version remains updateable when only the CLI version is
+  behind; incomplete or otherwise unverified Skill drift blocks overwrite. Pi
+  resources reload only after the updater verifies convergence. One update pins the
+  same user-managed CLI executable for its pre-check, mutation, and post-check;
+  Desktop's private packaged toolchain is never an installation target. Settings
+  reports the current CLI, official Skills, and latest stable version separately.
+  AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one
+  exact Pi-67 `main` commit, validates the bounded registry/lock and every declared
+  Skill hash, installs only those Skills as a separate Pi Package Overlay, activates
+  it atomically, and rolls back if any Workspace resource reload fails. The immutable
+  bundled baseline remains available through `恢复内置版本`. A legacy
+  `bundled-release-only` record with no installable upstream may prove only that an
+  older non-installable registry version exists; it can never stage an Overlay.
+  After an explicit check, Settings shows the effective version, the compatible or
+  historical registry version, and a distinct current/update/non-installable/error
+  result; the `全局可用` scope label never substitutes for update-check evidence.
+  Loose global Skills remain user-maintained, project Skills remain project-owned,
+  and Package Skills update with their Package. Bundled Skills always retain an
+  immutable Desktop baseline; a suite may additionally use a verified managed
+  overlay between Desktop releases only when its updater, compatibility contract,
+  content hashes, atomic activation, and rollback path are explicit.
+  Settings presents these as two availability scopes rather than mixing scope and
+  provenance: `全局可用` groups Desktop-bundled, updater-managed, and user-local
+  Skills, while `项目专属` contains only the current project's own Skills. Every
+  bundled suite remains available to all projects even when its release and update
+  lifecycle differs from a user-installed global Skill.
+- Bundled Skill suite versions come from the content owner rather than the Package
+  that happens to carry them. AI Berkshire reads its version plus source commit
+  provenance from the Pi-67 Skill Pack registry/lock and records
+  `https://github.com/xbtlin/ai-berkshire` as its upstream. Desktop pins the exact
+  upstream commit plus the expected Pack version, manifest hash, and bundle hash;
+  its build uses the adapter from the locked Pi-67 Core source and fails closed if
+  regenerating the Pack does not reproduce those values. This lets a Desktop release
+  refresh the bundled AI Berkshire baseline without relabeling Pi-67 Core or waiting
+  for a new Core release. Commerce and browser67 use their locked capability versions.
+  Multi-source design suites have no invented aggregate version, and Lark's bundled
+  copy remains explicitly unversioned until its build provenance supplies a
+  verifiable suite version.
 - Bundled browser67 source and Skills do not imply live browser readiness. Settings
   distinguishes bundled source, dependency preparation, deterministic Doctor,
   and real managed-browser readiness instead of collapsing them into one state.
@@ -82,9 +146,11 @@ count.
   as its primary in-memory preview when available, with the stable Pi Session
   name retained as secondary context. Prompt-derived previews are never copied
   into the Session Catalog or persisted Workbench state.
-- The application admits at most four tasks in accepted, running, approval-wait,
-  or Extension-input-wait states. The Renderer explains the limit early, but the
-  Pi runtime service owns the atomic admission decision.
+- The application admits at most eight top-level Session tasks in accepted,
+  running, approval-wait, or Extension-input-wait states. Subagents launched
+  inside a Task do not consume additional top-level admission slots. The Renderer
+  explains the limit early, but the Pi runtime service owns the atomic admission
+  decision.
 - Each live task owns an independent Pi Runtime and projection. Selecting another
   conversation, collapsing a Workspace, or opening Settings does not stop
   background work. One canonical Pi JSONL session path has at most one live
@@ -94,7 +160,11 @@ count.
   the rebuildable Session Catalog and no UI action deletes Pi JSONL in v1.
 - A workspace added through the native directory picker is trusted for project
   resource loading. That trust never replaces one-shot approval for destructive,
-  external, system, or workspace-external Tool actions.
+  system, workspace-external, or external side-effect Tool actions. Verified
+  read-only `web_search` and HTTP(S) `fetch_content` calls from the explicitly
+  enabled `pi-web-access` Package are the narrow exception: they run without a
+  per-call dialog, while malformed inputs, local-file fetches, unknown aliases,
+  and same-name Tools from any other source remain fail-closed.
 - Restored Workspace registrations are checked against their persisted filesystem
   identity before project resources load. A missing or replaced directory stays
   inactive until the user explicitly repairs it through the native directory
@@ -157,6 +227,27 @@ count.
   the operation for the same Host epoch, Session ID, and Session generation that
   submitted it. Transport failure, Host replacement, or a concurrent Session
   switch preserves the draft and rotates the retry submission identity.
+- The Composer exposes one `+` attachment action and one in-editor `/` catalog.
+  The catalog presents Pi-resolved Extension commands, Prompt Templates, and
+  Skills such as `/plan` and `/skill:design-craft`; selection inserts the command
+  into the draft and never bypasses normal send, queue, or IME behavior.
+- A draft supports at most 20 local attachments, 100 MiB per file, and 250 MiB
+  total. Pathless clipboard files have a stricter 16 MiB boundary. Main stages
+  regular files into a private disposable root and sends only opaque references
+  through Preload and Protocol; the Agent Host claims and revalidates the files
+  before it accepts the operation. Images use Pi native image content, while
+  ordinary files are inspected through the hidden bounded `read_attachment`
+  Tool. Renderer projections contain names, types, sizes, and opaque identities,
+  never filesystem paths, source bodies, or raw attachment bytes.
+- Attachment extraction is offline and bounded. Text, Office/PDF, archives,
+  audio/video metadata, binary strings/bytes, and image OCR run in cancellable
+  worker threads with a two-worker ceiling, single-OCR concurrency, queue and
+  timeout limits, archive traversal/ratio/entry/expanded-size checks, and 32 KiB
+  Tool results. Failure stays observable and never falls back to a network OCR
+  service.
+- The collapsed Composer model control shows only the readable model name. Its
+  open list keeps Provider ownership and the complete `provider/model-id`
+  visible for disambiguation without consuming permanent Composer width.
 - Long-running work has an explicit accepted/running/waiting/terminal lifecycle,
   and Host replacement cannot make a stale response or extension request current.
 - Visible Turn activity is derived from real Pi SDK events and owned by the Agent
@@ -247,7 +338,7 @@ count.
   does not persist credentials, prompts, source, tool payloads, or session data.
 - Electron Main may persist a bounded, schema-validated Workbench V2 layout with
   Workspace identity and ordering, expanded Workspace IDs, the selected
-  conversation or Settings surface, Settings scope, at most four runtime recovery
+  conversation or Settings surface, Settings scope, at most eight runtime recovery
   identities, and clean-exit state. Ordinary idle Session rows are rebuilt from
   Catalog instead of being persisted as open UI objects. Draft text, attachments,
   transcript, runtime detail, private fallback titles, and credential material
@@ -270,6 +361,22 @@ count.
   outside Electron `userData` fails closed instead of following the target.
 - Update checks disclose their network purpose and send no workspace, provider,
   model, session, or credential data.
+- Extension Package completion names the affected Package and, when available,
+  its previous and installed versions. Resource reload events and routine
+  informational Extension messages remain in Notification history rather than
+  stacking duplicate floating toasts around the one final update result.
+- Skill update checks are user-initiated, bounded, and use only the owning updater's
+  version and official-Skill synchronization contract. Desktop does not infer an
+  upstream from a directory name, pull arbitrary Skill repositories, or run an
+  updater for loose or project-owned Skills. An upstream repository alone does not
+  enable runtime updates. AI Berkshire is the first Pi-67 registry-managed Overlay:
+  it accepts only a compatible version bound to an exact Pi-67 commit and verified
+  hashed bundle, never downgrades the effective version, and rolls back atomically.
+  Commerce remains Desktop-release managed until it receives the same explicit
+  runtime channel contract.
+  Build-time AI Berkshire refreshes are a separate immutable release input: they pin
+  one upstream commit and reproduce the locked Pi-67 Pack hashes without following a
+  branch during runtime.
 - Unsigned Preview checks accept only complete prerelease artifact sets and open
   a canonical GitHub Release page; they never download or install in-app.
 - Diagnostic export is local, bounded, and redacted by default.

@@ -10,7 +10,7 @@ import {
   createExtensionAdapterRegistry,
   type ExtensionAdapterRegistry
 } from "@pi67/extension-compat";
-import type { CommandDescriptor } from "@pi67/protocol";
+import type { SlashCommandCatalogResult } from "@pi67/protocol";
 import {
   EMPTY_EXTENSION_ADAPTER_PROJECTION,
   projectExtensionAdapterProjection,
@@ -28,12 +28,17 @@ const EMPTY_EXTENSION_CATALOG: ExtensionCatalogResult = Object.freeze({
   total: 0,
   truncated: false
 });
+const EMPTY_SLASH_COMMAND_CATALOG: SlashCommandCatalogResult = Object.freeze({
+  items: [] as SlashCommandCatalogResult["items"],
+  total: 0,
+  truncated: false
+});
 
 /** Owns the disposable, generation-scoped projection of declarative Extension adapters. */
 export class ExtensionAdapterRuntime {
   private projection: ExtensionAdapterProjection = EMPTY_EXTENSION_ADAPTER_PROJECTION;
   private catalog: ExtensionCatalogResult = EMPTY_EXTENSION_CATALOG;
-  private commands: CommandDescriptor[] = [];
+  private commands: SlashCommandCatalogResult = EMPTY_SLASH_COMMAND_CATALOG;
   private readonly toolAttribution = new ToolAttributionRegistry();
   private refreshRevision = 0;
 
@@ -70,7 +75,7 @@ export class ExtensionAdapterRuntime {
     this.refreshRevision += 1;
     this.projection = EMPTY_EXTENSION_ADAPTER_PROJECTION;
     this.catalog = EMPTY_EXTENSION_CATALOG;
-    this.commands = [];
+    this.commands = EMPTY_SLASH_COMMAND_CATALOG;
     this.toolAttribution.reset();
   }
 
@@ -83,7 +88,7 @@ export class ExtensionAdapterRuntime {
   }
 
   getCatalog(): ExtensionCatalogResult { return this.catalog; }
-  getCommands(): CommandDescriptor[] { return this.commands; }
+  getCommands(): SlashCommandCatalogResult { return this.commands; }
 
   bindToolExecutionStart(
     sessionGeneration: number,

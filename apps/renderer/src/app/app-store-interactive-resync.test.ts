@@ -174,7 +174,13 @@ function runningToolOperation(): OperationView {
     sessionId: "session-1",
     sessionGeneration: 3,
     startedAt: 1,
-    activity: { kind: "tool", toolCallId: "tool-gap", toolKind: "edit" }
+    activity: {
+      kind: "tool",
+      toolCallId: "tool-gap",
+      toolName: "edit",
+      toolKind: "edit",
+      status: "running"
+    }
   };
 }
 

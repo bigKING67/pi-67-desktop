@@ -14,8 +14,10 @@ import type { ExtensionPackageTaskView } from "./extension-package-command-route
 import { isExtensionPackageCommand } from "./extension-package-command-router.js";
 import { GlobalRunAdmission, type RunAdmissionLease } from "./global-run-admission.js";
 import type { HostEventChannel } from "./host-event-channel.js";
+import { isContextFileCommand } from "./context-file-command-router.js";
 import { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError } from "./protocol-error.js";
+import { isSkillPackCommand } from "./skill-pack-command-router.js";
 import type { TaskRuntimeRecord, TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { isWorkspaceProviderCommand } from "./workspace-command-router.js";
@@ -41,7 +43,7 @@ export interface HostTaskStateCoordinatorOptions {
 
 export class HostTaskStateCoordinator {
   private readonly states = new Map<string, TaskHostState>();
-  private readonly runAdmission = new GlobalRunAdmission(4);
+  private readonly runAdmission = new GlobalRunAdmission();
   private activeTaskKey: string | undefined;
 
   constructor(
@@ -96,7 +98,11 @@ export class HostTaskStateCoordinator {
         if (isWorkspaceProviderCommand(request.type)) this.workspaces.require(context.workspaceId);
         return undefined;
       }
-      if (isExtensionPackageCommand(request.type)) {
+      if (
+        isContextFileCommand(request.type)
+        || isExtensionPackageCommand(request.type)
+        || isSkillPackCommand(request.type)
+      ) {
         this.workspaces.require(context.workspaceId);
         return undefined;
       }

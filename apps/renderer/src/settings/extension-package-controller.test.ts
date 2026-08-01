@@ -118,6 +118,49 @@ describe("Extension package controller", () => {
     await expect(updateExtensionPackage(source, "global", "workspace-a")).resolves.toBe(true);
     expect(useExtensionPackageStore.getState().updates).toEqual([]);
   });
+
+  it("names the updated package and reports its version transition", async () => {
+    const source = "npm:@example/pi-settings";
+    const store = useExtensionPackageStore.getState();
+    store.begin("workspace-a", "loading");
+    store.installList("workspace-a", [{
+      source,
+      scope: "global",
+      enabled: true,
+      filtered: false,
+      installed: true,
+      displayName: "Pi Settings",
+      version: "1.2.3"
+    }]);
+    store.begin("workspace-a", "checking");
+    store.installUpdates("workspace-a", [{
+      source,
+      scope: "global",
+      type: "npm",
+      displayName: "Pi Settings"
+    }]);
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [{
+        source,
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        displayName: "Pi Settings",
+        version: "1.3.0"
+      }],
+      total: 1,
+      changed: true
+    } as never);
+
+    await expect(updateExtensionPackage(source, "global", "workspace-a")).resolves.toBe(true);
+
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "success",
+      title: "Pi Settings 已更新",
+      message: "1.2.3 → 1.3.0 · 全局扩展包 · Pi 资源已重新加载。"
+    });
+  });
 });
 
 function registerWorkspace(

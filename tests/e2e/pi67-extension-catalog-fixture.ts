@@ -1,15 +1,32 @@
 import type { ExtensionCatalogResult, RuntimeCapabilities } from "../../packages/domain/src/index.js";
-import type { CommandDescriptor } from "../../packages/protocol/src/index.js";
+import type { SlashCommandCatalogResult } from "../../packages/protocol/src/index.js";
 
-export const MOCK_EXTENSION_COMMANDS = [{
-  name: "inspect",
-  description: "Inspect runtime",
-  adapter: {
-    adapterId: "verified-example",
-    package: "@verified/example",
-    label: "检查"
-  }
-}] satisfies CommandDescriptor[];
+export const MOCK_EXTENSION_COMMANDS = {
+  items: [{
+    name: "inspect",
+    source: "extension",
+    description: "Inspect runtime",
+    adapter: {
+      adapterId: "verified-example",
+      package: "@verified/example",
+      label: "检查"
+    }
+  }, {
+    name: "plan",
+    source: "prompt",
+    description: "Create an implementation plan"
+  }, {
+    name: "review",
+    source: "prompt",
+    description: "Review the current changes"
+  }, {
+    name: "skill:design-craft",
+    source: "skill",
+    description: "Design and frontend engineering"
+  }],
+  total: 4,
+  truncated: false
+} satisfies SlashCommandCatalogResult;
 
 export const MOCK_RUNTIME_CAPABILITIES = {
   sdkVersion: "0.81.1",

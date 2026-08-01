@@ -1,7 +1,8 @@
-import type {
-  RuntimeRecoveryRecord,
-  WorkbenchSettingsState,
-  WorkbenchSurface
+import {
+  MAX_RUNNING_TASKS,
+  type RuntimeRecoveryRecord,
+  type WorkbenchSettingsState,
+  type WorkbenchSurface
 } from "@pi67/domain";
 import { useAppStore } from "../app/app-store.js";
 import { INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
@@ -35,7 +36,7 @@ export function workbenchLayout(state: RendererWorkbenchState): WorkbenchLayoutV
       taskGeneration: task.taskGeneration,
       lastKnownLifecycle: task.lifecycle
     }];
-  }).slice(0, 4);
+  }).slice(0, MAX_RUNNING_TASKS);
   const settings: WorkbenchSettingsState = {
     section: state.settingsSection,
     scope: state.settingsScope,

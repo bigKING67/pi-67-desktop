@@ -25,11 +25,13 @@
 }
 
 .shell textarea {
+  field-sizing: content;
   display: block;
   width: 100%;
-  min-height: 78px;
-  max-height: 220px;
+  min-height: 64px;
+  max-height: min(220px, 32vh);
   padding: 13px 14px var(--space-2);
+  overflow-y: auto;
   resize: none;
   border: 0;
   outline: 2px solid transparent;
@@ -37,6 +39,118 @@
   background: transparent;
   color: var(--text-primary);
   line-height: 1.55;
+}
+
+.slashPickerAnchor {
+  position: relative;
+  z-index: 8;
+  width: min(860px, 100%);
+  height: 0;
+  margin: 0 auto;
+}
+
+.slashPicker {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.slashPicker header,
+.slashPicker footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.slashPicker header {
+  border-bottom: 1px solid var(--border);
+}
+
+.slashPicker header strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.slashPicker > p {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.slashPicker footer {
+  border-top: 1px solid var(--border);
+}
+
+.slashCommandList {
+  display: grid;
+  max-height: min(320px, 42vh);
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.slashCommandList button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 42px;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.slashCommandList button:hover,
+.slashCommandList button.slashCommandActive {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.slashCommandList button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.slashCommandList strong,
+.slashCommandList small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slashCommandList strong {
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.slashCommandList small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.slashCommandList em {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-style: normal;
 }
 
 .shell textarea::placeholder {
@@ -96,7 +210,14 @@
 
 .runtimeControls {
   min-width: 0;
+  align-items: flex-start;
   gap: 5px;
+}
+
+.modelRuntimeControl {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
 }
 
 .runtimeField {
@@ -113,6 +234,96 @@
 .runtimeField:focus-within {
   border-color: var(--focus);
   box-shadow: var(--shadow-focus);
+}
+
+.modelSelectButton {
+  width: min(190px, 26vw);
+  justify-content: flex-start;
+  padding-right: 7px;
+  border: 1px solid transparent;
+}
+
+.modelSelectButton[data-focus-visible] {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.modelSelectButton[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.modelSelectButton > svg:last-child {
+  margin-left: auto;
+}
+
+.modelSelectValue {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelSelectPopover {
+  z-index: 90;
+  width: min(360px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.modelSelectList {
+  display: grid;
+  max-height: min(360px, 48vh);
+  gap: 2px;
+  padding: 5px;
+  overflow-y: auto;
+  outline: none;
+}
+
+.modelSelectOption {
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  outline: none;
+}
+
+.modelSelectOption[data-focused],
+.modelSelectOption[data-selected] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.modelSelectOption > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.modelSelectOption strong,
+.modelSelectOption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelSelectOption strong {
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.modelSelectOption small {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 10px;
 }
 
 .runtimeField svg {
@@ -142,9 +353,30 @@
   max-width: 118px;
 }
 
+.modelSelectionStatus {
+  display: block;
+  max-width: 238px;
+  padding-left: var(--space-2);
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 540;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelSelectionStatus[data-status="confirmed"] {
+  color: var(--success);
+}
+
+.modelSelectionStatus[data-status="failed"] {
+  color: var(--danger);
+}
+
 .hint,
 .extensionWidget,
-.attachmentItem small {
+.attachmentRow small {
   font-size: 11px;
 }
 
@@ -411,65 +643,6 @@
   color: var(--text-secondary);
 }
 
-.attachmentItem {
-  display: inline-flex;
-  align-items: center;
-  width: 218px;
-  flex: 0 0 auto;
-  gap: 7px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface-muted);
-}
-
-.attachmentItem img {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  border-radius: 5px;
-  object-fit: cover;
-}
-
-.attachmentItem > span {
-  display: grid;
-  min-width: 0;
-  margin-right: auto;
-}
-
-.attachmentItem strong,
-.attachmentItem small {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-family: var(--font-code);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.attachmentItem strong {
-  font-size: 11px;
-}
-
-.attachmentItem small {
-  color: var(--text-tertiary);
-  font-size: 10px;
-}
-
-.attachmentItem button {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-tertiary);
-}
-
-.attachmentItem button:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
 .extensionWidget {
   display: flex;
   width: min(860px, 100%);
@@ -516,6 +689,15 @@
     flex: 1 1 auto;
   }
 
+  .modelRuntimeControl {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .modelSelectButton {
+    width: 100%;
+  }
+
   .runtimeField select {
     width: 100%;
   }
@@ -553,6 +735,10 @@
   }
 
   .runtimeField:first-child {
+    flex: 1 1 170px;
+  }
+
+  .modelRuntimeControl {
     flex: 1 1 170px;
   }
 

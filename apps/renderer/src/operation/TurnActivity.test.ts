@@ -34,13 +34,17 @@ describe("TurnActivity projection", () => {
     expect(operationPresentation("prompt", "running", {
       kind: "tool",
       toolCallId: "tool-shell",
-      toolKind: "shell"
-    }, undefined, undefined).label).toBe("正在执行命令");
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
+    }, undefined, undefined).label).toBe("正在调用 bash");
     expect(operationPresentation("prompt", "running", {
       kind: "tool",
       toolCallId: "tool-search",
-      toolKind: "search"
-    }, undefined, undefined).label).toBe("正在搜索项目");
+      toolName: "web_search",
+      toolKind: "search",
+      status: "running"
+    }, undefined, undefined).label).toBe("正在调用 web_search");
   });
 
   it("hides completed activity but keeps terminal failures and recovery visible", () => {

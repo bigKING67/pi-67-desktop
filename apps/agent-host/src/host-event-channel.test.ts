@@ -204,6 +204,44 @@ describe("HostEventChannel", () => {
       }
     });
   });
+
+  it("serializes synchronous activity emitted while an approval wait is established", () => {
+    const fixture = createFixture();
+    fixture.beginInteractiveWait.mockImplementation(() => {
+      fixture.channel.send({
+        type: "operation.activityChanged",
+        payload: {
+          operationId: "operation-events",
+          activity: { kind: "approval", requestId: "approval-reentrant" }
+        }
+      });
+      return true;
+    });
+
+    fixture.channel.send({
+      type: "approval.requested",
+      payload: approvalRequest("approval-reentrant", "tool-reentrant")
+    });
+
+    expect(fixture.postEvent.mock.calls.map(([envelope]) => envelope)).toMatchObject([
+      {
+        type: "approval.requested",
+        sequence: 1,
+        taskSequence: 1,
+        payload: { requestId: "approval-reentrant" }
+      },
+      {
+        type: "operation.activityChanged",
+        sequence: 2,
+        taskSequence: 2,
+        payload: {
+          operationId: "operation-events",
+          activity: { kind: "approval", requestId: "approval-reentrant" }
+        }
+      }
+    ]);
+    expect(fixture.resolveApproval).not.toHaveBeenCalled();
+  });
 });
 
 function createFixture(

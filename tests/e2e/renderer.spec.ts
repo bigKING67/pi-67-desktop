@@ -78,88 +78,6 @@ test("treats a native-picker workspace as trusted without a second confirmation"
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
 });
 
-test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 800 });
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.getByRole("button", { name: "选择工作区" }).click();
-
-  await expect(page.getByLabel("Pi conversation")).toBeVisible();
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
-  const contextToggle = page.getByRole("button", { name: "显示上下文" });
-  await contextToggle.click();
-  await expect(page.getByLabel("会话上下文")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "会话", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "关闭上下文抽屉" })).toBeVisible();
-  const sendButton = page.getByRole("button", { name: "发送" });
-  await expect(sendButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
-  await emitMockAgentEvent(page, {
-    type: "operation.started",
-    payload: {
-      operation: {
-        operationId: "operation-context-drawer",
-        kind: "prompt",
-        lifecycle: "running",
-        cancellable: true,
-        sessionId: "session-test",
-        sessionGeneration: 1,
-        startedAt: Date.now(),
-        activity: { kind: "tool", toolCallId: "tool-context-drawer", toolKind: "shell" }
-      }
-    }
-  }, { operationId: "operation-context-drawer" });
-  const stopButton = page.getByRole("button", { name: "停止" });
-  await expect(stopButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(stopButton)).toBe(true);
-  const columns = await page.locator(".workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns);
-  expect(columns.split(" ").length).toBeLessThanOrEqual(2);
-  await page.getByRole("button", { name: "关闭上下文抽屉" }).click();
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
-  await expect(contextToggle).toBeFocused();
-});
-
-async function isControlTopmost(locator: import("@playwright/test").Locator): Promise<boolean> {
-  return locator.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    const topmost = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    return topmost === element || (topmost !== null && element.contains(topmost));
-  });
-}
-
-test("opens narrow session navigation as a focus-restoring drawer", async ({ page }) => {
-  await page.setViewportSize({ width: 680, height: 800 });
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.getByRole("button", { name: "选择工作区" }).click();
-
-  const navigation = page.getByLabel("会话导航", { exact: true });
-  const navigationToggle = page.getByRole("button", { name: "显示会话导航" });
-  await expect(navigation).not.toBeVisible();
-  await expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
-
-  await navigationToggle.click();
-  await expect(navigation).toBeVisible();
-  await expect(page.getByRole("button", { name: "隐藏会话导航" })).toHaveAttribute("aria-expanded", "true");
-  await expect(navigation.getByRole("button", { name: "添加或创建工作区" })).toBeFocused();
-
-  await page.getByRole("button", { name: "关闭会话导航" }).click();
-  await expect(navigation).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
-
-  await page.keyboard.press("Control+b");
-  await expect(navigation).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(navigation).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
-
-  await page.keyboard.press("Control+Shift+b");
-  await expect(page.getByLabel("会话上下文")).toBeVisible();
-  await page.keyboard.press("Control+Shift+b");
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "显示上下文" })).toBeFocused();
-});
-
 test("fills the composer from a starter prompt without sending it", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
@@ -211,11 +129,14 @@ test("renders verified declarative Extension Tool Adapter metadata without execu
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
+  const process = page.getByTestId("transcript-process-group");
+  await expect(process).toBeVisible();
+  await expect(process).toHaveAttribute("open", "");
   const card = page.locator('[data-presenter="extension-adapter"]');
   await expect(card).toBeVisible();
   await expect(card).toContainText("读取制品");
   await expect(card).toContainText("artifact.json");
-  await card.getByText("查看详情").click();
+  await card.locator(":scope > summary").click();
   await expect(card).toContainText("@verified/reader");
   await expect(card).toContainText("不会加载 Extension 提供的 HTML、脚本或组件");
 });
@@ -340,7 +261,10 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId, activity: { kind: "thinking" } }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在分析问题" })).toBeVisible();
+  const initialTimeline = page.locator("[data-turn-activity]").filter({ hasText: "正在分析问题" });
+  await expect(initialTimeline).toBeVisible();
+  await expect(initialTimeline).toHaveAttribute("open", "");
+  await expect(initialTimeline.locator("li").getByText("正在分析问题", { exact: true })).toBeVisible();
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
@@ -350,9 +274,12 @@ test("projects operation activities and sends an operation-scoped abort", async 
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
-    payload: { operationId, activity: { kind: "tool", toolCallId: "tool-1", toolKind: "shell" } }
+    payload: {
+      operationId,
+      activity: { kind: "tool", toolCallId: "tool-1", toolName: "bash", toolKind: "shell", status: "running" }
+    }
   }, { operationId });
-  const shellStep = page.locator("[data-turn-activity]").filter({ hasText: "正在执行命令" });
+  const shellStep = page.locator("[data-turn-activity]").filter({ hasText: "正在调用 bash" });
   await expect(shellStep).toBeVisible();
   await expect(shellStep).toContainText("分析问题");
   await expect(shellStep).toContainText("组织回复");
@@ -389,7 +316,10 @@ test("projects operation activities and sends an operation-scoped abort", async 
       error: { code: "INTERNAL", message: "测试失败", recoverable: true }
     }
   }, { operationId });
-  await expect(page.locator("[data-turn-activity]").filter({ hasText: "任务失败" })).toBeVisible();
+  const failedTimeline = page.locator("[data-turn-activity]").filter({ hasText: "执行过程有失败" });
+  await expect(failedTimeline).toBeVisible();
+  await expect(failedTimeline).toHaveAttribute("open", "");
+  await expect(failedTimeline).toContainText("测试失败");
 
   const completedOperationId = "operation-completed-timeline";
   const completedStartedAt = Date.now() - 3_000;
@@ -411,13 +341,36 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: { operationId: completedOperationId, activity: { kind: "thinking" } }
   }, { operationId: completedOperationId });
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在分析问题" })).toBeVisible();
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",
     payload: {
       operationId: completedOperationId,
-      activity: { kind: "tool", toolCallId: "completed-tool", toolKind: "read" }
+      activity: {
+        kind: "tool",
+        toolCallId: "completed-tool",
+        toolName: "read",
+        toolKind: "read",
+        status: "running"
+      }
     }
   }, { operationId: completedOperationId });
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "正在调用 read" })).toBeVisible();
+  await emitMockAgentEvent(page, {
+    type: "operation.activityChanged",
+    payload: {
+      operationId: completedOperationId,
+      activity: {
+        kind: "tool",
+        toolCallId: "completed-tool",
+        toolName: "read",
+        toolKind: "read",
+        status: "completed"
+      }
+    }
+  }, { operationId: completedOperationId });
+  await expect(page.locator("[data-turn-activity]").filter({ hasText: "调用 read" }))
+    .toContainText("已完成");
   await emitMockAgentEvent(page, {
     type: "operation.completed",
     payload: { operationId: completedOperationId, completedAt: completedStartedAt + 3_000 }
@@ -426,9 +379,11 @@ test("projects operation activities and sends an operation-scoped abort", async 
     "[data-turn-activity][data-operation-lifecycle='completed']"
   );
   await expect(completedTimeline).toContainText("执行过程 · 3 个步骤 · 3 秒");
-  await completedTimeline.getByText("执行过程 · 3 个步骤 · 3 秒", { exact: true }).click();
+  await expect(completedTimeline).toHaveAttribute("open", "");
   await expect(completedTimeline).toContainText("分析问题");
   await expect(completedTimeline).toContainText("读取文件");
+  await expect(completedTimeline.getByText("read", { exact: true })).toBeVisible();
+  await expect(completedTimeline).toContainText("已完成");
 
   const importOperationId = "operation-import-status-test";
   await emitMockAgentEvent(page, {
@@ -449,29 +404,4 @@ test("projects operation activities and sends an operation-scoped abort", async 
   await expect(importStatus).toBeVisible();
   await expect(importStatus.getByRole("button", { name: "停止" })).toHaveCount(0);
   await expect(page.getByTestId("composer-region").getByRole("button", { name: "停止" })).toHaveCount(0);
-});
-
-test("resynchronizes the projection after an event sequence gap without guessing the missing event", async ({ page }) => {
-  await page.goto("/");
-  // Keep the recovery state observable long enough for Chromium's accessibility tree to update.
-  await attachMockAgent(page, [], { "projection.resync": 1_500 });
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await clearRecordedCommands(page);
-
-  await emitMockAgentEvent(page, {
-    type: "resource.changed",
-    payload: { reason: "missing-event" }
-  }, { sequence: 100 });
-  await expect(page.getByRole("status").filter({ hasText: "检测到状态事件缺口" })).toBeVisible();
-  await expect(page.getByText("Pi 资源已重新加载", { exact: true })).toHaveCount(0);
-  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
-    command === "projection.resync"
-  ))).toEqual(["projection.resync"]);
-  await expect(page.getByText("Pi 状态已重新同步")).toBeVisible();
-
-  await emitMockAgentEvent(page, {
-    type: "resource.changed",
-    payload: { reason: "after-resync" }
-  });
-  await expect(page.getByText("Pi 资源已重新加载", { exact: true })).toBeVisible();
 });

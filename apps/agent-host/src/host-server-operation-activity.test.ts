@@ -26,11 +26,19 @@ describe("AgentHostServer operation activity", () => {
 
     runtime.activity({ kind: "thinking" });
     runtime.activity({ kind: "responding" });
-    runtime.activity({ kind: "tool", toolCallId: "tool-1", toolKind: "shell" });
+    runtime.activity({
+      kind: "tool",
+      toolCallId: "tool-1",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
+    });
     await vi.waitFor(() => expect(activityEvents(port).at(-1)?.payload.activity).toEqual({
       kind: "tool",
       toolCallId: "tool-1",
-      toolKind: "shell"
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
     }));
 
     runtime.event({
@@ -55,7 +63,9 @@ describe("AgentHostServer operation activity", () => {
     expect(activityEvents(port).at(-1)?.payload.activity).toEqual({
       kind: "tool",
       toolCallId: "tool-1",
-      toolKind: "shell"
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
     });
 
     runtime.event({
@@ -79,7 +89,9 @@ describe("AgentHostServer operation activity", () => {
     expect(activityEvents(port).at(-1)?.payload.activity).toEqual({
       kind: "tool",
       toolCallId: "tool-1",
-      toolKind: "shell"
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
     });
 
     runtime.activity(null);
@@ -104,7 +116,13 @@ describe("AgentHostServer operation activity", () => {
     const port = connect(server, 13);
     const operationId = await submitPrompt(port, 13);
 
-    runtime.activity({ kind: "tool", toolCallId: "tool-2", toolKind: "edit" });
+    runtime.activity({
+      kind: "tool",
+      toolCallId: "tool-2",
+      toolName: "edit",
+      toolKind: "edit",
+      status: "running"
+    });
     runtime.event({
       type: "approval.requested",
       payload: approvalRequest("approval-resync", "tool-2")
@@ -128,7 +146,13 @@ describe("AgentHostServer operation activity", () => {
       activeOperation: {
         operationId,
         lifecycle: "running",
-        activity: { kind: "tool", toolCallId: "tool-2", toolKind: "edit" }
+        activity: {
+          kind: "tool",
+          toolCallId: "tool-2",
+          toolName: "edit",
+          toolKind: "edit",
+          status: "running"
+        }
       }
     }));
     expect(runtime.cancelReasons).toContain("projection-resync");
@@ -145,7 +169,9 @@ describe("AgentHostServer operation activity", () => {
     expect(activityEvents(port).at(-1)?.payload.activity).toEqual({
       kind: "tool",
       toolCallId: "tool-2",
-      toolKind: "edit"
+      toolName: "edit",
+      toolKind: "edit",
+      status: "running"
     });
 
     runtime.finishPrompt();

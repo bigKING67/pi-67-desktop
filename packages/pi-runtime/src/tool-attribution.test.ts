@@ -110,6 +110,14 @@ describe("ToolAttributionRegistry", () => {
       toolName: "edit",
       toolKind: "generic"
     });
+    expect(registry.bindToolExecutionStart(5, "sdk-web-search", "WebSearch", [sdkTool("WebSearch")])).toEqual({
+      toolName: "WebSearch",
+      toolKind: "search"
+    });
+    expect(registry.bindToolExecutionStart(5, "sdk-web-fetch", "web_fetch", [sdkTool("web_fetch")])).toEqual({
+      toolName: "web_fetch",
+      toolKind: "search"
+    });
   });
 
   it("bounds effective tools and simultaneous tool-call bindings", () => {

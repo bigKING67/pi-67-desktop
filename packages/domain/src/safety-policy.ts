@@ -10,6 +10,7 @@ export type RiskCategory =
   | "dependency-change"
   | "git-external-action"
   | "download-and-execute"
+  | "network-read"
   | "network-side-effect"
   | "ambiguous-command";
 
@@ -68,6 +69,10 @@ export function decideApproval(
     return { allow: true, approvalRequired: false, reason: "Read-only workspace action." };
   }
 
+  if (intent.category === "network-read") {
+    return { allow: true, approvalRequired: false, reason: "Verified read-only web capability." };
+  }
+
   if (mode === "balanced" && intent.category === "workspace-write") {
     return { allow: true, approvalRequired: false, reason: "Workspace-local write in balanced mode." };
   }
@@ -90,6 +95,7 @@ export function riskLabel(category: RiskCategory): string {
     "dependency-change": "安装、删除或更新依赖",
     "git-external-action": "访问或修改远程 Git 状态",
     "download-and-execute": "下载后立即执行内容",
+    "network-read": "访问外部网络获取信息",
     "network-side-effect": "执行外部网络操作",
     "ambiguous-command": "执行无法安全分类的命令"
   };

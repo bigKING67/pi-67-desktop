@@ -6,9 +6,10 @@ export class HostCommandError extends Error {
     readonly code: ProtocolErrorCode,
     message: string,
     readonly recoverable = true,
-    readonly details?: Record<string, string | number | boolean>
+    readonly details?: Record<string, string | number | boolean>,
+    options?: ErrorOptions
   ) {
-    super(message);
+    super(message, options);
     this.name = "HostCommandError";
   }
 }

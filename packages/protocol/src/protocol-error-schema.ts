@@ -12,7 +12,7 @@ export const ProtocolErrorSchema = strictObject({
     Type.Literal("STALE_OPERATION"), Type.Literal("STALE_SESSION_CATALOG"),
     Type.Literal("DUPLICATE_REQUEST"), Type.Literal("BUSY"),
     Type.Literal("OPERATION_NOT_FOUND"), Type.Literal("SESSION_CHANGED_EXTERNALLY"),
-    Type.Literal("CONFIGURATION_CHANGED_EXTERNALLY"),
+    Type.Literal("CONFIGURATION_CHANGED_EXTERNALLY"), Type.Literal("RESOURCE_CHANGED_EXTERNALLY"),
     Type.Literal("RUNTIME_NOT_READY"), Type.Literal("RUNTIME_POISONED"),
     Type.Literal("MODEL_NOT_FOUND"), Type.Literal("NATIVE_BUILD_TOOLCHAIN_REQUIRED"),
     Type.Literal("NO_REACHABLE_PACKAGE_SOURCE"), Type.Literal("PACKAGE_INTEGRITY_MISMATCH"),
@@ -20,6 +20,7 @@ export const ProtocolErrorSchema = strictObject({
     Type.Literal("GIT_CONTENT_HASH_MISMATCH"), Type.Literal("TOOLCHAIN_INTEGRITY_FAILED"),
     Type.Literal("TOOLCHAIN_MISSING"), Type.Literal("WORKSPACE_NOT_TRUSTED"),
     Type.Literal("PATH_OUTSIDE_WORKSPACE"), Type.Literal("RESOURCE_LIMIT_EXCEEDED"),
+    Type.Literal("RESOURCE_NOT_FOUND"),
     Type.Literal("UNSUPPORTED"), Type.Literal("INTERNAL")
   ]),
   message: Type.String({ maxLength: 4_096 }),

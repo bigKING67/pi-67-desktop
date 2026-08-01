@@ -82,9 +82,14 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ...messages.settings.sections.skills,
         searchTerms: [
           "技能",
+          "全局可用",
+          "项目专属",
           "全局技能",
           "项目技能",
           "内置技能",
+          "内置技能套件",
+          "受管技能套件",
+          "本地全局技能",
           ".agents/skills",
           ".pi/skills",
           "skill",
@@ -107,7 +112,19 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "integrations",
         ...messages.settings.sections.integrations,
-        searchTerms: ["browser67", "浏览器", "集成", "setup", "doctor", "integration"],
+        searchTerms: [
+          "browser67",
+          "浏览器",
+          "集成",
+          "setup",
+          "doctor",
+          "integration",
+          "tavily",
+          "mcp",
+          "搜索",
+          "token",
+          "中转"
+        ],
         icon: Unplug
       },
       {
@@ -150,7 +167,6 @@ export function sectionSupportsProjectScope(section: SettingsSection): boolean {
     || section === "packages"
     || section === "extensions"
     || section === "prompts"
-    || section === "rules"
     || section === "runtime";
 }
 

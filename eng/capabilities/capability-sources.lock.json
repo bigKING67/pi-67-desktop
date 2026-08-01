@@ -39,6 +39,20 @@
       "version": "2.2.0"
     }
   ],
+  "skillPacks": [
+    {
+      "name": "ai-berkshire-investment-suite",
+      "adapter": "pi67-ai-berkshire-v1",
+      "adapterSourceId": "pi67-core",
+      "repository": "https://github.com/xbtlin/ai-berkshire",
+      "ref": "refs/heads/main",
+      "commit": "66e556262d6486a9819286252e5c9f90a4cfa386",
+      "localSibling": "../ai-berkshire",
+      "version": "1.0.1",
+      "manifestSha256": "ce79fbc1c20d8da9e6a3171dc267df50470fe89c52db577ff441c8c582556ab0",
+      "bundleSha256": "7438834d7e26b0043332c886503cfdf45ac3dab5d1e46def95ce2b899f08d018"
+    }
+  ],
   "recommendedExternal": [
     { "id": "pi-subagents", "source": "npm:pi-subagents", "recommendedVersion": "0.34.0" },
     { "id": "pi-observational-memory", "source": "npm:pi-observational-memory", "recommendedVersion": "3.0.2" },

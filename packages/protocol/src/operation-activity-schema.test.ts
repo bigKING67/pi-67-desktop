@@ -31,6 +31,29 @@ describe("operation activity protocol", () => {
       payload: { ...valid.payload, activity: undefined }
     })).toBe(false);
   });
+
+  it("accepts bounded tool identity and outcome without raw arguments or results", () => {
+    const tool = eventEnvelope("operation.activityChanged", {
+      operationId: "operation-1",
+      activity: {
+        kind: "tool",
+        toolCallId: "tool-1",
+        toolName: "WebSearch",
+        toolKind: "search",
+        status: "failed",
+        aliasTarget: "web_search"
+      }
+    }, eventContext());
+
+    expect(isEventEnvelope(tool)).toBe(true);
+    expect(isEventEnvelope({
+      ...tool,
+      payload: {
+        ...tool.payload,
+        activity: { ...tool.payload.activity, rawResult: "must not cross protocol" }
+      }
+    })).toBe(false);
+  });
 });
 
 function eventContext() {

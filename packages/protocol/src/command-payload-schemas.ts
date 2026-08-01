@@ -3,6 +3,11 @@ import type { AgentCommandType } from "./agent-messages.js";
 import { ApprovalRespondSchema } from "./approval-schemas.js";
 import { AssetReadPayloadSchema } from "./asset-schemas.js";
 import {
+  ContextFileListPayloadSchema,
+  ContextFileReadPayloadSchema,
+  ContextFileSavePayloadSchema
+} from "./context-file-schemas.js";
+import {
   ExtensionPackageEnabledTargetSchema,
   ExtensionPackageInheritanceTargetSchema,
   ExtensionPackageTargetSchema
@@ -13,6 +18,7 @@ import {
   PiProviderConfigurationInputSchema
 } from "./provider-configuration-schemas.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
+import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
 
 const EmptyPayloadSchema = strictObject({});
@@ -21,14 +27,11 @@ const ApprovalModeSchema = Type.Union([Type.Literal("guided"), Type.Literal("bal
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const PromptSchema = Type.String({ maxLength: 2_000_000 });
 const SubmissionIdSchema = Type.String({ minLength: 1, maxLength: 512 });
-const TransferImageSchema = strictObject({
-  name: Type.String({ minLength: 1, maxLength: 512 }),
-  mimeType: Type.String({ minLength: 1, maxLength: 128 }),
-  // ArrayBuffer is verified with an explicit runtime predicate after TypeBox validation.
-  data: Type.Any()
+const PromptAttachmentRefSchema = strictObject({
+  id: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" })
 });
-const ImagesSchema = Type.Optional(Type.Array(TransferImageSchema, { maxItems: 8 }));
-const PromptPayloadSchema = strictObject({ text: PromptSchema, images: ImagesSchema });
+const PromptAttachmentsSchema = Type.Optional(Type.Array(PromptAttachmentRefSchema, { maxItems: 20 }));
+const PromptPayloadSchema = strictObject({ text: PromptSchema });
 
 export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "runtime.initialize": strictObject({
@@ -74,7 +77,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "prompt.submit": strictObject({
     submissionId: SubmissionIdSchema,
     text: PromptSchema,
-    images: ImagesSchema,
+    attachments: PromptAttachmentsSchema,
     delivery: Type.Union([Type.Literal("new-turn"), Type.Literal("steer"), Type.Literal("follow-up")])
   }),
   "prompt.steer": PromptPayloadSchema,
@@ -133,6 +136,9 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "thinking.set": strictObject({ level: Type.String({ minLength: 1, maxLength: 32 }) }),
   "resource.list": EmptyPayloadSchema,
   "resource.reload": EmptyPayloadSchema,
+  "context.file.list": ContextFileListPayloadSchema,
+  "context.file.read": ContextFileReadPayloadSchema,
+  "context.file.save": ContextFileSavePayloadSchema,
   "command.list": EmptyPayloadSchema,
   "command.invoke": strictObject({
     submissionId: SubmissionIdSchema,
@@ -146,6 +152,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "extension.package.setEnabled": ExtensionPackageEnabledTargetSchema,
   "extension.package.restoreInheritance": ExtensionPackageInheritanceTargetSchema,
   "extension.package.uninstall": ExtensionPackageTargetSchema,
+  "skill.pack.list": EmptyPayloadSchema,
+  "skill.pack.checkUpdates": EmptyPayloadSchema,
+  "skill.pack.update": SkillPackTargetSchema,
+  "skill.pack.restore": SkillPackTargetSchema,
   "extension.ui.respond": strictObject({
     requestId: Type.String({ minLength: 1, maxLength: 512 }),
     sessionId: Type.String({ minLength: 1, maxLength: 512 }),

@@ -42,6 +42,20 @@ describe("decideApproval", () => {
     }
   });
 
+  it("allows verified read-only web capabilities without per-call approval", () => {
+    for (const mode of ["guided", "balanced"] as const) {
+      expect(decideApproval({
+        toolName: "web_search",
+        category: "network-read",
+        target: "杭州天气"
+      }, "trusted", mode)).toEqual({
+        allow: true,
+        approvalRequired: false,
+        reason: "Verified read-only web capability."
+      });
+    }
+  });
+
   it("keeps adversarial Bash, PowerShell and CMD syntax behind one-shot approval", () => {
     expect(ADVERSARIAL_SHELL_COMMANDS.length).toBeGreaterThanOrEqual(50);
     for (const mode of ["guided", "balanced"] as const) {

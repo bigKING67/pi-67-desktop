@@ -96,6 +96,17 @@ describe("notification store", () => {
     expect(useNotificationStore.getState().items).toHaveLength(1);
   });
 
+  it("records informational history without forcing a floating toast", () => {
+    useNotificationStore.getState().publish({
+      level: "info",
+      title: "Pi 资源已重新加载",
+      toast: false
+    });
+
+    expect(useNotificationStore.getState().items).toHaveLength(1);
+    expect(useNotificationStore.getState().toastIds).toEqual([]);
+  });
+
   it("marks all history as read", () => {
     useNotificationStore.getState().publish({ level: "info", title: "第一条" });
     useNotificationStore.getState().publish({ level: "warning", title: "第二条" });

@@ -25,7 +25,18 @@ export interface ImagePart {
   name?: string;
 }
 
-export type MessagePart = TextPart | ToolCallPart | ImagePart;
+export type AttachmentKind = "document" | "archive" | "audio" | "video" | "file";
+
+export interface AttachmentPart {
+  type: "attachment";
+  id: string;
+  name: string;
+  mimeType: string;
+  byteLength: number;
+  kind: AttachmentKind;
+}
+
+export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart;
 
 export interface SessionMessageView {
   id: string;
@@ -33,6 +44,7 @@ export interface SessionMessageView {
   parts: MessagePart[];
   createdAt?: number;
   model?: string;
+  toolName?: string;
   stopped?: boolean;
   error?: string;
 }

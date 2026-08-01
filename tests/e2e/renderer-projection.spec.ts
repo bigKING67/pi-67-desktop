@@ -115,8 +115,13 @@ test("throttles assistant stream announcements and clears them when the turn set
 
   await expect(announcer).toHaveText("第一句。");
   await expect(announcer).not.toContainText("private reasoning");
+  const liveProcess = page.getByTestId("transcript-process-group");
+  await expect(liveProcess).toHaveAttribute("open", "");
+  await expect(liveProcess).toContainText("private reasoning");
+  await expect(liveProcess).toContainText("分析");
   const liveMessage = page.getByRole("article", { name: "Pi 正在回复", exact: true });
   await expect(liveMessage).toBeVisible();
+  await expect(liveMessage).not.toContainText("private reasoning");
   await expect(liveMessage.locator('[data-message-footer="assistant"]')).toHaveCount(0);
   await expect(liveMessage.getByRole("button", { name: "复制回答" })).toHaveCount(0);
   await emitMockAgentEvent(page, {
@@ -130,6 +135,7 @@ test("throttles assistant stream announcements and clears them when the turn set
   }, { operationId });
   await expect(announcer).toHaveText("第一句。");
   await expect(announcer).toHaveText("第二句。", { timeout: 3_000 });
+  await expect(liveProcess).toContainText("more private reasoning");
 
   await setMockConversationMessages(page, [
     message("settled-message", "Settled response"),
@@ -302,7 +308,8 @@ test("projects live changes, preserves write truth boundaries and restores chang
     }
   });
   await expect(page.getByRole("tab", { name: "修改" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByText("src/live.ts", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "修改" })
+    .getByText("src/live.ts", { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("Unified patch 预览")).toContainText("+new");
 
   await emitMockAgentEvent(page, {

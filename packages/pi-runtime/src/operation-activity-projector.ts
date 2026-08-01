@@ -1,5 +1,6 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { OperationActivity, RuntimeOperationActivity, ToolPresentationKind } from "@pi67/domain";
+import { desktopToolAliasTarget } from "./tool-routing-extension.js";
 
 const MAX_ACTIVE_TOOLS = 64;
 
@@ -39,10 +40,15 @@ export class OperationActivityProjector {
         return;
       }
       case "tool_execution_start": {
+        const toolName = safeToolName(event.toolName);
+        const aliasTarget = desktopToolAliasTarget(toolName);
         const activity = {
           kind: "tool",
           toolCallId: event.toolCallId,
-          toolKind
+          toolName,
+          toolKind,
+          status: "running",
+          ...(aliasTarget === undefined ? {} : { aliasTarget })
         } as const;
         this.activeTools.delete(event.toolCallId);
         this.activeTools.set(event.toolCallId, activity);
@@ -50,10 +56,23 @@ export class OperationActivityProjector {
         this.publish(activity);
         return;
       }
-      case "tool_execution_end":
+      case "tool_execution_end": {
+        const active = this.activeTools.get(event.toolCallId);
         this.activeTools.delete(event.toolCallId);
-        this.publish(lastActiveTool(this.activeTools) ?? null);
+        const toolName = active?.toolName ?? safeToolName(event.toolName);
+        const aliasTarget = active?.aliasTarget ?? desktopToolAliasTarget(toolName);
+        this.publish({
+          kind: "tool",
+          toolCallId: event.toolCallId,
+          toolName,
+          toolKind: active?.toolKind ?? "generic",
+          status: event.isError ? "failed" : "completed",
+          ...(aliasTarget === undefined ? {} : { aliasTarget })
+        });
+        const next = lastActiveTool(this.activeTools);
+        if (next) this.publish(next);
         return;
+      }
       case "compaction_start":
         this.publish({ kind: "compaction" });
         return;
@@ -99,7 +118,20 @@ function sameActivity(
   if (left === null || right === null) return left === right;
   if (!left || left.kind !== right.kind) return false;
   if (left.kind === "tool" && right.kind === "tool") {
-    return left.toolCallId === right.toolCallId && left.toolKind === right.toolKind;
+    return left.toolCallId === right.toolCallId
+      && left.toolName === right.toolName
+      && left.toolKind === right.toolKind
+      && left.status === right.status
+      && left.aliasTarget === right.aliasTarget;
   }
   return true;
+}
+
+function safeToolName(value: string): string {
+  const bounded = value.slice(0, 128);
+  for (let index = 0; index < bounded.length; index += 1) {
+    const code = bounded.charCodeAt(index);
+    if (code <= 31 || code === 127) return "unknown-tool";
+  }
+  return bounded || "unknown-tool";
 }

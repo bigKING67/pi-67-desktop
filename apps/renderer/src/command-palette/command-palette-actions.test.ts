@@ -42,7 +42,7 @@ describe("command palette actions", () => {
 function build(connected: boolean, activeOperation: OperationView | undefined) {
   return buildPaletteActions({
     sessions: SESSIONS,
-    extensionCommands: [{ name: "inspect" }],
+    extensionCommands: [{ name: "inspect", source: "extension" }],
     activeSessionPath: "/sessions/current.jsonl",
     availability: paletteAvailability({
       connected,

@@ -6,18 +6,13 @@ import {
   MOCK_RUNTIME_CAPABILITIES
 } from "./pi67-extension-catalog-fixture.js";
 import { MOCK_SESSION_CATALOG_STATUS, mockSessionCatalogPage } from "./pi67-session-catalog-fixture.js";
-import {
-  createMockSessionSnapshot,
-  installMockSessionControlCommandHandler
-} from "./pi67-renderer-snapshot-fixture.js";
+import { createMockSessionSnapshot, installMockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import { installMockAssetReadHandler, type MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
 import { installMockCommandResponseHandler, type MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
 import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixture.js";
 import { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
-import {
-  installMockPayloadSanitizer,
-  type MockPayloadSanitizer
-} from "./pi67-renderer-payload-sanitizer.js";
+import { createMockContextFiles, installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
+import { installMockPayloadSanitizer, type MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
 import type {
   FixtureAgentState,
   FixtureMessage,
@@ -52,11 +47,12 @@ export async function attachMockAgent(
   await page.evaluate(installMockAssetReadHandler);
   await page.evaluate(installMockSessionRotationHandler);
   await page.evaluate(installMockPayloadSanitizer);
+  await page.evaluate(installMockContextFileCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
     fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
   });
-  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolRevision }) => {
+  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureContextFiles, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolRevision }) => {
     const testWindow = window as FixtureWindow;
     const readMockAsset = (testWindow as FixtureWindow & {
       __pi67ReadMockAsset: MockAssetReadHandler;
@@ -84,7 +80,8 @@ export async function attachMockAgent(
       operationCounter: 0,
       conversationMessages: fixtureMessages,
       workspaceChanges: { sessionId: "session-test", items: [], truncated: false, total: 0 },
-      extensionCatalog: fixtureExtensionCatalog,
+      extensionCatalog: fixtureOptions.extensionCatalog ?? fixtureExtensionCatalog,
+      contextFiles: fixtureOptions.contextFiles ?? fixtureContextFiles,
       providerConfiguration: fixtureProviderConfiguration,
       sessionCatalogPage: fixtureSessionCatalogPage,
       sessionCatalogPagesByWorkspace: fixtureSessionCatalogPagesByWorkspace,
@@ -108,7 +105,7 @@ export async function attachMockAgent(
         const channel = new MessageChannel();
         const hostPort = channel.port2 as TestPort;
         state.activePort = hostPort;
-        hostPort.onmessage = (messageEvent) => {
+        hostPort.onmessage = async (messageEvent) => {
           const envelope = messageEvent.data as {
             kind?: string;
             appInstanceId?: string;
@@ -153,7 +150,7 @@ export async function attachMockAgent(
           }
           state.commands.push({
             type: envelope.type,
-            payload: sanitizeMockPayload(envelope.type, envelope.payload),
+            payload: await sanitizeMockPayload(envelope.type, envelope.payload),
             hostEpoch,
             context: structuredClone(envelope.context)
           });
@@ -444,6 +441,7 @@ export async function attachMockAgent(
     fixtureRuntimeCapabilities: MOCK_RUNTIME_CAPABILITIES,
     fixtureProviderConfiguration: options.providerConfigurationSnapshot
       ?? createMockProviderConfigurationSnapshot(),
+    fixtureContextFiles: createMockContextFiles(),
     fixtureSessionCatalogPage: mockSessionCatalogPage(options.sessionCatalogItems ?? []),
     fixtureSessionCatalogPagesByWorkspace: Object.fromEntries(
       Object.entries(options.sessionCatalogItemsByWorkspace ?? {}).map(([workspaceId, items]) => (

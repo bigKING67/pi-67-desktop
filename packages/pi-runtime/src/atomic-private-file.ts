@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, open, rename, stat, unlink } from "node:fs/promises";
+import { chmod, link, mkdir, open, rename, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import lockfile from "proper-lockfile";
 
@@ -41,6 +41,26 @@ export async function writePrivateFileAtomically(path: string, content: string):
   } catch (error) {
     await unlink(temporaryPath).catch(() => undefined);
     throw error;
+  }
+}
+
+export async function createPrivateFileAtomically(path: string, content: string): Promise<void> {
+  const directory = dirname(path);
+  await mkdir(directory, { recursive: true });
+  const temporaryPath = join(directory, `.${randomUUID()}.pi67-tmp`);
+  const file = await open(temporaryPath, "wx", PRIVATE_FILE_MODE);
+  try {
+    await file.writeFile(content, "utf8");
+    await file.sync();
+  } finally {
+    await file.close();
+  }
+  try {
+    // A same-directory hard link publishes the fully written inode without replacing an existing file.
+    await link(temporaryPath, path);
+    await syncDirectory(directory);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
   }
 }
 

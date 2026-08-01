@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   editableUserMessageText,
   messageTextForCopy,
-  userMessageContainsImage
+  userMessageContainsAttachment
 } from "./message-actions.js";
 
 describe("transcript message actions", () => {
@@ -31,7 +31,7 @@ describe("transcript message actions", () => {
     };
 
     expect(editableUserMessageText(message)).toBe("Keep this prompt.");
-    expect(userMessageContainsImage(message)).toBe(false);
+    expect(userMessageContainsAttachment(message)).toBe(false);
     expect(message.parts[0]).toEqual({ type: "text", text: "  Keep this prompt.  " });
   });
 
@@ -47,6 +47,28 @@ describe("transcript message actions", () => {
 
     expect(messageTextForCopy(message)).toBe("Describe this.");
     expect(editableUserMessageText(message)).toBeUndefined();
-    expect(userMessageContainsImage(message)).toBe(true);
+    expect(userMessageContainsAttachment(message)).toBe(true);
+  });
+
+  it("does not offer lossy editing for user messages with ordinary attachments", () => {
+    const message: SessionMessageView = {
+      id: "user-document-1",
+      role: "user",
+      parts: [
+        { type: "text", text: "Review this." },
+        {
+          type: "attachment",
+          id: "attachment-1",
+          name: "requirements.pdf",
+          mimeType: "application/pdf",
+          byteLength: 42,
+          kind: "document"
+        }
+      ]
+    };
+
+    expect(messageTextForCopy(message)).toBe("Review this.");
+    expect(editableUserMessageText(message)).toBeUndefined();
+    expect(userMessageContainsAttachment(message)).toBe(true);
   });
 });

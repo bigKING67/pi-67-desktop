@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  commitFromGitRefOutput,
   compareStableVersions,
   createCapabilityFreshnessReport,
   latestStableReleaseFromGitOutput
@@ -40,7 +41,7 @@ describe("first-party capability freshness", () => {
       now: () => new Date("2026-07-30T12:00:00.000Z"),
       resolveLatest: async (repository) => {
         if (repository.endsWith("/current.git")) {
-          return { version: "1.0.0", tag: "v1.0.0", commit: LATEST_COMMIT };
+          return { version: "1.0.0", tag: "v1.0.0", commit: CURRENT_COMMIT };
         }
         if (repository.endsWith("/stale.git")) {
           return { version: "2.2.0", tag: "v2.2.0", commit: LATEST_COMMIT };
@@ -49,14 +50,15 @@ describe("first-party capability freshness", () => {
           return { version: "2.0.0", tag: "v2.0.0", commit: LATEST_COMMIT };
         }
         throw new Error(`network failed\n${"x".repeat(600)}`);
-      }
+      },
+      resolveRef: async () => CURRENT_COMMIT
     });
 
     expect(report).toMatchObject({
       generatedAt: "2026-07-30T12:00:00.000Z",
       catalogVersion: "2026.07.30.1",
       status: "failed",
-      statuses: { ahead: 1, current: 1, stale: 1, unreachable: 1 }
+      statuses: { ahead: 1, current: 2, stale: 1, unreachable: 1 }
     });
     expect(report.sources.map(({ id, status }) => ({ id, status }))).toEqual([
       { id: "current", status: "current" },
@@ -66,6 +68,37 @@ describe("first-party capability freshness", () => {
     ]);
     expect(report.sources[3].error).not.toContain("\n");
     expect(report.sources[3].error.length).toBeLessThanOrEqual(500);
+    expect(report.skillPacks).toEqual([{
+      name: "ai-berkshire-investment-suite",
+      repository: "https://github.com/example/ai-berkshire.git",
+      ref: "refs/heads/main",
+      lockedVersion: "1.0.1",
+      lockedCommit: CURRENT_COMMIT,
+      latestCommit: CURRENT_COMMIT,
+      status: "current"
+    }]);
+  });
+
+  it("parses one exact tracked branch ref and detects a newer Skill Pack commit", async () => {
+    expect(commitFromGitRefOutput(
+      `${LATEST_COMMIT}\trefs/heads/main\n`,
+      "refs/heads/main"
+    )).toBe(LATEST_COMMIT);
+    expect(() => commitFromGitRefOutput("", "refs/heads/main")).toThrow(/did not resolve/u);
+
+    const lock = fixtureLock();
+    const report = await createCapabilityFreshnessReport({
+      lock,
+      resolveLatest: async (repository) => ({
+        version: lock.sources.find((source) => source.repository === repository).version,
+        tag: "v1.0.0",
+        commit: LATEST_COMMIT
+      }),
+      resolveRef: async () => LATEST_COMMIT
+    });
+    expect(report.sources.every((source) => source.status === "current")).toBe(true);
+    expect(report.skillPacks[0].status).toBe("stale");
+    expect(report.status).toBe("failed");
   });
 
   it("rejects ambiguous stable tag aliases that resolve to different commits", () => {
@@ -107,7 +140,8 @@ function fixtureLock() {
       source("stale", "2.0.0"),
       source("ahead", "3.0.0"),
       source("offline", "1.0.0")
-    ]
+    ],
+    skillPacks: [skillPackSource()]
   };
 }
 
@@ -117,5 +151,19 @@ function source(id, version) {
     repository: `https://github.com/example/${id}.git`,
     commit: CURRENT_COMMIT,
     version
+  };
+}
+
+function skillPackSource() {
+  return {
+    name: "ai-berkshire-investment-suite",
+    adapter: "pi67-ai-berkshire-v1",
+    adapterSourceId: "pi67-core",
+    repository: "https://github.com/example/ai-berkshire.git",
+    ref: "refs/heads/main",
+    commit: CURRENT_COMMIT,
+    version: "1.0.1",
+    manifestSha256: "4".repeat(64),
+    bundleSha256: "5".repeat(64)
   };
 }

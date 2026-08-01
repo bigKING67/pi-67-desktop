@@ -1,55 +1,48 @@
 import {
-  ALLOWED_IMAGE_MIME_TYPES,
-  MAX_TRANSFER_IMAGE_BYTES,
-  MAX_TRANSFER_IMAGE_COUNT,
-  MAX_TRANSFER_IMAGE_TOTAL_BYTES,
-  type TransferImage
+  MAX_PROMPT_ATTACHMENT_BYTES,
+  MAX_PROMPT_ATTACHMENT_COUNT,
+  MAX_PROMPT_ATTACHMENT_NAME_CHARS,
+  MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
+  type StagedPromptAttachment
 } from "@pi67/protocol";
 
-export interface DraftAttachment {
-  id: string;
-  file: File;
-  previewUrl: string;
+export interface DraftAttachment extends StagedPromptAttachment {
+  identity: string;
+  previewUrl?: string;
 }
 
-export function createDraftAttachments(
+export async function stageDraftAttachments(
   files: Iterable<File>,
   current: readonly DraftAttachment[]
-): DraftAttachment[] {
+): Promise<DraftAttachment[]> {
   const selected = [...files];
   if (selected.length === 0) return [...current];
-  if (current.length + selected.length > MAX_TRANSFER_IMAGE_COUNT) {
-    throw new Error(`每条消息最多添加 ${MAX_TRANSFER_IMAGE_COUNT} 张图片。`);
+  validateSelectedFiles(selected, current);
+  const staged = await window.pi67.system.stagePromptAttachments(selected);
+  if (staged.length !== selected.length) {
+    await releaseAttachmentIds(staged.map((attachment) => attachment.id));
+    throw new Error("附件暂存结果不完整，请重新选择。");
   }
-
-  const identities = new Set(current.map((attachment) => fileIdentity(attachment.file)));
-  let totalBytes = current.reduce((sum, attachment) => sum + attachment.file.size, 0);
-  for (const file of selected) {
-    if (!ALLOWED_IMAGE_MIME_TYPES.some((mimeType) => mimeType === file.type)) {
-      throw new Error(`不支持 ${file.name} 的图片格式。`);
-    }
-    if (file.size > MAX_TRANSFER_IMAGE_BYTES) {
-      throw new Error(`${file.name} 超过单张 10 MiB 限制。`);
-    }
-    const identity = fileIdentity(file);
-    if (identities.has(identity)) throw new Error(`${file.name} 已经添加。`);
-    identities.add(identity);
-    totalBytes += file.size;
-    if (totalBytes > MAX_TRANSFER_IMAGE_TOTAL_BYTES) {
-      throw new Error("图片总大小超过每条消息 30 MiB 限制。");
-    }
-  }
-
   const created: DraftAttachment[] = [];
   try {
-    for (const file of selected) {
-      created.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+    for (let index = 0; index < staged.length; index += 1) {
+      const attachment = staged[index];
+      const file = selected[index];
+      if (!attachment || !file || attachment.name !== file.name || attachment.byteLength !== file.size) {
+        throw new Error("附件暂存结果与所选文件不一致，请重新选择。");
+      }
+      created.push({
+        ...attachment,
+        identity: fileIdentity(file),
+        ...(attachment.kind === "image" ? { previewUrl: URL.createObjectURL(file) } : {})
+      });
     }
+    return [...current, ...created];
   } catch (error) {
-    revokeDraftAttachments(created);
+    revokeObjectUrls(created);
+    await releaseAttachmentIds(staged.map((attachment) => attachment.id));
     throw error;
   }
-  return [...current, ...created];
 }
 
 export function filesFromTransfer(transfer: DataTransfer): File[] {
@@ -70,25 +63,49 @@ export function removeDraftAttachment(
   id: string
 ): DraftAttachment[] {
   const removed = attachments.find((attachment) => attachment.id === id);
-  if (removed) URL.revokeObjectURL(removed.previewUrl);
+  if (removed) {
+    revokeObjectUrls([removed]);
+    void releaseAttachmentIds([removed.id]);
+  }
   return attachments.filter((attachment) => attachment.id !== id);
 }
 
 export function revokeDraftAttachments(attachments: readonly DraftAttachment[]): void {
-  for (const attachment of attachments) URL.revokeObjectURL(attachment.previewUrl);
+  revokeObjectUrls(attachments);
+  void releaseAttachmentIds(attachments.map((attachment) => attachment.id));
 }
 
-export async function toTransferImages(attachments: readonly DraftAttachment[]): Promise<TransferImage[]> {
-  return Promise.all(attachments.map(async ({ file }) => ({
-    name: file.name,
-    mimeType: file.type,
-    data: await file.arrayBuffer()
-  })));
+function validateSelectedFiles(files: readonly File[], current: readonly DraftAttachment[]): void {
+  if (current.length + files.length > MAX_PROMPT_ATTACHMENT_COUNT) {
+    throw new Error(`每条消息最多添加 ${MAX_PROMPT_ATTACHMENT_COUNT} 个附件。`);
+  }
+  const identities = new Set(current.map((attachment) => attachment.identity));
+  let totalBytes = current.reduce((sum, attachment) => sum + attachment.byteLength, 0);
+  for (const file of files) {
+    if (!file.name || file.name.length > MAX_PROMPT_ATTACHMENT_NAME_CHARS) {
+      throw new Error("附件文件名为空或过长。");
+    }
+    if (file.size > MAX_PROMPT_ATTACHMENT_BYTES) {
+      throw new Error(`${file.name} 超过单文件 100 MiB 限制。`);
+    }
+    const identity = fileIdentity(file);
+    if (identities.has(identity)) throw new Error(`${file.name} 已经添加。`);
+    identities.add(identity);
+    totalBytes += file.size;
+    if (totalBytes > MAX_PROMPT_ATTACHMENT_TOTAL_BYTES) {
+      throw new Error("附件总大小超过每条消息 250 MiB 限制。");
+    }
+  }
 }
 
-export function formatAttachmentFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KiB`;
+function revokeObjectUrls(attachments: readonly DraftAttachment[]): void {
+  for (const attachment of attachments) {
+    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+  }
+}
+
+function releaseAttachmentIds(ids: readonly string[]): Promise<void> {
+  return ids.length === 0 ? Promise.resolve() : window.pi67.system.releasePromptAttachments([...ids]);
 }
 
 function fileIdentity(file: File): string {

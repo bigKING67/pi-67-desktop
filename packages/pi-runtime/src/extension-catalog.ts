@@ -6,6 +6,8 @@ import {
   MAX_EXTENSION_CATALOG_JSON_BYTES,
   MAX_EXTENSION_CATALOG_LABEL_CHARS,
   MAX_EXTENSION_CATALOG_PATH_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS,
+  MAX_EXTENSION_CATALOG_TOOL_NAMES,
   MAX_EXTENSION_SURFACE_DETAIL_CHARS,
   type ExtensionCatalogItem,
   type ExtensionCatalogResult,
@@ -16,6 +18,12 @@ import {
 } from "@pi67/domain";
 import { sanitizeRuntimeText } from "./runtime-redaction.js";
 import { DESKTOP_SAFETY_EXTENSION_PATH } from "./safety-extension.js";
+import { DESKTOP_TOOL_ROUTING_EXTENSION_PATH } from "./tool-routing-extension.js";
+
+const DESKTOP_INTERNAL_EXTENSION_PATHS = new Set([
+  DESKTOP_SAFETY_EXTENSION_PATH,
+  DESKTOP_TOOL_ROUTING_EXTENSION_PATH
+]);
 
 export function projectExtensionCatalog(
   extensions: LoadExtensionsResult | undefined,
@@ -26,7 +34,7 @@ export function projectExtensionCatalog(
       .filter((extension) => !extension.hidden)
       .map((extension) => projectLoadedExtension(extension, adapterMatches.get(extensionProjectionId(extension)))),
     ...(extensions?.errors ?? [])
-      .filter((error) => error.path !== DESKTOP_SAFETY_EXTENSION_PATH)
+      .filter((error) => !DESKTOP_INTERNAL_EXTENSION_PATHS.has(error.path))
       .map((error) => projectLoadError(error.path, error.error))
   ].sort(compareCatalogItems);
   const items = boundedCatalogItems(candidates);
@@ -57,7 +65,8 @@ function projectLoadedExtension(
     ...(adapterMatch === undefined ? {} : { adapter: projectAdapterMatch(adapterMatch) }),
     assessment,
     commandCount,
-    toolCount
+    toolCount,
+    toolNames: projectToolNames(extension.tools.keys())
   };
 }
 
@@ -78,7 +87,8 @@ function projectLoadError(path: string, error: string): ExtensionCatalogItem {
       surfaces: allSurfaces("unsupported", "Extension 加载失败，Desktop 不会尝试执行其能力。")
     },
     commandCount: 0,
-    toolCount: 0
+    toolCount: 0,
+    toolNames: []
   };
 }
 
@@ -225,6 +235,30 @@ function bounded(value: string, maxLength: number): string {
 
 function nonEmptyBounded(value: string, maxLength: number): string {
   return bounded(value.trim() || "unknown-extension", maxLength);
+}
+
+function projectToolNames(names: Iterable<string>): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const name of names) {
+    if (result.length >= MAX_EXTENSION_CATALOG_TOOL_NAMES) break;
+    const normalized = replaceControlCharacters(name).trim();
+    if (!normalized) continue;
+    const boundedName = bounded(normalized, MAX_EXTENSION_CATALOG_TOOL_NAME_CHARS);
+    if (seen.has(boundedName)) continue;
+    seen.add(boundedName);
+    result.push(boundedName);
+  }
+  return result;
+}
+
+function replaceControlCharacters(value: string): string {
+  let result = "";
+  for (const character of value) {
+    const code = character.codePointAt(0) ?? 0;
+    result += code <= 31 || code === 127 ? " " : character;
+  }
+  return result;
 }
 
 function catalogLabel(extension: Extension): string {

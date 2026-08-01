@@ -8,6 +8,8 @@ import { isAttachPortMessage } from "./connection-context.js";
 import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
+import { bootstrapTeamMcpConfig } from "./team-mcp-bootstrap.js";
+import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -22,11 +24,17 @@ interface UtilityParentPort {
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
 
+const agentDir = resolveAgentDirectory(undefined);
 await bootstrapDesktopCapabilities({
-  agentDir: resolveAgentDirectory(undefined)
+  agentDir
+});
+await bootstrapTeamMcpConfig({
+  agentDir
 });
 
+const promptAttachments = createPromptAttachmentAccessOwner(process.env.PI67_PROMPT_ATTACHMENT_ROOT);
 const server = new AgentHostServer(undefined, {
+  ...(promptAttachments === undefined ? {} : { promptAttachments }),
   onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message)
 });
 let shuttingDown = false;

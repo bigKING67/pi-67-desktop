@@ -102,7 +102,7 @@ export interface WorkbenchStateV2 {
   cleanExit: boolean;
 }
 
-export const MAX_RUNNING_TASKS = 4;
+export const MAX_RUNNING_TASKS = 8;
 
 export function taskConsumesRunSlot(lifecycle: TaskLifecycle): boolean {
   return lifecycle === "accepted"

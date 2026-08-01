@@ -9,12 +9,13 @@ export function messageTextForCopy(message: SessionMessageView): string | undefi
 }
 
 export function editableUserMessageText(message: SessionMessageView): string | undefined {
-  if (message.role !== "user" || message.parts.some((part) => part.type === "image")) {
+  if (message.role !== "user" || userMessageContainsAttachment(message)) {
     return undefined;
   }
   return messageTextForCopy(message);
 }
 
-export function userMessageContainsImage(message: SessionMessageView): boolean {
-  return message.role === "user" && message.parts.some((part) => part.type === "image");
+export function userMessageContainsAttachment(message: SessionMessageView): boolean {
+  return message.role === "user"
+    && message.parts.some((part) => part.type === "image" || part.type === "attachment");
 }

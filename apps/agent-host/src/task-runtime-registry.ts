@@ -6,6 +6,7 @@ import type {
 } from "@pi67/pi-runtime";
 import type { TaskProtocolContext } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
+import type { PromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
 
 export type TaskRuntimeLoader = (options?: PiSdkRuntimeOptions) => Promise<AgentRuntime>;
 
@@ -31,7 +32,8 @@ export class TaskRuntimeRegistry {
   constructor(
     private readonly runtimeLoader: TaskRuntimeLoader,
     private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore,
-    private readonly options: TaskRuntimeRegistryOptions = {}
+    private readonly options: TaskRuntimeRegistryOptions = {},
+    private readonly promptAttachments?: PromptAttachmentAccessOwner
   ) {}
 
   admit(context: TaskProtocolContext): TaskRuntimeRecord {
@@ -107,6 +109,9 @@ export class TaskRuntimeRegistry {
     record.workspaceServices = workspaceServices;
     const runtimeOptions: PiSdkRuntimeOptions = {
       runtimeCredentialOverrides: this.runtimeCredentialOverrides,
+      ...(this.promptAttachments === undefined
+        ? {}
+        : { promptAttachmentAccess: this.promptAttachments.forTask(record.taskKey) }),
       ...(workspaceServices === undefined ? {} : { workspaceServices })
     };
     record.runtimeLoad = this.runtimeLoader(runtimeOptions)

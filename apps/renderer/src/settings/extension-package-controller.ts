@@ -1,7 +1,9 @@
 import {
   taskConsumesRunSlot,
+  type ExtensionPackageEntry,
   type ExtensionPackageMutationResult,
-  type ExtensionPackageScope
+  type ExtensionPackageScope,
+  type ExtensionPackageUpdate
 } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
@@ -128,7 +130,14 @@ async function mutate<T extends MutationType>(
 ): Promise<boolean> {
   const target = resolveWorkspace(workspaceId);
   if (!target || !preflightMutation(target.id, scope)) return false;
-  useExtensionPackageStore.getState().begin(target.id, "mutating");
+  const store = useExtensionPackageStore.getState();
+  const beforeItems = store.items;
+  const pendingUpdate = type === "extension.package.update" && "scope" in payload
+    ? store.updates.find((entry) => (
+        entry.source === payload.source && entry.scope === payload.scope
+      ))
+    : undefined;
+  store.begin(target.id, "mutating");
   try {
     await ensureAgentConnection();
     const result = await agentConnectionController.request(
@@ -137,17 +146,27 @@ async function mutate<T extends MutationType>(
       [],
       { context: workspaceContext(target.id) }
     ) as ExtensionPackageMutationResult;
-    const store = useExtensionPackageStore.getState();
-    store.installList(target.id, result.items);
+    const currentStore = useExtensionPackageStore.getState();
+    currentStore.installList(target.id, result.items);
     if (
       (type === "extension.package.update" || type === "extension.package.uninstall")
       && "scope" in payload
-    ) store.removeUpdate(target.id, payload.source, payload.scope);
-    publishNotification({
-      level: "success",
-      title: successTitle,
-      message: result.changed ? "Pi Settings 已更新。" : "配置已经是目标状态。"
-    });
+    ) currentStore.removeUpdate(target.id, payload.source, payload.scope);
+    publishNotification(type === "extension.package.update" && "scope" in payload
+      ? updateNotification(
+          payload.source,
+          payload.scope,
+          beforeItems,
+          pendingUpdate,
+          result
+        )
+      : {
+          level: "success",
+          title: successTitle,
+          message: result.changed
+            ? "扩展包配置已应用，Pi 资源已重新加载。"
+            : "配置已经是目标状态。"
+        });
     return true;
   } catch (error) {
     return reportFailure(target.id, "扩展包操作失败", error);
@@ -199,6 +218,49 @@ function resolveWorkspace(workspaceId?: string) {
 
 function workspaceContext(workspaceId: string) {
   return { scope: "workspace" as const, workspaceId };
+}
+
+function updateNotification(
+  source: string,
+  scope: ExtensionPackageScope,
+  beforeItems: ExtensionPackageEntry[],
+  pendingUpdate: ExtensionPackageUpdate | undefined,
+  result: ExtensionPackageMutationResult
+) {
+  const previous = packageEntry(beforeItems, source, scope);
+  const current = packageEntry(result.items, source, scope);
+  const displayName = current?.displayName
+    ?? pendingUpdate?.displayName
+    ?? previous?.displayName
+    ?? "该扩展包";
+  if (!result.changed) {
+    return {
+      level: "info" as const,
+      title: `${displayName} 已是最新`,
+      message: current?.version
+        ? `当前版本 ${current.version}，没有需要安装的更新。`
+        : "当前配置已经是目标状态。"
+    };
+  }
+  const scopeLabel = scope === "global" ? "全局扩展包" : "当前项目扩展包";
+  const versionTransition = previous?.version && current?.version && previous.version !== current.version
+    ? `${previous.version} → ${current.version}`
+    : current?.version
+      ? `当前版本 ${current.version}`
+      : undefined;
+  return {
+    level: "success" as const,
+    title: `${displayName} 已更新`,
+    message: [versionTransition, scopeLabel, "Pi 资源已重新加载。"].filter(Boolean).join(" · ")
+  };
+}
+
+function packageEntry(
+  items: ExtensionPackageEntry[],
+  source: string,
+  scope: ExtensionPackageScope
+): ExtensionPackageEntry | undefined {
+  return items.find((entry) => entry.source === source && entry.scope === scope);
 }
 
 function reportFailure(workspaceId: string, title: string, error: unknown): false {

@@ -1,4 +1,4 @@
-import type { WorkspaceDescriptor } from "@pi67/domain";
+import { MAX_RUNNING_TASKS, type WorkspaceDescriptor } from "@pi67/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useAppStore } from "../app/app-store.js";
 import { createRendererWorkbenchStore } from "./workbench-store.js";
@@ -44,6 +44,32 @@ describe("renderer workbench persistence boundary", () => {
     expect(serialized).not.toContain("private runtime detail");
     expect(serialized).not.toContain("hasDraft");
     expect(serialized).not.toContain("attachmentCount");
+  });
+
+  it("persists recovery metadata for every admitted top-level Session Task", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace());
+    for (let index = 0; index < MAX_RUNNING_TASKS; index += 1) {
+      store.getState().openTask({
+        id: `task-${index}`,
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-1",
+          sessionPath: `/sessions/${index}.jsonl`
+        },
+        workspaceId: "workspace-1",
+        sessionId: `session-${index}`,
+        sessionPath: `/sessions/${index}.jsonl`,
+        taskGeneration: 1,
+        lifecycle: "running",
+        runtime: { phase: "busy", detail: "running", recoverable: true },
+        title: `Task ${index}`,
+        hasDraft: false,
+        attachmentCount: 0
+      });
+    }
+
+    expect(workbenchLayout(store.getState()).runtimeRecovery).toHaveLength(MAX_RUNNING_TASKS);
   });
 
   it("drops an inconsistent selected task surface instead of sending invalid layout", () => {

@@ -1,10 +1,11 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   DesktopCapabilitySnapshot,
   PackageNetworkSettings,
   PackageNetworkSnapshot
 } from "@pi67/protocol";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
+import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
 import type {
   WorkbenchLayoutV2,
   WorkbenchStateV2
@@ -31,6 +32,22 @@ const systemBridge = {
   getPlatformInfo: (): Promise<PlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
   connectAgentHost: (options?: { replaceCurrent?: boolean }): Promise<void> => (
     ipcRenderer.invoke("pi67:agent-host-connect", options?.replaceCurrent === true)
+  ),
+  stagePromptAttachments: async (files: File[]) => ipcRenderer.invoke(
+    "pi67:prompt-attachments-stage",
+    await Promise.all(files.map(async (file) => {
+      const path = webUtils.getPathForFile(file);
+      return {
+        name: file.name,
+        mimeType: file.type,
+        byteLength: file.size,
+        lastModified: file.lastModified,
+        ...(path ? { path } : { data: await file.arrayBuffer() })
+      };
+    }))
+  ),
+  releasePromptAttachments: (ids: string[]): Promise<void> => (
+    ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
   loadWorkbenchState: (): Promise<WorkbenchStateV2> => ipcRenderer.invoke("pi67:workbench-load"),
   updateWorkbenchLayout: (layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2> => (
@@ -70,6 +87,12 @@ const systemBridge = {
   ),
   setupBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-setup"),
   doctorBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-doctor"),
+  getTeamMcpStatus: (): Promise<TeamMcpStatus> => ipcRenderer.invoke("pi67:team-mcp-status"),
+  revealTeamMcpToken: (): Promise<TeamMcpRevealResult> => ipcRenderer.invoke("pi67:team-mcp-reveal"),
+  saveTeamMcpToken: (token: string): Promise<TeamMcpStatus> => (
+    ipcRenderer.invoke("pi67:team-mcp-save", token)
+  ),
+  clearTeamMcpToken: (): Promise<TeamMcpStatus> => ipcRenderer.invoke("pi67:team-mcp-clear"),
   getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
   onAgentHostFailed: (listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): (() => void) => {

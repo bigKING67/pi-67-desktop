@@ -155,6 +155,98 @@ describe("operationSubmissionIdentity", () => {
     )).resolves.toEqual(resources);
     expect(getSnapshot).not.toHaveBeenCalled();
   });
+
+  it("claims prompt attachments before accepting the operation", async () => {
+    const order: string[] = [];
+    const attachments = {
+      id: "attachment_set_a",
+      attachments: [{
+        id: "attachment_a",
+        name: "notes.txt",
+        mimeType: "text/plain",
+        byteLength: 12,
+        kind: "document" as const
+      }]
+    };
+    const preparePromptAttachments = vi.fn(async () => {
+      order.push("claim");
+      return attachments;
+    });
+    const accept = vi.fn(() => {
+      order.push("accept");
+      return { kind: "accepted", operationId: "operation_a" } as never;
+    });
+    const runtime = { preparePromptAttachments } as unknown as AgentRuntime;
+    const context = { operations: () => ({ accept }) };
+    const command: AgentCommand<"prompt.submit"> = {
+      type: "prompt.submit",
+      payload: {
+        submissionId: "submission_a",
+        text: "Inspect this file",
+        attachments: [{ id: "draft_attachment_a" }],
+        delivery: "new-turn"
+      }
+    };
+
+    await dispatchHostCommand(runtime, command, context as never);
+
+    expect(order).toEqual(["claim", "accept"]);
+    expect(preparePromptAttachments).toHaveBeenCalledWith(
+      "submission_a",
+      [{ id: "draft_attachment_a" }]
+    );
+    expect(accept).toHaveBeenCalledWith(expect.objectContaining({
+      submissionId: "submission_a",
+      kind: "prompt",
+      execute: expect.any(Function)
+    }));
+  });
+
+  it("does not require attachment staging for a prompt without attachments", async () => {
+    const accept = vi.fn(() => ({
+      kind: "accepted",
+      operationId: "operation_without_attachments"
+    }) as never);
+    const runtime = {} as AgentRuntime;
+    const context = { operations: () => ({ accept }) };
+
+    await expect(dispatchHostCommand(runtime, {
+      type: "prompt.submit",
+      payload: {
+        submissionId: "submission_without_attachments",
+        text: "Answer without files",
+        delivery: "new-turn"
+      }
+    }, context as never)).resolves.toEqual({
+      kind: "accepted",
+      operationId: "operation_without_attachments"
+    });
+
+    expect(accept).toHaveBeenCalledWith(expect.objectContaining({
+      submissionId: "submission_without_attachments",
+      kind: "prompt"
+    }));
+  });
+
+  it("does not accept a prompt operation when attachment claim fails", async () => {
+    const failure = new Error("staged attachment changed");
+    const preparePromptAttachments = vi.fn().mockRejectedValue(failure);
+    const accept = vi.fn();
+    const runtime = { preparePromptAttachments } as unknown as AgentRuntime;
+    const context = { operations: () => ({ accept }) };
+
+    await expect(dispatchHostCommand(runtime, {
+      type: "prompt.submit",
+      payload: {
+        submissionId: "submission_failed",
+        text: "Inspect this file",
+        attachments: [{ id: "draft_attachment_failed" }],
+        delivery: "new-turn"
+      }
+    }, context as never)).rejects.toBe(failure);
+
+    expect(accept).not.toHaveBeenCalled();
+  });
 });
 
 function identity<T extends "session.import" | "session.compact" | "command.invoke">(

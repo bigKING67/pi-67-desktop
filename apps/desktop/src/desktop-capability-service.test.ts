@@ -32,6 +32,13 @@ describe("Desktop capability service", () => {
       bundledSkills: [{ id: "browser67", packageId: "browser67", installed: true }],
       bundledSkillSuites: [{
         id: "browser67",
+        versionSource: "capability-package",
+        bundledVersion: "0.4.0",
+        upstream: "https://github.com/example/browser67",
+        sourceCommit: "1".repeat(40),
+        updatePolicy: "capability-package",
+        updateManager: "desktop-capability",
+        independentUpdateState: "not-applicable",
         skills: [{ id: "browser67", packageId: "browser67", installed: true }]
       }],
       integrations: [{ dependencyState: "not-prepared", doctorState: "not-checked" }]
@@ -325,6 +332,13 @@ async function createFixture() {
       id: "browser67",
       displayName: "browser67",
       description: "Managed browser skills.",
+      versionSource: "capability-package",
+      bundledVersion: "0.4.0",
+      upstream: "https://github.com/example/browser67",
+      sourceCommit: "1".repeat(40),
+      updatePolicy: "capability-package",
+      updateManager: "desktop-capability",
+      independentUpdateState: "not-applicable",
       members: [{ packageId: "browser67", skillId: "browser67" }]
     }],
     recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }]

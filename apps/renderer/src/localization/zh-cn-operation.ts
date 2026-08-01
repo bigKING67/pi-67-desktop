@@ -14,6 +14,8 @@ export const zhCNOperationMessages = {
   coordinatingTask: "正在协调子任务",
   processingImage: "正在处理图片",
   callingExtension: "正在调用扩展",
+  callingNamedTool: (toolName: string) => `正在调用 ${toolName}`,
+  calledNamedTool: (toolName: string) => `调用 ${toolName}`,
   compacting: "正在压缩上下文",
   responding: "正在组织回复",
   thinking: "正在分析问题",

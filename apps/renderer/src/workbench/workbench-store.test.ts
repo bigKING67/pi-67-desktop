@@ -1,8 +1,9 @@
-import type {
-  RuntimeStatus,
-  TaskLifecycle,
-  WorkbenchStateV2,
-  WorkspaceDescriptor
+import {
+  MAX_RUNNING_TASKS,
+  type RuntimeStatus,
+  type TaskLifecycle,
+  type WorkbenchStateV2,
+  type WorkspaceDescriptor
 } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
@@ -26,7 +27,7 @@ describe("renderer workbench store", () => {
     });
   });
 
-  it("enforces four active or interactive-wait runtimes across all workspaces", () => {
+  it("enforces the shared active or interactive-wait runtime limit across all workspaces", () => {
     const store = createRendererWorkbenchStore();
     store.getState().registerWorkspace(workspace("a", "/work/a"));
     store.getState().registerWorkspace(workspace("b", "/work/b"));
@@ -36,9 +37,10 @@ describe("renderer workbench store", () => {
       "waiting-approval",
       "waiting-extension-input"
     ];
-    lifecycles.forEach((lifecycle, index) => {
-      store.getState().openTask(task(`active-${index}`, index % 2 === 0 ? "a" : "b", lifecycle));
-    });
+    Array.from({ length: MAX_RUNNING_TASKS }, (_, index) => lifecycles[index % lifecycles.length]!)
+      .forEach((lifecycle, index) => {
+        store.getState().openTask(task(`active-${index}`, index % 2 === 0 ? "a" : "b", lifecycle));
+      });
     store.getState().openTask(task("idle", "a", "idle"));
 
     expect(store.getState().canStartTask("idle")).toBe("run-limit");

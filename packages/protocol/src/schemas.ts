@@ -1,10 +1,20 @@
 import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
-import { MAX_TREE_NODES } from "@pi67/domain";
+import {
+  MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
+  MAX_SLASH_COMMAND_ITEMS,
+  MAX_SLASH_COMMAND_NAME_CHARS,
+  MAX_TREE_NODES
+} from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
 import {
   AssetReadResultSchema
 } from "./asset-schemas.js";
 import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema } from "./approval-schemas.js";
+import {
+  ContextFileCatalogResultSchema,
+  ContextFileReadResultSchema,
+  ContextFileSaveResultSchema
+} from "./context-file-schemas.js";
 import {
   ExtensionCompatibilitySchema,
   ExtensionUiCancelledSchema,
@@ -51,6 +61,10 @@ import {
   ResourceSummarySchema,
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
+import {
+  SkillPackListResultSchema,
+  SkillPackMutationResultSchema
+} from "./skill-pack-schemas.js";
 import { ProtocolErrorSchema } from "./protocol-error-schema.js";
 import {
   PiCredentialRevealResultSchema,
@@ -188,10 +202,16 @@ const RuntimeDiagnosticsSchema = strictObject({
   extensionCount: Type.Number(),
   extensionErrors: Type.Array(strictObject({ path: Type.String(), error: Type.String() }))
 });
-const CommandDescriptorSchema = strictObject({
-  name: Type.String(),
-  description: Type.Optional(Type.String()),
+const SlashCommandDescriptorSchema = strictObject({
+  name: Type.String({ minLength: 1, maxLength: MAX_SLASH_COMMAND_NAME_CHARS }),
+  source: Type.Union([Type.Literal("extension"), Type.Literal("prompt"), Type.Literal("skill")]),
+  description: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_SLASH_COMMAND_DESCRIPTION_CHARS })),
   adapter: Type.Optional(ExtensionCommandAdapterSchema)
+});
+const SlashCommandCatalogResultSchema = strictObject({
+  items: Type.Array(SlashCommandDescriptorSchema, { maxItems: MAX_SLASH_COMMAND_ITEMS }),
+  total: Type.Integer({ minimum: 0 }),
+  truncated: Type.Boolean()
 });
 
 export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
@@ -251,7 +271,10 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "thinking.set": SessionControlResultSchema,
   "resource.list": Type.Array(ResourceSummarySchema),
   "resource.reload": SessionResourceCatalogResultSchema,
-  "command.list": Type.Array(CommandDescriptorSchema),
+  "context.file.list": ContextFileCatalogResultSchema,
+  "context.file.read": ContextFileReadResultSchema,
+  "context.file.save": ContextFileSaveResultSchema,
+  "command.list": SlashCommandCatalogResultSchema,
   "command.invoke": operationSubmissionResultSchema(Type.Literal("command")),
   "extension.catalog.list": ExtensionCatalogSchema,
   "extension.package.list": ExtensionPackageListResultSchema,
@@ -261,6 +284,10 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "extension.package.setEnabled": ExtensionPackageMutationResultSchema,
   "extension.package.restoreInheritance": ExtensionPackageMutationResultSchema,
   "extension.package.uninstall": ExtensionPackageMutationResultSchema,
+  "skill.pack.list": SkillPackListResultSchema,
+  "skill.pack.checkUpdates": SkillPackListResultSchema,
+  "skill.pack.update": SkillPackMutationResultSchema,
+  "skill.pack.restore": SkillPackMutationResultSchema,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({ resolved: Type.Boolean() }),
   "diagnostics.collect": RuntimeDiagnosticsSchema,

@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import type { ImageContent } from "@earendil-works/pi-ai";
 import {
   MAX_PROJECTED_MESSAGE_PARTS,
   MAX_PROJECTED_TEXT_BYTES,
@@ -8,7 +7,6 @@ import {
   type MessagePart,
   type SessionMessageView
 } from "@pi67/domain";
-import type { TransferImage } from "@pi67/protocol";
 
 export interface ImageAssetSource {
   stableKey: string;
@@ -17,14 +15,6 @@ export interface ImageAssetSource {
 }
 
 export type ImageAssetProjector = (source: ImageAssetSource) => AssetReference | undefined;
-
-export function convertTransferImages(images: TransferImage[]): ImageContent[] {
-  return images.map((image) => ({
-    type: "image",
-    mimeType: image.mimeType,
-    data: Buffer.from(image.data).toString("base64")
-  }));
-}
 
 export function normalizeMessages(messages: readonly unknown[], stableIds: readonly string[] = []): SessionMessageView[] {
   return normalizeMessagesWithAdapters(messages, stableIds);
@@ -36,12 +26,36 @@ export function normalizeMessagesWithAdapters(
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
   projectImageAsset?: ImageAssetProjector
 ): SessionMessageView[] {
-  return messages.map((message, index) => normalizeMessage(
-    message,
-    stableIds[index],
-    resolveToolAdapter,
-    projectImageAsset
-  ));
+  const toolResultStatuses = collectToolResultStatuses(messages);
+  const normalized: SessionMessageView[] = [];
+  let promptAttachments: NormalizedPromptAttachment[] = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (isPromptAttachmentMessage(message)) {
+      const attachmentSet = normalizePromptAttachmentMessage(message);
+      const nextAttachments = attachmentSet
+        ? [...promptAttachments, ...attachmentSet]
+        : [];
+      promptAttachments = nextAttachments.length <= 20 ? nextAttachments : [];
+      continue;
+    }
+    const projected = normalizeMessage(
+      message,
+      stableIds[index],
+      resolveToolAdapter,
+      projectImageAsset,
+      (toolCallId) => toolResultStatuses.get(toolCallId)
+    );
+    if (projected.role === "user" && promptAttachments.length > 0) {
+      projected.parts = mergePromptAttachments(projected.parts, promptAttachments);
+      promptAttachments = [];
+    } else if (projected.role !== "user") {
+      // Attachment metadata is turn-local and must not cross an intervening message.
+      promptAttachments = [];
+    }
+    normalized.push(projected);
+  }
+  return normalized;
 }
 
 export function normalizeStreamDelta(value: unknown): {
@@ -59,21 +73,32 @@ function normalizeMessage(
   value: unknown,
   stableId: string | undefined,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
-  projectImageAsset: ImageAssetProjector | undefined
+  projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): SessionMessageView {
   const message = asRecord(value);
   const role = normalizeRole(message.role);
   const id = stringValue(message.id) ?? stringValue(message.toolCallId) ?? stableId ?? fallbackMessageId(message);
-  const parts = normalizeContent(message.content, message, id, resolveToolAdapter, projectImageAsset);
+  const parts = normalizeContent(
+    message.content,
+    message,
+    id,
+    resolveToolAdapter,
+    projectImageAsset,
+    resolveToolStatus
+  );
   const createdAt = numberValue(message.timestamp) ?? numberValue(message.createdAt);
   const model = stringValue(message.model);
-  const error = stringValue(message.errorMessage) ?? (message.isError === true ? "Tool execution failed." : undefined);
+  const toolName = role === "tool" ? stringValue(message.toolName)?.slice(0, 128) : undefined;
+  const error = stringValue(message.errorMessage)
+    ?? (message.isError === true ? "Tool execution failed." : emptyAssistantResponseError(message, role, parts));
   return {
     id,
     role,
-    parts: parts.length > 0 ? parts : [{ type: "text", text: fallbackText(message) }],
+    parts: parts.length > 0 ? parts : fallbackParts(message, role),
     ...(createdAt === undefined ? {} : { createdAt }),
     ...(model === undefined ? {} : { model }),
+    ...(toolName === undefined ? {} : { toolName }),
     ...(message.stopReason === "aborted" ? { stopped: true } : {}),
     ...(error === undefined ? {} : { error })
   };
@@ -84,7 +109,8 @@ function normalizeContent(
   message: Record<string, unknown>,
   messageId: string,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
-  projectImageAsset: ImageAssetProjector | undefined
+  projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): MessagePart[] {
   if (typeof content === "string") return [{ type: "text", text: boundedText(content) }];
   if (!Array.isArray(content)) {
@@ -105,7 +131,8 @@ function normalizeContent(
       messageId,
       partIndex,
       resolveToolAdapter,
-      projectImageAsset
+      projectImageAsset,
+      resolveToolStatus
     ));
 }
 
@@ -114,12 +141,16 @@ function normalizePart(
   messageId: string,
   partIndex: number,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
-  projectImageAsset: ImageAssetProjector | undefined
+  projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): MessagePart[] {
   const part = asRecord(value);
   const type = stringValue(part.type);
   if (type === "text") return [{ type: "text", text: boundedText(stringValue(part.text) ?? "") }];
-  if (type === "thinking") return [{ type: "thinking", text: boundedText(stringValue(part.thinking) ?? stringValue(part.text) ?? "") }];
+  if (type === "thinking") {
+    const text = boundedText(stringValue(part.thinking) ?? stringValue(part.text) ?? "");
+    return text.trim() === "" ? [] : [{ type: "thinking", text }];
+  }
   if (type === "toolCall" || type === "tool-call") {
     const name = stringValue(part.name) ?? "tool";
     const summary = part.arguments === undefined ? undefined : summarizeToolArguments(name, part.arguments);
@@ -129,7 +160,7 @@ function normalizePart(
       type: "tool-call",
       id: toolCallId,
       name,
-      status: "completed",
+      status: resolveToolStatus(toolCallId) ?? "completed",
       ...(summary === undefined ? {} : { summary }),
       ...(adapter === undefined ? {} : { adapter })
     }];
@@ -154,6 +185,93 @@ function normalizePart(
   return text ? [{ type: "text", text: boundedText(text) }] : [];
 }
 
+interface NormalizedPromptAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  byteLength: number;
+  kind: "image" | "document" | "archive" | "audio" | "video" | "file";
+}
+
+function isPromptAttachmentMessage(value: unknown): boolean {
+  const message = asRecord(value);
+  return message.role === "custom"
+    && message.customType === "pi67.desktop-attachments.v1"
+    && message.display === false;
+}
+
+function normalizePromptAttachmentMessage(value: unknown): NormalizedPromptAttachment[] | undefined {
+  const message = asRecord(value);
+  const details = asRecord(message.details);
+  const attachments = details.attachments;
+  if (!Array.isArray(attachments) || attachments.length === 0 || attachments.length > 20) return undefined;
+  const normalized = attachments.map((item) => {
+    const record = asRecord(item);
+    const kind = stringValue(record.kind);
+    const id = stringValue(record.id);
+    const name = stringValue(record.name);
+    const mimeType = stringValue(record.mimeType);
+    const byteLength = numberValue(record.byteLength);
+    if (!id || !/^[A-Za-z0-9_-]{1,128}$/u.test(id)
+      || !name || name.length > 512
+      || !mimeType || mimeType.length > 128
+      || byteLength === undefined || !Number.isSafeInteger(byteLength) || byteLength < 0
+      || !isPromptAttachmentKind(kind)) return undefined;
+    return { id, name, mimeType, byteLength, kind };
+  });
+  return normalized.every((item) => item !== undefined)
+    ? normalized as NormalizedPromptAttachment[]
+    : undefined;
+}
+
+function mergePromptAttachments(
+  parts: readonly MessagePart[],
+  attachments: readonly NormalizedPromptAttachment[]
+): MessagePart[] {
+  const merged = parts.map((part) => ({ ...part }));
+  let imageIndex = 0;
+  for (const attachment of attachments) {
+    if (attachment.kind === "image") {
+      for (; imageIndex < merged.length; imageIndex += 1) {
+        const part = merged[imageIndex];
+        if (part?.type !== "image") continue;
+        if (!part.name) part.name = attachment.name;
+        imageIndex += 1;
+        break;
+      }
+      continue;
+    }
+    merged.push({
+      type: "attachment",
+      id: attachment.id,
+      name: attachment.name,
+      mimeType: attachment.mimeType,
+      byteLength: attachment.byteLength,
+      kind: attachment.kind
+    });
+  }
+  return merged.slice(0, MAX_PROJECTED_MESSAGE_PARTS);
+}
+
+function isPromptAttachmentKind(value: string | undefined): value is NormalizedPromptAttachment["kind"] {
+  return value === "image" || value === "document" || value === "archive"
+    || value === "audio" || value === "video" || value === "file";
+}
+
+type ToolCallStatus = Extract<MessagePart, { type: "tool-call" }>["status"];
+
+function collectToolResultStatuses(messages: readonly unknown[]): Map<string, ToolCallStatus> {
+  const statuses = new Map<string, ToolCallStatus>();
+  for (const value of messages) {
+    const message = asRecord(value);
+    if (message.role !== "toolResult") continue;
+    const toolCallId = stringValue(message.toolCallId);
+    if (!toolCallId) continue;
+    statuses.set(toolCallId, message.isError === true ? "failed" : "completed");
+  }
+  return statuses;
+}
+
 function fallbackMessageId(message: Record<string, unknown>): string {
   const timestamp = numberValue(message.timestamp) ?? stringValue(message.timestamp) ?? "";
   const content = Array.isArray(message.content)
@@ -176,10 +294,32 @@ function normalizeRole(value: unknown): SessionMessageView["role"] {
   return "tool";
 }
 
-function fallbackText(message: Record<string, unknown>): string {
+function fallbackParts(
+  message: Record<string, unknown>,
+  role: SessionMessageView["role"]
+): MessagePart[] {
+  if (role === "assistant" && Array.isArray(message.content)) return [];
   const toolName = stringValue(message.toolName);
-  if (toolName) return `${toolName} tool result`;
-  return "Unsupported message content";
+  return [{
+    type: "text",
+    text: toolName ? `${toolName} tool result` : "当前版本无法显示此消息。"
+  }];
+}
+
+function emptyAssistantResponseError(
+  message: Record<string, unknown>,
+  role: SessionMessageView["role"],
+  parts: readonly MessagePart[]
+): string | undefined {
+  if (
+    role !== "assistant"
+    || !Array.isArray(message.content)
+    || parts.length > 0
+    || message.stopReason === "aborted"
+  ) return undefined;
+  return message.content.length === 0
+    ? "模型未返回内容，请重试；若持续出现，请切换模型或检查模型服务配置。"
+    : "模型返回了当前版本无法显示的内容，请重试或切换模型。";
 }
 
 function summarizeToolArguments(toolName: string, value: unknown): string {

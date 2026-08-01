@@ -31,6 +31,7 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
     },
     models: [
       { provider: "openai", id: "gpt-test", label: "GPT Test", configured: true, reasoning: true },
+      { provider: "deepseek", id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", configured: true, reasoning: true },
       { provider: "anthropic", id: "claude-test", label: "Claude Test", configured: false, reasoning: true }
     ],
     providers: [

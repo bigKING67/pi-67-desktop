@@ -11,7 +11,13 @@ describe("OperationActivityController", () => {
     const controller = new OperationActivityController((event) => events.push(event));
     const target = operationTarget();
 
-    expect(controller.updateBase(target, { kind: "tool", toolCallId: "tool-1", toolKind: "shell" })).toBe(true);
+    expect(controller.updateBase(target, {
+      kind: "tool",
+      toolCallId: "tool-1",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running"
+    })).toBe(true);
     expect(controller.beginInteractive(target, { kind: "approval", requestId: "approval-1" })).toBe(true);
     expect(controller.updateBase(target, { kind: "responding" })).toBe(false);
     expect(controller.completeInteractive(target, "approval-1")).toBe(true);

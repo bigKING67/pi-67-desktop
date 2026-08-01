@@ -26,6 +26,8 @@ export interface HostEventSendAuthority {
 export class HostEventChannel {
   private sequence = 0;
   private readonly taskSequences = new TaskEventSequenceRegistry();
+  private readonly outbox: Array<{ event: AgentEvent; authority: HostEventSendAuthority }> = [];
+  private draining = false;
 
   constructor(private readonly dependencies: HostEventChannelDependencies) {}
 
@@ -47,6 +49,26 @@ export class HostEventChannel {
 
   private sendWithAuthority(event: AgentEvent, authority: HostEventSendAuthority): boolean {
     if (!hasEventShape(event)) return false;
+    const queued = { event, authority };
+    this.outbox.push(queued);
+    if (this.draining) return true;
+
+    this.draining = true;
+    let initialResult = true;
+    try {
+      while (this.outbox.length > 0) {
+        const current = this.outbox.shift();
+        if (!current) break;
+        const delivered = this.deliver(current.event, current.authority);
+        if (current === queued) initialResult = delivered;
+      }
+    } finally {
+      this.draining = false;
+    }
+    return initialResult;
+  }
+
+  private deliver(event: AgentEvent, authority: HostEventSendAuthority): boolean {
     const blockingInteractiveRequest = isBlockingInteractiveRequest(event);
     const runtime = authority.runtime;
     const identity = runtime?.getIdentity() ?? { sessionGeneration: 0 };

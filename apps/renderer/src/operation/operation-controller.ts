@@ -1,4 +1,8 @@
-import { createMessageId, type CommandDescriptor, type OperationSubmissionResult } from "@pi67/protocol";
+import {
+  createMessageId,
+  type OperationSubmissionResult,
+  type SlashCommandCatalogResult
+} from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import {
@@ -45,33 +49,35 @@ export async function compactRendererSession(): Promise<void> {
   }
 }
 
-export async function listRuntimeCommands(): Promise<CommandDescriptor[]> {
+export async function listRuntimeCommands(): Promise<SlashCommandCatalogResult> {
   if (!agentConnectionController.identity) throw new Error(messages.operation.runtimeDisconnected);
   return agentConnectionController.request("command.list", {});
 }
 
-export async function invokeRuntimeCommand(command: string): Promise<void> {
+export async function invokeRuntimeCommand(command: string, submissionId = createMessageId("command")): Promise<boolean> {
   try {
     const authority = requireSessionAuthority();
     const accepted = await agentConnectionController.request("command.invoke", {
-      submissionId: createMessageId("command"),
+      submissionId,
       command
     });
-    if (!acceptSubmission(accepted, authority, messages.operation.commandAcknowledgementStale(command))) return;
+    if (!acceptSubmission(accepted, authority, messages.operation.commandAcknowledgementStale(command))) return false;
     if (applySettledSubmission(
       useAppStore.setState,
       accepted,
       "command",
       messages.operation.commandSettled(command),
       authority
-    )) return;
+    )) return true;
     useAppStore.setState({
       operation: operationFromSubmission(accepted, "command"),
       operationDetail: messages.operation.commandAccepted(command),
       operationProgress: undefined
     });
+    return true;
   } catch (error) {
     publishActionError(error, messages.operation.commandFailedTitle);
+    return false;
   }
 }
 

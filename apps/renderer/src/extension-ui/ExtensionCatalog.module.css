@@ -82,6 +82,40 @@
   font-variant-ligatures: none;
 }
 
+.toolNames {
+  display: grid;
+  gap: 5px;
+}
+
+.toolNames > span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.toolNames > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.toolNames code {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolNames small {
+  align-self: center;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
 .empty {
   padding: 10px 2px;
   color: var(--text-tertiary);

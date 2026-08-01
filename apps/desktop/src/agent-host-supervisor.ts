@@ -77,6 +77,31 @@ export class AgentHostSupervisor {
     this.#startAgentHost();
   }
 
+  /**
+   * Restart the utility process so Main-owned env (e.g. team MCP token) is re-read.
+   * Safe while the app remains running; not used for application quit.
+   */
+  restart(): void {
+    if (this.#stopping) return;
+    if (this.#restartTimer) {
+      clearTimeout(this.#restartTimer);
+      this.#restartTimer = undefined;
+    }
+    const host = this.#agentHost;
+    if (!host) {
+      this.#startAgentHost();
+      return;
+    }
+    try {
+      host.kill();
+    } catch {
+      this.#agentHost = undefined;
+      this.#identity = undefined;
+      this.#lastHandoffKey = undefined;
+      this.#startAgentHost();
+    }
+  }
+
   stop(): Promise<AgentHostStopResult> {
     if (this.#stopPromise) return this.#stopPromise;
     this.#stopping = true;

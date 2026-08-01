@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
 const execFile = promisify(execFileCallback);
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -28,7 +29,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 export async function createCapabilityFreshnessReport({
   lock,
   now = () => new Date(),
-  resolveLatest = resolveLatestStableRelease
+  resolveLatest = resolveLatestStableRelease,
+  resolveRef = resolveRemoteRef
 }) {
   assertCapabilityLock(lock);
   const sources = await Promise.all(lock.sources.map(async (source) => {
@@ -52,18 +54,39 @@ export async function createCapabilityFreshnessReport({
       return { ...base, status: "unreachable", error: boundedError(error) };
     }
   }));
+  const skillPacks = await Promise.all(lock.skillPacks.map(async (pack) => {
+    const base = {
+      name: pack.name,
+      repository: pack.repository,
+      ref: pack.ref,
+      lockedVersion: pack.version,
+      lockedCommit: pack.commit
+    };
+    try {
+      const latestCommit = await resolveRef(pack.repository, pack.ref);
+      return {
+        ...base,
+        status: latestCommit === pack.commit ? "current" : "stale",
+        latestCommit
+      };
+    } catch (error) {
+      return { ...base, status: "unreachable", error: boundedError(error) };
+    }
+  }));
+  const tracked = [...sources, ...skillPacks];
   const statuses = Object.fromEntries(
-    [...new Set(sources.map((source) => source.status))]
+    [...new Set(tracked.map((source) => source.status))]
       .sort((left, right) => left.localeCompare(right))
-      .map((status) => [status, sources.filter((source) => source.status === status).length])
+      .map((status) => [status, tracked.filter((source) => source.status === status).length])
   );
   return {
     schemaVersion: 1,
     generatedAt: now().toISOString(),
     catalogVersion: lock.catalogVersion,
-    status: sources.every((source) => source.status === "current") ? "passed" : "failed",
+    status: tracked.every((source) => source.status === "current") ? "passed" : "failed",
     statuses,
-    sources
+    sources,
+    skillPacks
   };
 }
 
@@ -84,6 +107,38 @@ export async function resolveLatestStableRelease(repositoryUrl) {
     }
   );
   return latestStableReleaseFromGitOutput(stdout);
+}
+
+export async function resolveRemoteRef(repositoryUrl, ref) {
+  const { stdout } = await execFile(
+    "git",
+    ["ls-remote", repositoryUrl, ref],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_TERMINAL_PROMPT: "0"
+      },
+      maxBuffer: GIT_OUTPUT_BYTES,
+      timeout: GIT_TIMEOUT_MS,
+      windowsHide: true
+    }
+  );
+  return commitFromGitRefOutput(stdout, ref);
+}
+
+export function commitFromGitRefOutput(output, ref) {
+  if (typeof output !== "string" || Buffer.byteLength(output) > GIT_OUTPUT_BYTES) {
+    throw new Error("git ref output is invalid or exceeds the bounded limit");
+  }
+  const lines = output.split(/\r?\n/u).filter(Boolean);
+  const matches = lines.map((line) => /^([0-9a-f]{40}|[0-9a-f]{64})\t([^\s]+)$/u.exec(line))
+    .filter((match) => match?.[2] === ref);
+  if (matches.length !== 1 || !gitObjectPattern.test(matches[0][1])) {
+    throw new Error(`Repository ref ${ref} did not resolve to one Git commit`);
+  }
+  return matches[0][1];
 }
 
 export function latestStableReleaseFromGitOutput(output) {
@@ -163,6 +218,9 @@ function assertCapabilityLock(lock) {
     || !Array.isArray(lock.sources)
     || lock.sources.length === 0
     || lock.sources.length > 32
+    || !Array.isArray(lock.skillPacks)
+    || lock.skillPacks.length === 0
+    || lock.skillPacks.length > 8
   ) throw new Error("Capability source lock is invalid");
   const ids = new Set();
   for (const source of lock.sources) {
@@ -180,6 +238,12 @@ function assertCapabilityLock(lock) {
     const repository = new URL(source.repository);
     if (repository.protocol !== "https:") throw new Error("Capability source repository must use HTTPS");
     ids.add(source.id);
+  }
+  const packNames = new Set();
+  for (const pack of lock.skillPacks) {
+    assertPi67SkillPackSource(pack);
+    if (packNames.has(pack.name)) throw new Error("Bundled Skill Pack source is duplicated");
+    packNames.add(pack.name);
   }
 }
 
@@ -207,6 +271,22 @@ function renderSummary(report) {
       escapeTable(source.latestVersion ?? source.error ?? "unknown"),
       source.status,
       source.latestCommit?.slice(0, 12) ?? "unknown"
+    ].join(" | ").replace(/^/u, "| ").replace(/$/u, " |"));
+  }
+  lines.push(
+    "",
+    "## Bundled Skill Pack freshness",
+    "",
+    "| Skill Pack | Locked baseline | Tracked ref | Status | Latest commit |",
+    "| --- | --- | --- | --- | --- |"
+  );
+  for (const pack of report.skillPacks) {
+    lines.push([
+      escapeTable(pack.name),
+      escapeTable(pack.lockedVersion),
+      escapeTable(pack.ref),
+      pack.status,
+      pack.latestCommit?.slice(0, 12) ?? "unknown"
     ].join(" | ").replace(/^/u, "| ").replace(/$/u, " |"));
   }
   lines.push("");

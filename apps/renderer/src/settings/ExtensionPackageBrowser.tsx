@@ -21,13 +21,16 @@ import {
   resolveSourceKind,
   sourceKindLabel
 } from "./extension-management-model.js";
+import packageStyles from "./ExtensionPackageBrowser.module.css";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
-export function PackageList({ rows, selectedKey, loading, onSelect }: {
+export function PackageList({ rows, selectedKey, loading, updateDisabled, onSelect, onUpdate }: {
   rows: PackageRow[];
   selectedKey: string | undefined;
   loading: boolean;
+  updateDisabled: boolean;
   onSelect: (key: string) => void;
+  onUpdate: (entry: ExtensionPackageEntry) => void;
 }) {
   if (loading && rows.length === 0) {
     return <div className={styles.listEmpty} role="status"><RefreshCw aria-hidden="true" size={16} />正在读取扩展包…</div>;
@@ -47,11 +50,13 @@ export function PackageList({ rows, selectedKey, loading, onSelect }: {
         <li><span className={styles.groupLabel}>第三方扩展包</span></li>
         {rows.map((row) => {
           return (
-            <li key={row.key}>
+            <li className={packageStyles.packageRow} data-selected={selectedKey === row.key || undefined} key={row.key}>
               <Button
                 aria-label={packageRowAccessibleName(row)}
                 aria-pressed={selectedKey === row.key}
-                className={styles.packageButton!}
+                className={packageStyles.packageButton!}
+                data-package-focus-action="details"
+                data-package-focus-key={row.key}
                 data-selected={selectedKey === row.key || undefined}
                 onPress={() => onSelect(row.key)}
               >
@@ -60,8 +65,17 @@ export function PackageList({ rows, selectedKey, loading, onSelect }: {
                   <strong>{packageRowName(row)}</strong>
                   <PackageRowMeta row={row} />
                 </span>
-                {row.update ? <span className={styles.updateFlag}>可更新</span> : null}
               </Button>
+              {row.update ? (
+                <Button
+                  aria-label={`更新 ${row.entry.source}`}
+                  className={packageStyles.packageUpdateAction!}
+                  data-package-focus-action="update"
+                  data-package-focus-key={row.key}
+                  isDisabled={updateDisabled}
+                  onPress={() => onUpdate(row.entry)}
+                ><Download aria-hidden="true" size={13} />更新</Button>
+              ) : null}
             </li>
           );
         })}
@@ -70,10 +84,11 @@ export function PackageList({ rows, selectedKey, loading, onSelect }: {
   );
 }
 
-export function PackageDetails({ row, workspaceName, updatesChecked, onBack, onPending, onRestore, onToggle }: {
+export function PackageDetails({ row, workspaceName, updatesChecked, updateDisabled, onBack, onPending, onRestore, onToggle }: {
   row: PackageRow | undefined;
   workspaceName: string | undefined;
   updatesChecked: boolean;
+  updateDisabled: boolean;
   onBack: () => void;
   onPending: (action: ConfirmedAction) => void;
   onRestore: (entry: ExtensionPackageEntry) => void;
@@ -149,6 +164,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, onBack, onP
           <Button
             aria-label={`更新 ${row.entry.source}`}
             className="secondary-button"
+            isDisabled={updateDisabled}
             onPress={() => onPending({ kind: "update", entry: row.entry })}
           ><Download aria-hidden="true" size={14} />更新</Button>
         ) : null}
@@ -202,7 +218,12 @@ function PackageState({ row }: { row: PackageRow }) {
 
 function DetailBackButton({ onBack }: { onBack: () => void }) {
   return (
-    <Button aria-label="返回扩展包列表" className={styles.detailBackButton!} onPress={onBack}>
+    <Button
+      aria-label="返回扩展包列表"
+      className={styles.detailBackButton!}
+      data-package-focus-action="detail-back"
+      onPress={onBack}
+    >
       <ArrowLeft aria-hidden="true" size={14} />扩展包列表
     </Button>
   );

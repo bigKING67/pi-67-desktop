@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { refreshSessionTree } from "./session-tree-controller.js";
 import { useSessionTreeStore } from "./session-tree-store.js";
 
@@ -21,6 +22,33 @@ describe("session tree controller", () => {
     useSessionProjectionStore.setState({ authority: { phase: "active", ...AUTHORITY } });
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     useSessionTreeStore.getState().replaceProjection(AUTHORITY, tree("initial"));
+    rendererWorkbenchStore.getState().reset();
+    rendererWorkbenchStore.getState().registerWorkspace({
+      id: "workspace-1",
+      displayName: "Workspace 1",
+      identity: { canonicalPath: "/work/one", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    rendererWorkbenchStore.getState().openTask({
+      id: "task-1",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-1",
+        sessionPath: "/sessions/one.jsonl"
+      },
+      workspaceId: "workspace-1",
+      sessionId: AUTHORITY.sessionId,
+      sessionGeneration: AUTHORITY.sessionGeneration,
+      taskGeneration: 2,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "Task 1",
+      sessionPath: "/sessions/one.jsonl",
+      hasDraft: false,
+      attachmentCount: 0
+    });
   });
 
   afterEach(() => {
@@ -33,7 +61,16 @@ describe("session tree controller", () => {
 
     await refreshSessionTree(AUTHORITY);
 
-    expect(request).toHaveBeenCalledWith("session.tree", {});
+    expect(request).toHaveBeenCalledWith("session.tree", {}, [], {
+      context: {
+        scope: "task",
+        workspaceId: "workspace-1",
+        taskId: "task-1",
+        taskGeneration: 2,
+        sessionId: "session-1",
+        sessionGeneration: 3
+      }
+    });
     expect(useSessionTreeStore.getState()).toMatchObject({ tree: expected, status: "ready" });
   });
 
@@ -125,6 +162,35 @@ describe("session tree controller", () => {
       title: "无法刷新会话树",
       message: "tree read failed"
     });
+  });
+
+  it("uses the matching Task authority while Settings is selected", async () => {
+    rendererWorkbenchStore.getState().openSettings("skills");
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+      tree("settings") as never
+    );
+
+    await refreshSessionTree(AUTHORITY);
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(useSessionTreeStore.getState()).toMatchObject({
+      tree: tree("settings"),
+      status: "ready"
+    });
+  });
+
+  it("does not send a Task command or show an error when no matching Task remains", async () => {
+    rendererWorkbenchStore.getState().reset();
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await refreshSessionTree(AUTHORITY);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(useSessionTreeStore.getState()).toMatchObject({
+      tree: tree("initial"),
+      status: "stale"
+    });
+    expect(useNotificationStore.getState().items).toHaveLength(0);
   });
 });
 

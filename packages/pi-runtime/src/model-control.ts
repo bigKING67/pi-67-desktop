@@ -6,6 +6,7 @@ export async function selectSessionModel(
   provider: string,
   id: string
 ): Promise<void> {
+  if (session.model?.provider === provider && session.model.id === id) return;
   const model = session.modelRuntime.getModel(provider, id);
   if (!model) {
     throw new RuntimeError("MODEL_NOT_FOUND", "The selected Pi model is not available.", {

@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
+import {
+  attachMockAgent,
+  installMockDesktopBridge,
+  recordedCommandDetails
+} from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
@@ -11,6 +15,9 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   const settings = await openSettingsSection(page, /^运行服务/u);
+  await expect(settings.getByText("同时运行的会话任务", { exact: true })).toBeVisible();
+  await expect(settings.getByText("最多 8 个", { exact: true })).toBeVisible();
+  await expect(settings.getByText(/任务内部的子代理不单独占用/u)).toBeVisible();
   await settings.getByRole("button", { name: /运行环境诊断/u }).click();
   const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
   await expect(doctorDialog).toBeVisible();
@@ -64,12 +71,38 @@ test("keeps the title controls limited to configured models and readable thinkin
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const modelSelect = page.getByLabel("Pi 模型");
-  await expect(modelSelect.locator("option")).toHaveCount(2);
-  await expect(modelSelect.getByRole("option", { name: /Claude Test/u })).toHaveCount(0);
+  const modelSelect = page.getByRole("button", { name: "Pi 模型", exact: true });
+  await expect(modelSelect).toContainText("GPT Test");
+  await expect(modelSelect).not.toContainText("openai");
+  await modelSelect.click();
+  const modelList = page.getByRole("listbox");
+  await expect(modelList.getByRole("option")).toHaveCount(2);
+  await expect(modelList.getByRole("option", { name: /Claude Test/u })).toHaveCount(0);
+  await expect(modelList.getByRole("option", { name: /GPT Test/u })).toContainText("openai · openai/gpt-test");
   const thinkingSelect = page.getByLabel("Pi 思考级别");
   await expect(thinkingSelect.locator('option[value="off"]')).toHaveText("思考：关闭");
   await expect(thinkingSelect.locator('option[value="medium"]')).toHaveText("思考：中");
+});
+
+test("switches the active model once with pending and confirmed feedback", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [], { "model.select": 350 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const modelSelect = page.getByRole("button", { name: "Pi 模型", exact: true });
+  await modelSelect.click();
+  await page.getByRole("option", { name: /DeepSeek V4 Flash/u }).click();
+  await expect(modelSelect).toBeDisabled();
+  await expect(modelSelect).toContainText("DeepSeek V4 Flash");
+  await expect(modelSelect).not.toContainText("deepseek/");
+  await expect(page.getByText("正在切换到 DeepSeek V4 Flash…", { exact: true })).toBeVisible();
+
+  await expect(modelSelect).toBeEnabled();
+  await expect(page.getByText("已切换到 DeepSeek V4 Flash", { exact: true })).toBeVisible();
+  const modelCommands = (await recordedCommandDetails(page)).filter((command) => command.type === "model.select");
+  expect(modelCommands).toEqual([expect.objectContaining({
+    payload: { provider: "deepseek", id: "deepseek-v4-flash" }
+  })]);
 });
 
 test("keeps Provider management usable in a narrow dark workspace", async ({ page }, testInfo) => {

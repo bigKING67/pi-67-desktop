@@ -19,13 +19,27 @@ describe("operation activity timeline", () => {
     timeline = recordOperationTimelineActivity(timeline, {
       kind: "tool",
       toolCallId: "tool-1",
-      toolKind: "shell"
+      toolName: "Bash",
+      toolKind: "shell",
+      status: "running",
+      aliasTarget: "bash"
     }, 30);
 
     expect(timeline.steps).toMatchObject([
       { activity: undefined, status: "completed", settledAt: 20 },
       { activity: { kind: "thinking" }, status: "completed", settledAt: 30 },
-      { activity: { kind: "tool", toolCallId: "tool-1", toolKind: "shell" }, status: "running" }
+      {
+        activity: {
+          kind: "tool",
+          toolCallId: "tool-1",
+          toolName: "Bash",
+          toolKind: "shell",
+          status: "running",
+          aliasTarget: "bash"
+        },
+        status: "running",
+        detail: "已兼容转发到 bash · 执行中"
+      }
     ]);
   });
 
@@ -51,7 +65,13 @@ describe("operation activity timeline", () => {
   it("restores only the current Host activity after projection resync", () => {
     const current = {
       ...operation(),
-      activity: { kind: "tool", toolCallId: "tool-current", toolKind: "edit" } as const
+      activity: {
+        kind: "tool",
+        toolCallId: "tool-current",
+        toolName: "edit",
+        toolKind: "edit",
+        status: "running"
+      } as const
     };
     const timeline = createResynchronizedOperationActivityTimeline(current, 50);
 
@@ -71,6 +91,36 @@ describe("operation activity timeline", () => {
 
     expect(timeline).toMatchObject({ lifecycle: "failed", settledAt: 40 });
     expect(timeline.steps.at(-1)).toMatchObject({ status: "failed", detail: "测试失败", settledAt: 40 });
+  });
+
+  it("settles the matching tool step from the real tool outcome without adding a false success step", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-failed",
+      toolName: "WebSearch",
+      toolKind: "search",
+      status: "running",
+      aliasTarget: "web_search"
+    }, 20);
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-failed",
+      toolName: "WebSearch",
+      toolKind: "search",
+      status: "failed",
+      aliasTarget: "web_search"
+    }, 45);
+    const afterClear = recordOperationTimelineActivity(timeline, null, 50);
+
+    expect(timeline.steps).toHaveLength(2);
+    expect(timeline.steps.at(-1)).toMatchObject({
+      status: "failed",
+      settledAt: 45,
+      detail: "已兼容转发到 web_search · 执行失败",
+      activity: { toolName: "WebSearch", status: "failed" }
+    });
+    expect(afterClear).toBe(timeline);
   });
 
   it("matches only the current operation authority", () => {

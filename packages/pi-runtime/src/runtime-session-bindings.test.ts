@@ -49,9 +49,10 @@ function createBindings(): RuntimeSessionBindings {
     getRuntimeCredentialOverrides: () => createRuntimeCredentialOverrideStore(),
     getSafety: () => ({ cwd: "/tmp/pi67-workspace", trust: "unknown", approvalMode: "guided" }),
     getWorkspaceServices: () => undefined,
+    getPromptAttachmentAccess: () => undefined,
     projections: { reset: vi.fn() } as unknown as RuntimeProjectionController,
     rebindExtensionUi: vi.fn(async () => undefined),
-    requestApproval: vi.fn(async () => false),
+    requestApproval: vi.fn(async () => ({ status: "denied" as const })),
     setSessionCwd: vi.fn()
   });
 }

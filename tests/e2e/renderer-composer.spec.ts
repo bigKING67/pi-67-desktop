@@ -98,7 +98,7 @@ test("reconciles the accepted bubble with the authoritative Pi user entry withou
   await expect(userMessage).toHaveAttribute("data-message-id", "authoritative-user-1");
   await expect(userMessage).not.toHaveAttribute("data-delivery-status", "accepted");
   await expect(userMessage).toContainText("你是谁");
-  await expect(composer).toHaveAttribute("placeholder", /补充方向/u);
+  await expect(composer).toHaveAttribute("placeholder", /补充要求/u);
 });
 
 test("keeps an accepted Prompt visible when its Operation fails before projection", async ({ page }) => {
@@ -176,7 +176,27 @@ test("keeps IME candidate confirmation separate from prompt submission", async (
   expect(command?.payload).toMatchObject({ submissionId: expect.stringMatching(UUID_PATTERN) });
 });
 
-test("adds pasted and dropped images without duplicating attachment state", async ({ page }) => {
+test("discovers prompt templates and skills from the slash catalog with keyboard selection", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("/pl");
+  const picker = page.getByTestId("composer-slash-picker");
+  await expect(picker).toBeVisible();
+  await expect(picker.getByRole("option", { name: /\/plan/u })).toBeVisible();
+  await expect(picker.getByRole("option", { name: /\/skill:design-craft/u })).toHaveCount(0);
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("/plan ");
+
+  await composer.fill("/skill:d");
+  await expect(picker.getByRole("option", { name: /\/skill:design-craft/u })).toBeVisible();
+  await composer.press("Tab");
+  await expect(composer).toHaveValue("/skill:design-craft ");
+});
+
+test("adds pasted and dropped attachments without duplicating attachment state", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -199,7 +219,7 @@ test("adds pasted and dropped images without duplicating attachment state", asyn
     }));
     element.dispatchEvent(new DragEvent("dragenter", { bubbles: true, cancelable: true, dataTransfer: transfer }));
   });
-  await expect(page.getByRole("status").filter({ hasText: "释放以添加图片" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "释放以添加附件" })).toBeVisible();
   await composerShell.evaluate((element) => {
     const transfer = new DataTransfer();
     transfer.items.add(new File([new Uint8Array([1, 2, 3, 4])], "dropped.webp", {
@@ -208,8 +228,40 @@ test("adds pasted and dropped images without duplicating attachment state", asyn
     }));
     element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
   });
-  await expect(page.getByRole("status").filter({ hasText: "释放以添加图片" })).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "释放以添加附件" })).toHaveCount(0);
   await expect(page.getByRole("img", { name: "dropped.webp" })).toHaveAttribute("src", /^blob:/u);
+});
+
+test("stages an ordinary file as an opaque ref and keeps its card in the pending user turn", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { terminalDelayMs: 90_000 });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await clearRecordedCommands(page);
+
+  await page.getByLabel("选择附件").setInputFiles({
+    name: "requirements.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.7", "utf8")
+  });
+  const composer = page.getByLabel("给 Pi 发送消息");
+  const draftAttachment = page.locator('[data-attachment-kind="document"]');
+  await expect(draftAttachment).toContainText("requirements.pdf");
+  await expect(draftAttachment).toContainText("文档 · 8 B");
+  await expect(draftAttachment.getByRole("img")).toHaveCount(0);
+  await composer.fill("检查这份需求文档");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+
+  await expect(composer).toHaveValue("");
+  await expect(page.getByLabel("待发送附件")).toHaveCount(0);
+  const pending = page.getByRole("article", { name: "用户消息", exact: true });
+  await expect(pending).toContainText("检查这份需求文档");
+  await expect(pending.locator('[data-attachment-kind="document"]')).toContainText("requirements.pdf");
+  const [command] = await scenarioCommands(page);
+  expect(command?.payload).toMatchObject({
+    text: "检查这份需求文档",
+    attachments: [{ id: "fixture_attachment_1" }]
+  });
+  expect(JSON.stringify(command?.payload)).not.toContain("%PDF");
 });
 
 test("preserves text and object URL attachments when prompt submission is rejected", async ({ page }) => {
@@ -223,7 +275,7 @@ test("preserves text and object URL attachments when prompt submission is reject
   });
   await clearRecordedCommands(page);
 
-  await page.getByLabel("选择图片附件").setInputFiles({
+  await page.getByLabel("选择附件").setInputFiles({
     name: "draft.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex")
@@ -243,7 +295,7 @@ test("preserves text and object URL attachments when prompt submission is reject
   expect(command?.payload).toMatchObject({
     submissionId: expect.stringMatching(UUID_PATTERN),
     text: "不要丢失这份草稿",
-    images: [{ name: "draft.png", mimeType: "image/png", bytes: 8 }]
+    attachments: [{ id: "fixture_attachment_1" }]
   });
 
   await page.getByRole("button", { name: "发送", exact: true }).click();
@@ -272,7 +324,7 @@ test("keeps the draft and rotates submission identity when the Session changes b
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
 
-  await page.getByLabel("选择图片附件").setInputFiles({
+  await page.getByLabel("选择附件").setInputFiles({
     name: "session-bound.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex")
@@ -311,6 +363,7 @@ const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
   "workspace.open",
   "workspace.register",
   "workspace.changes",
+  "command.list",
   "session.catalog.query"
 ]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;

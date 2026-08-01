@@ -1,56 +1,108 @@
-import type { DesktopBundledSkillSuiteSummary } from "@pi67/domain";
-import { ChevronRight, FolderOpen, Globe2, Layers3, RefreshCw, Search, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
+import type { SkillPackEntry } from "@pi67/domain";
+import {
+  ChevronRight,
+  FolderOpen,
+  Globe2,
+  Layers3,
+  RefreshCw
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs
+} from "react-aria-components";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
+import {
+  BundledSkillSuiteDetail,
+  suiteStatus,
+  suiteVersionSummary
+} from "./BundledSkillSuiteDetail.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
+import { ManagedGlobalSkillPanel, SkillPackMutationDialog } from "./ManagedGlobalSkillPanel.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import {
-  SettingsBackAction,
+  checkSkillPackUpdates,
+  loadSkillPacks,
+  restoreSkillPack,
+  updateSkillPack
+} from "./skill-pack-controller.js";
+import { useSkillPackStore } from "./skill-pack-store.js";
+import {
   SettingsCatalog,
   SettingsCatalogRow,
   SettingsNotice,
-  SettingsRow,
-  SettingsRows,
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
 
 type CapabilityState = ReturnType<typeof useDesktopCapabilitySnapshot>;
+type GlobalSkillSelection =
+  | { kind: "bundled"; id: string }
+  | { kind: "managed"; id: string };
 
 export function SkillSettingsWorkspace() {
   const capability = useDesktopCapabilitySnapshot();
   return (
     <Tabs className={styles.workspace!} defaultSelectedKey="global" data-testid="skill-settings-workspace">
-      <TabList aria-label="技能来源分类" className={styles.tabList!}>
+      <TabList aria-label="技能可用范围" className={styles.tabList!}>
         <Tab className={styles.tab!} id="global">
-          <Globe2 aria-hidden="true" size={15} />全局技能
+          <Globe2 aria-hidden="true" size={15} />全局可用
         </Tab>
         <Tab className={styles.tab!} id="project">
-          <FolderOpen aria-hidden="true" size={15} />项目技能
-        </Tab>
-        <Tab className={styles.tab!} id="bundled">
-          <Sparkles aria-hidden="true" size={15} />内置技能
+          <FolderOpen aria-hidden="true" size={15} />项目专属
         </Tab>
       </TabList>
       <TabPanel className={styles.tabPanel!} id="global">
-        <SessionResourcePanel
-          kind="skill"
-          origin="top-level"
-          resourceScope="user"
-          scope="global"
-          title="全局技能"
-          description="由用户在本机维护并适用于所有项目；这里只显示 Pi 已解析的独立技能，扩展包技能不会重复出现。"
-          empty="尚未发现全局技能。可以将技能放入 ~/.agents/skills 或 ~/.pi/agent/skills。"
-        />
+        <GlobalSkillPanel capability={capability} />
       </TabPanel>
       <TabPanel className={styles.tabPanel!} id="project">
         <ProjectSkillPanel />
       </TabPanel>
-      <TabPanel className={styles.tabPanel!} id="bundled">
-        <BundledSkillPanel capability={capability} />
-      </TabPanel>
     </Tabs>
+  );
+}
+
+function GlobalSkillPanel({ capability }: { capability: CapabilityState }) {
+  const [selection, setSelection] = useState<GlobalSkillSelection>();
+  const bundledSuiteIds = useMemo(() => new Set(
+    capability.snapshot?.bundledSkillSuites.map((suite) => suite.id) ?? []
+  ), [capability.snapshot?.bundledSkillSuites]);
+  if (selection?.kind === "bundled") {
+    return (
+      <BundledSkillPanel
+        capability={capability}
+        selectedSuiteId={selection.id}
+        onBack={() => setSelection(undefined)}
+        onSelectSuite={(id) => setSelection({ kind: "bundled", id })}
+      />
+    );
+  }
+  if (selection?.kind === "managed") {
+    return (
+      <ManagedGlobalSkillPanel
+        excludedSuiteIds={bundledSuiteIds}
+        selectedPackId={selection.id}
+        onBack={() => setSelection(undefined)}
+        onSelectPack={(id) => setSelection({ kind: "managed", id })}
+      />
+    );
+  }
+  return (
+    <div className={styles.globalSkills}>
+      <BundledSkillPanel
+        capability={capability}
+        onBack={() => setSelection(undefined)}
+        onSelectSuite={(id) => setSelection({ kind: "bundled", id })}
+      />
+      <ManagedGlobalSkillPanel
+        excludedSuiteIds={bundledSuiteIds}
+        onBack={() => setSelection(undefined)}
+        onSelectPack={(id) => setSelection({ kind: "managed", id })}
+      />
+    </div>
   );
 }
 
@@ -104,43 +156,100 @@ function ProjectSkillPanel() {
   );
 }
 
-function BundledSkillPanel({ capability }: { capability: CapabilityState }) {
-  const [selectedSuiteId, setSelectedSuiteId] = useState<string>();
+function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite }: {
+  capability: CapabilityState;
+  selectedSuiteId?: string;
+  onBack: () => void;
+  onSelectSuite: (id: string) => void;
+}) {
   const [query, setQuery] = useState("");
+  const [pending, setPending] = useState<{ action: "update" | "restore"; pack: SkillPackEntry }>();
+  const settingsWorkspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
+  const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
+  const workspaceId = settingsWorkspaceId ?? currentWorkspaceId;
+  const { items: managedPacks, phase, error, workspaceId: loadedWorkspaceId } = useSkillPackStore();
   const suites = capability.snapshot?.bundledSkillSuites ?? [];
   const selectedSuite = suites.find((suite) => suite.id === selectedSuiteId);
+  const managedBySuiteId = useMemo(() => new Map(
+    managedPacks.filter((pack) => pack.installed).map((pack) => [pack.suiteId, pack])
+  ), [managedPacks]);
+  const busy = phase === "loading" || phase === "checking" || phase === "updating" || phase === "restoring";
+  const updateCount = suites.filter((suite) => (
+    managedBySuiteId.get(suite.id)?.updateStatus === "update-available"
+  )).length;
+
+  useEffect(() => {
+    if (!workspaceId) useSkillPackStore.getState().reset();
+    else if (loadedWorkspaceId !== workspaceId) void loadSkillPacks(workspaceId);
+  }, [loadedWorkspaceId, workspaceId]);
+
   if (selectedSuite) {
+    const pack = managedBySuiteId.get(selectedSuite.id);
     return (
-      <BundledSkillSuiteDetail
-        query={query}
-        suite={selectedSuite}
-        onBack={() => {
-          setSelectedSuiteId(undefined);
-          setQuery("");
-        }}
-        onQueryChange={setQuery}
-      />
+      <>
+        <BundledSkillSuiteDetail
+          busy={busy}
+          {...(pack ? { pack } : {})}
+          query={query}
+          suite={selectedSuite}
+          onBack={() => {
+            setQuery("");
+            onBack();
+          }}
+          onMutation={(action, target) => setPending({ action, pack: target })}
+          onQueryChange={setQuery}
+        />
+        {pending ? <SkillPackMutationDialog
+          action={pending.action}
+          busy={phase === "updating" || phase === "restoring"}
+          error={phase === "failed" ? error : undefined}
+          pack={pending.pack}
+          onCancel={() => setPending(undefined)}
+          onConfirm={async () => {
+            const completed = pending.action === "update"
+              ? await updateSkillPack(pending.pack.id, workspaceId)
+              : await restoreSkillPack(pending.pack.id, workspaceId);
+            if (completed) setPending(undefined);
+          }}
+        /> : null}
+      </>
     );
   }
   const skillCount = suites.reduce((total, suite) => total + suite.skills.length, 0);
   return (
     <SettingsSectionBlock
-      actions={<Button
-        className="secondary-button"
-        isDisabled={capability.phase === "loading"}
-        onPress={() => void capability.refresh()}
-      >
-        <RefreshCw aria-hidden="true" size={14} />
-        {capability.phase === "loading" ? "刷新中…" : "刷新状态"}
-      </Button>}
+      actions={<span className={styles.detailActions}>
+        <Button
+          className="secondary-button"
+          isDisabled={!workspaceId || busy}
+          onPress={() => void checkSkillPackUpdates(workspaceId)}
+        >
+          <RefreshCw
+            aria-hidden="true"
+            className={phase === "checking" ? styles.spinning : undefined}
+            size={14}
+          />
+          {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查技能更新"}
+        </Button>
+        <Button
+          className="secondary-button"
+          isDisabled={capability.phase === "loading"}
+          onPress={() => void capability.refresh()}
+        >
+          <RefreshCw aria-hidden="true" size={14} />
+          {capability.phase === "loading" ? "刷新中…" : "刷新状态"}
+        </Button>
+      </span>}
       title="内置技能套件"
       description={suites.length > 0
-        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；随 Pi-67 Desktop 发布并跟随应用更新。`
-        : "随 Pi-67 Desktop 发布并跟随应用更新；不通过第三方扩展包单独安装、更新或卸载。"}
+        ? `${suites.length} 个技能套件，共 ${skillCount} 个技能；随 Desktop 提供并对所有项目可用。`
+        : "随 Pi-67 Desktop 提供并对所有项目可用；不通过第三方扩展包重复安装。"}
     >
       {capability.error ? <SettingsNotice tone="danger">{capability.error}</SettingsNotice> : null}
+      {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       {suites.length > 0 ? <SettingsCatalog label="内置技能套件">{suites.map((suite) => {
-        const status = suiteStatus(suite);
+        const pack = managedBySuiteId.get(suite.id);
+        const status = suiteStatus(suite, pack);
         return (
           <SettingsCatalogRow
             key={suite.id}
@@ -148,10 +257,10 @@ function BundledSkillPanel({ capability }: { capability: CapabilityState }) {
             leading={<span className={styles.suiteIcon} data-status={status.id}>
               <Layers3 aria-hidden="true" size={16} />
             </span>}
-            meta={`${suite.skills.length} 个技能 · ${suiteSourceSummary(suite)}`}
+            meta={`${pack?.skillIds.length ?? suite.skills.length} 个技能 · ${suiteVersionSummary(suite, pack)}`}
             onSelect={() => {
-              setSelectedSuiteId(suite.id);
               setQuery("");
+              onSelectSuite(suite.id);
             }}
             testId="bundled-skill-suite-row"
             title={suite.displayName}
@@ -168,86 +277,8 @@ function BundledSkillPanel({ capability }: { capability: CapabilityState }) {
         </SettingsNotice>
       )}
       <SettingsNotice className={styles.scopeNotice!}>
-        这里表示 Desktop 已随应用提供该技能；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
+        内置技能对所有项目可用并由 Desktop 管理；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
       </SettingsNotice>
     </SettingsSectionBlock>
   );
-}
-
-function BundledSkillSuiteDetail({ suite, query, onBack, onQueryChange }: {
-  suite: DesktopBundledSkillSuiteSummary;
-  query: string;
-  onBack: () => void;
-  onQueryChange: (query: string) => void;
-}) {
-  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
-  const skills = useMemo(() => suite.skills.filter((skill) => (
-    !normalizedQuery
-    || [skill.displayName, skill.description, skill.packageDisplayName]
-      .some((value) => value.toLocaleLowerCase("zh-CN").includes(normalizedQuery))
-  )), [normalizedQuery, suite.skills]);
-  const status = suiteStatus(suite);
-  return (
-    <div className={styles.suiteDetail!} data-testid="bundled-skill-suite-detail">
-      <SettingsBackAction label="返回内置技能套件" onPress={onBack}>返回内置技能</SettingsBackAction>
-      <SettingsSectionBlock
-        actions={<span className={styles.detailStatus} data-status={status.id}>{status.label}</span>}
-        title={suite.displayName}
-        description={`${suite.skills.length} 个技能 · ${suiteSourceSummary(suite)} · 跟随 Pi-67 Desktop 更新`}
-      >
-        <label className={styles.skillSearch!}>
-          <Search aria-hidden="true" size={15} />
-          <input
-            aria-label={`搜索 ${suite.displayName} 技能`}
-            onChange={(event) => onQueryChange(event.currentTarget.value)}
-            placeholder="搜索技能名称、用途或来源"
-            type="search"
-            value={query}
-          />
-        </label>
-        {skills.length > 0 ? <SettingsRows className={styles.skillRows!}>{skills.map((skill) => (
-          <SettingsRow
-            key={`${skill.packageId}:${skill.id}`}
-            title={skill.displayName}
-            description={skillPurpose(skill.description)}
-            value={skill.installed ? undefined : "准备中"}
-          >
-            <span className={styles.skillMeta}>{skill.packageDisplayName} · {skill.version}</span>
-          </SettingsRow>
-        ))}</SettingsRows> : (
-          <SettingsNotice className={styles.emptyResult!}>没有匹配的内置技能。</SettingsNotice>
-        )}
-        <SettingsNotice className={styles.scopeNotice!}>
-          套件表示 Desktop 的内置技能分组；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
-        </SettingsNotice>
-      </SettingsSectionBlock>
-    </div>
-  );
-}
-
-function suiteStatus(suite: DesktopBundledSkillSuiteSummary): {
-  id: "ready" | "partial" | "unavailable";
-  label: string;
-} {
-  const installedCount = suite.skills.filter((skill) => skill.installed).length;
-  if (installedCount === suite.skills.length) return { id: "ready", label: "已提供" };
-  if (installedCount > 0) return { id: "partial", label: "部分准备" };
-  return { id: "unavailable", label: "准备中" };
-}
-
-function suiteSourceSummary(suite: DesktopBundledSkillSuiteSummary): string {
-  const sources = new Set(suite.skills.map((skill) => `${skill.packageDisplayName} ${skill.version}`));
-  return sources.size === 1 ? [...sources][0]! : `${sources.size} 个内置来源`;
-}
-
-function skillPurpose(description: string): string {
-  const normalized = description.replace(/\s+/gu, " ").trim();
-  const chineseStop = normalized.indexOf("。");
-  const englishStop = normalized.indexOf(". ");
-  const stop = [
-    chineseStop >= 0 ? chineseStop + 1 : Number.POSITIVE_INFINITY,
-    englishStop >= 0 ? englishStop + 1 : Number.POSITIVE_INFINITY,
-    180
-  ].reduce((shortest, candidate) => Math.min(shortest, candidate));
-  return normalized.length > stop ? `${normalized.slice(0, stop).trim()}…` : normalized;
 }

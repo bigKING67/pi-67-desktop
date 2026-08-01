@@ -8,9 +8,10 @@ import styles from "./MarkdownView.module.css";
 interface MarkdownViewProps {
   children: string;
   mode?: "settled" | "streaming";
+  externalImages?: "allowed" | "blocked";
 }
 
-export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) {
+export function MarkdownView({ children, mode = "settled", externalImages = "allowed" }: MarkdownViewProps) {
   const streaming = mode === "streaming";
   return (
     <div className={styles.body} data-markdown-mode={mode}>
@@ -41,7 +42,12 @@ export function MarkdownView({ children, mode = "settled" }: MarkdownViewProps) 
                 ? <StreamingCodeBlock code={code} {...(language === undefined ? {} : { language })} />
                 : <CodeBlock code={code} {...(language === undefined ? {} : { language })} />
               : <code>{codeChildren}</code>;
-          }
+          },
+          img: ({ alt, src }) => externalImages === "blocked" ? (
+            <span className={styles.blockedImage} role="img" aria-label={alt || "外部图片已阻止"}>
+              {alt ? `图片：${alt}` : "外部图片已阻止"}{src ? <small>{src}</small> : null}
+            </span>
+          ) : <img alt={alt ?? ""} src={src} />
         }}
       >
         {children}

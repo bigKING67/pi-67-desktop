@@ -2,6 +2,8 @@ import { ProtocolRequestError } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import {
   useSessionTreeStore,
   type SessionTreeAuthority
@@ -33,8 +35,18 @@ async function drainRefreshes(): Promise<void> {
     const store = useSessionTreeStore.getState();
     const target = store.beginRefresh(currentCanonicalAuthority());
     if (!target) return;
+    const context = taskContextForTarget(target);
+    if (!context) {
+      store.failRefresh(target);
+      return;
+    }
     try {
-      const tree = await agentConnectionController.request("session.tree", {});
+      const tree = await agentConnectionController.request(
+        "session.tree",
+        {},
+        [],
+        { context }
+      );
       const result = store.finishRefresh(target, tree);
       if (result !== "superseded") return;
       transientBusyRetries = 0;
@@ -61,6 +73,14 @@ async function drainRefreshes(): Promise<void> {
 
 function currentCanonicalAuthority() {
   return useSessionProjectionStore.getState().authority;
+}
+
+function taskContextForTarget(target: SessionTreeAuthority) {
+  const task = Object.values(rendererWorkbenchStore.getState().tasks).find((candidate) => (
+    candidate.sessionId === target.sessionId
+    && candidate.sessionGeneration === target.sessionGeneration
+  ));
+  return task ? workbenchProtocolContextForTask(task) : undefined;
 }
 
 function isTransientBusy(error: unknown): error is ProtocolRequestError {

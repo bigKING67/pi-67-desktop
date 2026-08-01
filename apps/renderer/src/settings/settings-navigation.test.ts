@@ -56,12 +56,14 @@ describe("settings navigation", () => {
     expect(extension && matchesSettingsQuery(extension, "本地扩展")).toBe(true);
     const skill = items.find((item) => item.id === "skills");
     expect(skill && matchesSettingsQuery(skill, "内置技能")).toBe(true);
+    expect(skill && matchesSettingsQuery(skill, "全局可用")).toBe(true);
+    expect(skill && matchesSettingsQuery(skill, "项目专属")).toBe(true);
     expect(skill && matchesSettingsQuery(skill, ".agents/skills")).toBe(true);
     expect(sectionSupportsProjectScope("skills")).toBe(false);
     expect(prompt && matchesSettingsQuery(prompt, "prompts")).toBe(true);
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
-    expect(sectionSupportsProjectScope("rules")).toBe(true);
+    expect(sectionSupportsProjectScope("rules")).toBe(false);
   });
 });

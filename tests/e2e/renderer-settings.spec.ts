@@ -65,6 +65,34 @@ test("lists package sources and keeps update eligibility bounded to npm and git"
   await clearRecordedCommands(page);
   await page.getByRole("button", { name: "检查更新" }).click();
 
+  const list = page.getByTestId("extension-package-list-scroll");
+  const updateAction = list.getByRole("button", { name: `更新 ${npmSource}` });
+  const packageRow = updateAction.locator("xpath=ancestor::li[1]");
+  const detailAction = packageRow.locator('[data-package-focus-action="details"]');
+  await expect(updateAction).toBeVisible();
+  await expect(updateAction).toHaveCSS("cursor", "pointer");
+  await expect(detailAction).toHaveCSS("cursor", "pointer");
+  await detailAction.hover();
+  const rowAppearance = await packageRow.evaluate((element) => {
+    const action = element.querySelector<HTMLElement>('[data-package-focus-action="update"]')!;
+    const details = element.querySelector<HTMLElement>('[data-package-focus-action="details"]')!;
+    const rowBounds = element.getBoundingClientRect();
+    const actionBounds = action.getBoundingClientRect();
+    return {
+      actionRightInset: rowBounds.right - actionBounds.right,
+      detailsBackground: getComputedStyle(details).backgroundColor,
+      rowBackground: getComputedStyle(element).backgroundColor
+    };
+  });
+  expect(rowAppearance.actionRightInset).toBeGreaterThanOrEqual(8);
+  expect(rowAppearance.detailsBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(rowAppearance.rowBackground).not.toBe("rgba(0, 0, 0, 0)");
+  await updateAction.click();
+  const updateDialog = page.getByRole("dialog", { name: "更新扩展包？" });
+  await expect(updateDialog).toBeVisible();
+  await expect(page.getByTestId("extension-package-detail-scroll")).toBeHidden();
+  await updateDialog.getByRole("button", { name: "取消" }).click();
+
   await page.getByRole("button", { name: /@example\/pi-extension，npm:@example\/pi-extension/u }).click();
   await expect(page.getByRole("button", { name: `更新 ${npmSource}` })).toBeVisible();
   await expect(page.getByRole("button", { name: `更新 ${pathSource}` })).toHaveCount(0);
@@ -74,6 +102,53 @@ test("lists package sources and keeps update eligibility bounded to npm and git"
     payload: {},
     context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   });
+});
+
+test("updates one package from the catalog and focuses the next available update", async ({ page }) => {
+  const firstSource = "npm:@example/update-first";
+  const secondSource = "npm:@example/update-second";
+  const entries = [
+    packageEntry(firstSource, "global", true, { displayName: "Update First", version: "1.2.3" }),
+    packageEntry(secondSource, "global", true, { displayName: "Update Second", version: "2.0.0" })
+  ];
+  await openPackageSettings(page, entries);
+  await setMockAgentResponseResult(page, "extension.package.checkUpdates", {
+    items: entries.map((entry) => ({
+      source: entry.source,
+      scope: entry.scope,
+      type: "npm",
+      displayName: entry.source.slice(4)
+    })),
+    total: entries.length
+  });
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await page.getByRole("button", { name: /可更新 2/u }).click();
+  await setMockAgentResponseResult(page, "extension.package.update", {
+    changed: true,
+    items: [
+      { ...entries[0]!, version: "1.3.0" },
+      entries[1]!
+    ],
+    total: entries.length
+  });
+  await clearRecordedCommands(page);
+
+  await page.getByRole("button", { name: `更新 ${firstSource}` }).click();
+  await page.getByRole("dialog", { name: "更新扩展包？" })
+    .getByRole("button", { name: "确认更新" }).click();
+
+  await expect(page.getByRole("button", { name: `更新 ${firstSource}` })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: `更新 ${secondSource}` })).toBeFocused();
+  await expect(page.getByText("Update First 已更新", { exact: true })).toBeVisible();
+  await expect(page.getByText("1.2.3 → 1.3.0 · 全局扩展包 · Pi 资源已重新加载。", { exact: true }))
+    .toBeVisible();
+  await expect(page.getByText("Pi Settings 已更新。", { exact: true })).toHaveCount(0);
+  expect((await recordedCommandDetails(page)).filter((command) => (
+    command.type === "extension.package.update"
+  ))).toEqual([expect.objectContaining({
+    payload: { source: firstSource, scope: "global" },
+    context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+  })]);
 });
 
 test("confirms install and path uninstall with scoped Host mutations", async ({ page }) => {

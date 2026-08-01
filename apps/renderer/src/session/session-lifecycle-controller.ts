@@ -204,7 +204,6 @@ export async function submitRendererEditedMessage(
   try {
     result = await submitRendererPrompt(
       normalized,
-      [],
       "send",
       createMessageId("submission")
     );

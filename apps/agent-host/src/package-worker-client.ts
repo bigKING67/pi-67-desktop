@@ -12,6 +12,7 @@ import {
   resolveDesktopPackageToolchain,
   type PiWorkspaceRuntimeServices
 } from "@pi67/pi-runtime";
+import { EXTENSION_PACKAGE_WORKER_TIMEOUT_MS } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
 import type { ExtensionPackageManagementPort } from "./extension-package-command-router.js";
 import {
@@ -20,7 +21,6 @@ import {
   type PackageWorkerRequest
 } from "./package-worker-protocol.js";
 
-const DEFAULT_PACKAGE_WORKER_TIMEOUT_MS = 5 * 60_000;
 const packageWorkerEntry = fileURLToPath(new URL("./package-worker.mjs", import.meta.url));
 
 export interface PackageWorkerClientOptions {
@@ -47,7 +47,7 @@ export class PackageWorkerClient implements PackageWorkerPort {
   constructor(options: PackageWorkerClientOptions = {}) {
     this.#workerEntry = options.workerEntry ?? packageWorkerEntry;
     this.#environment = options.environment ?? process.env;
-    this.#timeoutMs = options.timeoutMs ?? DEFAULT_PACKAGE_WORKER_TIMEOUT_MS;
+    this.#timeoutMs = options.timeoutMs ?? EXTENSION_PACKAGE_WORKER_TIMEOUT_MS;
     this.#spawnWorker = options.spawnWorker ?? spawn;
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 1_000 || this.#timeoutMs > 10 * 60_000) {
       throw new RangeError("Package worker timeout must be between 1000 and 600000 milliseconds.");

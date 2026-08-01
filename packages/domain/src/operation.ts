@@ -25,7 +25,14 @@ export type ToolPresentationKind =
 export type OperationActivity =
   | { kind: "thinking" }
   | { kind: "responding" }
-  | { kind: "tool"; toolCallId: string; toolKind: ToolPresentationKind }
+  | {
+      kind: "tool";
+      toolCallId: string;
+      toolName: string;
+      toolKind: ToolPresentationKind;
+      status: "running" | "completed" | "failed";
+      aliasTarget?: string;
+    }
   | { kind: "approval"; requestId: string }
   | { kind: "extension-input"; requestId: string }
   | { kind: "compaction" };

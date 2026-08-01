@@ -6,11 +6,11 @@ import {
   LoaderCircle,
   MessageSquarePlus,
   Pencil,
-  TriangleAlert,
-  Wrench
+  TriangleAlert
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
+import { AttachmentPreview } from "../attachments/AttachmentPreview.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
@@ -18,10 +18,11 @@ import { publishNotification } from "../notifications/notification-store.js";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
 import { MarkdownView } from "./MarkdownView.js";
+import { ToolResultDisclosure } from "./ToolResultDisclosure.js";
 import {
   editableUserMessageText,
   messageTextForCopy,
-  userMessageContainsImage
+  userMessageContainsAttachment
 } from "./message-actions.js";
 import styles from "./MessageCard.module.css";
 
@@ -62,6 +63,9 @@ export function MessageCard({
   const isUser = message.role === "user";
   const isTool = message.role === "tool";
   const isAssistant = message.role === "assistant";
+  const toolErrorAlreadyVisible = isTool && message.parts.some(
+    (part) => part.type === "text" && part.text.trim() !== ""
+  );
   const isSettled = !streaming && deliveryStatus === undefined;
   const ariaLabel = streaming
     ? "Pi 正在回复"
@@ -81,20 +85,25 @@ export function MessageCard({
       data-render-mode={streaming ? "streaming" : "settled"}
       data-edit-phase={edit?.phase}
     >
-      {isUser ? null : (
+      {isUser || isTool ? null : (
         <header className={styles.header}>
           <span className={styles.author}>
-            {isTool ? <Wrench size={14} /> : <Bot size={14} />}
-            {isTool ? "工具" : "Pi"}
+            <Bot size={14} />
+            Pi
           </span>
           {message.stopped ? <span className={styles.meta}>已停止</span> : null}
         </header>
       )}
       <div className={styles.content} data-testid="message-content">
-        {edit ? <InlineUserMessageEditor edit={edit} /> : message.parts.map((part, index) => {
+        {isTool && !edit ? <ToolResultDisclosure message={message} /> : edit ? <InlineUserMessageEditor edit={edit} /> : message.parts.map((part, index) => {
           if (part.type === "thinking") {
+            if (part.text.trim() === "") return null;
             return (
-              <details className={styles.thinking} key={`${message.id}-thinking-${index}`}>
+              <details
+                className={styles.thinking}
+                key={`${message.id}-thinking-${index}`}
+                open={streaming}
+              >
                 <summary>推理过程</summary>
                 <MarkdownView mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>
               </details>
@@ -111,6 +120,14 @@ export function MessageCard({
               />
             );
           }
+          if (part.type === "attachment") {
+            return (
+              <AttachmentPreview
+                attachment={part}
+                key={`${message.id}-attachment-${part.id}`}
+              />
+            );
+          }
           if (part.type === "tool-call") return <ToolCard key={part.id} tool={part} />;
           return null;
         })}
@@ -123,7 +140,7 @@ export function MessageCard({
           />
         )) : null}
       </div>
-      {!edit && message.error ? (
+      {!edit && !isTool && message.error && !toolErrorAlreadyVisible ? (
         <div className={styles.error} role={deliveryStatus === "failed" ? "alert" : undefined}>
           {message.error}
         </div>
@@ -221,7 +238,7 @@ function MessageFooter({
   const isUser = message.role === "user";
   const copyText = messageTextForCopy(message);
   const editText = editableUserMessageText(message);
-  const containsImage = userMessageContainsImage(message);
+  const containsAttachment = userMessageContainsAttachment(message);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [pendingAction, setPendingAction] = useState<MessageAction>();
   const resetCopyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -282,8 +299,8 @@ function MessageFooter({
   );
 
   if (isUser) {
-    const editDisabledReason = containsImage
-      ? messages.transcript.editImageUnavailable
+    const editDisabledReason = containsAttachment
+      ? messages.transcript.editAttachmentUnavailable
       : !editText
         ? messages.transcript.noCopyText
         : actionDisabledReason;

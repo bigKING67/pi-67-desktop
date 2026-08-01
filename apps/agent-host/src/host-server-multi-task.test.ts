@@ -1,5 +1,6 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { MAX_RUNNING_TASKS } from "@pi67/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isEventEnvelope } from "@pi67/protocol";
 import {
@@ -161,26 +162,29 @@ describe("AgentHostServer multi-Task routing", () => {
     await fixture.server.shutdown();
   });
 
-  it("atomically rejects the fifth running Task and admits it after a slot is released", async () => {
-    const fixture = await createServerFixture(5);
+  it("atomically rejects a Task above the shared limit and admits it after a slot is released", async () => {
+    const fixture = await createServerFixture(MAX_RUNNING_TASKS + 1);
     const workspace = await fixture.workspace("workspace-a");
     temporaryRoots.push(workspace.root);
-    const tasks = Array.from({ length: 5 }, (_, index) => task("workspace-a", `task-${index + 1}`));
+    const tasks = Array.from(
+      { length: MAX_RUNNING_TASKS + 1 },
+      (_, index) => task("workspace-a", `task-${index + 1}`)
+    );
     for (const context of tasks) await initialize(fixture.port, context, workspace);
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < MAX_RUNNING_TASKS; index += 1) {
       expect((await submit(fixture.port, tasks[index]!, `run-${index + 1}`)).response)
         .toMatchObject({ ok: true });
     }
-    const rejected = await submit(fixture.port, tasks[4]!, "run-5");
+    const rejected = await submit(fixture.port, tasks[MAX_RUNNING_TASKS]!, "run-over-limit");
     expect(rejected.response).toMatchObject({
       ok: false,
       error: {
         code: "RESOURCE_LIMIT_EXCEEDED",
-        details: { maximumRunningTasks: 4 }
+        details: { maximumRunningTasks: MAX_RUNNING_TASKS }
       }
     });
-    expect(fixture.runtimes[4]?.submitPrompt).not.toHaveBeenCalled();
+    expect(fixture.runtimes[MAX_RUNNING_TASKS]?.submitPrompt).not.toHaveBeenCalled();
 
     fixture.runtimes[0]?.completePrompt();
     await vi.waitFor(() => {
@@ -191,8 +195,11 @@ describe("AgentHostServer multi-Task routing", () => {
         && value.context.taskId === "task-1"
       ))).toBe(true);
     });
-    expect((await submit(fixture.port, tasks[4]!, "run-5")).response).toMatchObject({ ok: true });
-    await vi.waitFor(() => expect(fixture.runtimes[4]?.submitPrompt).toHaveBeenCalledOnce());
+    expect((await submit(fixture.port, tasks[MAX_RUNNING_TASKS]!, "run-after-release")).response)
+      .toMatchObject({ ok: true });
+    await vi.waitFor(() => (
+      expect(fixture.runtimes[MAX_RUNNING_TASKS]?.submitPrompt).toHaveBeenCalledOnce()
+    ));
 
     await fixture.server.shutdown();
   });

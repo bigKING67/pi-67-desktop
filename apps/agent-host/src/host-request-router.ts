@@ -9,6 +9,10 @@ import {
 } from "@pi67/protocol";
 import type { HostConnectionContext } from "./connection-context.js";
 import {
+  type ContextFileCommandRouter,
+  isContextFileCommand
+} from "./context-file-command-router.js";
+import {
   type ExtensionPackageCommandRouter,
   isExtensionPackageCommand
 } from "./extension-package-command-router.js";
@@ -19,6 +23,10 @@ import {
 } from "./host-task-state-coordinator.js";
 import type { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError, toProtocolError } from "./protocol-error.js";
+import {
+  isSkillPackCommand,
+  type SkillPackCommandRouter
+} from "./skill-pack-command-router.js";
 import {
   isWorkspaceLifecycleCommand,
   isWorkspaceProviderCommand,
@@ -46,7 +54,9 @@ export interface HostRequestRouterOptions {
 export class HostRequestRouter {
   constructor(
     private readonly tasks: HostTaskStateCoordinator,
+    private readonly contextFiles: ContextFileCommandRouter,
     private readonly extensionPackages: ExtensionPackageCommandRouter,
+    private readonly skillPacks: SkillPackCommandRouter,
     private readonly workspaceCommands: WorkspaceCommandRouter,
     private readonly options: HostRequestRouterOptions
   ) {}
@@ -82,8 +92,16 @@ export class HostRequestRouter {
         .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
       return;
     }
+    if (isContextFileCommand(request.type)) {
+      this.handleContextFileCommand(origin, request);
+      return;
+    }
     if (isExtensionPackageCommand(request.type)) {
       this.handleExtensionPackageCommand(origin, request);
+      return;
+    }
+    if (isSkillPackCommand(request.type)) {
+      this.handleSkillPackCommand(origin, request);
       return;
     }
     if (request.context.scope === "task") {
@@ -121,6 +139,24 @@ export class HostRequestRouter {
       return;
     }
     this.handleTaskCommand(origin, request, state);
+  }
+
+  private handleContextFileCommand(
+    origin: HostConnectionContext,
+    request: RequestEnvelope
+  ): void {
+    if (!isContextFileCommand(request.type) || request.context.scope !== "workspace") {
+      origin.sendError(request.requestId, request.type, toProtocolError(new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Context file commands require Workspace authority.",
+        false
+      )));
+      return;
+    }
+    const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
+    void this.contextFiles.dispatch(request.context, command, request.idempotencyKey)
+      .then((result) => sendSuccess(origin, request, result))
+      .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }
 
   private handleWorkspaceProviderCommand(
@@ -173,6 +209,24 @@ export class HostRequestRouter {
     }
     const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
     void this.extensionPackages.dispatch(request.context, command, request.idempotencyKey)
+      .then((result) => sendSuccess(origin, request, result))
+      .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
+  }
+
+  private handleSkillPackCommand(
+    origin: HostConnectionContext,
+    request: RequestEnvelope
+  ): void {
+    if (!isSkillPackCommand(request.type) || request.context.scope !== "workspace") {
+      origin.sendError(request.requestId, request.type, toProtocolError(new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Skill Pack commands require Workspace authority.",
+        false
+      )));
+      return;
+    }
+    const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
+    void this.skillPacks.dispatch(request.context, command, request.idempotencyKey)
       .then((result) => sendSuccess(origin, request, result))
       .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }

@@ -41,7 +41,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(await scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
   await navigation.getByRole("button", { name: "技能", exact: true }).click();
-  const skillTabs = settings.getByRole("tablist", { name: "技能来源分类" });
+  const skillTabs = settings.getByRole("tablist", { name: "技能可用范围" });
   await expect(skillTabs).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
   const skillTabBounds = await skillTabs.evaluate((element) => {
@@ -50,12 +50,44 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   });
   expect(skillTabBounds.left).toBeGreaterThanOrEqual(0);
   expect(skillTabBounds.right).toBeLessThanOrEqual(520);
-  await skillTabs.getByRole("tab", { name: "内置技能", exact: true }).click();
-  const bundledPanel = settings.getByRole("tabpanel", { name: "内置技能", exact: true });
+  const bundledPanel = settings.getByRole("tabpanel", { name: "全局可用", exact: true });
   await expect(bundledPanel.getByTestId("bundled-skill-suite-row")).toHaveCount(5);
   await bundledPanel.getByTestId("bundled-skill-suite-row").filter({ hasText: "browser67" }).click();
   await expect(bundledPanel.getByRole("searchbox", { name: "搜索 browser67 技能" })).toBeVisible();
-  await expect(bundledPanel.getByRole("button", { name: "返回内置技能套件" })).toBeVisible();
+  await expect(bundledPanel.getByRole("button", { name: "返回全局可用技能" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
+
+  await navigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
+  const ruleWorkspace = settings.getByTestId("rule-settings-workspace");
+  const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "规则与上下文可用范围" });
+  await expect(ruleTabs).toBeVisible();
+  const ruleTabBounds = await ruleTabs.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right };
+  });
+  expect(ruleTabBounds.left).toBeGreaterThanOrEqual(0);
+  expect(ruleTabBounds.right).toBeLessThanOrEqual(520);
+  const ruleCategories = ruleWorkspace.getByRole("group", { name: "全局规则与上下文分类" });
+  const ruleCategoryBounds = await ruleCategories.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right };
+  });
+  expect(ruleCategoryBounds.left).toBeGreaterThanOrEqual(0);
+  expect(ruleCategoryBounds.right).toBeLessThanOrEqual(520);
+  await ruleCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
+  await ruleWorkspace.getByRole("list", { name: "桌面托管规则" })
+    .getByRole("button", { name: /00-product\.md/u }).click();
+  const contextDetail = ruleWorkspace.getByTestId("context-file-detail");
+  await expect(contextDetail.getByRole("textbox", { name: "00-product.md Markdown 源码" })).toBeVisible();
+  const detailBounds = await contextDetail.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+  });
+  expect(detailBounds.left).toBeGreaterThanOrEqual(0);
+  expect(detailBounds.right).toBeLessThanOrEqual(520);
+  expect(detailBounds.scrollWidth).toBeLessThanOrEqual(detailBounds.clientWidth);
+  await contextDetail.getByRole("button", { name: "预览", exact: true }).click();
+  await expect(contextDetail.getByTestId("context-file-preview")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
   await navigation.getByRole("button", { name: /更新与诊断/u }).click();

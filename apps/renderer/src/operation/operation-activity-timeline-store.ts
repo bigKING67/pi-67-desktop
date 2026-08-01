@@ -134,14 +134,23 @@ export function recordOperationTimelineActivity(
   observedAt: number
 ): OperationActivityTimeline {
   const current = timeline.steps.at(-1);
+  if (activity?.kind === "tool" && activity.status !== "running") {
+    return settleToolTimelineStep(timeline, activity, observedAt);
+  }
+  if (
+    activity === null
+    && current?.activity?.kind === "tool"
+    && current.activity.status !== "running"
+  ) return timeline;
   if (current?.status === "running" && sameTimelineActivity(current.activity, activity)) return timeline;
 
   const settledSteps = settleRunningStep(timeline.steps, "completed", undefined, observedAt);
   const nextStep: OperationTimelineStep = {
     id: `${timeline.operationId}:${timeline.nextStepSequence}`,
-    activity,
-    status: "running",
-    startedAt: observedAt
+      activity,
+      status: "running",
+      startedAt: observedAt,
+      ...(activity?.kind === "tool" ? { detail: toolActivityDetail(activity) } : {})
   };
   return {
     ...timeline,
@@ -151,6 +160,51 @@ export function recordOperationTimelineActivity(
     nextStepSequence: timeline.nextStepSequence + 1,
     steps: [...settledSteps, nextStep].slice(-MAX_TIMELINE_STEPS)
   };
+}
+
+function settleToolTimelineStep(
+  timeline: OperationActivityTimeline,
+  activity: Extract<OperationActivity, { kind: "tool" }>,
+  observedAt: number
+): OperationActivityTimeline {
+  const index = timeline.steps.findLastIndex((step) => (
+    step.status === "running"
+    && step.activity?.kind === "tool"
+    && step.activity.toolCallId === activity.toolCallId
+  ));
+  if (index < 0) {
+    return {
+      ...timeline,
+      nextStepSequence: timeline.nextStepSequence + 1,
+      steps: [...timeline.steps, {
+        id: `${timeline.operationId}:${timeline.nextStepSequence}`,
+        activity,
+        status: activity.status,
+        startedAt: observedAt,
+        settledAt: observedAt,
+        detail: toolActivityDetail(activity)
+      }].slice(-MAX_TIMELINE_STEPS)
+    };
+  }
+  return {
+    ...timeline,
+    steps: timeline.steps.map((step, stepIndex) => stepIndex === index ? {
+      ...step,
+      activity,
+      status: activity.status,
+      settledAt: observedAt,
+      detail: toolActivityDetail(activity)
+    } : step)
+  };
+}
+
+function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" }>): string {
+  const result = activity.status === "running"
+    ? "执行中"
+    : activity.status === "completed" ? "执行成功" : "执行失败";
+  return activity.aliasTarget === undefined
+    ? result
+    : `已兼容转发到 ${activity.aliasTarget} · ${result}`;
 }
 
 export function updateOperationTimelineProgress(
@@ -220,7 +274,11 @@ function sameTimelineActivity(
   if (left === null || right === null) return left === right;
   if (left === undefined || left.kind !== right.kind) return false;
   if (left.kind === "tool" && right.kind === "tool") {
-    return left.toolCallId === right.toolCallId && left.toolKind === right.toolKind;
+    return left.toolCallId === right.toolCallId
+      && left.toolName === right.toolName
+      && left.toolKind === right.toolKind
+      && left.status === right.status
+      && left.aliasTarget === right.aliasTarget;
   }
   if (left.kind === "approval" && right.kind === "approval") return left.requestId === right.requestId;
   if (left.kind === "extension-input" && right.kind === "extension-input") {

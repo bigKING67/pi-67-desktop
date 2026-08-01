@@ -69,7 +69,7 @@ export function CommandPalette() {
     }),
     handlers: {
       openSession: openRendererSession,
-      invokeCommand: invokeRuntimeCommand,
+      invokeCommand: (command) => void invokeRuntimeCommand(command),
       reloadResources: reloadSessionResources,
       compactSession: compactRendererSession,
       openProvider: () => setCredentialDialogOpen(true),

@@ -69,10 +69,11 @@ describe("OperationActivityProjector", () => {
     }));
 
     expect(activities).toEqual([
-      { kind: "tool", toolCallId: "read-1", toolKind: "read" },
-      { kind: "tool", toolCallId: "shell-1", toolKind: "shell" },
-      { kind: "tool", toolCallId: "read-1", toolKind: "read" },
-      null
+      { kind: "tool", toolCallId: "read-1", toolName: "read", toolKind: "read", status: "running" },
+      { kind: "tool", toolCallId: "shell-1", toolName: "bash", toolKind: "shell", status: "running" },
+      { kind: "tool", toolCallId: "shell-1", toolName: "bash", toolKind: "shell", status: "completed" },
+      { kind: "tool", toolCallId: "read-1", toolName: "read", toolKind: "read", status: "running" },
+      { kind: "tool", toolCallId: "read-1", toolName: "read", toolKind: "read", status: "completed" }
     ]);
   });
 
@@ -114,8 +115,59 @@ describe("OperationActivityProjector", () => {
       isError: false
     }));
 
-    expect(activities.at(-2)).toEqual({ kind: "tool", toolCallId: "tool-64", toolKind: "generic" });
-    expect(activities.at(-1)).toEqual({ kind: "tool", toolCallId: "tool-63", toolKind: "read" });
+    expect(activities.at(-2)).toEqual({
+      kind: "tool",
+      toolCallId: "tool-64",
+      toolName: "extension:unknown",
+      toolKind: "generic",
+      status: "completed"
+    });
+    expect(activities.at(-1)).toEqual({
+      kind: "tool",
+      toolCallId: "tool-63",
+      toolName: "read",
+      toolKind: "read",
+      status: "running"
+    });
+  });
+
+  it("preserves a bounded tool name, alias target, and real terminal outcome", () => {
+    const activities: RuntimeOperationActivity[] = [];
+    const projector = new OperationActivityProjector((activity) => activities.push(activity));
+
+    projector.handle(event({
+      type: "tool_execution_start",
+      toolCallId: "alias-search",
+      toolName: "WebSearch",
+      args: { query: "杭州天气", workflow: "none" }
+    }), "search");
+    projector.handle(event({
+      type: "tool_execution_end",
+      toolCallId: "alias-search",
+      toolName: "WebSearch",
+      result: { content: [{ type: "text", text: "provider payload must not enter activity" }] },
+      isError: true
+    }));
+
+    expect(activities).toEqual([
+      {
+        kind: "tool",
+        toolCallId: "alias-search",
+        toolName: "WebSearch",
+        toolKind: "search",
+        status: "running",
+        aliasTarget: "web_search"
+      },
+      {
+        kind: "tool",
+        toolCallId: "alias-search",
+        toolName: "WebSearch",
+        toolKind: "search",
+        status: "failed",
+        aliasTarget: "web_search"
+      }
+    ]);
+    expect(JSON.stringify(activities)).not.toContain("provider payload");
   });
 });
 

@@ -92,6 +92,128 @@ describe("AgentHostServer Extension package commands", () => {
 
     await server.shutdown();
   });
+
+  it("routes Context file commands through Workspace authority and reloads after save", async () => {
+    const runtime = createRuntime();
+    const id = `ctx_${"c".repeat(64)}`;
+    const revision = "d".repeat(64);
+    const savedRevision = "e".repeat(64);
+    const item = {
+      id,
+      name: "AGENTS.md",
+      path: "/workspace/AGENTS.md",
+      category: "rules-context" as const,
+      scope: "project" as const,
+      origin: "workspace" as const,
+      presence: "present" as const,
+      access: "editable" as const,
+      runtimeState: "active" as const
+    };
+    const files = { items: [item], workspaceTrusted: true };
+    const beginSave = vi.fn(async () => ({
+      result: { item, revision: savedRevision, files },
+      commit: async () => undefined,
+      rollback: async () => undefined
+    }));
+    const server = new AgentHostServer(async () => runtime.runtime, {
+      sdkVersionLoader: async () => "0.81.1",
+      contextFileManagementFactory: () => ({
+        list: async () => files,
+        read: async () => ({ item, content: "# Project\n", revision }),
+        mutationScope: async () => "project",
+        beginSave
+      })
+    });
+    const port = await attach(server);
+    const workspace = await createWorkspace();
+
+    await expect(command(port, TASK_CONTEXT, "runtime.initialize", {
+      cwd: workspace.cwd,
+      agentDir: workspace.agentDir,
+      trust: "trusted",
+      approvalMode: "guided"
+    })).resolves.toMatchObject({ ok: true });
+    await expect(command(port, WORKSPACE_CONTEXT, "context.file.list", {}))
+      .resolves.toMatchObject({ ok: true, result: files });
+    await expect(command(port, WORKSPACE_CONTEXT, "context.file.read", { id }))
+      .resolves.toMatchObject({ ok: true, result: { item, content: "# Project\n", revision } });
+    await expect(command(port, WORKSPACE_CONTEXT, "context.file.save", {
+      id,
+      expectedRevision: revision,
+      content: "# Updated\n"
+    }, "save-context-file")).resolves.toMatchObject({
+      ok: true,
+      result: { item, revision: savedRevision, files }
+    });
+    expect(beginSave).toHaveBeenCalledOnce();
+    expect(runtime.reloadResources).toHaveBeenCalledOnce();
+
+    await server.shutdown();
+  });
+
+  it("routes Skill Pack queries through the shared global resource fence", async () => {
+    const runtime = createRuntime();
+    let finishUpdate!: () => void;
+    const list = vi.fn(async () => ({ items: [], total: 0 }));
+    const update = vi.fn(() => new Promise<{
+      result: { items: []; total: 0; changed: true };
+      commit(): Promise<void>;
+      rollback(): Promise<void>;
+    }>((resolve) => {
+      finishUpdate = () => resolve({
+        result: { items: [], total: 0, changed: true },
+        commit: async () => undefined,
+        rollback: async () => undefined
+      });
+    }));
+    const server = new AgentHostServer(async () => runtime.runtime, {
+      sdkVersionLoader: async () => "0.81.1",
+      skillPackManagementFactory: () => ({
+        list,
+        checkForUpdates: vi.fn(async () => ({ items: [], total: 0 })),
+        beginUpdate: update,
+        beginRestore: vi.fn(async () => ({
+          result: { items: [], total: 0, changed: false },
+          commit: async () => undefined,
+          rollback: async () => undefined
+        }))
+      })
+    });
+    const port = await attach(server);
+    const workspace = await createWorkspace();
+
+    await expect(command(port, TASK_CONTEXT, "runtime.initialize", {
+      cwd: workspace.cwd,
+      agentDir: workspace.agentDir,
+      trust: "trusted",
+      approvalMode: "guided"
+    })).resolves.toMatchObject({ ok: true });
+    await expect(command(port, WORKSPACE_CONTEXT, "skill.pack.list", {}))
+      .resolves.toMatchObject({ ok: true, result: { items: [], total: 0 } });
+    expect(list).toHaveBeenCalledOnce();
+
+    const mutation = commandEnvelopeForContext(
+      "skill.pack.update",
+      { id: "lark-cli-global" },
+      WORKSPACE_CONTEXT,
+      3,
+      "update-skill-pack"
+    );
+    port.emit(mutation);
+    await expect(command(port, TASK_CONTEXT, "resource.list", {})).resolves.toMatchObject({
+      ok: false,
+      error: { code: "BUSY" }
+    });
+    await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+    finishUpdate();
+    await expect(responseFor(port, mutation)).resolves.toMatchObject({
+      ok: true,
+      result: { changed: true }
+    });
+    expect(runtime.reloadResources).toHaveBeenCalledOnce();
+
+    await server.shutdown();
+  });
 });
 
 class FakePort implements ProtocolPort {

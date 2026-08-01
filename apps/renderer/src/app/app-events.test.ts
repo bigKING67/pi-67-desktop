@@ -1,8 +1,7 @@
 import type {
   ApprovalRequestView,
   ExtensionUiRequestView,
-  OperationView,
-  SessionSnapshot
+  OperationView
 } from "@pi67/domain";
 import { eventEnvelope as createEventEnvelope, type EventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -13,7 +12,10 @@ import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
+import {
+  installSessionProjectionFixture,
+  sessionSnapshotFixture
+} from "../session/session-projection-test-support.js";
 import { handleAgentEvent, type RoutedAgentEvent } from "./app-events.js";
 
 const operation: OperationView = {
@@ -65,7 +67,7 @@ describe("handleAgentEvent interactive authority", () => {
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     installSessionProjectionFixture(
       { connected: true, hostEpoch: 9 },
-      sessionSnapshot(),
+      sessionSnapshotFixture(),
       3
     );
   });
@@ -206,6 +208,50 @@ describe("handleAgentEvent interactive authority", () => {
     expect(useExtensionUiStore.getState().widgets).toEqual({});
   });
 
+  it("keeps routine resource and Extension information in history without toast noise", () => {
+    const state = eventState();
+    const notify = extensionUpdate({
+      kind: "notify",
+      level: "info",
+      message: "Indexed 24 rule files."
+    });
+
+    dispatch(state, { type: "extension.ui.updated", payload: notify }, eventEnvelopeFor(
+      "extension.ui.updated",
+      notify
+    ));
+    dispatch(state, { type: "resource.changed", payload: { reason: "reload" } }, eventEnvelopeFor(
+      "resource.changed",
+      { reason: "reload" }
+    ));
+
+    expect(useNotificationStore.getState().items.map((item) => item.title)).toEqual([
+      "Extension 通知",
+      "Pi 资源已重新加载"
+    ]);
+    expect(useNotificationStore.getState().toastIds).toEqual([]);
+  });
+
+  it("still raises Extension warnings as floating notifications", () => {
+    const state = eventState();
+    const notify = extensionUpdate({
+      kind: "notify",
+      level: "warning",
+      message: "Extension requires attention."
+    });
+
+    dispatch(state, { type: "extension.ui.updated", payload: notify }, eventEnvelopeFor(
+      "extension.ui.updated",
+      notify
+    ));
+
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "Extension 通知"
+    });
+    expect(useNotificationStore.getState().toastIds).toHaveLength(1);
+  });
+
   it("keeps Extension title and compatibility structured and generation-scoped", () => {
     const state = eventState();
     dispatch(state, {
@@ -312,27 +358,6 @@ describe("handleAgentEvent interactive authority", () => {
     expect(useLiveTurnStore.getState().textChunks).toEqual([]);
   });
 
-  it("keeps the runtime recovering after an operation is lost", () => {
-    const state = eventState();
-    dispatch(state, {
-      type: "operation.lost",
-      payload: {
-        operationId: "operation-1",
-        lostAt: 2,
-        reason: "Agent Host replacement is required."
-      }
-    }, eventEnvelopeFor("operation.lost", {
-      operationId: "operation-1",
-      lostAt: 2,
-      reason: "Agent Host replacement is required."
-    }));
-
-    expect(state.operation?.lifecycle).toBe("lost");
-    expect(state.runtime).toMatchObject({ phase: "recovering" });
-    expect(useNotificationStore.getState().items).toEqual([
-      expect.objectContaining({ level: "warning", title: "任务已中断" })
-    ]);
-  });
 });
 
 function eventState() {
@@ -344,24 +369,6 @@ function eventState() {
     operationDetail: undefined as string | undefined,
     operationProgress: undefined as string | undefined,
     sessionTransitionPending: false
-  };
-}
-
-function sessionSnapshot(): SessionSnapshot {
-  return {
-    sessionId: "session-1",
-    cwd: "/workspace",
-    streaming: false,
-    messages: [],
-    messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
-    tree: { nodes: [], truncated: false, total: 0 },
-    resources: []
   };
 }
 

@@ -17,7 +17,7 @@ describe("projectExtensionCatalog", () => {
       extension("<inline:pi67-desktop-safety>", { hidden: true }),
       extension("example-package", {
         commands: 2,
-        tools: 1,
+        toolNames: ["web_search"],
         messageRenderers: 1,
         shortcuts: 1,
         scope: "project",
@@ -41,6 +41,7 @@ describe("projectExtensionCatalog", () => {
       loadState: "loaded",
       commandCount: 2,
       toolCount: 1,
+      toolNames: ["web_search"],
       source: { scope: "project", origin: "package" },
       assessment: {
         overall: "partial",
@@ -57,7 +58,8 @@ describe("projectExtensionCatalog", () => {
   it("fails closed for load errors and redacts secret-shaped error text", () => {
     const catalog = projectExtensionCatalog(extensionResult([], [
       { path: "/extensions/broken.ts", error: "apiKey=sk-secret-value-12345678" },
-      { path: "<inline:pi67-desktop-safety>", error: "internal fixture" }
+      { path: "<inline:pi67-desktop-safety>", error: "internal fixture" },
+      { path: "<inline:pi67-desktop-tool-routing>", error: "internal fixture" }
     ]));
 
     expect(catalog.items).toHaveLength(1);
@@ -133,6 +135,7 @@ function extension(
     hidden?: boolean;
     commands?: number;
     tools?: number;
+    toolNames?: string[];
     messageRenderers?: number;
     entryRenderers?: number;
     shortcuts?: number;
@@ -152,7 +155,9 @@ function extension(
     ...(options.hidden === undefined ? {} : { hidden: options.hidden }),
     sourceInfo,
     handlers: new Map(),
-    tools: numberedMap(options.tools),
+    tools: options.toolNames
+      ? new Map(options.toolNames.map((toolName) => [toolName, {}]))
+      : numberedMap(options.tools),
     messageRenderers: numberedMap(options.messageRenderers),
     entryRenderers: numberedMap(options.entryRenderers),
     commands: numberedMap(options.commands),

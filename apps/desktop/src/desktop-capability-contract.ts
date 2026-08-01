@@ -4,6 +4,7 @@ import type {
   DesktopCapabilityPackageSummary,
   DesktopCapabilityResourceType,
   DesktopCapabilitySnapshot,
+  DesktopBundledSkillSuiteSummary,
   DesktopIntegrationStatus,
   DesktopRecommendedPackage
 } from "@pi67/protocol";
@@ -18,10 +19,7 @@ export interface BundledCapabilityCatalog {
     bundledExtensions: Array<{ id: string; displayName: string }>;
     bundledSkills: Array<{ id: string; displayName: string; description: string }>;
   }>;
-  bundledSkillSuites: Array<{
-    id: string;
-    displayName: string;
-    description: string;
+  bundledSkillSuites: Array<Omit<DesktopBundledSkillSuiteSummary, "skills"> & {
     members: Array<{ packageId: string; skillId: string }>;
   }>;
   recommendedExternal: DesktopRecommendedPackage[];
@@ -78,11 +76,9 @@ export function snapshotFromCatalog(
       installed: installed.get(entry.id) === true
     }))),
     bundledSkills,
-    bundledSkillSuites: catalog.bundledSkillSuites.map((suite) => ({
-      id: suite.id,
-      displayName: suite.displayName,
-      description: suite.description,
-      skills: suite.members.map((member) => {
+    bundledSkillSuites: catalog.bundledSkillSuites.map(({ members, ...suite }) => ({
+      ...suite,
+      skills: members.map((member) => {
         const skill = bundledSkillsByKey.get(bundledSkillKey(member.packageId, member.skillId));
         if (!skill) throw new Error("Desktop bundled Skill suite member is unavailable.");
         return skill;
@@ -225,6 +221,13 @@ function parseBundledSkillSuites(
       || typeof item.description !== "string"
       || item.description.length === 0
       || item.description.length > 500
+      || !isBundledSkillSuiteVersionSource(item.versionSource)
+      || !isBundledSkillSuiteVersion(item.versionSource, item.bundledVersion)
+      || (item.upstream !== undefined && !isHttpsUrl(item.upstream))
+      || (item.sourceCommit !== undefined && !isCommit(item.sourceCommit))
+      || !isBundledSkillSuiteUpdatePolicy(item.updatePolicy)
+      || !isBundledSkillSuiteUpdateManager(item.updateManager)
+      || !isBundledSkillSuiteIndependentUpdateState(item.independentUpdateState)
       || !Array.isArray(item.members)
       || item.members.length === 0
       || item.members.length > 256
@@ -244,6 +247,13 @@ function parseBundledSkillSuites(
       id: item.id,
       displayName: item.displayName,
       description: item.description,
+      versionSource: item.versionSource,
+      ...(typeof item.bundledVersion === "string" ? { bundledVersion: item.bundledVersion } : {}),
+      ...(typeof item.upstream === "string" ? { upstream: item.upstream } : {}),
+      ...(typeof item.sourceCommit === "string" ? { sourceCommit: item.sourceCommit } : {}),
+      updatePolicy: item.updatePolicy,
+      updateManager: item.updateManager,
+      independentUpdateState: item.independentUpdateState,
       members
     };
   });
@@ -256,6 +266,37 @@ function parseBundledSkillSuites(
 
 function bundledSkillKey(packageId: string, skillId: string): string {
   return `${packageId}:${skillId}`;
+}
+
+function isBundledSkillSuiteVersionSource(value: unknown): value is DesktopBundledSkillSuiteSummary["versionSource"] {
+  return ["unversioned", "skill-pack", "capability-package", "multiple-sources"].includes(String(value));
+}
+
+function isBundledSkillSuiteVersion(
+  source: DesktopBundledSkillSuiteSummary["versionSource"],
+  value: unknown
+): boolean {
+  return source === "skill-pack" || source === "capability-package"
+    ? isVersion(value)
+    : value === undefined;
+}
+
+function isBundledSkillSuiteUpdatePolicy(
+  value: unknown
+): value is DesktopBundledSkillSuiteSummary["updatePolicy"] {
+  return ["hybrid", "capability-package", "source-specific"].includes(String(value));
+}
+
+function isBundledSkillSuiteUpdateManager(
+  value: unknown
+): value is DesktopBundledSkillSuiteSummary["updateManager"] {
+  return ["lark-cli", "pi67-skill-pack-registry", "desktop-capability", "source-specific"].includes(String(value));
+}
+
+function isBundledSkillSuiteIndependentUpdateState(
+  value: unknown
+): value is DesktopBundledSkillSuiteSummary["independentUpdateState"] {
+  return ["available", "planned", "not-applicable"].includes(String(value));
 }
 
 export function parseManagedState(value: unknown): ManagedCapabilityState {
@@ -329,6 +370,19 @@ function isResourceType(value: unknown): value is DesktopCapabilityResourceType 
 
 function isVersion(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 100;
+}
+
+function isCommit(value: unknown): value is string {
+  return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value);
+}
+
+function isHttpsUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 500) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function isId(value: unknown): value is string {

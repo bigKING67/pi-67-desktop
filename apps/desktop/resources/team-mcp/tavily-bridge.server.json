@@ -1,0 +1,12 @@
+{
+  "name": "tavily-bridge",
+  "url": "https://tavily.52671314.xyz/mcp",
+  "auth": "bearer",
+  "bearerTokenEnv": "TAVILY_BRIDGE_MCP_TOKEN",
+  "lifecycle": "lazy",
+  "requestTimeoutMs": 180000,
+  "directTools": [
+    "tavily_search",
+    "tavily_extract"
+  ]
+}

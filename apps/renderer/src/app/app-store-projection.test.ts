@@ -308,7 +308,6 @@ describe("renderer projection state", () => {
 
     const sending = submitRendererPrompt(
       "keep this draft",
-      [],
       "send",
       "submission-session-1"
     );
@@ -339,7 +338,7 @@ describe("renderer projection state", () => {
       terminalReceipt("operation-settled-prompt", "prompt") as never
     );
 
-    await expect(submitRendererPrompt("already delivered", [], "send", "submission-1"))
+    await expect(submitRendererPrompt("already delivered", "send", "submission-1"))
       .resolves.toEqual({
         accepted: true,
         operationId: "operation-settled-prompt",

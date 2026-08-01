@@ -26,6 +26,8 @@ extraResources:
     to: toolchain
   - from: artifacts/capabilities/current
     to: capabilities
+  - from: apps/desktop/resources/team-mcp
+    to: team-mcp
 protocols:
   - name: π
     schemes:

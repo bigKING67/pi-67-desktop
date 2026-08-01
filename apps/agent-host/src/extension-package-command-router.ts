@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type {
-  AgentRuntime,
   ExtensionPackageManagement,
   PiWorkspaceRuntimeServices
 } from "@pi67/pi-runtime";
@@ -11,6 +10,10 @@ import type {
   WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
+import {
+  ResourceManagementCoordinator,
+  type ResourceManagementTaskView
+} from "./resource-management-coordinator.js";
 
 export type ExtensionPackageCommandType =
   | "extension.package.list"
@@ -33,24 +36,14 @@ export type ExtensionPackageManagementPort = Pick<ExtensionPackageManagement,
   | "uninstall"
 >;
 
-export interface ExtensionPackageTaskView {
-  readonly taskKey: string;
-  readonly workspaceId: string;
-  readonly runtime: AgentRuntime | undefined;
-  readonly initialized: boolean;
-  isIdle(): boolean;
-}
+export type ExtensionPackageTaskView = ResourceManagementTaskView;
 
 export interface ExtensionPackageCommandRouterOptions {
   getWorkspaceServices(workspaceId: string): PiWorkspaceRuntimeServices;
   listTasks(): ExtensionPackageTaskView[];
   createManagement(services: PiWorkspaceRuntimeServices): ExtensionPackageManagementPort;
+  coordinator?: ResourceManagementCoordinator;
   maxConcurrentQueries?: number;
-}
-
-interface ActiveMutation {
-  readonly scope: "global" | "project";
-  readonly workspaceId: string;
 }
 
 interface MutationRecord {
@@ -67,23 +60,21 @@ const MUTATION_TYPES = new Set<AgentCommandType>([
   "extension.package.uninstall"
 ]);
 
-const DEFAULT_MAX_CONCURRENT_QUERIES = 4;
 const MAX_LEDGER_ENTRIES = 32;
 const LEDGER_RETENTION_MS = 5 * 60_000;
 
 export class ExtensionPackageCommandRouter {
   private readonly globalMutations = new Map<string, MutationRecord>();
   private readonly projectMutations = new Map<string, Map<string, MutationRecord>>();
-  private readonly activeQueries = new Map<string, number>();
-  private readonly maxConcurrentQueries: number;
-  private activeMutation: ActiveMutation | undefined;
+  private readonly coordinator: ResourceManagementCoordinator;
 
   constructor(private readonly options: ExtensionPackageCommandRouterOptions) {
-    const maximum = options.maxConcurrentQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES;
-    if (!Number.isSafeInteger(maximum) || maximum < 1) {
-      throw new RangeError("maxConcurrentQueries must be a positive integer.");
-    }
-    this.maxConcurrentQueries = maximum;
+    this.coordinator = options.coordinator ?? new ResourceManagementCoordinator({
+      listTasks: () => options.listTasks(),
+      ...(options.maxConcurrentQueries === undefined
+        ? {}
+        : { maxConcurrentQueries: options.maxConcurrentQueries })
+    });
   }
 
   dispatch(
@@ -92,7 +83,10 @@ export class ExtensionPackageCommandRouter {
     idempotencyKey?: string
   ): Promise<ExtensionPackageResult> {
     if (!isExtensionPackageMutation(command.type)) {
-      return this.runQuery(context.workspaceId, () => this.dispatchQuery(context.workspaceId, command));
+      return this.coordinator.runQuery(
+        context.workspaceId,
+        () => this.dispatchQuery(context.workspaceId, command)
+      );
     }
     if (!idempotencyKey) {
       return Promise.reject(new HostCommandError(
@@ -111,25 +105,7 @@ export class ExtensionPackageCommandRouter {
   }
 
   assertTaskCommandAllowed(workspaceId: string): void {
-    if (!this.activeMutation) return;
-    if (this.activeMutation.scope === "project" && this.activeMutation.workspaceId !== workspaceId) return;
-    throw busy("Extension package resources are being changed for this Task Workspace.");
-  }
-
-  private runQuery<T>(workspaceId: string, query: () => Promise<T>): Promise<T> {
-    this.assertPackageQueryAllowed(workspaceId);
-    const active = this.activeQueries.get(workspaceId) ?? 0;
-    if (active >= this.maxConcurrentQueries) {
-      return Promise.reject(busy("Too many Extension package queries are already running."));
-    }
-    this.activeQueries.set(workspaceId, active + 1);
-    return Promise.resolve()
-      .then(query)
-      .finally(() => {
-        const remaining = (this.activeQueries.get(workspaceId) ?? 1) - 1;
-        if (remaining <= 0) this.activeQueries.delete(workspaceId);
-        else this.activeQueries.set(workspaceId, remaining);
-      });
+    this.coordinator.assertTaskCommandAllowed(workspaceId);
   }
 
   private async dispatchQuery(
@@ -149,33 +125,14 @@ export class ExtensionPackageCommandRouter {
 
   private executeMutation(
     workspaceId: string,
-    scope: ActiveMutation["scope"],
+    scope: "global" | "project",
     command: ExtensionPackageCommand
   ): Promise<ExtensionPackageResult> {
-    if (this.activeMutation) throw busy("Another Extension package mutation is already running.");
-    this.assertNoConflictingQueries(workspaceId, scope);
-    const affectedTasks = this.affectedTasks(workspaceId, scope);
-    const busyTask = affectedTasks.find((task) => !task.isIdle());
-    if (busyTask) {
-      throw new HostCommandError(
-        "BUSY",
-        scope === "global"
-          ? "Stop all running or waiting Pi Tasks before changing global Extensions."
-          : "Stop running or waiting Pi Tasks in this Workspace before changing project Extensions.",
-        true,
-        { retryable: true, taskKey: busyTask.taskKey, scope }
-      );
-    }
-    this.activeMutation = { scope, workspaceId };
-    return Promise.resolve()
-      .then(() => this.dispatchMutation(workspaceId, command))
-      .then(async (result) => {
-        await reloadAffectedTasks(affectedTasks);
-        return result;
-      })
-      .finally(() => {
-        this.activeMutation = undefined;
-      });
+    return this.coordinator.runMutation(
+      workspaceId,
+      scope,
+      () => this.dispatchMutation(workspaceId, command)
+    );
   }
 
   private async dispatchMutation(
@@ -238,25 +195,6 @@ export class ExtensionPackageCommandRouter {
     return record.promise;
   }
 
-  private assertPackageQueryAllowed(workspaceId: string): void {
-    if (!this.activeMutation) return;
-    if (this.activeMutation.scope === "project" && this.activeMutation.workspaceId !== workspaceId) return;
-    throw busy("Extension package settings are being changed for this Workspace.");
-  }
-
-  private assertNoConflictingQueries(workspaceId: string, scope: ActiveMutation["scope"]): void {
-    const hasQueries = scope === "global"
-      ? this.activeQueries.size > 0
-      : (this.activeQueries.get(workspaceId) ?? 0) > 0;
-    if (hasQueries) throw busy("Wait for Extension package queries to finish before changing packages.");
-  }
-
-  private affectedTasks(workspaceId: string, scope: ActiveMutation["scope"]): ExtensionPackageTaskView[] {
-    return this.options.listTasks().filter((task) => (
-      scope === "global" || task.workspaceId === workspaceId
-    ));
-  }
-
   private management(workspaceId: string): ExtensionPackageManagementPort {
     return this.options.createManagement(this.options.getWorkspaceServices(workspaceId));
   }
@@ -280,24 +218,11 @@ function isExtensionPackageMutation(type: AgentCommandType): boolean {
   return MUTATION_TYPES.has(type);
 }
 
-function mutationScope(command: ExtensionPackageCommand): ActiveMutation["scope"] {
+function mutationScope(command: ExtensionPackageCommand): "global" | "project" {
   return command.type === "extension.package.restoreInheritance"
     || ("scope" in command.payload && command.payload.scope === "project")
     ? "project"
     : "global";
-}
-
-async function reloadAffectedTasks(tasks: ExtensionPackageTaskView[]): Promise<void> {
-  let firstError: unknown;
-  for (const task of tasks) {
-    if (!task.initialized || !task.runtime) continue;
-    try {
-      await task.runtime.reloadResources();
-    } catch (error) {
-      firstError ??= error;
-    }
-  }
-  if (firstError !== undefined) throw firstError;
 }
 
 function mutationFingerprint(context: WorkspaceProtocolContext, command: ExtensionPackageCommand): string {
@@ -344,8 +269,4 @@ function pruneLedger(ledger: Map<string, MutationRecord>): void {
   for (const [key, record] of ledger) {
     if (record.settledAt !== undefined && record.settledAt <= cutoff) ledger.delete(key);
   }
-}
-
-function busy(message: string): HostCommandError {
-  return new HostCommandError("BUSY", message, true, { retryable: true });
 }

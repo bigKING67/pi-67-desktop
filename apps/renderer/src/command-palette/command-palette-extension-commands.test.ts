@@ -3,8 +3,9 @@ import { normalizePaletteExtensionCommands } from "./command-palette-extension-c
 
 describe("command palette Extension Commands", () => {
   it("normalizes bounded metadata", () => {
-    expect(normalizePaletteExtensionCommands([{
+    expect(normalizePaletteExtensionCommands({ items: [{
       name: " review ",
+      source: "extension",
       description: " Inspect changes ",
       adapter: {
         adapterId: "verified",
@@ -12,8 +13,9 @@ describe("command palette Extension Commands", () => {
         label: "检查",
         description: "Adapter description"
       }
-    }])).toEqual([{
+    }], total: 1, truncated: false })).toEqual([{
       name: "review",
+      source: "extension",
       description: "Inspect changes",
       adapter: {
         adapterId: "verified",
@@ -25,8 +27,15 @@ describe("command palette Extension Commands", () => {
   });
 
   it("fails closed on empty, oversized, or duplicate command identities", () => {
-    expect(normalizePaletteExtensionCommands([{ name: "" }])).toBeUndefined();
-    expect(normalizePaletteExtensionCommands([{ name: "x".repeat(161) }])).toBeUndefined();
-    expect(normalizePaletteExtensionCommands([{ name: "review" }, { name: " review " }])).toBeUndefined();
+    expect(normalizePaletteExtensionCommands({ items: [{ name: "", source: "extension" }], total: 1, truncated: false })).toBeUndefined();
+    expect(normalizePaletteExtensionCommands({ items: [{ name: "x".repeat(161), source: "extension" }], total: 1, truncated: false })).toBeUndefined();
+    expect(normalizePaletteExtensionCommands({
+      items: [
+        { name: "review", source: "extension" },
+        { name: " review ", source: "extension" }
+      ],
+      total: 2,
+      truncated: false
+    })).toBeUndefined();
   });
 });

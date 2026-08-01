@@ -1,27 +1,23 @@
 import {
   createRuntimeCredentialOverrideStore,
   type AgentRuntime,
-  type PiWorkspaceRuntimeServices,
-  type PiSdkRuntimeOptions,
   type RuntimeCredentialOverrideStore
 } from "@pi67/pi-runtime";
 import {
   createMessageId,
   type AgentCommand,
   type AgentCommandType,
-  type AgentHostRuntimePoisonedMessage,
-  type AgentHostShutdownCompleteMessage,
   type CommandResults,
   type ProtocolPort,
   type RequestEnvelope
 } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
 import { forkSessionFromTask } from "./cross-task-session-fork.js";
-import { ExtensionPackageCommandRouter, type ExtensionPackageManagementPort } from "./extension-package-command-router.js";
-import { createWorkerBackedExtensionPackageManagement } from "./package-worker-client.js";
 import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostRequestRouter } from "./host-request-router.js";
+import { defaultRuntimeLoader, parseHostEpoch } from "./host-runtime-loader.js";
+import type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 import { HostSdkVersionLoader } from "./host-sdk-version-loader.js";
 import { boundedMetadataCount, shutdownDeadline } from "./host-shutdown-contract.js";
 import { HostTaskStateCoordinator, type TaskHostState } from "./host-task-state-coordinator.js";
@@ -31,36 +27,21 @@ import {
   captureProjectionResync
 } from "./host-projection.js";
 import { HostCommandError } from "./protocol-error.js";
-import type { SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
 import {
-  TaskRuntimeRegistry,
-  type TaskRuntimeLoader
-} from "./task-runtime-registry.js";
+  createResourceManagementRouters,
+  type ResourceManagementRouters
+} from "./resource-management-routers.js";
+import type { SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
+import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 
-export interface AttachPortOptions {
-  expectedOrigin?: string;
-  appInstanceId?: string;
-  hostInstanceId?: string;
-  hostEpoch?: number;
-}
-
-export type AgentRuntimeLoader = TaskRuntimeLoader;
-
-export interface AgentHostServerOptions {
-  abortWatchdogMs?: number;
-  operationHeartbeatIntervalMs?: number;
-  maxQueuedCommands?: number;
-  extensionPackageManagementFactory?: (
-    services: PiWorkspaceRuntimeServices
-  ) => ExtensionPackageManagementPort;
-  onRuntimePoisoned?: (message: AgentHostRuntimePoisonedMessage) => void;
-  runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
-  sdkVersionLoader?: () => Promise<string>;
-}
-
-export type AgentHostShutdownResult = Omit<AgentHostShutdownCompleteMessage, "type">;
+export type {
+  AgentHostServerOptions,
+  AgentHostShutdownResult,
+  AgentRuntimeLoader,
+  AttachPortOptions
+} from "./host-server-contract.js";
 
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
 const MAX_RESYNC_INTERACTIVE_REQUESTS = 512;
@@ -74,7 +55,9 @@ export class AgentHostServer {
   private readonly workspaceCommands: WorkspaceCommandRouter;
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
   private readonly taskRuntimes: TaskRuntimeRegistry;
-  private readonly extensionPackages: ExtensionPackageCommandRouter;
+  private readonly contextFiles: ResourceManagementRouters["contextFiles"];
+  private readonly extensionPackages: ResourceManagementRouters["extensionPackages"];
+  private readonly skillPacks: ResourceManagementRouters["skillPacks"];
   private readonly tasks: HostTaskStateCoordinator;
   private readonly taskLifecycle: HostTaskRuntimeLifecycle;
   private readonly requests: HostRequestRouter;
@@ -97,7 +80,8 @@ export class AgentHostServer {
     this.taskRuntimes = new TaskRuntimeRegistry(
       this.runtimeLoader,
       this.runtimeCredentialOverrides,
-      { onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime) }
+      { onRuntimeLoaded: (record, runtime) => this.tasks.bindRuntime(record, runtime) },
+      this.options.promptAttachments
     );
     this.tasks = new HostTaskStateCoordinator(this.taskRuntimes, this.workspaces, {
       ...(this.options.abortWatchdogMs === undefined ? {} : { abortWatchdogMs: this.options.abortWatchdogMs }),
@@ -117,12 +101,22 @@ export class AgentHostServer {
         context: state.record.context
       })
     });
-    this.extensionPackages = new ExtensionPackageCommandRouter({
+    const resourceManagement = createResourceManagementRouters({
       getWorkspaceServices: (workspaceId) => this.workspaces.require(workspaceId).workspaceServices,
       listTasks: () => this.tasks.packageTaskViews(),
-      createManagement: (services) => this.options.extensionPackageManagementFactory?.(services)
-        ?? createWorkerBackedExtensionPackageManagement(services)
+      ...(this.options.extensionPackageManagementFactory === undefined
+        ? {}
+        : { extensionPackageManagementFactory: this.options.extensionPackageManagementFactory }),
+      ...(this.options.contextFileManagementFactory === undefined
+        ? {}
+        : { contextFileManagementFactory: this.options.contextFileManagementFactory }),
+      ...(this.options.skillPackManagementFactory === undefined
+        ? {}
+        : { skillPackManagementFactory: this.options.skillPackManagementFactory })
     });
+    this.contextFiles = resourceManagement.contextFiles;
+    this.extensionPackages = resourceManagement.extensionPackages;
+    this.skillPacks = resourceManagement.skillPacks;
     this.events = new HostEventChannel({
       getConnection: () => this.currentConnection,
       getHostEpoch: () => this.hostIdentity?.hostEpoch ?? 1,
@@ -151,15 +145,22 @@ export class AgentHostServer {
       usesCompatibilityRuntime: () => this.usesCompatibilityRuntime,
       takeCompatibilityRuntime: () => this.takeCompatibilityRuntime()
     });
-    this.requests = new HostRequestRouter(this.tasks, this.extensionPackages, this.workspaceCommands, {
-      isShuttingDown: () => this.shuttingDown,
-      runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),
-      dispatchAppCommand: (command) => this.dispatchAppCommand(command),
-      handleProjectionResync: (origin, request, state) => this.handleProjectionResync(origin, request, state),
-      loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
-      closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
-      dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint)
-    });
+    this.requests = new HostRequestRouter(
+      this.tasks,
+      this.contextFiles,
+      this.extensionPackages,
+      this.skillPacks,
+      this.workspaceCommands,
+      {
+        isShuttingDown: () => this.shuttingDown,
+        runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),
+        dispatchAppCommand: (command) => this.dispatchAppCommand(command),
+        handleProjectionResync: (origin, request, state) => this.handleProjectionResync(origin, request, state),
+        loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
+        closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
+        dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint)
+      }
+    );
   }
 
   attachPort(port: ProtocolPort, options: AttachPortOptions = {}): void {
@@ -248,7 +249,10 @@ export class AgentHostServer {
   private loadCompatibilityRuntime(): Promise<AgentRuntime> {
     if (this.compatibilityRuntime) return Promise.resolve(this.compatibilityRuntime);
     this.compatibilityRuntimeLoad ??= this.runtimeLoader({
-      runtimeCredentialOverrides: this.runtimeCredentialOverrides
+      runtimeCredentialOverrides: this.runtimeCredentialOverrides,
+      ...(this.options.promptAttachments === undefined
+        ? {}
+        : { promptAttachmentAccess: this.options.promptAttachments.forTask("compatibility") })
     }).then((runtime) => {
       this.compatibilityRuntime = runtime;
       this.compatibilityRuntimeUnsubscribe = runtime.subscribe((event) => this.events.send(event));
@@ -349,6 +353,11 @@ export class AgentHostServer {
     } catch (error) {
       rememberError(error);
     }
+    try {
+      await this.options.promptAttachments?.dispose();
+    } catch (error) {
+      rememberError(error);
+    }
     for (const runtime of connectionCloseRuntimes) {
       try {
         runtime.cancelInteractiveRequests("connection-close");
@@ -430,16 +439,6 @@ export class AgentHostServer {
     }
     return this.hostIdentity;
   }
-}
-
-function parseHostEpoch(value: string | undefined): number {
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 1;
-}
-
-async function defaultRuntimeLoader(options?: PiSdkRuntimeOptions): Promise<AgentRuntime> {
-  const { PiSdkRuntime } = await import("@pi67/pi-runtime");
-  return new PiSdkRuntime(options);
 }
 
 function consumesRunAdmission(command: AgentCommand): boolean {

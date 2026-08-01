@@ -14,6 +14,8 @@ import {
   resolveDesktopAgentDirectory
 } from "./desktop-capability-service.js";
 import { PackageNetworkSettingsStore } from "./package-network-settings.js";
+import { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
+import { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import { redact } from "./redaction.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
 import { registerSystemBridge } from "./system-bridge.js";
@@ -34,6 +36,9 @@ const toolchainRoot = app.isPackaged
 const capabilitiesRoot = app.isPackaged
   ? join(process.resourcesPath, "capabilities")
   : normalize(join(currentDirectory, "../../../artifacts/capabilities/current"));
+const teamMcpResourcesRoot = app.isPackaged
+  ? join(process.resourcesPath, "team-mcp")
+  : normalize(join(currentDirectory, "../resources/team-mcp"));
 const desktopToolchain = resolveDesktopToolchain(toolchainRoot, app.isPackaged);
 const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER_DEV_URL);
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
@@ -50,18 +55,26 @@ let mainWindow: BrowserWindow | undefined;
 let unregisterPowerResumeRecovery: (() => void) | undefined;
 let workbenchState: WorkbenchStateStore | undefined;
 let packageNetworkSettings: PackageNetworkSettingsStore | undefined;
+let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
+let promptAttachments: PromptAttachmentStagingService | undefined;
+const appInstanceId = randomUUID();
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
-  appInstanceId: randomUUID(),
+  appInstanceId,
   expectedRendererOrigin,
   getStoragePaths: () => createAgentHostStoragePaths(app.getPath("userData")),
   getRuntimeEnvironment: () => {
     if (!packageNetworkSettings) throw new Error("Package network settings are not initialized.");
+    if (!teamMcpSettings) throw new Error("Team MCP settings are not initialized.");
+    if (!promptAttachments) throw new Error("Prompt attachment staging is not initialized.");
     return {
       toolchain: desktopToolchain,
       capabilitiesRoot,
+      teamMcpResourcesRoot,
+      teamMcpTokenPath: teamMcpSettings.tokenPath,
       packageNetworkSettingsPath: packageNetworkSettings.requestedSettingsPath,
+      promptAttachmentRoot: promptAttachments.root,
       packaged: app.isPackaged,
       electronExecutable: process.execPath
     };
@@ -71,6 +84,9 @@ const agentHostSupervisor = new AgentHostSupervisor({
 });
 const applicationShutdown = createApplicationShutdownController({
   stopAgentHost: () => agentHostSupervisor.stop(),
+  afterAgentHostStop: async () => {
+    await promptAttachments?.cleanup();
+  },
   markCleanExit: async () => {
     if (workbenchState) await workbenchState.update(finishWorkbenchRun);
   },
@@ -95,6 +111,13 @@ if (hasSingleInstanceLock) {
     registerApplicationProtocol(rendererDirectory);
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
+    teamMcpSettings = new TeamMcpSettingsStore(app.getPath("userData"));
+    promptAttachments = new PromptAttachmentStagingService(join(
+      app.getPath("userData"),
+      "runtime",
+      "prompt-attachments",
+      appInstanceId
+    ));
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
       agentDir: resolveDesktopAgentDirectory(),
@@ -109,10 +132,13 @@ if (hasSingleInstanceLock) {
     await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
     registerSystemBridge({
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
+      restartAgentHost: () => agentHostSupervisor.restart(),
       getMainWindow: () => mainWindow,
       desktopToolchain,
       desktopCapabilities,
       packageNetworkSettings,
+      teamMcpSettings,
+      promptAttachments,
       workbenchState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({

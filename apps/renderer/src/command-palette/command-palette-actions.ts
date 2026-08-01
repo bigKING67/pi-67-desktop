@@ -1,5 +1,5 @@
 import type { OperationView, SessionSummary } from "@pi67/domain";
-import type { CommandDescriptor } from "@pi67/protocol";
+import type { SlashCommandDescriptor } from "@pi67/protocol";
 import {
   Command,
   DownloadCloud,
@@ -38,7 +38,7 @@ export interface PaletteActionHandlers {
 
 interface BuildPaletteActionsOptions {
   sessions: readonly SessionSummary[];
-  extensionCommands: readonly CommandDescriptor[];
+  extensionCommands: readonly SlashCommandDescriptor[];
   activeSessionPath: string | undefined;
   availability: PaletteAvailability;
   handlers: PaletteActionHandlers;
@@ -184,7 +184,7 @@ function mutationAction(
   };
 }
 
-function commandDetail(command: CommandDescriptor): string {
+function commandDetail(command: SlashCommandDescriptor): string {
   const description = command.description
     ?? command.adapter?.description
     ?? messages.commandPalette.extensionFallbackDescription;

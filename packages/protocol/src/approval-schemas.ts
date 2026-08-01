@@ -17,6 +17,7 @@ const RiskCategorySchema = Type.Union([
   Type.Literal("dependency-change"),
   Type.Literal("git-external-action"),
   Type.Literal("download-and-execute"),
+  Type.Literal("network-read"),
   Type.Literal("network-side-effect"),
   Type.Literal("ambiguous-command")
 ]);

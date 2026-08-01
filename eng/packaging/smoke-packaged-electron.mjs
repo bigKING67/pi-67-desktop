@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import {
   isProcessAlive,
   writeControlledShutdownExtension
@@ -10,8 +10,7 @@ import {
   createPackagedTestDirectories,
   installWorkspaceDialogResult,
   launchPackagedApplication,
-  resolvePackagedArtifact,
-  setPackagedContentSize
+  resolvePackagedArtifact
 } from "./packaged-electron-fixture.mjs";
 import {
   captureProcessOutput,
@@ -21,12 +20,17 @@ import {
   verifyColdProviderRestoration,
   verifyInitialRuntimeSettings
 } from "./packaged-electron-smoke-scenarios.mjs";
+import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
 if (packagedScreenshotDirectory) await mkdir(packagedScreenshotDirectory, { recursive: true });
+const {
+  capturePackagedScreenshot,
+  capturePackagedWorkbenchVisualEvidence
+} = createPackagedVisualEvidence(packagedScreenshotDirectory);
 const {
   agentDir,
   extensionsDirectory,
@@ -268,7 +272,7 @@ try {
   await capturePackagedScreenshot(window, "06-local-extensions.png");
   await settingsNavigation.getByRole("button", { name: "技能", exact: true }).click();
   const skillSettingsWorkspace = workspaceSettings.getByTestId("skill-settings-workspace");
-  const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局技能", exact: true });
+  const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   if (await globalSkillPanel.getByText("pi-subagents", { exact: true }).count()) {
@@ -287,12 +291,37 @@ try {
   }
   await capturePackagedScreenshot(window, "08-prompt-template-resources.png");
   await settingsNavigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
-  await workspaceSettings.getByRole("button", { name: `项目 · ${basename(workspace)}`, exact: true }).click();
+  const ruleSettingsWorkspace = workspaceSettings.getByTestId("rule-settings-workspace");
+  const globalRuleCategories = ruleSettingsWorkspace.getByRole("group", { name: "全局规则与上下文分类" });
+  await globalRuleCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
+  const managedRuleCatalog = ruleSettingsWorkspace.getByRole("list", { name: "桌面托管规则", exact: true });
+  const managedRuleRows = managedRuleCatalog.getByRole("listitem");
+  await managedRuleRows.first().waitFor({ state: "visible", timeout: 15_000 });
+  if (await managedRuleRows.count() !== 11) {
+    throw new Error(`Expected 11 Desktop-managed rule files, received ${await managedRuleRows.count()}.`);
+  }
+  await managedRuleRows.first().getByRole("button").click();
+  const managedRuleDetail = ruleSettingsWorkspace.getByTestId("context-file-detail");
+  const managedRuleSource = managedRuleDetail.getByRole("textbox");
+  await managedRuleSource.waitFor({ state: "visible", timeout: 15_000 });
+  if (await managedRuleSource.getAttribute("readonly") === null) {
+    throw new Error("Desktop-managed rule source was unexpectedly editable.");
+  }
+  await managedRuleDetail.getByRole("button", { name: "预览", exact: true }).click();
+  await managedRuleDetail.getByTestId("context-file-preview")
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "09-rule-context-managed-preview.png");
+  await managedRuleDetail.getByRole("button", { name: "返回规则目录", exact: true }).click();
+  await ruleSettingsWorkspace.getByRole("tab", { name: "项目专属", exact: true }).click();
+  await ruleSettingsWorkspace.getByRole("heading", { name: "项目规则与上下文", exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
   await workspaceSettings.getByText(/(?:\/|\\)workspace(?:\/|\\)AGENTS\.md$/u)
     .waitFor({ state: "visible", timeout: 15_000 });
-  await workspaceSettings.getByText("继承自全局", { exact: false })
+  await capturePackagedScreenshot(window, "09-rule-context-project-catalog.png");
+  const projectRuleCategories = ruleSettingsWorkspace.getByRole("group", { name: "项目规则与上下文分类" });
+  await projectRuleCategories.getByRole("button", { name: "继承规则", exact: true }).click();
+  await ruleSettingsWorkspace.getByRole("heading", { name: "继承的规则与上下文", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await capturePackagedScreenshot(window, "09-rule-context-resources.png");
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({
     hasNodeProcess: "process" in globalThis,
@@ -391,63 +420,6 @@ try {
   } finally {
     await cleanupPackagedTestDirectories(userDataDirectory);
   }
-}
-
-async function capturePackagedScreenshot(window, fileName) {
-  if (!packagedScreenshotDirectory) return;
-  await window.screenshot({ path: join(packagedScreenshotDirectory, fileName) });
-}
-
-async function capturePackagedWorkbenchVisualEvidence(application, window) {
-  if (!packagedScreenshotDirectory) return;
-  const conversation = window.getByLabel("Pi conversation");
-  const composer = window.getByLabel("给 Pi 发送消息");
-  await conversation.waitFor({ state: "visible", timeout: 15_000 });
-  await capturePackagedScreenshot(window, "11-workbench-light.png");
-
-  await composer.focus();
-  await capturePackagedScreenshot(window, "12-composer-focus-light.png");
-  await window.getByRole("button", { name: "打开命令面板" }).click();
-  const commandPalette = window.getByRole("dialog", { name: "命令面板" });
-  await commandPalette.waitFor({ state: "visible", timeout: 15_000 });
-  await capturePackagedScreenshot(window, "13-command-palette-light.png");
-  await window.keyboard.press("Escape");
-  await commandPalette.waitFor({ state: "hidden", timeout: 15_000 });
-  await window.mouse.move(720, 460);
-  await window.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
-
-  await setPackagedContentSize(application, 1040, 720);
-  await waitForTwoPaints(window);
-  await capturePackagedScreenshot(window, "14-workbench-1040-light.png");
-  await setPackagedContentSize(application, 760, 720);
-  await waitForTwoPaints(window);
-  await capturePackagedScreenshot(window, "15-workbench-760-light.png");
-  await setPackagedContentSize(application, 1440, 920);
-  await waitForTwoPaints(window);
-
-  const darkSettings = await openSettingsSection(window, /^通用/u);
-  await darkSettings.getByRole("button", { name: /^深色/u }).click();
-  await window.locator('html[data-theme-preference="dark"][data-theme="dark"]').waitFor({ state: "attached" });
-  await capturePackagedScreenshot(window, "16-general-dark.png");
-  await darkSettings.getByRole("button", { name: "返回工作台" }).click();
-  await darkSettings.waitFor({ state: "hidden", timeout: 15_000 });
-  await conversation.waitFor({ state: "visible", timeout: 15_000 });
-  await capturePackagedScreenshot(window, "17-workbench-dark.png");
-
-  const lightSettings = await openSettingsSection(window, /^通用/u);
-  await lightSettings.getByRole("button", { name: /^浅色/u }).click();
-  await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
-  await lightSettings.getByRole("button", { name: "返回工作台" }).click();
-  await lightSettings.waitFor({ state: "hidden", timeout: 15_000 });
-  await conversation.waitFor({ state: "visible", timeout: 15_000 });
-}
-
-async function waitForTwoPaints(window) {
-  await window.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  }));
 }
 
 async function assertNoWorkspaceChangesAuthorityWarning(window) {

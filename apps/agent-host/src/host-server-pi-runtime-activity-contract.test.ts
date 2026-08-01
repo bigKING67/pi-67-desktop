@@ -90,7 +90,13 @@ describe("AgentHostServer Pi runtime activity contract", () => {
       });
       await vi.waitFor(() => expect(activityEvents(port).at(-1)?.payload).toEqual({
         operationId,
-        activity: { kind: "tool", toolCallId: "builtin-bash-call", toolKind: "shell" }
+        activity: {
+          kind: "tool",
+          toolCallId: "builtin-bash-call",
+          toolName: "bash",
+          toolKind: "shell",
+          status: "running"
+        }
       }));
 
       session.emit({
@@ -102,7 +108,13 @@ describe("AgentHostServer Pi runtime activity contract", () => {
       });
       await vi.waitFor(() => expect(activityEvents(port).at(-1)?.payload).toEqual({
         operationId,
-        activity: null
+        activity: {
+          kind: "tool",
+          toolCallId: "builtin-bash-call",
+          toolName: "bash",
+          toolKind: "shell",
+          status: "completed"
+        }
       }));
 
       session.emit({
@@ -113,7 +125,13 @@ describe("AgentHostServer Pi runtime activity contract", () => {
       });
       await vi.waitFor(() => expect(activityEvents(port).at(-1)?.payload).toEqual({
         operationId,
-        activity: { kind: "tool", toolCallId: "extension-read-call", toolKind: "generic" }
+        activity: {
+          kind: "tool",
+          toolCallId: "extension-read-call",
+          toolName: "read",
+          toolKind: "generic",
+          status: "running"
+        }
       }));
 
       session.emit({
@@ -125,7 +143,13 @@ describe("AgentHostServer Pi runtime activity contract", () => {
       });
       await vi.waitFor(() => expect(activityEvents(port).at(-1)?.payload).toEqual({
         operationId,
-        activity: null
+        activity: {
+          kind: "tool",
+          toolCallId: "extension-read-call",
+          toolName: "read",
+          toolKind: "generic",
+          status: "completed"
+        }
       }));
 
       finishPrompt?.();

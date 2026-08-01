@@ -9,14 +9,12 @@ import {
   type WorkspaceTrust
 } from "@pi67/domain";
 import type {
-  AgentEvent, AssetReadResult, CommandDescriptor, PiConfigurationReloadState,
-  RuntimeDiagnostics, StreamDelta,
-  TransferImage
+  AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
+  PromptAttachmentRef, RuntimeDiagnostics, StreamDelta
 } from "@pi67/protocol";
 import type { AgentRuntime, RuntimeInitializeOptions } from "./agent-runtime.js";
 import { bindSessionExtensionUi, createSessionExtensionUiBridge } from "./extension-ui-lifecycle.js";
 import { conversationChangedEvent, sessionMetaChangedEvent, usageChangedEvent } from "./incremental-events.js";
-import { convertTransferImages } from "./message-normalizer.js";
 import { selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
 import { createDoctorReport } from "./runtime-doctor.js";
 import { createRuntimeCredentialOverrideStore, type RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
@@ -35,10 +33,13 @@ import {
 } from "./session-snapshot.js";
 import { StreamBatcher } from "./stream-batcher.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import type { PreparedPromptAttachmentSet, PromptAttachmentAccess } from "./prompt-attachment.js";
+import { RuntimePromptAttachments } from "./runtime-prompt-attachments.js";
 
 export interface PiSdkRuntimeOptions {
   workspaceServices?: PiWorkspaceRuntimeServices;
   runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
+  promptAttachmentAccess?: PromptAttachmentAccess;
 }
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -47,6 +48,8 @@ export class PiSdkRuntime implements AgentRuntime {
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
   private readonly ownsRuntimeCredentialOverrides: boolean;
   private readonly workspaceServices: PiWorkspaceRuntimeServices | undefined;
+  private readonly promptAttachmentAccess: PromptAttachmentAccess | undefined;
+  private readonly promptAttachments: RuntimePromptAttachments;
   private runtimeCredentialUnsubscribe: (() => void) | undefined;
   private configurationRuntimeUnsubscribe: (() => void) | undefined;
   private readonly configurationReload: PiRuntimeConfigurationReload;
@@ -62,6 +65,8 @@ export class PiSdkRuntime implements AgentRuntime {
 
   constructor(options: PiSdkRuntimeOptions = {}) {
     this.workspaceServices = options.workspaceServices;
+    this.promptAttachmentAccess = options.promptAttachmentAccess;
+    this.promptAttachments = new RuntimePromptAttachments(this.promptAttachmentAccess);
     this.ownsRuntimeCredentialOverrides = options.runtimeCredentialOverrides === undefined;
     this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
       ?? createRuntimeCredentialOverrideStore();
@@ -88,6 +93,7 @@ export class PiSdkRuntime implements AgentRuntime {
       getRuntimeCredentialOverrides: () => this.runtimeCredentialOverrides,
       getSafety: () => this.safety,
       getWorkspaceServices: () => this.workspaceServices,
+      getPromptAttachmentAccess: () => this.promptAttachmentAccess,
       projections: this.projections,
       rebindExtensionUi: async (session) => {
         this.uiBridge.dispose();
@@ -284,31 +290,34 @@ export class PiSdkRuntime implements AgentRuntime {
     this.emit(sessionMetaChangedEvent(session));
   }
 
-  async submitPrompt(text: string, images: TransferImage[] = []): Promise<void> {
+  async preparePromptAttachments(submissionId: string, refs: readonly PromptAttachmentRef[]): Promise<PreparedPromptAttachmentSet | undefined> {
+    return this.promptAttachments.claim(submissionId, refs);
+  }
+
+  async submitPrompt(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
     await this.assertSessionWritable();
     await this.configurationReload.assertReady();
     const session = this.sessionBindings.requireSession();
     try {
-      await session.prompt(text, {
-        images: convertTransferImages(images),
-        ...(session.isStreaming ? { streamingBehavior: "followUp" as const } : {})
-      });
+      await this.promptAttachments.submit(session, text, attachments);
     } finally {
       await this.sessionCatalog.upsertCurrent("session-updated");
       await this.configurationReload.apply();
     }
   }
 
-  async steer(text: string, images: TransferImage[] = []): Promise<void> {
+  async steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
     await this.assertSessionWritable();
     await this.configurationReload.assertReady();
-    await this.sessionBindings.requireSession().steer(text, convertTransferImages(images));
+    const session = this.sessionBindings.requireSession();
+    await this.promptAttachments.steer(session, text, attachments);
   }
 
-  async followUp(text: string, images: TransferImage[] = []): Promise<void> {
+  async followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {
     await this.assertSessionWritable();
     await this.configurationReload.assertReady();
-    await this.sessionBindings.requireSession().followUp(text, convertTransferImages(images));
+    const session = this.sessionBindings.requireSession();
+    await this.promptAttachments.followUp(session, text, attachments);
   }
 
   clearQueue() { return clearSessionQueue(this.sessionBindings.requireSession()); }
@@ -383,7 +392,7 @@ export class PiSdkRuntime implements AgentRuntime {
     }
   }
 
-  getCommands(): CommandDescriptor[] { return this.projections.getCommands(); }
+  getCommands(): SlashCommandCatalogResult { return this.projections.getCommands(); }
 
   getExtensionCatalog(): ExtensionCatalogResult { return this.projections.getCatalog(); }
 

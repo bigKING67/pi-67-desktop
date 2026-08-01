@@ -42,6 +42,22 @@ Copyright 2022 The Maple Mono Project Authors。许可证为 SIL Open Font Licen
 各组件的完整版权和许可证随其 npm package 保留；打包前应从冻结 lockfile 生成 SBOM
 和 license inventory。
 
+## Local attachment inspection
+
+通用附件的离线、受限解析直接使用以下冻结包；版本以 `pnpm-lock.yaml` 为准：
+
+- `officeparser` 7.5.1、`file-type` 22.0.1、`chardet` 2.2.0、
+  `music-metadata` 11.14.0、`tar-stream` 3.2.0、`yauzl` 3.4.0：MIT License
+- `mediainfo.js` 0.3.7：BSD 2-Clause License
+- `tesseract.js` 7.0.0 与传递的 `tesseract.js-core` 7.0.0：Apache License 2.0
+- `@tesseract.js-data/eng` 1.0.0 与 `@tesseract.js-data/chi_sim` 1.0.0：
+  npm package metadata 为 MIT License，训练数据来源为
+  <https://github.com/naptha/tessdata>
+
+这些组件只在 Agent Host 的有界 worker 中处理用户明确附加的本地文件。英文和简体
+中文 OCR 数据随应用离线打包；运行时不下载语言数据，也不把附件发送给网络 OCR
+服务。完整版权、许可证文本和 NOTICE 仍随对应 npm package 保留在打包内容中。
+
 ## Peak Code reference
 
 产品信息架构参考 PeakCode-AI/PeakCode commit：

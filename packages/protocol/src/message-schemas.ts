@@ -42,6 +42,7 @@ export const SessionMessageSchema = messageObject({
   parts: Type.Array(MessagePartSchema, { maxItems: MAX_PROJECTED_MESSAGE_PARTS }),
   createdAt: Type.Optional(Type.Number()),
   model: Type.Optional(Type.String()),
+  toolName: Type.Optional(Type.String({ maxLength: 128 })),
   stopped: Type.Optional(Type.Boolean()),
   error: Type.Optional(Type.String())
 });

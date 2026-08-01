@@ -1,4 +1,8 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
+import type {
+  ContextFileCatalogResult,
+  ExtensionCatalogResult
+} from "../../packages/domain/src/index.js";
 import type { FixtureSessionSummary } from "./pi67-session-catalog-fixture.js";
 
 export interface FixtureMessage {
@@ -6,12 +10,15 @@ export interface FixtureMessage {
   role: string;
   createdAt?: number;
   model?: string;
+  toolName?: string;
   stopped?: boolean;
   error?: string;
   parts: Array<{
     type: string;
     text?: string;
     mimeType?: string;
+    byteLength?: number;
+    kind?: string;
     id?: string;
     name?: string;
     status?: string;
@@ -37,6 +44,8 @@ export interface MockAgentOptions {
   rotateSessionOnCreate?: boolean;
   isolateTaskSnapshots?: boolean;
   providerConfigurationSnapshot?: PiProviderConfigurationSnapshot;
+  extensionCatalog?: ExtensionCatalogResult;
+  contextFiles?: FixtureContextFiles;
   sessionCatalogItems?: FixtureSessionSummary[];
   sessionCatalogItemsByWorkspace?: Record<string, FixtureSessionSummary[]>;
   assets?: Record<string, {
@@ -44,6 +53,11 @@ export interface MockAgentOptions {
     dataBase64: string;
     sessionGeneration?: number;
   }>;
+}
+
+export interface FixtureContextFiles {
+  catalog: ContextFileCatalogResult;
+  contents: Record<string, { content: string; revision: string }>;
 }
 
 interface MockEventOptions {
@@ -122,6 +136,7 @@ export interface FixtureAgentState {
   conversationMessages: FixtureMessage[];
   workspaceChanges: { sessionId: string; items: unknown[]; truncated: boolean; total: number };
   extensionCatalog: { items: unknown[]; truncated: boolean; total: number };
+  contextFiles: FixtureContextFiles;
   providerConfiguration: PiProviderConfigurationSnapshot;
   sessionCatalogPage: { itemCount: number };
   sessionCatalogPagesByWorkspace: Record<string, { itemCount: number }>;

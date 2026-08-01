@@ -11,6 +11,7 @@ allowBuilds:
   '@google/genai': false
   electron-winstaller: false
   protobufjs: false
+  tesseract.js: true
 minimumReleaseAgeExclude:
   - '@vitejs/plugin-react@6.0.4'
   - knip@6.29.0

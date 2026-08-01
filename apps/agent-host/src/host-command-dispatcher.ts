@@ -28,13 +28,20 @@ export type RuntimeLoadedCommand = Exclude<
       | "provider.credential.remove"
       | "model.default.set"
       | "provider.configuration.reload"
+      | "context.file.list"
+      | "context.file.read"
+      | "context.file.save"
       | "extension.package.list"
       | "extension.package.checkUpdates"
       | "extension.package.install"
       | "extension.package.update"
       | "extension.package.setEnabled"
       | "extension.package.restoreInheritance"
-      | "extension.package.uninstall";
+      | "extension.package.uninstall"
+      | "skill.pack.list"
+      | "skill.pack.checkUpdates"
+      | "skill.pack.update"
+      | "skill.pack.restore";
   }
 >;
 
@@ -196,34 +203,41 @@ export async function dispatchHostCommand(
     case "prompt.submit": {
       const operations = context.operations();
       const fingerprint = submissionFingerprint ?? promptSubmissionFingerprint(command.payload);
+      const attachmentRefs = command.payload.attachments ?? [];
+      const attachments = attachmentRefs.length === 0
+        ? undefined
+        : await runtime.preparePromptAttachments(
+            command.payload.submissionId,
+            attachmentRefs
+          );
       if (command.payload.delivery === "steer") {
         return operations.queueForActive(
           command.payload.submissionId,
           fingerprint,
-          () => runtime.steer(command.payload.text, command.payload.images)
+          () => runtime.steer(command.payload.text, attachments)
         );
       }
       if (command.payload.delivery === "follow-up") {
         return operations.queueForActive(
           command.payload.submissionId,
           fingerprint,
-          () => runtime.followUp(command.payload.text, command.payload.images)
+          () => runtime.followUp(command.payload.text, attachments)
         );
       }
       return operations.accept({
         submissionId: command.payload.submissionId,
         fingerprint,
         kind: "prompt",
-        execute: () => runtime.submitPrompt(command.payload.text, command.payload.images),
+        execute: () => runtime.submitPrompt(command.payload.text, attachments),
         abort: () => runtime.abort(),
         beforeTerminal: () => runtime.flushStream()
       });
     }
     case "prompt.steer":
-      await runtime.steer(command.payload.text, command.payload.images);
+      await runtime.steer(command.payload.text);
       return { accepted: true };
     case "prompt.followUp":
-      await runtime.followUp(command.payload.text, command.payload.images);
+      await runtime.followUp(command.payload.text);
       return { accepted: true };
     case "operation.abort":
       return context.operations().abort(command.payload.operationId);
@@ -302,10 +316,8 @@ function promptSubmissionFingerprint(
   const updateText = (value: string) => hash.update(value, "utf8").update("\0");
   updateText(payload.delivery);
   updateText(payload.text);
-  for (const image of payload.images ?? []) {
-    updateText(image.name);
-    updateText(image.mimeType);
-    hash.update(Buffer.from(image.data));
+  for (const attachment of payload.attachments ?? []) {
+    updateText(attachment.id);
   }
   return hash.digest("hex");
 }

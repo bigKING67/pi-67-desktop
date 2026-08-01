@@ -1,6 +1,9 @@
 import type {
   ApprovalMode,
   ConversationPage,
+  ContextFileCatalogResult,
+  ContextFileReadResult,
+  ContextFileSaveResult,
   DoctorReport,
   ExtensionCatalogResult,
   ExtensionCommandAdapterView,
@@ -22,6 +25,8 @@ import type {
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
   SessionSnapshot,
+  SkillPackListResult,
+  SkillPackMutationResult,
   SessionTreeProjection,
   WorkspaceChangesProjection,
   WorkspaceTrust
@@ -36,23 +41,34 @@ import type { ProtocolError } from "./protocol-error.js";
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
 
-export interface TransferImage {
-  name: string;
-  mimeType: string;
-  data: ArrayBuffer;
+export interface PromptAttachmentRef {
+  id: string;
 }
 
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
-export const MAX_TRANSFER_IMAGE_COUNT = 8;
-export const MAX_TRANSFER_IMAGE_BYTES = 10 * 1024 * 1024;
-export const MAX_TRANSFER_IMAGE_TOTAL_BYTES = 30 * 1024 * 1024;
+
+export type PromptAttachmentKind = "image" | "document" | "archive" | "audio" | "video" | "file";
+
+export interface StagedPromptAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  byteLength: number;
+  kind: PromptAttachmentKind;
+}
+
+export const MAX_PROMPT_ATTACHMENT_COUNT = 20;
+export const MAX_PROMPT_ATTACHMENT_NAME_CHARS = 512;
+export const MAX_PROMPT_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+export const MAX_PROMPT_ATTACHMENT_TOTAL_BYTES = 250 * 1024 * 1024;
+export const MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES = 16 * 1024 * 1024;
 
 export type PromptDelivery = "new-turn" | "steer" | "follow-up";
 
 export interface PromptSubmitRequest {
   submissionId: string;
   text: string;
-  images?: TransferImage[];
+  attachments?: PromptAttachmentRef[];
   delivery: PromptDelivery;
 }
 
@@ -140,10 +156,19 @@ export interface RuntimeDiagnostics {
   extensionErrors: Array<{ path: string; error: string }>;
 }
 
-export interface CommandDescriptor {
+export type SlashCommandSource = "extension" | "prompt" | "skill";
+
+export interface SlashCommandDescriptor {
   name: string;
+  source: SlashCommandSource;
   description?: string;
   adapter?: ExtensionCommandAdapterView;
+}
+
+export interface SlashCommandCatalogResult {
+  items: SlashCommandDescriptor[];
+  total: number;
+  truncated: boolean;
 }
 
 export interface QueueClearResult {
@@ -200,8 +225,8 @@ export interface CommandPayloads {
   "session.compact": { submissionId: string; instructions?: string };
   "session.name": { name: string };
   "prompt.submit": PromptSubmitRequest;
-  "prompt.steer": { text: string; images?: TransferImage[] };
-  "prompt.followUp": { text: string; images?: TransferImage[] };
+  "prompt.steer": { text: string };
+  "prompt.followUp": { text: string };
   "queue.clear": Record<string, never>;
   "operation.abort": { operationId?: string };
   "model.list": Record<string, never>;
@@ -228,6 +253,9 @@ export interface CommandPayloads {
   "thinking.set": { level: string };
   "resource.list": Record<string, never>;
   "resource.reload": Record<string, never>;
+  "context.file.list": Record<string, never>;
+  "context.file.read": { id: string };
+  "context.file.save": { id: string; expectedRevision: string; content: string };
   "command.list": Record<string, never>;
   "command.invoke": { submissionId: string; command: string };
   "extension.catalog.list": Record<string, never>;
@@ -243,6 +271,10 @@ export interface CommandPayloads {
   };
   "extension.package.restoreInheritance": { source: string };
   "extension.package.uninstall": { source: string; scope: ExtensionPackageScope };
+  "skill.pack.list": Record<string, never>;
+  "skill.pack.checkUpdates": Record<string, never>;
+  "skill.pack.update": { id: string };
+  "skill.pack.restore": { id: string };
   "extension.ui.respond": {
     requestId: string;
     sessionId: string;
@@ -306,7 +338,10 @@ export interface CommandResults {
   "thinking.set": SessionControlResult;
   "resource.list": ResourceSummary[];
   "resource.reload": SessionResourceCatalogResult;
-  "command.list": CommandDescriptor[];
+  "context.file.list": ContextFileCatalogResult;
+  "context.file.read": ContextFileReadResult;
+  "context.file.save": ContextFileSaveResult;
+  "command.list": SlashCommandCatalogResult;
   "command.invoke": OperationSubmissionResult;
   "extension.catalog.list": ExtensionCatalogResult;
   "extension.package.list": ExtensionPackageListResult;
@@ -316,6 +351,10 @@ export interface CommandResults {
   "extension.package.setEnabled": ExtensionPackageMutationResult;
   "extension.package.restoreInheritance": ExtensionPackageMutationResult;
   "extension.package.uninstall": ExtensionPackageMutationResult;
+  "skill.pack.list": SkillPackListResult;
+  "skill.pack.checkUpdates": SkillPackListResult;
+  "skill.pack.update": SkillPackMutationResult;
+  "skill.pack.restore": SkillPackMutationResult;
   "extension.ui.respond": { resolved: boolean };
   "approval.respond": { resolved: boolean };
   "diagnostics.collect": RuntimeDiagnostics;
@@ -347,11 +386,14 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "model.default.set",
   "thinking.set",
   "resource.reload",
+  "context.file.save",
   "extension.package.install",
   "extension.package.update",
   "extension.package.setEnabled",
   "extension.package.restoreInheritance",
-  "extension.package.uninstall"
+  "extension.package.uninstall",
+  "skill.pack.update",
+  "skill.pack.restore"
 ] as const satisfies readonly AgentCommandType[];
 
 export type ReplaySafeControlMutationType = typeof REPLAY_SAFE_CONTROL_MUTATION_TYPES[number];
