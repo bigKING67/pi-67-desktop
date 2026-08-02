@@ -21,7 +21,9 @@ import type {
   WorkspaceTrust,
   TaskToolMode,
   ApprovalResponseDecision,
-  ApprovalResolution
+  ApprovalResolution,
+  UserMessageIndexPage,
+  LocatedMessageWindow
 } from "@pi67/domain";
 import type {
   AgentEvent,
@@ -58,6 +60,8 @@ export interface AgentRuntime {
   getSessionTree(): SessionTreeProjection;
   getWorkspaceChanges(): WorkspaceChangesProjection;
   getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage;
+  getUserMessageIndex(options: { offset?: number; limit?: number }): UserMessageIndexPage;
+  locateUserMessage(id: string): LocatedMessageWindow;
   readAsset(options: { assetId: string; sessionGeneration: number; offset: number; length?: number }): AssetReadResult;
   createSession(): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;

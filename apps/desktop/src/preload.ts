@@ -2,7 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   DesktopCapabilitySnapshot,
   PackageNetworkSettings,
-  PackageNetworkSnapshot
+  PackageNetworkSnapshot,
+  WorkspaceEntryContextAction,
+  WorkspaceEntryRequest,
+  WorkspaceFilePersistedState,
+  WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
 import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
@@ -50,6 +54,12 @@ const systemBridge = {
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
   loadWorkbenchState: (): Promise<WorkbenchStateV2> => ipcRenderer.invoke("pi67:workbench-load"),
+  loadWorkspaceFileState: (): Promise<WorkspaceFileStateSnapshot> => (
+    ipcRenderer.invoke("pi67:workspace-file-state-load")
+  ),
+  updateWorkspaceFileState: (state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot> => (
+    ipcRenderer.invoke("pi67:workspace-file-state-update", state)
+  ),
   updateWorkbenchLayout: (layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
   ),
@@ -70,6 +80,21 @@ const systemBridge = {
   saveDiagnostics: (content: string): Promise<string | undefined> => ipcRenderer.invoke("pi67:save-diagnostics", content),
   showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("pi67:notify", { title, body }),
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
+  showWorkspaceEntryContextMenu: (entry: WorkspaceEntryRequest): Promise<WorkspaceEntryContextAction | undefined> => (
+    ipcRenderer.invoke("pi67:workspace-entry-menu", entry)
+  ),
+  revealWorkspaceEntry: (entry: WorkspaceEntryRequest): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:workspace-entry-reveal", entry)
+  ),
+  openWorkspaceEntryInDefaultApp: (entry: WorkspaceEntryRequest): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:workspace-entry-open-default", entry)
+  ),
+  copyWorkspaceEntryPath: (entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:workspace-entry-copy", entry, mode)
+  ),
+  trashWorkspaceEntry: (entry: WorkspaceEntryRequest): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:workspace-entry-trash", entry)
+  ),
   getPackageNetworkSnapshot: (): Promise<PackageNetworkSnapshot> => (
     ipcRenderer.invoke("pi67:package-network-snapshot")
   ),

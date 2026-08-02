@@ -93,6 +93,39 @@ describe("SessionProjectionIndex", () => {
     expect(projection.getBranch().map((entry) => entry.id)).toEqual(manager.getBranch().map((entry) => entry.id));
     expect(flattenTree(projection.getTree()).map(treeRecord)).toEqual(flattenTree(manager.getTree()).map(treeRecord));
   });
+
+  it("indexes only user messages on the active branch with bounded metadata and revision changes", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "projection-user-index" });
+    const firstId = manager.appendMessage({ role: "user", content: "First   user message", timestamp: 1 });
+    const assistantId = manager.appendMessage(assistantMessage("Assistant response", 2));
+    const originalBranchId = manager.appendMessage({ role: "user", content: "Original branch", timestamp: 3 });
+    const projection = new SessionProjectionIndex();
+    projection.bind(manager);
+    const initialRevision = projection.getRevision();
+
+    expect(projection.getUserMessages()).toEqual([
+      expect.objectContaining({ id: firstId, ordinal: 1, preview: "First user message", createdAt: 1 }),
+      expect.objectContaining({ id: originalBranchId, ordinal: 2, preview: "Original branch", createdAt: 3 })
+    ]);
+    expect(projection.getUserMessages().some((item) => item.id === assistantId)).toBe(false);
+
+    manager.branch(firstId);
+    expect(projection.getUserMessages()).toEqual([
+      expect.objectContaining({ id: firstId, ordinal: 1 })
+    ]);
+    expect(projection.getRevision()).toBeGreaterThan(initialRevision);
+
+    const newBranchId = manager.appendMessage({
+      role: "user",
+      content: [{ type: "text", text: "New branch message" }, { type: "image", mimeType: "image/png", data: "AQID" }],
+      timestamp: 4
+    });
+    projection.observe(manager, appended(manager, newBranchId));
+    expect(projection.getUserMessages()).toEqual([
+      expect.objectContaining({ id: firstId, ordinal: 1 }),
+      expect.objectContaining({ id: newBranchId, ordinal: 2, preview: "New branch message", imageCount: 1 })
+    ]);
+  });
 });
 
 function appended(manager: SessionManager, id: string): AgentSessionEvent {

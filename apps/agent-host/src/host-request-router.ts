@@ -32,6 +32,10 @@ import {
   isWorkspaceProviderCommand,
   type WorkspaceCommandRouter
 } from "./workspace-command-router.js";
+import {
+  isWorkspaceFileCommand,
+  type WorkspaceFileCommandRouter
+} from "./workspace-file-command-router.js";
 
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
@@ -58,6 +62,7 @@ export class HostRequestRouter {
     private readonly extensionPackages: ExtensionPackageCommandRouter,
     private readonly skillPacks: SkillPackCommandRouter,
     private readonly workspaceCommands: WorkspaceCommandRouter,
+    private readonly workspaceFiles: WorkspaceFileCommandRouter,
     private readonly options: HostRequestRouterOptions
   ) {}
 
@@ -90,6 +95,10 @@ export class HostRequestRouter {
       void this.workspaceCommands.queryCatalog(request.context, command)
         .then((result) => origin.sendSuccess(request.requestId, request.type, result))
         .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
+      return;
+    }
+    if (isWorkspaceFileCommand(request.type)) {
+      this.handleWorkspaceFileCommand(origin, request);
       return;
     }
     if (isContextFileCommand(request.type)) {
@@ -155,6 +164,24 @@ export class HostRequestRouter {
     }
     const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
     void this.contextFiles.dispatch(request.context, command, request.idempotencyKey)
+      .then((result) => sendSuccess(origin, request, result))
+      .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
+  }
+
+  private handleWorkspaceFileCommand(
+    origin: HostConnectionContext,
+    request: RequestEnvelope
+  ): void {
+    if (!isWorkspaceFileCommand(request.type) || request.context.scope !== "workspace") {
+      origin.sendError(request.requestId, request.type, toProtocolError(new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Workspace file commands require Workspace authority.",
+        false
+      )));
+      return;
+    }
+    const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
+    void this.workspaceFiles.dispatch(request.context, command, request.idempotencyKey)
       .then((result) => sendSuccess(origin, request, result))
       .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }

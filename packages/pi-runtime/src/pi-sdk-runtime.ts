@@ -214,13 +214,11 @@ export class PiSdkRuntime implements AgentRuntime {
     this.listeners.clear();
     this.activityListeners.clear();
   }
-
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
     const mode = this.toolSafety.setWorkspacePolicy(trust, approvalMode);
     this.workspaceServices?.setProjectTrusted(trust === "trusted");
     return mode;
   }
-
   getTaskToolMode(): TaskToolMode { return this.toolSafety.getTaskToolMode(); }
   setTaskToolMode(mode: TaskToolMode): TaskToolMode { return this.toolSafety.setTaskToolMode(mode); }
   async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
@@ -231,6 +229,8 @@ export class PiSdkRuntime implements AgentRuntime {
   getSessionCatalogStatus(): SessionCatalogStatus { return this.sessionCatalog.status(); }
   getSessionTree(): SessionTreeProjection { return this.projections.getTree(); }
   getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage { return this.projections.getMessagePage(options); }
+  getUserMessageIndex(options: { offset?: number; limit?: number }) { return this.projections.getUserMessageIndex(options); }
+  locateUserMessage(id: string) { return this.projections.locateUserMessage(id); }
   readAsset(options: {
     assetId: string;
     sessionGeneration: number;

@@ -6,6 +6,11 @@ import type {
   SessionStats,
   SessionTreeNode
 } from "@earendil-works/pi-coding-agent";
+import {
+  MAX_USER_MESSAGE_PREVIEW_CHARS,
+  type UserMessageIndexItem
+} from "@pi67/domain";
+import { sanitizeRuntimeText } from "./runtime-redaction.js";
 
 export interface SessionProjectionMetadata {
   sessionId: string;
@@ -28,6 +33,8 @@ interface ProjectionState {
   entriesById: Map<string, SessionEntry>;
   branch: SessionEntry[];
   branchIndex: Map<string, number>;
+  revision: number;
+  userMessages: UserMessageIndexItem[];
   leafId: string | null;
   metadata: SessionProjectionMetadata;
   usage: UsageTotals;
@@ -69,6 +76,14 @@ export class SessionProjectionIndex {
 
   getBranch(): SessionEntry[] {
     return this.synchronizeState().branch;
+  }
+
+  getRevision(): number {
+    return this.synchronizeState().revision;
+  }
+
+  getUserMessages(): UserMessageIndexItem[] {
+    return this.synchronizeState().userMessages;
   }
 
   findBranchEntryIndex(id: string): number | undefined {
@@ -139,6 +154,8 @@ function buildState(manager: SessionManager, entries: SessionEntry[]): Projectio
     entriesById: new Map(entries.map((entry) => [entry.id, entry])),
     branch: [],
     branchIndex: new Map(),
+    revision: 1,
+    userMessages: [],
     leafId: manager.getLeafId(),
     metadata: {
       sessionId,
@@ -158,6 +175,7 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
   if (state.entriesById.has(entry.id)) {
     state.leafId = nextLeafId;
     rebuildBranch(state);
+    state.revision += 1;
     return;
   }
   const previousLeafId = state.leafId;
@@ -169,15 +187,24 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
   if (nextLeafId === entry.id && entry.parentId === previousLeafId) {
     state.branchIndex.set(entry.id, state.branch.length);
     state.branch.push(entry);
+    if (isUserMessageEntry(entry)) {
+      state.userMessages.push(projectUserMessageIndexItem(
+        entry,
+        state.userMessages.length + 1,
+        state.branch.at(-2)
+      ));
+    }
   } else {
     rebuildBranch(state);
   }
+  state.revision += 1;
 }
 
 function syncBranch(state: ProjectionState, nextLeafId = state.manager.getLeafId()): void {
   if (nextLeafId === state.leafId) return;
   state.leafId = nextLeafId;
   rebuildBranch(state);
+  state.revision += 1;
 }
 
 function rebuildBranch(state: ProjectionState): void {
@@ -191,6 +218,87 @@ function rebuildBranch(state: ProjectionState): void {
   }
   state.branch = reverse.reverse();
   state.branchIndex = new Map(state.branch.map((entry, index) => [entry.id, index]));
+  state.userMessages = projectUserMessageIndex(state.branch);
+}
+
+function projectUserMessageIndex(branch: SessionEntry[]): UserMessageIndexItem[] {
+  const items: UserMessageIndexItem[] = [];
+  for (let index = 0; index < branch.length; index += 1) {
+    const entry = branch[index];
+    if (!entry || !isUserMessageEntry(entry)) continue;
+    items.push(projectUserMessageIndexItem(entry, items.length + 1, branch[index - 1]));
+  }
+  return items;
+}
+
+function isUserMessageEntry(entry: SessionEntry): entry is Extract<SessionEntry, { type: "message" }> {
+  return entry.type === "message" && entry.message.role === "user";
+}
+
+function projectUserMessageIndexItem(
+  entry: Extract<SessionEntry, { type: "message" }>,
+  ordinal: number,
+  previous: SessionEntry | undefined
+): UserMessageIndexItem {
+  const message = entry.message as unknown as { content?: unknown; timestamp?: unknown };
+  const content = message.content;
+  const text = typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.flatMap((part) => {
+          if (typeof part !== "object" || part === null) return [];
+          const record = part as { type?: unknown; text?: unknown };
+          return record.type === "text" && typeof record.text === "string" ? [record.text] : [];
+        }).join(" ")
+      : "";
+  const fallbackImageCount = Array.isArray(content)
+    ? content.filter((part) => (
+        typeof part === "object" && part !== null && (part as { type?: unknown }).type === "image"
+      )).length
+    : 0;
+  const attachmentCounts = promptAttachmentCounts(previous);
+  const timestamp = typeof message.timestamp === "number"
+    ? message.timestamp
+    : Date.parse(entry.timestamp);
+  return {
+    id: entry.id,
+    ordinal,
+    preview: boundedPreview(text),
+    ...(Number.isFinite(timestamp) ? { createdAt: Math.max(0, Math.trunc(timestamp)) } : {}),
+    imageCount: attachmentCounts?.images ?? fallbackImageCount,
+    attachmentCount: attachmentCounts?.attachments ?? 0
+  };
+}
+
+function promptAttachmentCounts(
+  entry: SessionEntry | undefined
+): { images: number; attachments: number } | undefined {
+  if (
+    entry?.type !== "custom_message"
+    || entry.customType !== "pi67.desktop-attachments.v1"
+    || entry.display
+    || typeof entry.details !== "object"
+    || entry.details === null
+  ) return undefined;
+  const attachments = (entry.details as { attachments?: unknown }).attachments;
+  if (!Array.isArray(attachments)) return undefined;
+  let images = 0;
+  let nonImages = 0;
+  for (const item of attachments.slice(0, 20)) {
+    if (typeof item !== "object" || item === null) continue;
+    if ((item as { kind?: unknown }).kind === "image") images += 1;
+    else nonImages += 1;
+  }
+  return { images, attachments: nonImages };
+}
+
+function boundedPreview(value: string): string {
+  const normalized = sanitizeRuntimeText(value)
+    .replace(/\s+/gu, " ")
+    .trim();
+  const codePoints = Array.from(normalized);
+  if (codePoints.length <= MAX_USER_MESSAGE_PREVIEW_CHARS) return normalized;
+  return `${codePoints.slice(0, MAX_USER_MESSAGE_PREVIEW_CHARS - 1).join("")}…`;
 }
 
 function buildTree(entries: SessionEntry[]): Pick<ProjectionState, "tree" | "treeNodesById"> {

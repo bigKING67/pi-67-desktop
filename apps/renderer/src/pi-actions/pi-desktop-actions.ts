@@ -147,9 +147,7 @@ export async function executePiDesktopAction(
       return { status: "handled" };
     case "tree": {
       rendererWorkbenchStore.getState().closeSettings();
-      const shell = useShellStore.getState();
-      shell.setContextTab("session");
-      shell.setContextVisible(true);
+      useShellStore.getState().setSessionTreeDialogOpen(true);
       return { status: "handled" };
     }
     case "reload":

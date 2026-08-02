@@ -1,22 +1,33 @@
-import type {
-  AgentSession,
-  AgentSessionEvent,
-  AgentSessionServices,
-  LoadExtensionsResult,
-  SessionManager,
-  SessionStats
+import {
+  sessionEntryToContextMessages,
+  type AgentSession,
+  type AgentSessionEvent,
+  type AgentSessionServices,
+  type LoadExtensionsResult,
+  type SessionManager,
+  type SessionStats
 } from "@earendil-works/pi-coding-agent";
-import type {
-  ConversationPage,
-  ExtensionCatalogResult,
-  RuntimeCapabilities,
-  RuntimeOperationActivity,
-  SessionSnapshot,
-  SessionTreeProjection,
-  ToolAuthorizationProjection,
-  WorkspaceChangesProjection
+import {
+  DEFAULT_USER_MESSAGE_INDEX_PAGE_ITEMS,
+  MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
+  type LocatedMessageWindow,
+  type ConversationPage,
+  type ExtensionCatalogResult,
+  type RuntimeCapabilities,
+  type RuntimeOperationActivity,
+  type SessionSnapshot,
+  type SessionTreeProjection,
+  type ToolAuthorizationProjection,
+  type WorkspaceChangesProjection,
+  type UserMessageIndexPage
 } from "@pi67/domain";
-import type { AgentEvent, AssetReadResult, SlashCommandCatalogResult, StreamDelta } from "@pi67/protocol";
+import {
+  ProtocolRequestError,
+  type AgentEvent,
+  type AssetReadResult,
+  type SlashCommandCatalogResult,
+  type StreamDelta
+} from "@pi67/protocol";
 import { ExtensionAdapterRuntime } from "./extension-adapter-runtime.js";
 import type { ImageAssetSource } from "./message-normalizer.js";
 import { projectMessagePage, type MessagePageOptions } from "./message-projection.js";
@@ -125,6 +136,47 @@ export class RuntimeProjectionController {
     );
   }
 
+  getUserMessageIndex(options: { offset?: number; limit?: number }): UserMessageIndexPage {
+    const items = this.session.getUserMessages();
+    const limit = Math.min(
+      MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
+      Math.max(1, options.limit ?? DEFAULT_USER_MESSAGE_INDEX_PAGE_ITEMS)
+    );
+    const offset = options.offset === undefined
+      ? Math.max(0, items.length - limit)
+      : Math.min(items.length, Math.max(0, options.offset));
+    return {
+      sessionId: this.session.getSessionId(),
+      revision: this.session.getRevision(),
+      total: items.length,
+      offset,
+      items: items.slice(offset, offset + limit)
+    };
+  }
+
+  locateUserMessage(id: string): LocatedMessageWindow {
+    const userMessage = this.session.getUserMessages().find((item) => item.id === id);
+    const entryIndex = this.session.findBranchEntryIndex(id);
+    if (!userMessage || entryIndex === undefined) throw missingUserMessage();
+    const branch = this.session.getBranch();
+    let cursor: string | undefined;
+    for (let index = entryIndex - 1; index >= 0; index -= 1) {
+      const entry = branch[index];
+      if (!entry || (entry.type === "custom_message" && !entry.display)) continue;
+      if (sessionEntryToContextMessages(entry).length === 0) continue;
+      cursor = entry.id;
+      break;
+    }
+    const page = projectMessagePage(
+      this.session,
+      { direction: "newer", ...(cursor === undefined ? {} : { cursor }), limit: 100 },
+      (toolCallId) => this.resolveToolAdapter(toolCallId),
+      (source) => this.projectImageAsset(source)
+    );
+    if (!page.messages.some((message) => message.id === id)) throw missingUserMessage();
+    return { ...page, anchorId: id, revision: this.session.getRevision() };
+  }
+
   readAsset(options: {
     assetId: string;
     sessionGeneration: number;
@@ -160,4 +212,12 @@ export class RuntimeProjectionController {
   private projectImageAsset(source: ImageAssetSource) {
     return this.assets.register(source);
   }
+}
+
+function missingUserMessage(): ProtocolRequestError {
+  return new ProtocolRequestError({
+    code: "RESOURCE_NOT_FOUND",
+    message: "The user message no longer exists in the active Session branch.",
+    recoverable: true
+  });
 }

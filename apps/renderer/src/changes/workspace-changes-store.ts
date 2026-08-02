@@ -141,13 +141,6 @@ export function selectCommittedWorkspaceChangesProjection(
     : EMPTY_WORKSPACE_CHANGES_PROJECTION;
 }
 
-export function useCommittedWorkspaceChangesProjection(): WorkspaceChangesProjectionView {
-  const canonicalAuthority = useSessionProjectionStore((state) => state.authority);
-  return useWorkspaceChangesStore((state) => (
-    selectCommittedWorkspaceChangesProjection(state, canonicalAuthority)
-  ));
-}
-
 export function useCommittedWorkspaceChange(
   toolCallId: string
 ): WorkspaceChangeView | undefined {

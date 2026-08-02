@@ -8,3 +8,4 @@ export * from "./provider-configuration-schemas.js";
 export * from "./protocol-revision.js";
 export * from "./protocol-revision-contract.js";
 export * from "./supervisor-messages.js";
+export * from "./workspace-file-schemas.js";

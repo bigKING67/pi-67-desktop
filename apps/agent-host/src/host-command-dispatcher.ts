@@ -18,6 +18,13 @@ export type RuntimeLoadedCommand = Exclude<
       | "task.close"
       | "workspace.register"
       | "workspace.unregister"
+      | "workspace.file.list"
+      | "workspace.file.search"
+      | "workspace.file.resolve"
+      | "workspace.file.open"
+      | "workspace.file.save"
+      | "workspace.file.create"
+      | "workspace.file.rename"
       | "provider.list"
       | "provider.setRuntimeKey"
       | "provider.configuration.get"
@@ -109,6 +116,10 @@ export async function dispatchHostCommand(
       return runtime.getSessionTree();
     case "message.page":
       return runtime.getMessagePage(command.payload);
+    case "message.index":
+      return runtime.getUserMessageIndex(command.payload);
+    case "message.locate":
+      return runtime.locateUserMessage(command.payload.id);
     case "asset.read": {
       const identity = runtime.getIdentity();
       if (identity.sessionGeneration !== command.payload.sessionGeneration) {

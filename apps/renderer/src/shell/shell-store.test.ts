@@ -6,7 +6,7 @@ describe("shell store", () => {
     useShellStore.setState(useShellStore.getInitialState(), true);
   });
 
-  it("starts with the workspace inspector visible on changes", () => {
+  it("starts with the workspace inspector visible on files", () => {
     expect(useShellStore.getState()).toMatchObject({
       navigationVisible: true,
       sessionSearchFocusRevision: 0,
@@ -14,7 +14,8 @@ describe("shell store", () => {
       modelPickerRequestRevision: 0,
       modelPickerHandledRevision: 0,
       contextVisible: true,
-      contextTab: "changes",
+      contextTab: "files",
+      sessionTreeDialogOpen: false,
       commandPaletteOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,
@@ -52,17 +53,17 @@ describe("shell store", () => {
 
     expect(useShellStore.getState()).toMatchObject({
       contextVisible: false,
-      contextTab: "changes",
+      contextTab: "files",
       commandPaletteOpen: false
     });
   });
 
   it("updates the context tab without changing visibility or the palette", () => {
-    useShellStore.getState().setContextTab("session");
+    useShellStore.getState().setContextTab("messages");
 
     expect(useShellStore.getState()).toMatchObject({
       contextVisible: true,
-      contextTab: "session",
+      contextTab: "messages",
       commandPaletteOpen: false
     });
   });
@@ -72,7 +73,7 @@ describe("shell store", () => {
 
     expect(useShellStore.getState()).toMatchObject({
       contextVisible: true,
-      contextTab: "changes",
+      contextTab: "files",
       commandPaletteOpen: true
     });
   });

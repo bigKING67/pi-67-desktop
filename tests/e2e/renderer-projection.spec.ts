@@ -272,22 +272,34 @@ test("discards a delayed conversation page after the session generation changes"
   await expect(page.locator('[data-transcript-region="true"]')).toHaveAttribute("data-message-count", "1");
 });
 
-test("projects live changes, preserves write truth boundaries and restores changes on resync", async ({ page }) => {
+test("projects live change facts into Tool cards and restores them on resync", async ({ page }) => {
   await page.goto("/");
-  await attachMockAgent(page, [{
-    id: "tool-message",
-    role: "assistant",
-    parts: [{
-      type: "tool-call",
-      id: "edit-live",
-      name: "edit",
-      status: "completed",
-      summary: "Updated src/live.ts"
-    }]
-  }]);
+  await attachMockAgent(page, [
+    {
+      id: "edit-tool-message",
+      role: "assistant",
+      parts: [{
+        type: "tool-call",
+        id: "edit-live",
+        name: "edit",
+        status: "completed",
+        summary: "Updated src/live.ts"
+      }]
+    },
+    {
+      id: "write-tool-message",
+      role: "assistant",
+      parts: [{
+        type: "tool-call",
+        id: "write-live",
+        name: "write",
+        status: "completed",
+        summary: "Wrote src/generated.ts"
+      }]
+    }
+  ]);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("tab", { name: "修改" }).click();
-  await expect(page.getByText(/本会话记录/u)).toBeVisible();
+  await expect.poll(async () => (await recordedCommands(page)).includes("workspace.changes")).toBe(true);
 
   await emitMockAgentEvent(page, {
     type: "workspace.changeChanged",
@@ -307,10 +319,11 @@ test("projects live changes, preserves write truth boundaries and restores chang
       }
     }
   });
-  await expect(page.getByRole("tab", { name: "修改" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "修改" })
-    .getByText("src/live.ts", { exact: true }).first()).toBeVisible();
-  await expect(page.getByLabel("Unified patch 预览")).toContainText("+new");
+  const editCard = page.locator('details[data-presenter="edit-write"]').filter({ hasText: "src/live.ts" });
+  await expect(editCard).toBeVisible();
+  await editCard.locator("summary").click();
+  await expect(editCard).toContainText("+1 -1");
+  await expect(editCard).toContainText("Pi Session 记录包含 Patch；它不等于当前 Git Diff。");
 
   await emitMockAgentEvent(page, {
     type: "workspace.changeChanged",
@@ -328,13 +341,25 @@ test("projects live changes, preserves write truth boundaries and restores chang
       }
     }
   });
-  await page.getByRole("button", { name: /src\/generated\.ts/u }).click();
-  await expect(page.getByText(/write Tool Result 不包含写入前版本/u)).toBeVisible();
-  await expect(page.getByLabel("Unified patch 预览")).toHaveCount(0);
+  const writeCard = page.locator('details[data-presenter="edit-write"]').filter({ hasText: "src/generated.ts" });
+  await expect(writeCard).toBeVisible();
+  await writeCard.locator("summary").click();
+  await expect(writeCard).toContainText("67 bytes");
+  await expect(writeCard).toContainText("write Tool Result 不包含写入前版本");
 
-  await replaceMockSessionProjection(page, "session-new", [message("new-session", "New session")]);
-  await expect(page.getByText("src/live.ts", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("src/generated.ts", { exact: true })).toHaveCount(0);
+  await replaceMockSessionProjection(page, "session-new", [{
+    id: "resynced-tool-message",
+    role: "assistant",
+    parts: [{
+      type: "tool-call",
+      id: "edit-resynced",
+      name: "edit",
+      status: "completed",
+      summary: "Updated src/resynced.ts"
+    }]
+  }]);
+  await expect(editCard).toHaveCount(0);
+  await expect(writeCard).toHaveCount(0);
 
   await setMockWorkspaceChanges(page, {
     sessionId: "session-new",
@@ -359,7 +384,10 @@ test("projects live changes, preserves write truth boundaries and restores chang
     payload: { reason: "force-sequence-gap" }
   }, { sequence: 100, sessionId: "session-new", sessionGeneration: 2 });
   await expect.poll(async () => (await recordedCommands(page)).includes("projection.resync")).toBe(true);
-  await expect(page.getByText("src/resynced.ts", { exact: true }).first()).toBeVisible();
+  const resyncedCard = page.locator('details[data-presenter="edit-write"]').filter({ hasText: "src/resynced.ts" });
+  await expect(resyncedCard).toBeVisible();
+  await resyncedCard.locator("summary").click();
+  await expect(resyncedCard).toContainText("+1 -1");
 });
 
 test("returns extension input only with its authoritative session and operation context", async ({ page }) => {

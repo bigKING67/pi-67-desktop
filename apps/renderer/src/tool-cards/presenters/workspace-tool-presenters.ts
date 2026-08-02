@@ -121,7 +121,7 @@ function presentWorkspaceChange(change: WorkspaceChangeView) {
     limitations: isWrite
       ? ["Pi 的 write Tool Result 不包含写入前版本，因此不生成历史 Diff。"]
       : change.patch
-        ? ["Changes 面板显示的是 Pi Session 记录的 Patch，不等于当前 Git Diff。"]
+        ? ["Pi Session 记录包含 Patch；它不等于当前 Git Diff。"]
         : ["Session 中没有可验证的完整 Edit Patch。"]
   };
 }

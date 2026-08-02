@@ -94,6 +94,14 @@ export async function installMockDesktopBridge(
     let capabilitySnapshotCalls = 0;
     let promptAttachmentCounter = 0;
     let teamMcpToken: string | undefined;
+    let workspaceFileState = { version: 1 as const, workspaces: [] as Array<Record<string, unknown>> };
+    const workspaceEntryTest = {
+      menus: [] as Array<Record<string, unknown>>,
+      reveals: [] as Array<Record<string, unknown>>,
+      defaultOpens: [] as Array<Record<string, unknown>>,
+      copies: [] as Array<{ entry: Record<string, unknown>; kind: "absolute" | "relative" }>,
+      trashes: [] as Array<Record<string, unknown>>
+    };
     let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     let workbenchState: FixtureWorkbenchState = {
       version: 2 as const,
@@ -113,6 +121,14 @@ export async function installMockDesktopBridge(
           getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "0.1.0-alpha.1" }),
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
+          loadWorkspaceFileState: async () => ({
+            state: structuredClone(workspaceFileState),
+            draftPersistence: "available" as const
+          }),
+          updateWorkspaceFileState: async (state: typeof workspaceFileState) => {
+            workspaceFileState = structuredClone(state);
+            return { state: structuredClone(workspaceFileState), draftPersistence: "available" as const };
+          },
           updateWorkbenchLayout: async (layout: Record<string, unknown>) => {
             workbenchState = { ...workbenchState, ...structuredClone(layout) } as FixtureWorkbenchState;
             return structuredClone(workbenchState);
@@ -257,6 +273,29 @@ export async function installMockDesktopBridge(
             testWindow.__pi67UpdateTest.openedUrls.push(url);
             return testWindow.__pi67UpdateTest.allowOpen;
           },
+          showWorkspaceEntryContextMenu: async (entry: Record<string, unknown>) => {
+            workspaceEntryTest.menus.push(structuredClone(entry));
+            return entry.kind === "file" ? "pi67-open" as const : "reveal" as const;
+          },
+          revealWorkspaceEntry: async (entry: Record<string, unknown>) => {
+            workspaceEntryTest.reveals.push(structuredClone(entry));
+            return true;
+          },
+          openWorkspaceEntryInDefaultApp: async (entry: Record<string, unknown>) => {
+            workspaceEntryTest.defaultOpens.push(structuredClone(entry));
+            return true;
+          },
+          copyWorkspaceEntryPath: async (
+            entry: Record<string, unknown>,
+            kind: "absolute" | "relative"
+          ) => {
+            workspaceEntryTest.copies.push({ entry: structuredClone(entry), kind });
+            return true;
+          },
+          trashWorkspaceEntry: async (entry: Record<string, unknown>) => {
+            workspaceEntryTest.trashes.push(structuredClone(entry));
+            return true;
+          },
           getUpdateState: async () => ({
             phase: "idle",
             channel: "unsigned-preview",
@@ -282,6 +321,10 @@ export async function installMockDesktopBridge(
     Object.defineProperty(window, "__pi67UpdateTest", {
       configurable: false,
       value: { checks: 0, openedUrls: [], allowOpen: false }
+    });
+    Object.defineProperty(window, "__pi67WorkspaceEntryTest", {
+      configurable: false,
+      value: workspaceEntryTest
     });
 
     function selectedWorkspaceId(surface: FixtureWorkbenchState["selectedSurface"]): string | undefined {

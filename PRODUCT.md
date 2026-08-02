@@ -415,9 +415,44 @@ count.
   latches the Session read-only, interrupts an active turn, and requires reopen or
   repair before another mutation. The renderer receives only a typed reason and
   recoverability flag, never the Session path.
-- The Inspector exposes bounded Pi Session Recorded Changes from the active
-  branch. It never presents those edit/write records as a complete Git or
-  workspace diff, and it never invents a historical diff for write results.
+- The Inspector has three primary views: `文件`, `消息`, and `上下文`. Files is a
+  lazy, bounded navigator for the registered trusted Workspace and remains
+  available without initializing a Task Runtime. Directory clicks expand in
+  place; ordinary file clicks reveal the file in Finder or Explorer. The native
+  context menu has one `在 Pi-67 中打开` action plus system-default open, copy
+  absolute/relative path, and reveal actions. Files also supports explicit
+  create-file, create-directory, rename, refresh, and confirmed trash operations.
+- `在 Pi-67 中打开` creates one Workspace-scoped file tab or focuses the existing
+  tab for the same relative path. The fixed `对话` tab remains available, file
+  tabs survive Conversation and Settings navigation, and selecting a Conversation
+  returns to `对话` without closing those tabs. File navigation never starts,
+  stops, or replaces a Pi Task; a background Task keeps running while a file tab
+  is active.
+- The first editor release accepts only regular, non-symlink UTF-8 text files up
+  to 2 MiB and provides line numbers, syntax highlighting, search, undo/redo, and
+  `Cmd/Ctrl+S`. Binary, invalid UTF-8, oversized, symlink, missing, and special
+  files fail explicitly. Saves require the revision that was opened and refuse
+  to overwrite an externally changed file; the recovery actions are `重新读取`
+  and `将草稿另存为`.
+- Renderer requests carry Host-issued opaque references rather than absolute
+  paths. Host and Main revalidate Workspace registration, filesystem identity,
+  containment, kind, trust, and `.git` exclusion at each boundary. Clean tabs and
+  encrypted dirty drafts are restored across restart through Electron
+  `safeStorage`; when encryption is unavailable, dirty source is not persisted in
+  plaintext and exit remains guarded. Limits are 32 tabs per Workspace, 128 per
+  app, and 20 MiB of dirty draft text. File bodies never enter Workbench state,
+  Pi JSONL, notifications, diagnostics, logs, or telemetry.
+- Messages is a paged index of only the user's messages on the current Pi Session
+  active branch. It excludes Assistant, System, Tool, Thinking, and Session
+  control entries, and can locate an unloaded message through one bounded
+  historical conversation window without transferring the complete JSONL.
+  Historical mode is visibly read-only and offers `回到最新消息`.
+- Active-branch `edit` and `write` facts enrich their matching Tool cards by
+  `toolCallId`; Files does not contain a Recorded Changes or Diff drill-down.
+  These facts never claim to be a complete Git or Workspace diff, and `write`
+  results never invent a before-version. Session branching and rollback lives in
+  the dedicated `会话分支与回退` dialog opened by `/tree` or the command palette
+  rather than appearing as an Inspector tab.
 - Safety approval is a dedicated, fail-closed single-Tool-Call flow bound to
   Host epoch, session generation, operation, request, and Pi `toolCallId`;
   ordinary Extension confirmation cannot impersonate it. Skill selection and

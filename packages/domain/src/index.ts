@@ -15,3 +15,5 @@ export * from "./session-view.js";
 export * from "./skill-pack-management.js";
 export * from "./workspace-change.js";
 export * from "./workbench.js";
+export * from "./workspace-file.js";
+export * from "./user-message-index.js";

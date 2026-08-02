@@ -21,6 +21,7 @@ import { isSkillPackCommand } from "./skill-pack-command-router.js";
 import type { TaskRuntimeRecord, TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { isWorkspaceProviderCommand } from "./workspace-command-router.js";
+import { isWorkspaceFileCommand } from "./workspace-file-command-router.js";
 
 export interface TaskHostState {
   readonly record: TaskRuntimeRecord;
@@ -100,6 +101,7 @@ export class HostTaskStateCoordinator {
       }
       if (
         isContextFileCommand(request.type)
+        || isWorkspaceFileCommand(request.type)
         || isExtensionPackageCommand(request.type)
         || isSkillPackCommand(request.type)
       ) {

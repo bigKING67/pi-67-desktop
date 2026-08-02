@@ -1,4 +1,8 @@
 export {
+  MAX_WORKSPACE_FILE_DRAFT_BYTES_TOTAL,
+  MAX_WORKSPACE_FILE_PATH_CHARS,
+  MAX_WORKSPACE_FILE_TABS_PER_WORKSPACE,
+  MAX_WORKSPACE_FILE_TABS_TOTAL,
   MAX_RUNNING_TASKS,
   defaultPackageNetworkSettings,
   gitSourceCandidates,
@@ -16,5 +20,11 @@ export {
   type DesktopToolchainStatus,
   type PackageNetworkSettings,
   type PackageNetworkSnapshot,
-  type PackageSourceHealth
+  type PackageSourceHealth,
+  type WorkspaceEntryContextAction,
+  type WorkspaceEntryRequest,
+  type WorkspaceFileKind,
+  type WorkspaceFilePersistedState,
+  type WorkspaceFilePersistedTab,
+  type WorkspaceFileStateSnapshot
 } from "@pi67/domain";

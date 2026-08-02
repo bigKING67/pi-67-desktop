@@ -12,6 +12,7 @@ import { installMockCommandResponseHandler, type MockCommandResponseHandler } fr
 import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixture.js";
 import { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 import { createMockContextFiles, installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
+import { installMockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import { installMockPayloadSanitizer, type MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
 import { installMockOperationFactories, type MockOperationViewFactory, type MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
 import type {
@@ -50,6 +51,7 @@ export async function attachMockAgent(
   await page.evaluate(installMockPayloadSanitizer);
   await page.evaluate(installMockOperationFactories);
   await page.evaluate(installMockContextFileCommandHandler);
+  await page.evaluate(installMockInspectorCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
     fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS

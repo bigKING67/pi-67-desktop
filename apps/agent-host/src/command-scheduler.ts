@@ -24,9 +24,15 @@ const EXCLUSIVE_COMMANDS = new Set<AgentCommandType>([
 const QUERY_COMMANDS = new Set<AgentCommandType>([
   "runtime.getStatus",
   "workspace.changes",
+  "workspace.file.list",
+  "workspace.file.search",
+  "workspace.file.resolve",
+  "workspace.file.open",
   "session.catalog.query",
   "session.tree",
   "message.page",
+  "message.index",
+  "message.locate",
   "asset.read",
   "model.list",
   "resource.list",
@@ -43,7 +49,9 @@ const TRANSITION_DEFERRED_QUERY_COMMANDS = new Set<AgentCommandType>([
   "workspace.changes",
   "session.catalog.query",
   "session.tree",
-  "message.page"
+  "message.page",
+  "message.index",
+  "message.locate"
 ]);
 
 export function commandClassFor(command: AgentCommand): CommandClass {

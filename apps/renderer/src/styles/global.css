@@ -1,4 +1,5 @@
 @import "./foundations.css";
 @import "./workspace-shell.css";
+@import "./workspace-files.css";
 @import "./context-overlays.css";
 @import "./responsive.css";

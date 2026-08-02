@@ -9,8 +9,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@codemirror/language-data": "6.5.2",
     "@pi67/domain": "workspace:*",
     "@pi67/protocol": "workspace:*",
+    "codemirror": "6.0.2",
     "lucide-react": "1.25.0",
     "react": "19.2.8",
     "react-aria-components": "1.19.0",

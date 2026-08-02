@@ -175,10 +175,10 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
           <Command aria-hidden="true" size={16} />
           <ControlTooltip id="command-palette-tooltip">{messages.shell.commandPalette}</ControlTooltip>
         </Button>
-        {selectedTaskIsLive ? (
+        {selectedWorkspace && !settingsSelected ? (
           <Button
             className={`icon-button context-toggle ${styles.iconButton}`}
-            aria-controls="session-context"
+            aria-controls="task-inspector"
             aria-describedby="context-toggle-tooltip"
             aria-expanded={contextVisible}
             aria-keyshortcuts="Control+Shift+B Meta+Shift+B"

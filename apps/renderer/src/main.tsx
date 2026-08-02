@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/App.js";
 import { initializeThemeController } from "./theme/theme-controller.js";
 import { initializeRendererWorkbench } from "./workbench/workbench-controller.js";
+import { initializeWorkspaceFilePersistence } from "./workspace-files/workspace-file-persistence.js";
 import "./styles/tokens.css";
 import "./styles/global.css";
 import "./styles/dialogs.css";
@@ -12,6 +13,7 @@ if (!root) throw new Error("Pi-67 renderer root was not found.");
 
 initializeThemeController();
 void initializeRendererWorkbench();
+void initializeWorkspaceFilePersistence();
 
 void window.pi67.system.getPlatformInfo().then((info) => {
   document.documentElement.dataset.platform = info.platform;

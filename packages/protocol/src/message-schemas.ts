@@ -1,5 +1,7 @@
 import { Type, type TProperties } from "./typebox-schema.js";
 import {
+  MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
+  MAX_USER_MESSAGE_PREVIEW_CHARS,
   MAX_PROJECTED_MESSAGE_PARTS,
   MAX_PROJECTED_TEXT_BYTES
 } from "@pi67/domain";
@@ -34,7 +36,26 @@ const ImagePartSchema = messageObject({
   asset: Type.Optional(AssetReferenceSchema),
   name: Type.Optional(Type.String({ maxLength: 512 }))
 });
-const MessagePartSchema = Type.Union([TextPartSchema, ToolCallPartSchema, ImagePartSchema]);
+const AttachmentPartSchema = messageObject({
+  type: Type.Literal("attachment"),
+  id: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" }),
+  name: Type.String({ minLength: 1, maxLength: 512 }),
+  mimeType: Type.String({ minLength: 1, maxLength: 128 }),
+  byteLength: Type.Integer({ minimum: 0 }),
+  kind: Type.Union([
+    Type.Literal("document"),
+    Type.Literal("archive"),
+    Type.Literal("audio"),
+    Type.Literal("video"),
+    Type.Literal("file")
+  ])
+});
+const MessagePartSchema = Type.Union([
+  TextPartSchema,
+  ToolCallPartSchema,
+  ImagePartSchema,
+  AttachmentPartSchema
+]);
 
 export const SessionMessageSchema = messageObject({
   id: Type.String(),
@@ -61,6 +82,34 @@ export const ConversationPageSchema = messageObject({
   endCursor: Type.Optional(Type.String()),
   hasOlder: Type.Boolean(),
   hasNewer: Type.Boolean()
+});
+
+const UserMessageIndexItemSchema = messageObject({
+  id: Type.String({ minLength: 1, maxLength: 512 }),
+  ordinal: Type.Integer({ minimum: 1 }),
+  preview: Type.String({ maxLength: MAX_USER_MESSAGE_PREVIEW_CHARS }),
+  createdAt: Type.Optional(Type.Number()),
+  imageCount: Type.Integer({ minimum: 0 }),
+  attachmentCount: Type.Integer({ minimum: 0 })
+});
+
+export const UserMessageIndexPageSchema = messageObject({
+  sessionId: Type.String({ minLength: 1, maxLength: 512 }),
+  revision: Type.Integer({ minimum: 1 }),
+  total: Type.Integer({ minimum: 0 }),
+  offset: Type.Integer({ minimum: 0 }),
+  items: Type.Array(UserMessageIndexItemSchema, { maxItems: MAX_USER_MESSAGE_INDEX_PAGE_ITEMS })
+});
+
+export const LocatedMessageWindowSchema = messageObject({
+  sessionId: Type.String(),
+  messages: Type.Array(SessionMessageSchema, { maxItems: 200 }),
+  startCursor: Type.Optional(Type.String()),
+  endCursor: Type.Optional(Type.String()),
+  hasOlder: Type.Boolean(),
+  hasNewer: Type.Boolean(),
+  anchorId: Type.String({ minLength: 1, maxLength: 512 }),
+  revision: Type.Integer({ minimum: 1 })
 });
 
 function messageObject<T extends TProperties>(properties: T) {

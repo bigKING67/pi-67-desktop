@@ -1,8 +1,10 @@
 import { writeFile } from "node:fs/promises";
 import {
   app,
+  clipboard,
   dialog,
   ipcMain,
+  Menu,
   net,
   Notification,
   shell,
@@ -16,6 +18,7 @@ import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-s
 import { redact } from "./redaction.js";
 import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
+import type { WorkspaceEntryContextAction } from "@pi67/protocol";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
 import {
   addOrRefreshWorkspace,
@@ -26,6 +29,8 @@ import {
   WorkbenchStateStore
 } from "./workbench-state.js";
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
+import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
+import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
 
 const manualUpdateChannel = "unsigned-preview" as const;
 
@@ -39,6 +44,7 @@ interface SystemBridgeOptions {
   teamMcpSettings: TeamMcpSettingsStore;
   promptAttachments: PromptAttachmentStagingService;
   workbenchState: WorkbenchStateStore;
+  workspaceFileState: WorkspaceFileStateStore;
 }
 
 export function registerSystemBridge(options: SystemBridgeOptions): void {
@@ -84,6 +90,10 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     options.promptAttachments.release(value)
   ));
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
+  ipcMain.handle("pi67:workspace-file-state-load", () => options.workspaceFileState.load());
+  ipcMain.handle("pi67:workspace-file-state-update", (_event, value: unknown) => (
+    options.workspaceFileState.update(value)
+  ));
   ipcMain.handle("pi67:workbench-layout-update", (_event, value: unknown) => (
     workbenchState.update((state) => replaceWorkbenchLayout(state, value))
   ));
@@ -109,9 +119,12 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     });
     return repaired;
   });
-  ipcMain.handle("pi67:workspace-remove", (_event, workspaceId: unknown) => (
-    workbenchState.update((state) => removeWorkspaceRegistration(state, assertWorkspaceId(workspaceId)))
-  ));
+  ipcMain.handle("pi67:workspace-remove", async (_event, workspaceId: unknown) => {
+    const id = assertWorkspaceId(workspaceId);
+    const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
+    await options.workspaceFileState.removeWorkspace(id);
+    return state;
+  });
   ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
     workbenchState.update((state) => reorderWorkspaceRegistrations(state, assertWorkspaceIds(workspaceIds)))
   ));
@@ -160,6 +173,71 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     });
     if (result.response !== 0) return false;
     await shell.openExternal(target.toString());
+    return true;
+  });
+  ipcMain.handle("pi67:workspace-entry-menu", async (_event, value: unknown) => {
+    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
+    const window = options.getMainWindow();
+    if (!window) return undefined;
+    return new Promise<WorkspaceEntryContextAction | undefined>((resolveAction) => {
+      let resolved = false;
+      const choose = (action: WorkspaceEntryContextAction) => {
+        resolved = true;
+        resolveAction(action);
+      };
+      const template: Electron.MenuItemConstructorOptions[] = entry.kind === "file"
+        ? [
+            { label: "在 Pi-67 中打开", click: () => choose("pi67-open") },
+            { type: "separator" },
+            { label: "使用系统默认应用打开", click: () => choose("open-default") },
+            { label: "复制路径", click: () => choose("copy-absolute") },
+            { label: "复制相对路径", click: () => choose("copy-relative") },
+            { label: process.platform === "darwin" ? "在 Finder 中显示" : "在文件资源管理器中显示", click: () => choose("reveal") }
+          ]
+        : [
+            { label: process.platform === "darwin" ? "在 Finder 中打开" : "在文件资源管理器中打开", click: () => choose("reveal") },
+            { label: "复制路径", click: () => choose("copy-absolute") },
+            { label: "复制相对路径", click: () => choose("copy-relative") }
+          ];
+      Menu.buildFromTemplate(template).popup({
+        window,
+        callback: () => {
+          if (!resolved) resolveAction(undefined);
+        }
+      });
+    });
+  });
+  ipcMain.handle("pi67:workspace-entry-reveal", async (_event, value: unknown) => {
+    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
+    if (entry.kind === "file") shell.showItemInFolder(entry.absolutePath);
+    else await openSystemPath(entry.absolutePath);
+    return true;
+  });
+  ipcMain.handle("pi67:workspace-entry-open-default", async (_event, value: unknown) => {
+    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
+    await openSystemPath(entry.absolutePath);
+    return true;
+  });
+  ipcMain.handle("pi67:workspace-entry-copy", async (_event, value: unknown, mode: unknown) => {
+    if (mode !== "absolute" && mode !== "relative") throw new Error("Workspace path copy mode is invalid.");
+    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
+    clipboard.writeText(mode === "absolute" ? entry.absolutePath : entry.relativePath);
+    return true;
+  });
+  ipcMain.handle("pi67:workspace-entry-trash", async (_event, value: unknown) => {
+    const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
+    const result = await dialog.showMessageBox(options.getMainWindow()!, {
+      type: "warning",
+      title: "移到废纸篓",
+      message: `将“${entry.relativePath}”移到废纸篓？`,
+      detail: "可以从系统废纸篓恢复；Pi-67 不会执行永久删除。",
+      buttons: ["移到废纸篓", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    if (result.response !== 0) return false;
+    await shell.trashItem(entry.absolutePath);
     return true;
   });
   ipcMain.handle("pi67:update-state", currentUpdateState);
@@ -240,6 +318,11 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
       if (updateCheck === pendingCheck) updateCheck = undefined;
     }
   });
+}
+
+async function openSystemPath(path: string): Promise<void> {
+  const failure = await shell.openPath(path);
+  if (failure) throw new Error(failure);
 }
 
 function initialManualUpdateState(currentVersion: string): ManualUpdateState {

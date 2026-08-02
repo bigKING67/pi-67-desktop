@@ -88,7 +88,7 @@ function projectTreeNode(node: SourceTreeNode, depth: number, leafId: string | n
   return {
     id: boundedUtf8(rawId, MAX_TREE_ID_BYTES),
     parentId: typeof entry.parentId === "string" ? boundedUtf8(entry.parentId, MAX_TREE_ID_BYTES) : null,
-    type: boundedUtf8(typeof entry.type === "string" ? entry.type : "entry", MAX_TREE_TYPE_BYTES),
+    type: boundedUtf8(sessionTreeEntryType(entry), MAX_TREE_TYPE_BYTES),
     ...(node.label ? {
       label: boundedUtf8(
         sanitizeRuntimeText(boundedUtf8(node.label, MAX_TREE_LABEL_BYTES * 2)),
@@ -99,6 +99,17 @@ function projectTreeNode(node: SourceTreeNode, depth: number, leafId: string | n
     active: rawId === leafId,
     depth
   };
+}
+
+function sessionTreeEntryType(entry: Record<string, unknown>): string {
+  if (entry.type !== "message") return typeof entry.type === "string" ? entry.type : "entry";
+  const message = typeof entry.message === "object" && entry.message !== null
+    ? entry.message as Record<string, unknown>
+    : undefined;
+  if (message?.role === "user") return "user_message";
+  if (message?.role === "assistant") return "assistant_message";
+  if (message?.role === "toolResult") return "tool_result";
+  return "message";
 }
 
 function fitTreeToByteBudget(candidates: SessionTreeNodeView[], total: number): SessionTreeNodeView[] {

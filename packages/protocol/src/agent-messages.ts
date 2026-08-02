@@ -31,6 +31,8 @@ import type {
   TaskToolMode,
   ApprovalResponseDecision,
   ApprovalResolution,
+  LocatedMessageWindow,
+  UserMessageIndexPage,
   WorkspaceChangesProjection,
   WorkspaceTrust
 } from "@pi67/domain";
@@ -40,13 +42,14 @@ import type {
   PiProviderConfigurationSnapshot
 } from "./provider-configuration-schemas.js";
 import type { ProtocolError } from "./protocol-error.js";
+import type {
+  WorkspaceFileCommandPayloads,
+  WorkspaceFileCommandResults
+} from "./workspace-file-messages.js";
 
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
-
-export interface PromptAttachmentRef {
-  id: string;
-}
+export interface PromptAttachmentRef { id: string; }
 
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 
@@ -194,7 +197,7 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
   items: SessionCatalogResultItem[];
 };
 
-export interface CommandPayloads {
+export interface CommandPayloads extends WorkspaceFileCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -215,6 +218,8 @@ export interface CommandPayloads {
   "session.catalog.query": SessionCatalogQuery;
   "session.tree": Record<string, never>;
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
+  "message.index": { offset?: number; limit?: number };
+  "message.locate": { id: string };
   "session.create": Record<string, never>;
   "session.open": { path: string; cwdOverride?: string };
   "session.import": { submissionId: string; path: string };
@@ -300,7 +305,7 @@ export interface CommandPayloads {
   "doctor.run": Record<string, never>;
 }
 
-export interface CommandResults {
+export interface CommandResults extends WorkspaceFileCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;
@@ -315,6 +320,8 @@ export interface CommandResults {
   "session.catalog.query": SessionCatalogPageResult;
   "session.tree": SessionTreeProjection;
   "message.page": ConversationPage;
+  "message.index": UserMessageIndexPage;
+  "message.locate": LocatedMessageWindow;
   "session.create": ProjectionMutationAcknowledgement;
   "session.open": ProjectionMutationAcknowledgement;
   "session.import": OperationSubmissionResult;
@@ -393,6 +400,9 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "thinking.set",
   "resource.reload",
   "context.file.save",
+  "workspace.file.save",
+  "workspace.file.create",
+  "workspace.file.rename",
   "extension.package.install",
   "extension.package.update",
   "extension.package.setEnabled",

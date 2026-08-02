@@ -3,6 +3,10 @@ import type {
   PackageNetworkSnapshot,
   DesktopCapabilitySnapshot,
   RuntimeRecoveryRecord,
+  WorkspaceEntryContextAction,
+  WorkspaceEntryRequest,
+  WorkspaceFilePersistedState,
+  WorkspaceFileStateSnapshot,
   WorkbenchSettingsState,
   WorkbenchStateV2,
   WorkbenchSurface,
@@ -40,6 +44,8 @@ declare global {
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
         loadWorkbenchState(): Promise<WorkbenchStateV2>;
+        loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
+        updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
         updateWorkbenchLayout(layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
         repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
@@ -50,6 +56,11 @@ declare global {
         saveDiagnostics(content: string): Promise<string | undefined>;
         showNotification(title: string, body: string): Promise<void>;
         requestOpenExternal(url: string): Promise<boolean>;
+        showWorkspaceEntryContextMenu(entry: WorkspaceEntryRequest): Promise<WorkspaceEntryContextAction | undefined>;
+        revealWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
+        openWorkspaceEntryInDefaultApp(entry: WorkspaceEntryRequest): Promise<boolean>;
+        copyWorkspaceEntryPath(entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean>;
+        trashWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
         getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
         savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
         resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;

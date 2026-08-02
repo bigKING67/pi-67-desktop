@@ -8,6 +8,7 @@ import type {
   FixtureMessage,
   FixtureWindow
 } from "./pi67-renderer-fixture-types.js";
+import type { MockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
 import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
@@ -31,10 +32,12 @@ export function installMockCommandResponseHandler({
   const testWindow = window as FixtureWindow & {
     __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
     __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
+    __pi67ResolveMockInspectorCommand: MockInspectorCommandHandler;
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
   const applyMockSessionControlCommand = testWindow.__pi67ApplyMockSessionControlCommand;
   const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
+  const resolveMockInspectorCommand = testWindow.__pi67ResolveMockInspectorCommand;
 
   const resolveMockCommand: MockCommandResponseHandler = (type, payload, current, hostEpoch) => {
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
@@ -64,6 +67,8 @@ export function installMockCommandResponseHandler({
       ...current.resyncOperations
     };
     if (type === "workspace.changes") return current.workspaceChanges;
+    const inspectorResult = resolveMockInspectorCommand(type, payload, current);
+    if (inspectorResult !== undefined) return inspectorResult;
     if (type === "extension.catalog.list") return current.extensionCatalog;
     if (type === "extension.package.list") return { items: [], total: 0 };
     if (type === "extension.package.checkUpdates") return { items: [], total: 0 };

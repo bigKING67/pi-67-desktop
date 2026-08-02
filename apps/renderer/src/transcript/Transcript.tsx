@@ -1,13 +1,10 @@
-import type { OperationView, SessionMessageView } from "@pi67/domain";
+import type { LocatedMessageWindow, OperationView, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Virtuoso, type Components } from "react-virtuoso";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Virtuoso, type Components, type VirtuosoHandle } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import {
-  selectSessionGeneration,
-  selectSessionId
-} from "../session/session-projection-selectors.js";
+import { selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
 import { requestComposerPrefill } from "../composer/composer-events.js";
 import { loadOlderConversation } from "../conversation/conversation-controller.js";
 import {
@@ -41,6 +38,8 @@ import {
 import { MessageCard } from "./MessageCard.js";
 import { TranscriptProcessGroup } from "./TranscriptProcessGroup.js";
 import { editableUserMessageText } from "./message-actions.js";
+import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
+import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows,
@@ -51,6 +50,10 @@ import styles from "./Transcript.module.css";
 export function Transcript() {
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
+  const [historicalWindow, setHistoricalWindow] = useState<LocatedMessageWindow>();
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string>();
+  const transcriptRegionRef = useRef<HTMLDivElement>(null);
+  const transcriptRef = useRef<VirtuosoHandle>(null);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const runtime = useAppStore((state) => state.runtime);
@@ -77,7 +80,13 @@ export function Transcript() {
       ? [...messages, currentEdit.message]
       : messages
   ), [currentEdit, messages]);
-  const transcriptRows = useMemo(() => projectTranscriptRows(transcriptMessages), [transcriptMessages]);
+  const visibleMessages = historicalWindow?.messages ?? transcriptMessages;
+  const transcriptRows = useMemo(() => projectTranscriptRows(visibleMessages), [visibleMessages]);
+  const historicalAnchorRowIndex = historicalWindow
+    ? Math.max(0, transcriptRows.findIndex((row) => (
+      row.kind === "message" && row.message.id === historicalWindow.anchorId
+    )))
+    : undefined;
   const hasCurrentProcessGroup = !pendingUserTurn && hasProcessGroupAfterLatestUser(transcriptRows);
   const currentProcessGroupKey = hasCurrentProcessGroup
     ? [...transcriptRows].reverse().find((row) => row.kind === "process-group")?.key
@@ -115,7 +124,33 @@ export function Transcript() {
     : undefined;
   const messageActionDisabledReason = currentEdit
     ? messagesCatalog.transcript.finishMessageEdit
-    : sessionForkActionBlockedReason();
+    : historicalWindow
+      ? "正在查看较早消息，请先回到最新消息。"
+      : sessionForkActionBlockedReason();
+
+  useEffect(() => subscribeTranscriptMessageJump((target) => {
+    if (target.window) setHistoricalWindow(target.window);
+    setHighlightedMessageId(target.id);
+  }), []);
+
+  useEffect(() => {
+    setHistoricalWindow(undefined);
+    setHighlightedMessageId(undefined);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!pendingUserTurn) return;
+    setHistoricalWindow(undefined);
+    setHighlightedMessageId(undefined);
+  }, [pendingUserTurn]);
+
+  useTranscriptMessageFocus({
+    highlightedMessageId,
+    regionRef: transcriptRegionRef,
+    rows: transcriptRows,
+    setHighlightedMessageId,
+    virtuosoRef: transcriptRef
+  });
 
   if (!sessionId || (sessionTransitionPending && !currentEdit)) {
     if (runtime.phase === "failed") {
@@ -153,30 +188,48 @@ export function Transcript() {
       data-message-count={transcriptMessages.length}
       data-pending-user-turn={pendingUserTurn ? "true" : "false"}
       data-session-id={sessionId}
+      data-historical-window={historicalWindow ? "true" : "false"}
       data-transcript-region="true"
+      ref={transcriptRegionRef}
     >
+      {historicalWindow ? (
+        <div className={styles.historicalBanner} role="status">
+          <span>正在查看较早消息</span>
+          <button
+            type="button"
+            onClick={() => {
+              setHistoricalWindow(undefined);
+              setHighlightedMessageId(undefined);
+              requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
+            }}
+          >回到最新消息</button>
+        </div>
+      ) : null}
       {/* Explicit paging avoids Virtuoso chaining requests while a prepend preserves the top anchor. */}
       <Virtuoso
-        key={sessionId}
+        key={`${sessionId}:${historicalWindow?.anchorId ?? "latest"}`}
+        ref={transcriptRef}
         components={TRANSCRIPT_COMPONENTS}
         context={{
-          hasLiveTurn,
-          hasTurnActivity,
-          pendingUserTurn,
-          liveText,
-          liveThinking,
-          hasOlder: page.hasOlder,
-          loadingOlder,
-          conversationError,
-          liveProcess,
+          hasLiveTurn: historicalWindow ? false : hasLiveTurn,
+          hasTurnActivity: historicalWindow ? false : hasTurnActivity,
+          pendingUserTurn: historicalWindow ? undefined : pendingUserTurn,
+          liveText: historicalWindow ? "" : liveText,
+          liveThinking: historicalWindow ? "" : liveThinking,
+          hasOlder: historicalWindow ? false : page.hasOlder,
+          loadingOlder: historicalWindow ? false : loadingOlder,
+          conversationError: historicalWindow ? undefined : conversationError,
+          liveProcess: historicalWindow ? undefined : liveProcess,
           loadOlderMessages: loadOlderConversation
         }}
         data={transcriptRows}
         computeItemKey={(_index, row) => row.key}
-        firstItemIndex={firstItemIndex + transcriptMessages.length - transcriptRows.length}
-        followOutput={streaming || hasTurnActivity ? "auto" : false}
+        firstItemIndex={historicalWindow ? 0 : firstItemIndex + transcriptMessages.length - transcriptRows.length}
+        followOutput={!historicalWindow && (streaming || hasTurnActivity) ? "auto" : false}
         increaseViewportBy={{ top: 500, bottom: 800 }}
-        initialTopMostItemIndex={Math.max(0, transcriptRows.length - 1)}
+        initialTopMostItemIndex={historicalAnchorRowIndex === undefined
+          ? Math.max(0, transcriptRows.length - 1)
+          : { index: historicalAnchorRowIndex, align: "center" }}
         itemContent={(_index, row) => {
           if (row.kind === "process-group") {
             const current = row.key === currentProcessGroupKey;
@@ -199,7 +252,8 @@ export function Transcript() {
           return (
             <MessageCard
               actionDisabledReason={messageActionDisabledReason}
-              edit={currentEdit?.message.id === message.id ? {
+              highlighted={highlightedMessageId === message.id}
+              edit={!historicalWindow && currentEdit?.message.id === message.id ? {
                 value: currentEdit.value,
                 phase: currentEdit.phase,
                 ...(currentEdit.error === undefined ? {} : { error: currentEdit.error }),
@@ -210,10 +264,10 @@ export function Transcript() {
                 onSubmit: () => void submitMessageEdit(currentEdit)
               } : undefined}
               message={message}
-              onContinue={message.role === "assistant"
+              onContinue={!historicalWindow && message.role === "assistant"
                 ? () => continueRendererSessionFrom(message.id)
                 : undefined}
-              onEditStart={message.role === "user"
+              onEditStart={!historicalWindow && message.role === "user"
                 ? () => beginMessageEdit(message)
                 : undefined}
             />

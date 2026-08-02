@@ -35,7 +35,7 @@ import type { SessionWriterLeaseReservation } from "./session-writer-lease-regis
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
-
+import { WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
 export type {
   AgentHostServerOptions,
   AgentHostShutdownResult,
@@ -53,6 +53,7 @@ export class AgentHostServer {
   private compatibilityRuntimeUnsubscribe: (() => void) | undefined;
   private readonly workspaces = new WorkspaceContextRegistry();
   private readonly workspaceCommands: WorkspaceCommandRouter;
+  private readonly workspaceFiles: WorkspaceFileCommandRouter;
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
   private readonly taskRuntimes: TaskRuntimeRegistry;
   private readonly contextFiles: ResourceManagementRouters["contextFiles"];
@@ -130,6 +131,7 @@ export class AgentHostServer {
       this.runtimeCredentialOverrides,
       this.events
     );
+    this.workspaceFiles = new WorkspaceFileCommandRouter(this.workspaces);
     this.sdkVersions = new HostSdkVersionLoader({
       runtimeLoader: this.runtimeLoader,
       runtimeCredentialOverrides: this.runtimeCredentialOverrides,
@@ -151,6 +153,7 @@ export class AgentHostServer {
       this.extensionPackages,
       this.skillPacks,
       this.workspaceCommands,
+      this.workspaceFiles,
       {
         isShuttingDown: () => this.shuttingDown,
         runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),

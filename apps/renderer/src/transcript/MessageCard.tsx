@@ -38,6 +38,7 @@ interface MessageCardProps {
   deliveryStatus?: "accepted" | "failed";
   localImages?: LocalMessageImage[];
   actionDisabledReason?: string | undefined;
+  highlighted?: boolean;
   onContinue?: (() => Promise<boolean>) | undefined;
   onEditStart?: (() => void) | undefined;
   edit?: {
@@ -56,6 +57,7 @@ export function MessageCard({
   deliveryStatus,
   localImages = [],
   actionDisabledReason,
+  highlighted = false,
   onContinue,
   onEditStart,
   edit
@@ -74,9 +76,10 @@ export function MessageCard({
       : isTool
         ? "工具消息"
         : "Pi 消息";
+
   return (
     <article
-      className={`${styles.card} ${isUser ? styles.user : ""} ${edit ? styles.userEditing : ""}`}
+      className={`${styles.card} ${isUser ? styles.user : ""} ${edit ? styles.userEditing : ""} ${highlighted ? styles.highlighted : ""}`}
       aria-busy={streaming || undefined}
       aria-label={ariaLabel}
       data-delivery-status={deliveryStatus}
@@ -84,6 +87,8 @@ export function MessageCard({
       data-testid="message-card"
       data-render-mode={streaming ? "streaming" : "settled"}
       data-edit-phase={edit?.phase}
+      data-highlighted={highlighted || undefined}
+      tabIndex={-1}
     >
       {isUser || isTool ? null : (
         <header className={styles.header}>

@@ -15,6 +15,7 @@ import {
 } from "@pi67/domain";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
+import { activateWorkspaceConversation } from "../workspace-files/workspace-file-store.js";
 
 export interface RendererWorkbenchTask {
   id: TaskId;
@@ -181,6 +182,7 @@ export function createRendererWorkbenchStore() {
     selectWorkspace(workspaceId) {
       const current = get();
       if (!current.workspaces[workspaceId]) return false;
+      activateWorkspaceConversation(workspaceId);
       set({
         currentWorkspaceId: workspaceId,
         expandedWorkspaceIds: current.expandedWorkspaceIds.includes(workspaceId)
@@ -207,6 +209,7 @@ export function createRendererWorkbenchStore() {
     openTask(task) {
       const current = get();
       if (!current.workspaces[task.workspaceId]) return "workspace-missing";
+      activateWorkspaceConversation(task.workspaceId);
       const matching = taskForConversation(current.tasks, task.conversation);
       const id = matching?.id ?? task.id;
       const existing = current.tasks[id];
@@ -248,6 +251,7 @@ export function createRendererWorkbenchStore() {
       const current = get();
       const task = current.tasks[taskId];
       if (!task) return false;
+      activateWorkspaceConversation(task.workspaceId);
       set({
         currentWorkspaceId: task.workspaceId,
         expandedWorkspaceIds: current.expandedWorkspaceIds.includes(task.workspaceId)
@@ -261,6 +265,7 @@ export function createRendererWorkbenchStore() {
     selectConversation(conversation) {
       const current = get();
       if (!current.workspaces[conversation.workspaceId]) return false;
+      activateWorkspaceConversation(conversation.workspaceId);
       set({
         currentWorkspaceId: conversation.workspaceId,
         expandedWorkspaceIds: current.expandedWorkspaceIds.includes(conversation.workspaceId)

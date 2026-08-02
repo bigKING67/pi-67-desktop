@@ -236,17 +236,17 @@ test("refreshes the session tree after rollback without a transition BUSY warnin
     await settings.getByRole("button", { name: "返回工作台" }).click();
     await expect(window.getByText("Rollback fixture assistant response.", { exact: true })).toBeVisible();
 
-    await window.getByTestId("inspector-toggle").click();
-    const contextPane = window.getByRole("complementary", { name: "会话上下文" });
-    await window.getByRole("tab", { name: "会话" }).click();
-    const sessionTree = window.locator(".session-tree");
+    const composer = window.getByLabel("给 Pi 发送消息");
+    await composer.fill("/tree");
+    await composer.press("Enter");
+    const sessionTree = window.getByRole("dialog", { name: "会话分支与回退" });
     const rollbackTarget = sessionTree.getByRole("button", { name: /Rollback fixture user message/u });
     await expect(rollbackTarget).toBeVisible();
     await rollbackTarget.click();
 
     await expect(window.getByRole("banner").getByText("Pi 会话已回退", { exact: true }))
       .toBeVisible({ timeout: 30_000 });
-    await expect(contextPane).not.toContainText("等待同步");
+    await expect(sessionTree).toHaveCount(0);
     await expect(window.getByText("无法刷新会话树", { exact: true })).toHaveCount(0);
     await expect(window.getByText("A session transition is in progress.", { exact: true })).toHaveCount(0);
 

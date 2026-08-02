@@ -5,6 +5,7 @@ const WORKBENCH_SETUP_OR_READ_COMMANDS = new Set([
   "workspace.open",
   "workspace.register",
   "workspace.changes",
+  "workspace.file.list",
   "command.list",
   "session.catalog.query"
 ]);

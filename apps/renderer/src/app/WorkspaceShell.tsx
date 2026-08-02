@@ -23,6 +23,7 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { resumeRendererTask } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./WorkspaceShell.module.css";
 
@@ -74,7 +75,31 @@ export function WorkspaceShell({
     && sessionTransitionPending
     && liveRuntime.phase === "recovering"
   );
-  const effectiveContextVisible = liveTaskSelected && !taskRecoveryPending && contextVisible;
+  const effectiveContextVisible = Boolean(selectedWorkspace) && !settingsSelected && !taskRecoveryPending && contextVisible;
+  const centralSurface = taskRecoveryPending ? (
+    <TaskRecoveryState detail={liveRuntime.detail} />
+  ) : liveTaskSelected ? (
+    <section className="conversation-region" aria-label="Pi conversation">
+      <TrustBanner />
+      <StreamingAnnouncer />
+      <Transcript />
+      <Composer />
+    </section>
+  ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
+    <WorkspaceRecoveryState workspace={selectedWorkspace} />
+  ) : selectedTask && selectedWorkspace ? (
+    <StoppedTaskState task={selectedTask} workspace={selectedWorkspace} />
+  ) : selectedSurface?.kind === "conversation"
+    && selectedSurface.conversation.kind === "session"
+    && selectedWorkspace ? (
+      <StoppedConversationState
+        sessionName={selectedSession?.name}
+        sessionPath={selectedSurface.conversation.sessionPath}
+        workspace={selectedWorkspace}
+      />
+  ) : (
+    <WorkspaceEmptyState />
+  );
 
   useLayoutEffect(() => {
     if (!navigationIsDrawer || !navigationVisible) return;
@@ -146,34 +171,13 @@ export function WorkspaceShell({
           type="button"
         />
       ) : null}
-      {taskRecoveryPending ? (
-        <TaskRecoveryState detail={liveRuntime.detail} />
-      ) : liveTaskSelected ? (
-        <section className="conversation-region" aria-label="Pi conversation">
-          <TrustBanner />
-          <StreamingAnnouncer />
-          <Transcript />
-          <Composer />
-        </section>
-      ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
-        <WorkspaceRecoveryState workspace={selectedWorkspace} />
-      ) : selectedTask && selectedWorkspace ? (
-        <StoppedTaskState task={selectedTask} workspace={selectedWorkspace} />
-      ) : selectedSurface?.kind === "conversation"
-        && selectedSurface.conversation.kind === "session"
-        && selectedWorkspace ? (
-          <StoppedConversationState
-            sessionName={selectedSession?.name}
-            sessionPath={selectedSurface.conversation.sessionPath}
-            workspace={selectedWorkspace}
-          />
-      ) : (
-        <WorkspaceEmptyState />
-      )}
+      {selectedWorkspace ? (
+        <WorkspaceFileSurface workspace={selectedWorkspace}>{centralSurface}</WorkspaceFileSurface>
+      ) : centralSurface}
       {effectiveContextVisible ? (
         <>
           <button
-            aria-label="关闭上下文抽屉"
+            aria-label="关闭任务检查器抽屉"
             className="context-drawer-scrim"
             onClick={onCloseContextDrawer}
             type="button"

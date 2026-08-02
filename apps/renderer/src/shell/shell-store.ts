@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ShellContextTab = "changes" | "session" | "context";
+type ShellContextTab = "files" | "messages" | "context";
 
 interface ShellState {
   navigationVisible: boolean;
@@ -10,6 +10,7 @@ interface ShellState {
   modelPickerHandledRevision: number;
   contextVisible: boolean;
   contextTab: ShellContextTab;
+  sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
   doctorDialogOpen: boolean;
   credentialDialogOpen: boolean;
@@ -21,6 +22,7 @@ interface ShellState {
   acknowledgeModelPickerRequest: (revision: number) => void;
   setContextVisible: (visible: boolean) => void;
   setContextTab: (tab: ShellContextTab) => void;
+  setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setDoctorDialogOpen: (open: boolean) => void;
   setCredentialDialogOpen: (open: boolean) => void;
@@ -35,7 +37,8 @@ export const useShellStore = create<ShellState>((set) => ({
   modelPickerRequestRevision: 0,
   modelPickerHandledRevision: 0,
   contextVisible: true,
-  contextTab: "changes",
+  contextTab: "files",
+  sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
   doctorDialogOpen: false,
   credentialDialogOpen: false,
@@ -62,9 +65,10 @@ export const useShellStore = create<ShellState>((set) => ({
   },
   setContextVisible(contextVisible) { set({ contextVisible }); },
   setContextTab(contextTab) { set({ contextTab }); },
+  setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setDoctorDialogOpen(doctorDialogOpen) { set({ doctorDialogOpen }); },
   setCredentialDialogOpen(credentialDialogOpen) { set({ credentialDialogOpen }); },
   setUpdateDialogOpen(updateDialogOpen) { set({ updateDialogOpen }); },
-  closeRuntimeBoundDialogs() { set({ credentialDialogOpen: false }); }
+  closeRuntimeBoundDialogs() { set({ credentialDialogOpen: false, sessionTreeDialogOpen: false }); }
 }));

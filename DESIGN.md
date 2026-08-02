@@ -92,8 +92,8 @@ completing a real session without learning terminal UI conventions first.
 | navigation | current Workspace / conversation | status | notices | Inspector |
 +----------------------+--------------------------------------+----------------+
 | Workspace groups     | Conversation or Settings workbench   | Inspector      |
-| active / recent      | Transcript / tools / Composer        | Changes        |
-| account          [?] | or scoped configuration              | Context        |
+| active / recent      | Transcript / tools / Composer        | Files          |
+| account          [?] | or scoped configuration              | Messages/Context |
 +----------------------+--------------------------------------+----------------+
 ```
 
@@ -159,9 +159,10 @@ Application-level surfaces use a separate wide-window shell:
   status such as Pi Runtime readiness rather than ordinary category selection.
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
-- Resizable split handles, a complete Git/workspace Diff, and Files browsing are
-  future Inspector capabilities. The current Changes tab is a bounded Pi Session
-  Recorded Changes projection, not a synthetic replacement for those features.
+- Resizable split handles, multiple editor panes/windows, media preview, and a
+  complete Git/workspace Diff remain future capabilities. Files is the narrow
+  Workspace navigator; editable text opens in the central workbench rather than
+  replacing the file tree or pretending to be Git state.
 
 ## Typography
 
@@ -335,11 +336,11 @@ loading error where the operation can produce those states
   They are revoked only after authoritative reconciliation, failure disposal, or
   authority replacement; the renderer never copies their binary payload merely
   to keep the acknowledgement state visible.
-- Long code uses a bounded 520px viewport, worker-based highlighting, internally
+- Long transcript code uses a bounded 520px viewport, worker-based highlighting, internally
   virtualized lines, and a full-content copy action. Long lines preserve their
   source layout and remain horizontally navigable without a persistent scrollbar;
   they never widen the Transcript or application document. Tool summaries and
-  recorded Edit Patch previews remain bounded; complete Tool Output and workspace
+  recorded Edit Patch facts remain bounded; complete Tool Output and Git/workspace
   Diff require future explicit data and expansion contracts.
 - Markdown never executes raw HTML.
 - Session images never render a cross-process data URL. A generation-bound asset
@@ -359,23 +360,66 @@ loading error where the operation can produce those states
 
 ### Inspector
 
-- Changes is the default tab. It displays only `edit` and `write` facts recorded
-  on the current Pi Session active branch and repeats that authority boundary in
-  the UI; it never claims to represent all uncommitted Git/workspace changes.
-- Completed `edit` records may show the bounded unified Patch, first changed line,
-  and additions/deletions recovered from the Pi Tool Result. `write` records show
-  bounded byte/line metrics and explicitly state that no before-version exists,
-  so no historical Diff is invented.
+- The primary order is `文件 / 消息 / 上下文`; Files is the default. The Files
+  root preserves expansion, search, selection, and scroll state while the
+  Inspector stays mounted. Directories load in pages of at most 200 entries.
+  Search accepts at most 256 characters, returns at most 200 matches, visits at
+  most 50,000 nodes, always skips `.git`, and skips dependency, generated, and
+  cache directories unless `包含依赖与生成目录` is enabled.
+- Directory rows expand or collapse. Clicking an ordinary file asks the native
+  shell to reveal it in Finder or Explorer; it never squeezes source into the
+  Inspector. Right-click opens the native menu with one `在 Pi-67 中打开` action,
+  system-default open, absolute/relative path copy, and reveal. The toolbar owns
+  create-file, create-directory, and refresh; the row menu owns rename and
+  confirmed trash.
+- File references are Host-epoch opaque IDs scoped to one registered Workspace.
+  Every list, search, resolve, open, save, create, rename, reveal, system-open,
+  copy, and trash boundary rechecks persisted Workspace identity, trust, `lstat`,
+  canonical containment, `.git` exclusion, and the allowed entry kind. Symlinks,
+  sockets, devices, FIFOs, traversal, and platform-reserved names fail closed.
+- `在 Pi-67 中打开` deduplicates by Workspace and relative path. The central tab
+  row begins with fixed `对话`, followed by file tabs. Selecting Workspace or
+  Conversation returns to `对话` without removing file tabs; a Settings round
+  trip preserves the active tab. A file surface replaces Transcript and Composer
+  in the DOM only while active, without changing the background Pi Task Runtime.
+- The editor accepts strict UTF-8 regular files up to 2 MiB and provides line
+  numbers, syntax highlighting, search, undo/redo, and `Cmd/Ctrl+S`. Binary,
+  invalid UTF-8, oversized, symlink, missing, and special files own explicit
+  unavailable states. Clean inactive tabs release source text and reopen it on
+  demand rather than retaining every file body indefinitely.
+- Save carries the opened opaque revision and cannot overwrite an external
+  change. A dirty conflict exposes `重新读取` and `将草稿另存为`; closing a dirty
+  tab offers save, discard, and cancel. Clean tabs and dirty drafts restore per
+  Workspace. Draft text is encrypted with Electron `safeStorage`; unavailable
+  encryption means no plaintext draft persistence and a guarded exit. Limits are
+  32 tabs per Workspace, 128 per app, and 20 MiB of dirty drafts.
+- No file body enters Workbench state, Pi JSONL, notifications, diagnostics,
+  logs, or telemetry. The first release has no split pane, new editor window,
+  system file association, media preview, or complete Git/workspace Diff.
+- Active-branch `edit` and `write` facts enrich only their matching transcript
+  Tool card through `toolCallId`; Files has no Recorded Changes drill-down.
+  `edit` facts may carry bounded Patch metadata and additions/deletions. `write`
+  facts explicitly state that no before-version exists, so no historical Diff is
+  invented.
 - Live Changes upsert by `toolCallId`; session bootstrap, Host generation change,
   and projection resync cannot mix records from different session generations.
-- Session tree projections are flat and renderer recursion is forbidden.
+- Messages shows only user-authored messages on the current active branch. The
+  index is paged at 100 by default and 200 maximum, previews are capped at 120
+  grapheme-scale characters, and image/attachment counts contain metadata only.
+  Clicking a loaded message scrolls and focuses its virtualized Transcript row;
+  clicking an unloaded message installs one bounded historical window, disables
+  edit/continue actions, highlights the target with Reduced Motion support, and
+  offers `回到最新消息`. Sending a new turn exits historical mode.
+- Session tree projections are flat and renderer recursion is forbidden. They
+  are no longer an Inspector tab: `/tree` and the command palette open the
+  dedicated `会话分支与回退` dialog, where common technical node types are shown as
+  user-facing events before a rollback is selected.
 - At most 512 nodes and 128 KiB of tree JSON cross the process boundary; the
   active node remains prioritized and truncation is visible.
-- Tree rows are virtualized. Session and Context are independent tabs; Context
-  contains usage, Extension status, and Resources without forcing conversation
-  history to be reprojected.
-- A complete Git/workspace Diff and Files browser are reserved for future data
-  contracts and are not represented by synthetic client-side data.
+- Tree rows are virtualized. Context contains usage, Extension status, and
+  Resources without forcing conversation history to be reprojected.
+- A complete Git/workspace Diff remains outside the current data contract and is
+  not represented by synthetic client-side state.
 
 ### Appearance
 
@@ -641,8 +685,10 @@ loading error where the operation can produce those states
   until a real browser extension and managed-browser connection are independently
   proven.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
-  removes the task-only Inspector surface and its focus targets from the DOM.
-  Returning to a Task restores only that Task's Inspector projection.
+  removes the Workspace Inspector surface and its focus targets from the DOM.
+  Returning to a Workspace restores its file navigation and Workspace-scoped
+  file tabs; Task-bound Messages, Context, and Tool change facts accept only
+  current Task authority.
 - At high zoom or an equivalently narrow effective viewport, Settings moves its
   category navigation from a fixed left column to one horizontally reachable
   compact row above the content. Icons retain their visible category labels so

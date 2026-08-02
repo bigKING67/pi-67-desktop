@@ -20,7 +20,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useCommittedWorkspaceChange } from "../changes/workspace-changes-store.js";
-import { useShellStore } from "../shell/shell-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { AssetImage } from "../transcript/AssetImage.js";
 import { messageTextForCopy } from "../transcript/message-actions.js";
@@ -59,8 +58,6 @@ export function ToolCard({
   authorization?: ToolAuthorizationProjection;
 }) {
   const change = useCommittedWorkspaceChange(tool.id);
-  const setContextTab = useShellStore((state) => state.setContextTab);
-  const setContextVisible = useShellStore((state) => state.setContextVisible);
   const presentation = presentToolCall(tool, change);
   const KindIcon = KIND_ICONS[presentation.kind];
   const failed = tool.status === "failed" || Boolean(result?.error);
@@ -185,15 +182,6 @@ export function ToolCard({
               <Button className={styles.copyButton!} onPress={() => setExpanded((value) => !value)}>
                 {expanded ? <Minimize2 size={13} aria-hidden="true" /> : <Maximize2 size={13} aria-hidden="true" />}
                 {expanded ? "收起结果" : "展开全部"}
-              </Button>
-            ) : null}
-            {change ? (
-              <Button className={styles.copyButton!} onPress={() => {
-                setContextTab("changes");
-                setContextVisible(true);
-              }}>
-                <FilePenLine size={13} aria-hidden="true" />
-                查看修改记录
               </Button>
             ) : null}
             <Button className={styles.copyButton!} onPress={() => void copyDetails()}>

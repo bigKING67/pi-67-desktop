@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, safeStorage } from "electron";
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
 import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
@@ -26,6 +26,7 @@ import {
   WorkbenchStateStore
 } from "./workbench-state.js";
 import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
+import { WorkspaceFileStateStore } from "./workspace-file-state.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -58,6 +59,7 @@ let packageNetworkSettings: PackageNetworkSettingsStore | undefined;
 let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
 let promptAttachments: PromptAttachmentStagingService | undefined;
+let workspaceFileState: WorkspaceFileStateStore | undefined;
 const appInstanceId = randomUUID();
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
@@ -118,6 +120,13 @@ if (hasSingleInstanceLock) {
       "prompt-attachments",
       appInstanceId
     ));
+    workspaceFileState = new WorkspaceFileStateStore(app.getPath("userData"), {
+      encryption: {
+        isAvailable: () => safeStorage.isEncryptionAvailable(),
+        encrypt: (value) => safeStorage.encryptString(value),
+        decrypt: (value) => safeStorage.decryptString(value)
+      }
+    });
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
       agentDir: resolveDesktopAgentDirectory(),
@@ -139,7 +148,8 @@ if (hasSingleInstanceLock) {
       packageNetworkSettings,
       teamMcpSettings,
       promptAttachments,
-      workbenchState
+      workbenchState,
+      workspaceFileState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
       getMainWindow: () => mainWindow

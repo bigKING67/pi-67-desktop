@@ -48,9 +48,18 @@ import {
 } from "./operation-schemas.js";
 import {
   ConversationPageSchema,
+  LocatedMessageWindowSchema,
   MessagePageMetadataSchema,
-  SessionMessageSchema
+  SessionMessageSchema,
+  UserMessageIndexPageSchema
 } from "./message-schemas.js";
+import {
+  WorkspaceFileEntryResultSchema,
+  WorkspaceFileOpenResultSchema,
+  WorkspaceFilePageSchema,
+  WorkspaceFileRenameResultSchema,
+  WorkspaceFileSearchResultSchema
+} from "./workspace-file-schemas.js";
 import {
   ModelSummarySchema,
   ProviderSummarySchema,
@@ -241,11 +250,20 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.unregister": WorkspaceUnregisterResultSchema,
   "workspace.setTrust": SessionResourceCatalogResultSchema,
   "workspace.changes": WorkspaceChangesProjectionSchema,
+  "workspace.file.list": WorkspaceFilePageSchema,
+  "workspace.file.search": WorkspaceFileSearchResultSchema,
+  "workspace.file.resolve": WorkspaceFileEntryResultSchema,
+  "workspace.file.open": WorkspaceFileOpenResultSchema,
+  "workspace.file.save": WorkspaceFileEntryResultSchema,
+  "workspace.file.create": WorkspaceFileEntryResultSchema,
+  "workspace.file.rename": WorkspaceFileRenameResultSchema,
   "task.close": strictObject({ closed: Type.Literal(true), stopped: Type.Boolean() }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogPageSchema,
   "session.tree": SessionTreeProjectionSchema,
   "message.page": ConversationPageSchema,
+  "message.index": UserMessageIndexPageSchema,
+  "message.locate": LocatedMessageWindowSchema,
   "session.create": ProjectionMutationAcknowledgementSchema,
   "session.open": ProjectionMutationAcknowledgementSchema,
   "session.import": operationSubmissionResultSchema(Type.Literal("session-import")),

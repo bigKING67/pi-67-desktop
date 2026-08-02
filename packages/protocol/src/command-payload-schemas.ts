@@ -20,6 +20,16 @@ import {
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
+import {
+  WorkspaceFileCreatePayloadSchema,
+  WorkspaceFileListPayloadSchema,
+  WorkspaceFileOpenPayloadSchema,
+  WorkspaceFileRenamePayloadSchema,
+  WorkspaceFileResolvePayloadSchema,
+  WorkspaceFileSavePayloadSchema,
+  WorkspaceFileSearchPayloadSchema
+} from "./workspace-file-schemas.js";
+import { MAX_USER_MESSAGE_INDEX_PAGE_ITEMS } from "@pi67/domain";
 
 const EmptyPayloadSchema = strictObject({});
 const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
@@ -54,6 +64,13 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.unregister": EmptyPayloadSchema,
   "workspace.setTrust": strictObject({ trust: TrustSchema, approvalMode: ApprovalModeSchema }),
   "workspace.changes": EmptyPayloadSchema,
+  "workspace.file.list": WorkspaceFileListPayloadSchema,
+  "workspace.file.search": WorkspaceFileSearchPayloadSchema,
+  "workspace.file.resolve": WorkspaceFileResolvePayloadSchema,
+  "workspace.file.open": WorkspaceFileOpenPayloadSchema,
+  "workspace.file.save": WorkspaceFileSavePayloadSchema,
+  "workspace.file.create": WorkspaceFileCreatePayloadSchema,
+  "workspace.file.rename": WorkspaceFileRenamePayloadSchema,
   "task.close": strictObject({ mode: Type.Union([Type.Literal("stop"), Type.Literal("dispose")]) }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogQuerySchema,
@@ -63,6 +80,11 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 }))
   }),
+  "message.index": strictObject({
+    offset: Type.Optional(Type.Integer({ minimum: 0 })),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_USER_MESSAGE_INDEX_PAGE_ITEMS }))
+  }),
+  "message.locate": strictObject({ id: Type.String({ minLength: 1, maxLength: 512 }) }),
   "session.create": EmptyPayloadSchema,
   "session.open": strictObject({ path: PathSchema, cwdOverride: Type.Optional(PathSchema) }),
   "session.import": strictObject({ submissionId: SubmissionIdSchema, path: PathSchema }),

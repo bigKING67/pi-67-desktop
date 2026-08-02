@@ -27,6 +27,7 @@ const DoctorDialog = lazy(() => import("../doctor/DoctorDialog.js").then((module
 const ExtensionDialog = lazy(() => import("../extension-ui/ExtensionDialog.js").then((module) => ({ default: module.ExtensionDialog })));
 const CredentialDialog = lazy(() => import("../settings/CredentialDialog.js").then((module) => ({ default: module.CredentialDialog })));
 const UpdateDialog = lazy(() => import("../updates/UpdateDialog.js").then((module) => ({ default: module.UpdateDialog })));
+const SessionTreeDialog = lazy(() => import("../session-tree/SessionTreeDialog.js").then((module) => ({ default: module.SessionTreeDialog })));
 
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
@@ -42,6 +43,7 @@ export function App() {
   const credentialDialogOpen = useShellStore((state) => state.credentialDialogOpen);
   const updateDialogOpen = useShellStore((state) => state.updateDialogOpen);
   const commandPaletteOpen = useShellStore((state) => state.commandPaletteOpen);
+  const sessionTreeDialogOpen = useShellStore((state) => state.sessionTreeDialogOpen);
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
@@ -258,6 +260,17 @@ export function App() {
           title="更新界面未能加载"
         >
           <Suspense fallback={<OverlayLoading label="正在加载更新界面" />}><UpdateDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
+      {sessionTreeDialogOpen ? (
+        <LazySurfaceBoundary
+          description="关闭后可通过 /tree 或命令面板重新打开。"
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setSessionTreeDialogOpen(false)}
+          surface="session-tree-dialog"
+          title="会话分支界面未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载会话分支" />}><SessionTreeDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
       {commandPaletteOpen ? (

@@ -16,12 +16,13 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
-  const contextToggle = page.getByRole("button", { name: "显示上下文" });
+  const inspector = page.getByRole("complementary", { name: "任务检查器" });
+  await expect(inspector).toHaveCount(0);
+  const contextToggle = page.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
-  await expect(page.getByLabel("会话上下文")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "会话", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "关闭上下文抽屉" })).toBeVisible();
+  await expect(inspector).toBeVisible();
+  await expect(page.getByRole("tab", { name: "消息", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "关闭任务检查器抽屉" })).toBeVisible();
   const sendButton = page.getByRole("button", { name: "发送" });
   await expect(sendButton).toBeVisible();
   await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
@@ -51,8 +52,8 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect.poll(() => isControlTopmost(stopButton)).toBe(true);
   const columns = await page.locator(".workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns);
   expect(columns.split(" ").length).toBeLessThanOrEqual(2);
-  await page.getByRole("button", { name: "关闭上下文抽屉" }).click();
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
+  await page.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
+  await expect(inspector).toHaveCount(0);
   await expect(contextToggle).toBeFocused();
 });
 
@@ -90,9 +91,10 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
 
+  const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await page.keyboard.press("Control+Shift+b");
-  await expect(page.getByLabel("会话上下文")).toBeVisible();
+  await expect(inspector).toBeVisible();
   await page.keyboard.press("Control+Shift+b");
-  await expect(page.getByLabel("会话上下文")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "显示上下文" })).toBeFocused();
+  await expect(inspector).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "显示任务检查器" })).toBeFocused();
 });
