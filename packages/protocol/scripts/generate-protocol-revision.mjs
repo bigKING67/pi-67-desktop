@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseProtocolRevisionSource } from "./protocol-revision-source.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.mjs");
@@ -15,14 +16,11 @@ const revision = createHash("sha256")
   .update(protocol.canonicalProtocolRevisionMaterial(), "utf8")
   .digest("hex");
 const previous = await readFile(revisionFile, "utf8");
-const revisionMatch = /^export const PROTOCOL_REVISION = "([0-9a-f]{64})" as const;\n$/u.exec(previous);
-if (!revisionMatch) {
-  throw new Error("Refusing to replace an unexpected protocol-revision.ts shape.");
-}
+const previousRevision = parseProtocolRevisionSource(previous);
 if (process.argv.includes("--check")) {
-  if (revisionMatch[1] !== revision) {
+  if (previousRevision !== revision) {
     throw new Error(
-      `Protocol revision is stale: expected ${revision}, received ${revisionMatch[1]}. `
+      `Protocol revision is stale: expected ${revision}, received ${previousRevision}. `
       + "Run `corepack pnpm --filter @pi67/protocol run generate:revision` and commit the schema and revision together."
     );
   }
