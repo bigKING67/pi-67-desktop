@@ -8,9 +8,58 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  quality-and-native-smoke:
-    name: ${{ matrix.name }}
+  quality-and-renderer:
+    name: Fast checks / ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-2025
+            expectedArch: x64
+          - name: macOS arm64
+            os: macos-15
+            expectedArch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify runner architecture
+        shell: bash
+        run: node -e "if (process.arch !== '${{ matrix.expectedArch }}') throw new Error('Expected ${{ matrix.expectedArch }}, got ' + process.arch)"
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Quality gates
+        run: corepack pnpm run check
+      - name: Install Playwright Chromium
+        run: corepack pnpm exec playwright install --no-shell chromium
+      - name: Renderer browser E2E
+        run: corepack pnpm exec playwright test --project=renderer-chromium --workers=2
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: fast-check-failure-evidence-${{ matrix.expectedArch }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  native-smoke:
+    name: Native smoke / ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
@@ -38,17 +87,13 @@ jobs:
         run: node -e "if (process.arch !== '${{ matrix.expectedArch }}') throw new Error('Expected ${{ matrix.expectedArch }}, got ' + process.arch)"
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
-      - name: Quality gates
-        run: corepack pnpm run check
-      - name: Install Playwright Chromium
-        run: corepack pnpm exec playwright install --no-shell chromium
       - name: Build apps and prepare runtime resources
         run: |
           corepack pnpm run build
           corepack pnpm run prepare:toolchain
           corepack pnpm run prepare:capabilities
-      - name: Renderer and Electron smoke
-        run: corepack pnpm exec playwright test
+      - name: Native Electron E2E
+        run: corepack pnpm exec playwright test --project=electron --workers=1
       - name: Build unsigned native smoke package
         run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs
       - name: Smoke packaged Electron runtime
@@ -76,7 +121,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: failure-evidence-${{ matrix.expectedArch }}
+          name: native-smoke-failure-evidence-${{ matrix.expectedArch }}
           path: |
             playwright-report/
             test-results/

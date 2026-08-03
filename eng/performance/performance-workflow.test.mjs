@@ -26,22 +26,46 @@ describe("release performance workflow gates", () => {
     );
   });
 
-  it("keeps CI fast while preparing clean-checkout E2E resources and reusing one build", async () => {
+  it("runs platform checks and renderer E2E in parallel with native smoke", async () => {
     const source = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+    const fastStart = source.indexOf("  quality-and-renderer:");
+    const nativeStart = source.indexOf("  native-smoke:");
+    const fastSource = source.slice(fastStart, nativeStart);
+    const nativeSource = source.slice(nativeStart);
 
     expect(source).not.toContain("performance:measure");
     expect(source).not.toContain("PI67_PERF_SAMPLES");
-    expect(source).toContain("corepack pnpm run build");
-    expect(source).toContain("corepack pnpm run prepare:toolchain");
-    expect(source).toContain("corepack pnpm run prepare:capabilities");
-    expect(source).toContain("run: corepack pnpm exec playwright test");
-    expect(source).toContain("run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs");
-    expect(source.indexOf("corepack pnpm run build"))
-      .toBeLessThan(source.indexOf("corepack pnpm run prepare:toolchain"));
-    expect(source.indexOf("corepack pnpm run prepare:toolchain"))
-      .toBeLessThan(source.indexOf("corepack pnpm run prepare:capabilities"));
-    expect(source.indexOf("corepack pnpm run prepare:capabilities"))
-      .toBeLessThan(source.indexOf("corepack pnpm exec playwright test"));
+    expect(source).toContain("group: ci-${{ github.workflow }}-${{ github.ref }}");
+    expect(source).toContain("cancel-in-progress: true");
+    expect(fastStart).toBeGreaterThan(-1);
+    expect(nativeStart).toBeGreaterThan(fastStart);
+    expect(fastSource).toContain("    strategy:\n      fail-fast: false\n      matrix:\n");
+    expect(fastSource).toContain("os: windows-2025");
+    expect(fastSource).toContain("os: macos-15");
+    expect(fastSource).toContain("run: corepack pnpm run check");
+    expect(fastSource).toContain(
+      "run: corepack pnpm exec playwright test --project=renderer-chromium --workers=2"
+    );
+    expect(nativeSource).toContain("os: windows-2025");
+    expect(nativeSource).toContain("os: macos-15");
+    expect(nativeSource).toContain("    strategy:\n      fail-fast: false\n      matrix:\n");
+    expect(nativeSource).not.toContain("run: corepack pnpm run check");
+    expect(nativeSource).toContain("corepack pnpm run build");
+    expect(nativeSource).toContain("corepack pnpm run prepare:toolchain");
+    expect(nativeSource).toContain("corepack pnpm run prepare:capabilities");
+    expect(nativeSource).toContain(
+      "run: corepack pnpm exec playwright test --project=electron --workers=1"
+    );
+    expect(nativeSource).toContain("run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs");
+    expect(nativeSource).toContain("run: corepack pnpm run package:smoke");
+    expect(nativeSource).toContain("run: corepack pnpm run package:smoke:windows-ui");
+    expect(nativeSource).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(nativeSource.indexOf("corepack pnpm run build"))
+      .toBeLessThan(nativeSource.indexOf("corepack pnpm run prepare:toolchain"));
+    expect(nativeSource.indexOf("corepack pnpm run prepare:toolchain"))
+      .toBeLessThan(nativeSource.indexOf("corepack pnpm run prepare:capabilities"));
+    expect(nativeSource.indexOf("corepack pnpm run prepare:capabilities"))
+      .toBeLessThan(nativeSource.indexOf("corepack pnpm exec playwright test --project=electron"));
   });
 
   it("keeps unsigned previews fast without dropping packaged release gates", async () => {
