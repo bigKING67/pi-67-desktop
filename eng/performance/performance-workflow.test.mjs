@@ -26,14 +26,22 @@ describe("release performance workflow gates", () => {
     );
   });
 
-  it("keeps CI fast while reusing one build for E2E and native packaging", async () => {
+  it("keeps CI fast while preparing clean-checkout E2E resources and reusing one build", async () => {
     const source = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
 
     expect(source).not.toContain("performance:measure");
     expect(source).not.toContain("PI67_PERF_SAMPLES");
-    expect(source).toContain("run: corepack pnpm run build");
+    expect(source).toContain("corepack pnpm run build");
+    expect(source).toContain("corepack pnpm run prepare:toolchain");
+    expect(source).toContain("corepack pnpm run prepare:capabilities");
     expect(source).toContain("run: corepack pnpm exec playwright test");
     expect(source).toContain("run: node eng/packaging/package-native-unsigned.mjs");
+    expect(source.indexOf("corepack pnpm run build"))
+      .toBeLessThan(source.indexOf("corepack pnpm run prepare:toolchain"));
+    expect(source.indexOf("corepack pnpm run prepare:toolchain"))
+      .toBeLessThan(source.indexOf("corepack pnpm run prepare:capabilities"));
+    expect(source.indexOf("corepack pnpm run prepare:capabilities"))
+      .toBeLessThan(source.indexOf("corepack pnpm exec playwright test"));
   });
 
   it("keeps unsigned previews fast without dropping packaged release gates", async () => {

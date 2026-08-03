@@ -42,8 +42,11 @@ jobs:
         run: corepack pnpm run check
       - name: Install Playwright Chromium
         run: corepack pnpm exec playwright install --no-shell chromium
-      - name: Build apps for smoke and packaging
-        run: corepack pnpm run build
+      - name: Build apps and prepare runtime resources
+        run: |
+          corepack pnpm run build
+          corepack pnpm run prepare:toolchain
+          corepack pnpm run prepare:capabilities
       - name: Renderer and Electron smoke
         run: corepack pnpm exec playwright test
       - name: Build unsigned native smoke package
