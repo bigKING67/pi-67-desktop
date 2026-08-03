@@ -154,10 +154,19 @@ async function verifyScaleScenario(artifact, scaleFactor) {
 }
 
 export async function verifyPackagedResponsiveLayout(window, application, scaleFactor) {
+  await prepareResponsiveLayoutControls(window);
   return {
     contextViewport: await verifyContextDrawerLayout(window, application, scaleFactor),
     navigationViewport: await verifyNavigationDrawerLayout(window, application, scaleFactor)
   };
+}
+
+export async function prepareResponsiveLayoutControls(window) {
+  await window.getByLabel("给 Pi 发送消息").fill("Windows packaged responsive layout probe");
+  await Promise.all([
+    window.getByRole("button", { name: "发送", exact: true }).waitFor({ state: "visible" }),
+    window.getByRole("button", { name: "停止", exact: true }).waitFor({ state: "visible" })
+  ]);
 }
 
 export function locateTaskInspector(window) {
@@ -391,9 +400,9 @@ export function assertLayoutObservation(observation, contract) {
     throw new Error(`${prefix}: Composer or TitleBar geometry is unavailable.`);
   }
   for (const [name, control] of [["Send", observation.send], ["Stop", observation.stop]]) {
-    if (!control?.contained || !control.topmost) {
-      throw new Error(`${prefix}: ${name} is clipped or covered.`);
-    }
+    if (!control) throw new Error(`${prefix}: ${name} is unavailable.`);
+    if (!control.contained) throw new Error(`${prefix}: ${name} is clipped.`);
+    if (!control.topmost) throw new Error(`${prefix}: ${name} is covered.`);
   }
   if (observation.titleBarNativeControlReserve < 136) {
     throw new Error(
