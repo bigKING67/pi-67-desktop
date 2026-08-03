@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import {
   access,
   chmod,
+  copyFile,
   mkdir,
   readFile,
   readdir,
@@ -21,6 +22,7 @@ const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/packaging/toolchain.lock.json");
 const cacheRoot = resolve(repositoryRoot, "artifacts/toolchain/cache");
 const stagingRoot = resolve(repositoryRoot, "artifacts/toolchain/current");
+const WINDOWS_GIT_HTTP_HELPERS = ["git-remote-http.exe", "git-remote-https.exe"];
 
 export async function prepareDesktopToolchain(platform = process.platform, architecture = process.arch) {
   const target = `${platform}-${architecture}`;
@@ -48,6 +50,7 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
     await extractNode(nodeArchive, join(extractionRoot, "node"), join(stagingRoot, "node"));
     await extractSingleDirectory(npmArchive, join(extractionRoot, "npm"), join(stagingRoot, "npm"));
     await extractArchive(gitArchive, join(stagingRoot, "git"));
+    if (platform === "win32") await materializeWindowsGitHttpHelpers(join(stagingRoot, "git"));
   } finally {
     await rm(extractionRoot, { recursive: true, force: true });
   }
@@ -96,6 +99,22 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
   await writeFile(join(stagingRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   console.log(`Prepared Pi-67 Desktop toolchain ${target}: Node ${versions.node}, npm ${versions.npm}, Git ${versions.git}.`);
   return manifest;
+}
+
+export async function materializeWindowsGitHttpHelpers(gitRoot) {
+  const binaryRoot = join(gitRoot, "mingw64", "bin");
+  const execRoot = join(gitRoot, "mingw64", "libexec", "git-core");
+  await mkdir(execRoot, { recursive: true });
+  await Promise.all(WINDOWS_GIT_HTTP_HELPERS.map(async (helper) => {
+    const destination = join(execRoot, helper);
+    try {
+      await access(destination);
+      return;
+    } catch {
+      // Dugite keeps these verified transport helpers in mingw64/bin.
+    }
+    await copyFile(join(binaryRoot, helper), destination);
+  }));
 }
 
 function requiredArtifact(artifacts, target, label) {

@@ -1,8 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { materializeWindowsGitHttpHelpers } from "./prepare-toolchain.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
+const temporaryDirectories = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
 describe("Desktop private toolchain lock", () => {
   it("pins exactly the supported native targets and public mirror fallbacks", async () => {
@@ -16,5 +23,23 @@ describe("Desktop private toolchain lock", () => {
     expect(lock.node.artifacts["darwin-arm64"].urls[0]).toMatch(/^https:\/\/npmmirror\.com\//u);
     expect(lock.npm.urls[0]).toMatch(/^https:\/\/registry\.npmmirror\.com\//u);
     expect(lock.git.artifacts["darwin-arm64"].urls[0]).toMatch(/^https:\/\/ghproxy\.net\//u);
+  });
+
+  it("materializes Dugite Windows HTTP helpers in the configured Git exec path", async () => {
+    const gitRoot = await mkdtemp(join(tmpdir(), "pi67-windows-git-"));
+    temporaryDirectories.push(gitRoot);
+    const binaryRoot = join(gitRoot, "mingw64", "bin");
+    const execRoot = join(gitRoot, "mingw64", "libexec", "git-core");
+    await Promise.all([mkdir(binaryRoot, { recursive: true }), mkdir(execRoot, { recursive: true })]);
+    await Promise.all([
+      writeFile(join(binaryRoot, "git-remote-http.exe"), "http-from-bin"),
+      writeFile(join(binaryRoot, "git-remote-https.exe"), "https-from-bin"),
+      writeFile(join(execRoot, "git-remote-http.exe"), "existing-http")
+    ]);
+
+    await materializeWindowsGitHttpHelpers(gitRoot);
+
+    await expect(readFile(join(execRoot, "git-remote-http.exe"), "utf8")).resolves.toBe("existing-http");
+    await expect(readFile(join(execRoot, "git-remote-https.exe"), "utf8")).resolves.toBe("https-from-bin");
   });
 });
