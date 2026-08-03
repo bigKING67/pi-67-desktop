@@ -60,9 +60,7 @@ export async function launchInstalledApplication({
       await window.getByRole("button", { name: "选择工作区" }).click();
       await waitForRuntimeReady(window, legacyUserInterface);
     } else if (startupSurface === "workspace-restored") {
-      if (!(await window.getByLabel("Pi conversation").isVisible())) {
-        await window.keyboard.press("Control+N");
-      }
+      await activateRestoredWorkspace(window);
       await waitForRuntimeReady(window, legacyUserInterface);
     }
 
@@ -139,6 +137,24 @@ export async function waitForInstalledStartupSurface(window, legacyUserInterface
     .waitFor({ state: "visible", timeout: 30_000 });
   if (await workspacePicker.isVisible()) return "workspace-picker";
   return await runtimeReady.isVisible() ? "runtime-ready" : "workspace-restored";
+}
+
+export async function activateRestoredWorkspace(window) {
+  if (await window.getByLabel("Pi conversation").isVisible()) return "conversation";
+
+  for (const [name, result] of [
+    ["恢复任务", "task-restored"],
+    ["打开会话", "session-opened"],
+    ["新建会话", "session-created"]
+  ]) {
+    const action = window.getByRole("button", { name, exact: true });
+    if (await action.isVisible()) {
+      await action.click();
+      return result;
+    }
+  }
+
+  throw new Error("Installed Workspace restore surface no longer exposed an activation action.");
 }
 
 async function waitForRuntimeReady(window, legacyUserInterface) {

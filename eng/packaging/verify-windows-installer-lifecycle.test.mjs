@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  activateRestoredWorkspace,
   selectLightThemePreference,
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
@@ -149,6 +150,36 @@ describe("Windows installer lifecycle contract", () => {
 
     await expect(waitForInstalledStartupSurface(window, false)).resolves.toBe(expected);
     expect(actions).toEqual(["combined:visible"]);
+  });
+
+  it.each([
+    { visibleAction: "恢复任务", expected: "task-restored" },
+    { visibleAction: "打开会话", expected: "session-opened" },
+    { visibleAction: "新建会话", expected: "session-created" }
+  ])("activates a restored Workspace through $visibleAction", async ({ visibleAction, expected }) => {
+    const actions = [];
+    const window = {
+      getByLabel: () => ({ isVisible: async () => false }),
+      getByRole: (_role, options) => ({
+        click: async () => actions.push(`click:${options.name}`),
+        isVisible: async () => options.name === visibleAction
+      })
+    };
+
+    await expect(activateRestoredWorkspace(window)).resolves.toBe(expected);
+    expect(actions).toEqual([`click:${visibleAction}`]);
+  });
+
+  it("keeps an already active restored conversation without creating another Session", async () => {
+    const getByRole = () => {
+      throw new Error("No activation action should be queried for an active conversation.");
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => true }),
+      getByRole
+    };
+
+    await expect(activateRestoredWorkspace(window)).resolves.toBe("conversation");
   });
 
   it("waits for a path to become present or absent", async () => {
