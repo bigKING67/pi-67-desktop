@@ -364,7 +364,7 @@ async function measureStreamingRate(page) {
       return;
     }
     void (async () => {
-      control.beginStreaming();
+      await control.beginStreaming();
       await new Promise((afterSnapshot) => requestAnimationFrame(() => requestAnimationFrame(afterSnapshot)));
       let updates = 0;
       let visibleText = "";
@@ -381,7 +381,7 @@ async function measureStreamingRate(page) {
       for (let index = 0; index < 20; index += 1) {
         const delay = Math.max(0, started + ((index + 1) * 50) - performance.now());
         await new Promise((continueBatch) => setTimeout(continueBatch, delay));
-        control.emitStreamBatch(`token-${index} `);
+        await control.emitStreamBatch(`token-${index} `);
       }
       await new Promise((afterPaint) => requestAnimationFrame(() => requestAnimationFrame(afterPaint)));
       observer.disconnect();

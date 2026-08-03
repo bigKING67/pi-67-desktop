@@ -212,13 +212,34 @@ async function hostCommand<T extends AgentCommandType>(
 ): Promise<{ response: ResponseEnvelope<T> }> {
   const request = commandEnvelopeForContext(type, payload, context, 7, idempotencyKey);
   port.emit(request);
+  const phase = "awaiting-correlated-response";
   let response: ResponseEnvelope<T> | undefined;
-  await vi.waitFor(() => {
-    response = port.sent.find((candidate) => (
-      isResponseEnvelope(candidate) && candidate.requestId === request.requestId
-    )) as ResponseEnvelope<T> | undefined;
-    expect(response).toBeDefined();
-  });
+  try {
+    await vi.waitFor(() => {
+      response = port.sent.find((candidate) => (
+        isResponseEnvelope(candidate) && candidate.requestId === request.requestId
+      )) as ResponseEnvelope<T> | undefined;
+      expect(response).toBeDefined();
+    }, { timeout: 5_000, interval: 20 });
+  } catch (error) {
+    const recent = port.sent.slice(-8).map(safeProtocolMessageSummary);
+    throw new Error(
+      `Timed out waiting for Host response: command=${type} requestId=${request.requestId} phase=${phase} recent=${JSON.stringify(recent)}`,
+      { cause: error }
+    );
+  }
   if (!response) throw new Error("Expected a correlated Host response.");
   return { response };
+}
+
+function safeProtocolMessageSummary(value: unknown): Record<string, string | number | boolean> {
+  if (typeof value !== "object" || value === null) return { kind: typeof value };
+  const candidate = value as Record<string, unknown>;
+  return {
+    ...(typeof candidate.kind === "string" ? { kind: candidate.kind } : {}),
+    ...(typeof candidate.type === "string" ? { type: candidate.type } : {}),
+    ...(typeof candidate.requestId === "string" ? { requestId: candidate.requestId } : {}),
+    ...(typeof candidate.hostEpoch === "number" ? { hostEpoch: candidate.hostEpoch } : {}),
+    ...(typeof candidate.ok === "boolean" ? { ok: candidate.ok } : {})
+  };
 }

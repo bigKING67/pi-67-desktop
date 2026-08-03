@@ -6,7 +6,7 @@ import {
 import type { RendererWorkbenchTask } from "./workbench-store.js";
 
 describe("WorkbenchProjectionBridge", () => {
-  it("preserves task-local draft metadata while runtime projections update", () => {
+  it("preserves event-owned lifecycle and runtime while metadata projections update", () => {
     const existing: RendererWorkbenchTask = {
       id: "task-a",
       conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
@@ -29,6 +29,15 @@ describe("WorkbenchProjectionBridge", () => {
       workspaceId: "workspace-a",
       sessionId: "session-a",
       sessionGeneration: 2,
+      operation: {
+        operationId: "operation-a",
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-a",
+        sessionGeneration: 2,
+        startedAt: 1
+      },
       runtime: { phase: "busy", detail: "running", recoverable: true },
       sessionName: "Task A",
       sessionPath: "/work/a/session-a.jsonl"
@@ -38,7 +47,32 @@ describe("WorkbenchProjectionBridge", () => {
       hasDraft: true,
       attachmentCount: 2,
       recentUserMessagePreview: "最后一次用户消息",
-      runtime: { phase: "busy" }
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready" }
+    });
+  });
+
+  it("uses the App projection only to initialize a new Task", () => {
+    expect(workbenchTaskFromProjection({
+      workspaceId: "workspace-a",
+      sessionId: "session-a",
+      sessionGeneration: 2,
+      operation: {
+        operationId: "operation-a",
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-a",
+        sessionGeneration: 2,
+        startedAt: 1
+      },
+      runtime: { phase: "busy", detail: "running", recoverable: true },
+      sessionName: "Task A",
+      sessionPath: "/work/a/session-a.jsonl"
+    })).toMatchObject({
+      lifecycle: "running",
+      runtime: { phase: "busy", detail: "running" },
+      toolMode: "auto"
     });
   });
 

@@ -5,7 +5,8 @@ import {
   emitMockAgentEvent,
   installMockDesktopBridge,
   recordedCommandDetails,
-  recordedCommands
+  recordedCommands,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -240,6 +241,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   const operationId = "operation-status-test";
 

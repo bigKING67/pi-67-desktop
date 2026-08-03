@@ -3,7 +3,8 @@ import {
   attachMockAgent,
   emitMockAgentEvent,
   installMockDesktopBridge,
-  recordedCommands
+  recordedCommands,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -80,6 +81,7 @@ test("fails closed when the lazy approval surface cannot load", async ({ page })
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   const operationId = "operation-lazy-approval";
 
   await emitMockAgentEvent(page, {

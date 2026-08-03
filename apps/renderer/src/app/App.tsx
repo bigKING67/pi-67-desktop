@@ -10,12 +10,12 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { NotificationToasts } from "../notifications/NotificationToasts.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { createOperationFreshnessInstallation } from "../operation/operation-freshness-installation.js";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import { WorkbenchProjectionBridge } from "../workbench/WorkbenchProjectionBridge.js";
-import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
+import { installGlobalShortcuts, toggleRendererNavigation } from "./global-shortcuts.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
@@ -67,12 +67,7 @@ export function App() {
     if (restoreFocus) restoreNavigationTriggerFocus();
   }, [restoreNavigationTriggerFocus, setNavigationVisible]);
 
-  const toggleNavigation = useCallback(() => {
-    const nextVisible = !navigationVisible;
-    setNavigationVisible(nextVisible);
-    if (nextVisible) setContextVisible(false);
-    else restoreNavigationTriggerFocus();
-  }, [navigationVisible, restoreNavigationTriggerFocus, setContextVisible, setNavigationVisible]);
+  const toggleNavigation = useCallback(toggleRendererNavigation, []);
 
   useEffect(() => {
     const unsubscribe = agentConnectionController.subscribe({
@@ -116,38 +111,7 @@ export function App() {
     document.title = extensionTitle ? `${extensionTitle} - ${DEFAULT_APPLICATION_TITLE}` : DEFAULT_APPLICATION_TITLE;
   }, [extensionTitle]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === ",") {
-        event.preventDefault();
-        rendererWorkbenchStore.getState().openSettings();
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        useShellStore.getState().setCommandPaletteOpen(true);
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && ["n", "t"].includes(event.key.toLowerCase())) {
-        if (!workspace) return;
-        event.preventDefault();
-        void createRendererSession();
-        return;
-      }
-      if (!workspace || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "b") return;
-      event.preventDefault();
-      if (event.shiftKey) {
-        const state = useShellStore.getState();
-        const nextVisible = !state.contextVisible;
-        state.setContextVisible(nextVisible);
-        if (!nextVisible) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".context-toggle")?.focus());
-        return;
-      }
-      toggleNavigation();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [toggleNavigation, workspace]);
+  useEffect(() => installGlobalShortcuts(), []);
 
   useEffect(() => {
     const breakpoint = window.matchMedia("(max-width: 760px)");

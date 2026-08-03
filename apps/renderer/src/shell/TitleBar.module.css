@@ -139,6 +139,7 @@
 }
 
 .iconButton[aria-expanded="true"] .tooltip,
+.iconButton:active .tooltip,
 .iconButton[data-pressed] .tooltip {
   opacity: 0;
   transform: translate(-50%, -2px);

@@ -166,6 +166,11 @@ export async function recordedCommandDetails(page: Page): Promise<RecordedComman
   ]);
 }
 
+export async function waitForMockWorkspaceReady(page: Page): Promise<void> {
+  await page.locator('.application-shell[data-agent-connected="true"]').waitFor({ state: "visible" });
+  await page.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible" });
+}
+
 export async function emitMockAgentEvent(
   page: Page,
   event: unknown,

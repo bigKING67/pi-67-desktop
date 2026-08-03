@@ -71,15 +71,18 @@
   color: var(--text-secondary);
 }
 
+.close:hover,
 .close[data-hovered] {
   background: var(--surface-hover);
   color: var(--text-primary);
 }
 
+.close:active,
 .close[data-pressed] {
   background: var(--surface-active);
 }
 
+.close:focus-visible,
 .close[data-focus-visible] {
   box-shadow: var(--shadow-focus);
 }

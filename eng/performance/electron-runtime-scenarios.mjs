@@ -1,11 +1,58 @@
 import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
+import { _electron as electron } from "@playwright/test";
 import {
   isProcessAlive,
   readPositiveProcessId,
   waitForProcessExit
 } from "../packaging/controlled-shutdown-fixture.ts";
 import { locateWorkspaceSessionImportAction } from "./packaged-workspace-menu.mjs";
+
+export async function measurePackagedApplicationLaunch({
+  executablePath,
+  profile,
+  agentDir,
+  expectWelcome,
+  inheritedEnvironment
+}) {
+  const started = performance.now();
+  const application = await electron.launch({
+    executablePath,
+    args: [`--user-data-dir=${profile}`],
+    env: { ...inheritedEnvironment, NODE_ENV: "test", PI_CODING_AGENT_DIR: agentDir }
+  });
+  const electronHandshakeMs = performance.now() - started;
+  try {
+    const window = await application.firstWindow();
+    const firstWindowMs = performance.now() - started;
+    await window.waitForLoadState("domcontentloaded");
+    const domContentLoadedMs = performance.now() - started;
+    const workspaceAction = window.getByRole("button", { name: "选择工作区" });
+    let workspaceActionVisibleMs;
+    if (expectWelcome) {
+      await workspaceAction.waitFor({ state: "visible", timeout: 15_000 });
+      workspaceActionVisibleMs = performance.now() - started;
+      await waitUntilEnabled(workspaceAction, 15_000);
+    } else {
+      await window.getByTestId("workspace-add").waitFor({ state: "visible", timeout: 15_000 });
+    }
+    const durationMs = performance.now() - started;
+    return {
+      application,
+      window,
+      durationMs,
+      phases: {
+        electronHandshakeMs,
+        firstWindowMs,
+        domContentLoadedMs,
+        workspaceActionVisibleMs: workspaceActionVisibleMs ?? durationMs
+      }
+    };
+  } catch (error) {
+    await application.close();
+    throw error;
+  }
+}
 
 export async function initializePackagedRuntime(application, window, workspace) {
   await application.evaluate(({ dialog }, selectedPath) => {
@@ -97,7 +144,6 @@ export async function measureRealPiSessionProjection(application, window, sessio
   await application.evaluate(({ dialog }, selectedPath) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
   }, sessionPath);
-  await window.getByRole("tab", { name: "会话" }).click();
   const action = await locateWorkspaceSessionImportAction(window);
   return withTimeout(action.evaluate((importAction, messageCount) => new Promise((resolve, reject) => {
     const started = performance.now();
@@ -108,26 +154,28 @@ export async function measureRealPiSessionProjection(application, window, sessio
     let previousProjectionKey = "";
     importAction.click();
     const observe = () => {
-      const treeEntryCount = Number(document.querySelector(".session-tree")?.getAttribute("data-entry-count") ?? 0);
-      const renderedTreeNodeCount = document.querySelectorAll(".tree-node").length;
       const transcriptMessageCount = Number(document.querySelector('[data-transcript-region="true"]')?.getAttribute("data-message-count") ?? 0);
       const fixtureMessageVisible = document.querySelector('[data-testid="message-card"] [data-testid="message-content"]')?.textContent
         ?.includes("Pi-67 restore fixture") ?? false;
+      const olderPageAvailable = Boolean(document.querySelector('[data-testid="load-older-messages"]'));
       maxTranscriptMessageCount = Math.max(maxTranscriptMessageCount, transcriptMessageCount);
       fixtureMessageWasVisible ||= fixtureMessageVisible;
-      const projectionKey = `${transcriptMessageCount}:${treeEntryCount}:${renderedTreeNodeCount}:${fixtureMessageVisible}`;
+      const projectionKey = `${transcriptMessageCount}:${fixtureMessageVisible}:${olderPageAvailable}`;
       if (projectionKey !== previousProjectionKey && projectionTimeline.length < 24) {
         projectionTimeline.push({
           elapsedMs: Math.round(performance.now() - started),
           transcriptMessageCount,
-          treeEntryCount,
-          renderedTreeNodeCount,
-          fixtureMessageVisible
+          fixtureMessageVisible,
+          olderPageAvailable
         });
         previousProjectionKey = projectionKey;
       }
-      const treeVirtualized = renderedTreeNodeCount > 0 && renderedTreeNodeCount < treeEntryCount;
-      if (transcriptMessageCount === messageCount && treeVirtualized && fixtureMessageVisible && document.querySelector('[data-testid="composer-shell"]')) {
+      if (
+        transcriptMessageCount === messageCount
+        && fixtureMessageVisible
+        && olderPageAvailable
+        && document.querySelector('[data-testid="composer-shell"]')
+      ) {
         requestAnimationFrame(() => resolve(performance.now() - started));
         return;
       }
@@ -146,8 +194,8 @@ export async function measureRealPiSessionProjection(application, window, sessio
           bodyText: document.body.innerText.slice(0, 800)
         };
         reject(new Error(
-          `Pi session projection timed out: transcriptMessages=${transcriptMessageCount}, treeEntries=${treeEntryCount}, `
-          + `renderedTreeNodes=${renderedTreeNodeCount}, fixtureMessageVisible=${fixtureMessageVisible}, `
+          `Pi session projection timed out: transcriptMessages=${transcriptMessageCount}, `
+          + `fixtureMessageVisible=${fixtureMessageVisible}, olderPageAvailable=${olderPageAvailable}, `
           + `diagnostic=${JSON.stringify(diagnostic)}.`
         ));
         return;
@@ -165,6 +213,15 @@ export async function waitForRuntimeReady(window, timeoutMs) {
     const state = await window.locator('[aria-label^="当前状态："], [role="alert"], [role="status"]').allTextContents();
     throw new Error(`Pi SDK did not recover: ${state.join(" | ").slice(0, 1_000)}`, { cause: error });
   }
+}
+
+async function waitUntilEnabled(locator, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await locator.isEnabled()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("Timed out waiting for the workspace action to become enabled.");
 }
 
 async function withTimeout(operation, timeoutMs, label) {

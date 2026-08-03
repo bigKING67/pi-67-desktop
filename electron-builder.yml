@@ -14,6 +14,13 @@ files:
   - packages/protocol/dist/**
   - packages/domain/dist/**
   - node_modules/**
+  # Runtime packages do not consume source maps or TypeScript declarations.
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/*.d.ts"
+  - "!node_modules/**/*.d.mts"
+  - "!node_modules/**/*.d.cts"
+  # These three workspace packages are loaded from the explicit app dist paths above.
+  - "!node_modules/@pi67/{agent-host,desktop,renderer}/**"
   - package.json
 asarUnpack:
   - node_modules/@silvia-odwyer/photon-node/**

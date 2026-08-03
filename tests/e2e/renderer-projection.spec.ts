@@ -9,6 +9,7 @@ import {
   replaceMockSessionProjection,
   setMockConversationMessages,
   setMockWorkspaceChanges,
+  waitForMockWorkspaceReady,
   type FixtureMessage
 } from "./pi67-renderer-fixture.js";
 
@@ -86,6 +87,7 @@ test("throttles assistant stream announcements and clears them when the turn set
   await page.goto("/");
   await attachMockAgent(page, [message("settled-message", "Settled response")]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   const operationId = "operation-streaming-announcer";
   const announcer = page.locator('[data-streaming-announcer="true"]');
@@ -176,6 +178,7 @@ test("starts a bootstrapped session at the recent end without loading an older p
   await page.goto("/");
   await attachMockAgent(page, [message("old-entry", "Previous session")]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
 
   const messages = Array.from({ length: 1_000 }, (_, index) => message(`entry-${index}`, `Message ${index}`));
@@ -192,6 +195,7 @@ test("applies narrow conversation, queue, metadata, tree and usage projections",
   await page.goto("/");
   await attachMockAgent(page, [message("entry-0", "Before")]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
 
   await setMockConversationMessages(page, [
@@ -394,6 +398,7 @@ test("returns extension input only with its authoritative session and operation 
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   const operationId = "operation-extension-context";
 

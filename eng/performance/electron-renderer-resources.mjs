@@ -4,8 +4,8 @@ import { join, relative } from "node:path";
 const MAX_CAPTURED_RESOURCES = 512;
 const MAX_REPORTED_RESOURCES = 128;
 const STAGES = ["runtimeInitialization", "sessionRestore"];
-const DEFERRED_OVERLAY_ASSET = /\/assets\/(?:ApprovalDialog|CommandPalette|CredentialDialog|DoctorDialog|ExtensionDialog|Modal-|UpdateDialog)/u;
-const DEFERRED_WORKSPACE_ASSET = /\/assets\/(?:WorkspaceShell|code-highlighter|MapleMono|markdown-)/u;
+const DEFERRED_OVERLAY_ASSET = /\/assets\/(?:ApprovalDialog|CommandPalette|CredentialDialog|DoctorDialog|ExtensionDialog|UpdateDialog)/u;
+const DEFERRED_WORKSPACE_ASSET = /\/assets\/(?:WorkspaceShell|Modal-|code-highlighter|MapleMono|markdown-)/u;
 
 export async function createRendererResourceCollector(page, assetRoot) {
   const welcome = await attachAssetFileBytes(await captureWelcomeDocumentAssets(page), assetRoot);

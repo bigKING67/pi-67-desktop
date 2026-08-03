@@ -44,6 +44,7 @@
 }
 
 .trigger:hover .tooltip,
+.trigger:focus-visible .tooltip,
 .trigger[data-focus-visible] .tooltip {
   opacity: 1;
   transform: translate(-50%, 0);

@@ -1,6 +1,26 @@
-import { PROTOCOL_REVISION } from "../../packages/protocol/dist/index.mjs";
+import {
+  eventEnvelope,
+  isEventEnvelope,
+  isResponseEnvelope,
+  PROTOCOL_REVISION,
+  responseEnvelope
+} from "../../packages/protocol/dist/index.mjs";
 
 export async function attachMockAgent(page, messageCount) {
+  await page.exposeFunction("__pi67BuildPerformanceEvent", ({ type, payload, context }) => {
+    const envelope = eventEnvelope(type, payload, context);
+    if (!isEventEnvelope(envelope)) {
+      throw new Error(`Performance fixture event failed protocol validation: type=${type}.`);
+    }
+    return envelope;
+  });
+  await page.exposeFunction("__pi67BuildPerformanceResponse", ({ requestId, hostEpoch, context, response }) => {
+    const envelope = responseEnvelope(requestId, hostEpoch, context, response);
+    if (!isResponseEnvelope(envelope)) {
+      throw new Error(`Performance fixture response failed protocol validation: type=${response.type}.`);
+    }
+    return envelope;
+  });
   await page.evaluate(({ count, protocolRevision }) => {
     let messages = Array.from({ length: count }, (_, index) => ({
       id: `message-${index}`,
@@ -78,21 +98,32 @@ export async function attachMockAgent(page, messageCount) {
     let messageSequence = 0;
     let activeTaskContext;
     const requests = [];
-    const sendEvent = (type, payload, eventOperationId) => {
+    const sendEvent = async (type, payload, eventOperationId) => {
       messageSequence += 1;
       const context = activeTaskContext ?? { scope: "app" };
-      channel.port2.postMessage({
-        protocolVersion: 3,
-        kind: "event",
-        hostEpoch,
-        sequence: messageSequence,
-        context: eventOperationId === undefined || context.scope !== "task"
-          ? context
-          : { ...context, operationId: eventOperationId },
-        ...(context.scope === "task" ? { taskSequence: messageSequence } : {}),
+      const eventContext = eventOperationId === undefined || context.scope !== "task"
+        ? context
+        : { ...context, operationId: eventOperationId };
+      const envelope = await globalThis.__pi67BuildPerformanceEvent({
         type,
-        payload
+        payload,
+        context: {
+          hostEpoch,
+          sequence: messageSequence,
+          context: eventContext,
+          ...(eventContext.scope === "task" ? { taskSequence: messageSequence } : {})
+        }
       });
+      channel.port2.postMessage(envelope);
+    };
+    const postResponse = async (request, response) => {
+      const envelope = await globalThis.__pi67BuildPerformanceResponse({
+        requestId: request.requestId,
+        hostEpoch,
+        context: request.context,
+        response
+      });
+      channel.port2.postMessage(envelope);
     };
     channel.port2.onmessage = (event) => {
       const envelope = event.data;
@@ -119,53 +150,77 @@ export async function attachMockAgent(page, messageCount) {
         return;
       }
       if (envelope?.kind !== "request" || !envelope.requestId) return;
-      const type = envelope.type;
-      requests.push(type);
-      let result = type === "workspace.register"
-        ? { registered: true }
-        : type === "session.tree"
-        ? snapshot.tree
-        : type === "session.catalog.query"
-          ? { ...sessionCatalogStatus, items: [], total: 0, hasMore: false }
-        : type === "command.list"
-          ? []
-          : type === "workspace.changes"
-            ? changes
-          : type === "message.page"
-            ? messagePage(envelope.payload ?? {})
-            : type === "projection.resync"
-              ? { snapshot, changes, sessionCatalogStatus, eventSequence: messageSequence, hostEpoch, sessionGeneration: 1 }
-              : snapshot;
-      if (type === "runtime.initialize" || type === "workspace.open") {
-        activeTaskContext = envelope.context?.scope === "task"
-          ? {
-              ...envelope.context,
-              sessionId: snapshot.sessionId,
-              sessionGeneration: 1
-            }
-          : undefined;
-        sendEvent("runtime.ready", {
-          capabilities: runtimeCapabilities,
-          snapshot
-        });
-        result = projectionMutationAcknowledgement();
-      }
-      channel.port2.postMessage({
-        protocolVersion: 3,
-        kind: "response",
-        requestId: envelope.requestId,
-        hostEpoch,
-        context: envelope.context,
-        type,
-        ok: true,
-        result
+      void handleRequest(envelope).catch((error) => {
+        console.error(error instanceof Error ? error.message : String(error));
       });
     };
     channel.port2.start();
+
+    async function handleRequest(envelope) {
+      const type = envelope.type;
+      requests.push(type);
+      try {
+        let result = type === "workspace.register"
+          ? { registered: true }
+          : type === "session.tree"
+          ? snapshot.tree
+          : type === "session.catalog.query"
+            ? { ...sessionCatalogStatus, items: [], total: 0, hasMore: false }
+          : type === "command.list"
+            ? []
+            : type === "workspace.changes"
+              ? changes
+            : type === "message.page"
+              ? messagePage(envelope.payload ?? {})
+              : type === "projection.resync"
+                ? {
+                    snapshot,
+                    changes,
+                    extensionCatalog: { items: [], total: 0, truncated: false },
+                    sessionCatalogStatus,
+                    eventSequence: messageSequence,
+                    hostEpoch,
+                    sessionGeneration: 1,
+                    taskToolMode: "auto"
+                  }
+                : snapshot;
+        if (type === "runtime.initialize" || type === "workspace.open") {
+          activeTaskContext = envelope.context?.scope === "task"
+            ? {
+                ...envelope.context,
+                sessionId: snapshot.sessionId,
+                sessionGeneration: 1
+              }
+            : undefined;
+          await sendEvent("runtime.ready", {
+            capabilities: runtimeCapabilities,
+            snapshot,
+            taskToolMode: "auto"
+          });
+          result = projectionMutationAcknowledgement();
+        }
+        await postResponse(envelope, {
+          ok: true,
+          type,
+          result
+        });
+      } catch (error) {
+        await postResponse(envelope, {
+          ok: false,
+          type,
+          error: {
+            code: "PROTOCOL_MISMATCH",
+            message: error instanceof Error ? error.message : "Performance fixture protocol validation failed.",
+            recoverable: false
+          }
+        });
+      }
+    }
+
     globalThis.__pi67Performance = {
-      beginStreaming() {
+      async beginStreaming() {
         snapshot.streaming = true;
-        sendEvent("operation.started", {
+        await sendEvent("operation.started", {
           operation: {
             operationId,
             kind: "prompt",
@@ -176,18 +231,18 @@ export async function attachMockAgent(page, messageCount) {
             startedAt: Date.now()
           }
         }, operationId);
-        sendEvent("session.metaChanged", {
+        await sendEvent("session.metaChanged", {
           streaming: true,
           thinkingLevel: snapshot.thinkingLevel,
           selectedModel: snapshot.selectedModel
         });
       },
-      emitStreamBatch(delta) {
-        sendEvent("turn.streamBatch", {
+      async emitStreamBatch(delta) {
+        await sendEvent("turn.streamBatch", {
           events: [{ assistantMessageEvent: { type: "text_delta", delta } }]
         }, operationId);
       },
-      showMarkdown(markdown, messageId) {
+      async showMarkdown(markdown, messageId) {
         snapshot.streaming = false;
         messages = [{
           id: messageId,
@@ -195,9 +250,9 @@ export async function attachMockAgent(page, messageCount) {
           parts: [{ type: "text", text: markdown }],
           createdAt: Date.now()
         }];
-        sendEvent("conversation.changed", { sessionId: snapshot.sessionId, reason: "settled" });
+        await sendEvent("conversation.changed", { sessionId: snapshot.sessionId, reason: "settled" });
       },
-      switchSession(marker, nextMessageCount) {
+      async switchSession(marker, nextMessageCount) {
         messages = Array.from({ length: nextMessageCount }, (_, index) => ({
           id: `${marker}-message-${index}`,
           role: index % 2 === 0 ? "user" : "assistant",
@@ -226,7 +281,7 @@ export async function attachMockAgent(page, messageCount) {
             sessionGeneration: 1
           };
         }
-        sendEvent("session.bootstrap", { snapshot, reason: "session-open" });
+        await sendEvent("session.bootstrap", { snapshot, reason: "session-open" });
       },
       diagnostics() {
         return {

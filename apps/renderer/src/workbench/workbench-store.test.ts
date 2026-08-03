@@ -92,6 +92,37 @@ describe("renderer workbench store", () => {
     expect(store.getState().settingsWorkspaceId).toBe("b");
   });
 
+  it("keeps Settings selected while a Workspace transition updates its return surface", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace("a", "/work/a"));
+    store.getState().openSettings();
+
+    expect(store.getState().selectWorkspace("a")).toBe(true);
+    expect(store.getState().selectedSurface).toEqual({ kind: "settings" });
+    expect(store.getState().settingsReturnSurface).toEqual({
+      kind: "workspace",
+      workspaceId: "a"
+    });
+
+    expect(store.getState().openTask(task("task-a", "a", "idle"))).toBe("opened");
+    expect(store.getState()).toMatchObject({
+      selectedSurface: { kind: "settings" },
+      settingsReturnSurface: {
+        kind: "conversation",
+        conversation: sessionConversation("task-a", "a")
+      }
+    });
+
+    store.getState().closeSettings();
+    expect(store.getState()).toMatchObject({
+      selectedSurface: {
+        kind: "conversation",
+        conversation: sessionConversation("task-a", "a")
+      },
+      settingsReturnSurface: undefined
+    });
+  });
+
   it("blocks Workspace removal for active Runtime state but drops stopped records", () => {
     const store = createRendererWorkbenchStore();
     store.getState().registerWorkspace(workspace("a", "/work/a"));

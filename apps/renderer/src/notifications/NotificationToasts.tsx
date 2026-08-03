@@ -6,7 +6,6 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "react-aria-components";
 import {
   type NotificationItem,
   type NotificationLevel,
@@ -57,13 +56,14 @@ function NotificationToast({ item }: { item: NotificationItem }) {
         <strong>{item.title}</strong>
         {item.message ? <span>{item.message}</span> : null}
       </span>
-      <Button
+      <button
         aria-label={`关闭通知：${item.title}`}
         className={styles.close!}
-        onPress={() => dismissToast(item.id)}
+        onClick={() => dismissToast(item.id)}
+        type="button"
       >
         <X aria-hidden="true" size={15} />
-      </Button>
+      </button>
     </section>
   );
 }

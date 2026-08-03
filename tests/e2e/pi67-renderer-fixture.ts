@@ -36,7 +36,8 @@ export {
   setMockAgentResponseResult,
   setMockConversationMessages,
   setMockResyncOperations,
-  setMockWorkspaceChanges
+  setMockWorkspaceChanges,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-controls.js";
 export { installMockDesktopBridge } from "./pi67-renderer-desktop-bridge.js";
 export async function attachMockAgent(

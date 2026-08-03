@@ -158,6 +158,13 @@ CI 会在 `windows-2025` x64 与 `macos-15` arm64 的真实文件系统上各运
 - `welcomeIdleWorkingSet`：Agent Host 尚未按需启动时，只统计 Main 和 renderer；不统计 GPU
   和 network utility process。macOS 使用 RSS，Windows 使用 `WorkingSetSize`。进程 working set
   求和可能重复计算共享页，报告保留这一限制。
+- `warmRestoredWorkspaceWorkingSet`：同一 profile 第二次启动并恢复 Workspace 后、Agent Host
+  尚未按需启动时的 Main + renderer 信息项。它保留 warm restored Workspace 的内存证据，但不与
+  clean-profile Welcome 样本混合，也不参与 `welcomeIdleWorkingSet` 的 release budget 判断。
+- `cleanProfileElectronHandshake` / `cleanProfileFirstWindow` / `cleanProfileDomContentLoaded` /
+  `cleanProfileWorkspaceActionVisible`：与 `cleanProfileLaunch` 使用同一起点的累计 phase 信息项，
+  用于区分操作系统与 packaged process 启动、首窗、Renderer DOM 和 Welcome 交互阶段；预算仍只由
+  完整的 `cleanProfileLaunch` 样本执行，不得用单个 phase 替代。
 - `*OwnedMemory`：保留 working-set 指标作为跨版本连续基线，同时补充平台原生的进程占用证据。
   macOS 使用 `/usr/bin/footprint` 的 `phys_footprint`；Windows 使用
   `Win32_Process.PrivatePageCount`。两者都比直接求和 RSS 更适合定位 Main、Renderer 和 Agent

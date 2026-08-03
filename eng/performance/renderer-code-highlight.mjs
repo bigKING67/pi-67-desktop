@@ -31,7 +31,6 @@ export async function measureCodeHighlight(page, { markdown, messageId, expected
 
     const started = performance.now();
     const deadline = started + 15_000;
-    control.showMarkdown(fixtureMarkdown, fixtureMessageId);
     const observe = () => {
       const codeBlock = document.querySelector('[data-testid="code-block"]');
       if (codeBlock?.getAttribute("data-highlight-state") === "fallback") {
@@ -71,7 +70,9 @@ export async function measureCodeHighlight(page, { markdown, messageId, expected
       }
       requestAnimationFrame(observe);
     };
-    requestAnimationFrame(observe);
+    void control.showMarkdown(fixtureMarkdown, fixtureMessageId)
+      .then(() => requestAnimationFrame(observe))
+      .catch(reject);
   }), { fixtureMarkdown: markdown, fixtureMessageId: messageId, lineCount: expectedLineCount });
 
   const resources = await highlightResources(page);

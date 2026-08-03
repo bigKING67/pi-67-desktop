@@ -37,6 +37,19 @@
   padding: var(--space-3) var(--space-4) var(--space-1);
 }
 
+.rowLoading {
+  display: grid;
+  min-height: 56px;
+  place-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+.listLoading {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+}
+
 .loading,
 .error,
 .empty {

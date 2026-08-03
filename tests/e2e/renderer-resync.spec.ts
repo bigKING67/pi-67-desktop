@@ -4,7 +4,8 @@ import {
   clearRecordedCommands,
   emitMockAgentEvent,
   installMockDesktopBridge,
-  recordedCommands
+  recordedCommands,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -16,6 +17,7 @@ test("resynchronizes the projection after an event sequence gap without guessing
   // Keep the recovery state observable long enough for Chromium's accessibility tree to update.
   await attachMockAgent(page, [], { "projection.resync": 1_500 });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
 
   await emitMockAgentEvent(page, {

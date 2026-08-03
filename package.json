@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "corepack pnpm run build && playwright test",
-    "performance:prepare": "corepack pnpm run build && node eng/performance/prepare-packaged-app.mjs",
+    "performance:prepare": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && node eng/performance/prepare-packaged-app.mjs",
     "performance:renderer": "node eng/performance/measure-renderer.mjs",
     "performance:electron": "node eng/performance/measure-electron.mjs",
     "performance:session-catalog": "corepack pnpm run build:packages && node eng/performance/measure-session-catalog.mjs",

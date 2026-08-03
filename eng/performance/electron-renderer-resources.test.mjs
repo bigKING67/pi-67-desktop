@@ -58,6 +58,16 @@ describe("packaged renderer resource attribution", () => {
       sessionRestore: []
     })).toThrow(/resource boundary violation/u);
     expect(() => assertRendererResourceBoundaries({
+      welcome: [resource("/assets/Modal-shared.js", 100)],
+      runtimeInitialization: [],
+      sessionRestore: []
+    })).toThrow(/resource boundary violation/u);
+    expect(() => assertRendererResourceBoundaries({
+      welcome: [],
+      runtimeInitialization: [resource("/assets/Modal-shared.js", 100)],
+      sessionRestore: []
+    })).not.toThrow();
+    expect(() => assertRendererResourceBoundaries({
       welcome: [],
       runtimeInitialization: [resource("/assets/ApprovalDialog.js", 100)],
       sessionRestore: []

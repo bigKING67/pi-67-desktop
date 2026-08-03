@@ -143,9 +143,7 @@ export function createRendererWorkbenchStore() {
       const workspaces = { ...current.workspaces };
       delete workspaces[workspaceId];
       const workspaceOrder = current.workspaceOrder.filter((id) => id !== workspaceId);
-      const currentWorkspaceId = current.currentWorkspaceId === workspaceId
-        ? workspaceOrder[0]
-        : current.currentWorkspaceId;
+      const currentWorkspaceId = current.currentWorkspaceId === workspaceId ? workspaceOrder[0] : current.currentWorkspaceId;
       const selectedSurface = workspaceForSurface(current.selectedSurface) === workspaceId
         ? fallbackSurface(currentWorkspaceId, runtimeTaskOrder, tasks)
         : current.selectedSurface;
@@ -188,7 +186,8 @@ export function createRendererWorkbenchStore() {
         expandedWorkspaceIds: current.expandedWorkspaceIds.includes(workspaceId)
           ? current.expandedWorkspaceIds
           : [...current.expandedWorkspaceIds, workspaceId],
-        selectedSurface: { kind: "workspace", workspaceId },
+        selectedSurface: current.selectedSurface?.kind === "settings" ? current.selectedSurface : { kind: "workspace", workspaceId },
+        settingsReturnSurface: current.selectedSurface?.kind === "settings" ? { kind: "workspace", workspaceId } : current.settingsReturnSurface,
         ...(current.settingsScope === "project" ? { settingsWorkspaceId: workspaceId } : {})
       });
       return true;
@@ -221,7 +220,8 @@ export function createRendererWorkbenchStore() {
         expandedWorkspaceIds: current.expandedWorkspaceIds.includes(task.workspaceId)
           ? current.expandedWorkspaceIds
           : [...current.expandedWorkspaceIds, task.workspaceId],
-        selectedSurface: { kind: "conversation", conversation: nextTask.conversation }
+        selectedSurface: current.selectedSurface?.kind === "settings" ? current.selectedSurface : { kind: "conversation", conversation: nextTask.conversation },
+        settingsReturnSurface: current.selectedSurface?.kind === "settings" ? { kind: "conversation", conversation: nextTask.conversation } : current.settingsReturnSurface
       });
       return existing || matching ? "selected" : "opened";
     },

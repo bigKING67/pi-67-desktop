@@ -13,7 +13,6 @@ import {
   TriangleAlert,
   Wrench
 } from "lucide-react";
-import { Button } from "react-aria-components";
 import type { ReactNode } from "react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
@@ -113,20 +112,21 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
     <header className={`title-bar ${styles.header}`}>
       <div className={styles.identity}>
         {navigationAvailable && !settingsSelected ? (
-          <Button
+          <button
             className={`icon-button navigation-toggle ${styles.iconButton}`}
             aria-controls="session-navigation"
             aria-describedby="navigation-toggle-tooltip"
             aria-expanded={navigationVisible}
             aria-keyshortcuts="Control+B Meta+B"
             aria-label={navigationVisible ? messages.shell.hideNavigation : messages.shell.showNavigation}
-            onPress={onToggleNavigation}
+            onClick={onToggleNavigation}
+            type="button"
           >
             {navigationVisible ? <PanelLeftClose aria-hidden="true" size={16} /> : <PanelLeftOpen aria-hidden="true" size={16} />}
             <ControlTooltip id="navigation-toggle-tooltip">{navigationVisible
               ? messages.shell.hideNavigation
               : messages.shell.showNavigation}</ControlTooltip>
-          </Button>
+          </button>
         ) : null}
         <div className={`brand-lockup ${styles.brand}`} title={fullContextTitle}>
           {showBrandMark ? (
@@ -165,18 +165,19 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
           <span>{status.label}</span>
         </div>
         <NotificationCenter />
-        <Button
+        <button
           className={`icon-button ${styles.iconButton}`}
           aria-describedby="command-palette-tooltip"
           aria-keyshortcuts="Control+K Meta+K"
           aria-label={messages.shell.openCommandPalette}
-          onPress={() => setCommandPaletteOpen(true)}
+          onClick={() => setCommandPaletteOpen(true)}
+          type="button"
         >
           <Command aria-hidden="true" size={16} />
           <ControlTooltip id="command-palette-tooltip">{messages.shell.commandPalette}</ControlTooltip>
-        </Button>
+        </button>
         {selectedWorkspace && !settingsSelected ? (
-          <Button
+          <button
             className={`icon-button context-toggle ${styles.iconButton}`}
             aria-controls="task-inspector"
             aria-describedby="context-toggle-tooltip"
@@ -184,13 +185,14 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             aria-keyshortcuts="Control+Shift+B Meta+Shift+B"
             aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
             data-testid="inspector-toggle"
-            onPress={() => setContextVisible(!contextVisible)}
+            onClick={() => setContextVisible(!contextVisible)}
+            type="button"
           >
             {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
             <ControlTooltip id="context-toggle-tooltip">{contextVisible
               ? messages.shell.hideContextPanel
               : messages.shell.showContextPanel}</ControlTooltip>
-          </Button>
+          </button>
         ) : null}
       </div>
     </header>

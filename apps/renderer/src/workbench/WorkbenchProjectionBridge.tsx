@@ -22,8 +22,6 @@ import { registerRendererWorkspaceWithHost } from "./workspace-host-registration
 export function WorkbenchProjectionBridge() {
   const workspacePath = useAppStore((state) => state.workspace);
   const trust = useAppStore((state) => state.trust);
-  const runtime = useAppStore((state) => state.runtime);
-  const operation = useAppStore((state) => state.operation);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
@@ -80,6 +78,7 @@ export function WorkbenchProjectionBridge() {
       ? selected
       : undefined;
     const existing = matchingSession ?? provisional;
+    const { operation, runtime } = useAppStore.getState();
     const task = workbenchTaskFromProjection({
       ...(existing ? { existing } : {}),
       workspaceId,
@@ -99,9 +98,7 @@ export function WorkbenchProjectionBridge() {
     }
     lastProjectedTaskId.current = taskId;
   }, [
-    operation,
     recentUserMessagePreview,
-    runtime,
     sessionGeneration,
     sessionId,
     sessionName,
@@ -158,8 +155,8 @@ export function workbenchTaskFromProjection({
     sessionId,
     taskGeneration: existing?.taskGeneration ?? 1,
     ...(sessionGeneration === undefined ? {} : { sessionGeneration }),
-    lifecycle: taskLifecycle(operation),
-    runtime,
+    lifecycle: existing?.lifecycle ?? taskLifecycle(operation),
+    runtime: existing?.runtime ?? runtime,
     title: sessionName?.trim() || "未命名任务",
     ...(effectiveUserMessagePreview
       ? { recentUserMessagePreview: effectiveUserMessagePreview }

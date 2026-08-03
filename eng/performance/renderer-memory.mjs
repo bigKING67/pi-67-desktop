@@ -129,8 +129,8 @@ export async function loadAllOlderMessages(page, expectedCount) {
 export async function switchPerformanceSessions(page, count, messageCount) {
   for (let index = 0; index < count; index += 1) {
     const marker = `switch-${index}`;
-    await page.evaluate(({ nextMarker, nextMessageCount }) => {
-      globalThis.__pi67Performance?.switchSession(nextMarker, nextMessageCount);
+    await page.evaluate(async ({ nextMarker, nextMessageCount }) => {
+      await globalThis.__pi67Performance?.switchSession(nextMarker, nextMessageCount);
     }, { nextMarker: marker, nextMessageCount: messageCount });
     await page.waitForFunction(({ expected, expectedMessageCount }) => {
       const region = document.querySelector('[data-transcript-region="true"]');

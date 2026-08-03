@@ -1,5 +1,8 @@
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
-import { eventTaskAuthority } from "../connection/event-authority.js";
+import {
+  eventSessionAuthority,
+  eventTaskAuthority
+} from "../connection/event-authority.js";
 import { messages } from "../localization/message-catalog.js";
 import {
   rendererWorkbenchStore,
@@ -23,9 +26,18 @@ export function routeWorkbenchAgentEvent(
     || task.taskGeneration !== authority.taskGeneration
   ) return "stale";
 
-  const sessionContext = envelope.context.scope === "task" && envelope.context.sessionId !== undefined
-    ? envelope.context
-    : undefined;
+  const sessionAuthority = eventSessionAuthority(envelope);
+  if (
+    event.type !== "runtime.ready"
+    && event.type !== "session.bootstrap"
+    && eventUpdatesWorkbenchTaskSummary(event.type)
+    && sessionAuthority
+    && (
+      task.sessionId !== sessionAuthority.sessionId
+      || task.sessionGeneration !== sessionAuthority.sessionGeneration
+    )
+  ) return "stale";
+
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap": {
@@ -36,7 +48,7 @@ export function routeWorkbenchAgentEvent(
           conversation: { kind: "session" as const, workspaceId: task.workspaceId, sessionPath: snapshot.sessionPath }
         } : {}),
         sessionId: snapshot.sessionId,
-        ...(sessionContext ? { sessionGeneration: sessionContext.sessionGeneration } : {}),
+        ...(sessionAuthority ? { sessionGeneration: sessionAuthority.sessionGeneration } : {}),
         ...(snapshot.sessionPath ? { sessionPath: snapshot.sessionPath } : {}),
         title: sessionName
           || task.pendingTitle
@@ -103,4 +115,22 @@ export function routeWorkbenchAgentEvent(
   return activeTask?.id === task.id
     ? "active"
     : "background";
+}
+
+function eventUpdatesWorkbenchTaskSummary(type: AgentEvent["type"]): boolean {
+  switch (type) {
+    case "task.toolMode.changed":
+    case "runtime.statusChanged":
+    case "runtime.crashed":
+    case "operation.started":
+    case "operation.activityChanged":
+    case "operation.completed":
+    case "operation.failed":
+    case "operation.cancelled":
+    case "operation.lost":
+    case "session.metaChanged":
+      return true;
+    default:
+      return false;
+  }
 }

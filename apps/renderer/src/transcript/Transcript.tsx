@@ -1,16 +1,13 @@
 import type { LocatedMessageWindow, OperationView, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Virtuoso, type Components, type VirtuosoHandle } from "react-virtuoso";
+import type { Components, VirtuosoHandle } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
 import { requestComposerPrefill } from "../composer/composer-events.js";
 import { loadOlderConversation } from "../conversation/conversation-controller.js";
-import {
-  type PendingUserTurn,
-  useCommittedConversationProjection
-} from "../conversation/conversation-store.js";
+import { useCommittedConversationProjection } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { messages as messagesCatalog } from "../localization/message-catalog.js";
 import {
@@ -21,7 +18,6 @@ import {
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import {
   timelineMatchesOperation,
-  type OperationActivityTimeline,
   useOperationActivityTimelineStore
 } from "../operation/operation-activity-timeline-store.js";
 import {
@@ -35,9 +31,10 @@ import {
   selectedWorkbenchTask,
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
-import { MessageCard } from "./MessageCard.js";
-import { TranscriptProcessGroup } from "./TranscriptProcessGroup.js";
+import { DeferredMessageCard, DeferredTranscriptProcessGroup } from "./DeferredTranscriptRows.js";
+import { DeferredTranscriptList } from "./DeferredTranscriptList.js";
 import { editableUserMessageText } from "./message-actions.js";
+import type { TranscriptContext } from "./transcript-context.js";
 import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
@@ -46,7 +43,6 @@ import {
   type TranscriptRow
 } from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
-
 export function Transcript() {
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
@@ -206,9 +202,9 @@ export function Transcript() {
         </div>
       ) : null}
       {/* Explicit paging avoids Virtuoso chaining requests while a prepend preserves the top anchor. */}
-      <Virtuoso
+      <DeferredTranscriptList
         key={`${sessionId}:${historicalWindow?.anchorId ?? "latest"}`}
-        ref={transcriptRef}
+        virtuosoRef={transcriptRef}
         components={TRANSCRIPT_COMPONENTS}
         context={{
           hasLiveTurn: historicalWindow ? false : hasLiveTurn,
@@ -224,18 +220,19 @@ export function Transcript() {
         }}
         data={transcriptRows}
         computeItemKey={(_index, row) => row.key}
+        defaultItemHeight={120}
         firstItemIndex={historicalWindow ? 0 : firstItemIndex + transcriptMessages.length - transcriptRows.length}
         followOutput={!historicalWindow && (streaming || hasTurnActivity) ? "auto" : false}
-        increaseViewportBy={{ top: 500, bottom: 800 }}
+        increaseViewportBy={{ top: 400, bottom: 100 }}
         initialTopMostItemIndex={historicalAnchorRowIndex === undefined
-          ? Math.max(0, transcriptRows.length - 1)
+          ? { index: "LAST", align: "end" }
           : { index: historicalAnchorRowIndex, align: "center" }}
         itemContent={(_index, row) => {
           if (row.kind === "process-group") {
             const current = row.key === currentProcessGroupKey;
             const currentOperation = current && operationMatchesSession ? operation : undefined;
             return (
-              <TranscriptProcessGroup
+              <DeferredTranscriptProcessGroup
                 completed={currentOperation ? currentOperation.lifecycle === "completed" : true}
                 interrupted={current && currentProcessInterrupted}
                 liveThinking={current ? liveThinking : ""}
@@ -250,7 +247,7 @@ export function Transcript() {
           }
           const message = row.message;
           return (
-            <MessageCard
+            <DeferredMessageCard
               actionDisabledReason={messageActionDisabledReason}
               highlighted={highlightedMessageId === message.id}
               edit={!historicalWindow && currentEdit?.message.id === message.id ? {
@@ -349,28 +346,6 @@ const STARTER_PROMPTS = [
   "实现一个有测试覆盖的小功能"
 ] as const;
 
-interface TranscriptContext {
-  hasLiveTurn: boolean;
-  hasTurnActivity: boolean;
-  pendingUserTurn: PendingUserTurn | undefined;
-  liveText: string;
-  liveThinking: string;
-  hasOlder: boolean;
-  loadingOlder: boolean;
-  conversationError: string | undefined;
-  liveProcess: LiveProcessPresentation | undefined;
-  loadOlderMessages: () => Promise<void>;
-}
-
-interface LiveProcessPresentation {
-  row: Extract<TranscriptRow, { kind: "process-group" }>;
-  operation: OperationView;
-  timeline: OperationActivityTimeline | undefined;
-  running: boolean;
-  interrupted: boolean;
-  completed: boolean;
-}
-
 const TRANSCRIPT_COMPONENTS: Components<TranscriptRow, TranscriptContext> = {
   Header: OlderMessagesHeader,
   Footer: LiveTurnFooter
@@ -399,7 +374,7 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
   return (
     <>
       {context.pendingUserTurn ? (
-        <MessageCard
+        <DeferredMessageCard
           deliveryStatus={context.pendingUserTurn.status}
           localImages={context.pendingUserTurn.attachments.flatMap((attachment) => (
             attachment.kind === "image" && attachment.previewUrl
@@ -414,7 +389,7 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
         />
       ) : null}
       {context.liveProcess ? (
-        <TranscriptProcessGroup
+        <DeferredTranscriptProcessGroup
           completed={context.liveProcess.completed}
           interrupted={context.liveProcess.interrupted}
           liveThinking={context.liveThinking}
@@ -427,7 +402,7 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
         />
       ) : context.hasTurnActivity ? <TurnActivity /> : null}
       {context.liveText
-        ? <MessageCard message={liveMessage(context.liveText)} streaming />
+        ? <DeferredMessageCard message={liveMessage(context.liveText)} streaming />
         : null}
     </>
   );

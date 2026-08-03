@@ -9,6 +9,7 @@ import {
   printRendererResourceAttribution,
   summarizeRendererResourceTransitions
 } from "./electron-renderer-resources.mjs";
+import { createElectronLaunchPerformanceMetrics } from "./electron-launch-performance-metrics.mjs";
 import { createElectronRendererPerformanceMetrics } from "./electron-renderer-performance-metrics.mjs";
 
 export async function writeElectronPerformanceReport({
@@ -27,25 +28,7 @@ export async function writeElectronPerformanceReport({
   const rendererResources = summarizeRendererResourceTransitions(samples.rendererResourceTransitions);
   const rendererMetrics = createElectronRendererPerformanceMetrics(samples);
   const metrics = [
-    summarizeMetric({
-      id: "cleanProfileLaunch",
-      label: "Clean-profile launch to usable window",
-      unit: "ms",
-      samples: samples.cleanProfileLaunch,
-      budget: 3_000,
-      evidenceLevel: "packaged",
-      method: "New Electron user-data directory; first window and connected workspace action",
-      limitations: ["The harness does not flush the operating-system file cache, so this is not a power-cycle cold start."]
-    }),
-    summarizeMetric({
-      id: "warmLaunch",
-      label: "Warm-profile launch to usable window",
-      unit: "ms",
-      samples: samples.warmLaunch,
-      budget: 1_800,
-      evidenceLevel: "packaged",
-      method: "Second packaged launch using the same clean profile"
-    }),
+    ...createElectronLaunchPerformanceMetrics(samples),
     ...rendererMetrics.slice(0, 2),
     summarizeMetric({
       id: "welcomeIdleWorkingSet",
@@ -58,6 +41,24 @@ export async function writeElectronPerformanceReport({
         ? "Win32 WorkingSetSize for packaged Main and renderer before Agent Host demand"
         : "macOS RSS for packaged Main and renderer before Agent Host demand",
       limitations: ["Summed process working sets can double-count shared pages; GPU and network utility processes are excluded."]
+    }),
+    summarizeMetric({
+      id: "warmRestoredWorkspaceWorkingSet",
+      label: "Warm restored Workspace Main + renderer resident working set",
+      unit: "MiB",
+      samples: samples.warmRestoredWorkspaceMemory,
+      evidenceLevel: "packaged",
+      method: platform === "win32" ? "Win32 WorkingSetSize for packaged Main and restored Workspace renderer before Agent Host demand" : "macOS RSS for packaged Main and restored Workspace renderer before Agent Host demand",
+      limitations: ["Informational restored-Workspace state; it is intentionally excluded from the Welcome budget distribution.", "Summed process working sets can double-count shared pages; GPU and network utility processes are excluded."]
+    }),
+    summarizeMetric({
+      id: "warmRestoredWorkspaceOwnedMemory",
+      label: "Warm restored Workspace Main + renderer owned/effective memory",
+      unit: "MiB",
+      samples: samples.warmRestoredWorkspaceOwnedMemory,
+      evidenceLevel: "packaged",
+      method: `${ownedMemoryMethod}; Main and restored Workspace renderer sum before Agent Host demand`,
+      limitations: ["Informational restored-Workspace state; it is intentionally excluded from the Welcome budget distribution.", ...ownedMemoryLimitations]
     }),
     summarizeMetric({
       id: "mainWorkingSet",
@@ -276,7 +277,7 @@ export async function writeElectronPerformanceReport({
       samples: samples.realPiSessionProjection,
       budget: 1_500,
       evidenceLevel: "packaged",
-      method: `SessionManager.appendMessage JSONL fixture; native import dialog bridge; managed copy; Pi SDK restore; validated recent ${defaultMessagePageSize}-message page, bounded virtualized tree, visible fixture content, and composer paint`,
+      method: `SessionManager.appendMessage JSONL fixture; Workspace menu import action; native dialog bridge; managed copy; Pi SDK restore; validated bounded recent ${defaultMessagePageSize}-message page, older-page affordance, visible fixture content, and composer paint`,
       limitations: ["The synthetic session contains user and assistant text messages but no images, tool results, compaction, or branches."]
     }),
     summarizeMetric({

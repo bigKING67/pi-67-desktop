@@ -6,7 +6,8 @@ import {
   installMockDesktopBridge,
   recordedCommandDetails,
   recordedCommands,
-  setMockAgentResponseFailure
+  setMockAgentResponseFailure,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -189,6 +190,7 @@ test("matches Host scheduler availability while an operation is active", async (
     ]
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   const operationId = "operation-palette-busy";
   await emitMockAgentEvent(page, {
     type: "operation.started",

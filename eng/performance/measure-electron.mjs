@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
-import { _electron as electron } from "@playwright/test";
 import {
   createPerformanceCodeSessionFixture,
   createPerformanceSessionFixture
@@ -19,6 +18,7 @@ import {
 import {
   initializePackagedRuntime,
   measureActiveExtensionCommandClose,
+  measurePackagedApplicationLaunch,
   measurePackagedCommandPaletteFirstOpen,
   measureRealPiSessionProjection,
   waitForRuntimeReady
@@ -35,14 +35,23 @@ const outputPath = process.env.PI67_PERF_ELECTRON_OUTPUT
 const inheritedEnvironment = Object.fromEntries(
   Object.entries(process.env).filter((entry) => entry[1] !== undefined)
 );
+const launch = (profile, agentDir, expectWelcome) => measurePackagedApplicationLaunch({
+  executablePath, profile, agentDir, expectWelcome, inheritedEnvironment
+});
 
 await access(executablePath);
 
 const cleanProfileLaunchSamples = [];
+const cleanProfileElectronHandshakeSamples = [];
+const cleanProfileFirstWindowSamples = [];
+const cleanProfileDomContentLoadedSamples = [];
+const cleanProfileWorkspaceActionVisibleSamples = [];
 const warmLaunchSamples = [];
 const welcomeMemorySamples = [];
+const warmRestoredWorkspaceMemorySamples = [];
 const connectedMemorySamples = [];
 const welcomeOwnedMemorySamples = [];
+const warmRestoredWorkspaceOwnedMemorySamples = [];
 const connectedOwnedMemorySamples = [];
 const mainMemorySamples = [];
 const rendererMemorySamples = [];
@@ -107,6 +116,10 @@ for (let index = 0; index < samples; index += 1) {
     const cleanLaunch = await launch(profile, agentDir, true);
     activeApplication = cleanLaunch.application;
     cleanProfileLaunchSamples.push(cleanLaunch.durationMs);
+    cleanProfileElectronHandshakeSamples.push(cleanLaunch.phases.electronHandshakeMs);
+    cleanProfileFirstWindowSamples.push(cleanLaunch.phases.firstWindowMs);
+    cleanProfileDomContentLoadedSamples.push(cleanLaunch.phases.domContentLoadedMs);
+    cleanProfileWorkspaceActionVisibleSamples.push(cleanLaunch.phases.workspaceActionVisibleMs);
     const resourceCollector = await createRendererResourceCollector(cleanLaunch.window, join(root, "apps/renderer/dist"));
     recordWelcomeMemory(await measureWorkingSet(cleanLaunch.application, false));
     await connectAgentHost(cleanLaunch.application, cleanLaunch.window);
@@ -186,7 +199,7 @@ for (let index = 0; index < samples; index += 1) {
     const warmLaunch = await launch(profile, agentDir, false);
     activeApplication = warmLaunch.application;
     warmLaunchSamples.push(warmLaunch.durationMs);
-    recordWelcomeMemory(await measureWorkingSet(warmLaunch.application, false));
+    recordWarmRestoredWorkspaceMemory(await measureWorkingSet(warmLaunch.application, false));
     closeSamples.push(await close(warmLaunch.application));
     activeApplication = undefined;
   } finally {
@@ -202,10 +215,16 @@ await writeElectronPerformanceReport({
   defaultMessagePageSize: DEFAULT_MESSAGE_PAGE_SIZE,
   samples: {
     cleanProfileLaunch: cleanProfileLaunchSamples,
+    cleanProfileElectronHandshake: cleanProfileElectronHandshakeSamples,
+    cleanProfileFirstWindow: cleanProfileFirstWindowSamples,
+    cleanProfileDomContentLoaded: cleanProfileDomContentLoadedSamples,
+    cleanProfileWorkspaceActionVisible: cleanProfileWorkspaceActionVisibleSamples,
     warmLaunch: warmLaunchSamples,
     welcomeMemory: welcomeMemorySamples,
+    warmRestoredWorkspaceMemory: warmRestoredWorkspaceMemorySamples,
     connectedMemory: connectedMemorySamples,
     welcomeOwnedMemory: welcomeOwnedMemorySamples,
+    warmRestoredWorkspaceOwnedMemory: warmRestoredWorkspaceOwnedMemorySamples,
     connectedOwnedMemory: connectedOwnedMemorySamples,
     mainMemory: mainMemorySamples,
     rendererMemory: rendererMemorySamples,
@@ -261,34 +280,6 @@ function resolvePackagedExecutable() {
   throw new Error(`Packaged performance harness does not support ${process.platform}/${process.arch}.`);
 }
 
-async function launch(profile, agentDir, expectWelcome) {
-  const started = performance.now();
-  const application = await electron.launch({
-    executablePath,
-    args: [`--user-data-dir=${profile}`],
-    env: { ...inheritedEnvironment, NODE_ENV: "test", PI_CODING_AGENT_DIR: agentDir }
-  });
-  try {
-    const window = await application.firstWindow();
-    await window.waitForLoadState("domcontentloaded");
-    const workspaceAction = window.getByRole("button", { name: "选择工作区" });
-    if (expectWelcome) {
-      await workspaceAction.waitFor({ state: "visible", timeout: 15_000 });
-      await waitUntilEnabled(workspaceAction, 15_000);
-    } else {
-      await Promise.any([
-        workspaceAction.waitFor({ state: "visible", timeout: 15_000 }),
-        window.getByTestId("workspace-add").waitFor({ state: "visible", timeout: 15_000 })
-      ]);
-      if (await workspaceAction.isVisible()) await waitUntilEnabled(workspaceAction, 15_000);
-    }
-    return { application, window, durationMs: performance.now() - started };
-  } catch (error) {
-    await application.close();
-    throw error;
-  }
-}
-
 async function connectAgentHost(application, window) {
   await window.evaluate(() => window.pi67.system.connectAgentHost());
   await waitForReplacementAgentHost(application.process().pid, -1, 10_000);
@@ -320,6 +311,11 @@ function recordWelcomeMemory(sample) {
   rendererOwnedMemorySamples.push(sample.rendererOwned);
   welcomeMemorySamples.push(sample.main + sample.renderer);
   welcomeOwnedMemorySamples.push(sample.mainOwned + sample.rendererOwned);
+}
+
+function recordWarmRestoredWorkspaceMemory(sample) {
+  warmRestoredWorkspaceMemorySamples.push(sample.main + sample.renderer);
+  warmRestoredWorkspaceOwnedMemorySamples.push(sample.mainOwned + sample.rendererOwned);
 }
 
 function recordConnectedMemory(sample) {
@@ -369,15 +365,6 @@ async function close(application) {
   const started = performance.now();
   await application.close();
   return performance.now() - started;
-}
-
-async function waitUntilEnabled(locator, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await locator.isEnabled()) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  throw new Error("Timed out waiting for the workspace action to become enabled.");
 }
 
 async function waitForReplacementAgentHost(rootPid, previousPid, timeoutMs) {

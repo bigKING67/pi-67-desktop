@@ -5,7 +5,8 @@ import {
   emitMockAgentEvent,
   installMockDesktopBridge,
   recordedCommands,
-  replaceMockAgentHost
+  replaceMockAgentHost,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -16,6 +17,7 @@ test("clears stale Extension UI and restores the session after Host epoch replac
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   const operationId = "operation-old-host";
 
