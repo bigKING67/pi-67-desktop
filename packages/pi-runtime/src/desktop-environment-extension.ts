@@ -1,7 +1,5 @@
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 
-export const DESKTOP_ENVIRONMENT_EXTENSION_PATH = "<inline:pi67-desktop-environment>";
-
 interface DesktopEnvironmentExtensionOptions {
   now?: () => Date;
   resolveTimeZone?: () => string | undefined;
