@@ -55,6 +55,27 @@ describe("provider configuration store", () => {
     });
   });
 
+  it("discards a draft against the latest observed snapshot", () => {
+    const initial = snapshot("1", "Initial");
+    const external = snapshot("2", "External");
+    const store = useProviderConfigurationStore.getState();
+    store.install("workspace-a", initial);
+    store.updateDraft((draft) => ({ ...draft, name: "Unsaved draft" }));
+    store.observeExternal("workspace-a", change(external));
+
+    useProviderConfigurationStore.getState().discardDraft();
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      snapshot: external,
+      draft: { name: "External" },
+      baselineRevision: external.revision,
+      dirty: false,
+      externalConflict: undefined,
+      phase: "idle",
+      error: undefined
+    });
+  });
+
   it("ignores events belonging to another Workspace", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");

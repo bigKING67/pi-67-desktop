@@ -18,7 +18,7 @@ import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-s
 import { redact } from "./redaction.js";
 import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
-import type { WorkspaceEntryContextAction } from "@pi67/protocol";
+import { parsePackageNetworkSettings, type WorkspaceEntryContextAction } from "@pi67/protocol";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
 import {
   addOrRefreshWorkspace,
@@ -263,13 +263,15 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
       await options.packageNetworkSettings.reset()
     )
   ));
-  ipcMain.handle("pi67:package-network-probe", async () => (
-    probePackageSources({
+  ipcMain.handle("pi67:package-network-probe", async (_event, value: unknown) => {
+    const settings = parsePackageNetworkSettings(value);
+    if (!settings) throw new Error("Package network settings are invalid.");
+    return probePackageSources({
       toolchain: options.desktopToolchain,
-      settings: await options.packageNetworkSettings.load(),
+      settings,
       fetcher: (input, init) => net.fetch(input, init)
-    })
-  ));
+    });
+  });
   ipcMain.handle("pi67:capability-snapshot", () => options.desktopCapabilities.snapshot());
   ipcMain.handle("pi67:browser67-setup", async () => {
     const result = await dialog.showMessageBox(options.getMainWindow()!, {

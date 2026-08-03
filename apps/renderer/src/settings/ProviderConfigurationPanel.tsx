@@ -24,6 +24,8 @@ import {
 } from "./ProviderCatalog.js";
 import { ProviderHeaderMutationEditor } from "./ProviderHeaderMutationEditor.js";
 import { ProviderModelWorkspace } from "./ProviderModelWorkspace.js";
+import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
+import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import {
   SettingsBackAction,
   SettingsNotice,
@@ -56,6 +58,7 @@ export function ProviderConfigurationPanel() {
   const [section, setSection] = useState<ProviderSection>("models");
   const [providerDetailOpen, setProviderDetailOpen] = useState(false);
   const [pendingProviderId, setPendingProviderId] = useState<string | null>();
+  const [removalTarget, setRemovalTarget] = useState<string>();
   const panelRef = useRef<HTMLDivElement>(null);
   const catalogScrollTopRef = useRef(0);
   const catalogViewWorkspaceRef = useRef<string | undefined>(undefined);
@@ -95,6 +98,16 @@ export function ProviderConfigurationPanel() {
     scrollRegion.scrollTop = catalogScrollTopRef.current;
     restoreCatalogScrollRef.current = false;
   }, [providerDetailOpen]);
+
+  const draftSubject = snapshot?.providers.find((provider) => provider.id === selectedProviderId)?.name
+    ?? selectedProviderId
+    ?? "新建模型服务";
+  useSettingsDraftRegistration({
+    dirty,
+    busy: phase === "saving",
+    subject: draftSubject,
+    discard: () => useProviderConfigurationStore.getState().discardDraft()
+  });
 
   if (!workspaceId) {
     return <PanelEmpty title="先打开一个工作区" detail="Pi 配置命令需要明确的 Workspace authority。" />;
@@ -149,7 +162,9 @@ export function ProviderConfigurationPanel() {
     setProviderDetailOpen(false);
   };
 
+  const removalView = snapshot.providers.find((provider) => provider.id === removalTarget);
   return (
+    <>
     <div
       className={styles.panel}
       data-testid="provider-configuration-panel"
@@ -213,7 +228,7 @@ export function ProviderConfigurationPanel() {
                       <KeyRound aria-hidden="true" size={14} />管理凭据
                     </Button>
                     {selectedProviderId && editable ? (
-                      <Button className={styles.dangerButton!} onPress={() => void removeProviderConfiguration(selectedProviderId, workspaceId)}>
+                      <Button className={styles.dangerButton!} onPress={() => setRemovalTarget(selectedProviderId)}>
                         <Trash2 aria-hidden="true" size={14} />移除
                       </Button>
                     ) : null}
@@ -251,6 +266,30 @@ export function ProviderConfigurationPanel() {
       )}
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
     </div>
+    <SettingsDestructiveActionDialog
+      busy={phase === "saving"}
+      confirmLabel="移除模型服务"
+      description={<>这会从 Pi <code>models.json</code> 移除模型服务定义。<code>auth.json</code> 中的持久凭据不会被删除。</>}
+      error={removalTarget ? error : undefined}
+      facts={[
+        { label: "模型服务", value: removalView?.name ?? removalTarget ?? "-" },
+        { label: "未保存草稿", value: dirty ? "将一并丢弃" : "无" },
+        { label: "持久凭据", value: "保留" }
+      ]}
+      open={removalTarget !== undefined}
+      pendingLabel="正在移除…"
+      title="移除模型服务定义？"
+      onCancel={() => setRemovalTarget(undefined)}
+      onConfirm={() => {
+        if (!removalTarget) return;
+        void removeProviderConfiguration(removalTarget, workspaceId).then((removed) => {
+          if (!removed) return;
+          setRemovalTarget(undefined);
+          setProviderDetailOpen(false);
+        });
+      }}
+    />
+    </>
   );
 }
 

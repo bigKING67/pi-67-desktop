@@ -166,6 +166,7 @@ function autoAuthorizationReason(category: RiskCategory): ToolAutoAuthorizationR
     || category === "capability-read"
     || category === "network-read"
   ) return "read-only";
+  if (category === "workspace-command") return "workspace-command";
   if (category === "workspace-write") return "workspace-write";
   if (category === "configured-operation" || category === "persistent-state-write") {
     return "configured-source";

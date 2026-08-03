@@ -102,6 +102,14 @@ export async function installMockDesktopBridge(
       copies: [] as Array<{ entry: Record<string, unknown>; kind: "absolute" | "relative" }>,
       trashes: [] as Array<Record<string, unknown>>
     };
+    const settingsActionsTest = {
+      packageSaves: [] as Array<Record<string, unknown>>,
+      packageResets: 0,
+      packageProbes: [] as Array<Record<string, unknown>>,
+      mcpSaves: 0,
+      mcpClears: 0,
+      platformInfoCalls: 0
+    };
     let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     let workbenchState: FixtureWorkbenchState = {
       version: 2 as const,
@@ -118,7 +126,10 @@ export async function installMockDesktopBridge(
       configurable: false,
       value: {
         system: {
-          getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "0.1.0-alpha.1" }),
+          getPlatformInfo: async () => {
+            settingsActionsTest.platformInfoCalls += 1;
+            return { platform: "darwin" as const, architecture: "arm64" as const, version: "0.1.0-alpha.1" };
+          },
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
           loadWorkspaceFileState: async () => ({
@@ -195,20 +206,30 @@ export async function installMockDesktopBridge(
           })),
           releasePromptAttachments: async () => undefined,
           getPackageNetworkSnapshot: async () => structuredClone(bridgeFixture.packageNetworkSnapshot),
-          savePackageNetworkSettings: async (settings: Record<string, unknown>) => ({
-            ...structuredClone(bridgeFixture.packageNetworkSnapshot),
-            settings: structuredClone(settings)
-          }),
-          resetPackageNetworkSettings: async () => structuredClone(bridgeFixture.packageNetworkSnapshot),
-          probePackageSources: async () => ({
-            ...structuredClone(bridgeFixture.packageNetworkSnapshot),
-            checkedAt: 1_784_800_000_000,
-            sources: bridgeFixture.packageNetworkSnapshot.sources.map((source) => ({
-              ...source,
-              status: "reachable",
-              latencyMs: 36
-            }))
-          }),
+          savePackageNetworkSettings: async (settings: Record<string, unknown>) => {
+            settingsActionsTest.packageSaves.push(structuredClone(settings));
+            return {
+              ...structuredClone(bridgeFixture.packageNetworkSnapshot),
+              settings: structuredClone(settings)
+            };
+          },
+          resetPackageNetworkSettings: async () => {
+            settingsActionsTest.packageResets += 1;
+            return structuredClone(bridgeFixture.packageNetworkSnapshot);
+          },
+          probePackageSources: async (settings: Record<string, unknown>) => {
+            settingsActionsTest.packageProbes.push(structuredClone(settings));
+            return {
+              ...structuredClone(bridgeFixture.packageNetworkSnapshot),
+              settings: structuredClone(settings),
+              checkedAt: 1_784_800_000_000,
+              sources: bridgeFixture.packageNetworkSnapshot.sources.map((source) => ({
+                ...source,
+                status: "reachable",
+                latencyMs: 36
+              }))
+            };
+          },
           getDesktopCapabilitySnapshot: async () => {
             capabilitySnapshotCalls += 1;
             const snapshot = structuredClone(bridgeFixture.capabilitySnapshot);
@@ -286,6 +307,7 @@ export async function installMockDesktopBridge(
             ? { status: "revealed", token: teamMcpToken }
             : { status: "missing" },
           saveTeamMcpToken: async (token: string) => {
+            settingsActionsTest.mcpSaves += 1;
             teamMcpToken = token;
             teamMcpStatus = {
               ...teamMcpStatus,
@@ -295,6 +317,7 @@ export async function installMockDesktopBridge(
             return structuredClone(teamMcpStatus);
           },
           clearTeamMcpToken: async () => {
+            settingsActionsTest.mcpClears += 1;
             teamMcpToken = undefined;
             teamMcpStatus = {
               serverName: bridgeFixture.teamMcpStatus.serverName,
@@ -365,6 +388,10 @@ export async function installMockDesktopBridge(
     Object.defineProperty(window, "__pi67WorkspaceEntryTest", {
       configurable: false,
       value: workspaceEntryTest
+    });
+    Object.defineProperty(window, "__pi67SettingsTest", {
+      configurable: false,
+      value: settingsActionsTest
     });
 
     function selectedWorkspaceId(surface: FixtureWorkbenchState["selectedSurface"]): string | undefined {

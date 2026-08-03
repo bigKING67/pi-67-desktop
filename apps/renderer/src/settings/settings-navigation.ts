@@ -22,6 +22,7 @@ export interface SettingsNavigationItem {
   summary: string;
   searchTerms: readonly string[];
   icon: typeof SlidersHorizontal;
+  measure: "compact" | "standard";
 }
 
 export const SETTINGS_GROUPS: ReadonlyArray<{
@@ -29,22 +30,23 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
   items: readonly SettingsNavigationItem[];
 }> = [
   {
-    label: messages.settings.groups.personal,
-    items: [{
-      id: "account",
-      ...messages.settings.sections.account,
-      searchTerms: ["登录", "未登录", "同步", "企业", "本地模式", "account", "sign in"],
-      icon: UserRound
-    }]
-  },
-  {
     label: messages.settings.groups.application,
-    items: [{
-      id: "general",
-      ...messages.settings.sections.general,
-      searchTerms: ["外观", "主题", "深色", "浅色", "系统", "语言", "交互", "appearance", "theme"],
-      icon: SlidersHorizontal
-    }]
+    items: [
+      {
+        id: "account",
+        ...messages.settings.sections.account,
+        searchTerms: ["账户", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
+        icon: UserRound,
+        measure: "compact"
+      },
+      {
+        id: "general",
+        ...messages.settings.sections.general,
+        searchTerms: ["通用", "外观", "主题", "深色", "浅色", "跟随系统", "appearance", "theme"],
+        icon: SlidersHorizontal,
+        measure: "compact"
+      }
+    ]
   },
   {
     label: messages.settings.groups.pi,
@@ -53,7 +55,8 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         id: "providers",
         ...messages.settings.sections.providers,
         searchTerms: ["提供商", "服务商", "认证", "密钥", "思考级别", "provider", "model", "api key"],
-        icon: Bot
+        icon: Bot,
+        measure: "standard"
       },
       {
         id: "extensions",
@@ -76,7 +79,8 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "extension",
           "resource"
         ],
-        icon: Blocks
+        icon: Blocks,
+        measure: "standard"
       },
       {
         id: "skills",
@@ -96,20 +100,28 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "skill",
           "resource"
         ],
-        icon: Sparkles
+        icon: Sparkles,
+        measure: "standard"
       },
       {
         id: "prompts",
         ...messages.settings.sections.prompts,
         searchTerms: ["指令模板", "提示词模板", ".pi/prompts", "prompt", "prompts", "slash command"],
-        icon: FileText
+        icon: FileText,
+        measure: "standard"
       },
       {
         id: "rules",
         ...messages.settings.sections.rules,
         searchTerms: ["规则", "上下文", "agents", "claude", "system", "rule", "rules", "行为约束"],
-        icon: Scale
-      },
+        icon: Scale,
+        measure: "standard"
+      }
+    ]
+  },
+  {
+    label: messages.settings.groups.connections,
+    items: [
       {
         id: "mcp",
         ...messages.settings.sections.mcp,
@@ -122,7 +134,8 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "中转",
           "搜索服务"
         ],
-        icon: Server
+        icon: Server,
+        measure: "compact"
       },
       {
         id: "integrations",
@@ -137,36 +150,41 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "doctor",
           "integration"
         ],
-        icon: Globe
-      },
+        icon: Globe,
+        measure: "standard"
+      }
+    ]
+  },
+  {
+    label: messages.settings.groups.systemSupport,
+    items: [
       {
         id: "runtime",
         ...messages.settings.sections.runtime,
         searchTerms: ["运行", "会话", "并发", "恢复", "诊断", "runtime", "session"],
-        icon: Activity
+        icon: Activity,
+        measure: "compact"
       },
       {
         id: "network",
         ...messages.settings.sections.network,
         searchTerms: ["镜像", "npm", "git", "node", "下载", "网络", "registry", "github"],
-        icon: Network
-      }
-    ]
-  },
-  {
-    label: messages.settings.groups.support,
-    items: [
+        icon: Network,
+        measure: "standard"
+      },
       {
         id: "updates",
         ...messages.settings.sections.updates,
         searchTerms: ["版本", "检查更新", "导出", "诊断", "update", "version", "doctor"],
-        icon: RefreshCw
+        icon: RefreshCw,
+        measure: "compact"
       },
       {
         id: "about",
         ...messages.settings.sections.about,
         searchTerms: ["版本", "架构", "pi", "jsonl", "electron", "about"],
-        icon: Info
+        icon: Info,
+        measure: "compact"
       }
     ]
   }
@@ -175,11 +193,9 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
 export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.items);
 
 export function sectionSupportsProjectScope(section: SettingsSection): boolean {
-  return section === "providers"
-    || section === "packages"
+  return section === "packages"
     || section === "extensions"
-    || section === "prompts"
-    || section === "runtime";
+    || section === "prompts";
 }
 
 export function matchesSettingsQuery(item: SettingsNavigationItem, query: string): boolean {

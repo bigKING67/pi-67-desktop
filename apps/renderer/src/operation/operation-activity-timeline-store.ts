@@ -226,7 +226,9 @@ function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" 
         ? "AUTO · 已配置来源"
         : activity.authorization.reason === "read-only"
           ? "AUTO · 只读"
-          : "AUTO · Workspace 内写入",
+          : activity.authorization.reason === "workspace-command"
+            ? "AUTO · 工作区命令"
+            : "AUTO · Workspace 内写入",
     activity.aliasTarget === undefined ? undefined : `已兼容转发到 ${activity.aliasTarget}`,
     result
   ].filter((value): value is string => value !== undefined).join(" · ");

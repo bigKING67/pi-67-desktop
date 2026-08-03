@@ -13,19 +13,19 @@ export const zhCNMessages = {
   },
   settings: {
     groups: {
-      personal: "个人",
       application: "应用",
       pi: "Pi",
-      support: "支持"
+      connections: "连接与集成",
+      systemSupport: "系统与支持"
     },
     sections: {
       account: {
-        label: "账户",
-        summary: "管理登录状态、账户同步与本地数据边界。"
+        label: "账户与本地数据",
+        summary: "查看本地模式、账户服务状态与数据保留边界。"
       },
       general: {
-        label: "通用",
-        summary: "调整外观、语言和桌面交互偏好。"
+        label: "外观",
+        summary: "选择跟随系统、浅色或深色应用外观。"
       },
       providers: {
         label: "模型服务",
@@ -53,7 +53,7 @@ export const zhCNMessages = {
       },
       mcp: {
         label: "MCP 服务",
-        summary: "管理外部 MCP 服务的连接端点、认证凭据与本机配置状态。"
+        summary: "管理 Tavily Bridge Client Token 与本机凭据状态。"
       },
       integrations: {
         label: "浏览器集成",
@@ -61,7 +61,7 @@ export const zhCNMessages = {
       },
       runtime: {
         label: "运行服务",
-        summary: "查看并发、恢复和 Pi 运行服务状态。"
+        summary: "查看运行名额、会话写入边界与 Pi 运行环境诊断。"
       },
       network: {
         label: "下载源与网络",
@@ -73,7 +73,7 @@ export const zhCNMessages = {
       },
       about: {
         label: "关于",
-        summary: "查看 π 的产品边界、版本与运行架构。"
+        summary: "查看当前版本、平台、架构、更新通道与产品边界。"
       }
     },
     emptySearchSuggestion: "尝试搜索主题、模型、技能、镜像或更新。",

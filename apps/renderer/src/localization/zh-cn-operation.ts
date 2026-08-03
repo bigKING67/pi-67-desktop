@@ -29,6 +29,7 @@ export const zhCNOperationMessages = {
   autoAuthorizationReasons: {
     "configured-source": "AUTO · 已配置来源",
     "read-only": "AUTO · 只读",
+    "workspace-command": "AUTO · 工作区命令",
     "workspace-write": "AUTO · Workspace 内写入"
   },
   quiet: "暂时没有新活动",

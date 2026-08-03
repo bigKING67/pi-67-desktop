@@ -115,7 +115,7 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
 
   await page.getByRole("button", { name: /未登录\s*本地模式/u }).click();
   await expect(page.getByLabel("π 设置")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "账户", exact: true }).last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "账户与本地数据", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByTestId("inspector-toggle")).toHaveCount(0);
@@ -329,7 +329,7 @@ test("opens Settings, update, and help from the lower-left help menu", async ({ 
   await helpButton.click();
   await page.getByRole("menuitem", { name: "设置", exact: true }).click();
   await expect(page.getByLabel("π 设置")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "通用", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
 
   await page.getByRole("button", { name: "返回工作台" }).click();
   await expect(helpButton).toBeVisible();

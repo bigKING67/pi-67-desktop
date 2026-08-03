@@ -94,18 +94,20 @@ describe("createDesktopSafetyExtension", () => {
 
   it("auto-allows bounded workspace commands in balanced mode", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const recordToolAuthorization = vi.fn();
     const handler = safetyHandler({
       ...trustedPolicy(),
       approvalMode: "balanced",
       taskToolMode: "auto"
-    }, requestApproval);
+    }, requestApproval, undefined, undefined, recordToolAuthorization);
 
     await expect(handler({
       toolCallId: "tool-call-workspace-command",
       toolName: "bash",
-      input: { command: "git status --short" }
+      input: { command: "git status --short && git diff --check" }
     }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();
+    expect(recordToolAuthorization).toHaveBeenCalledWith("tool-call-workspace-command", "workspace-command");
   });
 
   it("auto-allows only the exact internal Desktop attachment Tool and its bounded input", async () => {
@@ -347,7 +349,8 @@ function safetyHandler(
   policy: SafetyPolicyState,
   requestApproval: DesktopApprovalRequester,
   getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => [builtinTool("bash")],
-  getActiveTools?: () => string[]
+  getActiveTools?: () => string[],
+  recordToolAuthorization?: Parameters<typeof createDesktopSafetyExtension>[4]
 ): SafetyHandler {
   let handler: SafetyHandler | undefined;
   const api = {
@@ -359,7 +362,10 @@ function safetyHandler(
   } as unknown as ExtensionAPI;
   const extension = createDesktopSafetyExtension(
     () => policy,
-    requestApproval
+    requestApproval,
+    undefined,
+    undefined,
+    recordToolAuthorization
   );
   if (!("factory" in extension)) throw new Error("Expected the named Desktop safety extension factory.");
   void extension.factory(api);

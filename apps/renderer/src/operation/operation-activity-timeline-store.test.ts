@@ -151,6 +151,23 @@ describe("operation activity timeline", () => {
     });
   });
 
+  it("labels AUTO-authorized workspace commands distinctly from file writes", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-command",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "completed",
+      authorization: { mode: "auto", reason: "workspace-command" }
+    }, 20);
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      detail: "AUTO · 工作区命令 · 执行成功",
+      activity: { authorization: { mode: "auto", reason: "workspace-command" } }
+    });
+  });
+
   it("adds a late AUTO reason to the running Tool without creating a duplicate step", () => {
     let timeline = createOperationActivityTimeline(operation());
     timeline = recordOperationTimelineActivity(timeline, {

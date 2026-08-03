@@ -64,7 +64,7 @@ declare global {
         getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
         savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
         resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;
-        probePackageSources(): Promise<PackageNetworkSnapshot>;
+        probePackageSources(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
         getDesktopCapabilitySnapshot(): Promise<DesktopCapabilitySnapshot>;
         setupBrowser67(): Promise<DesktopCapabilitySnapshot>;
         doctorBrowser67(): Promise<DesktopCapabilitySnapshot>;

@@ -1,0 +1,115 @@
+.modal {
+  width: min(540px, calc(100vw - 40px));
+}
+
+.dialog {
+  display: grid;
+  gap: 13px;
+  padding: 20px;
+}
+
+.dialog h2,
+.dialog p {
+  margin: 0;
+}
+
+.dialog h2 {
+  color: var(--text-primary);
+  font-size: 18px;
+}
+
+.dialog p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dialog p strong {
+  color: var(--text-primary);
+}
+
+.facts {
+  display: grid;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-muted);
+}
+
+.facts div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--border);
+}
+
+.facts div:last-child {
+  border-bottom: 0;
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.facts dt {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
+.error {
+  padding: 9px 11px;
+  border-left: 3px solid var(--danger);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  color: var(--danger) !important;
+}
+
+.dangerButton {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger);
+  color: var(--text-on-danger);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dangerButton[data-hovered] {
+  filter: brightness(0.96);
+}
+
+.dangerButton[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.dangerButton[data-disabled] {
+  opacity: 0.55;
+}
+
+@media (max-width: 560px) {
+  .modal {
+    width: min(100%, calc(100vw - 20px));
+  }
+
+  .dialog {
+    padding: 16px;
+  }
+
+  .facts div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

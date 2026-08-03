@@ -25,6 +25,7 @@ export type ToolPresentationKind =
 export type ToolAutoAuthorizationReason =
   | "configured-source"
   | "read-only"
+  | "workspace-command"
   | "workspace-write";
 
 export interface ToolAuthorizationProjection {

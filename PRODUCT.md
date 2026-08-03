@@ -53,8 +53,9 @@ count.
 5. Diagnose shell, configuration, extension, update, and runtime failures
    without exposing credentials or private content.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
-7. Open the singleton Settings surface for account, application, global, or
-   current-workspace Pi configuration without losing drafts or background work.
+7. Open the singleton Settings surface across Application, Pi, Connections &
+   Integrations, and System & Support categories without losing drafts or
+   background work.
 8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
    external MCP services; and prepare supported browser integrations without
    requiring a system Node, npm, Git, pnpm, or Pi CLI.
@@ -134,9 +135,14 @@ count.
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
 - MCP credentials and browser capability readiness are independent Settings tasks.
-  `MCP 服务` owns external service endpoints, local credential configuration, and
-  connection identity; `浏览器集成` owns browser-specific dependency preparation
-  and runtime diagnostics. They never share one mixed Settings document.
+  `MCP 服务` owns external service endpoints and local credential status;
+  live connection identity comes only from the Task/Agent Host projection after
+  Pi establishes the MCP transport. `浏览器集成` owns browser-specific dependency
+  preparation and runtime diagnostics. They never share one mixed Settings document.
+- Download-source probing validates and checks the current in-memory draft without
+  persisting it. Probe results identify whether they belong to unsaved settings and
+  become stale as soon as the draft changes; only the explicit Save action writes
+  settings. Restoring defaults is a separate confirmed destructive action.
 - Bundled browser67 source and Skills do not imply live browser readiness. The
   product treats bundled source, prepared runtime dependencies, prepared unpacked
   extension files, a browser-loaded extension, and a live identity-matched managed
@@ -275,6 +281,17 @@ count.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
+- Settings navigation groups `账户与本地数据` and `外观` under Application; Pi
+  resources under Pi; MCP and browser work under Connections & Integrations; and
+  runtime, network, updates, and About under System & Support. Category search
+  searches these navigation targets rather than arbitrary page content. Narrow
+  windows use the same grouped information architecture in a bounded popover.
+- Provider, Download Sources/Network, MCP credential, and Rules/Context drafts stay
+  in Renderer memory. Leaving the category, changing an applicable page scope, or
+  returning to the Workbench requires an explicit discard decision while dirty.
+  Removing a custom Provider definition, restoring default download sources,
+  clearing an MCP token, or removing a persistent Provider credential requires a
+  separate confirmation whose default action is Cancel.
 - The conversation workbench is the only three-region application surface.
   Settings and other application-level surfaces replace the Workspace rail with
   their own bounded navigation, use a two-column shell on wide windows, and
@@ -313,6 +330,9 @@ count.
   `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
   `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
   model configuration copy.
+- Removing a custom Provider deletes only its `models.json` definition and does not
+  silently remove a same-named `auth.json` credential. Persistent credential removal
+  is an independent confirmed operation against `auth.json`.
 - Desktop watches those Pi files and publishes revisioned snapshots. A clean
   view adopts external TUI, script, or manual edits automatically; an unsaved
   draft remains intact and must explicitly adopt the newer revision before it

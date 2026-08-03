@@ -295,7 +295,8 @@ loading error where the operation can produce those states
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
 - An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
-  `AUTO · 已配置来源`, `AUTO · 只读`, or `AUTO · Workspace 内写入`. The reason
+  `AUTO · 已配置来源`, `AUTO · 只读`, `AUTO · 工作区命令`, or
+  `AUTO · Workspace 内写入`. The reason
   is a fixed enum projected by Host/Runtime authority, stays on the same unwrapped
   header line without becoming a badge, and remains visible when a completed
   process is reopened. It never competes with the Tool name, compact summary, or
@@ -1121,7 +1122,12 @@ loading error where the operation can produce those states
   read/write Tools, exact current-Session loaded resource reads, verified
   read-only web Tools, ordinary effective configured Package/MCP operations,
   non-destructive persistent writes, and conservatively classified local
-  inspection/test/build Shell commands proceed without repetitive approval.
+  inspection/test/build Shell commands proceed without repetitive approval. A
+  bounded `&&` chain or read-only pipeline is admitted only when every segment is
+  independently safe; Workspace-local `cd` and the small CI environment allowlist
+  never widen a following segment's authority. Redirection, substitution, unknown
+  interpreters, unsafe environment changes, or one unsafe segment keep the complete
+  command in the one-shot flow.
   The effective capability catalog is rebuilt from Task-local Package settings
   and bounded `mcp.json`/`mcp-cache.json` metadata at resource load/reload; Tool
   Calls perform in-memory identity lookups and never expose command, env, URL,

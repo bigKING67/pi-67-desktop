@@ -60,7 +60,7 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   background: color-mix(in srgb, var(--surface) 72%, transparent);
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .search[data-hovered] {
@@ -85,7 +85,7 @@
 }
 
 .searchInput::placeholder {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .searchInput::-webkit-search-cancel-button {
@@ -135,7 +135,7 @@
 
 .navigationGroupLabel {
   padding: 0 9px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.01em;
@@ -167,7 +167,7 @@
   display: grid;
   gap: 5px;
   padding: 10px 9px;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .emptySearch strong {
@@ -247,6 +247,10 @@
   margin-inline: auto;
 }
 
+.documentBody[data-measure="compact"] {
+  width: min(840px, 100%);
+}
+
 .pageContent {
   min-width: 0;
 }
@@ -316,7 +320,7 @@
   min-width: 0;
   margin-top: 3px;
   overflow: hidden;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-family: var(--font-code);
   font-size: 11px;
   font-variant-ligatures: none;
@@ -324,10 +328,103 @@
   overflow-wrap: anywhere;
 }
 
-.aboutIcon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+.mobileNavigation {
+  display: none;
+}
+
+.mobileNavigationTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.mobileNavigationTrigger > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.mobileNavigationTrigger small {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.mobileNavigationTrigger strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileNavigationTrigger[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.mobileNavigationPopover {
+  z-index: 70;
+  width: min(320px, calc(100vw - 20px));
+  max-height: min(460px, calc(100vh - 100px));
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.mobileNavigationMenu {
+  display: grid;
+  gap: 10px;
+  outline: none;
+}
+
+.mobileNavigationSection {
+  display: grid;
+  gap: 2px;
+}
+
+.mobileNavigationHeader {
+  padding: 3px 9px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.mobileNavigationItem {
+  display: grid;
+  min-height: 36px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  outline: none;
+}
+
+.mobileNavigationItem[data-current="true"] {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.mobileNavigationItem[data-focused],
+.mobileNavigationItem[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 @media (max-width: 1100px) {
@@ -367,38 +464,18 @@
     padding: 8px 10px 4px;
   }
 
-  .navigation {
-    display: flex;
-    gap: 4px;
+  .desktopNavigation {
+    display: none;
+  }
+
+  .mobileNavigation {
+    display: block;
+    min-width: 0;
     padding: 4px 10px 8px;
-    overflow-x: auto;
-    scrollbar-gutter: auto;
-    scrollbar-width: none;
   }
 
-  .navigation::-webkit-scrollbar {
-    display: none;
-  }
-
-  .navigationGroup,
-  .navigationGroupItems {
-    display: contents;
-  }
-
-  .navigationGroupLabel {
-    display: none;
-  }
-
-  .navigationItem {
-    flex: 0 0 auto;
-    width: auto;
-    grid-template-columns: 18px auto;
-    padding: 0 10px;
-    white-space: nowrap;
-  }
-
-  .emptySearch {
-    flex: 1 0 240px;
+  .mobileNavigation .emptySearch {
+    padding: 8px 2px;
   }
 
   .scrollRegion {

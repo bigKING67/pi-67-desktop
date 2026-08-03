@@ -8,6 +8,8 @@ import {
   SettingsRows,
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
+import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
+import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 
 type TeamMcpStatus = Awaited<ReturnType<Window["pi67"]["system"]["getTeamMcpStatus"]>>;
 
@@ -22,7 +24,19 @@ export function TeamMcpPanel() {
   const [phase, setPhase] = useState<"idle" | "loading" | "saving" | "clearing">("idle");
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
+  const [clearOpen, setClearOpen] = useState(false);
   const mounted = useRef(false);
+
+  useSettingsDraftRegistration({
+    dirty: draft.length > 0,
+    busy: phase === "saving",
+    subject: "Tavily Bridge Client Token",
+    discard: () => {
+      setDraft("");
+      setDraftVisible(false);
+      setError(undefined);
+    }
+  });
 
   const hideRevealedToken = useCallback(() => {
     setRevealedToken(undefined);
@@ -94,7 +108,8 @@ export function TeamMcpPanel() {
       setStatus(next);
       setDraft("");
       setDraftVisible(false);
-      setNotice("已清除本机 Token。在重新配置前，自建 Tavily 中转搜索将不可用。");
+      setClearOpen(false);
+      setNotice("已清除本机 Token，并重启了 Pi 运行服务。在重新配置前，自建 Tavily 中转搜索将不可用。");
     } catch (clearError) {
       if (mounted.current) {
         setError(clearError instanceof Error ? clearError.message : "清除失败");
@@ -143,6 +158,7 @@ export function TeamMcpPanel() {
       : "未设置";
 
   return (
+    <>
     <SettingsSectionBlock
       actions={<Button className="secondary-button" isDisabled={busy} onPress={() => void refresh()}>
         <RefreshCw aria-hidden="true" size={14} />刷新
@@ -155,9 +171,14 @@ export function TeamMcpPanel() {
       <SettingsRows>
         <SettingsRow
           leading={<span className={styles.status} data-status={status?.configured ? "ready" : "warning"} />}
-          title="配置状态"
+          title="凭据状态"
           description="Token 只保存在本机 userData，不会打进安装包，也不会出现在投影日志中。"
           value={status?.configured ? "已配置" : "未配置"}
+        />
+        <SettingsRow
+          title="连接状态"
+          description="实际连接随 Pi 任务建立；请在任务的工具状态中查看真实 MCP 连接。"
+          value="设置页未验证连接"
         />
         <SettingsRow
           title="MCP 端点"
@@ -232,7 +253,7 @@ export function TeamMcpPanel() {
               <Button
                 className="secondary-button"
                 isDisabled={busy || !status?.configured}
-                onPress={() => void clear()}
+                onPress={() => setClearOpen(true)}
               >
                 <Trash2 aria-hidden="true" size={14} />{phase === "clearing" ? "清除中…" : "清除"}
               </Button>
@@ -247,5 +268,22 @@ export function TeamMcpPanel() {
         />
       </SettingsRows>
     </SettingsSectionBlock>
+    <SettingsDestructiveActionDialog
+      busy={phase === "clearing"}
+      confirmLabel="清除 Client Token"
+      description="这会删除 Pi-67 userData 中保存的 Tavily Bridge Client Token，并重启 Pi 运行服务以移除凭据。"
+      error={clearOpen ? error : undefined}
+      facts={[
+        { label: "MCP 服务", value: status?.serverName ?? "Tavily Bridge" },
+        { label: "存储位置", value: "Pi-67 userData" },
+        { label: "运行服务", value: "确认后重启" }
+      ]}
+      open={clearOpen}
+      pendingLabel="正在清除…"
+      title="清除 MCP Client Token？"
+      onCancel={() => setClearOpen(false)}
+      onConfirm={() => void clear()}
+    />
+    </>
   );
 }

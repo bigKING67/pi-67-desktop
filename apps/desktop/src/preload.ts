@@ -104,8 +104,8 @@ const systemBridge = {
   resetPackageNetworkSettings: (): Promise<PackageNetworkSnapshot> => (
     ipcRenderer.invoke("pi67:package-network-reset")
   ),
-  probePackageSources: (): Promise<PackageNetworkSnapshot> => (
-    ipcRenderer.invoke("pi67:package-network-probe")
+  probePackageSources: (settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot> => (
+    ipcRenderer.invoke("pi67:package-network-probe", settings)
   ),
   getDesktopCapabilitySnapshot: (): Promise<DesktopCapabilitySnapshot> => (
     ipcRenderer.invoke("pi67:capability-snapshot")

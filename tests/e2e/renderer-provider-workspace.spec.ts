@@ -192,8 +192,9 @@ test("uses a list-to-detail model flow in a narrow Settings workspace", async ({
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("π 设置");
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+  await settings.getByRole("button", { name: "选择设置分类", exact: true }).click();
+  await page.getByRole("menu", { name: "选择设置分类" })
+    .getByRole("menuitem", { name: "模型服务", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   const providerList = panel.getByTestId("provider-configuration-list");
   const editor = panel.getByTestId("provider-configuration-editor");
@@ -247,20 +248,83 @@ test("persists a Provider credential from a registered Workspace without startin
 
   await expect(dialog.getByText("已持久化到 Pi auth.json")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("workspace-secret-1234");
-  await dialog.getByRole("button", { name: "移除持久凭据" }).click();
-  await expect(dialog.getByText("尚未配置")).toBeVisible();
-  const commands = await recordedCommandDetails(page);
-  expect(commands.filter((command) => command.type === "runtime.initialize")).toHaveLength(0);
-  expect(commands).toContainEqual(expect.objectContaining({
+  expect(await recordedCommandDetails(page)).toContainEqual(expect.objectContaining({
     type: "provider.credential.store",
     payload: expect.objectContaining({ provider: "anthropic", apiKey: "[redacted]" }),
     context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   }));
+  await clearRecordedCommands(page);
+  await dialog.getByRole("button", { name: "移除持久凭据" }).click();
+  const removal = page.getByRole("dialog", { name: "移除持久凭据？" });
+  await expect(removal).toContainText("Pi auth.json");
+  await expect(removal).not.toContainText("workspace-secret-1234");
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "provider.credential.remove"))
+    .toHaveLength(0);
+  await removal.getByRole("button", { name: "取消", exact: true }).click();
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "provider.credential.remove"))
+    .toHaveLength(0);
+  await dialog.getByRole("button", { name: "移除持久凭据" }).click();
+  await removal.getByRole("button", { name: "移除持久凭据", exact: true }).click();
+  await expect(dialog.getByText("尚未配置")).toBeVisible();
+  const commands = await recordedCommandDetails(page);
+  expect(commands.filter((command) => command.type === "runtime.initialize")).toHaveLength(0);
   expect(commands).toContainEqual(expect.objectContaining({
     type: "provider.credential.remove",
     payload: expect.objectContaining({ provider: "anthropic" }),
     context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   }));
+});
+
+test("protects Provider drafts and confirms models.json definition removal", async ({ page }) => {
+  const providerConfigurationSnapshot = createMockProviderConfigurationSnapshot();
+  providerConfigurationSnapshot.providers = providerConfigurationSnapshot.providers.map((provider) => (
+    provider.id === "anthropic"
+      ? { ...provider, origin: "models.json" as const, configured: true }
+      : provider
+  ));
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("π 设置");
+  const navigation = settings.getByRole("navigation", { name: "设置分类" });
+  await navigation.getByRole("button", { name: "模型服务", exact: true }).click();
+  const panel = settings.getByTestId("provider-configuration-panel");
+  await panel.getByTestId("provider-configuration-list")
+    .getByRole("button", { name: /Anthropic/u }).click();
+  await panel.getByRole("tab", { name: "基本配置" }).click();
+  const name = panel.getByLabel("显示名称");
+  await name.fill("Unsaved Provider Draft");
+
+  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  const discard = page.getByRole("dialog", { name: "放弃未保存的修改" });
+  await expect(discard).toContainText("Anthropic");
+  await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(name).toHaveValue("Unsaved Provider Draft");
+  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
+  await expect(settings.getByRole("heading", { name: "MCP 服务", exact: true })).toBeVisible();
+
+  await navigation.getByRole("button", { name: "模型服务", exact: true }).click();
+  await panel.getByTestId("provider-configuration-list")
+    .getByRole("button", { name: /Anthropic/u }).click();
+  await clearRecordedCommands(page);
+  await panel.getByRole("button", { name: "移除", exact: true }).click();
+  const removal = page.getByRole("dialog", { name: "移除模型服务定义？" });
+  await expect(removal).toContainText("models.json");
+  await expect(removal).toContainText("auth.json");
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "provider.configuration.remove"))
+    .toHaveLength(0);
+  await removal.getByRole("button", { name: "取消", exact: true }).click();
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "provider.configuration.remove"))
+    .toHaveLength(0);
+  await panel.getByRole("button", { name: "移除", exact: true }).click();
+  await removal.getByRole("button", { name: "移除模型服务", exact: true }).click();
+  await expect(panel.getByTestId("provider-configuration-list")).toBeVisible();
+  const removeCommands = (await recordedCommandDetails(page))
+    .filter((command) => command.type === "provider.configuration.remove");
+  expect(removeCommands).toHaveLength(1);
+  expect(removeCommands[0]).toMatchObject({ payload: { provider: "anthropic" } });
 });
 
 test("edits Pi Provider files, selects built-in defaults, and preserves a stale draft", async ({ page }) => {

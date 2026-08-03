@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   attachMockAgent,
   installMockDesktopBridge,
@@ -16,9 +16,10 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
 
   const settings = page.getByLabel("π 设置");
   const navigation = page.getByRole("navigation", { name: "设置分类" });
-  const contentHeader = page.getByRole("heading", { name: "通用", exact: true }).locator("..");
+  const contentHeader = page.getByRole("heading", { name: "外观", exact: true, level: 1 }).locator("..");
   const layout = await settings.evaluate((element) => {
-    const navigationElement = element.querySelector<HTMLElement>('[aria-label="设置分类"]');
+    const navigationElement = [...element.querySelectorAll<HTMLElement>('[aria-label="设置分类"]')]
+      .find((candidate) => getComputedStyle(candidate).display !== "none");
     const contentElement = navigationElement?.parentElement?.nextElementSibling;
     const navigationRect = navigationElement?.getBoundingClientRect();
     const contentRect = contentElement?.getBoundingClientRect();
@@ -34,13 +35,29 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(contentHeader).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
 
-  await navigation.getByRole("button", { name: "扩展", exact: true }).click();
+  const categoryTrigger = settings.getByRole("button", { name: "选择设置分类", exact: true });
+  await categoryTrigger.click();
+  const categoryMenu = page.getByRole("menu", { name: "选择设置分类" });
+  await expect(categoryMenu).toBeVisible();
+  for (const group of ["应用", "Pi", "连接与集成", "系统与支持"]) {
+    await expect(categoryMenu.getByText(group, { exact: true })).toBeVisible();
+  }
+  const categoryPopover = page.getByRole("dialog", { name: "选择设置分类" });
+  const popoverBounds = await categoryPopover.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  });
+  expect(popoverBounds.left).toBeGreaterThanOrEqual(0);
+  expect(popoverBounds.right).toBeLessThanOrEqual(520);
+  expect(popoverBounds.top).toBeGreaterThanOrEqual(0);
+  expect(popoverBounds.bottom).toBeLessThanOrEqual(400);
+  await categoryMenu.getByRole("menuitem", { name: "扩展", exact: true }).click();
   await expect(page.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true })).toBeVisible();
   const scrollRegion = settings.getByTestId("settings-scroll-region");
   await scrollRegion.evaluate((element) => { element.scrollTop = element.scrollHeight; });
   expect(await scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
-  await navigation.getByRole("button", { name: "技能", exact: true }).click();
+  await selectMobileSettingsSection(settings, page, "技能");
   const skillTabs = settings.getByRole("tablist", { name: "技能可用范围" });
   await expect(skillTabs).toBeVisible();
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
@@ -57,7 +74,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(bundledPanel.getByRole("button", { name: "返回全局可用技能" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
-  await navigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
+  await selectMobileSettingsSection(settings, page, "规则与上下文");
   const ruleWorkspace = settings.getByTestId("rule-settings-workspace");
   const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "规则与上下文可用范围" });
   await expect(ruleTabs).toBeVisible();
@@ -90,14 +107,14 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(contextDetail.getByTestId("context-file-preview")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
-  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  await selectMobileSettingsSection(settings, page, "MCP 服务");
   await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "显示输入内容" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "保存", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "清除", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
-  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
+  await selectMobileSettingsSection(settings, page, "浏览器集成");
   await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
   await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
@@ -119,7 +136,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
   await installer.getByRole("button", { name: "关闭", exact: true }).click();
 
-  await navigation.getByRole("button", { name: /更新与诊断/u }).click();
+  await selectMobileSettingsSection(settings, page, "更新与诊断");
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.getByRole("button", { name: /^检查更新/u })).toBeVisible();
   await expect(page.getByRole("button", { name: /^导出脱敏诊断/u })).toBeVisible();
@@ -163,7 +180,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
   const manageCredentials = page.getByRole("button", { name: "管理凭据" });
-  await expect(scope).toBeVisible();
+  await expect(scope).toHaveCount(0);
   await expect(providerList).toBeVisible();
   await expect(providerEditor).toBeHidden();
   await providerList.getByRole("button").first().click();
@@ -175,7 +192,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth
   }))).toEqual({ clientWidth: 1040, scrollWidth: 1040 });
-  for (const locator of [scope, manageCredentials]) {
+  for (const locator of [manageCredentials]) {
     const bounds = await locator.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return { left: rect.left, right: rect.right, width: rect.width };
@@ -213,7 +230,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1040);
 });
 
-test("centers a 1120 pixel Settings document and never expands management flows into side-by-side panes", async ({ page }) => {
+test("centers compact and standard Settings documents without side-by-side management panes", async ({ page }) => {
   await page.setViewportSize({ width: 1476, height: 908 });
   await installMockDesktopBridge(page);
   await page.goto("/");
@@ -234,11 +251,16 @@ test("centers a 1120 pixel Settings document and never expands management flows 
       rightInset: regionRect.right - bodyRect.right
     };
   });
-  expect(documentMetrics.bodyWidth).toBeLessThanOrEqual(1120.5);
+  expect(documentMetrics.bodyWidth).toBeLessThanOrEqual(840.5);
   expect(Math.abs(documentMetrics.leftInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
 
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
   await navigation.getByRole("button", { name: /^模型服务/u }).click();
+  const standardWidth = await scrollRegion.evaluate((element) => (
+    (element.firstElementChild as HTMLElement).getBoundingClientRect().width
+  ));
+  expect(standardWidth).toBeGreaterThan(840.5);
+  expect(standardWidth).toBeLessThanOrEqual(1120.5);
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
   await expect(providerList).toBeVisible();
@@ -283,4 +305,10 @@ async function installPackageFixture(page: Page): Promise<void> {
     }],
     total: 1
   });
+}
+
+async function selectMobileSettingsSection(settings: Locator, page: Page, label: string) {
+  await settings.getByRole("button", { name: "选择设置分类", exact: true }).click();
+  await page.getByRole("menu", { name: "选择设置分类" })
+    .getByRole("menuitem", { name: label, exact: true }).click();
 }

@@ -27,6 +27,7 @@ export interface ProviderConfigurationState {
   beginSave(): void;
   observeExternal(workspaceId: string, change: PiProviderConfigurationChanged): void;
   adoptExternal(): void;
+  discardDraft(): void;
   reset(): void;
 }
 
@@ -122,6 +123,12 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
   },
 
   adoptExternal() {
+    const state = get();
+    if (!state.workspaceId || !state.snapshot) return;
+    state.install(state.workspaceId, state.snapshot);
+  },
+
+  discardDraft() {
     const state = get();
     if (!state.workspaceId || !state.snapshot) return;
     state.install(state.workspaceId, state.snapshot);

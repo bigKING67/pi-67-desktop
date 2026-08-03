@@ -331,12 +331,21 @@ try {
   if (security.hasNodeProcess || security.hasRequire || !security.hasBridge) {
     throw new Error(`Packaged renderer security boundary failed: ${JSON.stringify(security)}`);
   }
+  const packagedVersion = await application.evaluate(({ app }) => app.getVersion());
+  await workspaceSettings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: /^关于/u }).click();
+  await workspaceSettings.getByRole("heading", { name: "关于", exact: true, level: 1 })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  for (const value of [packagedVersion, "macOS", "Apple Silicon (arm64)", "Unsigned Preview · 手动更新"]) {
+    await workspaceSettings.getByText(value, { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
+  }
+  await capturePackagedScreenshot(window, "10-about.png");
   await window.locator('html[data-theme-preference="system"]').waitFor({ state: "attached" });
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^通用/u }).click();
+    .getByRole("button", { name: /^外观/u }).click();
   await workspaceSettings.getByRole("button", { name: /^浅色/u }).click();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
-  await capturePackagedScreenshot(window, "10-general-light.png");
+  await capturePackagedScreenshot(window, "10-appearance-light.png");
   await workspaceSettings.getByRole("button", { name: "返回工作台" }).click();
   await workspaceSettings.waitFor({ state: "hidden", timeout: 15_000 });
   try {

@@ -279,13 +279,22 @@ test("projects operation activities and sends an operation-scoped abort", async 
     type: "operation.activityChanged",
     payload: {
       operationId,
-      activity: { kind: "tool", toolCallId: "tool-1", toolName: "bash", toolKind: "shell", status: "running" }
+      activity: {
+        kind: "tool",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        toolKind: "shell",
+        status: "running",
+        authorization: { mode: "auto", reason: "workspace-command" }
+      }
     }
   }, { operationId });
   const shellStep = page.locator("[data-turn-activity]").filter({ hasText: "正在调用 bash" });
   await expect(shellStep).toBeVisible();
   await expect(shellStep).toContainText("分析问题");
   await expect(shellStep).toContainText("组织回复");
+  await expect(shellStep).toContainText("AUTO · 工作区命令");
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toHaveCount(0);
 
   await emitMockAgentEvent(page, {
     type: "operation.activityChanged",

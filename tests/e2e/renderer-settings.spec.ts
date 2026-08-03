@@ -377,9 +377,9 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
 
   const settings = page.getByLabel("π 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  const search = settings.getByRole("searchbox", { name: "搜索设置" });
+  const search = settings.getByRole("searchbox", { name: "搜索设置分类" });
 
-  for (const group of ["个人", "应用", "Pi", "支持"]) {
+  for (const group of ["应用", "Pi", "连接与集成", "系统与支持"]) {
     await expect(navigation.getByRole("group", { name: group, exact: true })).toBeVisible();
   }
   await expect(settings.locator("aside img")).toHaveCount(0);
@@ -388,20 +388,20 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await page.keyboard.press(process.platform === "darwin" ? "Meta+f" : "Control+f");
   await expect(search).toBeFocused();
   await search.fill("主题");
-  await expect(navigation.getByRole("button", { name: "通用", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "账户与本地数据", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("button", { name: "扩展", exact: true })).toHaveCount(0);
 
   await search.fill("卸载");
   await navigation.getByRole("button", { name: "扩展", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "扩展", exact: true })).toBeVisible();
 
-  await settings.getByRole("button", { name: "清除设置搜索" }).click();
-  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toBeVisible();
+  await settings.getByRole("button", { name: "清除设置分类搜索" }).click();
+  await expect(navigation.getByRole("button", { name: "账户与本地数据", exact: true })).toBeVisible();
   await search.fill("不存在的设置");
   await expect(navigation.getByText("没有匹配的设置", { exact: true })).toBeVisible();
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();
-  await expect(navigation.getByRole("button", { name: "通用", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
 });
 
 function packageEntry(

@@ -19,6 +19,7 @@ import {
   storePersistentCredential
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
+import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 
 export function CredentialDialog() {
   const open = useShellStore((state) => state.credentialDialogOpen);
@@ -28,6 +29,9 @@ export function CredentialDialog() {
   const configuration = useProviderConfigurationStore((state) => (
     state.workspaceId === workspaceId ? state.snapshot : undefined
   ));
+  const configurationError = useProviderConfigurationStore((state) => (
+    state.workspaceId === workspaceId ? state.error : undefined
+  ));
   const [providers, setProviders] = useState<ProviderSummary[] | undefined>(undefined);
   const providerList = useMemo(() => providers ?? [], [providers]);
   const [providerId, setProviderId] = useState("");
@@ -36,6 +40,7 @@ export function CredentialDialog() {
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [loadRevision, setLoadRevision] = useState(0);
+  const [removeTargetProviderId, setRemoveTargetProviderId] = useState<string>();
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +48,7 @@ export function CredentialDialog() {
     setProviderQuery("");
     setSubmitting(false);
     setLoadError(undefined);
+    setRemoveTargetProviderId(undefined);
     if (!workspaceId) {
       setProviders([]);
       return;
@@ -93,10 +99,17 @@ export function CredentialDialog() {
 
   if (!open) return null;
   const selectedProvider = providerList.find((provider) => provider.id === providerId);
+  const removalProvider = providerList.find((provider) => provider.id === removeTargetProviderId);
   const canSubmit = selectedProvider !== undefined && apiKey.trim().length >= 8 && !submitting;
 
   return (
-    <ModalOverlay className="modal-overlay" isOpen isDismissable={!submitting} onOpenChange={setOpen}>
+    <>
+    <ModalOverlay
+      className="modal-overlay"
+      isOpen
+      isDismissable={!submitting && removeTargetProviderId === undefined}
+      onOpenChange={(next) => { if (removeTargetProviderId === undefined) setOpen(next); }}
+    >
       <Modal className="modal-surface credential-dialog">
         <Dialog aria-label={messages.credentials.title}>
           <form onSubmit={(event) => {
@@ -221,17 +234,8 @@ export function CredentialDialog() {
                 className="secondary-button"
                 isDisabled={submitting}
                 onPress={() => {
-                  setSubmitting(true);
-                  void (async () => {
-                    try {
-                      const removed = await removePersistentCredential(workspaceId, providerId);
-                      if (removed) setProviders(await loadWorkspaceProviderCatalog(workspaceId));
-                    } catch (error) {
-                      setLoadError(error instanceof Error ? error.message : messages.credentials.loadFailed);
-                    } finally {
-                      setSubmitting(false);
-                    }
-                  })();
+                  setLoadError(undefined);
+                  setRemoveTargetProviderId(providerId);
                 }}
               >移除持久凭据</Button> : null}
               <Button className="primary-button" type="submit" isDisabled={!canSubmit}>
@@ -242,6 +246,40 @@ export function CredentialDialog() {
         </Dialog>
       </Modal>
     </ModalOverlay>
+    <SettingsDestructiveActionDialog
+      busy={submitting}
+      confirmLabel="移除持久凭据"
+      description={<>这会从 Pi <code>auth.json</code> 删除所选 Provider 的持久凭据。当前输入框中的密钥不会被发送或显示在确认信息中。</>}
+      error={removeTargetProviderId ? (loadError ?? configurationError) : undefined}
+      facts={[
+        { label: "Provider", value: removalProvider?.label ?? removeTargetProviderId ?? "-" },
+        { label: "配置文件", value: "Pi auth.json" },
+        { label: "本次运行覆盖", value: "不受此操作影响" }
+      ]}
+      open={removeTargetProviderId !== undefined}
+      pendingLabel="正在移除…"
+      title="移除持久凭据？"
+      onCancel={() => setRemoveTargetProviderId(undefined)}
+      onConfirm={() => {
+        if (!workspaceId || !removeTargetProviderId) return;
+        const target = removeTargetProviderId;
+        setSubmitting(true);
+        setLoadError(undefined);
+        void (async () => {
+          try {
+            const removed = await removePersistentCredential(workspaceId, target);
+            if (!removed) return;
+            setProviders(await loadWorkspaceProviderCatalog(workspaceId));
+            setRemoveTargetProviderId(undefined);
+          } catch (error) {
+            setLoadError(error instanceof Error ? error.message : messages.credentials.loadFailed);
+          } finally {
+            setSubmitting(false);
+          }
+        })();
+      }}
+    />
+    </>
   );
 }
 

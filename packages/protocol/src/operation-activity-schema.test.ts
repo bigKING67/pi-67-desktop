@@ -51,6 +51,13 @@ describe("operation activity protocol", () => {
       ...tool,
       payload: {
         ...tool.payload,
+        activity: { ...tool.payload.activity, authorization: { mode: "auto", reason: "workspace-command" } }
+      }
+    })).toBe(true);
+    expect(isEventEnvelope({
+      ...tool,
+      payload: {
+        ...tool.payload,
         activity: { ...tool.payload.activity, authorization: { mode: "auto", reason: "unknown" } }
       }
     })).toBe(false);

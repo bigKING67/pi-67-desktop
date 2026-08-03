@@ -1,4 +1,4 @@
-import { MAX_RUNNING_TASKS, type SettingsSection } from "@pi67/domain";
+import type { SettingsSection } from "@pi67/domain";
 import {
   ArrowLeft,
   DownloadCloud,
@@ -6,20 +6,17 @@ import {
   Monitor,
   Moon,
   Search,
-  Stethoscope,
   Sun,
   UserRound,
   X
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Button,
   Input,
   SearchField
 } from "react-aria-components";
-import piIconUrl from "../assets/pi-icon-64.png";
 import { saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
-import { messages } from "../localization/message-catalog.js";
 import { useShellStore } from "../shell/shell-store.js";
 import {
   setThemePreference,
@@ -36,11 +33,17 @@ import { Browser67IntegrationPanel } from "./DesktopCapabilityPanels.js";
 import { PackageNetworkPanel } from "./PackageNetworkPanel.js";
 import { TeamMcpPanel } from "./TeamMcpPanel.js";
 import { ProviderConfigurationPanel } from "./ProviderConfigurationPanel.js";
-import { ContextFileDiscardDialog } from "./ContextFileDiscardDialog.js";
 import { RuleSettingsWorkspace } from "./RuleSettingsWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import { SkillSettingsWorkspace } from "./SkillSettingsWorkspace.js";
-import { useContextFileStore } from "./context-file-store.js";
+import { SettingsDiscardDialog } from "./SettingsActionDialogs.js";
+import { SettingsCategoryNavigation } from "./SettingsCategoryNavigation.js";
+import {
+  SettingsDraftGuardContext,
+  type SettingsDraftRegistration,
+  type SettingsDraftRegistrar
+} from "./SettingsDraftGuard.js";
+import { AboutSettings, RuntimeSettings } from "./SettingsSystemPanels.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -67,31 +70,50 @@ export function SettingsWorkbench() {
     currentWorkspaceId ? state.workspaces[currentWorkspaceId] : undefined
   ));
   const currentSection = SETTINGS_SECTIONS.find((item) => item.id === activeSection) ?? SETTINGS_SECTIONS[0]!;
+  const currentGroup = SETTINGS_GROUPS.find((group) => group.items.some((item) => item.id === activeSection))
+    ?? SETTINGS_GROUPS[0]!;
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const visibleGroups = SETTINGS_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => matchesSettingsQuery(item, normalizedQuery))
   })).filter((group) => group.items.length > 0);
   const projectScopeAvailable = sectionSupportsProjectScope(activeSection);
-  const contextFileDirty = useContextFileStore((state) => state.dirty);
-  const contextFileName = useContextFileStore((state) => state.selectedItem?.name);
-  const contextFileSaving = useContextFileStore((state) => state.phase === "saving");
+  const [draftRegistration, setDraftRegistration] = useState<SettingsDraftRegistration>();
+  const draftRegistrationRef = useRef<SettingsDraftRegistration | undefined>(undefined);
   const [pendingNavigation, setPendingNavigation] = useState<
-    { kind: "close" } | { kind: "section"; section: SettingsSection }
+    | { kind: "close" }
+    | { kind: "section"; section: SettingsSection }
+    | { kind: "scope"; scope: "global" | "project" }
   >();
 
-  const performNavigation = (navigation: NonNullable<typeof pendingNavigation>) => {
+  const registerDraft = useCallback<SettingsDraftRegistrar>((registration) => {
+    draftRegistrationRef.current = registration;
+    setDraftRegistration(registration);
+    return () => {
+      if (draftRegistrationRef.current !== registration) return;
+      draftRegistrationRef.current = undefined;
+      setDraftRegistration(undefined);
+    };
+  }, []);
+
+  const performNavigation = useCallback((navigation: NonNullable<typeof pendingNavigation>) => {
     const store = rendererWorkbenchStore.getState();
     if (navigation.kind === "close") {
       store.closeSettings();
       return;
     }
+    if (navigation.kind === "scope") {
+      store.setSettingsScope(navigation.scope);
+      return;
+    }
     store.selectSettingsSection(navigation.section);
     if (!sectionSupportsProjectScope(navigation.section)) store.setSettingsScope("global");
-  };
+  }, []);
 
   const requestNavigation = (navigation: NonNullable<typeof pendingNavigation>) => {
-    if (activeSection === "rules" && contextFileDirty) {
+    if (navigation.kind === "section" && navigation.section === activeSection) return;
+    if (navigation.kind === "scope" && navigation.scope === scope) return;
+    if (draftRegistrationRef.current?.dirty) {
       setPendingNavigation(navigation);
       return;
     }
@@ -107,6 +129,12 @@ export function SettingsWorkbench() {
       rendererWorkbenchStore.getState().setSettingsScope("global");
     }
   }, [projectScopeAvailable, scope]);
+
+  useEffect(() => {
+    if (!pendingNavigation || !draftRegistration || draftRegistration.dirty) return;
+    setPendingNavigation(undefined);
+    performNavigation(pendingNavigation);
+  }, [draftRegistration, pendingNavigation, performNavigation]);
 
   useLayoutEffect(() => {
     const scrollRegion = scrollRegionRef.current;
@@ -139,7 +167,7 @@ export function SettingsWorkbench() {
             <span>返回工作台</span>
           </Button>
           <SearchField
-            aria-label="搜索设置"
+            aria-label="搜索设置分类"
             className={styles.search!}
             value={query}
             onChange={setQuery}
@@ -152,44 +180,24 @@ export function SettingsWorkbench() {
             <Search aria-hidden="true" size={15} />
             <Input
               className={styles.searchInput!}
-              placeholder="搜索设置…"
+              placeholder="搜索设置分类…"
               ref={searchInputRef}
             />
             {query ? <Button
-              aria-label="清除设置搜索"
+              aria-label="清除设置分类搜索"
               className={styles.clearSearch!}
               onPress={() => setQuery("")}
             ><X aria-hidden="true" size={13} /></Button> : null}
           </SearchField>
         </div>
-        <nav aria-label="设置分类" className={styles.navigation}>
-          {visibleGroups.map((group) => (
-            <div aria-label={group.label} className={styles.navigationGroup} key={group.label} role="group">
-              <span className={styles.navigationGroupLabel}>{group.label}</span>
-              <div className={styles.navigationGroupItems}>
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Button
-                      aria-current={activeSection === item.id ? "page" : false}
-                      className={`${styles.navigationItem} ${activeSection === item.id ? styles.selected : ""}`}
-                      key={item.id}
-                      onPress={() => requestNavigation({ kind: "section", section: item.id })}
-                    >
-                      <Icon aria-hidden="true" size={16} />
-                      <span>{item.label}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {visibleGroups.length === 0 ? <div className={styles.emptySearch} role="status">
-            <strong>没有匹配的设置</strong>
-            <span>{messages.settings.emptySearchSuggestion}</span>
-            <Button onPress={() => setQuery("")}>清除搜索</Button>
-          </div> : null}
-        </nav>
+        <SettingsCategoryNavigation
+          activeSection={activeSection}
+          currentGroupLabel={currentGroup.label}
+          currentSectionLabel={currentSection.label}
+          groups={visibleGroups}
+          onClearSearch={() => setQuery("")}
+          onSelect={(nextSection) => requestNavigation({ kind: "section", section: nextSection })}
+        />
       </aside>
       <div className={styles.content}>
         <div
@@ -198,37 +206,39 @@ export function SettingsWorkbench() {
           data-testid="settings-scroll-region"
           ref={scrollRegionRef}
         >
-          <div className={styles.documentBody}>
+          <div className={styles.documentBody} data-measure={currentSection.measure}>
             <SettingsPageHeader
               title={currentSection.label}
               description={currentSection.summary}
               actions={projectScopeAvailable ? <div aria-label="设置作用域" className={styles.scope} role="group">
                 <Button
                   className={scope === "global" ? styles.scopeSelected! : ""}
-                  onPress={() => rendererWorkbenchStore.getState().setSettingsScope("global")}
+                  onPress={() => requestNavigation({ kind: "scope", scope: "global" })}
                 >全局</Button>
                 <Button
                   className={scope === "project" ? styles.scopeSelected! : ""}
                   isDisabled={!workspace}
-                  onPress={() => rendererWorkbenchStore.getState().setSettingsScope("project")}
+                  onPress={() => requestNavigation({ kind: "scope", scope: "project" })}
                 >{workspace ? `项目 · ${workspace.displayName}` : "当前项目"}</Button>
               </div> : undefined}
             />
             <div className={styles.pageContent}>
-              <SettingsSectionContent section={activeSection} />
+              <SettingsDraftGuardContext.Provider value={registerDraft}>
+                <SettingsSectionContent section={activeSection} />
+              </SettingsDraftGuardContext.Provider>
             </div>
           </div>
         </div>
       </div>
     </section>
-    <ContextFileDiscardDialog
-      busy={contextFileSaving}
-      fileName={contextFileName}
+    <SettingsDiscardDialog
+      busy={draftRegistration?.busy ?? false}
       open={pendingNavigation !== undefined}
+      subject={draftRegistration?.subject ?? "当前设置"}
       onCancel={() => setPendingNavigation(undefined)}
       onDiscard={() => {
         const navigation = pendingNavigation;
-        useContextFileStore.getState().discardDraft();
+        draftRegistrationRef.current?.discard();
         setPendingNavigation(undefined);
         if (navigation) performNavigation(navigation);
       }}
@@ -324,29 +334,6 @@ function PromptSettings() {
   );
 }
 
-function RuntimeSettings() {
-  const setDoctorDialogOpen = useShellStore((state) => state.setDoctorDialogOpen);
-  return (
-    <SettingsSectionBlock title="Pi 运行服务" description="每个活动任务拥有独立的 Pi 运行服务；切换工作区或会话不会停止后台任务。">
-      <SettingsRows>
-        <SettingsRow
-          title="同时运行的会话任务"
-          description="正在执行、等待审批或等待交互的独立会话任务都会占用名额；任务内部的子代理不单独占用。"
-          value={`最多 ${MAX_RUNNING_TASKS} 个`}
-        />
-        <SettingsRow title="可浏览的本地会话" description="会话目录按需加载，Pi JSONL 始终是唯一真源。" value="不设上限" />
-        <SettingsRow title="单个会话写入实例" description="同一 Session 路径不会同时绑定两个 live writer。" value="1 个" />
-        <SettingsRow
-          leading={<Stethoscope aria-hidden="true" size={17} />}
-          title="运行环境诊断"
-          description="检查内置 Node、Pi SDK、SQLite、Shell 和 Git。"
-          actions={<Button aria-label="运行环境诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
-        />
-      </SettingsRows>
-    </SettingsSectionBlock>
-  );
-}
-
 function UpdateSettings() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
   return (
@@ -364,25 +351,6 @@ function UpdateSettings() {
           description="不包含提示词、源码正文、凭据或原始工具载荷。"
           actions={<Button aria-label="导出脱敏诊断" className="secondary-button" onPress={() => void saveRuntimeDiagnostics()}>导出</Button>}
         />
-      </SettingsRows>
-    </SettingsSectionBlock>
-  );
-}
-
-function AboutSettings() {
-  return (
-    <SettingsSectionBlock title="π" description="一个 Pi-first、local-first 的 Windows 与 macOS 桌面工作台。">
-      <SettingsRows>
-        <SettingsRow
-          leading={<img alt="" aria-hidden="true" className={styles.aboutIcon} src={piIconUrl} />}
-          title="π"
-          description="Pi-first Desktop Workbench"
-          value="Pi-67 Desktop"
-        />
-        <SettingsRow title="Agent 运行组件" value="@earendil-works/pi-coding-agent" />
-        <SettingsRow title="会话真源" value="Pi JSONL" />
-        <SettingsRow title="渲染进程" value="Electron sandbox + contextIsolation" />
-        <SettingsRow title="网络边界" value="生产环境无本地 HTTP 服务或业务网络监听" />
       </SettingsRows>
     </SettingsSectionBlock>
   );

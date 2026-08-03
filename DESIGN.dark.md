@@ -59,9 +59,11 @@ spacing, component states, and motion as `DESIGN.md`.
   single-line category rows neutral in dark mode. Category selection uses a
   low-contrast luminance fill rather than the green runtime accent, and the
   removed Settings brand/description hero must not reappear as dark-theme-only
-  chrome.
-- The right column remains one centered `1120px` maximum document with a single
-  vertical scroll owner. Grouped Settings use one quiet surface and row dividers;
+  chrome. At narrow widths the grouped Popover uses the same raised neutral surface,
+  retains all four group labels, and remains bounded inside the viewport.
+- The right column uses the same centered `840px` compact and `1120px` standard
+  measures as light mode with a single vertical scroll owner. Grouped Settings use
+  one quiet surface and row dividers;
   Catalogs have no enclosing frame; Editors and semantic Notices are their own
   surfaces. Dark mode must not reintroduce glowing cards, green selected Catalog
   rows, or repeated borders merely to manufacture depth.
@@ -78,6 +80,8 @@ spacing, component states, and motion as `DESIGN.md`.
   input; persisted credentials and Header values never gain a theme-specific
   value preview, and focus rings remain visible on every raised surface.
 - Disabled controls use explicit tokens rather than blanket opacity.
+- Readable Settings metadata at 10-12px uses the secondary text role in both themes;
+  the tertiary role remains limited to decorative status dots and nonessential marks.
 - Focus, semantic state, diff foregrounds, and code syntax colors must be
   checked in the rendered dark theme.
 - Transcript action tooltips use the same raised neutral surface below message
