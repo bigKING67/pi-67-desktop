@@ -81,7 +81,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(builder).toMatch(/nsis:[\s\S]*?deleteAppDataOnUninstall:\s*false/u);
   });
 
-  it("selects the current light theme through General Settings and returns to the workbench", async () => {
+  it("selects the current light theme through Appearance Settings and returns to the workbench", async () => {
     const actions = [];
     const button = (name) => ({ click: async () => actions.push(`click:${String(name)}`) });
     const navigation = {
@@ -111,8 +111,8 @@ describe("Windows installer lifecycle contract", () => {
       `key:${process.platform === "darwin" ? "Meta+," : "Control+,"}`,
       "settings:visible",
       "role:navigation:设置分类",
-      "role:button:/^通用/u",
-      "click:/^通用/u",
+      "role:button:/^外观/u",
+      "click:/^外观/u",
       "role:button:/^浅色/u",
       "click:/^浅色/u",
       "role:button:返回工作台",

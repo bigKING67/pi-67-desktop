@@ -117,7 +117,7 @@ export async function selectLightThemePreference(window, legacyUserInterface) {
     await window.getByRole("menuitemradio", { name: /浅色/u }).click();
     return;
   }
-  const settings = await openSettingsSection(window, /^通用/u);
+  const settings = await openSettingsSection(window, /^外观/u);
   await settings.getByRole("button", { name: /^浅色/u }).click();
   await settings.getByRole("button", { name: "返回工作台", exact: true }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });

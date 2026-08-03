@@ -37,16 +37,16 @@ export function createPackagedVisualEvidence(screenshotDirectory) {
     await setPackagedContentSize(application, 1440, 920);
     await waitForTwoPaints(window);
 
-    const darkSettings = await openSettingsSection(window, /^通用/u);
+    const darkSettings = await openSettingsSection(window, /^外观/u);
     await darkSettings.getByRole("button", { name: /^深色/u }).click();
     await window.locator('html[data-theme-preference="dark"][data-theme="dark"]').waitFor({ state: "attached" });
-    await capturePackagedScreenshot(window, "16-general-dark.png");
+    await capturePackagedScreenshot(window, "16-appearance-dark.png");
     await darkSettings.getByRole("button", { name: "返回工作台" }).click();
     await darkSettings.waitFor({ state: "hidden", timeout: 15_000 });
     await conversation.waitFor({ state: "visible", timeout: 15_000 });
     await capturePackagedScreenshot(window, "17-workbench-dark.png");
 
-    const lightSettings = await openSettingsSection(window, /^通用/u);
+    const lightSettings = await openSettingsSection(window, /^外观/u);
     await lightSettings.getByRole("button", { name: /^浅色/u }).click();
     await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
     await lightSettings.getByRole("button", { name: "返回工作台" }).click();
