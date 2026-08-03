@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
 import {
   isProcessAlive,
   readPositiveProcessId,
@@ -12,6 +13,11 @@ import {
   captureProcessOutput,
   openSettingsSection
 } from "./packaged-electron-smoke-scenarios.mjs";
+
+const RUNTIME_READINESS_PROPAGATION_MARGIN_MS = 15_000;
+
+export const INSTALLED_RUNTIME_READINESS_TIMEOUT_MS =
+  CONTROL_MUTATION_ACK_TIMEOUT_MS + RUNTIME_READINESS_PROPAGATION_MARGIN_MS;
 
 export async function launchInstalledApplication({
   activeControlledOperation,
@@ -180,10 +186,28 @@ export async function waitForRuntimeReady(window, legacyUserInterface) {
     await runtimeReady.waitFor({ state: "visible", timeout: 30_000 });
     return;
   }
-  await Promise.all([
-    runtimeReady.waitFor({ state: "visible", timeout: 30_000 }),
-    window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: 30_000 })
-  ]);
+
+  const startedAt = performance.now();
+  const runtimeFailed = window.locator('[data-runtime-phase="failed"]');
+  await runtimeReady.or(runtimeFailed).waitFor({
+    state: "visible",
+    timeout: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+  });
+  if (await runtimeFailed.isVisible()) {
+    const runtimeStatus = (await runtimeFailed.getAttribute("aria-label"))?.slice(0, 160);
+    throw new Error(runtimeStatus
+      ? `Installed runtime entered failed phase before becoming ready: ${runtimeStatus}`
+      : "Installed runtime entered failed phase before becoming ready.");
+  }
+
+  const remainingTimeoutMs = Math.max(
+    1,
+    Math.ceil(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS - (performance.now() - startedAt))
+  );
+  await window.getByLabel("Pi conversation").waitFor({
+    state: "visible",
+    timeout: remainingTimeoutMs
+  });
 }
 
 function runtimeReadyLocator(window, legacyUserInterface) {

@@ -2,9 +2,11 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateRestoredWorkspace,
+  INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
   selectLightThemePreference,
   waitForInstalledStartupSurface,
   waitForRuntimeReady
@@ -23,6 +25,7 @@ const temporaryDirectories = [];
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(temporaryDirectories.splice(0).map((path) => (
     rm(path, { recursive: true, force: true })
   )));
@@ -45,6 +48,11 @@ describe("Windows installer lifecycle contract", () => {
 
   it("keeps enough process-timeout margin for variable GitHub Windows installer performance", () => {
     expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(180_000);
+  });
+
+  it("aligns installed runtime readiness with the replay-safe control mutation timeout", () => {
+    expect(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS)
+      .toBe(CONTROL_MUTATION_ACK_TIMEOUT_MS + 15_000);
   });
 
   it("accepts only an older exact Windows x64 installer as the upgrade baseline", () => {
@@ -166,20 +174,65 @@ describe("Windows installer lifecycle contract", () => {
 
   it("accepts any modern ready detail while requiring the conversation surface", async () => {
     const actions = [];
+    const runtimeFailed = {
+      getAttribute: async () => null,
+      isVisible: async () => false
+    };
+    const combinedRuntimePhase = {
+      waitFor: async (options) => actions.push(`runtime-phase:${options.state}:${options.timeout}`)
+    };
     const window = {
       getByLabel: (name) => ({
         waitFor: async (options) => actions.push(`${name}:${options.state}:${options.timeout}`)
       }),
-      locator: (selector) => ({
-        waitFor: async (options) => actions.push(`${selector}:${options.state}:${options.timeout}`)
-      })
+      locator: (selector) => selector === '[data-runtime-phase="failed"]'
+        ? runtimeFailed
+        : {
+            or: (other) => {
+              expect(other).toBe(runtimeFailed);
+              return combinedRuntimePhase;
+            }
+          }
     };
+    vi.spyOn(performance, "now")
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_250);
 
     await waitForRuntimeReady(window, false);
 
     expect(actions).toEqual([
-      '[data-runtime-phase="ready"]:visible:30000',
-      "Pi conversation:visible:30000"
+      `runtime-phase:visible:${INSTALLED_RUNTIME_READINESS_TIMEOUT_MS}`,
+      `Pi conversation:visible:${INSTALLED_RUNTIME_READINESS_TIMEOUT_MS - 250}`
+    ]);
+  });
+
+  it("fails immediately when the modern runtime enters a failed phase", async () => {
+    const actions = [];
+    const runtimeFailed = {
+      getAttribute: async (name) => {
+        actions.push(`attribute:${name}`);
+        return "当前状态：Pi SDK 初始化失败";
+      },
+      isVisible: async () => true
+    };
+    const combinedRuntimePhase = {
+      waitFor: async (options) => actions.push(`runtime-phase:${options.state}:${options.timeout}`)
+    };
+    const window = {
+      getByLabel: () => ({
+        waitFor: async () => actions.push("conversation-wait")
+      }),
+      locator: (selector) => selector === '[data-runtime-phase="failed"]'
+        ? runtimeFailed
+        : { or: () => combinedRuntimePhase }
+    };
+
+    await expect(waitForRuntimeReady(window, false)).rejects.toThrow(
+      "Installed runtime entered failed phase before becoming ready: 当前状态：Pi SDK 初始化失败"
+    );
+    expect(actions).toEqual([
+      `runtime-phase:visible:${INSTALLED_RUNTIME_READINESS_TIMEOUT_MS}`,
+      "attribute:aria-label"
     ]);
   });
 
