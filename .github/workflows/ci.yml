@@ -50,7 +50,7 @@ jobs:
       - name: Renderer and Electron smoke
         run: corepack pnpm exec playwright test
       - name: Build unsigned native smoke package
-        run: node eng/packaging/package-native-unsigned.mjs
+        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts

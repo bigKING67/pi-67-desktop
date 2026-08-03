@@ -35,7 +35,7 @@ describe("release performance workflow gates", () => {
     expect(source).toContain("corepack pnpm run prepare:toolchain");
     expect(source).toContain("corepack pnpm run prepare:capabilities");
     expect(source).toContain("run: corepack pnpm exec playwright test");
-    expect(source).toContain("run: node eng/packaging/package-native-unsigned.mjs");
+    expect(source).toContain("run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs");
     expect(source.indexOf("corepack pnpm run build"))
       .toBeLessThan(source.indexOf("corepack pnpm run prepare:toolchain"));
     expect(source.indexOf("corepack pnpm run prepare:toolchain"))
