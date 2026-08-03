@@ -390,11 +390,14 @@ test("projects operation activities and sends an operation-scoped abort", async 
   const completedTimeline = page.locator(
     "[data-turn-activity][data-operation-lifecycle='completed']"
   );
-  await expect(completedTimeline).toContainText("执行过程 · 3 个步骤 · 3 秒");
+  await expect(completedTimeline).toContainText("执行过程 · 1 次工具调用 · 3 秒");
   await expect(completedTimeline).toHaveAttribute("open", "");
   await expect(completedTimeline).toContainText("分析问题");
   await expect(completedTimeline).toContainText("读取文件");
-  await expect(completedTimeline.getByText("read", { exact: true })).toBeVisible();
+  const completedTool = completedTimeline.locator('details[data-presenter="read-search"]');
+  await expect(completedTool.locator(":scope > summary")).not.toContainText("read");
+  await completedTool.locator(":scope > summary").click();
+  await expect(completedTool.getByText("read", { exact: true })).toBeVisible();
   await expect(completedTimeline).toContainText("已完成");
 
   const importOperationId = "operation-import-status-test";

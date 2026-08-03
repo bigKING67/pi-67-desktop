@@ -15,8 +15,8 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   const settings = await openSettingsSection(page, /^运行服务/u);
-  await expect(settings.getByText("同时运行的会话任务", { exact: true })).toBeVisible();
-  await expect(settings.getByText("最多 8 个", { exact: true })).toBeVisible();
+  await expect(settings.getByText("正在占用运行名额", { exact: true })).toBeVisible();
+  await expect(settings.getByText("0 / 8", { exact: true })).toBeVisible();
   await expect(settings.getByText(/任务内部的子代理不单独占用/u)).toBeVisible();
   await settings.getByRole("button", { name: /运行环境诊断/u }).click();
   const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
@@ -157,7 +157,17 @@ async function openSettingsSection(page: Page, sectionName: RegExp) {
   }
   await expect(settings).toBeVisible();
   await expect(page.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: sectionName }).click();
+  const compactCategoryTrigger = settings.getByRole("button", {
+    name: "选择设置分类",
+    exact: true
+  });
+  if (await compactCategoryTrigger.isVisible()) {
+    await compactCategoryTrigger.click();
+    await page.getByRole("menu", { name: "选择设置分类" })
+      .getByRole("menuitem", { name: sectionName }).click();
+  } else {
+    await settings.getByRole("navigation", { name: "设置分类" })
+      .getByRole("button", { name: sectionName }).click();
+  }
   return settings;
 }
