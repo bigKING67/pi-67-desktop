@@ -35,7 +35,7 @@ export async function launchInstalledApplication({
     const mainPid = application.process().pid;
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
-    await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
+    const startupSurface = await waitForInstalledStartupSurface(window, legacyUserInterface);
     if (window.url() !== "app://pi67/index.html") {
       throw new Error(`Installed renderer did not use app://pi67: ${window.url()}.`);
     }
@@ -55,9 +55,11 @@ export async function launchInstalledApplication({
       await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
     }
 
-    await installWorkspaceDialogResult(application, workspace);
-    await window.getByRole("button", { name: "选择工作区" }).click();
-    await waitForRuntimeReady(window, legacyUserInterface);
+    if (startupSurface === "workspace-picker") {
+      await installWorkspaceDialogResult(application, workspace);
+      await window.getByRole("button", { name: "选择工作区" }).click();
+      await waitForRuntimeReady(window, legacyUserInterface);
+    }
 
     if (selectLightTheme && !legacyUserInterface) {
       await selectLightThemePreference(window, legacyUserInterface);
@@ -100,6 +102,7 @@ export async function launchInstalledApplication({
         electronVersion: runtime.electronVersion
       },
       rendererIsolationProbe: probePackagedRendererIsolation,
+      startupSurface,
       utilityProcessCount: utilityPids.length
     };
   } finally {
@@ -120,11 +123,23 @@ export async function selectLightThemePreference(window, legacyUserInterface) {
   await settings.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
+export async function waitForInstalledStartupSurface(window, legacyUserInterface) {
+  const workspacePicker = window.getByRole("button", { name: "选择工作区" });
+  const runtimeReady = runtimeReadyLocator(window, legacyUserInterface);
+  await workspacePicker.or(runtimeReady).waitFor({ state: "visible", timeout: 30_000 });
+  if (await workspacePicker.isVisible()) return "workspace-picker";
+  await runtimeReady.waitFor({ state: "visible", timeout: 30_000 });
+  return "runtime-ready";
+}
+
 async function waitForRuntimeReady(window, legacyUserInterface) {
-  const ready = legacyUserInterface
+  await runtimeReadyLocator(window, legacyUserInterface).waitFor({ state: "visible", timeout: 30_000 });
+}
+
+function runtimeReadyLocator(window, legacyUserInterface) {
+  return legacyUserInterface
     ? window.getByText("Pi SDK 已就绪", { exact: true })
     : window.getByLabel("当前状态：Pi SDK 已就绪");
-  await ready.waitFor({ state: "visible", timeout: 30_000 });
 }
 
 function round(value) {

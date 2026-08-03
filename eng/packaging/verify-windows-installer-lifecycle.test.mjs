@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { selectLightThemePreference } from "./windows-installed-application-lifecycle.mjs";
+import {
+  selectLightThemePreference,
+  waitForInstalledStartupSurface
+} from "./windows-installed-application-lifecycle.mjs";
 import {
   assertPreservedUserData,
   buildNsisInstallArguments,
@@ -116,6 +119,35 @@ describe("Windows installer lifecycle contract", () => {
       "click:返回工作台",
       "settings:hidden"
     ]);
+  });
+
+  it.each([
+    { pickerVisible: true, expected: "workspace-picker" },
+    { pickerVisible: false, expected: "runtime-ready" }
+  ])("accepts $expected as an installed startup surface", async ({ pickerVisible, expected }) => {
+    const actions = [];
+    const runtimeReady = {
+      waitFor: async (options) => actions.push(`ready:${options.state}`)
+    };
+    const combined = {
+      waitFor: async (options) => actions.push(`combined:${options.state}`)
+    };
+    const workspacePicker = {
+      isVisible: async () => pickerVisible,
+      or: (other) => {
+        expect(other).toBe(runtimeReady);
+        return combined;
+      }
+    };
+    const window = {
+      getByLabel: () => runtimeReady,
+      getByRole: () => workspacePicker
+    };
+
+    await expect(waitForInstalledStartupSurface(window, false)).resolves.toBe(expected);
+    expect(actions).toEqual(pickerVisible
+      ? ["combined:visible"]
+      : ["combined:visible", "ready:visible"]);
   });
 
   it("waits for a path to become present or absent", async () => {
