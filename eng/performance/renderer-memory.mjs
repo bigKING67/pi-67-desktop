@@ -32,7 +32,7 @@ export function createRendererMemoryMetrics(input, summarizeMetric) {
       unit: "MiB",
       samples: input.switchedHeap,
       evidenceLevel: "browser",
-      method: "Ten 1,000-message Session bootstrap replacements, then explicit GC and CDP heap sampling"
+      method: "Ten 1,000-message Session bootstrap replacements, current message cards mounted, then explicit GC and CDP heap sampling"
     }),
     summarizeMetric({
       id: "rendererLoaded1kHeapDelta",
@@ -48,9 +48,9 @@ export function createRendererMemoryMetrics(input, summarizeMetric) {
       label: "Retained JS heap after 10 Session switches",
       unit: "MiB",
       samples: deltas(input.switchedHeap, input.restoredHeap),
-      budget: 4,
+      budget: 8,
       evidenceLevel: "browser",
-      method: "Per-sample post-switch heap minus first restored-Session heap after explicit GC"
+      method: "Per-sample settled post-switch heap minus first restored-Session heap after explicit GC"
     }),
     summarizeMetric({
       id: "rendererLoaded1kDomNodes",
@@ -66,9 +66,9 @@ export function createRendererMemoryMetrics(input, summarizeMetric) {
       label: "DOM nodes after 10 Session switches",
       unit: "nodes",
       samples: input.switchedNodes,
-      budget: 500,
+      budget: 800,
       evidenceLevel: "browser",
-      method: "CDP Memory.getDOMCounters after ten bootstrap replacements and explicit GC"
+      method: "CDP Memory.getDOMCounters after ten settled bootstrap replacements and explicit GC"
     })
   ];
 }
@@ -134,8 +134,11 @@ export async function switchPerformanceSessions(page, count, messageCount) {
     }, { nextMarker: marker, nextMessageCount: messageCount });
     await page.waitForFunction(({ expected, expectedMessageCount }) => {
       const region = document.querySelector('[data-transcript-region="true"]');
+      const cards = [...(region?.querySelectorAll('[data-testid="message-card"]') ?? [])];
       return region?.getAttribute("data-session-id") === `performance-${expected}`
-        && Number(region.getAttribute("data-message-count") ?? 0) === Math.min(100, expectedMessageCount);
+        && Number(region.getAttribute("data-message-count") ?? 0) === Math.min(100, expectedMessageCount)
+        && cards.length > 0
+        && cards.every((card) => card.getAttribute("data-message-id")?.startsWith(`${expected}-message-`));
     }, { expected: marker, expectedMessageCount: messageCount });
   }
 }

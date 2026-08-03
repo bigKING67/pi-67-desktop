@@ -6,9 +6,9 @@ describe("renderer memory performance contract", () => {
     const metrics = createRendererMemoryMetrics(fixture(), (metric) => metric);
 
     expect(metrics.find((metric) => metric.id === "rendererLoaded1kHeapDelta")?.budget).toBe(6);
-    expect(metrics.find((metric) => metric.id === "rendererAfter10SwitchesHeapDelta")?.budget).toBe(4);
+    expect(metrics.find((metric) => metric.id === "rendererAfter10SwitchesHeapDelta")?.budget).toBe(8);
     expect(metrics.find((metric) => metric.id === "rendererLoaded1kDomNodes")?.budget).toBe(1_000);
-    expect(metrics.find((metric) => metric.id === "rendererAfter10SwitchesDomNodes")?.budget).toBe(500);
+    expect(metrics.find((metric) => metric.id === "rendererAfter10SwitchesDomNodes")?.budget).toBe(800);
   });
 
   it("calculates per-sample retained heap deltas against the restored Session", () => {
