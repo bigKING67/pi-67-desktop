@@ -24,6 +24,7 @@ import {
 } from "./context-file-controller.js";
 import { useContextFileStore } from "./context-file-store.js";
 import { ContextFileDiscardDialog } from "./ContextFileDiscardDialog.js";
+import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import {
   contextFileAccessLabel,
   contextFileRuntimeStateLabel,
@@ -63,6 +64,13 @@ export function RuleSettingsWorkspace() {
   const activeCatalogKey = scope === "global"
     ? `${workspaceId}:global:${globalCategory}`
     : `${workspaceId}:project:${projectCategory}`;
+
+  useSettingsDraftRegistration({
+    dirty: state.dirty,
+    busy: state.phase === "saving",
+    subject: state.selectedItem?.name ?? "规则与上下文",
+    discard: () => useContextFileStore.getState().discardDraft()
+  });
 
   useEffect(() => {
     if (previousWorkspaceId.current !== workspaceId) {

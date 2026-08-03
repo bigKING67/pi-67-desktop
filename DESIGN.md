@@ -501,17 +501,19 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings owns `账户`, `通用`, `模型服务`, `扩展`, `技能`,
+- Settings owns `账户与本地数据`, `外观`, `模型服务`, `扩展`, `技能`,
   `指令模板`, `规则与上下文`, `MCP 服务`, `浏览器集成`, `运行服务`,
-  `下载源与网络`, `更新与诊断`, and `关于`. Account,
-  General, managed Rules, MCP Services, Browser Integration, Download
-  Sources/Network, Updates, and About are global-only and do not show a
-  meaningless scope control. Model
-  services, the Extension workspace, Prompt Templates, Context Files, and Runtime
-  support explicit global or current-Workspace project scope where Pi has that
-  concept. Skills own source tabs instead of repeating the page-level scope switch.
+  `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
+  `应用`, `Pi`, `连接与集成`, and `系统与支持`. Account, Appearance, Model
+  Services, managed Rules, MCP Services, Browser Integration, Runtime, Download
+  Sources/Network, Updates, and About are global-only and do not show a meaningless
+  page-level scope control. Only the Extension workspace and Prompt Templates use
+  the generic global/current-project switch; Skills and Rules own their explicit
+  availability tabs instead.
 - Every Settings category uses one centered document flow and the content region
-  is its only vertical scroll owner. The document width is `min(1120px, 100%)`,
+  is its only vertical scroll owner. Dense catalog/editor categories use
+  `min(1120px, 100%)`; compact account, appearance, MCP, runtime, update, and About
+  categories use `min(840px, 100%)` without changing the shared header alignment,
   with `32px` top, `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding;
   narrow windows retain full-width content without document-level horizontal
   overflow. Page title, summary, scope, and content share the same alignment.
@@ -571,6 +573,12 @@ loading error where the operation can produce those states
   catalog, and Pi reload status without placing Markdown content in notifications,
   Session projection, or persisted Workbench state. Returning to a catalog restores
   its prior scroll position.
+- Provider, Download Sources/Network, MCP, and Rules/Context register at most one
+  active Settings draft with the shell. Category changes, applicable page-scope
+  changes, and `返回工作台` open one discard dialog while dirty. `继续编辑` is the
+  default focus; the destructive choice discards the current in-memory draft before
+  completing the original navigation. A successful save may complete a pending
+  navigation without a second prompt.
 - Product navigation calls the transient execution environment `运行服务`, not
   the literal translation `运行时`. Persistent Pi JSONL Sessions remain in the
   Workspace navigation unless a real, independently actionable Session-settings
@@ -687,11 +695,17 @@ loading error where the operation can produce those states
   than a card marketplace. It shows the private Node/npm/Git versions, source mode,
   ordered mirror and official candidates, not-checked/reachable/unreachable state,
   latency, resolved Git revision when available, and explicit save/probe errors.
+  Save is enabled only for a valid dirty draft. Probe validates and checks that
+  draft without saving or clearing dirty state, labels results based on unsaved
+  settings, and marks them stale after any subsequent edit. `恢复默认` remains
+  reachable but opens a cancel-first confirmation before it overwrites persistence.
 - `MCP 服务` and `浏览器集成` are separate first-level Settings categories rather
   than tabs or vertically stacked sections in one generic Integration document.
-  The MCP page owns external service endpoints, local credential configuration,
-  and connection identity. Its current single `Tavily Bridge` service remains a
-  flat Settings section until another independently manageable MCP service exists.
+  The MCP page owns external service endpoints and local credential configuration.
+  It labels configured state as `凭据状态`, never as a live connection, and states
+  `设置页未验证连接`; real MCP connection identity belongs to the active Pi Task and
+  Agent Host projection. Its current single `Tavily Bridge` service remains a flat
+  Settings section until another independently manageable MCP service exists.
 - Browser integrations do not equate copied source with readiness. The browser67
   section reports separate rows for bundled source, runtime dependencies, browser
   extension files, and the managed connection. Its three-step dialog prepares the
@@ -712,11 +726,12 @@ loading error where the operation can produce those states
   file tabs; Task-bound Messages, Context, and Tool change facts accept only
   current Task authority.
 - At high zoom or an equivalently narrow effective viewport, Settings moves its
-  category navigation from a fixed left column to one horizontally reachable
-  compact row above the content. Icons retain their visible category labels so
-  navigation does not depend on memorizing symbols. The scope switch and current
-  section remain at the top of the same document, while the content owns vertical scrolling
-  without introducing document-level or two-dimensional overflow.
+  category navigation from a fixed left column to one grouped Popover trigger above
+  the content. The trigger names the current group and category; the Popover repeats
+  all visible search results under `应用`, `Pi`, `连接与集成`, and `系统与支持`, is at
+  most `320px` wide and bounded by the viewport height. The scope switch and current
+  section remain at the top of the same document, while the content owns vertical
+  scrolling without introducing document-level or two-dimensional overflow.
 - Native directory selection is an explicit trust gesture for that Workspace's
   project resources. The UI does not ask for duplicate Workspace trust after a
   successful picker result, and it never describes that trust as approval for a
@@ -753,6 +768,11 @@ loading error where the operation can produce those states
   selection but are read-only. Creating or editing a custom Provider writes only
   its `models.json` entry; Desktop never copies built-in definitions into that
   file merely to display them.
+- Removing a custom Provider opens a cancel-first confirmation that names the
+  `models.json` definition, states that any dirty Provider draft will be discarded,
+  and explicitly preserves `auth.json`. Removing a persistent credential is a
+  separate cancel-first confirmation scoped only to the selected Provider's
+  `auth.json` entry; neither confirmation reveals a secret.
 - Provider identity, name, Base URL, API protocol, model identity, input types,
   reasoning, context window, and token limit use labeled bounded controls.
   Advanced JSON owns uncommon non-secret fields and rejects `apiKey`, `headers`,

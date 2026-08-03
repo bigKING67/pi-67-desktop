@@ -37,8 +37,8 @@ test("lets users persist System, Light, and Dark appearance choices", async ({ p
 
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
-  const settings = await openGeneralSettings(page);
-  await expect(settings.getByRole("heading", { name: "外观", exact: true })).toBeVisible();
+  const settings = await openAppearanceSettings(page);
+  await expect(settings.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("appearance-settings-dark.png"), animations: "disabled" });
 
   await settings.getByRole("button", { name: /^浅色/u }).click();
@@ -52,7 +52,7 @@ test("lets users persist System, Light, and Dark appearance choices", async ({ p
   await expect(root).toHaveAttribute("data-theme-preference", "light");
   await expect(root).toHaveAttribute("data-theme", "light");
   await openWorkspace(page);
-  const restoredSettings = await openGeneralSettings(page);
+  const restoredSettings = await openAppearanceSettings(page);
   await restoredSettings.getByRole("button", { name: /^深色/u }).click();
   await expect(root).toHaveAttribute("data-theme-preference", "dark");
   await expect(root).toHaveAttribute("data-theme", "dark");
@@ -79,7 +79,7 @@ test("keeps theme selection usable when renderer storage is unavailable", async 
   await page.goto("/");
   await openWorkspace(page);
 
-  const settings = await openGeneralSettings(page);
+  const settings = await openAppearanceSettings(page);
   await expect(page.getByText("主题存储不可用，选择仅在本次运行有效。")).toBeVisible();
   await settings.getByRole("button", { name: /^深色/u }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -351,13 +351,13 @@ async function openWorkspace(page: Page): Promise<void> {
   await page.getByRole("button", { name: "选择工作区" }).click();
 }
 
-async function openGeneralSettings(page: Page) {
+async function openAppearanceSettings(page: Page) {
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menu", { name: "帮助与设置" })
     .getByRole("menuitem", { name: "设置", exact: true }).click();
   const settings = page.getByLabel("π 设置");
   await expect(settings).toBeVisible();
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^通用/u }).click();
+    .getByRole("button", { name: /^外观/u }).click();
   return settings;
 }
