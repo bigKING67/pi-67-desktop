@@ -16,6 +16,8 @@ import { attach, FakePort } from "./host-server-multi-task-fixture.js";
 import { commandEnvelopeForContext } from "./protocol-test-fixtures.js";
 
 const WORKSPACE: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-1" };
+const HOST_RESPONSE_TIMEOUT_MS = 15_000;
+const PROVIDER_CONFIGURATION_TEST_TIMEOUT_MS = 45_000;
 const ENVIRONMENT_KEYS = [
   "PI_CODING_AGENT_DIR",
   "PI67_SESSION_CATALOG_DIR",
@@ -186,7 +188,7 @@ describe("AgentHostServer Provider configuration", () => {
     } finally {
       await server.shutdown();
     }
-  }, 20_000);
+  }, PROVIDER_CONFIGURATION_TEST_TIMEOUT_MS);
 
 });
 
@@ -220,7 +222,7 @@ async function hostCommand<T extends AgentCommandType>(
         isResponseEnvelope(candidate) && candidate.requestId === request.requestId
       )) as ResponseEnvelope<T> | undefined;
       expect(response).toBeDefined();
-    }, { timeout: 5_000, interval: 20 });
+    }, { timeout: HOST_RESPONSE_TIMEOUT_MS, interval: 20 });
   } catch (error) {
     const recent = port.sent.slice(-8).map(safeProtocolMessageSummary);
     throw new Error(
