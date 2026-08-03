@@ -5,6 +5,8 @@ import { spawn } from "node:child_process";
 
 const MAX_GIT_OUTPUT_BYTES = 8_192;
 const GIT_TIMEOUT_MS = 60_000;
+const SOURCE_CLEANUP_MAX_RETRIES = 10;
+const SOURCE_CLEANUP_RETRY_DELAY_MS = 250;
 
 export async function resolveExactCapabilitySource({
   source,
@@ -15,12 +17,12 @@ export async function resolveExactCapabilitySource({
   const local = resolve(repositoryRoot, source.localSibling);
   if (await isExactCleanRepository(local, source.commit, git)) return local;
   const destination = join(sourceCacheRoot, source.id);
-  await rm(destination, { recursive: true, force: true });
+  await removeSourceTree(destination);
   await mkdir(dirname(destination), { recursive: true });
   let lastError;
   const transports = [
     ...(await repositoryContainsCommit(local, source.commit, git) ? [local] : []),
-    ...gitTransportCandidates(source.repository)
+    ...capabilityGitTransportCandidates(source.repository)
   ];
   for (const url of transports) {
     try {
@@ -35,7 +37,7 @@ export async function resolveExactCapabilitySource({
       return destination;
     } catch (error) {
       lastError = error;
-      await rm(destination, { recursive: true, force: true });
+      await removeSourceTree(destination);
     }
   }
   throw new Error(`Unable to obtain locked capability source ${source.id}: ${errorMessage(lastError)}`);
@@ -74,13 +76,13 @@ async function isExactCleanRepository(path, commit, git) {
   }
 }
 
-function gitTransportCandidates(canonical) {
+export function capabilityGitTransportCandidates(canonical) {
   const parsed = new URL(canonical);
   const path = parsed.pathname.replace(/^\/+|\/+$/gu, "");
   return [
+    canonical,
     `https://gitclone.com/github.com/${path}`,
-    `https://ghproxy.net/${canonical}`,
-    canonical
+    `https://ghproxy.net/${canonical}`
   ];
 }
 
@@ -88,14 +90,17 @@ function capture(command, arguments_) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command.executable, arguments_, {
       stdio: ["ignore", "pipe", "pipe"],
-      env: gitEnvironment(command.execPath)
+      env: gitEnvironment(command.execPath),
+      detached: process.platform !== "win32",
+      windowsHide: true
     });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let termination = Promise.resolve();
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      termination = terminateProcessTree(child);
     }, GIT_TIMEOUT_MS);
     child.stdout.on("data", (chunk) => { stdout += String(chunk); });
     child.stderr.on("data", (chunk) => { stderr += String(chunk); });
@@ -103,26 +108,31 @@ function capture(command, arguments_) {
       clearTimeout(timeout);
       reject(error);
     });
-    child.once("exit", (code, signal) => {
+    child.once("close", (code, signal) => {
       clearTimeout(timeout);
-      if (code === 0) resolvePromise(stdout.trim());
-      else reject(new Error(`${basename(command.executable)} ${timedOut ? "timed out" : `exited with ${signal ?? code}`}: ${(stderr || stdout).trim()}`));
+      void termination.then(() => {
+        if (code === 0) resolvePromise(stdout.trim());
+        else reject(new Error(`${basename(command.executable)} ${timedOut ? "timed out" : `exited with ${signal ?? code}`}: ${(stderr || stdout).trim()}`));
+      });
     });
   });
 }
 
-function run(command, arguments_) {
+export function runCapabilityGitCommand(command, arguments_, { timeoutMs = GIT_TIMEOUT_MS } = {}) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command.executable, arguments_, {
       stdio: ["ignore", "pipe", "pipe"],
-      env: gitEnvironment(command.execPath)
+      env: gitEnvironment(command.execPath),
+      detached: process.platform !== "win32",
+      windowsHide: true
     });
     let output = "";
     let timedOut = false;
+    let termination = Promise.resolve();
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill();
-    }, GIT_TIMEOUT_MS);
+      termination = terminateProcessTree(child);
+    }, timeoutMs);
     const captureOutput = (chunk) => {
       if (output.length < MAX_GIT_OUTPUT_BYTES) {
         output += String(chunk).slice(0, MAX_GIT_OUTPUT_BYTES - output.length);
@@ -134,11 +144,51 @@ function run(command, arguments_) {
       clearTimeout(timeout);
       reject(error);
     });
-    child.once("exit", (code, signal) => {
+    child.once("close", (code, signal) => {
       clearTimeout(timeout);
-      if (code === 0) resolvePromise();
-      else reject(new Error(`${basename(command.executable)} ${timedOut ? "timed out" : `exited with ${signal ?? code}`}: ${output.trim()}`));
+      void termination.then(() => {
+        if (code === 0) resolvePromise();
+        else reject(new Error(`${basename(command.executable)} ${timedOut ? "timed out" : `exited with ${signal ?? code}`}: ${output.trim()}`));
+      });
     });
+  });
+}
+
+const run = runCapabilityGitCommand;
+
+async function terminateProcessTree(child) {
+  if (child.pid === undefined) return;
+  // Git transport helpers outlive their parent unless the entire process tree is terminated.
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+    return;
+  }
+  await new Promise((resolvePromise) => {
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true
+    });
+    killer.once("error", () => {
+      child.kill();
+      resolvePromise();
+    });
+    killer.once("exit", () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+      resolvePromise();
+    });
+  });
+}
+
+function removeSourceTree(path) {
+  return rm(path, {
+    recursive: true,
+    force: true,
+    maxRetries: SOURCE_CLEANUP_MAX_RETRIES,
+    retryDelay: SOURCE_CLEANUP_RETRY_DELAY_MS
   });
 }
 
