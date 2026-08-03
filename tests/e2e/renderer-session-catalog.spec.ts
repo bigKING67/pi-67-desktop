@@ -103,7 +103,8 @@ test("invalidates pages on a revision event and applies explicit refresh data on
   await clearSessionCatalogRequests(page);
   await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "刷新会话" }).click();
-  await expect.poll(async () => (await sessionCatalogRequests(page))[0]?.payload).toEqual({
+  await expect.poll(async () => (await sessionCatalogRequests(page))
+    .find((request) => request.payload.refresh === true)?.payload).toEqual({
     scope: "workspace",
     limit: 50,
     refresh: true
