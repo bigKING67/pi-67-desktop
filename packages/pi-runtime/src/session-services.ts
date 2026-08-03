@@ -25,6 +25,7 @@ import {
   bindConfiguredCapabilityCatalog,
   ConfiguredCapabilityCatalog
 } from "./configured-capability-catalog.js";
+import { createDesktopEnvironmentExtension } from "./desktop-environment-extension.js";
 
 interface DesktopSessionServicesOptions {
   cwd: string;
@@ -68,7 +69,8 @@ export async function createDesktopSessionServices(
           loadedResourceReadAccess,
           configuredCapabilities,
           options.recordToolAuthorization
-        )
+        ),
+        createDesktopEnvironmentExtension()
       ]
     },
     resourceLoaderReloadOptions: {

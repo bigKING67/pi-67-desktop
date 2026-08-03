@@ -65,6 +65,11 @@ count.
 - Both supported platforms can install, launch, and complete an offline SDK
   contract smoke from signed packages.
 - Existing users reuse `~/.pi/agent` without credential or session migration.
+- Every Desktop Pi turn receives the device-local calendar date and time zone in
+  a bounded, non-persisted environment context. Relative terms such as `today`,
+  `tomorrow`, `this week`, and `recent` use that local calendar; volatile claims
+  still require available Tool evidence rather than dates inferred from retrieved
+  documents.
 - Windows x64 and macOS arm64 packages include pinned private Node, npm, and Git
   toolchains. Package operations fail closed when the bundled toolchain is
   missing or invalid and never fall back to unverified system executables.

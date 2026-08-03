@@ -70,6 +70,9 @@ describe("Desktop tool routing Extension integration", () => {
       );
       expect(beforeStart?.systemPrompt).toContain("`Bash`→`bash`");
       expect(beforeStart?.systemPrompt).not.toContain("`WebSearch`→`web_search`");
+      expect(beforeStart?.systemPrompt).toContain("<desktop_environment>");
+      expect(beforeStart?.systemPrompt).toMatch(/Current local date: \d{4}-\d{2}-\d{2}/u);
+      expect(beforeStart?.systemPrompt).toMatch(/Current local timezone: .+\(UTC[+-]\d{2}:\d{2}\)|Current local timezone: UTC[+-]\d{2}:\d{2}/u);
 
       const bashAlias = session.getToolDefinition("Bash");
       if (!bashAlias?.prepareArguments) throw new Error("Expected the verified Bash alias.");
