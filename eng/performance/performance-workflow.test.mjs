@@ -1,14 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-const workflows = [
-  ["CI", new URL("../../.github/workflows/ci.yml", import.meta.url)],
-  ["unsigned preview", new URL("../../.github/workflows/unsigned-preview.yml", import.meta.url)],
+const performanceWorkflows = [
+  ["performance certification", new URL("../../.github/workflows/performance-certification.yml", import.meta.url)],
   ["signed release", new URL("../../.github/workflows/release.yml", import.meta.url)]
 ];
 
 describe("release performance workflow gates", () => {
-  it.each(workflows)("enforces the complete performance suite in %s", async (_name, url) => {
+  it.each(performanceWorkflows)("enforces the complete performance suite in %s", async (_name, url) => {
     const source = await readFile(url, "utf8");
 
     expect(source).toContain("PI67_PERF_SAMPLES: 10");
@@ -27,9 +26,37 @@ describe("release performance workflow gates", () => {
     );
   });
 
-  it("gives the unsigned native matrix enough time for ten Windows samples", async () => {
+  it("keeps CI fast while reusing one build for E2E and native packaging", async () => {
+    const source = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+
+    expect(source).not.toContain("performance:measure");
+    expect(source).not.toContain("PI67_PERF_SAMPLES");
+    expect(source).toContain("run: corepack pnpm run build");
+    expect(source).toContain("run: corepack pnpm exec playwright test");
+    expect(source).toContain("run: node eng/packaging/package-native-unsigned.mjs");
+  });
+
+  it("keeps unsigned previews fast without dropping packaged release gates", async () => {
     const source = await readFile(new URL("../../.github/workflows/unsigned-preview.yml", import.meta.url), "utf8");
 
-    expect(source).toContain("timeout-minutes: 90");
+    expect(source).not.toContain("performance:measure");
+    expect(source).not.toContain("PI67_PERF_SAMPLES");
+    expect(source).toContain("timeout-minutes: 30");
+    expect(source).toContain("run: corepack pnpm run package:native:unsigned");
+    expect(source).toContain("run: corepack pnpm run package:smoke");
+    expect(source).toContain("run: corepack pnpm run package:smoke:windows-ui");
+    expect(source).toContain("run: corepack pnpm run package:smoke:windows-installer");
+  });
+
+  it("allows deep Windows certification and signed releases to finish", async () => {
+    const certification = await readFile(
+      new URL("../../.github/workflows/performance-certification.yml", import.meta.url),
+      "utf8"
+    );
+    const release = await readFile(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8");
+
+    expect(certification).toContain("timeout-minutes: 180");
+    expect(certification).toContain("schedule:");
+    expect(release).toContain("timeout-minutes: 180");
   });
 });

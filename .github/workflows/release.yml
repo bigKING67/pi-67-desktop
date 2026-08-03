@@ -127,7 +127,7 @@ jobs:
             arch: arm64
             command: package:mac
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
         with:
