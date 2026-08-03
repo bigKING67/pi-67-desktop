@@ -233,7 +233,9 @@ export async function installMockDesktopBridge(
               displayName: "browser67",
               bundled: true,
               dependencyState: "prepared",
+              extensionState: "not-prepared",
               doctorState: "degraded",
+              availableBrowsers: ["chrome", "edge"],
               detail: "依赖与命令入口已验证；真实 managed browser 连接仍需独立检查。",
               preparedAt: 1_784_800_000_000,
               checkedAt: 1_784_800_000_000,
@@ -241,6 +243,44 @@ export async function installMockDesktopBridge(
             }]
           }),
           doctorBrowser67: async () => structuredClone(bridgeFixture.capabilitySnapshot),
+          prepareBrowser67Extension: async () => ({
+            ...structuredClone(bridgeFixture.capabilitySnapshot),
+            integrations: [{
+              id: "browser67",
+              displayName: "browser67",
+              bundled: true,
+              dependencyState: "prepared",
+              extensionState: "prepared",
+              doctorState: "degraded",
+              availableBrowsers: ["chrome", "edge"],
+              detail: "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。",
+              preparedAt: 1_784_800_000_000,
+              extensionPreparedAt: 1_784_800_000_000,
+              extensionCheckedAt: 1_784_800_000_000,
+              registry: "https://registry.npmmirror.com"
+            }]
+          }),
+          openBrowser67ExtensionPage: async () => true,
+          revealBrowser67Extension: async () => true,
+          copyBrowser67ExtensionPath: async () => true,
+          verifyBrowser67Extension: async () => ({
+            ...structuredClone(bridgeFixture.capabilitySnapshot),
+            integrations: [{
+              id: "browser67",
+              displayName: "browser67",
+              bundled: true,
+              dependencyState: "prepared",
+              extensionState: "connected",
+              doctorState: "ready",
+              availableBrowsers: ["chrome", "edge"],
+              detail: "browser67 扩展身份与当前内置版本一致，真实受管浏览器连接已就绪。",
+              preparedAt: 1_784_800_000_000,
+              checkedAt: 1_784_800_000_100,
+              extensionPreparedAt: 1_784_800_000_000,
+              extensionCheckedAt: 1_784_800_000_100,
+              registry: "https://registry.npmmirror.com"
+            }]
+          }),
           getTeamMcpStatus: async () => structuredClone(teamMcpStatus),
           revealTeamMcpToken: async () => teamMcpToken
             ? { status: "revealed", token: teamMcpToken }

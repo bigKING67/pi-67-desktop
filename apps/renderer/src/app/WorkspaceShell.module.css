@@ -7,7 +7,7 @@
 }
 
 .navigationHidden {
-  grid-template-columns: minmax(520px, 1fr) 360px;
+  grid-template-columns: minmax(520px, 1fr) var(--workspace-side-width, 248px);
 }
 
 .navigationHidden:global(.context-hidden) {

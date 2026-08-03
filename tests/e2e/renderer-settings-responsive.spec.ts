@@ -98,9 +98,26 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
   await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
-  await expect(settings.getByRole("button", { name: "准备依赖", exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
+  await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
+  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
+  await expect(installer).toBeVisible();
+  await expect(installer.getByRole("button", { name: "打开 Chrome 扩展页", exact: true })).toBeVisible();
+  const installerBounds = await installer.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth
+    };
+  });
+  expect(installerBounds.left).toBeGreaterThanOrEqual(0);
+  expect(installerBounds.right).toBeLessThanOrEqual(520);
+  expect(installerBounds.scrollWidth).toBeLessThanOrEqual(installerBounds.clientWidth);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
+  await installer.getByRole("button", { name: "关闭", exact: true }).click();
 
   await navigation.getByRole("button", { name: /更新与诊断/u }).click();
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);

@@ -95,14 +95,27 @@ html[data-platform="darwin"] .title-bar {
 }
 
 .workspace-grid {
+  --workspace-side-width: clamp(248px, 18vw, 288px);
+  --conversation-track-width: 860px;
+
   display: grid;
-  grid-template-columns: 248px minmax(520px, 1fr) 360px;
+  grid-template-columns: var(--workspace-side-width) minmax(520px, 1fr) var(--workspace-side-width);
   min-width: 0;
   min-height: 0;
 }
 
 .workspace-grid.context-hidden {
-  grid-template-columns: 248px minmax(520px, 1fr);
+  --conversation-track-width: 1040px;
+
+  grid-template-columns: var(--workspace-side-width) minmax(520px, 1fr);
+}
+
+.workspace-grid.navigation-hidden {
+  --conversation-track-width: 1040px;
+}
+
+.workspace-grid.navigation-hidden.context-hidden {
+  --conversation-track-width: 1120px;
 }
 
 .navigation-rail,

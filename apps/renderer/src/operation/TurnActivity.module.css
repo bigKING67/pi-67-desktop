@@ -1,6 +1,6 @@
 .activity {
   display: flex;
-  width: min(820px, calc(100% - 48px));
+  width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   min-width: 0;
   align-items: flex-start;
   gap: 8px;
@@ -10,7 +10,7 @@
 }
 
 .timeline {
-  width: min(820px, calc(100% - 48px));
+  width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   min-width: 0;
   margin: 0 auto;
   padding: 10px 0 14px;

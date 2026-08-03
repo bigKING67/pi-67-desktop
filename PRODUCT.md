@@ -137,9 +137,20 @@ count.
   `MCP 服务` owns external service endpoints, local credential configuration, and
   connection identity; `浏览器集成` owns browser-specific dependency preparation
   and runtime diagnostics. They never share one mixed Settings document.
-- Bundled browser67 source and Skills do not imply live browser readiness. Settings
-  distinguishes bundled source, dependency preparation, deterministic Doctor,
-  and real managed-browser readiness instead of collapsing them into one state.
+- Bundled browser67 source and Skills do not imply live browser readiness. The
+  product treats bundled source, prepared runtime dependencies, prepared unpacked
+  extension files, a browser-loaded extension, and a live identity-matched managed
+  connection as distinct facts. `已安装并连接` requires a current-process Doctor
+  result whose WS or Link route reports `extension_identity_ok` with
+  `identity_match=true`; persisted success from an earlier application process is
+  only a prompt to recheck.
+- Browser-extension installation is guided rather than silent. After one-shot
+  confirmation, Desktop may prepare dependencies and files, then opens a detected
+  Chrome or Edge extension page and reveals or copies the validated extension
+  directory. The user remains responsible for enabling Developer mode and choosing
+  `Load unpacked`; a second one-shot confirmation may start or reuse the local Hub
+  before live identity verification. Desktop never installs through browser policy,
+  mutates a browser profile, or treats copied files as proof that Chrome/Edge loaded them.
 - One Electron window can register multiple workspaces. The navigation rail is
   the only Workspace and conversation switcher: each Workspace is a collapsible
   group containing active work, drafts, and Catalog-backed recent sessions.

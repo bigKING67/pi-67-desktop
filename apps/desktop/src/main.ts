@@ -10,9 +10,9 @@ import { createMainWindow } from "./main-window.js";
 import { registerPowerResumeRecovery } from "./power-resume.js";
 import { resolveDesktopToolchain } from "./desktop-toolchain.js";
 import {
-  DesktopCapabilityService,
-  resolveDesktopAgentDirectory
+  DesktopCapabilityService
 } from "./desktop-capability-service.js";
+import { resolveDesktopAgentDirectory } from "./desktop-agent-directory.js";
 import { PackageNetworkSettingsStore } from "./package-network-settings.js";
 import { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import { TeamMcpSettingsStore } from "./team-mcp-settings.js";

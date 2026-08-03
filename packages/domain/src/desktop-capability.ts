@@ -80,10 +80,14 @@ export interface DesktopIntegrationStatus {
   displayName: string;
   bundled: boolean;
   dependencyState: "not-prepared" | "prepared" | "failed";
+  extensionState: "not-prepared" | "prepared" | "reload-required" | "connected" | "failed";
   doctorState: "not-checked" | "degraded" | "ready" | "failed";
+  availableBrowsers: Array<"chrome" | "edge">;
   detail?: string;
   preparedAt?: number;
   checkedAt?: number;
+  extensionPreparedAt?: number;
+  extensionCheckedAt?: number;
   registry?: string;
 }
 

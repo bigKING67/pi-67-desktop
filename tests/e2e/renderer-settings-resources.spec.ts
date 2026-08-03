@@ -196,7 +196,7 @@ test("separates MCP services from browser integrations", async ({ page }, testIn
   await expect(settings.getByRole("heading", { name: "MCP 服务", exact: true })).toBeVisible();
   await expect(settings.getByRole("heading", { name: "Tavily Bridge", exact: true })).toBeVisible();
   await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "准备依赖", exact: true })).toHaveCount(0);
+  await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toHaveCount(0);
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toHaveCount(0);
   const mcpScreenshotPath = visualArtifactDirectory
     ? resolve(visualArtifactDirectory, "settings-mcp-services.png")
@@ -220,10 +220,25 @@ test("separates MCP services from browser integrations", async ({ page }, testIn
   await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
   await expect(settings.getByText("内置第一方", { exact: true })).toBeVisible();
   await expect(settings.getByText("尚未检查", { exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "准备依赖", exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
   await expect(settings.getByRole("heading", { name: "Tavily Bridge", exact: true })).toHaveCount(0);
   await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toHaveCount(0);
+  await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
+  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
+  await expect(installer).toBeVisible();
+  await expect(settings.getByText("待浏览器加载", { exact: true })).toBeVisible();
+  for (const action of [
+    "打开 Chrome 扩展页",
+    "打开 Edge 扩展页",
+    "在系统中显示目录",
+    "复制扩展目录"
+  ]) {
+    await expect(installer.getByRole("button", { name: action, exact: true })).toBeVisible();
+  }
+  await installer.getByRole("button", { name: "启动连接并验证", exact: true }).click();
+  await expect(installer.getByText("已安装并连接", { exact: true })).toBeVisible();
+  await expect(settings.getByText("已安装并连接", { exact: true }).first()).toBeVisible();
   const browserScreenshotPath = visualArtifactDirectory
     ? resolve(visualArtifactDirectory, "settings-browser-integration.png")
     : testInfo.outputPath("settings-browser-integration.png");
@@ -232,6 +247,7 @@ test("separates MCP services from browser integrations", async ({ page }, testIn
     path: browserScreenshotPath,
     contentType: "image/png"
   });
+  await installer.getByRole("button", { name: "完成", exact: true }).click();
 });
 
 test("opens, previews, edits, creates, and conflict-checks Context Markdown files", async ({ page }) => {

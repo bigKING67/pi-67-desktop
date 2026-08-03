@@ -221,9 +221,10 @@ test("serializes new-session transitions and keeps one terminal notification acr
   await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionGeneration });
   const toast = page.locator("[data-notification-id]").filter({ hasText: "任务失败" });
   await expect(toast).toHaveCount(1);
-  await toast.getByText("任务失败").click();
+  const closeToast = toast.getByRole("button", { name: "关闭通知：任务失败" });
+  await closeToast.focus();
   await expect(toast).toBeVisible();
-  await toast.getByRole("button", { name: "关闭通知：任务失败" }).click();
+  await closeToast.click();
   await expect(toast).toHaveCount(0);
 
   const notificationTrigger = page.locator('button[aria-describedby="notification-center-tooltip"]');

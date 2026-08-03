@@ -21,7 +21,7 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-floating);
   color: var(--text-primary);
-  pointer-events: auto;
+  pointer-events: none;
   animation: toast-enter var(--motion-standard) var(--motion-ease-out);
 }
 
@@ -69,6 +69,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
+  pointer-events: auto;
 }
 
 .close:hover,

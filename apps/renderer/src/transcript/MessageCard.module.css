@@ -1,5 +1,5 @@
 .card {
-  width: min(820px, calc(100% - 48px));
+  width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
   margin: 0 auto;
   padding: 18px 0;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent);
@@ -16,9 +16,8 @@
 
 .user {
   display: grid;
-  width: fit-content;
-  max-width: min(680px, calc(100% - 48px));
-  margin: 10px max(24px, calc(50% - 410px)) 10px auto;
+  width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
+  margin: 10px auto;
   padding: 0;
   border-bottom: 0;
   justify-items: end;
@@ -58,7 +57,7 @@
 
 .user .content {
   width: fit-content;
-  max-width: 100%;
+  max-width: min(680px, 100%);
   padding: 10px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   border-radius: 16px;
@@ -74,12 +73,11 @@
 }
 
 .userEditing {
-  width: min(680px, calc(100% - 48px));
   justify-items: stretch;
 }
 
 .userEditing .content {
-  width: 100%;
+  width: min(680px, 100%);
   padding: 12px;
   border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
   background: var(--surface-raised);
@@ -468,16 +466,12 @@
   }
 
   .user {
-    width: fit-content;
-    max-width: calc(100% - 28px);
-    margin: 8px 14px 8px auto;
+    width: calc(100% - 28px);
+    margin: 8px auto;
   }
 
   .user .content {
     padding: 10px 12px;
   }
 
-  .userEditing {
-    width: calc(100% - 28px);
-  }
 }

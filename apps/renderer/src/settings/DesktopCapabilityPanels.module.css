@@ -21,3 +21,168 @@
 .status[data-status="external"] {
   background: var(--info);
 }
+
+.installModal {
+  width: min(680px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.installDialog {
+  display: grid;
+  max-height: calc(100vh - 48px);
+  gap: 14px;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.installDialog h2 {
+  margin: -6px 0 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.installIntro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.installError {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.installSteps {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.installStep {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0 14px;
+}
+
+.installStep:not(:last-child)::after {
+  position: absolute;
+  top: 40px;
+  bottom: -2px;
+  left: 13px;
+  width: 1px;
+  background: var(--border);
+  content: "";
+}
+
+.stepMarker {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  place-items: center;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.installStep[data-current="true"] .stepMarker {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.installStep[data-complete="true"] .stepMarker {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  color: var(--success);
+}
+
+.installStep > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding-top: 3px;
+}
+
+.installStep strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.installStep p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.stepActions {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.browserActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inlineProgress,
+.connectedState {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.inlineProgress svg {
+  animation: browser67-spin 0.9s linear infinite;
+}
+
+.connectedState {
+  color: var(--success);
+}
+
+.browserUnavailable {
+  color: var(--warning) !important;
+}
+
+@keyframes browser67-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inlineProgress svg { animation: none; }
+}
+
+@media (max-width: 620px) {
+  .browserActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .browserActions button {
+    width: 100%;
+    justify-content: center;
+  }
+}

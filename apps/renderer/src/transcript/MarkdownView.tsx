@@ -47,7 +47,17 @@ export function MarkdownView({ children, mode = "settled", externalImages = "all
             <span className={styles.blockedImage} role="img" aria-label={alt || "外部图片已阻止"}>
               {alt ? `图片：${alt}` : "外部图片已阻止"}{src ? <small>{src}</small> : null}
             </span>
-          ) : <img alt={alt ?? ""} src={src} />
+          ) : <img alt={alt ?? ""} src={src} />,
+          table: ({ children: tableChildren }) => (
+            <div
+              aria-label="表格，可横向滚动"
+              className={styles.tableScroll}
+              data-markdown-table-scroll="true"
+              tabIndex={0}
+            >
+              <table>{tableChildren}</table>
+            </div>
+          )
         }}
       >
         {children}

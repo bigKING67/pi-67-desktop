@@ -112,6 +112,17 @@ const systemBridge = {
   ),
   setupBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-setup"),
   doctorBrowser67: (): Promise<DesktopCapabilitySnapshot> => ipcRenderer.invoke("pi67:browser67-doctor"),
+  prepareBrowser67Extension: (): Promise<DesktopCapabilitySnapshot> => (
+    ipcRenderer.invoke("pi67:browser67-extension-prepare")
+  ),
+  openBrowser67ExtensionPage: (browser: "chrome" | "edge"): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:browser67-extension-open-browser", browser)
+  ),
+  revealBrowser67Extension: (): Promise<boolean> => ipcRenderer.invoke("pi67:browser67-extension-reveal"),
+  copyBrowser67ExtensionPath: (): Promise<boolean> => ipcRenderer.invoke("pi67:browser67-extension-copy"),
+  verifyBrowser67Extension: (options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot> => (
+    ipcRenderer.invoke("pi67:browser67-extension-verify", options)
+  ),
   getTeamMcpStatus: (): Promise<TeamMcpStatus> => ipcRenderer.invoke("pi67:team-mcp-status"),
   revealTeamMcpToken: (): Promise<TeamMcpRevealResult> => ipcRenderer.invoke("pi67:team-mcp-reveal"),
   saveTeamMcpToken: (token: string): Promise<TeamMcpStatus> => (

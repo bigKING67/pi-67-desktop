@@ -10,7 +10,8 @@ import type {
 } from "@pi67/protocol";
 
 const MAX_METADATA_BYTES = 1_000_000;
-export const INTEGRATION_STATE_SCHEMA = "pi67.desktop-integration-state.v1";
+export const INTEGRATION_STATE_SCHEMA = "pi67.desktop-integration-state.v2";
+const LEGACY_INTEGRATION_STATE_SCHEMA = "pi67.desktop-integration-state.v1";
 
 export interface BundledCapabilityCatalog {
   catalogVersion: string;
@@ -35,10 +36,13 @@ export interface ManagedCapabilityState {
 export interface Browser67IntegrationState {
   schema: typeof INTEGRATION_STATE_SCHEMA;
   dependencyState: DesktopIntegrationStatus["dependencyState"];
+  extensionState: DesktopIntegrationStatus["extensionState"];
   doctorState: DesktopIntegrationStatus["doctorState"];
   detail?: string;
   preparedAt?: number;
   checkedAt?: number;
+  extensionPreparedAt?: number;
+  extensionCheckedAt?: number;
   registry?: string;
 }
 
@@ -320,11 +324,53 @@ export function parseManagedState(value: unknown): ManagedCapabilityState {
 export function parseBrowserState(value: unknown): Browser67IntegrationState {
   if (
     !isRecord(value)
-    || value.schema !== INTEGRATION_STATE_SCHEMA
+    || (value.schema !== INTEGRATION_STATE_SCHEMA && value.schema !== LEGACY_INTEGRATION_STATE_SCHEMA)
     || !["not-prepared", "prepared", "failed"].includes(String(value.dependencyState))
     || !["not-checked", "degraded", "ready", "failed"].includes(String(value.doctorState))
   ) throw new Error("browser67 integration state is invalid.");
-  return value as unknown as Browser67IntegrationState;
+  if (value.schema === LEGACY_INTEGRATION_STATE_SCHEMA) {
+    return {
+      schema: INTEGRATION_STATE_SCHEMA,
+      dependencyState: value.dependencyState as Browser67IntegrationState["dependencyState"],
+      extensionState: "not-prepared",
+      doctorState: value.doctorState as Browser67IntegrationState["doctorState"],
+      ...(typeof value.detail === "string" ? { detail: value.detail } : {}),
+      ...(typeof value.preparedAt === "number" ? { preparedAt: value.preparedAt } : {}),
+      ...(typeof value.checkedAt === "number" ? { checkedAt: value.checkedAt } : {}),
+      ...(typeof value.registry === "string" ? { registry: value.registry } : {})
+    };
+  }
+  if (![
+    "not-prepared",
+    "prepared",
+    "reload-required",
+    "connected",
+    "failed"
+  ].includes(String(value.extensionState))) throw new Error("browser67 integration state is invalid.");
+  if (
+    (value.detail !== undefined && (typeof value.detail !== "string" || value.detail.length > 500))
+    || !isOptionalTimestamp(value.preparedAt)
+    || !isOptionalTimestamp(value.checkedAt)
+    || !isOptionalTimestamp(value.extensionPreparedAt)
+    || !isOptionalTimestamp(value.extensionCheckedAt)
+    || (value.registry !== undefined && (typeof value.registry !== "string" || value.registry.length > 2_048))
+  ) throw new Error("browser67 integration state is invalid.");
+  return {
+    schema: INTEGRATION_STATE_SCHEMA,
+    dependencyState: value.dependencyState as Browser67IntegrationState["dependencyState"],
+    extensionState: value.extensionState as Browser67IntegrationState["extensionState"],
+    doctorState: value.doctorState as Browser67IntegrationState["doctorState"],
+    ...(typeof value.detail === "string" ? { detail: value.detail } : {}),
+    ...(typeof value.preparedAt === "number" ? { preparedAt: value.preparedAt } : {}),
+    ...(typeof value.checkedAt === "number" ? { checkedAt: value.checkedAt } : {}),
+    ...(typeof value.extensionPreparedAt === "number" ? { extensionPreparedAt: value.extensionPreparedAt } : {}),
+    ...(typeof value.extensionCheckedAt === "number" ? { extensionCheckedAt: value.extensionCheckedAt } : {}),
+    ...(typeof value.registry === "string" ? { registry: value.registry } : {})
+  };
+}
+
+function isOptionalTimestamp(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isFinite(value) && value >= 0);
 }
 
 export async function readBoundedJson(path: string): Promise<unknown> {

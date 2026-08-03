@@ -156,6 +156,75 @@ test("keeps long code horizontally navigable without a persistent scrollbar", as
   await page.screenshot({ path: testInfo.outputPath("long-code-without-scrollbar.png"), animations: "disabled" });
 });
 
+test("renders structured Markdown without letting wide tables widen the workbench", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  await attachMockAgent(page, [{
+    id: "markdown-document-message",
+    role: "assistant",
+    parts: [{
+      type: "text",
+      text: [
+        "## 内容方案",
+        "",
+        "- 明确目标人群",
+        "  - 记录真实使用场景",
+        "- [x] 保留可验证证据",
+        "",
+        "| 人群 | 场景 | 问题 | 证据 | 标题 | 正文 | 图片 | 复盘 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 通勤用户 | 早高峰 | 没时间护肤 | 30 天照片对比 | 油皮通勤底妆 | 步骤与数据 | 实拍对比图 | 收藏与搜索进站 |",
+        "| 新手用户 | 第一次购买 | 不会选色号 | 自然光试色 | 新手选色指南 | 肤色判断方法 | 多肤色样本 | 有效评论 |",
+        "",
+        "> 结论必须能被读者验证。",
+        "",
+        "---",
+        "",
+        "正文继续保持稳定的阅读层级。"
+      ].join("\n")
+    }]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const tableViewport = page.getByLabel("表格，可横向滚动");
+  const table = tableViewport.getByRole("table");
+  await expect(table).toBeVisible();
+  await expect(table.getByRole("columnheader", { name: "人群" })).toBeVisible();
+  await expect(table.getByRole("cell", { name: "收藏与搜索进站" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "内容方案", level: 2 })).toBeVisible();
+
+  const metrics = await tableViewport.evaluate((element) => {
+    const header = element.querySelector("th");
+    element.scrollLeft = 120;
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      scrollLeft: element.scrollLeft,
+      headerBackground: header ? getComputedStyle(header).backgroundColor : "",
+      headerPaddingLeft: header ? getComputedStyle(header).paddingLeft : "",
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth
+    };
+  });
+  expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+  expect(metrics.scrollLeft).toBeGreaterThan(0);
+  expect(metrics.headerBackground).not.toBe("rgba(0, 0, 0, 0)");
+  expect(metrics.headerPaddingLeft).toBe("12px");
+  expect(metrics.documentScrollWidth).toBe(metrics.documentClientWidth);
+
+  await tableViewport.focus();
+  await expect(tableViewport).toBeFocused();
+  await tableViewport.evaluate((element) => { element.scrollLeft = 0; });
+  await page.screenshot({ path: testInfo.outputPath("markdown-document-dark.png"), animations: "disabled" });
+
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth))
+    .toBe(await page.evaluate(() => document.documentElement.clientWidth));
+  await page.screenshot({ path: testInfo.outputPath("markdown-document-light.png"), animations: "disabled" });
+});
+
 test("renders user messages as compact right-aligned bubbles", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.goto("/");
@@ -192,15 +261,17 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   await expect(piMessage.getByText("Pi", { exact: true })).toBeVisible();
   await expect(piMessage.getByText("deepseek-v4-pro", { exact: true })).toHaveCount(0);
 
-  const [shortBox, longBox, piBox] = await Promise.all([
-    shortUserMessage.boundingBox(),
-    longUserMessage.boundingBox(),
-    piMessage.boundingBox()
+  const [shortBox, longBox, piBox, shortTrackBox] = await Promise.all([
+    shortUserMessage.getByTestId("message-content").boundingBox(),
+    longUserMessage.getByTestId("message-content").boundingBox(),
+    piMessage.boundingBox(),
+    shortUserMessage.boundingBox()
   ]);
   expect(shortBox).not.toBeNull();
   expect(longBox).not.toBeNull();
   expect(piBox).not.toBeNull();
-  if (!shortBox || !longBox || !piBox) throw new Error("Message geometry is unavailable");
+  expect(shortTrackBox).not.toBeNull();
+  if (!shortBox || !longBox || !piBox || !shortTrackBox) throw new Error("Message geometry is unavailable");
 
   expect(shortBox.width).toBeLessThan(piBox.width / 2);
   expect(Math.abs(shortBox.x + shortBox.width - (piBox.x + piBox.width))).toBeLessThanOrEqual(1);
@@ -208,6 +279,7 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   expect(longBox.width).toBeLessThanOrEqual(682);
   expect(Math.abs(longBox.x + longBox.width - (piBox.x + piBox.width))).toBeLessThanOrEqual(1);
   expect(longBox.x).toBeGreaterThan(piBox.x);
+  expect(shortTrackBox.width).toBe(piBox.width);
 
   const documentWidth = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -222,7 +294,7 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   await page.setViewportSize({ width: 720, height: 920 });
   await expect(shortUserMessage).toBeVisible();
   const [narrowUserBox, narrowPiBox] = await Promise.all([
-    shortUserMessage.boundingBox(),
+    shortUserMessage.getByTestId("message-content").boundingBox(),
     piMessage.boundingBox()
   ]);
   expect(narrowUserBox).not.toBeNull();

@@ -1,12 +1,15 @@
-import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { mkdir, rm, unlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { DesktopCapabilityService } from "./desktop-capability-service.js";
+import { resolveDesktopAgentDirectory } from "./desktop-agent-directory.js";
 import {
-  DesktopCapabilityService,
-  resolveDesktopAgentDirectory
-} from "./desktop-capability-service.js";
-import { PackageNetworkSettingsStore } from "./package-network-settings.js";
+  createDesktopCapabilityFixture as createFixture,
+  currentExtensionDoctorResult,
+  prepareBrowserDependencies,
+  writeManagedState
+} from "./desktop-capability-service.test-fixture.js";
 
 describe("Desktop capability service", () => {
   it("reports bundled capability and browser67 setup states without exposing paths", async () => {
@@ -20,7 +23,7 @@ describe("Desktop capability service", () => {
     const service = new DesktopCapabilityService({
       ...fixture,
       runNpm,
-      runBrowserDoctor: vi.fn(async () => undefined),
+      runBrowserEntrypointCheck: vi.fn(async () => undefined),
       now: () => 123,
       createToken: () => "fixture"
     });
@@ -47,7 +50,7 @@ describe("Desktop capability service", () => {
     expect(runNpm).toHaveBeenCalledWith("https://registry.npmmirror.com", expect.any(String), fixture.toolchain);
     expect(prepared.integrations[0]).toMatchObject({
       dependencyState: "prepared",
-      doctorState: "degraded",
+      doctorState: "not-checked",
       preparedAt: 123,
       registry: "https://registry.npmmirror.com"
     });
@@ -143,7 +146,7 @@ describe("Desktop capability service", () => {
     const fallbackService = new DesktopCapabilityService({
       ...fallback,
       runNpm,
-      runBrowserDoctor: vi.fn(async () => undefined),
+      runBrowserEntrypointCheck: vi.fn(async () => undefined),
       now: () => 200,
       createToken: () => "fallback"
     });
@@ -158,7 +161,7 @@ describe("Desktop capability service", () => {
       runNpm: vi.fn(async () => {
         throw "registry unavailable\ninternal detail";
       }),
-      runBrowserDoctor: vi.fn(async () => undefined),
+      runBrowserEntrypointCheck: vi.fn(async () => undefined),
       now: () => 201,
       createToken: () => "failure"
     });
@@ -185,7 +188,7 @@ describe("Desktop capability service", () => {
       integrations: [{
         dependencyState: "not-prepared",
         doctorState: "not-checked",
-        detail: "browser67 依赖尚未准备。"
+        detail: "browser67 运行依赖尚未准备。"
       }]
     });
 
@@ -206,10 +209,17 @@ describe("Desktop capability service", () => {
 
     const prepared = await createFixture();
     await prepareBrowserDependencies(prepared.packageRoot);
-    const doctor = vi.fn(async () => undefined);
+    const extensionDoctor = vi.fn(async () => currentExtensionDoctorResult());
+    const liveDoctor = vi.fn(async () => ({
+      ready: false,
+      extensionConnected: false,
+      identityMatch: false,
+      detail: "浏览器扩展尚未连接；可从安装向导启动 Hub 并验证。"
+    }));
     expect(await new DesktopCapabilityService({
       ...prepared,
-      runBrowserDoctor: doctor,
+      runBrowserExtensionDoctor: extensionDoctor,
+      runBrowserLiveDoctor: liveDoctor,
       now: () => 301,
       createToken: () => "prepared"
     }).doctorBrowser67()).toMatchObject({
@@ -219,13 +229,14 @@ describe("Desktop capability service", () => {
         checkedAt: 301
       }]
     });
-    expect(doctor).toHaveBeenCalledOnce();
+    expect(extensionDoctor).toHaveBeenCalledOnce();
+    expect(liveDoctor).toHaveBeenCalledOnce();
 
     const failed = await createFixture();
     await prepareBrowserDependencies(failed.packageRoot);
     expect(await new DesktopCapabilityService({
       ...failed,
-      runBrowserDoctor: vi.fn(async () => {
+      runBrowserExtensionDoctor: vi.fn(async () => {
         throw new Error("doctor failed\nprivate detail");
       }),
       now: () => 302,
@@ -271,20 +282,6 @@ describe("Desktop capability service", () => {
       }]
     });
 
-    const privateDoctor = await createFixture();
-    await prepareBrowserDependencies(privateDoctor.packageRoot);
-    expect(await new DesktopCapabilityService({
-      ...privateDoctor,
-      toolchain: { ...privateDoctor.toolchain, nodeExecutable: process.execPath },
-      now: () => 402,
-      createToken: () => "private-doctor"
-    }).doctorBrowser67()).toMatchObject({
-      integrations: [{
-        dependencyState: "prepared",
-        doctorState: "degraded",
-        checkedAt: 402
-      }]
-    });
   });
 
   it("resolves the Desktop agent directory from every supported environment form", () => {
@@ -298,92 +295,3 @@ describe("Desktop capability service", () => {
       .toBe(resolve("/private/custom-agent"));
   });
 });
-
-async function createFixture() {
-  const root = await mkdtemp(join(tmpdir(), "pi67-capability-service-"));
-  const capabilitiesRoot = join(root, "bundled");
-  const agentDir = join(root, "agent");
-  const packageRoot = join(agentDir, "desktop-capabilities", "packages", "browser67");
-  await mkdir(join(capabilitiesRoot), { recursive: true });
-  await mkdir(join(packageRoot, "bin"), { recursive: true });
-  await writeFile(join(packageRoot, "package.json"), "{}", "utf8");
-  await writeFile(join(packageRoot, "bin", "browser67.mjs"), "", "utf8");
-  await writeFile(join(capabilitiesRoot, "catalog.json"), JSON.stringify({
-    schema: "pi67.capability-catalog.v1",
-    catalogVersion: "test.1",
-    entries: [{
-      id: "browser67",
-      displayName: "browser67",
-      origin: "first-party",
-      bundled: true,
-      defaultEnabled: true,
-      version: "0.4.0",
-      commit: "1".repeat(40),
-      packagePath: "packages/browser67",
-      resourceTypes: ["skill", "integration"],
-      bundledExtensions: [{ id: "browser-bridge", displayName: "browser-bridge" }],
-      bundledSkills: [{
-        id: "browser67",
-        displayName: "browser67",
-        description: "Controls the managed browser runtime."
-      }]
-    }],
-    bundledSkillSuites: [{
-      id: "browser67",
-      displayName: "browser67",
-      description: "Managed browser skills.",
-      versionSource: "capability-package",
-      bundledVersion: "0.4.0",
-      upstream: "https://github.com/example/browser67",
-      sourceCommit: "1".repeat(40),
-      updatePolicy: "capability-package",
-      updateManager: "desktop-capability",
-      independentUpdateState: "not-applicable",
-      members: [{ packageId: "browser67", skillId: "browser67" }]
-    }],
-    recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }]
-  }), "utf8");
-  await writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
-    schema: "pi67.desktop-capability-state.v1",
-    catalogVersion: "test.1",
-    packages: [{ id: "browser67", installed: true }],
-    rules: "installed",
-    agents: "user-owned"
-  }), "utf8");
-  const packageNetworkSettings = new PackageNetworkSettingsStore(join(root, "user-data"));
-  const toolchain = {
-    root: join(root, "toolchain"),
-    ready: true,
-    packaged: true,
-    platform: "darwin" as const,
-    architecture: "arm64" as const,
-    nodeVersion: "24.18.0",
-    npmVersion: "12.0.1",
-    gitVersion: "2.53.0",
-    nodeExecutable: join(root, "toolchain", "node"),
-    npmCli: join(root, "toolchain", "npm-cli.js"),
-    gitExecutable: join(root, "toolchain", "git"),
-    gitExecPath: join(root, "toolchain", "git-core")
-  };
-  return { capabilitiesRoot, agentDir, packageRoot, toolchain, packageNetworkSettings };
-}
-
-async function prepareBrowserDependencies(packageRoot: string) {
-  await mkdir(join(packageRoot, "node_modules", "ajv"), { recursive: true });
-  await mkdir(join(packageRoot, "node_modules", "ws"), { recursive: true });
-  await writeFile(join(packageRoot, "node_modules", "ajv", "package.json"), "{}", "utf8");
-  await writeFile(join(packageRoot, "node_modules", "ws", "package.json"), "{}", "utf8");
-}
-
-async function writeManagedState(
-  agentDir: string,
-  options: { catalogVersion: string; installed: boolean }
-) {
-  await writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
-    schema: "pi67.desktop-capability-state.v1",
-    catalogVersion: options.catalogVersion,
-    packages: [{ id: "browser67", installed: options.installed }],
-    rules: "installed",
-    agents: "user-owned"
-  }), "utf8");
-}

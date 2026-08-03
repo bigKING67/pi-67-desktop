@@ -111,8 +111,7 @@
       "independentUpdateState": "not-applicable",
       "members": [
         { "packageId": "browser67", "skillId": "browser67" },
-        { "packageId": "browser67", "skillId": "js-reverse" },
-        { "packageId": "browser67", "skillId": "tmwd-browser-mcp" }
+        { "packageId": "browser67", "skillId": "js-reverse" }
       ]
     },
     {

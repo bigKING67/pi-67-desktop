@@ -160,7 +160,7 @@ export function WorkspaceShell({
   return (
     <main
       aria-label="π 工作台"
-      className={`workspace-grid ${effectiveContextVisible ? "has-context" : "context-hidden"} ${navigationVisible ? styles.navigationVisible : styles.navigationHidden}`}
+      className={`workspace-grid ${effectiveContextVisible ? "has-context" : "context-hidden"} ${navigationVisible ? `navigation-visible ${styles.navigationVisible}` : `navigation-hidden ${styles.navigationHidden}`}`}
     >
       <NavigationRail containerRef={navigationRef} />
       {navigationIsDrawer && navigationVisible ? (

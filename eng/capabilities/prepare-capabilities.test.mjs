@@ -13,7 +13,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.01.1");
+    expect(lock.catalogVersion).toBe("2026.08.03.2");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -21,6 +21,10 @@ describe("Desktop first-party capability source lock", () => {
       "commerce-growth-os"
     ]);
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
+    expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
+      version: "0.4.0",
+      commit: "eb857d335660380a383490f549c4d40227dbf3dc"
+    });
     expect(lock.skillPacks).toEqual([{
       name: "ai-berkshire-investment-suite",
       adapter: "pi67-ai-berkshire-v1",
@@ -60,7 +64,7 @@ describe("Desktop first-party capability source lock", () => {
     })).toThrow(/source is invalid/u);
   });
 
-  it("declares five explicit suites covering all 66 bundled Skill identities", async () => {
+  it("declares five explicit suites covering all 65 bundled Skill identities", async () => {
     const definition = JSON.parse(await readFile(
       resolve(root, "eng/capabilities/bundled-skill-suites.json"),
       "utf8"
@@ -73,8 +77,8 @@ describe("Desktop first-party capability source lock", () => {
       "browser67",
       "design-output-tools"
     ]);
-    expect(definition.suites.map((suite) => suite.members.length)).toEqual([27, 21, 8, 3, 7]);
-    expect(definition.suites.flatMap((suite) => suite.members)).toHaveLength(66);
+    expect(definition.suites.map((suite) => suite.members.length)).toEqual([27, 21, 8, 2, 7]);
+    expect(definition.suites.flatMap((suite) => suite.members)).toHaveLength(65);
     expect(definition.suites.find((suite) => suite.id === "ai-berkshire-investment-suite")).toMatchObject({
       versionSource: { kind: "pi67-skill-pack", packName: "ai-berkshire-investment-suite" },
       upstream: "https://github.com/xbtlin/ai-berkshire",

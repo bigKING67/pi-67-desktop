@@ -68,6 +68,11 @@ declare global {
         getDesktopCapabilitySnapshot(): Promise<DesktopCapabilitySnapshot>;
         setupBrowser67(): Promise<DesktopCapabilitySnapshot>;
         doctorBrowser67(): Promise<DesktopCapabilitySnapshot>;
+        prepareBrowser67Extension(): Promise<DesktopCapabilitySnapshot>;
+        openBrowser67ExtensionPage(browser: "chrome" | "edge"): Promise<boolean>;
+        revealBrowser67Extension(): Promise<boolean>;
+        copyBrowser67ExtensionPath(): Promise<boolean>;
+        verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot>;
         getTeamMcpStatus(): Promise<TeamMcpStatus>;
         revealTeamMcpToken(): Promise<TeamMcpRevealResult>;
         saveTeamMcpToken(token: string): Promise<TeamMcpStatus>;

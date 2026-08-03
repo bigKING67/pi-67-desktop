@@ -31,6 +31,10 @@ import {
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
 import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
+import {
+  openBrowser67ExtensionPage,
+  type Browser67BrowserId
+} from "./browser67-integration.js";
 
 const manualUpdateChannel = "unsigned-preview" as const;
 
@@ -283,6 +287,57 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
       : options.desktopCapabilities.snapshot();
   });
   ipcMain.handle("pi67:browser67-doctor", () => options.desktopCapabilities.doctorBrowser67());
+  ipcMain.handle("pi67:browser67-extension-prepare", async () => {
+    const result = await dialog.showMessageBox(options.getMainWindow()!, {
+      type: "question",
+      title: "安装 browser67 浏览器扩展",
+      message: "允许本次准备 browser67 运行依赖和扩展文件？",
+      detail: "可能按照下载源设置访问 npm，并将 unpacked extension 写入 browser67 活动目录。不会修改系统 Node/npm、浏览器策略或其他扩展；首次加载仍需你在 Chrome/Edge 中确认。",
+      buttons: ["允许本次准备", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    return result.response === 0
+      ? options.desktopCapabilities.prepareBrowser67Extension()
+      : options.desktopCapabilities.snapshot();
+  });
+  ipcMain.handle("pi67:browser67-extension-open-browser", async (_event, value: unknown) => {
+    if (value !== "chrome" && value !== "edge") throw new Error("Browser selection is invalid.");
+    return openBrowser67ExtensionPage(value as Browser67BrowserId);
+  });
+  ipcMain.handle("pi67:browser67-extension-reveal", async () => {
+    shell.showItemInFolder(await options.desktopCapabilities.browser67ExtensionManifestPath());
+    return true;
+  });
+  ipcMain.handle("pi67:browser67-extension-copy", async () => {
+    await options.desktopCapabilities.browser67ExtensionManifestPath();
+    clipboard.writeText(options.desktopCapabilities.browser67ExtensionDirectory());
+    return true;
+  });
+  ipcMain.handle("pi67:browser67-extension-verify", async (_event, value: unknown) => {
+    if (
+      !isRecord(value)
+      || typeof value.startHub !== "boolean"
+      || Object.keys(value).length !== 1
+    ) {
+      throw new Error("browser67 verification options are invalid.");
+    }
+    if (!value.startHub) return options.desktopCapabilities.verifyBrowser67Extension({ startHub: false });
+    const result = await dialog.showMessageBox(options.getMainWindow()!, {
+      type: "question",
+      title: "启动 browser67 连接",
+      message: "启动或复用本地 browser67 Hub 并验证扩展连接？",
+      detail: "验证只接受当前内置扩展版本的 live identity。若扩展尚未在 Chrome/Edge 中加载，本次检查会保持为未就绪。",
+      buttons: ["启动并验证", "取消"],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    });
+    return result.response === 0
+      ? options.desktopCapabilities.verifyBrowser67Extension({ startHub: true })
+      : options.desktopCapabilities.snapshot();
+  });
   ipcMain.handle("pi67:team-mcp-status", () => options.teamMcpSettings.status());
   ipcMain.handle("pi67:team-mcp-reveal", () => options.teamMcpSettings.revealToken());
   ipcMain.handle("pi67:team-mcp-save", async (_event, value: unknown) => {
@@ -335,6 +390,10 @@ function disabledManualUpdateState(currentVersion: string): ManualUpdateState {
 
 function errorManualUpdateState(currentVersion: string, detail: string): ManualUpdateState {
   return { phase: "error", channel: manualUpdateChannel, currentVersion, detail: detail.slice(0, 500) };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function assertWorkspaceId(value: unknown): string {

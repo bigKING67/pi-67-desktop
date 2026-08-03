@@ -9,7 +9,7 @@
 
 .shell {
   position: relative;
-  width: min(860px, 100%);
+  width: min(var(--conversation-track-width, 860px), 100%);
   min-width: 0;
   margin: 0 auto;
   overflow: hidden;
@@ -44,7 +44,7 @@
 .slashPickerAnchor {
   position: relative;
   z-index: 8;
-  width: min(860px, 100%);
+  width: min(var(--conversation-track-width, 860px), 100%);
   height: 0;
   margin: 0 auto;
 }
@@ -413,7 +413,7 @@
 }
 
 .queuePanel {
-  width: min(860px, 100%);
+  width: min(var(--conversation-track-width, 860px), 100%);
   margin: 0 auto 6px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -833,7 +833,7 @@
 
 .extensionWidget {
   display: flex;
-  width: min(860px, 100%);
+  width: min(var(--conversation-track-width, 860px), 100%);
   gap: 8px;
   margin: 0 auto 6px;
   padding: 6px 9px;

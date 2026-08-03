@@ -130,9 +130,15 @@ Application-level surfaces use a separate wide-window shell:
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.
-- Navigation rail: 248px on the current wide layout.
-- Context pane: 360px on the current wide layout and collapsible.
+- Navigation and Inspector share `clamp(248px, 18vw, 288px)` on the wide
+  three-region layout. Neither side column gains width at the other's expense;
+  long names truncate inside the shared measure.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
+- Transcript, execution process, Composer, queue, and Composer-anchored overlays
+  share one conversation measure: 860px with both side columns present, 1040px
+  when either side column stops consuming layout width, and at most 1120px when
+  neither side column consumes layout width. The workbench expands visibly when
+  a side column closes without turning ordinary prose into full-window lines.
 - Below 1040px, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
@@ -242,13 +248,14 @@ loading error where the operation can produce those states
   occupies the Virtuoso footer and joins history only after it settles.
 - Streaming text is coalesced; token-level React commits are forbidden.
 - User messages use a compact, content-width bubble aligned to the right edge of
-  the 820px Transcript reading track. Short messages never expand to the maximum
-  width; long prompts, code, and attachments remain bounded. The visible author
+  the shared adaptive conversation measure. Short messages never expand to the
+  maximum width; long prompts, code, and attachments remain bounded. The visible author
   header is omitted because position and surface already communicate ownership,
   while the message article retains an explicit accessible user label. Pi and
   Tool output remain left-aligned, wide editorial content with visible authors.
 - Every settled User or Pi message exposes one low-emphasis action footer without
-  widening the 820px reading track or creating document-level horizontal scroll.
+  widening the adaptive conversation measure or creating document-level
+  horizontal scroll.
   Pi answers place `复制回答` and `在新任务中继续` before the timestamp; User
   messages place the timestamp before `复制消息` and `编辑消息`. Action
   targets remain at least 28px, are keyboard-focusable, have named tooltips, and
@@ -342,6 +349,12 @@ loading error where the operation can produce those states
   they never widen the Transcript or application document. Tool summaries and
   recorded Edit Patch facts remain bounded; complete Tool Output and Git/workspace
   Diff require future explicit data and expansion contracts.
+- Editorial Markdown uses visible heading, paragraph, nested-list, quote,
+  separator, and GFM task-list hierarchy. GFM tables retain semantic table
+  structure, a quiet header surface, cell spacing and row boundaries; a wide
+  table scrolls only inside its keyboard-focusable table viewport and never
+  widens the Transcript or application document. Streaming and settled text use
+  the same semantic structure so completion does not replace the document layout.
 - Markdown never executes raw HTML.
 - Session images never render a cross-process data URL. A generation-bound asset
   reference loads only while its virtualized message is mounted, shows explicit
@@ -678,12 +691,20 @@ loading error where the operation can produce those states
   The MCP page owns external service endpoints, local credential configuration,
   and connection identity. Its current single `Tavily Bridge` service remains a
   flat Settings section until another independently manageable MCP service exists.
-- Browser integrations do not equate copied source with readiness. browser67
-  separately reports `Bundled`, `Dependencies not prepared/Prepared`, and Doctor
-  state. Setup is an explicit one-shot network action through the Desktop private
-  toolchain; deterministic dependency and entrypoint checks may report Degraded
-  until a real browser extension and managed-browser connection are independently
-  proven.
+- Browser integrations do not equate copied source with readiness. The browser67
+  section reports separate rows for bundled source, runtime dependencies, browser
+  extension files, and the managed connection. Its three-step dialog prepares the
+  unpacked extension after one-shot confirmation, offers only fixed Chrome/Edge
+  extension-management destinations plus reveal/copy actions for the revalidated
+  directory, and explains the browser-owned Developer mode / `Load unpacked` step.
+  Starting or reusing the local Hub requires a second one-shot confirmation.
+- `已安装并连接` is a live state, not an optimistic completion label. It appears
+  only when the current Desktop process observes a WS or Link Doctor route with
+  `ok=true`, `detail=extension_identity_ok`, and `identity_match=true`. Missing
+  connection keeps prepared files in `待浏览器加载`; a live identity mismatch becomes
+  `需要重新加载`; malformed files or operations fail visibly. A persisted connected
+  result is demoted until this process rechecks it. The dialog scrolls vertically
+  inside the viewport at high zoom and never creates document-level horizontal overflow.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
   removes the Workspace Inspector surface and its focus targets from the DOM.
   Returning to a Workspace restores its file navigation and Workspace-scoped
@@ -880,8 +901,10 @@ loading error where the operation can produce those states
   error remains until dismissed. Timers pause while the document is hidden or the Toast
   has pointer/keyboard interaction.
 - Toast copy is never itself a dismiss target. Every Toast has a separate labeled close
-  button; error uses `alert`, while info, success, and warning use `status`. Reduced Motion
-  removes entrance travel.
+  button, and only that button accepts pointer input so transient feedback cannot block
+  Workbench controls behind it. Keyboard focus and pointer interaction on the close button
+  still pause the timer. Error uses `alert`, while info, success, and warning use `status`.
+  Reduced Motion removes entrance travel.
 - The Title Bar Bell opens a React Aria Popover/Dialog, exposes a `9+` bounded unread
   badge, marks history read when opened, and restores focus to the Bell when closed.
   History is newest-first, capped at 50 entries, and can be cleared explicitly.

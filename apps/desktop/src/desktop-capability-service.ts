@@ -1,9 +1,6 @@
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
 import { chmod, lstat, mkdir, open, rename } from "node:fs/promises";
-import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { homedir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   npmRegistryCandidates,
   type DesktopCapabilitySnapshot,
@@ -23,19 +20,33 @@ import {
   type BundledCapabilityCatalog,
   type ManagedCapabilityState
 } from "./desktop-capability-contract.js";
+import {
+  assertSafeBrowser67ExtensionTarget,
+  detectBrowser67Browsers,
+  resolveBrowser67Home,
+  type Browser67BrowserId
+} from "./browser67-integration.js";
+import {
+  browser67DependenciesPrepared,
+  runBrowser67EntrypointCheck,
+  runBrowser67ExtensionDoctor,
+  runBrowser67ExtensionReload,
+  runBrowser67ExtensionSetup,
+  runBrowser67LiveDoctor,
+  runBrowser67NpmInstall,
+  type Browser67ProcessRunners
+} from "./browser67-capability-process.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 
-const NPM_OPERATION_TIMEOUT_MS = 5 * 60_000;
-const MAX_PROCESS_OUTPUT_BYTES = 8_192;
-
-export interface DesktopCapabilityServiceOptions {
+export interface DesktopCapabilityServiceOptions extends Partial<Browser67ProcessRunners> {
   capabilitiesRoot: string;
   agentDir: string;
   toolchain: DesktopToolchain;
   packageNetworkSettings: PackageNetworkSettingsStore;
-  runNpm?: (registry: string, cwd: string, toolchain: DesktopToolchain) => Promise<void>;
-  runBrowserDoctor?: (cwd: string, toolchain: DesktopToolchain) => Promise<void>;
+  browser67Home?: string;
+  browser67ExtensionDirectory?: string;
+  availableBrowsers?: () => Browser67BrowserId[];
   now?: () => number;
   createToken?: () => string;
 }
@@ -46,18 +57,35 @@ export class DesktopCapabilityService {
   readonly #toolchain: DesktopToolchain;
   readonly #packageNetworkSettings: PackageNetworkSettingsStore;
   readonly #runNpm: NonNullable<DesktopCapabilityServiceOptions["runNpm"]>;
-  readonly #runBrowserDoctor: NonNullable<DesktopCapabilityServiceOptions["runBrowserDoctor"]>;
+  readonly #runBrowserEntrypointCheck: NonNullable<DesktopCapabilityServiceOptions["runBrowserEntrypointCheck"]>;
+  readonly #runBrowserExtensionSetup: NonNullable<DesktopCapabilityServiceOptions["runBrowserExtensionSetup"]>;
+  readonly #runBrowserExtensionDoctor: NonNullable<DesktopCapabilityServiceOptions["runBrowserExtensionDoctor"]>;
+  readonly #runBrowserLiveDoctor: NonNullable<DesktopCapabilityServiceOptions["runBrowserLiveDoctor"]>;
+  readonly #runBrowserExtensionReload: NonNullable<DesktopCapabilityServiceOptions["runBrowserExtensionReload"]>;
+  readonly #browser67Home: string;
+  readonly #browser67ExtensionDirectory: string;
+  readonly #availableBrowsers: () => Browser67BrowserId[];
   readonly #now: () => number;
   readonly #createToken: () => string;
   #pending: Promise<void> = Promise.resolve();
+  #liveIdentityVerified = false;
 
   constructor(options: DesktopCapabilityServiceOptions) {
     this.#capabilitiesRoot = resolve(options.capabilitiesRoot);
     this.#managedRoot = join(resolve(options.agentDir), "desktop-capabilities");
     this.#toolchain = options.toolchain;
     this.#packageNetworkSettings = options.packageNetworkSettings;
-    this.#runNpm = options.runNpm ?? runPrivateNpmInstall;
-    this.#runBrowserDoctor = options.runBrowserDoctor ?? runPrivateBrowserDoctor;
+    this.#runNpm = options.runNpm ?? runBrowser67NpmInstall;
+    this.#runBrowserEntrypointCheck = options.runBrowserEntrypointCheck ?? runBrowser67EntrypointCheck;
+    this.#runBrowserExtensionSetup = options.runBrowserExtensionSetup ?? runBrowser67ExtensionSetup;
+    this.#runBrowserExtensionDoctor = options.runBrowserExtensionDoctor ?? runBrowser67ExtensionDoctor;
+    this.#runBrowserLiveDoctor = options.runBrowserLiveDoctor ?? runBrowser67LiveDoctor;
+    this.#runBrowserExtensionReload = options.runBrowserExtensionReload ?? runBrowser67ExtensionReload;
+    this.#browser67Home = resolve(options.browser67Home ?? resolveBrowser67Home());
+    this.#browser67ExtensionDirectory = resolve(
+      options.browser67ExtensionDirectory ?? join(this.#browser67Home, "browser", "tmwd_cdp_bridge")
+    );
+    this.#availableBrowsers = options.availableBrowsers ?? (() => detectBrowser67Browsers());
     this.#now = options.now ?? Date.now;
     this.#createToken = options.createToken ?? randomUUID;
   }
@@ -67,75 +95,228 @@ export class DesktopCapabilityService {
   }
 
   setupBrowser67(): Promise<DesktopCapabilitySnapshot> {
+    return this.#enqueue(() => this.#setupBrowser67Unlocked());
+  }
+
+  prepareBrowser67Extension(): Promise<DesktopCapabilitySnapshot> {
     return this.#enqueue(async () => {
-      const packageRoot = await this.#requireBrowser67Package();
-      if (!this.#toolchain.ready) throw new Error("Desktop private Node/npm/Git toolchain is unavailable.");
-      const candidates = npmRegistryCandidates(await this.#packageNetworkSettings.load());
-      if (candidates.length === 0) throw new Error("Package downloads are offline; browser67 dependencies cannot be prepared.");
-      let lastError: unknown;
-      for (const candidate of candidates) {
-        try {
-          await this.#runNpm(candidate.url, packageRoot, this.#toolchain);
-          await this.#runBrowserDoctor(packageRoot, this.#toolchain);
-          await this.#writeBrowserState({
-            schema: INTEGRATION_STATE_SCHEMA,
-            dependencyState: "prepared",
-            doctorState: "degraded",
-            detail: "依赖与命令入口已验证；Chrome 扩展和真实 managed browser 连接仍需独立检查。",
-            preparedAt: this.#now(),
-            checkedAt: this.#now(),
-            registry: candidate.url
-          });
-          return this.#snapshotUnlocked();
-        } catch (error) {
-          lastError = error;
-        }
+      if (!browser67DependenciesPrepared(this.#browserPackageRoot())) {
+        await this.#setupBrowser67Unlocked();
       }
-      await this.#writeBrowserState({
-        schema: INTEGRATION_STATE_SCHEMA,
-        dependencyState: "failed",
-        doctorState: "failed",
-        detail: boundedError(lastError),
-        checkedAt: this.#now()
-      });
-      throw new Error(`browser67 dependencies could not be prepared: ${boundedError(lastError)}`);
+      const packageRoot = await this.#requireBrowser67Package();
+      const previous = await this.#readBrowserState();
+      this.#liveIdentityVerified = false;
+      try {
+        await assertSafeBrowser67ExtensionTarget(this.#browser67Home, this.#browser67ExtensionDirectory, {
+          requireManifest: false
+        });
+        const before = await this.#runBrowserExtensionDoctor(
+          packageRoot, this.#browser67ExtensionDirectory, this.#toolchain
+        );
+        const alreadyCurrent = before.installedCurrent || before.identityMetadataOnlyDrift;
+        if (!alreadyCurrent) {
+          await this.#runBrowserExtensionSetup(
+            packageRoot, this.#browser67ExtensionDirectory, this.#toolchain
+          );
+        }
+        await assertSafeBrowser67ExtensionTarget(this.#browser67Home, this.#browser67ExtensionDirectory, {
+          requireManifest: true
+        });
+        const extension = alreadyCurrent
+          ? before
+          : await this.#runBrowserExtensionDoctor(
+              packageRoot, this.#browser67ExtensionDirectory, this.#toolchain
+            );
+        if (!extension.installedCurrent && !extension.identityMetadataOnlyDrift) {
+          throw new Error("browser67 extension files did not match the bundled source after setup.");
+        }
+        let detail = alreadyCurrent
+          ? "扩展文件已是当前内置版本；请验证连接。"
+          : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。";
+        if (!alreadyCurrent && previous?.extensionState === "connected") {
+          try {
+            await this.#runBrowserExtensionReload(packageRoot, this.#toolchain);
+            detail = "扩展文件已更新并请求浏览器重新加载；请验证连接。";
+          } catch {
+            detail = "扩展文件已更新；当前连接无法自动重新加载，请在扩展页手动重新加载。";
+          }
+        }
+        const now = this.#now();
+        await this.#writeBrowserState({
+          schema: INTEGRATION_STATE_SCHEMA,
+          dependencyState: "prepared",
+          extensionState: "prepared",
+          doctorState: "degraded",
+          detail,
+          ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
+          ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
+          extensionPreparedAt: now,
+          extensionCheckedAt: now
+        });
+        return this.#snapshotUnlocked();
+      } catch (error) {
+        const now = this.#now();
+        await this.#writeBrowserState({
+          schema: INTEGRATION_STATE_SCHEMA,
+          dependencyState: "prepared",
+          extensionState: "failed",
+          doctorState: "failed",
+          detail: boundedError(error),
+          ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
+          ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
+          checkedAt: now,
+          extensionCheckedAt: now
+        });
+        throw new Error(`browser67 extension could not be prepared: ${boundedError(error)}`);
+      }
     });
   }
 
   doctorBrowser67(): Promise<DesktopCapabilitySnapshot> {
-    return this.#enqueue(async () => {
-      const packageRoot = await this.#requireBrowser67Package();
-      const dependencyState = browserDependenciesPrepared(packageRoot) ? "prepared" as const : "not-prepared" as const;
-      if (dependencyState === "not-prepared") {
+    return this.#enqueue(() => this.#diagnoseBrowser67Unlocked(false));
+  }
+
+  verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot> {
+    return this.#enqueue(() => this.#diagnoseBrowser67Unlocked(options.startHub));
+  }
+
+  async browser67ExtensionManifestPath(): Promise<string> {
+    return assertSafeBrowser67ExtensionTarget(
+      this.#browser67Home,
+      this.#browser67ExtensionDirectory,
+      { requireManifest: true }
+    );
+  }
+
+  browser67ExtensionDirectory(): string {
+    return this.#browser67ExtensionDirectory;
+  }
+
+  async #setupBrowser67Unlocked(): Promise<DesktopCapabilitySnapshot> {
+    const packageRoot = await this.#requireBrowser67Package();
+    if (!this.#toolchain.ready) throw new Error("Desktop private Node/npm/Git toolchain is unavailable.");
+    const candidates = npmRegistryCandidates(await this.#packageNetworkSettings.load());
+    if (candidates.length === 0) throw new Error("Package downloads are offline; browser67 dependencies cannot be prepared.");
+    const previous = await this.#readBrowserState();
+    let lastError: unknown;
+    for (const candidate of candidates) {
+      try {
+        await this.#runNpm(candidate.url, packageRoot, this.#toolchain);
+        await this.#runBrowserEntrypointCheck(packageRoot, this.#toolchain);
+        await this.#writeBrowserState({
+          schema: INTEGRATION_STATE_SCHEMA,
+          dependencyState: "prepared",
+          extensionState: previous?.extensionState ?? "not-prepared",
+          doctorState: previous?.doctorState ?? "not-checked",
+          detail: previous?.extensionState === "connected"
+            ? "运行依赖与扩展连接均已准备。"
+            : "运行依赖与命令入口已验证；浏览器扩展尚未完成连接。",
+          preparedAt: this.#now(),
+          ...(previous?.checkedAt === undefined ? {} : { checkedAt: previous.checkedAt }),
+          ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+          ...(previous?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: previous.extensionCheckedAt }),
+          registry: candidate.url
+        });
+        return this.#snapshotUnlocked();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    await this.#writeBrowserState({
+      schema: INTEGRATION_STATE_SCHEMA,
+      dependencyState: "failed",
+      extensionState: previous?.extensionState ?? "not-prepared",
+      doctorState: "failed",
+      detail: boundedError(lastError),
+      checkedAt: this.#now(),
+      ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+      ...(previous?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: previous.extensionCheckedAt })
+    });
+    throw new Error(`browser67 dependencies could not be prepared: ${boundedError(lastError)}`);
+  }
+
+  async #diagnoseBrowser67Unlocked(ensureHub: boolean): Promise<DesktopCapabilitySnapshot> {
+    const packageRoot = await this.#requireBrowser67Package();
+    const previous = await this.#readBrowserState();
+    const dependencyState = browser67DependenciesPrepared(packageRoot) ? "prepared" as const : "not-prepared" as const;
+    const now = this.#now();
+    if (dependencyState === "not-prepared") {
+      this.#liveIdentityVerified = false;
+      await this.#writeBrowserState({
+        schema: INTEGRATION_STATE_SCHEMA,
+        dependencyState,
+        extensionState: previous?.extensionState ?? "not-prepared",
+        doctorState: "not-checked",
+        detail: "browser67 运行依赖尚未准备。",
+        checkedAt: now,
+        ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+        ...(previous?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: previous.extensionCheckedAt })
+      });
+      return this.#snapshotUnlocked();
+    }
+    let extensionFilesCurrent = false;
+    try {
+      const extension = await this.#runBrowserExtensionDoctor(
+        packageRoot,
+        this.#browser67ExtensionDirectory,
+        this.#toolchain
+      );
+      if (!extension.installedCurrent && !extension.identityMetadataOnlyDrift) {
+        this.#liveIdentityVerified = false;
+        const extensionState = extension.targetStatus === "missing" ? "not-prepared" as const : "reload-required" as const;
         await this.#writeBrowserState({
           schema: INTEGRATION_STATE_SCHEMA,
           dependencyState,
-          doctorState: "failed",
-          detail: "browser67 依赖尚未准备。",
-          checkedAt: this.#now()
+          extensionState,
+          doctorState: "degraded",
+          detail: extensionState === "not-prepared"
+            ? "扩展文件尚未准备，请先安装浏览器扩展。"
+            : "扩展文件与当前内置版本不一致，请更新并重新加载扩展。",
+          ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
+          ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
+          checkedAt: now,
+          extensionCheckedAt: now
         });
         return this.#snapshotUnlocked();
       }
-      try {
-        await this.#runBrowserDoctor(packageRoot, this.#toolchain);
-        await this.#writeBrowserState({
-          schema: INTEGRATION_STATE_SCHEMA,
-          dependencyState,
-          doctorState: "degraded",
-          detail: "依赖与命令入口可用；Chrome 扩展和真实 managed browser 连接未在本次检查中证明。",
-          checkedAt: this.#now()
-        });
-      } catch (error) {
-        await this.#writeBrowserState({
-          schema: INTEGRATION_STATE_SCHEMA,
-          dependencyState,
-          doctorState: "failed",
-          detail: boundedError(error),
-          checkedAt: this.#now()
-        });
-      }
-      return this.#snapshotUnlocked();
-    });
+      extensionFilesCurrent = true;
+      const live = await this.#runBrowserLiveDoctor(packageRoot, ensureHub, this.#toolchain);
+      this.#liveIdentityVerified = live.ready;
+      const extensionState = live.ready
+        ? "connected" as const
+        : live.extensionConnected && !live.identityMatch
+          ? "reload-required" as const
+          : "prepared" as const;
+      await this.#writeBrowserState({
+        schema: INTEGRATION_STATE_SCHEMA,
+        dependencyState,
+        extensionState,
+        doctorState: live.ready ? "ready" : "degraded",
+        detail: live.ready
+          ? "browser67 扩展身份与当前内置版本一致，真实受管浏览器连接已就绪。"
+          : live.detail,
+        ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
+        ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
+        ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+        checkedAt: now,
+        extensionCheckedAt: now
+      });
+    } catch (error) {
+      this.#liveIdentityVerified = false;
+      await this.#writeBrowserState({
+        schema: INTEGRATION_STATE_SCHEMA,
+        dependencyState,
+        extensionState: extensionFilesCurrent ? "prepared" : "failed",
+        doctorState: "failed",
+        detail: boundedError(error),
+        ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
+        ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
+        ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+        checkedAt: now,
+        extensionCheckedAt: now
+      });
+    }
+    return this.#snapshotUnlocked();
   }
 
   #enqueue<T>(operation: () => Promise<T>): Promise<T> {
@@ -187,23 +368,47 @@ export class DesktopCapabilityService {
           displayName: "browser67",
           bundled: true,
           dependencyState: "failed",
+          extensionState: "failed",
           doctorState: "failed",
+          availableBrowsers: this.#availableBrowsers(),
           detail: boundedError(error)
         };
       }
     }
-    const prepared = browserDependenciesPrepared(this.#browserPackageRoot());
+    const prepared = browser67DependenciesPrepared(this.#browserPackageRoot());
+    const persistedConnected = state?.extensionState === "connected";
+    const extensionState = persistedConnected && !this.#liveIdentityVerified
+      ? "prepared" as const
+      : state?.extensionState ?? "not-prepared";
+    const doctorState = persistedConnected && !this.#liveIdentityVerified
+      ? "degraded" as const
+      : prepared ? state?.doctorState ?? "not-checked" : "not-checked";
     return {
       id: "browser67",
       displayName: "browser67",
       bundled: true,
       dependencyState: prepared ? "prepared" : state?.dependencyState ?? "not-prepared",
-      doctorState: prepared ? state?.doctorState ?? "not-checked" : "not-checked",
-      ...(state?.detail === undefined ? {} : { detail: state.detail }),
+      extensionState,
+      doctorState,
+      availableBrowsers: this.#availableBrowsers(),
+      ...(persistedConnected && !this.#liveIdentityVerified
+        ? { detail: "扩展曾通过身份验证；请运行诊断确认本次应用进程中的真实连接。" }
+        : state?.detail === undefined ? {} : { detail: state.detail }),
       ...(state?.preparedAt === undefined ? {} : { preparedAt: state.preparedAt }),
       ...(state?.checkedAt === undefined ? {} : { checkedAt: state.checkedAt }),
+      ...(state?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: state.extensionPreparedAt }),
+      ...(state?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: state.extensionCheckedAt }),
       ...(state?.registry === undefined ? {} : { registry: state.registry })
     };
+  }
+
+  async #readBrowserState(): Promise<Browser67IntegrationState | undefined> {
+    try {
+      return parseBrowserState(await readBoundedJson(this.#browserStatePath()));
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return undefined;
+      throw error;
+    }
   }
 
   async #requireBrowser67Package(): Promise<string> {
@@ -237,87 +442,6 @@ export class DesktopCapabilityService {
     await rename(temporary, path);
     if (process.platform !== "win32") await chmod(path, 0o600);
   }
-}
-
-export function resolveDesktopAgentDirectory(environment: NodeJS.ProcessEnv = process.env): string {
-  const configured = environment.PI_CODING_AGENT_DIR;
-  if (!configured) return join(homedir(), ".pi", "agent");
-  if (configured === "~") return homedir();
-  if (configured.startsWith("~/") || configured.startsWith("~\\")) {
-    return resolve(homedir(), configured.slice(2));
-  }
-  return resolve(configured);
-}
-
-function browserDependenciesPrepared(packageRoot: string): boolean {
-  return existsSync(join(packageRoot, "node_modules", "ajv", "package.json"))
-    && existsSync(join(packageRoot, "node_modules", "ws", "package.json"));
-}
-
-function runPrivateNpmInstall(registry: string, cwd: string, toolchain: DesktopToolchain): Promise<void> {
-  if (!toolchain.nodeExecutable || !toolchain.npmCli || !toolchain.gitExecutable) {
-    return Promise.reject(new Error("Desktop private npm is unavailable."));
-  }
-  return runBoundedProcess(toolchain.nodeExecutable, [
-    toolchain.npmCli,
-    "ci",
-    "--omit=dev",
-    "--ignore-scripts",
-    "--no-audit",
-    "--no-fund",
-    "--registry",
-    registry
-  ], cwd, toolchain);
-}
-
-function runPrivateBrowserDoctor(cwd: string, toolchain: DesktopToolchain): Promise<void> {
-  if (!toolchain.nodeExecutable) return Promise.reject(new Error("Desktop private Node is unavailable."));
-  return runBoundedProcess(toolchain.nodeExecutable, [join(cwd, "bin", "browser67.mjs"), "--help"], cwd, toolchain);
-}
-
-function runBoundedProcess(
-  executable: string,
-  arguments_: string[],
-  cwd: string,
-  toolchain: DesktopToolchain
-): Promise<void> {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(executable, arguments_, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        PATH: [
-          toolchain.nodeExecutable ? dirname(toolchain.nodeExecutable) : undefined,
-          toolchain.gitExecutable ? dirname(toolchain.gitExecutable) : undefined,
-          process.env.PATH
-        ].filter((value): value is string => Boolean(value)).join(delimiter),
-        GIT_TERMINAL_PROMPT: "0",
-        GCM_INTERACTIVE: "never"
-      }
-    });
-    let output = "";
-    const timer = setTimeout(() => {
-      child.kill();
-      reject(new Error("Private capability operation timed out."));
-    }, NPM_OPERATION_TIMEOUT_MS);
-    const capture = (chunk: Buffer) => {
-      if (output.length < MAX_PROCESS_OUTPUT_BYTES) {
-        output += chunk.toString("utf8").slice(0, MAX_PROCESS_OUTPUT_BYTES - output.length);
-      }
-    };
-    child.stdout.on("data", capture);
-    child.stderr.on("data", capture);
-    child.once("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.once("exit", (code, signal) => {
-      clearTimeout(timer);
-      if (code === 0) resolvePromise();
-      else reject(new Error(`Private capability operation exited with ${signal ?? code}: ${output.trim()}`));
-    });
-  });
 }
 
 function isContained(candidate: string, root: string): boolean {

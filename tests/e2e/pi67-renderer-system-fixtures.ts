@@ -87,7 +87,7 @@ export function createMockDesktopCapabilitySnapshot() {
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.07.31.2",
+    catalogVersion: "2026.08.03.2",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -105,7 +105,7 @@ export function createMockDesktopCapabilitySnapshot() {
       bundled: true,
       defaultEnabled: true,
       version: "0.4.0",
-      commit: "952ef19255f4aa1de535e114dc395eec5c9f0819",
+      commit: "eb857d335660380a383490f549c4d40227dbf3dc",
       resourceTypes: ["skill", "integration"],
       installed: true
     }, {
@@ -184,7 +184,7 @@ export function createMockDesktopCapabilitySnapshot() {
       versionSource: "capability-package",
       bundledVersion: "0.4.0",
       upstream: "https://github.com/bigKING67/browser67",
-      sourceCommit: "952ef19255f4aa1de535e114dc395eec5c9f0819",
+      sourceCommit: "eb857d335660380a383490f549c4d40227dbf3dc",
       updatePolicy: "capability-package",
       updateManager: "desktop-capability",
       independentUpdateState: "not-applicable",
@@ -206,7 +206,9 @@ export function createMockDesktopCapabilitySnapshot() {
       displayName: "browser67",
       bundled: true,
       dependencyState: "not-prepared",
-      doctorState: "not-checked"
+      extensionState: "not-prepared",
+      doctorState: "not-checked",
+      availableBrowsers: ["chrome", "edge"]
     }]
   };
 }

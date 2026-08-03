@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
 import {
   mkdir,
   readFile,
@@ -6,13 +7,11 @@ import {
   rm,
   writeFile
 } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
-import {
-  resolveBundledGitToolchain,
-  resolveExactCapabilitySource
-} from "./capability-source-resolver.mjs";
+import { resolveBundledGitToolchain, resolveExactCapabilitySource } from "./capability-source-resolver.mjs";
 import {
   assertPi67SkillPackSource,
   preparePi67SkillPackOverlay
@@ -25,6 +24,7 @@ const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
 const sourceCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/sources");
 const generatedSkillPackRoot = resolve(repositoryRoot, "artifacts/capabilities/generated/skill-packs");
 const toolchainManifestPath = resolve(repositoryRoot, "artifacts/toolchain/current/manifest.json");
+const execFileAsync = promisify(execFile);
 const COMMERCE_SKILLS = new Set([
   "commerce-growth-os",
   "commerce-commercial-strategy",
@@ -182,8 +182,26 @@ async function prepareBrowser67(sourceRoot, source) {
     "bin",
     "src",
     "extension",
-    "skills"
+    "skills",
+    "scripts/build-extension.mjs",
+    "scripts/extension-install-doctor.mjs",
+    "scripts/reload-extension-live.mjs",
+    "scripts/setup-extension.mjs",
+    "contracts/browser67-live-doctor.mjs",
+    "contracts/browser67-live-doctor",
+    "contracts/browser67-live-gate.mjs",
+    "contracts/browser67-live-gate"
   ]);
+  const packagePath = join(destination, "package.json");
+  const packageManifest = JSON.parse(await readFile(packagePath, "utf8"));
+  if (packageManifest.version !== source.version) {
+    throw new Error("Bundled browser67 version does not match the capability source lock");
+  }
+  await writeFile(packagePath, `${JSON.stringify({
+    ...packageManifest,
+    gitHead: source.commit
+  }, null, 2)}\n`, "utf8");
+  await assertBrowser67PackageEntrypoints(destination);
   const skillPaths = (await readdir(join(destination, "skills"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())
     .map((entry) => `skills/${entry.name}`)
@@ -195,6 +213,31 @@ async function prepareBrowser67(sourceRoot, source) {
     [],
     await bundledSkillEntries(destination, skillPaths)
   );
+}
+
+async function assertBrowser67PackageEntrypoints(packageRoot) {
+  const checks = [[
+    join(packageRoot, "bin", "browser67.mjs"),
+    "setup",
+    "--help"
+  ], [
+    join(packageRoot, "scripts", "extension-install-doctor.mjs"),
+    "--help"
+  ]];
+  for (const arguments_ of checks) {
+    const { stdout } = await execFileAsync(process.execPath, arguments_, {
+      cwd: packageRoot,
+      env: {
+        ...process.env,
+        PATH: [dirname(process.execPath), process.env.PATH].filter(Boolean).join(delimiter)
+      },
+      maxBuffer: 1_000_000,
+      timeout: 30_000
+    });
+    if (!String(stdout).includes("Usage:")) {
+      throw new Error(`Bundled browser67 entrypoint did not report usage: ${relative(packageRoot, arguments_[0])}`);
+    }
+  }
 }
 
 async function prepareDesignCraft(sourceRoot, source) {
