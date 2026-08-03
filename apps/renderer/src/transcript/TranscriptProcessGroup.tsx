@@ -13,7 +13,7 @@ import type {
 import { operationPresentation } from "../operation/TurnActivity.js";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
-import { MarkdownView } from "./MarkdownView.js";
+import { TranscriptMarkdownView } from "./TranscriptMarkdownView.js";
 import type { TranscriptProcessItem, TranscriptRow } from "./transcript-rows.js";
 import styles from "./TranscriptProcessGroup.module.css";
 
@@ -172,7 +172,7 @@ function ProcessItem({
       <li className={styles.step} data-process-step="narration">
         <div className={styles.narration}>
           {typeof item.content === "string" ? (
-            <MarkdownView mode="settled">{item.content}</MarkdownView>
+            <TranscriptMarkdownView mode="settled">{item.content}</TranscriptMarkdownView>
           ) : (
             <AssetImage
               asset={item.content.asset}
@@ -212,7 +212,7 @@ function Reasoning({ text, streaming = false }: { text: string; streaming?: bool
   return (
     <div className={styles.reasoning} aria-label="模型推理">
       <span>分析</span>
-      <MarkdownView mode={streaming ? "streaming" : "settled"}>{text}</MarkdownView>
+      <TranscriptMarkdownView mode={streaming ? "streaming" : "settled"}>{text}</TranscriptMarkdownView>
     </div>
   );
 }

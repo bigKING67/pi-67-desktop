@@ -20,6 +20,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useCommittedWorkspaceChange } from "../changes/workspace-changes-store.js";
+import { useCopyFeedback } from "../clipboard/use-copy-feedback.js";
 import { messages } from "../localization/message-catalog.js";
 import { AssetImage } from "../transcript/AssetImage.js";
 import { messageTextForCopy } from "../transcript/message-actions.js";
@@ -46,8 +47,6 @@ const STATUS_ICONS = {
   failed: AlertCircle
 } satisfies Record<ToolCallPart["status"], typeof Wrench>;
 
-type CopyState = "idle" | "copied" | "failed";
-
 export function ToolCard({
   tool,
   result,
@@ -65,7 +64,7 @@ export function ToolCard({
   const StatusIcon = STATUS_ICONS[effectiveStatus];
   const statusLabel = TOOL_STATUS_LABELS[effectiveStatus];
   const toolName = getToolDisplayName(tool.name);
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const { copyState, copyText } = useCopyFeedback({ failureTitle: "工具详情复制失败" });
   const [open, setOpen] = useState(failed);
   const [expanded, setExpanded] = useState(false);
   const previousFailed = useRef(failed);
@@ -78,14 +77,8 @@ export function ToolCard({
   }, [failed]);
 
   async function copyDetails() {
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-      const callText = createToolCopyText(tool, presentation);
-      await navigator.clipboard.writeText(resultText ? `${callText}\n\n工具结果\n${resultText}` : callText);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
+    const callText = createToolCopyText(tool, presentation);
+    await copyText(resultText ? `${callText}\n\n工具结果\n${resultText}` : callText);
   }
 
   return (
@@ -184,13 +177,18 @@ export function ToolCard({
                 {expanded ? "收起结果" : "展开全部"}
               </Button>
             ) : null}
-            <Button className={styles.copyButton!} onPress={() => void copyDetails()}>
-              <Copy size={13} aria-hidden="true" />
-              复制详情
+            <Button
+              aria-live="polite"
+              className={`${styles.copyButton!} ${copyState === "failed" ? styles.copyError! : ""}`}
+              onPress={() => void copyDetails()}
+            >
+              {copyState === "copied"
+                ? <CheckCircle2 size={13} aria-hidden="true" />
+                : copyState === "failed"
+                  ? <AlertCircle size={13} aria-hidden="true" />
+                  : <Copy size={13} aria-hidden="true" />}
+              {copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : "复制详情"}
             </Button>
-            <span className={copyState === "failed" ? styles.copyError! : ""} aria-live="polite">
-              {copyState === "copied" ? "已复制" : copyState === "failed" ? "复制失败" : ""}
-            </span>
           </div>
         </div>
       ) : null}

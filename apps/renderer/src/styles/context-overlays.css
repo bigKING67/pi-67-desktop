@@ -25,7 +25,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .context-pane [role="tab"][data-selected] { background: var(--surface); color: var(--text-primary); }
@@ -73,7 +73,7 @@
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .inspector-search > button,
@@ -120,11 +120,11 @@
   align-items: center;
   gap: 5px;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .inspector-files-toolbar input { accent-color: var(--accent); }
-.inspector-result-summary { margin: 0 0 6px; color: var(--text-tertiary); font-size: 9px; }
+.inspector-result-summary { margin: 0 0 6px; color: var(--text-tertiary); font-size: 10px; }
 
 .inspector-file-tree,
 .inspector-message-list {
@@ -148,7 +148,7 @@
   grid-template-columns: 12px 15px minmax(0, 1fr) auto;
   align-items: center;
   width: 100%;
-  min-height: 30px;
+  min-height: 32px;
   gap: 5px;
   padding: 4px 7px;
   border: 0;
@@ -161,8 +161,8 @@
 .inspector-file-row:hover { color: var(--text-primary); }
 .inspector-file-row:disabled { opacity: 0.5; }
 .inspector-file-chevron { display: grid; place-items: center; color: var(--text-tertiary); }
-.inspector-file-name { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.inspector-file-row small { color: var(--text-tertiary); font-family: var(--font-code); font-size: 8px; }
+.inspector-file-name { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-file-row small { color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; }
 
 .inspector-file-more {
   display: grid;
@@ -197,7 +197,7 @@
   padding: 0 8px;
   border-radius: 5px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   outline: none;
 }
 .inspector-file-menu [role="menuitem"][data-focused] { background: var(--surface-hover); color: var(--text-primary); }
@@ -209,12 +209,12 @@
   gap: 5px;
   min-height: 26px;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 .inspector-tree-status.is-error,
 .inspector-error { color: var(--danger); }
-.inspector-error { margin: 3px 0 7px; font-size: 10px; }
-.inspector-load-more { width: 100%; padding: 6px; border: 0; background: transparent; color: var(--accent); font-size: 10px; }
+.inspector-error { margin: 3px 0 7px; font-size: 11px; }
+.inspector-load-more { width: 100%; padding: 6px; border: 0; background: transparent; color: var(--accent); font-size: 11px; }
 
 .inspector-loading,
 .inspector-unavailable,
@@ -225,7 +225,7 @@
   gap: 7px;
   min-height: 96px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .inspector-messages { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
@@ -248,23 +248,23 @@
   text-align: left;
 }
 .inspector-message-row:hover { border-color: var(--border-strong); background: var(--surface-hover); }
-.inspector-message-ordinal { padding-top: 1px; color: var(--accent); font-family: var(--font-code); font-size: 9px; }
+.inspector-message-ordinal { padding-top: 1px; color: var(--accent); font-family: var(--font-code); font-size: 10px; }
 .inspector-message-content { display: grid; min-width: 0; gap: 4px; }
 .inspector-message-content strong {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-.inspector-message-content small { color: var(--text-tertiary); font-size: 9px; }
+.inspector-message-content small { color: var(--text-tertiary); font-size: 10px; }
 .inspector-message-assets { display: flex; align-items: center; gap: 5px; color: var(--text-tertiary); }
-.inspector-message-assets small { display: inline-flex; align-items: center; gap: 2px; font-size: 8px; }
+.inspector-message-assets small { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
 .inspector-message-pagination { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; padding-top: 8px; }
 .inspector-message-pagination button:last-child { justify-self: end; }
-.inspector-message-pagination span { color: var(--text-tertiary); font-family: var(--font-code); font-size: 9px; }
+.inspector-message-pagination span { color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; }
 
 .session-tree,
 .resource-list,
@@ -287,8 +287,8 @@
 .tree-node > button:hover { background: var(--surface-hover); }
 .tree-node > button.is-active { background: var(--surface-active); }
 .tree-node > button > span:last-child { display: grid; min-width: 0; }
-.tree-node strong { font-size: 11px; }
-.tree-node small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.tree-node strong { font-size: 12px; }
+.tree-node small { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .tree-rail { width: 7px; height: 7px; margin-top: 5px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); }
 .is-active .tree-rail { border-color: var(--accent); background: var(--accent); }
 .metric-list { display: grid; gap: 1px; margin: 0 0 18px; }
@@ -310,13 +310,13 @@
 }
 
 .resource-row > div { display: grid; min-width: 0; }
-.resource-row strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.resource-row small { color: var(--text-tertiary); font-family: var(--font-code); font-size: 9px; }
+.resource-row strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.resource-row small { color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; }
 .resource-status { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
 .resource-status.status-failed { background: var(--danger); }
 .resource-status.status-partial,
 .resource-status.status-tui-only { background: var(--warning); }
-.context-empty { padding: 12px 3px; color: var(--text-tertiary); font-size: 11px; }
+.context-empty { padding: 12px 3px; color: var(--text-tertiary); font-size: 12px; }
 
 .session-tree-dialog { width: min(720px, 100%); }
 .session-tree-dialog-content { display: grid; grid-template-rows: auto auto auto minmax(260px, 56vh) auto; gap: 12px; padding: 20px; }

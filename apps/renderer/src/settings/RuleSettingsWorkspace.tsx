@@ -298,7 +298,7 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
       />
       {draft === undefined ? <SettingsNotice>{state.phase === "loading-file" ? "正在读取 Markdown 正文…" : "正文尚未加载。"}</SettingsNotice> : mode === "preview" ? (
         <div className={styles.preview} data-testid="context-file-preview">
-          {draft ? <MarkdownView externalImages="blocked" mode="settled">{draft}</MarkdownView> : <p>Markdown 文件为空。</p>}
+          {draft ? <MarkdownView mode="settled">{draft}</MarkdownView> : <p>Markdown 文件为空。</p>}
         </div>
       ) : (
         <TextArea

@@ -10,13 +10,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "react-aria-components";
-import { messages } from "../localization/message-catalog.js";
-import { publishNotification } from "../notifications/notification-store.js";
+import { useCopyFeedback } from "../clipboard/use-copy-feedback.js";
 import { AssetImage } from "./AssetImage.js";
 import { messageTextForCopy } from "./message-actions.js";
 import styles from "./MessageCard.module.css";
-
-type CopyState = "idle" | "copied" | "failed";
 
 export function ToolResultDisclosure({
   message,
@@ -27,25 +24,14 @@ export function ToolResultDisclosure({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [expanded, setExpanded] = useState(false);
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const { copyState, copyText } = useCopyFeedback();
   const text = messageTextForCopy(message);
   const hasLongText = (text?.length ?? 0) > 800;
   const failed = Boolean(message.error);
 
   async function copyResult() {
     if (!text) return;
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(text);
-      setCopyState("copied");
-    } catch (error) {
-      setCopyState("failed");
-      publishNotification({
-        level: "error",
-        title: messages.transcript.copyFailed,
-        message: error instanceof Error ? error.message : messages.runtime.unknownError
-      });
-    }
+    await copyText(text);
   }
 
   return (
@@ -93,6 +79,7 @@ export function ToolResultDisclosure({
               </Button>
             ) : null}
             <Button
+              aria-live="polite"
               className={styles.toolResultButton!}
               isDisabled={!text}
               onPress={() => void copyResult()}

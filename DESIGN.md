@@ -182,7 +182,9 @@ Application-level surfaces use a separate wide-window shell:
 - Use Maple Mono for code, tools, diffs, paths, commands, and compact runtime
   metadata.
 - Code blocks may use ligatures. Commands, paths, diffs, and exact output do not.
-- Body text is 14-15px with a 1.5-1.6 line height. Metadata is 12-13px.
+- Body text is 14-15px with a 1.5-1.6 line height. Standard metadata is
+  12-13px; space-constrained navigation and Inspector metadata never drops
+  below 10px, and their primary labels remain at least 12px.
 - Use tabular figures for tokens, context, time, and cost.
 
 ## Semantic tokens
@@ -347,7 +349,10 @@ loading error where the operation can produce those states
 - Long transcript code uses a bounded 520px viewport, worker-based highlighting, internally
   virtualized lines, and a full-content copy action. Long lines preserve their
   source layout and remain horizontally navigable without a persistent scrollbar;
-  they never widen the Transcript or application document. Tool summaries and
+  an actually overflowing viewport becomes keyboard-focusable, exposes a visible
+  focus ring, and supports keyboard scrolling. Copy reports `复制`, `已复制`, or
+  `复制失败` through the same bounded feedback contract used by message and Tool
+  copy actions. Code never widens the Transcript or application document. Tool summaries and
   recorded Edit Patch facts remain bounded; complete Tool Output and Git/workspace
   Diff require future explicit data and expansion contracts.
 - Editorial Markdown uses visible heading, paragraph, nested-list, quote,
@@ -356,7 +361,22 @@ loading error where the operation can produce those states
   table scrolls only inside its keyboard-focusable table viewport and never
   widens the Transcript or application document. Streaming and settled text use
   the same semantic structure so completion does not replace the document layout.
-- Markdown never executes raw HTML.
+- Formulae accept `$...$`, `$$...$$`, `\(...\)`, and `\[...\]`, plus fenced
+  `math` blocks. Recognized formulae lazy-load KaTeX and its CSS rather than
+  increasing the ordinary prose path. KaTeX emits HTML plus MathML with
+  `trust=false`, bounded expansion and size; raw HTML remains disabled. An
+  incomplete streaming delimiter stays readable as source text until complete,
+  a parse failure remains visible, and a wide display formula scrolls only inside
+  its keyboard-focusable formula viewport.
+- A validated Workspace-relative Markdown link resolves through the current
+  Workspace Host boundary and opens the ordinary central file tab. Absolute,
+  traversal, malformed, active-scheme, and unsupported links remain inert.
+  Source fragments are preserved for future line navigation but do not invent a
+  line jump in this release.
+- Markdown never executes raw HTML or directly mounts Markdown image sources.
+  HTTP(S), data, Workspace-relative, and unsupported images render one inert,
+  labeled placeholder; an HTTP(S) placeholder may explicitly open the source URL
+  through the existing external-link boundary.
 - Session images never render a cross-process data URL. A generation-bound asset
   reference loads only while its virtualized message is mounted, shows explicit
   loading/unavailable/retry states, and renders from a lazy Blob URL. Host
@@ -377,6 +397,10 @@ loading error where the operation can produce those states
 - The primary order is `文件 / 消息 / 上下文`; Files is the default. The Files
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
+  Tabs, search text, file names, message summaries, tree labels, and resource
+  names use at least 12px type; constrained ordinals, paths, counts, timestamps,
+  and other compact metadata use at least 10px. File-tree rows remain at least
+  32px high.
   Search accepts at most 256 characters, returns at most 200 matches, visits at
   most 50,000 nodes, always skips `.git`, and skips dependency, generated, and
   cache directories unless `包含依赖与生成目录` is enabled.
@@ -457,6 +481,9 @@ loading error where the operation can produce those states
 - Each Workspace disclosure initially shows active/waiting/draft rows first and
   the six most recent ordinary Sessions after them. `展开显示` loads additional
   bounded Catalog pages; there is no user-visible open-conversation limit.
+- Current-Workspace emphasis belongs only to its quiet header tint. The complete
+  Workspace group and conversation list remain on the navigation surface, while
+  the current conversation row carries the primary selected state.
 - Selecting a conversation automatically expands its Workspace and keeps the row
   visible. A collapsed Workspace with background work shows running and waiting
   counts on its group header without relying on color alone.

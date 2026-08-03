@@ -11,13 +11,13 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button, Tooltip, TooltipTrigger } from "react-aria-components";
 import { AttachmentPreview } from "../attachments/AttachmentPreview.js";
+import { useCopyFeedback } from "../clipboard/use-copy-feedback.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { formatMessageDateTime, formatMessageDateTimeTitle } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
-import { publishNotification } from "../notifications/notification-store.js";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
-import { MarkdownView } from "./MarkdownView.js";
+import { TranscriptMarkdownView } from "./TranscriptMarkdownView.js";
 import { ToolResultDisclosure } from "./ToolResultDisclosure.js";
 import {
   editableUserMessageText,
@@ -110,11 +110,11 @@ export function MessageCard({
                 open={streaming}
               >
                 <summary>推理过程</summary>
-                <MarkdownView mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>
+                <TranscriptMarkdownView mode={streaming ? "streaming" : "settled"}>{part.text}</TranscriptMarkdownView>
               </details>
             );
           }
-          if (part.type === "text") return <MarkdownView key={`${message.id}-text-${index}`} mode={streaming ? "streaming" : "settled"}>{part.text}</MarkdownView>;
+          if (part.type === "text") return <TranscriptMarkdownView key={`${message.id}-text-${index}`} mode={streaming ? "streaming" : "settled"}>{part.text}</TranscriptMarkdownView>;
           if (part.type === "image") {
             return (
               <AssetImage
@@ -224,7 +224,6 @@ function InlineUserMessageEditor({ edit }: {
   );
 }
 
-type CopyState = "idle" | "copied" | "failed";
 type MessageAction = "continue";
 
 function MessageFooter({
@@ -244,9 +243,8 @@ function MessageFooter({
   const copyText = messageTextForCopy(message);
   const editText = editableUserMessageText(message);
   const containsAttachment = userMessageContainsAttachment(message);
-  const [copyState, setCopyState] = useState<CopyState>("idle");
+  const { copyState, copyText: copyToClipboard } = useCopyFeedback();
   const [pendingAction, setPendingAction] = useState<MessageAction>();
-  const resetCopyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copyLabel = copyState === "copied"
     ? messages.transcript.copied
     : copyState === "failed"
@@ -255,26 +253,9 @@ function MessageFooter({
         ? messages.transcript.copyMessage
         : messages.transcript.copyAnswer;
 
-  useEffect(() => () => {
-    if (resetCopyTimer.current !== undefined) clearTimeout(resetCopyTimer.current);
-  }, []);
-
   async function copyMessage() {
     if (!copyText) return;
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard API unavailable");
-      await navigator.clipboard.writeText(copyText);
-      setCopyState("copied");
-    } catch (error) {
-      setCopyState("failed");
-      publishNotification({
-        level: "error",
-        title: messages.transcript.copyFailed,
-        message: error instanceof Error ? error.message : messages.runtime.unknownError
-      });
-    }
-    if (resetCopyTimer.current !== undefined) clearTimeout(resetCopyTimer.current);
-    resetCopyTimer.current = setTimeout(() => setCopyState("idle"), 1_800);
+    await copyToClipboard(copyText);
   }
 
   async function runAction(action: MessageAction, callback: () => Promise<boolean>) {
@@ -367,7 +348,11 @@ function MessageActionControl({
   state: string;
 }) {
   return (
-    <span className={styles.actionControl} data-action-state={state}>
+    <span
+      aria-live={state === "copied" || state === "failed" ? "polite" : undefined}
+      className={styles.actionControl}
+      data-action-state={state}
+    >
       <TooltipTrigger closeDelay={80} delay={300}>
         <Button
           aria-label={ariaLabel}

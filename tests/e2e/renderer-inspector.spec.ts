@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   attachMockAgent,
+  clearRecordedCommands,
   installMockDesktopBridge,
   recordedCommands,
   type FixtureMessage
@@ -20,6 +21,32 @@ test("reveals Workspace files and opens one deduplicated Pi-67 editor tab", asyn
   await expect(inspector.getByRole("tab", { name: "文件" })).toHaveAttribute("aria-selected", "true");
   const readmeRow = inspector.getByRole("button", { name: "README.md 24 B", exact: true });
   await expect(readmeRow).toBeVisible();
+  const typeMetrics = await inspector.evaluate((element) => {
+    const fontSize = (selector: string) => {
+      const candidate = element.querySelector<HTMLElement>(selector);
+      return candidate ? Number.parseFloat(getComputedStyle(candidate).fontSize) : 0;
+    };
+    return {
+      tab: fontSize('[role="tab"]'),
+      search: fontSize(".inspector-search input"),
+      fileName: fontSize(".inspector-file-name"),
+      fileMetadata: fontSize(".inspector-file-row small")
+    };
+  });
+  expect(typeMetrics.tab).toBeGreaterThanOrEqual(12);
+  expect(typeMetrics.search).toBeGreaterThanOrEqual(12);
+  expect(typeMetrics.fileName).toBeGreaterThanOrEqual(12);
+  expect(typeMetrics.fileMetadata).toBeGreaterThanOrEqual(10);
+
+  const workspaceEmphasis = await page.getByTestId("workspace-group").evaluate((group) => {
+    const header = group.querySelector("header");
+    return {
+      group: getComputedStyle(group).backgroundColor,
+      header: header ? getComputedStyle(header).backgroundColor : ""
+    };
+  });
+  expect(workspaceEmphasis.group).toBe("rgba(0, 0, 0, 0)");
+  expect(workspaceEmphasis.header).not.toBe(workspaceEmphasis.group);
 
   await readmeRow.click();
   await expect.poll(async () => page.evaluate(() => (
@@ -48,6 +75,42 @@ test("reveals Workspace files and opens one deduplicated Pi-67 editor tab", asyn
   await search.fill("main");
   await search.press("Enter");
   await expect(inspector.getByRole("button", { name: "main.ts 42 B", exact: true })).toBeVisible();
+});
+
+test("opens safe transcript Workspace links and keeps unsupported targets inert", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page, [{
+    id: "assistant-workspace-links",
+    role: "assistant",
+    parts: [{
+      type: "text",
+      text: [
+        "[README source](./README.md#L4)",
+        "[escape](../outside.md)",
+        "[active](javascript:alert(1))"
+      ].join(" ")
+    }]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await clearRecordedCommands(page);
+
+  const message = page.locator('[data-message-id="assistant-workspace-links"]');
+  await expect(message.getByRole("link", { name: "README source" })).toBeVisible();
+  await expect(message.getByRole("link", { name: "escape" })).toHaveCount(0);
+  await expect(message.getByRole("link", { name: "active" })).toHaveCount(0);
+  await message.getByText("escape", { exact: true }).click();
+  await message.getByText("active", { exact: true }).click();
+  expect((await recordedCommands(page)).filter((type) => (
+    type === "workspace.file.resolve" || type === "workspace.file.open"
+  ))).toEqual([]);
+
+  await message.getByRole("link", { name: "README source" }).click();
+  const fileSurface = page.getByRole("region", { name: "工作区文件与对话" });
+  await expect(fileSurface.getByRole("tab", { name: "README.md", exact: true })).toBeVisible();
+  await expect(page.locator(".cm-content")).toContainText("# Fixture workspace");
+  await expect.poll(async () => (await recordedCommands(page)).filter((type) => (
+    type === "workspace.file.resolve" || type === "workspace.file.open"
+  ))).toEqual(["workspace.file.resolve", "workspace.file.open"]);
 });
 
 test("indexes only user messages and jumps to an unloaded historical window", async ({ page }) => {

@@ -13,9 +13,9 @@ import { workspaceFileStore } from "./workspace-file-store.js";
 async function openWorkspaceFile(
   workspace: WorkspaceDescriptor,
   entry: WorkspaceFileEntry,
-  options: { discardDraft?: boolean } = {}
-): Promise<void> {
-  if (entry.kind !== "file") return;
+  options: { discardDraft?: boolean; hostRegistered?: boolean; notifyFailure?: boolean } = {}
+): Promise<boolean> {
+  if (entry.kind !== "file") return false;
   workspaceFileStore.getState().beginOpen(workspace.id, entry);
   if (!workspaceFileStore.getState().workspaces[workspace.id]?.byPath[entry.relativePath]) {
     publishNotification({
@@ -23,10 +23,12 @@ async function openWorkspaceFile(
       title: "无法打开更多文件",
       message: workspaceFileStore.getState().persistenceError ?? "请先关闭不需要的文件标签。"
     });
-    return;
+    return false;
   }
   try {
-    await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+    if (!options.hostRegistered) {
+      await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+    }
     const result = await agentConnectionController.request(
       "workspace.file.open",
       { id: entry.id },
@@ -34,6 +36,7 @@ async function openWorkspaceFile(
       { context: { scope: "workspace", workspaceId: workspace.id } }
     );
     workspaceFileStore.getState().installOpenResult(workspace.id, result, options.discardDraft);
+    return true;
   } catch (error) {
     workspaceFileStore.getState().failOpen(
       workspace.id,
@@ -41,6 +44,39 @@ async function openWorkspaceFile(
       errorMessage(error),
       error instanceof ProtocolRequestError && error.code === "RESOURCE_NOT_FOUND"
     );
+    if (options.notifyFailure) {
+      publishNotification({ level: "error", title: "无法打开工作区文件", message: errorMessage(error) });
+    }
+    return false;
+  }
+}
+
+export async function openWorkspaceFileByRelativePath(
+  workspace: WorkspaceDescriptor,
+  relativePath: string
+): Promise<boolean> {
+  try {
+    if (!await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false })) {
+      throw new Error("工作区当前不可用。");
+    }
+    const result = await agentConnectionController.request(
+      "workspace.file.resolve",
+      { relativePath },
+      [],
+      { context: { scope: "workspace", workspaceId: workspace.id } }
+    );
+    if (result.entry.kind !== "file") {
+      publishNotification({
+        level: "warning",
+        title: "无法打开工作区链接",
+        message: "该链接没有指向普通文件。"
+      });
+      return false;
+    }
+    return openWorkspaceFile(workspace, result.entry, { hostRegistered: true, notifyFailure: true });
+  } catch (error) {
+    publishNotification({ level: "error", title: "无法打开工作区链接", message: errorMessage(error) });
+    return false;
   }
 }
 

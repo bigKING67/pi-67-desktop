@@ -123,6 +123,7 @@ test("keeps Shiki deferred and permits only its WASM engine when code is present
 });
 
 test("keeps long code horizontally navigable without a persistent scrollbar", async ({ page }, testInfo) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.goto("/");
   const longLine = `const enabledTools = new Set(savedTools.filter((tool: string) => allToolNames.includes(tool))); // ${"long-code-path-".repeat(18)}`;
@@ -153,6 +154,35 @@ test("keeps long code horizontally navigable without a persistent scrollbar", as
   expect(metrics.scrollLeft).toBeGreaterThan(metrics.initialScrollLeft);
   expect(metrics.horizontalScrollbarHeight).toBe("0px");
   expect(metrics.documentScrollWidth).toBe(metrics.documentClientWidth);
+
+  await expect(codeViewport).toHaveAttribute("data-code-scrollable", "true");
+  await expect(codeViewport).toHaveCSS("visibility", "visible");
+  await codeViewport.evaluate((element) => { element.scrollLeft = 0; });
+  await codeViewport.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  expect(await codeViewport.evaluate((element) => {
+    element.focus();
+    return document.activeElement === element;
+  })).toBe(true);
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => codeViewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+
+  const copyCode = codeBlock.getByRole("button", { name: "复制", exact: true });
+  await copyCode.click();
+  await expect(codeBlock.getByRole("button", { name: "已复制", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(longLine);
+  await expect(codeBlock.getByRole("button", { name: "复制", exact: true })).toBeVisible({ timeout: 3_000 });
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async () => { throw new Error("code clipboard blocked"); } }
+    });
+  });
+  await copyCode.click();
+  await expect(codeBlock.getByRole("button", { name: "复制失败", exact: true })).toBeVisible();
+  await expect(page.locator("[data-notification-id]").filter({ hasText: "代码复制失败" }))
+    .toContainText("code clipboard blocked");
   await page.screenshot({ path: testInfo.outputPath("long-code-without-scrollbar.png"), animations: "disabled" });
 });
 

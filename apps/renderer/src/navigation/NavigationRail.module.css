@@ -396,7 +396,12 @@
 }
 
 .workspaceGroup.currentGroup {
-  background: color-mix(in srgb, var(--surface-active) 44%, transparent);
+  background: transparent;
+}
+
+.workspaceGroup.currentGroup .workspaceGroupHeader {
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-active) 18%, transparent);
 }
 
 .workspaceGroupHeader {
@@ -485,7 +490,7 @@
 
 .workspaceGroupName small {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .workspaceGroupName .workspaceGlyph {
@@ -505,7 +510,7 @@
   background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised));
   color: var(--accent);
   font-family: var(--font-code);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -618,7 +623,7 @@
 
 .conversationCopy small {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .conversationState {
@@ -626,7 +631,7 @@
   border-radius: 4px;
   background: var(--surface-raised);
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -730,7 +735,7 @@
 
 .accountButton small {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .helpButton {
