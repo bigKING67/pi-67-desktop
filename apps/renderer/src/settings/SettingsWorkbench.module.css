@@ -247,10 +247,6 @@
   margin-inline: auto;
 }
 
-.documentBody[data-measure="compact"] {
-  width: min(840px, 100%);
-}
-
 .pageContent {
   min-width: 0;
 }

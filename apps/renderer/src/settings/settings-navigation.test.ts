@@ -87,7 +87,6 @@ describe("settings navigation", () => {
     expect(sectionSupportsProjectScope("mcp")).toBe(false);
     expect(sectionSupportsProjectScope("integrations")).toBe(false);
     expect(sectionSupportsProjectScope("runtime")).toBe(false);
-    expect(items.find((item) => item.id === "about")?.measure).toBe("compact");
-    expect(provider?.measure).toBe("standard");
+    expect(items.every((item) => !("measure" in item))).toBe(true);
   });
 });

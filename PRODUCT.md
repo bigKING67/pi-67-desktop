@@ -552,6 +552,11 @@ count.
   outside Electron `userData` fails closed instead of following the target.
 - Update checks disclose their network purpose and send no workspace, provider,
   model, session, or credential data.
+- Packaged Desktop builds automatically check the bounded public GitHub Release
+  metadata after startup and at most once per 24 hours while running. Development
+  builds stay offline. Current-version results and automatic failures are
+  non-blocking; an available version is projected into the Help entry and menu.
+  Manual retry remains available and explicit.
 - Extension Package completion names the affected Package and, when available,
   its previous and installed versions. Resource reload events and routine
   informational Extension messages remain in Notification history rather than

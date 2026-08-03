@@ -74,7 +74,7 @@ export function AboutSettings() {
         <SettingsRow title="当前版本" value={loading ? "正在读取…" : platformInfo?.version ?? "未知"} />
         <SettingsRow title="操作系统" value={platformLabel(platformInfo?.platform)} />
         <SettingsRow title="处理器架构" value={architectureLabel(platformInfo?.architecture)} />
-        <SettingsRow title="发布与更新" value="Unsigned Preview · 手动更新" />
+        <SettingsRow title="发布与更新" value="Unsigned Preview · 自动检查，手动安装" />
         <SettingsRow title="Agent 运行组件" value="@earendil-works/pi-coding-agent" />
         <SettingsRow title="会话真源" value="Pi JSONL" />
         <SettingsRow title="渲染进程" value="Electron sandbox + contextIsolation" />

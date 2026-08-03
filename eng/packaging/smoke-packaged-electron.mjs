@@ -336,7 +336,12 @@ try {
     .getByRole("button", { name: /^关于/u }).click();
   await workspaceSettings.getByRole("heading", { name: "关于", exact: true, level: 1 })
     .waitFor({ state: "visible", timeout: 15_000 });
-  for (const value of [packagedVersion, "macOS", "Apple Silicon (arm64)", "Unsigned Preview · 手动更新"]) {
+  for (const value of [
+    packagedVersion,
+    "macOS",
+    "Apple Silicon (arm64)",
+    "Unsigned Preview · 自动检查，手动安装"
+  ]) {
     await workspaceSettings.getByText(value, { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
   }
   await capturePackagedScreenshot(window, "10-about.png");

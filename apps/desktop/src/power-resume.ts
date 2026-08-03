@@ -15,6 +15,7 @@ interface PowerResumeSource {
 
 interface RegisterPowerResumeRecoveryOptions {
   getMainWindow: () => PowerResumeWindow | undefined;
+  onResume?: () => void;
   source?: PowerResumeSource;
 }
 
@@ -23,6 +24,7 @@ export function registerPowerResumeRecovery(
 ): () => void {
   const source = options.source ?? powerMonitor;
   const handleResume = () => {
+    options.onResume?.();
     const window = options.getMainWindow();
     if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
     window.webContents.send("pi67:power-resumed");

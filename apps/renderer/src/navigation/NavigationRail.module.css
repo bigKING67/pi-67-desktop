@@ -739,8 +739,21 @@
 }
 
 .helpButton {
+  position: relative;
   width: 34px;
   height: 34px;
+}
+
+.helpButton[data-update-available="true"]::after {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--surface);
+  border-radius: 999px;
+  background: var(--accent-strong);
+  content: "";
 }
 
 .footerMenu {
@@ -837,6 +850,17 @@
 
 .menuItem[data-disabled] {
   opacity: 0.45;
+}
+
+.updateBadge {
+  margin-left: auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 9px;
+  font-weight: 680;
+  line-height: 1.2;
 }
 
 .workspaceDisclosure:focus-visible,

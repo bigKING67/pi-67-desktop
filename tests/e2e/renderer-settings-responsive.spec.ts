@@ -138,7 +138,13 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
 
   await selectMobileSettingsSection(settings, page, "更新与诊断");
   await expect.poll(async () => scrollRegion.evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.getByRole("button", { name: /^检查更新/u })).toBeVisible();
+  await page.getByRole("button", { name: "立即检查", exact: true }).click();
+  const updateDialog = page.getByRole("dialog", { name: "Pi-67 更新" });
+  await expect(updateDialog.getByText("发现 Pi-67 0.1.0-alpha.2", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (
+    window as unknown as { __pi67UpdateTest: { checks: number } }
+  ).__pi67UpdateTest.checks)).toBe(1);
+  await updateDialog.getByRole("button", { name: "稍后处理", exact: true }).click();
   await expect(page.getByRole("button", { name: /^导出脱敏诊断/u })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "显示会话导航" })).toHaveCount(0);
@@ -171,6 +177,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await attachMockAgent(page);
   await installPackageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("π 设置");
@@ -230,18 +237,19 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1040);
 });
 
-test("centers compact and standard Settings documents without side-by-side management panes", async ({ page }) => {
+test("keeps every Settings category on one centered document measure without side-by-side management panes", async ({ page }) => {
   await page.setViewportSize({ width: 1476, height: 908 });
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
   await installPackageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("π 设置");
   const scrollRegion = settings.getByTestId("settings-scroll-region");
-  const documentMetrics = await scrollRegion.evaluate((element) => {
+  const measureDocument = () => scrollRegion.evaluate((element) => {
     const body = element.firstElementChild as HTMLElement;
     const regionRect = element.getBoundingClientRect();
     const bodyRect = body.getBoundingClientRect();
@@ -251,16 +259,24 @@ test("centers compact and standard Settings documents without side-by-side manag
       rightInset: regionRect.right - bodyRect.right
     };
   });
-  expect(documentMetrics.bodyWidth).toBeLessThanOrEqual(840.5);
+  const documentMetrics = await measureDocument();
+  expect(documentMetrics.bodyWidth).toBeGreaterThan(840.5);
+  expect(documentMetrics.bodyWidth).toBeLessThanOrEqual(1120.5);
   expect(Math.abs(documentMetrics.leftInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
 
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
+  for (const category of ["指令模板", "MCP 服务", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
+    await navigation.getByRole("button", { name: category, exact: true }).click();
+    await expect(settings.getByRole("heading", { name: category, exact: true }).first()).toBeVisible();
+    const next = await measureDocument();
+    expect(Math.abs(next.bodyWidth - documentMetrics.bodyWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(next.leftInset - documentMetrics.leftInset)).toBeLessThanOrEqual(1);
+    expect(Math.abs(next.rightInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
+  }
+
   await navigation.getByRole("button", { name: /^模型服务/u }).click();
-  const standardWidth = await scrollRegion.evaluate((element) => (
-    (element.firstElementChild as HTMLElement).getBoundingClientRect().width
-  ));
-  expect(standardWidth).toBeGreaterThan(840.5);
-  expect(standardWidth).toBeLessThanOrEqual(1120.5);
+  const standardWidth = (await measureDocument()).bodyWidth;
+  expect(Math.abs(standardWidth - documentMetrics.bodyWidth)).toBeLessThanOrEqual(1);
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
   await expect(providerList).toBeVisible();

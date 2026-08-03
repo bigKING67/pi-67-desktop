@@ -549,13 +549,13 @@ loading error where the operation can produce those states
   page-level scope control. Only the Extension workspace and Prompt Templates use
   the generic global/current-project switch; Skills and Rules own their explicit
   availability tabs instead.
-- Every Settings category uses one centered document flow and the content region
-  is its only vertical scroll owner. Dense catalog/editor categories use
-  `min(1120px, 100%)`; compact account, appearance, MCP, runtime, update, and About
-  categories use `min(840px, 100%)` without changing the shared header alignment,
-  with `32px` top, `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding;
-  narrow windows retain full-width content without document-level horizontal
-  overflow. Page title, summary, scope, and content share the same alignment.
+- Every Settings category uses one centered `min(1120px, 100%)` document flow and
+  the content region is its only vertical scroll owner. Page title, summary,
+  scope, section headings, and content share the same cross-category alignment;
+  lightweight pages create compactness through row density instead of recentering
+  a narrower document. The document keeps `32px` top,
+  `clamp(24px, 3vw, 32px)` inline, and `48px` bottom padding; narrow windows retain
+  full-width content without document-level horizontal overflow.
 - Settings uses three intentional content grammars. **Grouped Settings** places
   related `64px` minimum rows inside one `12px` rounded surface with only row
   dividers; a row is never an independent card. **Catalog** places tabs, search,
@@ -789,7 +789,10 @@ loading error where the operation can produce those states
 - The footer places the signed-out account entry on the left and a `?` menu on
   the right. Account opens Settings/Account. The `?` menu contains Settings,
   Check for Updates, and Help; refresh and Session import belong to the owning
-  Workspace overflow menu.
+  Workspace overflow menu. When the packaged Main process discovers a newer
+  complete release, the `?` control gains one non-numeric accent dot and the menu
+  action becomes `发现新版本 <version>` with a compact `新版本` badge. Clicking it
+  opens the shared update status; it never starts a download or installation.
 - Account v1 is truthfully `signed-out`: local Pi, Workspaces, and Sessions remain
   available, while enterprise/team features are described as not yet connected.
 - `Cmd/Ctrl+N` creates a conversation in the current Workspace; `Cmd/Ctrl+T` is a
@@ -1302,10 +1305,13 @@ loading error where the operation can produce those states
   retry available without changing the active Pi session.
 - Before Doctor has run, it presents an explicit invitation to run checks and
   never renders an inferred all-passed state.
-- Update checks disclose their GitHub Release network purpose before the first
-  request. Unsigned Preview checks and opening the canonical GitHub Release page
-  remain separate explicit actions. Unsigned builds expose no in-app download,
-  background download, or quit-to-install path.
+- Settings and the update dialog disclose that automatic checks request only
+  public GitHub Release metadata and send no Workspace, Session, model-service,
+  or credential data. Packaged builds check 10 seconds after startup and at most
+  once per 24 hours while running; development builds stay offline. Current and
+  automatic-error results do not interrupt work. Unsigned Preview checks and
+  opening the canonical GitHub Release page remain separate actions. Unsigned
+  builds expose no in-app download, background download, or quit-to-install path.
 
 ### Empty, loading, and error states
 

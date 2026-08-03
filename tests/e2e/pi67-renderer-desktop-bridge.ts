@@ -94,6 +94,22 @@ export async function installMockDesktopBridge(
     let capabilitySnapshotCalls = 0;
     let promptAttachmentCounter = 0;
     let teamMcpToken: string | undefined;
+    let updateState: Record<string, unknown> = {
+      phase: "idle",
+      channel: "unsigned-preview",
+      currentVersion: "0.1.0-alpha.1",
+      automaticChecks: true
+    };
+    const updateListeners = new Set<(state: unknown) => void>();
+    const updateTest = {
+      checks: 0,
+      openedUrls: [] as string[],
+      allowOpen: false,
+      emit(state: Record<string, unknown>) {
+        updateState = structuredClone(state);
+        for (const listener of updateListeners) listener(structuredClone(updateState));
+      }
+    };
     let workspaceFileState = { version: 1 as const, workspaces: [] as Array<Record<string, unknown>> };
     const workspaceEntryTest = {
       menus: [] as Array<Record<string, unknown>>,
@@ -330,11 +346,8 @@ export async function installMockDesktopBridge(
             return structuredClone(teamMcpStatus);
           },
           requestOpenExternal: async (url: string) => {
-            const testWindow = window as unknown as {
-              __pi67UpdateTest: { checks: number; openedUrls: string[]; allowOpen: boolean };
-            };
-            testWindow.__pi67UpdateTest.openedUrls.push(url);
-            return testWindow.__pi67UpdateTest.allowOpen;
+            updateTest.openedUrls.push(url);
+            return updateTest.allowOpen;
           },
           showWorkspaceEntryContextMenu: async (entry: Record<string, unknown>) => {
             workspaceEntryTest.menus.push(structuredClone(entry));
@@ -359,21 +372,26 @@ export async function installMockDesktopBridge(
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
-          getUpdateState: async () => ({
-            phase: "idle",
-            channel: "unsigned-preview",
-            currentVersion: "0.1.0-alpha.1"
-          }),
+          getUpdateState: async () => structuredClone(updateState),
           checkForUpdates: async () => {
-            const testWindow = window as unknown as { __pi67UpdateTest: { checks: number } };
-            testWindow.__pi67UpdateTest.checks += 1;
-            return {
+            updateTest.checks += 1;
+            updateState = {
               phase: "available",
               channel: "unsigned-preview",
               currentVersion: "0.1.0-alpha.1",
               version: "0.1.0-alpha.2",
               releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
-              publishedAt: "2026-07-23T06:00:00.000Z"
+              publishedAt: "2026-07-23T06:00:00.000Z",
+              automaticChecks: true,
+              checkedAt: "2026-08-03T08:00:00.000Z"
+            };
+            for (const listener of updateListeners) listener(structuredClone(updateState));
+            return structuredClone(updateState);
+          },
+          onUpdateStateChanged: (listener: (state: unknown) => void) => {
+            updateListeners.add(listener);
+            return () => {
+              updateListeners.delete(listener);
             };
           },
           onAgentHostFailed: () => () => undefined,
@@ -383,7 +401,7 @@ export async function installMockDesktopBridge(
     });
     Object.defineProperty(window, "__pi67UpdateTest", {
       configurable: false,
-      value: { checks: 0, openedUrls: [], allowOpen: false }
+      value: updateTest
     });
     Object.defineProperty(window, "__pi67WorkspaceEntryTest", {
       configurable: false,

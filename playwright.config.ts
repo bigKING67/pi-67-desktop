@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const rendererPort = process.env.PI67_E2E_RENDERER_PORT ?? "5173";
+if (!/^\d{1,5}$/u.test(rendererPort) || Number(rendererPort) < 1 || Number(rendererPort) > 65_535) {
+  throw new Error("PI67_E2E_RENDERER_PORT must be a valid TCP port.");
+}
+const rendererUrl = `http://127.0.0.1:${rendererPort}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "test-results",
@@ -9,7 +15,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   expect: { timeout: 5_000 },
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: rendererUrl,
     screenshot: "only-on-failure",
     trace: "retain-on-failure"
   },
@@ -25,8 +31,8 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: "corepack pnpm --filter @pi67/renderer run dev",
-    url: "http://127.0.0.1:5173",
+    command: `corepack pnpm --filter @pi67/renderer exec vite --host 127.0.0.1 --port ${rendererPort} --strictPort`,
+    url: rendererUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000
   }

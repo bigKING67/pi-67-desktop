@@ -10,7 +10,7 @@ import {
   shell,
   type BrowserWindow
 } from "electron";
-import type { ManualUpdateState } from "./manual-update.js";
+import { ManualUpdateController } from "./manual-update-controller.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { DesktopCapabilityService } from "./desktop-capability-service.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
@@ -36,8 +36,6 @@ import {
   type Browser67BrowserId
 } from "./browser67-integration.js";
 
-const manualUpdateChannel = "unsigned-preview" as const;
-
 interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
@@ -51,16 +49,24 @@ interface SystemBridgeOptions {
   workspaceFileState: WorkspaceFileStateStore;
 }
 
-export function registerSystemBridge(options: SystemBridgeOptions): void {
-  const workbenchState = options.workbenchState;
-  let updateState: ManualUpdateState | undefined;
-  let updateCheck: Promise<ManualUpdateState> | undefined;
+export interface SystemBridgeRegistration {
+  handlePowerResume(): void;
+  dispose(): void;
+}
 
-  const currentUpdateState = (): ManualUpdateState => {
-    if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
-    updateState ??= initialManualUpdateState(app.getVersion());
-    return updateState;
-  };
+export function registerSystemBridge(options: SystemBridgeOptions): SystemBridgeRegistration {
+  const workbenchState = options.workbenchState;
+  const updateController = new ManualUpdateController({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    fetcher: (input, init) => net.fetch(input, init),
+    publish: (state) => {
+      const window = options.getMainWindow();
+      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+      window.webContents.send("pi67:update-state-changed", state);
+    },
+    sanitizeError: (error) => redact(error instanceof Error ? error.message : String(error))
+  });
 
   const pickAndRegisterWorkspace = async (): Promise<NativeWorkspaceDescriptor | undefined> => {
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
@@ -244,7 +250,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     await shell.trashItem(entry.absolutePath);
     return true;
   });
-  ipcMain.handle("pi67:update-state", currentUpdateState);
+  ipcMain.handle("pi67:update-state", () => updateController.getState());
   ipcMain.handle("pi67:package-network-snapshot", async () => (
     unprobedPackageNetworkSnapshot(
       options.desktopToolchain,
@@ -353,45 +359,18 @@ export function registerSystemBridge(options: SystemBridgeOptions): void {
     (options.restartAgentHost ?? (() => options.connectAgentHost(true)))();
     return status;
   });
-  ipcMain.handle("pi67:update-check", async () => {
-    if (!app.isPackaged) return disabledManualUpdateState(app.getVersion());
-    if (updateCheck) return updateCheck;
+  ipcMain.handle("pi67:update-check", () => updateController.checkNow());
 
-    const currentVersion = app.getVersion();
-    const pendingCheck = import("./manual-update.js").then(({ checkForUnsignedPreviewUpdate }) => (
-      checkForUnsignedPreviewUpdate({
-        currentVersion,
-        fetcher: (input, init) => net.fetch(input, init)
-      })
-    )).catch((error: unknown) => errorManualUpdateState(
-      currentVersion,
-      redact(error instanceof Error ? error.message : String(error))
-    ));
-    updateCheck = pendingCheck;
-    try {
-      updateState = await pendingCheck;
-      return updateState;
-    } finally {
-      if (updateCheck === pendingCheck) updateCheck = undefined;
-    }
-  });
+  updateController.startAutomaticChecks();
+  return {
+    handlePowerResume: () => updateController.checkIfDue(),
+    dispose: () => updateController.dispose()
+  };
 }
 
 async function openSystemPath(path: string): Promise<void> {
   const failure = await shell.openPath(path);
   if (failure) throw new Error(failure);
-}
-
-function initialManualUpdateState(currentVersion: string): ManualUpdateState {
-  return { phase: "idle", channel: manualUpdateChannel, currentVersion };
-}
-
-function disabledManualUpdateState(currentVersion: string): ManualUpdateState {
-  return { phase: "disabled", channel: manualUpdateChannel, currentVersion, detail: "Development build" };
-}
-
-function errorManualUpdateState(currentVersion: string, detail: string): ManualUpdateState {
-  return { phase: "error", channel: manualUpdateChannel, currentVersion, detail: detail.slice(0, 500) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

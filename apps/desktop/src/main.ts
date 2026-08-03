@@ -18,7 +18,7 @@ import { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import { redact } from "./redaction.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
-import { registerSystemBridge } from "./system-bridge.js";
+import { registerSystemBridge, type SystemBridgeRegistration } from "./system-bridge.js";
 import {
   beginWorkbenchRun,
   finishWorkbenchRun,
@@ -60,6 +60,7 @@ let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
 let promptAttachments: PromptAttachmentStagingService | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
+let systemBridgeRegistration: SystemBridgeRegistration | undefined;
 const appInstanceId = randomUUID();
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
@@ -139,7 +140,7 @@ if (hasSingleInstanceLock) {
       persistedWorkbench.workspaces.map(refreshPersistedWorkspaceDescriptor)
     );
     await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
-    registerSystemBridge({
+    systemBridgeRegistration = registerSystemBridge({
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       restartAgentHost: () => agentHostSupervisor.restart(),
       getMainWindow: () => mainWindow,
@@ -152,7 +153,8 @@ if (hasSingleInstanceLock) {
       workspaceFileState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
-      getMainWindow: () => mainWindow
+      getMainWindow: () => mainWindow,
+      onResume: () => systemBridgeRegistration?.handlePowerResume()
     });
     await openMainWindow();
   }).catch((error: unknown) => {
@@ -174,6 +176,8 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", (event) => applicationShutdown.handleBeforeQuit(event));
 app.once("will-quit", () => {
+  systemBridgeRegistration?.dispose();
+  systemBridgeRegistration = undefined;
   unregisterPowerResumeRecovery?.();
   unregisterPowerResumeRecovery = undefined;
 });

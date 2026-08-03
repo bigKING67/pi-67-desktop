@@ -341,35 +341,66 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   });
 });
 
-test("keeps unsigned preview checks and external downloads user initiated", async ({ page }) => {
+test("keeps unsigned preview downloads user initiated after automatic metadata checks", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menu", { name: "帮助与设置" })
     .getByRole("menuitem", { name: "检查更新", exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Unsigned Preview 手动更新" });
-  await expect(dialog.getByText(/不会发送工作区、会话、模型、Provider 或凭据数据/u)).toBeVisible();
-  await expect(dialog.getByText("由你决定何时联网检查")).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Pi-67 更新" });
+  await expect(dialog.getByText(/不会发送工作区、会话、模型服务或密钥信息/u)).toBeVisible();
+  await expect(dialog.getByText("正在等待自动检查")).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(0);
   await dialog.getByRole("button", { name: "检查更新" }).click();
-  await expect(dialog.getByText("发现 π 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
   await expect(dialog.getByText(/核对 SHA-256 后手动下载安装/u)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(1);
 
-  await dialog.getByRole("button", { name: "打开 GitHub 下载页" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("GitHub 下载页未打开");
-  await expect(dialog.getByText("发现 π 0.1.0-alpha.2")).toBeVisible();
+  await dialog.getByRole("button", { name: "查看更新" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("GitHub 更新页未打开");
+  await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
 
   await page.evaluate(() => {
     (window as unknown as { __pi67UpdateTest: { allowOpen: boolean } }).__pi67UpdateTest.allowOpen = true;
   });
-  await dialog.getByRole("button", { name: "打开 GitHub 下载页" }).click();
+  await dialog.getByRole("button", { name: "查看更新" }).click();
   const releaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2";
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { openedUrls: string[] } }).__pi67UpdateTest.openedUrls)).toEqual([
     releaseUrl,
     releaseUrl
   ]);
+});
+
+test("projects an automatically discovered version into the help entry and menu", async ({ page }) => {
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.evaluate(() => {
+    (window as unknown as {
+      __pi67UpdateTest: { emit(state: Record<string, unknown>): void };
+    }).__pi67UpdateTest.emit({
+      phase: "available",
+      channel: "unsigned-preview",
+      currentVersion: "0.1.0-alpha.1",
+      version: "0.1.0-alpha.2",
+      releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
+      automaticChecks: true,
+      checkedAt: "2026-08-03T08:00:00.000Z"
+    });
+  });
+
+  const helpButton = page.getByRole("button", { name: "帮助与设置，有新版本 0.1.0-alpha.2" });
+  await expect(helpButton).toHaveAttribute("data-update-available", "true");
+  await helpButton.click();
+  const updateItem = page.getByRole("menu", { name: "帮助与设置" })
+    .getByRole("menuitem", { name: /发现新版本 0\.1\.0-alpha\.2/u });
+  await expect(updateItem.getByText("新版本", { exact: true })).toBeVisible();
+  await updateItem.click();
+  await expect(page.getByRole("dialog", { name: "Pi-67 更新" })
+    .getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  expect(await page.evaluate(() => (
+    window as unknown as { __pi67UpdateTest: { checks: number } }
+  ).__pi67UpdateTest.checks)).toBe(0);
 });
 
 function isHighlightResource(name: string): boolean {

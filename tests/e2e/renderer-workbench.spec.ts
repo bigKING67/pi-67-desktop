@@ -322,8 +322,8 @@ test("opens Settings, update, and help from the lower-left help menu", async ({ 
 
   await helpButton.click();
   await page.getByRole("menuitem", { name: "检查更新" }).click();
-  await expect(page.getByRole("dialog", { name: "Unsigned Preview 手动更新" })).toBeVisible();
-  await page.getByRole("dialog", { name: "Unsigned Preview 手动更新" })
+  await expect(page.getByRole("dialog", { name: "Pi-67 更新" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Pi-67 更新" })
     .getByRole("button", { name: "关闭" }).click();
 
   await helpButton.click();

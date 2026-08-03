@@ -8,7 +8,7 @@ const releasePageBaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/
 const requestTimeoutMilliseconds = 10_000;
 const maximumReleases = 20;
 
-export type ManualUpdateState =
+export type UnsignedPreviewUpdateResult =
   | {
       phase: "idle" | "current";
       channel: typeof UNSIGNED_PREVIEW_CHANNEL;
@@ -29,6 +29,11 @@ export type ManualUpdateState =
       detail: string;
     };
 
+export type ManualUpdateState = UnsignedPreviewUpdateResult & {
+  automaticChecks: boolean;
+  checkedAt?: string;
+};
+
 interface ReleaseCandidate {
   version: string;
   publishedAt?: string;
@@ -42,7 +47,7 @@ interface CheckForUnsignedPreviewUpdateOptions {
 
 export async function checkForUnsignedPreviewUpdate(
   options: CheckForUnsignedPreviewUpdateOptions
-): Promise<ManualUpdateState> {
+): Promise<UnsignedPreviewUpdateResult> {
   const currentVersion = valid(options.currentVersion);
   if (!currentVersion) throw new Error("The current application version is not valid SemVer.");
 

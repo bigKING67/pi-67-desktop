@@ -19,6 +19,7 @@ import { installGlobalShortcuts, toggleRendererNavigation } from "./global-short
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
+import { initializeUpdateProjection } from "../updates/update-store.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -104,6 +105,8 @@ export function App() {
     freshnessInstallationRef.current?.handlePowerResume();
     useAppStore.getState().handlePowerResume();
   }), []);
+
+  useEffect(() => initializeUpdateProjection(), []);
 
   useEffect(() => () => useTaskDraftStore.getState().dispose(), []);
 
@@ -217,7 +220,7 @@ export function App() {
       ) : null}
       {updateDialogOpen ? (
         <LazySurfaceBoundary
-          description="更新界面模块发生错误。没有更新操作会在后台自动开始。"
+          description="更新界面模块发生错误。不会自动下载或安装任何更新。"
           kind="overlay"
           onDismiss={() => useShellStore.getState().setUpdateDialogOpen(false)}
           surface="update-dialog"

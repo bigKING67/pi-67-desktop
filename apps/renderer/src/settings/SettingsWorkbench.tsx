@@ -18,6 +18,8 @@ import {
 } from "react-aria-components";
 import { saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
+import type { UpdateState } from "../updates/update-state.js";
+import { checkForUpdatesNow, useUpdateStore } from "../updates/update-store.js";
 import {
   setThemePreference,
   type ThemePreference,
@@ -206,7 +208,7 @@ export function SettingsWorkbench() {
           data-testid="settings-scroll-region"
           ref={scrollRegionRef}
         >
-          <div className={styles.documentBody} data-measure={currentSection.measure}>
+          <div className={styles.documentBody}>
             <SettingsPageHeader
               title={currentSection.label}
               description={currentSection.summary}
@@ -336,14 +338,47 @@ function PromptSettings() {
 
 function UpdateSettings() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
+  const update = useUpdateStore((state) => state.update);
+  const [checking, setChecking] = useState(false);
+  const handleUpdateAction = async (): Promise<void> => {
+    if (update.phase === "available" || update.phase === "disabled") {
+      setUpdateDialogOpen(true);
+      return;
+    }
+    setChecking(true);
+    try {
+      const result = await checkForUpdatesNow();
+      if (result.phase === "available") setUpdateDialogOpen(true);
+    } finally {
+      setChecking(false);
+    }
+  };
   return (
     <SettingsSectionBlock title="更新与诊断" description="更新检查不携带工作区、会话、模型服务或凭据信息；诊断导出默认脱敏。">
       <SettingsRows>
         <SettingsRow
           leading={<DownloadCloud aria-hidden="true" size={17} />}
-          title="检查更新"
-          description="查看当前版本、可用更新和 Unsigned Preview 状态。"
-          actions={<Button className="secondary-button" onPress={() => setUpdateDialogOpen(true)}>检查更新</Button>}
+          title="自动检查更新"
+          description="打包版启动 10 秒后自动检查；持续运行时每天最多检查一次，不会自动下载或安装。"
+          value={update.automaticChecks ? "已开启" : "仅打包版可用"}
+        />
+        <SettingsRow
+          title="更新状态"
+          description={updateSettingsDescription(update)}
+          value={updateSettingsStatus(update)}
+          actions={<Button
+            className="secondary-button"
+            isDisabled={checking}
+            onPress={() => void handleUpdateAction()}
+          >
+            {checking
+              ? "正在检查…"
+              : update.phase === "available"
+                ? "查看更新"
+                : update.phase === "disabled"
+                  ? "查看说明"
+                  : "立即检查"}
+          </Button>}
         />
         <SettingsRow
           leading={<FileDown aria-hidden="true" size={17} />}
@@ -354,6 +389,32 @@ function UpdateSettings() {
       </SettingsRows>
     </SettingsSectionBlock>
   );
+}
+
+function updateSettingsStatus(update: UpdateState): string {
+  if (update.phase === "available") return `新版本 ${update.version}`;
+  if (update.phase === "current") return "已是最新版本";
+  if (update.phase === "error") return "检查未完成";
+  if (update.phase === "disabled") return "开发构建";
+  return "等待首次检查";
+}
+
+function updateSettingsDescription(update: UpdateState): string {
+  const checkedAt = update.checkedAt
+    ? `上次检查：${new Intl.DateTimeFormat("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(update.checkedAt))}。`
+    : "";
+  if (update.phase === "available") {
+    return `当前版本 ${update.currentVersion}，可用版本 ${update.version}。${checkedAt}`;
+  }
+  if (update.phase === "current") return `当前版本 ${update.currentVersion}。${checkedAt}`;
+  if (update.phase === "error") return `上次检查未完成，可以手动重试。${checkedAt}`;
+  if (update.phase === "disabled") return "开发构建不会请求 GitHub Release。";
+  return `当前版本 ${update.currentVersion}；等待启动后的首次自动检查。`;
 }
 
 const THEME_OPTIONS: ReadonlyArray<{

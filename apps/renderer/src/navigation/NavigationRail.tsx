@@ -13,6 +13,7 @@ import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { useUpdateStore } from "../updates/update-store.js";
 import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { workspaceRemovalDisposition } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
@@ -117,9 +118,17 @@ export function NavigationRail({
 
 function HelpMenu() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
+  const update = useUpdateStore((state) => state.update);
+  const updateAvailable = update.phase === "available";
+  const updateLabel = updateAvailable ? `发现新版本 ${update.version}` : "检查更新";
   return (
     <MenuTrigger>
-      <Button className={styles.helpButton!} aria-label="帮助与设置" data-testid="help-menu-trigger">
+      <Button
+        aria-label={updateAvailable ? `帮助与设置，有新版本 ${update.version}` : "帮助与设置"}
+        className={styles.helpButton!}
+        data-testid="help-menu-trigger"
+        data-update-available={updateAvailable}
+      >
         <CircleHelp aria-hidden="true" size={16} />
       </Button>
       <Popover className={`${styles.menuPopover} ${styles.footerMenu}`} placement="top end" offset={6}>
@@ -132,8 +141,12 @@ function HelpMenu() {
           <MenuItem
             className={styles.menuItem!}
             onAction={() => setUpdateDialogOpen(true)}
-            textValue="检查更新"
-          ><DownloadCloud aria-hidden="true" size={14} />检查更新</MenuItem>
+            textValue={updateLabel}
+          >
+            <DownloadCloud aria-hidden="true" size={14} />
+            <span>{updateLabel}</span>
+            {updateAvailable ? <span className={styles.updateBadge!}>新版本</span> : null}
+          </MenuItem>
           <MenuItem
             className={styles.menuItem!}
             onAction={() => rendererWorkbenchStore.getState().openSettings("about")}
