@@ -336,7 +336,7 @@ export interface CommandResults extends WorkspaceFileCommandResults {
   "queue.clear": QueueClearResult;
   "operation.abort": { aborted: boolean; operationId?: string };
   "model.list": ModelSummary[];
-  "model.select": SessionControlResult;
+  "model.select": SessionModelCatalogResult;
   "model.setRuntimeKey": SessionModelCatalogResult;
   "provider.list": ProviderSummary[];
   "provider.setRuntimeKey": ProviderSummary[];

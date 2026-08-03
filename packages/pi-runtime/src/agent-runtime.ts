@@ -80,7 +80,7 @@ export interface AgentRuntime {
   followUp(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void>;
   clearQueue(): RuntimeQueueClearResult;
   abort(): Promise<void>;
-  selectModel(provider: string, id: string): Promise<SessionControlResult>;
+  selectModel(provider: string, id: string): Promise<SessionModelCatalogResult>;
   setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionModelCatalogResult>;
   setThinkingLevel(level: string): Promise<SessionControlResult>;
   reloadResources(): Promise<SessionResourceCatalogResult>;

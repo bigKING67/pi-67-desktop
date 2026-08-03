@@ -12,7 +12,7 @@ const TASK_CONTEXT: ProtocolContext = {
 };
 
 describe("Session control response schemas", () => {
-  it("accepts narrow Session control results and rejects legacy full snapshots", () => {
+  it("requires model selection to return its catalog while thinking stays narrow", () => {
     const controls = {
       sessionId: "session-1",
       controls: {
@@ -20,10 +20,18 @@ describe("Session control response schemas", () => {
         thinkingLevel: "high"
       }
     };
+    const modelCatalog = {
+      ...controls,
+      modelCatalog: {
+        models: [],
+        providers: [],
+        availableThinkingLevels: ["off", "high"]
+      }
+    };
     const select = responseEnvelope("select-model", 1, TASK_CONTEXT, {
       ok: true,
       type: "model.select",
-      result: controls
+      result: modelCatalog
     });
     const thinking = responseEnvelope("thinking-level", 1, TASK_CONTEXT, {
       ok: true,
@@ -33,19 +41,13 @@ describe("Session control response schemas", () => {
     const runtimeKey = responseEnvelope("runtime-key", 1, TASK_CONTEXT, {
       ok: true,
       type: "model.setRuntimeKey",
-      result: {
-        ...controls,
-        modelCatalog: {
-          models: [],
-          providers: [],
-          availableThinkingLevels: ["off", "high"]
-        }
-      }
+      result: modelCatalog
     });
 
     expect(isResponseEnvelope(select)).toBe(true);
     expect(isResponseEnvelope(thinking)).toBe(true);
     expect(isResponseEnvelope(runtimeKey)).toBe(true);
+    expect(isResponseEnvelope({ ...select, result: controls })).toBe(false);
     expect(isResponseEnvelope({ ...select, result: legacySnapshot() })).toBe(false);
     expect(isResponseEnvelope({ ...thinking, result: legacySnapshot() })).toBe(false);
     expect(isResponseEnvelope({ ...runtimeKey, result: legacySnapshot() })).toBe(false);

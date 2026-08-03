@@ -282,7 +282,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   }),
   "operation.abort": strictObject({ aborted: Type.Boolean(), operationId: Type.Optional(Type.String()) }),
   "model.list": Type.Array(ModelSummarySchema),
-  "model.select": SessionControlResultSchema,
+  "model.select": SessionModelCatalogResultSchema,
   "model.setRuntimeKey": SessionModelCatalogResultSchema,
   "provider.list": Type.Array(ProviderSummarySchema),
   "provider.setRuntimeKey": Type.Array(ProviderSummarySchema),

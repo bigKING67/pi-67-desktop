@@ -110,10 +110,13 @@ describe("PiSdkRuntime configuration reload", () => {
       if (!replacement) throw new Error("The Pi runtime fixture requires a built-in replacement model.");
       await runtime.setRuntimeApiKey(replacement.provider, "fixture-runtime-replacement-key");
       const selected = await runtime.selectModel(replacement.provider, replacement.id);
+      expect(Object.keys(selected).sort()).toEqual(["controls", "modelCatalog", "sessionId"]);
       expect(selected.controls.selectedModel).toEqual({
         provider: replacement.provider,
         id: replacement.id
       });
+      expect(selected.modelCatalog.availableThinkingLevels)
+        .toEqual(runtime.getSnapshot().availableThinkingLevels);
       expect(runtime.getSnapshot().selectedModel).toEqual({
         provider: replacement.provider,
         id: replacement.id

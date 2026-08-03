@@ -19,6 +19,7 @@ import {
   emitQueue,
   emitUsage,
   installSession,
+  modelSelectionResult,
   resetStores,
   resourceCatalogResult,
   resyncResult
@@ -158,7 +159,7 @@ describe("App Store Session controls", () => {
     });
   });
 
-  it("applies only model controls from a delayed narrow response", async () => {
+  it("applies model controls and model-specific thinking levels without rolling back unrelated state", async () => {
     const request = deferred<CommandResults["model.select"]>();
     vi.spyOn(agentConnectionController, "request").mockReturnValue(request.promise as never);
 
@@ -166,17 +167,17 @@ describe("App Store Session controls", () => {
     await Promise.resolve();
     emitQueue(["newer queue"], []);
     emitUsage(50, 0.5, 25);
-    request.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "anthropic", id: "claude" },
-        thinkingLevel: "high"
-      }
-    });
+    request.resolve(modelSelectionResult(
+      "session-1",
+      { provider: "anthropic", id: "claude" },
+      "high",
+      ["off", "high", "max"]
+    ));
     await selecting;
 
     expect(useSessionProjectionStore.getState()).toMatchObject({
       controls: { selectedModel: { provider: "anthropic", id: "claude" } },
+      modelCatalog: { availableThinkingLevels: ["off", "high", "max"] },
       queue: { steeringQueue: ["newer queue"], followUpQueue: [] },
       usage: { tokens: 50, cost: 0.5, contextPercent: 25 }
     });
@@ -209,13 +210,7 @@ describe("App Store Session controls", () => {
       target: { provider: "anthropic", id: "claude", label: "anthropic/claude" }
     });
 
-    request.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "anthropic", id: "claude" },
-        thinkingLevel: "high"
-      }
-    });
+    request.resolve(modelSelectionResult("session-1", { provider: "anthropic", id: "claude" }));
     await first;
 
     expect(useModelSelectionStore.getState().status).toBe("confirmed");
@@ -230,13 +225,7 @@ describe("App Store Session controls", () => {
     const selecting = selectSessionModel("anthropic", "claude");
     await Promise.resolve();
     emitMeta("Newer metadata", { provider: "openai", id: "gpt-newer" }, "off");
-    request.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "anthropic", id: "claude" },
-        thinkingLevel: "high"
-      }
-    });
+    request.resolve(modelSelectionResult("session-1", { provider: "anthropic", id: "claude" }));
     await selecting;
 
     expect(resync).toHaveBeenCalledTimes(1);
@@ -256,21 +245,14 @@ describe("App Store Session controls", () => {
 
     const selectingFirst = selectSessionModel("anthropic", "claude");
     const selectingSecond = selectSessionModel("deepseek", "deepseek-v4-flash");
-    second.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "deepseek", id: "deepseek-v4-flash" },
-        thinkingLevel: "high"
-      }
-    });
+    second.resolve(modelSelectionResult(
+      "session-1",
+      { provider: "deepseek", id: "deepseek-v4-flash" },
+      "high",
+      ["off", "high", "max"]
+    ));
     await selectingSecond;
-    first.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "anthropic", id: "claude" },
-        thinkingLevel: "high"
-      }
-    });
+    first.resolve(modelSelectionResult("session-1", { provider: "anthropic", id: "claude" }));
     await selectingFirst;
 
     expect(useSessionProjectionStore.getState().controls?.selectedModel).toEqual({
@@ -290,13 +272,7 @@ describe("App Store Session controls", () => {
     const selecting = selectSessionModel("anthropic", "claude");
     await Promise.resolve();
     installSession("session-2", 4);
-    request.resolve({
-      sessionId: "session-1",
-      controls: {
-        selectedModel: { provider: "anthropic", id: "claude" },
-        thinkingLevel: "high"
-      }
-    });
+    request.resolve(modelSelectionResult("session-1", { provider: "anthropic", id: "claude" }));
     await selecting;
 
     expect(useSessionProjectionStore.getState().authority).toMatchObject({

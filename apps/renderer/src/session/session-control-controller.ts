@@ -184,7 +184,7 @@ async function performModelSelection(
     const resultMatchesTarget = modelSelectionTargetKey(result.controls.selectedModel)
       === modelSelectionTargetKey(modelTarget);
     if (resultMatchesTarget) {
-      useSessionProjectionStore.getState().applyControlResult(projectionTarget, result);
+      useSessionProjectionStore.getState().applyModelCatalogResult(projectionTarget, result);
     }
     if (!acceptRendererSessionResponse(get(), authority)) {
       if (isPendingModelSelection(token)) resetModelSelection();

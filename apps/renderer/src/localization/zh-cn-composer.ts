@@ -92,7 +92,6 @@ export const zhCNComposerMessages = {
   emptyQueueItem: "（空消息）",
   queueItemTruncated: "内容已截断",
   runtimeSettings: "本次发送设置",
-  modelTitle: "选择本次任务使用的 Pi 模型",
   modelLabel: "Pi 模型",
   selectModel: "选择模型",
   noAvailableModels: "没有可用模型",
@@ -104,16 +103,7 @@ export const zhCNComposerMessages = {
   modelSwitchFailed: (model: string, detail: string) => `切换到 ${model} 失败：${detail}`,
   modelSwitchConfirmationFailed: "无法确认模型切换",
   modelSwitchStateUnconfirmed: "Pi 返回后仍无法确认当前模型，请稍后重试。",
-  thinkingTitle: "设置 Pi 的思考级别",
   thinkingLabel: "Pi 思考级别",
-  thinking: {
-    off: "思考：关闭",
-    minimal: "思考：最低",
-    low: "思考：低",
-    medium: "思考：中",
-    high: "思考：高",
-    xhigh: "思考：很高",
-    max: "思考：最高",
-    fallback: (level: string) => `思考：${level}`
-  }
+  thinkingValue: (level: string) => `思考：${level}`,
+  thinkingAvailabilityHint: "仅显示当前模型支持的等级"
 } as const;

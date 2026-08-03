@@ -97,6 +97,37 @@ export function resourceCatalogResult(
   };
 }
 
+export function modelSelectionResult(
+  sessionId: string,
+  selectedModel: NonNullable<SessionSnapshot["selectedModel"]>,
+  thinkingLevel = "high",
+  availableThinkingLevels: string[] = ["off", "high"]
+): CommandResults["model.select"] {
+  return {
+    sessionId,
+    controls: { selectedModel, thinkingLevel },
+    modelCatalog: {
+      models: [
+        { provider: "openai", id: "gpt", label: "GPT", configured: true, reasoning: true },
+        { provider: "anthropic", id: "claude", label: "Claude", configured: true, reasoning: true },
+        {
+          provider: "deepseek",
+          id: "deepseek-v4-flash",
+          label: "DeepSeek V4 Flash",
+          configured: true,
+          reasoning: true
+        }
+      ],
+      providers: [
+        { id: "openai", label: "OpenAI", configured: true, modelCount: 1 },
+        { id: "anthropic", label: "Anthropic", configured: true, modelCount: 1 },
+        { id: "deepseek", label: "DeepSeek", configured: true, modelCount: 1 }
+      ],
+      availableThinkingLevels
+    }
+  };
+}
+
 export function resyncResult(
   selectedModel: NonNullable<SessionSnapshot["selectedModel"]>
 ): ProjectionResyncResult {

@@ -30,7 +30,13 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
       hasNewer: false
     },
     models: [
-      { provider: "openai", id: "gpt-test", label: "GPT Test", configured: true, reasoning: true },
+      {
+        provider: "openai",
+        id: "gpt-test",
+        label: "GPT Test Extended Reasoning Preview",
+        configured: true,
+        reasoning: true
+      },
       { provider: "deepseek", id: "deepseek-v4-flash", label: "DeepSeek V4 Flash", configured: true, reasoning: true },
       { provider: "anthropic", id: "claude-test", label: "Claude Test", configured: false, reasoning: true }
     ],
@@ -48,7 +54,7 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
     ],
     selectedModel: { provider: "openai", id: "gpt-test" },
     thinkingLevel: "medium",
-    availableThinkingLevels: ["off", "medium", "high"],
+    availableThinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
     steeringQueue: [],
     followUpQueue: [],
     tree: { nodes: [], truncated: false, total: 0 },
@@ -137,11 +143,14 @@ export function installMockSessionControlCommandHandler(): void {
       return { snapshot: nextSnapshot, result: modelCatalogResult(nextSnapshot) };
     }
     if (type === "model.select" && typeof payload.provider === "string" && typeof payload.id === "string") {
+      const deepSeekSelected = payload.provider === "deepseek" && payload.id === "deepseek-v4-flash";
       const nextSnapshot = {
         ...snapshot,
-        selectedModel: { provider: payload.provider, id: payload.id }
+        selectedModel: { provider: payload.provider, id: payload.id },
+        thinkingLevel: deepSeekSelected ? "high" : snapshot.thinkingLevel,
+        availableThinkingLevels: deepSeekSelected ? ["off", "high", "max"] : snapshot.availableThinkingLevels
       };
-      return { snapshot: nextSnapshot, result: controlResult(nextSnapshot) };
+      return { snapshot: nextSnapshot, result: modelCatalogResult(nextSnapshot) };
     }
     if (type === "thinking.set" && typeof payload.level === "string") {
       const nextSnapshot = { ...snapshot, thinkingLevel: payload.level };

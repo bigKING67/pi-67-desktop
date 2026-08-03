@@ -28,7 +28,7 @@ import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { clearSessionQueue } from "./session-queue.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import { resolveManagedSessionPath } from "./session-import.js";
-import { projectSessionControls, projectSessionModelCatalog, projectSessionModels, projectSessionResources } from "./session-snapshot.js";
+import { projectSessionControls, projectSessionModelCatalog, projectSessionModelCatalogResult, projectSessionModels, projectSessionResources } from "./session-snapshot.js";
 import { refreshLoadedResourceReadAccess } from "./loaded-resource-read-access.js";
 import { refreshConfiguredCapabilityCatalog } from "./configured-capability-catalog.js";
 import { StreamBatcher } from "./stream-batcher.js";
@@ -339,23 +339,19 @@ export class PiSdkRuntime implements AgentRuntime {
     await this.sessionBindings.requireSession().abort();
   }
 
-  async selectModel(provider: string, id: string): Promise<SessionControlResult> {
+  async selectModel(provider: string, id: string): Promise<SessionModelCatalogResult> {
     await this.assertSessionWritable();
     await this.configurationReload.apply();
     const session = this.sessionBindings.requireSession();
     await selectSessionModel(session, provider, id);
     this.configurationReload.markModelSelected();
-    return { sessionId: session.sessionId, controls: projectSessionControls(session) };
+    return projectSessionModelCatalogResult(session);
   }
 
   async setRuntimeApiKey(provider: string, apiKey: string): Promise<SessionModelCatalogResult> {
     const session = this.sessionBindings.requireSession();
     await this.runtimeCredentialOverrides.set(provider, apiKey);
-    return {
-      sessionId: session.sessionId,
-      controls: projectSessionControls(session),
-      modelCatalog: projectSessionModelCatalog(session)
-    };
+    return projectSessionModelCatalogResult(session);
   }
 
   async setThinkingLevel(level: string): Promise<SessionControlResult> {

@@ -1,12 +1,5 @@
-import { Brain, ChevronDown, Sparkles } from "lucide-react";
+import { Brain, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  Button as AriaButton,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  Select
-} from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
 import { messages } from "../localization/message-catalog.js";
@@ -28,6 +21,10 @@ import {
 } from "../session/model-selection-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import {
+  ComposerRuntimeSelect,
+  type ComposerRuntimeSelectOption
+} from "./ComposerRuntimeSelect.js";
 import styles from "./Composer.module.css";
 
 const CONFIGURE_PROVIDER_VALUE = "__configure_provider__";
@@ -46,6 +43,7 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
   const modelPickerHandledRevision = useShellStore((state) => state.modelPickerHandledRevision);
   const acknowledgeModelPickerRequest = useShellStore((state) => state.acknowledgeModelPickerRequest);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const streaming = useCommittedConversationStreaming();
   useEffect(() => {
     if (modelSelection.status !== "confirmed") return;
@@ -61,6 +59,9 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
     setModelPickerOpen(true);
     acknowledgeModelPickerRequest(modelPickerRequestRevision);
   }, [acknowledgeModelPickerRequest, modelPickerHandledRevision, modelPickerRequestRevision]);
+  useEffect(() => {
+    if (modelSelection.status === "pending") setThinkingPickerOpen(false);
+  }, [modelSelection.status]);
   if (!sessionId) return null;
 
   const selectedModelValue = selectedModel
@@ -78,19 +79,33 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
     ? modelSelection.target.label
     : visibleModels.find((model) => `${model.provider}/${model.id}` === selectedModelValue)?.label
       ?? messages.composer.selectModel;
+  const modelOptions: ComposerRuntimeSelectOption[] = visibleModels.length > 0
+    ? visibleModels.map((model) => ({
+        id: `${model.provider}/${model.id}`,
+        label: model.label,
+        detail: `${model.provider}/${model.id}${model.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}`
+      }))
+    : [{
+        id: CONFIGURE_PROVIDER_VALUE,
+        label: messages.composer.noAvailableModels,
+        detail: messages.composer.configureProvider
+      }];
+  const thinkingOptions: ComposerRuntimeSelectOption[] = (availableThinkingLevels ?? []).map((level) => ({
+    id: level,
+    label: level
+  }));
+  const modelSelectionPending = modelSelection.status === "pending";
 
   return (
     <div className={styles.runtimeControls} aria-label={messages.composer.runtimeSettings}>
       <div className={styles.modelRuntimeControl}>
-        <Select
-          aria-label={messages.composer.modelLabel}
+        <ComposerRuntimeSelect
+          ariaLabel={messages.composer.modelLabel}
+          disabled={disabled || modelSelectionPending}
+          icon={<Sparkles aria-hidden="true" size={14} />}
           isOpen={modelPickerOpen}
-          isDisabled={disabled || modelSelection.status === "pending"}
-          selectedKey={modelValue || null}
           onOpenChange={setModelPickerOpen}
-          onSelectionChange={(key) => {
-            if (key === null) return;
-            const value = String(key);
+          onSelectionChange={(value) => {
             if (value === CONFIGURE_PROVIDER_VALUE) {
               setCredentialDialogOpen(true);
               return;
@@ -98,45 +113,11 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
             const model = visibleModels.find((candidate) => `${candidate.provider}/${candidate.id}` === value);
             if (model) void selectSessionModel(model.provider, model.id);
           }}
-        >
-          <AriaButton className={`${styles.runtimeField} ${styles.modelSelectButton}`}>
-            <Sparkles aria-hidden="true" size={14} />
-            <span className={styles.modelSelectValue}>{modelLabel}</span>
-            <ChevronDown aria-hidden="true" size={13} />
-          </AriaButton>
-          <Popover className={styles.modelSelectPopover!} placement="bottom end">
-            <ListBox className={styles.modelSelectList!}>
-              {visibleModels.map((model) => (
-                <ListBoxItem
-                  className={styles.modelSelectOption!}
-                  id={`${model.provider}/${model.id}`}
-                  key={`${model.provider}/${model.id}`}
-                  textValue={model.label}
-                >
-                  <span>
-                    <strong>{model.label}</strong>
-                    <small>
-                      {model.provider}/{model.id}
-                      {model.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}
-                    </small>
-                  </span>
-                </ListBoxItem>
-              ))}
-              {visibleModels.length === 0 ? (
-                <ListBoxItem
-                  className={styles.modelSelectOption!}
-                  id={CONFIGURE_PROVIDER_VALUE}
-                  textValue={messages.composer.configureProvider}
-                >
-                  <span>
-                    <strong>{messages.composer.noAvailableModels}</strong>
-                    <small>{messages.composer.configureProvider}</small>
-                  </span>
-                </ListBoxItem>
-              ) : null}
-            </ListBox>
-          </Popover>
-        </Select>
+          options={modelOptions}
+          selectedKey={modelValue || null}
+          valueText={modelLabel}
+          variant="model"
+        />
         {modelStatus ? (
           <span
             className={styles.modelSelectionStatus}
@@ -146,20 +127,19 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
           >{modelStatus}</span>
         ) : null}
       </div>
-      <label className={`${styles.runtimeField} ${styles.thinkingField}`} title={messages.composer.thinkingTitle}>
-        <Brain aria-hidden="true" size={14} />
-        <span className="sr-only">{messages.composer.thinkingLabel}</span>
-        <select
-          aria-label={messages.composer.thinkingLabel}
-          disabled={disabled}
-          value={thinkingLevel}
-          onChange={(event) => void setSessionThinkingLevel(event.target.value)}
-        >
-          {availableThinkingLevels?.map((level) => (
-            <option key={level} value={level}>{thinkingLevelLabel(level)}</option>
-          ))}
-        </select>
-      </label>
+      <ComposerRuntimeSelect
+        ariaLabel={messages.composer.thinkingLabel}
+        disabled={disabled || modelSelectionPending || thinkingOptions.length === 0}
+        footer={messages.composer.thinkingAvailabilityHint}
+        icon={<Brain aria-hidden="true" size={14} />}
+        isOpen={thinkingPickerOpen}
+        onOpenChange={setThinkingPickerOpen}
+        onSelectionChange={(level) => void setSessionThinkingLevel(level)}
+        options={thinkingOptions}
+        selectedKey={thinkingLevel ?? null}
+        valueText={messages.composer.thinkingValue(thinkingLevel ?? "-")}
+        variant="thinking"
+      />
     </div>
   );
 }
@@ -174,18 +154,4 @@ function modelSelectionStatusText(
     return messages.composer.modelSwitchFailed(selection.target.label, selection.error ?? "未知错误");
   }
   return undefined;
-}
-
-const THINKING_LEVEL_LABELS: Readonly<Record<string, string>> = {
-  off: messages.composer.thinking.off,
-  minimal: messages.composer.thinking.minimal,
-  low: messages.composer.thinking.low,
-  medium: messages.composer.thinking.medium,
-  high: messages.composer.thinking.high,
-  xhigh: messages.composer.thinking.xhigh,
-  max: messages.composer.thinking.max
-};
-
-function thinkingLevelLabel(level: string): string {
-  return THINKING_LEVEL_LABELS[level] ?? messages.composer.thinking.fallback(level);
 }

@@ -11,6 +11,7 @@ import type {
   ResourceSummary,
   ExtensionToolAdapterView,
   SessionControlsView,
+  SessionModelCatalogResult,
   SessionModelCatalogView,
   SessionSnapshot
 } from "@pi67/domain";
@@ -78,6 +79,14 @@ export function projectSessionModelCatalog(session: AgentSession): SessionModelC
     models: projectSessionModels(session),
     providers: projectRuntimeProviders(session.modelRuntime, session.model?.provider),
     availableThinkingLevels: session.getAvailableThinkingLevels()
+  };
+}
+
+export function projectSessionModelCatalogResult(session: AgentSession): SessionModelCatalogResult {
+  return {
+    sessionId: session.sessionId,
+    controls: projectSessionControls(session),
+    modelCatalog: projectSessionModelCatalog(session)
   };
 }
 

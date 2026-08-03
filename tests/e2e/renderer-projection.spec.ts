@@ -239,7 +239,8 @@ test("applies narrow conversation, queue, metadata, tree and usage projections",
   });
   await expect(page.locator(".brand-lockup").getByText("增量投影会话", { exact: true })).toBeVisible();
   await expect(page.getByTestId("conversation-row").filter({ hasText: "增量投影会话" })).toBeVisible();
-  await expect(page.getByLabel("Pi 思考级别")).toHaveValue("high");
+  await expect(page.getByRole("button", { name: "Pi 思考级别", exact: true }))
+    .toContainText("思考：high");
 
   await emitMockAgentEvent(page, {
     type: "usage.changed",

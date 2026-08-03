@@ -890,8 +890,11 @@ loading error where the operation can produce those states
   current model if authentication changes so the selected value never disappears.
 - Provider setup belongs to the `Provider 与凭据` dialog rather than the model
   selector. An empty configured-model set names that next action explicitly.
-- Thinking levels use readable product labels such as `思考：关闭` and
-  `思考：高`; raw SDK enum values are not the primary user-facing copy.
+- The thinking control localizes its product label but preserves Pi's canonical
+  lowercase Runtime values, such as `思考：off`, `思考：high`, and `思考：max`.
+  Its bounded React Aria picker exposes only levels supported by the authoritative
+  current model and explains that model-specific scope without translating or
+  inventing Runtime semantics.
 - Model selection is an explicit Renderer-owned mutation state rather than an
   optimistic projection write. While one target is pending, the selector keeps
   that target visible, disables duplicate selection, and exposes `正在切换到…`
@@ -903,6 +906,14 @@ loading error where the operation can produce those states
   it on one line. Provider and the complete `provider/model-id` appear only in
   the open list, where they disambiguate equal labels without widening the
   resting Composer.
+- Model and thinking controls share one compact trigger, focus, selection, and
+  raised-Popover language. Their Popovers open toward the conversation, retain
+  viewport collision handling, and bound long model catalogs to roughly five or
+  six visible rows with internal scrolling rather than covering most of the Turn.
+- A model change returns controls and its model catalog as one authoritative
+  mutation result. The Renderer updates the selected model, clamped thinking
+  value, and available thinking levels together; both controls remain disabled
+  while that model mutation is pending.
 - Inline Turn activity is a bounded execution timeline rather than one generic
   spinner. It names import and compaction, displays the bounded real Tool name,
   maps verified Tool presentation kinds to reading, search, edit, command,

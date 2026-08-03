@@ -66,7 +66,9 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(page.getByLabel("Provider API 密钥", { exact: true })).toHaveValue("");
 });
 
-test("keeps the title controls limited to configured models and readable thinking labels", async ({ page }) => {
+test("keeps configured models and canonical thinking values in bounded runtime pickers", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -79,9 +81,35 @@ test("keeps the title controls limited to configured models and readable thinkin
   await expect(modelList.getByRole("option")).toHaveCount(2);
   await expect(modelList.getByRole("option", { name: /Claude Test/u })).toHaveCount(0);
   await expect(modelList.getByRole("option", { name: /GPT Test/u })).toContainText("openai/gpt-test");
-  const thinkingSelect = page.getByLabel("Pi 思考级别");
-  await expect(thinkingSelect.locator('option[value="off"]')).toHaveText("思考：关闭");
-  await expect(thinkingSelect.locator('option[value="medium"]')).toHaveText("思考：中");
+  await expectNoHorizontalPageOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("runtime-model-picker.png"), animations: "disabled" });
+  await page.keyboard.press("Escape");
+  await expect(modelList).not.toBeVisible();
+  const thinkingSelect = page.getByRole("button", { name: "Pi 思考级别", exact: true });
+  await expect(thinkingSelect).toContainText("思考：medium");
+  await thinkingSelect.click();
+  const thinkingList = page.getByRole("listbox");
+  await expect(thinkingList.getByRole("option")).toHaveText([
+    "off",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ]);
+  await expect(page.getByText("仅显示当前模型支持的等级", { exact: true })).toBeVisible();
+  await expectNoHorizontalPageOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("runtime-thinking-picker.png"), animations: "disabled" });
+  await page.keyboard.press("Escape");
+  await expect(thinkingList).not.toBeVisible();
+  await expect(thinkingSelect).toBeFocused();
+
+  await page.setViewportSize({ width: 360, height: 400 });
+  await expect(modelSelect).toBeInViewport();
+  await expect(thinkingSelect).toBeInViewport();
+  await expect(page.getByRole("button", { name: "发送", exact: true })).toBeInViewport();
+  await expectNoHorizontalPageOverflow(page);
 });
 
 test("switches the active model once with pending and confirmed feedback", async ({ page }) => {
@@ -90,15 +118,25 @@ test("switches the active model once with pending and confirmed feedback", async
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   const modelSelect = page.getByRole("button", { name: "Pi 模型", exact: true });
+  const thinkingSelect = page.getByRole("button", { name: "Pi 思考级别", exact: true });
   await modelSelect.click();
   await page.getByRole("option", { name: /DeepSeek V4 Flash/u }).click();
   await expect(modelSelect).toBeDisabled();
+  await expect(thinkingSelect).toBeDisabled();
   await expect(modelSelect).toContainText("DeepSeek V4 Flash");
   await expect(modelSelect).not.toContainText("deepseek/");
   await expect(page.getByText("正在切换到 DeepSeek V4 Flash…", { exact: true })).toBeVisible();
 
   await expect(modelSelect).toBeEnabled();
+  await expect(thinkingSelect).toBeEnabled();
+  await expect(thinkingSelect).toContainText("思考：high");
   await expect(page.getByText("已切换到 DeepSeek V4 Flash", { exact: true })).toBeVisible();
+  await thinkingSelect.click();
+  const thinkingList = page.getByRole("listbox");
+  await expect(thinkingList.getByRole("option")).toHaveCount(3);
+  await expect(thinkingList.getByRole("option", { name: "off", exact: true })).toBeVisible();
+  await expect(thinkingList.getByRole("option", { name: "high", exact: true })).toBeVisible();
+  await expect(thinkingList.getByRole("option", { name: "max", exact: true })).toBeVisible();
   const modelCommands = (await recordedCommandDetails(page)).filter((command) => command.type === "model.select");
   expect(modelCommands).toEqual([expect.objectContaining({
     payload: { provider: "deepseek", id: "deepseek-v4-flash" }
@@ -146,6 +184,13 @@ async function openProviderDialog(page: Page): Promise<void> {
   }
   await expect(editor).toBeVisible();
   await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
+}
+
+async function expectNoHorizontalPageOverflow(page: Page): Promise<void> {
+  const overflow = await page.evaluate(() => (
+    document.documentElement.scrollWidth - document.documentElement.clientWidth
+  ));
+  expect(overflow).toBeLessThanOrEqual(1);
 }
 
 async function openSettingsSection(page: Page, sectionName: RegExp) {
