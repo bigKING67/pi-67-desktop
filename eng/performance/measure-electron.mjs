@@ -96,6 +96,8 @@ const closeSamples = [];
 const rendererResourceTransitions = [];
 
 for (let index = 0; index < samples; index += 1) {
+  const sampleStarted = performance.now();
+  console.log(`Electron performance sample ${index + 1}/${samples}: start`);
   const profile = await mkdtemp(join(tmpdir(), "pi67-performance-"));
   const agentDir = join(profile, "pi-agent");
   const extensionsDirectory = join(agentDir, "extensions");
@@ -202,6 +204,10 @@ for (let index = 0; index < samples; index += 1) {
     recordWarmRestoredWorkspaceMemory(await measureWorkingSet(warmLaunch.application, false));
     closeSamples.push(await close(warmLaunch.application));
     activeApplication = undefined;
+    console.log(
+      `Electron performance sample ${index + 1}/${samples}: complete in `
+      + `${Math.round(performance.now() - sampleStarted)}ms`
+    );
   } finally {
     await activeApplication?.close().catch(() => undefined);
     await rm(profile, { recursive: true, force: true });

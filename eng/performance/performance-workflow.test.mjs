@@ -26,4 +26,10 @@ describe("release performance workflow gates", () => {
       "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && node eng/performance/prepare-packaged-app.mjs"
     );
   });
+
+  it("gives the unsigned native matrix enough time for ten Windows samples", async () => {
+    const source = await readFile(new URL("../../.github/workflows/unsigned-preview.yml", import.meta.url), "utf8");
+
+    expect(source).toContain("timeout-minutes: 90");
+  });
 });
