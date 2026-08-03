@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   assertLayoutObservation,
+  locateTaskInspector,
   viewportWidthMatches,
   WINDOWS_SYNTHETIC_SCALE_FACTORS
 } from "./verify-windows-packaged-input-layout.mjs";
@@ -8,6 +9,17 @@ import {
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
+  });
+
+  it("locates only the task inspector complementary region", () => {
+    const inspector = {};
+    const getByRole = vi.fn(() => inspector);
+
+    expect(locateTaskInspector({ getByRole })).toBe(inspector);
+    expect(getByRole).toHaveBeenCalledWith("complementary", {
+      exact: true,
+      name: "任务检查器"
+    });
   });
 
   it("accepts contained topmost controls and the native title-bar reserve", () => {

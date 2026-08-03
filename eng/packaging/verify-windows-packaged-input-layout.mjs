@@ -160,12 +160,17 @@ export async function verifyPackagedResponsiveLayout(window, application, scaleF
   };
 }
 
+export function locateTaskInspector(window) {
+  return window.getByRole("complementary", { name: "任务检查器", exact: true });
+}
+
 async function verifyContextDrawerLayout(window, application, scaleFactor) {
   await setStableContentViewport(window, application, 1_040, 800);
-  await window.getByLabel("任务检查器").waitFor({ state: "detached" });
+  const taskInspector = locateTaskInspector(window);
+  await taskInspector.waitFor({ state: "detached" });
   const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
-  await window.getByLabel("任务检查器").waitFor({ state: "visible" });
+  await taskInspector.waitFor({ state: "visible" });
   await window.getByRole("button", { name: "关闭任务检查器抽屉" }).waitFor({ state: "visible" });
 
   const observation = await observeLayout(window);
@@ -179,7 +184,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   }
 
   await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
-  await window.getByLabel("任务检查器").waitFor({ state: "detached" });
+  await taskInspector.waitFor({ state: "detached" });
   await waitForFocus(window, "显示任务检查器");
   return observation;
 }
