@@ -32,6 +32,7 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   const nodeArtifact = requiredArtifact(lock.node.artifacts, target, "Node");
   const gitArtifact = requiredArtifact(lock.git.artifacts, target, "Git");
+  const expectedGitVersion = requiredReportedVersion(gitArtifact, "Git");
 
   await mkdir(cacheRoot, { recursive: true });
   await rm(stagingRoot, { recursive: true, force: true });
@@ -74,7 +75,7 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
   };
   assertVersion("Node", versions.node, lock.node.version);
   assertVersion("npm", versions.npm, lock.npm.version);
-  assertVersion("Git", versions.git, lock.git.version);
+  assertVersion("Git", versions.git, expectedGitVersion);
 
   const manifest = {
     schema: "pi67.desktop-toolchain.v1",
@@ -121,6 +122,13 @@ function requiredArtifact(artifacts, target, label) {
   const artifact = artifacts?.[target];
   if (!artifact) throw new Error(`${label} has no locked artifact for ${target}.`);
   return artifact;
+}
+
+function requiredReportedVersion(artifact, label) {
+  if (typeof artifact.reportedVersion !== "string" || artifact.reportedVersion.length === 0) {
+    throw new Error(`${label} artifact has no locked reported version.`);
+  }
+  return artifact.reportedVersion;
 }
 
 async function obtainVerifiedArchive(artifact) {

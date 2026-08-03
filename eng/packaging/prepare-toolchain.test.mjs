@@ -18,6 +18,8 @@ describe("Desktop private toolchain lock", () => {
     expect(lock.node.version).toBe("24.18.0");
     expect(lock.npm.version).toBe("12.0.1");
     expect(lock.git.version).toBe("2.53.0");
+    expect(lock.git.artifacts["darwin-arm64"].reportedVersion).toBe("2.53.0");
+    expect(lock.git.artifacts["win32-x64"].reportedVersion).toBe("2.53.0.windows.3");
     expect(Object.keys(lock.node.artifacts).sort()).toEqual(["darwin-arm64", "win32-x64"]);
     expect(Object.keys(lock.git.artifacts).sort()).toEqual(["darwin-arm64", "win32-x64"]);
     expect(lock.node.artifacts["darwin-arm64"].urls[0]).toMatch(/^https:\/\/npmmirror\.com\//u);
