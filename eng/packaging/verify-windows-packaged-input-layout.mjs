@@ -162,11 +162,11 @@ export async function verifyPackagedResponsiveLayout(window, application, scaleF
 
 async function verifyContextDrawerLayout(window, application, scaleFactor) {
   await setStableContentViewport(window, application, 1_040, 800);
-  await window.getByLabel("会话上下文").waitFor({ state: "detached" });
-  const contextToggle = window.getByRole("button", { name: "显示上下文" });
+  await window.getByLabel("任务检查器").waitFor({ state: "detached" });
+  const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
-  await window.getByLabel("会话上下文").waitFor({ state: "visible" });
-  await window.getByRole("button", { name: "关闭上下文抽屉" }).waitFor({ state: "visible" });
+  await window.getByLabel("任务检查器").waitFor({ state: "visible" });
+  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).waitFor({ state: "visible" });
 
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
@@ -178,9 +178,9 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
     throw new Error(`Scale ${scaleFactor}: context drawer is not visible at the 1040px breakpoint.`);
   }
 
-  await window.getByRole("button", { name: "关闭上下文抽屉" }).click();
-  await window.getByLabel("会话上下文").waitFor({ state: "detached" });
-  await waitForFocus(window, "显示上下文");
+  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
+  await window.getByLabel("任务检查器").waitFor({ state: "detached" });
+  await waitForFocus(window, "显示任务检查器");
   return observation;
 }
 
