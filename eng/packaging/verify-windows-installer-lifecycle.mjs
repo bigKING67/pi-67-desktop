@@ -33,7 +33,7 @@ import {
 
 export { resolveExpectedLifecycleSigner, resolveUpgradeBaselineInstaller, resolveWindowsInstallerPath };
 
-const INSTALLER_TIMEOUT_MS = 120_000;
+export const WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS = 180_000;
 const FILE_STATE_TIMEOUT_MS = 30_000;
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");
 const summaryPath = join(outputDirectory, "summary.json");
@@ -313,12 +313,20 @@ function runExecutable(executablePath, argumentsList) {
     execFile(executablePath, argumentsList, {
       encoding: "utf8",
       maxBuffer: 256 * 1024,
-      timeout: INSTALLER_TIMEOUT_MS,
+      timeout: WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS,
       windowsHide: true
     }, (error, stdout, stderr) => {
       if (error) {
         const detail = [stdout, stderr].filter(Boolean).join("\n").slice(0, 4_096);
-        reject(new Error(`${basename(executablePath)} failed: ${error.message}${detail ? `\n${detail}` : ""}`));
+        const termination = [
+          `timeoutMs=${WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS}`,
+          `killed=${String(error.killed ?? false)}`,
+          `code=${String(error.code ?? "none")}`,
+          `signal=${String(error.signal ?? "none")}`
+        ].join(", ");
+        reject(new Error(
+          `${basename(executablePath)} failed (${termination}): ${error.message}${detail ? `\n${detail}` : ""}`
+        ));
         return;
       }
       resolvePromise();

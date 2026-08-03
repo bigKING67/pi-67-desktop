@@ -15,7 +15,8 @@ import {
   resolveExpectedLifecycleSigner,
   resolveUpgradeBaselineInstaller,
   resolveWindowsInstallerPath,
-  waitForPathState
+  waitForPathState,
+  WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
 } from "./verify-windows-installer-lifecycle.mjs";
 
 const temporaryDirectories = [];
@@ -40,6 +41,10 @@ describe("Windows installer lifecycle contract", () => {
       .toEqual(["/S", "/D=C:\\Pi-67 Desktop 中文"]);
     expect(() => buildNsisInstallArguments("C:\\Pi-67\nDesktop"))
       .toThrow("single-line path");
+  });
+
+  it("keeps enough process-timeout margin for variable GitHub Windows installer performance", () => {
+    expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(180_000);
   });
 
   it("accepts only an older exact Windows x64 installer as the upgrade baseline", () => {
