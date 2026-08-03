@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
+import {
+  attachMockAgent,
+  installMockDesktopBridge,
+  waitForMockWorkspaceReady
+} from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
@@ -133,6 +137,7 @@ test("keeps long code horizontally navigable without a persistent scrollbar", as
     parts: [{ type: "text", text: `\`\`\`typescript\n${longLine}\n\`\`\`` }]
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   const codeBlock = page.getByTestId("code-block");
   const codeViewport = codeBlock.locator("pre");
