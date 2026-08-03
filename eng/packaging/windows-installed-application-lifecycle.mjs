@@ -8,6 +8,7 @@ import {
   installWorkspaceDialogResult,
   launchPackagedApplication
 } from "./packaged-electron-fixture.mjs";
+import { openSettingsSection } from "./packaged-electron-smoke-scenarios.mjs";
 
 export async function launchInstalledApplication({
   activeControlledOperation,
@@ -49,7 +50,7 @@ export async function launchInstalledApplication({
       throw new Error("Installed Electron runtime launched from an unexpected executable path.");
     }
 
-    if (selectLightTheme) {
+    if (selectLightTheme && legacyUserInterface) {
       await selectLightThemePreference(window, legacyUserInterface);
       await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
     }
@@ -57,6 +58,11 @@ export async function launchInstalledApplication({
     await installWorkspaceDialogResult(application, workspace);
     await window.getByRole("button", { name: "选择工作区" }).click();
     await waitForRuntimeReady(window, legacyUserInterface);
+
+    if (selectLightTheme && !legacyUserInterface) {
+      await selectLightThemePreference(window, legacyUserInterface);
+      await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
+    }
 
     if (activeControlledOperation) {
       await window.keyboard.press("Control+k");
@@ -102,14 +108,16 @@ export async function launchInstalledApplication({
   }
 }
 
-async function selectLightThemePreference(window, legacyUserInterface) {
+export async function selectLightThemePreference(window, legacyUserInterface) {
   if (legacyUserInterface) {
     await window.getByRole("button", { name: /外观：跟随系统/u }).click();
     await window.getByRole("menuitemradio", { name: /浅色/u }).click();
     return;
   }
-  await window.getByRole("button", { name: "打开更多菜单" }).click();
-  await window.getByRole("menu").getByRole("menuitem", { name: /外观：浅色/u }).click();
+  const settings = await openSettingsSection(window, /^通用/u);
+  await settings.getByRole("button", { name: /^浅色/u }).click();
+  await settings.getByRole("button", { name: "返回工作台", exact: true }).click();
+  await settings.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
 async function waitForRuntimeReady(window, legacyUserInterface) {

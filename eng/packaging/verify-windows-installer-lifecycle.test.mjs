@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { selectLightThemePreference } from "./windows-installed-application-lifecycle.mjs";
 import {
   assertPreservedUserData,
   buildNsisInstallArguments,
@@ -75,6 +76,46 @@ describe("Windows installer lifecycle contract", () => {
     expect(builder).toMatch(/nsis:[\s\S]*?perMachine:\s*false/u);
     expect(builder).toMatch(/nsis:[\s\S]*?allowToChangeInstallationDirectory:\s*true/u);
     expect(builder).toMatch(/nsis:[\s\S]*?deleteAppDataOnUninstall:\s*false/u);
+  });
+
+  it("selects the current light theme through General Settings and returns to the workbench", async () => {
+    const actions = [];
+    const button = (name) => ({ click: async () => actions.push(`click:${String(name)}`) });
+    const navigation = {
+      getByRole: (role, options) => {
+        actions.push(`role:${role}:${String(options.name)}`);
+        return button(options.name);
+      }
+    };
+    const settings = {
+      evaluate: async () => ({ columns: "240px 1fr", width: 1_200 }),
+      getByRole: (role, options) => {
+        actions.push(`role:${role}:${String(options.name)}`);
+        return role === "navigation" ? navigation : button(options.name);
+      },
+      waitFor: async (options) => actions.push(`settings:${options.state}`)
+    };
+    const window = {
+      getByLabel: () => settings,
+      getByRole: () => ({ count: async () => 0 }),
+      getByTestId: () => ({ count: async () => 0 }),
+      keyboard: { press: async (key) => actions.push(`key:${key}`) }
+    };
+
+    await selectLightThemePreference(window, false);
+
+    expect(actions).toEqual([
+      `key:${process.platform === "darwin" ? "Meta+," : "Control+,"}`,
+      "settings:visible",
+      "role:navigation:设置分类",
+      "role:button:/^通用/u",
+      "click:/^通用/u",
+      "role:button:/^浅色/u",
+      "click:/^浅色/u",
+      "role:button:返回工作台",
+      "click:返回工作台",
+      "settings:hidden"
+    ]);
   });
 
   it("waits for a path to become present or absent", async () => {
