@@ -154,19 +154,33 @@ async function verifyScaleScenario(artifact, scaleFactor) {
 }
 
 export async function verifyPackagedResponsiveLayout(window, application, scaleFactor) {
+  await prepareResponsiveLayoutControls(window);
   return {
     contextViewport: await verifyContextDrawerLayout(window, application, scaleFactor),
     navigationViewport: await verifyNavigationDrawerLayout(window, application, scaleFactor)
   };
 }
 
+export async function prepareResponsiveLayoutControls(window) {
+  await window.getByLabel("给 Pi 发送消息").fill("Windows packaged responsive layout probe");
+  await Promise.all([
+    window.getByRole("button", { name: "发送", exact: true }).waitFor({ state: "visible" }),
+    window.getByRole("button", { name: "停止", exact: true }).waitFor({ state: "visible" })
+  ]);
+}
+
+export function locateTaskInspector(window) {
+  return window.getByRole("complementary", { name: "任务检查器", exact: true });
+}
+
 async function verifyContextDrawerLayout(window, application, scaleFactor) {
   await setStableContentViewport(window, application, 1_040, 800);
-  await window.getByLabel("会话上下文").waitFor({ state: "detached" });
-  const contextToggle = window.getByRole("button", { name: "显示上下文" });
+  const taskInspector = locateTaskInspector(window);
+  await taskInspector.waitFor({ state: "detached" });
+  const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
-  await window.getByLabel("会话上下文").waitFor({ state: "visible" });
-  await window.getByRole("button", { name: "关闭上下文抽屉" }).waitFor({ state: "visible" });
+  await taskInspector.waitFor({ state: "visible" });
+  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).waitFor({ state: "visible" });
 
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
@@ -178,9 +192,9 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
     throw new Error(`Scale ${scaleFactor}: context drawer is not visible at the 1040px breakpoint.`);
   }
 
-  await window.getByRole("button", { name: "关闭上下文抽屉" }).click();
-  await window.getByLabel("会话上下文").waitFor({ state: "detached" });
-  await waitForFocus(window, "显示上下文");
+  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
+  await taskInspector.waitFor({ state: "detached" });
+  await waitForFocus(window, "显示任务检查器");
   return observation;
 }
 
@@ -386,9 +400,9 @@ export function assertLayoutObservation(observation, contract) {
     throw new Error(`${prefix}: Composer or TitleBar geometry is unavailable.`);
   }
   for (const [name, control] of [["Send", observation.send], ["Stop", observation.stop]]) {
-    if (!control?.contained || !control.topmost) {
-      throw new Error(`${prefix}: ${name} is clipped or covered.`);
-    }
+    if (!control) throw new Error(`${prefix}: ${name} is unavailable.`);
+    if (!control.contained) throw new Error(`${prefix}: ${name} is clipped.`);
+    if (!control.topmost) throw new Error(`${prefix}: ${name} is covered.`);
   }
   if (observation.titleBarNativeControlReserve < 136) {
     throw new Error(

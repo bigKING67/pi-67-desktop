@@ -58,7 +58,7 @@ test("balances wide side columns and expands the shared conversation measure", a
 });
 
 test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 800 });
+  await page.setViewportSize({ width: 1_040, height: 800 });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -96,6 +96,9 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
       }
     }
   }, { operationId: "operation-context-drawer" });
+  await page.getByLabel("给 Pi 发送消息").fill("Windows packaged responsive layout probe");
+  await expect(sendButton).toBeVisible();
+  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
   const stopButton = page.getByRole("button", { name: "停止" });
   await expect(stopButton).toBeVisible();
   await expect.poll(() => isControlTopmost(stopButton)).toBe(true);
@@ -153,11 +156,15 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
 
   const navigation = page.getByLabel("会话导航", { exact: true });
   const navigationToggle = page.getByRole("button", { name: "显示会话导航" });
+  const sendButton = page.getByRole("button", { name: "发送" });
   await expect(navigation).not.toBeVisible();
   await expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(sendButton).toBeVisible();
+  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
 
   await navigationToggle.click();
   await expect(navigation).toBeVisible();
+  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
   await expect(page.getByRole("button", { name: "隐藏会话导航" })).toHaveAttribute("aria-expanded", "true");
   await expect(navigation.getByRole("button", { name: "添加或创建工作区" })).toBeFocused();
 

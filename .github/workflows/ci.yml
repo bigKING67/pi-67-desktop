@@ -42,23 +42,12 @@ jobs:
         run: corepack pnpm run check
       - name: Install Playwright Chromium
         run: corepack pnpm exec playwright install --no-shell chromium
-      - name: Measure and enforce release performance
-        env:
-          PI67_PERF_SAMPLES: 10
-          PI67_PERF_JSONL_BOUNDARY_SAMPLES: 3
-          PI67_PERF_ENFORCE: 1
-        run: corepack pnpm run performance:measure
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: performance-ci-${{ runner.os }}-${{ matrix.expectedArch }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/performance/*.json
-          if-no-files-found: error
-          retention-days: 30
+      - name: Build apps for smoke and packaging
+        run: corepack pnpm run build
       - name: Renderer and Electron smoke
         run: corepack pnpm exec playwright test
       - name: Build unsigned native smoke package
-        run: corepack pnpm run package:native:unsigned
+        run: node eng/packaging/package-native-unsigned.mjs
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts

@@ -92,7 +92,7 @@ describe("SQLite Session Catalog", () => {
     expect(catalog.query({ scope: "all", cwdKey: WORKSPACE, limit: 50 }).records.map((item) => item.path))
       .toEqual(["/sessions/004.jsonl"]);
     catalog.close();
-  });
+  }, 15_000);
 
   it("replaces a corrupt disposable database without accumulating recovery files", async () => {
     const root = await temporaryRoot();

@@ -1,0 +1,63 @@
+name: Performance certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref or SHA to certify
+        required: false
+        default: main
+        type: string
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            os: windows-2025
+            arch: x64
+          - platform: macos-arm64
+            os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify runner architecture
+        shell: bash
+        run: >-
+          node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('Unexpected runner arch: ' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: corepack pnpm exec playwright install --no-shell chromium
+      - name: Measure and enforce release performance
+        env:
+          PI67_PERF_SAMPLES: 10
+          PI67_PERF_JSONL_BOUNDARY_SAMPLES: 3
+          PI67_PERF_ENFORCE: 1
+        run: corepack pnpm run performance:measure
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: performance-certification-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/performance/*.json
+          if-no-files-found: error
+          retention-days: 30
