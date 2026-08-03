@@ -1,7 +1,12 @@
 import type { LocatedMessageWindow, OperationView, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Components, VirtuosoHandle } from "react-virtuoso";
+import type {
+  Components,
+  ScrollSeekConfiguration,
+  ScrollSeekPlaceholderProps,
+  VirtuosoHandle
+} from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
@@ -224,6 +229,7 @@ export function Transcript() {
         firstItemIndex={historicalWindow ? 0 : firstItemIndex + transcriptMessages.length - transcriptRows.length}
         followOutput={!historicalWindow && (streaming || hasTurnActivity) ? "auto" : false}
         increaseViewportBy={{ top: 400, bottom: 100 }}
+        scrollSeekConfiguration={TRANSCRIPT_SCROLL_SEEK}
         initialTopMostItemIndex={historicalAnchorRowIndex === undefined
           ? { index: "LAST", align: "end" }
           : { index: historicalAnchorRowIndex, align: "center" }}
@@ -346,10 +352,20 @@ const STARTER_PROMPTS = [
   "实现一个有测试覆盖的小功能"
 ] as const;
 
+const TRANSCRIPT_SCROLL_SEEK: ScrollSeekConfiguration = {
+  enter: (velocity) => Math.abs(velocity) > 600,
+  exit: (velocity) => Math.abs(velocity) < 100
+};
+
 const TRANSCRIPT_COMPONENTS: Components<TranscriptRow, TranscriptContext> = {
   Header: OlderMessagesHeader,
-  Footer: LiveTurnFooter
+  Footer: LiveTurnFooter,
+  ScrollSeekPlaceholder: TranscriptScrollSeekPlaceholder
 };
+
+function TranscriptScrollSeekPlaceholder({ height }: ScrollSeekPlaceholderProps) {
+  return <div aria-hidden="true" style={{ height }} />;
+}
 
 function OlderMessagesHeader({ context }: { context: TranscriptContext }) {
   if (!context.hasOlder && !context.loadingOlder && !context.conversationError) return null;

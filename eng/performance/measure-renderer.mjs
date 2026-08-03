@@ -84,12 +84,12 @@ try {
     const restoredMemory = await memory.sample();
     restoredHeapSamples.push(restoredMemory.usedHeapMiB);
     composerSamples.push(await measureComposerPaint(page, index));
-    scrollSamples.push((await measureScroll(page)) * 100);
-    streamingSamples.push(await measureStreamingRate(page));
     await loadAllOlderMessages(page, 1_000);
     const loadedMemory = await memory.sample();
     loadedTranscriptHeapSamples.push(loadedMemory.usedHeapMiB);
     loadedTranscriptNodeSamples.push(loadedMemory.nodes);
+    scrollSamples.push((await measureScroll(page)) * 100);
+    streamingSamples.push(await measureStreamingRate(page));
     await switchPerformanceSessions(page, 10, 1_000);
     const switchedMemory = await memory.sample();
     switchedHeapSamples.push(switchedMemory.usedHeapMiB);
@@ -140,7 +140,7 @@ try {
       samples: scrollSamples,
       budget: 1,
       evidenceLevel: "browser",
-      method: `${scrollSweepCount} consecutive one-second full-range requestAnimationFrame scrolls; per-sweep dropped-frame rates averaged`,
+      method: `Explicitly paginated to all 1,000 messages, then ${scrollSweepCount} consecutive one-second full-range requestAnimationFrame scrolls; per-sweep dropped-frame rates averaged`,
       limitations: ["Headless Chromium is not a packaged Electron compositor or physical display measurement."]
     }),
     summarizeMetric({
