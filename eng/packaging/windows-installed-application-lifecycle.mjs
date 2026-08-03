@@ -8,7 +8,10 @@ import {
   installWorkspaceDialogResult,
   launchPackagedApplication
 } from "./packaged-electron-fixture.mjs";
-import { openSettingsSection } from "./packaged-electron-smoke-scenarios.mjs";
+import {
+  captureProcessOutput,
+  openSettingsSection
+} from "./packaged-electron-smoke-scenarios.mjs";
 
 export async function launchInstalledApplication({
   activeControlledOperation,
@@ -33,6 +36,7 @@ export async function launchInstalledApplication({
       probePackagedRendererIsolation,
       userDataDirectory
     });
+    const packagedProcessOutput = captureProcessOutput(application.process());
     const mainPid = application.process().pid;
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
@@ -66,7 +70,11 @@ export async function launchInstalledApplication({
         await waitForRuntimeReady(window, legacyUserInterface);
       } catch (error) {
         throw new Error(
-          `Installed restored Workspace did not become ready after ${restoredActivation}: ${errorMessage(error)}`,
+          [
+            `Installed restored Workspace did not become ready after ${restoredActivation}: ${errorMessage(error)}`,
+            `Runtime diagnostics: ${JSON.stringify(await inspectInstalledRuntimeState(window))}`,
+            packagedProcessOutput() || "No installed process diagnostics were emitted."
+          ].join("\n"),
           { cause: error }
         );
       }
@@ -166,14 +174,50 @@ export async function activateRestoredWorkspace(window) {
   throw new Error("Installed Workspace restore surface no longer exposed an activation action.");
 }
 
-async function waitForRuntimeReady(window, legacyUserInterface) {
-  await runtimeReadyLocator(window, legacyUserInterface).waitFor({ state: "visible", timeout: 30_000 });
+export async function waitForRuntimeReady(window, legacyUserInterface) {
+  const runtimeReady = runtimeReadyLocator(window, legacyUserInterface);
+  if (legacyUserInterface) {
+    await runtimeReady.waitFor({ state: "visible", timeout: 30_000 });
+    return;
+  }
+  await Promise.all([
+    runtimeReady.waitFor({ state: "visible", timeout: 30_000 }),
+    window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: 30_000 })
+  ]);
 }
 
 function runtimeReadyLocator(window, legacyUserInterface) {
   return legacyUserInterface
     ? window.getByText("Pi SDK 已就绪", { exact: true })
-    : window.getByLabel("当前状态：Pi SDK 已就绪");
+    : window.locator('[data-runtime-phase="ready"]');
+}
+
+function inspectInstalledRuntimeState(window) {
+  return window.evaluate(() => {
+    const status = document.querySelector('[aria-label^="当前状态："]');
+    const visible = (element) => Boolean(
+      element
+      && (element.getClientRects().length > 0 || element.getBoundingClientRect().width > 0)
+    );
+    const activationActions = Object.fromEntries(
+      ["恢复任务", "打开会话", "新建会话"].map((name) => {
+        const button = [...document.querySelectorAll("button")]
+          .find((candidate) => candidate.textContent?.trim() === name);
+        return [name, visible(button)];
+      })
+    );
+    return {
+      activationActions,
+      conversationCount: document.querySelectorAll('[aria-label="Pi conversation"]').length,
+      conversationRowCount: document.querySelectorAll('[data-testid="conversation-row"]').length,
+      runtimePhase: status?.getAttribute("data-runtime-phase") ?? null,
+      runtimeStatus: status?.getAttribute("aria-label")?.slice(0, 160) ?? null,
+      workspacePickerVisible: visible(
+        [...document.querySelectorAll("button")]
+          .find((candidate) => candidate.textContent?.trim() === "选择工作区")
+      )
+    };
+  });
 }
 
 function round(value) {

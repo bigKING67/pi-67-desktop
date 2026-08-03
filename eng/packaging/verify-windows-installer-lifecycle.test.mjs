@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   activateRestoredWorkspace,
   selectLightThemePreference,
-  waitForInstalledStartupSurface
+  waitForInstalledStartupSurface,
+  waitForRuntimeReady
 } from "./windows-installed-application-lifecycle.mjs";
 import {
   assertPreservedUserData,
@@ -128,6 +129,7 @@ describe("Windows installer lifecycle contract", () => {
     { pickerVisible: false, runtimeReadyVisible: false, expected: "workspace-restored" }
   ])("accepts $expected as an installed startup surface", async ({ pickerVisible, runtimeReadyVisible, expected }) => {
     const actions = [];
+    const selectors = [];
     const combined = {
       or: () => combined,
       waitFor: async (options) => actions.push(`combined:${options.state}`)
@@ -144,12 +146,53 @@ describe("Windows installer lifecycle contract", () => {
       or: () => restoredWorkspace
     };
     const window = {
-      getByLabel: (name) => name === "Pi conversation" ? restoredWorkspace : runtimeReady,
-      getByRole: (_role, options) => options.name === "选择工作区" ? workspacePicker : restoredWorkspace
+      getByLabel: () => restoredWorkspace,
+      getByRole: (_role, options) => options.name === "选择工作区" ? workspacePicker : restoredWorkspace,
+      locator: (selector) => {
+        selectors.push(selector);
+        return runtimeReady;
+      }
     };
 
     await expect(waitForInstalledStartupSurface(window, false)).resolves.toBe(expected);
     expect(actions).toEqual(["combined:visible"]);
+    expect(selectors).toEqual(['[data-runtime-phase="ready"]']);
+  });
+
+  it("accepts any modern ready detail while requiring the conversation surface", async () => {
+    const actions = [];
+    const window = {
+      getByLabel: (name) => ({
+        waitFor: async (options) => actions.push(`${name}:${options.state}:${options.timeout}`)
+      }),
+      locator: (selector) => ({
+        waitFor: async (options) => actions.push(`${selector}:${options.state}:${options.timeout}`)
+      })
+    };
+
+    await waitForRuntimeReady(window, false);
+
+    expect(actions).toEqual([
+      '[data-runtime-phase="ready"]:visible:30000',
+      "Pi conversation:visible:30000"
+    ]);
+  });
+
+  it("preserves the legacy exact readiness label", async () => {
+    const actions = [];
+    const window = {
+      getByText: (name, options) => ({
+        waitFor: async (waitOptions) => actions.push({ name, options, waitOptions })
+      })
+    };
+
+    await waitForRuntimeReady(window, true);
+
+    expect(actions).toEqual([{
+      name: "Pi SDK 已就绪",
+      options: { exact: true },
+      waitOptions: { state: "visible", timeout: 30_000 }
+    }]);
   });
 
   it.each([
