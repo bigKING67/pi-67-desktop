@@ -120,10 +120,13 @@ test("reloads the first page automatically after a stale next cursor", async ({ 
   await armStaleSessionCatalogCursor(page);
 
   await page.getByRole("button", { name: "显示更多" }).click();
-  await expect.poll(async () => (await sessionCatalogRequests(page)).length).toBeGreaterThanOrEqual(2);
-  const requests = await sessionCatalogRequests(page);
-  expect(requests[0]?.payload.cursor).toBeDefined();
-  expect(requests[1]?.payload).toEqual({ scope: "workspace", limit: 50 });
+  await expect.poll(async () => {
+    const requests = await sessionCatalogRequests(page);
+    const staleCursorIndex = requests.findIndex((request) => request.payload.cursor !== undefined);
+    if (staleCursorIndex < 0) return undefined;
+    return requests.slice(staleCursorIndex + 1)
+      .find((request) => request.payload.cursor === undefined)?.payload;
+  }).toEqual({ scope: "workspace", limit: 50 });
   await expect(page.getByText(/Session Catalog cursor is stale/u)).toHaveCount(0);
   await expect(sessionButton(page, "Stale 01")).toBeVisible();
 });

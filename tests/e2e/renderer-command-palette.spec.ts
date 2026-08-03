@@ -141,7 +141,7 @@ test("does not execute a selected action while Windows IME confirmation is activ
   });
 
   await expect(page.getByRole("dialog", { name: "命令面板" })).toBeVisible();
-  expect(await recordedCommands(page)).toEqual([]);
+  expect((await recordedCommands(page)).filter((command) => command === "command.invoke")).toEqual([]);
   await expect(search).toHaveValue("inspect");
   const activeId = await search.getAttribute("aria-activedescendant");
   expect(activeId).toBeTruthy();

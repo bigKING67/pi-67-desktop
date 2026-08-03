@@ -332,14 +332,16 @@ try {
     throw new Error(`Packaged renderer security boundary failed: ${JSON.stringify(security)}`);
   }
   const packagedVersion = await application.evaluate(({ app }) => app.getVersion());
+  const expectedPlatformLabel = artifact.platform === "darwin" ? "macOS" : "Windows";
+  const expectedArchitectureLabel = artifact.arch === "arm64" ? "Apple Silicon (arm64)" : "x64";
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^关于/u }).click();
   await workspaceSettings.getByRole("heading", { name: "关于", exact: true, level: 1 })
     .waitFor({ state: "visible", timeout: 15_000 });
   for (const value of [
     packagedVersion,
-    "macOS",
-    "Apple Silicon (arm64)",
+    expectedPlatformLabel,
+    expectedArchitectureLabel,
     "Unsigned Preview · 自动检查，手动安装"
   ]) {
     await workspaceSettings.getByText(value, { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
