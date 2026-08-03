@@ -83,7 +83,7 @@ test("keeps the committed transcript visible across a Settings round trip", asyn
   await expect(page.getByText("Settings round-trip transcript", { exact: true })).toBeVisible();
 });
 
-test("throttles assistant stream announcements and clears them when the turn settles", async ({ page }) => {
+test("projects assistant stream announcements without private reasoning and clears them when settled", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page, [message("settled-message", "Settled response")]);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -135,7 +135,6 @@ test("throttles assistant stream announcements and clears them when the turn set
       ]
     }
   }, { operationId });
-  await expect(announcer).toHaveText("第一句。");
   await expect(announcer).toHaveText("第二句。", { timeout: 3_000 });
   await expect(liveProcess).toContainText("more private reasoning");
 

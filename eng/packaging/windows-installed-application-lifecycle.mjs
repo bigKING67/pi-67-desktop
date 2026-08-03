@@ -59,6 +59,11 @@ export async function launchInstalledApplication({
       await installWorkspaceDialogResult(application, workspace);
       await window.getByRole("button", { name: "选择工作区" }).click();
       await waitForRuntimeReady(window, legacyUserInterface);
+    } else if (startupSurface === "workspace-restored") {
+      if (!(await window.getByLabel("Pi conversation").isVisible())) {
+        await window.keyboard.press("Control+N");
+      }
+      await waitForRuntimeReady(window, legacyUserInterface);
     }
 
     if (selectLightTheme && !legacyUserInterface) {
@@ -126,10 +131,14 @@ export async function selectLightThemePreference(window, legacyUserInterface) {
 export async function waitForInstalledStartupSurface(window, legacyUserInterface) {
   const workspacePicker = window.getByRole("button", { name: "选择工作区" });
   const runtimeReady = runtimeReadyLocator(window, legacyUserInterface);
-  await workspacePicker.or(runtimeReady).waitFor({ state: "visible", timeout: 30_000 });
+  const restoredWorkspace = window.getByLabel("Pi conversation")
+    .or(window.getByRole("button", { name: "恢复任务", exact: true }))
+    .or(window.getByRole("button", { name: "打开会话", exact: true }))
+    .or(window.getByRole("button", { name: "新建会话", exact: true }));
+  await workspacePicker.or(runtimeReady).or(restoredWorkspace)
+    .waitFor({ state: "visible", timeout: 30_000 });
   if (await workspacePicker.isVisible()) return "workspace-picker";
-  await runtimeReady.waitFor({ state: "visible", timeout: 30_000 });
-  return "runtime-ready";
+  return await runtimeReady.isVisible() ? "runtime-ready" : "workspace-restored";
 }
 
 async function waitForRuntimeReady(window, legacyUserInterface) {

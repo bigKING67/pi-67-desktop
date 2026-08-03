@@ -122,32 +122,33 @@ describe("Windows installer lifecycle contract", () => {
   });
 
   it.each([
-    { pickerVisible: true, expected: "workspace-picker" },
-    { pickerVisible: false, expected: "runtime-ready" }
-  ])("accepts $expected as an installed startup surface", async ({ pickerVisible, expected }) => {
+    { pickerVisible: true, runtimeReadyVisible: false, expected: "workspace-picker" },
+    { pickerVisible: false, runtimeReadyVisible: true, expected: "runtime-ready" },
+    { pickerVisible: false, runtimeReadyVisible: false, expected: "workspace-restored" }
+  ])("accepts $expected as an installed startup surface", async ({ pickerVisible, runtimeReadyVisible, expected }) => {
     const actions = [];
-    const runtimeReady = {
-      waitFor: async (options) => actions.push(`ready:${options.state}`)
-    };
     const combined = {
+      or: () => combined,
       waitFor: async (options) => actions.push(`combined:${options.state}`)
+    };
+    const runtimeReady = {
+      isVisible: async () => runtimeReadyVisible,
+      or: () => combined
     };
     const workspacePicker = {
       isVisible: async () => pickerVisible,
-      or: (other) => {
-        expect(other).toBe(runtimeReady);
-        return combined;
-      }
+      or: () => combined
+    };
+    const restoredWorkspace = {
+      or: () => restoredWorkspace
     };
     const window = {
-      getByLabel: () => runtimeReady,
-      getByRole: () => workspacePicker
+      getByLabel: (name) => name === "Pi conversation" ? restoredWorkspace : runtimeReady,
+      getByRole: (_role, options) => options.name === "选择工作区" ? workspacePicker : restoredWorkspace
     };
 
     await expect(waitForInstalledStartupSurface(window, false)).resolves.toBe(expected);
-    expect(actions).toEqual(pickerVisible
-      ? ["combined:visible"]
-      : ["combined:visible", "ready:visible"]);
+    expect(actions).toEqual(["combined:visible"]);
   });
 
   it("waits for a path to become present or absent", async () => {
