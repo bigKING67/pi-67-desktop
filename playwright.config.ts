@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const rendererPort = process.env.PI67_E2E_RENDERER_PORT ?? "5173";
+const rendererPortWasExplicit = process.env.PI67_E2E_RENDERER_PORT !== undefined;
 if (!/^\d{1,5}$/u.test(rendererPort) || Number(rendererPort) < 1 || Number(rendererPort) > 65_535) {
   throw new Error("PI67_E2E_RENDERER_PORT must be a valid TCP port.");
 }
@@ -33,7 +34,7 @@ export default defineConfig({
   webServer: {
     command: `corepack pnpm --filter @pi67/renderer exec vite --host 127.0.0.1 --port ${rendererPort} --strictPort`,
     url: rendererUrl,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !rendererPortWasExplicit,
     timeout: 30_000
   }
 });

@@ -339,8 +339,10 @@ function PromptSettings() {
 function UpdateSettings() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const update = useUpdateStore((state) => state.update);
+  const initialized = useUpdateStore((state) => state.initialized);
   const [checking, setChecking] = useState(false);
   const handleUpdateAction = async (): Promise<void> => {
+    if (!initialized) return;
     if (update.phase === "available" || update.phase === "disabled") {
       setUpdateDialogOpen(true);
       return;
@@ -360,18 +362,20 @@ function UpdateSettings() {
           leading={<DownloadCloud aria-hidden="true" size={17} />}
           title="自动检查更新"
           description="打包版启动 10 秒后自动检查；持续运行时每天最多检查一次，不会自动下载或安装。"
-          value={update.automaticChecks ? "已开启" : "仅打包版可用"}
+          value={initialized ? (update.automaticChecks ? "已开启" : "仅打包版可用") : "正在读取…"}
         />
         <SettingsRow
           title="更新状态"
-          description={updateSettingsDescription(update)}
-          value={updateSettingsStatus(update)}
+          description={updateSettingsDescription(update, initialized)}
+          value={updateSettingsStatus(update, initialized)}
           actions={<Button
             className="secondary-button"
-            isDisabled={checking}
+            isDisabled={checking || !initialized}
             onPress={() => void handleUpdateAction()}
           >
-            {checking
+            {!initialized
+              ? "正在读取…"
+              : checking
               ? "正在检查…"
               : update.phase === "available"
                 ? "查看更新"
@@ -391,7 +395,8 @@ function UpdateSettings() {
   );
 }
 
-function updateSettingsStatus(update: UpdateState): string {
+function updateSettingsStatus(update: UpdateState, initialized: boolean): string {
+  if (!initialized) return "正在读取…";
   if (update.phase === "available") return `新版本 ${update.version}`;
   if (update.phase === "current") return "已是最新版本";
   if (update.phase === "error") return "检查未完成";
@@ -399,7 +404,8 @@ function updateSettingsStatus(update: UpdateState): string {
   return "等待首次检查";
 }
 
-function updateSettingsDescription(update: UpdateState): string {
+function updateSettingsDescription(update: UpdateState, initialized: boolean): string {
+  if (!initialized) return "正在读取当前版本和更新设置。";
   const checkedAt = update.checkedAt
     ? `上次检查：${new Intl.DateTimeFormat("zh-CN", {
         month: "2-digit",

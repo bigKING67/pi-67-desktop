@@ -71,6 +71,46 @@ test("keeps Network and MCP drafts in memory until the user saves or discards th
   expect((await settingsActionState(page)).mcpSaves).toBe(0);
 });
 
+test("keeps update actions disabled until the Main update state is ready", async ({ page }) => {
+  await installMockDesktopBridge(page, { deferInitialUpdateState: true });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("π 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: "更新与诊断", exact: true }).click();
+  const automaticRow = settings.getByText("自动检查更新", { exact: true }).locator("xpath=../..");
+  const statusRow = settings.getByText("更新状态", { exact: true }).locator("xpath=../..");
+  await expect(automaticRow).toContainText("正在读取…");
+  await expect(statusRow).toContainText("正在读取当前版本和更新设置。");
+  await expect(statusRow).toContainText("正在读取…");
+  await expect(settings.getByRole("button", { name: "正在读取…", exact: true })).toBeDisabled();
+  expect(await updateTestState(page)).toMatchObject({ checks: 0 });
+
+  await finishInitialUpdateRead(page);
+  await expect(automaticRow).toContainText("已开启");
+  await expect(statusRow).toContainText("等待首次检查");
+  await expect(settings.getByRole("button", { name: "立即检查", exact: true })).toBeEnabled();
+
+  await page.reload();
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: "帮助与设置" }).click();
+  await page.getByRole("menu", { name: "帮助与设置" })
+    .getByRole("menuitem", { name: "检查更新", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Pi-67 更新" });
+  await expect(dialog.getByText("正在读取更新状态", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("正在确认当前版本和自动检查设置。", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "检查更新", exact: true })).toHaveCount(0);
+  expect(await updateTestState(page)).toMatchObject({ checks: 0 });
+
+  await finishInitialUpdateRead(page);
+  await expect(dialog.getByText("正在等待自动检查", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "检查更新", exact: true })).toBeEnabled();
+});
+
 async function settingsActionState(page: import("@playwright/test").Page) {
   return page.evaluate(() => {
     const state = (window as typeof window & {
@@ -91,5 +131,22 @@ async function settingsActionState(page: import("@playwright/test").Page) {
       mcpClears: state.mcpClears,
       platformInfoCalls: state.platformInfoCalls
     };
+  });
+}
+
+async function finishInitialUpdateRead(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as typeof window & {
+      __pi67UpdateTest: { finishInitialRead(): void };
+    }).__pi67UpdateTest.finishInitialRead();
+  });
+}
+
+async function updateTestState(page: import("@playwright/test").Page) {
+  return page.evaluate(() => {
+    const state = (window as typeof window & {
+      __pi67UpdateTest: { checks: number; openedUrls: string[] };
+    }).__pi67UpdateTest;
+    return { checks: state.checks, openedUrls: [...state.openedUrls] };
   });
 }

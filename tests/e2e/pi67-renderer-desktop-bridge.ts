@@ -37,6 +37,7 @@ export interface MockDesktopBridgeOptions {
     workspaceId?: string;
   };
   capabilityInitializingCalls?: number;
+  deferInitialUpdateState?: boolean;
 }
 
 export const DEFAULT_MOCK_WORKSPACE: MockWorkspaceDescriptor = {
@@ -67,6 +68,7 @@ export async function installMockDesktopBridge(
     selectedSurface: options.selectedSurface,
     settings: options.settings ?? { section: "general" as const, scope: "global" as const },
     capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0,
+    deferInitialUpdateState: options.deferInitialUpdateState ?? false,
     capabilitySnapshot: createMockDesktopCapabilitySnapshot(),
     packageNetworkSnapshot: createMockPackageNetworkSnapshot(),
     teamMcpStatus: {
@@ -101,10 +103,18 @@ export async function installMockDesktopBridge(
       automaticChecks: true
     };
     const updateListeners = new Set<(state: unknown) => void>();
+    let resolveInitialUpdateState: (() => void) | undefined;
+    const initialUpdateStateGate = bridgeFixture.deferInitialUpdateState
+      ? new Promise<void>((resolve) => { resolveInitialUpdateState = resolve; })
+      : Promise.resolve();
     const updateTest = {
       checks: 0,
       openedUrls: [] as string[],
       allowOpen: false,
+      finishInitialRead() {
+        resolveInitialUpdateState?.();
+        resolveInitialUpdateState = undefined;
+      },
       emit(state: Record<string, unknown>) {
         updateState = structuredClone(state);
         for (const listener of updateListeners) listener(structuredClone(updateState));
@@ -372,7 +382,10 @@ export async function installMockDesktopBridge(
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
-          getUpdateState: async () => structuredClone(updateState),
+          getUpdateState: async () => {
+            await initialUpdateStateGate;
+            return structuredClone(updateState);
+          },
           checkForUpdates: async () => {
             updateTest.checks += 1;
             updateState = {

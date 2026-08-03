@@ -11,14 +11,15 @@ export function UpdateDialog() {
   const open = useShellStore((state) => state.updateDialogOpen);
   const setOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const update = useUpdateStore((state) => state.update);
+  const initialized = useUpdateStore((state) => state.initialized);
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string>();
 
   if (!open) return null;
-  const action = updateAction(update);
+  const action = initialized ? updateAction(update) : undefined;
 
   const runAction = async () => {
-    if (!action || pending) return;
+    if (!initialized || !action || pending) return;
     setPending(true);
     setActionError(undefined);
     try {
@@ -44,7 +45,7 @@ export function UpdateDialog() {
           <div className="diagnostic-dialog-content">
             <span className="dialog-eyebrow">Unsigned Preview</span>
             <Heading slot="title">Pi-67 更新</Heading>
-            <UpdateSummary update={update} pending={pending} action={action} />
+            <UpdateSummary update={update} initialized={initialized} pending={pending} action={action} />
             <div className="update-network-note">
               自动检查只请求 Pi-67 的公开 GitHub Release 元数据，不会发送工作区、会话、模型服务或密钥信息，也不会自动下载或安装。
             </div>
@@ -71,12 +72,13 @@ export function UpdateDialog() {
   );
 }
 
-function UpdateSummary({ update, pending, action }: {
+function UpdateSummary({ update, initialized, pending, action }: {
   update: UpdateState;
+  initialized: boolean;
   pending: boolean;
   action: UpdateAction | undefined;
 }) {
-  const Icon = pending
+  const Icon = !initialized || pending
     ? LoaderCircle
     : update.phase === "error"
       ? TriangleAlert
@@ -87,13 +89,22 @@ function UpdateSummary({ update, pending, action }: {
           : RefreshCw;
   return (
     <div className={`update-summary phase-${update.phase}`} role="status">
-      <Icon className={pending ? "spin" : undefined} size={18} aria-hidden="true" />
-      <div><strong>{updateTitle(update, pending, action)}</strong><span>{updateDetail(update)}</span></div>
+      <Icon className={!initialized || pending ? "spin" : undefined} size={18} aria-hidden="true" />
+      <div>
+        <strong>{updateTitle(update, initialized, pending, action)}</strong>
+        <span>{updateDetail(update, initialized)}</span>
+      </div>
     </div>
   );
 }
 
-function updateTitle(update: UpdateState, pending: boolean, action?: UpdateAction): string {
+function updateTitle(
+  update: UpdateState,
+  initialized: boolean,
+  pending: boolean,
+  action?: UpdateAction
+): string {
+  if (!initialized) return "正在读取更新状态";
   if (pending) return action === "open" ? "正在打开 GitHub 更新页" : "正在检查更新";
   if (update.phase === "available") return `发现 Pi-67 ${update.version}`;
   if (update.phase === "current") return "当前已是最新版本";
@@ -102,7 +113,8 @@ function updateTitle(update: UpdateState, pending: boolean, action?: UpdateActio
   return update.automaticChecks ? "正在等待自动检查" : "尚未检查更新";
 }
 
-function updateDetail(update: UpdateState): string {
+function updateDetail(update: UpdateState, initialized: boolean): string {
+  if (!initialized) return "正在确认当前版本和自动检查设置。";
   if (update.phase === "available") {
     const published = update.publishedAt ? `发布于 ${update.publishedAt.slice(0, 10)}。` : "";
     return `Unsigned Preview 不会自动下载或安装。${published}查看 GitHub Release，核对 SHA-256 后手动下载安装。`;
