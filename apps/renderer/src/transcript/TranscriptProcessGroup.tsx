@@ -48,10 +48,11 @@ export function TranscriptProcessGroup({
     [liveThinking, row.items, timeline]
   );
   const toolAuthorizations = useMemo(() => projectToolAuthorizations(timeline), [timeline]);
-  const stepCount = Math.max(
-    1,
-    row.items.length + supplementalTimeline.length + (supplementalThinking ? 1 : 0)
-  );
+  const supplementalTools = supplementalTimeline.filter((item) => item.kind === "tool");
+  const stepCount = row.stepCount + supplementalTimeline.length + (supplementalThinking ? 1 : 0);
+  const toolCount = row.toolCount + supplementalTools.length;
+  const failedToolCount = row.failedToolCount
+    + supplementalTools.filter((item) => item.tool.status === "failed").length;
 
   useEffect(() => {
     if (!previousRunning.current && running) setOpen(true);
@@ -80,6 +81,9 @@ export function TranscriptProcessGroup({
     : undefined;
   const statusDetail = currentBlockingDetail(operation);
   const hasBody = row.items.length > 0 || supplementalThinking !== "" || supplementalTimeline.length > 0 || statusDetail;
+  const countSummary = toolCount > 0
+    ? `${toolCount} 次工具调用${failedToolCount > 0 ? ` · ${failedToolCount} 次失败` : ""}`
+    : `${Math.max(1, stepCount)} 个步骤`;
 
   return (
     <details
@@ -101,7 +105,7 @@ export function TranscriptProcessGroup({
         <span className={styles.summaryCopy} aria-live={running ? "polite" : undefined}>
           <strong>{label}</strong>
           <small>
-            {!running ? " · " : ""}{stepCount} 个步骤{duration ? ` · ${duration}` : ""}
+            {!running ? " · " : ""}{countSummary}{duration ? ` · ${duration}` : ""}
           </small>
         </span>
         <ChevronRight className={styles.chevron} size={14} aria-hidden="true" />
@@ -171,6 +175,7 @@ function ProcessItem({
     return (
       <li className={styles.step} data-process-step="narration">
         <div className={styles.narration}>
+          <span>进度</span>
           {typeof item.content === "string" ? (
             <TranscriptMarkdownView mode="settled">{item.content}</TranscriptMarkdownView>
           ) : (

@@ -30,6 +30,7 @@ describe("projectTranscriptRows", () => {
       key: "assistant-tool:group",
       stepCount: 1,
       toolCount: 1,
+      failedToolCount: 0,
       failed: false,
       hasFinalAnswer: true,
       items: [{
@@ -73,7 +74,13 @@ describe("projectTranscriptRows", () => {
       }
     ]);
 
-    expect(rows.at(-1)).toMatchObject({ kind: "process-group", failed: true, stepCount: 1 });
+    expect(rows.at(-1)).toMatchObject({
+      kind: "process-group",
+      failed: true,
+      failedToolCount: 1,
+      stepCount: 1,
+      toolCount: 1
+    });
   });
 
   it("separates visible reasoning from the final Assistant answer", () => {
@@ -131,6 +138,7 @@ describe("projectTranscriptRows", () => {
       kind: "process-group",
       stepCount: 3,
       toolCount: 1,
+      failedToolCount: 0,
       items: [
         { kind: "reasoning", text: "先读取入口。" },
         {
@@ -155,12 +163,40 @@ describe("projectTranscriptRows", () => {
       kind: "process-group",
       stepCount: 1,
       toolCount: 1,
+      failedToolCount: 0,
       hasFinalAnswer: false,
       items: [expect.objectContaining({
         kind: "orphan-tool-result",
         result: expect.objectContaining({ id: "orphan-result" })
       })]
     })]);
+  });
+
+  it("keeps narration as an ordered process step instead of merging it into reasoning", () => {
+    const rows = projectTranscriptRows([
+      message("assistant-process", "assistant", [
+        { type: "thinking", text: "先搜索资料。" },
+        { type: "text", text: "已经找到线索，正在获取内容。" },
+        {
+          type: "tool-call",
+          id: "search-content",
+          name: "get_search_content",
+          status: "completed"
+        }
+      ])
+    ]);
+
+    expect(rows[0]).toMatchObject({
+      kind: "process-group",
+      stepCount: 3,
+      toolCount: 1,
+      failedToolCount: 0,
+      items: [
+        { kind: "reasoning", text: "先搜索资料。" },
+        { kind: "narration", content: "已经找到线索，正在获取内容。" },
+        { kind: "tool", call: { id: "search-content" } }
+      ]
+    });
   });
 });
 

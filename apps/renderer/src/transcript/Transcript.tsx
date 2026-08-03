@@ -443,6 +443,7 @@ function liveProcessRow(
     items: [],
     stepCount: 1,
     toolCount: 0,
+    failedToolCount: 0,
     failed: interrupted,
     hasFinalAnswer
   };

@@ -12,7 +12,7 @@ interface ToolPresentationDetail {
 }
 
 export interface ToolPresentation {
-  presenterId: "extension-adapter" | "bash" | "read-search" | "edit-write" | "generic";
+  presenterId: "extension-adapter" | "bash" | "web-access" | "read-search" | "edit-write" | "generic";
   kind: ToolPresentationKind;
   title: string;
   compact: string;

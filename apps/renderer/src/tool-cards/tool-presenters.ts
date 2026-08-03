@@ -6,11 +6,13 @@ import {
   editWriteToolPresenter,
   readSearchToolPresenter
 } from "./presenters/workspace-tool-presenters.js";
+import { webAccessToolPresenter } from "./presenters/web-access-tool-presenter.js";
 import type { ToolPresentation, ToolPresenter } from "./tool-presentation.js";
 
 const TOOL_PRESENTERS: readonly ToolPresenter[] = [
   extensionToolPresenter,
   commandToolPresenter,
+  webAccessToolPresenter,
   readSearchToolPresenter,
   editWriteToolPresenter,
   genericToolPresenter

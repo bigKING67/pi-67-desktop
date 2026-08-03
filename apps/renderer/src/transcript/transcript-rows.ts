@@ -38,6 +38,7 @@ export type TranscriptRow =
     items: TranscriptProcessItem[];
     stepCount: number;
     toolCount: number;
+    failedToolCount: number;
     failed: boolean;
     hasFinalAnswer: boolean;
   };
@@ -55,6 +56,7 @@ export function projectTranscriptRows(messages: readonly SessionMessageView[]): 
       items,
       stepCount: Math.max(1, items.length),
       toolCount: items.filter((item) => item.kind === "tool" || item.kind === "orphan-tool-result").length,
+      failedToolCount: items.filter(processItemFailed).length,
       failed: items.some(processItemFailed),
       hasFinalAnswer: followedBy?.role === "assistant" && hasVisibleAnswer(followedBy)
     });

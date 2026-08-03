@@ -99,7 +99,6 @@ export function ToolCard({
         <div className={styles.identity}>
           <span className={styles.titleRow}>
             <strong>{presentation.title}</strong>
-            <code>{toolName}</code>
           </span>
           <span className={styles.compact}>{presentation.compact}</span>
           {authorization ? (
@@ -121,16 +120,18 @@ export function ToolCard({
 
       {open ? (
         <div className={styles.detailBody}>
-          {presentation.details.length > 0 ? (
-            <dl className={styles.detailList}>
-              {presentation.details.map((detail) => (
-                <div key={detail.label}>
-                  <dt>{detail.label}</dt>
-                  <dd><code>{detail.value}</code></dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
+          <dl className={styles.detailList}>
+            <div>
+              <dt>精确工具</dt>
+              <dd><code>{toolName}</code></dd>
+            </div>
+            {presentation.details.map((detail, index) => (
+              <div key={`${detail.label}:${index}`}>
+                <dt>{detail.label}</dt>
+                <dd><code>{detail.value}</code></dd>
+              </div>
+            ))}
+          </dl>
 
           {presentation.summary ? (
             <div className={styles.rawSummary}>

@@ -91,6 +91,63 @@ describe("tool presenter registry", () => {
     expect(edit.limitations.join(" ")).toContain("Diff");
   });
 
+  it("projects Pi Web Access calls as semantic summaries without compact JSON", () => {
+    const search = presentToolCall(tool({
+      name: "web_search",
+      summary: JSON.stringify({ queries: ["桐庐今天新闻", "桐庐本周新闻"] })
+    }));
+    const content = presentToolCall(tool({
+      name: "get_search_content",
+      summary: JSON.stringify({ responseId: "response-123", query: "桐庐新闻 2026年7月" })
+    }));
+    const fetch = presentToolCall(tool({
+      name: "fetch_content",
+      summary: JSON.stringify({ urls: ["https://example.test/a", "https://example.test/b"] })
+    }));
+    const source = presentToolCall(tool({
+      name: "source_check",
+      summary: JSON.stringify({ claim: "桐庐本周发布了新政策", query: "ignored fallback" })
+    }));
+
+    expect(search).toMatchObject({
+      presenterId: "web-access",
+      kind: "read",
+      title: "搜索内容",
+      compact: "桐庐今天新闻 · 等 2 项"
+    });
+    expect(content).toMatchObject({
+      presenterId: "web-access",
+      title: "获取搜索内容",
+      compact: "桐庐新闻 2026年7月"
+    });
+    expect(content.details).toContainEqual({ label: "响应 ID", value: "response-123" });
+    expect(content.compact).not.toContain("response-123");
+    expect(fetch).toMatchObject({ title: "读取网页", compact: "https://example.test/a · 等 2 项" });
+    expect(source).toMatchObject({ title: "核对来源", compact: "桐庐本周发布了新政策" });
+  });
+
+  it("keeps structured fallback arguments out of compact generic and Extension rows", () => {
+    const generic = presentToolCall(tool({
+      name: "extension.custom",
+      summary: JSON.stringify({ token: "redacted", target: "artifact" })
+    }));
+    const adapted = presentToolCall(tool({
+      name: "extension.adapted",
+      summary: JSON.stringify({ target: "artifact" }),
+      adapter: {
+        adapterId: "artifact-adapter",
+        package: "@verified/artifact",
+        presentation: "generic",
+        label: "处理制品"
+      }
+    }));
+
+    expect(generic.compact).toBe("已提交参数");
+    expect(generic.summary).toContain("artifact");
+    expect(adapted.compact).toBe("已提交参数");
+    expect(adapted.summary).toContain("artifact");
+  });
+
   it("bounds displayed and copied text and strips control characters", () => {
     const presentation = presentToolCall(tool({ name: "extension-tool", summary: `line\u0000${"x".repeat(10_000)}` }));
     const copied = createToolCopyText(tool({ name: "extension-tool", summary: "ignored" }), presentation);

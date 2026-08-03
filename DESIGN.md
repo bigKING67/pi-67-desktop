@@ -281,11 +281,14 @@ loading error where the operation can produce those states
   unsupported content. It remains a visible model-response failure with a retry,
   model-switch, and Provider-configuration recovery path; aborted empty turns keep
   their distinct stopped state.
-- Consecutive reasoning Assistant parts, Tool Calls, and Tool Results form one
-  `执行过程 · N 个步骤` disclosure in the Transcript. Within it, reasoning is continuous
-  secondary prose and each Tool Call is paired with its correlated Tool Result as
-  one compact logical step; the call and result are never rendered as duplicate peer
-  cards. An unmatched legacy Tool Result remains one explicitly inspectable
+- Consecutive reasoning Assistant parts, progress narration, Tool Calls, and Tool
+  Results form one execution disclosure in the Transcript. A process with Tools
+  summarizes as `执行过程 · N 次工具调用 · duration`; a process without Tools falls
+  back to `执行过程 · N 个步骤 · duration`, and a failed Tool count is appended when
+  present. Within it, reasoning uses the low-emphasis `分析` label, narration uses
+  the parallel `进度` label, and each Tool Call is paired with its correlated Tool
+  Result as one compact logical step; the call and result are never rendered as
+  duplicate peer cards. An unmatched legacy Tool Result remains one explicitly inspectable
   compatibility step. This includes visible reasoning carried beside final text in
   one Assistant record: the reasoning belongs to the process while the text remains
   the final answer. The current process is expanded while work is running and
@@ -296,6 +299,15 @@ loading error where the operation can produce those states
   process data. The final Assistant answer remains an ordinary editorial Markdown
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
+- A recognized Tool row leads with a human semantic action and one bounded target
+  summary. Its exact Tool identifier, response identity, and bounded redacted
+  argument projection belong inside the expanded detail rather than competing on
+  the default row. Dedicated presenters derive summaries from allowlisted fields;
+  structured arguments from an unknown Tool collapse to `已提交参数` instead of raw
+  JSON, while the unknown Tool name remains visible as its only reliable identity.
+  Tool titles use 12px, semantic summaries 11px, and process metadata no smaller
+  than 10px. Desktop widths keep one truncated row; narrow widths use one deliberate
+  second metadata row rather than arbitrary wrapping or document overflow.
 - An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
   `AUTO · 已配置来源`, `AUTO · 只读`, `AUTO · 工作区命令`, or
   `AUTO · Workspace 内写入`. The reason
@@ -917,8 +929,8 @@ loading error where the operation can produce those states
   steps stay visible; the user may still collapse them. As Pi JSONL messages arrive,
   their persisted reasoning and Tool identities replace matching transient Host
   steps without duplication. Completion with a visible final answer automatically
-  collapses to `执行过程 · N 个步骤 · duration`, and reopening restores the recorded
-  steps. Completion without a final answer, failure, cancellation, loss, quiet,
+  collapses to the Tool-count-first execution summary above, and reopening restores
+  the recorded steps. Completion without a final answer, failure, cancellation, loss, quiet,
   stalled, and recovery remain expanded, visually distinct, and actionable. A projection resync
   may restart the disposable timeline from the one current Host activity; it never
   fabricates missing earlier steps or competes with Pi JSONL as conversation truth.

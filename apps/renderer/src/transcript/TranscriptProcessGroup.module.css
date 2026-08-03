@@ -132,12 +132,13 @@
   padding: 1px 0 3px;
 }
 
-.reasoning > span {
+.reasoning > span,
+.narration > span {
   display: block;
   margin-bottom: 3px;
   color: var(--text-tertiary);
   font-family: var(--font-code);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 620;
   letter-spacing: 0.04em;
   text-transform: uppercase;

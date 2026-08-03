@@ -31,6 +31,11 @@ export function parseToolSummaryFields(
   }
 }
 
+export function isStructuredToolSummary(summary: string | undefined): boolean {
+  const normalized = summary?.trimStart();
+  return normalized?.startsWith("{") === true || normalized?.startsWith("[") === true;
+}
+
 export function readToolSummaryTextField(
   fields: Record<string, unknown> | undefined,
   keys: readonly string[]
@@ -43,6 +48,24 @@ export function readToolSummaryTextField(
     }
   }
   return undefined;
+}
+
+export function readToolSummaryTextArrayField(
+  fields: Record<string, unknown> | undefined,
+  keys: readonly string[]
+): string[] {
+  if (!fields) return [];
+  for (const key of keys) {
+    const value = fields[key];
+    if (!Array.isArray(value)) continue;
+    const items = value
+      .slice(0, 16)
+      .flatMap((item) => typeof item === "string" && item.trim()
+        ? [boundToolText(item.trim(), DETAIL_TEXT_LIMIT)]
+        : []);
+    if (items.length > 0) return items;
+  }
+  return [];
 }
 
 export function compactToolDetails<T extends { label: string; value: string }>(

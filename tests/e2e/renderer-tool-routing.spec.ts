@@ -85,7 +85,7 @@ test("collapses a recovered Tool failure after a final answer", async ({ page })
 
   const process = page.getByTestId("transcript-process-group");
   await expect(process).toBeVisible();
-  await expect(process).toContainText("执行过程有失败");
+  await expect(process.locator(":scope > summary")).toContainText("执行过程有失败 · 1 次工具调用 · 1 次失败");
   await expect(process).not.toHaveAttribute("open", "");
   await expect(page.getByText("已通过其他只读来源完成回答。", { exact: true })).toBeVisible();
   await expect(page.getByText("结果引用已过期。", { exact: true })).not.toBeVisible();
@@ -190,11 +190,16 @@ test("keeps the settled process collapsed and renders Tool output as a bounded l
   await process.locator(":scope > summary").click();
   const tool = page.locator('[data-tool-status="completed"]');
   await expect(tool).toBeVisible();
-  await expect(tool).toContainText("web_search");
+  await expect(tool.locator(":scope > summary")).toContainText("搜索内容");
+  await expect(tool.locator(":scope > summary")).toContainText("杭州天气");
+  await expect(tool.locator(":scope > summary")).not.toContainText("web_search");
+  await expect(tool.locator(":scope > summary")).not.toContainText("{\"query\"");
   await expect(tool).not.toHaveAttribute("open", "");
   await expect(page.getByText(rawResult, { exact: true })).not.toBeVisible();
   await tool.locator(":scope > summary").click();
   await expect(tool).toHaveAttribute("open", "");
+  await expect(tool.getByText("精确工具", { exact: true })).toBeVisible();
+  await expect(tool.getByText("web_search", { exact: true })).toBeVisible();
   const log = tool.locator("pre").last();
   await expect(log).toBeVisible();
   await expect(log).toHaveCSS("font-family", /monospace|Mono/u);
@@ -215,6 +220,7 @@ test("expands the current execution process and collapses it when the operation 
       role: "assistant",
       parts: [
         { type: "thinking", text: "正在定位调用链。" },
+        { type: "text", text: "已经找到入口，正在读取文件。" },
         {
           type: "tool-call",
           id: "read-current-process",
@@ -259,6 +265,8 @@ test("expands the current execution process and collapses it when the operation 
   await expect(process).toHaveAttribute("open", "");
   await expect(process).toContainText("正在继续处理");
   await expect(page.getByText("正在定位调用链。", { exact: true })).toBeVisible();
+  await expect(process.getByText("进度", { exact: true })).toBeVisible();
+  await expect(page.getByText("已经找到入口，正在读取文件。", { exact: true })).toBeVisible();
   await expect(page.getByText("入口已经确认。", { exact: true })).toBeVisible();
   const currentTool = page.locator('[data-tool-status="completed"]');
   await expect(currentTool).toBeVisible();
@@ -272,7 +280,7 @@ test("expands the current execution process and collapses it when the operation 
   }, { operationId });
 
   await expect(process).not.toHaveAttribute("open", "");
-  await expect(process).toContainText("执行过程");
+  await expect(process.locator(":scope > summary")).toContainText("执行过程 · 1 次工具调用");
   await expect(page.getByText("export const ready = true;", { exact: true })).not.toBeVisible();
 });
 

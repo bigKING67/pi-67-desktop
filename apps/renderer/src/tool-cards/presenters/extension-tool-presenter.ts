@@ -2,6 +2,7 @@ import { getToolDisplayName, type ToolPresenter } from "../tool-presentation.js"
 import {
   compactToolDetails,
   compactToolText,
+  isStructuredToolSummary,
   normalizeToolSummary
 } from "../tool-presentation-boundaries.js";
 import { genericToolPresenter } from "./generic-tool-presenter.js";
@@ -14,11 +15,15 @@ export const extensionToolPresenter: ToolPresenter = {
     const adapter = tool.adapter;
     if (!adapter) return genericToolPresenter.present(tool, change);
     const summary = normalizeToolSummary(tool.summary);
+    const structured = isStructuredToolSummary(summary);
     return {
       presenterId: "extension-adapter",
       kind: adapter.presentation,
       title: adapter.label ?? getToolDisplayName(tool.name),
-      compact: compactToolText(change?.path ?? summary, `由 ${adapter.package} 提供`),
+      compact: compactToolText(
+        change?.path ?? (structured ? undefined : summary),
+        summary ? "已提交参数" : `由 ${adapter.package} 提供`
+      ),
       details: compactToolDetails([
         { label: "Extension", value: adapter.package },
         { label: "Adapter", value: adapter.adapterId },
