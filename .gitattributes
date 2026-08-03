@@ -1,0 +1,2 @@
+# Keep text fixtures, workflows, and hash-locked source assets deterministic across release runners.
+* text=auto eol=lf

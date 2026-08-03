@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TEAM_MCP_SERVER,
@@ -82,7 +83,7 @@ describe("team-mcp helpers", () => {
     expect(resolveTeamMcpResourcesRoot({
       packaged: true,
       resourcesPath: "/App/Resources"
-    })).toBe("/App/Resources/team-mcp");
+    })).toBe(join("/App/Resources", "team-mcp"));
     expect(resolveTeamMcpResourcesRoot({
       packaged: false,
       repositoryRoot: "/repo"

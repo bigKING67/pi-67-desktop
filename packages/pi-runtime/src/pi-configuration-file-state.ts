@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { watch, type FSWatcher } from "node:fs";
+import { realpathSync, watch, type FSWatcher } from "node:fs";
 import { readFile, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { SettingsManager as PiSettingsManager } from "@earendil-works/pi-coding-agent";
@@ -227,7 +227,8 @@ async function readConfigurationPath(
 
 function createDirectoryWatcher(path: string, onDirty: () => void): FSWatcher | undefined {
   try {
-    const watcher = watch(path, { persistent: false }, onDirty);
+    // Native canonical paths avoid libuv short-path/long-path mismatches on Windows.
+    const watcher = watch(realpathSync.native(path), { persistent: false }, onDirty);
     watcher.on("error", () => undefined);
     return watcher;
   } catch {

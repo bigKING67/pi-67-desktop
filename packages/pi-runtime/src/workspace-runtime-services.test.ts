@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   type AgentSession,
   DefaultPackageManager,
@@ -43,6 +43,8 @@ describe("Pi Workspace runtime services", () => {
       projectTrusted: true,
       settingsManager
     });
+    expect(workspaceServices.cwd).toBe(resolve(cwd));
+    expect(workspaceServices.agentDir).toBe(resolve(agentDir));
     const runtimeCredentialOverrides = createRuntimeCredentialOverrideStore();
     const runtimeA = new PiSdkRuntime({ workspaceServices, runtimeCredentialOverrides });
     const runtimeB = new PiSdkRuntime({ workspaceServices, runtimeCredentialOverrides });

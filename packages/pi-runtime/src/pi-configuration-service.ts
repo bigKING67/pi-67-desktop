@@ -38,6 +38,7 @@ import {
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
 import { refreshPiConfigurationProjection } from "./pi-configuration-projection.js";
+import { normalizeSessionCatalogPathIdentity as workspaceIdentity } from "./session-path-identity.js";
 
 const FALLBACK_POLL_MS = 2_000;
 const WATCH_DEBOUNCE_MS = 200;
@@ -98,7 +99,7 @@ export class PiConfigurationService {
   registerWorkspace(options: RegisterPiConfigurationWorkspaceOptions): () => void {
     this.assertActive();
     const cwd = resolve(options.cwd);
-    const existing = this.workspaces.get(cwd);
+    const existing = this.workspaces.get(workspaceIdentity(cwd));
     if (existing) {
       existing.registrations += 1;
       existing.settingsManager = options.settingsManager;
@@ -113,7 +114,7 @@ export class PiConfigurationService {
       listeners: new Set(),
       runtimes: new Set()
     };
-    this.workspaces.set(cwd, state);
+    this.workspaces.set(workspaceIdentity(cwd), state);
     this.watcher.start();
     this.watcher.schedule();
     return () => this.unregisterWorkspace(cwd);
@@ -419,16 +420,16 @@ export class PiConfigurationService {
   }
 
   private unregisterWorkspace(cwd: string): void {
-    const state = this.workspaces.get(cwd);
+    const state = this.workspaces.get(workspaceIdentity(cwd));
     if (!state) return;
     state.registrations -= 1;
     if (state.registrations > 0) return;
     state.projectWatcher?.close();
-    this.workspaces.delete(cwd);
+    this.workspaces.delete(workspaceIdentity(cwd));
   }
 
   private requireWorkspace(cwd: string): WorkspaceConfigurationState {
-    const state = this.workspaces.get(resolve(cwd));
+    const state = this.workspaces.get(workspaceIdentity(cwd));
     if (state) return state;
     throw new RuntimeError("RUNTIME_NOT_READY", "Pi configuration is not registered for this Workspace.");
   }

@@ -82,7 +82,8 @@ export class WorkspaceContextRegistry {
     workspaceId: string,
     options: RegisterWorkspaceContextOptions
   ): WorkspaceContextRecord {
-    const canonicalCwd = canonicalizeWorkspaceCwd(options.cwd);
+    const cwd = canonicalizeWorkspaceCwd(options.cwd);
+    const canonicalCwd = workspaceCwdIdentity(cwd);
     const existing = this.records.get(workspaceId);
     if (existing) {
       if (existing.canonicalCwd !== canonicalCwd) {
@@ -92,7 +93,7 @@ export class WorkspaceContextRegistry {
           false
         );
       }
-      existing.workspaceServices.assertCompatible(canonicalCwd, options.agentDir);
+      existing.workspaceServices.assertCompatible(cwd, options.agentDir);
       this.requireSessionCatalogOwner(options);
       existing.workspaceServices.setProjectTrusted(options.trust === "trusted");
       existing.initialization = initializationFrom(options, existing.cwd, existing.agentDir);
@@ -110,7 +111,7 @@ export class WorkspaceContextRegistry {
     const sessionCatalogOwner = this.requireSessionCatalogOwner(options);
     const configurationService = this.configurationServices.acquire(options.agentDir);
     const workspaceServices = this.createServices({
-      cwd: canonicalCwd,
+      cwd,
       agentDir: options.agentDir,
       configurationService,
       sessionCatalogOwner,
@@ -174,7 +175,7 @@ export class WorkspaceContextRegistry {
   }
 
   workspaceIdForCwd(cwd: string): string | undefined {
-    return this.workspaceIdsByCanonicalCwd.get(canonicalizeWorkspaceCwd(cwd));
+    return this.workspaceIdsByCanonicalCwd.get(workspaceCwdIdentity(canonicalizeWorkspaceCwd(cwd)));
   }
 
   queryCatalog(workspaceId: string, query: SessionCatalogQuery): Promise<SessionCatalogPage> {
@@ -311,5 +312,9 @@ function canonicalizeWorkspaceCwd(cwd: string): string {
   } catch {
     // A validated directory may disappear between Main validation and Host registration.
   }
-  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
+  return canonical;
+}
+
+function workspaceCwdIdentity(cwd: string): string {
+  return process.platform === "win32" ? cwd.toLowerCase() : cwd;
 }

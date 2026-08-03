@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
@@ -35,6 +36,7 @@ class BootstrapTaskPort implements ProtocolPort {
 
 describe("AgentHostServer multi-Task session bootstrap", () => {
   it("lazily initializes an independent Runtime for a second Task", async () => {
+    const workspaceCwd = resolve("/tmp/pi67-multi-task-workspace");
     const runtimeA = taskRuntime("session-a", "session-a-created");
     const runtimeB = taskRuntime("session-b", "session-b-created");
     const runtimes = [runtimeA.runtime, runtimeB.runtime];
@@ -56,7 +58,7 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
     await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
 
     const openWorkspace = commandEnvelope("workspace.open", {
-      cwd: "/tmp/pi67-multi-task-workspace",
+      cwd: workspaceCwd,
       trust: "trusted",
       approvalMode: "guided"
     }, 12);
@@ -73,7 +75,7 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
 
     expect(runtimeA.initialize).toHaveBeenCalledOnce();
     expect(runtimeB.initialize).toHaveBeenCalledWith({
-      cwd: "/tmp/pi67-multi-task-workspace",
+      cwd: workspaceCwd,
       agentDir: expect.any(String),
       trust: "trusted",
       approvalMode: "guided"

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
   DefaultPackageManager,
   SettingsManager
@@ -42,8 +43,10 @@ export interface PiWorkspaceRuntimeServices {
 export function createPiWorkspaceRuntimeServices(
   options: CreatePiWorkspaceRuntimeServicesOptions
 ): PiWorkspaceRuntimeServices {
-  const cwd = normalizeSessionCatalogPathIdentity(options.cwd);
-  const agentDir = normalizeSessionCatalogPathIdentity(options.agentDir);
+  const cwd = resolve(options.cwd);
+  const agentDir = resolve(options.agentDir);
+  const cwdIdentity = normalizeSessionCatalogPathIdentity(cwd);
+  const agentDirIdentity = normalizeSessionCatalogPathIdentity(agentDir);
   const settingsManager = options.settingsManager ?? SettingsManager.create(cwd, agentDir, {
     projectTrusted: options.projectTrusted ?? false
   });
@@ -82,8 +85,8 @@ export function createPiWorkspaceRuntimeServices(
     sessionCatalog,
     assertCompatible(candidateCwd, candidateAgentDir) {
       if (
-        normalizeSessionCatalogPathIdentity(candidateCwd) !== cwd
-        || normalizeSessionCatalogPathIdentity(candidateAgentDir) !== agentDir
+        normalizeSessionCatalogPathIdentity(candidateCwd) !== cwdIdentity
+        || normalizeSessionCatalogPathIdentity(candidateAgentDir) !== agentDirIdentity
       ) {
         throw new RuntimeError(
           "INVALID_PAYLOAD",
