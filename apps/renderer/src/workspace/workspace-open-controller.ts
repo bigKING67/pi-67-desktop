@@ -76,6 +76,7 @@ export async function openRendererWorkspaceDescriptor(
   });
   let target: RendererSessionTransitionTarget | undefined;
   try {
+    await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
     await ensureAgentConnection();
     const transitionTarget = requireRendererSessionTransition(get());
     target = transitionTarget;

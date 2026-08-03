@@ -24,6 +24,7 @@ export async function launchInstalledApplication({
 }) {
   let application;
   let childPid;
+  let restoredActivation;
   try {
     const startedAt = performance.now();
     application = await launchPackagedApplication({
@@ -60,8 +61,15 @@ export async function launchInstalledApplication({
       await window.getByRole("button", { name: "选择工作区" }).click();
       await waitForRuntimeReady(window, legacyUserInterface);
     } else if (startupSurface === "workspace-restored") {
-      await activateRestoredWorkspace(window);
-      await waitForRuntimeReady(window, legacyUserInterface);
+      restoredActivation = await activateRestoredWorkspace(window);
+      try {
+        await waitForRuntimeReady(window, legacyUserInterface);
+      } catch (error) {
+        throw new Error(
+          `Installed restored Workspace did not become ready after ${restoredActivation}: ${errorMessage(error)}`,
+          { cause: error }
+        );
+      }
     }
 
     if (selectLightTheme && !legacyUserInterface) {
@@ -106,6 +114,7 @@ export async function launchInstalledApplication({
       },
       rendererIsolationProbe: probePackagedRendererIsolation,
       startupSurface,
+      ...(restoredActivation ? { restoredActivation } : {}),
       utilityProcessCount: utilityPids.length
     };
   } finally {
@@ -169,4 +178,8 @@ function runtimeReadyLocator(window, legacyUserInterface) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : "Unknown installed runtime readiness failure.";
 }

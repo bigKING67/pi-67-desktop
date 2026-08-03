@@ -5,6 +5,7 @@ import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
+import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 
 export async function activateRendererTask(taskId: string): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
@@ -62,6 +63,7 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     trust: workspace.trust
   });
   try {
+    await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     const identity = await ensureAgentConnection();
     const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
       hostEpoch: identity.hostEpoch,

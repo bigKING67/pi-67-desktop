@@ -6,6 +6,7 @@ import { resynchronizeRendererProjection } from "../connection/projection-recove
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 import { resumeRendererTask } from "./task-activation-controller.js";
+import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 
 vi.mock("../workspace/workspace-open-controller.js", () => ({
   openRendererWorkspaceDescriptor: vi.fn()
@@ -15,14 +16,21 @@ vi.mock("../connection/projection-recovery-controller.js", () => ({
   resynchronizeRendererProjection: vi.fn()
 }));
 
+vi.mock("./workspace-host-registration-controller.js", () => ({
+  registerRendererWorkspaceWithHost: vi.fn()
+}));
+
 const resynchronize = vi.mocked(resynchronizeRendererProjection);
 const openWorkspace = vi.mocked(openRendererWorkspaceDescriptor);
+const registerWorkspace = vi.mocked(registerRendererWorkspaceWithHost);
 
 describe("task activation controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resynchronize.mockReset();
     openWorkspace.mockReset();
+    registerWorkspace.mockReset();
+    registerWorkspace.mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -66,6 +74,10 @@ describe("task activation controller", () => {
 
     await expect(resumeRendererTask("task-a")).resolves.toBe(true);
 
+    expect(registerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      { queryCatalog: false }
+    );
     expect(resynchronize).toHaveBeenCalledWith(
       useAppStore.getState,
       useAppStore.setState,
@@ -106,6 +118,39 @@ describe("task activation controller", () => {
     await expect(resumeRendererTask("task-a")).resolves.toBe(false);
   });
 
+  it("waits for Workspace registration before resynchronizing a restored Task", async () => {
+    const registration = deferred<boolean>();
+    registerWorkspace.mockReturnValue(registration.promise);
+    resynchronize.mockResolvedValue("committed");
+
+    const recovery = resumeRendererTask("task-a");
+    await vi.waitFor(() => expect(registerWorkspace).toHaveBeenCalledOnce());
+    expect(resynchronize).not.toHaveBeenCalled();
+
+    registration.resolve(true);
+    await expect(recovery).resolves.toBe(true);
+    expect(registerWorkspace.mock.invocationCallOrder[0]).toBeLessThan(
+      resynchronize.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+  });
+
+  it("marks the restored Task lost when Workspace registration fails", async () => {
+    registerWorkspace.mockRejectedValue(new Error("Workspace registration failed"));
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      lifecycle: "lost",
+      runtime: {
+        phase: "failed",
+        detail: "Workspace registration failed",
+        recoverable: true
+      }
+    });
+  });
+
   it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
     "does not initialize after a %s projection recovery",
     async (disposition) => {
@@ -120,3 +165,14 @@ describe("task activation controller", () => {
     }
   );
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}

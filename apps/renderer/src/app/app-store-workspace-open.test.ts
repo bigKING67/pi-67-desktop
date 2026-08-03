@@ -24,6 +24,7 @@ import {
 } from "../workspace/workspace-open-controller.js";
 import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
 
 describe("App Store workspace open authority", () => {
@@ -105,14 +106,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("opens a catalog Session in an independent Task Runtime", async () => {
-    const descriptor: WorkspaceDescriptor = {
-      id: "workspace-catalog",
-      displayName: "catalog",
-      identity: { canonicalPath: "/workspace-catalog", assurance: "path-only" },
-      trust: "trusted",
-      trustProvenance: "native-picker",
-      availability: "available"
-    };
+    const descriptor = workspaceDescriptor("workspace-catalog", "/workspace-catalog");
     const existingTaskId = "task-existing";
     rendererWorkbenchStore.getState().registerWorkspace(descriptor);
     rendererWorkbenchStore.getState().openTask({
@@ -136,6 +130,7 @@ describe("App Store workspace open authority", () => {
       _transfer,
       options
     ) => {
+      if (type === "workspace.register") return { registered: true } as never;
       if (type === "runtime.initialize") {
         expect(payload).toEqual({
           cwd: descriptor.identity.canonicalPath,
@@ -202,14 +197,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("resynchronizes after Session initialization when runtime.ready was blocked", async () => {
-    const descriptor: WorkspaceDescriptor = {
-      id: "workspace-resync",
-      displayName: "resync",
-      identity: { canonicalPath: "/workspace-resync", assurance: "path-only" },
-      trust: "trusted",
-      trustProvenance: "native-picker",
-      availability: "available"
-    };
+    const descriptor = workspaceDescriptor("workspace-resync", "/workspace-resync");
     const sessionPath = "/sessions/resync-target.jsonl";
     const readySnapshot = {
       ...snapshot("session-resync-target"),
@@ -218,6 +206,7 @@ describe("App Store workspace open authority", () => {
     };
     rendererWorkbenchStore.getState().registerWorkspace(descriptor);
     vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
       if (type === "runtime.initialize") {
         return projectionAcknowledgement(readySnapshot.sessionId, 1) as never;
       }
@@ -241,9 +230,86 @@ describe("App Store workspace open authority", () => {
       runtime: { phase: "ready", detail: "Pi 会话已恢复" }
     });
   });
+
+  it("waits for Workspace registration before initializing a saved Session", async () => {
+    const descriptor = workspaceDescriptor(
+      "workspace-registration-order",
+      "/workspace-registration-order"
+    );
+    const registration = deferred<void>();
+    const requestOrder: string[] = [];
+    rendererWorkbenchStore.getState().registerWorkspace(descriptor);
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") {
+        requestOrder.push("workspace.register:start");
+        await registration.promise;
+        requestOrder.push("workspace.register:end");
+        return { registered: true } as never;
+      }
+      if (type === "runtime.initialize") {
+        requestOrder.push("runtime.initialize");
+        throw new Error("stop after ordering assertion");
+      }
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    const opening = openRendererWorkspaceDescriptor(descriptor, "/sessions/registration-order.jsonl");
+    await vi.waitFor(() => expect(requestOrder).toEqual(["workspace.register:start"]));
+    expect(request).not.toHaveBeenCalledWith(
+      "runtime.initialize",
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+
+    registration.resolve();
+    await expect(opening).resolves.toBe(false);
+    expect(requestOrder).toEqual([
+      "workspace.register:start",
+      "workspace.register:end",
+      "runtime.initialize"
+    ]);
+  });
+
+  it("surfaces Workspace registration failure without starting the saved Session", async () => {
+    const descriptor = workspaceDescriptor(
+      "workspace-registration-failure",
+      "/workspace-registration-failure"
+    );
+    rendererWorkbenchStore.getState().registerWorkspace(descriptor);
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") throw new Error("Workspace registration failed");
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    await expect(openRendererWorkspaceDescriptor(
+      descriptor,
+      "/sessions/registration-failure.jsonl"
+    )).resolves.toBe(false);
+
+    expect(request).not.toHaveBeenCalledWith(
+      "runtime.initialize",
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      runtime: {
+        phase: "failed",
+        detail: "无法打开会话：Workspace registration failed"
+      }
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "error",
+      title: "无法打开会话",
+      message: "Workspace registration failed"
+    });
+  });
 });
 
 function resetStores(): void {
+  resetWorkspaceHostRegistrationState();
   useAppStore.setState(useAppStore.getInitialState(), true);
   useApprovalStore.setState(useApprovalStore.getInitialState(), true);
   useWorkspaceChangesStore.setState(useWorkspaceChangesStore.getInitialState(), true);
@@ -363,5 +429,27 @@ function projectionResyncResult(
     hostEpoch: 9,
     sessionGeneration,
     taskToolMode: "auto"
+  };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function workspaceDescriptor(id: string, canonicalPath: string): WorkspaceDescriptor {
+  return {
+    id,
+    displayName: id,
+    identity: { canonicalPath, assurance: "path-only" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
   };
 }
