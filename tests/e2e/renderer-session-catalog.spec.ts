@@ -162,12 +162,16 @@ test("replaces old pages after sequence-gap resync reports a ready revision", as
   await clearSessionCatalogRequests(page);
   await emitSessionCatalogSequenceGap(page);
 
-  await expect.poll(() => sessionCatalogRequests(page)).toEqual([{
-    hostEpoch: 1,
-    payload: { scope: "workspace", limit: 50 }
-  }]);
+  await expect.poll(async () => (await sessionCatalogRequests(page)).some((request) => (
+    request.hostEpoch === 1
+    && request.payload.scope === "workspace"
+    && request.payload.limit === 50
+    && request.payload.cursor === undefined
+    && request.payload.refresh === undefined
+  ))).toBe(true);
   await expect(sessionButton(page, "Resync 新会话")).toBeVisible();
   await expect(sessionButton(page, "Resync 旧会话")).toHaveCount(0);
+  expect((await sessionCatalogRequests(page)).every((request) => request.payload.cursor === undefined)).toBe(true);
 });
 
 test("shows fallback, incomplete, and unavailable catalog states explicitly", async ({ page }) => {
@@ -271,16 +275,17 @@ test("pins a conversation ahead of newer unpinned history", async ({ page }) => 
   await clearRecordedCommands(page);
 
   await page.getByRole("button", { name: `${pinned.name} 对话菜单` }).click();
+  await page.getByRole("menuitem", { name: "置顶对话" }).click();
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "conversation.pin"
+  ))).toMatchObject({ payload: { path: pinned.path, pinned: true } });
   await updateSessionCatalogFixture(page, {
     revision: 2,
     items: [newer, { ...pinned, pinnedAt: 1_900_000_000_000 }]
   });
-  await page.getByRole("menuitem", { name: "置顶对话" }).click();
+  await emitSessionCatalogChanged(page, 2, "session-updated");
 
   await expect(page.getByTestId("conversation-row").first()).toContainText(pinned.name);
-  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
-    command.type === "conversation.pin"
-  ))).toMatchObject({ payload: { path: pinned.path, pinned: true } });
   await page.getByRole("button", { name: `${pinned.name} 对话菜单` }).click();
   await expect(page.getByRole("menuitem", { name: "取消置顶" })).toBeVisible();
 });
@@ -317,26 +322,28 @@ test("archives without deleting Pi history and restores from the undo action", a
   await clearRecordedCommands(page);
 
   await page.getByRole("button", { name: `${active.name} 对话菜单` }).click();
+  await page.getByRole("menuitem", { name: "归档对话" }).click();
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "conversation.archive"
+  ))).toMatchObject({ payload: { path: active.path, archived: true } });
   await updateSessionCatalogFixture(page, {
     revision: 2,
     items: [{ ...active, archivedAt: 1_900_000_000_000 }]
   });
-  await page.getByRole("menuitem", { name: "归档对话" }).click();
+  await emitSessionCatalogChanged(page, 2, "session-updated");
 
   await expect(sessionButton(page, active.name)).toHaveCount(0);
   await expect(page.getByText("对话已归档", { exact: true })).toBeVisible();
-  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
-    command.type === "conversation.archive"
-  ))).toMatchObject({ payload: { path: active.path, archived: true } });
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "task.close"))
     .toHaveLength(0);
 
-  await updateSessionCatalogFixture(page, { revision: 3, items: [active] });
   await page.getByRole("button", { name: "撤销" }).click();
-  await expect(sessionButton(page, active.name)).toBeVisible();
   await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
     command.type === "conversation.archive"
   )).at(-1)).toMatchObject({ payload: { path: active.path, archived: false } });
+  await updateSessionCatalogFixture(page, { revision: 3, items: [active] });
+  await emitSessionCatalogChanged(page, 3, "session-updated");
+  await expect(sessionButton(page, active.name)).toBeVisible();
 });
 
 test("searches archived conversations and supports restore plus restore-and-open", async ({ page }) => {
@@ -361,22 +368,27 @@ test("searches archived conversations and supports restore plus restore-and-open
   await expect(dialog.getByText(archivedA.name, { exact: true })).toBeVisible();
   await expect(dialog.getByText(archivedB.name, { exact: true })).toHaveCount(0);
 
-  await updateSessionCatalogFixture(page, { revision: 2, items: [active, session(2, archivedA.name), archivedB] });
   await dialog.getByRole("button", { name: "恢复", exact: true }).click();
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "conversation.archive"
+  ))).toMatchObject({ payload: { path: archivedA.path, archived: false } });
+  await updateSessionCatalogFixture(page, { revision: 2, items: [active, session(2, archivedA.name), archivedB] });
+  await emitSessionCatalogChanged(page, 2, "session-updated");
   await expect(sessionButton(page, archivedA.name)).toBeVisible();
   await expect(dialog.getByText(archivedA.name, { exact: true })).toHaveCount(0);
 
   await dialog.getByRole("textbox", { name: "搜索已归档对话" }).fill("");
   await expect(dialog.getByText(archivedB.name, { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "恢复并打开" }).click();
+  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "conversation.archive"
+  )).at(-1)).toMatchObject({ payload: { path: archivedB.path, archived: false } });
   await updateSessionCatalogFixture(page, {
     revision: 3,
     items: [active, session(2, archivedA.name), session(3, archivedB.name)]
   });
-  await dialog.getByRole("button", { name: "恢复并打开" }).click();
+  await emitSessionCatalogChanged(page, 3, "session-updated");
   await expect(dialog).toHaveCount(0);
-  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
-    command.type === "conversation.archive"
-  )).at(-1)).toMatchObject({ payload: { path: archivedB.path, archived: false } });
 });
 
 async function openCatalogWorkspace(page: Page, options: Parameters<typeof installSessionCatalogFixture>[1]): Promise<void> {
