@@ -1,16 +1,65 @@
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, win32 } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   INSTALLED_SHUTDOWN_BUDGET_MS,
   measureInstalledApplicationShutdown,
   waitForRealUserCreatedSession
 } from "./windows-installed-application-lifecycle.mjs";
+import { sessionPathFromIdentity } from "./windows-installer-identity.mjs";
 import {
+  canonicalSessionPathFromIdentity,
   shouldCreateInitialRealUserSession,
   verifyProviderConfiguration,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
 
 describe("Windows installed real-user lifecycle", () => {
+  it("canonicalizes the Agent root before checking a real Session path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-path-"));
+    const canonicalAgentDir = join(root, "canonical-agent");
+    const aliasAgentDir = join(root, "alias-agent");
+    const sessionPath = join(canonicalAgentDir, "sessions", "session.jsonl");
+    try {
+      await mkdir(join(canonicalAgentDir, "sessions"), { recursive: true });
+      await symlink(canonicalAgentDir, aliasAgentDir, process.platform === "win32" ? "junction" : "dir");
+      await writeFile(sessionPath, "{\"type\":\"session\"}\n", "utf8");
+      const canonicalSessionPath = await realpath(sessionPath);
+
+      await expect(canonicalSessionPathFromIdentity(
+        `session:workspace-12345678:${canonicalSessionPath}`,
+        aliasAgentDir
+      )).resolves.toBe(canonicalSessionPath);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["native drive path", "C:\\isolated\\agent", "C:\\isolated\\agent\\sessions\\session.jsonl"],
+    ["drive-letter casing", "C:\\isolated\\agent", "c:\\isolated\\agent\\sessions\\session.jsonl"],
+    ["forward slashes", "C:/isolated/agent", "C:/isolated/agent/sessions/session.jsonl"],
+    ["extended-length Session path", "C:\\isolated\\agent", "\\\\?\\C:\\isolated\\agent\\sessions\\session.jsonl"],
+    ["extended-length Agent path", "\\\\?\\C:\\isolated\\agent", "C:\\isolated\\agent\\sessions\\session.jsonl"]
+  ])("accepts a contained %s using Windows path semantics", (_label, agentDir, sessionPath) => {
+    const identity = `session:workspace-12345678:${sessionPath}`;
+
+    expect(sessionPathFromIdentity(identity, agentDir, win32)).toBe(win32.resolve(sessionPath));
+  });
+
+  it.each([
+    ["different drive", "C:\\isolated\\agent", "D:\\isolated\\agent\\sessions\\session.jsonl"],
+    ["parent traversal", "C:\\isolated\\agent", "C:\\isolated\\agent\\..\\outside\\session.jsonl"],
+    ["sibling prefix", "C:\\isolated\\agent", "C:\\isolated\\agent-other\\session.jsonl"]
+  ])("rejects a %s outside the isolated Agent directory", (_label, agentDir, sessionPath) => {
+    const identity = `session:workspace-12345678:${sessionPath}`;
+
+    expect(() => sessionPathFromIdentity(identity, agentDir, win32)).toThrow(
+      "Windows real-user Session JSONL resolved outside the isolated Agent directory."
+    );
+  });
+
   it("polls Session materialization without a blocking active-row locator", async () => {
     vi.useFakeTimers();
     try {
