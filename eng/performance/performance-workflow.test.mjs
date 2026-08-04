@@ -68,7 +68,7 @@ describe("release performance workflow gates", () => {
     expect(windowsSource).toContain("--prepared-resources --ci-fast");
     expect(windowsSource).toContain("run: pnpm run package:smoke:windows-ui");
     expect(windowsSource).toContain("WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}");
-    expect(windowsSource).toContain("pnpm run package:smoke:windows-installer -- --quick");
+    expect(windowsSource).toContain("pnpm run package:smoke:windows-installer --quick");
     expect(windowsSource).toContain("pnpm run package:smoke:windows-installer\n");
     expect(macosSource).toContain("runs-on: macos-15");
     expect(macosSource).toContain("needs.change-scope.outputs.run_macos == 'true'");

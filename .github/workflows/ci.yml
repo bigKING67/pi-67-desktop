@@ -159,7 +159,7 @@ jobs:
           WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}
         run: |
           if [[ "$WINDOWS_INSTALLER_MODE" == "quick" ]]; then
-            pnpm run package:smoke:windows-installer -- --quick
+            pnpm run package:smoke:windows-installer --quick
           else
             pnpm run package:smoke:windows-installer
           fi
