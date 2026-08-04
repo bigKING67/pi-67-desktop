@@ -21,6 +21,13 @@ files:
   - "!node_modules/**/*.d.cts"
   # These three workspace packages are loaded from the explicit app dist paths above.
   - "!node_modules/@pi67/{agent-host,desktop,renderer}/**"
+  # Keep every scalar/SIMD Node core fallback. The Agent Host never loads the
+  # browser-inline WASM payloads that duplicate those external .wasm files.
+  - "!node_modules/tesseract.js-core/*.wasm.js"
+  # Pi-67 copies the full bilingual 4.0.0 data into its isolated OCR cache.
+  - "!node_modules/@tesseract.js-data/{eng,chi_sim}/4.0.0_best_int/**"
+  # OfficeParser executes through its Node ESM wrapper in the Agent Host.
+  - "!node_modules/officeparser/dist/officeparser.browser*.{js,mjs}"
   - package.json
 asarUnpack:
   - node_modules/@silvia-odwyer/photon-node/**

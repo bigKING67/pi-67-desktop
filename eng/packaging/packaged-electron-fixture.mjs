@@ -7,6 +7,43 @@ import { _electron as electron } from "@playwright/test";
 
 export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
+export const packagedAttachmentRequiredAsarPaths = [
+  "apps/agent-host/dist/prompt-attachment-worker.mjs",
+  "node_modules/mediainfo.js/dist/MediaInfoModule.wasm",
+  "node_modules/officeparser/package.json",
+  "node_modules/officeparser/dist/index.mjs",
+  "node_modules/tesseract.js/src/worker-script/node/index.js",
+  "node_modules/tesseract.js-core/tesseract-core.js",
+  "node_modules/tesseract.js-core/tesseract-core.wasm",
+  "node_modules/tesseract.js-core/tesseract-core-simd.js",
+  "node_modules/tesseract.js-core/tesseract-core-simd.wasm",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.js",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm",
+  "node_modules/tesseract.js-core/tesseract-core-lstm.js",
+  "node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+  "node_modules/tesseract.js-core/tesseract-core-simd-lstm.js",
+  "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.js",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm",
+  "node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz",
+  "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz"
+];
+
+export const packagedAttachmentExcludedAsarPaths = [
+  "node_modules/tesseract.js-core/tesseract-core.wasm.js",
+  "node_modules/tesseract.js-core/tesseract-core-simd.wasm.js",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm.js",
+  "node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js",
+  "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js",
+  "node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js",
+  "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
+  "node_modules/@tesseract.js-data/chi_sim/4.0.0_best_int/chi_sim.traineddata.gz",
+  "node_modules/officeparser/dist/officeparser.browser.iife.js",
+  "node_modules/officeparser/dist/officeparser.browser.mjs",
+  "node_modules/officeparser/dist/officeparser.browser.slim.iife.js",
+  "node_modules/officeparser/dist/officeparser.browser.slim.mjs"
+];
+
 export function resolvePackagedArtifact(platform = process.platform, arch = process.arch) {
   const supportedHost = (platform === "darwin" && arch === "arm64")
     || (platform === "win32" && arch === "x64");
@@ -48,31 +85,29 @@ export async function assertPackagedRuntimeAssets(artifact) {
     access(join(artifact.resourcesPath, "capabilities/packages/browser67/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/design-craft/package.json")),
     access(join(artifact.resourcesPath, "capabilities/packages/commerce-growth-os/package.json")),
-    assertPackagedAsarPaths(artifact, [
-      "apps/agent-host/dist/prompt-attachment-worker.mjs",
-      "node_modules/mediainfo.js/dist/MediaInfoModule.wasm",
-      "node_modules/officeparser/package.json",
-      "node_modules/tesseract.js/src/worker-script/node/index.js",
-      "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
-      "node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz",
-      "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz"
-    ])
+    assertPackagedAsarContract(artifact)
   ]);
 }
 
-function assertPackagedAsarPaths(artifact, paths) {
+function assertPackagedAsarContract(artifact) {
   const script = [
     "const { accessSync } = require('node:fs');",
     "const { join } = require('node:path');",
     "const root = process.argv[1];",
-    "for (const path of JSON.parse(process.argv[2])) accessSync(join(root, 'app.asar', path));"
+    "for (const path of JSON.parse(process.argv[2])) accessSync(join(root, 'app.asar', path));",
+    "for (const path of JSON.parse(process.argv[3])) {",
+    "  try { accessSync(join(root, 'app.asar', path)); }",
+    "  catch (error) { if (error && error.code === 'ENOENT') continue; throw error; }",
+    "  throw new Error('Unexpected packaged path: ' + path);",
+    "}"
   ].join(" ");
   return new Promise((resolvePromise, reject) => {
     const child = spawn(artifact.executablePath, [
       "-e",
       script,
       artifact.resourcesPath,
-      JSON.stringify(paths)
+      JSON.stringify(packagedAttachmentRequiredAsarPaths),
+      JSON.stringify(packagedAttachmentExcludedAsarPaths)
     ], {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       stdio: "inherit"

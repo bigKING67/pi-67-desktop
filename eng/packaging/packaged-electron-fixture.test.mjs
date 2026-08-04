@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { packagedApplicationEnvironment } from "./packaged-electron-fixture.mjs";
+import {
+  packagedApplicationEnvironment,
+  packagedAttachmentExcludedAsarPaths,
+  packagedAttachmentRequiredAsarPaths
+} from "./packaged-electron-fixture.mjs";
 
 describe("packaged Electron launch environment", () => {
   it("injects an external renderer URL only when probing packaged isolation", () => {
@@ -48,5 +52,27 @@ describe("packaged Electron launch environment", () => {
     });
 
     expect(environment.PI67_RENDERER_DEV_URL).toBe("http://127.0.0.1:5173");
+  });
+
+  it("keeps every Node OCR fallback while excluding browser-only payloads", () => {
+    expect(packagedAttachmentRequiredAsarPaths).toEqual(expect.arrayContaining([
+      "node_modules/tesseract.js-core/tesseract-core.wasm",
+      "node_modules/tesseract.js-core/tesseract-core-simd.wasm",
+      "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm",
+      "node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+      "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+      "node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm",
+      "node_modules/@tesseract.js-data/eng/4.0.0/eng.traineddata.gz",
+      "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz",
+      "node_modules/officeparser/dist/index.mjs"
+    ]));
+    expect(packagedAttachmentExcludedAsarPaths).toEqual(expect.arrayContaining([
+      "node_modules/tesseract.js-core/tesseract-core.wasm.js",
+      "node_modules/tesseract.js-core/tesseract-core-simd.wasm.js",
+      "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm.js",
+      "node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js",
+      "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
+      "node_modules/officeparser/dist/officeparser.browser.mjs"
+    ]));
   });
 });

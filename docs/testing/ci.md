@@ -59,3 +59,17 @@ the new verifier to that immutable candidate and executes the full lifecycle.
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.
+
+## Packaged attachment footprint
+
+Native packages keep all attachment-processing runtime paths while excluding payloads that the
+Agent Host cannot execute. Packaging retains both Tesseract Node core families across scalar, SIMD,
+and relaxed-SIMD hosts because the upstream worker may select either family at runtime. It excludes
+only the browser-inline WASM copies that duplicate the external `.wasm` files used by Node. The
+attachment worker copies only the bilingual `4.0.0` language data, so the unused `4.0.0_best_int`
+copies are excluded. OfficeParser runs through its Node ESM wrapper, so its browser bundles are also
+excluded.
+
+The packaged smoke contract verifies both sides of this boundary: every required Node fallback and
+language file must exist in `app.asar`, and every excluded duplicate/browser payload must be absent.
+Source OCR tests continue to initialize the real worker with the repository-packaged language data.

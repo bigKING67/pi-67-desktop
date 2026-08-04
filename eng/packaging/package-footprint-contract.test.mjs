@@ -13,7 +13,10 @@ describe("packaged runtime footprint contract", () => {
       "!node_modules/**/*.d.ts",
       "!node_modules/**/*.d.mts",
       "!node_modules/**/*.d.cts",
-      "!node_modules/@pi67/{agent-host,desktop,renderer}/**"
+      "!node_modules/@pi67/{agent-host,desktop,renderer}/**",
+      "!node_modules/tesseract.js-core/*.wasm.js",
+      "!node_modules/@tesseract.js-data/{eng,chi_sim}/4.0.0_best_int/**",
+      "!node_modules/officeparser/dist/officeparser.browser*.{js,mjs}"
     ]) expect(config, requiredPattern).toContain(requiredPattern);
   });
 });
