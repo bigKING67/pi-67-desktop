@@ -138,6 +138,7 @@ export function launchPackagedApplication({
   applicationArguments = [],
   artifact,
   environment = {},
+  offline = true,
   probePackagedRendererIsolation = true,
   userDataDirectory
 }) {
@@ -147,6 +148,7 @@ export function launchPackagedApplication({
     env: packagedApplicationEnvironment({
       agentDir,
       environment,
+      offline,
       probePackagedRendererIsolation
     })
   });
@@ -156,20 +158,23 @@ export function packagedApplicationEnvironment({
   agentDir,
   environment = {},
   hostEnvironment = process.env,
+  offline = true,
   probePackagedRendererIsolation = true
 }) {
   const baseEnvironment = { ...hostEnvironment };
   delete baseEnvironment.PI67_RENDERER_DEV_URL;
-  return {
+  const applicationEnvironment = {
     ...baseEnvironment,
     NODE_ENV: "test",
     PI_CODING_AGENT_DIR: agentDir,
-    PI_OFFLINE: "1",
     ...(probePackagedRendererIsolation
       ? { PI67_RENDERER_DEV_URL: "https://renderer.invalid/" }
       : {}),
     ...environment
   };
+  if (offline) applicationEnvironment.PI_OFFLINE = "1";
+  else delete applicationEnvironment.PI_OFFLINE;
+  return applicationEnvironment;
 }
 
 export async function installWorkspaceDialogResult(application, workspace) {

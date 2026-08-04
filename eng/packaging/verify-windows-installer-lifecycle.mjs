@@ -23,6 +23,7 @@ import {
 } from "./packaged-electron-fixture.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
 import { launchInstalledApplication } from "./windows-installed-application-lifecycle.mjs";
+import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
 import {
   readLifecycleArtifactIdentity,
   resolveExpectedLifecycleSigner,
@@ -51,10 +52,10 @@ export function resolveWindowsInstallerLifecycleContract({ baseline, quick }) {
   return {
     certificationMode: quick ? "quick" : "full",
     evidenceLevel: baseline
-      ? "windows-nsis-cross-version-upgrade-uninstall"
+      ? "windows-nsis-cross-version-upgrade-real-user-lifecycle-uninstall"
       : quick
-        ? "windows-nsis-silent-install-launch-uninstall"
-        : "windows-nsis-silent-install-reinstall-uninstall",
+        ? "windows-nsis-silent-install-real-user-lifecycle-uninstall"
+        : "windows-nsis-silent-install-reinstall-real-user-lifecycle-uninstall",
     verifyReinstall: !quick
   };
 }
@@ -110,7 +111,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
   const childPidPath = join(root, "controlled-child.pid");
   const lifecyclePath = join(root, "controlled-lifecycle.txt");
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: "running",
     certificationMode: lifecycleContract.certificationMode,
     evidenceLevel: lifecycleContract.evidenceLevel,
@@ -151,7 +152,12 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     await Promise.all([
       mkdir(extensionsDirectory, { recursive: true }),
       mkdir(userDataDirectory, { recursive: true }),
-      mkdir(workspace, { recursive: true })
+      mkdir(join(workspace, ".git"), { recursive: true })
+    ]);
+    await Promise.all([
+      writeFile(join(workspace, "README.md"), "Windows installed lifecycle fixture.\n", "utf8"),
+      writeFile(join(workspace, ".git", "HEAD"), "ref: refs/heads/main\n", "utf8"),
+      writeFile(join(workspace, ".git", "config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n", "utf8")
     ]);
     const extensionPath = join(extensionsDirectory, "installer-lifecycle-fixture.ts");
     if (baseline) {
@@ -252,6 +258,17 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       });
     }
 
+    const realUserLifecycle = await verifyInstalledRealUserLifecycle({
+      agentDir,
+      artifact: finalInstalledArtifact,
+      userDataDirectory,
+      workspace
+    });
+    report.phases.push({
+      name: "real-user-lifecycle",
+      ...realUserLifecycle
+    });
+
     const uninstallPath = await resolveUninstallerPath(installDirectory);
     const uninstall = await timedPhase("uninstall", async () => {
       await runExecutable(uninstallPath, ["/S"]);
@@ -271,7 +288,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       : "";
     console.log(
       `Windows NSIS ${lifecycleContract.certificationMode} lifecycle smoke passed: silent install, `
-      + "installed app:// launch, controlled process shutdown, "
+      + "installed app:// launch, controlled process shutdown, Provider/Catalog/create hard gates, "
+      + `${realUserLifecycle.restartCount} clean real-user restarts, `
       + reinstallEvidence
       + "silent uninstall, and isolated user-data preservation. "
       + `Evidence: ${relative(repositoryRoot, summaryPath)}.`

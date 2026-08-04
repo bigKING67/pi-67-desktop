@@ -155,7 +155,7 @@ describe("workbench event routing", () => {
   });
 
   it("installs a new Session identity from runtime.ready", () => {
-    openActiveTask();
+    openActiveProvisionalTask();
     const readySnapshot = snapshot("session-ready", "/sessions/ready.jsonl", "Ready Session");
     const payload = {
       capabilities: runtimeCapabilities(),
@@ -178,16 +178,17 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().tasks.active).toMatchObject({
       sessionId: "session-ready",
       sessionGeneration: 3,
-      sessionPath: "/sessions/ready.jsonl",
+      conversation: { kind: "provisional", workspaceId: "workspace-a" },
       title: "Ready Session",
       lifecycle: "idle",
       runtime: { phase: "ready" },
       toolMode: "yolo"
     });
+    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBeUndefined();
   });
 
   it("installs a new Session identity from session.bootstrap", () => {
-    openActiveTask();
+    openActiveProvisionalTask();
     const bootstrapSnapshot = snapshot("session-bootstrap", "/sessions/bootstrap.jsonl", "Bootstrap Session");
     const payload = { snapshot: bootstrapSnapshot, reason: "session-open" as const };
 
@@ -206,12 +207,13 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().tasks.active).toMatchObject({
       sessionId: "session-bootstrap",
       sessionGeneration: 4,
-      sessionPath: "/sessions/bootstrap.jsonl",
+      conversation: { kind: "provisional", workspaceId: "workspace-a" },
       title: "Bootstrap Session",
       lifecycle: "idle",
       runtime: { phase: "ready" },
       toolMode: "auto"
     });
+    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBeUndefined();
   });
 
   it("keeps the originating task active while Settings is open", () => {
@@ -342,6 +344,24 @@ function openActiveTask(): void {
     availability: "available"
   });
   rendererWorkbenchStore.getState().openTask(task("active"));
+}
+
+function openActiveProvisionalTask(): void {
+  const workbench = rendererWorkbenchStore.getState();
+  workbench.reset();
+  workbench.registerWorkspace({
+    id: "workspace-a",
+    displayName: "A",
+    identity: { canonicalPath: "/work/a", assurance: "filesystem" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
+  });
+  workbench.openTask({
+    ...task("active"),
+    conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "active" },
+    creationStatus: "pending"
+  });
 }
 
 function snapshot(sessionId: string, sessionPath: string, sessionName: string): SessionSnapshot {

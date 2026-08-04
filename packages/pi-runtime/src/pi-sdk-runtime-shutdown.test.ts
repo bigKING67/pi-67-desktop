@@ -123,7 +123,9 @@ describe("PiSdkRuntime shutdown", () => {
         sessionPath,
         trust: "trusted",
         approvalMode: "guided"
-      }, (stage) => stages.push(stage));
+      }, (observation) => {
+        if (observation.outcome === "started") stages.push(observation.stage);
+      });
       expect(restoredRuntime.getIdentity().sessionPath).toBe(await realpath(sessionPath));
       expect(restored.messages).toHaveLength(2);
       expect(stages).toEqual([

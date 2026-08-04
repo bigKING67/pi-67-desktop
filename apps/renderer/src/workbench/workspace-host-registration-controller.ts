@@ -1,7 +1,10 @@
 import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
-import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
+import {
+  cancelSessionCatalogRetries,
+  queryFirstSessionCatalog
+} from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 
@@ -81,6 +84,7 @@ export function resetWorkspaceHostRegistrationState(): void {
   registeredWorkspaces.clear();
   catalogFlights.clear();
   queriedCatalogs.clear();
+  cancelSessionCatalogRetries();
 }
 
 export async function registerAvailableRendererWorkspaces(): Promise<void> {

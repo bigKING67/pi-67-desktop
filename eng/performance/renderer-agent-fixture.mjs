@@ -350,7 +350,7 @@ export async function installPerformanceSystemBridge(page) {
       availability: "available"
     };
     let workbenchState = {
-      version: 2,
+      version: 3,
       workspaces: [],
       workspaceOrder: [],
       expandedWorkspaceIds: [],

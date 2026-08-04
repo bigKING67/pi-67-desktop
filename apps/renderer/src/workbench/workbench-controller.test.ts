@@ -27,6 +27,7 @@ describe("renderer workbench persistence boundary", () => {
       workspaceId: "workspace-1",
       sessionId: "session-1",
       sessionPath: "/sessions/one.jsonl",
+      sessionGeneration: 2,
       taskGeneration: 7,
       lifecycle: "running",
       runtime: { phase: "busy", detail: "private runtime detail", recoverable: true },
@@ -37,7 +38,7 @@ describe("renderer workbench persistence boundary", () => {
       attachmentCount: 2
     });
 
-    const serialized = JSON.stringify(workbenchLayout(store.getState()));
+    const serialized = JSON.stringify(workbenchLayout(store.getState(), persistenceAuthority()));
 
     expect(serialized).toContain("session-1");
     expect(serialized).not.toContain("Private title");
@@ -62,6 +63,7 @@ describe("renderer workbench persistence boundary", () => {
         workspaceId: "workspace-1",
         sessionId: `session-${index}`,
         sessionPath: `/sessions/${index}.jsonl`,
+        sessionGeneration: 2,
         taskGeneration: 1,
         lifecycle: "running",
         runtime: { phase: "busy", detail: "running", recoverable: true },
@@ -72,7 +74,64 @@ describe("renderer workbench persistence boundary", () => {
       });
     }
 
-    expect(workbenchLayout(store.getState()).runtimeRecovery).toHaveLength(MAX_RUNNING_TASKS);
+    const recovery = workbenchLayout(store.getState(), persistenceAuthority()).runtimeRecovery;
+    expect(recovery).toHaveLength(MAX_RUNNING_TASKS);
+    expect(recovery[0]).toMatchObject({
+      sessionGeneration: 2,
+      hostInstanceId: "host-1",
+      hostEpoch: 1
+    });
+  });
+
+  it("excludes provisional, draft, failed, generation-less, and non-Catalog Tasks from recovery", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace());
+    store.getState().openTask(persistableTask("valid"));
+    store.getState().openTask({
+      ...persistableTask("draft"),
+      lifecycle: "draft"
+    });
+    store.getState().openTask({
+      ...persistableTask("failed"),
+      lifecycle: "failed",
+      runtime: { phase: "failed", detail: "failed", recoverable: true }
+    });
+    const { sessionGeneration: _sessionGeneration, ...withoutGeneration } = persistableTask("no-generation");
+    store.getState().openTask(withoutGeneration);
+    store.getState().openTask(persistableTask("not-in-catalog"));
+    store.getState().openTask(persistableTask("future-path"));
+    store.getState().openTask({
+      id: "provisional",
+      conversation: { kind: "provisional", workspaceId: "workspace-1", draftId: "provisional" },
+      workspaceId: "workspace-1",
+      sessionId: "session-provisional",
+      taskGeneration: 1,
+      sessionGeneration: 2,
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "starting", recoverable: true },
+      title: "Provisional",
+      hasDraft: false,
+      toolMode: "auto",
+      attachmentCount: 0,
+      creationStatus: "confirming"
+    });
+
+    const authority = {
+      identity: { hostInstanceId: "host-1", hostEpoch: 1 },
+      sessionFor: (task: { id: string; sessionId: string; sessionPath?: string }) => {
+        if (task.id === "valid" && task.sessionPath) return sessionSummary(task.sessionId, task.sessionPath);
+        if (task.id === "future-path") return sessionSummary(task.sessionId, "/sessions/materialized.jsonl");
+        return undefined;
+      }
+    };
+
+    expect(workbenchLayout(store.getState(), authority).runtimeRecovery).toEqual([
+      expect.objectContaining({ taskId: "valid", sessionId: "session-valid" })
+    ]);
+    expect(workbenchLayout(store.getState(), authority).selectedSurface).toEqual({
+      kind: "workspace",
+      workspaceId: "workspace-1"
+    });
   });
 
   it("drops an inconsistent selected task surface instead of sending invalid layout", () => {
@@ -129,7 +188,7 @@ describe("renderer workbench persistence boundary", () => {
   it("binds a persisted Workspace and Session to the App runtime authority without replaying it", () => {
     const store = createRendererWorkbenchStore();
     store.getState().hydrate({
-      version: 2,
+      version: 3,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-1"],
       expandedWorkspaceIds: ["workspace-1"],
@@ -159,7 +218,7 @@ describe("renderer workbench persistence boundary", () => {
   it("preserves the explicit interrupted-task recovery state on cold start", () => {
     const store = createRendererWorkbenchStore();
     store.getState().hydrate({
-      version: 2,
+      version: 3,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-1"],
       expandedWorkspaceIds: ["workspace-1"],
@@ -181,6 +240,9 @@ describe("renderer workbench persistence boundary", () => {
         },
         sessionId: "session-interrupted",
         taskGeneration: 4,
+        sessionGeneration: 2,
+        hostInstanceId: "host-1",
+        hostEpoch: 1,
         lastKnownLifecycle: "running"
       }],
       settings: { section: "general", scope: "global" },
@@ -204,5 +266,53 @@ function workspace(): WorkspaceDescriptor {
     trust: "trusted",
     trustProvenance: "native-picker",
     availability: "available"
+  };
+}
+
+function persistenceAuthority() {
+  return {
+    identity: { hostInstanceId: "host-1", hostEpoch: 1 },
+    sessionFor: (task: { sessionId: string; sessionPath?: string }) => task.sessionPath
+      ? {
+          id: task.sessionId,
+          path: task.sessionPath,
+          cwd: "/workspace/one",
+          name: "Catalog session",
+          nameSource: "explicit" as const,
+          modifiedAt: 1,
+          messageCount: 1
+        }
+      : undefined
+  };
+}
+
+function persistableTask(id: string) {
+  const sessionPath = `/sessions/${id}.jsonl`;
+  return {
+    id,
+    conversation: { kind: "session" as const, workspaceId: "workspace-1", sessionPath },
+    workspaceId: "workspace-1",
+    sessionId: `session-${id}`,
+    sessionPath,
+    sessionGeneration: 2,
+    taskGeneration: 1,
+    lifecycle: "running" as const,
+    runtime: { phase: "busy" as const, detail: "running", recoverable: true },
+    title: id,
+    hasDraft: false,
+    toolMode: "auto" as const,
+    attachmentCount: 0
+  };
+}
+
+function sessionSummary(id: string, path: string) {
+  return {
+    id,
+    path,
+    cwd: "/workspace/one",
+    name: id,
+    nameSource: "explicit" as const,
+    modifiedAt: 1,
+    messageCount: 1
   };
 }

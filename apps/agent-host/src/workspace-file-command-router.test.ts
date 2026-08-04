@@ -93,6 +93,32 @@ describe("WorkspaceFileCommandRouter", () => {
     expect(JSON.stringify(included)).not.toContain(".git/feature");
   });
 
+  it("keeps ordinary root files visible while hiding and rejecting .git metadata", async () => {
+    const root = await workspaceRoot();
+    await mkdir(join(root, ".git"));
+    await writeFile(join(root, ".git", "config"), "private metadata", "utf8");
+    await writeFile(join(root, "README.md"), "visible", "utf8");
+    const router = routerFor(root);
+    const context = { scope: "workspace" as const, workspaceId: "workspace-1" };
+
+    const page = await router.dispatch(context, { type: "workspace.file.list", payload: {} });
+    if (!("entries" in page)) throw new Error("Expected a Workspace file page.");
+    expect(page.entries.map((entry) => entry.name)).toEqual(["README.md"]);
+
+    await expect(router.dispatch(context, {
+      type: "workspace.file.search",
+      payload: { query: "config", includeGenerated: true }
+    })).resolves.toMatchObject({ entries: [] });
+    await expect(router.dispatch(context, {
+      type: "workspace.file.resolve",
+      payload: { relativePath: ".git" }
+    })).rejects.toMatchObject({ code: "UNSUPPORTED" });
+    await expect(router.dispatch(context, {
+      type: "workspace.file.open",
+      payload: { id: "forged-git-reference" }
+    })).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
+  });
+
   it("rejects untrusted Workspaces and forged opaque references", async () => {
     const root = await workspaceRoot();
     const context = { scope: "workspace" as const, workspaceId: "workspace-1" };

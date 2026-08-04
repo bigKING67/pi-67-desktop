@@ -1,5 +1,5 @@
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
-import { createMessageId } from "@pi67/protocol";
+import { createMessageId, ProtocolRequestError } from "@pi67/protocol";
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { useAppStore } from "../app/app-store.js";
@@ -28,19 +28,81 @@ export async function createRendererSession(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (!get().workspace || get().sessionTransitionPending) return;
+  const pendingCreation = Object.values(rendererWorkbenchStore.getState().tasks).find((candidate) => (
+    candidate.workspaceId === rendererWorkbenchStore.getState().currentWorkspaceId
+    && candidate.creationStatus !== undefined
+  ));
+  if (pendingCreation) {
+    rendererWorkbenchStore.getState().selectTask(pendingCreation.id);
+    publishNotification({
+      level: "warning",
+      title: messages.runtime.session.confirmingCreation,
+      message: messages.runtime.session.creationOutcomeUnknown
+    });
+    return;
+  }
   const task = beginPendingTask();
   if (!task) return;
   await runSessionBootstrapTransition(get, set, {
     detail: messages.runtime.session.creating,
     refreshSessionCatalogFor: task.workspaceId,
     onError: (error) => {
-      rendererWorkbenchStore.getState().updateTask(task.id, {
-        lifecycle: "failed",
-        runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
-      });
+      if (error instanceof ProtocolRequestError && error.code === "REQUEST_OUTCOME_UNKNOWN") {
+        rendererWorkbenchStore.getState().updateTask(task.id, {
+          lifecycle: "draft",
+          creationStatus: "unconfirmed",
+          runtime: {
+            phase: "failed",
+            detail: messages.runtime.session.creationOutcomeUnknown,
+            recoverable: true
+          }
+        });
+        publishNotification({
+          level: "warning",
+          title: messages.runtime.session.confirmingCreation,
+          message: messages.runtime.session.creationOutcomeUnknown
+        });
+        set({
+          runtime: {
+            phase: "failed",
+            detail: messages.runtime.session.creationOutcomeUnknown,
+            recoverable: true
+          }
+        });
+        return;
+      }
+      const draft = useTaskDraftStore.getState().drafts[task.id];
+      if (!draft || (draft.text.trim().length === 0 && draft.attachments.length === 0)) {
+        useTaskDraftStore.getState().discard(task.id);
+        rendererWorkbenchStore.getState().removeRuntimeTask(task.id);
+      } else {
+        rendererWorkbenchStore.getState().updateTask(task.id, {
+          lifecycle: "draft",
+          creationStatus: undefined,
+          runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
+        });
+      }
       reportSessionError(error, set, messages.runtime.session.createFailed);
     },
-    request: () => agentConnectionController.request("session.create", {})
+    request: () => agentConnectionController.request("session.create", {}, [], {
+      onAcknowledgementDelayed: () => {
+        rendererWorkbenchStore.getState().updateTask(task.id, {
+          creationStatus: "confirming",
+          runtime: {
+            phase: "starting",
+            detail: messages.runtime.session.confirmingCreation,
+            recoverable: true
+          }
+        });
+        set({
+          runtime: {
+            phase: "starting",
+            detail: messages.runtime.session.confirmingCreation,
+            recoverable: true
+          }
+        });
+      }
+    })
   });
 }
 
@@ -333,7 +395,8 @@ function beginPendingTask(
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
     attachmentCount: 0,
-    toolMode: "auto"
+    toolMode: "auto",
+    ...(!sessionPath ? { creationStatus: "pending" as const } : {})
   };
   const result = workbench.openTask(task);
   return result === "workspace-missing" ? undefined : task;

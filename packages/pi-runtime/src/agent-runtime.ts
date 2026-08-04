@@ -52,7 +52,13 @@ export type RuntimeInitializationStage =
   | "update-catalog"
   | "project-snapshot";
 
-export type RuntimeInitializationObserver = (stage: RuntimeInitializationStage) => void;
+export interface RuntimeInitializationObservation {
+  stage: RuntimeInitializationStage;
+  outcome: "started" | "completed" | "failed";
+  durationMs: number;
+}
+
+export type RuntimeInitializationObserver = (observation: RuntimeInitializationObservation) => void;
 
 export interface AgentRuntime {
   getSdkVersion(): string;

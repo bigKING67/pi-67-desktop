@@ -2,7 +2,10 @@ import type { SessionCatalogPage, SessionSummary } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
+  cancelSessionCatalogRetries,
+  findSessionForRecovery,
   handleSessionCatalogChanged,
   loadMoreSessionCatalog,
   queryFirstSessionCatalog,
@@ -45,9 +48,12 @@ const NEXT_CURSOR = {
 describe("session catalog controller", () => {
   beforeEach(() => {
     useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
+    rendererWorkbenchStore.getState().reset();
   });
 
   afterEach(() => {
+    cancelSessionCatalogRetries();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -70,6 +76,48 @@ describe("session catalog controller", () => {
     });
   });
 
+  it("materializes a matching provisional Task only after the Catalog returns its path", async () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: WORKSPACE_ID,
+      displayName: "A",
+      identity: { canonicalPath: "/work", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask({
+      id: "task-pending",
+      conversation: { kind: "provisional", workspaceId: WORKSPACE_ID, draftId: "task-pending" },
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ONE.id,
+      sessionGeneration: 2,
+      taskGeneration: 1,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "未命名对话",
+      hasDraft: false,
+      attachmentCount: 0,
+      toolMode: "auto",
+      creationStatus: "confirming"
+    });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-pending"]).toMatchObject({
+      conversation: {
+        kind: "session",
+        workspaceId: WORKSPACE_ID,
+        sessionPath: SESSION_ONE.path
+      },
+      sessionPath: SESSION_ONE.path,
+      title: SESSION_ONE.name,
+      titleSource: SESSION_ONE.nameSource
+    });
+    expect(rendererWorkbenchStore.getState().tasks["task-pending"]?.creationStatus).toBeUndefined();
+  });
+
   it("appends the next page without duplicating an existing path", async () => {
     vi.spyOn(agentConnectionController, "request")
       .mockResolvedValueOnce(page([SESSION_ONE], { total: 2, hasMore: true, nextCursor: NEXT_CURSOR }) as never)
@@ -79,6 +127,46 @@ describe("session catalog controller", () => {
     await loadMoreSessionCatalog(WORKSPACE_ID);
 
     expect(catalog().items).toEqual([SESSION_ONE, SESSION_TWO]);
+  });
+
+  it("walks Catalog pages until the exact recovery Session id and path match", async () => {
+    vi.spyOn(agentConnectionController, "request")
+      .mockResolvedValueOnce(page([SESSION_ONE], { total: 2, hasMore: true, nextCursor: NEXT_CURSOR }) as never)
+      .mockResolvedValueOnce(page([SESSION_TWO], { total: 2 }) as never);
+
+    await expect(findSessionForRecovery(
+      WORKSPACE_ID,
+      SESSION_TWO.id,
+      SESSION_TWO.path
+    )).resolves.toEqual({ status: "found", session: SESSION_TWO });
+  });
+
+  it("reports a missing recovery Session only from a complete ready SQLite Catalog", async () => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
+
+    await expect(findSessionForRecovery(
+      WORKSPACE_ID,
+      SESSION_TWO.id,
+      SESSION_TWO.path
+    )).resolves.toEqual({ status: "missing" });
+  });
+
+  it("does not turn an incomplete fallback Catalog miss into Session deletion", async () => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE], {
+      source: "sdk-fallback",
+      state: "fallback",
+      incomplete: true,
+      degradedReason: "runtime-query"
+    }) as never);
+
+    await expect(findSessionForRecovery(
+      WORKSPACE_ID,
+      SESSION_TWO.id,
+      SESSION_TWO.path
+    )).resolves.toEqual({
+      status: "unavailable",
+      detail: "对话目录仍在重建，请稍后重试。"
+    });
   });
 
   it("reloads the first page when a keyset cursor becomes stale", async () => {
@@ -119,6 +207,39 @@ describe("session catalog controller", () => {
     });
   });
 
+  it("retries an unavailable Catalog after 1s, 3s and 10s", async () => {
+    vi.useFakeTimers();
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockRejectedValueOnce(new Error("unavailable-1"))
+      .mockRejectedValueOnce(new Error("unavailable-2"))
+      .mockRejectedValueOnce(new Error("unavailable-3"))
+      .mockResolvedValueOnce(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+    expect(request).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(request).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(request).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(catalog()).toMatchObject({ items: [SESSION_ONE], error: undefined });
+  });
+
+  it("cancels a scheduled unavailable retry when a newer query succeeds", async () => {
+    vi.useFakeTimers();
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockRejectedValueOnce(new Error("unavailable"))
+      .mockResolvedValueOnce(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+    await queryFirstSessionCatalog(WORKSPACE_ID, { refresh: true });
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(catalog().items).toEqual([SESSION_ONE]);
+  });
+
   it("refreshes on a changed revision but ignores an unchanged ready revision", async () => {
     useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, status(3));
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
@@ -130,6 +251,18 @@ describe("session catalog controller", () => {
     handleSessionCatalogChanged(WORKSPACE_ID, 4);
 
     await vi.waitFor(() => expect(catalog().items).toEqual([SESSION_TWO]));
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("refreshes an unchanged revision when background automatic titles become available", async () => {
+    useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, status(3));
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+      page([SESSION_ONE], { revision: 3 }) as never
+    );
+
+    handleSessionCatalogChanged(WORKSPACE_ID, 3, "automatic-title");
+
+    await vi.waitFor(() => expect(catalog().items).toEqual([SESSION_ONE]));
     expect(request).toHaveBeenCalledOnce();
   });
 

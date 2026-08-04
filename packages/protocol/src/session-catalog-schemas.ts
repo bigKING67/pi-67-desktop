@@ -108,6 +108,7 @@ export const SessionCatalogChangedSchema = strictObject({
     Type.Literal("session-updated"),
     Type.Literal("session-imported"),
     Type.Literal("conversation-organized"),
+    Type.Literal("automatic-title"),
     Type.Literal("source-changed")
   ])
 });

@@ -246,6 +246,17 @@ describe("AgentHostServer Session Catalog", () => {
       }, context, 9, "restore-automatic-title");
       port.emit(clearName);
       expect(await responseFor(port, clearName.requestId)).toMatchObject({ ok: true });
+      const automaticTitleEventsBefore = port.sent.filter(isAutomaticTitleCatalogEvent).length;
+      const pendingAutomatic = await queryCatalog(port, context, { view: "active" });
+      expect(pendingAutomatic.items).toEqual([
+        expect.objectContaining({
+          path: sessionPath,
+          name: "未命名对话",
+          nameSource: "fallback"
+        })
+      ]);
+      await vi.waitFor(() => expect(port.sent.filter(isAutomaticTitleCatalogEvent).length)
+        .toBeGreaterThan(automaticTitleEventsBefore));
       const automatic = await queryCatalog(port, context, { view: "active" });
       expect(automatic.items).toEqual([
         expect.objectContaining({
@@ -336,6 +347,15 @@ function sessionJsonl(cwd: string): string {
       }
     }
   ].map((entry) => JSON.stringify(entry)).join("\n") + "\n";
+}
+
+function isAutomaticTitleCatalogEvent(value: unknown): boolean {
+  return isEventEnvelope(value)
+    && value.type === "session.catalog.changed"
+    && typeof value.payload === "object"
+    && value.payload !== null
+    && "reason" in value.payload
+    && value.payload.reason === "automatic-title";
 }
 
 function restoreEnvironment(key: string, value: string | undefined): void {

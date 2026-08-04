@@ -11,14 +11,14 @@ import type {
 import { isTrustedRendererOrigin } from "./renderer-security.js";
 import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
 import type {
-  WorkbenchLayoutV2,
-  WorkbenchStateV2
+  WorkbenchLayoutV3,
+  WorkbenchStateV3
 } from "./workbench-state.js";
 import type { WorkspaceDescriptor } from "./workspace-identity.js";
 
 export type {
-  WorkbenchLayoutV2,
-  WorkbenchStateV2,
+  WorkbenchLayoutV3,
+  WorkbenchStateV3,
 } from "./workbench-state.js";
 export type {
   NativeWorkspaceDescriptor,
@@ -53,14 +53,14 @@ const systemBridge = {
   releasePromptAttachments: (ids: string[]): Promise<void> => (
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
-  loadWorkbenchState: (): Promise<WorkbenchStateV2> => ipcRenderer.invoke("pi67:workbench-load"),
+  loadWorkbenchState: (): Promise<WorkbenchStateV3> => ipcRenderer.invoke("pi67:workbench-load"),
   loadWorkspaceFileState: (): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-load")
   ),
   updateWorkspaceFileState: (state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-update", state)
   ),
-  updateWorkbenchLayout: (layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2> => (
+  updateWorkbenchLayout: (layout: WorkbenchLayoutV3): Promise<WorkbenchStateV3> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
   ),
   pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
@@ -69,10 +69,10 @@ const systemBridge = {
   repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
   ),
-  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV2> => (
+  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV3> => (
     ipcRenderer.invoke("pi67:workspace-remove", workspaceId)
   ),
-  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV2> => (
+  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV3> => (
     ipcRenderer.invoke("pi67:workspace-reorder", workspaceIds)
   ),
   selectWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-workspace"),

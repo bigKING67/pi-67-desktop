@@ -9,18 +9,17 @@ import {
 import {
   MAX_RUNTIME_RECOVERY_RECORDS,
   MAX_WORKSPACES,
-  WORKBENCH_STATE_VERSION,
   isTaskLifecycle,
-  parseWorkbenchStateV2,
   parseExactWorkbenchIdOrder,
   type ConversationKey,
-  type RuntimeRecoveryRecord,
+  type RuntimeRecoveryRecordV2,
   type SettingsSection,
   type TaskLifecycle,
   type WorkbenchSettingsState,
   type WorkbenchStateV2,
   type WorkbenchSurface
 } from "./workbench-state-contract.js";
+import { parseWorkbenchStateV2 } from "./workbench-state-v2.js";
 
 const LEGACY_STATE_VERSION = 1;
 const MAX_PERSISTED_TASKS = 24;
@@ -94,7 +93,7 @@ export function parseAndMigrateWorkbenchStateV1(value: unknown): WorkbenchStateV
   const currentWorkspaceId = selectedWorkspaceId ?? legacy.currentWorkspaceId;
   const settings = migrateSettings(legacy.settings);
   const migrated: WorkbenchStateV2 = {
-    version: WORKBENCH_STATE_VERSION,
+    version: 2,
     workspaces: legacy.workspaces,
     workspaceOrder: legacy.workspaceOrder,
     expandedWorkspaceIds: currentWorkspaceId ? [currentWorkspaceId] : [],
@@ -251,7 +250,7 @@ function parseLegacySurface(
   return undefined;
 }
 
-function migrateRuntimeRecoveryRecord(task: LegacyTaskState): RuntimeRecoveryRecord {
+function migrateRuntimeRecoveryRecord(task: LegacyTaskState): RuntimeRecoveryRecordV2 {
   return {
     taskId: task.taskId,
     conversation: conversationForLegacyTask(task),
@@ -263,7 +262,7 @@ function migrateRuntimeRecoveryRecord(task: LegacyTaskState): RuntimeRecoveryRec
 
 function migrateSelectedSurface(
   legacy: LegacyStateV1,
-  runtimeRecovery: readonly RuntimeRecoveryRecord[]
+  runtimeRecovery: readonly RuntimeRecoveryRecordV2[]
 ): WorkbenchSurface | undefined {
   const selected = legacy.selectedSurface;
   if (selected?.kind === "settings" && legacy.settings.open) return { kind: "settings" };

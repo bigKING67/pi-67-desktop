@@ -175,9 +175,9 @@ describe("PiConfigurationService", () => {
       watchDebounceMs: 60_000
     });
     const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
-    const releaseReload = deferred<void>();
+    const releaseRefresh = deferred<Awaited<ReturnType<ModelRuntime["refresh"]>>>();
     const createRuntime = vi.spyOn(ModelRuntime, "create").mockResolvedValue(runtime);
-    const reloadConfig = vi.spyOn(runtime, "reloadConfig").mockReturnValue(releaseReload.promise);
+    const refresh = vi.spyOn(runtime, "refresh").mockReturnValue(releaseRefresh.promise);
     try {
       const result = await Promise.race([
         fixture.service.get(fixture.cwd),
@@ -187,11 +187,11 @@ describe("PiConfigurationService", () => {
       expect(result).not.toBe("timed-out");
       expect(result).toMatchObject({ syncState: "current" });
       expect(createRuntime).toHaveBeenCalledOnce();
-      expect(reloadConfig).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
     } finally {
-      releaseReload.resolve();
+      releaseRefresh.resolve({ errors: new Map(), aborted: false });
       createRuntime.mockRestore();
-      reloadConfig.mockRestore();
+      refresh.mockRestore();
       await fixture.dispose();
     }
   }, 20_000);

@@ -85,6 +85,7 @@ export interface AgentPortClientOptions {
 export interface AgentRequestOptions {
   idempotencyKey?: string;
   context?: ProtocolContext;
+  ackTimeoutMs?: number;
 }
 
 export type ProjectionResyncInstaller = (result: ProjectionResyncResult) => boolean;
@@ -236,6 +237,7 @@ export class AgentPortClient {
         recoverable: true
       });
     }
+    const ackTimeoutMs = acknowledgementTimeout(options.ackTimeoutMs, type, this.requestTimeoutMs);
     const response = new Promise<TResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(envelope.requestId);
@@ -244,7 +246,7 @@ export class AgentPortClient {
           message: `Agent request acknowledgement timed out: ${type}`,
           recoverable: true
         }));
-      }, timeoutFor(type, this.requestTimeoutMs));
+      }, ackTimeoutMs);
       this.pending.set(envelope.requestId, {
         type,
         context: envelope.context,
@@ -416,4 +418,20 @@ function timeoutFor(type: AgentCommandType, fallback: number): number {
   if (type === "prompt.submit" || type === "command.invoke" || type === "session.compact" || type === "session.import") return 5_000;
   if (type === "runtime.getStatus") return 5_000;
   return fallback;
+}
+
+function acknowledgementTimeout(
+  override: number | undefined,
+  type: AgentCommandType,
+  fallback: number
+): number {
+  if (override === undefined) return timeoutFor(type, fallback);
+  if (!Number.isSafeInteger(override) || override < 1_000 || override > CONTROL_MUTATION_ACK_TIMEOUT_MS) {
+    throw new ProtocolRequestError({
+      code: "INVALID_PAYLOAD",
+      message: "Agent acknowledgement timeout is outside the supported range.",
+      recoverable: false
+    });
+  }
+  return override;
 }

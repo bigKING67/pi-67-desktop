@@ -144,7 +144,8 @@ export class AgentHostServer {
       getHostEpoch: () => this.hostIdentity?.hostEpoch ?? 1,
       isShuttingDown: () => this.shuttingDown,
       usesCompatibilityRuntime: () => this.usesCompatibilityRuntime,
-      takeCompatibilityRuntime: () => this.takeCompatibilityRuntime()
+      takeCompatibilityRuntime: () => this.takeCompatibilityRuntime(),
+      ...(this.options.onRuntimeInitializationObservation === undefined ? {} : { onRuntimeInitializationObservation: this.options.onRuntimeInitializationObservation })
     }, this.sessionWriterLeases);
     this.requests = new HostRequestRouter(
       this.tasks,

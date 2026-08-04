@@ -1,6 +1,7 @@
 import { useAppStore } from "../app/app-store.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
+import { findSessionForRecovery } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
@@ -53,7 +54,14 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
-  if (!task || !workspace || !task.sessionPath || !workbench.selectTask(taskId)) return false;
+  if (
+    !task
+    || !workspace
+    || task.conversation.kind !== "session"
+    || !task.sessionPath
+    || task.sessionPath !== task.conversation.sessionPath
+    || !workbench.selectTask(taskId)
+  ) return false;
   workbench.updateTask(task.id, {
     lifecycle: "initializing",
     runtime: { phase: "starting", detail: `正在恢复任务：${task.title}`, recoverable: true }
@@ -65,17 +73,45 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
   try {
     await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     const identity = await ensureAgentConnection();
-    const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
-      hostEpoch: identity.hostEpoch,
-      recoveringDetail: `正在重新连接任务：${task.title}`,
-      readyDetail: "Pi SDK 已就绪",
-      failureTitle: "无法恢复任务",
-      deferRuntimeNotReady: true
-    });
-    if (recovery === "committed") return true;
-    if (recovery !== "runtime-not-ready") {
-      if (recovery === "failed") markTaskRecoveryFailed(task.id);
+    const catalog = await findSessionForRecovery(
+      workspace.id,
+      task.sessionId,
+      task.sessionPath
+    );
+    if (catalog.status === "missing") {
+      removeMissingRecoveryTask(task.id, workspace.id);
       return false;
+    }
+    if (catalog.status === "unavailable") {
+      markTaskRecoveryFailed(task.id, new Error(catalog.detail));
+      return false;
+    }
+    workbench.updateTask(task.id, {
+      title: catalog.session.name,
+      titleSource: catalog.session.nameSource
+    });
+
+    const sameHost = task.recoveryHostInstanceId === identity.hostInstanceId
+      && task.recoveryHostEpoch === identity.hostEpoch;
+    if (sameHost) {
+      const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
+        hostEpoch: identity.hostEpoch,
+        recoveringDetail: `正在重新连接任务：${task.title}`,
+        readyDetail: "Pi SDK 已就绪",
+        failureTitle: "无法恢复任务",
+        deferRuntimeNotReady: true
+      });
+      if (recovery === "committed") {
+        workbench.updateTask(task.id, {
+          recoveryHostInstanceId: undefined,
+          recoveryHostEpoch: undefined
+        });
+        return true;
+      }
+      if (recovery !== "runtime-not-ready") {
+        if (recovery === "failed") markTaskRecoveryFailed(task.id);
+        return false;
+      }
     }
     workbench.removeRuntimeTask(task.id);
     return openRendererWorkspaceDescriptor(workspace, task.sessionPath);
@@ -83,6 +119,21 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     markTaskRecoveryFailed(task.id, error);
     return false;
   }
+}
+
+function removeMissingRecoveryTask(taskId: string, workspaceId: string): void {
+  const workbench = rendererWorkbenchStore.getState();
+  workbench.removeRuntimeTask(taskId);
+  workbench.selectWorkspace(workspaceId);
+  useAppStore.setState({
+    sessionTransitionPending: false,
+    runtime: { phase: "stopped", detail: "对话记录已不存在", recoverable: true }
+  });
+  publishNotification({
+    level: "warning",
+    title: "对话记录已不存在",
+    message: "该对话可能已被移动或删除，请从左侧选择其他对话。"
+  });
 }
 
 function markTaskRecoveryFailed(taskId: string, error?: unknown): void {

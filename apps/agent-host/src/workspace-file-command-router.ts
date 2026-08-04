@@ -103,7 +103,7 @@ export class WorkspaceFileCommandRouter {
       parent.relativePath,
       "directory"
     );
-    const names = await readdir(directory.path);
+    const names = (await readdir(directory.path)).filter((name) => name !== ".git");
     const entries = (await Promise.all(names.map((name) => this.access.projectEntry(
       context.workspaceId,
       workspace.canonicalCwd,

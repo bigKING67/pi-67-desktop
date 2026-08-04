@@ -39,7 +39,7 @@ describe("AgentHostServer session bootstrap", () => {
         _options: Parameters<AgentRuntime["initialize"]>[0],
         observeStage?: Parameters<AgentRuntime["initialize"]>[1]
       ) => {
-        observeStage?.("create-session");
+        observeStage?.({ stage: "create-session", outcome: "started", durationMs: 0 });
         throw new Error("token=private-fixture initialization failed");
       },
       cancelInteractiveRequests: () => [],

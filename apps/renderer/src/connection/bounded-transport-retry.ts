@@ -6,9 +6,12 @@ export type TransportRetryPreparation = (
   error: ProtocolRequestError
 ) => boolean | Promise<boolean>;
 
+export type TransportRetryPredicate = (error: unknown) => error is ProtocolRequestError;
+
 export async function requestWithBoundedTransportRetry<TResult>(
   execute: (attempt: number) => Promise<TResult>,
-  prepareRetry: TransportRetryPreparation = allowRetry
+  prepareRetry: TransportRetryPreparation = allowRetry,
+  isRetryable: TransportRetryPredicate = isRetryableTransportError
 ): Promise<TResult> {
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_TRANSPORT_ATTEMPTS; attempt += 1) {
@@ -18,7 +21,7 @@ export async function requestWithBoundedTransportRetry<TResult>(
       lastError = error;
       if (
         attempt + 1 >= MAX_TRANSPORT_ATTEMPTS
-        || !isRetryableTransportError(error)
+        || !isRetryable(error)
         || !await prepareRetry(error)
       ) throw error;
     }
@@ -30,7 +33,7 @@ function allowRetry(): boolean {
   return true;
 }
 
-function isRetryableTransportError(error: unknown): error is ProtocolRequestError {
+export function isRetryableTransportError(error: unknown): error is ProtocolRequestError {
   return error instanceof ProtocolRequestError
     && (error.code === "CONNECTION_CLOSED" || error.code === "STALE_HOST_EPOCH");
 }

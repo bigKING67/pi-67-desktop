@@ -348,14 +348,17 @@ function taskFromRecovery(record: RuntimeRecoveryRecord): RendererWorkbenchTask 
     workspaceId: record.conversation.workspaceId,
     sessionId: record.sessionId,
     taskGeneration: record.taskGeneration,
+    sessionGeneration: record.sessionGeneration,
     lifecycle: record.lastKnownLifecycle,
     runtime: stoppedRuntime(record.lastKnownLifecycle),
     title: "未命名会话",
     titleSource: "fallback",
     ...(record.conversation.kind === "session" ? { sessionPath: record.conversation.sessionPath } : {}),
-    hasDraft: record.conversation.kind === "provisional",
+    hasDraft: false,
     attachmentCount: 0,
-    toolMode: "auto"
+    toolMode: "auto",
+    recoveryHostInstanceId: record.hostInstanceId,
+    recoveryHostEpoch: record.hostEpoch
   };
 }
 

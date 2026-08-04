@@ -87,7 +87,9 @@ export function WorkspaceShell({
     </section>
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
     <WorkspaceRecoveryState workspace={selectedWorkspace} />
-  ) : selectedTask && selectedWorkspace ? (
+  ) : selectedTask?.conversation.kind === "provisional" && selectedWorkspace ? (
+    <ProvisionalTaskState task={selectedTask} workspace={selectedWorkspace} />
+  ) : selectedTask?.conversation.kind === "session" && selectedWorkspace ? (
     <StoppedTaskState task={selectedTask} workspace={selectedWorkspace} />
   ) : selectedSurface?.kind === "conversation"
     && selectedSurface.conversation.kind === "session"
@@ -276,6 +278,51 @@ function StoppedTaskState({ task, workspace }: {
       </div>
     </section>
   );
+}
+
+function ProvisionalTaskState({ task, workspace }: {
+  task: RendererWorkbenchTask;
+  workspace: WorkspaceDescriptor;
+}) {
+  const copy = provisionalTaskStateCopy(task);
+  return (
+    <section className={styles.emptyWorkspace}>
+      <div aria-live="polite" role="status">
+        {copy.loading ? <span className="loading-line" /> : null}
+        <span className="section-label">{workspace.displayName}</span>
+        <h2>{copy.title}</h2>
+        <p>{copy.detail}</p>
+      </div>
+    </section>
+  );
+}
+
+export function provisionalTaskStateCopy(task: RendererWorkbenchTask): {
+  title: string;
+  detail: string;
+  loading: boolean;
+} {
+  if (task.creationStatus === "pending" || task.creationStatus === "confirming") {
+    return {
+      title: "正在确认对话",
+      detail: "Pi 运行服务正在确认对话是否已创建，请稍候。",
+      loading: true
+    };
+  }
+  if (task.creationStatus === "unconfirmed") {
+    return {
+      title: "对话创建结果尚未确认",
+      detail: "运行服务恢复后会继续对账；当前不会重复创建对话。",
+      loading: false
+    };
+  }
+  return {
+    title: task.hasDraft ? "对话草稿尚未创建" : "对话尚未创建",
+    detail: task.hasDraft
+      ? "草稿仍保留在当前窗口中，重新新建对话后可以继续发送。"
+      : "该条目没有可恢复的会话记录。",
+    loading: false
+  };
 }
 
 function WorkspaceRecoveryState({ workspace }: { workspace: WorkspaceDescriptor }) {

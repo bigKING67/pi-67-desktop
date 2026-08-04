@@ -1,6 +1,10 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentRuntime, RuntimeInitializationStage } from "@pi67/pi-runtime";
+import type {
+  AgentRuntime,
+  RuntimeInitializationObservation,
+  RuntimeInitializationStage
+} from "@pi67/pi-runtime";
 import type { AgentCommand, CommandResults } from "@pi67/protocol";
 import { captureProjectionMutationAcknowledgement } from "./host-projection.js";
 import type {
@@ -23,6 +27,7 @@ export interface HostTaskRuntimeLifecycleOptions {
   isShuttingDown(): boolean;
   usesCompatibilityRuntime(): boolean;
   takeCompatibilityRuntime(): AgentRuntime | undefined;
+  onRuntimeInitializationObservation?: (observation: RuntimeInitializationObservation) => void;
 }
 
 export class HostTaskRuntimeLifecycle {
@@ -42,12 +47,15 @@ export class HostTaskRuntimeLifecycle {
   ): Promise<CommandResults["runtime.initialize"]> {
     this.tasks.sendStatus(state, { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true });
     try {
-      const snapshot = await runtime.initialize(options, (stage) => {
-        this.tasks.sendStatus(state, {
-          phase: "starting",
-          detail: initializationStageDetail(stage),
-          recoverable: true
-        });
+      const snapshot = await runtime.initialize(options, (observation) => {
+        this.options.onRuntimeInitializationObservation?.(observation);
+        if (observation.outcome === "started") {
+          this.tasks.sendStatus(state, {
+            phase: "starting",
+            detail: initializationStageDetail(observation.stage),
+            recoverable: true
+          });
+        }
       });
       state.record.initialized = true;
       await commitSessionWriter();

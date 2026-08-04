@@ -2,10 +2,10 @@ packages:
   - apps/*
   - packages/*
 overrides:
-  '@earendil-works/pi-agent-core': 0.81.1
-  '@earendil-works/pi-ai': 0.81.1
-  '@earendil-works/pi-coding-agent': 0.81.1
-  '@earendil-works/pi-tui': 0.81.1
+  '@earendil-works/pi-agent-core': 0.83.0
+  '@earendil-works/pi-ai': 0.83.0
+  '@earendil-works/pi-coding-agent': 0.83.0
+  '@earendil-works/pi-tui': 0.83.0
   'brace-expansion@5': 5.0.8
 allowBuilds:
   '@google/genai': false

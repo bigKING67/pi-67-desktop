@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSessionCatalog } from "./session-catalog.js";
 import {
   createSessionCatalogContext,
@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("Pi SDK Session Catalog discovery contract", () => {
-  it("prefers explicit names and otherwise derives the latest valid user title at query time", async () => {
+  it("prefers explicit names and derives fallback titles outside the query hot path", async () => {
     const fixture = await createFixture();
     const unnamed = SessionManager.create(fixture.cwd, fixture.sessionDirectory);
     unnamed.appendMessage({
@@ -40,8 +40,20 @@ describe("Pi SDK Session Catalog discovery contract", () => {
       configuredSessionDir: fixture.sessionDirectory,
       workspaceCwd: fixture.cwd
     });
-    const catalog = createSessionCatalog();
+    const onChanged = vi.fn();
+    const catalog = createSessionCatalog({ onChanged });
     await catalog.reconcile(context);
+    onChanged.mockClear();
+    const firstPage = await catalog.query({ scope: "workspace" }, context);
+    expect(firstPage.items.find((item) => item.path === unnamed.getSessionFile())).toMatchObject({
+      name: "未命名对话",
+      nameSource: "fallback"
+    });
+    expect(firstPage.items.find((item) => item.path === named.getSessionFile())?.name).toBe("Explicit catalog name");
+    await vi.waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({
+      reason: "automatic-title"
+    })));
+
     const page = await catalog.query({ scope: "workspace" }, context);
     expect(page.items.find((item) => item.path === unnamed.getSessionFile())?.name).toBe(
       "PRIVATE_PROMPT_MUST_NOT_BECOME_A_SESSION_NAME"

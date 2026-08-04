@@ -40,6 +40,7 @@ export interface AgentPortHandoffTarget {
 
 export interface AgentConnectionRequestOptions {
   context?: ProtocolContext;
+  onAcknowledgementDelayed?: () => void;
 }
 
 export class AgentConnectionController {
@@ -114,8 +115,16 @@ export class AgentConnectionController {
     if (isReplaySafeControlMutation(type)) {
       return requestReplaySafeControlMutation(
         type,
-        (idempotencyKey) => this.requestOnce(type, payload, transfer, context, idempotencyKey),
-        () => this.prepareSameHostRetry(expectedHostEpoch)
+        (idempotencyKey, attempt) => this.requestOnce(
+          type,
+          payload,
+          transfer,
+          context,
+          idempotencyKey,
+          type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined
+        ),
+        () => this.prepareSameHostRetry(expectedHostEpoch),
+        options.onAcknowledgementDelayed
       ) as Promise<CommandResults[T]>;
     }
     if (isReplaySafeOperationAck(type)) {
@@ -139,7 +148,8 @@ export class AgentConnectionController {
     payload: CommandPayloads[T],
     transfer: Transferable[],
     context: ProtocolContext,
-    idempotencyKey?: string
+    idempotencyKey?: string,
+    ackTimeoutMs?: number
   ): Promise<CommandResults[T]> {
     const client = this.client;
     const generation = this.generation;
@@ -148,7 +158,8 @@ export class AgentConnectionController {
     try {
       result = await client.request(type, payload, transfer, {
         context,
-        ...(idempotencyKey === undefined ? {} : { idempotencyKey })
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs })
       });
     } catch (error) {
       if (client.isClosed) {

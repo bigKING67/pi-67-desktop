@@ -146,7 +146,7 @@ test("uses the latest accepted user message as the current in-memory conversatio
     hasText: "重新检查双栏设置的响应式问题"
   });
   await expect(currentRow).toContainText("重新检查双栏设置的响应式问题");
-  await expect(currentRow).toContainText("未命名任务");
+  await expect(currentRow).toContainText("未命名会话");
   await expect(page.locator(".brand-lockup")).toContainText("重新检查双栏设置的响应式问题");
 });
 
@@ -299,7 +299,7 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
   await markCurrentTaskRunning(page, 1, "session-test", 1);
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: /未命名任务 对话菜单/u }).click();
+  await page.getByRole("button", { name: /未命名会话 对话菜单/u }).click();
   await page.getByRole("menuitem", { name: "停止任务" }).click();
 
   await expect.poll(async () => (

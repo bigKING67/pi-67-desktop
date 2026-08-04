@@ -3,6 +3,7 @@ import type { ProjectionRecoveryDisposition } from "../connection/projection-rec
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
+import { findSessionForRecovery } from "../navigation/session-catalog-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 import { resumeRendererTask } from "./task-activation-controller.js";
@@ -16,11 +17,16 @@ vi.mock("../connection/projection-recovery-controller.js", () => ({
   resynchronizeRendererProjection: vi.fn()
 }));
 
+vi.mock("../navigation/session-catalog-controller.js", () => ({
+  findSessionForRecovery: vi.fn()
+}));
+
 vi.mock("./workspace-host-registration-controller.js", () => ({
   registerRendererWorkspaceWithHost: vi.fn()
 }));
 
 const resynchronize = vi.mocked(resynchronizeRendererProjection);
+const findSession = vi.mocked(findSessionForRecovery);
 const openWorkspace = vi.mocked(openRendererWorkspaceDescriptor);
 const registerWorkspace = vi.mocked(registerRendererWorkspaceWithHost);
 
@@ -28,9 +34,22 @@ describe("task activation controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resynchronize.mockReset();
+    findSession.mockReset();
     openWorkspace.mockReset();
     registerWorkspace.mockReset();
     registerWorkspace.mockResolvedValue(true);
+    findSession.mockResolvedValue({
+      status: "found",
+      session: {
+        id: "session-a",
+        path: "/sessions/a.jsonl",
+        cwd: "/work/a",
+        name: "Task A",
+        nameSource: "explicit",
+        modifiedAt: 1,
+        messageCount: 1
+      }
+    });
     rendererWorkbenchStore.getState().reset();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -57,7 +76,9 @@ describe("task activation controller", () => {
       sessionPath: "/sessions/a.jsonl",
       hasDraft: false,
       toolMode: "auto",
-      attachmentCount: 0
+      attachmentCount: 0,
+      recoveryHostInstanceId: "host",
+      recoveryHostEpoch: 9
     });
     vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
       appInstanceId: "app",
@@ -78,6 +99,7 @@ describe("task activation controller", () => {
       expect.objectContaining({ id: "workspace-a" }),
       { queryCatalog: false }
     );
+    expect(findSession).toHaveBeenCalledWith("workspace-a", "session-a", "/sessions/a.jsonl");
     expect(resynchronize).toHaveBeenCalledWith(
       useAppStore.getState,
       useAppStore.setState,
@@ -86,6 +108,57 @@ describe("task activation controller", () => {
     expect(request).not.toHaveBeenCalled();
     expect(openWorkspace).not.toHaveBeenCalled();
     expect(rendererWorkbenchStore.getState().tasks["task-a"]?.taskGeneration).toBe(3);
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]?.recoveryHostEpoch).toBeUndefined();
+  });
+
+  it("skips projection resync after the Agent Host identity changes", async () => {
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
+      appInstanceId: "app",
+      hostInstanceId: "replacement-host",
+      hostEpoch: 10,
+      sdkVersion: "fixture",
+      eventSequence: 0
+    });
+    openWorkspace.mockResolvedValue(true);
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(true);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      "/sessions/a.jsonl"
+    );
+  });
+
+  it("removes stale recovery state only after an authoritative Catalog miss", async () => {
+    findSession.mockResolvedValue({ status: "missing" });
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeUndefined();
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+      kind: "workspace",
+      workspaceId: "workspace-a"
+    });
+    expect(useAppStore.getState().runtime.detail).toBe("对话记录已不存在");
+  });
+
+  it("preserves recovery state while the Catalog is unavailable", async () => {
+    findSession.mockResolvedValue({
+      status: "unavailable",
+      detail: "对话目录仍在重建，请稍后重试。"
+    });
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      lifecycle: "lost",
+      runtime: { detail: "对话目录仍在重建，请稍后重试。" }
+    });
   });
 
   it("rotates stale Task authority before initializing the saved Session", async () => {

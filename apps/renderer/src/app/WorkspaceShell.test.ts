@@ -1,6 +1,6 @@
 import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { describe, expect, it } from "vitest";
-import { canRenderLiveTask } from "./WorkspaceShell.js";
+import { canRenderLiveTask, provisionalTaskStateCopy } from "./WorkspaceShell.js";
 
 describe("WorkspaceShell live task selection", () => {
   it("does not render a stopped task as a live conversation when a stale projection still matches", () => {
@@ -29,7 +29,30 @@ describe("WorkspaceShell live task selection", () => {
   });
 });
 
-function task(overrides: Pick<RendererWorkbenchTask, "lifecycle" | "runtime">): RendererWorkbenchTask {
+describe("WorkspaceShell provisional task state", () => {
+  it("shows acknowledgement confirmation without offering runtime recovery", () => {
+    expect(provisionalTaskStateCopy(task({
+      conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },
+      creationStatus: "confirming"
+    }))).toEqual({
+      title: "正在确认对话",
+      detail: "Pi 运行服务正在确认对话是否已创建，请稍候。",
+      loading: true
+    });
+  });
+
+  it("explains an unconfirmed create outcome without claiming a missing Session", () => {
+    expect(provisionalTaskStateCopy(task({
+      conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },
+      creationStatus: "unconfirmed"
+    }))).toMatchObject({
+      title: "对话创建结果尚未确认",
+      loading: false
+    });
+  });
+});
+
+function task(overrides: Partial<RendererWorkbenchTask>): RendererWorkbenchTask {
   return {
     id: "task-a",
     conversation: {
@@ -41,6 +64,8 @@ function task(overrides: Pick<RendererWorkbenchTask, "lifecycle" | "runtime">): 
     sessionId: "session-a",
     sessionPath: "/sessions/a.jsonl",
     taskGeneration: 1,
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true },
     title: "A",
     hasDraft: false,
     toolMode: "auto",

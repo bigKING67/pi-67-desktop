@@ -5,17 +5,19 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { promisify } from "node:util";
 import {
   LEGACY_WORKBENCH_STATE_FILENAME,
+  LEGACY_WORKBENCH_STATE_V2_FILENAME,
   MAX_WORKBENCH_STATE_BYTES,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME,
   WORKBENCH_STATE_VERSION,
   UnsupportedWorkbenchStateVersionError,
   createEmptyWorkbenchState,
-  parseWorkbenchStateV2,
+  parseWorkbenchStateV3,
   type WorkbenchLoadResult,
-  type WorkbenchStateV2
+  type WorkbenchStateV3
 } from "./workbench-state-contract.js";
 import { parseAndMigrateWorkbenchStateV1 } from "./workbench-state-v1.js";
+import { parseAndMigrateWorkbenchStateV2 } from "./workbench-state-v2.js";
 
 export * from "./workbench-state-contract.js";
 export * from "./workbench-state-mutations.js";
@@ -48,11 +50,11 @@ export class WorkbenchStateStore {
     return this.#enqueue(() => this.#loadUnlocked());
   }
 
-  update(mutator: (current: WorkbenchStateV2) => WorkbenchStateV2): Promise<WorkbenchStateV2> {
+  update(mutator: (current: WorkbenchStateV3) => WorkbenchStateV3): Promise<WorkbenchStateV3> {
     return this.#enqueue(async () => {
       const loaded = await this.#loadUnlocked();
       const next = mutator(structuredClone(loaded.state));
-      const validated = parseWorkbenchStateV2(next);
+      const validated = parseWorkbenchStateV3(next);
       if (!validated) throw new Error("Workbench state update is invalid.");
       await this.#writeUnlocked(validated);
       return structuredClone(validated);
@@ -75,13 +77,28 @@ export class WorkbenchStateStore {
     if (version !== undefined && version > WORKBENCH_STATE_VERSION) {
       throw new UnsupportedWorkbenchStateVersionError(version);
     }
-    const state = parseWorkbenchStateV2(current.value);
+    const state = parseWorkbenchStateV3(current.value);
     if (!state) return this.#quarantineCorruptState(currentPath);
     if (process.platform !== "win32") await chmod(currentPath, 0o600);
     return { state: structuredClone(state) };
   }
 
   async #loadLegacyOrEmpty(directory: string): Promise<WorkbenchLoadResult> {
+    const legacyV2Path = join(directory, LEGACY_WORKBENCH_STATE_V2_FILENAME);
+    const legacyV2 = await this.#readStateFile(legacyV2Path);
+    if (legacyV2.kind !== "missing") {
+      if (legacyV2.kind === "invalid") return this.#quarantineCorruptState(legacyV2Path);
+      const version = readStateVersion(legacyV2.value);
+      if (version !== undefined && version > WORKBENCH_STATE_VERSION) {
+        throw new UnsupportedWorkbenchStateVersionError(version);
+      }
+      const migrated = parseAndMigrateWorkbenchStateV2(legacyV2.value);
+      if (!migrated) return this.#quarantineCorruptState(legacyV2Path);
+      await this.#writeUnlocked(migrated);
+      if (process.platform !== "win32") await chmod(legacyV2Path, 0o600);
+      return { state: structuredClone(migrated), recovery: { kind: "migrated-v2" } };
+    }
+
     const legacyPath = join(directory, LEGACY_WORKBENCH_STATE_FILENAME);
     const legacy = await this.#readStateFile(legacyPath);
     if (legacy.kind === "missing") return { state: createEmptyWorkbenchState() };
@@ -90,7 +107,8 @@ export class WorkbenchStateStore {
     if (version !== undefined && version > WORKBENCH_STATE_VERSION) {
       throw new UnsupportedWorkbenchStateVersionError(version);
     }
-    const migrated = parseAndMigrateWorkbenchStateV1(legacy.value);
+    const migratedV2 = parseAndMigrateWorkbenchStateV1(legacy.value);
+    const migrated = migratedV2 ? parseAndMigrateWorkbenchStateV2(migratedV2) : undefined;
     if (!migrated) return this.#quarantineCorruptState(legacyPath);
     await this.#writeUnlocked(migrated);
     if (process.platform !== "win32") await chmod(legacyPath, 0o600);
@@ -134,7 +152,7 @@ export class WorkbenchStateStore {
     }
   }
 
-  async #writeUnlocked(state: WorkbenchStateV2): Promise<void> {
+  async #writeUnlocked(state: WorkbenchStateV3): Promise<void> {
     const serialized = `${JSON.stringify(state)}\n`;
     if (Buffer.byteLength(serialized, "utf8") > MAX_WORKBENCH_STATE_BYTES) {
       throw new Error("Workbench state exceeds the persistence size limit.");

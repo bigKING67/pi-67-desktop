@@ -1,3 +1,5 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   assertSingleShutdownQuitLifecycle,
   CONTROLLED_PROMPT_TEXT,
@@ -95,8 +97,10 @@ export async function runControlledShutdownScenario({
     .waitFor({ state: "visible", timeout: 30_000 });
   // Reload recovery may reattach the runtime; the final quit owns this lifecycle probe.
   await resetControlledShutdownLifecycle(lifecyclePath);
+  // A prior controlled prompt can leave a dead PID in this shared probe file.
+  await writeFile(childPidPath, "", "utf8");
   await startControlledPrompt(window);
-  await window.locator('[data-testid="conversation-row"]')
+  await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
   await window.locator(".brand-lockup").getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
     .waitFor({ state: "visible", timeout: 10_000 });
@@ -119,6 +123,21 @@ export async function runControlledShutdownScenario({
   for (const pid of utilityPids) await waitForProcessExit(pid);
   await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
   return closeDurationMs;
+}
+
+export async function waitForPersistedRuntimeRecovery(userDataDirectory, timeoutMs = 10_000) {
+  const statePath = join(userDataDirectory, "workbench", "state-v3.json");
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    const state = await readFile(statePath, "utf8")
+      .then((value) => JSON.parse(value))
+      .catch(() => undefined);
+    if (state?.version === 3 && Array.isArray(state.runtimeRecovery) && state.runtimeRecovery.length > 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Packaged Workbench did not persist a materialized Session recovery record.");
 }
 
 export function captureProcessOutput(process) {

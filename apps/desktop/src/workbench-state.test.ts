@@ -1,6 +1,5 @@
 import { lstatSync } from "node:fs";
-import { chmod, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -8,7 +7,6 @@ import {
   beginWorkbenchRun,
   createEmptyWorkbenchState,
   finishWorkbenchRun,
-  LEGACY_WORKBENCH_STATE_FILENAME,
   MAX_RUNTIME_RECOVERY_RECORDS,
   MAX_WORKBENCH_STATE_BYTES,
   removeWorkspaceRegistration,
@@ -19,19 +17,20 @@ import {
   UnsupportedWorkbenchStateVersionError,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME,
-  WorkbenchStateStore,
-  type WorkbenchStateV2
+  type WorkbenchStateV3
 } from "./workbench-state.js";
-import type { NativeWorkspaceDescriptor } from "./workspace-identity.js";
+import {
+  cleanupWorkbenchStateTestRoots,
+  temporaryWorkbenchStateRoot as temporaryRoot,
+  workbenchDescriptorFixture as descriptorFixture,
+  workbenchRecoveryRecord as recoveryRecord,
+  workbenchStateTestStore as testStore
+} from "./workbench-state-test-fixture.js";
 
-const roots: string[] = [];
+afterEach(cleanupWorkbenchStateTestRoots);
 
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
-});
-
-describe("WorkbenchStateV2 persistence", () => {
-  it("writes the canonical V2 state atomically with POSIX-private modes", async () => {
+describe("WorkbenchStateV3 persistence", () => {
+  it("writes the canonical V3 state atomically with POSIX-private modes", async () => {
     const userData = await temporaryRoot();
     const store = testStore(userData);
     const workspace = descriptorFixture("workspace-1", join(userData, "workspace-1"));
@@ -40,7 +39,7 @@ describe("WorkbenchStateV2 persistence", () => {
     const serialized = await readFile(store.requestedStatePath, "utf8");
     const directoryEntries = await readdir(join(userData, WORKBENCH_STATE_DIRECTORY));
 
-    expect(saved).toMatchObject({ version: 2, expandedWorkspaceIds: [workspace.id], runtimeRecovery: [] });
+    expect(saved).toMatchObject({ version: 3, expandedWorkspaceIds: [workspace.id], runtimeRecovery: [] });
     expect(JSON.parse(serialized)).toEqual(saved);
     expect(directoryEntries).toEqual([WORKBENCH_STATE_FILENAME]);
     if (process.platform !== "win32") {
@@ -65,7 +64,7 @@ describe("WorkbenchStateV2 persistence", () => {
     });
   });
 
-  it("quarantines malformed and oversized V2 state before resetting", async () => {
+  it("quarantines malformed and oversized V3 state before resetting", async () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
@@ -77,9 +76,9 @@ describe("WorkbenchStateV2 persistence", () => {
     expect(malformed.state).toEqual(createEmptyWorkbenchState());
     expect(malformed.recovery).toEqual({
       kind: "corrupt-reset",
-      quarantinedFileName: "state-v2.corrupt-1700000000000-token.json"
+      quarantinedFileName: "state-v3.corrupt-1700000000000-token.json"
     });
-    expect(await readdir(directory)).toEqual(["state-v2.corrupt-1700000000000-token.json"]);
+    expect(await readdir(directory)).toEqual(["state-v3.corrupt-1700000000000-token.json"]);
 
     await writeFile(statePath, "x".repeat(MAX_WORKBENCH_STATE_BYTES + 1), { mode: 0o600 });
     await expect(testStore(userData).load()).resolves.toMatchObject({ recovery: { kind: "corrupt-reset" } });
@@ -89,7 +88,7 @@ describe("WorkbenchStateV2 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const future = '{"version":3,"future":true}\n';
+    const future = '{"version":4,"future":true}\n';
     await mkdir(directory);
     await writeFile(statePath, future, { mode: 0o600 });
     const store = testStore(userData);
@@ -103,7 +102,7 @@ describe("WorkbenchStateV2 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const state = createEmptyWorkbenchState() as WorkbenchStateV2 & { prompt?: string; draft?: string; credential?: string };
+    const state = createEmptyWorkbenchState() as WorkbenchStateV3 & { prompt?: string; draft?: string; credential?: string };
     state.prompt = "do not persist";
     state.draft = "do not persist";
     state.credential = "do not persist";
@@ -151,29 +150,20 @@ describe("WorkbenchStateV2 persistence", () => {
       sessionPath: "/sessions/first.jsonl"
     };
     const secondConversation = {
-      kind: "provisional" as const,
+      kind: "session" as const,
       workspaceId: second.id,
-      draftId: "second-task"
+      sessionPath: "/sessions/second.jsonl"
     };
     state = replaceWorkbenchLayout(state, {
       currentWorkspaceId: first.id,
       expandedWorkspaceIds: [first.id, second.id],
       selectedSurface: { kind: "conversation", conversation: firstConversation },
       runtimeRecovery: [
-        {
-          taskId: "first-task",
-          conversation: firstConversation,
-          sessionId: "first-session",
-          taskGeneration: 1,
-          lastKnownLifecycle: "running"
-        },
-        {
-          taskId: "second-task",
-          conversation: secondConversation,
+        recoveryRecord("first-task", firstConversation, { sessionId: "first-session" }),
+        recoveryRecord("second-task", secondConversation, {
           sessionId: "second-session",
-          taskGeneration: 1,
           lastKnownLifecycle: "stopped"
-        }
+        })
       ],
       settings: { section: "extensions", scope: "project", workspaceId: first.id }
     });
@@ -193,7 +183,7 @@ describe("WorkbenchStateV2 persistence", () => {
     expect(() => reorderWorkspaceRegistrations(removed, [])).toThrow(/exact permutation/u);
   });
 
-  it("accepts only bounded referentially valid V2 layout metadata", () => {
+  it("accepts only bounded referentially valid V3 layout metadata", () => {
     const workspace = descriptorFixture("workspace-1", "/workspace/first", "31");
     const state = addOrRefreshWorkspace(createEmptyWorkbenchState(), workspace).state;
     const conversation = {
@@ -205,13 +195,10 @@ describe("WorkbenchStateV2 persistence", () => {
       currentWorkspaceId: workspace.id,
       expandedWorkspaceIds: [workspace.id],
       selectedSurface: { kind: "conversation" as const, conversation },
-      runtimeRecovery: [{
-        taskId: "task-1",
-        conversation,
+      runtimeRecovery: [recoveryRecord("task-1", conversation, {
         sessionId: "session-1",
-        taskGeneration: 2,
-        lastKnownLifecycle: "running" as const
-      }],
+        taskGeneration: 2
+      })],
       settings: { section: "packages" as const, scope: "project" as const, workspaceId: workspace.id }
     };
 
@@ -238,166 +225,52 @@ describe("WorkbenchStateV2 persistence", () => {
       settings: { section: "integrations", scope: "global" }
     }).settings).toEqual({ section: "integrations", scope: "global" });
 
-    const boundedRecovery = Array.from({ length: MAX_RUNTIME_RECOVERY_RECORDS }, (_, index) => ({
-      taskId: `task-${index}`,
-      conversation: {
+    const boundedRecovery = Array.from({ length: MAX_RUNTIME_RECOVERY_RECORDS }, (_, index) => recoveryRecord(
+      `task-${index}`,
+      {
         kind: "session" as const,
         workspaceId: workspace.id,
         sessionPath: `/sessions/task-${index}.jsonl`
       },
-      sessionId: `session-${index}`,
-      taskGeneration: 1,
-      lastKnownLifecycle: "running" as const
-    }));
+      { sessionId: `session-${index}` }
+    ));
     expect(replaceWorkbenchLayout(state, { ...layout, runtimeRecovery: boundedRecovery }).runtimeRecovery)
       .toHaveLength(MAX_RUNTIME_RECOVERY_RECORDS);
     expect(() => replaceWorkbenchLayout(state, {
       ...layout,
-      runtimeRecovery: [...boundedRecovery, {
-        taskId: "task-over-limit",
-        conversation: {
+      runtimeRecovery: [...boundedRecovery, recoveryRecord(
+        "task-over-limit",
+        {
           kind: "session",
           workspaceId: workspace.id,
           sessionPath: "/sessions/task-over-limit.jsonl"
         },
-        sessionId: "session-over-limit",
-        taskGeneration: 1,
-        lastKnownLifecycle: "running"
-      }]
+        { sessionId: "session-over-limit" }
+      )]
     })).toThrow(/invalid/u);
   });
 
-  it("normalizes the former V2 resources section to skills without resetting state", async () => {
-    const userData = await temporaryRoot();
-    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
-    const workspace = descriptorFixture("workspace-1", "/workspace/first", "32");
-    await mkdir(directory);
-    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
-      version: 2,
-      workspaces: [workspace],
-      workspaceOrder: [workspace.id],
-      expandedWorkspaceIds: [workspace.id],
-      currentWorkspaceId: workspace.id,
-      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
-      runtimeRecovery: [],
-      settings: { section: "resources", scope: "project", workspaceId: workspace.id },
-      cleanExit: true
-    }), { mode: 0o600 });
-
-    const loaded = await testStore(userData).load();
-    expect(loaded.recovery).toBeUndefined();
-    expect(loaded.state.settings).toEqual({
-      section: "skills",
-      scope: "project",
-      workspaceId: workspace.id
-    });
-  });
-
-  it("normalizes the combined prompts and rules section to prompts without resetting state", async () => {
-    const userData = await temporaryRoot();
-    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
-    const workspace = descriptorFixture("workspace-1", "/workspace/first", "33");
-    await mkdir(directory);
-    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
-      version: 2,
-      workspaces: [workspace],
-      workspaceOrder: [workspace.id],
-      expandedWorkspaceIds: [workspace.id],
-      currentWorkspaceId: workspace.id,
-      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
-      runtimeRecovery: [],
-      settings: { section: "prompts-rules", scope: "project", workspaceId: workspace.id },
-      cleanExit: true
-    }), { mode: 0o600 });
-
-    const loaded = await testStore(userData).load();
-    expect(loaded.recovery).toBeUndefined();
-    expect(loaded.state.settings).toEqual({
-      section: "prompts",
-      scope: "project",
-      workspaceId: workspace.id
-    });
-  });
-
-  it("normalizes the former package category into the unified extension workspace", async () => {
-    const userData = await temporaryRoot();
-    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
-    const workspace = descriptorFixture("workspace-1", "/workspace/first", "34");
-    await mkdir(directory);
-    await writeFile(join(directory, WORKBENCH_STATE_FILENAME), JSON.stringify({
-      version: 2,
-      workspaces: [workspace],
-      workspaceOrder: [workspace.id],
-      expandedWorkspaceIds: [workspace.id],
-      currentWorkspaceId: workspace.id,
-      selectedSurface: { kind: "settings" },
-      runtimeRecovery: [],
-      settings: { section: "packages", scope: "project", workspaceId: workspace.id },
-      cleanExit: true
-    }), { mode: 0o600 });
-
-    const loaded = await testStore(userData).load();
-    expect(loaded.state.settings).toEqual({
-      section: "extensions",
-      scope: "project",
-      workspaceId: workspace.id
-    });
-  });
-
-  it("marks formerly live recovery records stopped after a clean exit and lost after an unclean exit", () => {
+  it("marks live recovery lost after an unclean exit and clears it on a clean exit", () => {
     const workspace = descriptorFixture("workspace-1", "/workspace/first", "41");
     const base = addOrRefreshWorkspace(createEmptyWorkbenchState(), workspace).state;
-    const conversation = { kind: "provisional" as const, workspaceId: workspace.id, draftId: "running-task" };
+    const conversation = {
+      kind: "session" as const,
+      workspaceId: workspace.id,
+      sessionPath: "/sessions/running.jsonl"
+    };
     const withRecovery = replaceWorkbenchLayout(base, {
       currentWorkspaceId: workspace.id,
       expandedWorkspaceIds: [workspace.id],
       selectedSurface: { kind: "conversation", conversation },
-      runtimeRecovery: [{
-        taskId: "running-task",
-        conversation,
-        sessionId: "running-session",
-        taskGeneration: 1,
-        lastKnownLifecycle: "running"
-      }],
+      runtimeRecovery: [recoveryRecord("running-task", conversation, {
+        sessionId: "running-session"
+      })],
       settings: { section: "general", scope: "global" }
     });
 
     expect(beginWorkbenchRun(withRecovery).runtimeRecovery[0]?.lastKnownLifecycle).toBe("lost");
-    expect(beginWorkbenchRun(finishWorkbenchRun(withRecovery)).runtimeRecovery[0]?.lastKnownLifecycle).toBe("stopped");
-  });
-
-  it("migrates V1 selected sessions and bounded live recovery while leaving idle tabs to Catalog", async () => {
-    const userData = await temporaryRoot();
-    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
-    const workspace = descriptorFixture("workspace-1", "/workspace/first", "51");
-    await mkdir(directory);
-    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_FILENAME), JSON.stringify({
-      version: 1,
-      workspaces: [workspace],
-      workspaceOrder: [workspace.id],
-      currentWorkspaceId: workspace.id,
-      tasks: [
-        legacyTask("running-task", workspace.id, "running", "/sessions/running.jsonl"),
-        legacyTask("idle-task", workspace.id, "idle", "/sessions/idle.jsonl")
-      ],
-      taskOrder: ["running-task", "idle-task"],
-      selectedSurface: { kind: "task", taskId: "idle-task" },
-      settings: { open: false, section: "extensions", scope: "project", workspaceId: workspace.id },
-      cleanExit: false
-    }), { mode: 0o600 });
-
-    const loaded = await testStore(userData).load();
-
-    expect(loaded.recovery).toEqual({ kind: "migrated-v1" });
-    expect(loaded.state).toMatchObject({
-      version: 2,
-      selectedSurface: {
-        kind: "conversation",
-        conversation: { kind: "session", sessionPath: "/sessions/idle.jsonl" }
-      },
-      runtimeRecovery: [{ taskId: "running-task", lastKnownLifecycle: "running" }]
-    });
-    expect(await readdir(directory)).toEqual([LEGACY_WORKBENCH_STATE_FILENAME, WORKBENCH_STATE_FILENAME]);
+    expect(finishWorkbenchRun(withRecovery)).toMatchObject({ cleanExit: true, runtimeRecovery: [] });
+    expect(beginWorkbenchRun(finishWorkbenchRun(withRecovery)).runtimeRecovery).toEqual([]);
   });
 
   it("rejects a symlink or junction at the workbench storage boundary", async () => {
@@ -420,38 +293,3 @@ describe("WorkbenchStateV2 persistence", () => {
     expect(lstatSync(join(directory, WORKBENCH_STATE_FILENAME)).mode & 0o777).toBe(0o600);
   });
 });
-
-async function temporaryRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "pi67-workbench-state-"));
-  roots.push(root);
-  return root;
-}
-
-function testStore(userData: string): WorkbenchStateStore {
-  return new WorkbenchStateStore(userData, {
-    now: () => 1_700_000_000_000,
-    createToken: () => "token"
-  });
-}
-
-function descriptorFixture(id: string, canonicalPath: string, ino = "2"): NativeWorkspaceDescriptor {
-  return {
-    id,
-    displayName: id,
-    identity: { canonicalPath, device: "1", inode: ino, birthtimeNs: "3", assurance: "filesystem" },
-    trust: "trusted",
-    trustProvenance: "native-picker",
-    availability: "available"
-  };
-}
-
-function legacyTask(taskId: string, workspaceId: string, lastKnownLifecycle: "running" | "idle", sessionPath: string) {
-  return {
-    taskId,
-    workspaceId,
-    sessionId: `${taskId}-session`,
-    sessionPath,
-    visibility: "tab",
-    lastKnownLifecycle
-  };
-}

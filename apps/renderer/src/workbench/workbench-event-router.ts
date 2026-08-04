@@ -26,6 +26,19 @@ export function routeWorkbenchAgentEvent(
     || task.taskGeneration !== authority.taskGeneration
   ) return "stale";
 
+  const operationId = operationIdForEvent(event);
+  if (
+    operationId
+    && event.type !== "operation.started"
+    && task.operationId
+    && task.operationId !== operationId
+  ) return "stale";
+  if (
+    event.type === "operation.started"
+    && task.operationId === event.payload.operation.operationId
+    && isTerminalTaskLifecycle(task.lifecycle)
+  ) return "stale";
+
   const sessionAuthority = eventSessionAuthority(envelope);
   if (
     event.type !== "runtime.ready"
@@ -44,12 +57,8 @@ export function routeWorkbenchAgentEvent(
       const snapshot = event.type === "runtime.ready" ? event.payload.snapshot : event.payload.snapshot;
       const sessionName = snapshot.sessionName?.trim();
       workbench.updateTask(task.id, {
-        ...(snapshot.sessionPath ? {
-          conversation: { kind: "session" as const, workspaceId: task.workspaceId, sessionPath: snapshot.sessionPath }
-        } : {}),
         sessionId: snapshot.sessionId,
         ...(sessionAuthority ? { sessionGeneration: sessionAuthority.sessionGeneration } : {}),
-        ...(snapshot.sessionPath ? { sessionPath: snapshot.sessionPath } : {}),
         title: sessionName
           || task.pendingTitle
           || messages.runtime.workbench.unnamedSession,
@@ -57,7 +66,9 @@ export function routeWorkbenchAgentEvent(
         ...(sessionName ? { pendingTitle: undefined } : {}),
         lifecycle: "idle",
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },
-        ...(event.type === "runtime.ready" ? { toolMode: event.payload.taskToolMode } : {})
+        ...(event.type === "runtime.ready" ? { toolMode: event.payload.taskToolMode } : {}),
+        operationId: undefined,
+        creationStatus: undefined
       });
       break;
     }
@@ -74,7 +85,11 @@ export function routeWorkbenchAgentEvent(
       });
       break;
     case "operation.started":
-      workbench.updateTask(task.id, { lifecycle: "running", runtime: { phase: "busy", detail: messages.operation.running, recoverable: true } });
+      workbench.updateTask(task.id, {
+        lifecycle: "running",
+        runtime: { phase: "busy", detail: messages.operation.running, recoverable: true },
+        operationId: event.payload.operation.operationId
+      });
       break;
     case "operation.activityChanged":
       workbench.updateTask(task.id, {
@@ -86,16 +101,16 @@ export function routeWorkbenchAgentEvent(
       });
       break;
     case "operation.completed":
-      workbench.updateTask(task.id, { lifecycle: "completed", runtime: { phase: "ready", detail: messages.operation.completed, recoverable: true } });
+      workbench.updateTask(task.id, { lifecycle: "completed", runtime: { phase: "ready", detail: messages.operation.completed, recoverable: true }, operationId: event.payload.operationId });
       break;
     case "operation.failed":
-      workbench.updateTask(task.id, { lifecycle: "failed", runtime: { phase: "failed", detail: event.payload.error.message, recoverable: event.payload.error.recoverable } });
+      workbench.updateTask(task.id, { lifecycle: "failed", runtime: { phase: "failed", detail: event.payload.error.message, recoverable: event.payload.error.recoverable }, operationId: event.payload.operationId });
       break;
     case "operation.cancelled":
-      workbench.updateTask(task.id, { lifecycle: "cancelled", runtime: { phase: "ready", detail: event.payload.reason, recoverable: true } });
+      workbench.updateTask(task.id, { lifecycle: "cancelled", runtime: { phase: "ready", detail: event.payload.reason, recoverable: true }, operationId: event.payload.operationId });
       break;
     case "operation.lost":
-      workbench.updateTask(task.id, { lifecycle: "lost", runtime: { phase: "failed", detail: event.payload.reason, recoverable: true } });
+      workbench.updateTask(task.id, { lifecycle: "lost", runtime: { phase: "failed", detail: event.payload.reason, recoverable: true }, operationId: event.payload.operationId });
       break;
     case "session.metaChanged":
       workbench.updateTask(task.id, {
@@ -117,6 +132,30 @@ export function routeWorkbenchAgentEvent(
   return activeTask?.id === task.id
     ? "active"
     : "background";
+}
+
+function operationIdForEvent(event: AgentEvent): string | undefined {
+  switch (event.type) {
+    case "operation.started":
+      return event.payload.operation.operationId;
+    case "operation.heartbeat":
+    case "operation.activityChanged":
+    case "operation.progress":
+    case "operation.completed":
+    case "operation.failed":
+    case "operation.cancelled":
+    case "operation.lost":
+      return event.payload.operationId;
+    default:
+      return undefined;
+  }
+}
+
+function isTerminalTaskLifecycle(lifecycle: string): boolean {
+  return lifecycle === "completed"
+    || lifecycle === "failed"
+    || lifecycle === "cancelled"
+    || lifecycle === "lost";
 }
 
 function eventUpdatesWorkbenchTaskSummary(type: AgentEvent["type"]): boolean {

@@ -13,6 +13,14 @@ import {
   waitForRuntimeReady
 } from "./windows-installed-application-lifecycle.mjs";
 import {
+  parseInitializationObservations,
+  REAL_USER_CATALOG_TIMEOUT_MS,
+  REAL_USER_CREATE_HARD_TIMEOUT_MS,
+  REAL_USER_CREATE_TARGET_MS,
+  REAL_USER_PROVIDER_TIMEOUT_MS,
+  REAL_USER_RESTART_COUNT
+} from "./windows-real-user-lifecycle.mjs";
+import {
   assertPreservedUserData,
   buildNsisInstallArguments,
   parseWindowsInstallerLifecycleArguments,
@@ -46,17 +54,17 @@ describe("Windows installer lifecycle contract", () => {
   it("keeps upgrade and release evidence on the full lifecycle contract", () => {
     expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: true })).toEqual({
       certificationMode: "quick",
-      evidenceLevel: "windows-nsis-silent-install-launch-uninstall",
+      evidenceLevel: "windows-nsis-silent-install-real-user-lifecycle-uninstall",
       verifyReinstall: false
     });
     expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: false })).toEqual({
       certificationMode: "full",
-      evidenceLevel: "windows-nsis-silent-install-reinstall-uninstall",
+      evidenceLevel: "windows-nsis-silent-install-reinstall-real-user-lifecycle-uninstall",
       verifyReinstall: true
     });
     expect(resolveWindowsInstallerLifecycleContract({ baseline: true, quick: false })).toEqual({
       certificationMode: "full",
-      evidenceLevel: "windows-nsis-cross-version-upgrade-uninstall",
+      evidenceLevel: "windows-nsis-cross-version-upgrade-real-user-lifecycle-uninstall",
       verifyReinstall: true
     });
     expect(() => resolveWindowsInstallerLifecycleContract({ baseline: true, quick: true }))
@@ -84,6 +92,44 @@ describe("Windows installer lifecycle contract", () => {
   it("aligns installed runtime readiness with the replay-safe control mutation timeout", () => {
     expect(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS)
       .toBe(CONTROL_MUTATION_ACK_TIMEOUT_MS + 15_000);
+  });
+
+  it("enforces bounded real-user Provider, Catalog, create and restart gates", async () => {
+    expect({
+      catalog: REAL_USER_CATALOG_TIMEOUT_MS,
+      createHard: REAL_USER_CREATE_HARD_TIMEOUT_MS,
+      createTarget: REAL_USER_CREATE_TARGET_MS,
+      provider: REAL_USER_PROVIDER_TIMEOUT_MS,
+      restarts: REAL_USER_RESTART_COUNT
+    }).toEqual({
+      catalog: 5_000,
+      createHard: 15_000,
+      createTarget: 5_000,
+      provider: 10_000,
+      restarts: 3
+    });
+
+    const source = await readFile(
+      join(repositoryRoot, "eng/packaging/verify-windows-installer-lifecycle.mjs"),
+      "utf8"
+    );
+    const realUserGate = source.indexOf("await verifyInstalledRealUserLifecycle({");
+    const uninstall = source.indexOf("const uninstallPath = await resolveUninstallerPath");
+    expect(realUserGate).toBeGreaterThan(-1);
+    expect(uninstall).toBeGreaterThan(realUserGate);
+  });
+
+  it("keeps initialization evidence structured and drops unrelated or malformed output", () => {
+    expect(parseInitializationObservations([
+      "unrelated output",
+      '[agent-host:init] {"stage":"create-session","outcome":"started","durationMs":0}',
+      '[agent-host:init] {"stage":"create-session","outcome":"completed","durationMs":24.6}',
+      '[agent-host:init] {"stage":"private-path","outcome":"completed","durationMs":1}',
+      "[agent-host:init] not-json"
+    ].join("\n"))).toEqual([
+      { stage: "create-session", outcome: "started", durationMs: 0 },
+      { stage: "create-session", outcome: "completed", durationMs: 25 }
+    ]);
   });
 
   it("waits for the controlled prompt projection before measuring installed shutdown", async () => {

@@ -8,7 +8,7 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot,
   WorkbenchSettingsState,
-  WorkbenchStateV2,
+  WorkbenchStateV3,
   WorkbenchSurface,
   WorkspaceDescriptor
 } from "@pi67/domain";
@@ -27,7 +27,7 @@ export type TeamMcpRevealResult =
   | { status: "revealed"; token: string }
   | { status: "missing" };
 
-export type WorkbenchLayoutV2 = {
+export type WorkbenchLayoutV3 = {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -43,14 +43,14 @@ declare global {
         connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
-        loadWorkbenchState(): Promise<WorkbenchStateV2>;
+        loadWorkbenchState(): Promise<WorkbenchStateV3>;
         loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
         updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
-        updateWorkbenchLayout(layout: WorkbenchLayoutV2): Promise<WorkbenchStateV2>;
+        updateWorkbenchLayout(layout: WorkbenchLayoutV3): Promise<WorkbenchStateV3>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
         repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
-        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV2>;
-        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV2>;
+        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV3>;
+        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV3>;
         selectWorkspace(): Promise<string | undefined>;
         selectSessionFile(): Promise<string | undefined>;
         saveDiagnostics(content: string): Promise<string | undefined>;

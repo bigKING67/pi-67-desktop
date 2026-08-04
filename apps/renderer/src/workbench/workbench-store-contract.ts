@@ -5,7 +5,7 @@ import type {
   TaskId,
   TaskLifecycle,
   TaskToolMode,
-  WorkbenchStateV2,
+  WorkbenchStateV3,
   WorkbenchSurface,
   WorkspaceDescriptor,
   WorkspaceId
@@ -28,6 +28,10 @@ export interface RendererWorkbenchTask {
   hasDraft: boolean;
   attachmentCount: number;
   toolMode: TaskToolMode;
+  operationId?: string | undefined;
+  creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
+  recoveryHostInstanceId?: string | undefined;
+  recoveryHostEpoch?: number | undefined;
 }
 
 type TaskOpenResult = "opened" | "selected" | "workspace-missing";
@@ -45,7 +49,7 @@ export interface RendererWorkbenchState {
   settingsSection: SettingsSection;
   settingsScope: "global" | "project";
   settingsWorkspaceId: WorkspaceId | undefined;
-  hydrate: (state: WorkbenchStateV2) => void;
+  hydrate: (state: WorkbenchStateV3) => void;
   registerWorkspace: (workspace: WorkspaceDescriptor) => void;
   unregisterWorkspace: (workspaceId: WorkspaceId) => boolean;
   reorderWorkspaces: (workspaceIds: WorkspaceId[]) => boolean;

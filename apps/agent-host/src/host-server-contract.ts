@@ -1,5 +1,6 @@
 import type {
-  RuntimeCredentialOverrideStore
+  RuntimeCredentialOverrideStore,
+  RuntimeInitializationObservation
 } from "@pi67/pi-runtime";
 import type {
   AgentHostRuntimePoisonedMessage,
@@ -33,6 +34,7 @@ export interface AgentHostServerOptions {
   runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
   sdkVersionLoader?: () => Promise<string>;
   promptAttachments?: PromptAttachmentAccessOwner;
+  onRuntimeInitializationObservation?: (observation: RuntimeInitializationObservation) => void;
 }
 
 export type AgentHostShutdownResult = Omit<AgentHostShutdownCompleteMessage, "type">;

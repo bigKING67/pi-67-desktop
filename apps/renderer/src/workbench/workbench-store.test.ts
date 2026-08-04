@@ -2,7 +2,7 @@ import {
   MAX_RUNNING_TASKS,
   type RuntimeStatus,
   type TaskLifecycle,
-  type WorkbenchStateV2,
+  type WorkbenchStateV3,
   type WorkspaceDescriptor
 } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
@@ -142,8 +142,8 @@ describe("renderer workbench store", () => {
   it("normalizes a previously persisted Settings surface to its recoverable task", () => {
     const store = createRendererWorkbenchStore();
     const conversation = sessionConversation("task-a", "a");
-    const persisted: WorkbenchStateV2 = {
-      version: 2,
+    const persisted: WorkbenchStateV3 = {
+      version: 3,
       workspaces: [workspace("a", "/work/a")],
       workspaceOrder: ["a"],
       expandedWorkspaceIds: ["a"],
@@ -154,6 +154,9 @@ describe("renderer workbench store", () => {
         conversation,
         sessionId: "session-task-a",
         taskGeneration: 1,
+        sessionGeneration: 2,
+        hostInstanceId: "host-1",
+        hostEpoch: 1,
         lastKnownLifecycle: "running"
       }],
       settings: { section: "runtime", scope: "global" },

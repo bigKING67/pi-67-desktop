@@ -35,7 +35,10 @@ await bootstrapTeamMcpConfig({
 const promptAttachments = createPromptAttachmentAccessOwner(process.env.PI67_PROMPT_ATTACHMENT_ROOT);
 const server = new AgentHostServer(undefined, {
   ...(promptAttachments === undefined ? {} : { promptAttachments }),
-  onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message)
+  onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message),
+  onRuntimeInitializationObservation: (observation) => {
+    process.stderr.write(`[agent-host:init] ${JSON.stringify(observation)}\n`);
+  }
 });
 let shuttingDown = false;
 let shutdownPromise: Promise<void> | undefined;

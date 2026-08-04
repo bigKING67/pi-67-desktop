@@ -70,6 +70,7 @@ export type SessionCatalogChangedReason =
   | "session-updated"
   | "session-imported"
   | "conversation-organized"
+  | "automatic-title"
   | "source-changed";
 
 export interface SessionCatalogChangedEvent {

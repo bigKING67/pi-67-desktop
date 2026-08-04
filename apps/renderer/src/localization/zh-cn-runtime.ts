@@ -3,6 +3,8 @@ export const zhCNRuntimeMessages = {
   session: {
     creating: "正在创建 Pi 新会话",
     createFailed: "无法创建 Pi 会话",
+    confirmingCreation: "正在确认对话是否已创建",
+    creationOutcomeUnknown: "对话创建结果尚未确认，请等待运行服务完成对账。",
     starting: "正在启动 Pi 会话",
     forking: "正在准备 Pi 会话",
     forkFailed: "无法准备 Pi 会话",

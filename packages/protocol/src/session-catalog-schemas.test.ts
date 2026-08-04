@@ -217,6 +217,7 @@ describe("Session Catalog protocol schemas", () => {
       "session-updated",
       "session-imported",
       "conversation-organized",
+      "automatic-title",
       "source-changed"
     ] as const) {
       expect(isEventEnvelope(eventEnvelope("session.catalog.changed", {

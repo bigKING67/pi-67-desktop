@@ -20,7 +20,7 @@ import { createRuntimeCredentialOverrideStore, type RuntimeCredentialOverrideSto
 import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-metadata.js";
 import { PiRuntimeConfigurationReload } from "./pi-runtime-configuration-reload.js";
 import { RuntimeProjectionController } from "./runtime-projection-controller.js";
-import { reportRuntimeInitializationStage } from "./runtime-initialization-observer.js";
+import { runRuntimeInitializationStage } from "./runtime-initialization-observer.js";
 import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from "./runtime-session-catalog.js";
 import { RuntimeSessionTransitions } from "./runtime-session-transitions.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
@@ -181,33 +181,32 @@ export class PiSdkRuntime implements AgentRuntime {
       this.uiBridge.cancelAll("runtime-dispose");
       const nextAgentDir = options.agentDir ?? getAgentDir();
       this.workspaceServices?.assertCompatible(options.cwd, nextAgentDir);
-      reportRuntimeInitializationStage(observeStage, "resolve-session");
-      const sessionPath = options.sessionPath
-        ? await resolveManagedSessionPath(options.sessionPath, options.cwd, nextAgentDir)
-        : undefined;
-      const sessionManager = sessionPath ? SessionManager.open(sessionPath, undefined, options.cwd) : undefined;
+      const sessionManager = await runRuntimeInitializationStage(observeStage, "resolve-session", async () => {
+        const sessionPath = options.sessionPath
+          ? await resolveManagedSessionPath(options.sessionPath, options.cwd, nextAgentDir)
+          : undefined;
+        return sessionPath ? SessionManager.open(sessionPath, undefined, options.cwd) : undefined;
+      });
 
       // Keep the old policy visible through its shutdown hooks, then commit the
       // target workspace policy before target services or extensions are loaded.
-      reportRuntimeInitializationStage(observeStage, "dispose-current");
-      await this.sessionBindings.disposeRuntime();
+      await runRuntimeInitializationStage(observeStage, "dispose-current", () => this.sessionBindings.disposeRuntime());
       this.agentDir = nextAgentDir;
       this.toolSafety.initialize(options.cwd, options.trust, options.approvalMode);
       this.workspaceServices?.setProjectTrusted(options.trust === "trusted");
-      reportRuntimeInitializationStage(observeStage, "create-session");
-      await this.sessionBindings.createInitial(options.cwd, sessionManager);
-      reportRuntimeInitializationStage(observeStage, "reload-configuration");
-      await this.configurationReload.apply();
-      reportRuntimeInitializationStage(observeStage, "update-catalog");
-      await this.sessionCatalog.upsertCurrent("session-updated");
-      reportRuntimeInitializationStage(observeStage, "project-snapshot");
-      return this.getSnapshot();
+      await runRuntimeInitializationStage(observeStage, "create-session", () => (
+        this.sessionBindings.createInitial(options.cwd, sessionManager)
+      ));
+      await runRuntimeInitializationStage(observeStage, "reload-configuration", () => this.configurationReload.apply());
+      await runRuntimeInitializationStage(observeStage, "update-catalog", () => this.sessionCatalog.upsertCurrent("session-updated"));
+      return runRuntimeInitializationStage(observeStage, "project-snapshot", () => this.getSnapshot());
     });
   }
 
   async dispose(): Promise<void> {
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
+    await this.configurationReload.dispose();
     await this.sessionBindings.settleAndDispose();
     await this.sessionCatalog.dispose();
     this.runtimeCredentialUnsubscribe?.();

@@ -1,9 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  CONTROLLED_PROMPT_TEXT,
   isProcessAlive,
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
+import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -17,6 +19,7 @@ import {
   inspectRendererSurface,
   openSettingsSection,
   runControlledShutdownScenario,
+  waitForPersistedRuntimeRecovery,
   verifyColdProviderRestoration,
   verifyInitialRuntimeSettings
 } from "./packaged-electron-smoke-scenarios.mjs";
@@ -362,13 +365,22 @@ try {
     throw new Error(`Packaged Settings did not return to the conversation: ${JSON.stringify(returnedSurface)}`, { cause: error });
   }
   await capturePackagedWorkbenchVisualEvidence(application, window);
+  await startControlledPrompt(window);
+  await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
+  await window.getByRole("button", { name: "停止", exact: true })
+    .waitFor({ state: "hidden", timeout: 10_000 });
+  await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 10_000 });
+  await window.locator('[data-testid="conversation-row"][aria-current="page"]')
+    .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
+  await waitForPersistedRuntimeRecovery(userDataDirectory);
   await window.reload();
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
   const restoredConversation = window.getByLabel("Pi conversation");
   const restoreTask = window.getByRole("button", { name: "恢复任务", exact: true });
   const createConversation = window.getByRole("button", { name: "新建会话", exact: true });
   try {
-    await restoredConversation.or(restoreTask).or(createConversation).waitFor({ state: "visible", timeout: 30_000 });
+    await restoredConversation.or(restoreTask).or(createConversation)
+      .waitFor({ state: "visible", timeout: 30_000 });
   } catch (error) {
     const reloadSurface = await inspectRendererSurface(window);
     throw new Error(`Packaged workspace did not restore after reload: ${JSON.stringify(reloadSurface)}`, { cause: error });

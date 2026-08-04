@@ -48,9 +48,10 @@ describe("Desktop tool routing Extension integration", () => {
       requestApproval
     });
     const aliases = createDesktopToolAliasBinding();
+    const sessionManager = SessionManager.inMemory(cwd);
     const { session } = await createAgentSessionFromServices({
       services,
-      sessionManager: SessionManager.inMemory(cwd),
+      sessionManager,
       customTools: aliases.tools
     });
     aliases.bind(session);
@@ -93,7 +94,7 @@ describe("Desktop tool routing Extension integration", () => {
         bashInput,
         undefined,
         undefined,
-        {} as never
+        { sessionManager } as never
       );
       expect(bashResult.content).toEqual([expect.objectContaining({
         type: "text",

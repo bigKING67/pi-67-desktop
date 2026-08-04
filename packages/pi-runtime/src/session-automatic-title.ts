@@ -3,7 +3,9 @@ import { conversationTitleCandidate } from "@pi67/domain";
 
 const READ_CHUNK_BYTES = 128 * 1024;
 const MAX_LINE_BYTES = 4 * 1024 * 1024;
+const MAX_TAIL_BYTES = 8 * 1024 * 1024;
 const DEFAULT_CACHE_ITEMS = 512;
+const MAX_BACKGROUND_WORKERS = 4;
 
 interface CachedTitle {
   key: string;
@@ -12,25 +14,80 @@ interface CachedTitle {
 
 export class SessionAutomaticTitleReader {
   private readonly cache = new Map<string, CachedTitle>();
+  private readonly queuedCallbacks = new Map<string, Set<(path: string) => void>>();
+  private readonly queue: string[] = [];
+  private activeWorkers = 0;
+  private generation = 0;
 
   constructor(private readonly maximumItems = DEFAULT_CACHE_ITEMS) {}
 
   async read(path: string): Promise<string | undefined> {
+    const loaded = await this.load(path);
+    if (!loaded) return undefined;
+    this.touch(path, loaded);
+    return loaded.value;
+  }
+
+  peek(path: string): string | undefined {
+    const cached = this.cache.get(path);
+    if (!cached) return undefined;
+    this.touch(path, cached);
+    return cached.value;
+  }
+
+  enqueue(paths: readonly string[], onTitleChanged: (path: string) => void): void {
+    for (const path of paths) {
+      const callbacks = this.queuedCallbacks.get(path);
+      if (callbacks) {
+        callbacks.add(onTitleChanged);
+        continue;
+      }
+      this.queuedCallbacks.set(path, new Set([onTitleChanged]));
+      this.queue.push(path);
+    }
+    this.drain();
+  }
+
+  clear(): void {
+    this.generation += 1;
+    this.queue.length = 0;
+    this.queuedCallbacks.clear();
+    this.cache.clear();
+  }
+
+  private drain(): void {
+    while (this.activeWorkers < MAX_BACKGROUND_WORKERS) {
+      const path = this.queue.shift();
+      if (!path) return;
+      this.activeWorkers += 1;
+      const generation = this.generation;
+      void this.refreshQueued(path, generation).finally(() => {
+        this.activeWorkers -= 1;
+        this.drain();
+      });
+    }
+  }
+
+  private async refreshQueued(path: string, generation: number): Promise<void> {
+    const previous = this.cache.get(path)?.value;
+    const loaded = await this.load(path);
+    if (generation !== this.generation) return;
+    const callbacks = this.queuedCallbacks.get(path);
+    this.queuedCallbacks.delete(path);
+    if (!loaded) return;
+    this.touch(path, loaded);
+    if (loaded.value === undefined || loaded.value === previous) return;
+    for (const callback of callbacks ?? []) callback(path);
+  }
+
+  private async load(path: string): Promise<CachedTitle | undefined> {
     const file = await stat(path, { bigint: true }).catch(() => undefined);
     if (!file?.isFile()) return undefined;
     const key = `${file.dev}:${file.ino}:${file.mtimeNs}:${file.size}`;
     const cached = this.cache.get(path);
-    if (cached?.key === key) {
-      this.touch(path, cached);
-      return cached.value;
-    }
+    if (cached?.key === key) return cached;
     const value = await readLatestUserTitle(path, Number(file.size)).catch(() => undefined);
-    this.touch(path, { key, value });
-    return value;
-  }
-
-  clear(): void {
-    this.cache.clear();
+    return { key, value };
   }
 
   private touch(path: string, value: CachedTitle): void {
@@ -48,11 +105,12 @@ async function readLatestUserTitle(path: string, size: number): Promise<string |
   if (!Number.isSafeInteger(size) || size <= 0) return undefined;
   const handle = await open(path, "r");
   let offset = size;
+  const minimumOffset = Math.max(0, size - MAX_TAIL_BYTES);
   let suffix = Buffer.alloc(0);
   let targetId: string | null | undefined;
   try {
-    while (offset > 0) {
-      const length = Math.min(READ_CHUNK_BYTES, offset);
+    while (offset > minimumOffset) {
+      const length = Math.min(READ_CHUNK_BYTES, offset - minimumOffset);
       offset -= length;
       const buffer = Buffer.allocUnsafe(length);
       const read = await handle.read(buffer, 0, length, offset);

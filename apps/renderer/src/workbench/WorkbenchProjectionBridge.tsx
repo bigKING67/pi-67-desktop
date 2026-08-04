@@ -27,6 +27,8 @@ export function WorkbenchProjectionBridge() {
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionPath = useSessionProjectionStore(selectSessionPath);
+  const operation = useAppStore((state) => state.operation);
+  const runtime = useAppStore((state) => state.runtime);
   const conversationAuthority = useConversationStore((state) => state.authority);
   const conversationMessages = useConversationStore((state) => state.messages);
   const recentUserMessagePreview = useMemo(() => {
@@ -78,7 +80,6 @@ export function WorkbenchProjectionBridge() {
       ? selected
       : undefined;
     const existing = matchingSession ?? provisional;
-    const { operation, runtime } = useAppStore.getState();
     const task = workbenchTaskFromProjection({
       ...(existing ? { existing } : {}),
       workspaceId,
@@ -99,6 +100,8 @@ export function WorkbenchProjectionBridge() {
     lastProjectedTaskId.current = taskId;
   }, [
     recentUserMessagePreview,
+    operation,
+    runtime,
     sessionGeneration,
     sessionId,
     sessionName,
@@ -142,10 +145,24 @@ export function workbenchTaskFromProjection({
   const effectiveUserMessagePreview = projectionMatchesExistingSession
     ? existing.recentUserMessagePreview ?? recentUserMessagePreview
     : recentUserMessagePreview;
+  const existingMaterializedPath = projectionMatchesExistingSession
+    && existing?.conversation.kind === "session"
+    ? existing.sessionPath ?? existing.conversation.sessionPath
+    : undefined;
+  const materializedPath = sessionPath ?? existingMaterializedPath;
+  const authoritativeOperation = operation
+    && sessionGeneration !== undefined
+    && operation.sessionId === sessionId
+    && operation.sessionGeneration === sessionGeneration
+    ? operation
+    : undefined;
+  const authoritativeRuntime = authoritativeOperation
+    ? runtime
+    : { phase: "ready" as const, detail: "Pi SDK 已就绪", recoverable: true };
   return {
     id: existing?.id ?? `${workspaceId}:${sessionId}`,
-    conversation: sessionPath
-      ? { kind: "session", workspaceId, sessionPath }
+    conversation: materializedPath
+      ? { kind: "session", workspaceId, sessionPath: materializedPath }
       : existing?.conversation ?? {
           kind: "provisional",
           workspaceId,
@@ -155,17 +172,21 @@ export function workbenchTaskFromProjection({
     sessionId,
     taskGeneration: existing?.taskGeneration ?? 1,
     ...(sessionGeneration === undefined ? {} : { sessionGeneration }),
-    lifecycle: existing?.lifecycle ?? taskLifecycle(operation),
-    runtime: existing?.runtime ?? runtime,
-    title: sessionName?.trim() || "未命名任务",
-    titleSource: sessionName?.trim() ? "explicit" : "fallback",
+    lifecycle: taskLifecycle(authoritativeOperation),
+    runtime: authoritativeRuntime,
+    title: sessionName?.trim() || existing?.title || "未命名任务",
+    titleSource: sessionName?.trim() ? "explicit" : existing?.titleSource ?? "fallback",
     ...(effectiveUserMessagePreview
       ? { recentUserMessagePreview: effectiveUserMessagePreview }
       : {}),
-    ...(sessionPath ? { sessionPath } : {}),
+    ...(materializedPath ? { sessionPath: materializedPath } : {}),
     hasDraft: existing?.hasDraft ?? false,
     attachmentCount: existing?.attachmentCount ?? 0,
-    toolMode: existing?.toolMode ?? "auto"
+    toolMode: existing?.toolMode ?? "auto",
+    operationId: authoritativeOperation?.operationId,
+    recoveryHostInstanceId: undefined,
+    recoveryHostEpoch: undefined,
+    creationStatus: undefined
   };
 }
 

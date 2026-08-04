@@ -32,6 +32,7 @@ import type {
   SessionCatalogContext
 } from "./session-catalog-contract.js";
 import { SessionCatalogRecordEnricher } from "./session-catalog-record-enricher.js";
+import { SessionCatalogAutomaticTitlePublisher } from "./session-catalog-automatic-title-publisher.js";
 import { SessionCatalogSqliteLifecycle } from "./session-catalog-sqlite-lifecycle.js";
 import {
   openSqliteSessionCatalog,
@@ -78,6 +79,7 @@ class DefaultSessionCatalog implements SessionCatalog {
   private readonly onChanged: ((event: SessionCatalogChangedEvent) => void) | undefined;
   private readonly now: () => number;
   private readonly recordEnricher: SessionCatalogRecordEnricher;
+  private readonly automaticTitlePublisher = new SessionCatalogAutomaticTitlePublisher();
   constructor(options: CreateSessionCatalogOptions) {
     this.onChanged = options.onChanged;
     this.now = options.now ?? (() => Date.now());
@@ -109,9 +111,14 @@ class DefaultSessionCatalog implements SessionCatalog {
       }
       const result = this.readProjection(validated);
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
-      return this.recordEnricher.withAutomaticTitles(result.records).then((records) => createBoundedSessionCatalogPage(
+      const records = this.recordEnricher.withCachedAutomaticTitles(result.records);
+      const page = createBoundedSessionCatalogPage(
         { ...result, records }, this.current, validated.limit, queryKey
-      ));
+      );
+      this.recordEnricher.queueAutomaticTitles(result.records, () => {
+        this.scheduleAutomaticTitlePublish(context, contextGeneration);
+      });
+      return page;
     });
   }
   status(): SessionCatalogStatus {
@@ -215,6 +222,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.sqliteLifecycle.close();
     this.fallbackRecords = [];
     this.pendingUpserts.clear();
+    this.automaticTitlePublisher.dispose();
     this.recordEnricher.clear();
     this.activeContext = undefined;
   }
@@ -427,6 +435,12 @@ class DefaultSessionCatalog implements SessionCatalog {
   }
   private publish(reason: SessionCatalogChangedReason): void {
     if (!this.disposed) this.onChanged?.({ revision: this.current.revision, reason });
+  }
+  private scheduleAutomaticTitlePublish(context: SessionCatalogContext, contextGeneration: number): void {
+    this.automaticTitlePublisher.schedule(
+      () => this.isCurrentContext(context, contextGeneration),
+      () => this.publish("automatic-title")
+    );
   }
   private isCurrentContext(context: SessionCatalogContext, contextGeneration: number): boolean {
     return !this.disposed

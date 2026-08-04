@@ -54,6 +54,17 @@ describe("packaged Electron launch environment", () => {
     expect(environment.PI67_RENDERER_DEV_URL).toBe("http://127.0.0.1:5173");
   });
 
+  it("removes inherited and caller-provided offline mode for the real-user lifecycle", () => {
+    const environment = packagedApplicationEnvironment({
+      agentDir: "C:\\fixture\\agent",
+      environment: { PI_OFFLINE: "caller-value" },
+      hostEnvironment: { PI_OFFLINE: "inherited-value" },
+      offline: false
+    });
+
+    expect(environment).not.toHaveProperty("PI_OFFLINE");
+  });
+
   it("keeps every Node OCR fallback while excluding browser-only payloads", () => {
     expect(packagedAttachmentRequiredAsarPaths).toEqual(expect.arrayContaining([
       "node_modules/tesseract.js-core/tesseract-core.wasm",

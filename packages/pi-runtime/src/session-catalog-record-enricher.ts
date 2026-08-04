@@ -33,20 +33,19 @@ export class SessionCatalogRecordEnricher {
     return records.map((record) => this.withOrganization(sourceKey, record));
   }
 
-  async withAutomaticTitles(records: SessionCatalogRecord[]): Promise<SessionCatalogRecord[]> {
-    const output = [...records];
-    const workerCount = Math.min(4, output.length);
-    let next = 0;
-    await Promise.all(Array.from({ length: workerCount }, async () => {
-      while (next < output.length) {
-        const index = next++;
-        const record = output[index];
-        if (!record || record.explicitName !== undefined) continue;
-        const automaticName = await this.automaticTitles.read(record.path);
-        if (automaticName !== undefined) output[index] = { ...record, automaticName };
-      }
-    }));
-    return output;
+  withCachedAutomaticTitles(records: SessionCatalogRecord[]): SessionCatalogRecord[] {
+    return records.map((record) => {
+      if (record.explicitName !== undefined) return record;
+      const automaticName = this.automaticTitles.peek(record.path);
+      return automaticName === undefined ? record : { ...record, automaticName };
+    });
+  }
+
+  queueAutomaticTitles(records: SessionCatalogRecord[], onTitleChanged: () => void): void {
+    this.automaticTitles.enqueue(
+      records.filter((record) => record.explicitName === undefined).map((record) => record.path),
+      onTitleChanged
+    );
   }
 
   async organize(

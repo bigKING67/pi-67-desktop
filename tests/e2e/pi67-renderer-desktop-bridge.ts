@@ -82,7 +82,7 @@ export async function installMockDesktopBridge(
   };
   await page.addInitScript((bridgeFixture) => {
     type FixtureWorkbenchState = {
-      version: 2;
+      version: 3;
       workspaces: MockWorkspaceDescriptor[];
       workspaceOrder: string[];
       expandedWorkspaceIds: string[];
@@ -138,7 +138,7 @@ export async function installMockDesktopBridge(
     };
     let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     let workbenchState: FixtureWorkbenchState = {
-      version: 2 as const,
+      version: 3 as const,
       workspaces: structuredClone(bridgeFixture.initialWorkspaces),
       workspaceOrder: bridgeFixture.initialWorkspaces.map((workspace) => workspace.id),
       expandedWorkspaceIds: structuredClone(bridgeFixture.expandedWorkspaceIds),
@@ -196,7 +196,7 @@ export async function installMockDesktopBridge(
               ? (currentWorkspaceId ? { kind: "workspace" as const, workspaceId: currentWorkspaceId } : undefined)
               : workbenchState.selectedSurface;
             workbenchState = {
-              version: 2,
+              version: 3,
               workspaces: workbenchState.workspaces.filter((item) => item.id !== workspaceId),
               workspaceOrder,
               expandedWorkspaceIds: workbenchState.expandedWorkspaceIds.filter((id) => id !== workspaceId),

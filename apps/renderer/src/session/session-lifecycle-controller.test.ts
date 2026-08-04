@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ProtocolRequestError } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
 import {
   runIncrementalSessionTransition,
@@ -60,24 +61,29 @@ describe("session lifecycle controller", () => {
       conversation: { kind: "provisional", workspaceId: "workspace-a" },
       sessionId: expect.stringMatching(/^pending:task-/u),
       lifecycle: "initializing",
-      runtime: { phase: "starting", detail: "正在启动 Pi 会话" }
+      runtime: { phase: "starting", detail: "正在启动 Pi 会话" },
+      creationStatus: "pending"
     });
 
     await options.request();
-    expect(request).toHaveBeenCalledWith("session.create", {});
+    expect(request).toHaveBeenCalledWith("session.create", {}, [], {
+      onAcknowledgementDelayed: expect.any(Function)
+    });
+    const delayed = request.mock.calls[0]?.[3]?.onAcknowledgementDelayed;
+    delayed?.();
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]).toMatchObject({
+      creationStatus: "confirming",
+      runtime: { phase: "starting", detail: "正在确认对话是否已创建" }
+    });
   });
 
-  it("marks the provisional Task and live projection failed when creation fails", async () => {
+  it("removes an empty provisional Task when creation fails", async () => {
     await createRendererSession();
     const options = runBootstrap.mock.calls[0]![2];
 
     options.onError(new Error("create failed"));
 
-    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
-    expect(task).toMatchObject({
-      lifecycle: "failed",
-      runtime: { phase: "failed", detail: "无法创建 Pi 会话", recoverable: true }
-    });
+    expect(rendererWorkbenchStore.getState().tasks).toEqual({});
     expect(useAppStore.getState().runtime).toEqual({
       phase: "failed",
       detail: "无法创建 Pi 会话：create failed",
@@ -87,6 +93,65 @@ describe("session lifecycle controller", () => {
       level: "error",
       title: "无法创建 Pi 会话",
       message: "create failed"
+    });
+  });
+
+  it("preserves a non-empty in-memory draft when creation fails", async () => {
+    await createRendererSession();
+    const options = runBootstrap.mock.calls[0]![2];
+    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+    useTaskDraftStore.getState().setText(task!.id, "保留这个草稿");
+
+    options.onError(new Error("create failed"));
+
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]).toMatchObject({
+      lifecycle: "draft",
+      runtime: { phase: "failed", detail: "无法创建 Pi 会话", recoverable: true }
+    });
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]?.creationStatus).toBeUndefined();
+    expect(useTaskDraftStore.getState().drafts[task!.id]?.text).toBe("保留这个草稿");
+  });
+
+  it("keeps one unconfirmed Task when the create acknowledgement outcome is unknown", async () => {
+    await createRendererSession();
+    const options = runBootstrap.mock.calls[0]![2];
+    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+
+    options.onError(new ProtocolRequestError({
+      code: "REQUEST_OUTCOME_UNKNOWN",
+      message: "not acknowledged",
+      recoverable: true
+    }));
+
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]).toMatchObject({
+      lifecycle: "draft",
+      creationStatus: "unconfirmed",
+      runtime: {
+        phase: "failed",
+        detail: "对话创建结果尚未确认，请等待运行服务完成对账。",
+        recoverable: true
+      }
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "正在确认对话是否已创建"
+    });
+  });
+
+  it("selects the existing pending creation instead of issuing a second create", async () => {
+    await createRendererSession();
+    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+
+    await createRendererSession();
+
+    expect(runBootstrap).toHaveBeenCalledOnce();
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+      kind: "conversation",
+      conversation: task!.conversation
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "正在确认对话是否已创建"
     });
   });
 

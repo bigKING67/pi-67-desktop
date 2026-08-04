@@ -77,7 +77,7 @@ export type SettingsSection =
   | "updates"
   | "about";
 
-export interface RuntimeRecoveryRecord {
+export interface RuntimeRecoveryRecordV2 {
   taskId: TaskId;
   conversation: ConversationKey;
   sessionId: string;
@@ -93,6 +93,29 @@ export interface WorkbenchSettingsState {
 
 export interface WorkbenchStateV2 {
   version: 2;
+  workspaces: WorkspaceDescriptor[];
+  workspaceOrder: WorkspaceId[];
+  expandedWorkspaceIds: WorkspaceId[];
+  currentWorkspaceId?: WorkspaceId;
+  selectedSurface?: WorkbenchSurface;
+  runtimeRecovery: RuntimeRecoveryRecordV2[];
+  settings: WorkbenchSettingsState;
+  cleanExit: boolean;
+}
+
+export interface RuntimeRecoveryRecord {
+  taskId: TaskId;
+  conversation: Extract<ConversationKey, { kind: "session" }>;
+  sessionId: string;
+  taskGeneration: number;
+  sessionGeneration: number;
+  hostInstanceId: string;
+  hostEpoch: number;
+  lastKnownLifecycle: TaskLifecycle;
+}
+
+export interface WorkbenchStateV3 {
+  version: 3;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: WorkspaceId[];
   expandedWorkspaceIds: WorkspaceId[];

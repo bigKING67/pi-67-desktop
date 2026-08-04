@@ -1,5 +1,6 @@
 import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { ProtocolRequestError } from "@pi67/protocol";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import {
   invalidateProjectionRecoveryGeneration,
@@ -133,19 +134,31 @@ export async function openRendererWorkspaceDescriptor(
       }
       if (disposition === "stale") return false;
     }
-    const detail = errorMessage(error);
+    const missingSession = Boolean(sessionPath) && isMissingSessionError(error);
+    const detail = missingSession ? "对话记录已不存在" : errorMessage(error);
     const failureTitle = sessionPath ? "无法打开会话" : "无法打开工作区";
     const runtime = {
-      phase: "failed" as const,
-      detail: `${failureTitle}：${detail}`,
+      phase: missingSession ? "stopped" as const : "failed" as const,
+      detail: missingSession ? detail : `${failureTitle}：${detail}`,
       recoverable: true
     };
     set({
       sessionTransitionPending: false,
       runtime
     });
-    rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
-    publishNotification({ level: "error", title: failureTitle, message: detail });
+    if (missingSession) {
+      const workbench = rendererWorkbenchStore.getState();
+      workbench.removeRuntimeTask(task.id);
+      workbench.selectWorkspace(descriptor.id);
+      publishNotification({
+        level: "warning",
+        title: "对话记录已不存在",
+        message: "该对话可能已被移动或删除，请从左侧选择其他对话。"
+      });
+    } else {
+      rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
+      publishNotification({ level: "error", title: failureTitle, message: detail });
+    }
     return false;
   }
 }
@@ -227,6 +240,14 @@ function requireRendererSessionTransition(state: AppState): RendererSessionTrans
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "未知错误";
+}
+
+function isMissingSessionError(error: unknown): boolean {
+  if (error instanceof ProtocolRequestError && error.code === "RESOURCE_NOT_FOUND") return true;
+  if (!(error instanceof Error)) return false;
+  const code = "code" in error ? String(error.code) : "";
+  return code === "ENOENT"
+    || /\bENOENT\b|no such file or directory/iu.test(error.message);
 }
 
 function basename(path: string): string {

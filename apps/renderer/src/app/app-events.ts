@@ -59,7 +59,11 @@ export function handleAgentEvent<TState extends AppEventState>(
       return;
     case "session.catalog.changed":
       if (envelope.context.scope !== "app") {
-        handleSessionCatalogChanged(envelope.context.workspaceId, event.payload.revision);
+        handleSessionCatalogChanged(
+          envelope.context.workspaceId,
+          event.payload.revision,
+          event.payload.reason
+        );
       }
       return;
     case "session.externalChangeDetected":

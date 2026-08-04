@@ -6,7 +6,7 @@ import {
 import type { RendererWorkbenchTask } from "./workbench-store.js";
 
 describe("WorkbenchProjectionBridge", () => {
-  it("preserves event-owned lifecycle and runtime while metadata projections update", () => {
+  it("atomically replaces a stale Task lifecycle and runtime from the active projection", () => {
     const existing: RendererWorkbenchTask = {
       id: "task-a",
       conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
@@ -47,13 +47,14 @@ describe("WorkbenchProjectionBridge", () => {
       hasDraft: true,
       attachmentCount: 2,
       recentUserMessagePreview: "最后一次用户消息",
-      lifecycle: "idle",
-      runtime: { phase: "ready", detail: "ready" }
+      lifecycle: "running",
+      runtime: { phase: "busy", detail: "running" },
+      operationId: "operation-a"
     });
   });
 
-  it("uses the App projection only to initialize a new Task", () => {
-    expect(workbenchTaskFromProjection({
+  it("materializes a new Task from an authoritative Session projection", () => {
+    const projected = workbenchTaskFromProjection({
       workspaceId: "workspace-a",
       sessionId: "session-a",
       sessionGeneration: 2,
@@ -69,10 +70,97 @@ describe("WorkbenchProjectionBridge", () => {
       runtime: { phase: "busy", detail: "running", recoverable: true },
       sessionName: "Task A",
       sessionPath: "/work/a/session-a.jsonl"
-    })).toMatchObject({
+    });
+    expect(projected).toMatchObject({
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionPath: "/work/a/session-a.jsonl"
+      },
+      sessionPath: "/work/a/session-a.jsonl",
       lifecycle: "running",
       runtime: { phase: "busy", detail: "running" },
       toolMode: "auto"
+    });
+  });
+
+  it("replaces a provisional conversation after Session creation is materialized", () => {
+    const existing: RendererWorkbenchTask = {
+      id: "task-pending",
+      conversation: {
+        kind: "provisional",
+        workspaceId: "workspace-a",
+        draftId: "task-pending"
+      },
+      workspaceId: "workspace-a",
+      sessionId: "pending:task-pending",
+      taskGeneration: 1,
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "creating", recoverable: true },
+      title: "未命名任务",
+      hasDraft: false,
+      toolMode: "auto",
+      attachmentCount: 0,
+      creationStatus: "pending"
+    };
+
+    expect(workbenchTaskFromProjection({
+      existing,
+      workspaceId: "workspace-a",
+      sessionId: "session-created",
+      sessionGeneration: 1,
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      sessionPath: "/work/a/session-created.jsonl"
+    })).toMatchObject({
+      id: "task-pending",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionPath: "/work/a/session-created.jsonl"
+      },
+      sessionId: "session-created",
+      sessionPath: "/work/a/session-created.jsonl",
+      lifecycle: "idle",
+      creationStatus: undefined
+    });
+  });
+
+  it("projects an idle ready Task when no operation matches the Session authority", () => {
+    const existing: RendererWorkbenchTask = {
+      id: "task-a",
+      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
+      workspaceId: "workspace-a",
+      sessionId: "session-a",
+      sessionGeneration: 2,
+      taskGeneration: 3,
+      lifecycle: "running",
+      runtime: { phase: "busy", detail: "stale operation", recoverable: true },
+      title: "Task A",
+      sessionPath: "/work/a/session-a.jsonl",
+      hasDraft: false,
+      toolMode: "auto",
+      attachmentCount: 0,
+      operationId: "old-operation"
+    };
+
+    expect(workbenchTaskFromProjection({
+      existing,
+      workspaceId: "workspace-a",
+      sessionId: "session-a",
+      sessionGeneration: 2,
+      operation: {
+        operationId: "other-session-operation",
+        kind: "prompt",
+        lifecycle: "running",
+        cancellable: true,
+        sessionId: "session-b",
+        sessionGeneration: 1,
+        startedAt: 1
+      },
+      runtime: { phase: "busy", detail: "other Session", recoverable: true }
+    })).toMatchObject({
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
     });
   });
 
