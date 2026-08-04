@@ -2,6 +2,7 @@ import {
   DEFAULT_SESSION_CATALOG_PAGE_ITEMS,
   type SessionCatalogCursor,
   type SessionCatalogPage,
+  type SessionCatalogView,
   type WorkspaceId
 } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
@@ -62,12 +63,14 @@ export function querySessionCatalogPage(options: {
   query?: string;
   cursor?: SessionCatalogCursor;
   refresh?: boolean;
+  view?: SessionCatalogView;
 }): Promise<SessionCatalogPage> {
   const { workspaceId } = options;
   const query = normalizeSessionCatalogQuery(options.query ?? "");
   return agentConnectionController.request("session.catalog.query", {
     scope: "workspace",
     limit: DEFAULT_SESSION_CATALOG_PAGE_ITEMS,
+    ...(options.view && options.view !== "active" ? { view: options.view } : {}),
     ...(query ? { search: query } : {}),
     ...(options.cursor ? { cursor: options.cursor } : {}),
     ...(options.refresh ? { refresh: true } : {})

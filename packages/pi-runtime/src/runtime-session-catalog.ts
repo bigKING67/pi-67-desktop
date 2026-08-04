@@ -31,6 +31,8 @@ export interface RuntimeSessionCatalog {
   query(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
   status(): SessionCatalogStatus;
   upsertCurrent(reason: UpsertReason): Promise<void>;
+  upsertRecord(record: SessionCatalogRecord, reason: UpsertReason): Promise<void>;
+  organize(path: string, mutation: { kind: "pin" | "archive"; value: boolean }): Promise<number>;
   dispose(): Promise<void>;
 }
 
@@ -71,6 +73,14 @@ export function createRuntimeSessionCatalogOwner(
           if (bindingDisposed) return Promise.resolve();
           return upsertCurrentSession(catalog, target, reason);
         },
+        upsertRecord(record, reason) {
+          if (bindingDisposed) return Promise.resolve();
+          return catalog.upsert(record, createContext(target), reason);
+        },
+        organize(path, mutation) {
+          if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
+          return catalog.organize(path, mutation, createContext(target));
+        },
         async dispose() {
           if (bindingDisposed) return;
           bindingDisposed = true;
@@ -99,6 +109,8 @@ export function createRuntimeSessionCatalog(
     query: (query) => binding.query(query),
     status: () => binding.status(),
     upsertCurrent: (reason) => binding.upsertCurrent(reason),
+    upsertRecord: (record, reason) => binding.upsertRecord(record, reason),
+    organize: (path, mutation) => binding.organize(path, mutation),
     async dispose() {
       await binding.dispose();
       await owner.dispose();

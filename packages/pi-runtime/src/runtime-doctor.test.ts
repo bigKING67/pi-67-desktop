@@ -10,7 +10,10 @@ describe("Runtime Doctor Session Catalog status", () => {
 
   it("passes only a complete, settled ready Catalog", async () => {
     const report = await createDoctorReport(undefined, undefined, status());
-    expect(report.checks.find((check) => check.id === "session-catalog")?.status).toBe("pass");
+    expect(report.checks.find((check) => check.id === "session-catalog")).toMatchObject({
+      status: "pass",
+      detail: expect.stringContaining("schema v2; ready")
+    });
   });
 
   it("reports only the bounded degraded stage without exposing raw errors", async () => {

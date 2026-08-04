@@ -1,20 +1,16 @@
 import type { Page } from "@playwright/test";
-import { PROTOCOL_REVISION } from "../../packages/protocol/src/index.js";
-import {
-  MOCK_EXTENSION_CATALOG,
-  MOCK_EXTENSION_COMMANDS,
-  MOCK_RUNTIME_CAPABILITIES
-} from "./pi67-extension-catalog-fixture.js";
-import { MOCK_SESSION_CATALOG_STATUS, mockSessionCatalogPage } from "./pi67-session-catalog-fixture.js";
-import { createMockSessionSnapshot, installMockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
+import { MOCK_EXTENSION_COMMANDS } from "./pi67-extension-catalog-fixture.js";
+import { MOCK_SESSION_CATALOG_STATUS } from "./pi67-session-catalog-fixture.js";
+import { installMockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import { installMockAssetReadHandler, type MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
 import { installMockCommandResponseHandler, type MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
 import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixture.js";
-import { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
-import { createMockContextFiles, installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
+import { installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import { installMockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
+import { installMockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
 import { installMockPayloadSanitizer, type MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
 import { installMockOperationFactories, type MockOperationViewFactory, type MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
+import { createMockAgentFixtureInput } from "./pi67-renderer-agent-input-fixture.js";
 import type {
   FixtureAgentState,
   FixtureMessage,
@@ -53,6 +49,7 @@ export async function attachMockAgent(
   await page.evaluate(installMockOperationFactories);
   await page.evaluate(installMockContextFileCommandHandler);
   await page.evaluate(installMockInspectorCommandHandler);
+  await page.evaluate(installMockProviderConfigurationCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
     fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
@@ -270,6 +267,9 @@ export async function attachMockAgent(
                 result = projectionMutationAcknowledgement(state, hostEpoch);
               }
             }
+            if (envelope.type === "session.name" && !hasConfiguredResult) {
+              result = projectionMutationAcknowledgement(state, hostEpoch);
+            }
             hostPort.postMessage({
               protocolVersion: 3,
               kind: "response",
@@ -435,24 +435,7 @@ export async function attachMockAgent(
 
     testWindow.__pi67TestAgent = state;
     state.attachHost(state.hostEpoch);
-  }, {
-    fixtureMessages: messages,
-    fixtureResponseDelays: responseDelays,
-    fixtureOptions: options,
-    fixtureExtensionCatalog: MOCK_EXTENSION_CATALOG,
-    fixtureRuntimeCapabilities: MOCK_RUNTIME_CAPABILITIES,
-    fixtureProviderConfiguration: options.providerConfigurationSnapshot
-      ?? createMockProviderConfigurationSnapshot(),
-    fixtureContextFiles: createMockContextFiles(),
-    fixtureSessionCatalogPage: mockSessionCatalogPage(options.sessionCatalogItems ?? []),
-    fixtureSessionCatalogPagesByWorkspace: Object.fromEntries(
-      Object.entries(options.sessionCatalogItemsByWorkspace ?? {}).map(([workspaceId, items]) => (
-        [workspaceId, mockSessionCatalogPage(items)]
-      ))
-    ),
-    fixtureSnapshot: createMockSessionSnapshot(messages),
-    fixtureProtocolRevision: PROTOCOL_REVISION
-  });
+  }, createMockAgentFixtureInput(messages, responseDelays, options));
   await page.waitForFunction(() => (
     window as unknown as FixtureWindow
   ).__pi67TestAgent?.ready === true);

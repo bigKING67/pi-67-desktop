@@ -73,6 +73,28 @@ describe("SQLite Session Catalog", () => {
     catalog.close();
   });
 
+  it("separates archived conversations and orders active conversations by pin time", async () => {
+    const root = await temporaryRoot();
+    const catalog = await openReady(root);
+    catalog.replaceAll("source", [
+      record(1, { modifiedAt: 900 }),
+      record(2, { modifiedAt: 700, pinnedAt: 2_000 }),
+      record(3, { modifiedAt: 800, pinnedAt: 1_000 }),
+      record(4, { modifiedAt: 950, archivedAt: 3_000 })
+    ], metadata(), 1);
+
+    expect(catalog.query({ scope: "all", view: "active", cwdKey: WORKSPACE, limit: 50 }).records
+      .map((item) => item.id)).toEqual(["id-2", "id-3", "id-1"]);
+    expect(catalog.query({ scope: "all", view: "archived", cwdKey: WORKSPACE, limit: 50 }).records
+      .map((item) => item.id)).toEqual(["id-4"]);
+
+    const revision = catalog.organize?.("/sessions/001.jsonl", { archivedAt: 4_000 }, 2);
+    expect(revision?.revision).toBeGreaterThan(2);
+    expect(catalog.query({ scope: "all", view: "active", cwdKey: WORKSPACE, limit: 50 }).records
+      .map((item) => item.id)).not.toContain("id-1");
+    catalog.close();
+  });
+
   it("rebuilds atomically, replaces a changed source and preserves duplicate ids by path", async () => {
     const root = await temporaryRoot();
     const catalog = await openReady(root);

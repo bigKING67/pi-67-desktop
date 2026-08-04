@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -6,8 +6,10 @@ import {
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
+  type CommandResults,
   type ProtocolPort,
   type RendererHello,
+  type ResponseEnvelope,
   type WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { describe, expect, it, vi } from "vitest";
@@ -108,7 +110,233 @@ describe("AgentHostServer Session Catalog", () => {
       restoreEnvironment("PI67_STORAGE_ROOT", previous.storageRoot);
     }
   });
+
+  it("renames, pins, archives, restores, and replays cold conversation mutations without loading a Task Runtime", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi67-host-conversation-organization-")));
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const sessionDirectory = join(agentDir, "sessions", "fixture");
+    const catalogDirectory = join(root, "catalog");
+    const sessionPath = join(sessionDirectory, "conversation.jsonl");
+    await Promise.all([
+      mkdir(cwd),
+      mkdir(sessionDirectory, { recursive: true }),
+      mkdir(catalogDirectory)
+    ]);
+    await writeFile(sessionPath, sessionJsonl(cwd), "utf8");
+    const previous = {
+      agentDir: process.env.PI_CODING_AGENT_DIR,
+      catalogDirectory: process.env.PI67_SESSION_CATALOG_DIR,
+      storageRoot: process.env.PI67_STORAGE_ROOT
+    };
+    process.env.PI_CODING_AGENT_DIR = agentDir;
+    process.env.PI67_SESSION_CATALOG_DIR = catalogDirectory;
+    process.env.PI67_STORAGE_ROOT = root;
+
+    const runtimeLoader = vi.fn(async () => { throw new Error("Conversation organization must not load a Task Runtime."); });
+    const server = new AgentHostServer(runtimeLoader, { sdkVersionLoader: async () => "0.81.1" });
+    try {
+      const port = new FakePort();
+      const context: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-organize" };
+      server.attachPort(port, { appInstanceId: "app", hostInstanceId: "host", hostEpoch: 9 });
+      port.emit({
+        protocolVersion: 3,
+        protocolRevision: PROTOCOL_REVISION,
+        kind: "hello",
+        rendererInstanceId: "renderer-organize",
+        appInstanceId: "app",
+        maxEnvelopeBytes: 2 * 1024 * 1024
+      } satisfies RendererHello);
+      await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
+
+      const registration = commandEnvelopeForContext("workspace.register", {
+        cwd,
+        trust: "trusted",
+        approvalMode: "guided"
+      }, context, 9, "register-workspace-organize");
+      port.emit(registration);
+      expect(await responseFor(port, registration.requestId)).toMatchObject({
+        ok: true,
+        result: { registered: true }
+      });
+
+      const refresh = commandEnvelopeForContext("session.catalog.query", {
+        scope: "workspace",
+        limit: 50,
+        refresh: true
+      }, context, 9);
+      port.emit(refresh);
+      expect(await responseFor(port, refresh.requestId)).toMatchObject({ ok: true });
+      await vi.waitFor(() => expect(port.sent.some((value) => (
+        isEventEnvelope(value)
+        && value.type === "session.catalog.changed"
+        && "reason" in value.payload
+        && value.payload.reason === "reconciled"
+      ))).toBe(true));
+
+      const rename = commandEnvelopeForContext("session.nameByPath", {
+        path: sessionPath,
+        mutation: { action: "set", name: "显式固定标题" }
+      }, context, 9, "rename-cold-conversation");
+      port.emit(rename);
+      const renamed = await responseFor(port, rename.requestId);
+      if (!renamed.ok) throw new Error(`${renamed.error.code}: ${renamed.error.message}`);
+      expect(renamed).toMatchObject({ ok: true, result: { revision: expect.any(Number) } });
+
+      const renameReplay = commandEnvelopeForContext("session.nameByPath", {
+        path: sessionPath,
+        mutation: { action: "set", name: "显式固定标题" }
+      }, context, 9, "rename-cold-conversation");
+      port.emit(renameReplay);
+      expect(await responseFor(port, renameReplay.requestId)).toMatchObject({
+        ok: true,
+        result: renamed.ok ? renamed.result : undefined
+      });
+      expect((await readFile(sessionPath, "utf8")).match(/"type":"session_info"/gu)).toHaveLength(1);
+
+      const pinned = commandEnvelopeForContext("conversation.pin", {
+        path: sessionPath,
+        pinned: true
+      }, context, 9, "pin-cold-conversation");
+      port.emit(pinned);
+      expect(await responseFor(port, pinned.requestId)).toMatchObject({ ok: true });
+      const activeAfterPin = await queryCatalog(port, context, { view: "active" });
+      expect(activeAfterPin.items).toEqual([
+        expect.objectContaining({
+          path: sessionPath,
+          name: "显式固定标题",
+          nameSource: "explicit",
+          pinnedAt: expect.any(Number)
+        })
+      ]);
+
+      const archived = commandEnvelopeForContext("conversation.archive", {
+        path: sessionPath,
+        archived: true
+      }, context, 9, "archive-cold-conversation");
+      port.emit(archived);
+      expect(await responseFor(port, archived.requestId)).toMatchObject({ ok: true });
+      expect((await queryCatalog(port, context, { view: "active" })).items).toEqual([]);
+      const archivedItems = (await queryCatalog(port, context, { view: "archived" })).items;
+      expect(archivedItems).toEqual([
+        expect.objectContaining({
+          path: sessionPath,
+          archivedAt: expect.any(Number)
+        })
+      ]);
+      expect(archivedItems[0]).not.toHaveProperty("pinnedAt");
+
+      const organizationRaw = await readFile(
+        join(root, "conversation-organization", "organization-v1.json"),
+        "utf8"
+      );
+      expect(organizationRaw).not.toContain(sessionPath);
+      expect(organizationRaw).not.toContain("修复冷启动对话标题");
+
+      const restored = commandEnvelopeForContext("conversation.archive", {
+        path: sessionPath,
+        archived: false
+      }, context, 9, "restore-cold-conversation");
+      port.emit(restored);
+      expect(await responseFor(port, restored.requestId)).toMatchObject({ ok: true });
+
+      const clearName = commandEnvelopeForContext("session.nameByPath", {
+        path: sessionPath,
+        mutation: { action: "clear" }
+      }, context, 9, "restore-automatic-title");
+      port.emit(clearName);
+      expect(await responseFor(port, clearName.requestId)).toMatchObject({ ok: true });
+      const automatic = await queryCatalog(port, context, { view: "active" });
+      expect(automatic.items).toEqual([
+        expect.objectContaining({
+          path: sessionPath,
+          name: "修复冷启动对话标题",
+          nameSource: "latest-user"
+        })
+      ]);
+      expect(automatic.items[0]).not.toHaveProperty("pinnedAt");
+      expect(automatic.items[0]).not.toHaveProperty("archivedAt");
+      expect(runtimeLoader).not.toHaveBeenCalled();
+    } finally {
+      await server.shutdown();
+      restoreEnvironment("PI_CODING_AGENT_DIR", previous.agentDir);
+      restoreEnvironment("PI67_SESSION_CATALOG_DIR", previous.catalogDirectory);
+      restoreEnvironment("PI67_STORAGE_ROOT", previous.storageRoot);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
+
+async function responseFor(port: FakePort, requestId: string): Promise<ResponseEnvelope> {
+  let response: ResponseEnvelope | undefined;
+  await vi.waitFor(() => {
+    response = port.sent.find((value): value is ResponseEnvelope => (
+      isResponseEnvelope(value) && value.requestId === requestId
+    ));
+    expect(response).toBeDefined();
+  });
+  return response!;
+}
+
+async function queryCatalog(
+  port: FakePort,
+  context: WorkspaceProtocolContext,
+  options: { view: "active" | "archived" }
+): Promise<CommandResults["session.catalog.query"]> {
+  const request = commandEnvelopeForContext("session.catalog.query", {
+    scope: "workspace",
+    view: options.view,
+    limit: 50
+  }, context, 9);
+  port.emit(request);
+  const response = await responseFor(port, request.requestId);
+  if (!response.ok || response.type !== "session.catalog.query") {
+    throw new Error(`Session Catalog query failed: ${response.type}`);
+  }
+  return response.result as CommandResults["session.catalog.query"];
+}
+
+function sessionJsonl(cwd: string): string {
+  return [
+    {
+      type: "session",
+      version: 3,
+      id: "conversation-session",
+      timestamp: "2026-08-04T00:00:00.000Z",
+      cwd
+    },
+    {
+      type: "message",
+      id: "user-1",
+      parentId: null,
+      timestamp: "2026-08-04T00:00:01.000Z",
+      message: { role: "user", content: "修复冷启动对话标题", timestamp: 1 }
+    },
+    {
+      type: "message",
+      id: "assistant-1",
+      parentId: "user-1",
+      timestamp: "2026-08-04T00:00:02.000Z",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "已完成" }],
+        api: "openai-responses",
+        provider: "fixture",
+        model: "fixture",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+        },
+        stopReason: "stop",
+        timestamp: 2
+      }
+    }
+  ].map((entry) => JSON.stringify(entry)).join("\n") + "\n";
+}
 
 function restoreEnvironment(key: string, value: string | undefined): void {
   if (value === undefined) delete process.env[key];

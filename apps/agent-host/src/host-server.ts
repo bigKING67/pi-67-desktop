@@ -27,11 +27,8 @@ import {
   captureProjectionResync
 } from "./host-projection.js";
 import { HostCommandError } from "./protocol-error.js";
-import {
-  createResourceManagementRouters,
-  type ResourceManagementRouters
-} from "./resource-management-routers.js";
-import type { SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
+import { createResourceManagementRouters, type ResourceManagementRouters } from "./resource-management-routers.js";
+import { SessionWriterLeaseRegistry, type SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
@@ -52,6 +49,7 @@ export class AgentHostServer {
   private compatibilityRuntimeLoad: Promise<AgentRuntime> | undefined;
   private compatibilityRuntimeUnsubscribe: (() => void) | undefined;
   private readonly workspaces = new WorkspaceContextRegistry();
+  private readonly sessionWriterLeases = new SessionWriterLeaseRegistry();
   private readonly workspaceCommands: WorkspaceCommandRouter;
   private readonly workspaceFiles: WorkspaceFileCommandRouter;
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
@@ -129,7 +127,8 @@ export class AgentHostServer {
       this.workspaces,
       this.taskRuntimes,
       this.runtimeCredentialOverrides,
-      this.events
+      this.events,
+      this.sessionWriterLeases
     );
     this.workspaceFiles = new WorkspaceFileCommandRouter(this.workspaces);
     this.sdkVersions = new HostSdkVersionLoader({
@@ -146,7 +145,7 @@ export class AgentHostServer {
       isShuttingDown: () => this.shuttingDown,
       usesCompatibilityRuntime: () => this.usesCompatibilityRuntime,
       takeCompatibilityRuntime: () => this.takeCompatibilityRuntime()
-    });
+    }, this.sessionWriterLeases);
     this.requests = new HostRequestRouter(
       this.tasks,
       this.contextFiles,

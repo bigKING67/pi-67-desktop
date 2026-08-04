@@ -37,6 +37,11 @@ import type {
   WorkspaceTrust
 } from "@pi67/domain";
 import type {
+  ConversationOrganizationCommandPayloads,
+  ConversationOrganizationCommandResults,
+  SessionNameMutation
+} from "./conversation-organization-messages.js";
+import type {
   PiCredentialRevealResult,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
@@ -49,6 +54,10 @@ import type {
 
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
+export type {
+  SessionCatalogMutationResult,
+  SessionNameMutation
+} from "./conversation-organization-messages.js";
 export interface PromptAttachmentRef { id: string; }
 
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
@@ -197,7 +206,9 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
   items: SessionCatalogResultItem[];
 };
 
-export interface CommandPayloads extends WorkspaceFileCommandPayloads {
+export interface CommandPayloads extends
+  WorkspaceFileCommandPayloads,
+  ConversationOrganizationCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -233,7 +244,7 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads {
   };
   "session.rollback": { entryId: string; summarize?: boolean };
   "session.compact": { submissionId: string; instructions?: string };
-  "session.name": { name: string };
+  "session.name": { mutation: SessionNameMutation };
   "prompt.submit": PromptSubmitRequest;
   "prompt.steer": { text: string };
   "prompt.followUp": { text: string };
@@ -305,7 +316,9 @@ export interface CommandPayloads extends WorkspaceFileCommandPayloads {
   "doctor.run": Record<string, never>;
 }
 
-export interface CommandResults extends WorkspaceFileCommandResults {
+export interface CommandResults extends
+  WorkspaceFileCommandResults,
+  ConversationOrganizationCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;
@@ -376,67 +389,14 @@ export interface CommandResults extends WorkspaceFileCommandResults {
 
 export type AgentCommandType = keyof CommandPayloads;
 
-export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
-  "runtime.initialize",
-  "workspace.open",
-  "workspace.register",
-  "workspace.unregister",
-  "workspace.setTrust",
-  "task.close",
-  "session.create",
-  "session.open",
-  "session.fork",
-  "session.forkFromTask",
-  "session.rollback",
-  "session.name",
-  "model.select",
-  "model.setRuntimeKey",
-  "provider.setRuntimeKey",
-  "provider.configuration.save",
-  "provider.configuration.remove",
-  "provider.credential.store",
-  "provider.credential.remove",
-  "model.default.set",
-  "thinking.set",
-  "resource.reload",
-  "context.file.save",
-  "workspace.file.save",
-  "workspace.file.create",
-  "workspace.file.rename",
-  "extension.package.install",
-  "extension.package.update",
-  "extension.package.setEnabled",
-  "extension.package.restoreInheritance",
-  "extension.package.uninstall",
-  "skill.pack.update",
-  "skill.pack.restore"
-] as const satisfies readonly AgentCommandType[];
-
-export type ReplaySafeControlMutationType = typeof REPLAY_SAFE_CONTROL_MUTATION_TYPES[number];
-
-const REPLAY_SAFE_CONTROL_MUTATIONS = new Set<AgentCommandType>(REPLAY_SAFE_CONTROL_MUTATION_TYPES);
-
-export function isReplaySafeControlMutation(
-  type: AgentCommandType
-): type is ReplaySafeControlMutationType {
-  return REPLAY_SAFE_CONTROL_MUTATIONS.has(type);
-}
-
-export const REPLAY_SAFE_OPERATION_ACK_TYPES = [
-  "session.import",
-  "session.compact",
-  "command.invoke"
-] as const satisfies readonly AgentCommandType[];
-
-export type ReplaySafeOperationAckType = typeof REPLAY_SAFE_OPERATION_ACK_TYPES[number];
-
-const REPLAY_SAFE_OPERATION_ACKS = new Set<AgentCommandType>(REPLAY_SAFE_OPERATION_ACK_TYPES);
-
-export function isReplaySafeOperationAck(
-  type: AgentCommandType
-): type is ReplaySafeOperationAckType {
-  return REPLAY_SAFE_OPERATION_ACKS.has(type);
-}
+export {
+  REPLAY_SAFE_CONTROL_MUTATION_TYPES,
+  REPLAY_SAFE_OPERATION_ACK_TYPES,
+  isReplaySafeControlMutation,
+  isReplaySafeOperationAck,
+  type ReplaySafeControlMutationType,
+  type ReplaySafeOperationAckType
+} from "./replay-safe-commands.js";
 
 export type AgentCommand<T extends AgentCommandType = AgentCommandType> = {
   [K in T]: { type: K; payload: CommandPayloads[K] };

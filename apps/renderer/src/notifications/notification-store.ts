@@ -32,6 +32,12 @@ export interface NotificationItem {
   createdAt: number;
   read: boolean;
   operation?: OperationNotificationMetadata;
+  action?: NotificationAction;
+}
+
+interface NotificationAction {
+  label: string;
+  run: () => void | Promise<void>;
 }
 
 export interface PublishNotificationInput {
@@ -39,6 +45,7 @@ export interface PublishNotificationInput {
   title: string;
   message?: string;
   toast?: boolean;
+  action?: NotificationAction;
 }
 
 interface NotificationState {
@@ -130,6 +137,7 @@ function systemNotification(input: PublishNotificationInput, createdAt: number):
     level: input.level,
     title,
     ...(message === undefined ? {} : { message }),
+    ...(input.action === undefined ? {} : { action: input.action }),
     createdAt,
     read: false
   };

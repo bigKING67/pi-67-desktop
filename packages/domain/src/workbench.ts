@@ -112,6 +112,24 @@ export function taskConsumesRunSlot(lifecycle: TaskLifecycle): boolean {
     || lifecycle === "waiting-extension-input";
 }
 
+export function taskCanBeStopped(lifecycle: TaskLifecycle): boolean {
+  return taskConsumesRunSlot(lifecycle);
+}
+
+export type ConversationArchiveBlocker = "provisional" | "initializing" | "active-task" | "draft";
+
+export function conversationArchiveBlocker(options: {
+  kind: ConversationKey["kind"];
+  lifecycle?: TaskLifecycle;
+  hasDraft?: boolean;
+}): ConversationArchiveBlocker | undefined {
+  if (options.kind === "provisional") return "provisional";
+  if (options.lifecycle === "initializing") return "initializing";
+  if (options.lifecycle !== undefined && taskConsumesRunSlot(options.lifecycle)) return "active-task";
+  if (options.hasDraft) return "draft";
+  return undefined;
+}
+
 export function conversationKeyIdentity(conversation: ConversationKey): string {
   return conversation.kind === "session"
     ? `session:${conversation.workspaceId}:${conversation.sessionPath}`

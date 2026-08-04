@@ -83,7 +83,7 @@ describe("SQLite Session Catalog external writer guard", () => {
     const opened = await openInterleavingCatalog(root, control);
     opened.replaceAll("source", [record(1)], metadata(), 1);
     control.beforeAll = (sql) => {
-      if (!sql.includes("ORDER BY modified_at_ms DESC")) return;
+      if (!sql.includes("FROM sessions") || !sql.includes("ORDER BY")) return;
       delete control.beforeAll;
       control.external!.exec("UPDATE sessions SET message_count = message_count + 1;");
     };

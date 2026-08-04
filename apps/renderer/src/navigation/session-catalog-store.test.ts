@@ -11,6 +11,7 @@ const SESSION_ONE: SessionSummary = {
   path: "/sessions/one.jsonl",
   cwd: "/work",
   name: "Session one",
+  nameSource: "explicit",
   modifiedAt: 20,
   messageCount: 2
 };
@@ -20,6 +21,7 @@ const SESSION_TWO: SessionSummary = {
   path: "/sessions/two.jsonl",
   cwd: "/work",
   name: "Session two",
+  nameSource: "explicit",
   modifiedAt: 10,
   messageCount: 4
 };

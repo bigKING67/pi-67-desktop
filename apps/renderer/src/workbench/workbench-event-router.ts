@@ -53,6 +53,7 @@ export function routeWorkbenchAgentEvent(
         title: sessionName
           || task.pendingTitle
           || messages.runtime.workbench.unnamedSession,
+        titleSource: sessionName ? "explicit" : task.pendingTitle ? "latest-user" : "fallback",
         ...(sessionName ? { pendingTitle: undefined } : {}),
         lifecycle: "idle",
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },
@@ -99,6 +100,7 @@ export function routeWorkbenchAgentEvent(
     case "session.metaChanged":
       workbench.updateTask(task.id, {
         title: event.payload.sessionName?.trim() || messages.runtime.workbench.unnamedSession,
+        titleSource: event.payload.sessionName?.trim() ? "explicit" : "fallback",
         ...(event.payload.sessionName?.trim() ? { pendingTitle: undefined } : {})
       });
       break;

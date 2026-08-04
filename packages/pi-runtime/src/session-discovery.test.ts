@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 describe("Pi SDK Session Catalog discovery contract", () => {
-  it("uses only explicit names and never falls back to the first prompt", async () => {
+  it("prefers explicit names and otherwise derives the latest valid user title at query time", async () => {
     const fixture = await createFixture();
     const unnamed = SessionManager.create(fixture.cwd, fixture.sessionDirectory);
     unnamed.appendMessage({
@@ -43,10 +43,11 @@ describe("Pi SDK Session Catalog discovery contract", () => {
     const catalog = createSessionCatalog();
     await catalog.reconcile(context);
     const page = await catalog.query({ scope: "workspace" }, context);
-    expect(page.items.find((item) => item.path === unnamed.getSessionFile())?.name).toBe("Untitled session");
+    expect(page.items.find((item) => item.path === unnamed.getSessionFile())?.name).toBe(
+      "PRIVATE_PROMPT_MUST_NOT_BECOME_A_SESSION_NAME"
+    );
     expect(page.items.find((item) => item.path === named.getSessionFile())?.name).toBe("Explicit catalog name");
-    expect(page.items.find((item) => item.path === whitespaceNamed.getSessionFile())?.name).toBe("Untitled session");
-    expect(JSON.stringify(page)).not.toContain("PRIVATE_PROMPT_MUST_NOT_BECOME_A_SESSION_NAME");
+    expect(page.items.find((item) => item.path === whitespaceNamed.getSessionFile())?.name).toBe("private unnamed prompt");
     await catalog.dispose();
   });
 

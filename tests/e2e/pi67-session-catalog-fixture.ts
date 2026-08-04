@@ -1,83 +1,22 @@
 import type { Page } from "@playwright/test";
-type SessionCatalogSource = "sqlite" | "sdk-fallback";
-type SessionCatalogState = "ready" | "rebuilding" | "fallback" | "unavailable";
-type SessionCatalogDegradedReason = "busy" | "unavailable" | "runtime-load" | "storage-prepare" | "storage-inspect" | "database-open" | "database-verify" | "schema-prepare" | "recovery-prepare" | "recovery-open" | "recovery-verify" | "recovery-schema" | "runtime-query";
-
-export interface FixtureSessionSummary {
-  id: string;
-  path: string;
-  cwd: string;
-  name: string;
-  modifiedAt: number;
-  messageCount: number;
-  parentSessionPath?: string;
-}
-
-export interface FixtureSessionCatalogStatus {
-  revision: number;
-  source: SessionCatalogSource;
-  state: SessionCatalogState;
-  rebuilding: boolean;
-  degradedReason?: SessionCatalogDegradedReason;
-  reconciledAt?: number;
-  itemCount: number;
-  incomplete: boolean;
-  skippedCount: number;
-}
-
-interface FixtureSessionCatalogPage extends FixtureSessionCatalogStatus {
-  items: FixtureSessionSummary[];
-  total: number;
-  hasMore: boolean;
-  nextCursor?: FixtureSessionCatalogCursor;
-}
-
-interface FixtureSessionCatalogCursor {
-  revision: number;
-  queryKey: string;
-  modifiedAt: number;
-  path: string;
-}
-
-const FIXTURE_QUERY_KEY = "0".repeat(64);
-
-export interface SessionCatalogFixtureOptions {
-  items?: FixtureSessionSummary[];
-  revision?: number;
-  source?: SessionCatalogSource;
-  state?: SessionCatalogState;
-  rebuilding?: boolean;
-  degradedReason?: SessionCatalogDegradedReason;
-  reconciledAt?: number;
-  incomplete?: boolean;
-  skippedCount?: number;
-}
-export type SessionCatalogFixturePatch = SessionCatalogFixtureOptions;
-export interface SessionCatalogRequestRecord {
-  hostEpoch: number;
-  payload: {
-    scope?: string;
-    search?: string;
-    cursor?: FixtureSessionCatalogCursor;
-    limit?: number;
-    refresh?: boolean;
-  };
-}
-
-export const MOCK_SESSION_CATALOG_STATUS: FixtureSessionCatalogStatus = {
-  revision: 1,
-  source: "sqlite",
-  state: "ready",
-  rebuilding: false,
-  reconciledAt: 1_753_000_000_000,
-  itemCount: 0,
-  incomplete: false,
-  skippedCount: 0
-};
-
-export function mockSessionCatalogPage(sessions: FixtureSessionSummary[]): FixtureSessionCatalogPage {
-  return createPage(sessions, MOCK_SESSION_CATALOG_STATUS, {}, 50);
-}
+import { normalizedSessionCatalogOptions } from "./pi67-session-catalog-model-fixture.js";
+import type {
+  SessionCatalogDegradedReason,
+  SessionCatalogFixtureOptions,
+  SessionCatalogFixturePatch,
+  SessionCatalogRequestRecord
+} from "./pi67-session-catalog-model-fixture.js";
+export {
+  MOCK_SESSION_CATALOG_STATUS,
+  mockSessionCatalogPage
+} from "./pi67-session-catalog-model-fixture.js";
+export type {
+  FixtureSessionCatalogStatus,
+  FixtureSessionSummary,
+  SessionCatalogFixtureOptions,
+  SessionCatalogFixturePatch,
+  SessionCatalogRequestRecord
+} from "./pi67-session-catalog-model-fixture.js";
 
 /**
  * Replaces only the Session Catalog request handler installed by the shared
@@ -87,15 +26,25 @@ export async function installSessionCatalogFixture(
   page: Page,
   options: SessionCatalogFixtureOptions = {}
 ): Promise<void> {
-  const initial = normalizedOptions(options);
+  const initial = normalizedSessionCatalogOptions(options);
   await page.evaluate((fixture) => {
-    type CatalogCursor = { revision: number; queryKey: string; modifiedAt: number; path: string };
+    type CatalogCursor = {
+      revision: number;
+      queryKey: string;
+      pinnedAt?: number;
+      archivedAt?: number;
+      modifiedAt: number;
+      path: string;
+    };
     const fixtureQueryKey = "0".repeat(64);
     type CatalogItem = {
       id: string;
       path: string;
       cwd: string;
       name: string;
+      nameSource?: "explicit" | "latest-user" | "fallback";
+      pinnedAt?: number;
+      archivedAt?: number;
       modifiedAt: number;
       messageCount: number;
       parentSessionPath?: string;
@@ -103,6 +52,7 @@ export async function installSessionCatalogFixture(
     type CatalogPatch = Omit<SessionCatalogFixtureOptions, "items"> & { items?: CatalogItem[] };
     type CatalogRequest = {
       scope?: string;
+      view?: "active" | "archived";
       search?: string;
       cursor?: CatalogCursor;
       limit?: number;
@@ -269,12 +219,21 @@ export async function installSessionCatalogFixture(
 
     function queryCatalog(target: CatalogFixtureState, request: CatalogRequest) {
       const search = request.search?.normalize("NFKC").trim().toLocaleLowerCase() ?? "";
-      const filtered = [...target.items]
+      const view = request.view ?? "active";
+      const filtered = target.items
+        .filter((item) => view === "archived" ? item.archivedAt !== undefined : item.archivedAt === undefined)
         .filter((item) => !search || `${item.name}\n${item.cwd}\n${item.path}\n${item.id}`
           .normalize("NFKC")
           .toLocaleLowerCase()
           .includes(search))
-        .sort((left, right) => right.modifiedAt - left.modifiedAt || left.path.localeCompare(right.path));
+        .map((item) => ({ ...item, nameSource: item.nameSource ?? "explicit" as const }))
+        .sort((left, right) => view === "archived"
+          ? (right.archivedAt ?? 0) - (left.archivedAt ?? 0)
+            || right.modifiedAt - left.modifiedAt
+            || right.path.localeCompare(left.path)
+          : (right.pinnedAt ?? -1) - (left.pinnedAt ?? -1)
+            || right.modifiedAt - left.modifiedAt
+            || right.path.localeCompare(left.path));
       const limit = Math.min(200, Math.max(1, Math.trunc(request.limit ?? 50)));
       const start = cursorStart(filtered, request.cursor);
       const items = filtered.slice(start, start + limit);
@@ -288,6 +247,8 @@ export async function installSessionCatalogFixture(
           nextCursor: {
             revision: target.revision,
             queryKey: fixtureQueryKey,
+            ...(last.pinnedAt === undefined ? {} : { pinnedAt: last.pinnedAt }),
+            ...(last.archivedAt === undefined ? {} : { archivedAt: last.archivedAt }),
             modifiedAt: last.modifiedAt,
             path: last.path
           }
@@ -410,50 +371,4 @@ export async function emitSessionCatalogSequenceGap(page: Page): Promise<void> {
       payload: { reason: "session-catalog-resync-fixture" }
     }, { sequence: agent.sequence + 2 });
   });
-}
-
-function normalizedOptions(options: SessionCatalogFixtureOptions) {
-  return {
-    items: options.items ?? [],
-    revision: options.revision ?? MOCK_SESSION_CATALOG_STATUS.revision,
-    source: options.source ?? MOCK_SESSION_CATALOG_STATUS.source,
-    state: options.state ?? MOCK_SESSION_CATALOG_STATUS.state,
-    rebuilding: options.rebuilding ?? MOCK_SESSION_CATALOG_STATUS.rebuilding,
-    ...(options.degradedReason === undefined ? {} : { degradedReason: options.degradedReason }),
-    ...(options.reconciledAt === undefined
-      ? { reconciledAt: MOCK_SESSION_CATALOG_STATUS.reconciledAt }
-      : { reconciledAt: options.reconciledAt }),
-    incomplete: options.incomplete ?? MOCK_SESSION_CATALOG_STATUS.incomplete,
-    skippedCount: options.skippedCount ?? MOCK_SESSION_CATALOG_STATUS.skippedCount
-  };
-}
-
-function createPage(
-  sessions: FixtureSessionSummary[],
-  status: FixtureSessionCatalogStatus,
-  cursor: Partial<FixtureSessionCatalogCursor>,
-  limit: number
-): FixtureSessionCatalogPage {
-  const sorted = [...sessions].sort((left, right) => right.modifiedAt - left.modifiedAt || left.path.localeCompare(right.path));
-  const start = cursor.path === undefined
-    ? 0
-    : Math.max(0, sorted.findIndex((item) => item.path === cursor.path && item.modifiedAt === cursor.modifiedAt) + 1);
-  const items = sorted.slice(start, start + limit);
-  const hasMore = start + items.length < sorted.length;
-  const last = items.at(-1);
-  return {
-    ...status,
-    itemCount: sessions.length,
-    items,
-    total: sessions.length,
-    hasMore,
-    ...(hasMore && last ? {
-      nextCursor: {
-        revision: status.revision,
-        queryKey: FIXTURE_QUERY_KEY,
-        modifiedAt: last.modifiedAt,
-        path: last.path
-      }
-    } : {})
-  };
 }

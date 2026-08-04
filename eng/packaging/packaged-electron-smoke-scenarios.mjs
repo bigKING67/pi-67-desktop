@@ -40,7 +40,7 @@ export async function verifyInitialRuntimeSettings(window, packagedProcessOutput
     .waitFor({ state: "visible", timeout: 30_000 });
   const sessionCatalogCheck = doctorResults.locator(".doctor-check").filter({ hasText: "Session 目录" });
   await sessionCatalogCheck.getByText("需注意", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v1; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v2; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await settings.getByRole("button", { name: "返回工作台" }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });

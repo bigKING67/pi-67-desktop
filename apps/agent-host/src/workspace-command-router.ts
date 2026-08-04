@@ -8,8 +8,18 @@ import type { RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "./host-event-channel.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { HostCommandError } from "./protocol-error.js";
+import type { SessionWriterLeaseRegistry } from "./session-writer-lease-registry.js";
 import type { TaskRuntimeRegistry } from "./task-runtime-registry.js";
+import {
+  WorkspaceConversationCommandRouter,
+  isWorkspaceConversationCommand,
+  type WorkspaceConversationCommand,
+  type WorkspaceConversationCommandType,
+  type WorkspaceConversationResult
+} from "./workspace-conversation-command-router.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
+
+export { isWorkspaceConversationCommand };
 
 export type WorkspaceLifecycleCommandType = "workspace.register" | "workspace.unregister";
 type WorkspaceLifecycleCommand = AgentCommand<WorkspaceLifecycleCommandType>;
@@ -40,7 +50,8 @@ type WorkspaceMutationCommandType = WorkspaceLifecycleCommandType
   | "provider.configuration.remove"
   | "provider.credential.store"
   | "provider.credential.remove"
-  | "model.default.set";
+  | "model.default.set"
+  | WorkspaceConversationCommandType;
 type WorkspaceMutationCommand = AgentCommand<WorkspaceMutationCommandType>;
 type WorkspaceMutationResult = CommandResults[WorkspaceMutationCommandType];
 
@@ -62,13 +73,16 @@ const LEDGER_RETENTION_MS = 5 * 60_000;
 
 export class WorkspaceCommandRouter {
   private readonly ledgers = new Map<string, WorkspaceMutationLedger>();
+  private readonly conversations: WorkspaceConversationCommandRouter;
 
   constructor(
     private readonly workspaces: WorkspaceContextRegistry,
     private readonly taskRuntimes: TaskRuntimeRegistry,
     private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore,
-    events: HostEventChannel
+    events: HostEventChannel,
+    sessionWriterLeases: SessionWriterLeaseRegistry
   ) {
+    this.conversations = new WorkspaceConversationCommandRouter(workspaces, sessionWriterLeases);
     this.workspaces.setEventSink((workspaceId, event) => {
       events.sendFor(event, {
         runtime: undefined,
@@ -204,6 +218,30 @@ export class WorkspaceCommandRouter {
     return this.workspaces.queryCatalog(context.workspaceId, command.payload);
   }
 
+  dispatchConversation(
+    context: WorkspaceProtocolContext,
+    command: WorkspaceConversationCommand,
+    idempotencyKey?: string
+  ): Promise<WorkspaceConversationResult> {
+    if (!idempotencyKey) {
+      return Promise.reject(new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Replay-safe conversation mutations require an idempotency key.",
+        false
+      ));
+    }
+    try {
+      return this.runMutation(
+        context.workspaceId,
+        idempotencyKey,
+        command,
+        () => this.conversations.execute(context.workspaceId, command, idempotencyKey)
+      ) as Promise<WorkspaceConversationResult>;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
   private async execute(
     workspaceId: string,
     command: WorkspaceLifecycleCommand
@@ -269,7 +307,7 @@ export class WorkspaceCommandRouter {
     if ([...ledger.records.values()].some((record) => record.state === "pending")) {
       throw new HostCommandError(
         "BUSY",
-        "Another Workspace registration mutation is still pending.",
+        "Another Workspace mutation is still pending.",
         true,
         { retryable: true }
       );

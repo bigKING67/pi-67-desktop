@@ -129,7 +129,7 @@ try {
     .locator(".doctor-check").filter({ hasText: "Session 目录" });
   await doctorDialog.getByRole("button", { name: /重新运行检查/u }).click();
   await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v1; ready/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v2; ready/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^模型服务/u }).click();

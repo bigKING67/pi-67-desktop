@@ -1,4 +1,5 @@
 export * from "./agent-runtime.js";
+export * from "./conversation-organization-store.js";
 export * from "./context-file-management.js";
 export * from "./desktop-package-toolchain.js";
 export * from "./desktop-package-operation-runtime.js";
@@ -8,6 +9,7 @@ export * from "./extension-package-management.js";
 export * from "./extension-commands.js";
 export * from "./extension-ui-bridge.js";
 export * from "./message-projection.js";
+export * from "./managed-session-name.js";
 export * from "./pi-configuration-service.js";
 export * from "./pi-configuration-service-registry.js";
 export * from "./pi-web-access-result-extension.js";
@@ -28,3 +30,4 @@ export {
   createSessionCatalogSourceKey,
   type SessionCatalogDiscoveryOptions
 } from "./session-discovery.js";
+export { resolveManagedSessionPath } from "./session-import.js";

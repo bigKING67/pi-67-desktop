@@ -17,10 +17,13 @@ export interface ConversationRowModel {
   identity: string;
   conversation: ConversationKey;
   task?: RendererWorkbenchTask;
+  session?: SessionSummary;
   title: string;
   meta: string;
   status?: "running" | "waiting" | "draft";
   priority: boolean;
+  pinned: boolean;
+  titleSource: SessionSummary["nameSource"];
   modifiedAt: number;
 }
 
@@ -47,10 +50,13 @@ export function conversationRows(
       identity: rendererConversationIdentity(task.conversation),
       conversation: task.conversation,
       task,
+      ...(session ? { session } : {}),
       title,
       meta,
       ...(status ? { status } : {}),
       priority: status !== undefined,
+      pinned: session?.pinnedAt !== undefined,
+      titleSource: task.titleSource === "explicit" ? "explicit" : session?.nameSource ?? "fallback",
       modifiedAt: session?.modifiedAt ?? 0,
       searchText: session
         ? sessionSearchText(session, `${title} ${stableTitle}`, meta)
@@ -63,9 +69,12 @@ export function conversationRows(
     return {
       identity: rendererConversationIdentity(conversation),
       conversation,
+      session,
       title: session.name,
       meta,
       priority: false,
+      pinned: session.pinnedAt !== undefined,
+      titleSource: session.nameSource,
       modifiedAt: session.modifiedAt,
       searchText: sessionSearchText(session, session.name, meta)
     };
@@ -74,6 +83,8 @@ export function conversationRows(
     .filter((row) => !normalizedQuery || row.searchText.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery))
     .sort((left, right) => Number(right.priority) - Number(left.priority)
       || taskStatusRank(left.status) - taskStatusRank(right.status)
+      || Number(right.pinned) - Number(left.pinned)
+      || (right.session?.pinnedAt ?? 0) - (left.session?.pinnedAt ?? 0)
       || right.modifiedAt - left.modifiedAt)
     .map(({ searchText: _searchText, ...row }) => row);
 }

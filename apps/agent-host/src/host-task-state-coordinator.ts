@@ -20,7 +20,10 @@ import { HostCommandError } from "./protocol-error.js";
 import { isSkillPackCommand } from "./skill-pack-command-router.js";
 import type { TaskRuntimeRecord, TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
-import { isWorkspaceProviderCommand } from "./workspace-command-router.js";
+import {
+  isWorkspaceConversationCommand,
+  isWorkspaceProviderCommand
+} from "./workspace-command-router.js";
 import { isWorkspaceFileCommand } from "./workspace-file-command-router.js";
 
 export interface TaskHostState {
@@ -95,8 +98,12 @@ export class HostTaskStateCoordinator {
         request.type === "workspace.register"
         || request.type === "workspace.unregister"
         || isWorkspaceProviderCommand(request.type)
+        || isWorkspaceConversationCommand(request.type)
       ) {
-        if (isWorkspaceProviderCommand(request.type)) this.workspaces.require(context.workspaceId);
+        if (
+          isWorkspaceProviderCommand(request.type)
+          || isWorkspaceConversationCommand(request.type)
+        ) this.workspaces.require(context.workspaceId);
         return undefined;
       }
       if (

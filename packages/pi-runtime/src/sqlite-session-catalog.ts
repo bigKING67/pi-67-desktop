@@ -1,23 +1,26 @@
 import { rename } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-  SessionCatalogCursor,
-  SessionCatalogDegradedReason,
-  SessionCatalogScope
-} from "@pi67/domain";
+import type { SessionCatalogDegradedReason } from "@pi67/domain";
 import {
   configureCatalogDatabase,
   CorruptCatalogError,
   createCatalogSchema,
-  recordFromRow,
   recordValues,
   SchemaMismatchError,
   stateFromRow,
   validateCatalogDatabase,
   type DatabaseConstructor,
-  type DatabaseLike,
-  type SqlValue
+  type DatabaseLike
 } from "./sqlite-session-catalog-schema.js";
+import {
+  organizeSqliteSessionCatalog,
+  type SessionCatalogOrganization
+} from "./sqlite-session-catalog-organization.js";
+import {
+  querySqliteSessionCatalog,
+  type SqliteCatalogQuery,
+  type SqliteCatalogQueryResult
+} from "./sqlite-session-catalog-query.js";
 import {
   enforcePrivateSessionCatalogPermissions,
   prepareSessionCatalogDirectory,
@@ -27,8 +30,10 @@ import {
   type SessionCatalogPermissionOperations
 } from "./session-catalog-storage.js";
 
-export const SESSION_CATALOG_DATABASE_FILENAME = "session-catalog-v1.sqlite3";
-export const SESSION_CATALOG_RECOVERY_FILENAME = "session-catalog-v1.recovery.sqlite3";
+export type { SqliteCatalogQueryResult } from "./sqlite-session-catalog-query.js";
+
+export const SESSION_CATALOG_DATABASE_FILENAME = "session-catalog-v2.sqlite3";
+export const SESSION_CATALOG_RECOVERY_FILENAME = "session-catalog-v2.recovery.sqlite3";
 const CATALOG_DATABASE_VERSION_SQL = `
   SELECT data.data_version, schema_version.schema_version
   FROM pragma_data_version() AS data
@@ -41,6 +46,9 @@ export interface SessionCatalogRecord {
   cwd: string;
   cwdKey: string;
   explicitName?: string;
+  automaticName?: string;
+  pinnedAt?: number;
+  archivedAt?: number;
   modifiedAt: number;
   messageCount: number;
   parentSessionPath?: string;
@@ -69,20 +77,6 @@ export class SessionCatalogChangedExternallyError extends Error {
   }
 }
 
-interface SqliteCatalogQuery {
-  scope: SessionCatalogScope;
-  cwdKey: string;
-  search?: string;
-  cursor?: Pick<SessionCatalogCursor, "modifiedAt" | "path">;
-  limit: number;
-}
-
-export interface SqliteCatalogQueryResult {
-  records: SessionCatalogRecord[];
-  total: number;
-  hasMore: boolean;
-}
-
 export interface SqliteSessionCatalog {
   getState(): SqliteCatalogState;
   query(query: SqliteCatalogQuery): SqliteCatalogQueryResult;
@@ -93,6 +87,7 @@ export interface SqliteSessionCatalog {
     minimumRevision: number
   ): SqliteCatalogState;
   upsert(record: SessionCatalogRecord, minimumRevision: number): SqliteCatalogState;
+  organize?(path: string, organization: SessionCatalogOrganization, minimumRevision: number): SqliteCatalogState;
   close(): void;
 }
 
@@ -224,39 +219,7 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
 
   query(query: SqliteCatalogQuery): SqliteCatalogQueryResult {
     this.assertDatabaseVersion();
-    const filters: string[] = [];
-    const values: SqlValue[] = [];
-    if (query.scope === "workspace") {
-      filters.push("cwd_key = ?");
-      values.push(query.cwdKey);
-    }
-    if (query.search !== undefined && query.search.length > 0) {
-      filters.push("(search_name LIKE ? ESCAPE '\\' OR search_path LIKE ? ESCAPE '\\' OR search_id LIKE ? ESCAPE '\\')");
-      const pattern = `%${escapeLikePattern(query.search)}%`;
-      values.push(pattern, pattern, pattern);
-    }
-    const countWhere = filters.length > 0 ? ` WHERE ${filters.join(" AND ")}` : "";
-    const totalRow = this.database.prepare(`SELECT COUNT(*) AS total FROM sessions${countWhere}`).get(...values);
-    const total = readInteger(totalRow?.total, "total");
-
-    const pageFilters = [...filters];
-    const pageValues = [...values];
-    if (query.cursor) {
-      pageFilters.push("(modified_at_ms < ? OR (modified_at_ms = ? AND path < ?))");
-      pageValues.push(query.cursor.modifiedAt, query.cursor.modifiedAt, query.cursor.path);
-    }
-    const pageWhere = pageFilters.length > 0 ? ` WHERE ${pageFilters.join(" AND ")}` : "";
-    const rows = this.database.prepare(`
-      SELECT path, session_id, cwd, cwd_key, explicit_name, modified_at_ms, message_count, parent_session_path
-      FROM sessions${pageWhere}
-      ORDER BY modified_at_ms DESC, path DESC
-      LIMIT ?
-    `).all(...pageValues, query.limit + 1);
-    const result = {
-      records: rows.slice(0, query.limit).map(recordFromRow),
-      total,
-      hasMore: rows.length > query.limit
-    };
+    const result = querySqliteSessionCatalog(this.database, query);
     this.assertDatabaseVersion();
     return result;
   }
@@ -271,8 +234,8 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     const insert = this.database.prepare(`
       INSERT INTO sessions (
         path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-        modified_at_ms, message_count, parent_session_path
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.database.exec("BEGIN IMMEDIATE");
     try {
@@ -315,8 +278,8 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
       this.database.prepare(`
         INSERT INTO sessions (
           path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-          modified_at_ms, message_count, parent_session_path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
           session_id = excluded.session_id,
           cwd = excluded.cwd,
@@ -327,7 +290,9 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
           search_id = excluded.search_id,
           modified_at_ms = excluded.modified_at_ms,
           message_count = excluded.message_count,
-          parent_session_path = excluded.parent_session_path
+          parent_session_path = excluded.parent_session_path,
+          pinned_at_ms = excluded.pinned_at_ms,
+          archived_at_ms = excluded.archived_at_ms
       `).run(...recordValues(record));
       this.database.prepare(`
         UPDATE catalog_state
@@ -339,6 +304,22 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
       rollback(this.database);
       throw error;
     }
+    return this.getState();
+  }
+
+  organize(
+    path: string,
+    organization: SessionCatalogOrganization,
+    minimumRevision: number
+  ): SqliteCatalogState {
+    this.assertDatabaseVersion();
+    organizeSqliteSessionCatalog(
+      this.database,
+      path,
+      organization,
+      minimumRevision,
+      () => this.readState().revision
+    );
     return this.getState();
   }
 
@@ -391,10 +372,6 @@ function classifySqliteFailure(error: unknown): "busy" | "replaceable" | "unavai
   if (code === 5 || code === 6) return "busy";
   if (code === 11 || code === 17 || code === 26) return "replaceable";
   return "unavailable";
-}
-
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/gu, (character) => `\\${character}`);
 }
 
 function readInteger(value: unknown, field: string): number {

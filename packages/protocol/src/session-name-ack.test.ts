@@ -10,7 +10,7 @@ describe("session name acknowledgement", () => {
   it("accepts only a narrow projection mutation acknowledgement", () => {
     const request = commandEnvelope(
       "session.name",
-      { name: "Renamed" },
+      { mutation: { action: "set", name: "Renamed" } },
       APP_PROTOCOL_CONTEXT,
       5,
       "rename-1"

@@ -9,6 +9,7 @@ describe("conversation title", () => {
       path: "/sessions/recovered.jsonl",
       cwd: "/Users/test/Projects/pi",
       name: "已保存的会话",
+      nameSource: "explicit" as const,
       modifiedAt: 1_800_000_000_000,
       messageCount: 8
     };

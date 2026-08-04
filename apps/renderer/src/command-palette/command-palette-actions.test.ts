@@ -7,8 +7,8 @@ import {
 } from "./command-palette-actions.js";
 
 const SESSIONS: SessionSummary[] = [
-  { id: "current", path: "/sessions/current.jsonl", cwd: "/work", name: "Current", modifiedAt: 2, messageCount: 2 },
-  { id: "other", path: "/sessions/other.jsonl", cwd: "/work", name: "Other", modifiedAt: 1, messageCount: 1 }
+  { id: "current", path: "/sessions/current.jsonl", cwd: "/work", name: "Current", nameSource: "explicit", modifiedAt: 2, messageCount: 2 },
+  { id: "other", path: "/sessions/other.jsonl", cwd: "/work", name: "Other", nameSource: "explicit", modifiedAt: 1, messageCount: 1 }
 ];
 
 describe("command palette actions", () => {

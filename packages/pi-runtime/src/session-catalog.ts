@@ -26,37 +26,24 @@ import {
   type ValidatedSessionCatalogQuery
 } from "./session-catalog-projection.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import type {
+  CreateSessionCatalogOptions,
+  SessionCatalog,
+  SessionCatalogContext
+} from "./session-catalog-contract.js";
+import { SessionCatalogRecordEnricher } from "./session-catalog-record-enricher.js";
+import { SessionCatalogSqliteLifecycle } from "./session-catalog-sqlite-lifecycle.js";
 import {
   openSqliteSessionCatalog,
-  type OpenSqliteSessionCatalog,
   type SessionCatalogRecord,
   type SqliteSessionCatalog
 } from "./sqlite-session-catalog.js";
-const SQLITE_RETRY_MS = { initial: 1_000, maximum: 30_000 };
 export type { SessionCatalogDiscoveryResult } from "./session-catalog-projection.js";
-export interface SessionCatalogContext {
-  sourceKey: string;
-  workspaceCwd: string;
-  discover(): Promise<SessionCatalogDiscoveryResult>;
-}
-export interface SessionCatalog {
-  query(query: SessionCatalogQuery, context: SessionCatalogContext): Promise<SessionCatalogPage>;
-  status(): SessionCatalogStatus;
-  reconcile(context: SessionCatalogContext, reason?: SessionCatalogChangedReason): Promise<void>;
-  upsert(
-    record: SessionCatalogRecord,
-    context: SessionCatalogContext,
-    reason: Extract<SessionCatalogChangedReason, "session-created" | "session-updated" | "session-imported">
-  ): Promise<void>;
-  dispose(): Promise<void>;
-}
-export interface CreateSessionCatalogOptions {
-  directory?: string;
-  storageRoot?: string;
-  onChanged?: (event: SessionCatalogChangedEvent) => void;
-  openSqlite?: OpenSqliteSessionCatalog;
-  now?: () => number;
-}
+export type {
+  CreateSessionCatalogOptions,
+  SessionCatalog,
+  SessionCatalogContext
+} from "./session-catalog-contract.js";
 interface ReconcileFlight {
   sourceKey: string;
   contextGeneration: number;
@@ -68,12 +55,7 @@ export function createSessionCatalog(options: CreateSessionCatalogOptions = {}):
 class DefaultSessionCatalog implements SessionCatalog {
   private activeSourceKey: string | undefined;
   private activeWorkspaceKey = "";
-  private sqlite: SqliteSessionCatalog | undefined;
-  private sqliteAttempted = false;
-  private sqliteRetryAt = 0;
-  private sqliteRetryMs = SQLITE_RETRY_MS.initial;
-  private sqliteDegradedReason: SessionCatalogDegradedReason | undefined;
-  private sqliteOpenFlight: Promise<void> | undefined;
+  private readonly sqliteLifecycle: SessionCatalogSqliteLifecycle;
   private fallbackRecords: SessionCatalogRecord[] = [];
   private fallbackReady = false;
   private reconcileFlight: ReconcileFlight | undefined;
@@ -93,23 +75,32 @@ class DefaultSessionCatalog implements SessionCatalog {
     incomplete: true,
     skippedCount: 0
   };
-  private readonly directory: string | undefined;
-  private readonly storageRoot: string | undefined;
   private readonly onChanged: ((event: SessionCatalogChangedEvent) => void) | undefined;
-  private readonly openSqlite: OpenSqliteSessionCatalog;
   private readonly now: () => number;
+  private readonly recordEnricher: SessionCatalogRecordEnricher;
   constructor(options: CreateSessionCatalogOptions) {
-    this.directory = options.directory;
-    this.storageRoot = options.storageRoot;
     this.onChanged = options.onChanged;
-    this.openSqlite = options.openSqlite ?? openSqliteSessionCatalog;
     this.now = options.now ?? (() => Date.now());
+    this.recordEnricher = new SessionCatalogRecordEnricher(options.storageRoot);
+    this.sqliteLifecycle = new SessionCatalogSqliteLifecycle(
+      options.directory,
+      options.storageRoot,
+      options.openSqlite ?? openSqliteSessionCatalog,
+      this.now
+    );
+  }
+  private get sqlite(): SqliteSessionCatalog | undefined {
+    return this.sqliteLifecycle.catalog;
   }
   query(query: SessionCatalogQuery, context: SessionCatalogContext): Promise<SessionCatalogPage> {
     const validated = validateSessionCatalogQuery(query);
     return this.withPreparedContext(context, (contextGeneration) => {
       const queryKey = createSessionCatalogQueryKey(
-        context.sourceKey, this.activeWorkspaceKey, validated.scope, normalizeSessionCatalogSearch(validated.search ?? "")
+        context.sourceKey,
+        this.activeWorkspaceKey,
+        validated.scope,
+        validated.view ?? "active",
+        normalizeSessionCatalogSearch(validated.search ?? "")
       );
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
       if (validated.refresh || this.autoReconciledSource !== context.sourceKey) {
@@ -118,7 +109,9 @@ class DefaultSessionCatalog implements SessionCatalog {
       }
       const result = this.readProjection(validated);
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
-      return createBoundedSessionCatalogPage(result, this.current, validated.limit, queryKey);
+      return this.recordEnricher.withAutomaticTitles(result.records).then((records) => createBoundedSessionCatalogPage(
+        { ...result, records }, this.current, validated.limit, queryKey
+      ));
     });
   }
   status(): SessionCatalogStatus {
@@ -139,9 +132,40 @@ class DefaultSessionCatalog implements SessionCatalog {
     reason: Extract<SessionCatalogChangedReason, "session-created" | "session-updated" | "session-imported">
   ): Promise<void> {
     return this.withPreparedContext(context, (contextGeneration) => {
-      const safe = sanitizeSessionCatalogRecord(record);
+      const safe = sanitizeSessionCatalogRecord(this.recordEnricher.withOrganization(context.sourceKey, record));
       if (!safe || !this.isCurrentContext(context, contextGeneration)) return;
       this.upsertPrepared(safe, context, reason);
+    });
+  }
+  organize(
+    path: string,
+    mutation: { kind: "pin" | "archive"; value: boolean },
+    context: SessionCatalogContext
+  ): Promise<number> {
+    return this.withPreparedContext(context, async (contextGeneration) => {
+      if (!this.isCurrentContext(context, contextGeneration)) return this.current.revision;
+      const organization = await this.recordEnricher.organize(
+        context.sourceKey,
+        path,
+        mutation,
+        this.now()
+      );
+      if (!this.isCurrentContext(context, contextGeneration)) return this.current.revision;
+      if (this.sqlite && this.current.source === "sqlite") {
+        try {
+          if (!this.sqlite.organize) throw new Error("Session Catalog organization projection is unavailable.");
+          const state = this.sqlite.organize(path, organization, this.current.revision);
+          this.applySqliteState(state, false);
+          this.publish("conversation-organized");
+          return this.current.revision;
+        } catch {
+          this.demoteSqlite(true);
+        }
+      }
+      this.fallbackRecords = this.recordEnricher.applyOrganization(this.fallbackRecords, path, organization);
+      this.current = { ...this.current, revision: this.current.revision + 1 };
+      this.publish("conversation-organized");
+      return this.current.revision;
     });
   }
   private upsertPrepared(
@@ -178,7 +202,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       state: "fallback",
       rebuilding: this.reconcileFlight !== undefined,
       itemCount: this.fallbackRecords.length,
-      ...degradedReason(this.sqliteDegradedReason)
+      ...degradedReason(this.sqliteLifecycle.degradedReason)
     };
     if (!this.reconcileFlight && !recoveryScheduled && !sqliteAwaitingReconcile) this.pendingUpserts.delete(safe.path);
     this.publish(reason);
@@ -188,16 +212,13 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.disposed = true;
     this.contextGeneration += 1;
     this.reconcileFlight = undefined;
-    try {
-      this.sqlite?.close();
-    } catch {
-      // Shutdown remains safe even if SQLite is already closed.
-    }
-    this.sqlite = undefined;
+    this.sqliteLifecycle.close();
     this.fallbackRecords = [];
     this.pendingUpserts.clear();
+    this.recordEnricher.clear();
     this.activeContext = undefined;
   }
+
   private withPreparedContext<T>(
     context: SessionCatalogContext,
     action: (contextGeneration: number) => T
@@ -211,6 +232,7 @@ class DefaultSessionCatalog implements SessionCatalog {
   private async prepareContextSerially(context: SessionCatalogContext): Promise<number> {
     this.assertNotDisposed();
     validateSessionCatalogContext(context);
+    await this.recordEnricher.initialize();
     await this.ensureSqlite();
     this.assertNotDisposed();
     this.activeContext = context;
@@ -248,7 +270,7 @@ class DefaultSessionCatalog implements SessionCatalog {
         itemCount: 0,
         incomplete: true,
         skippedCount: 0,
-        ...degradedReason(this.sqlite ? undefined : this.sqliteDegradedReason)
+        ...degradedReason(this.sqlite ? undefined : this.sqliteLifecycle.degradedReason)
       };
     }
     if (changed) this.publish("source-changed");
@@ -293,7 +315,10 @@ class DefaultSessionCatalog implements SessionCatalog {
     }
     if (!this.isCurrentContext(context, contextGeneration)) return;
     const appliedMutation = this.mutationGeneration;
-    const records = mergePendingSessionCatalogUpserts(discovered.records, this.pendingUpserts, appliedMutation);
+    const records = this.recordEnricher.withOrganizations(
+      context.sourceKey,
+      mergePendingSessionCatalogUpserts(discovered.records, this.pendingUpserts, appliedMutation)
+    );
     const reconciledAt = this.now();
     if (this.sqlite) {
       try {
@@ -325,7 +350,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       itemCount: records.length,
       incomplete: discovered.incomplete,
       skippedCount: discovered.skippedCount,
-      ...degradedReason(this.sqliteDegradedReason)
+      ...degradedReason(this.sqliteLifecycle.degradedReason)
     };
     this.autoReconciledSource = context.sourceKey;
     clearAppliedSessionCatalogUpserts(this.pendingUpserts, appliedMutation);
@@ -338,6 +363,7 @@ class DefaultSessionCatalog implements SessionCatalog {
         if (state.sourceKey === this.activeSourceKey) {
           return this.sqlite.query({
             scope: query.scope,
+            view: query.view ?? "active",
             cwdKey: this.activeWorkspaceKey,
             ...(query.search === undefined ? {} : { search: normalizeSessionCatalogSearch(query.search) }),
             ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
@@ -352,39 +378,11 @@ class DefaultSessionCatalog implements SessionCatalog {
     return querySessionCatalogFallback(this.fallbackRecords, this.activeWorkspaceKey, query);
   }
   private async ensureSqlite(): Promise<void> {
-    if (this.sqlite || this.directory === undefined || this.disposed) return;
-    if (this.sqliteOpenFlight) return this.sqliteOpenFlight;
-    const now = this.now();
-    if (this.sqliteAttempted && now < this.sqliteRetryAt) return;
-    this.sqliteAttempted = true;
     const lifecycleGeneration = this.contextGeneration;
-    const flight = this.openSqlite(this.directory, this.storageRoot)
-      .catch(() => ({
-        kind: "fallback" as const,
-        reason: "unavailable" as const,
-        degradedReason: "unavailable" as const
-      }))
-      .then((result) => {
-        if (this.disposed || lifecycleGeneration !== this.contextGeneration) {
-          if (result.kind === "ready") result.catalog.close();
-          return;
-        }
-        if (result.kind === "ready") {
-          this.sqlite = result.catalog;
-          this.sqliteDegradedReason = undefined;
-          this.autoReconciledSource = undefined;
-          this.sqliteRetryMs = SQLITE_RETRY_MS.initial;
-          return;
-        }
-        this.sqliteDegradedReason = result.degradedReason ?? result.reason;
-        this.sqliteRetryAt = now + this.sqliteRetryMs;
-        this.sqliteRetryMs = Math.min(this.sqliteRetryMs * 2, SQLITE_RETRY_MS.maximum);
-      })
-      .finally(() => {
-        if (this.sqliteOpenFlight === flight) this.sqliteOpenFlight = undefined;
-      });
-    this.sqliteOpenFlight = flight;
-    return flight;
+    const opened = await this.sqliteLifecycle.ensure(() => (
+      !this.disposed && lifecycleGeneration === this.contextGeneration
+    ));
+    if (opened) this.autoReconciledSource = undefined;
   }
   private applySqliteState(
     state: ReturnType<SqliteSessionCatalog["getState"]>,
@@ -401,18 +399,9 @@ class DefaultSessionCatalog implements SessionCatalog {
       incomplete: state.incomplete,
       skippedCount: state.skippedCount
     };
-    this.sqliteDegradedReason = undefined;
   }
   private demoteSqlite(scheduleReconcile: boolean): void {
-    try {
-      this.sqlite?.close();
-    } catch {
-      // The projection is disposable; fallback stays metadata-only.
-    }
-    this.sqlite = undefined;
-    this.sqliteDegradedReason = "runtime-query";
-    this.sqliteRetryAt = this.now() + this.sqliteRetryMs;
-    this.sqliteRetryMs = Math.min(this.sqliteRetryMs * 2, SQLITE_RETRY_MS.maximum);
+    this.sqliteLifecycle.demote();
     this.autoReconciledSource = undefined;
     this.fallbackRecords = [];
     this.fallbackReady = false;

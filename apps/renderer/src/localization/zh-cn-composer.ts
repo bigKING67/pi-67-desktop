@@ -50,6 +50,7 @@ export const zhCNComposerMessages = {
   piBuiltins: {
     new: "在当前工作区新建任务",
     model: "选择当前任务使用的模型",
+    name: "重命名当前对话",
     compact: "压缩当前会话上下文",
     resume: "查找并恢复已有会话",
     tree: "打开当前会话树",

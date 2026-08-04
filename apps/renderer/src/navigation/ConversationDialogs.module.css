@@ -1,0 +1,93 @@
+.renameModal {
+  width: min(520px, calc(100vw - 40px));
+}
+
+.archiveModal {
+  width: min(820px, calc(100vw - 40px));
+  max-height: min(720px, calc(100vh - 48px));
+}
+
+.dialog,
+.archiveDialog {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.dialog h2,
+.dialog p,
+.archiveDialog h2 {
+  margin: 0;
+}
+.dialog p { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.field { display: grid; gap: 6px; }
+.field label { color: var(--text-secondary); font-size: 11px; font-weight: 650; }
+.field input,
+.searchField input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+.field input { min-height: 38px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface-muted); }
+.field input:focus { border-color: var(--accent); box-shadow: var(--shadow-focus); }
+.dialogActions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dialogActions > div { display: flex; gap: 8px; }
+.textButton { padding: 6px 0; border: 0; background: transparent; color: var(--accent-strong); font-size: 12px; }
+.archiveHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.archiveHeader > div { display: grid; gap: 4px; }
+.iconButton { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); }
+.iconButton:hover,
+.iconButton[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.iconButton[data-focus-visible],
+.textButton[data-focus-visible],
+.rowButton[data-focus-visible],
+.rowPrimaryButton[data-focus-visible],
+.loadMore[data-focus-visible] {
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+.searchField { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-secondary); }
+.archiveList { display: grid; min-height: 180px; max-height: 480px; overflow-y: auto; border-block: 1px solid var(--border); }
+.archiveRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+.archiveRow:last-child { border-bottom: 0; }
+.archiveRow > svg { color: var(--text-tertiary); }
+.archiveRow > span { display: grid; min-width: 0; gap: 3px; }
+.archiveRow strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.archiveRow small {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.archiveRow > div { display: flex; gap: 6px; }
+.rowButton, .rowPrimaryButton, .loadMore { min-height: 30px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-raised); color: var(--text-primary); font-size: 11px; }
+.rowPrimaryButton {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.rowButton[data-disabled],
+.rowPrimaryButton[data-disabled],
+.loadMore[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.loadMore { justify-self: center; }
+.empty, .error { margin: auto; padding: 24px; color: var(--text-secondary); font-size: 12px; }
+.error { color: var(--danger); }
+@media (max-width: 680px) {
+  .archiveRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .archiveRow > div {
+    grid-column: 2;
+  }
+}

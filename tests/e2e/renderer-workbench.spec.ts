@@ -69,7 +69,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
   await expect(page.getByText("等待选择工作区", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("当前状态：会话待打开")).toBeVisible();
   await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /已保存的会话/u })).toBeVisible();
+  await expect(page.getByTestId("conversation-row").filter({ hasText: "已保存的会话" })).toBeVisible();
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
   await expect(page.getByTestId("title-context-current")).toHaveText("已保存的会话");
@@ -161,12 +161,13 @@ test("shows six recent sessions first and expands beyond the former 20-tab limit
   });
 
   const group = workspaceGroup(page, DEFAULT_MOCK_WORKSPACE.displayName);
-  await expect(group.getByRole("button", { name: /^会话 \d{2}/u })).toHaveCount(6);
+  const catalogRows = group.getByTestId("conversation-row").filter({ hasText: /会话 \d{2}/u });
+  await expect(catalogRows).toHaveCount(6);
   await expect(group.getByRole("button", { name: "显示更多" })).toBeVisible();
 
   await group.getByRole("button", { name: "显示更多" }).click();
 
-  await expect(group.getByRole("button", { name: /^会话 \d{2}/u })).toHaveCount(25);
+  await expect(catalogRows).toHaveCount(25);
   await expect(group.getByRole("button", { name: "收起" })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
 
@@ -174,7 +175,7 @@ test("shows six recent sessions first and expands beyond the former 20-tab limit
   const workspaceMenu = page.getByRole("menu", { name: `${DEFAULT_MOCK_WORKSPACE.displayName} 工作区菜单` });
   await expect(workspaceMenu.getByRole("menuitem", { name: "刷新会话" })).toBeVisible();
   await expect(workspaceMenu.getByRole("menuitem", { name: "导入 Pi Session" })).toBeVisible();
-  await expect(workspaceMenu.getByRole("menuitem", { name: /归档|隐藏|删除会话/u })).toHaveCount(0);
+  await expect(workspaceMenu.getByRole("menuitem", { name: "已归档对话" })).toBeVisible();
 });
 
 test("keeps independent session catalogs for multiple workspaces and switches the center surface", async ({ page }) => {
@@ -194,10 +195,10 @@ test("keeps independent session catalogs for multiple workspaces and switches th
 
   const piGroup = workspaceGroup(page, DEFAULT_MOCK_WORKSPACE.displayName);
   const docsGroup = workspaceGroup(page, docsWorkspace.displayName);
-  await expect(piGroup.getByRole("button", { name: /Pi 工作台方案/u })).toBeVisible();
-  await expect(piGroup.getByRole("button", { name: /Docs 发布说明/u })).toHaveCount(0);
-  await expect(docsGroup.getByRole("button", { name: /Docs 发布说明/u })).toBeVisible();
-  await expect(docsGroup.getByRole("button", { name: /Pi 工作台方案/u })).toHaveCount(0);
+  await expect(piGroup.getByTestId("conversation-row").filter({ hasText: "Pi 工作台方案" })).toBeVisible();
+  await expect(piGroup.getByTestId("conversation-row").filter({ hasText: "Docs 发布说明" })).toHaveCount(0);
+  await expect(docsGroup.getByTestId("conversation-row").filter({ hasText: "Docs 发布说明" })).toBeVisible();
+  await expect(docsGroup.getByTestId("conversation-row").filter({ hasText: "Pi 工作台方案" })).toHaveCount(0);
 
   const catalogContexts = (await recordedCommandDetails(page))
     .filter((command) => command.type === "session.catalog.query")
@@ -207,12 +208,12 @@ test("keeps independent session catalogs for multiple workspaces and switches th
     { scope: "workspace", workspaceId: docsWorkspace.id }
   ]));
 
-  await piGroup.getByRole("button", { name: /Pi 工作台方案/u }).click();
+  await piGroup.getByTestId("conversation-row").filter({ hasText: "Pi 工作台方案" }).click();
   await expect(page.getByTestId("title-context-current")).toHaveText("Pi 工作台方案");
   await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
 
-  await docsGroup.getByRole("button", { name: /Docs 发布说明/u }).click();
+  await docsGroup.getByTestId("conversation-row").filter({ hasText: "Docs 发布说明" }).click();
   await expect(page.getByTestId("title-context-current")).toHaveText("Docs 发布说明");
   await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
@@ -298,7 +299,7 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
   await markCurrentTaskRunning(page, 1, "session-test", 1);
   await clearRecordedCommands(page);
 
-  await page.getByRole("button", { name: /未命名任务 会话菜单/u }).click();
+  await page.getByRole("button", { name: /未命名任务 对话菜单/u }).click();
   await page.getByRole("menuitem", { name: "停止任务" }).click();
 
   await expect.poll(async () => (
@@ -306,9 +307,8 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
   ).filter((command) => command.type === "task.close")).toHaveLength(1);
   expect((await recordedCommandDetails(page)).find((command) => command.type === "task.close"))
     .toMatchObject({ payload: { mode: "stop" } });
-  expect((await recordedCommandDetails(page)).filter((command) => (
-    /archive|delete|hide/u.test(command.type)
-  ))).toHaveLength(0);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "conversation.archive"))
+    .toHaveLength(0);
   await expect(page.getByRole("heading", { name: "Pi 会话", exact: true })).toBeVisible();
   await expect(page.getByText("会话未在运行，打开后可继续。", {
     exact: true
@@ -369,7 +369,7 @@ test("keeps long workspace and session names inside the navigation column", asyn
   }));
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
   expect(metrics.documentScrollWidth).toBe(metrics.documentWidth);
-  await expect(workspaceGroup(page, longWorkspace.displayName).getByRole("button", { name: /重构跨工作区/u }))
+  await expect(workspaceGroup(page, longWorkspace.displayName).getByTestId("conversation-row").filter({ hasText: "重构跨工作区" }))
     .toBeVisible();
 });
 

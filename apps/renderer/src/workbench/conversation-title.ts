@@ -5,13 +5,17 @@ export function conversationPrimaryTitle(
   task: RendererWorkbenchTask,
   session: SessionSummary | undefined
 ): string {
-  return task.pendingTitle ?? task.recentUserMessagePreview ?? conversationStableTitle(task, session);
+  if (task.pendingTitle) return task.pendingTitle;
+  if (task.titleSource === "explicit") return task.title;
+  return task.recentUserMessagePreview ?? conversationStableTitle(task, session);
 }
 
 export function conversationStableTitle(
   task: RendererWorkbenchTask,
   session: SessionSummary | undefined
 ): string {
+  if (task.titleSource === "explicit") return task.title;
+  if (session && session.nameSource !== "fallback") return session.name;
   return ["未命名会话", "未命名任务"].includes(task.title) && session
     ? session.name
     : task.title;

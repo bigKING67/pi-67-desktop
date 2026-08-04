@@ -308,6 +308,7 @@ describe("protocol v3 envelopes", () => {
         path: "/sessions/one.jsonl",
         cwd: "/workspace",
         name: "Recovery",
+        nameSource: "explicit" as const,
         modifiedAt: 1_700_000_000_000,
         messageCount: 12
       }],

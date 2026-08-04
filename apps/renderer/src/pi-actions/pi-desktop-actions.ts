@@ -3,6 +3,7 @@ import {
   GitBranch,
   History,
   MessageSquarePlus,
+  Pencil,
   RefreshCw,
   Scissors,
   Settings,
@@ -13,11 +14,19 @@ import { compactRendererSession } from "../operation/operation-controller.js";
 import { selectSessionModel, reloadSessionResources } from "../session/session-control-controller.js";
 import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask
+} from "../workbench/workbench-store.js";
+import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
+import { selectConversationSessionSummary, useSessionCatalogStore } from "../navigation/session-catalog-store.js";
+import { useConversationDialogStore } from "../navigation/conversation-dialog-store.js";
+import { renameRendererConversation } from "../navigation/conversation-organization-controller.js";
 
 type PiDesktopActionName =
   | "new"
   | "model"
+  | "name"
   | "compact"
   | "resume"
   | "tree"
@@ -62,6 +71,10 @@ export const PI_DESKTOP_ACTIONS: readonly PiDesktopActionDescriptor[] = [
     session: true,
     idle: true
   }, "<provider/model>"),
+  action("name", messages.composer.piBuiltins.name, Pencil, {
+    connection: true,
+    session: true
+  }, "[title]"),
   action("compact", messages.composer.piBuiltins.compact, Scissors, {
     connection: true,
     session: true,
@@ -129,7 +142,7 @@ export async function executePiDesktopAction(
   const unavailable = piDesktopActionUnavailableReason(descriptor, context);
   if (unavailable) return { status: "blocked", message: unavailable };
   const args = rawArguments.trim();
-  if (!["model", "compact"].includes(descriptor.name) && args) {
+  if (!["model", "compact", "name"].includes(descriptor.name) && args) {
     return { status: "blocked", message: messages.composer.piActionUnexpectedArguments(`/${descriptor.name}`) };
   }
   switch (descriptor.name) {
@@ -138,6 +151,8 @@ export async function executePiDesktopAction(
       return { status: "handled" };
     case "model":
       return executeModelAction(args, context);
+    case "name":
+      return executeNameAction(args);
     case "compact":
       await compactRendererSession(args || undefined);
       return { status: "handled" };
@@ -157,6 +172,31 @@ export async function executePiDesktopAction(
       rendererWorkbenchStore.getState().openSettings("general");
       return { status: "handled" };
   }
+}
+
+async function executeNameAction(name: string): Promise<PiDesktopActionExecutionResult> {
+  const workbench = rendererWorkbenchStore.getState();
+  const task = selectedWorkbenchTask(workbench);
+  const conversation = workbench.selectedSurface?.kind === "conversation"
+    ? workbench.selectedSurface.conversation
+    : undefined;
+  if (conversation?.kind !== "session") {
+    return { status: "blocked", message: messages.composer.piActionUnavailable.session };
+  }
+  const session = selectConversationSessionSummary(useSessionCatalogStore.getState(), conversation);
+  if (name) {
+    const renamed = await renameRendererConversation(conversation.workspaceId, conversation.sessionPath, name);
+    return renamed
+      ? { status: "handled" }
+      : { status: "blocked", message: "对话名称未能保存。" };
+  }
+  useConversationDialogStore.getState().openRename({
+    workspaceId: conversation.workspaceId,
+    path: conversation.sessionPath,
+    title: task ? conversationPrimaryTitle(task, session) : session?.name ?? "未命名对话",
+    nameSource: task?.titleSource === "explicit" ? "explicit" : session?.nameSource ?? "fallback"
+  });
+  return { status: "handled" };
 }
 
 async function executeModelAction(

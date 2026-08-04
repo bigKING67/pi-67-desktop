@@ -31,6 +31,16 @@ a provider marketplace, an RPC wrapper, or a full IDE. It favors truthful
 state, fast interaction, safe recovery, and Pi compatibility over feature
 count.
 
+## Product vocabulary
+
+- `对话` is the user-visible, long-lived navigation object that may be renamed,
+  pinned, or archived.
+- `任务` is one execution instance and owns running, waiting, completed, failed,
+  cancelled, lost, and stopped lifecycle states.
+- `Session` is reserved for Pi JSONL, Protocol, diagnostics, import, tree, and
+  other technical contexts. User-facing organization actions do not call a
+  conversation a Task or Session.
+
 ## Primary jobs
 
 1. Register one or more workspaces and switch conversations from one grouped
@@ -169,10 +179,17 @@ count.
   list virtualization keep large histories bounded, while Pi JSONL remains the
   source of truth. Each group initially shows six ordinary recent sessions and
   offers an explicit load-more action.
-- A conversation row uses the latest accepted or currently loaded user message
-  as its primary in-memory preview when available, with the stable Pi Session
-  name retained as secondary context. Prompt-derived previews are never copied
-  into the Session Catalog or persisted Workbench state.
+- A conversation title resolves in one order everywhere: explicit Pi
+  `session_info.name`, otherwise the most recent topical user message on the
+  current Pi branch, otherwise `未命名对话`. Follow-ups such as `继续吧`, bare
+  confirmation, commit/push acknowledgements, and standalone navigation Slash
+  commands do not replace an earlier useful topic. Automatic titles are derived
+  locally without a model call and are never written into SQLite, Workbench
+  persistence, logs, diagnostics, or telemetry.
+- Explicit rename remains stable across later prompts. `恢复自动标题` appends an
+  empty Pi `session_info` name and returns the conversation to the branch-derived
+  title contract. A live Task uses Task authority for the mutation; a cold
+  Catalog row uses Workspace authority and never creates a hidden Runtime.
 - The application admits at most eight top-level Session tasks in accepted,
   running, approval-wait, or Extension-input-wait states. Subagents launched
   inside a Task do not consume additional top-level admission slots. The Renderer
@@ -182,9 +199,17 @@ count.
   conversation, collapsing a Workspace, or opening Settings does not stop
   background work. One canonical Pi JSONL session path has at most one live
   writer across the application.
-- There is no tab-close or local archive metaphor. A running or waiting row
-  exposes a deliberate stop action; ordinary history remains discoverable from
-  the rebuildable Session Catalog and no UI action deletes Pi JSONL in v1.
+- A conversation row menu owns `置顶对话` / `取消置顶`, `重命名对话`, optional
+  `恢复自动标题`, and `归档对话`. Only a genuinely accepted, running, or waiting
+  Task exposes `停止任务`; idle and terminal Tasks do not present a false stop
+  action.
+- Archive is organization, not deletion. It never moves, rewrites, or deletes Pi
+  JSONL and there is no permanent-delete action. Active, initializing,
+  provisional, or unsent-draft conversations cannot be archived. Archiving an
+  idle loaded conversation disposes its Runtime first, automatically removes its
+  pin, returns a selected row to its Workspace surface, and offers one memory-only
+  Undo action. The paged `已归档对话` view supports search, restore, and restore-and-open;
+  a restored conversation returns as ordinary unpinned history.
 - A workspace added through the native directory picker is trusted for project
   resource loading. Project trust and the current Task Runtime's Tool execution
   mode remain distinct: trust is a prerequisite for `YOLO`, not an implicit
@@ -357,17 +382,17 @@ count.
   switch preserves the draft and rotates the retry submission identity.
 - The Composer exposes one `+` attachment action and one in-editor `/` catalog.
   The catalog presents four explicit groups: `Pi 内置`, `扩展命令`, `提示词`, and
-  `技能`. The first Desktop-native set is `/new`, `/model`, `/compact`, `/resume`,
-  `/tree`, `/reload`, and `/settings`; these call existing Renderer/Workbench
+  `技能`. The first Desktop-native set is `/new`, `/model`, `/name`, `/compact`,
+  `/resume`, `/tree`, `/reload`, and `/settings`; these call existing Renderer/Workbench
   Controllers rather than Runtime `command.invoke`. Pi-resolved Extension
   commands, Prompt Templates, and Skills such as `/plan` and
   `/skill:design-craft` retain their current Runtime or Prompt paths. Click and
   Tab insert, Arrow keys only move selection, and an exact command plus Enter
   executes it; a partial token plus Enter completes it. IME confirmation does
   neither. Unsupported known Pi TUI builtins stay visible as an inline Desktop
-  compatibility error and are never sent to the model, while an unreserved
-  unknown `/name` remains an ordinary Prompt for compatibility. Runtime catalog
-  loading or failure never removes the Desktop-native group.
+  compatibility error and are never sent to the model. `/name 新标题` renames the
+  current conversation directly; bare `/name` opens the shared rename dialog.
+  Runtime catalog loading or failure never removes the Desktop-native group.
 - A draft supports at most 20 local attachments, 100 MiB per file, and 250 MiB
   total. Pathless clipboard files have a stricter 16 MiB boundary. Main stages
   regular files into a private disposable root and sends only opaque references
@@ -443,6 +468,13 @@ count.
 - Session navigation uses a disposable, rebuildable metadata-only Catalog with
   bounded keyset pages. Pi JSONL remains authoritative; the Catalog never stores
   Prompt, Assistant, Thinking, Tool, source, Patch, image, or transcript content.
+- For unnamed rows, the Agent Host reads only a bounded reverse JSONL stream and
+  walks from the current leaf through `parentId` to find the latest topical user
+  message on that branch. It does not open a cold Task Runtime, parse every
+  Session through `SessionManager.open()`, scan outside the requested page, or
+  persist the derived text. Consequently Catalog search is authoritative for
+  explicit names, Session path, and Session ID; it does not perform an unbounded
+  all-history Prompt scan to find cold automatic titles.
 - The active managed Session uses file and parent-directory watchers only as dirty
   signals. An authoritative bounded JSONL tail verifies file identity, byte offsets,
   strict UTF-8, physical-line limits, and complete JSON records. Appends already
@@ -544,9 +576,18 @@ count.
   error details, or raw payload objects in localStorage, SQLite, JSONL, or diagnostics.
 - Electron Main owns the disposable Session Catalog location. Its SQLite rows
   contain only bounded Session identity/path/cwd/explicit-name/count/time/parent
-  metadata; unnamed Sessions never derive a stored name from the first Prompt.
+  metadata plus pin/archive timestamps projected from the organization store;
+  unnamed Sessions never store their automatic title there.
   POSIX catalog storage must remain current-user-owned with directory `0700` and
   database `0600` permissions or fail closed to the disposable SDK projection.
+- Conversation pin/archive state is a separate bounded private document under
+  the Agent Host storage root. It stores only a version, a SHA-256 key derived
+  from Catalog source plus normalized Session path, and pin/archive timestamps;
+  it stores no raw path, title, Prompt, transcript, source, or Tool content. The
+  file is atomically replaced, limited to 10,000 records and 4 MiB, and uses
+  `0700` directory / `0600` file permissions on POSIX. Corrupt state is
+  quarantined and the rebuildable Catalog remains usable without inventing
+  organization state.
 - Catalog search may normalize user text, but filesystem source/workspace identity
   never uses Unicode compatibility normalization. Link-based storage indirection
   outside Electron `userData` fails closed instead of following the target.

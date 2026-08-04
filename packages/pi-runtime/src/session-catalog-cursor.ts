@@ -1,19 +1,28 @@
 import { createHash } from "node:crypto";
-import { RuntimeError, type SessionCatalogCursor, type SessionCatalogScope } from "@pi67/domain";
+import {
+  RuntimeError,
+  type SessionCatalogCursor,
+  type SessionCatalogScope,
+  type SessionCatalogView
+} from "@pi67/domain";
 
 export function createSessionCatalogQueryKey(
   sourceKey: string,
   workspaceKey: string,
   scope: SessionCatalogScope,
+  view: SessionCatalogView,
   normalizedSearch: string
 ): string {
   return createHash("sha256").update(JSON.stringify([
-    "session-catalog-query-v1",
+    "session-catalog-query-v2",
     sourceKey,
     workspaceKey,
     scope,
+    view,
     normalizedSearch,
-    "modified-at-desc-path-binary-desc-v1"
+    view === "archived"
+      ? "archived-at-desc-modified-at-desc-path-binary-desc-v1"
+      : "pinned-at-desc-modified-at-desc-path-binary-desc-v1"
   ])).digest("hex");
 }
 

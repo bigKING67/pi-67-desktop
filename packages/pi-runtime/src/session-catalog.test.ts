@@ -367,7 +367,8 @@ describe("Session Catalog orchestration", () => {
 
     const page = await catalog.query({ scope: "all" }, context);
     expect(page).toMatchObject({ total: 1, incomplete: true, skippedCount: 4 });
-    expect(page.items[0]?.name).toBe("Untitled session");
+    expect(page.items[0]?.name).toBe("未命名对话");
+    expect(page.items[0]?.nameSource).toBe("fallback");
     await catalog.dispose();
   });
 

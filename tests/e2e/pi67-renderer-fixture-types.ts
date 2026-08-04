@@ -140,8 +140,8 @@ export interface FixtureAgentState {
   extensionCatalog: { items: unknown[]; truncated: boolean; total: number };
   contextFiles: FixtureContextFiles;
   providerConfiguration: PiProviderConfigurationSnapshot;
-  sessionCatalogPage: { itemCount: number };
-  sessionCatalogPagesByWorkspace: Record<string, { itemCount: number }>;
+  sessionCatalogPage: { itemCount: number; revision: number };
+  sessionCatalogPagesByWorkspace: Record<string, { itemCount: number; revision: number }>;
   assets: Record<string, { mimeType: string; dataBase64: string; sessionGeneration?: number }>;
   snapshot: Record<string, unknown>;
   responseDelays: Record<string, number>;

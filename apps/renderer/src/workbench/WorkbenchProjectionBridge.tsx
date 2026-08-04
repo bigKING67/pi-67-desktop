@@ -158,6 +158,7 @@ export function workbenchTaskFromProjection({
     lifecycle: existing?.lifecycle ?? taskLifecycle(operation),
     runtime: existing?.runtime ?? runtime,
     title: sessionName?.trim() || "未命名任务",
+    titleSource: sessionName?.trim() ? "explicit" : "fallback",
     ...(effectiveUserMessagePreview
       ? { recentUserMessagePreview: effectiveUserMessagePreview }
       : {}),

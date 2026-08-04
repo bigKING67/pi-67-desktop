@@ -71,8 +71,8 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
     const primaryGroup = window.getByRole("listitem", { name: "工作区：workspace-primary" });
     const primaryOne = primaryGroup.locator('[data-testid="conversation-row"]').filter({ hasText: "Primary task one" });
     const primaryTwo = primaryGroup.locator('[data-testid="conversation-row"]').filter({ hasText: "Primary task two" });
-    await sendControlledPrompt(window, primaryOne);
-    await sendControlledPrompt(window, primaryTwo);
+    await sendControlledPrompt(window, primaryOne, "Primary task one");
+    await sendControlledPrompt(window, primaryTwo, "Primary task two");
     await expect(primaryGroup.getByText("运行中", { exact: true })).toHaveCount(2);
 
     const utilityProcessesBeforeSecondWorkspace = await utilityProcessCount(application);
@@ -82,7 +82,7 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
     await expect(window.getByLabel("Pi conversation")).toBeVisible({ timeout: 30_000 });
     const secondaryOne = secondaryGroup.locator('[data-testid="conversation-row"]')
       .filter({ hasText: "Secondary task one" });
-    await sendControlledPrompt(window, secondaryOne);
+    await sendControlledPrompt(window, secondaryOne, "Secondary task one");
 
     await expect(primaryGroup.getByText("运行中", { exact: true })).toHaveCount(2);
     await expect(secondaryGroup.getByText("运行中", { exact: true })).toHaveCount(1);
@@ -100,14 +100,16 @@ async function utilityProcessCount(application: Awaited<ReturnType<typeof electr
   return application.evaluate(({ app }) => app.getAppMetrics().filter((metric) => metric.type === "Utility").length);
 }
 
-async function sendControlledPrompt(window: Page, row: Locator): Promise<void> {
+async function sendControlledPrompt(window: Page, row: Locator, explicitTitle: string): Promise<void> {
   await row.click();
   await expect(window.getByLabel("Pi conversation")).toBeVisible({ timeout: 30_000 });
   await window.getByLabel("给 Pi 发送消息").fill(CONTROLLED_PROMPT_TEXT);
   await window.getByRole("button", { name: "发送", exact: true }).click();
   await expect(row.getByText("运行中", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(row).toContainText(CONTROLLED_PROMPT_TEXT);
-  await expect(window.locator(".brand-lockup")).toContainText(CONTROLLED_PROMPT_TEXT);
+  await expect(row.locator("strong")).toHaveText(explicitTitle);
+  await expect(window.locator(".brand-lockup")).toContainText(explicitTitle);
+  await expect(window.getByRole("article", { name: "用户消息", exact: true })
+    .filter({ hasText: CONTROLLED_PROMPT_TEXT })).toBeVisible();
 }
 
 function piDefaultSessionDirectory(cwd: string, agentDir: string): string {

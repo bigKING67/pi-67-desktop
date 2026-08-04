@@ -235,7 +235,7 @@ describe("SQLite Session Catalog integrity", () => {
     }
   });
 
-  it.each(["sessions_workspace_recent", "sessions_all_recent"] as const)(
+  it.each(["sessions_workspace_organized", "sessions_all_organized"] as const)(
     "replaces a valid projection when required index %s is missing",
     async (indexName) => {
       const root = await temporaryRoot();
@@ -255,12 +255,12 @@ describe("SQLite Session Catalog integrity", () => {
 
   it.each([
     [
-      "sessions_workspace_recent",
-      "CREATE INDEX sessions_workspace_recent ON sessions(cwd_key, path DESC, modified_at_ms DESC);"
+      "sessions_workspace_organized",
+      "CREATE INDEX sessions_workspace_organized ON sessions(cwd_key, archived_at_ms, pinned_at_ms DESC, path DESC, modified_at_ms DESC);"
     ],
     [
-      "sessions_all_recent",
-      "CREATE INDEX sessions_all_recent ON sessions(modified_at_ms ASC, path DESC);"
+      "sessions_all_organized",
+      "CREATE INDEX sessions_all_organized ON sessions(archived_at_ms, pinned_at_ms ASC, modified_at_ms DESC, path DESC);"
     ]
   ] as const)("replaces a valid projection when index %s violates ordering", async (indexName, replacementSql) => {
     const root = await temporaryRoot();

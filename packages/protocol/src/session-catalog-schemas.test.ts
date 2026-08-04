@@ -216,6 +216,7 @@ describe("Session Catalog protocol schemas", () => {
       "session-created",
       "session-updated",
       "session-imported",
+      "conversation-organized",
       "source-changed"
     ] as const) {
       expect(isEventEnvelope(eventEnvelope("session.catalog.changed", {
@@ -272,10 +273,11 @@ function sessionSummary(overrides: Partial<SessionCatalogResultItem> = {}): Sess
     path: "/sessions/one.jsonl",
     cwd: "/workspace",
     name: "First session",
+    nameSource: "explicit",
     modifiedAt: 1_700_000_000_000,
     messageCount: 12,
     ...overrides
-  };
+  } as SessionCatalogResultItem;
 }
 
 function catalogStatus(): SessionCatalogStatus {

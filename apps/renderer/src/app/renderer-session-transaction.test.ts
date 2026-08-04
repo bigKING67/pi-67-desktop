@@ -318,6 +318,7 @@ function seedFeatureStores(): void {
       path: "/sessions/session-1.jsonl",
       cwd: "/workspace",
       name: "Session 1",
+      nameSource: "explicit",
       modifiedAt: 1,
       messageCount: 1
     }], total: 1, hasMore: false }

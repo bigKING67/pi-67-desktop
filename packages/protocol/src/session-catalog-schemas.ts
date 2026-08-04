@@ -19,12 +19,15 @@ const SessionCatalogCursorSchema = strictObject({
     maxLength: SESSION_CATALOG_QUERY_KEY_CHARS,
     pattern: "^[0-9a-f]+$"
   }),
+  pinnedAt: Type.Optional(TimestampSchema),
+  archivedAt: Type.Optional(TimestampSchema),
   modifiedAt: TimestampSchema,
   path: CatalogPathSchema
 });
 
 export const SessionCatalogQuerySchema = strictObject({
   scope: Type.Union([Type.Literal("workspace"), Type.Literal("all")]),
+  view: Type.Optional(Type.Union([Type.Literal("active"), Type.Literal("archived")])),
   search: Type.Optional(Type.String({ maxLength: MAX_SESSION_CATALOG_SEARCH_CHARS })),
   cursor: Type.Optional(SessionCatalogCursorSchema),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SESSION_CATALOG_PAGE_ITEMS })),
@@ -37,8 +40,15 @@ const SessionSummarySchema = strictObject({
   path: CatalogPathSchema,
   cwd: CatalogPathSchema,
   name: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_NAME_CHARS }),
+  nameSource: Type.Union([
+    Type.Literal("explicit"),
+    Type.Literal("latest-user"),
+    Type.Literal("fallback")
+  ]),
   modifiedAt: TimestampSchema,
   messageCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  pinnedAt: Type.Optional(TimestampSchema),
+  archivedAt: Type.Optional(TimestampSchema),
   parentSessionPath: Type.Optional(CatalogPathSchema)
 });
 
@@ -97,6 +107,7 @@ export const SessionCatalogChangedSchema = strictObject({
     Type.Literal("session-created"),
     Type.Literal("session-updated"),
     Type.Literal("session-imported"),
+    Type.Literal("conversation-organized"),
     Type.Literal("source-changed")
   ])
 });

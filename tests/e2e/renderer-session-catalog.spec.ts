@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   attachMockAgent,
+  clearRecordedCommands,
   installMockDesktopBridge,
+  recordedCommandDetails,
   replaceMockAgentHost
 } from "./pi67-renderer-fixture.js";
 import {
@@ -218,6 +220,163 @@ test("keeps Command Palette server search independent from navigation search", a
   ))).toBe(true);
   await expect(palette.getByRole("option", { name: /Palette 服务端结果/u })).toBeVisible();
   await expect(navigationSearch).toHaveValue("navigation-only");
+});
+
+test("shows an automatic title before opening and supports explicit rename plus automatic restore", async ({ page }) => {
+  const automatic = {
+    ...session(1, "检查冷启动标题"),
+    nameSource: "latest-user" as const
+  };
+  await openCatalogWorkspace(page, { items: [automatic] });
+  await expect(sessionButton(page, automatic.name)).toBeVisible();
+  await clearRecordedCommands(page);
+
+  await page.getByRole("button", { name: `${automatic.name} 对话菜单` }).click();
+  await expect(page.getByRole("menuitem", { name: "停止任务" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "重命名对话" }).click();
+  const renameDialog = page.getByRole("dialog", { name: "重命名对话" });
+  await expect(renameDialog).toBeVisible();
+  await expect(renameDialog.getByRole("button", { name: "恢复自动标题" })).toHaveCount(0);
+  await renameDialog.getByRole("textbox", { name: "对话名称" }).fill("显式保留的标题");
+  await updateSessionCatalogFixture(page, {
+    revision: 2,
+    items: [{ ...automatic, name: "显式保留的标题", nameSource: "explicit" }]
+  });
+  await renameDialog.getByRole("button", { name: "保存" }).click();
+
+  await expect(sessionButton(page, "显式保留的标题")).toBeVisible();
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "session.nameByPath"
+  ))).toMatchObject({
+    context: { scope: "workspace", workspaceId: "workspace-pi-demo" },
+    payload: { path: automatic.path, mutation: { action: "set", name: "显式保留的标题" } }
+  });
+
+  await page.getByRole("button", { name: "显式保留的标题 对话菜单" }).click();
+  await updateSessionCatalogFixture(page, { revision: 3, items: [automatic] });
+  await page.getByRole("menuitem", { name: "恢复自动标题" }).click();
+  await expect(sessionButton(page, automatic.name)).toBeVisible();
+  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "session.nameByPath"
+  )).at(-1)).toMatchObject({
+    payload: { path: automatic.path, mutation: { action: "clear" } }
+  });
+});
+
+test("pins a conversation ahead of newer unpinned history", async ({ page }) => {
+  const newer = session(1, "较新的普通对话");
+  const pinned = session(2, "需要置顶的对话");
+  await openCatalogWorkspace(page, { items: [newer, pinned] });
+  await expect(page.getByTestId("conversation-row").first()).toContainText(newer.name);
+  await clearRecordedCommands(page);
+
+  await page.getByRole("button", { name: `${pinned.name} 对话菜单` }).click();
+  await updateSessionCatalogFixture(page, {
+    revision: 2,
+    items: [newer, { ...pinned, pinnedAt: 1_900_000_000_000 }]
+  });
+  await page.getByRole("menuitem", { name: "置顶对话" }).click();
+
+  await expect(page.getByTestId("conversation-row").first()).toContainText(pinned.name);
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "conversation.pin"
+  ))).toMatchObject({ payload: { path: pinned.path, pinned: true } });
+  await page.getByRole("button", { name: `${pinned.name} 对话菜单` }).click();
+  await expect(page.getByRole("menuitem", { name: "取消置顶" })).toBeVisible();
+});
+
+test("executes /name with an argument and opens the same rename dialog without one", async ({ page }) => {
+  const original = session(1, "Slash 命名前");
+  await openCatalogWorkspace(page, { items: [original] });
+  await sessionButton(page, original.name).click();
+  const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
+  await expect(composer).toBeVisible();
+  await clearRecordedCommands(page);
+
+  await updateSessionCatalogFixture(page, {
+    revision: 2,
+    items: [{ ...original, name: "Slash 命名后", nameSource: "explicit" }]
+  });
+  await composer.fill("/name Slash 命名后");
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("");
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "session.name"
+  ))).toMatchObject({ payload: { mutation: { action: "set", name: "Slash 命名后" } } });
+  await expect(sessionButton(page, "Slash 命名后")).toBeVisible();
+
+  await composer.fill("/name");
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("");
+  await expect(page.getByRole("dialog", { name: "重命名对话" })).toBeVisible();
+});
+
+test("archives without deleting Pi history and restores from the undo action", async ({ page }) => {
+  const active = session(1, "可归档对话");
+  await openCatalogWorkspace(page, { items: [active] });
+  await clearRecordedCommands(page);
+
+  await page.getByRole("button", { name: `${active.name} 对话菜单` }).click();
+  await updateSessionCatalogFixture(page, {
+    revision: 2,
+    items: [{ ...active, archivedAt: 1_900_000_000_000 }]
+  });
+  await page.getByRole("menuitem", { name: "归档对话" }).click();
+
+  await expect(sessionButton(page, active.name)).toHaveCount(0);
+  await expect(page.getByText("对话已归档", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "conversation.archive"
+  ))).toMatchObject({ payload: { path: active.path, archived: true } });
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "task.close"))
+    .toHaveLength(0);
+
+  await updateSessionCatalogFixture(page, { revision: 3, items: [active] });
+  await page.getByRole("button", { name: "撤销" }).click();
+  await expect(sessionButton(page, active.name)).toBeVisible();
+  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "conversation.archive"
+  )).at(-1)).toMatchObject({ payload: { path: active.path, archived: false } });
+});
+
+test("searches archived conversations and supports restore plus restore-and-open", async ({ page }) => {
+  const active = session(1, "当前对话");
+  const archivedA = { ...session(2, "归档设计检查"), archivedAt: 1_900_000_000_000 };
+  const archivedB = { ...session(3, "归档发布检查"), archivedAt: 1_800_000_000_000 };
+  await openCatalogWorkspace(page, { items: [active, archivedA, archivedB] });
+  await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
+  await page.getByRole("menuitem", { name: "已归档对话" }).click();
+  const dialog = page.getByRole("dialog", { name: "已归档对话：pi-demo" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(archivedA.name, { exact: true })).toBeVisible();
+  await expect(dialog).toContainText(/归档于.*最后修改/u);
+
+  await clearSessionCatalogRequests(page);
+  await dialog.getByRole("textbox", { name: "搜索已归档对话" }).fill("设计检查");
+  await expect.poll(async () => (await sessionCatalogRequests(page)).at(-1)?.payload).toMatchObject({
+    scope: "workspace",
+    view: "archived",
+    search: "设计检查"
+  });
+  await expect(dialog.getByText(archivedA.name, { exact: true })).toBeVisible();
+  await expect(dialog.getByText(archivedB.name, { exact: true })).toHaveCount(0);
+
+  await updateSessionCatalogFixture(page, { revision: 2, items: [active, session(2, archivedA.name), archivedB] });
+  await dialog.getByRole("button", { name: "恢复", exact: true }).click();
+  await expect(sessionButton(page, archivedA.name)).toBeVisible();
+  await expect(dialog.getByText(archivedA.name, { exact: true })).toHaveCount(0);
+
+  await dialog.getByRole("textbox", { name: "搜索已归档对话" }).fill("");
+  await expect(dialog.getByText(archivedB.name, { exact: true })).toBeVisible();
+  await updateSessionCatalogFixture(page, {
+    revision: 3,
+    items: [active, session(2, archivedA.name), session(3, archivedB.name)]
+  });
+  await dialog.getByRole("button", { name: "恢复并打开" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "conversation.archive"
+  )).at(-1)).toMatchObject({ payload: { path: archivedB.path, archived: false } });
 });
 
 async function openCatalogWorkspace(page: Page, options: Parameters<typeof installSessionCatalogFixture>[1]): Promise<void> {

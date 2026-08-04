@@ -47,6 +47,13 @@ const PromptAttachmentRefSchema = strictObject({
 });
 const PromptAttachmentsSchema = Type.Optional(Type.Array(PromptAttachmentRefSchema, { maxItems: 20 }));
 const PromptPayloadSchema = strictObject({ text: PromptSchema });
+const SessionNameMutationSchema = Type.Union([
+  strictObject({
+    action: Type.Literal("set"),
+    name: Type.String({ minLength: 1, maxLength: 256 })
+  }),
+  strictObject({ action: Type.Literal("clear") })
+]);
 
 export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "runtime.initialize": strictObject({
@@ -101,7 +108,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   }),
   "session.rollback": strictObject({ entryId: Type.String({ minLength: 1 }), summarize: Type.Optional(Type.Boolean()) }),
   "session.compact": strictObject({ submissionId: SubmissionIdSchema, instructions: Type.Optional(PromptSchema) }),
-  "session.name": strictObject({ name: Type.String({ minLength: 1, maxLength: 256 }) }),
+  "session.name": strictObject({ mutation: SessionNameMutationSchema }),
+  "session.nameByPath": strictObject({ path: PathSchema, mutation: SessionNameMutationSchema }),
+  "conversation.pin": strictObject({ path: PathSchema, pinned: Type.Boolean() }),
+  "conversation.archive": strictObject({ path: PathSchema, archived: Type.Boolean() }),
   "prompt.submit": strictObject({
     submissionId: SubmissionIdSchema,
     text: PromptSchema,

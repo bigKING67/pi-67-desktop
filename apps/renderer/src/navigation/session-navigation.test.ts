@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { buildSessionNavigationRows, formatSessionRelativeTime } from "./session-navigation.js";
 
 const SESSIONS: SessionSummary[] = [
-  { id: "session-live", path: "/sessions/live.jsonl", cwd: "/work", name: "修复恢复协议", modifiedAt: 300, messageCount: 12 },
-  { id: "session-recent", path: "/sessions/recent.jsonl", cwd: "/work", name: "性能审计", modifiedAt: 200, messageCount: 8 },
-  { id: "session-old", path: "/sessions/old.jsonl", cwd: "/work", name: "旧会话", modifiedAt: 100, messageCount: 4 }
+  { id: "session-live", path: "/sessions/live.jsonl", cwd: "/work", name: "修复恢复协议", nameSource: "explicit", modifiedAt: 300, messageCount: 12 },
+  { id: "session-recent", path: "/sessions/recent.jsonl", cwd: "/work", name: "性能审计", nameSource: "explicit", modifiedAt: 200, messageCount: 8 },
+  { id: "session-old", path: "/sessions/old.jsonl", cwd: "/work", name: "旧会话", nameSource: "explicit", modifiedAt: 100, messageCount: 4 }
 ];
 
 function operation(overrides: Partial<OperationView> = {}): OperationView {

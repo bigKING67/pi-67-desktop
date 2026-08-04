@@ -294,10 +294,10 @@ export class PiSdkRuntime implements AgentRuntime {
       await this.configurationReload.apply();
     }
   }
-  async setSessionName(name: string): Promise<void> {
+  async setSessionName(name?: string): Promise<void> {
     await this.assertSessionWritable();
     const session = this.sessionBindings.requireSession();
-    session.setSessionName(name.trim());
+    session.setSessionName(name?.trim() ?? "");
     await this.sessionCatalog.upsertCurrent("session-updated");
     this.emit(sessionMetaChangedEvent(session));
   }

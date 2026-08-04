@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { getShellConfig, VERSION } from "@earendil-works/pi-coding-agent";
 import type { DoctorCheck, DoctorReport, SessionCatalogStatus } from "@pi67/domain";
 import { probeNodeSqliteCapability } from "./node-sqlite-capability.js";
+import { SESSION_CATALOG_SCHEMA_VERSION } from "./sqlite-session-catalog-schema.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,7 +57,7 @@ function formatSessionCatalogStatus(status: SessionCatalogStatus | undefined): s
   const reconciled = status.reconciledAt === undefined ? "not reconciled" : "reconciled";
   const completeness = status.incomplete ? "incomplete" : "complete";
   const degraded = status.degradedReason === undefined ? "" : `; degraded ${status.degradedReason}`;
-  return `schema v1; ${status.state}; ${status.itemCount} items; ${reconciled}; ${completeness}; ${status.skippedCount} skipped${degraded}.`;
+  return `schema v${SESSION_CATALOG_SCHEMA_VERSION}; ${status.state}; ${status.itemCount} items; ${reconciled}; ${completeness}; ${status.skippedCount} skipped${degraded}.`;
 }
 
 async function commandVersion(command: string, args: string[]): Promise<{ ok: boolean; detail: string }> {

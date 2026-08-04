@@ -1,9 +1,4 @@
 import type {
-  PiProviderConfigurationInput,
-  PiProviderConfigurationSnapshot,
-  PiProviderConfigurationView
-} from "@pi67/protocol";
-import type {
   FixtureAgentState,
   FixtureMessage,
   FixtureWindow
@@ -12,6 +7,7 @@ import type { MockInspectorCommandHandler } from "./pi67-renderer-inspector-comm
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
 import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
+import type { MockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
 
 interface MockCommandResponseFixture {
   fixtureExtensionCommands: unknown;
@@ -33,11 +29,13 @@ export function installMockCommandResponseHandler({
     __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
     __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
     __pi67ResolveMockInspectorCommand: MockInspectorCommandHandler;
+    __pi67ResolveMockProviderConfigurationCommand: MockProviderConfigurationCommandHandler;
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
   const applyMockSessionControlCommand = testWindow.__pi67ApplyMockSessionControlCommand;
   const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
   const resolveMockInspectorCommand = testWindow.__pi67ResolveMockInspectorCommand;
+  const resolveMockProviderConfigurationCommand = testWindow.__pi67ResolveMockProviderConfigurationCommand;
 
   const resolveMockCommand: MockCommandResponseHandler = (type, payload, current, hostEpoch) => {
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
@@ -49,6 +47,7 @@ export function installMockCommandResponseHandler({
       || type === "session.open"
       || type === "session.fork"
       || type === "session.forkFromTask"
+      || type === "session.name"
     ) return {};
     if (type === "workspace.register") return { registered: true };
     if (type === "workspace.unregister") return { unregistered: true };
@@ -103,6 +102,11 @@ export function installMockCommandResponseHandler({
       changed: true
     };
     if (type === "session.catalog.query") return sessionCatalogPage;
+    if (
+      type === "session.nameByPath"
+      || type === "conversation.pin"
+      || type === "conversation.archive"
+    ) return { revision: sessionCatalogPage.revision + 1 };
     if (type === "message.page") return conversationPage(current, payload);
     if (type === "session.tree") return current.snapshot.tree;
     if (type === "command.list") return fixtureExtensionCommands;
@@ -122,16 +126,25 @@ export function installMockCommandResponseHandler({
         : { provider: String(payload.provider), status: "not-found" };
     }
     if (type === "provider.configuration.save") {
-      current.providerConfiguration = saveProviderConfiguration(current.providerConfiguration, payload);
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(
+        "save",
+        current.providerConfiguration,
+        payload
+      );
       return current.providerConfiguration;
     }
     if (type === "provider.configuration.remove") {
-      current.providerConfiguration = removeProviderConfiguration(current.providerConfiguration, payload);
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(
+        "remove",
+        current.providerConfiguration,
+        payload
+      );
       return current.providerConfiguration;
     }
     if (type === "provider.credential.store" || type === "provider.credential.remove") {
       const persistent = type === "provider.credential.store";
-      current.providerConfiguration = updateCredentialConfiguration(
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(
+        "credential",
         current.providerConfiguration,
         payload,
         persistent
@@ -149,7 +162,11 @@ export function installMockCommandResponseHandler({
       return current.providerConfiguration;
     }
     if (type === "model.default.set") {
-      current.providerConfiguration = updateDefaultConfiguration(current.providerConfiguration, payload);
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(
+        "default",
+        current.providerConfiguration,
+        payload
+      );
       return current.providerConfiguration;
     }
     if (
@@ -336,121 +353,6 @@ export function installMockCommandResponseHandler({
       hasOlder,
       hasNewer
     };
-  }
-
-  function saveProviderConfiguration(
-    value: PiProviderConfigurationSnapshot,
-    payload: Record<string, unknown>
-  ): PiProviderConfigurationSnapshot {
-    const provider = payload.provider as PiProviderConfigurationInput;
-    const snapshot = structuredClone(value);
-    const view: PiProviderConfigurationView = {
-      id: provider.id,
-      ...(provider.name === undefined ? {} : { name: provider.name }),
-      ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
-      ...(provider.api === undefined ? {} : { api: provider.api }),
-      ...(provider.oauth === undefined ? {} : { oauth: provider.oauth }),
-      ...(provider.authHeader === undefined ? {} : { authHeader: provider.authHeader }),
-      origin: "models.json",
-      configured: false,
-      modelsJsonApiKeyConfigured: false,
-      headerNames: appliedHeaderNames([], provider.headers),
-      models: provider.models.map((model) => ({
-        id: model.id,
-        ...(model.name === undefined ? {} : { name: model.name }),
-        ...(model.api === undefined ? {} : { api: model.api }),
-        ...(model.baseUrl === undefined ? {} : { baseUrl: model.baseUrl }),
-        input: model.input ?? ["text"],
-        reasoning: model.reasoning ?? false,
-        ...(model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow }),
-        ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }),
-        headerNames: appliedHeaderNames([], model.headers),
-        advancedJson: model.advancedJson ?? "{}"
-      })),
-      modelCount: provider.models.length,
-      advancedJson: provider.advancedJson ?? "{}"
-    };
-    const index = snapshot.providers.findIndex((candidate) => candidate.id === provider.id);
-    if (index >= 0) snapshot.providers[index] = view;
-    else snapshot.providers.push(view);
-    return nextConfigurationRevision(snapshot);
-  }
-
-  function removeProviderConfiguration(
-    value: PiProviderConfigurationSnapshot,
-    payload: Record<string, unknown>
-  ): PiProviderConfigurationSnapshot {
-    const snapshot = structuredClone(value);
-    snapshot.providers = snapshot.providers.filter((provider) => provider.id !== payload.provider);
-    return nextConfigurationRevision(snapshot);
-  }
-
-  function updateCredentialConfiguration(
-    value: PiProviderConfigurationSnapshot,
-    payload: Record<string, unknown>,
-    persistent: boolean
-  ): PiProviderConfigurationSnapshot {
-    const snapshot = structuredClone(value);
-    const providerId = payload.provider;
-    if (typeof providerId !== "string") throw new Error("Provider credential mutation requires a Provider ID.");
-    const credentials = snapshot.credentials;
-    snapshot.credentials = persistent
-      ? [...credentials.filter((credential) => credential.provider !== providerId), {
-          provider: providerId,
-          type: "api_key"
-        }]
-      : credentials.filter((credential) => credential.provider !== providerId);
-    snapshot.providers = snapshot.providers.map((provider) => {
-      if (provider.id !== providerId) return provider;
-      const next: PiProviderConfigurationView = { ...provider, configured: persistent };
-      if (persistent) next.credentialSource = "stored";
-      else delete next.credentialSource;
-      return next;
-    });
-    return nextConfigurationRevision(snapshot);
-  }
-
-  function updateDefaultConfiguration(
-    value: PiProviderConfigurationSnapshot,
-    payload: Record<string, unknown>
-  ): PiProviderConfigurationSnapshot {
-    const snapshot = structuredClone(value);
-    const defaults = snapshot.defaults;
-    const selection = typeof payload.provider === "string" && typeof payload.model === "string"
-      ? { provider: payload.provider, model: payload.model }
-      : undefined;
-    if (payload.scope === "global") {
-      if (selection) defaults.global = selection;
-      else delete defaults.global;
-    } else if (selection) defaults.project = selection;
-    else delete defaults.project;
-    const effective = defaults.project ?? defaults.global;
-    if (effective === undefined) delete defaults.effective;
-    else defaults.effective = effective;
-    return nextConfigurationRevision(snapshot);
-  }
-
-  function nextConfigurationRevision(
-    snapshot: PiProviderConfigurationSnapshot
-  ): PiProviderConfigurationSnapshot {
-    const revision = String(snapshot.revision ?? "0");
-    const next = (Number.parseInt(revision.slice(-8), 16) + 1).toString(16).padStart(8, "0");
-    snapshot.revision = `${"0".repeat(56)}${next}`;
-    snapshot.updatedAt = Date.now();
-    return snapshot;
-  }
-
-  function appliedHeaderNames(existing: string[], value: unknown): string[] {
-    const names = new Map(existing.map((name) => [name.toLocaleLowerCase(), name]));
-    if (!Array.isArray(value)) return [...names.values()];
-    for (const item of value) {
-      const mutation = item as Record<string, unknown>;
-      if (typeof mutation.name !== "string") continue;
-      const canonical = mutation.name.toLocaleLowerCase();
-      if (mutation.remove === true) names.delete(canonical);
-      else if (mutation.value !== undefined) names.set(canonical, mutation.name);
-    }
-    return [...names.values()];
   }
 
   testWindow.__pi67ResolveMockCommand = resolveMockCommand;

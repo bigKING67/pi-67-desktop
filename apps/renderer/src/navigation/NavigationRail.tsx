@@ -19,6 +19,9 @@ import { workspaceRemovalDisposition } from "../workbench/workspace-registration
 import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
 import styles from "./NavigationRail.module.css";
 import { WorkspaceConversationList } from "./WorkspaceConversationList.js";
+import { ConversationRenameDialog } from "./ConversationRenameDialog.js";
+import { ArchivedConversationsDialog } from "./ArchivedConversationsDialog.js";
+import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import {
   SessionCatalogSearch,
   useSessionCatalogSearch
@@ -54,6 +57,8 @@ export function NavigationRail({
   const sessionSearchHandledRevision = useShellStore((state) => state.sessionSearchHandledRevision);
   const acknowledgeSessionSearchFocus = useShellStore((state) => state.acknowledgeSessionSearchFocus);
   const removalWorkspace = removalWorkspaceId ? workspaces[removalWorkspaceId] : undefined;
+  const archivedWorkspaceId = useConversationDialogStore((state) => state.archivedWorkspaceId);
+  const archivedWorkspace = archivedWorkspaceId ? workspaces[archivedWorkspaceId] : undefined;
 
   return (
     <aside
@@ -112,6 +117,8 @@ export function NavigationRail({
           />
         </Suspense>
       ) : null}
+      <ConversationRenameDialog />
+      {archivedWorkspace ? <ArchivedConversationsDialog workspace={archivedWorkspace} /> : null}
     </aside>
   );
 }

@@ -29,6 +29,7 @@ import {
 } from "./skill-pack-command-router.js";
 import {
   isWorkspaceLifecycleCommand,
+  isWorkspaceConversationCommand,
   isWorkspaceProviderCommand,
   type WorkspaceCommandRouter
 } from "./workspace-command-router.js";
@@ -88,6 +89,10 @@ export class HostRequestRouter {
     }
     if (isWorkspaceProviderCommand(request.type)) {
       this.handleWorkspaceProviderCommand(origin, request);
+      return;
+    }
+    if (isWorkspaceConversationCommand(request.type)) {
+      this.handleWorkspaceConversationCommand(origin, request);
       return;
     }
     if (request.type === "session.catalog.query" && request.context.scope === "workspace") {
@@ -200,6 +205,24 @@ export class HostRequestRouter {
     }
     const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
     void this.workspaceCommands.dispatchProvider(request.context, command, request.idempotencyKey)
+      .then((result) => sendSuccess(origin, request, result))
+      .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
+  }
+
+  private handleWorkspaceConversationCommand(
+    origin: HostConnectionContext,
+    request: RequestEnvelope
+  ): void {
+    if (!isWorkspaceConversationCommand(request.type) || request.context.scope !== "workspace") {
+      origin.sendError(request.requestId, request.type, toProtocolError(new HostCommandError(
+        "INVALID_PAYLOAD",
+        "Conversation organization commands require Workspace authority.",
+        false
+      )));
+      return;
+    }
+    const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
+    void this.workspaceCommands.dispatchConversation(request.context, command, request.idempotencyKey)
       .then((result) => sendSuccess(origin, request, result))
       .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }

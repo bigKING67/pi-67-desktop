@@ -1,16 +1,25 @@
 import type { SessionSummary } from "./session-view.js";
 
 export type SessionCatalogScope = "workspace" | "all";
+export type SessionCatalogView = "active" | "archived";
+
+export interface ConversationOrganization {
+  pinnedAt?: number;
+  archivedAt?: number;
+}
 
 export interface SessionCatalogCursor {
   revision: number;
   queryKey: string;
+  pinnedAt?: number;
+  archivedAt?: number;
   modifiedAt: number;
   path: string;
 }
 
 export interface SessionCatalogQuery {
   scope: SessionCatalogScope;
+  view?: SessionCatalogView;
   search?: string;
   cursor?: SessionCatalogCursor;
   limit?: number;
@@ -60,6 +69,7 @@ export type SessionCatalogChangedReason =
   | "session-created"
   | "session-updated"
   | "session-imported"
+  | "conversation-organized"
   | "source-changed";
 
 export interface SessionCatalogChangedEvent {

@@ -48,7 +48,10 @@ export type RuntimeLoadedCommand = Exclude<
       | "skill.pack.list"
       | "skill.pack.checkUpdates"
       | "skill.pack.update"
-      | "skill.pack.restore";
+      | "skill.pack.restore"
+      | "session.nameByPath"
+      | "conversation.pin"
+      | "conversation.archive"
   }
 >;
 
@@ -230,7 +233,9 @@ export async function dispatchHostCommand(
       });
     }
     case "session.name":
-      await runtime.setSessionName(command.payload.name);
+      await runtime.setSessionName(
+        command.payload.mutation.action === "set" ? command.payload.mutation.name : undefined
+      );
       return context.captureProjectionMutationAcknowledgement(runtime);
     case "prompt.submit": {
       const operations = context.operations();

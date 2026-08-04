@@ -7,7 +7,7 @@ import { fingerprintSchemaSql, SchemaSqlFingerprintError } from "./sqlite-schema
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import type { SessionCatalogRecord, SqliteCatalogState } from "./sqlite-session-catalog.js";
 
-const SESSION_CATALOG_SCHEMA_VERSION = 1;
+export const SESSION_CATALOG_SCHEMA_VERSION = 2;
 const SQLITE_BUSY_TIMEOUT_MS = 100;
 const CATALOG_STATE_TABLE_SQL = `CREATE TABLE catalog_state (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -29,22 +29,28 @@ const SESSIONS_TABLE_SQL = `CREATE TABLE sessions (
   search_id TEXT NOT NULL CHECK (length(search_id) > 0),
   modified_at_ms INTEGER NOT NULL CHECK (modified_at_ms >= 0),
   message_count INTEGER NOT NULL CHECK (message_count >= 0),
-  parent_session_path TEXT CHECK (parent_session_path IS NULL OR length(trim(parent_session_path)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS})
+  parent_session_path TEXT CHECK (parent_session_path IS NULL OR length(trim(parent_session_path)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
+  pinned_at_ms INTEGER CHECK (pinned_at_ms IS NULL OR pinned_at_ms >= 0),
+  archived_at_ms INTEGER CHECK (archived_at_ms IS NULL OR archived_at_ms >= 0)
 ) STRICT`;
 const REQUIRED_SESSION_INDEXES = [
   {
-    name: "sessions_workspace_recent",
-    sql: "CREATE INDEX sessions_workspace_recent ON sessions(cwd_key, modified_at_ms DESC, path DESC)",
+    name: "sessions_workspace_organized",
+    sql: "CREATE INDEX sessions_workspace_organized ON sessions(cwd_key, archived_at_ms, pinned_at_ms DESC, modified_at_ms DESC, path DESC)",
     columns: [
       { cid: 3, name: "cwd_key", descending: false },
+      { cid: 12, name: "archived_at_ms", descending: false },
+      { cid: 11, name: "pinned_at_ms", descending: true },
       { cid: 8, name: "modified_at_ms", descending: true },
       { cid: 0, name: "path", descending: true }
     ]
   },
   {
-    name: "sessions_all_recent",
-    sql: "CREATE INDEX sessions_all_recent ON sessions(modified_at_ms DESC, path DESC)",
+    name: "sessions_all_organized",
+    sql: "CREATE INDEX sessions_all_organized ON sessions(archived_at_ms, pinned_at_ms DESC, modified_at_ms DESC, path DESC)",
     columns: [
+      { cid: 12, name: "archived_at_ms", descending: false },
+      { cid: 11, name: "pinned_at_ms", descending: true },
       { cid: 8, name: "modified_at_ms", descending: true },
       { cid: 0, name: "path", descending: true }
     ]
@@ -80,7 +86,9 @@ const SESSION_COLUMNS = [
   { name: "search_id", type: "TEXT", notNull: 1, primaryKey: 0 },
   { name: "modified_at_ms", type: "INTEGER", notNull: 1, primaryKey: 0 },
   { name: "message_count", type: "INTEGER", notNull: 1, primaryKey: 0 },
-  { name: "parent_session_path", type: "TEXT", notNull: 0, primaryKey: 0 }
+  { name: "parent_session_path", type: "TEXT", notNull: 0, primaryKey: 0 },
+  { name: "pinned_at_ms", type: "INTEGER", notNull: 0, primaryKey: 0 },
+  { name: "archived_at_ms", type: "INTEGER", notNull: 0, primaryKey: 0 }
 ] as const;
 
 interface StatementLike {
@@ -149,7 +157,9 @@ export function recordValues(record: SessionCatalogRecord): SqlValue[] {
     normalizeSearch(record.id),
     record.modifiedAt,
     record.messageCount,
-    record.parentSessionPath ?? null
+    record.parentSessionPath ?? null,
+    record.pinnedAt ?? null,
+    record.archivedAt ?? null
   ];
 }
 
@@ -160,6 +170,12 @@ export function recordFromRow(row: Record<string, unknown>): SessionCatalogRecor
     "parent_session_path",
     MAX_SESSION_CATALOG_PATH_CHARS
   );
+  const pinnedAt = row.pinned_at_ms === null
+    ? undefined
+    : readNonNegativeInteger(row.pinned_at_ms, "pinned_at_ms");
+  const archivedAt = row.archived_at_ms === null
+    ? undefined
+    : readNonNegativeInteger(row.archived_at_ms, "archived_at_ms");
   return {
     id: readText(row.session_id, "session_id", MAX_SESSION_CATALOG_ID_CHARS),
     path: readText(row.path, "path", MAX_SESSION_CATALOG_PATH_CHARS),
@@ -168,7 +184,9 @@ export function recordFromRow(row: Record<string, unknown>): SessionCatalogRecor
     ...(explicitName === undefined ? {} : { explicitName }),
     modifiedAt: readNonNegativeInteger(row.modified_at_ms, "modified_at_ms"),
     messageCount: readNonNegativeInteger(row.message_count, "message_count"),
-    ...(parentSessionPath === undefined ? {} : { parentSessionPath })
+    ...(parentSessionPath === undefined ? {} : { parentSessionPath }),
+    ...(pinnedAt === undefined ? {} : { pinnedAt }),
+    ...(archivedAt === undefined ? {} : { archivedAt })
   };
 }
 
@@ -214,6 +232,8 @@ function validateLogicalState(database: DatabaseLike): void {
        OR (explicit_name IS NOT NULL AND length(trim(explicit_name)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_NAME_CHARS})
        OR length(search_name) = 0 OR length(search_path) = 0 OR length(search_id) = 0
        OR modified_at_ms < 0 OR message_count < 0
+       OR (pinned_at_ms IS NOT NULL AND pinned_at_ms < 0)
+       OR (archived_at_ms IS NOT NULL AND archived_at_ms < 0)
        OR (parent_session_path IS NOT NULL AND length(trim(parent_session_path)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS})
   `).get()?.total, "invalid rows");
   if (invalid > 0) throw new SchemaMismatchError("Catalog contains invalid session metadata.");
@@ -237,7 +257,7 @@ function isConsistentCatalogState(state: SqliteCatalogState, total: number): boo
 function validateDerivedSessionMetadata(database: DatabaseLike): void {
   const rows = database.prepare(`
     SELECT path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-           modified_at_ms, message_count, parent_session_path
+           modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
     FROM sessions
   `).all();
   for (const row of rows) {

@@ -26,13 +26,12 @@ export interface HostTaskRuntimeLifecycleOptions {
 }
 
 export class HostTaskRuntimeLifecycle {
-  private readonly sessionWriterLeases = new SessionWriterLeaseRegistry();
-
   constructor(
     private readonly taskRuntimes: TaskRuntimeRegistry,
     private readonly workspaces: WorkspaceContextRegistry,
     private readonly tasks: HostTaskStateCoordinator,
-    private readonly options: HostTaskRuntimeLifecycleOptions
+    private readonly options: HostTaskRuntimeLifecycleOptions,
+    private readonly sessionWriterLeases = new SessionWriterLeaseRegistry()
   ) {}
 
   async initializeRuntime(

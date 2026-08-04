@@ -14,7 +14,7 @@ import {
 } from "@pi67/domain";
 import type { SessionCatalogRecord, SqliteCatalogQueryResult } from "./sqlite-session-catalog.js";
 
-const UNTITLED_SESSION_NAME = "Untitled session";
+const UNTITLED_SESSION_NAME = "未命名对话";
 
 export type ValidatedSessionCatalogQuery = SessionCatalogQuery & { limit: number };
 
@@ -27,6 +27,7 @@ export interface SessionCatalogDiscoveryResult {
 export function validateSessionCatalogQuery(query: SessionCatalogQuery): ValidatedSessionCatalogQuery {
   const limit = query.limit ?? DEFAULT_SESSION_CATALOG_PAGE_ITEMS;
   if ((query.scope !== "workspace" && query.scope !== "all")
+    || (query.view !== undefined && query.view !== "active" && query.view !== "archived")
     || !Number.isSafeInteger(limit)
     || limit < 1
     || limit > MAX_SESSION_CATALOG_PAGE_ITEMS
@@ -85,18 +86,24 @@ export function querySessionCatalogFallback(
   query: ValidatedSessionCatalogQuery
 ): SqliteCatalogQueryResult {
   const search = query.search === undefined ? undefined : normalizeSessionCatalogSearch(query.search);
+  const view = query.view ?? "active";
   const matching = records.filter((record) => (
     (query.scope === "all" || record.cwdKey === cwdKey)
+    && (view === "archived" ? record.archivedAt !== undefined : record.archivedAt === undefined)
     && (search === undefined || search.length === 0 || [
-      record.explicitName ?? UNTITLED_SESSION_NAME,
+      record.explicitName ?? record.automaticName ?? UNTITLED_SESSION_NAME,
       record.path,
       record.id
     ].some((value) => normalizeSessionCatalogSearch(value).includes(search)))
-  ));
+  )).sort((left, right) => view === "archived"
+    ? (right.archivedAt ?? -1) - (left.archivedAt ?? -1)
+      || right.modifiedAt - left.modifiedAt
+      || comparePathBinary(right.path, left.path)
+    : (right.pinnedAt ?? -1) - (left.pinnedAt ?? -1)
+      || right.modifiedAt - left.modifiedAt
+      || comparePathBinary(right.path, left.path));
   const afterCursor = query.cursor
-    ? matching.filter((record) => record.modifiedAt < query.cursor!.modifiedAt
-      || (record.modifiedAt === query.cursor!.modifiedAt
-        && comparePathBinary(record.path, query.cursor!.path) < 0))
+    ? matching.filter((record) => isAfterCursor(record, query.cursor!, view))
     : matching;
   return {
     records: afterCursor.slice(0, query.limit),
@@ -127,7 +134,9 @@ export function createBoundedSessionCatalogPage(
 
 export function sortSessionCatalogRecords(records: SessionCatalogRecord[]): SessionCatalogRecord[] {
   return records.sort((left, right) => (
-    right.modifiedAt - left.modifiedAt || comparePathBinary(right.path, left.path)
+    (right.pinnedAt ?? -1) - (left.pinnedAt ?? -1)
+      || right.modifiedAt - left.modifiedAt
+      || comparePathBinary(right.path, left.path)
   ));
 }
 
@@ -150,9 +159,30 @@ function pageWithItems(
     total,
     hasMore: more,
     ...(last ? {
-      nextCursor: { revision: status.revision, queryKey, modifiedAt: last.modifiedAt, path: last.path }
+      nextCursor: {
+        revision: status.revision,
+        queryKey,
+        ...(last.pinnedAt === undefined ? {} : { pinnedAt: last.pinnedAt }),
+        ...(last.archivedAt === undefined ? {} : { archivedAt: last.archivedAt }),
+        modifiedAt: last.modifiedAt,
+        path: last.path
+      }
     } : {})
   };
+}
+
+function isAfterCursor(
+  record: SessionCatalogRecord,
+  cursor: NonNullable<SessionCatalogQuery["cursor"]>,
+  view: "active" | "archived"
+): boolean {
+  const recordOrder = view === "archived" ? (record.archivedAt ?? -1) : (record.pinnedAt ?? -1);
+  const cursorOrder = view === "archived" ? (cursor.archivedAt ?? -1) : (cursor.pinnedAt ?? -1);
+  return recordOrder < cursorOrder
+    || (recordOrder === cursorOrder && (
+      record.modifiedAt < cursor.modifiedAt
+      || (record.modifiedAt === cursor.modifiedAt && comparePathBinary(record.path, cursor.path) < 0)
+    ));
 }
 
 function toSummary(record: SessionCatalogRecord): SessionSummary {
@@ -160,9 +190,14 @@ function toSummary(record: SessionCatalogRecord): SessionSummary {
     id: record.id,
     path: record.path,
     cwd: record.cwd,
-    name: record.explicitName ?? UNTITLED_SESSION_NAME,
+    name: record.explicitName ?? record.automaticName ?? UNTITLED_SESSION_NAME,
+    nameSource: record.explicitName !== undefined
+      ? "explicit"
+      : record.automaticName !== undefined ? "latest-user" : "fallback",
     modifiedAt: record.modifiedAt,
     messageCount: record.messageCount,
+    ...(record.pinnedAt === undefined ? {} : { pinnedAt: record.pinnedAt }),
+    ...(record.archivedAt === undefined ? {} : { archivedAt: record.archivedAt }),
     ...(record.parentSessionPath === undefined ? {} : { parentSessionPath: record.parentSessionPath })
   };
 }

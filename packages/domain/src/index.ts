@@ -1,6 +1,7 @@
 export * from "./asset.js";
 export * from "./approval.js";
 export * from "./context-file.js";
+export * from "./conversation-title.js";
 export * from "./extension-compatibility.js";
 export * from "./extension-package-management.js";
 export * from "./runtime-state.js";

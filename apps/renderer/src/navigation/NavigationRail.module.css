@@ -764,6 +764,17 @@
   color: var(--danger);
 }
 
+.menuSeparator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+.pinnedIcon {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
 .dangerMenuItem[data-focused],
 .dangerMenuItem[data-hovered] {
   background: color-mix(in srgb, var(--danger) 9%, var(--surface-hover));

@@ -13,6 +13,7 @@ describe("workspace conversation model", () => {
       path: "/Users/test/.pi/agent/sessions/session-source.jsonl",
       cwd: "/Users/test/Projects/hidden-folder",
       name: "服务端命中",
+      nameSource: "explicit" as const,
       modifiedAt: 1_800_000_000_000,
       messageCount: 3
     }], query);
@@ -27,6 +28,7 @@ describe("workspace conversation model", () => {
       path: "/Users/test/.pi/agent/sessions/session-source.jsonl",
       cwd: "/Users/test/Projects/pi",
       name: "稳定的 Pi 会话名",
+      nameSource: "explicit" as const,
       modifiedAt: 1_800_000_000_000,
       messageCount: 12
     };

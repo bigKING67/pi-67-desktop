@@ -5,15 +5,12 @@ import {
 import {
   ChevronDown,
   ChevronRight,
-  Circle,
-  Clock3,
+  Archive,
   Ellipsis,
   FileInput,
   FolderSearch,
-  LoaderCircle,
   Plus,
   RefreshCw,
-  Square,
   Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
@@ -22,8 +19,6 @@ import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { importRendererSessionFile } from "../session/session-import-controller.js";
 import { createRendererSession } from "../session/session-lifecycle-controller.js";
-import { activateRendererTask } from "../workbench/task-activation-controller.js";
-import { stopRendererTask } from "../workbench/task-stop-controller.js";
 import {
   rendererWorkbenchStore,
   rendererConversationIdentity,
@@ -35,7 +30,9 @@ import {
   repairAndOpenRendererWorkspace
 } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import { ConversationRow } from "./ConversationRow.js";
 import styles from "./NavigationRail.module.css";
+import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import {
   loadMoreSessionCatalog,
   queryFirstSessionCatalog
@@ -48,9 +45,7 @@ import {
 import {
   boundedRecent,
   conversationRows,
-  statusLabel,
-  workspaceStatus,
-  type ConversationRowModel
+  workspaceStatus
 } from "./workspace-conversation-model.js";
 
 const RECENT_SESSION_LIMIT = 6;
@@ -302,62 +297,6 @@ function WorkspaceConversationGroup({
   );
 }
 
-function ConversationRow({
-  row,
-  selected,
-  selectedRow,
-  disabled
-}: {
-  row: ConversationRowModel;
-  selected: boolean;
-  selectedRow: MutableRefObject<HTMLElement | null>;
-  disabled: boolean;
-}) {
-  const StatusIcon = row.status === "running" ? LoaderCircle : row.status === "waiting" ? Clock3 : Circle;
-  const task = row.task;
-  return (
-    <div className={styles.conversationRow}>
-      <button
-        {...(selected ? { "aria-current": "page" as const } : {})}
-        className={`${styles.conversationItem} ${selected ? styles.activeConversation : ""}`}
-        data-conversation-id={row.identity}
-        data-testid="conversation-row"
-        disabled={disabled}
-        onClick={() => void openConversation(row)}
-        ref={(element) => {
-          if (selected) selectedRow.current = element;
-        }}
-        type="button"
-      >
-        <span className={styles.conversationMarker} data-status={row.status ?? "idle"}>
-          <StatusIcon aria-hidden="true" className={row.status === "running" ? styles.spinning : undefined} size={11} />
-        </span>
-        <span className={styles.conversationCopy}>
-          <strong>{row.title}</strong>
-          <small>{row.meta}</small>
-        </span>
-        {row.status ? <span className={styles.conversationState}>{statusLabel(row.status)}</span> : null}
-      </button>
-      {task && task.runtime.phase !== "stopped" ? (
-        <MenuTrigger>
-          <Button className={styles.conversationMenuButton!} aria-label={`${row.title} 会话菜单`}>
-            <Ellipsis aria-hidden="true" size={13} />
-          </Button>
-          <Popover className={styles.menuPopover!} placement="bottom end" offset={4}>
-            <Menu aria-label={`${row.title} 会话菜单`} className={styles.menu!}>
-              <MenuItem
-                className={`${styles.menuItem} ${styles.dangerMenuItem}`}
-                onAction={() => void stopRendererTask(task.id)}
-                textValue="停止任务"
-              ><Square aria-hidden="true" size={12} />停止任务</MenuItem>
-            </Menu>
-          </Popover>
-        </MenuTrigger>
-      ) : null}
-    </div>
-  );
-}
-
 function WorkspaceMenu({
   workspace,
   index,
@@ -386,6 +325,9 @@ function WorkspaceMenu({
           <MenuItem className={styles.menuItem!} onAction={() => void importIntoWorkspace(workspace)} textValue="导入 Pi Session">
             <FileInput aria-hidden="true" size={14} />导入 Pi Session
           </MenuItem>
+          <MenuItem className={styles.menuItem!} onAction={() => useConversationDialogStore.getState().openArchived(workspace.id)} textValue="已归档对话">
+            <Archive aria-hidden="true" size={14} />已归档对话
+          </MenuItem>
           {workspace.availability !== "available" ? (
             <MenuItem className={styles.menuItem!} onAction={() => void repairAndOpenRendererWorkspace(workspace.id)} textValue="重新选择目录">
               <FolderSearch aria-hidden="true" size={14} />重新选择目录
@@ -400,18 +342,6 @@ function WorkspaceMenu({
       </Popover>
     </MenuTrigger>
   );
-}
-
-async function openConversation(row: ConversationRowModel): Promise<void> {
-  if (row.task) {
-    await activateRendererTask(row.task.id);
-    return;
-  }
-  const workbench = rendererWorkbenchStore.getState();
-  const workspace = workbench.workspaces[row.conversation.workspaceId];
-  if (!workspace || row.conversation.kind !== "session") return;
-  workbench.selectConversation(row.conversation);
-  await openRendererWorkspaceDescriptor(workspace, row.conversation.sessionPath);
 }
 
 async function createConversationInWorkspace(workspace: WorkspaceDescriptor): Promise<void> {

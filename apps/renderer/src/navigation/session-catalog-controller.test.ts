@@ -20,6 +20,7 @@ const SESSION_ONE: SessionSummary = {
   path: "/sessions/one.jsonl",
   cwd: "/work",
   name: "Session one",
+  nameSource: "explicit",
   modifiedAt: 20,
   messageCount: 2
 };
@@ -29,6 +30,7 @@ const SESSION_TWO: SessionSummary = {
   path: "/sessions/two.jsonl",
   cwd: "/work",
   name: "Session two",
+  nameSource: "explicit",
   modifiedAt: 10,
   messageCount: 4
 };
@@ -140,6 +142,25 @@ describe("session catalog controller", () => {
       scope: "workspace",
       limit: 50,
       search: "session"
+    }, [], { context: { scope: "workspace", workspaceId: WORKSPACE_ID } });
+    expect(catalog().items).toEqual([]);
+  });
+
+  it("passes the archived view through without mutating the active Catalog Store", async () => {
+    const archived = { ...SESSION_ONE, archivedAt: 30 };
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([archived]) as never);
+
+    await expect(querySessionCatalogPage({
+      workspaceId: WORKSPACE_ID,
+      query: " old ",
+      view: "archived"
+    })).resolves.toMatchObject({ items: [archived] });
+
+    expect(request).toHaveBeenCalledWith("session.catalog.query", {
+      scope: "workspace",
+      limit: 50,
+      view: "archived",
+      search: "old"
     }, [], { context: { scope: "workspace", workspaceId: WORKSPACE_ID } });
     expect(catalog().items).toEqual([]);
   });

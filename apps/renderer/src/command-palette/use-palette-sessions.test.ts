@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { filterPaletteSessionFallback } from "./use-palette-sessions.js";
 
 const SESSIONS: SessionSummary[] = [
-  { id: "protocol", path: "/sessions/protocol.jsonl", cwd: "/work/pi", name: "重构协议层", modifiedAt: 2, messageCount: 3 },
-  { id: "ui", path: "/sessions/ui.jsonl", cwd: "/work/桌面", name: "Command Palette", modifiedAt: 1, messageCount: 4 }
+  { id: "protocol", path: "/sessions/protocol.jsonl", cwd: "/work/pi", name: "重构协议层", nameSource: "explicit", modifiedAt: 2, messageCount: 3 },
+  { id: "ui", path: "/sessions/ui.jsonl", cwd: "/work/桌面", name: "Command Palette", nameSource: "explicit", modifiedAt: 1, messageCount: 4 }
 ];
 
 describe("command palette Session fallback", () => {

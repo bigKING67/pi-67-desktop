@@ -516,15 +516,29 @@ loading error where the operation can produce those states
   inside one Task do not consume additional top-level slots. Reaching the limit
   explains which state is preserved and that an existing Task must settle or stop
   before another send.
-- There is no tab close `x`, local hide, archive, or delete control in v1. A live
-  row menu exposes `停止任务`; stopping releases the Runtime but never deletes the
-  Pi JSONL Session. Idle and settled history stays discoverable through Catalog.
-- The stable Task title comes from Pi `session_info.name`. Until an explicit name
-  exists, use `未命名任务`. A row may use the latest accepted or currently loaded
-  user message as its primary one-line preview, while retaining the stable title
-  in secondary metadata. Prompt-derived previews are memory-only: never persist
-  them in Workbench state, copy them into the Session Catalog, or scan every
-  historical JSONL merely to populate navigation.
+- A row menu uses the same compact raised-Popover language as Workspace menus and
+  owns `置顶对话` / `取消置顶`, `重命名对话`, conditional `恢复自动标题`, and
+  `归档对话`. `停止任务` is separated as a danger action and appears only for an
+  accepted, running, approval-wait, or Extension-input-wait Task. Idle and
+  terminal conversations never expose a non-functional stop action.
+- Conversation titles have one semantic authority across cold Catalog rows and
+  loaded Tasks: explicit Pi `session_info.name`, then the latest topical User
+  message on the current Pi branch, then `未命名对话`. Routine follow-ups and bare
+  navigation commands do not displace the previous topic. The title stays on one
+  line in navigation and truncates rather than wrapping the row. Automatic titles
+  are derived locally without a model and remain query-time/memory-only; the
+  explicit rename and empty-name restore operations alone append Pi
+  `session_info` entries.
+- Archive is reversible organization rather than deletion. Active,
+  initializing, provisional, and draft conversations expose a disabled archive
+  action with the Controller retaining the same fail-closed check. Successful
+  archive removes any pin, disposes an idle loaded Runtime first, returns a
+  selected row to the Workspace surface, and presents a bounded Undo Toast.
+  `已归档对话` is a focus-trapped, dismissable dialog with debounced server search,
+  bounded pagination, loading/error/empty states, full local archive date and
+  time, relative last-modified metadata, `恢复`, and `恢复并打开`. Restore actions
+  disable while pending so duplicate mutations cannot be issued. No current UI
+  permanently deletes Pi JSONL.
 - Settings opens as one singleton application-level selected surface and does
   not count toward Task limits. It replaces the Workspace rail and Inspector
   with its own category/content columns; opening it again focuses the same
@@ -1032,7 +1046,7 @@ loading error where the operation can produce those states
   catalog above the Composer. It always groups `Pi 内置`, `扩展命令`, `提示词`,
   and `技能` in that order. Runtime loading, failure, or disconnection is a quiet
   status below available Desktop actions rather than a replacement for the list.
-  `/new`, `/model`, `/compact`, `/resume`, `/tree`, `/reload`, and `/settings`
+  `/new`, `/model`, `/name`, `/compact`, `/resume`, `/tree`, `/reload`, and `/settings`
   are Renderer-owned actions using the same feature Controllers as the rest of
   Desktop; they never become `command.invoke` calls or model Prompts. Pi-resolved
   Extension commands, Prompt Templates, and Skills retain distinct source labels;
@@ -1040,6 +1054,9 @@ loading error where the operation can produce those states
   exceptions. Arrow keys move the active row without mutating the textarea. Click
   and Tab insert. Enter executes an exact command, but completes a partial token;
   Escape dismisses, and IME confirmation never selects, executes, or sends.
+  `/name 新标题` uses the same rename Controller as the row menu; bare `/name`
+  opens the same rename dialog and therefore exposes `恢复自动标题` when the current
+  name is explicit.
   Unsupported known Pi TUI builtins produce an inline compatibility error and
   never reach the model; unreserved unknown Slash text remains a normal Prompt.
   A successful Desktop action clears only its command text from the originating
@@ -1110,8 +1127,19 @@ loading error where the operation can produce those states
   scope, normalized search, and sort contract. Query changes, revision changes,
   or Host epoch replacement clear old pages; stale results cannot append across
   result sets.
-- Sessions without an explicit Pi `session_info.name` display the fixed
-  `Untitled session` label; the first Prompt is never used as Catalog UI metadata.
+- Sessions without an explicit Pi `session_info.name` receive a query-time title
+  from the latest topical User message on the current Pi branch. The Host reads
+  the JSONL tail backwards in bounded chunks, follows the leaf's `id -> parentId`
+  chain, limits title length, and parses at most the already requested page with
+  four concurrent readers. File identity, inode, nanosecond mtime, and size bind
+  a bounded LRU cache. No model call, cold Runtime, SQLite title, Workbench title,
+  log, telemetry, or full-history scan is permitted; no valid title falls back to
+  `未命名对话`.
+- Active Catalog pages sort live/waiting/draft work first in the Renderer, then
+  pinned conversations by most recent pin, then ordinary modified time. Archived
+  pages sort by archive time and use a cursor bound to view and sort contract.
+  Pin/archive state comes from the private hash-and-timestamp organization store,
+  not Pi JSONL. Archive removes a pin, and restore returns the row unpinned.
 - The low-frequency `更多会话操作` menu contains `导入 Pi Session`; it copies a
   valid external JSONL session into the managed session directory before
   opening it and never implies that Desktop will keep writing to the selected

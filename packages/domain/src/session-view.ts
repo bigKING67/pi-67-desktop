@@ -54,8 +54,11 @@ export interface SessionSummary {
   path: string;
   cwd: string;
   name: string;
+  nameSource: "explicit" | "latest-user" | "fallback";
   modifiedAt: number;
   messageCount: number;
+  pinnedAt?: number;
+  archivedAt?: number;
   parentSessionPath?: string;
 }
 

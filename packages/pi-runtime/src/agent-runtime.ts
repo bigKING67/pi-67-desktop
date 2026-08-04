@@ -70,7 +70,7 @@ export interface AgentRuntime {
   forkSessionFrom(sourcePath: string, entryId: string): Promise<SessionSnapshot>;
   rollback(entryId: string, summarize?: boolean): Promise<void>;
   compact(instructions?: string): Promise<void>;
-  setSessionName(name: string): Promise<void>;
+  setSessionName(name?: string): Promise<void>;
   preparePromptAttachments(
     submissionId: string,
     refs: readonly PromptAttachmentRef[]

@@ -4,6 +4,7 @@ const controllers = vi.hoisted(() => ({
   compact: vi.fn(async () => undefined),
   create: vi.fn(async () => undefined),
   reload: vi.fn(async () => undefined),
+  rename: vi.fn(async () => true),
   selectModel: vi.fn(async () => undefined)
 }));
 
@@ -17,8 +18,13 @@ vi.mock("../session/session-control-controller.js", () => ({
 vi.mock("../session/session-lifecycle-controller.js", () => ({
   createRendererSession: controllers.create
 }));
+vi.mock("../navigation/conversation-organization-controller.js", () => ({
+  renameRendererConversation: controllers.rename
+}));
 
+import { useConversationDialogStore } from "../navigation/conversation-dialog-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   executePiDesktopAction,
   piDesktopAction,
@@ -38,6 +44,8 @@ const READY_CONTEXT: PiDesktopActionContext = {
 afterEach(() => {
   vi.clearAllMocks();
   useShellStore.setState(useShellStore.getInitialState(), true);
+  useConversationDialogStore.setState(useConversationDialogStore.getInitialState(), true);
+  rendererWorkbenchStore.getState().reset();
 });
 
 describe("Pi Desktop actions", () => {
@@ -80,4 +88,63 @@ describe("Pi Desktop actions", () => {
     expect(result).toEqual({ status: "blocked", message: "/reload 不接受附加参数。" });
     expect(controllers.reload).not.toHaveBeenCalled();
   });
+
+  it("exposes /name as a Desktop action for direct rename and the shared dialog", async () => {
+    installConversation();
+    expect(piDesktopAction("name")).toMatchObject({
+      name: "name",
+      source: "desktop-action",
+      argumentHint: "[title]"
+    });
+
+    await expect(executePiDesktopAction(piDesktopAction("name")!, "固定标题", READY_CONTEXT))
+      .resolves.toEqual({ status: "handled" });
+    expect(controllers.rename).toHaveBeenCalledWith(
+      "workspace-a",
+      "/sessions/a.jsonl",
+      "固定标题"
+    );
+
+    controllers.rename.mockClear();
+    await expect(executePiDesktopAction(piDesktopAction("name")!, "", READY_CONTEXT))
+      .resolves.toEqual({ status: "handled" });
+    expect(controllers.rename).not.toHaveBeenCalled();
+    expect(useConversationDialogStore.getState().renameTarget).toEqual({
+      workspaceId: "workspace-a",
+      path: "/sessions/a.jsonl",
+      title: "当前标题",
+      nameSource: "explicit"
+    });
+  });
 });
+
+function installConversation(): void {
+  rendererWorkbenchStore.getState().registerWorkspace({
+    id: "workspace-a",
+    displayName: "Workspace A",
+    identity: { canonicalPath: "/work/a", assurance: "path-only" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
+  });
+  rendererWorkbenchStore.getState().openTask({
+    id: "task-a",
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-a",
+      sessionPath: "/sessions/a.jsonl"
+    },
+    workspaceId: "workspace-a",
+    sessionId: "session-a",
+    taskGeneration: 1,
+    sessionGeneration: 1,
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "ready", recoverable: true },
+    title: "当前标题",
+    titleSource: "explicit",
+    sessionPath: "/sessions/a.jsonl",
+    hasDraft: false,
+    attachmentCount: 0,
+    toolMode: "auto"
+  });
+}

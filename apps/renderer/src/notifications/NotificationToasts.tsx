@@ -55,6 +55,16 @@ function NotificationToast({ item }: { item: NotificationItem }) {
       <span className={styles.copy}>
         <strong>{item.title}</strong>
         {item.message ? <span>{item.message}</span> : null}
+        {item.action ? (
+          <button
+            className={styles.action!}
+            onClick={() => {
+              dismissToast(item.id);
+              void item.action?.run();
+            }}
+            type="button"
+          >{item.action.label}</button>
+        ) : null}
       </span>
       <button
         aria-label={`关闭通知：${item.title}`}

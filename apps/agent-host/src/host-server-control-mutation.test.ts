@@ -264,7 +264,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
     const port = await attach(server);
     const request = commandEnvelope(
       "session.name",
-      { name: "Renamed Session" },
+      { mutation: { action: "set", name: "Renamed Session" } },
       5,
       "rename-session-a"
     );
