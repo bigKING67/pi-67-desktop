@@ -1,6 +1,6 @@
-import { readdir } from "node:fs/promises";
+import { readdir, realpath } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { SessionManager, type SessionInfo } from "@earendil-works/pi-coding-agent";
 import type { SessionCatalogContext, SessionCatalogDiscoveryResult } from "./session-catalog.js";
 import {
@@ -103,14 +103,19 @@ async function listSessionLane(
 }
 
 async function listConfiguredSessions(sessionDirectory: string): Promise<SessionDiscoveryScan> {
-  const expectedCount = await readdir(sessionDirectory).then(
+  const canonicalSessionDirectory = await realpath(resolve(sessionDirectory)).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!canonicalSessionDirectory) return { sessions: [], scannedCount: 0, incomplete: false };
+  const expectedCount = await readdir(canonicalSessionDirectory).then(
     (files) => files.filter((name) => name.endsWith(".jsonl")).length,
     (error: unknown) => (
       error instanceof Error && "code" in error && error.code === "ENOENT" ? 0 : undefined
     )
   );
   let progressCount = 0;
-  const sessions = await SessionManager.listAll(sessionDirectory, (_loaded, total) => {
+  const sessions = await SessionManager.listAll(canonicalSessionDirectory, (_loaded, total) => {
     progressCount = total;
   });
   return {

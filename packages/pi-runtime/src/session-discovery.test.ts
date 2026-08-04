@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -44,22 +44,27 @@ describe("Pi SDK Session Catalog discovery contract", () => {
     const catalog = createSessionCatalog({ onChanged });
     await catalog.reconcile(context);
     onChanged.mockClear();
+    const [unnamedPath, namedPath, whitespaceNamedPath] = await Promise.all([
+      requirePersistedPath(unnamed),
+      requirePersistedPath(named),
+      requirePersistedPath(whitespaceNamed)
+    ].map((path) => realpath(path)));
     const firstPage = await catalog.query({ scope: "workspace" }, context);
-    expect(firstPage.items.find((item) => item.path === unnamed.getSessionFile())).toMatchObject({
+    expect(firstPage.items.find((item) => item.path === unnamedPath)).toMatchObject({
       name: "未命名对话",
       nameSource: "fallback"
     });
-    expect(firstPage.items.find((item) => item.path === named.getSessionFile())?.name).toBe("Explicit catalog name");
+    expect(firstPage.items.find((item) => item.path === namedPath)?.name).toBe("Explicit catalog name");
     await vi.waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({
       reason: "automatic-title"
     })));
 
     const page = await catalog.query({ scope: "workspace" }, context);
-    expect(page.items.find((item) => item.path === unnamed.getSessionFile())?.name).toBe(
+    expect(page.items.find((item) => item.path === unnamedPath)?.name).toBe(
       "PRIVATE_PROMPT_MUST_NOT_BECOME_A_SESSION_NAME"
     );
-    expect(page.items.find((item) => item.path === named.getSessionFile())?.name).toBe("Explicit catalog name");
-    expect(page.items.find((item) => item.path === whitespaceNamed.getSessionFile())?.name).toBe("private unnamed prompt");
+    expect(page.items.find((item) => item.path === namedPath)?.name).toBe("Explicit catalog name");
+    expect(page.items.find((item) => item.path === whitespaceNamedPath)?.name).toBe("private unnamed prompt");
     await catalog.dispose();
   });
 
@@ -202,4 +207,10 @@ function assistantMessage(text: string, timestamp: number) {
     stopReason: "stop" as const,
     timestamp
   };
+}
+
+function requirePersistedPath(session: SessionManager): string {
+  const path = session.getSessionFile();
+  if (!path) throw new Error("The discovery fixture Session must be persisted.");
+  return path;
 }

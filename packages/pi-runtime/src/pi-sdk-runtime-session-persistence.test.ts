@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 
 const temporaryDirectories: string[] = [];
@@ -35,6 +35,10 @@ describe("PiSdkRuntime session persistence", () => {
       expect(externalChanges).toEqual([]);
       const initialPath = requireSessionPath(initial.sessionPath);
       await expectPersistedHeader(initialPath, initial.sessionId, cwd);
+      const initialCatalog = await queryReadyCatalog(runtime);
+      const initialCatalogRows = initialCatalog.items.filter((session) => session.id === initial.sessionId);
+      expect(initialCatalogRows).toHaveLength(1);
+      expect(initialCatalogRows[0]?.path).toBe(initialPath);
       await runtime.setSessionName("Persisted empty Session");
       expect(externalChanges).toEqual([]);
 
@@ -100,4 +104,10 @@ async function expectPersistedHeader(path: string, sessionId: string, cwd: strin
   });
   expect(lines.slice(1).map((line) => JSON.parse(line) as { type: string }))
     .not.toContainEqual(expect.objectContaining({ type: "message" }));
+}
+
+async function queryReadyCatalog(runtime: PiSdkRuntime) {
+  await runtime.querySessionCatalog({ scope: "workspace", refresh: true });
+  await vi.waitFor(() => expect(runtime.getSessionCatalogStatus().rebuilding).toBe(false), { timeout: 5_000 });
+  return runtime.querySessionCatalog({ scope: "workspace" });
 }
