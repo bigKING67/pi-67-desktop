@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
 import {
+  CONTROLLED_PROMPT_TEXT,
   isProcessAlive,
   readPositiveProcessId,
   waitForProcessExit
@@ -94,6 +95,7 @@ export async function launchInstalledApplication({
 
     if (activeControlledOperation) {
       await startControlledPrompt(window);
+      await waitForControlledPromptProjection(window);
       childPid = await readPositiveProcessId(childPidPath);
       if (!isProcessAlive(childPid)) throw new Error("Installed controlled Extension child exited before shutdown.");
     }
@@ -131,6 +133,15 @@ export async function launchInstalledApplication({
     if (application) await application.close();
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   }
+}
+
+export async function waitForControlledPromptProjection(window) {
+  await window.locator('[data-testid="conversation-row"]')
+    .filter({ hasText: CONTROLLED_PROMPT_TEXT })
+    .waitFor({ state: "visible", timeout: 10_000 });
+  await window.locator(".brand-lockup")
+    .getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
+    .waitFor({ state: "visible", timeout: 10_000 });
 }
 
 export async function selectLightThemePreference(window, legacyUserInterface) {

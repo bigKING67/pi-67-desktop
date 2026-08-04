@@ -9,6 +9,7 @@ import {
   INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
   selectLightThemePreference,
   waitForInstalledStartupSurface,
+  waitForControlledPromptProjection,
   waitForRuntimeReady
 } from "./windows-installed-application-lifecycle.mjs";
 import {
@@ -53,6 +54,43 @@ describe("Windows installer lifecycle contract", () => {
   it("aligns installed runtime readiness with the replay-safe control mutation timeout", () => {
     expect(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS)
       .toBe(CONTROL_MUTATION_ACK_TIMEOUT_MS + 15_000);
+  });
+
+  it("waits for the controlled prompt projection before measuring installed shutdown", async () => {
+    const actions = [];
+    const locator = (selector) => ({
+      filter: ({ hasText }) => {
+        actions.push(`filter:${selector}:${hasText}`);
+        return locator(`${selector}:filtered`);
+      },
+      getByText: (text, options) => {
+        actions.push(`text:${selector}:${text}:${String(options.exact)}`);
+        return locator(`${selector}:text`);
+      },
+      waitFor: async (options) => actions.push(
+        `wait:${selector}:${options.state}:${options.timeout}`
+      )
+    });
+
+    await waitForControlledPromptProjection({ locator });
+
+    expect(actions).toEqual([
+      "filter:[data-testid=\"conversation-row\"]:Keep the controlled Pi runtime active.",
+      "wait:[data-testid=\"conversation-row\"]:filtered:visible:10000",
+      "text:.brand-lockup:Keep the controlled Pi runtime active.:true",
+      "wait:.brand-lockup:text:visible:10000"
+    ]);
+
+    const source = await readFile(
+      join(repositoryRoot, "eng/packaging/windows-installed-application-lifecycle.mjs"),
+      "utf8"
+    );
+    const promptStarted = source.indexOf("await startControlledPrompt(window)");
+    const projectionReady = source.indexOf("await waitForControlledPromptProjection(window)");
+    const childObserved = source.indexOf("childPid = await readPositiveProcessId(childPidPath)");
+    expect(promptStarted).toBeGreaterThan(-1);
+    expect(projectionReady).toBeGreaterThan(promptStarted);
+    expect(childObserved).toBeGreaterThan(projectionReady);
   });
 
   it("accepts only an older exact Windows x64 installer as the upgrade baseline", () => {
