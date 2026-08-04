@@ -8,6 +8,7 @@ describe("CI change scope classifier", () => {
       runQuality: false,
       runWindows: false,
       runMacos: false,
+      windowsInstallerMode: "none",
       fullValidation: false
     });
   });
@@ -23,6 +24,7 @@ describe("CI change scope classifier", () => {
       runWindows: false,
       runMacos: false,
       fullValidation: false,
+      windowsInstallerMode: "full",
       reuseWindowsInstaller: true
     });
   });
@@ -46,25 +48,27 @@ describe("CI change scope classifier", () => {
       runQuality: true,
       runWindows: false,
       runMacos: true,
+      windowsInstallerMode: "none",
       fullValidation: false,
       reuseWindowsInstaller: false
     });
   });
 
   it.each([
-    ["shared renderer", ["apps/renderer/src/App.tsx"]],
-    ["runtime package", ["packages/pi-runtime/src/pi-sdk-runtime.ts"]],
-    ["dependency lock", ["pnpm-lock.yaml"]],
-    ["workflow source", [".github/workflows/ci.yml"]],
+    ["shared renderer", ["apps/renderer/src/App.tsx"], "quick"],
+    ["runtime package", ["packages/pi-runtime/src/pi-sdk-runtime.ts"], "quick"],
+    ["dependency lock", ["pnpm-lock.yaml"], "full"],
+    ["workflow source", [".github/workflows/ci.yml"], "quick"],
     ["mixed native platforms", [
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/preview-macos-unsigned.mjs"
-    ]]
-  ])("fails safe to both native platforms for %s", (_label, paths) => {
+    ], "full"]
+  ])("fails safe to both native platforms for %s", (_label, paths, windowsInstallerMode) => {
     expect(classifyChangedPaths(paths)).toMatchObject({
       runQuality: true,
       runWindows: true,
       runMacos: true,
+      windowsInstallerMode,
       fullValidation: true,
       reuseWindowsInstaller: false
     });
@@ -76,6 +80,7 @@ describe("CI change scope classifier", () => {
       runQuality: true,
       runWindows: true,
       runMacos: true,
+      windowsInstallerMode: "full",
       fullValidation: true,
       reuseWindowsInstaller: false
     });
@@ -84,5 +89,14 @@ describe("CI change scope classifier", () => {
   it("normalizes checkout paths before classification", () => {
     expect(normalizeRepoPath(".\\eng\\packaging\\windows-installer-identity.mjs"))
       .toBe("eng/packaging/windows-installer-identity.mjs");
+  });
+
+  it("keeps installer-byte and packaging changes on full lifecycle certification", () => {
+    expect(classifyChangedPaths(["electron-builder.yml"])).toMatchObject({
+      windowsInstallerMode: "full"
+    });
+    expect(classifyChangedPaths(["eng/packaging/package-native-unsigned.mjs"])).toMatchObject({
+      windowsInstallerMode: "full"
+    });
   });
 });

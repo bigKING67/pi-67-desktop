@@ -11,18 +11,27 @@ export function classifyChangedPaths(paths) {
     .sort((left, right) => left.localeCompare(right));
   if (changedPaths.length === 0) return fullValidation("empty-diff", changedPaths);
   if (changedPaths.every(isDocumentationPath)) {
-    return scopeResult("docs-only", changedPaths, false, false, false, false);
+    return scopeResult("docs-only", changedPaths, false, false, false, false, "none");
   }
 
   const productPaths = changedPaths.filter((path) => !isDocumentationPath(path));
   if (productPaths.every(isWindowsInstallerVerifierProductPath)) {
-    return scopeResult("windows-installer-verifier-only", changedPaths, false, false, false, false, true);
+    return scopeResult("windows-installer-verifier-only", changedPaths, false, false, false, false, "full", true);
   }
   if (productPaths.every(isWindowsOnlyPath)) {
-    return scopeResult("windows-only", changedPaths, true, true, false, false, false);
+    return scopeResult(
+      "windows-only",
+      changedPaths,
+      true,
+      true,
+      false,
+      false,
+      resolveWindowsInstallerMode(productPaths),
+      false
+    );
   }
   if (productPaths.every(isMacosOnlyPath)) {
-    return scopeResult("macos-only", changedPaths, true, false, true, false, false);
+    return scopeResult("macos-only", changedPaths, true, false, true, false, "none", false);
   }
   return fullValidation("shared-or-unknown", changedPaths);
 }
@@ -66,10 +75,30 @@ function isMacosOnlyPath(path) {
 }
 
 function fullValidation(reason, paths) {
-  return scopeResult(reason, paths, true, true, true, true, false);
+  return scopeResult(
+    reason,
+    paths,
+    true,
+    true,
+    true,
+    true,
+    reason === "empty-diff" || reason === "unavailable-base"
+      ? "full"
+      : resolveWindowsInstallerMode(paths.filter((path) => !isDocumentationPath(path))),
+    false
+  );
 }
 
-function scopeResult(reason, paths, runQuality, runWindows, runMacos, full, reuseWindowsInstaller = false) {
+function scopeResult(
+  reason,
+  paths,
+  runQuality,
+  runWindows,
+  runMacos,
+  full,
+  windowsInstallerMode,
+  reuseWindowsInstaller = false
+) {
   return {
     reason,
     changedPaths: paths,
@@ -77,8 +106,32 @@ function scopeResult(reason, paths, runQuality, runWindows, runMacos, full, reus
     runWindows,
     runMacos,
     fullValidation: full,
+    windowsInstallerMode,
     reuseWindowsInstaller
   };
+}
+
+function resolveWindowsInstallerMode(paths) {
+  const hasWindowsSpecificPath = paths.some((path) => (
+    isWindowsOnlyPath(path) || isWindowsInstallerVerifierProductPath(path)
+  ));
+  const hasMacosSpecificPath = paths.some(isMacosOnlyPath);
+  if (hasWindowsSpecificPath && hasMacosSpecificPath) return "full";
+  return paths.some(isFullWindowsInstallerPath) ? "full" : "quick";
+}
+
+function isFullWindowsInstallerPath(path) {
+  if ([
+    "electron-builder.yml",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".github/workflows/release.yml",
+    ".github/workflows/unsigned-preview.yml",
+    ".github/workflows/windows-installer-debug.yml"
+  ].includes(path)) return true;
+  return path.startsWith("eng/packaging/")
+    && !isWindowsInstallerVerifierProductPath(path)
+    && !isMacosOnlyPath(path);
 }
 
 function isCommitId(value) {
@@ -116,6 +169,7 @@ async function main() {
     `run_windows=${String(result.runWindows)}`,
     `run_macos=${String(result.runMacos)}`,
     `reuse_windows_installer=${String(result.reuseWindowsInstaller)}`,
+    `windows_installer_mode=${result.windowsInstallerMode}`,
     `full_validation=${String(result.fullValidation)}`,
     `scope_reason=${result.reason}`,
     ""
@@ -127,6 +181,7 @@ async function main() {
     runWindows: result.runWindows,
     runMacos: result.runMacos,
     reuseWindowsInstaller: result.reuseWindowsInstaller,
+    windowsInstallerMode: result.windowsInstallerMode,
     fullValidation: result.fullValidation
   }));
 }

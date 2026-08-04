@@ -81,6 +81,8 @@ describe("Windows installer debug artifact reuse", () => {
     expect(lifecycleStep).toBeGreaterThan(buildStep);
     expect(workflow.slice(buildStep, lifecycleStep))
       .toContain("pnpm --filter @pi67/protocol... run build");
+    expect(workflow).toContain("run: pnpm run package:smoke:windows-installer");
+    expect(workflow).not.toContain("package:smoke:windows-installer -- --quick");
   });
 
   it("exposes the verifier as a reusable workflow and rechecks source job metadata", async () => {

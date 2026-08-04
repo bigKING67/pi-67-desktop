@@ -38,7 +38,28 @@ const FILE_STATE_TIMEOUT_MS = 30_000;
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");
 const summaryPath = join(outputDirectory, "summary.json");
 
-export async function verifyWindowsInstallerLifecycle() {
+export function parseWindowsInstallerLifecycleArguments(arguments_) {
+  if (arguments_.length === 0) return { quick: false };
+  if (arguments_.length === 1 && arguments_[0] === "--quick") return { quick: true };
+  throw new Error("Expected no arguments or --quick.");
+}
+
+export function resolveWindowsInstallerLifecycleContract({ baseline, quick }) {
+  if (baseline && quick) {
+    throw new Error("Quick Windows installer lifecycle cannot verify a cross-version upgrade baseline.");
+  }
+  return {
+    certificationMode: quick ? "quick" : "full",
+    evidenceLevel: baseline
+      ? "windows-nsis-cross-version-upgrade-uninstall"
+      : quick
+        ? "windows-nsis-silent-install-launch-uninstall"
+        : "windows-nsis-silent-install-reinstall-uninstall",
+    verifyReinstall: !quick
+  };
+}
+
+export async function verifyWindowsInstallerLifecycle(options = {}) {
   if (process.platform !== "win32" || process.arch !== "x64") {
     throw new Error(`Windows installer lifecycle verification requires win32/x64, got ${process.platform}/${process.arch}.`);
   }
@@ -73,6 +94,10 @@ export async function verifyWindowsInstallerLifecycle() {
   const baselineIdentity = baseline
     ? await readLifecycleArtifactIdentity(baseline.path, expectedSigner, "Previous Windows installer")
     : undefined;
+  const lifecycleContract = resolveWindowsInstallerLifecycleContract({
+    baseline: Boolean(baseline),
+    quick: options.quick === true
+  });
   await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(outputDirectory, { recursive: true });
 
@@ -87,9 +112,8 @@ export async function verifyWindowsInstallerLifecycle() {
   const report = {
     schemaVersion: 1,
     status: "running",
-    evidenceLevel: baseline
-      ? "windows-nsis-cross-version-upgrade-uninstall"
-      : "windows-nsis-silent-install-reinstall-uninstall",
+    certificationMode: lifecycleContract.certificationMode,
+    evidenceLevel: lifecycleContract.evidenceLevel,
     host: {
       arch: process.arch,
       osRelease: release(),
@@ -116,6 +140,7 @@ export async function verifyWindowsInstallerLifecycle() {
       "interactive assisted installer UI",
       "SmartScreen reputation or user override flow",
       ...(baseline ? [] : ["upgrade from a distinct previously released version"]),
+      ...(lifecycleContract.verifyReinstall ? [] : ["same-version reinstall and restored-startup persistence"]),
       "machine-wide installation",
       "real user default-path uninstall data retention"
     ]
@@ -181,53 +206,56 @@ export async function verifyWindowsInstallerLifecycle() {
       sessionShutdownLifecycle: baseline ? "legacy-baseline-not-required" : "verified"
     });
 
-    if (baseline) {
-      await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
+    let finalInstalledArtifact = installedArtifact;
+    if (lifecycleContract.verifyReinstall) {
+      if (baseline) {
+        await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
+      }
+
+      const reinstall = await timedPhase(
+        baseline ? "upgrade" : "reinstall",
+        () => installNsisPackage(installerPath, installDirectory)
+      );
+      report.phases.push(reinstall);
+      finalInstalledArtifact = await resolveInstalledArtifact(installDirectory);
+      await assertPackagedRuntimeAssets(finalInstalledArtifact);
+      const finalInstalledIdentity = await readLifecycleArtifactIdentity(
+        finalInstalledArtifact.executablePath,
+        expectedSigner,
+        "Upgraded Windows executable"
+      );
+      assertSameArtifactBytes(
+        finalInstalledIdentity,
+        packagedExecutableIdentity,
+        "Upgraded Windows executable"
+      );
+      report.finalInstalledExecutable = finalInstalledIdentity;
+
+      await resetControlledShutdownLifecycle(lifecyclePath);
+      const secondLaunch = await launchInstalledApplication({
+        activeControlledOperation: Boolean(baseline),
+        agentDir,
+        artifact: finalInstalledArtifact,
+        expectedTheme: "light",
+        legacyUserInterface: false,
+        probePackagedRendererIsolation: true,
+        selectLightTheme: false,
+        userDataDirectory,
+        workspace
+      });
+      assertRuntimeVersion(secondLaunch, packageJson.version);
+      await assertSingleShutdownQuitLifecycle(lifecyclePath, "Upgraded Pi Runtime");
+      report.phases.push({
+        name: baseline ? "post-upgrade-launch" : "post-reinstall-launch",
+        ...secondLaunch,
+        sessionShutdownLifecycle: "verified"
+      });
     }
-
-    const reinstall = await timedPhase(
-      baseline ? "upgrade" : "reinstall",
-      () => installNsisPackage(installerPath, installDirectory)
-    );
-    report.phases.push(reinstall);
-    const reinstalledArtifact = await resolveInstalledArtifact(installDirectory);
-    await assertPackagedRuntimeAssets(reinstalledArtifact);
-    const finalInstalledIdentity = await readLifecycleArtifactIdentity(
-      reinstalledArtifact.executablePath,
-      expectedSigner,
-      "Upgraded Windows executable"
-    );
-    assertSameArtifactBytes(
-      finalInstalledIdentity,
-      packagedExecutableIdentity,
-      "Upgraded Windows executable"
-    );
-    report.finalInstalledExecutable = finalInstalledIdentity;
-
-    await resetControlledShutdownLifecycle(lifecyclePath);
-    const secondLaunch = await launchInstalledApplication({
-      activeControlledOperation: Boolean(baseline),
-      agentDir,
-      artifact: reinstalledArtifact,
-      expectedTheme: "light",
-      legacyUserInterface: false,
-      probePackagedRendererIsolation: true,
-      selectLightTheme: false,
-      userDataDirectory,
-      workspace
-    });
-    assertRuntimeVersion(secondLaunch, packageJson.version);
-    await assertSingleShutdownQuitLifecycle(lifecyclePath, "Upgraded Pi Runtime");
-    report.phases.push({
-      name: baseline ? "post-upgrade-launch" : "post-reinstall-launch",
-      ...secondLaunch,
-      sessionShutdownLifecycle: "verified"
-    });
 
     const uninstallPath = await resolveUninstallerPath(installDirectory);
     const uninstall = await timedPhase("uninstall", async () => {
       await runExecutable(uninstallPath, ["/S"]);
-      await waitForPathState(reinstalledArtifact.executablePath, false);
+      await waitForPathState(finalInstalledArtifact.executablePath, false);
       await waitForInstallationRemoval(installDirectory);
     });
     report.phases.push(uninstall);
@@ -238,10 +266,14 @@ export async function verifyWindowsInstallerLifecycle() {
     };
     report.status = "passed";
     await writeReport(report);
+    const reinstallEvidence = lifecycleContract.verifyReinstall
+      ? `${baseline ? "cross-version upgrade" : "same-version reinstall"} with theme persistence, `
+      : "";
     console.log(
-      "Windows NSIS lifecycle smoke passed: silent install, installed app:// launch, controlled process shutdown, "
-      + `${baseline ? "cross-version upgrade" : "same-version reinstall"} with theme persistence, silent uninstall, `
-      + "and isolated user-data preservation. "
+      `Windows NSIS ${lifecycleContract.certificationMode} lifecycle smoke passed: silent install, `
+      + "installed app:// launch, controlled process shutdown, "
+      + reinstallEvidence
+      + "silent uninstall, and isolated user-data preservation. "
       + `Evidence: ${relative(repositoryRoot, summaryPath)}.`
     );
   } catch (error) {
@@ -385,5 +417,7 @@ function round(value) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await verifyWindowsInstallerLifecycle();
+  await verifyWindowsInstallerLifecycle(
+    parseWindowsInstallerLifecycleArguments(process.argv.slice(2))
+  );
 }

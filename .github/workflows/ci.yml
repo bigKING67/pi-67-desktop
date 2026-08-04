@@ -26,6 +26,7 @@ jobs:
       reuse_windows_installer_available: ${{ steps.installer-reuse.outputs.reuse_available }}
       reuse_source_run_id: ${{ steps.installer-reuse.outputs.source_run_id }}
       reuse_source_sha: ${{ steps.installer-reuse.outputs.source_sha }}
+      windows_installer_mode: ${{ steps.scope.outputs.windows_installer_mode }}
       full_validation: ${{ steps.scope.outputs.full_validation }}
       scope_reason: ${{ steps.scope.outputs.scope_reason }}
     steps:
@@ -153,7 +154,15 @@ jobs:
       - name: Verify Windows packaged synthetic scale and IME contracts
         run: pnpm run package:smoke:windows-ui
       - name: Verify Windows NSIS installer lifecycle
-        run: pnpm run package:smoke:windows-installer
+        shell: bash
+        env:
+          WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}
+        run: |
+          if [[ "$WINDOWS_INSTALLER_MODE" == "quick" ]]; then
+            pnpm run package:smoke:windows-installer -- --quick
+          else
+            pnpm run package:smoke:windows-installer
+          fi
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

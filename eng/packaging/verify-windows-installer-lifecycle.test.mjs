@@ -15,8 +15,10 @@ import {
 import {
   assertPreservedUserData,
   buildNsisInstallArguments,
+  parseWindowsInstallerLifecycleArguments,
   resolveExpectedLifecycleSigner,
   resolveUpgradeBaselineInstaller,
+  resolveWindowsInstallerLifecycleContract,
   resolveWindowsInstallerPath,
   waitForPathState,
   WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
@@ -33,6 +35,34 @@ afterEach(async () => {
 });
 
 describe("Windows installer lifecycle contract", () => {
+  it("defaults to full certification and accepts an explicit quick lane", () => {
+    expect(parseWindowsInstallerLifecycleArguments([])).toEqual({ quick: false });
+    expect(parseWindowsInstallerLifecycleArguments(["--quick"])).toEqual({ quick: true });
+    expect(() => parseWindowsInstallerLifecycleArguments(["--full"])).toThrow(
+      "Expected no arguments or --quick"
+    );
+  });
+
+  it("keeps upgrade and release evidence on the full lifecycle contract", () => {
+    expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: true })).toEqual({
+      certificationMode: "quick",
+      evidenceLevel: "windows-nsis-silent-install-launch-uninstall",
+      verifyReinstall: false
+    });
+    expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: false })).toEqual({
+      certificationMode: "full",
+      evidenceLevel: "windows-nsis-silent-install-reinstall-uninstall",
+      verifyReinstall: true
+    });
+    expect(resolveWindowsInstallerLifecycleContract({ baseline: true, quick: false })).toEqual({
+      certificationMode: "full",
+      evidenceLevel: "windows-nsis-cross-version-upgrade-uninstall",
+      verifyReinstall: true
+    });
+    expect(() => resolveWindowsInstallerLifecycleContract({ baseline: true, quick: true }))
+      .toThrow("cannot verify a cross-version upgrade baseline");
+  });
+
   it("resolves the exact current-version x64 NSIS artifact", () => {
     expect(resolveWindowsInstallerPath("C:\\release", "0.1.0-alpha.3"))
       .toBe(join("C:\\release", "Pi-67-Desktop-0.1.0-alpha.3-win-x64.exe"));

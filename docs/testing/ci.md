@@ -38,6 +38,24 @@ The Windows native lane instead caches Electron and electron-builder download di
 contain versioned Electron and NSIS tool downloads rather than repository build output; the cache
 key is bound to the lockfile and `electron-builder.yml`.
 
+## Two-tier Windows installer certification
+
+Ordinary CI selects an explicit `windows_installer_mode` from the exact product diff:
+
+- `quick` verifies silent install, installed `app://` launch, runtime readiness, controlled process
+  shutdown, silent uninstall, and isolated user-data preservation;
+- `full` additionally verifies same-version reinstall, packaged executable identity, persisted theme,
+  and restored startup state after reinstall.
+
+Shared product and CI-only changes use the quick lane. Dependency changes, `electron-builder.yml`,
+non-verifier packaging changes, and release/installer-debug workflow changes fail closed to the full
+lane. Empty or unavailable diffs also select full certification.
+
+The reusable verifier lane, unsigned preview, and signed Release workflow always execute the full
+lifecycle. A quick CI receipt is never sufficient evidence for a public Windows download. If a quick
+lifecycle fails and a follow-up verifier-only commit can reuse its candidate, the reusable lane applies
+the new verifier to that immutable candidate and executes the full lifecycle.
+
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.

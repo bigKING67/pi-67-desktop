@@ -47,6 +47,7 @@ describe("release performance workflow gates", () => {
     expect(macosStart).toBeGreaterThan(windowsStart);
     expect(gateStart).toBeGreaterThan(macosStart);
     expect(source).toContain("node eng/ci/classify-change-scope.mjs");
+    expect(source).toContain("windows_installer_mode: ${{ steps.scope.outputs.windows_installer_mode }}");
     expect(fastSource).toContain("runs-on: macos-15");
     expect(fastSource).not.toContain("windows-2025");
     expect(fastSource).toContain("run: pnpm run check");
@@ -66,7 +67,9 @@ describe("release performance workflow gates", () => {
     );
     expect(windowsSource).toContain("--prepared-resources --ci-fast");
     expect(windowsSource).toContain("run: pnpm run package:smoke:windows-ui");
-    expect(windowsSource).toContain("run: pnpm run package:smoke:windows-installer");
+    expect(windowsSource).toContain("WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}");
+    expect(windowsSource).toContain("pnpm run package:smoke:windows-installer -- --quick");
+    expect(windowsSource).toContain("pnpm run package:smoke:windows-installer\n");
     expect(macosSource).toContain("runs-on: macos-15");
     expect(macosSource).toContain("needs.change-scope.outputs.run_macos == 'true'");
     expect(macosSource).toContain("package-native-unsigned.mjs --prepared-resources");
@@ -84,6 +87,7 @@ describe("release performance workflow gates", () => {
     expect(source).toContain("run: corepack pnpm run package:smoke");
     expect(source).toContain("run: corepack pnpm run package:smoke:windows-ui");
     expect(source).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(source).not.toContain("package:smoke:windows-installer -- --quick");
   });
 
   it("allows deep Windows certification and signed releases to finish", async () => {
@@ -96,5 +100,7 @@ describe("release performance workflow gates", () => {
     expect(certification).toContain("timeout-minutes: 180");
     expect(certification).toContain("schedule:");
     expect(release).toContain("timeout-minutes: 180");
+    expect(release).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(release).not.toContain("package:smoke:windows-installer -- --quick");
   });
 });
