@@ -9,6 +9,7 @@ import {
   type SessionManager,
   type SettingsManager
 } from "@earendil-works/pi-coding-agent";
+import { realpath, stat, writeFile } from "node:fs/promises";
 import { RuntimeError, type ExtensionUiCancellationReason } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
@@ -182,6 +183,7 @@ export class RuntimeSessionBindings {
   }
 
   private async bindSession(session: AgentSession): Promise<void> {
+    await this.materializeSession(session.sessionManager);
     // Advance authority before extension hooks run so no event is attributed to the previous session.
     this.generation += 1;
     this.activeServices = this.requireRuntime().services;
@@ -210,6 +212,32 @@ export class RuntimeSessionBindings {
     }
   }
 
+  private async materializeSession(sessionManager: SessionManager): Promise<void> {
+    const sessionPath = sessionManager.getSessionFile();
+    if (!sessionManager.isPersisted() || !sessionPath) return;
+
+    const existing = await stat(sessionPath).catch((error: unknown) => {
+      if (isFileSystemError(error, "ENOENT")) return undefined;
+      throw error;
+    });
+    if (existing) {
+      if (existing.size === 0) {
+        throw new Error(`Pi Session file is empty and cannot be published: ${sessionPath}`);
+      }
+      return;
+    }
+
+    const header = sessionManager.getHeader();
+    if (!header) throw new Error("Pi Session cannot be persisted without a header.");
+    const content = [header, ...sessionManager.getEntries()]
+      .map((entry) => JSON.stringify(entry))
+      .join("\n");
+    await writeFile(sessionPath, `${content}\n`, { encoding: "utf8", flag: "wx" });
+
+    // Reopen through Pi so its append state matches the newly materialized file.
+    sessionManager.setSessionFile(await realpath(sessionPath));
+  }
+
   private detachSessionBindings(): void {
     this.options.externalChangeGuard.detach();
     this.sessionUnsubscribe?.();
@@ -217,4 +245,8 @@ export class RuntimeSessionBindings {
     this.options.projections.reset();
     this.options.cancelInteractiveRequests("session-transition");
   }
+}
+
+function isFileSystemError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === code;
 }

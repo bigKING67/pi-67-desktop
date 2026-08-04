@@ -255,7 +255,7 @@ describe("PiSdkRuntime", () => {
       expect(renamed.sessionName).toBe("Isolated SDK smoke");
       const sessionPath = renamed.sessionPath;
       if (!sessionPath) throw new Error("Pi SDK smoke requires a session path.");
-      expect(sessionPath.startsWith(`${join(agentDir, "sessions")}${sep}`)).toBe(true);
+      expect(sessionPath.startsWith(`${join(await realpath(agentDir), "sessions")}${sep}`)).toBe(true);
       const fixture = SessionManager.create(cwd, dirname(sessionPath));
       fixture.appendSessionInfo("Restored SDK smoke");
       fixture.appendMessage({ role: "user", content: "Restore this isolated Pi session.", timestamp: Date.now() });
@@ -271,11 +271,17 @@ describe("PiSdkRuntime", () => {
       });
       const fixturePath = fixture.getSessionFile();
       if (!fixturePath) throw new Error("Pi SDK smoke fixture was not persisted.");
-      expect((await queryReadyCatalog(runtime, { scope: "workspace" })).items).toEqual([
-        expect.objectContaining({ path: fixturePath, name: "Restored SDK smoke" })
-      ]);
-      expect((await queryReadyCatalog(runtime, { scope: "all" })).items.some((session) => session.path === fixturePath))
-        .toBe(true);
+      const workspaceCatalog = await queryReadyCatalog(runtime, { scope: "workspace" });
+      expect(workspaceCatalog.items).toHaveLength(2);
+      expect(workspaceCatalog.items.find((item) => item.id === renamed.sessionId)).toMatchObject({
+        name: "Isolated SDK smoke",
+        messageCount: 0
+      });
+      const restoredCatalogItem = workspaceCatalog.items.find((item) => item.id === fixture.getSessionId());
+      expect(restoredCatalogItem).toMatchObject({ name: "Restored SDK smoke", messageCount: 2 });
+      expect(await realpath(restoredCatalogItem?.path ?? "")).toBe(await realpath(fixturePath));
+      const allCatalog = await queryReadyCatalog(runtime, { scope: "all" });
+      expect(allCatalog.items.some((session) => session.id === fixture.getSessionId())).toBe(true);
 
       const externalSessionDir = join(root, "external-sessions");
       await mkdir(externalSessionDir);
