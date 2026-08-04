@@ -6,6 +6,7 @@ import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activateRestoredWorkspace,
+  inspectInstalledShutdownLifecycle,
   INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
   selectLightThemePreference,
   waitForInstalledStartupSurface,
@@ -167,6 +168,25 @@ describe("Windows installer lifecycle contract", () => {
     expect(promptStarted).toBeGreaterThan(-1);
     expect(projectionReady).toBeGreaterThan(promptStarted);
     expect(childObserved).toBeGreaterThan(projectionReady);
+  });
+
+  it("summarizes controlled shutdown lifecycle entries without exposing raw contents", async () => {
+    const root = await createTemporaryDirectory();
+    const lifecyclePath = join(root, "controlled-lifecycle.txt");
+    await writeFile(lifecyclePath, "shutdown:quit\nshutdown:switch\n", "utf8");
+
+    await expect(inspectInstalledShutdownLifecycle(lifecyclePath)).resolves.toEqual({
+      available: true,
+      entryCount: 2,
+      otherEntryCount: 1,
+      quitEntryCount: 1
+    });
+    await expect(inspectInstalledShutdownLifecycle(join(root, "missing.txt"))).resolves.toEqual({
+      available: false,
+      entryCount: 0,
+      otherEntryCount: 0,
+      quitEntryCount: 0
+    });
   });
 
   it("accepts only an older exact Windows x64 installer as the upgrade baseline", () => {

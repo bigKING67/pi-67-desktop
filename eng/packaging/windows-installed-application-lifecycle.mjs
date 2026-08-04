@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
 import {
@@ -17,6 +18,9 @@ import {
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 
 const RUNTIME_READINESS_PROPAGATION_MARGIN_MS = 15_000;
+const SHUTDOWN_PROCESS_POLL_INTERVAL_MS = 50;
+
+export const INSTALLED_SHUTDOWN_BUDGET_MS = 5_000;
 
 export const INSTALLED_RUNTIME_READINESS_TIMEOUT_MS =
   CONTROL_MUTATION_ACK_TIMEOUT_MS + RUNTIME_READINESS_PROPAGATION_MARGIN_MS;
@@ -28,6 +32,7 @@ export async function launchInstalledApplication({
   childPidPath,
   expectedTheme,
   legacyUserInterface,
+  lifecyclePath,
   probePackagedRendererIsolation,
   selectLightTheme,
   userDataDirectory,
@@ -105,19 +110,38 @@ export async function launchInstalledApplication({
       .map((metric) => metric.pid));
     if (utilityPids.length === 0) throw new Error("Installed Agent Host utility process was not observable.");
 
-    const closeStartedAt = performance.now();
-    await application.close();
+    const lifecycleBeforeClose = await inspectInstalledShutdownLifecycle(lifecyclePath);
+    const shutdownMeasurement = await measureInstalledApplicationShutdown({
+      application,
+      childPid,
+      mainPid,
+      utilityPids
+    });
     application = undefined;
-    const closeDurationMs = performance.now() - closeStartedAt;
-    if (closeDurationMs > 5_000) {
-      throw new Error(`Installed application shutdown exceeded 5000ms: ${closeDurationMs.toFixed(1)}ms.`);
+    const lifecycleAfterClose = await inspectInstalledShutdownLifecycle(lifecyclePath);
+    const shutdown = {
+      activeControlledOperation,
+      budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
+      closeDurationMs: round(shutdownMeasurement.closeDurationMs),
+      lifecycle: {
+        afterClose: lifecycleAfterClose,
+        beforeClose: lifecycleBeforeClose
+      },
+      processes: shutdownMeasurement.processes
+    };
+    if (shutdownMeasurement.closeDurationMs > INSTALLED_SHUTDOWN_BUDGET_MS) {
+      throw new Error(
+        `Installed application shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms: `
+        + `${shutdownMeasurement.closeDurationMs.toFixed(1)}ms. `
+        + `Shutdown diagnostics: ${JSON.stringify(shutdown)}`
+      );
     }
     if (mainPid !== undefined) await waitForProcessExit(mainPid);
     for (const pid of utilityPids) await waitForProcessExit(pid);
     if (childPid !== undefined) await waitForProcessExit(childPid);
 
     return {
-      closeDurationMs: round(closeDurationMs),
+      closeDurationMs: round(shutdownMeasurement.closeDurationMs),
       legacyUserInterface,
       launchToReadyMs: round(performance.now() - startedAt),
       runtime: {
@@ -127,12 +151,78 @@ export async function launchInstalledApplication({
       rendererIsolationProbe: probePackagedRendererIsolation,
       startupSurface,
       ...(restoredActivation ? { restoredActivation } : {}),
+      shutdown,
       utilityProcessCount: utilityPids.length
     };
   } finally {
     if (application) await application.close();
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   }
+}
+
+export async function measureInstalledApplicationShutdown({
+  application,
+  childPid,
+  mainPid,
+  now = () => performance.now(),
+  pollIntervalMs = SHUTDOWN_PROCESS_POLL_INTERVAL_MS,
+  processAlive = isProcessAlive,
+  utilityPids
+}) {
+  const startedAt = now();
+  const main = trackedProcess(mainPid, processAlive);
+  const utilities = utilityPids
+    .map((pid) => trackedProcess(pid, processAlive))
+    .filter(Boolean);
+  const controlledChild = trackedProcess(childPid, processAlive);
+  const tracked = [main, ...utilities, controlledChild].filter(Boolean);
+  const sample = () => {
+    const elapsedMs = round(now() - startedAt);
+    for (const state of tracked) {
+      state.aliveAfterClose = processAlive(state.pid);
+      if (!state.aliveAfterClose && state.exitObservedMs === null) {
+        state.exitObservedMs = elapsedMs;
+      }
+    }
+  };
+  const timer = setInterval(sample, pollIntervalMs);
+  timer.unref?.();
+  try {
+    await application.close();
+  } finally {
+    clearInterval(timer);
+    sample();
+  }
+
+  const closeDurationMs = now() - startedAt;
+  return {
+    closeDurationMs,
+    processes: {
+      controlledChild: summarizeTrackedProcess(controlledChild),
+      main: summarizeTrackedProcess(main, true),
+      utilities: summarizeUtilityProcesses(utilities)
+    }
+  };
+}
+
+export async function inspectInstalledShutdownLifecycle(path) {
+  const content = await readFile(path, "utf8").catch(() => undefined);
+  if (content === undefined) {
+    return {
+      available: false,
+      entryCount: 0,
+      otherEntryCount: 0,
+      quitEntryCount: 0
+    };
+  }
+  const entries = content.split(/\r?\n/u).filter(Boolean);
+  const quitEntryCount = entries.filter((entry) => entry === "shutdown:quit").length;
+  return {
+    available: true,
+    entryCount: entries.length,
+    otherEntryCount: entries.length - quitEntryCount,
+    quitEntryCount
+  };
 }
 
 export async function waitForControlledPromptProjection(window) {
@@ -249,6 +339,50 @@ function inspectInstalledRuntimeState(window) {
       )
     };
   });
+}
+
+function trackedProcess(pid, processAlive) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return undefined;
+  const alive = processAlive(pid);
+  return {
+    aliveAfterClose: alive,
+    aliveBeforeClose: alive,
+    exitObservedMs: alive ? null : 0,
+    pid
+  };
+}
+
+function summarizeTrackedProcess(state, includeProcessId = false) {
+  if (!state) {
+    return {
+      aliveAfterClose: false,
+      aliveBeforeClose: false,
+      exitObservedMs: null,
+      present: false,
+      ...(includeProcessId ? { processId: null } : {})
+    };
+  }
+  return {
+    aliveAfterClose: state.aliveAfterClose,
+    aliveBeforeClose: state.aliveBeforeClose,
+    exitObservedMs: state.exitObservedMs,
+    present: true,
+    ...(includeProcessId ? { processId: state.pid } : {})
+  };
+}
+
+function summarizeUtilityProcesses(states) {
+  const observedExitTimes = states
+    .map((state) => state.exitObservedMs)
+    .filter((value) => value !== null);
+  return {
+    aliveAfterCloseCount: states.filter((state) => state.aliveAfterClose).length,
+    aliveBeforeCloseCount: states.filter((state) => state.aliveBeforeClose).length,
+    count: states.length,
+    firstExitObservedMs: observedExitTimes.length > 0 ? Math.min(...observedExitTimes) : null,
+    lastExitObservedMs: observedExitTimes.length > 0 ? Math.max(...observedExitTimes) : null,
+    observedExitCount: observedExitTimes.length
+  };
 }
 
 function round(value) {

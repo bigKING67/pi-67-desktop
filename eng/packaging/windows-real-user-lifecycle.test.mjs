@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import {
+  INSTALLED_SHUTDOWN_BUDGET_MS,
+  measureInstalledApplicationShutdown
+} from "./windows-installed-application-lifecycle.mjs";
 import {
   shouldCreateInitialRealUserSession,
   verifyProviderConfiguration,
@@ -6,6 +10,61 @@ import {
 } from "./windows-real-user-lifecycle.mjs";
 
 describe("Windows installed real-user lifecycle", () => {
+  it("keeps the installed shutdown budget fixed and records bounded process exit timing", async () => {
+    vi.useFakeTimers();
+    try {
+      const alive = new Set([101, 201, 202, 301]);
+      const application = {
+        close: () => new Promise((resolve) => {
+          setTimeout(() => alive.delete(301), 100);
+          setTimeout(() => alive.delete(201), 200);
+          setTimeout(() => alive.delete(202), 400);
+          setTimeout(() => {
+            alive.delete(101);
+            resolve();
+          }, 600);
+        })
+      };
+
+      const closing = measureInstalledApplicationShutdown({
+        application,
+        childPid: 301,
+        mainPid: 101,
+        pollIntervalMs: 50,
+        processAlive: (pid) => alive.has(pid),
+        utilityPids: [201, 202]
+      });
+      await vi.advanceTimersByTimeAsync(600);
+      const result = await closing;
+
+      expect(INSTALLED_SHUTDOWN_BUDGET_MS).toBe(5_000);
+      expect(result.closeDurationMs).toBe(600);
+      expect(result.processes.main).toMatchObject({
+        aliveAfterClose: false,
+        aliveBeforeClose: true,
+        present: true,
+        processId: 101
+      });
+      expect(result.processes.main.exitObservedMs).not.toBeNull();
+      expect(result.processes.controlledChild).toMatchObject({
+        aliveAfterClose: false,
+        aliveBeforeClose: true,
+        present: true
+      });
+      expect(result.processes.controlledChild.exitObservedMs).not.toBeNull();
+      expect(result.processes.utilities).toMatchObject({
+        aliveAfterCloseCount: 0,
+        aliveBeforeCloseCount: 2,
+        count: 2,
+        observedExitCount: 2
+      });
+      expect(result.processes.utilities.firstExitObservedMs)
+        .toBeLessThan(result.processes.utilities.lastExitObservedMs);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("accepts a Catalog state only after the expected materialized Session is present", async () => {
     const workspaceGroup = {
       evaluate: async (_callback, expectedIdentity) => ({
