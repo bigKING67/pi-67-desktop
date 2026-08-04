@@ -39,7 +39,7 @@ export async function openRendererWorkspace(): Promise<void> {
   if (!selected) return;
   rendererWorkbenchStore.getState().registerWorkspace(selected);
   rendererWorkbenchStore.getState().selectWorkspace(selected.id);
-  await registerRendererWorkspaceWithHost(selected, { refreshCatalog: true });
+  await registerRendererWorkspaceWithHost(selected, { queryCatalog: false });
   await openRendererWorkspaceDescriptor(selected);
 }
 
@@ -121,7 +121,7 @@ export async function openRendererWorkspaceDescriptor(
       throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
     }
     if (disposition === "committed" && get().workspace === workspace) {
-      await queryFirstSessionCatalog(descriptor.id);
+      await queryFirstSessionCatalog(descriptor.id, { refresh: true });
     }
     return disposition === "committed";
   } catch (error) {
@@ -129,7 +129,7 @@ export async function openRendererWorkspaceDescriptor(
     if (target) {
       const disposition = classifyRendererSessionBootstrap(get(), target);
       if (disposition === "committed") {
-        await queryFirstSessionCatalog(descriptor.id);
+        await queryFirstSessionCatalog(descriptor.id, { refresh: true });
         return true;
       }
       if (disposition === "stale") return false;

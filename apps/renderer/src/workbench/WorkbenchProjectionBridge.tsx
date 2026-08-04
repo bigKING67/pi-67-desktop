@@ -57,7 +57,8 @@ export function WorkbenchProjectionBridge() {
           availability: "available"
         } as const;
     workbench.registerWorkspace(descriptor);
-    void registerRendererWorkspaceWithHost(descriptor).catch((error: unknown) => {
+    // Catalog loading is owned by startup registration and Workspace open flows.
+    void registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false }).catch((error: unknown) => {
       publishNotification({
         level: "warning",
         title: `无法加载 ${descriptor.displayName} 的会话`,
