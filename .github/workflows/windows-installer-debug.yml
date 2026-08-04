@@ -60,6 +60,8 @@ jobs:
             --run-metadata $metadata
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
+      - name: Build verifier workspace dependencies
+        run: corepack pnpm --filter @pi67/protocol... run build
       - name: Download source Windows installer candidate
         uses: actions/download-artifact@v8
         with:

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   verifySourceRunMetadata,
@@ -38,5 +39,16 @@ describe("Windows installer debug artifact reuse", () => {
       conclusion: "failure",
       path: ".github/workflows/ci.yml"
     }, sourceSha)).toThrow(/not a completed failed CI run/u);
+  });
+
+  it("builds workspace dependencies before running the direct Node verifier", async () => {
+    const workflow = await readFile(new URL("../../.github/workflows/windows-installer-debug.yml", import.meta.url), "utf8");
+    const buildStep = workflow.indexOf("- name: Build verifier workspace dependencies");
+    const lifecycleStep = workflow.indexOf("- name: Verify Windows NSIS installer lifecycle");
+
+    expect(buildStep).toBeGreaterThan(-1);
+    expect(lifecycleStep).toBeGreaterThan(buildStep);
+    expect(workflow.slice(buildStep, lifecycleStep))
+      .toContain("corepack pnpm --filter @pi67/protocol... run build");
   });
 });
