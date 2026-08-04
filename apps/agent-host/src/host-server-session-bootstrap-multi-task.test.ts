@@ -74,12 +74,15 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
     });
 
     expect(runtimeA.initialize).toHaveBeenCalledOnce();
-    expect(runtimeB.initialize).toHaveBeenCalledWith({
-      cwd: workspaceCwd,
-      agentDir: expect.any(String),
-      trust: "trusted",
-      approvalMode: "guided"
-    });
+    expect(runtimeB.initialize).toHaveBeenCalledWith(
+      {
+        cwd: workspaceCwd,
+        agentDir: expect.any(String),
+        trust: "trusted",
+        approvalMode: "guided"
+      },
+      expect.any(Function)
+    );
     expect(runtimeB.createSession).toHaveBeenCalledOnce();
     expect(successResult(port, createSecond.requestId)).toMatchObject({
       sessionId: "session-b-created",

@@ -1,9 +1,5 @@
-import type {
-  RuntimeCapabilities,
-  SessionSnapshot,
-  WorkspaceChangesProjection,
-  WorkspaceDescriptor
-} from "@pi67/domain";
+import type { RuntimeCapabilities, SessionSnapshot, WorkspaceChangesProjection,
+  WorkspaceDescriptor } from "@pi67/domain";
 import { eventEnvelope, type ProjectionResyncResult } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
@@ -99,6 +95,7 @@ describe("App Store workspace open authority", () => {
       }
     });
     expect(useSessionProjectionStore.getState().authority.phase).toBe("inactive");
+    expectFailedWorkbenchTask("无法打开工作区：Pi 运行服务未发送 authoritative runtime.ready 事件。");
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
       title: "无法打开工作区"
@@ -300,6 +297,7 @@ describe("App Store workspace open authority", () => {
         detail: "无法打开会话：Workspace registration failed"
       }
     });
+    expectFailedWorkbenchTask("无法打开会话：Workspace registration failed");
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
       title: "无法打开会话",
@@ -321,6 +319,12 @@ function resetStores(): void {
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
   useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
   rendererWorkbenchStore.getState().reset();
+}
+
+function expectFailedWorkbenchTask(detail: string): void {
+  expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
+    expect.objectContaining({ lifecycle: "lost", runtime: { phase: "failed", detail, recoverable: true } })
+  ]);
 }
 
 function snapshot(sessionId: string): SessionSnapshot {

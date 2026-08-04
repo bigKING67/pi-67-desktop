@@ -44,10 +44,23 @@ export interface RuntimeInitializeOptions {
   approvalMode: ApprovalMode;
 }
 
+export type RuntimeInitializationStage =
+  | "resolve-session"
+  | "dispose-current"
+  | "create-session"
+  | "reload-configuration"
+  | "update-catalog"
+  | "project-snapshot";
+
+export type RuntimeInitializationObserver = (stage: RuntimeInitializationStage) => void;
+
 export interface AgentRuntime {
   getSdkVersion(): string;
   getExtensionUiCapabilities(): RuntimeCapabilities["extensionUi"];
-  initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot>;
+  initialize(
+    options: RuntimeInitializeOptions,
+    observeStage?: RuntimeInitializationObserver
+  ): Promise<SessionSnapshot>;
   dispose(): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;

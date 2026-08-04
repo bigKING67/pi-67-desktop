@@ -135,14 +135,16 @@ export async function openRendererWorkspaceDescriptor(
     }
     const detail = errorMessage(error);
     const failureTitle = sessionPath ? "无法打开会话" : "无法打开工作区";
+    const runtime = {
+      phase: "failed" as const,
+      detail: `${failureTitle}：${detail}`,
+      recoverable: true
+    };
     set({
       sessionTransitionPending: false,
-      runtime: {
-        phase: "failed",
-        detail: `${failureTitle}：${detail}`,
-        recoverable: true
-      }
+      runtime
     });
+    rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
     publishNotification({ level: "error", title: failureTitle, message: detail });
     return false;
   }

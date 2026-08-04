@@ -1,13 +1,13 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentRuntime } from "@pi67/pi-runtime";
+import type { AgentRuntime, RuntimeInitializationStage } from "@pi67/pi-runtime";
 import type { AgentCommand, CommandResults } from "@pi67/protocol";
 import { captureProjectionMutationAcknowledgement } from "./host-projection.js";
 import type {
   HostTaskStateCoordinator,
   TaskHostState
 } from "./host-task-state-coordinator.js";
-import { HostCommandError } from "./protocol-error.js";
+import { HostCommandError, toProtocolError } from "./protocol-error.js";
 import { runtimeReadyEvent } from "./runtime-ready-event.js";
 import {
   SessionWriterLeaseRegistry,
@@ -41,16 +41,33 @@ export class HostTaskRuntimeLifecycle {
     commitSessionWriter: () => Promise<void> = () => this.commitWriterTransition(state, runtime)
   ): Promise<CommandResults["runtime.initialize"]> {
     this.tasks.sendStatus(state, { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true });
-    const snapshot = await runtime.initialize(options);
-    state.record.initialized = true;
-    await commitSessionWriter();
-    this.tasks.sendStatus(state, { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true });
-    this.tasks.sendEvent(state, runtimeReadyEvent(runtime, snapshot));
-    return captureProjectionMutationAcknowledgement(
-      runtime,
-      this.options.getEventSequence(),
-      this.options.getHostEpoch()
-    );
+    try {
+      const snapshot = await runtime.initialize(options, (stage) => {
+        this.tasks.sendStatus(state, {
+          phase: "starting",
+          detail: initializationStageDetail(stage),
+          recoverable: true
+        });
+      });
+      state.record.initialized = true;
+      await commitSessionWriter();
+      this.tasks.sendStatus(state, { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true });
+      this.tasks.sendEvent(state, runtimeReadyEvent(runtime, snapshot));
+      return captureProjectionMutationAcknowledgement(
+        runtime,
+        this.options.getEventSequence(),
+        this.options.getHostEpoch()
+      );
+    } catch (error) {
+      state.record.initialized = false;
+      const failure = toProtocolError(error);
+      this.tasks.sendStatus(state, {
+        phase: "failed",
+        detail: `Pi SDK 初始化失败：${failure.message}`,
+        recoverable: failure.recoverable
+      });
+      throw error;
+    }
   }
 
   async loadRuntimeForCommand(
@@ -193,6 +210,17 @@ export class HostTaskRuntimeLifecycle {
     this.tasks.releaseTaskRun(state.record.taskKey);
     this.sessionWriterLeases.releaseTask(state.record.taskKey);
     this.tasks.clearActiveTask(state.record.taskKey);
+  }
+}
+
+function initializationStageDetail(stage: RuntimeInitializationStage): string {
+  switch (stage) {
+    case "resolve-session": return "正在解析 Pi Session";
+    case "dispose-current": return "正在释放旧 Pi Runtime";
+    case "create-session": return "正在创建 Pi Session";
+    case "reload-configuration": return "正在加载 Pi 配置";
+    case "update-catalog": return "正在更新 Session 目录";
+    case "project-snapshot": return "正在同步 Pi Session 状态";
   }
 }
 

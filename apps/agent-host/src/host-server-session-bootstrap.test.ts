@@ -30,6 +30,73 @@ class FakePort implements ProtocolPort {
 }
 
 describe("AgentHostServer session bootstrap", () => {
+  it("publishes a bounded failed status when runtime initialization rejects", async () => {
+    const runtime = {
+      getSdkVersion: () => "0.81.1",
+      subscribe: () => () => undefined,
+      getIdentity: () => ({ sessionGeneration: 0 }),
+      initialize: async (
+        _options: Parameters<AgentRuntime["initialize"]>[0],
+        observeStage?: Parameters<AgentRuntime["initialize"]>[1]
+      ) => {
+        observeStage?.("create-session");
+        throw new Error("token=private-fixture initialization failed");
+      },
+      cancelInteractiveRequests: () => [],
+      dispose: async () => undefined
+    } as unknown as AgentRuntime;
+    const server = new AgentHostServer(async () => runtime, {
+      sdkVersionLoader: async () => "0.81.1"
+    });
+    const port = new FakePort();
+    server.attachPort(port, {
+      appInstanceId: "app-initialize-failure",
+      hostInstanceId: "host-initialize-failure",
+      hostEpoch: 5
+    });
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-initialize-failure",
+      appInstanceId: "app-initialize-failure",
+      maxEnvelopeBytes: 2 * 1024 * 1024
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
+
+    const initialize = commandEnvelope("runtime.initialize", {
+      cwd: "/tmp/workspace",
+      agentDir: "/tmp/agent",
+      trust: "unknown",
+      approvalMode: "guided"
+    }, 5);
+    port.emit(initialize);
+    await waitForResponse(port, initialize.requestId);
+
+    const statuses = port.sent.filter((value) => (
+      isEventEnvelope(value) && value.type === "runtime.statusChanged"
+    ));
+    expect(statuses).toEqual([
+      expect.objectContaining({
+        payload: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
+      }),
+      expect.objectContaining({
+        payload: { phase: "starting", detail: "正在创建 Pi Session", recoverable: true }
+      }),
+      expect.objectContaining({
+        payload: {
+          phase: "failed",
+          detail: "Pi SDK 初始化失败：token=[redacted] initialization failed",
+          recoverable: true
+        }
+      })
+    ]);
+    expect(responseIndex(port, initialize.requestId)).toBeGreaterThan(
+      port.sent.indexOf(statuses.at(-1))
+    );
+    await server.shutdown();
+  });
+
   it("publishes the authoritative generation before workspace and session transition responses", async () => {
     let sessionId = "session-workspace";
     let sessionGeneration = 1;

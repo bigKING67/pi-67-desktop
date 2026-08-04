@@ -9,11 +9,9 @@ import {
   type SessionSnapshot, type SessionTreeProjection,
   type WorkspaceTrust, type TaskToolMode
 } from "@pi67/domain";
-import type {
-  AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
-  PromptAttachmentRef, RuntimeDiagnostics, StreamDelta
-} from "@pi67/protocol";
-import type { AgentRuntime, RuntimeInitializeOptions } from "./agent-runtime.js";
+import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
+  PromptAttachmentRef, RuntimeDiagnostics, StreamDelta } from "@pi67/protocol";
+import type { AgentRuntime, RuntimeInitializationObserver, RuntimeInitializeOptions } from "./agent-runtime.js";
 import { bindSessionExtensionUi, createSessionExtensionUiBridge } from "./extension-ui-lifecycle.js";
 import { conversationChangedEvent, sessionMetaChangedEvent, usageChangedEvent } from "./incremental-events.js";
 import { selectSessionModel, setSessionThinkingLevel } from "./model-control.js";
@@ -22,6 +20,7 @@ import { createRuntimeCredentialOverrideStore, type RuntimeCredentialOverrideSto
 import { projectRuntimeDiagnostics, projectRuntimeIdentity } from "./runtime-metadata.js";
 import { PiRuntimeConfigurationReload } from "./pi-runtime-configuration-reload.js";
 import { RuntimeProjectionController } from "./runtime-projection-controller.js";
+import { reportRuntimeInitializationStage } from "./runtime-initialization-observer.js";
 import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from "./runtime-session-catalog.js";
 import { RuntimeSessionTransitions } from "./runtime-session-transitions.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
@@ -177,11 +176,12 @@ export class PiSdkRuntime implements AgentRuntime {
   subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void {
     this.activityListeners.add(listener); return () => this.activityListeners.delete(listener);
   }
-  async initialize(options: RuntimeInitializeOptions): Promise<SessionSnapshot> {
+  async initialize(options: RuntimeInitializeOptions, observeStage?: RuntimeInitializationObserver): Promise<SessionSnapshot> {
     return this.sessionBindings.runTransition(async () => {
       this.uiBridge.cancelAll("runtime-dispose");
       const nextAgentDir = options.agentDir ?? getAgentDir();
       this.workspaceServices?.assertCompatible(options.cwd, nextAgentDir);
+      reportRuntimeInitializationStage(observeStage, "resolve-session");
       const sessionPath = options.sessionPath
         ? await resolveManagedSessionPath(options.sessionPath, options.cwd, nextAgentDir)
         : undefined;
@@ -189,13 +189,18 @@ export class PiSdkRuntime implements AgentRuntime {
 
       // Keep the old policy visible through its shutdown hooks, then commit the
       // target workspace policy before target services or extensions are loaded.
+      reportRuntimeInitializationStage(observeStage, "dispose-current");
       await this.sessionBindings.disposeRuntime();
       this.agentDir = nextAgentDir;
       this.toolSafety.initialize(options.cwd, options.trust, options.approvalMode);
       this.workspaceServices?.setProjectTrusted(options.trust === "trusted");
+      reportRuntimeInitializationStage(observeStage, "create-session");
       await this.sessionBindings.createInitial(options.cwd, sessionManager);
+      reportRuntimeInitializationStage(observeStage, "reload-configuration");
       await this.configurationReload.apply();
+      reportRuntimeInitializationStage(observeStage, "update-catalog");
       await this.sessionCatalog.upsertCurrent("session-updated");
+      reportRuntimeInitializationStage(observeStage, "project-snapshot");
       return this.getSnapshot();
     });
   }
@@ -448,7 +453,6 @@ export class PiSdkRuntime implements AgentRuntime {
   private emit(event: AgentEvent): void {
     this.listeners.forEach((listener) => listener(event));
   }
-
   private emitOperationActivity(activity: RuntimeOperationActivity): void {
     this.activityListeners.forEach((listener) => listener(activity));
   }
