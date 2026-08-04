@@ -13,19 +13,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  change-scope:
+    name: Change scope
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_quality: ${{ steps.scope.outputs.run_quality }}
+      run_windows: ${{ steps.scope.outputs.run_windows }}
+      run_macos: ${{ steps.scope.outputs.run_macos }}
+      full_validation: ${{ steps.scope.outputs.full_validation }}
+      scope_reason: ${{ steps.scope.outputs.scope_reason }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Classify affected validation scope
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: >-
+          node eng/ci/classify-change-scope.mjs
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --github-output "$GITHUB_OUTPUT"
+
   quality-and-renderer:
-    name: Fast checks / ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            os: windows-2025
-            expectedArch: x64
-          - name: macOS arm64
-            os: macos-15
-            expectedArch: arm64
-    runs-on: ${{ matrix.os }}
+    name: Quality and renderer / macOS arm64
+    needs: change-scope
+    if: needs.change-scope.outputs.run_quality == 'true'
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -39,7 +57,7 @@ jobs:
           cache: pnpm
       - name: Verify runner architecture
         shell: bash
-        run: node -e "if (process.arch !== '${{ matrix.expectedArch }}') throw new Error('Expected ${{ matrix.expectedArch }}, got ' + process.arch)"
+        run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
       - name: Quality gates
@@ -51,26 +69,18 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: fast-check-failure-evidence-${{ matrix.expectedArch }}
+          name: quality-renderer-failure-evidence-arm64
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 7
 
-  native-smoke:
-    name: Native smoke / ${{ matrix.name }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            os: windows-2025
-            expectedArch: x64
-          - name: macOS arm64
-            os: macos-15
-            expectedArch: arm64
-    runs-on: ${{ matrix.os }}
+  native-windows:
+    name: Native smoke / Windows x64
+    needs: change-scope
+    if: needs.change-scope.outputs.run_windows == 'true'
+    runs-on: windows-2025
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
@@ -84,35 +94,51 @@ jobs:
           cache: pnpm
       - name: Verify runner architecture
         shell: bash
-        run: node -e "if (process.arch !== '${{ matrix.expectedArch }}') throw new Error('Expected ${{ matrix.expectedArch }}, got ' + process.arch)"
+        run: node -e "if (process.arch !== 'x64') throw new Error('Expected x64, got ' + process.arch)"
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
+      - name: Restore prepared runtime resources
+        uses: actions/cache@v4
+        with:
+          path: |
+            artifacts/toolchain/cache
+            artifacts/toolchain/current
+            artifacts/capabilities/sources
+            artifacts/capabilities/generated
+            artifacts/capabilities/current
+          key: pi67-runtime-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('eng/packaging/toolchain.lock.json', 'eng/packaging/prepare-toolchain.mjs', 'eng/capabilities/capability-sources.lock.json', 'eng/capabilities/bundled-skill-suites.json', 'eng/capabilities/*.mjs') }}
       - name: Build apps and prepare runtime resources
         run: |
           corepack pnpm run build
-          corepack pnpm run prepare:toolchain
-          corepack pnpm run prepare:capabilities
+          corepack pnpm run prepare:runtime-resources
       - name: Native Electron E2E
         run: corepack pnpm exec playwright test --project=electron --workers=1
-      - name: Build unsigned native smoke package
-        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs
+      - name: Build fast unsigned Windows smoke package
+        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
         run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts
-        if: runner.os == 'Windows'
         run: corepack pnpm run package:smoke:windows-ui
       - name: Verify Windows NSIS installer lifecycle
-        if: runner.os == 'Windows'
         run: corepack pnpm run package:smoke:windows-installer
       - uses: actions/upload-artifact@v7
-        if: always() && runner.os == 'Windows'
+        if: failure()
+        with:
+          name: windows-installer-debug-candidate-${{ github.run_id }}
+          path: |
+            artifacts/release/Pi-67-Desktop-*-win-x64.exe
+            artifacts/release/win-unpacked/Pi-67 Desktop.exe
+          if-no-files-found: warn
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: windows-packaged-ui-x64
           path: artifacts/validation/windows-packaged-ui/
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/upload-artifact@v7
-        if: always() && runner.os == 'Windows'
+        if: always()
         with:
           name: windows-installer-lifecycle-x64
           path: artifacts/validation/windows-installer-lifecycle/
@@ -121,9 +147,84 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: native-smoke-failure-evidence-${{ matrix.expectedArch }}
+          name: native-smoke-failure-evidence-x64
           path: |
             playwright-report/
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  native-macos:
+    name: Native smoke / macOS arm64
+    needs: change-scope
+    if: needs.change-scope.outputs.run_macos == 'true'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify runner architecture
+        shell: bash
+        run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Restore prepared runtime resources
+        uses: actions/cache@v4
+        with:
+          path: |
+            artifacts/toolchain/cache
+            artifacts/toolchain/current
+            artifacts/capabilities/sources
+            artifacts/capabilities/generated
+            artifacts/capabilities/current
+          key: pi67-runtime-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('eng/packaging/toolchain.lock.json', 'eng/packaging/prepare-toolchain.mjs', 'eng/capabilities/capability-sources.lock.json', 'eng/capabilities/bundled-skill-suites.json', 'eng/capabilities/*.mjs') }}
+      - name: Build apps and prepare runtime resources
+        run: |
+          corepack pnpm run build
+          corepack pnpm run prepare:runtime-resources
+      - name: Native Electron E2E
+        run: corepack pnpm exec playwright test --project=electron --workers=1
+      - name: Build unsigned macOS smoke package
+        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
+      - name: Smoke packaged Electron runtime
+        run: corepack pnpm run package:smoke
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: native-smoke-failure-evidence-arm64
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs: [change-scope, quality-and-renderer, native-windows, native-macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify selected validation jobs
+        env:
+          SCOPE_RESULT: ${{ needs.change-scope.result }}
+          RUN_QUALITY: ${{ needs.change-scope.outputs.run_quality }}
+          QUALITY_RESULT: ${{ needs.quality-and-renderer.result }}
+          RUN_WINDOWS: ${{ needs.change-scope.outputs.run_windows }}
+          WINDOWS_RESULT: ${{ needs.native-windows.result }}
+          RUN_MACOS: ${{ needs.change-scope.outputs.run_macos }}
+          MACOS_RESULT: ${{ needs.native-macos.result }}
+        run: >-
+          node eng/ci/verify-ci-gate.mjs
+          "$SCOPE_RESULT"
+          "$RUN_QUALITY" "$QUALITY_RESULT"
+          "$RUN_WINDOWS" "$WINDOWS_RESULT"
+          "$RUN_MACOS" "$MACOS_RESULT"

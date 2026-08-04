@@ -5,6 +5,7 @@ import {
   compileBundledSkillSuites,
   parseSkillMetadata
 } from "./bundled-skill-suites.mjs";
+import { assertCapabilitiesMetadata } from "./prepared-capabilities-validation.mjs";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -62,6 +63,36 @@ describe("Desktop first-party capability source lock", () => {
       manifestSha256: "invalid",
       bundleSha256: "2".repeat(64)
     })).toThrow(/source is invalid/u);
+  });
+
+  it("rejects prepared capability metadata that drifts from locked sources", async () => {
+    const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+    const generatedFrom = lock.sources.map((source) => ({ ...source }));
+    const entries = lock.sources.map((source) => ({
+      ...source,
+      packagePath: `packages/${source.id}`
+    }));
+    const packages = lock.sources.map((source) => ({
+      id: source.id,
+      treeSha256: "a".repeat(64)
+    }));
+    const catalog = {
+      schema: "pi67.capability-catalog.v1",
+      catalogVersion: lock.catalogVersion,
+      generatedFrom,
+      entries
+    };
+    const manifest = {
+      schema: "pi67.desktop-capabilities.v1",
+      catalogVersion: lock.catalogVersion,
+      packages
+    };
+
+    expect(() => assertCapabilitiesMetadata(lock, catalog, manifest)).not.toThrow();
+    expect(() => assertCapabilitiesMetadata(lock, {
+      ...catalog,
+      entries: entries.map((entry, index) => index === 0 ? { ...entry, commit: "0".repeat(40) } : entry)
+    }, manifest)).toThrow(/metadata is stale/u);
   });
 
   it("declares five explicit suites covering all 65 bundled Skill identities", async () => {

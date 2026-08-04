@@ -1,0 +1,83 @@
+name: Windows installer debug
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Failed CI run containing the Windows installer debug candidate
+        required: true
+        type: string
+      source_sha:
+        description: Exact 40-character source SHA used to build the candidate
+        required: true
+        type: string
+      verifier_ref:
+        description: Ref containing verifier-only changes descended from source_sha
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: windows-installer-debug-${{ inputs.source_run_id }}-${{ inputs.verifier_ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-installer:
+    name: Windows installer lifecycle only
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.verifier_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify source run and verifier-only diff
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $metadata = Join-Path $env:RUNNER_TEMP 'source-run.json'
+          gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID" > $metadata
+          $headSha = git rev-parse HEAD
+          node eng/ci/verify-windows-installer-debug-scope.mjs `
+            --base $env:SOURCE_SHA `
+            --head $headSha `
+            --run-metadata $metadata
+      - name: Install frozen dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Download source Windows installer candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-installer-debug-candidate-${{ inputs.source_run_id }}
+          path: artifacts/release
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+      - name: Verify installer helper tests
+        run: >-
+          corepack pnpm exec vitest run
+          eng/packaging/controlled-shutdown-fixture.test.mjs
+          eng/packaging/verify-windows-installer-lifecycle.test.mjs
+      - name: Verify Windows NSIS installer lifecycle
+        run: corepack pnpm run package:smoke:windows-installer
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-installer-debug-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 14

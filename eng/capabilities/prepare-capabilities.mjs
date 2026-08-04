@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
   mkdir,
@@ -12,10 +11,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
 import { resolveBundledGitToolchain, resolveExactCapabilitySource } from "./capability-source-resolver.mjs";
-import {
-  assertPi67SkillPackSource,
-  preparePi67SkillPackOverlay
-} from "./pi67-skill-pack-overlay.mjs";
+import { assertCapabilitySourceLock, treeSha256 } from "./prepared-capabilities-validation.mjs";
+import { preparePi67SkillPackOverlay } from "./pi67-skill-pack-overlay.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -39,7 +36,7 @@ const COMMERCE_SKILLS = new Set([
 export async function prepareDesktopCapabilities() {
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   const skillSuiteDefinition = JSON.parse(await readFile(skillSuitesPath, "utf8"));
-  assertLock(lock);
+  assertCapabilitySourceLock(lock);
   const git = await resolveBundledGitToolchain(toolchainManifestPath);
   await rm(outputRoot, { recursive: true, force: true });
   await mkdir(join(outputRoot, "packages"), { recursive: true });
@@ -360,73 +357,6 @@ async function copyEntry(source, destination, sourceRoot) {
 
 async function writePackageManifest(destination, manifest) {
   await writeFile(join(destination, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-}
-
-async function treeSha256(root) {
-  const hash = createHash("sha256");
-  const visit = async (directory) => {
-    const entries = (await readdir(directory, { withFileTypes: true }))
-      .sort((left, right) => left.name.localeCompare(right.name));
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const relativePath = relative(root, path).split(sep).join("/");
-      if (entry.isDirectory()) {
-        await visit(path);
-      } else if (entry.isFile()) {
-        hash.update(`f\0${relativePath}\0`);
-        hash.update(await readFile(path));
-        hash.update("\0");
-      } else {
-        throw new Error(`Unsupported generated capability entry: ${path}`);
-      }
-    }
-  };
-  await visit(root);
-  return hash.digest("hex");
-}
-
-function assertLock(lock) {
-  if (
-    lock.schema !== "pi67.capability-sources-lock.v1"
-    || !Array.isArray(lock.sources)
-    || !Array.isArray(lock.skillPacks)
-  ) {
-    throw new Error("Capability source lock is invalid.");
-  }
-  const ids = lock.sources.map((source) => source.id);
-  if (new Set(ids).size !== ids.length || ids.length !== 4) throw new Error("Capability source ids are invalid.");
-  for (const source of lock.sources) {
-    if (!/^[0-9a-f]{40}$/u.test(source.commit) || !source.repository.startsWith("https://github.com/")) {
-      throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
-    }
-    assertLocalSibling(source.localSibling, "capability local sibling");
-  }
-  const packNames = lock.skillPacks.map((pack) => pack?.name);
-  if (new Set(packNames).size !== packNames.length || packNames.length !== 1) {
-    throw new Error("Bundled Skill Pack source ids are invalid.");
-  }
-  for (const pack of lock.skillPacks) {
-    assertPi67SkillPackSource(pack);
-    assertLocalSibling(pack.localSibling, "Skill Pack local sibling");
-  }
-}
-
-function assertLocalSibling(path, label) {
-  if (
-    typeof path !== "string"
-    || path.length === 0
-    || path.includes("\0")
-    || isAbsolute(path)
-  ) throw new Error(`${label} must identify one direct sibling repository.`);
-  const normalized = path.replaceAll("\\", "/");
-  const parts = normalized.split("/");
-  const candidate = resolve(repositoryRoot, path);
-  if (
-    parts.length !== 2
-    || parts[0] !== ".."
-    || !/^[A-Za-z0-9._-]+$/u.test(parts[1] ?? "")
-    || resolve(dirname(candidate)) !== resolve(dirname(repositoryRoot))
-  ) throw new Error(`${label} must identify one direct sibling repository.`);
 }
 
 function assertRelativePath(path, label) {

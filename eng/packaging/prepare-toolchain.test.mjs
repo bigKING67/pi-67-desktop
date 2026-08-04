@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { materializeWindowsGitHttpHelpers } from "./prepare-toolchain.mjs";
+import {
+  assertToolchainManifest,
+  materializeWindowsGitHttpHelpers
+} from "./prepare-toolchain.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const temporaryDirectories = [];
@@ -43,5 +46,33 @@ describe("Desktop private toolchain lock", () => {
 
     await expect(readFile(join(execRoot, "git-remote-http.exe"), "utf8")).resolves.toBe("existing-http");
     await expect(readFile(join(execRoot, "git-remote-https.exe"), "utf8")).resolves.toBe("https-from-bin");
+  });
+
+  it("rejects prepared toolchains that drift from the platform lock", async () => {
+    const lock = JSON.parse(await readFile(resolve(repositoryRoot, "eng/packaging/toolchain.lock.json"), "utf8"));
+    const nodeArtifact = lock.node.artifacts["darwin-arm64"];
+    const gitArtifact = lock.git.artifacts["darwin-arm64"];
+    const manifest = {
+      schema: "pi67.desktop-toolchain.v1",
+      platform: "darwin",
+      architecture: "arm64",
+      versions: {
+        node: lock.node.version,
+        npm: lock.npm.version,
+        git: gitArtifact.reportedVersion,
+        gitBundle: lock.git.bundleVersion
+      },
+      archives: {
+        node: { fileName: nodeArtifact.fileName, sha256: nodeArtifact.sha256 },
+        npm: { fileName: lock.npm.fileName, sha256: lock.npm.sha256 },
+        git: { fileName: gitArtifact.fileName, sha256: gitArtifact.sha256 }
+      }
+    };
+
+    expect(() => assertToolchainManifest(manifest, lock, "darwin", "arm64")).not.toThrow();
+    expect(() => assertToolchainManifest({
+      ...manifest,
+      archives: { ...manifest.archives, node: { ...manifest.archives.node, sha256: "0".repeat(64) } }
+    }, lock, "darwin", "arm64")).toThrow(/does not match darwin-arm64/u);
   });
 });

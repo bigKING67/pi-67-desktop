@@ -26,46 +26,48 @@ describe("release performance workflow gates", () => {
     );
   });
 
-  it("runs platform checks and renderer E2E in parallel with native smoke", async () => {
+  it("scopes push validation while preserving native platform evidence", async () => {
     const source = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+    const scopeStart = source.indexOf("  change-scope:");
     const fastStart = source.indexOf("  quality-and-renderer:");
-    const nativeStart = source.indexOf("  native-smoke:");
-    const fastSource = source.slice(fastStart, nativeStart);
-    const nativeSource = source.slice(nativeStart);
+    const windowsStart = source.indexOf("  native-windows:");
+    const macosStart = source.indexOf("  native-macos:");
+    const gateStart = source.indexOf("  ci-gate:");
+    const fastSource = source.slice(fastStart, windowsStart);
+    const windowsSource = source.slice(windowsStart, macosStart);
+    const macosSource = source.slice(macosStart, gateStart);
 
     expect(source).not.toContain("performance:measure");
     expect(source).not.toContain("PI67_PERF_SAMPLES");
     expect(source).toContain("group: ci-${{ github.workflow }}-${{ github.ref }}");
     expect(source).toContain("cancel-in-progress: true");
-    expect(fastStart).toBeGreaterThan(-1);
-    expect(nativeStart).toBeGreaterThan(fastStart);
-    expect(fastSource).toContain("    strategy:\n      fail-fast: false\n      matrix:\n");
-    expect(fastSource).toContain("os: windows-2025");
-    expect(fastSource).toContain("os: macos-15");
+    expect(scopeStart).toBeGreaterThan(-1);
+    expect(fastStart).toBeGreaterThan(scopeStart);
+    expect(windowsStart).toBeGreaterThan(fastStart);
+    expect(macosStart).toBeGreaterThan(windowsStart);
+    expect(gateStart).toBeGreaterThan(macosStart);
+    expect(source).toContain("node eng/ci/classify-change-scope.mjs");
+    expect(fastSource).toContain("runs-on: macos-15");
+    expect(fastSource).not.toContain("windows-2025");
     expect(fastSource).toContain("run: corepack pnpm run check");
     expect(fastSource).toContain(
       "run: corepack pnpm exec playwright test --project=renderer-chromium --workers=2"
     );
-    expect(nativeSource).toContain("os: windows-2025");
-    expect(nativeSource).toContain("os: macos-15");
-    expect(nativeSource).toContain("    strategy:\n      fail-fast: false\n      matrix:\n");
-    expect(nativeSource).not.toContain("run: corepack pnpm run check");
-    expect(nativeSource).toContain("corepack pnpm run build");
-    expect(nativeSource).toContain("corepack pnpm run prepare:toolchain");
-    expect(nativeSource).toContain("corepack pnpm run prepare:capabilities");
-    expect(nativeSource).toContain(
+    expect(windowsSource).toContain("runs-on: windows-2025");
+    expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");
+    expect(windowsSource).not.toContain("run: corepack pnpm run check");
+    expect(windowsSource).toContain("corepack pnpm run prepare:runtime-resources");
+    expect(windowsSource).toContain(
       "run: corepack pnpm exec playwright test --project=electron --workers=1"
     );
-    expect(nativeSource).toContain("run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs");
-    expect(nativeSource).toContain("run: corepack pnpm run package:smoke");
-    expect(nativeSource).toContain("run: corepack pnpm run package:smoke:windows-ui");
-    expect(nativeSource).toContain("run: corepack pnpm run package:smoke:windows-installer");
-    expect(nativeSource.indexOf("corepack pnpm run build"))
-      .toBeLessThan(nativeSource.indexOf("corepack pnpm run prepare:toolchain"));
-    expect(nativeSource.indexOf("corepack pnpm run prepare:toolchain"))
-      .toBeLessThan(nativeSource.indexOf("corepack pnpm run prepare:capabilities"));
-    expect(nativeSource.indexOf("corepack pnpm run prepare:capabilities"))
-      .toBeLessThan(nativeSource.indexOf("corepack pnpm exec playwright test --project=electron"));
+    expect(windowsSource).toContain("--prepared-resources --ci-fast");
+    expect(windowsSource).toContain("run: corepack pnpm run package:smoke:windows-ui");
+    expect(windowsSource).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(macosSource).toContain("runs-on: macos-15");
+    expect(macosSource).toContain("needs.change-scope.outputs.run_macos == 'true'");
+    expect(macosSource).toContain("package-native-unsigned.mjs --prepared-resources");
+    expect(source).toContain("name: CI Gate");
+    expect(source).toContain("node eng/ci/verify-ci-gate.mjs");
   });
 
   it("keeps unsigned previews fast without dropping packaged release gates", async () => {

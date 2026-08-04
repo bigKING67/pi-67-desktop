@@ -102,6 +102,53 @@ export async function prepareDesktopToolchain(platform = process.platform, archi
   return manifest;
 }
 
+export async function assertPreparedDesktopToolchain(
+  platform = process.platform,
+  architecture = process.arch
+) {
+  const target = `${platform}-${architecture}`;
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  const manifest = JSON.parse(await readFile(join(stagingRoot, "manifest.json"), "utf8"));
+  assertToolchainManifest(manifest, lock, platform, architecture);
+  const paths = toolPaths(stagingRoot, platform);
+  await Promise.all([
+    access(paths.node),
+    access(paths.npmCli),
+    access(paths.git),
+    access(paths.gitExecPath),
+    access(paths.gitRemoteHttps)
+  ]);
+  const nodeVersion = (await capture(paths.node, ["--version"])).replace(/^v/u, "");
+  const npmVersion = await capture(paths.node, [paths.npmCli, "--version"]);
+  const gitVersion = (await capture(paths.git, ["--version"])).replace(/^git version\s+/u, "");
+  assertVersion("Node", nodeVersion, lock.node.version);
+  assertVersion("npm", npmVersion, lock.npm.version);
+  assertVersion("Git", gitVersion, requiredReportedVersion(requiredArtifact(lock.git.artifacts, target, "Git"), "Git"));
+  return manifest;
+}
+
+export function assertToolchainManifest(manifest, lock, platform, architecture) {
+  const target = `${platform}-${architecture}`;
+  const nodeArtifact = requiredArtifact(lock.node.artifacts, target, "Node");
+  const gitArtifact = requiredArtifact(lock.git.artifacts, target, "Git");
+  if (
+    lock.schema !== "pi67.desktop-toolchain-lock.v1"
+    || manifest?.schema !== "pi67.desktop-toolchain.v1"
+    || manifest.platform !== platform
+    || manifest.architecture !== architecture
+    || manifest.versions?.node !== lock.node.version
+    || manifest.versions?.npm !== lock.npm.version
+    || manifest.versions?.git !== requiredReportedVersion(gitArtifact, "Git")
+    || manifest.versions?.gitBundle !== lock.git.bundleVersion
+    || manifest.archives?.node?.fileName !== nodeArtifact.fileName
+    || manifest.archives?.node?.sha256 !== nodeArtifact.sha256
+    || manifest.archives?.npm?.fileName !== lock.npm.fileName
+    || manifest.archives?.npm?.sha256 !== lock.npm.sha256
+    || manifest.archives?.git?.fileName !== gitArtifact.fileName
+    || manifest.archives?.git?.sha256 !== gitArtifact.sha256
+  ) throw new Error(`Prepared desktop toolchain does not match ${target}.`);
+}
+
 export async function materializeWindowsGitHttpHelpers(gitRoot) {
   const binaryRoot = join(gitRoot, "mingw64", "bin");
   const execRoot = join(gitRoot, "mingw64", "libexec", "git-core");
