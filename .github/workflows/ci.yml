@@ -98,7 +98,7 @@ jobs:
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
       - name: Restore prepared runtime resources
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             artifacts/toolchain/cache
@@ -176,7 +176,7 @@ jobs:
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
       - name: Restore prepared runtime resources
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             artifacts/toolchain/cache
