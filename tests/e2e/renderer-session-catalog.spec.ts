@@ -58,7 +58,9 @@ test("uses a bounded first page, server search payload, and the bound next curso
 
   await expect(sessionButton(page, "Catalog 01")).toBeVisible();
   await expect(page.getByRole("button", { name: "显示更多" })).toBeVisible();
-  const [firstPage] = await sessionCatalogRequests(page);
+  const initialRequests = await sessionCatalogRequests(page);
+  expect(initialRequests).toHaveLength(1);
+  const [firstPage] = initialRequests;
   expect(firstPage?.payload).toEqual({ scope: "workspace", limit: 50, refresh: true });
 
   await clearSessionCatalogRequests(page);

@@ -54,7 +54,7 @@ test("gives the first on-demand Pi runtime connection one initialization owner",
   await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "开始一个新会话" })).toBeVisible();
-  await expect(page.getByText("等待选择工作区", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "在 pi-demo 新建会话" })).toBeDisabled();
 
   await attachMockAgent(page);
 
@@ -64,6 +64,7 @@ test("gives the first on-demand Pi runtime connection one initialization owner",
   await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
     command === "workspace.open"
   ))).toHaveLength(1);
+  await expect(page.getByRole("button", { name: "在 pi-demo 新建会话" })).toBeEnabled();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
 });
 

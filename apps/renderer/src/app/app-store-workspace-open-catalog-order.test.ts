@@ -34,6 +34,7 @@ describe("Workspace open Catalog ordering", () => {
 
   it("opens the initial Runtime Session before publishing the first Catalog result", async () => {
     const requestOrder: string[] = [];
+    const registration = deferred<void>();
     let initialRuntimeOpened = false;
     const initialSnapshot = snapshot();
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
@@ -43,7 +44,10 @@ describe("Workspace open Catalog ordering", () => {
       options
     ) => {
       requestOrder.push(type);
-      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "workspace.register") {
+        await registration.promise;
+        return { registered: true } as never;
+      }
       if (type === "workspace.open") {
         initialRuntimeOpened = true;
         const context = options?.context;
@@ -87,7 +91,17 @@ describe("Workspace open Catalog ordering", () => {
       throw new Error(`Unexpected request: ${type}`);
     });
 
-    await openRendererWorkspace();
+    const opening = openRendererWorkspace();
+    await vi.waitFor(() => expect(requestOrder).toEqual(["workspace.register"]));
+    expect(useAppStore.getState()).toMatchObject({
+      workspace: initialSnapshot.cwd,
+      sessionTransitionPending: true,
+      runtime: { phase: "starting", detail: "正在加载 Pi SDK" }
+    });
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
+
+    registration.resolve();
+    await opening;
 
     expect(useAppStore.getState()).toMatchObject({
       workspace: initialSnapshot.cwd,
@@ -243,4 +257,15 @@ function connectionIdentity() {
 
 function emptyChanges(sessionId: string): WorkspaceChangesProjection {
   return { sessionId, items: [], truncated: false, total: 0 };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }

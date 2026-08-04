@@ -297,7 +297,7 @@ describe("App Store workspace open authority", () => {
         detail: "无法打开会话：Workspace registration failed"
       }
     });
-    expectFailedWorkbenchTask("无法打开会话：Workspace registration failed");
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
       title: "无法打开会话",

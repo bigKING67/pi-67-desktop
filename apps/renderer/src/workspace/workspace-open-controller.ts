@@ -39,7 +39,6 @@ export async function openRendererWorkspace(): Promise<void> {
   if (!selected) return;
   rendererWorkbenchStore.getState().registerWorkspace(selected);
   rendererWorkbenchStore.getState().selectWorkspace(selected.id);
-  await registerRendererWorkspaceWithHost(selected, { queryCatalog: false });
   await openRendererWorkspaceDescriptor(selected);
 }
 
@@ -61,7 +60,6 @@ export async function openRendererWorkspaceDescriptor(
   const set: StoreSet = useAppStore.setState;
   if (get().sessionTransitionPending) return false;
   rendererWorkbenchStore.getState().selectWorkspace(descriptor.id);
-  const task = ensureWorkspaceRuntimeTask(descriptor, sessionPath);
   const workspace = descriptor.identity.canonicalPath;
   invalidateProjectionRecoveryGeneration();
   invalidateWorkspaceTrustRequests();
@@ -75,10 +73,12 @@ export async function openRendererWorkspaceDescriptor(
     approvalMode: DEFAULT_APPROVAL_MODE,
     runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
   });
+  let task: RendererWorkbenchTask | undefined;
   let target: RendererSessionTransitionTarget | undefined;
   try {
     await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
     await ensureAgentConnection();
+    task = ensureWorkspaceRuntimeTask(descriptor, sessionPath);
     const transitionTarget = requireRendererSessionTransition(get());
     target = transitionTarget;
     const acknowledgement = sessionPath
@@ -134,7 +134,7 @@ export async function openRendererWorkspaceDescriptor(
       }
       if (disposition === "stale") return false;
     }
-    const missingSession = Boolean(sessionPath) && isMissingSessionError(error);
+    const missingSession = task !== undefined && Boolean(sessionPath) && isMissingSessionError(error);
     const detail = missingSession ? "对话记录已不存在" : errorMessage(error);
     const failureTitle = sessionPath ? "无法打开会话" : "无法打开工作区";
     const runtime = {
@@ -146,7 +146,7 @@ export async function openRendererWorkspaceDescriptor(
       sessionTransitionPending: false,
       runtime
     });
-    if (missingSession) {
+    if (missingSession && task) {
       const workbench = rendererWorkbenchStore.getState();
       workbench.removeRuntimeTask(task.id);
       workbench.selectWorkspace(descriptor.id);
@@ -156,7 +156,7 @@ export async function openRendererWorkspaceDescriptor(
         message: "该对话可能已被移动或删除，请从左侧选择其他对话。"
       });
     } else {
-      rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
+      if (task) rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
       publishNotification({ level: "error", title: failureTitle, message: detail });
     }
     return false;

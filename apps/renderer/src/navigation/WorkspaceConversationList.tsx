@@ -347,7 +347,8 @@ function WorkspaceMenu({
 async function createConversationInWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
   if (useAppStore.getState().sessionTransitionPending) return;
   if (useAppStore.getState().workspace !== workspace.identity.canonicalPath) {
-    await openRendererWorkspaceDescriptor(workspace);
+    const opened = await openRendererWorkspaceDescriptor(workspace);
+    if (!opened) return;
   } else {
     rendererWorkbenchStore.getState().selectWorkspace(workspace.id);
   }

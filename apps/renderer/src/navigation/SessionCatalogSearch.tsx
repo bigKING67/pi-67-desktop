@@ -8,6 +8,7 @@ import {
 } from "react-aria-components";
 import { messages } from "../localization/message-catalog.js";
 import { queryWorkspaceSessionCatalogs } from "./session-catalog-controller.js";
+import { useSessionCatalogStore } from "./session-catalog-store.js";
 import styles from "./NavigationRail.module.css";
 
 export function useSessionCatalogSearch(
@@ -17,15 +18,18 @@ export function useSessionCatalogSearch(
 ) {
   const [query, setQuery] = useState("");
   const workspaceIds = query ? searchableWorkspaceIds : expandedWorkspaceIds;
+  const hasFilteredCatalog = useSessionCatalogStore((state) => workspaceIds.some((workspaceId) => (
+    Boolean(state.byWorkspace[workspaceId]?.query)
+  )));
+  const requestQuery = query ? query : hasFilteredCatalog ? "" : undefined;
 
   useEffect(() => {
-    if (!connected || workspaceIds.length === 0) return;
-    const timer = window.setTimeout(
-      () => void queryWorkspaceSessionCatalogs(workspaceIds, { query }),
-      180
-    );
+    if (!connected || workspaceIds.length === 0 || requestQuery === undefined) return;
+    const timer = window.setTimeout(() => {
+      void queryWorkspaceSessionCatalogs(workspaceIds, { query: requestQuery });
+    }, 180);
     return () => window.clearTimeout(timer);
-  }, [connected, query, workspaceIds]);
+  }, [connected, requestQuery, workspaceIds]);
 
   return { query, setQuery };
 }
