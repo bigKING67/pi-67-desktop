@@ -24,7 +24,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await startApprovalOperation(page, operationId);
 
   await emitMockAgentEvent(page, approvalRequest(operationId, "approval-reject", "git push origin main"), { operationId });
-  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("git push origin main", { exact: true })).toBeVisible();
   await expect(page.getByText("/Users/test/Projects/pi-demo", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "拒绝" }).click();

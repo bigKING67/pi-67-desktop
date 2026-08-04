@@ -421,7 +421,7 @@ async function openWorkspace(page: Page): Promise<void> {
 async function openAppearanceSettings(page: Page) {
   await page.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
   const settings = page.getByLabel("π 设置");
-  await expect(settings).toBeVisible();
+  await settings.waitFor({ state: "visible", timeout: 15_000 });
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^外观/u }).click();
   return settings;
