@@ -11,6 +11,7 @@ import { activateRendererTask } from "../workbench/task-activation-controller.js
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { useSessionProjectionStore } from "./session-projection-store.js";
+import { ensureRendererSessionCreationAuthority } from "./session-creation-authority.js";
 import {
   createRendererSession,
   openRendererSession,
@@ -26,9 +27,14 @@ vi.mock("../workbench/task-activation-controller.js", () => ({
   activateRendererTask: vi.fn().mockResolvedValue(true)
 }));
 
+vi.mock("./session-creation-authority.js", () => ({
+  ensureRendererSessionCreationAuthority: vi.fn()
+}));
+
 const runBootstrap = vi.mocked(runSessionBootstrapTransition);
 const runIncremental = vi.mocked(runIncrementalSessionTransition);
 const activateTask = vi.mocked(activateRendererTask);
+const ensureCreationAuthority = vi.mocked(ensureRendererSessionCreationAuthority);
 
 describe("session lifecycle controller", () => {
   beforeEach(() => {
@@ -36,13 +42,20 @@ describe("session lifecycle controller", () => {
     runBootstrap.mockReset().mockResolvedValue(true);
     runIncremental.mockReset().mockResolvedValue(undefined);
     activateTask.mockReset().mockResolvedValue(true);
+    ensureCreationAuthority.mockReset().mockResolvedValue(undefined);
     rendererWorkbenchStore.getState().reset();
     useTaskDraftStore.getState().dispose();
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     useAppStore.setState(useAppStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace(workspace());
-    useAppStore.setState({ workspace: "/work/a", trust: "trusted" });
+    useAppStore.setState({
+      workspace: "/work/a",
+      trust: "trusted",
+      connected: true,
+      hostEpoch: 7,
+      connectionIdentity: connectionIdentity(7)
+    });
   });
 
   it("opens a provisional Task before requesting a new Pi Session", async () => {
@@ -155,6 +168,58 @@ describe("session lifecycle controller", () => {
     });
   });
 
+  it("waits for matching Renderer connection authority before opening a provisional Task", async () => {
+    useAppStore.setState({ connected: false, hostEpoch: undefined, connectionIdentity: undefined });
+
+    let releaseAuthority!: () => void;
+    ensureCreationAuthority.mockReturnValueOnce(new Promise<void>((resolve) => {
+      releaseAuthority = resolve;
+    }));
+    const creation = createRendererSession();
+    await vi.waitFor(() => expect(ensureCreationAuthority).toHaveBeenCalledOnce());
+    expect(runBootstrap).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks).toEqual({});
+
+    releaseAuthority();
+    await creation;
+
+    expect(runBootstrap).toHaveBeenCalledOnce();
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toHaveLength(1);
+  });
+
+  it("coalesces repeated creation attempts while Renderer connection authority is pending", async () => {
+    useAppStore.setState({ connected: false, hostEpoch: undefined, connectionIdentity: undefined });
+
+    let releaseAuthority!: () => void;
+    const authority = new Promise<void>((resolve) => {
+      releaseAuthority = resolve;
+    });
+    ensureCreationAuthority.mockReturnValue(authority);
+    const first = createRendererSession();
+    const second = createRendererSession();
+    await vi.waitFor(() => expect(ensureCreationAuthority).toHaveBeenCalledTimes(2));
+    releaseAuthority();
+    await Promise.all([first, second]);
+
+    expect(runBootstrap).toHaveBeenCalledOnce();
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toHaveLength(1);
+  });
+
+  it("does not leave a provisional Task when Renderer connection establishment fails", async () => {
+    useAppStore.setState({ connected: false, hostEpoch: undefined, connectionIdentity: undefined });
+    ensureCreationAuthority.mockRejectedValueOnce(new Error("connection failed"));
+
+    await createRendererSession();
+
+    expect(runBootstrap).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks).toEqual({});
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "error",
+      title: "无法创建 Pi 会话",
+      message: "connection failed"
+    });
+  });
+
   it("selects an already-open Session Task instead of creating a duplicate", async () => {
     rendererWorkbenchStore.getState().openTask(task("task-existing", "/sessions/existing.jsonl"));
 
@@ -236,6 +301,16 @@ function workspace() {
     trust: "trusted" as const,
     trustProvenance: "native-picker" as const,
     availability: "available" as const
+  };
+}
+
+function connectionIdentity(hostEpoch: number) {
+  return {
+    appInstanceId: "app-1",
+    hostInstanceId: `host-${hostEpoch}`,
+    hostEpoch,
+    sdkVersion: "0.81.1",
+    eventSequence: 0
   };
 }
 

@@ -20,6 +20,7 @@ import { currentRendererSessionAuthority } from "./session-authority.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
+import { ensureRendererSessionCreationAuthority } from "./session-creation-authority.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -28,19 +29,24 @@ export async function createRendererSession(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
   if (!get().workspace || get().sessionTransitionPending) return;
-  const pendingCreation = Object.values(rendererWorkbenchStore.getState().tasks).find((candidate) => (
-    candidate.workspaceId === rendererWorkbenchStore.getState().currentWorkspaceId
-    && candidate.creationStatus !== undefined
-  ));
-  if (pendingCreation) {
-    rendererWorkbenchStore.getState().selectTask(pendingCreation.id);
-    publishNotification({
-      level: "warning",
-      title: messages.runtime.session.confirmingCreation,
-      message: messages.runtime.session.creationOutcomeUnknown
-    });
+  if (selectPendingSessionCreation()) return;
+  const workspace = get().workspace;
+  const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
+  if (!workspaceId) return;
+  try {
+    await ensureRendererSessionCreationAuthority();
+  } catch (error) {
+    if (get().workspace === workspace) {
+      reportSessionError(error, set, messages.runtime.session.createFailed);
+    }
     return;
   }
+  if (
+    get().workspace !== workspace
+    || get().sessionTransitionPending
+    || rendererWorkbenchStore.getState().currentWorkspaceId !== workspaceId
+    || selectPendingSessionCreation()
+  ) return;
   const task = beginPendingTask();
   if (!task) return;
   await runSessionBootstrapTransition(get, set, {
@@ -106,9 +112,23 @@ export async function createRendererSession(): Promise<void> {
   });
 }
 
-export async function openRendererSession(
-  path: string
-): Promise<void> {
+function selectPendingSessionCreation(): boolean {
+  const workbench = rendererWorkbenchStore.getState();
+  const pendingCreation = Object.values(workbench.tasks).find((candidate) => (
+    candidate.workspaceId === workbench.currentWorkspaceId
+    && candidate.creationStatus !== undefined
+  ));
+  if (!pendingCreation) return false;
+  workbench.selectTask(pendingCreation.id);
+  publishNotification({
+    level: "warning",
+    title: messages.runtime.session.confirmingCreation,
+    message: messages.runtime.session.creationOutcomeUnknown
+  });
+  return true;
+}
+
+export async function openRendererSession(path: string): Promise<void> {
   const existing = Object.values(rendererWorkbenchStore.getState().tasks).find((task) => task.sessionPath === path);
   if (existing) {
     await activateRendererTask(existing.id);
