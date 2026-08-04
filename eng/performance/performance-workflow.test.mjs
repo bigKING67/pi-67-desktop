@@ -52,7 +52,7 @@ describe("release performance workflow gates", () => {
     expect(fastSource).not.toContain("windows-2025");
     expect(fastSource).toContain("run: pnpm run check");
     expect(fastSource).toContain(
-      "run: pnpm exec playwright test --project=renderer-chromium --workers=2"
+      "run: pnpm exec playwright test --project=renderer-chromium --workers=3"
     );
     expect(windowsSource).toContain("runs-on: windows-2025");
     expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");

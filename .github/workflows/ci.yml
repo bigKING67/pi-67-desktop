@@ -87,7 +87,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --no-shell chromium
       - name: Renderer browser E2E
-        run: pnpm exec playwright test --project=renderer-chromium --workers=2
+        run: pnpm exec playwright test --project=renderer-chromium --workers=3
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
