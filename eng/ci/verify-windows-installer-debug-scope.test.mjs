@@ -99,12 +99,17 @@ describe("Windows installer debug artifact reuse", () => {
     ]);
 
     for (const workflow of workflows) {
+      const installStep = workflow.indexOf("- name: Install frozen dependencies");
+      const pnpmRuntimeStep = workflow.indexOf("- name: Verify pnpm execution runtime");
+
       expect(workflow).toContain("uses: pnpm/setup@v1");
       expect(workflow).toContain("runtime: node@24.18.0");
       expect(workflow).toContain("cache: false");
       expect(workflow).toContain("install: false");
       expect(workflow).toContain("pnpm exec node -e");
       expect(workflow).toContain('test "$(pnpm --version)" = "11.16.0"');
+      expect(installStep).toBeGreaterThan(-1);
+      expect(pnpmRuntimeStep).toBeGreaterThan(installStep);
       expect(workflow).not.toContain("pnpm/action-setup");
       expect(workflow).not.toContain("actions/setup-node");
       expect(workflow).not.toContain("corepack pnpm");

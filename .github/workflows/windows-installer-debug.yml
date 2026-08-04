@@ -59,7 +59,6 @@ jobs:
         shell: bash
         run: |
           node -e "if (process.platform !== 'win32' || process.arch !== 'x64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.platform + '/' + process.arch)"
-          pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
           test "$(pnpm --version)" = "11.16.0"
       - name: Verify source run and verifier-only diff
         shell: pwsh
@@ -82,6 +81,8 @@ jobs:
             --jobs-metadata $jobsMetadata
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify pnpm execution runtime
+        run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Build verifier workspace dependencies
         run: pnpm --filter @pi67/protocol... run build
       - name: Download source Windows installer candidate
