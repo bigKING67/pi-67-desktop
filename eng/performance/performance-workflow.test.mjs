@@ -57,6 +57,7 @@ describe("release performance workflow gates", () => {
     expect(qualitySource).not.toContain("playwright test");
     expect(rendererSource).toContain("runs-on: macos-15");
     expect(rendererSource).not.toContain("run: pnpm run check");
+    expect(rendererSource).toContain("run: pnpm --filter @pi67/protocol... run build");
     expect(rendererSource).toContain("pnpm exec playwright install --no-shell chromium");
     expect(rendererSource).toContain(
       "run: pnpm exec playwright test --project=renderer-chromium --workers=2 --retries=0"
