@@ -71,6 +71,7 @@ interface HostCommandDispatchContext {
   commitSessionWriter: (runtime: AgentRuntime) => Promise<void>;
   operations: () => OperationRegistry;
   completeInteractiveWait: (requestId: string) => void;
+  reuseInitializedSessionForCreate?: boolean;
   sendEvent: (event: AgentEvent) => void;
 }
 
@@ -139,8 +140,10 @@ export async function dispatchHostCommand(
       return runtime.readAsset(command.payload);
     }
     case "session.create": {
-      const snapshot = await runtime.createSession();
-      await context.commitSessionWriter(runtime);
+      const snapshot = context.reuseInitializedSessionForCreate
+        ? runtime.getSnapshot()
+        : await runtime.createSession();
+      if (!context.reuseInitializedSessionForCreate) await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-create" } });
       return context.captureProjectionMutationAcknowledgement(runtime);
     }

@@ -200,11 +200,10 @@ export class AgentHostServer {
   }
 
   private async dispatch(
-    command: AgentCommand,
-    state: TaskHostState,
-    submissionFingerprint?: string
+    command: AgentCommand, state: TaskHostState, submissionFingerprint?: string
   ): Promise<CommandResults[AgentCommandType]> {
     if (command.type === "task.close") return this.taskLifecycle.closeTask(state, command.payload.mode);
+    const initializedBeforeCommand = state.record.initialized;
     const runtime = await this.taskLifecycle.loadRuntimeForCommand(state, command);
     const admissionLease = consumesRunAdmission(command)
       ? this.tasks.reserveRun(state.record.taskKey)
@@ -238,6 +237,7 @@ export class AgentHostServer {
         ),
         operations: () => this.tasks.requireOperations(state),
         completeInteractiveWait: (requestId) => { state.operations?.completeInteractiveWait(requestId); },
+        reuseInitializedSessionForCreate: command.type === "session.create" && !initializedBeforeCommand && state.record.initialized,
         sendEvent: (event) => this.tasks.sendEvent(state, event)
       }, submissionFingerprint);
       if (admissionLease && isSettledSubmission(result)) this.tasks.releaseRun(admissionLease);

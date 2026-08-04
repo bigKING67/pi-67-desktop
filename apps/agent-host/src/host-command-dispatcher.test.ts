@@ -42,6 +42,37 @@ describe("operationSubmissionIdentity", () => {
     });
   });
 
+  it("uses a Task's freshly initialized Session as the requested new Session", async () => {
+    const snapshot = { sessionId: "session-initialized" } as never;
+    const acknowledgement = { accepted: true } as never;
+    const createSession = vi.fn();
+    const getSnapshot = vi.fn(() => snapshot);
+    const runtime = {
+      createSession,
+      getSnapshot
+    } as unknown as AgentRuntime;
+    const context = {
+      captureProjectionMutationAcknowledgement: vi.fn(() => acknowledgement),
+      commitSessionWriter: vi.fn().mockResolvedValue(undefined),
+      reuseInitializedSessionForCreate: true,
+      sendEvent: vi.fn()
+    };
+
+    await expect(dispatchHostCommand(
+      runtime,
+      { type: "session.create", payload: {} },
+      context as never
+    )).resolves.toBe(acknowledgement);
+
+    expect(createSession).not.toHaveBeenCalled();
+    expect(getSnapshot).toHaveBeenCalledOnce();
+    expect(context.commitSessionWriter).not.toHaveBeenCalled();
+    expect(context.sendEvent).toHaveBeenCalledWith({
+      type: "session.bootstrap",
+      payload: { snapshot, reason: "session-create" }
+    });
+  });
+
   it("forks from source Task authority and commits only the target writer", async () => {
     const snapshot = { sessionId: "session-target" } as never;
     const acknowledgement = { accepted: true } as never;

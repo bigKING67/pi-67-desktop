@@ -83,10 +83,10 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
       },
       expect.any(Function)
     );
-    expect(runtimeB.createSession).toHaveBeenCalledOnce();
+    expect(runtimeB.createSession).not.toHaveBeenCalled();
     expect(successResult(port, createSecond.requestId)).toMatchObject({
-      sessionId: "session-b-created",
-      sessionGeneration: 2
+      sessionId: "session-b",
+      sessionGeneration: 1
     });
     expect(port.sent.filter(isEventEnvelope)).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -95,7 +95,7 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
       }),
       expect.objectContaining({
         type: "session.bootstrap",
-        context: expect.objectContaining({ taskId: "task-second", sessionId: "session-b-created" })
+        context: expect.objectContaining({ taskId: "task-second", sessionId: "session-b" })
       })
     ]));
     await server.shutdown();
@@ -121,6 +121,7 @@ function taskRuntime(initialSessionId: string, createdSessionId: string) {
       subscribe: () => () => undefined,
       initialize,
       createSession,
+      getSnapshot: snapshot,
       getIdentity: () => ({ sessionId, sessionGeneration }),
       getTaskToolMode: () => "auto" as const,
       cancelInteractiveRequests: () => [],
