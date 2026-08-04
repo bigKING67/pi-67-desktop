@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   INSTALLED_SHUTDOWN_BUDGET_MS,
-  measureInstalledApplicationShutdown
+  measureInstalledApplicationShutdown,
+  waitForRealUserCreatedSession
 } from "./windows-installed-application-lifecycle.mjs";
 import {
   shouldCreateInitialRealUserSession,
@@ -10,6 +11,50 @@ import {
 } from "./windows-real-user-lifecycle.mjs";
 
 describe("Windows installed real-user lifecycle", () => {
+  it("polls Session materialization without a blocking active-row locator", async () => {
+    vi.useFakeTimers();
+    try {
+      const provisional = {
+        errorNotificationCount: 0,
+        newSessionIdentity: null,
+        newSessionRowCount: 0,
+        provisionalRowCount: 1,
+        rowCount: 2,
+        runtimePhase: "starting",
+        selectedNewSession: false,
+        selectedProvisional: true,
+        sessionRowCount: 1
+      };
+      const materialized = {
+        ...provisional,
+        newSessionIdentity: "session:workspace:new.jsonl",
+        newSessionRowCount: 1,
+        provisionalRowCount: 0,
+        runtimePhase: "ready",
+        selectedNewSession: true,
+        selectedProvisional: false,
+        sessionRowCount: 2
+      };
+      const window = {
+        evaluate: vi.fn()
+          .mockResolvedValueOnce(provisional)
+          .mockResolvedValueOnce(materialized)
+      };
+
+      const pending = waitForRealUserCreatedSession(
+        window,
+        new Set(["session:workspace:existing.jsonl"]),
+        performance.now() + 1_000
+      );
+      await vi.advanceTimersByTimeAsync(50);
+
+      await expect(pending).resolves.toBe("session:workspace:new.jsonl");
+      expect(window.evaluate).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the installed shutdown budget fixed and records bounded process exit timing", async () => {
     vi.useFakeTimers();
     try {

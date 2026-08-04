@@ -9,7 +9,7 @@ import {
   launchPackagedApplication
 } from "./packaged-electron-fixture.mjs";
 import { captureProcessOutput } from "./packaged-electron-smoke-scenarios.mjs";
-import { waitForInstalledStartupSurface } from "./windows-installed-application-lifecycle.mjs";
+import { readSelectedConversationIdentity, waitForInstalledStartupSurface, waitForRealUserCreatedSession } from "./windows-installed-application-lifecycle.mjs";
 
 export const REAL_USER_PROVIDER_TIMEOUT_MS = 10_000;
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
@@ -213,8 +213,7 @@ export function shouldCreateInitialRealUserSession({ catalog, expectedSessionIde
 async function activateCatalogSession(window, expectedSessionIdentity) {
   if (await window.getByLabel("Pi conversation").isVisible()) {
     if (!expectedSessionIdentity) return;
-    const selectedIdentity = await window.locator('[data-testid="conversation-row"][aria-current="page"]')
-      .getAttribute("data-conversation-id");
+    const selectedIdentity = await readSelectedConversationIdentity(window);
     if (selectedIdentity === expectedSessionIdentity) return;
   }
   const rows = window.locator('[data-testid="conversation-row"]');
@@ -295,11 +294,11 @@ async function createControlledConversation(window, agentDir) {
   const startedAt = performance.now();
   await window.getByRole("button", { name: /^在 .+ 新建会话$/u }).first()
     .click({ timeout: REAL_USER_CREATE_HARD_TIMEOUT_MS });
-  const sessionIdentity = await waitForCondition(async () => {
-    const identity = await window.locator('[data-testid="conversation-row"][aria-current="page"]')
-      .getAttribute("data-conversation-id");
-    return identity?.startsWith("session:") && !existingIdentities.has(identity) ? identity : undefined;
-  }, REAL_USER_CREATE_HARD_TIMEOUT_MS, "Windows real-user session.create exceeded its 15s hard gate");
+  const sessionIdentity = await waitForRealUserCreatedSession(
+    window,
+    existingIdentities,
+    startedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
+  );
   const createDurationMs = performance.now() - startedAt;
   if (createDurationMs > REAL_USER_CREATE_HARD_TIMEOUT_MS) {
     throw new Error("Windows real-user session.create succeeded after its 15s hard gate.");

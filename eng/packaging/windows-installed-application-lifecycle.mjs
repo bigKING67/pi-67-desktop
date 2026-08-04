@@ -234,6 +234,49 @@ export async function waitForControlledPromptProjection(window) {
     .waitFor({ state: "visible", timeout: 10_000 });
 }
 
+export function readSelectedConversationIdentity(window) {
+  return window.locator('[data-testid="conversation-row"][aria-current="page"]')
+    .evaluateAll((rows) => rows[0]?.getAttribute("data-conversation-id") ?? null);
+}
+
+export async function waitForRealUserCreatedSession(window, existingIdentities, deadline) {
+  const existing = [...existingIdentities];
+  let diagnostic = createObservationDiagnostic();
+  while (performance.now() <= deadline) {
+    const observation = await window.evaluate((knownIdentities) => {
+      const rows = [...document.querySelectorAll('[data-testid="conversation-row"]')];
+      const sessionRows = rows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"));
+      const newSessionRows = sessionRows.filter((row) => !knownIdentities.includes(
+        row.getAttribute("data-conversation-id") ?? ""
+      ));
+      const selected = rows.find((row) => row.getAttribute("aria-current") === "page");
+      const runtimeStatus = document.querySelector('[aria-label^="当前状态："]');
+      return {
+        errorNotificationCount: document.querySelectorAll('[aria-label="通知"] [role="alert"]').length,
+        newSessionIdentity: newSessionRows[0]?.getAttribute("data-conversation-id") ?? null,
+        newSessionRowCount: newSessionRows.length,
+        provisionalRowCount: rows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
+          .length,
+        rowCount: rows.length,
+        runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
+        selectedNewSession: newSessionRows.includes(selected),
+        selectedProvisional: selected?.getAttribute("data-conversation-id")?.startsWith("provisional:") ?? false,
+        sessionRowCount: sessionRows.length
+      };
+    }, existing);
+    const { newSessionIdentity, ...safeObservation } = observation;
+    diagnostic = safeObservation;
+    if (observation.newSessionRowCount > 1) {
+      throw new Error(`Windows real-user session.create materialized duplicate Sessions: ${JSON.stringify(diagnostic)}`);
+    }
+    if (newSessionIdentity && observation.selectedNewSession) return newSessionIdentity;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, SHUTDOWN_PROCESS_POLL_INTERVAL_MS));
+  }
+  throw new Error(
+    `Windows real-user session.create exceeded its 15s hard gate: ${JSON.stringify(diagnostic)}`
+  );
+}
+
 export async function selectLightThemePreference(window, legacyUserInterface) {
   if (legacyUserInterface) {
     await window.getByRole("button", { name: /外观：跟随系统/u }).click();
@@ -382,6 +425,19 @@ function summarizeUtilityProcesses(states) {
     firstExitObservedMs: observedExitTimes.length > 0 ? Math.min(...observedExitTimes) : null,
     lastExitObservedMs: observedExitTimes.length > 0 ? Math.max(...observedExitTimes) : null,
     observedExitCount: observedExitTimes.length
+  };
+}
+
+function createObservationDiagnostic() {
+  return {
+    errorNotificationCount: 0,
+    newSessionRowCount: 0,
+    provisionalRowCount: 0,
+    rowCount: 0,
+    runtimePhase: null,
+    selectedNewSession: false,
+    selectedProvisional: false,
+    sessionRowCount: 0
   };
 }
 
