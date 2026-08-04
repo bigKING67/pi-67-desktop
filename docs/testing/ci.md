@@ -27,6 +27,11 @@ The reusable lane still installs frozen dependencies, builds the minimum protoco
 runs installer helper tests, downloads the exact source artifact, and executes the full silent
 install, launch, reinstall, restore, shutdown, uninstall, and user-data preservation lifecycle.
 
+Both ordinary CI and the reusable installer lane use `pnpm/setup@v1` with explicit
+`pnpm 11.16.0` and `Node.js 24.18.0` versions. This is the pnpm 11 native setup path; workflow
+commands call its standalone `pnpm` binary directly rather than invoking Corepack or installing
+pnpm and Node through separate setup actions.
+
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies
 that new verifier to the old immutable candidate while binding both SHAs and the source run.

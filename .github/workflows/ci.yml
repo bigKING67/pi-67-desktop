@@ -66,25 +66,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v1
         with:
           version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-          cache: pnpm
+          runtime: node@24.18.0
+          cache: true
+          install: false
       - name: Verify runner architecture
         shell: bash
         run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
       - name: Install frozen dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Quality gates
-        run: corepack pnpm run check
+        run: pnpm run check
       - name: Install Playwright Chromium
-        run: corepack pnpm exec playwright install --no-shell chromium
+        run: pnpm exec playwright install --no-shell chromium
       - name: Renderer browser E2E
-        run: corepack pnpm exec playwright test --project=renderer-chromium --workers=2
+        run: pnpm exec playwright test --project=renderer-chromium --workers=2
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -106,19 +104,17 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v1
         with:
           version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-          cache: pnpm
+          runtime: node@24.18.0
+          cache: true
+          install: false
       - name: Verify runner architecture
         shell: bash
         run: node -e "if (process.arch !== 'x64') throw new Error('Expected x64, got ' + process.arch)"
       - name: Install frozen dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Restore prepared runtime resources
         uses: actions/cache@v5
         with:
@@ -131,18 +127,18 @@ jobs:
           key: pi67-runtime-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('eng/packaging/toolchain.lock.json', 'eng/packaging/prepare-toolchain.mjs', 'eng/capabilities/capability-sources.lock.json', 'eng/capabilities/bundled-skill-suites.json', 'eng/capabilities/*.mjs') }}
       - name: Build apps and prepare runtime resources
         run: |
-          corepack pnpm run build
-          corepack pnpm run prepare:runtime-resources
+          pnpm run build
+          pnpm run prepare:runtime-resources
       - name: Native Electron E2E
-        run: corepack pnpm exec playwright test --project=electron --workers=1
+        run: pnpm exec playwright test --project=electron --workers=1
       - name: Build fast unsigned Windows smoke package
-        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
+        run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
       - name: Smoke packaged Electron runtime
-        run: corepack pnpm run package:smoke
+        run: pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts
-        run: corepack pnpm run package:smoke:windows-ui
+        run: pnpm run package:smoke:windows-ui
       - name: Verify Windows NSIS installer lifecycle
-        run: corepack pnpm run package:smoke:windows-installer
+        run: pnpm run package:smoke:windows-installer
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -199,19 +195,17 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v1
         with:
           version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-          cache: pnpm
+          runtime: node@24.18.0
+          cache: true
+          install: false
       - name: Verify runner architecture
         shell: bash
         run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
       - name: Install frozen dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Restore prepared runtime resources
         uses: actions/cache@v5
         with:
@@ -224,14 +218,14 @@ jobs:
           key: pi67-runtime-resources-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('eng/packaging/toolchain.lock.json', 'eng/packaging/prepare-toolchain.mjs', 'eng/capabilities/capability-sources.lock.json', 'eng/capabilities/bundled-skill-suites.json', 'eng/capabilities/*.mjs') }}
       - name: Build apps and prepare runtime resources
         run: |
-          corepack pnpm run build
-          corepack pnpm run prepare:runtime-resources
+          pnpm run build
+          pnpm run prepare:runtime-resources
       - name: Native Electron E2E
-        run: corepack pnpm exec playwright test --project=electron --workers=1
+        run: pnpm exec playwright test --project=electron --workers=1
       - name: Build unsigned macOS smoke package
-        run: corepack pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
+        run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
       - name: Smoke packaged Electron runtime
-        run: corepack pnpm run package:smoke
+        run: pnpm run package:smoke
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

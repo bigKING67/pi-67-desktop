@@ -49,14 +49,12 @@ jobs:
           ref: ${{ inputs.verifier_ref }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v1
         with:
           version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-          cache: pnpm
+          runtime: node@24.18.0
+          cache: true
+          install: false
       - name: Verify source run and verifier-only diff
         shell: pwsh
         env:
@@ -77,9 +75,9 @@ jobs:
             --run-metadata $metadata `
             --jobs-metadata $jobsMetadata
       - name: Install frozen dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Build verifier workspace dependencies
-        run: corepack pnpm --filter @pi67/protocol... run build
+        run: pnpm --filter @pi67/protocol... run build
       - name: Download source Windows installer candidate
         uses: actions/download-artifact@v8
         with:
@@ -89,13 +87,13 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
       - name: Verify installer helper tests
         run: >-
-          corepack pnpm exec vitest run
+          pnpm exec vitest run
           eng/ci/verify-windows-installer-debug-scope.test.mjs
           eng/packaging/controlled-shutdown-fixture.test.mjs
           eng/packaging/verify-windows-installer-lifecycle.test.mjs
           eng/packaging/windows-artifact-identity.test.mjs
       - name: Verify Windows NSIS installer lifecycle
-        run: corepack pnpm run package:smoke:windows-installer
+        run: pnpm run package:smoke:windows-installer
       - uses: actions/upload-artifact@v7
         if: always()
         with:

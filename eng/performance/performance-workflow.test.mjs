@@ -49,20 +49,20 @@ describe("release performance workflow gates", () => {
     expect(source).toContain("node eng/ci/classify-change-scope.mjs");
     expect(fastSource).toContain("runs-on: macos-15");
     expect(fastSource).not.toContain("windows-2025");
-    expect(fastSource).toContain("run: corepack pnpm run check");
+    expect(fastSource).toContain("run: pnpm run check");
     expect(fastSource).toContain(
-      "run: corepack pnpm exec playwright test --project=renderer-chromium --workers=2"
+      "run: pnpm exec playwright test --project=renderer-chromium --workers=2"
     );
     expect(windowsSource).toContain("runs-on: windows-2025");
     expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");
-    expect(windowsSource).not.toContain("run: corepack pnpm run check");
-    expect(windowsSource).toContain("corepack pnpm run prepare:runtime-resources");
+    expect(windowsSource).not.toContain("run: pnpm run check");
+    expect(windowsSource).toContain("pnpm run prepare:runtime-resources");
     expect(windowsSource).toContain(
-      "run: corepack pnpm exec playwright test --project=electron --workers=1"
+      "run: pnpm exec playwright test --project=electron --workers=1"
     );
     expect(windowsSource).toContain("--prepared-resources --ci-fast");
-    expect(windowsSource).toContain("run: corepack pnpm run package:smoke:windows-ui");
-    expect(windowsSource).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(windowsSource).toContain("run: pnpm run package:smoke:windows-ui");
+    expect(windowsSource).toContain("run: pnpm run package:smoke:windows-installer");
     expect(macosSource).toContain("runs-on: macos-15");
     expect(macosSource).toContain("needs.change-scope.outputs.run_macos == 'true'");
     expect(macosSource).toContain("package-native-unsigned.mjs --prepared-resources");

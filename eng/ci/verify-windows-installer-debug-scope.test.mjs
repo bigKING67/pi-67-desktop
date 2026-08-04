@@ -80,7 +80,7 @@ describe("Windows installer debug artifact reuse", () => {
     expect(buildStep).toBeGreaterThan(-1);
     expect(lifecycleStep).toBeGreaterThan(buildStep);
     expect(workflow.slice(buildStep, lifecycleStep))
-      .toContain("corepack pnpm --filter @pi67/protocol... run build");
+      .toContain("pnpm --filter @pi67/protocol... run build");
   });
 
   it("exposes the verifier as a reusable workflow and rechecks source job metadata", async () => {
@@ -90,6 +90,23 @@ describe("Windows installer debug artifact reuse", () => {
     expect(workflow).toContain("--jobs-metadata $jobsMetadata");
     expect(workflow).toContain("eng/ci/verify-windows-installer-debug-scope.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-artifact-identity.test.mjs");
+  });
+
+  it("uses the pnpm 11 native setup action for CI and installer reuse", async () => {
+    const workflows = await Promise.all([
+      readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8"),
+      readFile(new URL("../../.github/workflows/windows-installer-debug.yml", import.meta.url), "utf8")
+    ]);
+
+    for (const workflow of workflows) {
+      expect(workflow).toContain("uses: pnpm/setup@v1");
+      expect(workflow).toContain("runtime: node@24.18.0");
+      expect(workflow).toContain("cache: true");
+      expect(workflow).toContain("install: false");
+      expect(workflow).not.toContain("pnpm/action-setup");
+      expect(workflow).not.toContain("actions/setup-node");
+      expect(workflow).not.toContain("corepack pnpm");
+    }
   });
 
   it("routes automatic reuse through the reusable verifier with full fallback", async () => {
