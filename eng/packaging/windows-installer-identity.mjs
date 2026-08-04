@@ -9,7 +9,11 @@ import {
   readWindowsArtifactIdentity
 } from "./windows-artifact-identity.mjs";
 
-export function createSessionCreationDiagnostic(observation, existingIdentities = []) {
+export function createSessionCreationDiagnostic(
+  observation,
+  existingIdentities = [],
+  existingSessionFileNames = []
+) {
   const newSessionIdentities = observation?.newSessionIdentities ?? [];
   const newSessionFileNames = newSessionIdentities
     .map(readDiagnosticSessionFileName)
@@ -19,6 +23,7 @@ export function createSessionCreationDiagnostic(observation, existingIdentities 
     errorNotificationCount: observation?.errorNotificationCount ?? 0,
     errorNotificationTitles: observation?.errorNotificationTitles ?? [],
     knownIdentityFingerprints: fingerprintSessionIdentities(existingIdentities),
+    knownSessionFileNameCount: existingSessionFileNames.length,
     newSessionFileNames,
     newSessionIdentityFingerprints: fingerprintSessionIdentities(newSessionIdentities),
     newSessionRowCount: observation?.newSessionRowCount ?? 0,

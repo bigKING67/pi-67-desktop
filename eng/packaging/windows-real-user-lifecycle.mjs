@@ -15,12 +15,14 @@ import {
   verifyGitMetadataIsHidden
 } from "./windows-real-user-health.mjs";
 import {
-  prepareRealUserSessionCreation,
   readSelectedConversationIdentity,
-  waitForInstalledStartupSurface,
-  waitForRealUserCreatedSession
+  waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
 import { assertSessionPathContained, sessionPathFromIdentity } from "./windows-installer-identity.mjs";
+import {
+  prepareRealUserSessionCreation,
+  waitForRealUserCreatedSession
+} from "./windows-real-user-session-creation.mjs";
 
 export const REAL_USER_PROVIDER_TIMEOUT_MS = 10_000;
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
@@ -300,8 +302,9 @@ export async function verifyProviderConfiguration(window) {
 }
 
 async function createControlledConversation(window, agentDir) {
-  const { createAction, existingIdentities } = await prepareRealUserSessionCreation(
+  const { createAction, existingIdentities, existingSessionFileNames } = await prepareRealUserSessionCreation(
     window,
+    agentDir,
     REAL_USER_CREATE_HARD_TIMEOUT_MS
   );
   const startedAt = performance.now();
@@ -309,6 +312,7 @@ async function createControlledConversation(window, agentDir) {
   const sessionIdentity = await waitForRealUserCreatedSession(
     window,
     existingIdentities,
+    existingSessionFileNames,
     startedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
   );
   const createDurationMs = performance.now() - startedAt;
