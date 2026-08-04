@@ -18,6 +18,10 @@ test("opens the command palette by shortcut, restores focus, and invokes one com
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  await expect.poll(async () => (await recordedCommands(page)).includes(
+    "session.catalog.query"
+  )).toBe(true);
 
   const composer = page.getByLabel("给 Pi 发送消息");
   await composer.focus();
