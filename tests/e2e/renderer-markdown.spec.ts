@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { attachMockAgent, installMockDesktopBridge } from "./pi67-renderer-fixture.js";
+import {
+  attachMockAgent,
+  installMockDesktopBridge,
+  waitForMockWorkspaceReady
+} from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
@@ -32,6 +36,7 @@ test("lazy-loads accessible KaTeX and confines wide formulae to their own viewpo
     }]
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   await expect.poll(() => page.locator(".katex").count()).toBeGreaterThanOrEqual(5);
   await expect.poll(() => page.locator(".katex-mathml math").count()).toBeGreaterThanOrEqual(5);
@@ -80,6 +85,7 @@ test("never mounts or requests Markdown image sources", async ({ page }) => {
     }]
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   await expect(page.getByRole("img", { name: "远程图" })).toBeVisible();
   await expect(page.getByRole("img", { name: "工作区图" })).toBeVisible();

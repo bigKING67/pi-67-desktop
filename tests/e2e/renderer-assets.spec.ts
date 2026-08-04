@@ -4,7 +4,8 @@ import {
   installMockDesktopBridge,
   recordedCommandDetails,
   recordedCommands,
-  replaceMockAgentHost
+  replaceMockAgentHost,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -39,6 +40,7 @@ test("loads projected image assets through chunked Blob URLs and revokes them on
     }
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   const image = page.getByRole("img", { name: "pixel.png" });
   await expect(image).toBeVisible();
@@ -73,6 +75,7 @@ test("shows a retryable state when an asset handle is unavailable", async ({ pag
     }]
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 
   await expect(page.getByText("图片未能从 Pi 运行服务加载。")).toBeVisible();
   await expect.poll(async () => (

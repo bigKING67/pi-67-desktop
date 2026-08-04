@@ -415,6 +415,7 @@ function isHighlightResource(name: string): boolean {
 async function openWorkspace(page: Page): Promise<void> {
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
 }
 
 async function openAppearanceSettings(page: Page) {

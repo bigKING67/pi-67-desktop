@@ -6,7 +6,8 @@ import {
   installMockDesktopBridge,
   recordedCommandDetails,
   recordedCommands,
-  setMockAgentResponseResult
+  setMockAgentResponseResult,
+  waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
@@ -17,7 +18,7 @@ test("renders one-tool approvals and refuses stale authority context", async ({ 
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByLabel("π 工作台")).toBeVisible();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   const operationId = "operation-approval-context";
   await startApprovalOperation(page, operationId);
@@ -97,7 +98,7 @@ test("renders a host-authored network-read approval when one is required", async
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByLabel("π 工作台")).toBeVisible();
+  await waitForMockWorkspaceReady(page);
   const operationId = "operation-web-search-approval";
   await startApprovalOperation(page, operationId);
 
@@ -137,7 +138,7 @@ test("renders suspicious approval bytes safely and keeps decisions reachable at 
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect(page.getByLabel("π 工作台")).toBeVisible();
+  await waitForMockWorkspaceReady(page);
   await clearRecordedCommands(page);
   const operationId = "operation-approval-security-literal";
   await startApprovalOperation(page, operationId);
