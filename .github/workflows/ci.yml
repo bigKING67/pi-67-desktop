@@ -4,6 +4,15 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      windows_installer_mode:
+        description: Windows installed NSIS lifecycle certification mode
+        required: true
+        type: choice
+        options:
+          - quick
+          - full
 
 permissions:
   actions: read
@@ -185,8 +194,13 @@ jobs:
       - name: Verify Windows NSIS installer lifecycle
         shell: bash
         env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_WINDOWS_INSTALLER_MODE: ${{ inputs.windows_installer_mode }}
           WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}
         run: |
+          if [[ "$CI_EVENT_NAME" == "workflow_dispatch" ]]; then
+            WINDOWS_INSTALLER_MODE="$DISPATCH_WINDOWS_INSTALLER_MODE"
+          fi
           if [[ "$WINDOWS_INSTALLER_MODE" == "quick" ]]; then
             pnpm run package:smoke:windows-installer --quick
           else
