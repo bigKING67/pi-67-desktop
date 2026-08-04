@@ -13,6 +13,32 @@ describe("CI change scope classifier", () => {
     });
   });
 
+  it("runs only quality validation for Renderer browser spec changes", () => {
+    expect(classifyChangedPaths([
+      "docs/testing/ci.md",
+      "tests/e2e/renderer-appearance.spec.ts",
+      "tests/e2e/renderer.spec.ts"
+    ])).toMatchObject({
+      reason: "quality-only",
+      runQuality: true,
+      runWindows: false,
+      runMacos: false,
+      windowsInstallerMode: "none",
+      fullValidation: false,
+      reuseWindowsInstaller: false
+    });
+  });
+
+  it("keeps native Electron specs on fail-safe full validation", () => {
+    expect(classifyChangedPaths(["tests/e2e/electron.spec.ts"])).toMatchObject({
+      reason: "shared-or-unknown",
+      runQuality: true,
+      runWindows: true,
+      runMacos: true,
+      fullValidation: true
+    });
+  });
+
   it("selects artifact reuse for installer verifier-only changes", () => {
     expect(classifyChangedPaths([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",

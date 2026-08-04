@@ -15,6 +15,9 @@ export function classifyChangedPaths(paths) {
   }
 
   const productPaths = changedPaths.filter((path) => !isDocumentationPath(path));
+  if (productPaths.every(isQualityOnlyPath)) {
+    return scopeResult("quality-only", changedPaths, true, false, false, false, "none");
+  }
   if (productPaths.every(isWindowsInstallerVerifierProductPath)) {
     return scopeResult("windows-installer-verifier-only", changedPaths, false, false, false, false, "full", true);
   }
@@ -60,6 +63,10 @@ function isDocumentationPath(path) {
   return path.startsWith("docs/")
     || path.endsWith(".md")
     || path.startsWith(".github/ISSUE_TEMPLATE/");
+}
+
+function isQualityOnlyPath(path) {
+  return /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path);
 }
 
 function isWindowsOnlyPath(path) {
