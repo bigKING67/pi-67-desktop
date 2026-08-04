@@ -56,8 +56,8 @@ jobs:
           --repository "$GITHUB_REPOSITORY"
           --github-output "$GITHUB_OUTPUT"
 
-  quality-and-renderer:
-    name: Quality and renderer / macOS arm64
+  quality-gates:
+    name: Quality gates / macOS arm64
     needs: change-scope
     if: >-
       needs.change-scope.outputs.run_quality == 'true' ||
@@ -84,14 +84,41 @@ jobs:
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Quality gates
         run: pnpm run check
+
+  renderer-e2e:
+    name: Renderer E2E / macOS arm64
+    needs: change-scope
+    if: >-
+      needs.change-scope.outputs.run_quality == 'true' ||
+      (needs.change-scope.outputs.reuse_windows_installer == 'true' &&
+       needs.change-scope.outputs.reuse_windows_installer_available != 'true')
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/setup@v1
+        with:
+          version: 11.16.0
+          runtime: node@24.18.0
+          cache: false
+          install: false
+      - name: Verify runner toolchain
+        shell: bash
+        run: |
+          node -e "if (process.arch !== 'arm64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          test "$(pnpm --version)" = "11.16.0"
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify pnpm execution runtime
+        run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --no-shell chromium
       - name: Renderer browser E2E
-        run: pnpm exec playwright test --project=renderer-chromium --workers=2
+        run: pnpm exec playwright test --project=renderer-chromium --workers=2 --retries=0
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: quality-renderer-failure-evidence-arm64
+          name: renderer-e2e-failure-evidence-arm64
           path: |
             playwright-report/
             test-results/
@@ -267,7 +294,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [change-scope, quality-and-renderer, native-windows, native-macos, windows-installer-reuse]
+    needs: [change-scope, quality-gates, renderer-e2e, native-windows, native-macos, windows-installer-reuse]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -276,7 +303,8 @@ jobs:
         env:
           SCOPE_RESULT: ${{ needs.change-scope.result }}
           RUN_QUALITY: ${{ needs.change-scope.outputs.run_quality }}
-          QUALITY_RESULT: ${{ needs.quality-and-renderer.result }}
+          QUALITY_RESULT: ${{ needs.quality-gates.result }}
+          RENDERER_RESULT: ${{ needs.renderer-e2e.result }}
           RUN_WINDOWS: ${{ needs.change-scope.outputs.run_windows }}
           WINDOWS_RESULT: ${{ needs.native-windows.result }}
           RUN_MACOS: ${{ needs.change-scope.outputs.run_macos }}
@@ -287,7 +315,7 @@ jobs:
         run: >-
           node eng/ci/verify-ci-gate.mjs
           "$SCOPE_RESULT"
-          "$RUN_QUALITY" "$QUALITY_RESULT"
+          "$RUN_QUALITY" "$QUALITY_RESULT" "$RENDERER_RESULT"
           "$RUN_WINDOWS" "$WINDOWS_RESULT"
           "$RUN_MACOS" "$MACOS_RESULT"
           "$REUSE_WINDOWS_INSTALLER" "$REUSE_AVAILABLE" "$WINDOWS_REUSE_RESULT"

@@ -106,9 +106,10 @@ Provider 操作。
 ## Native package smoke
 
 普通 CI 先由 `change-scope` 按实际 diff 选择验证范围：纯文档不启动产品验证，纯 Renderer
-browser spec 只运行 `quality-and-renderer`，Windows/macOS 专属变更只启动相关 native job，
-共享产品或未知路径继续 fail safe 到完整跨平台验证。`quality-and-renderer` 执行 `check` 与
-Renderer browser E2E，其中 Renderer 测试按文件使用两个 worker；native job 独立构建
+browser spec 只运行 `quality-gates` 与 `renderer-e2e`，Windows/macOS 专属变更只启动相关
+native job，共享产品或未知路径继续 fail safe 到完整跨平台验证。`quality-gates` 与
+`renderer-e2e` 在两个 macOS arm64 job 中并行执行，分别形成可独立重跑的失败边界；Renderer
+测试按文件使用两个 worker 且 CI 内不做自动 retry。native job 独立构建
 clean-checkout runtime resources，串行运行真实 Electron E2E，随后执行 unsigned native
 packaging 和 `package:smoke`。该路径会显式移除签名和
 notarization credential，只用于提前发现 electron-builder、平台可选原生依赖、
@@ -345,16 +346,24 @@ Unsigned Preview 是普通 CI smoke 之外的显式人工发布通道，必须�
 1. 用户明确授权发布 unsigned preview；
 2. tag 必须严格等于 `v<package.json version>`，并指向 workflow checkout 的 commit；
 3. tag checkout 必须通过 Built-in Extension Adapter npm/Git provenance gate；
-4. Windows x64 与 macOS arm64 都在原生 runner 运行完整 `pnpm run check`、unsigned
-   native package 和 packaged Electron smoke；
-5. Windows tag 候选必须通过 packaged synthetic scale/composition smoke 和真实 NSIS
-   silent install/reinstall/uninstall lifecycle smoke；
+4. 完整 `pnpm run check` 只在一个 macOS arm64 `quality-gates` job 中执行一次，并与 Windows
+   x64、macOS arm64 的 unsigned native candidate build 并行；两个原生 build 都必须通过
+   packaged Electron smoke；
+5. Windows tag 候选在 packaged smoke 与 synthetic scale/composition smoke 通过后立即上传为
+   绑定本次 run/attempt 的不可变 candidate；独立 `certify-windows-installer` job 只下载该精确
+   candidate 并运行真实 NSIS silent install/reinstall/uninstall lifecycle smoke，不重新构建；
 6. 只发布 Windows x64 NSIS、macOS arm64 DMG/ZIP 三个主产物；
 7. 文件名必须带 `-unsigned-preview`，Release 必须是 GitHub prerelease；
 8. 不发布 `latest.yml`、`latest-mac.yml` 或 blockmap，不进入稳定自动更新渠道；
 9. `unsigned-preview-manifest.json` 必须声明 `channel=unsigned-preview`、`signed=false`，
    并和 `SHA256SUMS.txt`、三个真实文件逐一验证 size、target 和 SHA-256；
 10. Release notes 必须明确说明 SmartScreen、Gatekeeper、未签名和手动升级边界。
+
+Windows installer certification 是独立 retry boundary。认证脚本或生命周期失败时，应选择
+GitHub Actions 的失败 job 重跑，复用 `build-windows` 已上传的精确 candidate；不得为了调试
+认证问题重新执行完整 quality、native build 和 packaging。`publish` 同时依赖 provenance、
+单次 quality gate、两个平台 candidate build 与 Windows certification，并只下载这些 build
+job 输出中记录的 artifact name，因此认证通过的字节与最终生成 manifest/Release 的字节一致。
 
 该通道不需要签名证书、Apple notarization credential 或真实付费 Provider Operation；
 这些认证只阻断正式 Signed Stable Release，不阻断明确标记的 alpha Unsigned Preview。

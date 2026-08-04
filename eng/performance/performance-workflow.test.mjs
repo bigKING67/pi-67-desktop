@@ -29,11 +29,13 @@ describe("release performance workflow gates", () => {
   it("scopes push validation while preserving native platform evidence", async () => {
     const source = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
     const scopeStart = source.indexOf("  change-scope:");
-    const fastStart = source.indexOf("  quality-and-renderer:");
+    const qualityStart = source.indexOf("  quality-gates:");
+    const rendererStart = source.indexOf("  renderer-e2e:");
     const windowsStart = source.indexOf("  native-windows:");
     const macosStart = source.indexOf("  native-macos:");
     const gateStart = source.indexOf("  ci-gate:");
-    const fastSource = source.slice(fastStart, windowsStart);
+    const qualitySource = source.slice(qualityStart, rendererStart);
+    const rendererSource = source.slice(rendererStart, windowsStart);
     const windowsSource = source.slice(windowsStart, macosStart);
     const macosSource = source.slice(macosStart, gateStart);
 
@@ -42,17 +44,22 @@ describe("release performance workflow gates", () => {
     expect(source).toContain("group: ci-${{ github.workflow }}-${{ github.ref }}");
     expect(source).toContain("cancel-in-progress: true");
     expect(scopeStart).toBeGreaterThan(-1);
-    expect(fastStart).toBeGreaterThan(scopeStart);
-    expect(windowsStart).toBeGreaterThan(fastStart);
+    expect(qualityStart).toBeGreaterThan(scopeStart);
+    expect(rendererStart).toBeGreaterThan(qualityStart);
+    expect(windowsStart).toBeGreaterThan(rendererStart);
     expect(macosStart).toBeGreaterThan(windowsStart);
     expect(gateStart).toBeGreaterThan(macosStart);
     expect(source).toContain("node eng/ci/classify-change-scope.mjs");
     expect(source).toContain("windows_installer_mode: ${{ steps.scope.outputs.windows_installer_mode }}");
-    expect(fastSource).toContain("runs-on: macos-15");
-    expect(fastSource).not.toContain("windows-2025");
-    expect(fastSource).toContain("run: pnpm run check");
-    expect(fastSource).toContain(
-      "run: pnpm exec playwright test --project=renderer-chromium --workers=2"
+    expect(qualitySource).toContain("runs-on: macos-15");
+    expect(qualitySource).not.toContain("windows-2025");
+    expect(qualitySource).toContain("run: pnpm run check");
+    expect(qualitySource).not.toContain("playwright test");
+    expect(rendererSource).toContain("runs-on: macos-15");
+    expect(rendererSource).not.toContain("run: pnpm run check");
+    expect(rendererSource).toContain("pnpm exec playwright install --no-shell chromium");
+    expect(rendererSource).toContain(
+      "run: pnpm exec playwright test --project=renderer-chromium --workers=2 --retries=0"
     );
     expect(windowsSource).toContain("runs-on: windows-2025");
     expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");
@@ -75,19 +82,54 @@ describe("release performance workflow gates", () => {
     expect(macosSource).toContain("package-native-unsigned.mjs --prepared-resources");
     expect(source).toContain("name: CI Gate");
     expect(source).toContain("node eng/ci/verify-ci-gate.mjs");
+    expect(source).toContain("RENDERER_RESULT: ${{ needs.renderer-e2e.result }}");
   });
 
   it("keeps unsigned previews fast without dropping packaged release gates", async () => {
     const source = await readFile(new URL("../../.github/workflows/unsigned-preview.yml", import.meta.url), "utf8");
+    const provenanceStart = source.indexOf("  provenance:");
+    const qualityStart = source.indexOf("  quality-gates:");
+    const windowsStart = source.indexOf("  build-windows:");
+    const macosStart = source.indexOf("  build-macos:");
+    const certificationStart = source.indexOf("  certify-windows-installer:");
+    const publishStart = source.indexOf("  publish:");
+    const qualitySource = source.slice(qualityStart, windowsStart);
+    const windowsSource = source.slice(windowsStart, macosStart);
+    const macosSource = source.slice(macosStart, certificationStart);
+    const certificationSource = source.slice(certificationStart, publishStart);
+    const publishSource = source.slice(publishStart);
 
     expect(source).not.toContain("performance:measure");
     expect(source).not.toContain("PI67_PERF_SAMPLES");
-    expect(source).toContain("timeout-minutes: 30");
-    expect(source).toContain("run: corepack pnpm run package:native:unsigned");
-    expect(source).toContain("run: corepack pnpm run package:smoke");
-    expect(source).toContain("run: corepack pnpm run package:smoke:windows-ui");
-    expect(source).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(provenanceStart).toBeGreaterThan(-1);
+    expect(qualityStart).toBeGreaterThan(provenanceStart);
+    expect(windowsStart).toBeGreaterThan(qualityStart);
+    expect(macosStart).toBeGreaterThan(windowsStart);
+    expect(certificationStart).toBeGreaterThan(macosStart);
+    expect(publishStart).toBeGreaterThan(certificationStart);
+    expect(source.match(/corepack pnpm run check\n/gu)).toHaveLength(1);
+    expect(qualitySource).toContain("needs: provenance");
+    expect(qualitySource).toContain("run: corepack pnpm run check");
+    expect(windowsSource).not.toContain("corepack pnpm run check");
+    expect(windowsSource).toContain("run: corepack pnpm run package:native:unsigned");
+    expect(windowsSource).toContain("run: corepack pnpm run package:smoke");
+    expect(windowsSource).toContain("run: corepack pnpm run package:smoke:windows-ui");
+    expect(windowsSource).toContain("unsigned-preview-windows-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}");
+    expect(windowsSource).toContain("artifacts/release/win-unpacked/Pi-67 Desktop.exe");
+    expect(macosSource).not.toContain("corepack pnpm run check");
+    expect(macosSource).toContain("run: corepack pnpm run package:native:unsigned");
+    expect(macosSource).toContain("run: corepack pnpm run package:smoke");
+    expect(certificationSource).toContain("needs: build-windows");
+    expect(certificationSource).toContain("name: ${{ needs.build-windows.outputs.candidate_artifact_name }}");
+    expect(certificationSource).toContain("eng/packaging/windows-artifact-identity.test.mjs");
+    expect(certificationSource).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(certificationSource).not.toContain("package:native:unsigned");
     expect(source).not.toContain("package:smoke:windows-installer -- --quick");
+    expect(publishSource).toContain(
+      "needs: [provenance, quality-gates, build-windows, build-macos, certify-windows-installer]"
+    );
+    expect(publishSource).toContain("name: ${{ needs.build-windows.outputs.candidate_artifact_name }}");
+    expect(publishSource).toContain("name: ${{ needs.build-macos.outputs.candidate_artifact_name }}");
   });
 
   it("allows deep Windows certification and signed releases to finish", async () => {

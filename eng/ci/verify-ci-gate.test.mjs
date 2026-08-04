@@ -7,6 +7,7 @@ describe("CI aggregate gate", () => {
       scopeResult: "success",
       runQuality: "true",
       qualityResult: "success",
+      rendererResult: "success",
       runWindows: "true",
       windowsResult: "success",
       runMacos: "false",
@@ -22,6 +23,7 @@ describe("CI aggregate gate", () => {
       scopeResult: "success",
       runQuality: "false",
       qualityResult: "skipped",
+      rendererResult: "skipped",
       runWindows: "false",
       windowsResult: "skipped",
       runMacos: "false",
@@ -37,6 +39,7 @@ describe("CI aggregate gate", () => {
       scopeResult: "success",
       runQuality: "false",
       qualityResult: "skipped",
+      rendererResult: "skipped",
       runWindows: "false",
       windowsResult: "skipped",
       runMacos: "false",
@@ -52,6 +55,7 @@ describe("CI aggregate gate", () => {
       scopeResult: "success",
       runQuality: "false",
       qualityResult: "success",
+      rendererResult: "success",
       runWindows: "false",
       windowsResult: "success",
       runMacos: "false",
@@ -65,6 +69,7 @@ describe("CI aggregate gate", () => {
   it.each([
     ["scope failure", { scopeResult: "failure" }],
     ["required failure", { windowsResult: "failure" }],
+    ["renderer failure", { rendererResult: "failure" }],
     ["unexpected skip", { windowsResult: "skipped" }],
     ["unexpected execution", { runMacos: "false", macosResult: "success" }]
   ])("rejects %s", (_label, patch) => {
@@ -72,6 +77,7 @@ describe("CI aggregate gate", () => {
       scopeResult: "success",
       runQuality: "true",
       qualityResult: "success",
+      rendererResult: "success",
       runWindows: "true",
       windowsResult: "success",
       runMacos: "true",

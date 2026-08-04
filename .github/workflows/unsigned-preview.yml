@@ -42,20 +42,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  build:
+  quality-gates:
     needs: provenance
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-x64
-            os: windows-2025
-            arch: x64
-          - platform: macos-arm64
-            os: macos-15
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -72,50 +62,144 @@ jobs:
       - name: Verify runner architecture
         shell: bash
         run: >-
-          node -e "if (process.arch !== '${{ matrix.arch }}') throw new Error('Unexpected runner arch: ' + process.arch)"
+          node -e "if (process.arch !== 'arm64') throw new Error('Unexpected runner arch: ' + process.arch)"
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run check
+
+  build-windows:
+    needs: provenance
+    runs-on: windows-2025
+    timeout-minutes: 30
+    outputs:
+      candidate_artifact_name: ${{ steps.candidate_name.outputs.name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - name: Verify runner architecture
+        shell: bash
+        run: >-
+          node -e "if (process.arch !== 'x64') throw new Error('Unexpected runner arch: ' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run package:native:unsigned
       - run: corepack pnpm run package:smoke
       - name: Verify Windows packaged synthetic scale and IME contracts
-        if: runner.os == 'Windows'
         run: corepack pnpm run package:smoke:windows-ui
-      - name: Verify Windows NSIS installer lifecycle
-        if: runner.os == 'Windows'
-        run: corepack pnpm run package:smoke:windows-installer
+      - name: Resolve Windows candidate artifact name
+        id: candidate_name
+        shell: bash
+        run: echo "name=unsigned-preview-windows-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
-        if: always() && runner.os == 'Windows'
         with:
-          name: windows-packaged-ui-unsigned-preview-x64
-          path: artifacts/validation/windows-packaged-ui/
-          if-no-files-found: error
-          retention-days: 30
-      - uses: actions/upload-artifact@v7
-        if: always() && runner.os == 'Windows'
-        with:
-          name: windows-installer-lifecycle-unsigned-preview-x64
-          path: artifacts/validation/windows-installer-lifecycle/
-          if-no-files-found: error
-          retention-days: 30
-      - uses: actions/upload-artifact@v7
-        if: runner.os == 'Windows'
-        with:
-          name: unsigned-preview-${{ matrix.platform }}
-          path: artifacts/release/Pi-67-Desktop-*-win-x64.exe
+          name: ${{ steps.candidate_name.outputs.name }}
+          path: |
+            artifacts/release/Pi-67-Desktop-*-win-x64.exe
+            artifacts/release/win-unpacked/Pi-67 Desktop.exe
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v7
-        if: runner.os == 'macOS'
+        if: always()
         with:
-          name: unsigned-preview-${{ matrix.platform }}
+          name: windows-packaged-ui-unsigned-preview-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: error
+          retention-days: 30
+
+  build-macos:
+    needs: provenance
+    runs-on: macos-15
+    timeout-minutes: 30
+    outputs:
+      candidate_artifact_name: ${{ steps.candidate_name.outputs.name }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - name: Verify runner architecture
+        shell: bash
+        run: >-
+          node -e "if (process.arch !== 'arm64') throw new Error('Unexpected runner arch: ' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run package:native:unsigned
+      - run: corepack pnpm run package:smoke
+      - name: Resolve macOS candidate artifact name
+        id: candidate_name
+        shell: bash
+        run: echo "name=unsigned-preview-macos-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.candidate_name.outputs.name }}
           path: |
             artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
             artifacts/release/Pi-67-Desktop-*-mac-arm64.zip
           if-no-files-found: error
           retention-days: 7
 
+  certify-windows-installer:
+    needs: build-windows
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - name: Verify runner architecture
+        shell: bash
+        run: >-
+          node -e "if (process.arch !== 'x64') throw new Error('Unexpected runner arch: ' + process.arch)"
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Build verifier workspace dependencies
+        run: corepack pnpm --filter @pi67/protocol... run build
+      - name: Download exact Windows candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build-windows.outputs.candidate_artifact_name }}
+          path: artifacts/release
+      - name: Verify installer helper tests
+        run: >-
+          corepack pnpm exec vitest run
+          eng/packaging/controlled-shutdown-fixture.test.mjs
+          eng/packaging/verify-windows-installer-lifecycle.test.mjs
+          eng/packaging/windows-artifact-identity.test.mjs
+      - name: Verify Windows NSIS installer lifecycle
+        run: corepack pnpm run package:smoke:windows-installer
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-installer-lifecycle-unsigned-preview-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 30
+
   publish:
-    needs: [provenance, build]
+    needs: [provenance, quality-gates, build-windows, build-macos, certify-windows-installer]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -135,12 +219,12 @@ jobs:
       - name: Download Windows unsigned preview artifacts
         uses: actions/download-artifact@v8
         with:
-          name: unsigned-preview-windows-x64
+          name: ${{ needs.build-windows.outputs.candidate_artifact_name }}
           path: artifacts/release
       - name: Download macOS unsigned preview artifacts
         uses: actions/download-artifact@v8
         with:
-          name: unsigned-preview-macos-arm64
+          name: ${{ needs.build-macos.outputs.candidate_artifact_name }}
           path: artifacts/release
       - run: corepack pnpm run release:preview:prepare
       - run: corepack pnpm run release:preview:verify

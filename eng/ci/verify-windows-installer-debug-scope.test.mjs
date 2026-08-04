@@ -122,7 +122,8 @@ describe("Windows installer debug artifact reuse", () => {
     const workflow = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
     expect(workflow).toContain("node eng/ci/resolve-windows-installer-reuse.mjs");
     expect(workflow).toContain("uses: ./.github/workflows/windows-installer-debug.yml");
-    expect(workflow).toMatch(/quality-and-renderer:[\s\S]*?reuse_windows_installer_available != 'true'/u);
+    expect(workflow).toMatch(/quality-gates:[\s\S]*?reuse_windows_installer_available != 'true'/u);
+    expect(workflow).toMatch(/renderer-e2e:[\s\S]*?reuse_windows_installer_available != 'true'/u);
     expect(workflow).toMatch(/native-windows:[\s\S]*?reuse_windows_installer_available != 'true'/u);
     expect(workflow).toContain("windows-installer-reuse]");
   });
