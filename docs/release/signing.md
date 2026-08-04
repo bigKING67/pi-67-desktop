@@ -106,7 +106,7 @@ Provider 操作。
 ## Native package smoke
 
 普通 CI 在 Windows x64 与 macOS arm64 上分别并行运行 `quality-and-renderer` 和 `native-smoke` job。
-前者保留两平台 `check` 与 Renderer browser E2E，其中 Renderer 测试按文件使用三个 worker；
+前者保留两平台 `check` 与 Renderer browser E2E，其中 Renderer 测试按文件使用两个 worker；
 后者独立构建 clean-checkout runtime resources，串行运行真实 Electron E2E，随后执行
 unsigned native packaging 和 `package:smoke`。该路径会显式移除签名和
 notarization credential，只用于提前发现 electron-builder、平台可选原生依赖、
