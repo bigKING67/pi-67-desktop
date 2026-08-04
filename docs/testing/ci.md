@@ -30,7 +30,13 @@ install, launch, reinstall, restore, shutdown, uninstall, and user-data preserva
 Both ordinary CI and the reusable installer lane use `pnpm/setup@v1` with explicit
 `pnpm 11.16.0` and `Node.js 24.18.0` versions. This is the pnpm 11 native setup path; workflow
 commands call its standalone `pnpm` binary directly rather than invoking Corepack or installing
-pnpm and Node through separate setup actions.
+pnpm and Node through separate setup actions. CI verifies both the direct Node runtime and the
+runtime resolved through `pnpm exec`. The pnpm store is not cached because a frozen install is
+faster than restoring and saving the current store archive on the hosted runners.
+
+The Windows native lane instead caches Electron and electron-builder download directories. These
+contain versioned Electron and NSIS tool downloads rather than repository build output; the cache
+key is bound to the lockfile and `electron-builder.yml`.
 
 GitHub's `Re-run failed jobs` always uses the original commit and workflow. Use it for an external
 or transient failure. A verifier code fix requires a new commit; automatic artifact reuse applies

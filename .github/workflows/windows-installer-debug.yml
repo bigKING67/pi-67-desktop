@@ -53,8 +53,14 @@ jobs:
         with:
           version: 11.16.0
           runtime: node@24.18.0
-          cache: true
+          cache: false
           install: false
+      - name: Verify runner toolchain
+        shell: bash
+        run: |
+          node -e "if (process.platform !== 'win32' || process.arch !== 'x64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.platform + '/' + process.arch)"
+          pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+          test "$(pnpm --version)" = "11.16.0"
       - name: Verify source run and verifier-only diff
         shell: pwsh
         env:

@@ -93,10 +93,10 @@ if (/\b(?:linux|ia32|universal)\b/iu.test(builder)) failures.push("unsupported p
 
 for (const path of [".github/workflows/ci.yml", ".github/workflows/release.yml"]) {
   const workflow = await readFile(join(root, path), "utf8");
-  const nativePnpmSetup = /pnpm\/setup@v1[\s\S]*?version:\s*11\.16\.0[\s\S]*?runtime:\s*node@24\.18\.0[\s\S]*?cache:\s*true/u;
+  const nativePnpmSetup = /pnpm\/setup@v1[\s\S]*?version:\s*11\.16\.0[\s\S]*?runtime:\s*node@24\.18\.0[\s\S]*?cache:\s*false[\s\S]*?install:\s*false/u;
   const legacyCachedNodeSetup = /pnpm\/action-setup@v6[\s\S]*?version:\s*11\.16\.0[\s\S]*?actions\/setup-node@v5[\s\S]*?node-version:\s*24\.18\.0[\s\S]*?cache:\s*pnpm/u;
   if (!nativePnpmSetup.test(workflow) && !legacyCachedNodeSetup.test(workflow)) {
-    failures.push(`${path} must pin pnpm 11.16.0 and Node 24.18.0 with pnpm store caching`);
+    failures.push(`${path} must pin pnpm 11.16.0 and Node 24.18.0 with an approved setup contract`);
   }
 }
 

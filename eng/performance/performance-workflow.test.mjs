@@ -57,6 +57,10 @@ describe("release performance workflow gates", () => {
     expect(windowsSource).toContain("needs.change-scope.outputs.run_windows == 'true'");
     expect(windowsSource).not.toContain("run: pnpm run check");
     expect(windowsSource).toContain("pnpm run prepare:runtime-resources");
+    expect(windowsSource).toContain("name: Restore Electron packaging downloads");
+    expect(windowsSource).toContain("~/AppData/Local/electron/Cache");
+    expect(windowsSource).toContain("~/AppData/Local/electron-builder/Cache");
+    expect(windowsSource).toContain("pi67-electron-packaging-${{ runner.os }}-${{ runner.arch }}-");
     expect(windowsSource).toContain(
       "run: pnpm exec playwright test --project=electron --workers=1"
     );

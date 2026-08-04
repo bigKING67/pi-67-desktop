@@ -70,11 +70,14 @@ jobs:
         with:
           version: 11.16.0
           runtime: node@24.18.0
-          cache: true
+          cache: false
           install: false
-      - name: Verify runner architecture
+      - name: Verify runner toolchain
         shell: bash
-        run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
+        run: |
+          node -e "if (process.arch !== 'arm64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+          test "$(pnpm --version)" = "11.16.0"
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
       - name: Quality gates
@@ -108,13 +111,23 @@ jobs:
         with:
           version: 11.16.0
           runtime: node@24.18.0
-          cache: true
+          cache: false
           install: false
-      - name: Verify runner architecture
+      - name: Verify runner toolchain
         shell: bash
-        run: node -e "if (process.arch !== 'x64') throw new Error('Expected x64, got ' + process.arch)"
+        run: |
+          node -e "if (process.arch !== 'x64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+          test "$(pnpm --version)" = "11.16.0"
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
+      - name: Restore Electron packaging downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: pi67-electron-packaging-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'electron-builder.yml') }}
       - name: Restore prepared runtime resources
         uses: actions/cache@v5
         with:
@@ -199,11 +212,14 @@ jobs:
         with:
           version: 11.16.0
           runtime: node@24.18.0
-          cache: true
+          cache: false
           install: false
-      - name: Verify runner architecture
+      - name: Verify runner toolchain
         shell: bash
-        run: node -e "if (process.arch !== 'arm64') throw new Error('Expected arm64, got ' + process.arch)"
+        run: |
+          node -e "if (process.arch !== 'arm64' || process.version !== 'v24.18.0') throw new Error('Unexpected Node runtime: ' + process.version + ' ' + process.arch)"
+          pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+          test "$(pnpm --version)" = "11.16.0"
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
       - name: Restore prepared runtime resources
