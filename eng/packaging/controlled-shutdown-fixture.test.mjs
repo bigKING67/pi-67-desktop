@@ -1,10 +1,12 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import { PiSdkRuntime } from "../../packages/pi-runtime/src/pi-sdk-runtime.ts";
 import {
   assertSingleShutdownQuitLifecycle,
+  CONTROLLED_PROMPT_TEXT,
   isProcessAlive,
   readPositiveProcessId,
   resetControlledShutdownLifecycle,
@@ -55,6 +57,53 @@ describe("controlled shutdown fixture", () => {
     await expect(waitForProcessExit(child.pid)).resolves.toBeUndefined();
     expect(isProcessAlive(child.pid)).toBe(false);
   });
+
+  it("persists the active controlled prompt as a managed Session that can be restored after shutdown", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-controlled-shutdown-session-"));
+    roots.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const extensionsDirectory = join(agentDir, "extensions");
+    const childPidPath = join(root, "child.pid");
+    const lifecyclePath = join(root, "lifecycle.txt");
+    await Promise.all([mkdir(cwd), mkdir(extensionsDirectory, { recursive: true })]);
+    await writeControlledShutdownExtension({
+      extensionPath: join(extensionsDirectory, "shutdown-fixture.ts"),
+      childPidPath,
+      lifecyclePath
+    });
+
+    const runtime = new PiSdkRuntime();
+    const restoredRuntime = new PiSdkRuntime();
+    let childPid;
+    try {
+      await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
+      const invocation = runtime.submitPrompt(CONTROLLED_PROMPT_TEXT);
+      childPid = await readPositiveProcessId(childPidPath);
+      const sessionPath = runtime.getIdentity().sessionPath;
+      if (!sessionPath) throw new Error("Controlled prompt did not project a managed Session path.");
+
+      await runtime.dispose();
+      await invocation.catch(() => undefined);
+      await expect(waitForProcessExit(childPid)).resolves.toBeUndefined();
+      await expect(assertSingleShutdownQuitLifecycle(lifecyclePath, "Controlled prompt Pi Runtime"))
+        .resolves.toBeUndefined();
+      await access(sessionPath);
+
+      await restoredRuntime.initialize({
+        cwd,
+        agentDir,
+        sessionPath,
+        trust: "trusted",
+        approvalMode: "guided"
+      });
+      expect(restoredRuntime.getIdentity().sessionPath).toBe(await realpath(sessionPath));
+    } finally {
+      await runtime.dispose();
+      await restoredRuntime.dispose();
+      if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
+    }
+  }, 15_000);
 
   it("writes a legacy-compatible shutdown-only Extension", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-shutdown-lifecycle-"));

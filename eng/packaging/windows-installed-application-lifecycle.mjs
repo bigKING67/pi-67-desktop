@@ -13,6 +13,7 @@ import {
   captureProcessOutput,
   openSettingsSection
 } from "./packaged-electron-smoke-scenarios.mjs";
+import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 
 const RUNTIME_READINESS_PROPAGATION_MARGIN_MS = 15_000;
 
@@ -92,12 +93,7 @@ export async function launchInstalledApplication({
     }
 
     if (activeControlledOperation) {
-      await window.keyboard.press("Control+k");
-      const command = window.getByRole("option", {
-        name: "/hold-open Start a controlled child process until Pi shuts down"
-      });
-      await command.waitFor({ state: "visible", timeout: 10_000 });
-      await command.click();
+      await startControlledPrompt(window);
       childPid = await readPositiveProcessId(childPidPath);
       if (!isProcessAlive(childPid)) throw new Error("Installed controlled Extension child exited before shutdown.");
     }
