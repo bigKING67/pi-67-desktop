@@ -7,6 +7,9 @@ describe("Windows installer certification workflow", () => {
 
     expect(workflow).toMatch(/workflow_dispatch:[\s\S]*?windows_installer_mode:/u);
     expect(workflow).toMatch(/windows_installer_mode:[\s\S]*?options:\s*- quick\s*- full/u);
+    expect(workflow).toContain(
+      "BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.pull_request.base.sha || github.event.before }}"
+    );
     expect(workflow).toContain("DISPATCH_WINDOWS_INSTALLER_MODE: ${{ inputs.windows_installer_mode }}");
     expect(workflow).toContain("WINDOWS_INSTALLER_MODE: ${{ needs.change-scope.outputs.windows_installer_mode }}");
     expect(workflow).toContain('if [[ "$CI_EVENT_NAME" == "workflow_dispatch" ]]; then');
