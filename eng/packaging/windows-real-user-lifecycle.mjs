@@ -104,16 +104,23 @@ async function runRealUserLaunch({
     }
 
     const catalog = await waitForCatalogState(window, expectedSessionIdentity);
-    await activateCatalogSession(window, expectedSessionIdentity);
+    let create;
+    let sessionIdentity = expectedSessionIdentity;
+    if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
+      await assertHealthyWorkbench(window);
+      const created = await createControlledConversation(window, agentDir);
+      create = created.report;
+      sessionIdentity = created.sessionIdentity;
+    } else {
+      await activateCatalogSession(window, expectedSessionIdentity);
+    }
     const runtimeReadyMs = await waitForRealUserRuntimeReady(window);
     const launchToReadyMs = performance.now() - launchStartedAt;
     await assertHealthyWorkbench(window);
     const providerConfiguration = await verifyProviderConfiguration(window);
     const fileProjection = await verifyGitMetadataIsHidden(window);
 
-    let create;
-    let sessionIdentity = expectedSessionIdentity;
-    if (launchIndex === 0) {
+    if (launchIndex === 0 && !create) {
       const created = await createControlledConversation(window, agentDir);
       create = created.report;
       sessionIdentity = created.sessionIdentity;
@@ -197,6 +204,12 @@ export async function waitForCatalogState(
   return { ...observation, durationMs: round(durationMs) };
 }
 
+export function shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex }) {
+  return launchIndex === 0
+    && expectedSessionIdentity === undefined
+    && catalog.itemCount === 0;
+}
+
 async function activateCatalogSession(window, expectedSessionIdentity) {
   if (await window.getByLabel("Pi conversation").isVisible()) {
     if (!expectedSessionIdentity) return;
@@ -217,7 +230,16 @@ async function activateCatalogSession(window, expectedSessionIdentity) {
       return;
     }
   }
-  throw new Error("Windows real-user lifecycle could not activate a Catalog-backed Session.");
+  const observation = await rows.evaluateAll((visibleRows) => ({
+    provisionalRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
+      .length,
+    rowCount: visibleRows.length,
+    sessionRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"))
+      .length
+  }));
+  throw new Error(
+    `Windows real-user lifecycle could not activate a Catalog-backed Session: ${JSON.stringify(observation)}`
+  );
 }
 
 async function waitForRealUserRuntimeReady(window) {

@@ -43,6 +43,8 @@ describe("CI change scope classifier", () => {
     expect(classifyChangedPaths([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.mjs",
+      "eng/packaging/windows-real-user-lifecycle.mjs",
+      "eng/packaging/windows-real-user-lifecycle.test.mjs",
       "eng/packaging/controlled-shutdown-fixture.test.mjs"
     ])).toMatchObject({
       reason: "windows-installer-verifier-only",

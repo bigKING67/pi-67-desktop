@@ -15,6 +15,8 @@ describe("Windows installer debug artifact reuse", () => {
     expect(() => verifyWindowsInstallerDebugScope([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.mjs",
+      "eng/packaging/windows-real-user-lifecycle.mjs",
+      "eng/packaging/windows-real-user-lifecycle.test.mjs",
       "eng/packaging/controlled-shutdown-fixture.ts",
       "docs/testing/windows-installer.md"
     ])).not.toThrow();

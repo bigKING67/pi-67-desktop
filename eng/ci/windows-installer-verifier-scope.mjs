@@ -8,7 +8,9 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-artifact-identity.mjs",
   "windows-artifact-identity.test.mjs",
   "windows-installed-application-lifecycle.mjs",
-  "windows-installer-identity.mjs"
+  "windows-installer-identity.mjs",
+  "windows-real-user-lifecycle.mjs",
+  "windows-real-user-lifecycle.test.mjs"
 ]);
 
 export function isWindowsInstallerVerifierProductPath(path) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  shouldCreateInitialRealUserSession,
   verifyProviderConfiguration,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
@@ -41,6 +42,30 @@ describe("Windows installed real-user lifecycle", () => {
     await expect(waitForCatalogState(window, undefined, 100)).rejects.toThrow(
       "Session Catalog became unavailable"
     );
+  });
+
+  it.each([
+    ["ready empty", { itemCount: 0, state: "ready-empty" }, true],
+    ["rebuilding empty", { itemCount: 0, state: "rebuilding" }, true],
+    ["materialized", { itemCount: 1, state: "ready" }, false]
+  ])("creates the first real-user Session before activation for %s Catalog state", (
+    _label,
+    catalog,
+    expected
+  ) => {
+    expect(shouldCreateInitialRealUserSession({
+      catalog,
+      expectedSessionIdentity: undefined,
+      launchIndex: 0
+    })).toBe(expected);
+  });
+
+  it("requires the exact persisted Session on real-user restarts", () => {
+    expect(shouldCreateInitialRealUserSession({
+      catalog: { itemCount: 0, state: "ready-empty" },
+      expectedSessionIdentity: "session:workspace-1:session.jsonl",
+      launchIndex: 1
+    })).toBe(false);
   });
 
   it("requires the Provider configuration panel and returns to the workbench inside the gate", async () => {
