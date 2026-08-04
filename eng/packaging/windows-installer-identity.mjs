@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { dirname, join, resolve, win32 } from "node:path";
 import { lt as semverLessThan, valid as validSemver } from "semver";
@@ -7,6 +8,48 @@ import {
   readFileByteIdentity,
   readWindowsArtifactIdentity
 } from "./windows-artifact-identity.mjs";
+
+export function createSessionCreationDiagnostic(observation, existingIdentities = []) {
+  const newSessionIdentities = observation?.newSessionIdentities ?? [];
+  const newSessionFileNames = newSessionIdentities
+    .map(readDiagnosticSessionFileName)
+    .filter((value) => value !== null);
+  return {
+    distinctNewSessionFileNameCount: new Set(newSessionFileNames).size,
+    errorNotificationCount: observation?.errorNotificationCount ?? 0,
+    errorNotificationTitles: observation?.errorNotificationTitles ?? [],
+    knownIdentityFingerprints: fingerprintSessionIdentities(existingIdentities),
+    newSessionFileNames,
+    newSessionIdentityFingerprints: fingerprintSessionIdentities(newSessionIdentities),
+    newSessionRowCount: observation?.newSessionRowCount ?? 0,
+    provisionalRowCount: observation?.provisionalRowCount ?? 0,
+    rowCount: observation?.rowCount ?? 0,
+    runtimePhase: observation?.runtimePhase ?? null,
+    runtimeStatus: observation?.runtimeStatus ?? null,
+    selectedIdentityFingerprint: fingerprintSessionIdentity(observation?.selectedIdentity),
+    selectedNewSession: observation?.selectedNewSession ?? false,
+    selectedProvisional: observation?.selectedProvisional ?? false,
+    sessionIdentityFingerprints: fingerprintSessionIdentities(observation?.sessionIdentities ?? []),
+    sessionRowCount: observation?.sessionRowCount ?? 0,
+    unrecognizedNewSessionFileNameCount: newSessionIdentities.length - newSessionFileNames.length
+  };
+}
+
+function fingerprintSessionIdentities(identities) {
+  return identities.slice(0, 8).map(fingerprintSessionIdentity);
+}
+
+function fingerprintSessionIdentity(identity) {
+  if (typeof identity !== "string" || identity.length === 0) return null;
+  return createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 12);
+}
+
+function readDiagnosticSessionFileName(identity) {
+  if (typeof identity !== "string") return null;
+  const separatorIndex = Math.max(identity.lastIndexOf("/"), identity.lastIndexOf("\\"), identity.lastIndexOf(":"));
+  const candidate = identity.slice(separatorIndex + 1);
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.jsonl$/u.test(candidate) ? candidate : null;
+}
 
 export function resolveWindowsInstallerPath(releaseDirectory, packageVersion) {
   if (typeof packageVersion !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(packageVersion)) {

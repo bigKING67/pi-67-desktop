@@ -16,6 +16,7 @@ import {
   openSettingsSection
 } from "./packaged-electron-smoke-scenarios.mjs";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import { createSessionCreationDiagnostic } from "./windows-installer-identity.mjs";
 
 const RUNTIME_READINESS_PROPAGATION_MARGIN_MS = 15_000;
 const SHUTDOWN_PROCESS_POLL_INTERVAL_MS = 50;
@@ -241,7 +242,7 @@ export function readSelectedConversationIdentity(window) {
 
 export async function waitForRealUserCreatedSession(window, existingIdentities, deadline) {
   const existing = [...existingIdentities];
-  let diagnostic = createObservationDiagnostic();
+  let diagnostic = createSessionCreationDiagnostic();
   while (performance.now() <= deadline) {
     const observation = await window.evaluate((knownIdentities) => {
       const rows = [...document.querySelectorAll('[data-testid="conversation-row"]')];
@@ -257,20 +258,22 @@ export async function waitForRealUserCreatedSession(window, existingIdentities, 
         errorNotificationTitles: errorNotifications.slice(0, 3).map((notification) => (
           notification.querySelector("strong")?.textContent?.trim().slice(0, 160) ?? null
         )),
-        newSessionIdentity: newSessionRows[0]?.getAttribute("data-conversation-id") ?? null,
+        newSessionIdentities: newSessionRows.map((row) => row.getAttribute("data-conversation-id") ?? ""),
         newSessionRowCount: newSessionRows.length,
         provisionalRowCount: rows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
           .length,
         rowCount: rows.length,
         runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
         runtimeStatus: runtimeStatus?.getAttribute("aria-label")?.slice(0, 160) ?? null,
+        selectedIdentity: selected?.getAttribute("data-conversation-id") ?? null,
         selectedNewSession: newSessionRows.includes(selected),
         selectedProvisional: selected?.getAttribute("data-conversation-id")?.startsWith("provisional:") ?? false,
+        sessionIdentities: sessionRows.map((row) => row.getAttribute("data-conversation-id") ?? ""),
         sessionRowCount: sessionRows.length
       };
     }, existing);
-    const { newSessionIdentity, ...safeObservation } = observation;
-    diagnostic = safeObservation;
+    const newSessionIdentity = observation.newSessionIdentities[0] ?? null;
+    diagnostic = createSessionCreationDiagnostic(observation, existing);
     if (observation.newSessionRowCount > 1) {
       throw new Error(`Windows real-user session.create materialized duplicate Sessions: ${JSON.stringify(diagnostic)}`);
     }
@@ -430,21 +433,6 @@ function summarizeUtilityProcesses(states) {
     firstExitObservedMs: observedExitTimes.length > 0 ? Math.min(...observedExitTimes) : null,
     lastExitObservedMs: observedExitTimes.length > 0 ? Math.max(...observedExitTimes) : null,
     observedExitCount: observedExitTimes.length
-  };
-}
-
-function createObservationDiagnostic() {
-  return {
-    errorNotificationCount: 0,
-    errorNotificationTitles: [],
-    newSessionRowCount: 0,
-    provisionalRowCount: 0,
-    rowCount: 0,
-    runtimePhase: null,
-    runtimeStatus: null,
-    selectedNewSession: false,
-    selectedProvisional: false,
-    sessionRowCount: 0
   };
 }
 
