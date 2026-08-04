@@ -251,14 +251,19 @@ export async function waitForRealUserCreatedSession(window, existingIdentities, 
       ));
       const selected = rows.find((row) => row.getAttribute("aria-current") === "page");
       const runtimeStatus = document.querySelector('[aria-label^="当前状态："]');
+      const errorNotifications = [...document.querySelectorAll('[aria-label="通知"] [role="alert"]')];
       return {
-        errorNotificationCount: document.querySelectorAll('[aria-label="通知"] [role="alert"]').length,
+        errorNotificationCount: errorNotifications.length,
+        errorNotificationTitles: errorNotifications.slice(0, 3).map((notification) => (
+          notification.querySelector("strong")?.textContent?.trim().slice(0, 160) ?? null
+        )),
         newSessionIdentity: newSessionRows[0]?.getAttribute("data-conversation-id") ?? null,
         newSessionRowCount: newSessionRows.length,
         provisionalRowCount: rows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
           .length,
         rowCount: rows.length,
         runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
+        runtimeStatus: runtimeStatus?.getAttribute("aria-label")?.slice(0, 160) ?? null,
         selectedNewSession: newSessionRows.includes(selected),
         selectedProvisional: selected?.getAttribute("data-conversation-id")?.startsWith("provisional:") ?? false,
         sessionRowCount: sessionRows.length
@@ -431,10 +436,12 @@ function summarizeUtilityProcesses(states) {
 function createObservationDiagnostic() {
   return {
     errorNotificationCount: 0,
+    errorNotificationTitles: [],
     newSessionRowCount: 0,
     provisionalRowCount: 0,
     rowCount: 0,
     runtimePhase: null,
+    runtimeStatus: null,
     selectedNewSession: false,
     selectedProvisional: false,
     sessionRowCount: 0

@@ -55,6 +55,42 @@ describe("Windows installed real-user lifecycle", () => {
     }
   });
 
+  it("reports bounded runtime failure diagnostics without exposing the Session identity", async () => {
+    vi.useFakeTimers();
+    try {
+      const window = {
+        evaluate: vi.fn().mockResolvedValue({
+          errorNotificationCount: 1,
+          errorNotificationTitles: ["无法创建 Pi 会话"],
+          newSessionIdentity: "session:workspace:sensitive.jsonl",
+          newSessionRowCount: 1,
+          provisionalRowCount: 0,
+          rowCount: 1,
+          runtimePhase: "failed",
+          runtimeStatus: "当前状态：Pi SDK 初始化失败：configuration reload failed",
+          selectedNewSession: false,
+          selectedProvisional: false,
+          sessionRowCount: 1
+        })
+      };
+      let failure;
+      const pending = waitForRealUserCreatedSession(
+        window,
+        new Set(),
+        performance.now() + 100
+      ).catch((error) => { failure = error; });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await pending;
+
+      expect(String(failure)).toContain("Pi SDK 初始化失败：configuration reload failed");
+      expect(String(failure)).toContain("无法创建 Pi 会话");
+      expect(String(failure)).not.toContain("sensitive.jsonl");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the installed shutdown budget fixed and records bounded process exit timing", async () => {
     vi.useFakeTimers();
     try {
