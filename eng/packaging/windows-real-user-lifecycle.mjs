@@ -223,32 +223,46 @@ export function shouldCreateInitialRealUserSession({ catalog, expectedSessionIde
     && catalog.itemCount === 0;
 }
 
-async function activateCatalogSession(window, expectedSessionIdentity) {
-  if (await window.getByLabel("Pi conversation").isVisible()) {
-    if (!expectedSessionIdentity) return;
-    const selectedIdentity = await readSelectedConversationIdentity(window);
-    if (selectedIdentity === expectedSessionIdentity) return;
-  }
+export async function activateCatalogSession(
+  window,
+  expectedSessionIdentity,
+  timeoutMs = REAL_USER_RUNTIME_TIMEOUT_MS
+) {
+  const deadline = performance.now() + timeoutMs;
+  const conversation = window.getByLabel("Pi conversation");
   const rows = window.locator('[data-testid="conversation-row"]');
-  const rowCount = await rows.count();
-  for (let index = 0; index < rowCount; index += 1) {
-    const row = rows.nth(index);
-    const identity = await row.getAttribute("data-conversation-id");
-    if (
-      (expectedSessionIdentity && identity === expectedSessionIdentity)
-      || (!expectedSessionIdentity && identity?.startsWith("session:"))
-    ) {
-      await row.click({ timeout: REAL_USER_RUNTIME_TIMEOUT_MS });
-      return;
+  let observation = { provisionalRowCount: 0, rowCount: 0, sessionRowCount: 0 };
+
+  while (performance.now() <= deadline) {
+    if (await conversation.isVisible()) {
+      if (!expectedSessionIdentity) return;
+      const selectedIdentity = await readSelectedConversationIdentity(window);
+      if (selectedIdentity === expectedSessionIdentity) return;
     }
+
+    const rowCount = await rows.count();
+    for (let index = 0; index < rowCount; index += 1) {
+      const row = rows.nth(index);
+      const identity = await row.getAttribute("data-conversation-id");
+      if (
+        (expectedSessionIdentity && identity === expectedSessionIdentity)
+        || (!expectedSessionIdentity && identity?.startsWith("session:"))
+      ) {
+        await row.click({ timeout: Math.max(1, Math.ceil(deadline - performance.now())) });
+        return;
+      }
+    }
+
+    observation = await rows.evaluateAll((visibleRows) => ({
+      provisionalRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
+        .length,
+      rowCount: visibleRows.length,
+      sessionRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"))
+        .length
+    }));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, POLL_INTERVAL_MS));
   }
-  const observation = await rows.evaluateAll((visibleRows) => ({
-    provisionalRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
-      .length,
-    rowCount: visibleRows.length,
-    sessionRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"))
-      .length
-  }));
+
   throw new Error(
     `Windows real-user lifecycle could not activate a Catalog-backed Session: ${JSON.stringify(observation)}`
   );

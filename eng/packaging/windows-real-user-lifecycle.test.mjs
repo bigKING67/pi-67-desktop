@@ -8,6 +8,7 @@ import {
 } from "./windows-installed-application-lifecycle.mjs";
 import { sessionPathFromIdentity } from "./windows-installer-identity.mjs";
 import {
+  activateCatalogSession,
   canonicalSessionPathFromIdentity,
   shouldCreateInitialRealUserSession,
   verifyProviderConfiguration,
@@ -174,6 +175,59 @@ describe("Windows installed real-user lifecycle", () => {
       expectedSessionIdentity: "session:workspace-1:session.jsonl",
       launchIndex: 1
     })).toBe(false);
+  });
+
+  it("waits for a Catalog Session row that is transiently absent during reconciliation", async () => {
+    const clicks = [];
+    let observationCount = 0;
+    const sessionRow = {
+      click: async () => clicks.push("session:workspace-1:session.jsonl"),
+      getAttribute: async () => "session:workspace-1:session.jsonl"
+    };
+    const rows = {
+      count: async () => observationCount++ === 0 ? 0 : 1,
+      evaluateAll: async () => ({
+        provisionalRowCount: 0,
+        rowCount: 0,
+        sessionRowCount: 0
+      }),
+      nth: () => sessionRow
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => false }),
+      locator: () => rows
+    };
+
+    await expect(activateCatalogSession(window, undefined, 200)).resolves.toBeUndefined();
+    expect(clicks).toEqual(["session:workspace-1:session.jsonl"]);
+  });
+
+  it("does not substitute another Catalog Session when the persisted identity is absent", async () => {
+    const clicks = [];
+    const sessionRow = {
+      click: async () => clicks.push("session:workspace-1:other.jsonl"),
+      getAttribute: async () => "session:workspace-1:other.jsonl"
+    };
+    const rows = {
+      count: async () => 1,
+      evaluateAll: async () => ({
+        provisionalRowCount: 0,
+        rowCount: 1,
+        sessionRowCount: 1
+      }),
+      nth: () => sessionRow
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => false }),
+      locator: () => rows
+    };
+
+    await expect(activateCatalogSession(
+      window,
+      "session:workspace-1:expected.jsonl",
+      10
+    )).rejects.toThrow('"sessionRowCount":1');
+    expect(clicks).toEqual([]);
   });
 
   it("requires the Provider configuration panel and returns to the workbench inside the gate", async () => {
