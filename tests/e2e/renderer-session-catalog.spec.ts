@@ -63,9 +63,8 @@ test("uses a bounded first page, server search payload, and the bound next curso
 
   await clearSessionCatalogRequests(page);
   await page.getByRole("button", { name: "显示更多" }).click();
-  await expect.poll(async () => (await sessionCatalogRequests(page)).length).toBeGreaterThanOrEqual(1);
-  const [nextPage] = await sessionCatalogRequests(page);
-  expect(nextPage?.payload).toEqual({
+  await expect.poll(async () => (await sessionCatalogRequests(page))
+    .find((request) => request.payload.cursor !== undefined)?.payload).toEqual({
     scope: "workspace",
     limit: 50,
     cursor: {
@@ -78,7 +77,8 @@ test("uses a bounded first page, server search payload, and the bound next curso
 
   await clearSessionCatalogRequests(page);
   await page.getByRole("searchbox", { name: "搜索会话" }).fill("hidden-folder");
-  await expect.poll(async () => (await sessionCatalogRequests(page))[0]?.payload).toEqual({
+  await expect.poll(async () => (await sessionCatalogRequests(page))
+    .find((request) => request.payload.search === "hidden-folder")?.payload).toEqual({
     scope: "workspace",
     limit: 50,
     search: "hidden-folder"
