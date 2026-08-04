@@ -1,6 +1,20 @@
 name: Windows installer debug
 
 on:
+  workflow_call:
+    inputs:
+      source_run_id:
+        description: Failed CI run containing the Windows installer debug candidate
+        required: true
+        type: string
+      source_sha:
+        description: Exact 40-character source SHA used to build the candidate
+        required: true
+        type: string
+      verifier_ref:
+        description: Ref containing verifier-only changes descended from source_sha
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -52,12 +66,16 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           $metadata = Join-Path $env:RUNNER_TEMP 'source-run.json'
+          $jobsMetadata = Join-Path $env:RUNNER_TEMP 'source-run-jobs.json'
           gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID" > $metadata
+          gh api --method GET "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SOURCE_RUN_ID/jobs" `
+            -f filter=latest -f per_page=100 > $jobsMetadata
           $headSha = git rev-parse HEAD
           node eng/ci/verify-windows-installer-debug-scope.mjs `
             --base $env:SOURCE_SHA `
             --head $headSha `
-            --run-metadata $metadata
+            --run-metadata $metadata `
+            --jobs-metadata $jobsMetadata
       - name: Install frozen dependencies
         run: corepack pnpm install --frozen-lockfile
       - name: Build verifier workspace dependencies
@@ -72,8 +90,10 @@ jobs:
       - name: Verify installer helper tests
         run: >-
           corepack pnpm exec vitest run
+          eng/ci/verify-windows-installer-debug-scope.test.mjs
           eng/packaging/controlled-shutdown-fixture.test.mjs
           eng/packaging/verify-windows-installer-lifecycle.test.mjs
+          eng/packaging/windows-artifact-identity.test.mjs
       - name: Verify Windows NSIS installer lifecycle
         run: corepack pnpm run package:smoke:windows-installer
       - uses: actions/upload-artifact@v7

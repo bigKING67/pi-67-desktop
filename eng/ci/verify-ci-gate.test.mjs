@@ -10,7 +10,10 @@ describe("CI aggregate gate", () => {
       runWindows: "true",
       windowsResult: "success",
       runMacos: "false",
-      macosResult: "skipped"
+      macosResult: "skipped",
+      reuseWindowsInstaller: "false",
+      reuseAvailable: "",
+      windowsReuseResult: "skipped"
     })).not.toThrow();
   });
 
@@ -22,7 +25,40 @@ describe("CI aggregate gate", () => {
       runWindows: "false",
       windowsResult: "skipped",
       runMacos: "false",
-      macosResult: "skipped"
+      macosResult: "skipped",
+      reuseWindowsInstaller: "false",
+      reuseAvailable: "",
+      windowsReuseResult: "skipped"
+    })).not.toThrow();
+  });
+
+  it("accepts a successfully reused Windows installer candidate", () => {
+    expect(() => verifyCiGateResults({
+      scopeResult: "success",
+      runQuality: "false",
+      qualityResult: "skipped",
+      runWindows: "false",
+      windowsResult: "skipped",
+      runMacos: "false",
+      macosResult: "skipped",
+      reuseWindowsInstaller: "true",
+      reuseAvailable: "true",
+      windowsReuseResult: "success"
+    })).not.toThrow();
+  });
+
+  it("requires full quality and Windows validation when reuse is unavailable", () => {
+    expect(() => verifyCiGateResults({
+      scopeResult: "success",
+      runQuality: "false",
+      qualityResult: "success",
+      runWindows: "false",
+      windowsResult: "success",
+      runMacos: "false",
+      macosResult: "skipped",
+      reuseWindowsInstaller: "true",
+      reuseAvailable: "false",
+      windowsReuseResult: "skipped"
     })).not.toThrow();
   });
 
@@ -40,6 +76,9 @@ describe("CI aggregate gate", () => {
       windowsResult: "success",
       runMacos: "true",
       macosResult: "success",
+      reuseWindowsInstaller: "false",
+      reuseAvailable: "",
+      windowsReuseResult: "skipped",
       ...patch
     })).toThrow();
   });

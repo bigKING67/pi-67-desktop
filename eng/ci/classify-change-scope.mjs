@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appendFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isWindowsInstallerVerifierProductPath } from "./windows-installer-verifier-scope.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -14,11 +15,14 @@ export function classifyChangedPaths(paths) {
   }
 
   const productPaths = changedPaths.filter((path) => !isDocumentationPath(path));
+  if (productPaths.every(isWindowsInstallerVerifierProductPath)) {
+    return scopeResult("windows-installer-verifier-only", changedPaths, false, false, false, false, true);
+  }
   if (productPaths.every(isWindowsOnlyPath)) {
-    return scopeResult("windows-only", changedPaths, true, true, false, false);
+    return scopeResult("windows-only", changedPaths, true, true, false, false, false);
   }
   if (productPaths.every(isMacosOnlyPath)) {
-    return scopeResult("macos-only", changedPaths, true, false, true, false);
+    return scopeResult("macos-only", changedPaths, true, false, true, false, false);
   }
   return fullValidation("shared-or-unknown", changedPaths);
 }
@@ -62,17 +66,18 @@ function isMacosOnlyPath(path) {
 }
 
 function fullValidation(reason, paths) {
-  return scopeResult(reason, paths, true, true, true, true);
+  return scopeResult(reason, paths, true, true, true, true, false);
 }
 
-function scopeResult(reason, paths, runQuality, runWindows, runMacos, full) {
+function scopeResult(reason, paths, runQuality, runWindows, runMacos, full, reuseWindowsInstaller = false) {
   return {
     reason,
     changedPaths: paths,
     runQuality,
     runWindows,
     runMacos,
-    fullValidation: full
+    fullValidation: full,
+    reuseWindowsInstaller
   };
 }
 
@@ -110,6 +115,7 @@ async function main() {
     `run_quality=${String(result.runQuality)}`,
     `run_windows=${String(result.runWindows)}`,
     `run_macos=${String(result.runMacos)}`,
+    `reuse_windows_installer=${String(result.reuseWindowsInstaller)}`,
     `full_validation=${String(result.fullValidation)}`,
     `scope_reason=${result.reason}`,
     ""
@@ -120,6 +126,7 @@ async function main() {
     runQuality: result.runQuality,
     runWindows: result.runWindows,
     runMacos: result.runMacos,
+    reuseWindowsInstaller: result.reuseWindowsInstaller,
     fullValidation: result.fullValidation
   }));
 }

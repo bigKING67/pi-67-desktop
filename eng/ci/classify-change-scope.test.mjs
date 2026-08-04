@@ -12,17 +12,28 @@ describe("CI change scope classifier", () => {
     });
   });
 
-  it("runs only Windows native validation for installer verifier changes", () => {
+  it("selects artifact reuse for installer verifier-only changes", () => {
     expect(classifyChangedPaths([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.mjs",
       "eng/packaging/controlled-shutdown-fixture.test.mjs"
     ])).toMatchObject({
-      reason: "windows-only",
-      runQuality: true,
-      runWindows: true,
+      reason: "windows-installer-verifier-only",
+      runQuality: false,
+      runWindows: false,
       runMacos: false,
-      fullValidation: false
+      fullValidation: false,
+      reuseWindowsInstaller: true
+    });
+  });
+
+  it("keeps documentation changes compatible with installer verifier reuse", () => {
+    expect(classifyChangedPaths([
+      "docs/testing/ci.md",
+      "eng/packaging/verify-windows-installer-lifecycle.test.mjs"
+    ])).toMatchObject({
+      reason: "windows-installer-verifier-only",
+      reuseWindowsInstaller: true
     });
   });
 
@@ -35,7 +46,8 @@ describe("CI change scope classifier", () => {
       runQuality: true,
       runWindows: false,
       runMacos: true,
-      fullValidation: false
+      fullValidation: false,
+      reuseWindowsInstaller: false
     });
   });
 
@@ -53,7 +65,8 @@ describe("CI change scope classifier", () => {
       runQuality: true,
       runWindows: true,
       runMacos: true,
-      fullValidation: true
+      fullValidation: true,
+      reuseWindowsInstaller: false
     });
   });
 
@@ -63,7 +76,8 @@ describe("CI change scope classifier", () => {
       runQuality: true,
       runWindows: true,
       runMacos: true,
-      fullValidation: true
+      fullValidation: true,
+      reuseWindowsInstaller: false
     });
   });
 

@@ -6,6 +6,7 @@ on:
     branches: [main]
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -21,6 +22,10 @@ jobs:
       run_quality: ${{ steps.scope.outputs.run_quality }}
       run_windows: ${{ steps.scope.outputs.run_windows }}
       run_macos: ${{ steps.scope.outputs.run_macos }}
+      reuse_windows_installer: ${{ steps.scope.outputs.reuse_windows_installer }}
+      reuse_windows_installer_available: ${{ steps.installer-reuse.outputs.reuse_available }}
+      reuse_source_run_id: ${{ steps.installer-reuse.outputs.source_run_id }}
+      reuse_source_sha: ${{ steps.installer-reuse.outputs.source_sha }}
       full_validation: ${{ steps.scope.outputs.full_validation }}
       scope_reason: ${{ steps.scope.outputs.scope_reason }}
     steps:
@@ -38,11 +43,25 @@ jobs:
           --base "$BASE_SHA"
           --head "$HEAD_SHA"
           --github-output "$GITHUB_OUTPUT"
+      - name: Resolve reusable Windows installer candidate
+        id: installer-reuse
+        if: steps.scope.outputs.reuse_windows_installer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: >-
+          node eng/ci/resolve-windows-installer-reuse.mjs
+          --base "$BASE_SHA"
+          --repository "$GITHUB_REPOSITORY"
+          --github-output "$GITHUB_OUTPUT"
 
   quality-and-renderer:
     name: Quality and renderer / macOS arm64
     needs: change-scope
-    if: needs.change-scope.outputs.run_quality == 'true'
+    if: >-
+      needs.change-scope.outputs.run_quality == 'true' ||
+      (needs.change-scope.outputs.reuse_windows_installer == 'true' &&
+       needs.change-scope.outputs.reuse_windows_installer_available != 'true')
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -79,7 +98,10 @@ jobs:
   native-windows:
     name: Native smoke / Windows x64
     needs: change-scope
-    if: needs.change-scope.outputs.run_windows == 'true'
+    if: >-
+      needs.change-scope.outputs.run_windows == 'true' ||
+      (needs.change-scope.outputs.reuse_windows_installer == 'true' &&
+       needs.change-scope.outputs.reuse_windows_installer_available != 'true')
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
@@ -154,6 +176,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  windows-installer-reuse:
+    name: Windows installer lifecycle / reused candidate
+    needs: change-scope
+    if: >-
+      needs.change-scope.outputs.reuse_windows_installer == 'true' &&
+      needs.change-scope.outputs.reuse_windows_installer_available == 'true'
+    uses: ./.github/workflows/windows-installer-debug.yml
+    with:
+      source_run_id: ${{ needs.change-scope.outputs.reuse_source_run_id }}
+      source_sha: ${{ needs.change-scope.outputs.reuse_source_sha }}
+      verifier_ref: ${{ github.sha }}
+    permissions:
+      actions: read
+      contents: read
+
   native-macos:
     name: Native smoke / macOS arm64
     needs: change-scope
@@ -208,7 +245,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [change-scope, quality-and-renderer, native-windows, native-macos]
+    needs: [change-scope, quality-and-renderer, native-windows, native-macos, windows-installer-reuse]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -222,9 +259,13 @@ jobs:
           WINDOWS_RESULT: ${{ needs.native-windows.result }}
           RUN_MACOS: ${{ needs.change-scope.outputs.run_macos }}
           MACOS_RESULT: ${{ needs.native-macos.result }}
+          REUSE_WINDOWS_INSTALLER: ${{ needs.change-scope.outputs.reuse_windows_installer }}
+          REUSE_AVAILABLE: ${{ needs.change-scope.outputs.reuse_windows_installer_available }}
+          WINDOWS_REUSE_RESULT: ${{ needs.windows-installer-reuse.result }}
         run: >-
           node eng/ci/verify-ci-gate.mjs
           "$SCOPE_RESULT"
           "$RUN_QUALITY" "$QUALITY_RESULT"
           "$RUN_WINDOWS" "$WINDOWS_RESULT"
           "$RUN_MACOS" "$MACOS_RESULT"
+          "$REUSE_WINDOWS_INSTALLER" "$REUSE_AVAILABLE" "$WINDOWS_REUSE_RESULT"

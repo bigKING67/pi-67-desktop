@@ -1,9 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  verifySourceRunJobsMetadata,
   verifySourceRunMetadata,
   verifyWindowsInstallerDebugScope
 } from "./verify-windows-installer-debug-scope.mjs";
+import {
+  WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME,
+  WINDOWS_NATIVE_JOB_NAME
+} from "./windows-installer-source-run.mjs";
 
 describe("Windows installer debug artifact reuse", () => {
   it("accepts only verifier, lifecycle fixture, and documentation changes", () => {
@@ -31,14 +36,40 @@ describe("Windows installer debug artifact reuse", () => {
       head_sha: sourceSha,
       status: "completed",
       conclusion: "failure",
-      path: ".github/workflows/ci.yml"
+      path: ".github/workflows/ci.yml",
+      run_attempt: 1
     }, sourceSha)).not.toThrow();
     expect(() => verifySourceRunMetadata({
       head_sha: "b".repeat(40),
       status: "completed",
       conclusion: "failure",
-      path: ".github/workflows/ci.yml"
+      path: ".github/workflows/ci.yml",
+      run_attempt: 1
     }, sourceSha)).toThrow(/not a completed failed CI run/u);
+  });
+
+  it("requires the source Windows job to fail only after installer prerequisites pass", () => {
+    const metadata = {
+      jobs: [{
+        name: WINDOWS_NATIVE_JOB_NAME,
+        status: "completed",
+        conclusion: "failure",
+        steps: [
+          { number: 12, name: "Verify Windows packaged synthetic scale and IME contracts", conclusion: "success" },
+          { number: 13, name: WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME, conclusion: "failure" }
+        ]
+      }]
+    };
+    expect(() => verifySourceRunJobsMetadata(metadata)).not.toThrow();
+    expect(() => verifySourceRunJobsMetadata({
+      jobs: [{
+        ...metadata.jobs[0],
+        steps: [
+          { number: 12, name: "Verify Windows packaged synthetic scale and IME contracts", conclusion: "failure" },
+          { number: 13, name: WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME, conclusion: "skipped" }
+        ]
+      }]
+    })).toThrow(/did not fail at the installer lifecycle step/u);
   });
 
   it("builds workspace dependencies before running the direct Node verifier", async () => {
@@ -50,5 +81,23 @@ describe("Windows installer debug artifact reuse", () => {
     expect(lifecycleStep).toBeGreaterThan(buildStep);
     expect(workflow.slice(buildStep, lifecycleStep))
       .toContain("corepack pnpm --filter @pi67/protocol... run build");
+  });
+
+  it("exposes the verifier as a reusable workflow and rechecks source job metadata", async () => {
+    const workflow = await readFile(new URL("../../.github/workflows/windows-installer-debug.yml", import.meta.url), "utf8");
+    expect(workflow).toMatch(/workflow_call:[\s\S]*?source_run_id:/u);
+    expect(workflow).toContain("source-run-jobs.json");
+    expect(workflow).toContain("--jobs-metadata $jobsMetadata");
+    expect(workflow).toContain("eng/ci/verify-windows-installer-debug-scope.test.mjs");
+    expect(workflow).toContain("eng/packaging/windows-artifact-identity.test.mjs");
+  });
+
+  it("routes automatic reuse through the reusable verifier with full fallback", async () => {
+    const workflow = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+    expect(workflow).toContain("node eng/ci/resolve-windows-installer-reuse.mjs");
+    expect(workflow).toContain("uses: ./.github/workflows/windows-installer-debug.yml");
+    expect(workflow).toMatch(/quality-and-renderer:[\s\S]*?reuse_windows_installer_available != 'true'/u);
+    expect(workflow).toMatch(/native-windows:[\s\S]*?reuse_windows_installer_available != 'true'/u);
+    expect(workflow).toContain("windows-installer-reuse]");
   });
 });
