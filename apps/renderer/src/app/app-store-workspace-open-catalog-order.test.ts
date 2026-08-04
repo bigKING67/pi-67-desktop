@@ -35,6 +35,7 @@ describe("Workspace open Catalog ordering", () => {
   it("opens the initial Runtime Session before publishing the first Catalog result", async () => {
     const requestOrder: string[] = [];
     const registration = deferred<void>();
+    const catalogQuery = deferred<void>();
     let initialRuntimeOpened = false;
     const initialSnapshot = snapshot();
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
@@ -83,6 +84,7 @@ describe("Workspace open Catalog ordering", () => {
       }
       if (type === "session.catalog.query") {
         expect(requestPayload).toEqual({ scope: "workspace", limit: 50, refresh: true });
+        await catalogQuery.promise;
         return (initialRuntimeOpened
           ? catalogPageForSnapshot(initialSnapshot)
           : emptyCatalogPage()) as never;
@@ -101,11 +103,26 @@ describe("Workspace open Catalog ordering", () => {
     expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
 
     registration.resolve();
+    await vi.waitFor(() => expect(requestOrder).toContain("session.catalog.query"));
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      workspaceOpenPending: true,
+      runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
+    });
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
+      expect.objectContaining({
+        conversation: expect.objectContaining({ kind: "provisional" }),
+        sessionId: initialSnapshot.sessionId
+      })
+    ]);
+
+    catalogQuery.resolve();
     await opening;
 
     expect(useAppStore.getState()).toMatchObject({
       workspace: initialSnapshot.cwd,
       sessionTransitionPending: false,
+      workspaceOpenPending: false,
       runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
     });
     expect(useSessionProjectionStore.getState().authority).toMatchObject({

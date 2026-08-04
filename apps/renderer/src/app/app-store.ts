@@ -25,6 +25,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   trustUpdating: false,
   sessionTransitionPending: false,
   sessionBootstrapTransitionPending: false,
+  workspaceOpenPending: false,
   approvalMode: DEFAULT_APPROVAL_MODE,
   operation: undefined,
   operationDetail: undefined,

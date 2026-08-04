@@ -240,6 +240,15 @@ export function readSelectedConversationIdentity(window) {
     .evaluateAll((rows) => rows[0]?.getAttribute("data-conversation-id") ?? null);
 }
 
+export async function prepareRealUserSessionCreation(window, timeoutMs) {
+  const createAction = window.getByRole("button", { name: /^在 .+ 新建会话$/u }).first();
+  // Capture the baseline only after Workspace initialization admits the action.
+  await createAction.click({ trial: true, timeout: timeoutMs });
+  const existingIdentities = new Set(await window.locator('[data-testid="conversation-row"]')
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-conversation-id")).filter(Boolean)));
+  return { createAction, existingIdentities };
+}
+
 export async function waitForRealUserCreatedSession(window, existingIdentities, deadline) {
   const existing = [...existingIdentities];
   let diagnostic = createSessionCreationDiagnostic();

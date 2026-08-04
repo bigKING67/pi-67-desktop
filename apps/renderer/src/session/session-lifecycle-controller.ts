@@ -20,7 +20,10 @@ import { currentRendererSessionAuthority } from "./session-authority.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
-import { ensureRendererSessionCreationAuthority } from "./session-creation-authority.js";
+import {
+  ensureRendererSessionCreationAuthority,
+  selectPendingRendererSessionCreation
+} from "./session-creation-authority.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -28,8 +31,8 @@ type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppS
 export async function createRendererSession(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
-  if (!get().workspace || get().sessionTransitionPending) return;
-  if (selectPendingSessionCreation()) return;
+  if (!get().workspace || get().sessionTransitionPending || get().workspaceOpenPending) return;
+  if (selectPendingRendererSessionCreation()) return;
   const workspace = get().workspace;
   const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
   if (!workspaceId) return;
@@ -44,8 +47,9 @@ export async function createRendererSession(): Promise<void> {
   if (
     get().workspace !== workspace
     || get().sessionTransitionPending
+    || get().workspaceOpenPending
     || rendererWorkbenchStore.getState().currentWorkspaceId !== workspaceId
-    || selectPendingSessionCreation()
+    || selectPendingRendererSessionCreation()
   ) return;
   const task = beginPendingTask();
   if (!task) return;
@@ -110,22 +114,6 @@ export async function createRendererSession(): Promise<void> {
       }
     })
   });
-}
-
-function selectPendingSessionCreation(): boolean {
-  const workbench = rendererWorkbenchStore.getState();
-  const pendingCreation = Object.values(workbench.tasks).find((candidate) => (
-    candidate.workspaceId === workbench.currentWorkspaceId
-    && candidate.creationStatus !== undefined
-  ));
-  if (!pendingCreation) return false;
-  workbench.selectTask(pendingCreation.id);
-  publishNotification({
-    level: "warning",
-    title: messages.runtime.session.confirmingCreation,
-    message: messages.runtime.session.creationOutcomeUnknown
-  });
-  return true;
 }
 
 export async function openRendererSession(path: string): Promise<void> {

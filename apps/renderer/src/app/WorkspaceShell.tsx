@@ -347,6 +347,8 @@ function WorkspaceRecoveryState({ workspace }: { workspace: WorkspaceDescriptor 
 
 function WorkspaceEmptyState() {
   const liveWorkspacePath = useAppStore((state) => state.workspace);
+  const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
+  const workspaceOpenPending = useAppStore((state) => state.workspaceOpenPending);
   const workspace = useWorkbenchStore((state) => (
     state.currentWorkspaceId ? state.workspaces[state.currentWorkspaceId] : undefined
   ));
@@ -363,7 +365,11 @@ function WorkspaceEmptyState() {
         <p>新会话会出现在当前工作区列表中。切换工作区或会话不会停止仍在后台运行的 Pi 任务。</p>
         <button
           className="primary-button"
-          disabled={workspace?.availability !== "available"}
+          disabled={
+            workspace?.availability !== "available"
+            || sessionTransitionPending
+            || workspaceOpenPending
+          }
           onClick={() => void start()}
           type="button"
         >新建会话</button>

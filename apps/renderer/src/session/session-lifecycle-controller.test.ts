@@ -27,7 +27,8 @@ vi.mock("../workbench/task-activation-controller.js", () => ({
   activateRendererTask: vi.fn().mockResolvedValue(true)
 }));
 
-vi.mock("./session-creation-authority.js", () => ({
+vi.mock("./session-creation-authority.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./session-creation-authority.js")>()),
   ensureRendererSessionCreationAuthority: vi.fn()
 }));
 
@@ -218,6 +219,16 @@ describe("session lifecycle controller", () => {
       title: "无法创建 Pi 会话",
       message: "connection failed"
     });
+  });
+
+  it("does not create while the initial Workspace Catalog is still settling", async () => {
+    useAppStore.setState({ workspaceOpenPending: true });
+
+    await createRendererSession();
+
+    expect(ensureCreationAuthority).not.toHaveBeenCalled();
+    expect(runBootstrap).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks).toEqual({});
   });
 
   it("selects an already-open Session Task instead of creating a duplicate", async () => {

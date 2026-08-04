@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   INSTALLED_SHUTDOWN_BUDGET_MS,
   measureInstalledApplicationShutdown,
+  prepareRealUserSessionCreation,
   waitForRealUserCreatedSession
 } from "./windows-installed-application-lifecycle.mjs";
 import { sessionPathFromIdentity } from "./windows-installer-identity.mjs";
@@ -16,6 +17,31 @@ import {
 } from "./windows-real-user-lifecycle.mjs";
 
 describe("Windows installed real-user lifecycle", () => {
+  it("captures the create baseline only after the action becomes admissible", async () => {
+    let actionAdmitted = false;
+    const createAction = {
+      click: vi.fn(async (options) => {
+        expect(options).toEqual({ trial: true, timeout: 15_000 });
+        actionAdmitted = true;
+      })
+    };
+    const evaluateAll = vi.fn(async () => {
+      expect(actionAdmitted).toBe(true);
+      return ["session:workspace:initial.jsonl"];
+    });
+    const window = {
+      getByRole: vi.fn(() => ({ first: () => createAction })),
+      locator: vi.fn(() => ({ evaluateAll }))
+    };
+
+    const prepared = await prepareRealUserSessionCreation(window, 15_000);
+
+    expect(prepared.createAction).toBe(createAction);
+    expect([...prepared.existingIdentities]).toEqual(["session:workspace:initial.jsonl"]);
+    expect(createAction.click).toHaveBeenCalledOnce();
+    expect(evaluateAll).toHaveBeenCalledOnce();
+  });
+
   it("canonicalizes the Agent root before checking a real Session path", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-real-user-path-"));
     const canonicalAgentDir = join(root, "canonical-agent");

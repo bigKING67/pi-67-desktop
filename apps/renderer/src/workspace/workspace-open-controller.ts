@@ -70,6 +70,7 @@ export async function openRendererWorkspaceDescriptor(
     trust: descriptor.trust,
     trustUpdating: false,
     sessionTransitionPending: true,
+    workspaceOpenPending: true,
     approvalMode: DEFAULT_APPROVAL_MODE,
     runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
   });
@@ -160,6 +161,8 @@ export async function openRendererWorkspaceDescriptor(
       publishNotification({ level: "error", title: failureTitle, message: detail });
     }
     return false;
+  } finally {
+    if (get().workspace === workspace) set({ workspaceOpenPending: false });
   }
 }
 

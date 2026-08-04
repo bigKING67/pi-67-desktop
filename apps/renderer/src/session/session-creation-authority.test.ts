@@ -44,6 +44,24 @@ describe("Renderer Session creation authority", () => {
     expect(settled).toBe(true);
   });
 
+  it("waits until the initial Workspace Catalog admits Session creation", async () => {
+    useAppStore.setState({
+      ...connectedState(7),
+      workspaceOpenPending: true
+    });
+
+    let settled = false;
+    const authority = ensureRendererSessionCreationAuthority().then(() => {
+      settled = true;
+    });
+    await vi.waitFor(() => expect(ensureConnection).toHaveBeenCalledOnce());
+    expect(settled).toBe(false);
+
+    useAppStore.setState({ workspaceOpenPending: false });
+    await authority;
+    expect(settled).toBe(true);
+  });
+
   it("does not accept a connected state from a stale Host epoch", async () => {
     useAppStore.setState(connectedState(6));
 

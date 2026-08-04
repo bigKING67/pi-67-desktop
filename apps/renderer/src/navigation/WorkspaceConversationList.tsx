@@ -65,6 +65,7 @@ export function WorkspaceConversationList({
   const runtimeTaskOrder = useWorkbenchStore((state) => state.runtimeTaskOrder);
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
+  const workspaceOpenPending = useAppStore((state) => state.workspaceOpenPending);
   const catalogs = useSessionCatalogStore((state) => state.byWorkspace);
   const [showAllWorkspaceIds, setShowAllWorkspaceIds] = useState<Set<string>>(() => new Set());
   const selectedRow = useRef<HTMLElement | null>(null);
@@ -111,6 +112,7 @@ export function WorkspaceConversationList({
             onRequestRemoval={onRequestRemoval}
             query={query}
             sessionTransitionPending={sessionTransitionPending}
+            workspaceOpenPending={workspaceOpenPending}
             selectedIdentity={selectedIdentity}
             selectedRow={selectedRow}
             showAll={showAllWorkspaceIds.has(workspaceId)}
@@ -136,6 +138,7 @@ function WorkspaceConversationGroup({
   catalog,
   query,
   sessionTransitionPending,
+  workspaceOpenPending,
   expanded,
   current,
   showAll,
@@ -151,6 +154,7 @@ function WorkspaceConversationGroup({
   catalog: WorkspaceSessionCatalogState;
   query: string;
   sessionTransitionPending: boolean;
+  workspaceOpenPending: boolean;
   expanded: boolean;
   current: boolean;
   showAll: boolean;
@@ -209,7 +213,7 @@ function WorkspaceConversationGroup({
         <button
           aria-label={`在 ${workspace.displayName} 新建会话`}
           className={styles.workspaceQuickAction}
-          disabled={workspace.availability !== "available" || sessionTransitionPending}
+          disabled={workspace.availability !== "available" || sessionTransitionPending || workspaceOpenPending}
           onClick={() => void createConversationInWorkspace(workspace)}
           title="新建会话"
           type="button"
@@ -345,7 +349,8 @@ function WorkspaceMenu({
 }
 
 async function createConversationInWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
-  if (useAppStore.getState().sessionTransitionPending) return;
+  const state = useAppStore.getState();
+  if (state.sessionTransitionPending || state.workspaceOpenPending) return;
   if (useAppStore.getState().workspace !== workspace.identity.canonicalPath) {
     const opened = await openRendererWorkspaceDescriptor(workspace);
     if (!opened) return;

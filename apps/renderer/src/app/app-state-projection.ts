@@ -13,12 +13,14 @@ export function clearedTransientState(): Pick<AppState,
   | "operationDetail"
   | "operationProgress"
   | "sessionBootstrapTransitionPending"
+  | "workspaceOpenPending"
 > {
   return {
     operation: undefined,
     operationDetail: undefined,
     operationProgress: undefined,
-    sessionBootstrapTransitionPending: false
+    sessionBootstrapTransitionPending: false,
+    workspaceOpenPending: false
   };
 }
 
