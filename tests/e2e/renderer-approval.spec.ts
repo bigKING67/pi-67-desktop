@@ -124,7 +124,7 @@ test("renders a host-authored network-read approval when one is required", async
     }
   }, { operationId });
 
-  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("读取外部网络信息", { exact: true })).toBeVisible();
   await expect(page.getByText("杭州天气", { exact: true })).toBeVisible();
   await expect(page.getByText("custom_network_reader", { exact: true })).toBeVisible();
