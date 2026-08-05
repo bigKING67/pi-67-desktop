@@ -365,6 +365,15 @@ Unsigned Preview 分成 candidate 和 promotion 两个显式人工阶段。旧 R
 Workspace、Prompt/streaming/Tools、审批、停止与恢复、中文输入、DPI、剪贴板、附件、重启及进程退出。
 发现阻断问题后废弃 candidate，修复并从新 source SHA 重建；不得覆盖旧 artifact 或把旧结论转移给新 SHA。
 
+### Internal candidate distribution
+
+日常开发候选使用仓库外飞书目录分发 Windows x64 EXE、macOS arm64 DMG 和 ZIP；GitHub Actions artifact
+只作短期 Windows 构建传输。完整的 source-only Git 边界、exact-SHA 构建、identity、并行上传、目录复核、
+真机测试和失败重建合同见 [`internal-candidate-distribution.md`](./internal-candidate-distribution.md)。
+
+内部候选上传并复核后默认结束，不自动进入下面的 Promotion。只有用户另行明确要求公开 unsigned preview
+时，才重新核对 source SHA、人工测试 receipt、exact bytes 和发布授权，并继续本文件的正式发布流程。
+
 ### Promotion
 
 `Unsigned preview promotion` 必须同时收到完整 source SHA、成功 candidate run/attempt、

@@ -605,6 +605,12 @@ count.
   outside Electron `userData` fails closed instead of following the target.
 - Update checks disclose their network purpose and send no workspace, provider,
   model, session, or credential data.
+- Internal development candidates are not an application update channel. Git
+  does not track their EXE, DMG, ZIP, identities, receipts, screenshots, or
+  logs; the three versioned product files are distributed through the
+  repository-external Feishu folder for target-OS manual testing. This internal
+  loop stops after mirror verification by default and does not imply a Tag,
+  GitHub Release, or promotion.
 - Packaged Desktop builds automatically check the bounded public GitHub Release
   metadata after startup and at most once per 24 hours while running. Development
   builds stay offline. Current-version results and automatic failures are

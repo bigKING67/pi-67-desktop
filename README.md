@@ -11,9 +11,12 @@
 Session，点击会话直接切换中央工作面；最多四个真正运行或等待输入的 Pi Runtime
 可以在切换会话后继续后台运行，普通 Session 历史由可重建 Catalog 分页承载。
 
-当前仓库处于 alpha 实施阶段。GitHub Releases 可以提供明确标记的 unsigned
-preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Developer ID
-签名和 Apple notarization。
+当前仓库处于 alpha 实施阶段。日常开发候选不提交到 Git，也不默认创建 GitHub
+Release：Windows x64 EXE、macOS arm64 DMG 和 ZIP 在完成对应 packaged smoke 后，
+通过内部飞书目录分发并在目标系统人工测试。完整流程见
+[`docs/release/internal-candidate-distribution.md`](docs/release/internal-candidate-distribution.md)。
+只有另行明确授权时才进入公开 GitHub Release；正式稳定渠道仍要求 Windows
+Authenticode、macOS Developer ID 签名和 Apple notarization。
 
 ## 支持范围
 
@@ -24,9 +27,22 @@ preview 安装包；正式稳定渠道仍要求 Windows Authenticode、macOS Dev
 
 不构建 Windows x86/ARM64、macOS Intel/Universal 或 Linux 版本。
 
-## 下载 Alpha Preview
+## 内部 Alpha 候选
 
-公开下载入口：
+内部测试只分发三个带精确版本的文件：
+
+- Windows x64：`Pi-67-Desktop-<version>-win-x64.exe`
+- macOS Apple Silicon：`Pi-67-Desktop-<version>-mac-arm64.dmg`
+- macOS Apple Silicon：`Pi-67-Desktop-<version>-mac-arm64.zip`
+
+GitHub Actions 可以作为 Windows x64 的临时构建和验证环境，但 Actions artifact
+不是内部产品下载入口。测试者从配置在仓库外的飞书目录获取候选；飞书凭据和目录
+token 不进入仓库。内部候选上传、真机测试完成后默认停止，不自动创建 Tag、Release
+或 promotion。
+
+## 公开 Alpha Preview
+
+只有已经另行授权并实际创建 GitHub prerelease 时，公开下载入口才是：
 
 ```text
 https://github.com/bigKING67/pi-67-desktop/releases

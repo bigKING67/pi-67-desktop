@@ -1,0 +1,71 @@
+# Internal candidate distribution
+
+本文是 Pi-67 Desktop 日常开发候选包的分发真源。目标是让 Windows x64 和 macOS Apple Silicon
+尽快拿到同一轮源码对应的可测试安装包，同时保持 Git 仓库不跟踪安装包、构建目录、验证截图、日志或凭据。
+
+内部候选分发与正式发布是两条独立通道。默认开发闭环到飞书真机测试为止，不创建 GitHub Tag、
+GitHub Release，也不触发 unsigned-preview promotion。签名、公证和公开发布仅在用户另行明确授权后，
+按 [`signing.md`](./signing.md) 执行。
+
+## Channel contract
+
+- Git 跟踪源码、测试、工作流和文档；`artifacts/` 下的 EXE、DMG、ZIP、identity、receipt、日志和截图
+  都是 ignored build output，不得提交。
+- Windows x64 使用 Windows runner 从完整、可从 `origin/main` 到达的 source SHA 构建 unsigned NSIS；
+  GitHub Actions artifact 只是短期构建传输，不是产品下载入口。
+- macOS arm64 在 Apple Silicon Mac 上从同一轮源码构建 unsigned DMG 和 ZIP，并完成相关 packaged smoke。
+- 内部分发入口是配置在仓库外的飞书云盘文件夹；不使用 Taildrop，也不使用 GitHub Release 分发日常候选。
+- 飞书只是分发镜像。source SHA、workflow run/attempt、candidate identity、size 和 SHA-256 才是候选身份。
+
+## Product files
+
+每轮只分发以下三个带精确 package version 的产品文件，不使用 `latest` 等模糊名称：
+
+```text
+Pi-67-Desktop-<version>-win-x64.exe
+Pi-67-Desktop-<version>-mac-arm64.dmg
+Pi-67-Desktop-<version>-mac-arm64.zip
+```
+
+Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作为构建证据，但该 identity、
+`win-unpacked`、验证截图和 receipt 不上传到面向测试者的飞书产品目录。
+
+## Default development loop
+
+1. **Freeze source**：完成相关测试后 scoped commit；push 必须有当前明确授权。记录完整 source SHA，
+   并确认本地 HEAD 与目标远端分支的关系。未提交的并发 WIP 不得进入本轮候选。
+2. **Build Windows**：使用 `Windows candidate` workflow 构建精确 source SHA。只有 provenance、
+   packaged smoke、synthetic scale/IME、candidate identity 和完整 NSIS lifecycle 全部成功后，才下载
+   `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。
+3. **Build macOS**：在 Apple Silicon Mac 上运行相关 quality gate 和
+   `corepack pnpm run preview:mac:unsigned`。该命令必须重新打包、执行 packaged smoke 并打开当前仓库
+   artifact；不能用一次 `open` 冒充新包已加载。分发的是生成的 DMG 和 ZIP。
+4. **Record identity**：对三个产品文件记录 version、完整 source SHA、size 和 SHA-256；Windows 另记录
+   workflow run/attempt、candidate identity SHA-256、installer identity 和 `signed=false`。
+5. **Resolve destination**：飞书文件夹 URL/token、OAuth token、cookie 和登录态必须留在仓库外。
+   目标可由 `PI67_FEISHU_CANDIDATE_FOLDER_TOKEN` 等 operator configuration 提供；不得把实际值写入文档、
+   workflow、`.env` 或日志。
+6. **Upload with authorization**：上传属于外部写操作，必须有当前明确授权。三个文件全部在本地准备完毕后，
+   可以对三个不同 file token 并行 multipart 上传；同一个 file token 不得并发写。覆盖同名文件时使用原
+   file token，让飞书保留版本历史并避免目录出现重复名称。删除远端文件或历史版本需要单独授权。
+7. **Verify mirror**：上传成功后重新列出目标文件夹。目录必须恰好包含本轮期望的三个产品名称；逐项核对
+   upload response 的远端 size 与本地 size。构建记录中的 SHA-256 继续作为内容身份，不以飞书文件名代替。
+8. **Manual test**：Windows x64 和 macOS Apple Silicon 分别下载并测试。人工结论必须记录所测文件的
+   version、source SHA、size、SHA-256，以及 Windows run/attempt 和 identity；不得把一轮结论转移给
+   另一轮 bytes。
+9. **Stop by default**：内部测试候选上传并复核后，本轮默认结束。不要因为测试通过而自动创建 Tag、
+   GitHub Release、promotion、签名或公证任务。
+
+## Failure and replacement rules
+
+- build、package 或 smoke 失败时不上传该平台文件；保留最低失败阶段，修复后从新 source SHA 重建。
+- multipart 上传失败时，原 file token 的已完成版本仍是当前可用文件；只重试失败的文件，不删除其他候选。
+- 若新的源码产生不同 bytes，之前的人工测试结论立即失效。优先使用新的 prerelease version；若内部迭代
+  有意复用尚未发布的 version/file token，必须记录新 source SHA 和 SHA-256，并明确废弃旧测试 receipt。
+- 三个新文件都上传成功并重新列目录复核之前，不清理旧候选。远端清理需要当前明确授权。
+- hosted Windows lifecycle、macOS packaged smoke 和飞书可下载都不能替代目标系统的人工真机结论。
+
+## Formal release boundary
+
+只有用户明确要求正式发布时，才从已验证候选进入签名、公证、promotion、Tag 或 GitHub Release。正式流程
+必须重新核对授权、版本、source SHA、目标平台证据和 exact bytes；内部飞书候选通过不等于已经发布。

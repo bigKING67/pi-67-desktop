@@ -52,6 +52,30 @@
   canonical file or Skill directory already loaded by that exact Session's Pi
   `ResourceLoader`; it never grants write or arbitrary home-directory access.
 
+## Candidate distribution
+
+- `docs/release/internal-candidate-distribution.md` is the canonical daily
+  development flow: source-only Git boundary, exact-SHA Windows/macOS builds,
+  packaged smoke, three versioned product files in Feishu, and target-OS manual
+  testing. Stop there by default; do not create a Tag, GitHub Release, or
+  promotion without separate current authorization.
+- Windows Actions artifacts are temporary build transport, not the product
+  download channel. Distribute the Windows x64 NSIS EXE and macOS arm64 DMG/ZIP
+  through the configured internal Feishu Drive folder. Do not use Taildrop.
+- Upload only the three current, versioned product files. Do not use ambiguous
+  `latest` names. Re-list the Feishu folder after upload and verify the expected
+  names and sizes before asking for manual-test confirmation.
+- Feishu is an internal distribution mirror, not the artifact identity
+  authority. Bind every test result to the source SHA, workflow run/attempt when
+  applicable, candidate identity, size, and SHA-256 recorded by the build.
+- Keep the Feishu folder URL/token and all Feishu credentials or login state
+  outside the repository. Resolve the destination from operator configuration,
+  such as `PI67_FEISHU_CANDIDATE_FOLDER_TOKEN`.
+- Uploads, remote candidate deletion, promotion, and publishing each require
+  explicit current authorization. Distinct file tokens may upload in parallel;
+  never write one file token concurrently. Do not remove the previous candidate
+  until the replacement set is uploaded and verified, and cleanup is authorized.
+
 ## Design and quality
 
 - `PRODUCT.md` owns product intent. `DESIGN.md` and `DESIGN.dark.md` own visual
