@@ -1,28 +1,54 @@
-name: Unsigned preview release
+name: Unsigned preview promotion
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing alpha version tag to publish as an unsigned prerelease
+      source_sha:
+        description: Full main commit SHA used by the tested Windows candidate
         required: true
         type: string
+      candidate_run_id:
+        description: Successful Windows candidate workflow run ID
+        required: true
+        type: string
+      candidate_run_attempt:
+        description: Successful Windows candidate workflow run attempt
+        required: true
+        default: '1'
+        type: string
+      confirm_windows_tested:
+        description: I manually tested this exact Windows candidate on Windows x64 and found no release-blocking issue
+        required: true
+        default: false
+        type: boolean
+      confirm_publish:
+        description: I authorize creating the version Tag and public unsigned GitHub prerelease
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
-  group: unsigned-preview-${{ inputs.tag }}
+  group: unsigned-preview-promotion-${{ inputs.source_sha }}
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
   provenance:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      source_commit: ${{ steps.source.outputs.source_commit }}
+      tag: ${{ steps.source.outputs.tag }}
+      version: ${{ steps.source.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -31,13 +57,48 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
+      - name: Require explicit Windows test and publish confirmations
+        shell: bash
+        env:
+          CONFIRM_PUBLISH: ${{ inputs.confirm_publish }}
+          CONFIRM_WINDOWS_TESTED: ${{ inputs.confirm_windows_tested }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+        run: |
+          [[ "$CONFIRM_WINDOWS_TESTED" == 'true' ]] || { echo 'Exact Windows candidate testing was not confirmed.' >&2; exit 1; }
+          [[ "$CONFIRM_PUBLISH" == 'true' ]] || { echo 'Unsigned preview publication was not authorized.' >&2; exit 1; }
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'Candidate run ID is invalid.' >&2; exit 1; }
+          [[ "$CANDIDATE_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo 'Candidate run attempt is invalid.' >&2; exit 1; }
+      - name: Refresh main source authority
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Verify exact main candidate source
+        id: source
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_sha }}
+        run: >-
+          node eng/release/preview-candidate-source.mjs
+          --source-commit "$SOURCE_COMMIT"
+          --github-output "$GITHUB_OUTPUT"
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run verify:extension-adapters
+      - name: Require a new version identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: extension-adapter-provenance-unsigned-preview
+          name: extension-adapter-provenance-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/quality/extension-adapter-provenance.json
           if-no-files-found: error
           retention-days: 30
@@ -49,7 +110,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.provenance.outputs.source_commit }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -58,72 +120,23 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
       - name: Verify runner architecture
-        shell: bash
         run: >-
           node -e "if (process.arch !== 'arm64') throw new Error('Unexpected runner arch: ' + process.arch)"
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run check
-
-  build-windows:
-    needs: provenance
-    runs-on: windows-2025
-    timeout-minutes: 30
-    outputs:
-      candidate_artifact_name: ${{ steps.candidate_name.outputs.name }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.tag }}
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-          cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
-      - name: Verify runner architecture
-        shell: bash
-        run: >-
-          node -e "if (process.arch !== 'x64') throw new Error('Unexpected runner arch: ' + process.arch)"
-      - run: corepack pnpm install --frozen-lockfile
-      - run: corepack pnpm run package:native:unsigned
-      - run: corepack pnpm run package:smoke
-      - name: Verify Windows packaged synthetic scale and IME contracts
-        run: corepack pnpm run package:smoke:windows-ui
-      - name: Resolve Windows candidate artifact name
-        id: candidate_name
-        shell: bash
-        run: echo "name=unsigned-preview-windows-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ steps.candidate_name.outputs.name }}
-          path: |
-            artifacts/release/Pi-67-Desktop-*-win-x64.exe
-            artifacts/release/win-unpacked/Pi-67 Desktop.exe
-          if-no-files-found: error
-          retention-days: 7
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: windows-packaged-ui-unsigned-preview-x64-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/validation/windows-packaged-ui/
-          if-no-files-found: error
-          retention-days: 30
 
   build-macos:
     needs: provenance
     runs-on: macos-15
     timeout-minutes: 30
     outputs:
-      candidate_artifact_name: ${{ steps.candidate_name.outputs.name }}
+      artifact_name: ${{ steps.name.outputs.artifact }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.provenance.outputs.source_commit }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -132,35 +145,33 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
       - name: Verify runner architecture
-        shell: bash
         run: >-
           node -e "if (process.arch !== 'arm64') throw new Error('Unexpected runner arch: ' + process.arch)"
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run package:native:unsigned
       - run: corepack pnpm run package:smoke
-      - name: Resolve macOS candidate artifact name
-        id: candidate_name
-        shell: bash
-        run: echo "name=unsigned-preview-macos-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+      - name: Resolve macOS artifact name
+        id: name
+        run: echo "artifact=unsigned-preview-macos-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.candidate_name.outputs.name }}
+          name: ${{ steps.name.outputs.artifact }}
           path: |
             artifacts/release/Pi-67-Desktop-*-mac-arm64.dmg
             artifacts/release/Pi-67-Desktop-*-mac-arm64.zip
           if-no-files-found: error
           retention-days: 7
 
-  certify-windows-installer:
-    needs: build-windows
-    runs-on: windows-2025
-    timeout-minutes: 15
+  verify-promotion:
+    needs: [provenance, quality-gates, build-macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ needs.provenance.outputs.source_commit }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: 11.16.0
@@ -169,95 +180,179 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
-      - name: Verify runner architecture
-        shell: bash
-        run: >-
-          node -e "if (process.arch !== 'x64') throw new Error('Unexpected runner arch: ' + process.arch)"
       - run: corepack pnpm install --frozen-lockfile
-      - name: Build verifier workspace dependencies
-        run: corepack pnpm --filter @pi67/protocol... run build
-      - name: Download exact Windows candidate
+      - name: Download exact manually tested Windows candidate
         uses: actions/download-artifact@v8
         with:
-          name: ${{ needs.build-windows.outputs.candidate_artifact_name }}
-          path: artifacts/release
-      - name: Verify installer helper tests
-        run: >-
-          corepack pnpm exec vitest run
-          eng/packaging/controlled-shutdown-fixture.test.mjs
-          eng/packaging/verify-windows-installer-lifecycle.test.mjs
-          eng/packaging/windows-artifact-identity.test.mjs
-      - name: Verify Windows NSIS installer lifecycle
-        run: corepack pnpm run package:smoke:windows-installer
-      - uses: actions/upload-artifact@v7
-        if: always()
+          name: windows-candidate-${{ inputs.candidate_run_id }}-${{ inputs.candidate_run_attempt }}
+          path: artifacts
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+      - name: Download macOS artifacts from this promotion run
+        uses: actions/download-artifact@v8
         with:
-          name: windows-installer-lifecycle-unsigned-preview-x64-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/validation/windows-installer-lifecycle/
+          name: ${{ needs.build-macos.outputs.artifact_name }}
+          path: artifacts/release
+      - name: Read candidate workflow metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+        run: |
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'Candidate run ID is invalid.' >&2; exit 1; }
+          [[ "$CANDIDATE_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || { echo 'Candidate run attempt is invalid.' >&2; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN_ID" > "$RUNNER_TEMP/windows-candidate-run.json"
+      - name: Bind manual Windows test confirmation to exact candidate bytes
+        shell: bash
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+          VERSION: ${{ needs.provenance.outputs.version }}
+        run: |
+          corepack pnpm run release:preview:promotion:verify \
+            --actor "$GITHUB_ACTOR" \
+            --candidate-identity artifacts/release/windows-preview-candidate-identity.json \
+            --candidate-run-id "$CANDIDATE_RUN_ID" \
+            --candidate-run-attempt "$CANDIDATE_RUN_ATTEMPT" \
+            --candidate-run-metadata "$RUNNER_TEMP/windows-candidate-run.json" \
+            --installer "artifacts/release/Pi-67-Desktop-${VERSION}-win-x64.exe" \
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' \
+            --promotion-run-id "$GITHUB_RUN_ID" \
+            --promotion-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_COMMIT" \
+            --output artifacts/release/windows-preview-manual-test.json
+      - run: corepack pnpm run release:preview:prepare
+      - run: corepack pnpm run release:preview:verify
+      - run: corepack pnpm run release:preview:bundle:prepare
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verified-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/verified-unsigned-preview/
           if-no-files-found: error
           retention-days: 30
 
   publish:
-    needs: [provenance, quality-gates, build-windows, build-macos, certify-windows-installer]
+    needs: [provenance, verify-promotion]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: write
     steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.tag }}
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.16.0
-          run_install: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24.18.0
-      - run: corepack pnpm run release:tag:verify "${{ inputs.tag }}"
-      - name: Download Windows unsigned preview artifacts
+      - name: Download verified unsigned preview bundle
         uses: actions/download-artifact@v8
         with:
-          name: ${{ needs.build-windows.outputs.candidate_artifact_name }}
-          path: artifacts/release
-      - name: Download macOS unsigned preview artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.build-macos.outputs.candidate_artifact_name }}
-          path: artifacts/release
-      - run: corepack pnpm run release:preview:prepare
-      - run: corepack pnpm run release:preview:verify
-      - name: Publish unsigned GitHub prerelease
+          name: verified-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/verified-unsigned-preview
+      - name: Verify immutable allowlist and publish exact candidate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          CANDIDATE_RUN_ATTEMPT: ${{ inputs.candidate_run_attempt }}
+          CONFIRM_PUBLISH: ${{ inputs.confirm_publish }}
+          CONFIRM_WINDOWS_TESTED: ${{ inputs.confirm_windows_tested }}
+          RELEASE_TAG: ${{ needs.provenance.outputs.tag }}
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+          VERSION: ${{ needs.provenance.outputs.version }}
         run: |
-          set -eu
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          set -euo pipefail
+          [[ "$CONFIRM_WINDOWS_TESTED" == 'true' && "$CONFIRM_PUBLISH" == 'true' ]] || {
+            echo 'Publish confirmations changed or are missing.' >&2
+            exit 1
+          }
+          root='artifacts/verified-unsigned-preview'
+          expected=(
+            "Pi-67-Desktop-${VERSION}-win-x64-unsigned-preview.exe"
+            "Pi-67-Desktop-${VERSION}-mac-arm64-unsigned-preview.dmg"
+            "Pi-67-Desktop-${VERSION}-mac-arm64-unsigned-preview.zip"
+            'SHA256SUMS.txt'
+            'unsigned-preview-manifest.json'
+            'windows-preview-candidate-identity.json'
+            'windows-preview-manual-test.json'
+          )
+          shopt -s nullglob
+          actual=("$root"/*)
+          [[ "${#actual[@]}" -eq "${#expected[@]}" ]] || { echo 'Verified preview bundle file count is invalid.' >&2; exit 1; }
+          for path in "${actual[@]}"; do
+            [[ -f "$path" && ! -L "$path" ]] || { echo "Invalid preview bundle entry: $path" >&2; exit 1; }
+            name="${path##*/}"
+            allowed=false
+            for expected_name in "${expected[@]}"; do
+              [[ "$name" == "$expected_name" ]] && allowed=true
+            done
+            [[ "$allowed" == 'true' ]] || { echo "Unsupported preview bundle entry: $name" >&2; exit 1; }
+          done
+          (cd "$root" && sha256sum -c SHA256SUMS.txt)
+          jq -e \
+            --arg version "$VERSION" \
+            '.schemaVersion == 1 and .channel == "unsigned-preview" and .signed == false and .version == $version and (.files | length) == 3' \
+            "$root/unsigned-preview-manifest.json" > /dev/null
+          candidate_hash="$(sha256sum "$root/windows-preview-candidate-identity.json" | cut -d ' ' -f 1)"
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg source "$SOURCE_COMMIT" \
+            --arg run_id "$CANDIDATE_RUN_ID" \
+            --arg run_attempt "$CANDIDATE_RUN_ATTEMPT" \
+            --arg identity_hash "$candidate_hash" \
+            '.schema == "pi67.windows-preview-manual-test.v1"
+              and .status == "passed"
+              and .repository == $repository
+              and .source.commit == $source
+              and .candidate.runId == $run_id
+              and .candidate.runAttempt == $run_attempt
+              and .candidate.identitySha256 == $identity_hash' \
+            "$root/windows-preview-manual-test.json" > /dev/null
+          jq -e \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg source "$SOURCE_COMMIT" \
+            --arg run_id "$CANDIDATE_RUN_ID" \
+            --arg run_attempt "$CANDIDATE_RUN_ATTEMPT" \
+            '.schema == "pi67.windows-preview-candidate.v1"
+              and .signed == false
+              and .repository == $repository
+              and .source.commit == $source
+              and .workflow.runId == $run_id
+              and .workflow.runAttempt == $run_attempt' \
+            "$root/windows-preview-candidate-identity.json" > /dev/null
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists." >&2
             exit 1
           fi
           cat > "$RUNNER_TEMP/unsigned-preview-notes.md" <<'EOF'
           ## Unsigned Alpha Preview
 
-          This is a non-commercial, unsigned preview build of Pi-67 Desktop. The Windows publisher and macOS developer identity are not verified. Download only from this GitHub repository and verify the SHA-256 value in `SHA256SUMS.txt` or `unsigned-preview-manifest.json`.
+          This is a non-commercial, unsigned preview build of Pi-67 Desktop. The Windows publisher and macOS developer identity are not verified. Download only from this GitHub repository and verify `SHA256SUMS.txt` or `unsigned-preview-manifest.json`.
 
-          ### Downloads
+          The exact Windows x64 candidate published here passed the repository's packaged runtime, synthetic layout/IME, and full NSIS lifecycle gates and was then manually tested on a Windows x64 device before promotion. Promotion reused the tested installer bytes; it did not rebuild Windows.
 
-          - Windows 10/11 x64: `Pi-67-Desktop-*-win-x64-unsigned-preview.exe`
-          - macOS 12+ Apple Silicon: `Pi-67-Desktop-*-mac-arm64-unsigned-preview.dmg` or `.zip`
-
-          Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. If Gatekeeper still blocks an app downloaded from this repository after its SHA-256 is verified, drag it to `/Applications` and run `xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"`. No stable updater metadata is included; install a later preview manually.
-
-          These packages passed the repository quality gates and packaged Electron runtime smoke on native Windows x64 and macOS arm64 GitHub runners. The Windows candidate also passed synthetic-scale layout checks and automated silent install/reinstall/uninstall lifecycle smoke. Cross-version upgrade certification is intentionally outside the unsigned preview release gate. These checks do not replace SmartScreen, real IME/DPI, or interactive installation and upgrade certification. The artifacts are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
+          Windows SmartScreen may require **More info -> Run anyway**. On macOS, use **Open** from Finder's context menu or allow the app in **System Settings -> Privacy & Security**. These checks do not prove every Windows client version, GPU, display, IME, or upgrade path, and the artifacts are not Authenticode-signed, Developer ID-signed, or Apple-notarized.
           EOF
+          printf '\nCandidate evidence: workflow run `%s`, attempt `%s`.\n' \
+            "$CANDIDATE_RUN_ID" "$CANDIDATE_RUN_ATTEMPT" >> "$RUNNER_TEMP/unsigned-preview-notes.md"
           gh release create "$RELEASE_TAG" \
-            artifacts/release/Pi-67-Desktop-*-unsigned-preview.* \
-            artifacts/release/SHA256SUMS.txt \
-            artifacts/release/unsigned-preview-manifest.json \
-            --verify-tag \
+            "${expected[@]/#/$root/}" \
+            --target "$SOURCE_COMMIT" \
             --prerelease \
             --title "Pi-67 Desktop ${RELEASE_TAG#v} (Unsigned Preview)" \
             --notes-file "$RUNNER_TEMP/unsigned-preview-notes.md"
+          ref="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          object_type="$(jq -r '.object.type' <<<"$ref")"
+          object_sha="$(jq -r '.object.sha' <<<"$ref")"
+          for _ in 1 2 3 4; do
+            [[ "$object_type" == 'tag' ]] || break
+            object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$object_sha")"
+            object_type="$(jq -r '.object.type' <<<"$object")"
+            object_sha="$(jq -r '.object.sha' <<<"$object")"
+          done
+          [[ "$object_type" == 'commit' && "$object_sha" == "$SOURCE_COMMIT" ]] || {
+            echo 'Published preview tag does not resolve to the tested source commit.' >&2
+            exit 1
+          }

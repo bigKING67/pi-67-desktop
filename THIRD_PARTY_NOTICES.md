@@ -5,7 +5,7 @@ SBOM 需要由 release workflow 从冻结 lockfile 生成，不能用本文件�
 
 ## Pi
 
-Pi-67 Desktop 直接使用以下 `0.81.1` 包：
+Pi-67 Desktop 直接使用以下 `0.83.0` 包：
 
 - `@earendil-works/pi-coding-agent`
 - `@earendil-works/pi-agent-core`

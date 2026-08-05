@@ -13,9 +13,10 @@ Pi-67-Desktop-<version>-mac-arm64.zip
 Windows 使用 NSIS；macOS 使用 hardened runtime、Developer ID 签名和 notarization。
 不得发布 Windows ARM64/x86、macOS Intel/Universal 或 Linux artifact。
 
-正式稳定 Release 只允许上述签名产物。经明确授权，alpha 阶段可以通过独立的
-`Unsigned preview release` workflow 发布显式带 `-unsigned-preview` 后缀的 GitHub
-prerelease，供非商业测试和反馈使用。Unsigned Preview 不是正式签名 Release。
+正式稳定 Release 只允许上述签名产物。alpha 阶段先通过独立的 `Windows candidate`
+workflow 生成不可发布的测试安装包；人工在 Windows x64 上确认该精确 candidate 没有阻断问题后，
+经明确授权才可通过 `Unsigned preview promotion` workflow 发布带 `-unsigned-preview` 后缀的
+GitHub prerelease。Unsigned Preview 不是正式签名 Release。
 
 `Signed release` 只接受 canonical `vMAJOR.MINOR.PATCH` tag。SemVer prerelease 或 build
 metadata 不得进入 stable workflow；需要签名 prerelease 时必须另建显式 prerelease channel，
@@ -341,29 +342,51 @@ unsigned native smoke package 不是 release artifact，不上传、不生成 re
 
 ## Unsigned preview channel
 
-Unsigned Preview 是普通 CI smoke 之外的显式人工发布通道，必须同时满足：
+Unsigned Preview 分成 candidate 和 promotion 两个显式人工阶段。旧 Release 安装包不作为当前源码的
+测试对象；每轮只测试精确 `main` commit 新生成的 candidate。
 
-1. 用户明确授权发布 unsigned preview；
-2. tag 必须严格等于 `v<package.json version>`，并指向 workflow checkout 的 commit；
-3. tag checkout 必须通过 Built-in Extension Adapter npm/Git provenance gate；
-4. 完整 `pnpm run check` 只在一个 macOS arm64 `quality-gates` job 中执行一次，并与 Windows
-   x64、macOS arm64 的 unsigned native candidate build 并行；两个原生 build 都必须通过
-   packaged Electron smoke；
-5. Windows tag 候选在 packaged smoke 与 synthetic scale/composition smoke 通过后立即上传为
-   绑定本次 run/attempt 的不可变 candidate；独立 `certify-windows-installer` job 只下载该精确
-   candidate 并运行真实 NSIS silent install/reinstall/uninstall lifecycle smoke，不重新构建；
-6. 只发布 Windows x64 NSIS、macOS arm64 DMG/ZIP 三个主产物；
-7. 文件名必须带 `-unsigned-preview`，Release 必须是 GitHub prerelease；
-8. 不发布 `latest.yml`、`latest-mac.yml` 或 blockmap，不进入稳定自动更新渠道；
-9. `unsigned-preview-manifest.json` 必须声明 `channel=unsigned-preview`、`signed=false`，
-   并和 `SHA256SUMS.txt`、三个真实文件逐一验证 size、target 和 SHA-256；
-10. Release notes 必须明确说明 SmartScreen、Gatekeeper、未签名和手动升级边界。
+### Windows candidate
 
-Windows installer certification 是独立 retry boundary。认证脚本或生命周期失败时，应选择
-GitHub Actions 的失败 job 重跑，复用 `build-windows` 已上传的精确 candidate；不得为了调试
-认证问题重新执行完整 quality、native build 和 packaging。`publish` 同时依赖 provenance、
-单次 quality gate、两个平台 candidate build 与 Windows certification，并只下载这些 build
-job 输出中记录的 artifact name，因此认证通过的字节与最终生成 manifest/Release 的字节一致。
+`Windows candidate` 只接受完整 `source_sha`，并要求 checkout 与该 SHA 相同且 SHA 可从
+`origin/main` 到达。开始打包前，package version 对应的 Tag 和 Release 必须都不存在；因此新一轮测试
+必须先 bump 新版本，不能继续构建或测试已经发布的旧版本号。Workflow 权限只有 `contents: read`，
+不创建 Tag 或 Release：
+
+1. Windows x64 hosted runner 打包 unsigned NSIS 与 `win-unpacked` executable；
+2. packaged Electron smoke 与 synthetic scale/composition smoke 必须通过；
+3. `windows-preview-candidate-identity.json` 绑定 repository、source SHA、run/attempt、version、
+   installer 和 packaged executable 的 size/SHA-256，并显式声明 `signed=false`；
+4. 独立 installer job 下载该精确 build，重新验证 identity，完成 full silent
+   install/reinstall/state restore/shutdown/uninstall lifecycle，不重新构建；
+5. 只有 lifecycle 成功后才上传 `windows-candidate-<run-id>-<attempt>`，保留 14 天供 Windows
+   真机人工测试；失败 build 不能成为可 promotion 的 candidate。
+
+人工测试直接在测试 Windows x64 主机的现有用户环境执行，重点验证安装、首次启动、Runtime、
+Workspace、Prompt/streaming/Tools、审批、停止与恢复、中文输入、DPI、剪贴板、附件、重启及进程退出。
+发现阻断问题后废弃 candidate，修复并从新 source SHA 重建；不得覆盖旧 artifact 或把旧结论转移给新 SHA。
+
+### Promotion
+
+`Unsigned preview promotion` 必须同时收到完整 source SHA、成功 candidate run/attempt、
+`confirm_windows_tested=true` 和 `confirm_publish=true`：
+
+1. source SHA 必须仍可从 `main` 到达，package version 对应的 Tag/Release 必须不存在；
+2. candidate run 必须是本仓库成功完成的 `Windows candidate` manual workflow；
+3. promotion 跨 run 下载 `windows-candidate-<run-id>-<attempt>`，重新验证 candidate identity 和
+   installer/executable bytes，并生成绑定该 identity SHA-256 的 `windows-preview-manual-test.json`；
+4. Windows 不再构建；macOS arm64 从同一 source SHA 运行完整 quality、package 和 smoke；
+5. `unsigned-preview-manifest.json` 必须声明 `channel=unsigned-preview`、`signed=false`，并与
+   `SHA256SUMS.txt`、Windows NSIS、macOS DMG/ZIP 逐一验证 size、target 和 SHA-256；重命名后的
+   Windows 发布 EXE 还必须与人工测试 candidate identity 中的 size/SHA-256 完全相同；
+6. verify job 只把三个产品、manifest、checksums、candidate identity 和 manual-test receipt 复制到
+   固定 allowlist bundle；持有 `contents: write` 的 publish job 不 checkout 或执行仓库代码；
+7. publish 使用 candidate 中已经人工测试的 Windows bytes，不调用 electron-builder；Tag 只在全部
+   gate 通过后由 `gh release create --target <source_sha>` 创建；
+8. 文件名必须带 `-unsigned-preview`，Release 必须是 prerelease，不发布 `latest*.yml` 或 blockmap；
+9. Release notes 必须明确 SmartScreen、Gatekeeper、未签名、人工 Windows x64 测试和剩余平台边界。
+
+Candidate build、人工测试、promotion 与 public Release 是四个不同状态。Actions artifact 或人工确认
+pending 不得写成已发布；实际 promotion 仍要求用户当前明确授权。
 
 该通道不需要签名证书、Apple notarization credential 或真实付费 Provider Operation；
 这些认证只阻断正式 Signed Stable Release，不阻断明确标记的 alpha Unsigned Preview。
@@ -373,23 +396,6 @@ macOS 用户只有在从本仓库下载并核对 Release SHA-256 后，才应在
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 ```
-
-Unsigned Preview workflow 也接受可选 `previous_tag`。提供时，只从当前 GitHub 仓库的
-对应 prerelease 下载精确的 Windows `-unsigned-preview.exe`、
-`unsigned-preview-manifest.json` 和 `SHA256SUMS.txt`。`release:preview:baseline:verify`
-会在执行旧 installer 前验证：
-
-```text
-tag SemVer
-manifest identity/channel/signed=false/runtime
-唯一 Windows x64 artifact name
-bounded file size
-manifest bytes and SHA-256
-SHA256SUMS exact entry
-```
-
-随后 lifecycle gate 再要求该版本严格早于当前候选，并执行真实覆盖升级。没有
-`previous_tag` 时仍只证明当前候选的基础安装和 same-version reinstall。
 
 该通道不改变 `Signed release` workflow 的 fail-closed 规则；一旦配置签名与
 notarization credentials，正式发行仍应使用签名工作流。

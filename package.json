@@ -1,6 +1,6 @@
 {
   "name": "pi-67-desktop",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "description": "Pi-first desktop client for Windows x64 and macOS Apple Silicon.",
   "author": "bigKING67",
   "private": true,
@@ -67,7 +67,11 @@
     "release:verify": "node eng/release/verify-artifacts.mjs",
     "release:preview:prepare": "node eng/release/unsigned-preview-artifacts.mjs prepare",
     "release:preview:baseline:verify": "node eng/release/verify-unsigned-preview-baseline.mjs",
-    "release:preview:verify": "node eng/release/unsigned-preview-artifacts.mjs verify"
+    "release:preview:verify": "node eng/release/unsigned-preview-artifacts.mjs verify",
+    "release:preview:source:verify": "node eng/release/preview-candidate-source.mjs",
+    "release:preview:candidate": "node eng/release/windows-preview-candidate.mjs",
+    "release:preview:promotion:verify": "node eng/release/windows-preview-promotion.mjs",
+    "release:preview:bundle:prepare": "node eng/release/prepare-unsigned-preview-bundle.mjs"
   },
   "dependencies": {
     "@pi67/agent-host": "workspace:*",

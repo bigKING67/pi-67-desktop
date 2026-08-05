@@ -1,0 +1,223 @@
+name: Windows candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full main commit SHA to build for Windows testing
+        required: true
+        type: string
+
+concurrency:
+  group: windows-candidate-${{ inputs.source_sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      source_commit: ${{ steps.source.outputs.source_commit }}
+      version: ${{ steps.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Refresh main source authority
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Verify exact main candidate source
+        id: source
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_sha }}
+        run: >-
+          node eng/release/preview-candidate-source.mjs
+          --source-commit "$SOURCE_COMMIT"
+          --github-output "$GITHUB_OUTPUT"
+      - name: Require an unpublished version identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists; bump the package version before building a candidate." >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; bump the package version before building a candidate." >&2
+            exit 1
+          fi
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run verify:extension-adapters
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: extension-adapter-provenance-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/extension-adapter-provenance.json
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    needs: provenance
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      internal_artifact_name: ${{ steps.names.outputs.internal }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.provenance.outputs.source_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Verify Windows x64 runner
+        shell: bash
+        run: >-
+          node -e "if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Unexpected runner: ' + process.platform + '/' + process.arch)"
+      - name: Refresh and verify exact main candidate source
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          node eng/release/preview-candidate-source.mjs --source-commit "$SOURCE_COMMIT"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run package:native:unsigned
+      - run: corepack pnpm run package:smoke
+      - name: Verify Windows packaged synthetic scale and IME contracts
+        run: corepack pnpm run package:smoke:windows-ui
+      - name: Create and verify Windows candidate identity
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          if ($installers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installers.Count)." }
+          $executable = 'artifacts/release/win-unpacked/Pi-67 Desktop.exe'
+          $identity = 'artifacts/release/windows-preview-candidate-identity.json'
+          corepack pnpm run release:preview:candidate create `
+            --installer $installers[0].FullName `
+            --packaged-executable $executable `
+            --repository $env:GITHUB_REPOSITORY `
+            --source-commit $env:SOURCE_COMMIT `
+            --run-id $env:GITHUB_RUN_ID `
+            --run-attempt $env:GITHUB_RUN_ATTEMPT `
+            --output $identity
+          corepack pnpm run release:preview:candidate verify `
+            --candidate-identity $identity `
+            --installer $installers[0].FullName `
+            --packaged-executable $executable `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-commit $env:SOURCE_COMMIT `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - name: Resolve internal artifact name
+        id: names
+        shell: bash
+        run: echo "internal=windows-candidate-build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.names.outputs.internal }}
+          path: |
+            artifacts/release/Pi-67-Desktop-*-win-x64.exe
+            artifacts/release/win-unpacked/Pi-67 Desktop.exe
+            artifacts/release/windows-preview-candidate-identity.json
+            artifacts/validation/windows-packaged-ui/
+          if-no-files-found: error
+          retention-days: 1
+
+  certify-installer:
+    needs: [provenance, build-windows]
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.provenance.outputs.source_commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.16.0
+          run_install: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - run: corepack pnpm install --frozen-lockfile
+      - name: Build verifier workspace dependencies
+        run: corepack pnpm --filter @pi67/protocol... run build
+      - name: Download exact candidate build
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build-windows.outputs.internal_artifact_name }}
+          path: artifacts
+      - name: Verify candidate and installer helper tests
+        run: >-
+          corepack pnpm exec vitest run
+          eng/release/windows-preview-candidate.test.mjs
+          eng/packaging/controlled-shutdown-fixture.test.mjs
+          eng/packaging/verify-windows-installer-lifecycle.test.mjs
+          eng/packaging/windows-artifact-identity.test.mjs
+      - name: Reverify exact Windows candidate bytes
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          if ($installers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($installers.Count)." }
+          corepack pnpm run release:preview:candidate verify `
+            --candidate-identity artifacts/release/windows-preview-candidate-identity.json `
+            --installer $installers[0].FullName `
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-commit $env:SOURCE_COMMIT `
+            --expected-run-id $env:GITHUB_RUN_ID `
+            --expected-run-attempt $env:GITHUB_RUN_ATTEMPT
+      - name: Verify full Windows NSIS installer lifecycle
+        run: corepack pnpm run package:smoke:windows-installer
+      - name: Upload testable Windows candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/release/Pi-67-Desktop-*-win-x64.exe
+            artifacts/release/win-unpacked/Pi-67 Desktop.exe
+            artifacts/release/windows-preview-candidate-identity.json
+            artifacts/validation/windows-packaged-ui/
+            artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Write candidate summary
+        shell: bash
+        env:
+          SOURCE_COMMIT: ${{ needs.provenance.outputs.source_commit }}
+        run: |
+          {
+            echo '## Windows candidate ready for manual testing'
+            echo
+            echo "- Source: \`$SOURCE_COMMIT\`"
+            echo "- Artifact: \`windows-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
+            echo '- Status: candidate only; no Tag or GitHub Release was created'
+          } >> "$GITHUB_STEP_SUMMARY"

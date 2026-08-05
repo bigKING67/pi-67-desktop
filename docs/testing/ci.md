@@ -51,8 +51,9 @@ Shared product and CI-only changes use the quick lane. Dependency changes, `elec
 non-verifier packaging changes, and release/installer-debug workflow changes fail closed to the full
 lane. Empty or unavailable diffs also select full certification.
 
-The reusable verifier lane, unsigned preview, and signed Release workflow always execute the full
-lifecycle. A quick CI receipt is never sufficient evidence for a public Windows download. If a quick
+The reusable verifier lane, `Windows candidate`, and signed Release workflow always execute the full
+lifecycle. Unsigned preview promotion reuses the exact manually tested Windows candidate instead of
+rebuilding it. A quick CI receipt is never sufficient evidence for a public Windows download. If a quick
 lifecycle fails and a follow-up verifier-only commit can reuse its candidate, the reusable lane applies
 the new verifier to that immutable candidate and executes the full lifecycle.
 
