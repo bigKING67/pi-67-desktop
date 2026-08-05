@@ -24,6 +24,7 @@ import {
   verifyInitialRuntimeSettings
 } from "./packaged-electron-smoke-scenarios.mjs";
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
+import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 
 const artifact = resolvePackagedArtifact();
@@ -125,6 +126,7 @@ try {
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
     throw new Error(`Packaged workspace open reported a failure: ${JSON.stringify(await inspectRendererSurface(window))}`);
   }
+  const sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
   const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
   await workspaceSettings.getByRole("button", { name: /运行环境诊断/u }).click();
   const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
@@ -439,7 +441,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

@@ -193,7 +193,7 @@ describe("AgentConnectionController", () => {
     firstHost.handoff(target);
     await controller.waitForConnection();
 
-    const pending = controller.request("session.create", {});
+    const pending = controller.request("session.create", { creationId: "session-creation-controller" });
     const firstRequest = await firstHost.nextRequest("session.create");
     firstHost.closeControllerPort();
     const replacement = createHost(9, 0, "host-9-restarted");

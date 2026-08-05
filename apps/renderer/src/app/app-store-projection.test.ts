@@ -16,6 +16,7 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { seedAuthoritativeRecoveryTask } from "../connection/projection-recovery-test-support.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useAppStore } from "./app-store.js";
 const runningChange: WorkspaceChangeView = {
@@ -41,6 +42,7 @@ describe("renderer projection state", () => {
       identity: { canonicalPath: "/workspace", assurance: "filesystem" },
       trust: "trusted", trustProvenance: "native-picker", availability: "available"
     });
+    seedAuthoritativeRecoveryTask();
     setSessionState("session-1", 3);
   });
 

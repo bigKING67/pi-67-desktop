@@ -20,6 +20,7 @@ export * from "./runtime-credential-overrides.js";
 export * from "./runtime-session-catalog.js";
 export * from "./safety-extension.js";
 export * from "./session-catalog.js";
+export * from "./session-creation-receipt-store.js";
 export * from "./session-projection-index.js";
 export * from "./session-tree-projection.js";
 export * from "./workspace-runtime-services.js";

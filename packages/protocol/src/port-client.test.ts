@@ -61,7 +61,12 @@ describe("AgentPortClient", () => {
       const hello = port.sent[0] as RendererHello;
       port.emit("message", hostWelcome(hello, 4));
 
-      const pending = client.request("session.create", {}, [], { idempotencyKey: "create-session-1" });
+      const pending = client.request(
+        "session.create",
+        { creationId: "session-creation-port" },
+        [],
+        { idempotencyKey: "create-session-1" }
+      );
       let failure: unknown;
       void pending.catch((error: unknown) => { failure = error; });
       await Promise.resolve();

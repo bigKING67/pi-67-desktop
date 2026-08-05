@@ -292,6 +292,11 @@ function requestContext<T extends AgentCommandType>(type: T, payload: CommandPay
       ? current
       : { scope: "workspace", workspaceId: current.workspaceId };
   }
+  if (type === "session.creation.resolve") {
+    return current.scope === "app"
+      ? current
+      : { scope: "workspace", workspaceId: current.workspaceId };
+  }
   return current;
 }
 

@@ -12,7 +12,9 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { agentConnectionController } from "./AgentConnectionController.js";
+import { seedAuthoritativeRecoveryTask } from "./projection-recovery-test-support.js";
 import { taskEventFixture } from "./protocol-test-fixtures.js";
 
 const RUNTIME_CAPABILITIES: RuntimeCapabilities = {
@@ -43,6 +45,10 @@ const RUNTIME_CAPABILITIES: RuntimeCapabilities = {
 describe("new Host Session recovery", () => {
   beforeEach(() => {
     resetStores();
+    seedAuthoritativeRecoveryTask({
+      workspaceId: "workspace-fixture",
+      taskId: "task-fixture"
+    });
     const previousSnapshot = snapshot();
     useAppStore.setState({
       workspace: "/workspace",
@@ -95,7 +101,14 @@ describe("new Host Session recovery", () => {
       sessionPath: "/sessions/session-1.jsonl",
       trust: "trusted",
       approvalMode: "guided"
-    });
+    }, [], { context: {
+      scope: "task",
+      workspaceId: "workspace-fixture",
+      taskId: "task-fixture",
+      taskGeneration: 1,
+      sessionId: "session-1",
+      sessionGeneration: 3
+    } });
     expect(useAppStore.getState()).toMatchObject({
       hostEpoch: 10,
       runtime: { phase: "ready", detail: "Pi 会话已恢复" }
@@ -131,6 +144,49 @@ describe("new Host Session recovery", () => {
       runtime: { phase: "ready", detail: "Pi 会话已恢复" }
     });
     expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("restores the original Settings surface after temporarily routing recovery to its Session Task", async () => {
+    rendererWorkbenchStore.getState().openSettings("runtime");
+    vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "runtime.initialize") {
+        const restoredSnapshot = snapshot();
+        const payload = {
+          capabilities: RUNTIME_CAPABILITIES,
+          snapshot: restoredSnapshot,
+          taskToolMode: "auto" as const
+        };
+        useAppStore.getState().receiveAgentEvent(
+          { type: "runtime.ready", payload },
+          eventEnvelope("runtime.ready", payload, taskEventFixture({
+            hostEpoch: 10,
+            sequence: 1,
+            sessionId: restoredSnapshot.sessionId,
+            sessionGeneration: 3
+          }))
+        );
+        return projectionAcknowledgement(10, restoredSnapshot.sessionId, 3, 1) as never;
+      }
+      if (type === "workspace.changes") return emptyChanges() as never;
+      if (type === "session.catalog.query") return emptyCatalogPage() as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    useAppStore.getState().handleAgentConnected(connectionIdentity(10));
+    await vi.waitFor(() => expect(useAppStore.getState().sessionTransitionPending).toBe(false));
+    await vi.waitFor(() => expect(rendererWorkbenchStore.getState().selectedSurface)
+      .toEqual({ kind: "settings" }));
+
+    expect(rendererWorkbenchStore.getState()).toMatchObject({
+      selectedSurface: { kind: "settings" },
+      settingsReturnSurface: {
+        kind: "conversation",
+        conversation: {
+          kind: "session",
+          sessionPath: "/sessions/session-1.jsonl"
+        }
+      }
+    });
   });
 });
 
@@ -208,4 +264,5 @@ function resetStores(): void {
   useNotificationStore.setState(useNotificationStore.getInitialState(), true);
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
   useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
+  rendererWorkbenchStore.getState().reset();
 }

@@ -107,7 +107,14 @@ export class HostTaskRuntimeLifecycle {
     const runtime = await this.loadRuntime(state, workspaceServices);
     if (!state.record.initialized) {
       const workspace = this.workspaces.get(state.record.context.workspaceId);
-      if (workspace) await this.initializeRuntime(state, runtime, workspace.initialization);
+      if (workspace) {
+        await this.initializeRuntime(state, runtime, {
+          ...workspace.initialization,
+          ...(command.type === "session.create"
+            ? { creationId: command.payload.creationId }
+            : {})
+        });
+      }
       else if (!this.options.usesCompatibilityRuntime()) throw runtimeNotReady();
     }
     return runtime;

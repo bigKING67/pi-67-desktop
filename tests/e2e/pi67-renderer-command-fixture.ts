@@ -102,6 +102,10 @@ export function installMockCommandResponseHandler({
       changed: true
     };
     if (type === "session.catalog.query") return sessionCatalogPage;
+    if (type === "session.creation.resolve") return {
+      status: "missing",
+      creationId: typeof payload.creationId === "string" ? payload.creationId : ""
+    };
     if (
       type === "session.nameByPath"
       || type === "conversation.pin"

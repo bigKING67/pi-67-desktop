@@ -40,6 +40,8 @@ export interface RuntimeInitializeOptions {
   cwd: string;
   agentDir?: string;
   sessionPath?: string;
+  /** Internal Host bootstrap identity used only when session.create initializes a fresh Task. */
+  creationId?: string;
   trust: WorkspaceTrust;
   approvalMode: ApprovalMode;
 }
@@ -82,7 +84,7 @@ export interface AgentRuntime {
   getUserMessageIndex(options: { offset?: number; limit?: number }): UserMessageIndexPage;
   locateUserMessage(id: string): LocatedMessageWindow;
   readAsset(options: { assetId: string; sessionGeneration: number; offset: number; length?: number }): AssetReadResult;
-  createSession(): Promise<SessionSnapshot>;
+  createSession(creationId: string): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
   importSession(path: string): Promise<SessionSnapshot>;
   forkSession(entryId: string, position?: "before" | "at"): Promise<SessionSnapshot>;

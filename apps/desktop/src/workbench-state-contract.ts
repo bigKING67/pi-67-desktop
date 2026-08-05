@@ -1,14 +1,10 @@
 import { isAbsolute } from "node:path";
 import { MAX_RUNNING_TASKS } from "@pi67/protocol";
-import {
-  MAX_WORKSPACE_ID_LENGTH,
-  MAX_WORKSPACE_PATH_LENGTH,
-  parseWorkspaceDescriptor,
-  workspaceDescriptorsReferToSameDirectory,
-  type WorkspaceDescriptor
-} from "./workspace-identity.js";
+import { MAX_WORKSPACE_ID_LENGTH, MAX_WORKSPACE_PATH_LENGTH, parseWorkspaceDescriptor,
+  workspaceDescriptorsReferToSameDirectory, type WorkspaceDescriptor } from "./workspace-identity.js";
 import type { TaskLifecycle } from "./workbench-state-lifecycle.js";
 import { parseRuntimeRecoveryV3 } from "./workbench-state-recovery-v3.js";
+import { parseSessionCreationRecovery, type SessionCreationRecoveryRecord } from "./workbench-state-session-creation.js";
 
 export { isTaskLifecycle, type TaskLifecycle } from "./workbench-state-lifecycle.js";
 
@@ -20,7 +16,6 @@ export const LEGACY_WORKBENCH_STATE_FILENAME = "state-v1.json";
 export const MAX_WORKBENCH_STATE_BYTES = 512 * 1024;
 export const MAX_WORKSPACES = 100;
 export const MAX_RUNTIME_RECOVERY_RECORDS = MAX_RUNNING_TASKS;
-
 export const MAX_TASK_ID_LENGTH = 200;
 export const MAX_SESSION_ID_LENGTH = 1_024;
 const MAX_DRAFT_ID_LENGTH = 200;
@@ -97,6 +92,7 @@ export interface WorkbenchStateV3 {
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
   cleanExit: boolean;
 }
@@ -107,6 +103,7 @@ export interface WorkbenchLayoutV3 {
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
 }
 
@@ -137,6 +134,7 @@ export function createEmptyWorkbenchState(): WorkbenchStateV3 {
     workspaceOrder: [],
     expandedWorkspaceIds: [],
     runtimeRecovery: [],
+    sessionCreationRecovery: [],
     settings: { section: "general", scope: "global" },
     cleanExit: false
   };
@@ -173,6 +171,7 @@ export function parseWorkbenchStateV3(value: unknown): WorkbenchStateV3 | undefi
       "currentWorkspaceId",
       "selectedSurface",
       "runtimeRecovery",
+      "sessionCreationRecovery",
       "settings",
       "cleanExit"
     ],
@@ -202,11 +201,23 @@ export function parseWorkbenchStateV3(value: unknown): WorkbenchStateV3 | undefi
     workspaceIds,
     MAX_RUNTIME_RECOVERY_RECORDS
   );
+  const sessionCreationRecovery = parseSessionCreationRecovery(
+    value.sessionCreationRecovery ?? [],
+    workspaceIds,
+    MAX_TASK_ID_LENGTH
+  );
   const settings = parseWorkbenchSettings(value.settings, workspaceIds);
-  if (!runtimeRecovery || !settings) return undefined;
+  if (
+    !runtimeRecovery
+    || !sessionCreationRecovery
+    || !settings
+    || runtimeRecovery.some((runtime) => (
+      sessionCreationRecovery.some((creation) => creation.taskId === runtime.taskId)
+    ))
+  ) return undefined;
   const selectedSurface = value.selectedSurface === undefined
     ? undefined
-    : parseWorkbenchSurfaceV3(value.selectedSurface, workspaceIds);
+    : parseWorkbenchSurfaceV3(value.selectedSurface, workspaceIds, sessionCreationRecovery);
   if (value.selectedSurface !== undefined && !selectedSurface) return undefined;
   const selectedWorkspaceId = selectedSurfaceWorkspaceId(selectedSurface);
   if (selectedWorkspaceId && value.currentWorkspaceId !== selectedWorkspaceId) return undefined;
@@ -219,6 +230,7 @@ export function parseWorkbenchStateV3(value: unknown): WorkbenchStateV3 | undefi
     ...(typeof value.currentWorkspaceId === "string" ? { currentWorkspaceId: value.currentWorkspaceId } : {}),
     ...(selectedSurface ? { selectedSurface } : {}),
     runtimeRecovery,
+    sessionCreationRecovery,
     settings,
     cleanExit: value.cleanExit
   };
@@ -349,7 +361,8 @@ export function parseWorkbenchSurfaceV2(
 
 function parseWorkbenchSurfaceV3(
   value: unknown,
-  workspaceIds: ReadonlySet<string>
+  workspaceIds: ReadonlySet<string>,
+  sessionCreationRecovery: readonly SessionCreationRecoveryRecord[]
 ): WorkbenchSurface | undefined {
   if (isRecord(value) && hasExactKeys(value, ["kind"]) && value.kind === "settings") return { kind: "settings" };
   if (isRecord(value) && hasExactKeys(value, ["kind", "workspaceId"]) && value.kind === "workspace"
@@ -358,7 +371,14 @@ function parseWorkbenchSurfaceV3(
   }
   if (isRecord(value) && hasExactKeys(value, ["kind", "conversation"]) && value.kind === "conversation") {
     const conversation = parseConversationKey(value.conversation, workspaceIds);
-    if (conversation?.kind !== "session") return undefined;
+    if (!conversation) return undefined;
+    if (
+      conversation.kind === "provisional"
+      && !sessionCreationRecovery.some((record) => (
+        record.workspaceId === conversation.workspaceId
+        && record.taskId === conversation.draftId
+      ))
+    ) return undefined;
     return { kind: "conversation", conversation };
   }
   return undefined;

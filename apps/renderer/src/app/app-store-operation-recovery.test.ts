@@ -10,6 +10,8 @@ import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { seedAuthoritativeRecoveryTask } from "../connection/projection-recovery-test-support.js";
 import { useAppStore } from "./app-store.js";
 
 describe("renderer Operation recovery", () => {
@@ -34,6 +36,7 @@ describe("renderer Operation recovery", () => {
     });
     useAppStore.getState().handleAgentTeardown(new Error("Port closed"));
 
+    seedAuthoritativeRecoveryTask();
     useAppStore.setState({ workspace: "/workspace" });
     mockProjectionResync(
       resyncResult({ latestOperationTerminal: terminalReceipt(stale.operationId) })
@@ -264,4 +267,5 @@ function resetStores(): void {
   useNotificationStore.setState(useNotificationStore.getInitialState(), true);
   useWorkspaceChangesStore.setState(useWorkspaceChangesStore.getInitialState(), true);
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
+  rendererWorkbenchStore.getState().reset();
 }

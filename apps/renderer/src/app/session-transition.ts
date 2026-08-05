@@ -20,7 +20,8 @@ import {
   acceptRendererSessionResponse,
   captureRendererSessionTransition,
   classifyRendererSessionBootstrap,
-  currentRendererSessionAuthority
+  currentRendererSessionAuthority,
+  type RendererSessionTransitionTarget
 } from "../session/session-authority.js";
 
 type StoreGet = () => AppState;
@@ -32,7 +33,14 @@ export interface SessionBootstrapTransitionOptions {
   preserveCurrentProjectionDuringRequest?: boolean;
   request: () => Promise<ProjectionMutationAcknowledgement>;
   onError: (error: unknown) => void;
+  onMissingBootstrap?: () => void;
+  onStale?: (reason: SessionBootstrapStaleReason) => void;
 }
+
+type SessionBootstrapStaleReason =
+  | "connection-lost"
+  | "host-replaced"
+  | "superseded";
 
 export interface SessionResourceCatalogTransitionOptions {
   detail: string;
@@ -75,14 +83,24 @@ export async function runSessionBootstrapTransition(
     const acknowledgement = await options.request();
     const disposition = classifyRendererSessionBootstrap(get(), target, acknowledgement);
     if (disposition === "missing-bootstrap") {
+      if (options.onMissingBootstrap) {
+        options.onMissingBootstrap();
+        return false;
+      }
       throw new Error("Pi 运行服务未发送 authoritative session.bootstrap 事件。");
     }
-    if (disposition === "stale") return false;
+    if (disposition === "stale") {
+      options.onStale?.(sessionBootstrapStaleReason(get(), target));
+      return false;
+    }
     committed = true;
   } catch (error) {
     const disposition = classifyRendererSessionBootstrap(get(), target);
     if (disposition === "committed") committed = true;
-    if (disposition === "stale") return false;
+    if (disposition === "stale") {
+      options.onStale?.(sessionBootstrapStaleReason(get(), target));
+      return false;
+    }
     if (!committed) {
       set({ sessionTransitionPending: false, sessionBootstrapTransitionPending: false });
       options.onError(error);
@@ -211,4 +229,13 @@ export async function runIncrementalSessionTransition(
 
 function transitionRuntime(detail: string): RuntimeStatus {
   return { phase: "starting", detail, recoverable: true };
+}
+
+function sessionBootstrapStaleReason(
+  state: AppState,
+  target: RendererSessionTransitionTarget
+): SessionBootstrapStaleReason {
+  if (!state.connected) return "connection-lost";
+  if (state.hostEpoch !== target.hostEpoch) return "host-replaced";
+  return "superseded";
 }

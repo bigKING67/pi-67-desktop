@@ -1127,6 +1127,21 @@ loading error where the operation can produce those states
   scope, normalized search, and sort contract. Query changes, revision changes,
   or Host epoch replacement clear old pages; stale results cannot append across
   result sets.
+- New Session creation opens one provisional conversation before the request is
+  acknowledged. An unknown create outcome stops the indefinite loading state and
+  shows `重新检查` plus `放弃此占位`; Desktop does not silently resubmit the create,
+  and the provisional identity remains in persisted Workbench state across restart.
+  Recheck asks `session.creation.resolve` for the exact Pi JSONL carrying the stable
+  `creationId` marker, then walks the active SQLite Catalog until an authoritative,
+  complete result confirms the same Session ID and canonical path. Only that exact
+  identity materializes the provisional row as a stopped, resumable Session. Missing,
+  ambiguous, unavailable, fallback, rebuilding, or incomplete results remain visibly
+  unconfirmed. Desktop never selects a latest empty Session or uses Catalog deltas,
+  message count, timestamps, or a bounded creation window as identity evidence.
+- `放弃此占位` removes only the empty in-memory Renderer provisional and returns to
+  the Workspace surface. It never opens, moves, rewrites, or deletes Pi JSONL. A
+  draft or attachment disables the destructive interpretation and keeps the
+  placeholder with an explanatory warning.
 - Sessions without an explicit Pi `session_info.name` receive a query-time title
   from the latest topical User message on the current Pi branch. The Host reads
   the JSONL tail backwards in bounded chunks, follows the leaf's `id -> parentId`
@@ -1183,7 +1198,7 @@ loading error where the operation can produce those states
 ### Extension UI and approval
 
 - Dialogs identify the extension or tool only when the runtime supplies an
-  authoritative identity. Pi SDK `0.81.1` does not identify the caller for
+  authoritative identity. Pi SDK `0.83.0` does not identify the caller for
   shared `ctx.ui` primitives, so those dialogs use the truthful generic label
   `Pi extension` instead of guessing a package.
 - Safety Approval is a dedicated dialog and protocol, not an Extension `confirm`.

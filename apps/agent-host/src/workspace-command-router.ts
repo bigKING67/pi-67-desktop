@@ -1,9 +1,5 @@
 import { createHash } from "node:crypto";
-import type {
-  AgentCommand,
-  CommandResults,
-  WorkspaceProtocolContext
-} from "@pi67/protocol";
+import type { AgentCommand, CommandResults, WorkspaceProtocolContext } from "@pi67/protocol";
 import type { RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "./host-event-channel.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
@@ -216,6 +212,14 @@ export class WorkspaceCommandRouter {
     command: AgentCommand<"session.catalog.query">
   ): Promise<CommandResults["session.catalog.query"]> {
     return this.workspaces.queryCatalog(context.workspaceId, command.payload);
+  }
+
+  resolveSessionCreation(
+    context: WorkspaceProtocolContext,
+    command: AgentCommand<"session.creation.resolve">
+  ): Promise<CommandResults["session.creation.resolve"]> {
+    return this.workspaces.require(context.workspaceId).workspaceServices.sessionCreationReceipts
+      .resolve(command.payload.creationId);
   }
 
   dispatchConversation(

@@ -60,6 +60,25 @@ export type {
 } from "./conversation-organization-messages.js";
 export interface PromptAttachmentRef { id: string; }
 
+export const MAX_SESSION_CREATION_ID_CHARS = 128;
+
+export type SessionCreationResolution =
+  | {
+      status: "materialized";
+      creationId: string;
+      sessionId: string;
+      sessionPath: string;
+    }
+  | {
+      status: "missing" | "ambiguous";
+      creationId: string;
+    }
+  | {
+      status: "unavailable";
+      creationId: string;
+      reason: "scan-limit" | "storage-error";
+    };
+
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 
 export type PromptAttachmentKind = "image" | "document" | "archive" | "audio" | "video" | "file";
@@ -231,7 +250,8 @@ export interface CommandPayloads extends
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
   "message.index": { offset?: number; limit?: number };
   "message.locate": { id: string };
-  "session.create": Record<string, never>;
+  "session.create": { creationId: string };
+  "session.creation.resolve": { creationId: string };
   "session.open": { path: string; cwdOverride?: string };
   "session.import": { submissionId: string; path: string };
   "session.fork": { entryId: string; position?: "before" | "at" };
@@ -336,6 +356,7 @@ export interface CommandResults extends
   "message.index": UserMessageIndexPage;
   "message.locate": LocatedMessageWindow;
   "session.create": ProjectionMutationAcknowledgement;
+  "session.creation.resolve": SessionCreationResolution;
   "session.open": ProjectionMutationAcknowledgement;
   "session.import": OperationSubmissionResult;
   "session.fork": ProjectionMutationAcknowledgement;

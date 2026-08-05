@@ -187,7 +187,8 @@ export function workbenchTaskFromProjection({
     operationId: authoritativeOperation?.operationId,
     recoveryHostInstanceId: undefined,
     recoveryHostEpoch: undefined,
-    creationStatus: undefined
+    creationId: undefined,
+    creationStatus: undefined,
   };
 }
 

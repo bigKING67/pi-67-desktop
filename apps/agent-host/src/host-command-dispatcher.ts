@@ -49,6 +49,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "skill.pack.checkUpdates"
       | "skill.pack.update"
       | "skill.pack.restore"
+      | "session.creation.resolve"
       | "session.nameByPath"
       | "conversation.pin"
       | "conversation.archive"
@@ -142,7 +143,7 @@ export async function dispatchHostCommand(
     case "session.create": {
       const snapshot = context.reuseInitializedSessionForCreate
         ? runtime.getSnapshot()
-        : await runtime.createSession();
+        : await runtime.createSession(command.payload.creationId);
       if (!context.reuseInitializedSessionForCreate) await context.commitSessionWriter(runtime);
       context.sendEvent({ type: "session.bootstrap", payload: { snapshot, reason: "session-create" } });
       return context.captureProjectionMutationAcknowledgement(runtime);

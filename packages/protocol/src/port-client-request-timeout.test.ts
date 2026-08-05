@@ -12,7 +12,7 @@ describe("AgentPortClient request acknowledgement overrides", () => {
       const hello = port.sent[0] as RendererHello;
       port.emit("message", hostWelcome(hello, 4));
 
-      const pending = client.request("session.create", {}, [], {
+      const pending = client.request("session.create", { creationId: "session-creation-timeout" }, [], {
         idempotencyKey: "create-session-override",
         ackTimeoutMs: 5_000
       });
@@ -34,7 +34,7 @@ describe("AgentPortClient request acknowledgement overrides", () => {
     const hello = port.sent[0] as RendererHello;
     port.emit("message", hostWelcome(hello, 4));
 
-    await expect(client.request("session.create", {}, [], {
+    await expect(client.request("session.create", { creationId: "session-creation-timeout" }, [], {
       idempotencyKey: "create-session-invalid-timeout",
       ackTimeoutMs: 999
     })).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });

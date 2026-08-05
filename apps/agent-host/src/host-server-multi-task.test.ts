@@ -247,7 +247,7 @@ describe("AgentHostServer multi-Task routing", () => {
       fixture.port,
       taskB,
       "session.create",
-      {},
+      { creationId: "session-creation-writer-conflict" },
       "create-conflicting-writer"
     );
     expect(conflict.response).toMatchObject({

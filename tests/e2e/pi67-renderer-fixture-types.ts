@@ -48,6 +48,7 @@ export interface MockAgentOptions {
   contextFiles?: FixtureContextFiles;
   sessionCatalogItems?: FixtureSessionSummary[];
   sessionCatalogItemsByWorkspace?: Record<string, FixtureSessionSummary[]>;
+  responseResults?: Record<string, unknown>;
   assets?: Record<string, {
     mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
     dataBase64: string;

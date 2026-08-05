@@ -11,6 +11,7 @@ import { ProtocolRequestError } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import {
   normalizeSessionCatalogQuery,
+  selectWorkspaceSessionCatalog,
   useSessionCatalogStore,
   type WorkspaceSessionCatalogState
 } from "./session-catalog-store.js";
@@ -47,7 +48,10 @@ async function runFirstSessionCatalogQuery(
     });
     const committed = store.finishFirstPage(target, page);
     if (committed) {
-      reconcileMaterializedSessions(workspaceId, page.items);
+      reconcileMaterializedSessions(
+        workspaceId,
+        selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), workspaceId)
+      );
       if (page.state === "unavailable") {
         scheduleSessionCatalogRetry(workspaceId, options, retryGeneration, retryAttempt);
       } else {
@@ -82,7 +86,12 @@ export async function loadMoreSessionCatalog(workspaceId: WorkspaceId): Promise<
   if (!target) return;
   try {
     const page = await querySessionCatalogPage({ workspaceId, query: target.query, cursor: target.cursor });
-    if (store.finishNextPage(target, page)) reconcileMaterializedSessions(workspaceId, page.items);
+    if (store.finishNextPage(target, page)) {
+      reconcileMaterializedSessions(
+        workspaceId,
+        selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), workspaceId)
+      );
+    }
   } catch (error) {
     if (error instanceof ProtocolRequestError && error.code === "STALE_SESSION_CATALOG") {
       if (store.cancelNextPage(target)) await queryFirstSessionCatalog(workspaceId, { query: target.query });
@@ -236,21 +245,28 @@ function isAuthoritativeCompleteCatalog(
 
 function reconcileMaterializedSessions(
   workspaceId: WorkspaceId,
-  sessions: SessionCatalogPage["items"]
+  catalog: WorkspaceSessionCatalogState
 ): void {
   const workbench = rendererWorkbenchStore.getState();
-  for (const session of sessions) {
+  for (const session of catalog.items) {
     const task = Object.values(workbench.tasks).find((candidate) => (
       candidate.workspaceId === workspaceId
       && candidate.sessionId === session.id
     ));
-    if (!task || task.conversation.kind === "session") continue;
+    if (
+      !task
+      || task.conversation.kind === "session"
+      || task.creationStatus !== undefined
+      || task.creationId !== undefined
+    ) continue;
     workbench.updateTask(task.id, {
       conversation: { kind: "session", workspaceId, sessionPath: session.path },
       sessionPath: session.path,
       title: session.name,
       titleSource: session.nameSource,
-      creationStatus: undefined
+      creationId: undefined,
+      creationStatus: undefined,
+      pendingTitle: undefined
     });
   }
 }

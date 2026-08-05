@@ -436,6 +436,18 @@ count.
   use stable idempotency keys and a bounded same-key transport retry. Lost responses
   cannot duplicate Session creation or replay a control mutation into a newer Session
   generation.
+- If `session.create` still ends with an unknown acknowledgement outcome, Desktop
+  never submits a second create automatically. It keeps one provisional conversation
+  in persisted Workbench state and reconciles it by the stable `creationId` written as
+  an exact marker in the created Pi JSONL. `session.creation.resolve` must return that
+  marker's exact Session ID and canonical path, and an authoritative, complete SQLite
+  Catalog must then expose the same identity before the placeholder materializes as a
+  resumable Session. Missing, ambiguous, unavailable, fallback, rebuilding, or
+  incomplete evidence stays provisional; Desktop never guesses from the newest empty
+  Session, a pre-create baseline, or a creation-time window. `重新检查` repeats only this
+  exact resolution and Catalog confirmation. `放弃此占位` removes only the empty
+  Renderer placeholder and never deletes or rewrites Pi JSONL. A draft or attachment
+  blocks dismissal so unsent user content cannot be discarded.
 - Session import, compaction, and Extension command invocation use caller-stable
   submission IDs and content fingerprints. They may retry one accepted acknowledgement
   only while the same Host epoch remains authoritative; a replacement Host never

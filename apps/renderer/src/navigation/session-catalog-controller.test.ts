@@ -76,7 +76,7 @@ describe("session catalog controller", () => {
     });
   });
 
-  it("materializes a matching provisional Task only after the Catalog returns its path", async () => {
+  it("materializes an ordinary matching provisional Task only after the Catalog returns its path", async () => {
     const workbench = rendererWorkbenchStore.getState();
     workbench.registerWorkspace({
       id: WORKSPACE_ID,
@@ -98,8 +98,7 @@ describe("session catalog controller", () => {
       title: "未命名对话",
       hasDraft: false,
       attachmentCount: 0,
-      toolMode: "auto",
-      creationStatus: "confirming"
+      toolMode: "auto"
     });
     vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
 
@@ -115,7 +114,50 @@ describe("session catalog controller", () => {
       title: SESSION_ONE.name,
       titleSource: SESSION_ONE.nameSource
     });
-    expect(rendererWorkbenchStore.getState().tasks["task-pending"]?.creationStatus).toBeUndefined();
+  });
+
+  it("does not bypass exact creation recovery with a matching Catalog Session id", async () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: WORKSPACE_ID,
+      displayName: "A",
+      identity: { canonicalPath: "/work", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask({
+      id: "task-creation-bound",
+      conversation: {
+        kind: "provisional",
+        workspaceId: WORKSPACE_ID,
+        draftId: "task-creation-bound"
+      },
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ONE.id,
+      taskGeneration: 1,
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "confirming", recoverable: true },
+      title: "未命名对话",
+      hasDraft: false,
+      attachmentCount: 0,
+      toolMode: "auto",
+      creationId: "session-creation-bound",
+      creationStatus: "confirming"
+    });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-creation-bound"]).toMatchObject({
+      conversation: {
+        kind: "provisional",
+        workspaceId: WORKSPACE_ID,
+        draftId: "task-creation-bound"
+      },
+      creationId: "session-creation-bound",
+      creationStatus: "confirming"
+    });
   });
 
   it("appends the next page without duplicating an existing path", async () => {

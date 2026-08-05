@@ -64,6 +64,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "workspace.register": "workspace",
   "workspace.unregister": "workspace",
   "session.catalog.query": "workspace",
+  "session.creation.resolve": "workspace",
   "session.nameByPath": "workspace",
   "conversation.pin": "workspace",
   "conversation.archive": "workspace",

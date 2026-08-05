@@ -16,7 +16,7 @@ describe("ControlMutationLedger", () => {
       finish = resolve;
     }));
     const ledger = new ControlMutationLedger(4, () => identity);
-    const command = controlCommand("session.create", {});
+    const command = controlCommand("session.create", { creationId: "session-creation-ledger" });
 
     const first = ledger.run("mutation-1", command, execute);
     const retry = ledger.run("mutation-1", command, execute);
@@ -77,7 +77,7 @@ describe("ControlMutationLedger", () => {
       now: () => now
     });
     let finish!: (value: ProjectionMutationAcknowledgement) => void;
-    const pending = ledger.run("pending", controlCommand("session.create", {}), () => (
+    const pending = ledger.run("pending", controlCommand("session.create", { creationId: "session-creation-pending" }), () => (
       new Promise<ProjectionMutationAcknowledgement>((resolve) => { finish = resolve; })
     ));
     await Promise.resolve();
@@ -91,7 +91,7 @@ describe("ControlMutationLedger", () => {
 
     now = 101;
     const execute = vi.fn(async () => acknowledgement(identity));
-    await ledger.run("pending", controlCommand("session.create", {}), execute);
+    await ledger.run("pending", controlCommand("session.create", { creationId: "session-creation-pending" }), execute);
     expect(execute).toHaveBeenCalledOnce();
   });
 });

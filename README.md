@@ -58,7 +58,7 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 
 ## 运行时决策
 
-- 唯一 Agent runtime：`@earendil-works/pi-coding-agent@0.81.1`
+- 唯一 Agent runtime：`@earendil-works/pi-coding-agent@0.83.0`
 - 不实现 Pi RPC Adapter，也不依赖系统安装的 `pi`
 - Pi SDK 运行在 Electron Agent Host utility process，不进入 renderer
 - Welcome 不预启动 Agent Host；选择工作区或运行 Doctor 时按需启动，随后才动态加载 Pi SDK
@@ -192,7 +192,7 @@ apps/
   renderer/         React 产品界面、Connection Controller、增量投影和 feature UI
 packages/
   domain/           无运行时依赖的策略与视图模型
-  protocol/         Protocol v2 envelope、逐消息 schema 和 Port client
+  protocol/         Protocol v3 envelope、逐消息 schema 和 Port client
   extension-compat/ 声明式 Extension Adapter manifest、校验与 immutable registry
   pi-runtime/       AgentRuntime port、PiSdkRuntime、extension UI 与安全扩展
 eng/

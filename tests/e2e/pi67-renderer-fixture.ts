@@ -94,7 +94,7 @@ export async function attachMockAgent(
       snapshot: fixtureSnapshot,
       responseDelays: fixtureResponseDelays,
       responseFailures: {},
-      responseResults: {},
+      responseResults: fixtureOptions.responseResults ?? {},
       commands: [],
       taskStates: {},
       resyncOperations: {},

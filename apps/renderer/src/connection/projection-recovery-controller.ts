@@ -25,8 +25,14 @@ import {
   installResynchronizedProjection
 } from "./projection-resync-installation.js";
 import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-identity.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask
+} from "../workbench/workbench-store.js";
+import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 import type { WorkspaceId } from "@pi67/domain";
+import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
+import { selectAuthoritativeRecoveryTask } from "./projection-recovery-task-selection.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -66,6 +72,20 @@ export function recoverConnectedRendererProjection(
 ): void {
   const revision = invalidateProjectionRecoveryGeneration();
   const recoverySessionPath = useSessionProjectionStore.getState().recoverySessionPath;
+  const recoverySelection = selectAuthoritativeRecoveryTask(recoverySessionPath);
+  if (!recoverySelection) {
+    if (input.workspaceId && hasPendingSessionCreation(input.workspaceId)) {
+      recoverCreationOnlyWorkbench(get, set, {
+        ...input,
+        workspaceId: input.workspaceId
+      }, revision);
+      return;
+    }
+    failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, new Error(
+      "No authoritative Workbench Task is available for Session recovery."
+    ));
+    return;
+  }
   prepareRendererSessionTransaction(
     input.sameHost ? "projection-resync" : "host-replaced"
   );
@@ -75,6 +95,7 @@ export function recoverConnectedRendererProjection(
   });
   const transitionTarget = captureRendererSessionTransition(get());
   if (!transitionTarget) {
+    recoverySelection.restore();
     failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, new Error(
       "Renderer Session transition authority is not connected."
     ));
@@ -92,7 +113,13 @@ export function recoverConnectedRendererProjection(
         messages.runtime.connection.sessionRestored,
         input.workspaceId
       )
-    )).catch((error: unknown) => {
+    ), recoverySelection.context).then((committed) => {
+      recoverySelection.restore();
+      if (committed && input.workspaceId) {
+        void reconcileUnconfirmedRendererSessions(input.workspaceId);
+      }
+    }).catch((error: unknown) => {
+      recoverySelection.restore();
       failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, error, transitionTarget);
     });
     return;
@@ -102,30 +129,133 @@ export function recoverConnectedRendererProjection(
     ...(recoverySessionPath === undefined ? {} : { sessionPath: recoverySessionPath }),
     trust: input.trust,
     approvalMode: input.approvalMode
-  }).then((acknowledgement) => {
-    if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
+  }, recoverySelection.context).then((acknowledgement) => {
+    if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) {
+      recoverySelection.restore();
+      return;
+    }
     const disposition = classifyRendererSessionBootstrap(
       get(),
       transitionTarget,
       acknowledgement
     );
     if (disposition === "committed") {
+      recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
+      if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
       return;
     }
-    if (disposition === "stale") return;
+    if (disposition === "stale") {
+      recoverySelection.restore();
+      return;
+    }
     throw new Error(messages.runtime.connection.missingRuntimeReady);
   }).catch((error: unknown) => {
     if (
       projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)
       && classifyRendererSessionBootstrap(get(), transitionTarget) === "committed"
     ) {
+      recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
+      if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
       return;
     }
+    recoverySelection.restore();
     failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, error, transitionTarget);
+  });
+}
+
+function hasPendingSessionCreation(workspaceId: WorkspaceId): boolean {
+  return Object.values(rendererWorkbenchStore.getState().tasks).some((task) => (
+    task.workspaceId === workspaceId
+    && task.conversation.kind === "provisional"
+    && task.creationId !== undefined
+    && task.creationStatus !== undefined
+  ));
+}
+
+function recoverCreationOnlyWorkbench(
+  get: StoreGet,
+  set: StoreSet,
+  input: ConnectedProjectionRecoveryInput & { workspaceId: WorkspaceId },
+  revision: number
+): void {
+  const workspace = rendererWorkbenchStore.getState().workspaces[input.workspaceId];
+  if (!workspace || workspace.availability !== "available") {
+    finishCreationOnlyRecoveryFailure(
+      get,
+      set,
+      input.identity.hostEpoch,
+      revision,
+      new Error("The Workspace for Session creation recovery is unavailable.")
+    );
+    return;
+  }
+  prepareRendererSessionTransaction(input.sameHost ? "projection-resync" : "host-replaced");
+  set({
+    ...clearedTransientState(),
+    sessionTransitionPending: true,
+    runtime: {
+      phase: "recovering",
+      detail: messages.runtime.connection.restoringSession,
+      recoverable: true
+    }
+  });
+  void registerRendererWorkspaceWithHost(workspace, {
+    queryCatalog: true,
+    refreshCatalog: true
+  }).then(async (registered) => {
+    if (!registered) throw new Error("The Workspace could not be registered for Session creation recovery.");
+    if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
+    await reconcileUnconfirmedRendererSessions(input.workspaceId);
+    if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
+    projectionRecoveryLedger.clearInterruptedOperation();
+    const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+    set({
+      sessionTransitionPending: false,
+      sessionBootstrapTransitionPending: false,
+      runtime: selected?.runtime ?? {
+        phase: "stopped",
+        detail: messages.runtime.workbench.workspaceRestored,
+        recoverable: true
+      }
+    });
+  }).catch((error: unknown) => {
+    finishCreationOnlyRecoveryFailure(
+      get,
+      set,
+      input.identity.hostEpoch,
+      revision,
+      error
+    );
+  });
+}
+
+function finishCreationOnlyRecoveryFailure(
+  get: StoreGet,
+  set: StoreSet,
+  hostEpoch: number,
+  revision: number,
+  error: unknown
+): void {
+  if (!projectionRecoveryLedger.isCurrent(get(), hostEpoch, revision)) return;
+  projectionRecoveryLedger.clearInterruptedOperation();
+  const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+  set({
+    sessionTransitionPending: false,
+    sessionBootstrapTransitionPending: false,
+    runtime: selected?.runtime ?? {
+      phase: "failed",
+      detail: messages.runtime.session.creationOutcomeUnknown,
+      recoverable: true
+    }
+  });
+  publishNotification({
+    level: "warning",
+    title: messages.runtime.session.creationRecheckUnavailable,
+    message: errorMessage(error)
   });
 }
 

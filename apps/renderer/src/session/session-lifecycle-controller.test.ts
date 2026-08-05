@@ -7,11 +7,13 @@ import {
 } from "../app/session-transition.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
+import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { activateRendererTask } from "../workbench/task-activation-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { useSessionProjectionStore } from "./session-projection-store.js";
 import { ensureRendererSessionCreationAuthority } from "./session-creation-authority.js";
+import { dismissUnconfirmedRendererSession } from "./session-creation-recovery-controller.js";
 import {
   createRendererSession,
   openRendererSession,
@@ -47,6 +49,7 @@ describe("session lifecycle controller", () => {
     rendererWorkbenchStore.getState().reset();
     useTaskDraftStore.getState().dispose();
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
+    useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
     useAppStore.setState(useAppStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace(workspace());
@@ -76,11 +79,18 @@ describe("session lifecycle controller", () => {
       sessionId: expect.stringMatching(/^pending:task-/u),
       lifecycle: "initializing",
       runtime: { phase: "starting", detail: "正在启动 Pi 会话" },
-      creationStatus: "pending"
+      creationStatus: "pending",
+      creationId: expect.stringMatching(/^session-creation-/u)
     });
 
     await options.request();
-    expect(request).toHaveBeenCalledWith("session.create", {}, [], {
+    expect(request).toHaveBeenCalledWith("session.create", { creationId: task!.creationId }, [], {
+      context: {
+        scope: "task",
+        workspaceId: "workspace-a",
+        taskId: task!.id,
+        taskGeneration: task!.taskGeneration
+      },
       onAcknowledgementDelayed: expect.any(Function)
     });
     const delayed = request.mock.calls[0]?.[3]?.onAcknowledgementDelayed;
@@ -122,11 +132,33 @@ describe("session lifecycle controller", () => {
       lifecycle: "draft",
       runtime: { phase: "failed", detail: "无法创建 Pi 会话", recoverable: true }
     });
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]?.creationId).toBeUndefined();
     expect(rendererWorkbenchStore.getState().tasks[task!.id]?.creationStatus).toBeUndefined();
     expect(useTaskDraftStore.getState().drafts[task!.id]?.text).toBe("保留这个草稿");
   });
 
+  it("keeps an unconfirmed Task when acknowledgement arrives without its bootstrap event", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("resolver unavailable"));
+    await createRendererSession();
+    const options = runBootstrap.mock.calls[0]![2];
+    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+
+    options.onMissingBootstrap?.();
+
+    expect(rendererWorkbenchStore.getState().tasks[task!.id]).toMatchObject({
+      lifecycle: "draft",
+      creationId: task!.creationId,
+      creationStatus: "unconfirmed",
+      runtime: {
+        phase: "failed",
+        detail: "对话创建结果尚未确认。请重新检查；如仍无法确认，可放弃占位后再次新建。",
+        recoverable: true
+      }
+    });
+  });
+
   it("keeps one unconfirmed Task when the create acknowledgement outcome is unknown", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("resolver unavailable"));
     await createRendererSession();
     const options = runBootstrap.mock.calls[0]![2];
     const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
@@ -142,13 +174,72 @@ describe("session lifecycle controller", () => {
       creationStatus: "unconfirmed",
       runtime: {
         phase: "failed",
-        detail: "对话创建结果尚未确认，请等待运行服务完成对账。",
+        detail: "对话创建结果尚未确认。请重新检查；如仍无法确认，可放弃占位后再次新建。",
         recoverable: true
       }
     });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "正在确认对话是否已创建"
+    });
+  });
+
+  it.each(["connection-lost", "host-replaced", "superseded"] as const)(
+    "automatically rechecks an unconfirmed create after a %s transition",
+    async (reason) => {
+      const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+        status: "missing",
+        creationId: "ignored-by-test"
+      } as never);
+      await createRendererSession();
+      const options = runBootstrap.mock.calls[0]![2];
+      const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+
+      options.onStale?.(reason);
+
+      await vi.waitFor(() => expect(request).toHaveBeenCalledWith(
+        "session.creation.resolve",
+        { creationId: task!.creationId },
+        [],
+        { context: { scope: "workspace", workspaceId: "workspace-a" } }
+      ));
+      expect(rendererWorkbenchStore.getState().tasks[task!.id]?.creationStatus).toBe("unconfirmed");
+    }
+  );
+
+  it("assigns creation identity independently of Catalog readiness", async () => {
+    await createRendererSession();
+
+    const [task] = Object.values(rendererWorkbenchStore.getState().tasks);
+    expect(task?.creationId).toMatch(/^session-creation-/u);
+    expect(task?.creationStatus).toBe("pending");
+  });
+
+  it("allows a fresh create after the unconfirmed placeholder is dismissed", async () => {
+    await createRendererSession();
+    const firstOptions = runBootstrap.mock.calls[0]![2];
+    const [unconfirmed] = Object.values(rendererWorkbenchStore.getState().tasks);
+    firstOptions.onError(new ProtocolRequestError({
+      code: "REQUEST_OUTCOME_UNKNOWN",
+      message: "not acknowledged",
+      recoverable: true
+    }));
+    expect(dismissUnconfirmedRendererSession(unconfirmed!.id)).toBe(true);
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+
+    await createRendererSession();
+    expect(runBootstrap).toHaveBeenCalledTimes(2);
+    await runBootstrap.mock.calls[1]![2].request();
+
+    expect(request).toHaveBeenCalledOnce();
+    const [secondTask] = Object.values(rendererWorkbenchStore.getState().tasks);
+    expect(request).toHaveBeenCalledWith("session.create", { creationId: secondTask!.creationId }, [], {
+      context: expect.objectContaining({
+        scope: "task",
+        workspaceId: "workspace-a",
+        taskId: secondTask!.id
+      }),
+      onAcknowledgementDelayed: expect.any(Function)
     });
   });
 

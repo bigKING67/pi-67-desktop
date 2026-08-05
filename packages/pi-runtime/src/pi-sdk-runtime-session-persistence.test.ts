@@ -42,7 +42,7 @@ describe("PiSdkRuntime session persistence", () => {
       await runtime.setSessionName("Persisted empty Session");
       expect(externalChanges).toEqual([]);
 
-      const created = await runtime.createSession();
+      const created = await runtime.createSession("session-creation-persistence");
       const createdPath = requireSessionPath(created.sessionPath);
       expect(created.sessionId).not.toBe(initial.sessionId);
       expect(createdPath).not.toBe(initialPath);

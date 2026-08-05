@@ -369,7 +369,7 @@ rebuilding 并调度 bounded discovery。Retry 重新打开 SQLite 后，在完�
 由下一次完整 reconcile 合并后再切回 SQLite，外部独有 rows 不得重新进入公开 projection。
 该合同用于 fail-closed 检测，不等于同用户恶意进程隔离或跨平台
 single-owner lock；文件替换、恶意重写 version cookie、多 utility-process 和 Windows lock timing 仍需独立证据。
-当前 Pi SDK `0.81.1` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
+当前 Pi SDK `0.83.0` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
 丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
 
@@ -499,7 +499,7 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整
   展示时立即拒绝，不能等待超时后继续执行。
-- Pi `0.81.1` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
+- Pi `0.83.0` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
   其他 Extension 修改后的最终 Tool 输入。真实 Pi ordering contract test 固定该属性，SDK
   升级若改变顺序必须失败。
 - Project trust only enables project resources. It does not replace per-action

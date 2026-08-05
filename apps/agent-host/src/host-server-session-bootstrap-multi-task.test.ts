@@ -66,7 +66,12 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
     await waitForResponse(port, openWorkspace.requestId);
 
     const secondContext = testTaskContext(1, { taskId: "task-second" });
-    const createSecond = commandEnvelopeForContext("session.create", {}, secondContext, 12);
+    const createSecond = commandEnvelopeForContext(
+      "session.create",
+      { creationId: "session-creation-second" },
+      secondContext,
+      12
+    );
     port.emit(createSecond);
     await waitForResponse(port, createSecond.requestId);
     expect(port.sent[responseIndex(port, createSecond.requestId)]).toMatchObject({
@@ -79,7 +84,8 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
         cwd: workspaceCwd,
         agentDir: expect.any(String),
         trust: "trusted",
-        approvalMode: "guided"
+        approvalMode: "guided",
+        creationId: "session-creation-second"
       },
       expect.any(Function)
     );

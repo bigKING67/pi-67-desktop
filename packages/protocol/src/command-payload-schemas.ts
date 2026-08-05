@@ -18,6 +18,7 @@ import {
   PiProviderConfigurationInputSchema
 } from "./provider-configuration-schemas.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
+import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
 import {
@@ -92,7 +93,8 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_USER_MESSAGE_INDEX_PAGE_ITEMS }))
   }),
   "message.locate": strictObject({ id: Type.String({ minLength: 1, maxLength: 512 }) }),
-  "session.create": EmptyPayloadSchema,
+  "session.create": strictObject({ creationId: SessionCreationIdSchema }),
+  "session.creation.resolve": strictObject({ creationId: SessionCreationIdSchema }),
   "session.open": strictObject({ path: PathSchema, cwdOverride: Type.Optional(PathSchema) }),
   "session.import": strictObject({ submissionId: SubmissionIdSchema, path: PathSchema }),
   "session.fork": strictObject({

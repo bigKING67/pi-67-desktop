@@ -3,7 +3,8 @@ import type {
   AgentConnectionIdentity,
   ProjectionMutationAcknowledgement,
   ProjectionResyncInstaller,
-  SequenceGap
+  SequenceGap,
+  TaskProtocolContext
 } from "@pi67/protocol";
 import { agentConnectionController } from "./AgentConnectionController.js";
 
@@ -33,19 +34,21 @@ export function ensureAgentConnection(): Promise<AgentConnectionIdentity> {
 }
 
 export async function recoverSession(
-  input: SessionRecoveryInput
+  input: SessionRecoveryInput,
+  context: TaskProtocolContext
 ): Promise<ProjectionMutationAcknowledgement> {
   return agentConnectionController.request("runtime.initialize", {
     cwd: input.workspace,
     ...(input.sessionPath === undefined ? {} : { sessionPath: input.sessionPath }),
     trust: input.trust,
     approvalMode: input.approvalMode
-  });
+  }, [], { context });
 }
 
 export async function resynchronizeProjection(
   expected: number | SequenceGap,
-  install: ProjectionResyncInstaller
+  install: ProjectionResyncInstaller,
+  context?: TaskProtocolContext
 ): Promise<boolean> {
   const expectedHostEpoch = typeof expected === "number" ? expected : expected.hostEpoch;
   return agentConnectionController.resyncProjection((result) => {
@@ -53,7 +56,7 @@ export async function resynchronizeProjection(
       throw new Error("Pi 运行服务在状态重同步期间已重启。");
     }
     return install(result);
-  });
+  }, context);
 }
 
 async function connectWithBoundedRetry(): Promise<AgentConnectionIdentity> {

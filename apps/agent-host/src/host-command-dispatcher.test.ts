@@ -60,7 +60,7 @@ describe("operationSubmissionIdentity", () => {
 
     await expect(dispatchHostCommand(
       runtime,
-      { type: "session.create", payload: {} },
+      { type: "session.create", payload: { creationId: "session-creation-initialized" } },
       context as never
     )).resolves.toBe(acknowledgement);
 

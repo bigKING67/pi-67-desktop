@@ -102,6 +102,20 @@ export class HostRequestRouter {
         .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
       return;
     }
+    if (request.type === "session.creation.resolve" && request.context.scope === "workspace") {
+      const command = {
+        type: request.type,
+        payload: request.payload
+      } as AgentCommand<"session.creation.resolve">;
+      void this.workspaceCommands.resolveSessionCreation(request.context, command)
+        .then((result) => origin.sendSuccess(request.requestId, request.type, result))
+        .catch((error: unknown) => origin.sendError(
+          request.requestId,
+          request.type,
+          toProtocolError(error)
+        ));
+      return;
+    }
     if (isWorkspaceFileCommand(request.type)) {
       this.handleWorkspaceFileCommand(origin, request);
       return;

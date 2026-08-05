@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect, useRef } from "react";
+import { lazy, Suspense, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspaceDescriptor } from "@pi67/domain";
 import {
   rendererWorkbenchStore,
@@ -11,6 +11,10 @@ import { ContextPane } from "../context/ContextPane.js";
 import { NavigationRail } from "../navigation/NavigationRail.js";
 import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
 import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import {
+  dismissUnconfirmedRendererSession,
+  recheckUnconfirmedRendererSession
+} from "../session/session-creation-recovery-controller.js";
 import {
   selectConversationSessionSummary,
   useSessionCatalogStore
@@ -284,17 +288,50 @@ function ProvisionalTaskState({ task, workspace }: {
   task: RendererWorkbenchTask;
   workspace: WorkspaceDescriptor;
 }) {
+  const [checking, setChecking] = useState(false);
   const copy = provisionalTaskStateCopy(task);
+  const unconfirmed = canManageUnconfirmedProvisionalTask(task);
+  const recheck = async () => {
+    if (checking) return;
+    setChecking(true);
+    try {
+      await recheckUnconfirmedRendererSession(task.id);
+    } finally {
+      setChecking(false);
+    }
+  };
   return (
     <section className={styles.emptyWorkspace}>
-      <div aria-live="polite" role="status">
-        {copy.loading ? <span className="loading-line" /> : null}
-        <span className="section-label">{workspace.displayName}</span>
-        <h2>{copy.title}</h2>
-        <p>{copy.detail}</p>
+      <div>
+        <div aria-live="polite" className={styles.provisionalStatus} role="status">
+          {copy.loading ? <span className="loading-line" /> : null}
+          <span className="section-label">{workspace.displayName}</span>
+          <h2>{copy.title}</h2>
+          <p>{copy.detail}</p>
+        </div>
+        {unconfirmed ? (
+          <div className={styles.provisionalActions}>
+            <button
+              className="primary-button"
+              disabled={checking}
+              onClick={() => void recheck()}
+              type="button"
+            >{checking ? "正在检查…" : "重新检查"}</button>
+            <button
+              className="secondary-button"
+              disabled={checking}
+              onClick={() => dismissUnconfirmedRendererSession(task.id)}
+              type="button"
+            >放弃此占位</button>
+          </div>
+        ) : null}
       </div>
     </section>
   );
+}
+
+export function canManageUnconfirmedProvisionalTask(task: RendererWorkbenchTask): boolean {
+  return task.conversation.kind === "provisional" && task.creationStatus === "unconfirmed";
 }
 
 export function provisionalTaskStateCopy(task: RendererWorkbenchTask): {
@@ -312,7 +349,7 @@ export function provisionalTaskStateCopy(task: RendererWorkbenchTask): {
   if (task.creationStatus === "unconfirmed") {
     return {
       title: "对话创建结果尚未确认",
-      detail: "运行服务恢复后会继续对账；当前不会重复创建对话。",
+      detail: "请先重新检查。只有找到唯一的新对话时才会自动匹配；放弃只移除占位，不会删除 Pi 对话记录。",
       loading: false
     };
   }

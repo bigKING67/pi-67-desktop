@@ -45,7 +45,7 @@ describe("PiSdkRuntime", () => {
     });
     try {
       const initial = await runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" });
-      const created = await runtime.createSession();
+      const created = await runtime.createSession("session-creation-lifecycle");
       expect(created.sessionId).not.toBe(initial.sessionId);
       expect(created.cwd).toBe(cwd);
       const resources = await runtime.reloadResources();
@@ -358,7 +358,7 @@ describe("PiSdkRuntime", () => {
         credentialSource: "runtime"
       }));
       expect(JSON.stringify(configured.modelCatalog.providers)).not.toContain(runtimeKey);
-      const configuredAfterNewSession = await runtime.createSession();
+      const configuredAfterNewSession = await runtime.createSession("session-creation-configuration");
       expect(configuredAfterNewSession.providers).toContainEqual(expect.objectContaining({
         id: provider,
         configured: true,

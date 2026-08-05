@@ -56,12 +56,13 @@ describe("AgentHostServer replay-safe control mutations", () => {
     const server = new AgentHostServer(async () => runtime);
 
     const firstPort = await attach(server);
-    const first = commandEnvelope("session.create", {}, 5, "create-session-b");
+    const createPayload = { creationId: "session-creation-b" };
+    const first = commandEnvelope("session.create", createPayload, 5, "create-session-b");
     firstPort.emit(first);
     await vi.waitFor(() => expect(createSession).toHaveBeenCalledOnce());
 
     const renewedPort = await attach(server);
-    const retry = commandEnvelope("session.create", {}, 5, "create-session-b");
+    const retry = commandEnvelope("session.create", createPayload, 5, "create-session-b");
     renewedPort.emit(retry);
     await Promise.resolve();
     expect(createSession).toHaveBeenCalledOnce();
@@ -80,7 +81,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
     });
     expect(createSession).toHaveBeenCalledOnce();
 
-    const settledRetry = commandEnvelope("session.create", {}, 5, "create-session-b");
+    const settledRetry = commandEnvelope("session.create", createPayload, 5, "create-session-b");
     renewedPort.emit(settledRetry);
     await expectResponse(renewedPort, settledRetry.requestId, {
       ok: true,
@@ -103,7 +104,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
 
     sessionId = "session-c";
     sessionGeneration = 3;
-    const staleRetry = commandEnvelope("session.create", {}, 5, "create-session-b");
+    const staleRetry = commandEnvelope("session.create", createPayload, 5, "create-session-b");
     renewedPort.emit(staleRetry);
     await expectResponse(renewedPort, staleRetry.requestId, {
       ok: false,

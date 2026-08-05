@@ -4,8 +4,10 @@ import { clearedTransientState, INITIAL_RUNTIME_STATE } from "../app/app-state-p
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
 import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-identity.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
 import {
   beginRendererConnectionLoss,
   prepareRendererHostReplacement,
@@ -40,7 +42,10 @@ export function handleConnected(
     sessionTransitionPending: shouldRecover,
     sessionBootstrapTransitionPending: false
   });
-  if (!shouldRecover || !state.workspace) return;
+  if (!shouldRecover || !state.workspace) {
+    synchronizeWorkspaceScopedStateAfterConnection();
+    return;
+  }
   recoverConnectedRendererProjection(get, set, {
     identity,
     workspace: state.workspace,
@@ -49,6 +54,12 @@ export function handleConnected(
     approvalMode: state.approvalMode,
     sameHost
   });
+}
+
+function synchronizeWorkspaceScopedStateAfterConnection(): void {
+  void registerAvailableRendererWorkspaces()
+    .then(() => reconcileUnconfirmedRendererSessions())
+    .catch(() => undefined);
 }
 
 export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void {

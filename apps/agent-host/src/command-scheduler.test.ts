@@ -132,7 +132,7 @@ describe("CommandScheduler", () => {
       await new Promise<void>((resolve) => { releaseFirst = resolve; });
       order.push("first:end");
     });
-    const second = scheduler.run(command("session.create", {}), async () => {
+    const second = scheduler.run(command("session.create", { creationId: "session-creation-second" }), async () => {
       order.push("second");
     });
     await Promise.resolve();
@@ -421,7 +421,7 @@ describe("CommandScheduler", () => {
       executed.push("exclusive:running");
       await new Promise<void>((resolve) => { releaseExclusive = resolve; });
     });
-    const queuedExclusive = scheduler.run(command("session.create", {}), async () => {
+    const queuedExclusive = scheduler.run(command("session.create", { creationId: "session-creation-queued" }), async () => {
       executed.push("exclusive:dropped");
     });
     const runningQueue = scheduler.run(command("prompt.steer", { text: "running" }), async () => {

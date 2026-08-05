@@ -6,6 +6,7 @@ import {
   type SessionTreeProjection
 } from "@pi67/domain";
 import { sanitizeRuntimeText } from "./runtime-redaction.js";
+import { SESSION_CREATION_MARKER_TYPE } from "./session-creation-receipt-store.js";
 
 const MAX_TREE_ID_BYTES = 512;
 const MAX_TREE_TYPE_BYTES = 64;
@@ -24,9 +25,9 @@ export function projectSessionTree(source: TreeSource): SessionTreeProjection {
 
   const window = projectionWindow(summary.total, summary.activeIndex);
   const candidates: SessionTreeNodeView[] = [];
-  visitTree(roots, (node, depth, index) => {
+  visitTree(roots, (node, depth, index, parentId) => {
     if (index >= window.start && index < window.end) {
-      candidates.push(projectTreeNode(node, depth, leafId));
+      candidates.push(projectTreeNode(node, depth, parentId, leafId));
     }
   });
 
@@ -59,13 +60,13 @@ function projectionWindow(total: number, activeIndex: number): { start: number; 
 
 function visitTree(
   roots: SourceTreeNode[],
-  visitor: (node: SourceTreeNode, depth: number, index: number) => void
+  visitor: (node: SourceTreeNode, depth: number, index: number, parentId: string | null) => void
 ): void {
-  const stack: Array<{ node: SourceTreeNode; depth: number }> = [];
+  const stack: Array<{ node: SourceTreeNode; depth: number; parentId: string | null }> = [];
   const visited = new WeakSet<object>();
   for (let index = roots.length - 1; index >= 0; index -= 1) {
     const root = roots[index];
-    if (root) stack.push({ node: root, depth: 0 });
+    if (root) stack.push({ node: root, depth: 0, parentId: null });
   }
 
   let index = 0;
@@ -73,21 +74,31 @@ function visitTree(
     const entry = stack.pop();
     if (!entry || visited.has(entry.node)) continue;
     visited.add(entry.node);
-    visitor(entry.node, entry.depth, index);
-    index += 1;
+    const hidden = isInternalSessionCreationMarker(entry.node);
+    if (!hidden) {
+      visitor(entry.node, entry.depth, index, entry.parentId);
+      index += 1;
+    }
+    const childDepth = hidden ? entry.depth : entry.depth + 1;
+    const childParentId = hidden ? entry.parentId : entry.node.entry.id;
     for (let childIndex = entry.node.children.length - 1; childIndex >= 0; childIndex -= 1) {
       const child = entry.node.children[childIndex];
-      if (child) stack.push({ node: child, depth: entry.depth + 1 });
+      if (child) stack.push({ node: child, depth: childDepth, parentId: childParentId });
     }
   }
 }
 
-function projectTreeNode(node: SourceTreeNode, depth: number, leafId: string | null): SessionTreeNodeView {
+function projectTreeNode(
+  node: SourceTreeNode,
+  depth: number,
+  parentId: string | null,
+  leafId: string | null
+): SessionTreeNodeView {
   const entry = node.entry as unknown as Record<string, unknown>;
   const rawId = typeof entry.id === "string" ? entry.id : "unknown";
   return {
     id: boundedUtf8(rawId, MAX_TREE_ID_BYTES),
-    parentId: typeof entry.parentId === "string" ? boundedUtf8(entry.parentId, MAX_TREE_ID_BYTES) : null,
+    parentId: parentId === null ? null : boundedUtf8(parentId, MAX_TREE_ID_BYTES),
     type: boundedUtf8(sessionTreeEntryType(entry), MAX_TREE_TYPE_BYTES),
     ...(node.label ? {
       label: boundedUtf8(
@@ -99,6 +110,11 @@ function projectTreeNode(node: SourceTreeNode, depth: number, leafId: string | n
     active: rawId === leafId,
     depth
   };
+}
+
+function isInternalSessionCreationMarker(node: SourceTreeNode): boolean {
+  return node.entry.type === "custom"
+    && node.entry.customType === SESSION_CREATION_MARKER_TYPE;
 }
 
 function sessionTreeEntryType(entry: Record<string, unknown>): string {

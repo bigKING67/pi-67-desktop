@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import type {
   RuntimeRecoveryRecord,
+  SessionCreationRecoveryRecord,
   SettingsSection,
   WorkbenchSurface
 } from "../../packages/domain/src/index.js";
@@ -28,6 +29,7 @@ export interface MockDesktopBridgeOptions {
   initialWorkspaces?: MockWorkspaceDescriptor[];
   pickerQueue?: MockWorkspaceDescriptor[];
   initialRuntimeRecovery?: RuntimeRecoveryRecord[];
+  initialSessionCreationRecovery?: SessionCreationRecoveryRecord[];
   expandedWorkspaceIds?: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -63,6 +65,7 @@ export async function installMockDesktopBridge(
     initialWorkspaces: options.initialWorkspaces ?? [],
     pickerQueue: options.pickerQueue ?? [DEFAULT_MOCK_WORKSPACE],
     initialRuntimeRecovery: options.initialRuntimeRecovery ?? [],
+    initialSessionCreationRecovery: options.initialSessionCreationRecovery ?? [],
     expandedWorkspaceIds: options.expandedWorkspaceIds ?? [],
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
@@ -89,6 +92,7 @@ export async function installMockDesktopBridge(
       currentWorkspaceId?: string;
       selectedSurface?: MockDesktopBridgeOptions["selectedSurface"];
       runtimeRecovery: RuntimeRecoveryRecord[];
+      sessionCreationRecovery: SessionCreationRecoveryRecord[];
       settings: NonNullable<MockDesktopBridgeOptions["settings"]>;
       cleanExit: boolean;
     };
@@ -145,6 +149,7 @@ export async function installMockDesktopBridge(
       ...(bridgeFixture.currentWorkspaceId ? { currentWorkspaceId: bridgeFixture.currentWorkspaceId } : {}),
       ...(bridgeFixture.selectedSurface ? { selectedSurface: structuredClone(bridgeFixture.selectedSurface) } : {}),
       runtimeRecovery: structuredClone(bridgeFixture.initialRuntimeRecovery),
+      sessionCreationRecovery: structuredClone(bridgeFixture.initialSessionCreationRecovery),
       settings: structuredClone(bridgeFixture.settings),
       cleanExit: false
     };
@@ -204,6 +209,9 @@ export async function installMockDesktopBridge(
               ...(selectedSurface ? { selectedSurface } : {}),
               runtimeRecovery: workbenchState.runtimeRecovery.filter((record) => (
                 record.conversation.workspaceId !== workspaceId
+              )),
+              sessionCreationRecovery: workbenchState.sessionCreationRecovery.filter((record) => (
+                record.workspaceId !== workspaceId
               )),
               settings: workbenchState.settings.workspaceId === workspaceId
                 ? { section: workbenchState.settings.section, scope: "global" }

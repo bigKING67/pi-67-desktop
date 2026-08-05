@@ -9,6 +9,7 @@ import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overri
 import { installDesktopPackageToolchainReloadHook } from "./desktop-package-toolchain.js";
 import { createRuntimeSessionCatalogOwner, type RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import { SessionCreationReceiptStore } from "./session-creation-receipt-store.js";
 import {
   createPiWorkspaceProviderCatalog,
   type PiWorkspaceProviderCatalog
@@ -35,6 +36,7 @@ export interface PiWorkspaceRuntimeServices {
   readonly providerCatalog: PiWorkspaceProviderCatalog;
   readonly configurationService?: PiConfigurationService;
   readonly sessionCatalog: RuntimeSessionCatalogOwner;
+  readonly sessionCreationReceipts: SessionCreationReceiptStore;
   assertCompatible(cwd: string, agentDir: string): void;
   setProjectTrusted(trusted: boolean): void;
   dispose(): Promise<void>;
@@ -66,6 +68,12 @@ export function createPiWorkspaceRuntimeServices(
     options.sessionCatalogDirectory,
     options.storageRoot
   );
+  const sessionCreationReceipts = new SessionCreationReceiptStore({
+    cwd,
+    agentDir,
+    getConfiguredSessionDir: () => settingsManager.getSessionDir(),
+    ...(options.storageRoot === undefined ? {} : { storageRoot: options.storageRoot })
+  });
   const unregisterConfiguration = options.configurationService?.registerWorkspace({
     cwd,
     settingsManager,
@@ -83,6 +91,7 @@ export function createPiWorkspaceRuntimeServices(
       ? {}
       : { configurationService: options.configurationService }),
     sessionCatalog,
+    sessionCreationReceipts,
     assertCompatible(candidateCwd, candidateAgentDir) {
       if (
         normalizeSessionCatalogPathIdentity(candidateCwd) !== cwdIdentity

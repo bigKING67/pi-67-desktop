@@ -202,6 +202,7 @@ describe("renderer workbench persistence boundary", () => {
         }
       },
       runtimeRecovery: [],
+      sessionCreationRecovery: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     });
@@ -245,6 +246,7 @@ describe("renderer workbench persistence boundary", () => {
         hostEpoch: 1,
         lastKnownLifecycle: "running"
       }],
+      sessionCreationRecovery: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     });

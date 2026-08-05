@@ -24,10 +24,10 @@ import {
   ensureRendererSessionCreationAuthority,
   selectPendingRendererSessionCreation
 } from "./session-creation-authority.js";
+import { markRendererSessionCreationUnconfirmed } from "./session-creation-lifecycle.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
-
 export async function createRendererSession(): Promise<void> {
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
@@ -51,27 +51,15 @@ export async function createRendererSession(): Promise<void> {
     || rendererWorkbenchStore.getState().currentWorkspaceId !== workspaceId
     || selectPendingRendererSessionCreation()
   ) return;
-  const task = beginPendingTask();
+  const creationId = createMessageId("session-creation");
+  const task = beginPendingTask(undefined, { creationId });
   if (!task) return;
   await runSessionBootstrapTransition(get, set, {
     detail: messages.runtime.session.creating,
     refreshSessionCatalogFor: task.workspaceId,
     onError: (error) => {
       if (error instanceof ProtocolRequestError && error.code === "REQUEST_OUTCOME_UNKNOWN") {
-        rendererWorkbenchStore.getState().updateTask(task.id, {
-          lifecycle: "draft",
-          creationStatus: "unconfirmed",
-          runtime: {
-            phase: "failed",
-            detail: messages.runtime.session.creationOutcomeUnknown,
-            recoverable: true
-          }
-        });
-        publishNotification({
-          level: "warning",
-          title: messages.runtime.session.confirmingCreation,
-          message: messages.runtime.session.creationOutcomeUnknown
-        });
+        markRendererSessionCreationUnconfirmed(task, creationId);
         set({
           runtime: {
             phase: "failed",
@@ -88,14 +76,28 @@ export async function createRendererSession(): Promise<void> {
       } else {
         rendererWorkbenchStore.getState().updateTask(task.id, {
           lifecycle: "draft",
+          creationId: undefined,
           creationStatus: undefined,
           runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
         });
       }
       reportSessionError(error, set, messages.runtime.session.createFailed);
     },
-    request: () => agentConnectionController.request("session.create", {}, [], {
+    onMissingBootstrap: () => {
+      markRendererSessionCreationUnconfirmed(task, creationId);
+    },
+    onStale: () => {
+      markRendererSessionCreationUnconfirmed(task, creationId);
+    },
+    request: () => agentConnectionController.request("session.create", { creationId }, [], {
+      context: workbenchProtocolContextForTask(task),
       onAcknowledgementDelayed: () => {
+        const current = rendererWorkbenchStore.getState().tasks[task.id];
+        if (
+          current?.taskGeneration !== task.taskGeneration
+          || current.creationId !== creationId
+          || current.creationStatus !== "pending"
+        ) return;
         rendererWorkbenchStore.getState().updateTask(task.id, {
           creationStatus: "confirming",
           runtime: {
@@ -382,7 +384,11 @@ function reportBlockedFork(title: string, message: string): false {
 
 function beginPendingTask(
   sessionPath?: string,
-  options: { workspaceId?: string; title?: string } = {}
+  options: {
+    workspaceId?: string;
+    title?: string;
+    creationId?: string;
+  } = {}
 ): RendererWorkbenchTask | undefined {
   const workbench = rendererWorkbenchStore.getState();
   const workspaceId = options.workspaceId ?? workbench.currentWorkspaceId;
@@ -400,11 +406,12 @@ function beginPendingTask(
     runtime: { phase: "starting", detail: messages.runtime.session.starting, recoverable: true },
     title: options.title ?? messages.runtime.workbench.unnamedSession,
     ...(options.title ? { pendingTitle: options.title } : {}),
+    ...(options.creationId ? { creationId: options.creationId } : {}),
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
     attachmentCount: 0,
     toolMode: "auto",
-    ...(!sessionPath ? { creationStatus: "pending" as const } : {})
+    ...(options.creationId ? { creationStatus: "pending" as const } : {})
   };
   const result = workbench.openTask(task);
   return result === "workspace-missing" ? undefined : task;

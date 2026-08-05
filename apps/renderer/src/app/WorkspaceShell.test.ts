@@ -1,6 +1,10 @@
 import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { describe, expect, it } from "vitest";
-import { canRenderLiveTask, provisionalTaskStateCopy } from "./WorkspaceShell.js";
+import {
+  canManageUnconfirmedProvisionalTask,
+  canRenderLiveTask,
+  provisionalTaskStateCopy
+} from "./WorkspaceShell.js";
 
 describe("WorkspaceShell live task selection", () => {
   it("does not render a stopped task as a live conversation when a stale projection still matches", () => {
@@ -42,13 +46,28 @@ describe("WorkspaceShell provisional task state", () => {
   });
 
   it("explains an unconfirmed create outcome without claiming a missing Session", () => {
-    expect(provisionalTaskStateCopy(task({
+    const unconfirmed = task({
       conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },
       creationStatus: "unconfirmed"
-    }))).toMatchObject({
+    });
+
+    expect(provisionalTaskStateCopy(unconfirmed)).toEqual({
       title: "对话创建结果尚未确认",
+      detail: "请先重新检查。只有找到唯一的新对话时才会自动匹配；放弃只移除占位，不会删除 Pi 对话记录。",
       loading: false
     });
+    expect(canManageUnconfirmedProvisionalTask(unconfirmed)).toBe(true);
+  });
+
+  it("offers placeholder actions only after the creation outcome becomes unconfirmed", () => {
+    expect(canManageUnconfirmedProvisionalTask(task({
+      conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "draft-a" },
+      creationStatus: "confirming"
+    }))).toBe(false);
+    expect(canManageUnconfirmedProvisionalTask(task({
+      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/sessions/a.jsonl" },
+      creationStatus: "unconfirmed"
+    }))).toBe(false);
   });
 });
 

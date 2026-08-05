@@ -4,13 +4,20 @@ import { describe, expect, it } from "vitest";
 import { projectSessionTree } from "./session-tree-projection.js";
 
 interface TestTreeNode {
-  entry: {
+  entry: ({
     id: string;
     parentId: string | null;
     type: "message";
     timestamp: string;
     message: { role: "user"; content: string; timestamp: number };
-  };
+  } | {
+    id: string;
+    parentId: string | null;
+    type: "custom";
+    timestamp: string;
+    customType: string;
+    data: unknown;
+  });
   children: TestTreeNode[];
   label?: string;
 }
@@ -35,6 +42,25 @@ describe("projectSessionTree", () => {
       ],
       truncated: false,
       total: 4
+    });
+  });
+
+  it("hides the Desktop Session creation marker and reparents visible descendants", () => {
+    const marker = internalMarker("marker", null);
+    const user = treeNode("user", "marker", "Prompt");
+    const assistant = treeNode("assistant", "user", "Reply");
+    marker.children.push(user);
+    user.children.push(assistant);
+
+    const projection = projectSessionTree(treeSource([marker], "assistant"));
+
+    expect(projection).toEqual({
+      nodes: [
+        expect.objectContaining({ id: "user", parentId: null, depth: 0, active: false }),
+        expect.objectContaining({ id: "assistant", parentId: "user", depth: 1, active: true })
+      ],
+      truncated: false,
+      total: 2
     });
   });
 
@@ -92,6 +118,20 @@ function treeNode(id: string, parentId: string | null, content: string): TestTre
       type: "message",
       timestamp: "2026-07-24T00:00:00.000Z",
       message: { role: "user", content, timestamp: 0 }
+    },
+    children: []
+  };
+}
+
+function internalMarker(id: string, parentId: string | null): TestTreeNode {
+  return {
+    entry: {
+      id,
+      parentId,
+      type: "custom",
+      timestamp: "2026-07-24T00:00:00.000Z",
+      customType: "pi67.session-creation",
+      data: { schemaVersion: 1, creationId: "session-creation-test" }
     },
     children: []
   };

@@ -165,6 +165,7 @@ describe("WorkbenchStateV3 persistence", () => {
           lastKnownLifecycle: "stopped"
         })
       ],
+      sessionCreationRecovery: [],
       settings: { section: "extensions", scope: "project", workspaceId: first.id }
     });
 
@@ -199,6 +200,7 @@ describe("WorkbenchStateV3 persistence", () => {
         sessionId: "session-1",
         taskGeneration: 2
       })],
+      sessionCreationRecovery: [],
       settings: { section: "packages" as const, scope: "project" as const, workspaceId: workspace.id }
     };
 
@@ -265,6 +267,7 @@ describe("WorkbenchStateV3 persistence", () => {
       runtimeRecovery: [recoveryRecord("running-task", conversation, {
         sessionId: "running-session"
       })],
+      sessionCreationRecovery: [],
       settings: { section: "general", scope: "global" }
     });
 

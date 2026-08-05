@@ -54,6 +54,13 @@ export function routeWorkbenchAgentEvent(
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap": {
+      const creationBootstrapAllowed = event.type === "session.bootstrap"
+        && event.payload.reason === "session-create";
+      if (
+        task.conversation.kind === "provisional"
+        && task.creationId
+        && !creationBootstrapAllowed
+      ) return "stale";
       const snapshot = event.type === "runtime.ready" ? event.payload.snapshot : event.payload.snapshot;
       const sessionName = snapshot.sessionName?.trim();
       workbench.updateTask(task.id, {
@@ -68,7 +75,8 @@ export function routeWorkbenchAgentEvent(
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },
         ...(event.type === "runtime.ready" ? { toolMode: event.payload.taskToolMode } : {}),
         operationId: undefined,
-        creationStatus: undefined
+        creationId: undefined,
+        creationStatus: undefined,
       });
       break;
     }

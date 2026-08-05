@@ -3,6 +3,7 @@ import {
   taskConsumesRunSlot,
   type ConversationKey,
   type RuntimeRecoveryRecord,
+  type SessionCreationRecoveryRecord,
   type RuntimeStatus,
   type TaskId,
   type TaskLifecycle,
@@ -26,11 +27,12 @@ export function createRendererWorkbenchStore() {
 
     hydrate(state) {
       const workspaces = Object.fromEntries(state.workspaces.map((workspace) => [workspace.id, workspace]));
-      const tasks = Object.fromEntries(state.runtimeRecovery.map((record) => {
-        const task = taskFromRecovery(record);
-        return [task.id, task];
-      }));
-      const runtimeTaskOrder = state.runtimeRecovery.map((record) => record.taskId);
+      const recoveredTasks = state.runtimeRecovery.map(taskFromRecovery);
+      const creationTasks = state.sessionCreationRecovery.map(taskFromSessionCreationRecovery);
+      const tasks = Object.fromEntries([...recoveredTasks, ...creationTasks].map((task) => (
+        [task.id, task]
+      )));
+      const runtimeTaskOrder = [...recoveredTasks, ...creationTasks].map((task) => task.id);
       const persistedSurface = state.selectedSurface?.kind === "settings"
         ? undefined
         : state.selectedSurface;
@@ -359,6 +361,35 @@ function taskFromRecovery(record: RuntimeRecoveryRecord): RendererWorkbenchTask 
     toolMode: "auto",
     recoveryHostInstanceId: record.hostInstanceId,
     recoveryHostEpoch: record.hostEpoch
+  };
+}
+
+function taskFromSessionCreationRecovery(
+  record: SessionCreationRecoveryRecord
+): RendererWorkbenchTask {
+  return {
+    id: record.taskId,
+    conversation: {
+      kind: "provisional",
+      workspaceId: record.workspaceId,
+      draftId: record.taskId
+    },
+    workspaceId: record.workspaceId,
+    sessionId: `pending:${record.taskId}`,
+    taskGeneration: record.taskGeneration,
+    lifecycle: "draft",
+    runtime: {
+      phase: "failed",
+      detail: "对话创建结果尚未确认",
+      recoverable: true
+    },
+    title: "未命名会话",
+    titleSource: "fallback",
+    hasDraft: false,
+    attachmentCount: 0,
+    toolMode: "auto",
+    creationId: record.creationId,
+    creationStatus: "unconfirmed"
   };
 }
 

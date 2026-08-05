@@ -114,6 +114,13 @@ export interface RuntimeRecoveryRecord {
   lastKnownLifecycle: TaskLifecycle;
 }
 
+export interface SessionCreationRecoveryRecord {
+  taskId: TaskId;
+  workspaceId: WorkspaceId;
+  creationId: string;
+  taskGeneration: number;
+}
+
 export interface WorkbenchStateV3 {
   version: 3;
   workspaces: WorkspaceDescriptor[];
@@ -122,11 +129,13 @@ export interface WorkbenchStateV3 {
   currentWorkspaceId?: WorkspaceId;
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
   cleanExit: boolean;
 }
 
 export const MAX_RUNNING_TASKS = 8;
+export const MAX_SESSION_CREATION_RECOVERY_RECORDS = 32;
 
 export function taskConsumesRunSlot(lifecycle: TaskLifecycle): boolean {
   return lifecycle === "accepted"

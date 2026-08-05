@@ -53,6 +53,18 @@
   line-height: 1.65;
 }
 
+.provisionalStatus {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.provisionalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 1040px) {
   .navigationHidden,
   .navigationHidden:global(.context-hidden) {

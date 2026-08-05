@@ -159,6 +159,7 @@ describe("renderer workbench store", () => {
         hostEpoch: 1,
         lastKnownLifecycle: "running"
       }],
+      sessionCreationRecovery: [],
       settings: { section: "runtime", scope: "global" },
       cleanExit: false
     };

@@ -3,6 +3,7 @@ import type {
   PackageNetworkSnapshot,
   DesktopCapabilitySnapshot,
   RuntimeRecoveryRecord,
+  SessionCreationRecoveryRecord,
   WorkspaceEntryContextAction,
   WorkspaceEntryRequest,
   WorkspaceFilePersistedState,
@@ -32,6 +33,7 @@ export type WorkbenchLayoutV3 = {
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
 };
 

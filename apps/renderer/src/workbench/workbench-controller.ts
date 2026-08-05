@@ -1,6 +1,8 @@
 import {
   MAX_RUNNING_TASKS,
+  MAX_SESSION_CREATION_RECOVERY_RECORDS,
   type RuntimeRecoveryRecord,
+  type SessionCreationRecoveryRecord,
   type SessionSummary,
   type WorkbenchSettingsState,
   type WorkbenchSurface
@@ -11,6 +13,7 @@ import { INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
+import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
 import {
   selectConversationSessionSummary,
   useSessionCatalogStore
@@ -27,10 +30,23 @@ let initialization: Promise<void> | undefined;
 let persistenceTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceRevision = 0;
 let observedPersistenceFingerprint: string | undefined;
+let persistenceSuspensionDepth = 0;
+let persistenceBound = false;
 
 export function initializeRendererWorkbench(): Promise<void> {
   initialization ??= initialize();
   return initialization;
+}
+
+export function suspendRendererWorkbenchPersistence(): () => void {
+  persistenceSuspensionDepth += 1;
+  let resumed = false;
+  return () => {
+    if (resumed) return;
+    resumed = true;
+    persistenceSuspensionDepth = Math.max(0, persistenceSuspensionDepth - 1);
+    if (persistenceSuspensionDepth === 0 && persistenceBound) observePersistenceChange();
+  };
 }
 
 export interface WorkbenchPersistenceAuthority {
@@ -73,6 +89,23 @@ export function workbenchLayout(
       lastKnownLifecycle: task.lifecycle
     }];
   }).slice(0, MAX_RUNNING_TASKS);
+  const sessionCreationRecovery = state.runtimeTaskOrder.flatMap(
+    (taskId): SessionCreationRecoveryRecord[] => {
+      const task = state.tasks[taskId];
+      if (
+        !task
+        || task.conversation.kind !== "provisional"
+        || task.creationStatus === undefined
+        || task.creationId === undefined
+      ) return [];
+      return [{
+        taskId: task.id,
+        workspaceId: task.workspaceId,
+        creationId: task.creationId,
+        taskGeneration: task.taskGeneration
+      }];
+    }
+  ).slice(0, MAX_SESSION_CREATION_RECOVERY_RECORDS);
   const settings: WorkbenchSettingsState = {
     section: state.settingsSection,
     scope: state.settingsScope,
@@ -86,6 +119,7 @@ export function workbenchLayout(
     ...(state.currentWorkspaceId ? { currentWorkspaceId: state.currentWorkspaceId } : {}),
     ...(selectedSurface ? { selectedSurface } : {}),
     runtimeRecovery,
+    sessionCreationRecovery,
     settings
   };
 }
@@ -96,6 +130,7 @@ async function initialize(): Promise<void> {
     rendererWorkbenchStore.getState().hydrate(state);
     bindPersistedRendererWorkbenchAuthority();
     await registerAvailableRendererWorkspaces();
+    void reconcileUnconfirmedRendererSessions();
   } catch (error) {
     publishNotification({
       level: "error",
@@ -104,6 +139,7 @@ async function initialize(): Promise<void> {
     });
   }
   observedPersistenceFingerprint = persistenceFingerprint(rendererWorkbenchStore.getState());
+  persistenceBound = true;
   rendererWorkbenchStore.subscribe(observePersistenceChange);
   useSessionCatalogStore.subscribe(observePersistenceChange);
 }
@@ -166,6 +202,7 @@ function schedulePersistence(): void {
 }
 
 function observePersistenceChange(): void {
+  if (persistenceSuspensionDepth > 0) return;
   const next = persistenceFingerprint(rendererWorkbenchStore.getState());
   if (next === observedPersistenceFingerprint) return;
   observedPersistenceFingerprint = next;
@@ -197,9 +234,19 @@ function persistedSelectedSurface(
     return surface.workspaceId === state.currentWorkspaceId ? surface : undefined;
   }
   if (surface.conversation.kind === "provisional") {
-    return surface.conversation.workspaceId === state.currentWorkspaceId
-      ? { kind: "workspace", workspaceId: surface.conversation.workspaceId }
-      : undefined;
+    const conversation = surface.conversation;
+    const persisted = Object.values(state.tasks).some((task) => (
+      task.conversation.kind === "provisional"
+      && task.creationStatus !== undefined
+      && task.creationId !== undefined
+      && task.conversation.workspaceId === conversation.workspaceId
+      && task.conversation.draftId === conversation.draftId
+    ));
+    return persisted && conversation.workspaceId === state.currentWorkspaceId
+      ? surface
+      : conversation.workspaceId === state.currentWorkspaceId
+        ? { kind: "workspace", workspaceId: conversation.workspaceId }
+        : undefined;
   }
   return surface.conversation.workspaceId === state.currentWorkspaceId
     ? surface
@@ -219,6 +266,7 @@ interface WorkbenchLayoutV3 {
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
   settings: WorkbenchSettingsState;
 }
 

@@ -362,7 +362,7 @@ describe("HostConnectionContext", () => {
     } satisfies RendererHello);
     await Promise.resolve();
 
-    const request = commandEnvelope("session.create", {}, 3);
+    const request = commandEnvelope("session.create", { creationId: "session-creation-context" }, 3);
     const { idempotencyKey: _idempotencyKey, ...missingKey } = request;
     port.emit(missingKey);
     expect(onRequest).not.toHaveBeenCalled();

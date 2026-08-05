@@ -116,6 +116,9 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV3, workspaceId
     ...(currentWorkspaceId ? { currentWorkspaceId } : {}),
     ...(selectedSurface ? { selectedSurface } : {}),
     runtimeRecovery: state.runtimeRecovery.filter((record) => record.conversation.workspaceId !== workspaceId),
+    sessionCreationRecovery: state.sessionCreationRecovery.filter((record) => (
+      record.workspaceId !== workspaceId
+    )),
     settings,
     cleanExit: state.cleanExit
   };
@@ -165,6 +168,7 @@ function parseWorkbenchLayout(
     ...(parsed.currentWorkspaceId ? { currentWorkspaceId: parsed.currentWorkspaceId } : {}),
     ...(parsed.selectedSurface ? { selectedSurface: parsed.selectedSurface } : {}),
     runtimeRecovery: parsed.runtimeRecovery,
+    sessionCreationRecovery: parsed.sessionCreationRecovery,
     settings: parsed.settings
   };
 }
@@ -176,9 +180,15 @@ function isWorkbenchLayoutRecord(value: unknown): value is Record<string, unknow
     "currentWorkspaceId",
     "selectedSurface",
     "runtimeRecovery",
+    "sessionCreationRecovery",
     "settings"
   ];
-  const required = ["expandedWorkspaceIds", "runtimeRecovery", "settings"];
+  const required = [
+    "expandedWorkspaceIds",
+    "runtimeRecovery",
+    "sessionCreationRecovery",
+    "settings"
+  ];
   const actual = Object.keys(value);
   return actual.every((key) => allowed.includes(key))
     && required.every((key) => Object.hasOwn(value, key));

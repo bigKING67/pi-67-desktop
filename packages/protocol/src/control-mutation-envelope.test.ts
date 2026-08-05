@@ -3,7 +3,13 @@ import { APP_PROTOCOL_CONTEXT, commandEnvelope, isRequestEnvelope } from "./enve
 
 describe("replay-safe control mutation envelopes", () => {
   it("requires bounded idempotency keys only for replay-safe control mutations", () => {
-    const control = commandEnvelope("session.create", {}, APP_PROTOCOL_CONTEXT, 3, "create-session-1");
+    const control = commandEnvelope(
+      "session.create",
+      { creationId: "session-creation-envelope" },
+      APP_PROTOCOL_CONTEXT,
+      3,
+      "create-session-1"
+    );
     expect(control.idempotencyKey).toBe("create-session-1");
     expect(isRequestEnvelope(control)).toBe(true);
 

@@ -19,7 +19,7 @@ describe("Session bootstrap acknowledgements", () => {
       trust: "unknown" as const,
       approvalMode: "guided" as const
     }],
-    ["session.create", {}],
+    ["session.create", { creationId: "session-creation-bootstrap" }],
     ["session.open", { path: "/sessions/session-2.jsonl" }],
     ["session.fork", { entryId: "entry-2" }]
   ] as const)("validates a narrow %s response", (type, payload) => {

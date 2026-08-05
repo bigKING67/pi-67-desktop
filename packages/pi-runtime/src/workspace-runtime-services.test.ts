@@ -115,7 +115,7 @@ describe("Pi Workspace runtime services", () => {
       }
 
       await runtimeA.dispose();
-      const afterPeerDispose = await runtimeB.createSession();
+      const afterPeerDispose = await runtimeB.createSession("session-creation-peer-dispose");
       expect(afterPeerDispose.providers).toContainEqual(expect.objectContaining({
         id: provider,
         configured: true,

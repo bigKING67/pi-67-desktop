@@ -168,7 +168,7 @@ describe("AgentHostServer cross-Task Session fork", () => {
     harness.source.runtime.createSession = createSession;
     const create = commandEnvelopeForContext(
       "session.create",
-      {},
+      { creationId: "session-creation-source-busy" },
       testTaskContext(1, { taskId: "task-source" }),
       10,
       "create-source-while-forking"

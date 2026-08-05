@@ -35,6 +35,7 @@ import {
   SessionCatalogPageSchema,
   SessionCatalogStatusSchema
 } from "./session-catalog-schemas.js";
+import { SessionCreationResolutionSchema } from "./session-creation-schemas.js";
 import { SessionExternalChangeSchema } from "./session-external-change-schema.js";
 import {
   WorkspaceChangeEventSchema,
@@ -265,6 +266,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "message.index": UserMessageIndexPageSchema,
   "message.locate": LocatedMessageWindowSchema,
   "session.create": ProjectionMutationAcknowledgementSchema,
+  "session.creation.resolve": SessionCreationResolutionSchema,
   "session.open": ProjectionMutationAcknowledgementSchema,
   "session.import": operationSubmissionResultSchema(Type.Literal("session-import")),
   "session.fork": ProjectionMutationAcknowledgementSchema,

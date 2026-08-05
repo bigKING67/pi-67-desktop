@@ -29,6 +29,7 @@ export interface RendererWorkbenchTask {
   attachmentCount: number;
   toolMode: TaskToolMode;
   operationId?: string | undefined;
+  creationId?: string | undefined;
   creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
   recoveryHostInstanceId?: string | undefined;
   recoveryHostEpoch?: number | undefined;

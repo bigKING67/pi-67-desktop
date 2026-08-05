@@ -178,7 +178,7 @@ describe("AgentHostServer session bootstrap", () => {
       eventSequence: eventSequenceAt(port, readyIndex)
     });
 
-    const create = commandEnvelope("session.create", {}, 6);
+    const create = commandEnvelope("session.create", { creationId: "session-creation-bootstrap" }, 6);
     port.emit(create);
     await waitForResponse(port, create.requestId);
     const bootstrapIndex = port.sent.findIndex((value) => isEventEnvelope(value) && value.type === "session.bootstrap");
