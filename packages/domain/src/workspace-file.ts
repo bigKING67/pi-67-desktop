@@ -80,4 +80,6 @@ export type WorkspaceEntryContextAction =
   | "open-default"
   | "copy-absolute"
   | "copy-relative"
-  | "reveal";
+  | "reveal"
+  | "rename"
+  | "trash";

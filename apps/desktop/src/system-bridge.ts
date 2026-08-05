@@ -185,7 +185,11 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     await shell.openExternal(target.toString());
     return true;
   });
-  ipcMain.handle("pi67:workspace-entry-menu", async (_event, value: unknown) => {
+  ipcMain.handle("pi67:workspace-entry-menu", async (_event, value: unknown, includeManagementValue: unknown) => {
+    if (includeManagementValue !== undefined && typeof includeManagementValue !== "boolean") {
+      throw new Error("Workspace entry menu options are invalid.");
+    }
+    const includeManagement = includeManagementValue === true;
     const entry = await resolveRegisteredWorkspaceEntry(workbenchState, value);
     const window = options.getMainWindow();
     if (!window) return undefined;
@@ -200,14 +204,24 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
             { label: "在 Pi-67 中打开", click: () => choose("pi67-open") },
             { type: "separator" },
             { label: "使用系统默认应用打开", click: () => choose("open-default") },
-            { label: "复制路径", click: () => choose("copy-absolute") },
             { label: "复制相对路径", click: () => choose("copy-relative") },
-            { label: process.platform === "darwin" ? "在 Finder 中显示" : "在文件资源管理器中显示", click: () => choose("reveal") }
+            { label: "复制绝对路径", click: () => choose("copy-absolute") },
+            { label: process.platform === "darwin" ? "在 Finder 中显示" : "在文件资源管理器中显示", click: () => choose("reveal") },
+            ...(includeManagement ? [
+              { type: "separator" as const },
+              { label: "重命名", click: () => choose("rename") },
+              { label: "移到废纸篓", click: () => choose("trash") }
+            ] : [])
           ]
         : [
             { label: process.platform === "darwin" ? "在 Finder 中打开" : "在文件资源管理器中打开", click: () => choose("reveal") },
-            { label: "复制路径", click: () => choose("copy-absolute") },
-            { label: "复制相对路径", click: () => choose("copy-relative") }
+            { label: "复制相对路径", click: () => choose("copy-relative") },
+            { label: "复制绝对路径", click: () => choose("copy-absolute") },
+            ...(includeManagement ? [
+              { type: "separator" as const },
+              { label: "重命名", click: () => choose("rename") },
+              { label: "移到废纸篓", click: () => choose("trash") }
+            ] : [])
           ];
       Menu.buildFromTemplate(template).popup({
         window,

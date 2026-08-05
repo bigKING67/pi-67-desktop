@@ -7,7 +7,7 @@ import type {
 } from "@pi67/domain";
 
 export interface WorkspaceFileCommandPayloads {
-  "workspace.file.list": { parentId?: string; cursor?: string; limit?: number };
+  "workspace.file.list": { parentId?: string; cursor?: string; limit?: number; includeGenerated?: boolean };
   "workspace.file.search": { query: string; includeGenerated?: boolean };
   "workspace.file.resolve": { relativePath: string };
   "workspace.file.open": { id: string };

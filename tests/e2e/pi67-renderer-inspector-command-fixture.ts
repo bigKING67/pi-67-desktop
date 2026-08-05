@@ -11,15 +11,34 @@ export type MockInspectorCommandHandler = (
 ) => unknown;
 
 export function installMockInspectorCommandHandler(): void {
-  const revisions = new Map<string, string>([
-    ["src", "revision-src"],
-    ["src/main.ts", "revision-main-1"],
-    ["README.md", "revision-readme-1"]
+  type Entry = {
+    id: string;
+    name: string;
+    relativePath: string;
+    kind: "file" | "directory";
+    revision: string;
+    byteLength?: number;
+    modifiedAt: number;
+  };
+  const entries = new Map<string, Entry>([
+    entry("fixture-src", "src", "directory"),
+    entry("fixture-tests", "tests", "directory"),
+    entry("fixture-node-modules", "node_modules", "directory"),
+    entry("fixture-dependency", "node_modules/dependency", "directory"),
+    entry("fixture-main-ts", "src/main.ts", "file", 42),
+    entry("fixture-src-index", "src/index.ts", "file", 18),
+    entry("fixture-tests-index", "tests/index.ts", "file", 20),
+    entry("fixture-generated-index", "node_modules/dependency/index.ts", "file", 24),
+    entry("fixture-readme", "README.md", "file", 24)
   ]);
   const contents = new Map<string, string>([
     ["src/main.ts", "export const fixture = true;\n"],
+    ["src/index.ts", "export * from './main';\n"],
+    ["tests/index.ts", "export const test = true;\n"],
+    ["node_modules/dependency/index.ts", "export const generated = true;\n"],
     ["README.md", "# Fixture workspace\n"]
   ]);
+  let createdIndex = 0;
   (window as FixtureWindow & {
     __pi67ResolveMockInspectorCommand?: MockInspectorCommandHandler;
   }).__pi67ResolveMockInspectorCommand = (type, payload, current) => {
@@ -28,42 +47,40 @@ export function installMockInspectorCommandHandler(): void {
     if (type === "workspace.file.resolve") return workspaceFileResolve(payload);
     if (type === "workspace.file.open") return workspaceFileOpen(payload);
     if (type === "workspace.file.save") return workspaceFileSave(payload);
+    if (type === "workspace.file.create") return workspaceFileCreate(payload);
+    if (type === "workspace.file.rename") return workspaceFileRename(payload);
     if (type === "message.index") return userMessageIndex(current, payload);
     if (type === "message.locate") return locatedMessageWindow(current, payload);
     return undefined;
   };
 
   function workspaceFilePage(payload: Record<string, unknown>, current: FixtureAgentState): unknown {
-    if (payload.parentId === "fixture-src") return {
-      workspaceId: current.workspaceId,
-      parentId: "fixture-src",
-      entries: [{
-        id: "fixture-main-ts",
-        name: "main.ts",
-        relativePath: "src/main.ts",
-        kind: "file",
-        revision: revisions.get("src/main.ts"),
-        byteLength: 42,
-        modifiedAt: 1
-      }],
-      truncated: false
-    };
+    const parent = typeof payload.parentId === "string"
+      ? [...entries.values()].find((candidate) => candidate.id === payload.parentId)
+      : undefined;
+    const parentPath = parent?.relativePath ?? "";
+    const includeGenerated = payload.includeGenerated === true;
     return {
       workspaceId: current.workspaceId,
-      entries: [
-        { id: "fixture-src", name: "src", relativePath: "src", kind: "directory", revision: revisions.get("src"), modifiedAt: 1 },
-        { id: "fixture-readme", name: "README.md", relativePath: "README.md", kind: "file", revision: revisions.get("README.md"), byteLength: 24, modifiedAt: 1 }
-      ],
+      ...(parent ? { parentId: parent.id } : {}),
+      entries: [...entries.values()]
+        .filter((candidate) => (
+          parentRelativePath(candidate.relativePath) === parentPath
+          && !isTrashed(candidate)
+          && (includeGenerated || candidate.kind !== "directory" || candidate.name !== "node_modules")
+        ))
+        .sort(compareEntries),
       truncated: false
     };
   }
 
   function workspaceFileSearch(payload: Record<string, unknown>, current: FixtureAgentState): unknown {
     const query = typeof payload.query === "string" ? payload.query : "";
-    const candidates = [
-      { id: "fixture-main-ts", name: "main.ts", relativePath: "src/main.ts", kind: "file", revision: revisions.get("src/main.ts"), byteLength: 42, modifiedAt: 1 },
-      { id: "fixture-readme", name: "README.md", relativePath: "README.md", kind: "file", revision: revisions.get("README.md"), byteLength: 24, modifiedAt: 1 }
-    ];
+    const includeGenerated = payload.includeGenerated === true;
+    const candidates = [...entries.values()].filter((candidate) => (
+      !isTrashed(candidate)
+      && (includeGenerated || !candidate.relativePath.startsWith("node_modules/"))
+    ));
     return {
       workspaceId: current.workspaceId,
       query,
@@ -77,19 +94,13 @@ export function installMockInspectorCommandHandler(): void {
 
   function workspaceFileResolve(payload: Record<string, unknown>): unknown {
     const relativePath = String(payload.relativePath);
-    const directory = relativePath === "src";
-    return { entry: {
-      id: directory ? "fixture-src" : relativePath === "README.md" ? "fixture-readme" : "fixture-main-ts",
-      name: relativePath.slice(relativePath.lastIndexOf("/") + 1),
-      relativePath,
-      kind: directory ? "directory" : "file",
-      revision: revisions.get(relativePath) ?? "revision-fixture"
-    } };
+    return { entry: entries.get(relativePath) ?? entry("fixture-resolved", relativePath, "file")[1] };
   }
 
   function workspaceFileOpen(payload: Record<string, unknown>): unknown {
-    const readme = payload.id === "fixture-readme";
-    const relativePath = readme ? "README.md" : "src/main.ts";
+    const candidate = [...entries.values()].find((item) => item.id === payload.id);
+    if (!candidate || candidate.kind !== "file") throw new Error("Mock file does not exist.");
+    const relativePath = candidate.relativePath;
     const content = contents.get(relativePath) ?? "";
     return {
       id: String(payload.id),
@@ -97,27 +108,87 @@ export function installMockInspectorCommandHandler(): void {
       kind: "text",
       totalBytes: content.length,
       content,
-      revision: revisions.get(relativePath)
+      revision: candidate.revision
     };
   }
 
   function workspaceFileSave(payload: Record<string, unknown>): unknown {
-    const readme = payload.id === "fixture-readme";
-    const relativePath = readme ? "README.md" : "src/main.ts";
+    const candidate = [...entries.values()].find((item) => item.id === payload.id);
+    if (!candidate || candidate.kind !== "file") throw new Error("Mock file does not exist.");
+    const relativePath = candidate.relativePath;
     if (typeof payload.content !== "string") throw new Error("Mock file content must be a string.");
     const content = payload.content;
-    const revision = `${revisions.get(relativePath) ?? "revision"}-saved`;
+    const revision = `${candidate.revision}-saved`;
     contents.set(relativePath, content);
-    revisions.set(relativePath, revision);
-    return { entry: {
-      id: String(payload.id),
+    const updated = { ...candidate, revision, byteLength: content.length, modifiedAt: 2 };
+    entries.set(relativePath, updated);
+    return { entry: updated };
+  }
+
+  function workspaceFileCreate(payload: Record<string, unknown>): unknown {
+    const parent = typeof payload.parentId === "string"
+      ? [...entries.values()].find((candidate) => candidate.id === payload.parentId)
+      : undefined;
+    const name = String(payload.name);
+    const relativePath = parent ? `${parent.relativePath}/${name}` : name;
+    const created = entry(
+      `fixture-created-${++createdIndex}`,
+      relativePath,
+      payload.kind === "directory" ? "directory" : "file",
+      payload.kind === "directory" ? undefined : 0
+    )[1];
+    entries.set(relativePath, created);
+    if (created.kind === "file") contents.set(relativePath, "");
+    return { entry: created };
+  }
+
+  function workspaceFileRename(payload: Record<string, unknown>): unknown {
+    const candidate = [...entries.values()].find((item) => item.id === payload.id);
+    if (!candidate) throw new Error("Mock file does not exist.");
+    const previousRelativePath = candidate.relativePath;
+    const nextRelativePath = [parentRelativePath(previousRelativePath), String(payload.name)].filter(Boolean).join("/");
+    const updated = { ...candidate, name: String(payload.name), relativePath: nextRelativePath, revision: `${candidate.revision}-renamed` };
+    entries.delete(previousRelativePath);
+    entries.set(nextRelativePath, updated);
+    if (candidate.kind === "file") {
+      const content = contents.get(previousRelativePath) ?? "";
+      contents.delete(previousRelativePath);
+      contents.set(nextRelativePath, content);
+    }
+    return { entry: updated, previousRelativePath };
+  }
+
+  function entry(id: string, relativePath: string, kind: "file" | "directory", byteLength?: number): [string, Entry] {
+    const value: Entry = {
+      id,
       name: relativePath.slice(relativePath.lastIndexOf("/") + 1),
       relativePath,
-      kind: "file",
-      revision,
-      byteLength: content.length,
-      modifiedAt: 2
-    } };
+      kind,
+      revision: `revision-${id}`,
+      ...(byteLength === undefined ? {} : { byteLength }),
+      modifiedAt: 1
+    };
+    return [relativePath, value];
+  }
+
+  function isTrashed(candidate: Entry): boolean {
+    const trashes = (window as FixtureWindow & {
+      __pi67WorkspaceEntryTest?: { trashes: Array<{ relativePath?: unknown }> };
+    }).__pi67WorkspaceEntryTest?.trashes ?? [];
+    return trashes.some((trashed) => (
+      trashed.relativePath === candidate.relativePath
+      || (typeof trashed.relativePath === "string" && candidate.relativePath.startsWith(`${trashed.relativePath}/`))
+    ));
+  }
+
+  function parentRelativePath(relativePath: string): string {
+    const index = relativePath.lastIndexOf("/");
+    return index < 0 ? "" : relativePath.slice(0, index);
+  }
+
+  function compareEntries(left: Entry, right: Entry): number {
+    return Number(right.kind === "directory") - Number(left.kind === "directory")
+      || left.name.localeCompare(right.name);
   }
 
   function userMessageIndex(

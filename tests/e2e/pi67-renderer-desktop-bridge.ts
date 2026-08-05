@@ -127,6 +127,7 @@ export async function installMockDesktopBridge(
     let workspaceFileState = { version: 1 as const, workspaces: [] as Array<Record<string, unknown>> };
     const workspaceEntryTest = {
       menus: [] as Array<Record<string, unknown>>,
+      menuManagement: [] as boolean[],
       reveals: [] as Array<Record<string, unknown>>,
       defaultOpens: [] as Array<Record<string, unknown>>,
       copies: [] as Array<{ entry: Record<string, unknown>; kind: "absolute" | "relative" }>,
@@ -367,8 +368,9 @@ export async function installMockDesktopBridge(
             updateTest.openedUrls.push(url);
             return updateTest.allowOpen;
           },
-          showWorkspaceEntryContextMenu: async (entry: Record<string, unknown>) => {
+          showWorkspaceEntryContextMenu: async (entry: Record<string, unknown>, includeManagement = false) => {
             workspaceEntryTest.menus.push(structuredClone(entry));
+            workspaceEntryTest.menuManagement.push(includeManagement);
             return entry.kind === "file" ? "pi67-open" as const : "reveal" as const;
           },
           revealWorkspaceEntry: async (entry: Record<string, unknown>) => {

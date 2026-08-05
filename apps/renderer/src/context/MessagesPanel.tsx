@@ -64,29 +64,30 @@ export function MessagesPanel() {
           {items.map((item) => {
             const pending = pendingUserTurn?.message.id === item.id;
             return (
-              <button
-                aria-busy={locatingId === item.id || undefined}
-                className="inspector-message-row"
-                key={item.id}
-                onClick={() => void jumpToMessage(item)}
-                role="listitem"
-                type="button"
-              >
-                <span className="inspector-message-ordinal">#{item.ordinal}</span>
-                <span className="inspector-message-content">
-                  <strong>{item.preview || "仅包含附件的消息"}</strong>
-                  <small title={item.createdAt === undefined ? undefined : formatMessageDateTimeTitle(item.createdAt)}>
-                    {pending
-                      ? pendingUserTurn?.status === "failed" ? "发送失败" : "发送中"
-                      : item.createdAt === undefined ? "时间未知" : formatMessageDateTime(item.createdAt)}
-                  </small>
-                </span>
-                <span className="inspector-message-assets">
-                  {item.imageCount > 0 ? <small title={`${item.imageCount} 张图片`}><Image size={11} />{item.imageCount}</small> : null}
-                  {item.attachmentCount > 0 ? <small title={`${item.attachmentCount} 个附件`}><Paperclip size={11} />{item.attachmentCount}</small> : null}
-                  {locatingId === item.id ? <LoaderCircle aria-label="正在定位" className="spin" size={13} /> : null}
-                </span>
-              </button>
+              <div className="inspector-message-row-shell" key={item.id} role="listitem">
+                <button
+                  aria-busy={locatingId === item.id || undefined}
+                  className="inspector-message-row"
+                  disabled={locatingId !== undefined && locatingId !== item.id}
+                  onClick={() => void jumpToMessage(item)}
+                  type="button"
+                >
+                  <span className="inspector-message-ordinal">#{item.ordinal}</span>
+                  <span className="inspector-message-content">
+                    <strong>{item.preview || "仅包含附件的消息"}</strong>
+                    <small title={item.createdAt === undefined ? undefined : formatMessageDateTimeTitle(item.createdAt)}>
+                      {pending
+                        ? pendingUserTurn?.status === "failed" ? "发送失败" : "发送中"
+                        : item.createdAt === undefined ? "时间未知" : formatMessageDateTime(item.createdAt)}
+                    </small>
+                  </span>
+                  <span className="inspector-message-assets">
+                    {item.imageCount > 0 ? <small title={`${item.imageCount} 张图片`}><Image size={11} />{item.imageCount}</small> : null}
+                    {item.attachmentCount > 0 ? <small title={`${item.attachmentCount} 个附件`}><Paperclip size={11} />{item.attachmentCount}</small> : null}
+                    {locatingId === item.id ? <LoaderCircle aria-label="正在定位" className="spin" size={13} /> : null}
+                  </span>
+                </button>
+              </div>
             );
           })}
         </div>

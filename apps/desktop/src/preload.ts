@@ -80,8 +80,11 @@ const systemBridge = {
   saveDiagnostics: (content: string): Promise<string | undefined> => ipcRenderer.invoke("pi67:save-diagnostics", content),
   showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("pi67:notify", { title, body }),
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
-  showWorkspaceEntryContextMenu: (entry: WorkspaceEntryRequest): Promise<WorkspaceEntryContextAction | undefined> => (
-    ipcRenderer.invoke("pi67:workspace-entry-menu", entry)
+  showWorkspaceEntryContextMenu: (
+    entry: WorkspaceEntryRequest,
+    includeManagement = false
+  ): Promise<WorkspaceEntryContextAction | undefined> => (
+    ipcRenderer.invoke("pi67:workspace-entry-menu", entry, includeManagement)
   ),
   revealWorkspaceEntry: (entry: WorkspaceEntryRequest): Promise<boolean> => (
     ipcRenderer.invoke("pi67:workspace-entry-reveal", entry)

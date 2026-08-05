@@ -17,7 +17,11 @@ const file = {
 describe("Inspector protocol", () => {
   it("validates strict Workspace file commands and bounded results", () => {
     expect(Value.Check(CommandPayloadSchemas["workspace.file.list"], {})).toBe(true);
-    expect(Value.Check(CommandPayloadSchemas["workspace.file.list"], { parentId: file.id, limit: 200 })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["workspace.file.list"], {
+      parentId: file.id,
+      limit: 200,
+      includeGenerated: true
+    })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.list"], { limit: 201 })).toBe(false);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.search"], { query: "main", includeGenerated: true })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.search"], { query: "x".repeat(257) })).toBe(false);

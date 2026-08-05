@@ -415,13 +415,43 @@ loading error where the operation can produce those states
   32px high.
   Search accepts at most 256 characters, returns at most 200 matches, visits at
   most 50,000 nodes, always skips `.git`, and skips dependency, generated, and
-  cache directories unless `包含依赖与生成目录` is enabled.
-- Directory rows expand or collapse. Clicking an ordinary file asks the native
-  shell to reveal it in Finder or Explorer; it never squeezes source into the
-  Inspector. Right-click opens the native menu with one `在 Pi-67 中打开` action,
-  system-default open, absolute/relative path copy, and reveal. The toolbar owns
-  create-file, create-directory, and refresh; the row menu owns rename and
-  confirmed trash.
+  cache directories from both the tree and search unless `显示依赖/生成目录` is
+  enabled. Search results render
+  file name as primary text and relative directory/path as secondary metadata;
+  toggling that option refreshes the tree and reruns the current query without
+  losing expansion, selection, or scroll; stale responses cannot replace the
+  latest result. A failed child directory exposes an inline `重试` without forcing
+  a whole-tree reset.
+- Directory rows expand or collapse. Clicking an ordinary file opens or focuses
+  its central Pi-67 file tab; source never gets squeezed into the Inspector.
+  The row menu presents `在 Pi-67 中打开`, system-default open, relative-path
+  copy, absolute-path copy, Finder/Explorer reveal, rename, and confirmed trash
+  in that order, and the native right-click menu keeps the same management actions.
+  Successful path copy owns visible feedback. The toolbar combines file/folder
+  creation under one compact, flat plus-and-chevron action with an accessible label
+  and tooltip, without redundant visible `新建` text, persistent outline, or pill;
+  refresh stays separate but uses the same icon-action visual language. Toolbar
+  targets are at least 28px on a side and expose tooltip, focus-visible, disabled,
+  and loading states. Neither the filter/action row nor its action group receives
+  a bordered, filled, rounded, or pill-shaped enclosing surface; only the individual
+  icon actions may show transient hover, pressed, or focus feedback.
+- File navigation uses `tree`, `treeitem`, and `group` semantics with level and
+  expansion state. The entire row remains the primary 32px click target; the
+  secondary menu target does not overlap it. Keyboard users can focus rows,
+  expand/collapse directories, move between parent and first-child rows, open files,
+  and reach every row action without a pointer. Type and expansion state remain
+  available to assistive technology. Message list items retain a nested native
+  button rather than replacing button semantics with `listitem`.
+- Create-file, create-directory, rename, and draft-save-as share a padded,
+  responsive dialog shell with a visible destination summary, name label,
+  example placeholder, supporting text, inline error, and stable footer. The
+  create-file variant adds a file-format selector: `自动识别`, Markdown,
+  TypeScript, JavaScript, JSON, YAML, and plain text. It displays the detected
+  format and extension, while the filename extension remains the only editor
+  language authority. Rename initially selects the basename while preserving a
+  file extension. Validation is immediate but non-destructive; Host failure
+  remains inline, preserves focus and input, and never collapses into Toast-only
+  feedback. Enter submits a valid form except during IME composition.
 - File references are Host-epoch opaque IDs scoped to one registered Workspace.
   Every list, search, resolve, open, save, create, rename, reveal, system-open,
   copy, and trash boundary rechecks persisted Workspace identity, trust, `lstat`,
@@ -438,8 +468,10 @@ loading error where the operation can produce those states
   unavailable states. Clean inactive tabs release source text and reopen it on
   demand rather than retaining every file body indefinitely.
 - Save carries the opened opaque revision and cannot overwrite an external
-  change. A dirty conflict exposes `重新读取` and `将草稿另存为`; closing a dirty
-  tab offers save, discard, and cancel. Clean tabs and dirty drafts restore per
+  change. A dirty conflict exposes `放弃草稿并重新读取` and `将草稿另存为`;
+  every reload that would replace a dirty draft requires a confirmation and a
+  failed read leaves the draft intact. Closing a dirty tab offers save, discard,
+  and cancel. Clean tabs and dirty drafts restore per
   Workspace. Draft text is encrypted with Electron `safeStorage`; unavailable
   encryption means no plaintext draft persistence and a guarded exit. Limits are
   32 tabs per Workspace, 128 per app, and 20 MiB of dirty drafts.

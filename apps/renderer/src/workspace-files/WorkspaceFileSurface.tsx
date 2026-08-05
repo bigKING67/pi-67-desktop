@@ -13,6 +13,7 @@ import {
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import {
   activateWorkspaceFileTab,
+  executeWorkspaceEntryAction,
   reloadWorkspaceFile,
   saveWorkspaceDraftAs,
   saveWorkspaceFile,
@@ -38,6 +39,7 @@ export function WorkspaceFileSurface({
   const draftPersistence = useWorkspaceFileStore((state) => state.draftPersistence);
   const persistenceError = useWorkspaceFileStore((state) => state.persistenceError);
   const [closeCandidate, setCloseCandidate] = useState<string>();
+  const [reloadCandidate, setReloadCandidate] = useState<string>();
   const [saveAsCandidate, setSaveAsCandidate] = useState<string>();
   const tabs = fileWorkspace?.tabs ?? [];
   const activeRelativePath = fileWorkspace?.activeRelativePath;
@@ -71,7 +73,7 @@ export function WorkspaceFileSurface({
                 key={relativePath}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  void showWorkspaceEntryMenu(workspace, tabEntry(tab));
+                  void showFileEntryMenu(workspace, tabEntry(tab));
                 }}
               >
                 <button
@@ -121,6 +123,9 @@ export function WorkspaceFileSurface({
             persistenceError={persistenceError}
             tab={activeTab}
             workspace={workspace}
+            onReload={() => activeTab.dirty
+              ? setReloadCandidate(activeTab.relativePath)
+              : void reloadWorkspaceFile(workspace, activeTab.relativePath)}
             onSaveAs={() => setSaveAsCandidate(activeTab.relativePath)}
           />
         ) : children}
@@ -133,11 +138,19 @@ export function WorkspaceFileSurface({
           onDismiss={() => setCloseCandidate(undefined)}
         />
       ) : null}
+      {reloadCandidate ? (
+        <DirtyFileReloadDialog
+          relativePath={reloadCandidate}
+          workspace={workspace}
+          onDismiss={() => setReloadCandidate(undefined)}
+        />
+      ) : null}
       {saveAsCandidate ? (
         <WorkspaceFileNameDialog
           confirmLabel="另存草稿"
-          detail="新文件会创建在当前文件所在目录；成功保存后关闭原草稿标签。"
+          detail={`位置：${parentRelativePath(saveAsCandidate) || "工作区根目录"}`}
           initialName={suggestCopyName(saveAsCandidate)}
+          mode="save-as"
           title="将草稿另存为"
           onDismiss={() => setSaveAsCandidate(undefined)}
           onConfirm={(name) => saveWorkspaceDraftAs(workspace, saveAsCandidate, name)}
@@ -152,12 +165,14 @@ function FileDocumentSurface({
   tab,
   draftPersistence,
   persistenceError,
+  onReload,
   onSaveAs
 }: {
   workspace: WorkspaceDescriptor;
   tab: WorkspaceFileTab;
   draftPersistence: "available" | "unavailable";
   persistenceError?: string | undefined;
+  onReload: () => void;
   onSaveAs: () => void;
 }) {
   const save = () => void saveWorkspaceFile(workspace, tab.relativePath);
@@ -172,10 +187,10 @@ function FileDocumentSurface({
           {tab.dirty ? (
             <button disabled={tab.conflict} type="button" onClick={save}><Save size={13} />保存</button>
           ) : null}
-          <button type="button" onClick={() => void reloadWorkspaceFile(workspace, tab.relativePath)}>
+          <button type="button" onClick={onReload}>
             <RotateCcw size={13} />重新读取
           </button>
-          <button type="button" onClick={() => void showWorkspaceEntryMenu(workspace, tabEntry(tab))}>
+          <button type="button" onClick={() => void showFileEntryMenu(workspace, tabEntry(tab))}>
             <ExternalLink size={13} />更多
           </button>
         </div>
@@ -185,7 +200,7 @@ function FileDocumentSurface({
         <div className="workspace-file-conflict" role="alert">
           <AlertTriangle size={15} />
           <span>{tab.reason ?? "磁盘文件已变化，草稿不会覆盖它。"}</span>
-          <button type="button" onClick={() => void reloadWorkspaceFile(workspace, tab.relativePath)}>重新读取</button>
+          <button type="button" onClick={onReload}>放弃草稿并重新读取</button>
           <button type="button" onClick={onSaveAs}>将草稿另存为</button>
         </div>
       ) : null}
@@ -202,7 +217,7 @@ function FileDocumentSurface({
       ) : tab.phase === "missing" ? (
         <div className="workspace-file-state"><AlertTriangle size={20} /><strong>文件已不存在</strong><p>{tab.reason}</p>{tab.dirty ? <button onClick={onSaveAs} type="button">将草稿另存为</button> : null}</div>
       ) : tab.phase === "unavailable" ? (
-        <div className="workspace-file-state"><FileText size={20} /><strong>无法在 Pi-67 中编辑</strong><p>{tab.reason}</p><button type="button" onClick={() => void showWorkspaceEntryMenu(workspace, tabEntry(tab))}>选择系统打开方式</button></div>
+        <div className="workspace-file-state"><FileText size={20} /><strong>无法在 Pi-67 中编辑</strong><p>{tab.reason}</p><button type="button" onClick={() => void showFileEntryMenu(workspace, tabEntry(tab))}>选择系统打开方式</button></div>
       ) : tab.content !== undefined ? (
         <Suspense fallback={<div className="workspace-file-state" role="status"><LoaderCircle className="spin" size={18} />正在加载编辑器</div>}>
           <FileEditor
@@ -263,6 +278,47 @@ function DirtyFileCloseDialog({
   );
 }
 
+function DirtyFileReloadDialog({
+  workspace,
+  relativePath,
+  onDismiss
+}: {
+  workspace: WorkspaceDescriptor;
+  relativePath: string;
+  onDismiss: () => void;
+}) {
+  const [reloading, setReloading] = useState(false);
+  const tab = useWorkspaceFileStore((state) => state.workspaces[workspace.id]?.byPath[relativePath]);
+  if (!tab) return null;
+  const discardAndReload = async () => {
+    setReloading(true);
+    try {
+      if (await reloadWorkspaceFile(workspace, relativePath)) onDismiss();
+    } finally {
+      setReloading(false);
+    }
+  };
+  return (
+    <ModalOverlay className="modal-overlay" isDismissable={!reloading} isOpen onOpenChange={(open) => {
+      if (!open && !reloading) onDismiss();
+    }}>
+      <Modal className="modal-surface workspace-file-close-modal">
+        <Dialog aria-label={`重新读取 ${tab.name}`} className="workspace-file-close-dialog">
+          <span className="dialog-eyebrow">未保存文件</span>
+          <Heading slot="title">放弃“{tab.name}”的修改？</Heading>
+          <p>重新读取会用磁盘中的最新内容替换当前草稿，此操作无法在 Pi-67 中撤销。</p>
+          <div className="dialog-actions">
+            <Button className="secondary-button" isDisabled={reloading} onPress={onDismiss}>取消</Button>
+            <Button className="workspace-file-discard-button" isDisabled={reloading} onPress={() => void discardAndReload()}>
+              {reloading ? "正在重新读取…" : "放弃修改并重新读取"}
+            </Button>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
+  );
+}
+
 function requestClose(
   workspaceId: string,
   tab: WorkspaceFileTab,
@@ -270,6 +326,13 @@ function requestClose(
 ): void {
   if (tab.dirty) setCloseCandidate(tab.relativePath);
   else workspaceFileStore.getState().closeTab(workspaceId, tab.relativePath);
+}
+
+async function showFileEntryMenu(workspace: WorkspaceDescriptor, entry: WorkspaceFileEntry): Promise<void> {
+  const action = await showWorkspaceEntryMenu(workspace, entry);
+  if (action && action !== "rename" && action !== "trash") {
+    await executeWorkspaceEntryAction(workspace, entry, action);
+  }
 }
 
 function tabEntry(tab: WorkspaceFileTab): WorkspaceFileEntry {
@@ -286,4 +349,9 @@ function suggestCopyName(relativePath: string): string {
   const name = relativePath.slice(relativePath.lastIndexOf("/") + 1);
   const dot = name.lastIndexOf(".");
   return dot > 0 ? `${name.slice(0, dot)}-copy${name.slice(dot)}` : `${name}-copy`;
+}
+
+function parentRelativePath(relativePath: string): string {
+  const index = relativePath.lastIndexOf("/");
+  return index < 0 ? "" : relativePath.slice(0, index);
 }

@@ -43,7 +43,7 @@ export type WorkspaceFileCommandType =
 type WorkspaceFileCommand = AgentCommand<WorkspaceFileCommandType>;
 type WorkspaceFileResult = CommandResults[WorkspaceFileCommandType];
 
-const SEARCH_SKIPPED_DIRECTORIES = new Set([
+const GENERATED_DIRECTORIES = new Set([
   ".cache",
   ".next",
   ".pnpm",
@@ -109,7 +109,11 @@ export class WorkspaceFileCommandRouter {
       workspace.canonicalCwd,
       parent.relativePath,
       name
-    )))).sort(compareWorkspaceFileEntries);
+    )))).filter((entry) => (
+      payload.includeGenerated
+      || entry.kind !== "directory"
+      || !GENERATED_DIRECTORIES.has(entry.name)
+    )).sort(compareWorkspaceFileEntries);
     const offset = parseCursor(payload.cursor);
     const limit = Math.min(MAX_WORKSPACE_FILE_PAGE_ITEMS, payload.limit ?? MAX_WORKSPACE_FILE_PAGE_ITEMS);
     const pageEntries = entries.slice(offset, offset + limit);
@@ -169,7 +173,7 @@ export class WorkspaceFileCommandRouter {
           continue;
         }
         const skipDirectory = entry.kind === "directory" && (
-          name === ".git" || (!payload.includeGenerated && SEARCH_SKIPPED_DIRECTORIES.has(name))
+          name === ".git" || (!payload.includeGenerated && GENERATED_DIRECTORIES.has(name))
         );
         if (!skipDirectory && relativePath.toLocaleLowerCase().includes(needle)) entries.push(entry);
         if (entries.length >= MAX_WORKSPACE_FILE_SEARCH_RESULTS) break;

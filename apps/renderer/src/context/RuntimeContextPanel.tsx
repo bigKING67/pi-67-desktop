@@ -27,10 +27,10 @@ export function RuntimeContextPanel() {
   return (
     <>
       <dl className="metric-list">
-        <div><dt>Session</dt><dd>{sessionName ?? sessionId?.slice(0, 8) ?? "-"}</dd></div>
-        <div><dt>Tokens</dt><dd>{stats?.tokens.toLocaleString() ?? "0"}</dd></div>
-        <div><dt>Context</dt><dd>{stats?.contextPercent === undefined ? "-" : `${stats.contextPercent.toFixed(1)}%`}</dd></div>
-        <div><dt>Cost</dt><dd>${stats?.cost.toFixed(4) ?? "0.0000"}</dd></div>
+        <div><dt>会话</dt><dd>{sessionName ?? sessionId?.slice(0, 8) ?? "-"}</dd></div>
+        <div><dt>Token</dt><dd>{stats?.tokens.toLocaleString() ?? "0"}</dd></div>
+        <div><dt>上下文占用</dt><dd>{stats?.contextPercent === undefined ? "-" : `${stats.contextPercent.toFixed(1)}%`}</dd></div>
+        <div><dt>费用</dt><dd>${stats?.cost.toFixed(4) ?? "0.0000"}</dd></div>
       </dl>
       <div className="status-list">
         <span className="section-label">Extension 状态</span>

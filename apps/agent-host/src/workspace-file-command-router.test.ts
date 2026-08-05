@@ -75,6 +75,16 @@ describe("WorkspaceFileCommandRouter", () => {
     const router = routerFor(root);
     const context = { scope: "workspace" as const, workspaceId: "workspace-1" };
 
+    const defaultPage = await router.dispatch(context, { type: "workspace.file.list", payload: {} });
+    if (!("entries" in defaultPage)) throw new Error("Expected a Workspace file page.");
+    expect(defaultPage.entries.map((entry) => entry.name)).toEqual(["src"]);
+    const completePage = await router.dispatch(context, {
+      type: "workspace.file.list",
+      payload: { includeGenerated: true }
+    });
+    if (!("entries" in completePage)) throw new Error("Expected a complete Workspace file page.");
+    expect(completePage.entries.map((entry) => entry.name)).toEqual(["node_modules", "src"]);
+
     await expect(router.dispatch(context, {
       type: "workspace.file.search",
       payload: { query: "feature" }

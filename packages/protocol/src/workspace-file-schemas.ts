@@ -29,7 +29,8 @@ const WorkspaceFileEntrySchema = strictObject({
 export const WorkspaceFileListPayloadSchema = strictObject({
   parentId: Type.Optional(OpaqueFileIdSchema),
   cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 32 })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_WORKSPACE_FILE_PAGE_ITEMS }))
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_WORKSPACE_FILE_PAGE_ITEMS })),
+  includeGenerated: Type.Optional(Type.Boolean())
 });
 
 export const WorkspaceFileSearchPayloadSchema = strictObject({

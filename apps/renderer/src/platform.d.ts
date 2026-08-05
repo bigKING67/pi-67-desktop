@@ -58,7 +58,10 @@ declare global {
         saveDiagnostics(content: string): Promise<string | undefined>;
         showNotification(title: string, body: string): Promise<void>;
         requestOpenExternal(url: string): Promise<boolean>;
-        showWorkspaceEntryContextMenu(entry: WorkspaceEntryRequest): Promise<WorkspaceEntryContextAction | undefined>;
+        showWorkspaceEntryContextMenu(
+          entry: WorkspaceEntryRequest,
+          includeManagement?: boolean
+        ): Promise<WorkspaceEntryContextAction | undefined>;
         revealWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
         openWorkspaceEntryInDefaultApp(entry: WorkspaceEntryRequest): Promise<boolean>;
         copyWorkspaceEntryPath(entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean>;

@@ -498,10 +498,29 @@ count.
 - The Inspector has three primary views: `文件`, `消息`, and `上下文`. Files is a
   lazy, bounded navigator for the registered trusted Workspace and remains
   available without initializing a Task Runtime. Directory clicks expand in
-  place; ordinary file clicks reveal the file in Finder or Explorer. The native
-  context menu has one `在 Pi-67 中打开` action plus system-default open, copy
-  absolute/relative path, and reveal actions. Files also supports explicit
-  create-file, create-directory, rename, refresh, and confirmed trash operations.
+  place; ordinary file clicks open or focus the file in Pi-67. A compact
+  flat plus-and-chevron menu owns create-file and create-directory, with an accessible
+  label and tooltip but no redundant visible `新建` text, persistent outline, or pill;
+  refresh remains a separate toolbar action in the same visual language. The filter
+  row and action group remain visually unboxed rather than becoming one large capsule;
+  only an individual icon action receives transient interaction feedback. The row
+  menu and native right-click menu order `在 Pi-67 中打开`, system-default open,
+  relative-path copy, absolute-path copy, Finder/Explorer reveal, rename, and
+  confirmed trash operations. Search results show the file name and relative
+  path so duplicate names remain distinguishable. Dependency and generated
+  directories are hidden from both the tree and search by default; changing
+  `显示依赖/生成目录` refreshes both while retaining expansion, selection, and
+  scroll state. A failed child-directory read owns a local retry action.
+- Create-file, create-directory, rename, and draft-save-as use one stable naming
+  dialog with a visible name label, destination summary, inline validation, and
+  recoverable request errors. Create-file additionally offers `自动识别`,
+  Markdown, TypeScript, JavaScript, JSON, YAML, and plain-text choices. The choice
+  only synchronizes or supplements the filename extension; `name + kind` and the
+  resulting extension remain authoritative across the protocol and editor.
+  Empty names, separators, control characters, trailing dot/space, `.git`,
+  Windows-reserved basenames, and names over 255 characters fail before submit
+  and are still revalidated by the Host. Enter never submits during IME
+  composition, and a failed mutation preserves the typed name and focus.
 - `在 Pi-67 中打开` creates one Workspace-scoped file tab or focuses the existing
   tab for the same relative path. The fixed `对话` tab remains available, file
   tabs survive Conversation and Settings navigation, and selecting a Conversation
@@ -512,8 +531,9 @@ count.
   to 2 MiB and provides line numbers, syntax highlighting, search, undo/redo, and
   `Cmd/Ctrl+S`. Binary, invalid UTF-8, oversized, symlink, missing, and special
   files fail explicitly. Saves require the revision that was opened and refuse
-  to overwrite an externally changed file; the recovery actions are `重新读取`
-  and `将草稿另存为`.
+  to overwrite an externally changed file; the recovery actions are
+  `放弃草稿并重新读取` and `将草稿另存为`. Any reload that would replace a dirty
+  draft requires an explicit confirmation and preserves the draft if the read fails.
 - Renderer requests carry Host-issued opaque references rather than absolute
   paths. Host and Main revalidate Workspace registration, filesystem identity,
   containment, kind, trust, and `.git` exclusion at each boundary. Clean tabs and
