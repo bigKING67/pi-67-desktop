@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { chmod, lstat, mkdir, readFile, readdir, realpath, rename } from "node:fs/promises";
-import { createInterface } from "node:readline";
+import { chmod, lstat, mkdir, readFile, readdir, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { SessionCreationResolution } from "@pi67/protocol";
@@ -11,14 +9,23 @@ import {
   writePrivateFileAtomically
 } from "./atomic-private-file.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  inspectSessionCreationMarker,
+  SESSION_CREATION_MARKER_SCHEMA_VERSION,
+  SESSION_CREATION_MARKER_TYPE,
+  SessionCreationScanBudgetTracker,
+  SessionCreationScanLimitError,
+  throwIfAborted,
+  type SessionCreationIdentity,
+  type SessionCreationMarkerInspection,
+  type SessionCreationScanBudget
+} from "./session-creation-marker-inspection.js";
 
-export const SESSION_CREATION_MARKER_TYPE = "pi67.session-creation";
+export { SESSION_CREATION_MARKER_TYPE };
+export type { SessionCreationScanBudget };
 
 const RECEIPT_VERSION = 1;
-const MARKER_SCHEMA_VERSION = 1;
 const MAX_RECEIPT_BYTES = 64 * 1024;
-const MAX_MARKER_SCAN_BYTES = 1024 * 1024;
-const MAX_MARKER_SCAN_LINES = 256;
 const MAX_FALLBACK_SESSION_FILES = 10_000;
 const FALLBACK_SCAN_BATCH_SIZE = 8;
 
@@ -30,21 +37,16 @@ interface SessionCreationReceipt {
   sessionPath: string;
 }
 
-interface SessionCreationIdentity {
-  sessionId: string;
-  sessionPath: string;
-}
-
-type MarkerInspection =
-  | { status: "match"; identity: SessionCreationIdentity }
-  | { status: "missing" }
-  | { status: "ambiguous" };
-
 export interface SessionCreationReceiptStoreOptions {
   cwd: string;
   agentDir: string;
   storageRoot?: string;
   getConfiguredSessionDir(): string | undefined;
+}
+
+export interface SessionCreationResolutionOptions {
+  signal?: AbortSignal;
+  scanBudget?: SessionCreationScanBudget;
 }
 
 export type SessionCreationManager = Pick<
@@ -88,14 +90,19 @@ export class SessionCreationReceiptStore {
     return inspection.identity;
   }
 
-  async resolve(creationId: string): Promise<SessionCreationResolution> {
+  async resolve(
+    creationId: string,
+    options: SessionCreationResolutionOptions = {}
+  ): Promise<SessionCreationResolution> {
     try {
+      throwIfAborted(options.signal);
       const receipt = await this.readReceipt(creationId);
       if (receipt?.workspaceKey === this.workspaceKey) {
         const inspection = await inspectSessionCreationMarker(
           receipt.sessionPath,
           creationId,
-          this.cwd
+          this.cwd,
+          options.signal === undefined ? {} : { signal: options.signal }
         );
         if (
           inspection.status === "match"
@@ -106,7 +113,7 @@ export class SessionCreationReceiptStore {
         if (inspection.status === "ambiguous") return { status: "ambiguous", creationId };
       }
 
-      const scanned = await this.scanSessionDirectories(creationId);
+      const scanned = await this.scanSessionDirectories(creationId, options);
       if (scanned.status !== "match") {
         return scanned.status === "ambiguous"
           ? { status: "ambiguous", creationId }
@@ -121,22 +128,34 @@ export class SessionCreationReceiptStore {
         ...scanned.identity
       }).catch(() => undefined);
       return materialized(creationId, scanned.identity);
-    } catch {
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      if (error instanceof SessionCreationScanLimitError) {
+        return { status: "unavailable", creationId, reason: "scan-limit" };
+      }
       return { status: "unavailable", creationId, reason: "storage-error" };
     }
   }
 
-  private async scanSessionDirectories(creationId: string): Promise<
-    MarkerInspection | { status: "unavailable"; reason: "scan-limit" | "storage-error" }
+  private async scanSessionDirectories(
+    creationId: string,
+    options: SessionCreationResolutionOptions
+  ): Promise<
+    SessionCreationMarkerInspection
+      | { status: "unavailable"; reason: "scan-limit" | "storage-error" }
   > {
     const paths: string[] = [];
     const seen = new Set<string>();
+    const budget = new SessionCreationScanBudgetTracker(options.scanBudget);
     try {
       for (const directory of this.sessionDirectories()) {
+        throwIfAborted(options.signal);
+        budget.assertAvailable();
         const entries = await readdir(directory, { withFileTypes: true }).catch((error: unknown) => {
           if (isNodeError(error, "ENOENT")) return [];
           throw error;
         });
+        throwIfAborted(options.signal);
         for (const entry of entries) {
           if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
           const path = join(directory, entry.name);
@@ -149,22 +168,38 @@ export class SessionCreationReceiptStore {
           }
         }
       }
-    } catch {
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      if (error instanceof SessionCreationScanLimitError) {
+        return { status: "unavailable", reason: "scan-limit" };
+      }
       return { status: "unavailable", reason: "storage-error" };
     }
 
     let match: SessionCreationIdentity | undefined;
-    for (let offset = 0; offset < paths.length; offset += FALLBACK_SCAN_BATCH_SIZE) {
-      const batch = paths.slice(offset, offset + FALLBACK_SCAN_BATCH_SIZE);
-      const inspections = await Promise.all(batch.map((path) => (
-        inspectSessionCreationMarker(path, creationId, this.cwd)
-      )));
-      for (const inspection of inspections) {
-        if (inspection.status === "ambiguous") return inspection;
-        if (inspection.status !== "match") continue;
-        if (match) return { status: "ambiguous" };
-        match = inspection.identity;
+    try {
+      for (let offset = 0; offset < paths.length; offset += FALLBACK_SCAN_BATCH_SIZE) {
+        throwIfAborted(options.signal);
+        budget.assertAvailable();
+        const batch = paths.slice(offset, offset + FALLBACK_SCAN_BATCH_SIZE);
+        const inspections = await Promise.all(batch.map((path) => (
+          inspectSessionCreationMarker(path, creationId, this.cwd, {
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
+            budget
+          })
+        )));
+        for (const inspection of inspections) {
+          if (inspection.status === "ambiguous") return inspection;
+          if (inspection.status !== "match") continue;
+          if (match) return { status: "ambiguous" };
+          match = inspection.identity;
+        }
       }
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return error instanceof SessionCreationScanLimitError
+        ? { status: "unavailable", reason: "scan-limit" }
+        : { status: "unavailable", reason: "storage-error" };
     }
     return match ? { status: "match", identity: match } : { status: "missing" };
   }
@@ -242,74 +277,6 @@ export class SessionCreationReceiptStore {
   }
 }
 
-async function inspectSessionCreationMarker(
-  sessionPath: string,
-  creationId: string,
-  expectedCwd: string
-): Promise<MarkerInspection> {
-  const info = await lstat(sessionPath).catch((error: unknown) => (
-    isNodeError(error, "ENOENT") ? undefined : Promise.reject(error)
-  ));
-  if (!info || !info.isFile() || info.isSymbolicLink()) return { status: "missing" };
-  const canonicalSessionPath = await realpath(sessionPath);
-
-  let header: { id: string; cwd: string } | undefined;
-  let matches = 0;
-  let bytes = 0;
-  let lines = 0;
-  const stream = createReadStream(canonicalSessionPath, {
-    encoding: "utf8",
-    start: 0,
-    end: MAX_MARKER_SCAN_BYTES - 1
-  });
-  const input = createInterface({ input: stream, crlfDelay: Infinity });
-  try {
-    for await (const line of input) {
-      lines += 1;
-      bytes += Buffer.byteLength(line, "utf8") + 1;
-      if (lines > MAX_MARKER_SCAN_LINES || bytes > MAX_MARKER_SCAN_BYTES) break;
-      let entry: unknown;
-      try {
-        entry = JSON.parse(line) as unknown;
-      } catch {
-        continue;
-      }
-      if (!isRecord(entry)) continue;
-      if (
-        entry.type === "session"
-        && typeof entry.id === "string"
-        && typeof entry.cwd === "string"
-      ) {
-        header ??= { id: entry.id, cwd: entry.cwd };
-        continue;
-      }
-      if (
-        entry.type === "custom"
-        && entry.customType === SESSION_CREATION_MARKER_TYPE
-        && isRecord(entry.data)
-        && entry.data.schemaVersion === MARKER_SCHEMA_VERSION
-        && entry.data.creationId === creationId
-      ) {
-        matches += 1;
-      }
-    }
-  } finally {
-    input.close();
-    stream.destroy();
-  }
-  if (matches > 1) return { status: "ambiguous" };
-  if (
-    matches !== 1
-    || !header
-    || normalizeSessionCatalogPathIdentity(header.cwd)
-      !== normalizeSessionCatalogPathIdentity(expectedCwd)
-  ) return { status: "missing" };
-  return {
-    status: "match",
-    identity: { sessionId: header.id, sessionPath: canonicalSessionPath }
-  };
-}
-
 export async function appendSessionCreationMarker(
   manager: Pick<
     SessionManager,
@@ -325,7 +292,7 @@ export async function appendSessionCreationMarker(
   creationId: string
 ): Promise<void> {
   manager.appendCustomEntry(SESSION_CREATION_MARKER_TYPE, {
-    schemaVersion: MARKER_SCHEMA_VERSION,
+    schemaVersion: SESSION_CREATION_MARKER_SCHEMA_VERSION,
     creationId
   });
   if (!manager.isPersisted()) return;

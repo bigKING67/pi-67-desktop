@@ -13,3 +13,26 @@ export function rendererSessionInstallationViolations(path, source) {
     `${path}: ${match[1]} is owned by ${SESSION_INSTALLATION_OWNER}`
   ));
 }
+
+export function protocolDocumentationViolations(protocolSource, documentationSource) {
+  const sourceMatch = protocolSource.match(
+    /export const PROTOCOL_VERSION\s*=\s*(\d+)\s+as const;/u
+  );
+  if (!sourceMatch?.[1]) {
+    return ["packages/protocol/src/protocol-version.ts: cannot resolve PROTOCOL_VERSION"];
+  }
+  const documentationMatch = documentationSource.match(
+    /所有 envelope 使用 `protocolVersion:\s*(\d+)`/u
+  );
+  if (!documentationMatch?.[1]) {
+    return [
+      "docs/architecture/processes-and-protocol.md: missing the canonical protocolVersion declaration"
+    ];
+  }
+  return documentationMatch[1] === sourceMatch[1]
+    ? []
+    : [
+        "docs/architecture/processes-and-protocol.md: "
+          + `protocolVersion ${documentationMatch[1]} does not match source ${sourceMatch[1]}`
+      ];
+}

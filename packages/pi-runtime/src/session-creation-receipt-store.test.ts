@@ -76,6 +76,33 @@ describe("SessionCreationReceiptStore", () => {
       creationId: "session-creation-duplicate"
     });
   });
+
+  it("returns scan-limit when the total fallback budget is exhausted", async () => {
+    const fixture = await createFixture();
+    const manager = SessionManager.create(fixture.cwd, fixture.sessionDir);
+    await appendSessionCreationMarker(manager, "session-creation-other");
+
+    await expect(fixture.store.resolve("session-creation-budget", {
+      scanBudget: { maxFiles: 0 }
+    })).resolves.toEqual({
+      status: "unavailable",
+      creationId: "session-creation-budget",
+      reason: "scan-limit"
+    });
+  });
+
+  it("propagates caller cancellation instead of reporting a storage failure", async () => {
+    const fixture = await createFixture();
+    const manager = SessionManager.create(fixture.cwd, fixture.sessionDir);
+    await appendSessionCreationMarker(manager, "session-creation-cancelled");
+    const controller = new AbortController();
+    const resolution = fixture.store.resolve("session-creation-cancelled", {
+      signal: controller.signal
+    });
+    queueMicrotask(() => controller.abort());
+
+    await expect(resolution).rejects.toMatchObject({ name: "AbortError" });
+  });
 });
 
 async function createFixture() {

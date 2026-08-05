@@ -11,10 +11,10 @@ import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
-import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
+import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 
 describe("Workspace open Catalog ordering", () => {
   beforeEach(() => {
@@ -78,8 +78,7 @@ describe("Workspace open Catalog ordering", () => {
           sessionGeneration: 1
         }));
         const event = { type: "runtime.ready", payload } as const;
-        routeWorkbenchAgentEvent(event, envelope);
-        useAppStore.getState().receiveAgentEvent(event, envelope);
+        applyRendererAgentEvent(event, envelope);
         return projectionAcknowledgement(initialSnapshot.sessionId) as never;
       }
       if (type === "session.catalog.query") {
@@ -111,8 +110,12 @@ describe("Workspace open Catalog ordering", () => {
     });
     expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
       expect.objectContaining({
-        conversation: expect.objectContaining({ kind: "provisional" }),
-        sessionId: initialSnapshot.sessionId
+        conversation: expect.objectContaining({
+          kind: "session",
+          sessionPath: initialSnapshot.sessionPath
+        }),
+        sessionId: initialSnapshot.sessionId,
+        sessionPath: initialSnapshot.sessionPath
       })
     ]);
 

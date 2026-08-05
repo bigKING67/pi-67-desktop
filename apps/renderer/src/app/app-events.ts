@@ -21,11 +21,11 @@ export function handleAgentEvent<TState extends AppEventState>(
   get: EventStoreGet<TState>,
   set: EventStoreSet<TState>,
   onMissingSessionImportBootstrap?: (event: RoutedAgentEvent, envelope: EventEnvelope) => void
-): void {
+): boolean {
   const sessionAuthority = sessionAuthorityForEvent(event, envelope, get);
   if (requiresSessionAuthority(event.type) && !sessionAuthority) {
     onMissingSessionImportBootstrap?.(event, envelope);
-    return;
+    return false;
   }
 
   switch (event.type) {
@@ -33,8 +33,7 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "runtime.crashed":
     case "diagnostics.progress":
     case "doctor.completed":
-      reduceRuntimeEvent(event, set);
-      return;
+      return reduceRuntimeEvent(event, set);
     case "turn.streamBatch":
     case "operation.started":
     case "operation.heartbeat":
@@ -44,8 +43,7 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "operation.failed":
     case "operation.cancelled":
     case "operation.lost":
-      reduceOperationEvent(event, envelope, get, set, sessionAuthority);
-      return;
+      return reduceOperationEvent(event, envelope, get, set, sessionAuthority);
     case "approval.requested":
     case "approval.resolved":
     case "approval.cancelled":
@@ -55,8 +53,7 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "extension.ui.cancelled":
     case "extension.compatibilityChanged":
     case "extension.catalog.changed":
-      reduceInteractiveEvent(event, envelope, get);
-      return;
+      return reduceInteractiveEvent(event, envelope, get);
     case "session.catalog.changed":
       if (envelope.context.scope !== "app") {
         handleSessionCatalogChanged(
@@ -65,24 +62,24 @@ export function handleAgentEvent<TState extends AppEventState>(
           event.payload.reason
         );
       }
-      return;
+      return true;
     case "session.externalChangeDetected":
       publishNotification({
         level: "warning",
         title: "Pi 会话已在外部修改",
         message: externalSessionChangeMessage(event.payload.reason)
       });
-      return;
+      return true;
     case "provider.configuration.changed":
       if (envelope.context.scope === "workspace") {
         handleProviderConfigurationChanged(envelope.context.workspaceId, event.payload);
       }
-      return;
+      return true;
     case "resource.changed":
       publishNotification({ level: "info", title: "Pi 资源已重新加载", toast: false });
-      return;
+      return true;
     case "task.toolMode.changed":
-      return;
+      return true;
     default:
       assertNever(event);
   }

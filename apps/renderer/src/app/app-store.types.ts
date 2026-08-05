@@ -37,5 +37,5 @@ export interface AppState {
   handleSequenceGap: (gap: SequenceGap) => void;
   handleAgentHostFailed: (state: AgentHostFailureState) => void;
   handlePowerResume: () => void;
-  receiveAgentEvent: (event: AgentEvent, envelope: EventEnvelope) => void;
+  receiveAgentEvent: (event: AgentEvent, envelope: EventEnvelope) => boolean;
 }

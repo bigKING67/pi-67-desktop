@@ -29,6 +29,11 @@ const OVERSIZED_HOST_RESPONSE_ERROR: ProtocolError = {
   message: "The Pi runtime service response exceeds the negotiated envelope limit.",
   recoverable: true
 };
+const PENDING_REQUEST_LIMIT_ERROR: ProtocolError = {
+  code: "RESOURCE_LIMIT_EXCEEDED",
+  message: "The Renderer connection has too many pending requests.",
+  recoverable: true
+};
 
 type PortListener = (event: unknown) => void;
 type ResponseAuthority = Pick<RequestEnvelope, "requestId" | "type" | "context">;
@@ -52,6 +57,7 @@ export class HostConnectionContext {
   private pendingResponses = 0;
   private negotiatedMaxEnvelopeBytes = DEFAULT_MAX_ENVELOPE_BYTES;
   private readonly pendingRequests = new Map<string, ResponseAuthority>();
+  private readonly requestAbortControllers = new Map<string, AbortController>();
   private readonly seenRequestIds = new Set<string>();
   private readonly messageListener: PortListener = (event) => this.handleMessage(extractData(event));
   private readonly messageErrorListener: PortListener = () => this.retire("message-error");
@@ -64,7 +70,8 @@ export class HostConnectionContext {
     private readonly getWelcomeRuntime: () => Promise<HostWelcomeRuntime>,
     private readonly onRequest: (connection: HostConnectionContext, request: RequestEnvelope) => void,
     private readonly onDisconnect: () => void = () => undefined,
-    private readonly maxSeenRequestIds = 2_048
+    private readonly maxSeenRequestIds = 2_048,
+    private readonly maxPendingRequests = 256
   ) {
     this.addListener("message", this.messageListener);
     this.addListener("messageerror", this.messageErrorListener);
@@ -78,7 +85,16 @@ export class HostConnectionContext {
 
   beginResponse(request: ResponseAuthority): void {
     this.pendingRequests.set(request.requestId, request);
+    this.requestAbortControllers.set(request.requestId, new AbortController());
     this.pendingResponses += 1;
+  }
+
+  signalForRequest(requestId: string): AbortSignal {
+    const signal = this.requestAbortControllers.get(requestId)?.signal;
+    if (signal) return signal;
+    const controller = new AbortController();
+    controller.abort();
+    return controller.signal;
   }
 
   sendSuccess<T extends AgentCommandType>(requestId: string, type: T, result: CommandResults[T]): void {
@@ -139,6 +155,7 @@ export class HostConnectionContext {
     if (this.retired) return;
     debugConnection(reason);
     this.retired = true;
+    this.abortPendingRequests();
     this.notifyDisconnect();
     this.removeListener("message", this.messageListener);
     this.removeListener("messageerror", this.messageErrorListener);
@@ -149,6 +166,7 @@ export class HostConnectionContext {
     if (this.closed) return;
     debugConnection(reason);
     this.closed = true;
+    this.abortPendingRequests();
     this.notifyDisconnect();
     this.removeListener("message", this.messageListener);
     this.removeListener("messageerror", this.messageErrorListener);
@@ -233,6 +251,10 @@ export class HostConnectionContext {
       const oldest = this.seenRequestIds.values().next().value as string | undefined;
       if (oldest === undefined) break;
       this.seenRequestIds.delete(oldest);
+    }
+    if (this.pendingRequests.size >= this.maxPendingRequests) {
+      this.sendUntrackedError(data, PENDING_REQUEST_LIMIT_ERROR);
+      return;
     }
     this.beginResponse(data);
     this.onRequest(this, data);
@@ -331,8 +353,13 @@ export class HostConnectionContext {
 
   private completeResponse(requestId: string): void {
     this.pendingRequests.delete(requestId);
+    this.requestAbortControllers.delete(requestId);
     this.pendingResponses = Math.max(0, this.pendingResponses - 1);
     if (this.retired && this.pendingResponses === 0) this.close();
+  }
+
+  private abortPendingRequests(): void {
+    for (const controller of this.requestAbortControllers.values()) controller.abort();
   }
 
   private addListener(type: "message" | "messageerror" | "close", listener: PortListener): void {

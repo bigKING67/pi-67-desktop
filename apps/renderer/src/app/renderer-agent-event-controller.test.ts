@@ -74,6 +74,27 @@ describe("renderer Agent event projection matrix", () => {
     expect(useAppStore.getState().runtime.detail).toBe("active ready");
   });
 
+  it("rejects a background terminal without a current Operation authority", () => {
+    const payload = { operationId: "operation-ghost", completedAt: 2 };
+
+    expect(applyRendererAgentEvent(
+      { type: "operation.completed", payload },
+      eventEnvelope("operation.completed", payload, taskEventFixture({
+        hostEpoch: 9,
+        sequence: 2,
+        workspaceId: "workspace-a",
+        taskId: "background",
+        taskGeneration: 1,
+        sessionId: "session-background",
+        sessionGeneration: 2,
+        operationId: "operation-ghost"
+      }))
+    )).toBe("stale");
+    expect(rendererWorkbenchStore.getState().tasks.background?.lifecycle).toBe("idle");
+    expect(rendererWorkbenchStore.getState().tasks.background).not.toHaveProperty("operationId");
+    expect(useAppStore.getState().operation).toBeUndefined();
+  });
+
   it("keeps the Settings return Task active and projects its event to both stores", () => {
     rendererWorkbenchStore.getState().openSettings("runtime");
     const status: RuntimeStatus = { phase: "busy", detail: "running", recoverable: true };

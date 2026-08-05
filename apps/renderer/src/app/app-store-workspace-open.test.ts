@@ -18,10 +18,10 @@ import {
   openRendererWorkspace,
   openRendererWorkspaceDescriptor
 } from "../workspace/workspace-open-controller.js";
-import { routeWorkbenchAgentEvent } from "../workbench/workbench-event-router.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
+import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 
 describe("App Store workspace open authority", () => {
   beforeEach(() => {
@@ -154,8 +154,7 @@ describe("App Store workspace open authority", () => {
           sessionGeneration: 1
         }));
         const event = { type: "runtime.ready", payload: readyPayload } as const;
-        routeWorkbenchAgentEvent(event, envelope);
-        useAppStore.getState().receiveAgentEvent(event, envelope);
+        applyRendererAgentEvent(event, envelope);
         return projectionAcknowledgement(readySnapshot.sessionId, 1) as never;
       }
       if (type === "session.catalog.query") return emptyCatalogPage() as never;

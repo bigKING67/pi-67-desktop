@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { rendererSessionInstallationViolations } from "./architecture-rules.mjs";
+import {
+  protocolDocumentationViolations,
+  rendererSessionInstallationViolations
+} from "./architecture-rules.mjs";
 
 describe("renderer architecture rules", () => {
   it("rejects production Session snapshot replacement outside the installation owner", () => {
@@ -21,5 +24,23 @@ describe("renderer architecture rules", () => {
         "store.commitSnapshotReplacement(connection, installation, snapshot);"
       )).toEqual([]);
     }
+  });
+});
+
+describe("protocol documentation architecture rule", () => {
+  it("accepts documentation that matches the source protocol version", () => {
+    expect(protocolDocumentationViolations(
+      "export const PROTOCOL_VERSION = 3 as const;",
+      "所有 envelope 使用 `protocolVersion: 3`："
+    )).toEqual([]);
+  });
+
+  it("rejects a stale documented protocol version", () => {
+    expect(protocolDocumentationViolations(
+      "export const PROTOCOL_VERSION = 3 as const;",
+      "所有 envelope 使用 `protocolVersion: 2`："
+    )).toEqual([
+      "docs/architecture/processes-and-protocol.md: protocolVersion 2 does not match source 3"
+    ]);
   });
 });

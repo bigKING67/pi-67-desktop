@@ -81,6 +81,21 @@ describe("handleAgentEvent operation activity authority", () => {
     expect(state.operation).toEqual(operation);
   });
 
+  it("rejects activity after the current Operation becomes terminal", () => {
+    const state = eventState();
+    state.operation = { ...operation, lifecycle: "completed" };
+
+    dispatch(state, {
+      type: "operation.activityChanged",
+      payload: { operationId: "operation-1", activity: { kind: "responding" } }
+    }, envelope("operation.activityChanged", {
+      operationId: "operation-1",
+      activity: { kind: "responding" }
+    }));
+
+    expect(state.operation).toEqual({ ...operation, lifecycle: "completed" });
+  });
+
   it("removes a resolved Extension request only under its current event authority", () => {
     const state = eventState();
     dispatch(state, { type: "extension.ui.requested", payload: extension }, envelope(

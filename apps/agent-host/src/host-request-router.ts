@@ -23,6 +23,7 @@ import {
 } from "./host-task-state-coordinator.js";
 import type { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError, toProtocolError } from "./protocol-error.js";
+import { SessionCreationResolutionCoordinator } from "./session-creation-resolution-coordinator.js";
 import {
   isSkillPackCommand,
   type SkillPackCommandRouter
@@ -57,6 +58,8 @@ export interface HostRequestRouterOptions {
 }
 
 export class HostRequestRouter {
+  private readonly sessionCreationResolutions: SessionCreationResolutionCoordinator;
+
   constructor(
     private readonly tasks: HostTaskStateCoordinator,
     private readonly contextFiles: ContextFileCommandRouter,
@@ -65,7 +68,13 @@ export class HostRequestRouter {
     private readonly workspaceCommands: WorkspaceCommandRouter,
     private readonly workspaceFiles: WorkspaceFileCommandRouter,
     private readonly options: HostRequestRouterOptions
-  ) {}
+  ) {
+    this.sessionCreationResolutions = new SessionCreationResolutionCoordinator(workspaceCommands);
+  }
+
+  shutdown(): void {
+    this.sessionCreationResolutions.shutdown();
+  }
 
   handle(origin: HostConnectionContext, request: RequestEnvelope): void {
     if (this.options.isShuttingDown()) {
@@ -107,7 +116,11 @@ export class HostRequestRouter {
         type: request.type,
         payload: request.payload
       } as AgentCommand<"session.creation.resolve">;
-      void this.workspaceCommands.resolveSessionCreation(request.context, command)
+      void this.sessionCreationResolutions.resolve(
+        request.context,
+        command,
+        origin.signalForRequest(request.requestId)
+      )
         .then((result) => origin.sendSuccess(request.requestId, request.type, result))
         .catch((error: unknown) => origin.sendError(
           request.requestId,

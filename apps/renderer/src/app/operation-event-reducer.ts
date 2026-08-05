@@ -13,6 +13,7 @@ import {
   recordOperationTerminal
 } from "../notifications/notification-store.js";
 import { useOperationActivityTimelineStore } from "../operation/operation-activity-timeline-store.js";
+import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import type { RendererSessionAuthority } from "../session/session-authority.js";
 import { eventSessionAuthority } from "../connection/event-authority.js";
 import type { AppEventState, EventStoreGet, EventStoreSet } from "./app-event-state.js";
@@ -39,8 +40,9 @@ export function reduceOperationEvent<TState extends AppEventState>(
       } as Partial<TState>);
       return true;
     case "operation.heartbeat":
-      return true;
+      return acceptsLiveOperationEvent(get(), event.payload.operationId);
     case "operation.activityChanged":
+      if (!acceptsLiveOperationEvent(get(), event.payload.operationId)) return false;
       useOperationActivityTimelineStore.getState().recordActivity(
         event.payload.operationId,
         event.payload.activity
@@ -48,6 +50,7 @@ export function reduceOperationEvent<TState extends AppEventState>(
       updateOperation(set, event.payload.operationId, event.payload.activity);
       return true;
     case "operation.progress":
+      if (!acceptsLiveOperationEvent(get(), event.payload.operationId)) return false;
       useOperationActivityTimelineStore.getState().updateProgress(
         event.payload.operationId,
         formatProgress(event.payload)
@@ -57,75 +60,71 @@ export function reduceOperationEvent<TState extends AppEventState>(
         : {} as Partial<TState>);
       return true;
     case "operation.completed":
-      if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
-        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
-        useOperationActivityTimelineStore.getState().finish(
-          event.payload.operationId,
-          "completed",
-          undefined,
-          event.payload.completedAt
-        );
-        recordRealtimeOperationTerminal(get(), envelope, {
-          operationId: event.payload.operationId,
-          lifecycle: "completed",
-          settledAt: event.payload.completedAt
-        });
-        finishOperation(set, event.payload.operationId, "completed", "任务已完成", sessionAuthority);
-      }
+      if (!sessionAuthority || !acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) return false;
+      clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
+      useOperationActivityTimelineStore.getState().finish(
+        event.payload.operationId,
+        "completed",
+        undefined,
+        event.payload.completedAt
+      );
+      recordRealtimeOperationTerminal(get(), envelope, {
+        operationId: event.payload.operationId,
+        lifecycle: "completed",
+        settledAt: event.payload.completedAt
+      });
+      finishOperation(set, event.payload.operationId, "completed", "任务已完成", sessionAuthority);
       return true;
     case "operation.failed":
-      if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
-        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
-        useOperationActivityTimelineStore.getState().finish(
-          event.payload.operationId,
-          "failed",
-          event.payload.error.message,
-          event.payload.failedAt
-        );
-        recordRealtimeOperationTerminal(get(), envelope, {
-          operationId: event.payload.operationId,
-          lifecycle: "failed",
-          settledAt: event.payload.failedAt,
-          error: event.payload.error
-        });
-        finishOperation(set, event.payload.operationId, "failed", event.payload.error.message, sessionAuthority);
-      }
+      if (!sessionAuthority || !acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) return false;
+      clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
+      useOperationActivityTimelineStore.getState().finish(
+        event.payload.operationId,
+        "failed",
+        event.payload.error.message,
+        event.payload.failedAt
+      );
+      recordRealtimeOperationTerminal(get(), envelope, {
+        operationId: event.payload.operationId,
+        lifecycle: "failed",
+        settledAt: event.payload.failedAt,
+        error: event.payload.error
+      });
+      finishOperation(set, event.payload.operationId, "failed", event.payload.error.message, sessionAuthority);
       return true;
     case "operation.cancelled":
-      if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
-        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
-        useOperationActivityTimelineStore.getState().finish(
-          event.payload.operationId,
-          "cancelled",
-          event.payload.reason,
-          event.payload.cancelledAt
-        );
-        recordRealtimeOperationTerminal(get(), envelope, {
-          operationId: event.payload.operationId,
-          lifecycle: "cancelled",
-          settledAt: event.payload.cancelledAt,
-          reason: event.payload.reason
-        });
-        finishOperation(set, event.payload.operationId, "cancelled", event.payload.reason, sessionAuthority);
-      }
+      if (!sessionAuthority || !acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) return false;
+      clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
+      useOperationActivityTimelineStore.getState().finish(
+        event.payload.operationId,
+        "cancelled",
+        event.payload.reason,
+        event.payload.cancelledAt
+      );
+      recordRealtimeOperationTerminal(get(), envelope, {
+        operationId: event.payload.operationId,
+        lifecycle: "cancelled",
+        settledAt: event.payload.cancelledAt,
+        reason: event.payload.reason
+      });
+      finishOperation(set, event.payload.operationId, "cancelled", event.payload.reason, sessionAuthority);
       return true;
     case "operation.lost":
-      if (sessionAuthority && acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) {
-        clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
-        useOperationActivityTimelineStore.getState().finish(
-          event.payload.operationId,
-          "lost",
-          event.payload.reason,
-          event.payload.lostAt
-        );
-        recordRealtimeOperationTerminal(get(), envelope, {
-          operationId: event.payload.operationId,
-          lifecycle: "lost",
-          settledAt: event.payload.lostAt,
-          reason: event.payload.reason
-        });
-        finishOperation(set, event.payload.operationId, "lost", event.payload.reason, sessionAuthority);
-      }
+      if (!sessionAuthority || !acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) return false;
+      clearOperationInteractiveRequests(sessionAuthority, event.payload.operationId);
+      useOperationActivityTimelineStore.getState().finish(
+        event.payload.operationId,
+        "lost",
+        event.payload.reason,
+        event.payload.lostAt
+      );
+      recordRealtimeOperationTerminal(get(), envelope, {
+        operationId: event.payload.operationId,
+        lifecycle: "lost",
+        settledAt: event.payload.lostAt,
+        reason: event.payload.reason
+      });
+      finishOperation(set, event.payload.operationId, "lost", event.payload.reason, sessionAuthority);
       return true;
     default:
       return false;
@@ -218,6 +217,11 @@ function acceptOperationTerminal(
   return operation?.operationId === operationId
     && operation.sessionId === authority.sessionId
     && operation.sessionGeneration === authority.sessionGeneration;
+}
+
+function acceptsLiveOperationEvent(state: AppEventState, operationId: string): boolean {
+  return state.operation?.operationId === operationId
+    && isActiveOperationLifecycle(state.operation.lifecycle);
 }
 
 function activityLifecycle(activity: OperationActivity): OperationLifecycle {

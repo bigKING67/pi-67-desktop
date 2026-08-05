@@ -84,7 +84,7 @@ Shutdown metadata 不包含 Prompt、Session path、命令、source、raw Tool p
 
 ## Protocol
 
-所有 envelope 使用 `protocolVersion: 2`：
+所有 envelope 使用 `protocolVersion: 3`：
 
 - hello/welcome：协商 `appInstanceId`、`hostInstanceId`、`hostEpoch`、初始 event sequence、
   capability、`idempotentControlMutations` 和 envelope byte budget；
@@ -128,6 +128,14 @@ Host 替换、Session 切换或同 Session projection transaction 已推进时�
 Lane。Queue Lane 默认最多 admission 32 条正在执行或等待执行的 delivery，容量耗尽返回可恢复的
 `RESOURCE_LIMIT_EXCEEDED`，不创建无界 Promise 链。abort、`queue.clear` 和 extension response 仍通过
 interrupt 路径绕过普通队列。Query lane 可受控并行，control mutation 与 active Turn 不会竞争。
+
+Workspace-scoped `session.creation.resolve` 不经过 Task Scheduler，而由 Agent Host 的独立 query
+coordinator 管理。同一 `workspaceId + creationId` 共享一次 single-flight 扫描；Host 最多并行 4 个、
+每个 Workspace 最多并行 1 个 resolution，最多保留 64 个 distinct job 和 256 个 waiter。超过边界返回
+`RESOURCE_LIMIT_EXCEEDED`。单个 Renderer Port 最多保留 256 个 pending request；Port retire/close 会取消
+该连接的 waiter，只有最后一个 waiter 离开或 Host shutdown 才取消共享扫描。JSONL fallback scan 还受
+10,000 个文件、64 MiB 总读取量和 10 秒总时间预算约束，预算耗尽返回 `unavailable: scan-limit`，不能
+退化成无界目录/文件读取或伪装成 storage error。
 
 Agent Host 维护最多 512 条 insertion-ordered terminal receipt，与 submission replay ledger 使用相同
 容量边界。Operation 进入 completed、failed、cancelled 或 lost 后，指向该 Operation 的 submission

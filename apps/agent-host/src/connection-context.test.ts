@@ -343,6 +343,42 @@ describe("HostConnectionContext", () => {
     });
   });
 
+  it("bounds pending requests before dispatching more Host work", async () => {
+    const port = new FakePort();
+    const onRequest = vi.fn();
+    new HostConnectionContext(
+      port,
+      { appInstanceId: "app-pending-limit", hostInstanceId: "host-pending-limit", hostEpoch: 3 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      onRequest,
+      () => undefined,
+      2_048,
+      2
+    );
+    port.emit({
+      protocolVersion: 3,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-pending-limit",
+      appInstanceId: "app-pending-limit",
+      maxEnvelopeBytes: 65_536
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
+
+    const requests = Array.from({ length: 3 }, () => (
+      commandEnvelope("runtime.getStatus", {}, 3)
+    ));
+    requests.forEach((request) => port.emit(request));
+
+    expect(onRequest).toHaveBeenCalledTimes(2);
+    expect(port.sent.at(-1)).toMatchObject({
+      kind: "response",
+      requestId: requests[2]?.requestId,
+      ok: false,
+      error: { code: "RESOURCE_LIMIT_EXCEEDED" }
+    });
+  });
+
   it("rejects a control mutation that omits its idempotency key", async () => {
     const port = new FakePort();
     const onRequest = vi.fn();

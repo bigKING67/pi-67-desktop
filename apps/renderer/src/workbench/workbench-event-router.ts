@@ -12,7 +12,7 @@ import {
 
 export type WorkbenchEventRoute = "active" | "background" | "stale" | "unscoped";
 
-export function routeWorkbenchAgentEvent(
+export function classifyWorkbenchAgentEvent(
   event: AgentEvent,
   envelope: EventEnvelope
 ): WorkbenchEventRoute {
@@ -30,12 +30,12 @@ export function routeWorkbenchAgentEvent(
   if (
     operationId
     && event.type !== "operation.started"
-    && task.operationId
     && task.operationId !== operationId
   ) return "stale";
   if (
-    event.type === "operation.started"
-    && task.operationId === event.payload.operation.operationId
+    operationId
+    && isLiveOperationEvent(event.type)
+    && task.operationId === operationId
     && isTerminalTaskLifecycle(task.lifecycle)
   ) return "stale";
 
@@ -51,21 +51,66 @@ export function routeWorkbenchAgentEvent(
     )
   ) return "stale";
 
+  if (
+    event.type === "session.bootstrap"
+    && event.payload.reason === "session-import"
+    && (
+      sessionAuthority?.operationId === undefined
+      || task.operationId !== sessionAuthority.operationId
+      || isTerminalTaskLifecycle(task.lifecycle)
+    )
+  ) return "stale";
+
+  if (
+    event.type === "runtime.ready"
+    && task.conversation.kind === "provisional"
+    && task.creationId
+  ) return "stale";
+
+  const activeTask = selectedWorkbenchTask(workbench) ?? (
+    workbench.selectedSurface?.kind === "settings"
+    && workbench.settingsReturnSurface?.kind === "conversation"
+      ? taskForConversation(workbench.tasks, workbench.settingsReturnSurface.conversation)
+      : undefined
+  );
+  return activeTask?.id === task.id
+    ? "active"
+    : "background";
+}
+
+export function applyWorkbenchAgentEvent(
+  event: AgentEvent,
+  envelope: EventEnvelope
+): boolean {
+  const route = classifyWorkbenchAgentEvent(event, envelope);
+  if (route === "stale" || route === "unscoped") return false;
+  const authority = eventTaskAuthority(envelope);
+  if (!authority) return false;
+  const workbench = rendererWorkbenchStore.getState();
+  const task = workbench.tasks[authority.taskId];
+  if (!task) return false;
+
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap": {
-      const creationBootstrapAllowed = event.type === "session.bootstrap"
-        && event.payload.reason === "session-create";
-      if (
-        task.conversation.kind === "provisional"
-        && task.creationId
-        && !creationBootstrapAllowed
-      ) return "stale";
-      const snapshot = event.type === "runtime.ready" ? event.payload.snapshot : event.payload.snapshot;
+      const snapshot = event.payload.snapshot;
       const sessionName = snapshot.sessionName?.trim();
+      const sessionAuthority = eventSessionAuthority(envelope);
       workbench.updateTask(task.id, {
+        ...(snapshot.sessionPath === undefined
+          ? {}
+          : {
+              conversation: {
+                kind: "session" as const,
+                workspaceId: task.workspaceId,
+                sessionPath: snapshot.sessionPath
+              },
+              sessionPath: snapshot.sessionPath
+            }),
         sessionId: snapshot.sessionId,
-        ...(sessionAuthority ? { sessionGeneration: sessionAuthority.sessionGeneration } : {}),
+        ...(sessionAuthority === undefined
+          ? {}
+          : { sessionGeneration: sessionAuthority.sessionGeneration }),
         title: sessionName
           || task.pendingTitle
           || messages.runtime.workbench.unnamedSession,
@@ -130,16 +175,7 @@ export function routeWorkbenchAgentEvent(
     default:
       break;
   }
-
-  const activeTask = selectedWorkbenchTask(workbench) ?? (
-    workbench.selectedSurface?.kind === "settings"
-    && workbench.settingsReturnSurface?.kind === "conversation"
-      ? taskForConversation(workbench.tasks, workbench.settingsReturnSurface.conversation)
-      : undefined
-  );
-  return activeTask?.id === task.id
-    ? "active"
-    : "background";
+  return true;
 }
 
 function operationIdForEvent(event: AgentEvent): string | undefined {
@@ -164,6 +200,13 @@ function isTerminalTaskLifecycle(lifecycle: string): boolean {
     || lifecycle === "failed"
     || lifecycle === "cancelled"
     || lifecycle === "lost";
+}
+
+function isLiveOperationEvent(type: AgentEvent["type"]): boolean {
+  return type === "operation.started"
+    || type === "operation.heartbeat"
+    || type === "operation.activityChanged"
+    || type === "operation.progress";
 }
 
 function eventUpdatesWorkbenchTaskSummary(type: AgentEvent["type"]): boolean {

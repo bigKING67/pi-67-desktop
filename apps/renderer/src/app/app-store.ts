@@ -8,7 +8,10 @@ import {
 } from "../connection/connection-state.js";
 import { INITIAL_RUNTIME_STATE } from "./app-state-projection.js";
 import { handleAgentEvent } from "./app-events.js";
-import { handleProjectionEvent } from "./incremental-projection.js";
+import {
+  handleProjectionEvent,
+  isProjectionAgentEvent
+} from "./incremental-projection.js";
 import {
   recoverSessionImportTerminalWithoutBootstrap
 } from "./session-import-bootstrap-recovery.js";
@@ -52,8 +55,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   receiveAgentEvent(event, envelope) {
-    if (handleProjectionEvent(event, envelope, get, set)) return;
-    handleAgentEvent(event, envelope, get, set, (terminal, terminalEnvelope) => {
+    const projectionDisposition = handleProjectionEvent(event, envelope, get, set);
+    if (projectionDisposition !== "unhandled") return projectionDisposition === "applied";
+    if (isProjectionAgentEvent(event)) return false;
+    return handleAgentEvent(event, envelope, get, set, (terminal, terminalEnvelope) => {
       recoverSessionImportTerminalWithoutBootstrap(terminal, terminalEnvelope, get, set);
     });
   }

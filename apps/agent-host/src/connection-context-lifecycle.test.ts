@@ -57,7 +57,10 @@ describe("HostConnectionContext lifecycle", () => {
     const request = commandEnvelope("runtime.getStatus", {}, 9);
     port.emit(request);
     expect(captured).toBe(connection);
+    const requestSignal = connection.signalForRequest(request.requestId);
+    expect(requestSignal.aborted).toBe(false);
     connection.retire();
+    expect(requestSignal.aborted).toBe(true);
     expect(port.closed).toBe(false);
 
     captured!.sendSuccess(request.requestId, request.type, { initialized: false, loaded: true });

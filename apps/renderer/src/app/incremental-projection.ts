@@ -1,6 +1,5 @@
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { useWorkspaceChangesStore } from "../changes/workspace-changes-store.js";
-import { refreshWorkspaceChanges } from "../changes/workspace-changes-controller.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
 import { refreshSessionTree } from "../session-tree/session-tree-controller.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -33,41 +32,41 @@ type ProjectionAgentEventType =
   | "usage.changed";
 
 export type ProjectionAgentEvent = Extract<AgentEvent, { type: ProjectionAgentEventType }>;
+export type ProjectionEventDisposition = "unhandled" | "applied" | "ignored";
 
 export function handleProjectionEvent(
   event: AgentEvent,
   envelope: EventEnvelope,
   get: StoreGet,
   set: StoreSet
-): event is ProjectionAgentEvent {
+): ProjectionEventDisposition {
   switch (event.type) {
     case "runtime.ready":
       // A lazily created target Task emits runtime.ready for its empty initial
       // Session before the requested create/open/fork bootstrap. Keep that
       // implementation detail from briefly replacing the intended projection.
-      if (get().sessionBootstrapTransitionPending) return true;
+      if (get().sessionBootstrapTransitionPending) return "ignored";
       if (!installAuthoritativeSnapshot(
         event.payload.snapshot,
         envelope,
         get,
         set,
         get().runtime.phase === "recovering" ? "Pi 会话已恢复" : "Pi SDK 已就绪"
-      )) return true;
+      )) return "ignored";
       activateRendererSessionChanges(get());
-      void refreshWorkspaceChanges();
-      return true;
+      return "applied";
     case "session.bootstrap":
       if (
         event.payload.reason === "session-import"
         && !acceptSessionImportBootstrap(get(), envelope)
-      ) return true;
+      ) return "ignored";
       if (!installAuthoritativeSnapshot(
         event.payload.snapshot,
         envelope,
         get,
         set,
         bootstrapReadyDetail(event.payload.reason)
-      )) return true;
+      )) return "ignored";
       const bootstrapAuthority = eventSessionAuthority(envelope);
       if (event.payload.reason === "session-import" && bootstrapAuthority?.operationId !== undefined) {
         cancelSessionImportBootstrapWatchdog({
@@ -76,63 +75,79 @@ export function handleProjectionEvent(
         });
       }
       activateRendererSessionChanges(get());
-      void refreshWorkspaceChanges();
       if (event.payload.reason === "session-import" && bootstrapAuthority) {
         void queryFirstSessionCatalog(bootstrapAuthority.workspaceId, { refresh: true });
       }
-      return true;
+      return "applied";
     case "workspace.changeChanged": {
       const target = acceptScopedEvent(envelope, get, event.payload.sessionId);
-      if (!target) return true;
+      if (!target) return "ignored";
       useWorkspaceChangesStore.getState().applyChange(target, event.payload.change);
-      return true;
+      return "applied";
     }
     case "conversation.changed": {
       const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
-      if (!authority) return true;
+      if (!authority) return "ignored";
       refreshConversation(event, authority, eventSessionAuthority(envelope)?.operationId);
-      return true;
+      return "applied";
     }
     case "queue.changed":
-      applyScopedSessionProjection(envelope, get, (authority) => {
+      return applyScopedSessionProjection(envelope, get, (authority) => {
         useSessionProjectionStore.getState().applyQueue(authority, {
           steeringQueue: event.payload.steeringQueue,
           followUpQueue: event.payload.followUpQueue
         });
       });
-      return true;
     case "session.metaChanged": {
       const authority = acceptScopedEvent(envelope, get);
-      if (!authority) return true;
+      if (!authority) return "ignored";
       setConversationStreaming(authority, event.payload.streaming);
       useSessionProjectionStore.getState().applyMeta(authority, {
         thinkingLevel: event.payload.thinkingLevel,
         sessionName: event.payload.sessionName,
         selectedModel: event.payload.selectedModel
       });
-      return true;
+      return "applied";
     }
     case "model.catalog.changed": {
       const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
-      if (!authority) return true;
+      if (!authority) return "ignored";
       const store = useSessionProjectionStore.getState();
       const target = store.capture(authority);
-      if (target) store.applyModelCatalogResult(target, event.payload);
-      return true;
+      return target && store.applyModelCatalogResult(target, event.payload)
+        ? "applied"
+        : "ignored";
     }
     case "tree.changed": {
       const authority = acceptScopedEvent(envelope, get);
-      if (authority) void refreshSessionTree(authority);
-      return true;
+      if (!authority) return "ignored";
+      void refreshSessionTree(authority);
+      return "applied";
     }
     case "usage.changed":
-      applyScopedSessionProjection(envelope, get, (authority) => {
+      return applyScopedSessionProjection(envelope, get, (authority) => {
         useSessionProjectionStore.getState().applyUsage(authority, {
           tokens: event.payload.tokens,
           cost: event.payload.cost,
           ...(event.payload.contextPercent === undefined ? {} : { contextPercent: event.payload.contextPercent })
         });
       });
+    default:
+      return "unhandled";
+  }
+}
+
+export function isProjectionAgentEvent(event: AgentEvent): event is ProjectionAgentEvent {
+  switch (event.type) {
+    case "runtime.ready":
+    case "session.bootstrap":
+    case "workspace.changeChanged":
+    case "conversation.changed":
+    case "queue.changed":
+    case "session.metaChanged":
+    case "model.catalog.changed":
+    case "tree.changed":
+    case "usage.changed":
       return true;
     default:
       return false;
@@ -143,9 +158,11 @@ function applyScopedSessionProjection(
   envelope: EventEnvelope,
   get: StoreGet,
   apply: (authority: RendererSessionAuthority) => void
-): void {
+): ProjectionEventDisposition {
   const authority = acceptScopedEvent(envelope, get);
-  if (authority) apply(authority);
+  if (!authority) return "ignored";
+  apply(authority);
+  return "applied";
 }
 
 function acceptScopedEvent(

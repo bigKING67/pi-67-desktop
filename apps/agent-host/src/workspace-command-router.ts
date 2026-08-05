@@ -216,10 +216,11 @@ export class WorkspaceCommandRouter {
 
   resolveSessionCreation(
     context: WorkspaceProtocolContext,
-    command: AgentCommand<"session.creation.resolve">
+    command: AgentCommand<"session.creation.resolve">,
+    options: { signal?: AbortSignal } = {}
   ): Promise<CommandResults["session.creation.resolve"]> {
     return this.workspaces.require(context.workspaceId).workspaceServices.sessionCreationReceipts
-      .resolve(command.payload.creationId);
+      .resolve(command.payload.creationId, options);
   }
 
   dispatchConversation(

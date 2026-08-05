@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -195,6 +195,69 @@ describe("AgentHostServer Workspace catalog", () => {
     expect(runtimeLoader).not.toHaveBeenCalled();
     await server.shutdown();
   });
+
+  it("discovers a configured custom Session directory without loading a Task Runtime", async () => {
+    const fixture = await workspaceFixture("custom-session-dir");
+    const customSessionDir = join(fixture.root, "custom-sessions");
+    const sessionPath = join(customSessionDir, "custom-session.jsonl");
+    await mkdir(customSessionDir);
+    const canonicalCwd = await realpath(fixture.cwd);
+    await Promise.all([
+      writeFile(
+        join(fixture.agentDir, "settings.json"),
+        `${JSON.stringify({ sessionDir: customSessionDir })}\n`,
+        "utf8"
+      ),
+      writeFile(sessionPath, sessionJsonl(canonicalCwd, "custom-session"), "utf8")
+    ]);
+    const runtimeLoader = vi.fn(async () => { throw new Error("Task Runtime must not load."); });
+    const server = new AgentHostServer(runtimeLoader, { sdkVersionLoader: async () => "0.81.1" });
+    const port = new FakePort();
+
+    try {
+      await attach(server, port);
+      expect((await hostCommand(port, WORKSPACE, "workspace.register", {
+        cwd: fixture.cwd,
+        trust: "trusted",
+        approvalMode: "guided"
+      }, "register-custom-session-dir")).response).toMatchObject({ ok: true });
+      expect(hostWorkspaceSettings(server, WORKSPACE.workspaceId).getSessionDir())
+        .toBe(customSessionDir);
+
+      expect((await hostCommand(port, WORKSPACE, "session.catalog.query", {
+        scope: "workspace",
+        limit: 50,
+        refresh: true
+      })).response).toMatchObject({ ok: true });
+      await vi.waitFor(() => expect(port.sent.some((value) => (
+        isEventEnvelope(value)
+        && value.type === "session.catalog.changed"
+        && "reason" in value.payload
+        && value.payload.reason === "reconciled"
+      ))).toBe(true));
+      const response = (await hostCommand(port, WORKSPACE, "session.catalog.query", {
+        scope: "workspace",
+        limit: 50
+      })).response;
+      const canonicalSessionPath = await realpath(sessionPath);
+
+      expect(response).toMatchObject({
+        ok: true,
+        result: {
+          items: [expect.objectContaining({
+            id: "custom-session",
+            path: canonicalSessionPath,
+            cwd: canonicalCwd
+          })],
+          total: 1
+        }
+      });
+      expect(runtimeLoader).not.toHaveBeenCalled();
+    } finally {
+      await server.shutdown();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
 });
 
 async function workspaceFixture(name: string) {
@@ -209,6 +272,28 @@ async function workspaceFixture(name: string) {
   process.env.PI67_SESSION_CATALOG_DIR = catalogDirectory;
   process.env.PI67_STORAGE_ROOT = root;
   return { root, cwd, agentDir, catalogDirectory, marker };
+}
+
+function sessionJsonl(cwd: string, sessionId: string): string {
+  return `${JSON.stringify({
+    type: "session",
+    version: 3,
+    id: sessionId,
+    timestamp: "2026-08-05T00:00:00.000Z",
+    cwd
+  })}\n`;
+}
+
+function hostWorkspaceSettings(server: AgentHostServer, workspaceId: string) {
+  return (server as unknown as {
+    workspaces: {
+      require(id: string): {
+        workspaceServices: {
+          settingsManager: { getSessionDir(): string | undefined };
+        };
+      };
+    };
+  }).workspaces.require(workspaceId).workspaceServices.settingsManager;
 }
 
 async function hostCommand<T extends AgentCommandType>(

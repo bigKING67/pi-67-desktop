@@ -127,7 +127,7 @@ export class WorkspaceContextRegistry {
     const sessionCatalog = workspaceServices.sessionCatalog.createBinding({
       emit: (event) => this.emitWorkspaceEvent(workspaceId, event),
       getAgentDir: () => workspaceServices.agentDir,
-      getConfiguredSessionDir: () => undefined,
+      getConfiguredSessionDir: () => workspaceServices.settingsManager.getSessionDir(),
       getWorkspaceCwd: () => workspaceServices.cwd,
       getSessionManager: () => undefined,
       getSessionMetadata: () => {

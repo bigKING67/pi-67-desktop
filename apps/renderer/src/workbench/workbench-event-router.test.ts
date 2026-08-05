@@ -12,7 +12,11 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
-import { routeWorkbenchAgentEvent } from "./workbench-event-router.js";
+import {
+  applyWorkbenchAgentEvent,
+  classifyWorkbenchAgentEvent,
+  type WorkbenchEventRoute
+} from "./workbench-event-router.js";
 
 describe("workbench event routing", () => {
   beforeEach(() => rendererWorkbenchStore.getState().reset());
@@ -178,13 +182,17 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().tasks.active).toMatchObject({
       sessionId: "session-ready",
       sessionGeneration: 3,
-      conversation: { kind: "provisional", workspaceId: "workspace-a" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionPath: "/sessions/ready.jsonl"
+      },
       title: "Ready Session",
       lifecycle: "idle",
       runtime: { phase: "ready" },
       toolMode: "yolo"
     });
-    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBeUndefined();
+    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBe("/sessions/ready.jsonl");
   });
 
   it("installs a new Session identity from session.bootstrap", () => {
@@ -207,13 +215,17 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().tasks.active).toMatchObject({
       sessionId: "session-bootstrap",
       sessionGeneration: 4,
-      conversation: { kind: "provisional", workspaceId: "workspace-a" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionPath: "/sessions/bootstrap.jsonl"
+      },
       title: "Bootstrap Session",
       lifecycle: "idle",
       runtime: { phase: "ready" },
       toolMode: "auto"
     });
-    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBeUndefined();
+    expect(rendererWorkbenchStore.getState().tasks.active?.sessionPath).toBe("/sessions/bootstrap.jsonl");
   });
 
   it("keeps the originating task active while Settings is open", () => {
@@ -430,4 +442,15 @@ function task(id: string) {
     toolMode: "auto" as const,
     attachmentCount: 0
   };
+}
+
+function routeWorkbenchAgentEvent(
+  event: AgentEvent,
+  envelope: EventEnvelope
+): WorkbenchEventRoute {
+  const route = classifyWorkbenchAgentEvent(event, envelope);
+  if (route === "active" || route === "background") {
+    applyWorkbenchAgentEvent(event, envelope);
+  }
+  return route;
 }

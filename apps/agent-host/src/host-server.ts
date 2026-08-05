@@ -42,7 +42,6 @@ export type {
 
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
 const MAX_RESYNC_INTERACTIVE_REQUESTS = 512;
-
 export class AgentHostServer {
   private currentConnection: HostConnectionContext | undefined;
   private compatibilityRuntime: AgentRuntime | undefined;
@@ -278,6 +277,7 @@ export class AgentHostServer {
   }
 
   private async performShutdown(deadlineMs: number): Promise<AgentHostShutdownResult> {
+    this.requests.shutdown();
     const connectionCloseRuntimes = new Set(this.taskRuntimes.values()
       .map((record) => record.runtime)
       .filter((runtime): runtime is AgentRuntime => runtime !== undefined));

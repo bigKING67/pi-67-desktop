@@ -1,7 +1,7 @@
 import { eventEnvelope } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
-import { routeWorkbenchAgentEvent } from "./workbench-event-router.js";
+import { classifyWorkbenchAgentEvent } from "./workbench-event-router.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 
 describe("workbench operation replay routing", () => {
@@ -48,7 +48,7 @@ describe("workbench operation replay routing", () => {
       startedAt: 1
     } };
 
-    expect(routeWorkbenchAgentEvent(
+    expect(classifyWorkbenchAgentEvent(
       { type: "operation.started", payload },
       eventEnvelope("operation.started", payload, taskEventFixture({
         hostEpoch: 9,
@@ -66,5 +66,27 @@ describe("workbench operation replay routing", () => {
       runtime: { phase: "ready" },
       operationId: "operation-complete"
     });
+  });
+
+  it("does not let delayed activity revive a terminal Task", () => {
+    const payload = {
+      operationId: "operation-complete",
+      activity: { kind: "responding" as const }
+    };
+
+    expect(classifyWorkbenchAgentEvent(
+      { type: "operation.activityChanged", payload },
+      eventEnvelope("operation.activityChanged", payload, taskEventFixture({
+        hostEpoch: 9,
+        sequence: 4,
+        workspaceId: "workspace-a",
+        taskId: "active",
+        taskGeneration: 1,
+        sessionId: "session-active",
+        sessionGeneration: 2,
+        operationId: "operation-complete"
+      }))
+    )).toBe("stale");
+    expect(rendererWorkbenchStore.getState().tasks.active?.lifecycle).toBe("completed");
   });
 });

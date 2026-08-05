@@ -1,7 +1,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { rendererSessionInstallationViolations } from "./architecture-rules.mjs";
+import {
+  protocolDocumentationViolations,
+  rendererSessionInstallationViolations
+} from "./architecture-rules.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const sourceRoots = [join(root, "apps"), join(root, "packages")];
@@ -29,6 +32,10 @@ for (const file of files) {
 }
 
 checkManifestBoundaries(workspacePackages, violations);
+violations.push(...protocolDocumentationViolations(
+  await readFile(join(root, "packages/protocol/src/protocol-version.ts"), "utf8"),
+  await readFile(join(root, "docs/architecture/processes-and-protocol.md"), "utf8")
+));
 
 for (const cycle of findCycles(graph)) {
   violations.push(`circular dependency: ${cycle.map(toRepoPath).join(" -> ")}`);
