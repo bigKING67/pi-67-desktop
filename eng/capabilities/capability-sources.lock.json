@@ -1,15 +1,20 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.07.1",
+  "catalogVersion": "2026.08.07.2",
   "sources": [
     {
       "id": "pi67-core",
       "displayName": "Pi-67 Core",
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/pi-67.git",
-      "commit": "62f34e955657da3ede8f105fb2d99fb0478d558c",
+      "commit": "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
       "localSibling": "../pi-67",
-      "version": "0.15.8"
+      "version": "0.15.8",
+      "includedExtensions": [
+        "pi-rules-loader",
+        "pi-vision-bridge",
+        "xtalpi-pi-tools"
+      ]
     },
     {
       "id": "browser67",

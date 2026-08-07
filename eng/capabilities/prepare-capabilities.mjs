@@ -11,7 +11,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
 import { resolveBundledGitToolchain, resolveExactCapabilitySource } from "./capability-source-resolver.mjs";
-import { assertCapabilitySourceLock, treeSha256 } from "./prepared-capabilities-validation.mjs";
+import {
+  assertCapabilitiesMetadata,
+  assertCapabilitySourceLock,
+  treeSha256
+} from "./prepared-capabilities-validation.mjs";
 import { preparePi67SkillPackOverlay } from "./pi67-skill-pack-overlay.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -98,7 +102,6 @@ export async function prepareDesktopCapabilities() {
     bundledSkillSuites,
     recommendedExternal: lock.recommendedExternal
   };
-  await writeFile(join(outputRoot, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
   const manifest = {
     schema: "pi67.desktop-capabilities.v1",
     catalogVersion: lock.catalogVersion,
@@ -107,6 +110,8 @@ export async function prepareDesktopCapabilities() {
       treeSha256: await treeSha256(join(outputRoot, entry.packagePath))
     })))
   };
+  assertCapabilitiesMetadata(lock, catalog, manifest);
+  await writeFile(join(outputRoot, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
   await writeFile(join(outputRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   console.log(`Prepared ${entries.length} Pi-67 Desktop first-party capability packages (${lock.catalogVersion}).`);
   return { catalog, manifest };
@@ -115,7 +120,15 @@ export async function prepareDesktopCapabilities() {
 async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
   const destination = join(outputRoot, "packages", source.id);
   await mkdir(join(destination, "skills"), { recursive: true });
-  await copyAllowed(sourceRoot, destination, ["extensions", "prompts", "rules", "AGENTS.md", "README.md", "VERSION"]);
+  await mkdir(join(destination, "extensions"), { recursive: true });
+  await copyAllowed(sourceRoot, destination, ["prompts", "rules", "AGENTS.md", "README.md", "VERSION"]);
+  for (const extensionId of source.includedExtensions) {
+    await copyEntry(
+      join(sourceRoot, "extensions", extensionId),
+      join(destination, "extensions", extensionId),
+      join(sourceRoot, "extensions")
+    );
+  }
   const overlaySkillRoots = new Map();
   for (const overlay of skillPackOverlays) {
     for (const skillName of overlay.skills) {

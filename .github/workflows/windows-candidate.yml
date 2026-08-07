@@ -60,6 +60,8 @@ jobs:
             echo "Release $RELEASE_TAG already exists; bump the package version before building a candidate." >&2
             exit 1
           fi
+      - name: Verify locked capability sources are remotely fetchable
+        run: node eng/capabilities/verify-capability-source-lock.mjs
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run verify:extension-adapters
       - uses: actions/upload-artifact@v7

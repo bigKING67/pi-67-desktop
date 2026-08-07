@@ -3,6 +3,8 @@
 Pi-67 Desktop bundles first-party capabilities from exact Git commits declared
 in `capability-sources.lock.json`. Runtime startup and ordinary builds never
 follow upstream branches or download a newer capability version implicitly.
+The Pi-67 Core entry also owns an explicit `includedExtensions` allowlist, so a
+new or retired upstream Extension cannot silently enter the Desktop baseline.
 
 The same lock also records Desktop-release-managed Skill Pack inputs. AI Berkshire
 pins one exact upstream commit plus its expected Pi-67 Pack version, source-manifest
@@ -59,6 +61,10 @@ and reproducible builds remain valid.
    suite membership.
 5. Run the freshness audit, targeted tests, typecheck, lint, build, and packaged
    Electron smoke before shipping the next Desktop release.
+
+`verify:capability-source-lock` shallow-fetches every exact locked commit from
+its canonical repository. Candidate and release provenance run this check before
+packaging so a local sibling repository or cache cannot hide an unpublished SHA.
 
 ## Updating a stale Skill Pack
 

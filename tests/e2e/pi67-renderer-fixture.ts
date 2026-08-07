@@ -450,7 +450,6 @@ export async function attachMockAgent(
       if (hostEpoch !== state.hostEpoch || port !== state.activePort) return;
       state.emit(event, { hostEpoch, ...(operationId === undefined ? {} : { operationId }) });
     }
-
     testWindow.__pi67TestAgent = state;
     state.attachHost(state.hostEpoch);
   }, createMockAgentFixtureInput(messages, responseDelays, options));

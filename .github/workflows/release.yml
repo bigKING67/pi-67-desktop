@@ -66,6 +66,8 @@ jobs:
         with:
           node-version: 24.18.0
           cache: pnpm
+      - name: Verify locked capability sources are remotely fetchable
+        run: node eng/capabilities/verify-capability-source-lock.mjs
       - name: Verify first-party capability freshness
         run: node eng/capabilities/check-capability-freshness.mjs --json
       - uses: actions/upload-artifact@v7

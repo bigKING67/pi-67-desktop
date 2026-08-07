@@ -45,6 +45,7 @@
     "preview:mac:unsigned": "node eng/packaging/preview-macos-unsigned.mjs",
     "prepare:toolchain": "node eng/packaging/prepare-toolchain.mjs",
     "prepare:capabilities": "node eng/capabilities/prepare-capabilities.mjs",
+    "verify:capability-source-lock": "node eng/capabilities/verify-capability-source-lock.mjs",
     "prepare:runtime-resources": "node eng/packaging/ensure-prepared-runtime-resources.mjs",
     "prepare:team-mcp": "node eng/packaging/prepare-team-mcp.mjs",
     "check:capability-freshness": "node eng/capabilities/check-capability-freshness.mjs",

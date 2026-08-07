@@ -53,6 +53,7 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     const generatedSource = generated.get(id);
     const entry = entries.get(id);
     const packageIdentity = packages.get(id);
+    const bundledExtensionIds = entry?.bundledExtensions?.map((extension) => extension.id);
     if (
       generatedSource?.commit !== source.commit
       || generatedSource?.version !== source.version
@@ -62,6 +63,7 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
       || entry?.repository !== source.repository
       || typeof entry?.packagePath !== "string"
       || !/^[a-f0-9]{64}$/u.test(packageIdentity?.treeSha256 ?? "")
+      || (id === "pi67-core" && JSON.stringify(bundledExtensionIds) !== JSON.stringify(source.includedExtensions))
     ) throw new Error(`Prepared capability metadata is stale: ${id}`);
   }
 }
@@ -104,6 +106,10 @@ export function assertCapabilitySourceLock(lock) {
       throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
     }
     assertLocalSibling(source.localSibling, "capability local sibling");
+    if (source.id === "pi67-core") assertIncludedExtensions(source.includedExtensions);
+    else if (source.includedExtensions !== undefined) {
+      throw new Error(`Capability source ${source.id} cannot declare bundled Extension selection.`);
+    }
   }
   const packNames = lock.skillPacks.map((pack) => pack?.name);
   if (new Set(packNames).size !== packNames.length || packNames.length !== 1) {
@@ -118,6 +124,17 @@ export function assertCapabilitySourceLock(lock) {
     throw new Error("Recommended Extension package ids are invalid.");
   }
   for (const entry of lock.recommendedExternal) assertRecommendedPackage(entry);
+}
+
+function assertIncludedExtensions(value) {
+  if (
+    !Array.isArray(value)
+    || value.length === 0
+    || value.length > 32
+    || value.some((id) => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(id))
+    || new Set(value).size !== value.length
+    || JSON.stringify(value) !== JSON.stringify([...value].sort((left, right) => left.localeCompare(right)))
+  ) throw new Error("Pi-67 Core bundled Extension selection is invalid.");
 }
 
 function assertRecommendedPackage(entry) {

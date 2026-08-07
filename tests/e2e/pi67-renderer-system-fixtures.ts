@@ -87,7 +87,7 @@ export function createMockDesktopCapabilitySnapshot() {
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.07.1",
+    catalogVersion: "2026.08.07.2",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -95,7 +95,7 @@ export function createMockDesktopCapabilitySnapshot() {
       bundled: true,
       defaultEnabled: true,
       version: "0.15.8",
-      commit: "62f34e955657da3ede8f105fb2d99fb0478d558c",
+      commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
       resourceTypes: ["extension", "skill", "prompt", "rule"],
       installed: true
     }, {

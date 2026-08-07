@@ -5,7 +5,10 @@ import {
   compileBundledSkillSuites,
   parseSkillMetadata
 } from "./bundled-skill-suites.mjs";
-import { assertCapabilitiesMetadata } from "./prepared-capabilities-validation.mjs";
+import {
+  assertCapabilitiesMetadata,
+  assertCapabilitySourceLock
+} from "./prepared-capabilities-validation.mjs";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -14,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.07.1");
+    expect(lock.catalogVersion).toBe("2026.08.07.2");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -22,6 +25,10 @@ describe("Desktop first-party capability source lock", () => {
       "commerce-growth-os"
     ]);
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
+    expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
+      commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
+      includedExtensions: ["pi-rules-loader", "pi-vision-bridge", "xtalpi-pi-tools"]
+    });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.4.0",
       commit: "eb857d335660380a383490f549c4d40227dbf3dc"
@@ -58,6 +65,19 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.recommendedExternal.every((entry) => (
       entry.installPolicy === "prompt-once" || entry.installPolicy === "user-initiated"
     ))).toBe(true);
+    expect(() => assertCapabilitySourceLock(lock)).not.toThrow();
+  });
+
+  it("rejects an implicit or unordered Pi-67 Core Extension selection", async () => {
+    const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+    const coreIndex = lock.sources.findIndex((source) => source.id === "pi67-core");
+    const withoutSelection = structuredClone(lock);
+    delete withoutSelection.sources[coreIndex].includedExtensions;
+    expect(() => assertCapabilitySourceLock(withoutSelection)).toThrow(/bundled Extension selection/u);
+
+    const unordered = structuredClone(lock);
+    unordered.sources[coreIndex].includedExtensions = ["xtalpi-pi-tools", "pi-rules-loader"];
+    expect(() => assertCapabilitySourceLock(unordered)).toThrow(/bundled Extension selection/u);
   });
 
   it("rejects a branch-tracked Skill Pack without immutable generated hashes", () => {
@@ -79,7 +99,8 @@ describe("Desktop first-party capability source lock", () => {
     const generatedFrom = lock.sources.map((source) => ({ ...source }));
     const entries = lock.sources.map((source) => ({
       ...source,
-      packagePath: `packages/${source.id}`
+      packagePath: `packages/${source.id}`,
+      bundledExtensions: (source.includedExtensions ?? []).map((id) => ({ id, displayName: id }))
     }));
     const packages = lock.sources.map((source) => ({
       id: source.id,
@@ -102,6 +123,18 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertCapabilitiesMetadata(lock, {
       ...catalog,
       entries: entries.map((entry, index) => index === 0 ? { ...entry, commit: "0".repeat(40) } : entry)
+    }, manifest)).toThrow(/metadata is stale/u);
+    expect(() => assertCapabilitiesMetadata(lock, {
+      ...catalog,
+      entries: entries.map((entry, index) => index === 0
+        ? {
+            ...entry,
+            bundledExtensions: [
+              ...entry.bundledExtensions,
+              { id: "pi-hy-memory", displayName: "pi-hy-memory" }
+            ]
+          }
+        : entry)
     }, manifest)).toThrow(/metadata is stale/u);
   });
 
