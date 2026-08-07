@@ -29,6 +29,7 @@ import {
 import {
   ExtensionPackageListResultSchema,
   ExtensionPackageMutationResultSchema,
+  ExtensionPackageOnboardingResultSchema,
   ExtensionPackageUpdatesResultSchema
 } from "./extension-package-schemas.js";
 import {
@@ -308,6 +309,9 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "extension.package.checkUpdates": ExtensionPackageUpdatesResultSchema,
   "extension.package.install": ExtensionPackageMutationResultSchema,
   "extension.package.update": ExtensionPackageMutationResultSchema,
+  "extension.package.approveObserved": ExtensionPackageMutationResultSchema,
+  "extension.package.onboarding.get": ExtensionPackageOnboardingResultSchema,
+  "extension.package.onboarding.decline": ExtensionPackageOnboardingResultSchema,
   "extension.package.setEnabled": ExtensionPackageMutationResultSchema,
   "extension.package.restoreInheritance": ExtensionPackageMutationResultSchema,
   "extension.package.uninstall": ExtensionPackageMutationResultSchema,

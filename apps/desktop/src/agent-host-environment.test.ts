@@ -60,6 +60,7 @@ describe("Agent Host environment", () => {
       capabilityProbeDirectory: "/app/user-data",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
     }, {
+      agentDir: "/Users/test/.pi/agent",
       toolchain: {
         root: toolchainRoot,
         ready: true,
@@ -83,6 +84,7 @@ describe("Agent Host environment", () => {
     });
 
     expect(environment).toMatchObject({
+      PI_CODING_AGENT_DIR: "/Users/test/.pi/agent",
       PI67_PACKAGED: "1",
       PI67_TEAM_MCP_RESOURCES: "/app/resources/team-mcp",
       PI67_NODE_EXECUTABLE: nodeExecutable,
@@ -117,6 +119,7 @@ describe("Agent Host environment", () => {
       capabilityProbeDirectory: "/app/user-data",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
     }, {
+      agentDir: "/Users/test/.pi/agent",
       toolchain: {
         root: "/app/resources/toolchain",
         ready: false,
@@ -156,6 +159,7 @@ describe("Agent Host environment", () => {
       capabilityProbeDirectory: "/app/user-data",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
     }, {
+      agentDir: "/Users/test/.pi/agent",
       toolchain: {
         root: "/app/resources/toolchain",
         ready: false,

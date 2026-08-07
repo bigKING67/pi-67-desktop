@@ -9,6 +9,7 @@ import type {
   ExtensionCommandAdapterView,
   ExtensionPackageListResult,
   ExtensionPackageMutationResult,
+  ExtensionPackageOnboardingResult,
   ExtensionPackageScope,
   PackageResourceType,
   ExtensionPackageUpdatesResult,
@@ -300,6 +301,9 @@ export interface CommandPayloads extends
   "extension.package.checkUpdates": Record<string, never>;
   "extension.package.install": { source: string; scope: ExtensionPackageScope };
   "extension.package.update": { source: string; scope: ExtensionPackageScope };
+  "extension.package.approveObserved": { source: string; scope: ExtensionPackageScope };
+  "extension.package.onboarding.get": { source: string; scope: ExtensionPackageScope };
+  "extension.package.onboarding.decline": { source: string; scope: ExtensionPackageScope };
   "extension.package.setEnabled": {
     source: string;
     scope: ExtensionPackageScope;
@@ -391,6 +395,9 @@ export interface CommandResults extends
   "extension.package.checkUpdates": ExtensionPackageUpdatesResult;
   "extension.package.install": ExtensionPackageMutationResult;
   "extension.package.update": ExtensionPackageMutationResult;
+  "extension.package.approveObserved": ExtensionPackageMutationResult;
+  "extension.package.onboarding.get": ExtensionPackageOnboardingResult;
+  "extension.package.onboarding.decline": ExtensionPackageOnboardingResult;
   "extension.package.setEnabled": ExtensionPackageMutationResult;
   "extension.package.restoreInheritance": ExtensionPackageMutationResult;
   "extension.package.uninstall": ExtensionPackageMutationResult;

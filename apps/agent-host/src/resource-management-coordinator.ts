@@ -72,6 +72,26 @@ export class ResourceManagementCoordinator {
     });
   }
 
+  runDeferredReloadMutation<T>(
+    workspaceId: string,
+    scope: ActiveMutation["scope"],
+    operation: () => Promise<T>
+  ): Promise<{ result: T; reloadRequired: boolean }> {
+    return this.runExclusiveMutation(workspaceId, scope, async (affectedTasks) => {
+      const result = await operation();
+      const reloadRequired = await reloadIdleAffectedTasks(affectedTasks);
+      return { result, reloadRequired };
+    }, true);
+  }
+
+  runMetadataMutation<T>(
+    workspaceId: string,
+    scope: ActiveMutation["scope"],
+    operation: () => Promise<T>
+  ): Promise<T> {
+    return this.runExclusiveMutation(workspaceId, scope, () => operation(), true);
+  }
+
   runTransactionalMutation<T>(
     workspaceId: string,
     scope: ActiveMutation["scope"],
@@ -154,13 +174,14 @@ export class ResourceManagementCoordinator {
   private runExclusiveMutation<T>(
     workspaceId: string,
     scope: ActiveMutation["scope"],
-    operation: (affectedTasks: ResourceManagementTaskView[]) => Promise<T>
+    operation: (affectedTasks: ResourceManagementTaskView[]) => Promise<T>,
+    allowBusyTasks = false
   ): Promise<T> {
     this.assertAcceptingCommands();
     if (this.activeMutation) throw busy("Another managed resource mutation is already running.");
     this.assertNoConflictingQueries(workspaceId, scope);
     const affectedTasks = this.affectedTasks(workspaceId, scope);
-    const busyTask = affectedTasks.find((task) => !task.isIdle());
+    const busyTask = allowBusyTasks ? undefined : affectedTasks.find((task) => !task.isIdle());
     if (busyTask) {
       throw new HostCommandError(
         "BUSY",
@@ -226,6 +247,25 @@ async function reloadAffectedTasks(tasks: ResourceManagementTaskView[]): Promise
     }
   }
   if (firstError !== undefined) throw firstError;
+}
+
+async function reloadIdleAffectedTasks(tasks: ResourceManagementTaskView[]): Promise<boolean> {
+  let firstError: unknown;
+  let reloadRequired = false;
+  for (const task of tasks) {
+    if (!task.isIdle()) {
+      reloadRequired = true;
+      continue;
+    }
+    if (!task.initialized || !task.runtime) continue;
+    try {
+      await task.runtime.reloadResources();
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+  if (firstError !== undefined) throw firstError;
+  return reloadRequired;
 }
 
 function busy(message: string): HostCommandError {

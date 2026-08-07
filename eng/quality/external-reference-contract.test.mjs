@@ -33,6 +33,23 @@ describe("external reference governance contract", () => {
     );
   });
 
+  it("accepts a weekly-and-feature cadence for the primary product reference", () => {
+    const input = fixture();
+    input.catalog.repositories.push({
+      id: "pi-gui",
+      url: "https://github.com/minghinmatthewlam/pi-gui",
+      role: "product-reference",
+      tier: "S1",
+      reviewState: "candidate",
+      defaultReuse: "reimplement-preferred",
+      reviewCadence: "weekly-and-feature",
+      reviewTriggers: ["workspace-navigation"],
+      constraints: ["Do not synchronize source automatically"]
+    });
+
+    expect(validate(input)).toEqual([]);
+  });
+
   it("rejects the product repository and duplicate catalog URLs", () => {
     const input = fixture();
     input.catalog.repositories.push({
@@ -69,6 +86,15 @@ describe("external reference governance contract", () => {
       expect.stringContaining("targetPath does not exist in the repository"),
       expect.stringContaining("noticePath must be a bounded repository-relative path")
     ]));
+  });
+
+  it("requires matching provenance when a locked review outcome is reimplemented", () => {
+    const input = fixture();
+    input.reviewLock.reviews.peakcode.outcome = "reimplemented";
+
+    expect(validate(input)).toContain(
+      "review lock peakcode outcome reimplemented requires matching code provenance"
+    );
   });
 
   it("rejects review notes that do not contain the locked commit", () => {

@@ -1,4 +1,4 @@
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import { beginRendererSessionIntent } from "../session/session-lifecycle-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
@@ -31,7 +31,7 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
   const workspace = useAppStore.getState().workspace;
   if ((key === "n" || key === "t") && workspace) {
     event.preventDefault();
-    void createRendererSession();
+    beginRendererSessionIntent();
     return;
   }
   if (key !== "b" || !workspace) return;

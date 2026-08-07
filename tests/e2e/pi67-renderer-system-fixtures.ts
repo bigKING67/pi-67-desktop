@@ -87,7 +87,7 @@ export function createMockDesktopCapabilitySnapshot() {
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.03.2",
+    catalogVersion: "2026.08.07.1",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -95,7 +95,7 @@ export function createMockDesktopCapabilitySnapshot() {
       bundled: true,
       defaultEnabled: true,
       version: "0.15.8",
-      commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
+      commit: "62f34e955657da3ede8f105fb2d99fb0478d558c",
       resourceTypes: ["extension", "skill", "prompt", "rule"],
       installed: true
     }, {
@@ -130,7 +130,6 @@ export function createMockDesktopCapabilitySnapshot() {
       installed: true
     }],
     bundledExtensions: [
-      "pi-hy-memory",
       "pi-rules-loader",
       "pi-vision-bridge",
       "xtalpi-pi-tools"
@@ -199,7 +198,21 @@ export function createMockDesktopCapabilitySnapshot() {
       independentUpdateState: "not-applicable",
       skills: bundledSkills.slice(6, 8)
     }],
-    recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }],
+    recommendedExternal: [{
+      id: "pi-subagents",
+      source: "npm:pi-subagents",
+      recommendedVersion: "0.34.0",
+      installPolicy: "user-initiated",
+      admissionPolicy: "known-baseline-or-user-approval",
+      baselineContentSha256: "a".repeat(64)
+    }, {
+      id: "pi-observational-memory",
+      source: "npm:pi-observational-memory",
+      recommendedVersion: "3.0.3",
+      installPolicy: "prompt-once",
+      admissionPolicy: "known-baseline-or-user-approval",
+      baselineContentSha256: "b".repeat(64)
+    }],
     managedContext: { rules: "installed", agents: "user-owned" },
     integrations: [{
       id: "browser67",

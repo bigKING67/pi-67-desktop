@@ -12,6 +12,8 @@ export interface AgentHostStoragePaths {
 }
 
 export interface AgentHostRuntimeEnvironment {
+  /** Main-resolved Pi profile directory shared by every Desktop-owned Pi service. */
+  readonly agentDir: string;
   readonly toolchain: DesktopToolchain;
   readonly capabilitiesRoot: string;
   readonly teamMcpResourcesRoot?: string;
@@ -44,6 +46,10 @@ export function agentHostEnvironment(
     allowLocalSecretFallback: runtime ? !runtime.packaged : true
   });
   if (!runtime) return environment;
+  // Do not let Main and the Utility Process independently infer the Pi profile.
+  // Packaged Windows launches can inherit a different shell environment, so the
+  // resolved directory is an explicit Main-owned runtime input.
+  environment.PI_CODING_AGENT_DIR = resolve(runtime.agentDir);
   environment.PI67_PACKAGED = runtime.packaged ? "1" : "0";
   environment.PI67_ELECTRON_EXECUTABLE = runtime.electronExecutable;
   environment.PI67_CAPABILITIES_ROOT = runtime.capabilitiesRoot;

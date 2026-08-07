@@ -2,6 +2,7 @@ import {
   taskConsumesRunSlot,
   type ExtensionPackageEntry,
   type ExtensionPackageMutationResult,
+  type ExtensionPackageOnboardingState,
   type ExtensionPackageScope,
   type ExtensionPackageUpdate
 } from "@pi67/domain";
@@ -63,12 +64,71 @@ export async function installExtensionPackage(
   return mutate("extension.package.install", { source, scope }, scope, workspaceId, "扩展包已安装");
 }
 
+export async function getExtensionPackageOnboarding(
+  source: string,
+  scope: ExtensionPackageScope,
+  workspaceId?: string
+): Promise<ExtensionPackageOnboardingState | undefined> {
+  const target = resolveWorkspace(workspaceId);
+  if (!target) return undefined;
+  try {
+    await ensureAgentConnection();
+    const result = await agentConnectionController.request(
+      "extension.package.onboarding.get",
+      { source, scope },
+      [],
+      { context: workspaceContext(target.id) }
+    );
+    return result.state;
+  } catch (error) {
+    reportFailure(target.id, "无法读取扩展包安装建议", error);
+    return undefined;
+  }
+}
+
+export async function declineExtensionPackageOnboarding(
+  source: string,
+  scope: ExtensionPackageScope,
+  workspaceId?: string
+): Promise<ExtensionPackageOnboardingState | undefined> {
+  const target = resolveWorkspace(workspaceId);
+  if (!target) return undefined;
+  try {
+    await ensureAgentConnection();
+    const result = await agentConnectionController.request(
+      "extension.package.onboarding.decline",
+      { source, scope },
+      [],
+      { context: workspaceContext(target.id) }
+    );
+    return result.state;
+  } catch (error) {
+    reportFailure(target.id, "无法保存扩展包安装选择", error);
+    return undefined;
+  }
+}
+
 export async function updateExtensionPackage(
   source: string,
   scope: ExtensionPackageScope,
   workspaceId?: string
 ): Promise<boolean> {
   return mutate("extension.package.update", { source, scope }, scope, workspaceId, "扩展包已更新");
+}
+
+export async function approveObservedExtensionPackage(
+  source: string,
+  scope: ExtensionPackageScope,
+  workspaceId?: string
+): Promise<boolean> {
+  return mutate(
+    "extension.package.approveObserved",
+    { source, scope },
+    scope,
+    workspaceId,
+    "扩展包内容已确认",
+    true
+  );
 }
 
 export async function setExtensionPackageEnabled(
@@ -126,10 +186,13 @@ async function mutate<T extends MutationType>(
   payload: MutationPayload<T>,
   scope: ExtensionPackageScope,
   workspaceId: string | undefined,
-  successTitle: string
+  successTitle: string,
+  allowDeferredReload = false
 ): Promise<boolean> {
   const target = resolveWorkspace(workspaceId);
-  if (!target || !preflightMutation(target.id, scope)) return false;
+  if (!target || !(allowDeferredReload
+    ? preflightApproval(target.id, scope)
+    : preflightMutation(target.id, scope))) return false;
   const store = useExtensionPackageStore.getState();
   const beforeItems = store.items;
   const pendingUpdate = type === "extension.package.update" && "scope" in payload
@@ -156,7 +219,7 @@ async function mutate<T extends MutationType>(
       publishNotification({
         level: "warning",
         title: "扩展包操作结果需要核对",
-        message: "Pi-67 未自动重放这次操作；扩展包会保持阻止执行，直到重新安装或完整性核对完成。"
+        message: "Pi-67 未自动重放这次操作；确认当前内容或重新安装前不会加载该扩展包。"
       });
       return false;
     }
@@ -171,8 +234,12 @@ async function mutate<T extends MutationType>(
       : {
           level: "success",
           title: successTitle,
-          message: result.changed
-            ? "扩展包配置已应用，Pi 资源已重新加载。"
+          message: result.reloadRequired
+            ? "当前内容已记录；正在运行的任务继续使用原资源，任务结束或下次加载时生效。"
+            : result.changed
+              ? allowDeferredReload
+                ? "当前内容已记录，空闲 Pi 任务的资源已重新加载。"
+                : "扩展包配置已应用，Pi 资源已重新加载。"
             : "配置已经是目标状态。"
         });
     return true;
@@ -204,6 +271,21 @@ function preflightMutation(workspaceId: string, scope: ExtensionPackageScope): b
       message: scope === "global"
         ? "请先完成或停止所有正在运行或等待输入的任务。"
         : "请先完成或停止当前 Workspace 中正在运行或等待输入的任务。"
+    });
+    return false;
+  }
+  return true;
+}
+
+function preflightApproval(workspaceId: string, scope: ExtensionPackageScope): boolean {
+  const workbench = rendererWorkbenchStore.getState();
+  const workspace = workbench.workspaces[workspaceId];
+  if (!workspace) return false;
+  if (scope === "project" && workspace.trust !== "trusted") {
+    publishNotification({
+      level: "error",
+      title: "项目扩展包内容未确认",
+      message: "请先信任当前 Workspace。"
     });
     return false;
   }
@@ -281,6 +363,7 @@ function reportFailure(workspaceId: string, title: string, error: unknown): fals
 type MutationType =
   | "extension.package.install"
   | "extension.package.update"
+  | "extension.package.approveObserved"
   | "extension.package.setEnabled"
   | "extension.package.restoreInheritance"
   | "extension.package.uninstall";

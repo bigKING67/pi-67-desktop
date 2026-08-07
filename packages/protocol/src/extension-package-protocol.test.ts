@@ -45,6 +45,8 @@ describe("Extension package management protocol", () => {
     const mutations = [
       ["extension.package.install", { source: "npm:example", scope: "global" }],
       ["extension.package.update", { source: "npm:example", scope: "global" }],
+      ["extension.package.approveObserved", { source: "npm:example", scope: "global" }],
+      ["extension.package.onboarding.decline", { source: "npm:example", scope: "global" }],
       ["extension.package.setEnabled", {
         source: "npm:example",
         scope: "project",
@@ -74,6 +76,33 @@ describe("Extension package management protocol", () => {
     expect(isRequestEnvelope({ ...install, payload: { source: " ", scope: "global" } })).toBe(false);
     expect(isRequestEnvelope({ ...install, payload: { source: "bad\0source", scope: "global" } })).toBe(false);
     expect(isRequestEnvelope({ ...install, payload: { source: "npm:example", scope: "task" } })).toBe(false);
+  });
+
+  it("validates the prompt-once onboarding query and persisted states", () => {
+    expect(isRequestEnvelope(commandEnvelope(
+      "extension.package.onboarding.get",
+      { source: "npm:pi-observational-memory", scope: "global" },
+      WORKSPACE_CONTEXT,
+      2
+    ))).toBe(true);
+    expect(isResponseEnvelope(responseEnvelope("onboarding-1", 2, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "extension.package.onboarding.get",
+      result: {
+        source: "npm:pi-observational-memory",
+        scope: "global",
+        state: "unseen"
+      }
+    }))).toBe(true);
+    expect(isResponseEnvelope(responseEnvelope("onboarding-invalid", 2, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "extension.package.onboarding.get",
+      result: {
+        source: "npm:pi-observational-memory",
+        scope: "global",
+        state: "prompt-again" as never
+      }
+    }))).toBe(false);
   });
 
   it("validates redacted package lists, updates and mutation results", () => {

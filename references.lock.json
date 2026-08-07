@@ -21,6 +21,34 @@
         "sha256": "751360828204a1cb884f65314275949f83a1420a8dbe42ea5509f066c9a7ebad"
       },
       "notesPath": "docs/provenance/peak-code-reference.md"
+    },
+    "pi-gui": {
+      "reviewedCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "remoteHeadAtReview": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourceRef": "main",
+      "reviewedAt": "2026-08-07",
+      "reviewedPaths": [
+        "README.md",
+        "LICENSE",
+        "apps/desktop/electron/app-store.ts",
+        "apps/desktop/electron/app-store-workspace.ts",
+        "apps/desktop/electron/app-store-persistence.ts",
+        "apps/desktop/electron/app-store-composer.ts",
+        "apps/desktop/electron/session-state-map.ts",
+        "apps/desktop/electron/notification-manager.ts",
+        "apps/desktop/electron/notification-permission.ts",
+        "apps/desktop/src/hooks/use-composer-draft-sync.ts",
+        "apps/desktop/src/new-thread-view.tsx",
+        "apps/desktop/src/hooks/use-new-thread-controller.tsx",
+        "packages/pi-sdk-driver/src/session-supervisor.ts"
+      ],
+      "outcome": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "notesPath": "docs/provenance/pi-gui-reference.md"
     }
   }
 }

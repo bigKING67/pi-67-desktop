@@ -1,7 +1,7 @@
-import { _electron as electron, expect, test, type Page } from "@playwright/test";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { _electron as electron, expect, test } from "@playwright/test";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   isProcessAlive,
@@ -9,73 +9,20 @@ import {
   waitForProcessExit,
   writeControlledShutdownExtension
 } from "../../eng/packaging/controlled-shutdown-fixture.js";
+import {
+  forwardElectronDebugOutput,
+  openRuntimeSettings,
+  piDefaultSessionDirectory,
+  utilityProcessCount,
+  utilityProcessIds,
+  writeNamedSessionFixture,
+  writeRollbackSessionFixture
+} from "./electron-test-fixtures.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const inheritedEnvironment = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
 );
-
-test("boots the real sandboxed Electron shell over app://", async () => {
-  test.setTimeout(90_000);
-
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-shell-"));
-  const agentDir = join(temporaryRoot, "agent");
-  await mkdir(agentDir);
-
-  let application: Awaited<ReturnType<typeof electron.launch>> | undefined;
-  try {
-    application = await electron.launch({
-      args: [".", `--user-data-dir=${join(temporaryRoot, "profile")}`],
-      cwd: root,
-      env: {
-        ...inheritedEnvironment,
-        NODE_ENV: "test",
-        PI_CODING_AGENT_DIR: agentDir,
-        PI_OFFLINE: "1"
-      }
-    });
-    const activeApplication = application;
-    forwardElectronDebugOutput(activeApplication);
-    const window = await activeApplication.firstWindow();
-    await window.waitForLoadState("domcontentloaded");
-    await expect(window).toHaveTitle("π");
-    expect(window.url()).toBe("app://pi67/index.html");
-    await expect(window.getByRole("heading", { name: "开始一个 Pi 会话" })).toBeVisible();
-    await expect(window.getByText("选择一个工作区，继续已有 Pi 会话或开始新会话。")).toBeVisible();
-    await expect(window.getByRole("button", { name: "选择工作区" })).toBeEnabled();
-    await expect(window.getByText("数据保存在本机")).toBeVisible();
-    await expect(window.locator("html")).toHaveAttribute("data-theme-preference", "system");
-
-    const utilityProcessesBefore = await utilityProcessCount(activeApplication);
-    await window.evaluate(() => {
-      const scope = globalThis as unknown as { pi67: { system: { connectAgentHost(): Promise<void> } } };
-      return scope.pi67.system.connectAgentHost();
-    });
-    await expect.poll(() => utilityProcessCount(activeApplication)).toBeGreaterThan(utilityProcessesBefore);
-
-    const settings = await openRuntimeSettings(window);
-    const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
-    await settings.getByRole("button", { name: /恢复与诊断/u }).click();
-    await expect(doctorDialog).toBeVisible();
-    await doctorDialog.getByRole("button", { name: "开始检查" }).click();
-    await expect(doctorDialog.getByLabel("运行环境检查结果").getByText("Pi SDK")).toBeVisible({ timeout: 30_000 });
-    await expect(doctorDialog.getByLabel("恢复状态检查结果").getByText(/上次退出 首次运行/u)).toBeVisible();
-    await doctorDialog.getByRole("button", { name: "关闭" }).click();
-
-    const security = await window.evaluate(() => {
-      const scope = globalThis as unknown as Record<string, unknown>;
-      return {
-        hasNodeProcess: "process" in scope,
-        hasRequire: "require" in scope,
-        hasBridge: typeof (scope.pi67 as { system?: unknown } | undefined)?.system === "object"
-      };
-    });
-    expect(security).toEqual({ hasNodeProcess: false, hasRequire: false, hasBridge: true });
-  } finally {
-    await application?.close();
-    await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  }
-});
 
 test("initializes and trusts a workspace through the on-demand real Agent Host", async () => {
   test.setTimeout(90_000);
@@ -134,8 +81,13 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     const createSessionButton = window.getByRole("button", { name: "在 workspace 新建会话" });
     await expect(createSessionButton).toBeEnabled();
     await createSessionButton.click();
+    await expect(window.getByTestId("new-session-intent")).toBeVisible();
+    await window.getByLabel("给 Pi 发送消息").fill("验证真实 Electron Session 创建");
+    await window.getByRole("button", { name: "发送", exact: true }).click();
     await expect(createSessionButton).toBeDisabled();
-    await expect(window.getByRole("banner").getByText("Pi 新会话已就绪", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(window.getByTestId("new-session-intent")).toHaveCount(0, { timeout: 30_000 });
+    await expect(window.getByText(/^发送失败：No API key found/u)).toBeVisible({ timeout: 30_000 });
+    await expect(window.locator('[data-testid="conversation-row"]')).toHaveCount(2);
     await expect(createSessionButton).toBeEnabled();
 
     const utilityProcessesBeforePortRenewal = await utilityProcessCount(application);
@@ -177,6 +129,128 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await expect(window.getByRole("banner").getByText("系统恢复后 Pi 状态已重新同步", { exact: true }))
       .toBeVisible({ timeout: 30_000 });
     await expect(createSessionButton).toBeEnabled();
+  } finally {
+    if (application) await application.close();
+    await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+});
+
+test("opens, switches, creates, and restores exact Sessions across a real Electron restart", async () => {
+  test.setTimeout(150_000);
+
+  const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "pi67-electron-session-story-")));
+  const workspace = join(temporaryRoot, "workspace");
+  const agentDir = join(temporaryRoot, "agent");
+  const profile = join(temporaryRoot, "profile");
+  const sessionDirectory = piDefaultSessionDirectory(workspace, agentDir);
+  await Promise.all([
+    mkdir(workspace),
+    mkdir(sessionDirectory, { recursive: true })
+  ]);
+  await writeNamedSessionFixture(join(sessionDirectory, "story-a.jsonl"), workspace, {
+    sessionId: "019fdf10-1111-7111-8111-111111111111",
+    name: "Session Story A",
+    userText: "Open Session Story A.",
+    assistantText: "Session Story A assistant response."
+  });
+  await writeNamedSessionFixture(join(sessionDirectory, "story-b.jsonl"), workspace, {
+    sessionId: "019fdf10-2222-7222-8222-222222222222",
+    name: "Session Story B",
+    userText: "Open Session Story B.",
+    assistantText: "Session Story B assistant response."
+  });
+
+  let application: Awaited<ReturnType<typeof electron.launch>> | undefined;
+  try {
+    application = await electron.launch({
+      args: [".", `--user-data-dir=${profile}`],
+      cwd: root,
+      env: {
+        ...inheritedEnvironment,
+        NODE_ENV: "test",
+        PI_CODING_AGENT_DIR: agentDir,
+        PI_OFFLINE: "1"
+      }
+    });
+    forwardElectronDebugOutput(application);
+    await application.evaluate(({ dialog }, selectedWorkspace) => {
+      Object.defineProperty(dialog, "showOpenDialog", {
+        configurable: true,
+        value: async () => ({ canceled: false, filePaths: [selectedWorkspace] })
+      });
+    }, workspace);
+
+    let window = await application.firstWindow();
+    await window.waitForLoadState("domcontentloaded");
+    await window.getByRole("button", { name: "选择工作区" }).click();
+
+    const sessionA = window.getByTestId("conversation-row").filter({ hasText: "Session Story A" });
+    const sessionB = window.getByTestId("conversation-row").filter({ hasText: "Session Story B" });
+    await expect(sessionA).toBeVisible({ timeout: 30_000 });
+    await expect(sessionB).toBeVisible({ timeout: 30_000 });
+
+    await sessionA.click();
+    await expect(window.getByText("Session Story A assistant response.", { exact: true }))
+      .toBeVisible({ timeout: 30_000 });
+    await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled();
+
+    await sessionB.click();
+    await expect(window.getByText("Session Story B assistant response.", { exact: true }))
+      .toBeVisible({ timeout: 30_000 });
+    await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled();
+
+    const createSessionButton = window.getByRole("button", { name: "在 workspace 新建会话" });
+    await createSessionButton.click();
+    await expect(window.getByTestId("new-session-intent")).toBeVisible();
+    await window.getByLabel("给 Pi 发送消息").fill("创建第三个 Session 并验证重启恢复");
+    await window.getByRole("button", { name: "发送", exact: true }).click();
+    await expect(window.getByTestId("new-session-intent")).toHaveCount(0, { timeout: 30_000 });
+    await expect(window.getByText(/^发送失败：No API key found/u)).toBeVisible({ timeout: 30_000 });
+    await expect.poll(async () => (
+      await readdir(sessionDirectory)
+    ).filter((name) => name.endsWith(".jsonl")).length).toBe(3);
+    await expect(window.getByTestId("conversation-row")).toHaveCount(3);
+    await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled();
+
+    const selectedBeforeRestart = window.locator('[data-testid="conversation-row"][aria-current="page"]');
+    await expect(selectedBeforeRestart).toHaveCount(1);
+    const selectedConversationId = await selectedBeforeRestart.getAttribute("data-conversation-id");
+    expect(selectedConversationId).toBeTruthy();
+    await window.waitForTimeout(300);
+
+    await application.close();
+    application = undefined;
+
+    application = await electron.launch({
+      args: [".", `--user-data-dir=${profile}`],
+      cwd: root,
+      env: {
+        ...inheritedEnvironment,
+        NODE_ENV: "test",
+        PI_CODING_AGENT_DIR: agentDir,
+        PI_OFFLINE: "1"
+      }
+    });
+    forwardElectronDebugOutput(application);
+    window = await application.firstWindow();
+    await window.waitForLoadState("domcontentloaded");
+
+    const selectedAfterRestart = window.locator('[data-testid="conversation-row"][aria-current="page"]');
+    await expect(selectedAfterRestart).toHaveAttribute(
+      "data-conversation-id",
+      selectedConversationId!,
+      { timeout: 30_000 }
+    );
+    await expect(window.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
+    await window.getByRole("button", { name: "打开会话", exact: true }).click();
+    await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled({ timeout: 30_000 });
+    await expect(window.getByRole("banner").getByText("Pi SDK 已就绪", { exact: true }))
+      .toBeVisible({ timeout: 30_000 });
+
+    await window.getByTestId("conversation-row").filter({ hasText: "Session Story A" }).click();
+    await expect(window.getByText("Session Story A assistant response.", { exact: true }))
+      .toBeVisible({ timeout: 30_000 });
+    await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled();
   } finally {
     if (application) await application.close();
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
@@ -335,92 +409,3 @@ test("closes an active Extension command and its child process within the shutdo
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
-
-async function utilityProcessCount(application: Awaited<ReturnType<typeof electron.launch>>): Promise<number> {
-  return application.evaluate(({ app }) => app.getAppMetrics().filter((metric) => metric.type === "Utility").length);
-}
-
-async function utilityProcessIds(application: Awaited<ReturnType<typeof electron.launch>>): Promise<number[]> {
-  return application.evaluate(({ app }) => app.getAppMetrics()
-    .filter((metric) => metric.type === "Utility")
-    .map((metric) => metric.pid));
-}
-
-function forwardElectronDebugOutput(application: Awaited<ReturnType<typeof electron.launch>>): void {
-  if (process.env.PI67_DEBUG_AGENT_STDERR !== "1") return;
-  application.process().stdout?.on("data", (chunk) => process.stdout.write(chunk));
-  application.process().stderr?.on("data", (chunk) => process.stderr.write(chunk));
-}
-
-async function openRuntimeSettings(window: Page) {
-  await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
-  const settings = window.getByLabel("π 设置");
-  await expect(settings).toBeVisible();
-  await expect(window.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
-  await expect(window.getByTestId("inspector-toggle")).toHaveCount(0);
-  await expect(settings.getByRole("button", { name: "返回工作台" })).toBeVisible();
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^运行服务/u }).click();
-  return settings;
-}
-
-async function writeRollbackSessionFixture(path: string, cwd: string): Promise<void> {
-  const timestamp = new Date().toISOString();
-  const records = [
-    {
-      type: "session",
-      version: 3,
-      id: "019fa284-b143-70e9-bb16-a8f4bf341f37",
-      timestamp,
-      cwd
-    },
-    {
-      type: "session_info",
-      id: "fixture-info",
-      parentId: null,
-      timestamp,
-      name: "Rollback race fixture"
-    },
-    {
-      type: "message",
-      id: "fixture-user",
-      parentId: "fixture-info",
-      timestamp,
-      message: {
-        role: "user",
-        content: "Rollback fixture user message.",
-        timestamp: Date.now()
-      }
-    },
-    {
-      type: "message",
-      id: "fixture-assistant",
-      parentId: "fixture-user",
-      timestamp,
-      message: {
-        role: "assistant",
-        content: [{ type: "text", text: "Rollback fixture assistant response." }],
-        api: "openai-responses",
-        provider: "pi67-test",
-        model: "fixture",
-        usage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 0,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
-        },
-        stopReason: "stop",
-        timestamp: Date.now() + 1
-      }
-    }
-  ];
-  await writeFile(path, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`, "utf8");
-}
-
-function piDefaultSessionDirectory(cwd: string, agentDir: string): string {
-  const resolvedCwd = resolve(cwd);
-  const safePath = `--${resolvedCwd.replace(/^[/\\]/u, "").replace(/[/\\:]/gu, "-")}--`;
-  return join(resolve(agentDir), "sessions", safePath);
-}

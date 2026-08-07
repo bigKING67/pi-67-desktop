@@ -1,42 +1,47 @@
-import type {
-  RuntimeCapabilities,
-  SessionCatalogPage,
-  SessionSnapshot,
-  WorkspaceChangesProjection
-} from "@pi67/domain";
+import type { SessionCatalogPage, SessionSnapshot } from "@pi67/domain";
 import { eventEnvelope } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
 import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { openRendererWorkspace } from "../workspace/workspace-open-controller.js";
+import {
+  openRendererWorkspace,
+  openRendererWorkspaceDescriptor
+} from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
+import {
+  deferred,
+  emptyWorkspaceChanges,
+  workspaceConnectionIdentity,
+  workspaceDescriptorFixture,
+  workspaceRuntimeCapabilities
+} from "./workspace-open-test-fixtures.js";
 
 describe("Workspace open Catalog ordering", () => {
   beforeEach(() => {
     resetStores();
     useAppStore.setState({ connected: true, hostEpoch: 9 });
-    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(connectionIdentity());
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(workspaceConnectionIdentity());
     vi.stubGlobal("window", {
       pi67: { system: { selectWorkspace: vi.fn().mockResolvedValue("/workspace-next") } }
     });
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     resetStores();
   });
 
-  it("opens the initial Runtime Session before publishing the first Catalog result", async () => {
+  it("queries the Catalog before opening the first persisted Session", async () => {
     const requestOrder: string[] = [];
     const registration = deferred<void>();
     const catalogQuery = deferred<void>();
-    let initialRuntimeOpened = false;
     const initialSnapshot = snapshot();
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
       type,
@@ -49,22 +54,35 @@ describe("Workspace open Catalog ordering", () => {
         await registration.promise;
         return { registered: true } as never;
       }
-      if (type === "workspace.open") {
-        initialRuntimeOpened = true;
+      if (type === "session.catalog.query") {
+        expect(requestPayload).toEqual({ scope: "workspace", limit: 50, refresh: true });
+        expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
+        await catalogQuery.promise;
+        return catalogPageForSnapshot(initialSnapshot) as never;
+      }
+      if (type === "runtime.initialize") {
+        expect(requestPayload).toEqual({
+          cwd: initialSnapshot.cwd,
+          sessionPath: initialSnapshot.sessionPath,
+          trust: "trusted",
+          approvalMode: "balanced"
+        });
         const context = options?.context;
         if (!context || context.scope !== "task") throw new Error("Expected Task context.");
         expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
           expect.objectContaining({
             id: context.taskId,
             conversation: expect.objectContaining({
-              kind: "provisional",
-              workspaceId: context.workspaceId
+              kind: "session",
+              workspaceId: context.workspaceId,
+              sessionFileIdentity: initialSnapshot.sessionFileIdentity,
+              sessionPath: initialSnapshot.sessionPath
             }),
             lifecycle: "initializing"
           })
         ]);
         const payload = {
-          capabilities: runtimeCapabilities(),
+          capabilities: workspaceRuntimeCapabilities(),
           snapshot: initialSnapshot,
           taskToolMode: "auto" as const
         };
@@ -82,14 +100,7 @@ describe("Workspace open Catalog ordering", () => {
         applyRendererAgentEvent(event, envelope);
         return projectionAcknowledgement(initialSnapshot.sessionId) as never;
       }
-      if (type === "session.catalog.query") {
-        expect(requestPayload).toEqual({ scope: "workspace", limit: 50, refresh: true });
-        await catalogQuery.promise;
-        return (initialRuntimeOpened
-          ? catalogPageForSnapshot(initialSnapshot)
-          : emptyCatalogPage()) as never;
-      }
-      if (type === "workspace.changes") return emptyChanges(initialSnapshot.sessionId) as never;
+      if (type === "workspace.changes") return emptyWorkspaceChanges(initialSnapshot.sessionId) as never;
       throw new Error(`Unexpected request: ${type}`);
     });
 
@@ -105,21 +116,11 @@ describe("Workspace open Catalog ordering", () => {
     registration.resolve();
     await vi.waitFor(() => expect(requestOrder).toContain("session.catalog.query"));
     expect(useAppStore.getState()).toMatchObject({
-      sessionTransitionPending: false,
+      sessionTransitionPending: true,
       workspaceOpenPending: true,
-      runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
+      runtime: { phase: "starting", detail: "正在加载 Pi SDK" }
     });
-    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
-      expect.objectContaining({
-        conversation: expect.objectContaining({
-          kind: "session",
-          sessionFileIdentity: initialSnapshot.sessionFileIdentity,
-          sessionPath: initialSnapshot.sessionPath
-        }),
-        sessionId: initialSnapshot.sessionId,
-        sessionPath: initialSnapshot.sessionPath
-      })
-    ]);
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
 
     catalogQuery.resolve();
     await opening;
@@ -137,10 +138,11 @@ describe("Workspace open Catalog ordering", () => {
     });
     expect(requestOrder.filter((type) => type !== "workspace.changes")).toEqual([
       "workspace.register",
-      "workspace.open",
-      "session.catalog.query"
+      "session.catalog.query",
+      "runtime.initialize"
     ]);
     expect(request.mock.calls.filter(([type]) => type === "session.catalog.query")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "workspace.open")).toHaveLength(0);
     expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
       expect.objectContaining({
         conversation: expect.objectContaining({
@@ -162,7 +164,194 @@ describe("Workspace open Catalog ordering", () => {
       })
     ]);
   });
+
+  it("creates the first Session exactly once only after the Catalog is authoritatively empty", async () => {
+    const requestOrder: string[] = [];
+    const initialSnapshot = snapshot();
+    let catalogQueries = 0;
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
+      type,
+      _requestPayload,
+      _transfer,
+      options
+    ) => {
+      requestOrder.push(type);
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") {
+        catalogQueries += 1;
+        return (catalogQueries === 1
+          ? emptyCatalogPage()
+          : catalogPageForSnapshot(initialSnapshot)) as never;
+      }
+      if (type === "workspace.open") {
+        const context = options?.context;
+        if (!context || context.scope !== "task") throw new Error("Expected Task context.");
+        expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
+          expect.objectContaining({
+            id: context.taskId,
+            conversation: expect.objectContaining({ kind: "provisional" }),
+            lifecycle: "initializing"
+          })
+        ]);
+        installRuntimeReady(initialSnapshot, context);
+        return projectionAcknowledgement(initialSnapshot.sessionId) as never;
+      }
+      if (type === "workspace.changes") return emptyWorkspaceChanges(initialSnapshot.sessionId) as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    await openRendererWorkspace();
+
+    expect(requestOrder.filter((type) => type !== "workspace.changes")).toEqual([
+      "workspace.register",
+      "session.catalog.query",
+      "workspace.open",
+      "session.catalog.query"
+    ]);
+    expect(request.mock.calls.filter(([type]) => type === "workspace.open")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "runtime.initialize")).toHaveLength(0);
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
+      expect.objectContaining({
+        conversation: expect.objectContaining({
+          kind: "session",
+          sessionFileIdentity: initialSnapshot.sessionFileIdentity,
+          sessionPath: initialSnapshot.sessionPath
+        }),
+        sessionId: initialSnapshot.sessionId,
+        lifecycle: "idle"
+      })
+    ]);
+  });
+
+  it("does not create a provisional Task while the Catalog is still rebuilding", async () => {
+    vi.useFakeTimers();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") return rebuildingCatalogPage() as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    const opening = openRendererWorkspace();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: true,
+      workspaceOpenPending: true
+    });
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(opening).resolves.toBeUndefined();
+
+    expect(request.mock.calls.filter(([type]) => type === "workspace.open")).toHaveLength(0);
+    expect(request.mock.calls.filter(([type]) => type === "runtime.initialize")).toHaveLength(0);
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      workspaceOpenPending: false,
+      runtime: {
+        phase: "stopped",
+        detail: "Session 目录暂不可用，尚未确认没有会话。"
+      }
+    });
+  });
+
+  it("ends the opening decision budget even when the Catalog IPC acknowledgement hangs", async () => {
+    vi.useFakeTimers();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") {
+        return await new Promise<never>(() => undefined);
+      }
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    const opening = openRendererWorkspace();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(request.mock.calls.filter(([type]) => type === "session.catalog.query")).toHaveLength(1);
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(opening).resolves.toBeUndefined();
+
+    expect(request.mock.calls.filter(([type]) => type === "workspace.open")).toHaveLength(0);
+    expect(request.mock.calls.filter(([type]) => type === "runtime.initialize")).toHaveLength(0);
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      workspaceOpenPending: false,
+      runtime: {
+        phase: "stopped",
+        detail: "Session 目录暂不可用，尚未确认没有会话。"
+      }
+    });
+  });
+
+  it("opens the persisted Session while a rebuilding Catalog has no rows yet", async () => {
+    const descriptor = workspaceDescriptorFixture();
+    const initialSnapshot = snapshot();
+    const conversation = {
+      kind: "session" as const,
+      workspaceId: descriptor.id,
+      sessionFileIdentity: initialSnapshot.sessionFileIdentity,
+      sessionPath: initialSnapshot.sessionPath
+    };
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace(descriptor);
+    workbench.selectConversation(conversation);
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
+      type,
+      _requestPayload,
+      _transfer,
+      options
+    ) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") return rebuildingCatalogPage() as never;
+      if (type === "runtime.initialize") {
+        const context = options?.context;
+        if (!context || context.scope !== "task") throw new Error("Expected Task context.");
+        installRuntimeReady(initialSnapshot, context);
+        return projectionAcknowledgement(initialSnapshot.sessionId) as never;
+      }
+      if (type === "workspace.changes") return emptyWorkspaceChanges(initialSnapshot.sessionId) as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    await expect(openRendererWorkspaceDescriptor(descriptor)).resolves.toBe(true);
+
+    expect(request.mock.calls.filter(([type]) => type === "runtime.initialize")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "workspace.open")).toHaveLength(0);
+    expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([
+      expect.objectContaining({
+        conversation,
+        sessionId: initialSnapshot.sessionId,
+        lifecycle: "idle"
+      })
+    ]);
+  });
 });
+
+function installRuntimeReady(
+  initialSnapshot: ReturnType<typeof snapshot>,
+  context: Extract<NonNullable<Parameters<typeof agentConnectionController.request>[3]>["context"], { scope: "task" }>
+): void {
+  const payload = {
+    capabilities: workspaceRuntimeCapabilities(),
+    snapshot: initialSnapshot,
+    taskToolMode: "auto" as const
+  };
+  const envelope = eventEnvelope("runtime.ready", payload, taskEventFixture({
+    hostEpoch: 9,
+    sequence: 2,
+    workspaceId: context.workspaceId,
+    taskId: context.taskId,
+    taskGeneration: context.taskGeneration,
+    sessionId: initialSnapshot.sessionId,
+    sessionFileIdentity: initialSnapshot.sessionFileIdentity,
+    sessionGeneration: 1
+  }));
+  applyRendererAgentEvent({ type: "runtime.ready", payload }, envelope);
+}
 
 function resetStores(): void {
   resetWorkspaceHostRegistrationState();
@@ -233,30 +422,11 @@ function emptyCatalogPage(): SessionCatalogPage {
   };
 }
 
-function runtimeCapabilities(): RuntimeCapabilities {
+function rebuildingCatalogPage(): SessionCatalogPage {
   return {
-    sdkVersion: "0.81.1",
-    supportsFollowUp: true,
-    supportsSessionTree: true,
-    extensionUi: {
-      primitives: [],
-      attribution: "none",
-      recognizedCompatibilityLevels: [],
-      adapterRegistry: {
-        available: false,
-        manifestSchemaVersions: [],
-        supportedSurfaces: [],
-        realtimeUiAttribution: false,
-        activeAdapterCount: 0
-      },
-      limitations: {
-        workingIndicator: "unsupported",
-        editorMutation: "unsupported",
-        customComponents: "tui-only",
-        autocomplete: "tui-only",
-        widgetPlacements: []
-      }
-    }
+    ...emptyCatalogPage(),
+    state: "rebuilding",
+    rebuilding: true
   };
 }
 
@@ -269,29 +439,4 @@ function projectionAcknowledgement(sessionId: string) {
     sessionGeneration: 1,
     eventSequence: 2
   };
-}
-
-function connectionIdentity() {
-  return {
-    appInstanceId: "app-1",
-    hostInstanceId: "host-9",
-    hostEpoch: 9,
-    sdkVersion: "0.81.1",
-    eventSequence: 0
-  };
-}
-
-function emptyChanges(sessionId: string): WorkspaceChangesProjection {
-  return { sessionId, items: [], truncated: false, total: 0 };
-}
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
 }

@@ -99,7 +99,6 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(sessionView.getGlobalSettings().extensions).toEqual([
       "extensions/user-tool/index.ts",
       "-extensions/xtalpi-pi-tools/index.ts",
-      "-extensions/pi-hy-memory/index.ts",
       "-extensions/pi-rules-loader/index.ts",
       "-extensions/pi-vision-bridge/index.ts"
     ]);
@@ -173,8 +172,8 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     const agentDir = join(root, "agent");
     const managedRoot = join(agentDir, "desktop-capabilities");
     const managedPackage = join(managedRoot, "packages", "pi67-core");
-    const legacyExtension = join(agentDir, "extensions", "pi-hy-memory");
-    const managedExtension = join(managedPackage, "extensions", "pi-hy-memory");
+    const legacyExtension = join(agentDir, "extensions", "pi-rules-loader");
+    const managedExtension = join(managedPackage, "extensions", "pi-rules-loader");
     await Promise.all([
       mkdir(cwd, { recursive: true }),
       mkdir(legacyExtension, { recursive: true }),
@@ -182,8 +181,8 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     ]);
     const extensionSource = `export default function extension(pi) {
       pi.registerTool({
-        name: "hy_memory_search",
-        label: "Memory search",
+        name: "rules_fixture",
+        label: "Rules fixture",
         description: "fixture",
         parameters: { type: "object", properties: {} },
         execute: async () => ({ content: [{ type: "text", text: "ok" }] })
@@ -195,7 +194,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
       writeFile(join(managedPackage, "package.json"), JSON.stringify({
         name: "pi67-core",
         version: "0.15.8",
-        pi: { extensions: ["./extensions/pi-hy-memory/index.ts"] }
+        pi: { extensions: ["./extensions/pi-rules-loader/index.ts"] }
       }))
     ]);
     const settingsManager = createDesktopPackageSettingsView(SettingsManager.inMemory(), {

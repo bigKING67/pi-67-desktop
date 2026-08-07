@@ -1,0 +1,266 @@
+import {
+  MAX_COMPOSER_DRAFTS,
+  MAX_COMPOSER_DRAFT_TEXT_BYTES,
+  MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
+  conversationKeyIdentity,
+  type ComposerDraftPersistedState,
+  type ComposerDraftRecord
+} from "@pi67/domain";
+import { createMessageId } from "@pi67/protocol";
+import { publishNotification } from "../notifications/notification-store.js";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask,
+  taskForConversation,
+  type RendererWorkbenchTask
+} from "./workbench-store.js";
+import { useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
+
+const PERSISTENCE_DELAY_MS = 500;
+const encoder = new TextEncoder();
+
+let initialization: Promise<void> | undefined;
+let persistenceTimer: number | undefined;
+let persistencePromise: Promise<void> = Promise.resolve();
+let persistenceBound = false;
+let suppressPersistence = false;
+let shuttingDown = false;
+let lastError: string | undefined;
+let limitWarningPublished = false;
+const updatedAtByConversation = new Map<string, number>();
+const contentFingerprintByConversation = new Map<string, string>();
+
+export function initializeTaskDraftPersistence(): Promise<void> {
+  initialization ??= initialize();
+  return initialization;
+}
+
+async function initialize(): Promise<void> {
+  try {
+    const snapshot = await window.pi67.system.loadComposerDraftState();
+    suppressPersistence = true;
+    restorePersistedDrafts(snapshot.state);
+    suppressPersistence = false;
+    if (snapshot.recovery === "backup-restored") {
+      publishNotification({
+        level: "warning",
+        title: "对话草稿已从备份恢复",
+        message: "主草稿状态文件不可用，已使用最近一次完整备份。Pi 会话未受影响。"
+      });
+    } else if (snapshot.recovery === "corrupt-reset") {
+      publishNotification({
+        level: "warning",
+        title: "对话草稿状态已重置",
+        message: "保存的草稿状态损坏并已隔离，Pi 会话和项目文件未受影响。"
+      });
+    } else if (snapshot.recovery === "draft-decrypt-failed") {
+      publishNotification({
+        level: "warning",
+        title: "对话草稿无法解密",
+        message: "无法解密的草稿未载入，Pi 会话和项目文件未受影响。"
+      });
+    }
+    if (snapshot.persistence === "unavailable") {
+      publishNotification({
+        level: "warning",
+        title: "对话草稿仅保留在当前窗口",
+        message: "系统安全存储不可用，Desktop 不会把 Prompt 草稿以明文写入磁盘。"
+      });
+    }
+  } catch (error) {
+    reportPersistenceError(error);
+  } finally {
+    suppressPersistence = false;
+  }
+
+  persistenceBound = true;
+  useTaskDraftStore.subscribe((state) => {
+    synchronizeTaskDraftFlags(state.drafts);
+    schedulePersistence();
+  });
+  rendererWorkbenchStore.subscribe(() => schedulePersistence());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void persistTaskDraftState();
+  });
+  window.addEventListener("beforeunload", () => {
+    shuttingDown = true;
+    void persistTaskDraftState();
+  });
+}
+
+function restorePersistedDrafts(state: ComposerDraftPersistedState): void {
+  const restoredTaskByConversation = new Map<string, string>();
+  for (const record of state.drafts) {
+    const workbench = rendererWorkbenchStore.getState();
+    if (!workbench.workspaces[record.conversation.workspaceId]) continue;
+    const existing = taskForConversation(workbench.tasks, record.conversation);
+    const taskId = existing?.id ?? workbench.restoreTask(restoredTask(record));
+    if (!taskId) continue;
+    const identity = conversationKeyIdentity(record.conversation);
+    updatedAtByConversation.set(identity, record.updatedAt);
+    contentFingerprintByConversation.set(identity, draftContentFingerprint(record));
+    const restored = useTaskDraftStore.getState().restore(taskId, record);
+    if (restored === "conflict") continue;
+    const draft = useTaskDraftStore.getState().drafts[taskId];
+    rendererWorkbenchStore.getState().updateTask(taskId, {
+      hasDraft: Boolean(draft?.text.trim()),
+      attachmentCount: draft?.attachments.length ?? 0
+    });
+    restoredTaskByConversation.set(identity, taskId);
+  }
+
+  const selected = state.selectedConversation
+    ? restoredTaskByConversation.get(conversationKeyIdentity(state.selectedConversation))
+    : undefined;
+  if (selected) rendererWorkbenchStore.getState().selectTask(selected);
+}
+
+function restoredTask(record: ComposerDraftRecord): RendererWorkbenchTask {
+  const conversation = record.conversation;
+  const taskId = conversation.kind === "provisional"
+    ? conversation.draftId
+    : createMessageId("draft-task");
+  return {
+    id: taskId,
+    conversation,
+    workspaceId: conversation.workspaceId,
+    sessionId: `pending:${taskId}`,
+    taskGeneration: 1,
+    ...(conversation.kind === "session"
+      ? {
+          sessionFileIdentity: conversation.sessionFileIdentity,
+          sessionPath: conversation.sessionPath
+        }
+      : {}),
+    lifecycle: conversation.kind === "provisional" ? "draft" : "stopped",
+    runtime: {
+      phase: "stopped",
+      detail: conversation.kind === "provisional" ? "首条消息尚未发送" : "对话草稿等待恢复",
+      recoverable: true
+    },
+    title: "未命名会话",
+    titleSource: "fallback",
+    hasDraft: true,
+    attachmentCount: 0,
+    toolMode: "auto"
+  };
+}
+
+function synchronizeTaskDraftFlags(drafts: Record<string, TaskDraft>): void {
+  if (suppressPersistence) return;
+  const workbench = rendererWorkbenchStore.getState();
+  for (const task of Object.values(workbench.tasks)) {
+    const draft = drafts[task.id];
+    const hasDraft = Boolean(draft && (draft.text.trim().length > 0 || draft.attachments.length > 0));
+    const attachmentCount = draft?.attachments.length ?? 0;
+    if (task.hasDraft === hasDraft && task.attachmentCount === attachmentCount) continue;
+    workbench.updateTask(task.id, { hasDraft, attachmentCount });
+  }
+}
+
+function schedulePersistence(): void {
+  if (!persistenceBound || suppressPersistence || shuttingDown) return;
+  if (persistenceTimer !== undefined) window.clearTimeout(persistenceTimer);
+  persistenceTimer = window.setTimeout(() => {
+    persistenceTimer = undefined;
+    void persistTaskDraftState();
+  }, PERSISTENCE_DELAY_MS);
+}
+
+function persistTaskDraftState(): Promise<void> {
+  if (persistenceTimer !== undefined) {
+    window.clearTimeout(persistenceTimer);
+    persistenceTimer = undefined;
+  }
+  const state = serializeTaskDraftState();
+  persistencePromise = persistencePromise.then(async () => {
+    try {
+      await window.pi67.system.updateComposerDraftState(state);
+      lastError = undefined;
+    } catch (error) {
+      reportPersistenceError(error);
+    }
+  });
+  return persistencePromise;
+}
+
+export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersistedState {
+  const workbench = rendererWorkbenchStore.getState();
+  const drafts = useTaskDraftStore.getState().drafts;
+  const candidates: ComposerDraftRecord[] = [];
+  for (const [taskId, draft] of Object.entries(drafts)) {
+    const task = workbench.tasks[taskId];
+    if (!task || draft.text.length === 0) continue;
+    const textBytes = encoder.encode(draft.text).byteLength;
+    if (textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES) {
+      publishLimitWarning();
+      continue;
+    }
+    const identity = conversationKeyIdentity(task.conversation);
+    const fingerprint = taskDraftFingerprint(draft);
+    if (contentFingerprintByConversation.get(identity) !== fingerprint) {
+      contentFingerprintByConversation.set(identity, fingerprint);
+      updatedAtByConversation.set(identity, now);
+    }
+    candidates.push({
+      conversation: task.conversation,
+      text: draft.text,
+      streamBehavior: draft.streamBehavior,
+      updatedAt: updatedAtByConversation.get(identity) ?? now
+    });
+  }
+
+  candidates.sort((left, right) => right.updatedAt - left.updatedAt);
+  const bounded: ComposerDraftRecord[] = [];
+  let totalTextBytes = 0;
+  for (const candidate of candidates) {
+    const textBytes = encoder.encode(candidate.text).byteLength;
+    if (
+      bounded.length >= MAX_COMPOSER_DRAFTS
+      || totalTextBytes + textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL
+    ) {
+      publishLimitWarning();
+      continue;
+    }
+    bounded.push(candidate);
+    totalTextBytes += textBytes;
+  }
+  const included = new Set(bounded.map((draft) => conversationKeyIdentity(draft.conversation)));
+  const selected = selectedWorkbenchTask(workbench);
+  return {
+    version: 1,
+    drafts: bounded,
+    ...(selected && included.has(conversationKeyIdentity(selected.conversation))
+      ? { selectedConversation: selected.conversation }
+      : {})
+  };
+}
+
+function taskDraftFingerprint(draft: TaskDraft): string {
+  return `${draft.streamBehavior}\0${draft.text}`;
+}
+
+function draftContentFingerprint(record: ComposerDraftRecord): string {
+  return `${record.streamBehavior}\0${record.text}`;
+}
+
+function publishLimitWarning(): void {
+  if (limitWarningPublished) return;
+  limitWarningPublished = true;
+  publishNotification({
+    level: "warning",
+    title: "部分对话草稿无法持久化",
+    message: "草稿超出安全存储上限，内容仍保留在当前窗口中。请发送、缩短或另行保存后再退出。"
+  });
+}
+
+function reportPersistenceError(error: unknown): void {
+  const detail = error instanceof Error ? error.message : "对话草稿无法保存。";
+  if (lastError === detail) return;
+  lastError = detail;
+  publishNotification({
+    level: "warning",
+    title: "对话草稿未保存",
+    message: `${detail} 草稿仍保留在当前窗口中。`
+  });
+}

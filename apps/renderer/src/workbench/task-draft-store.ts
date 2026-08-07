@@ -21,6 +21,7 @@ interface TaskDraftState {
   setText: (taskId: string, text: string) => void;
   setAttachments: (taskId: string, attachments: DraftAttachment[]) => void;
   setStreamBehavior: (taskId: string, streamBehavior: TaskDraft["streamBehavior"]) => void;
+  restore: (taskId: string, draft: Pick<TaskDraft, "text" | "streamBehavior">) => "restored" | "conflict";
   transfer: (sourceTaskId: string, targetTaskId: string) => "empty" | "moved" | "conflict";
   discard: (taskId: string) => void;
   dispose: () => void;
@@ -45,6 +46,24 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
     set((state) => ({
       drafts: { ...state.drafts, [taskId]: { ...draftFor(state, taskId), streamBehavior } }
     }));
+  },
+
+  restore(taskId, draft) {
+    const current = get().drafts[taskId];
+    // Any existing record represents a newer live-window mutation, including
+    // clearing the text, whitespace-only input, or a stream-mode change.
+    if (current) return "conflict";
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [taskId]: {
+          text: draft.text,
+          attachments: [],
+          streamBehavior: draft.streamBehavior
+        }
+      }
+    }));
+    return "restored";
   },
 
   transfer(sourceTaskId, targetTaskId) {

@@ -1,16 +1,16 @@
-import type { AgentRuntime, PiWorkspaceRuntimeServices } from "@pi67/pi-runtime";
-import type { ExtensionPackageListResult, ExtensionPackageMutationResult } from "@pi67/domain";
-import type { AgentCommand, WorkspaceProtocolContext } from "@pi67/protocol";
+import type { ExtensionPackageListResult } from "@pi67/domain";
 import { describe, expect, it, vi } from "vitest";
 import {
-  ExtensionPackageCommandRouter,
-  type ExtensionPackageCommandType,
-  type ExtensionPackageTaskView
-} from "./extension-package-command-router.js";
-
-const WORKSPACE_A: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-a" };
-const EMPTY_LIST: ExtensionPackageListResult = { items: [], total: 0 };
-const MUTATED_LIST: ExtensionPackageMutationResult = { items: [], total: 0, changed: true };
+  command,
+  createRouter,
+  EMPTY_LIST,
+  MUTATED_LIST,
+  observedPackage,
+  runtime,
+  task,
+  WORKSPACE_A,
+  workspaceServices
+} from "./extension-package-command-router.test-fixture.js";
 
 describe("ExtensionPackageCommandRouter", () => {
   it("routes Workspace queries without exposing a Task Runtime", async () => {
@@ -57,6 +57,84 @@ describe("ExtensionPackageCommandRouter", () => {
 
     expect(runtimeA.reloadResources).toHaveBeenCalledOnce();
     expect(runtimeB.reloadResources).not.toHaveBeenCalled();
+  });
+
+  it("records content approval while busy Tasks defer reload and idle Tasks reload immediately", async () => {
+    let approved = false;
+    const approvedList = (): ExtensionPackageListResult => ({
+      items: [{
+        source: "npm:example",
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        trustState: approved ? "user-approved-observed" : "unverified",
+        ...(approved ? {} : { trustReason: "receipt-missing" as const })
+      }],
+      total: 1
+    });
+    const reserve = vi.fn(async () => ({ status: "reserved" as const, record: {} }));
+    const commitActive = vi.fn(async () => { approved = true; });
+    const services = workspaceServices({ reserve, commitActive });
+    const busyRuntime = runtime();
+    const idleRuntime = runtime();
+    const router = createRouter({ list: approvedList }, [
+      task("workspace-a", false, busyRuntime.runtime),
+      task("workspace-b", true, idleRuntime.runtime)
+    ], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.approveObserved", { source: "npm:example", scope: "global" }),
+      "approve-global"
+    )).resolves.toMatchObject({
+      changed: true,
+      receiptState: "active",
+      reloadRequired: true
+    });
+    expect(reserve).toHaveBeenCalledWith(expect.objectContaining({ operation: "admit" }));
+    expect(commitActive).toHaveBeenCalledWith(
+      "npm:example",
+      "global",
+      "approve-global",
+      observedPackage(),
+      true
+    );
+    expect(busyRuntime.reloadResources).not.toHaveBeenCalled();
+    expect(idleRuntime.reloadResources).toHaveBeenCalledOnce();
+  });
+
+  it("routes the persisted prompt-once status and decline without reloading Tasks", async () => {
+    const status = vi.fn(async () => ({
+      source: "npm:pi-observational-memory",
+      scope: "global" as const,
+      state: "unseen" as const
+    }));
+    const decline = vi.fn(async () => ({
+      source: "npm:pi-observational-memory",
+      scope: "global" as const,
+      state: "declined" as const
+    }));
+    const activeRuntime = runtime();
+    const services = workspaceServices({}, {}, { status, decline });
+    const router = createRouter({}, [task("workspace-a", false, activeRuntime.runtime)], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.onboarding.get", {
+        source: "npm:pi-observational-memory",
+        scope: "global"
+      })
+    )).resolves.toMatchObject({ state: "unseen" });
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.onboarding.decline", {
+        source: "npm:pi-observational-memory",
+        scope: "global"
+      }),
+      "decline-onboarding"
+    )).resolves.toMatchObject({ state: "declined" });
+    expect(activeRuntime.reloadResources).not.toHaveBeenCalled();
   });
 
   it("replays one mutation result and rejects idempotency fingerprint conflicts", async () => {
@@ -305,108 +383,3 @@ describe("ExtensionPackageCommandRouter", () => {
     );
   });
 });
-
-function createRouter(
-  overrides: Partial<ReturnType<typeof management>> = {},
-  tasks: ExtensionPackageTaskView[] = [],
-  services: PiWorkspaceRuntimeServices = workspaceServices()
-): ExtensionPackageCommandRouter {
-  const packages = management(overrides);
-  return new ExtensionPackageCommandRouter({
-    getWorkspaceServices: () => services,
-    listTasks: () => tasks,
-    createManagement: () => packages
-  });
-}
-
-function workspaceServices(
-  receiptOverrides: Record<string, unknown> = {},
-  trustOverrides: Record<string, unknown> = {}
-): PiWorkspaceRuntimeServices {
-  return {
-    packageMutationReceipts: {
-      reserve: vi.fn(async () => ({ status: "reserved", record: {} })),
-      markMutating: vi.fn(async () => undefined),
-      commitActive: vi.fn(async () => undefined),
-      commitRemoved: vi.fn(async () => undefined),
-      markAmbiguous: vi.fn(async () => undefined),
-      refreshActiveObservation: vi.fn(async () => false),
-      ...receiptOverrides
-    },
-    packageTrustRegistry: {
-      refresh: vi.fn(async () => undefined),
-      observationFor: vi.fn(() => ({ status: "observed", observation: observedPackage() })),
-      ...trustOverrides
-    }
-  } as unknown as PiWorkspaceRuntimeServices;
-}
-
-function observedPackage() {
-  return {
-    manifestSha256: "1".repeat(64),
-    contentSha256: "2".repeat(64),
-    directoryIdentityDigest: "3".repeat(64),
-    observedAt: 1
-  };
-}
-
-function management(overrides: Partial<{
-  list: () => typeof EMPTY_LIST;
-  checkForUpdates: () => Promise<{ items: never[]; total: number }>;
-  install: (source: string, scope: "global" | "project") => Promise<typeof MUTATED_LIST>;
-  update: (source: string, scope: "global" | "project") => Promise<typeof MUTATED_LIST>;
-  setEnabled: (source: string, scope: "global" | "project", enabled: boolean) => Promise<typeof MUTATED_LIST>;
-  restoreProjectInheritance: (source: string) => Promise<typeof MUTATED_LIST>;
-  uninstall: (source: string, scope: "global" | "project") => Promise<typeof MUTATED_LIST>;
-}> = {}) {
-  return {
-    list: () => EMPTY_LIST,
-    checkForUpdates: async () => ({ items: [], total: 0 }),
-    install: async () => MUTATED_LIST,
-    update: async () => MUTATED_LIST,
-    setEnabled: async () => MUTATED_LIST,
-    restoreProjectInheritance: async () => MUTATED_LIST,
-    uninstall: async () => MUTATED_LIST,
-    ...overrides
-  };
-}
-
-function task(
-  workspaceId: string,
-  idle: boolean,
-  activeRuntime: AgentRuntime = runtime().runtime
-): ExtensionPackageTaskView {
-  return {
-    taskKey: `${workspaceId}:task`,
-    workspaceId,
-    runtime: activeRuntime,
-    initialized: true,
-    isIdle: () => idle
-  };
-}
-
-function runtime(reloadError?: Error): {
-  runtime: AgentRuntime;
-  reloadResources: ReturnType<typeof vi.fn<AgentRuntime["reloadResources"]>>;
-} {
-  const reloadResources = vi.fn<AgentRuntime["reloadResources"]>(async () => {
-      if (reloadError) throw reloadError;
-      return {
-        sessionId: "session-a",
-        controls: { thinkingLevel: "off" },
-        modelCatalog: { models: [], providers: [], availableThinkingLevels: [] },
-        resources: []
-      };
-  });
-  return {
-    runtime: { reloadResources } as unknown as AgentRuntime,
-    reloadResources
-  };
-}
-
-function command<T extends ExtensionPackageCommandType>(
-  type: T,
-  payload: AgentCommand<T>["payload"]
-): AgentCommand<T> {
-  return { type, payload } as AgentCommand<T>;
-}

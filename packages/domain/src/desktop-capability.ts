@@ -68,6 +68,9 @@ export interface DesktopRecommendedPackage {
   source: string;
   recommendedVersion?: string;
   minimumCommit?: string;
+  installPolicy: "prompt-once" | "user-initiated";
+  admissionPolicy: "known-baseline-or-user-approval" | "user-approval";
+  baselineContentSha256?: string;
 }
 
 export interface DesktopManagedContextStatus {

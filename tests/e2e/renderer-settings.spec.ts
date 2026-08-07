@@ -11,6 +11,34 @@ import {
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { openPackageSettings, packageEntry } from "./pi67-renderer-package-settings-fixture.js";
 
+test("asks once before installing observational memory on a fresh profile", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await setMockAgentResponseResult(page, "extension.package.onboarding.get", {
+    source: "npm:pi-observational-memory",
+    scope: "global",
+    state: "unseen"
+  });
+  await page.getByRole("button", { name: "帮助与设置" }).click();
+  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "扩展", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", { name: "安装会话观察记忆扩展" });
+  await expect(dialog.getByRole("heading", { name: "安装 pi-observational-memory？" })).toBeVisible();
+  await expect(dialog.getByText("不会静默下载", { exact: false })).toBeVisible();
+  await clearRecordedCommands(page);
+  await dialog.getByRole("button", { name: "暂不安装" }).click();
+
+  await expect.poll(async () => (await recordedCommandDetails(page)).map((command) => command.type))
+    .toContain("extension.package.onboarding.decline");
+  expect((await recordedCommandDetails(page)).some((command) => (
+    command.type === "extension.package.install"
+  ))).toBe(false);
+  await expect(dialog).toHaveCount(0);
+});
+
 test("lists package sources and keeps update eligibility bounded to npm and git", async ({ page }) => {
   const npmSource = "npm:@example/pi-extension";
   const pathSource = "/Users/test/Extensions/local-extension";

@@ -18,6 +18,12 @@ export interface RecordedCommand {
   context?: Record<string, unknown>;
 }
 
+export interface MockSessionAuthority {
+  sessionId: string;
+  sessionFileIdentity: string;
+  sessionGeneration: number;
+}
+
 interface MockWorkspaceChanges {
   sessionId: string;
   items: unknown[];
@@ -159,6 +165,27 @@ export async function recordedCommandDetails(page: Page): Promise<RecordedComman
   return page.evaluate(() => [
     ...(window as unknown as { __pi67TestAgent: { commands: RecordedCommand[] } }).__pi67TestAgent.commands
   ]);
+}
+
+export async function currentMockSessionAuthority(page: Page): Promise<MockSessionAuthority> {
+  return page.evaluate(() => {
+    const state = (window as unknown as {
+      __pi67TestAgent: {
+        sessionGeneration: number;
+        snapshot: Record<string, unknown>;
+      };
+    }).__pi67TestAgent;
+    const sessionId = state.snapshot.sessionId;
+    const sessionFileIdentity = state.snapshot.sessionFileIdentity;
+    if (typeof sessionId !== "string" || typeof sessionFileIdentity !== "string") {
+      throw new Error("Mock Agent does not have an authoritative Session projection.");
+    }
+    return {
+      sessionId,
+      sessionFileIdentity,
+      sessionGeneration: state.sessionGeneration
+    };
+  });
 }
 
 export async function waitForMockWorkspaceReady(page: Page): Promise<void> {

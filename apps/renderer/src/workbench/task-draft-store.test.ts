@@ -64,6 +64,40 @@ describe("task draft store", () => {
     expect(useTaskDraftStore.getState().transfer("source", "source")).toBe("conflict");
     expect(useTaskDraftStore.getState().drafts["source"]?.text).toBe("keep me");
   });
+
+  it("restores persisted text without replacing a live draft", () => {
+    expect(useTaskDraftStore.getState().restore("task-a", {
+      text: "restored",
+      streamBehavior: "steer"
+    })).toBe("restored");
+    expect(useTaskDraftStore.getState().drafts["task-a"]).toEqual({
+      text: "restored",
+      attachments: [],
+      streamBehavior: "steer"
+    });
+
+    useTaskDraftStore.getState().setText("task-a", "live");
+    expect(useTaskDraftStore.getState().restore("task-a", {
+      text: "stale",
+      streamBehavior: "followUp"
+    })).toBe("conflict");
+    expect(useTaskDraftStore.getState().drafts["task-a"]?.text).toBe("live");
+  });
+
+  it("does not replace a newer live clear or stream-mode change during hydration", () => {
+    useTaskDraftStore.getState().setText("task-b", "");
+    useTaskDraftStore.getState().setStreamBehavior("task-b", "steer");
+
+    expect(useTaskDraftStore.getState().restore("task-b", {
+      text: "stale persisted text",
+      streamBehavior: "followUp"
+    })).toBe("conflict");
+    expect(useTaskDraftStore.getState().drafts["task-b"]).toEqual({
+      text: "",
+      attachments: [],
+      streamBehavior: "steer"
+    });
+  });
 });
 
 function draftAttachment(): DraftAttachment {

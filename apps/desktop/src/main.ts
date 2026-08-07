@@ -31,6 +31,7 @@ import {
 } from "./workbench-state.js";
 import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 import { WorkspaceFileStateStore } from "./workspace-file-state.js";
+import { ComposerDraftStateStore } from "./composer-draft-state.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -47,6 +48,8 @@ const teamMcpResourcesRoot = app.isPackaged
 const desktopToolchain = resolveDesktopToolchain(toolchainRoot, app.isPackaged);
 const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER_DEV_URL);
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
+const desktopAppId = "com.pi67.desktop";
+const desktopAgentDirectory = resolveDesktopAgentDirectory();
 const supportedTarget = (process.platform === "win32" && process.arch === "x64")
   || (process.platform === "darwin" && process.arch === "arm64");
 
@@ -55,6 +58,7 @@ registerAppSchemePrivileges();
 if (!supportedTarget) {
   throw new Error(`π does not support ${process.platform}/${process.arch}.`);
 }
+if (process.platform === "win32") app.setAppUserModelId(desktopAppId);
 
 let mainWindow: BrowserWindow | undefined;
 let unregisterPowerResumeRecovery: (() => void) | undefined;
@@ -63,6 +67,7 @@ let packageNetworkSettings: PackageNetworkSettingsStore | undefined;
 let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
 let promptAttachments: PromptAttachmentStagingService | undefined;
+let composerDraftState: ComposerDraftStateStore | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
 let systemBridgeRegistration: SystemBridgeRegistration | undefined;
 const appInstanceId = randomUUID();
@@ -76,6 +81,7 @@ const agentHostSupervisor = new AgentHostSupervisor({
     if (!teamMcpSettings) throw new Error("Team MCP settings are not initialized.");
     if (!promptAttachments) throw new Error("Prompt attachment staging is not initialized.");
     return {
+      agentDir: desktopAgentDirectory,
       toolchain: desktopToolchain,
       capabilitiesRoot,
       teamMcpResourcesRoot,
@@ -107,10 +113,7 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) app.quit();
 
 app.on("second-instance", () => {
-  if (applicationShutdown.isShuttingDown() || !mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+  void activateMainWindow();
 });
 
 if (hasSingleInstanceLock) {
@@ -141,9 +144,16 @@ if (hasSingleInstanceLock) {
         decrypt: (value) => safeStorage.decryptString(value)
       }
     });
+    composerDraftState = new ComposerDraftStateStore(app.getPath("userData"), {
+      encryption: {
+        isAvailable: () => safeStorage.isEncryptionAvailable(),
+        encrypt: (value) => safeStorage.encryptString(value),
+        decrypt: (value) => safeStorage.decryptString(value)
+      }
+    });
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
-      agentDir: resolveDesktopAgentDirectory(),
+      agentDir: desktopAgentDirectory,
       toolchain: desktopToolchain,
       packageNetworkSettings
     });
@@ -159,6 +169,7 @@ if (hasSingleInstanceLock) {
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       restartAgentHost: () => agentHostSupervisor.restart(),
       getMainWindow: () => mainWindow,
+      activateMainWindow,
       desktopToolchain,
       desktopCapabilities,
       packageNetworkSettings,
@@ -166,6 +177,7 @@ if (hasSingleInstanceLock) {
       promptAttachments,
       previousRunExit,
       workbenchState,
+      composerDraftState,
       workspaceFileState
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
@@ -182,7 +194,7 @@ if (hasSingleInstanceLock) {
 
 app.on("activate", () => {
   if (!applicationShutdown.isShuttingDown() && BrowserWindow.getAllWindows().length === 0) {
-    void openMainWindow();
+    void activateMainWindow();
   }
 });
 
@@ -198,8 +210,20 @@ app.once("will-quit", () => {
   unregisterPowerResumeRecovery = undefined;
 });
 
-async function openMainWindow(): Promise<void> {
-  if (applicationShutdown.isShuttingDown()) return;
+async function activateMainWindow(): Promise<BrowserWindow | undefined> {
+  if (applicationShutdown.isShuttingDown()) return undefined;
+  if (!mainWindow || mainWindow.isDestroyed()) await openMainWindow();
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) return undefined;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+  return window;
+}
+
+async function openMainWindow(): Promise<BrowserWindow | undefined> {
+  if (applicationShutdown.isShuttingDown()) return undefined;
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
   const window = createMainWindow({
     currentDirectory,
     isPackaged: app.isPackaged,
@@ -213,4 +237,5 @@ async function openMainWindow(): Promise<void> {
   });
   mainWindow = window;
   await window.loadURL(rendererUrl);
+  return window;
 }

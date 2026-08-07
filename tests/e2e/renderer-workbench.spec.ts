@@ -1,41 +1,24 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
-  emitMockAgentEvent,
   installMockDesktopBridge,
-  recordedCommandDetails
+  recordedCommandDetails,
+  setMockAgentResponseFailure
 } from "./pi67-renderer-fixture.js";
 import {
   DEFAULT_MOCK_WORKSPACE,
-  type MockDesktopBridgeOptions,
   type MockWorkspaceDescriptor
 } from "./pi67-renderer-desktop-bridge.js";
-import type { FixtureSessionSummary } from "./pi67-session-catalog-fixture.js";
-import type { MockAgentOptions } from "./pi67-renderer-fixture-types.js";
+import {
+  markCurrentTaskRunning,
+  openWorkbench,
+  sessionSummary,
+  workspaceGroup
+} from "./renderer-workbench-test-fixture.js";
 
 const PRIMARY_MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
 const EXPECTED_MAX_RUNNING_TASKS = 8;
-
-async function openWorkbench(
-  page: Page,
-  bridgeOptions: MockDesktopBridgeOptions = {},
-  agentOptions: MockAgentOptions = {}
-): Promise<void> {
-  await installMockDesktopBridge(page, bridgeOptions);
-  await page.goto("/");
-  await attachMockAgent(page, [], {}, {
-    isolateTaskSnapshots: true,
-    rotateSessionOnCreate: true,
-    ...agentOptions
-  });
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await expect.poll(async () => (
-    await recordedCommandDetails(page)
-  ).map((command) => command.type)).toContain("workspace.open");
-  await expect(page.getByLabel("Pi conversation")).toBeVisible();
-  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
-}
 
 test("restores persisted Workspace authority without asking for the Workspace again", async ({ page }, testInfo) => {
   const sessionPath = "/Users/test/.pi/agent/sessions/persisted.jsonl";
@@ -236,14 +219,33 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
   await clearRecordedCommands(page);
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
+  await page.waitForTimeout(250);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "command.list"))
+    .toHaveLength(0);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "session.create"))
+    .toHaveLength(0);
+  await page.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("通过快捷键创建第一条消息");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect.poll(async () => (
     await recordedCommandDetails(page)
   ).filter((command) => command.type === "session.create")).toHaveLength(1);
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).filter((command) => command.type === "prompt.submit")).toHaveLength(1);
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+t`);
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "session.create"))
+    .toHaveLength(1);
+  await page.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("通过第二个快捷键创建消息");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect.poll(async () => (
     await recordedCommandDetails(page)
   ).filter((command) => command.type === "session.create")).toHaveLength(2);
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).filter((command) => command.type === "prompt.submit")).toHaveLength(2);
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+w`);
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "task.close"))
@@ -265,12 +267,95 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
   await expect(page.getByRole("button", { name: "返回工作台" })).toBeVisible();
 });
 
+test("restores an encrypted Composer intent projection without creating Pi state", async ({ page }) => {
+  const conversation = {
+    kind: "provisional" as const,
+    workspaceId: DEFAULT_MOCK_WORKSPACE.id,
+    draftId: "task-restored-intent"
+  };
+  await installMockDesktopBridge(page, {
+    initialWorkspaces: [DEFAULT_MOCK_WORKSPACE],
+    expandedWorkspaceIds: [DEFAULT_MOCK_WORKSPACE.id],
+    currentWorkspaceId: DEFAULT_MOCK_WORKSPACE.id,
+    selectedSurface: { kind: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id },
+    initialComposerDraftState: {
+      version: 1,
+      drafts: [{
+        conversation,
+        text: "重启后继续这条首条消息",
+        streamBehavior: "followUp",
+        updatedAt: 1_800_000_000_000
+      }],
+      selectedConversation: conversation
+    }
+  });
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, { isolateTaskSnapshots: true, rotateSessionOnCreate: true });
+
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
+  const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
+  await expect(composer).toHaveValue("重启后继续这条首条消息");
+  await page.waitForTimeout(250);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "command.list"))
+    .toHaveLength(0);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "session.create"))
+    .toHaveLength(0);
+
+  await composer.fill("恢复后继续编辑");
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as {
+      __pi67ComposerDraftTest: { state(): { drafts: Array<{ text: string }> } };
+    }).__pi67ComposerDraftTest.state().drafts[0]?.text
+  ))).toBe("恢复后继续编辑");
+});
+
+test("does not create a second Session when the first Prompt fails after materialization", async ({ page }) => {
+  await openWorkbench(page);
+  await clearRecordedCommands(page);
+  await setMockAgentResponseFailure(page, "prompt.submit", {
+    code: "INTERNAL",
+    message: "mock prompt failure",
+    recoverable: true
+  });
+
+  await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
+  const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
+  await composer.fill("创建后发送失败仍需保留");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).filter((command) => command.type === "session.create")).toHaveLength(1);
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).filter((command) => command.type === "prompt.submit")).toHaveLength(1);
+  await expect(composer).toHaveValue("创建后发送失败仍需保留");
+
+  await page.evaluate(() => {
+    const state = (window as unknown as {
+      __pi67TestAgent: { responseFailures: Record<string, unknown> };
+    }).__pi67TestAgent;
+    delete state.responseFailures["prompt.submit"];
+  });
+  await page.getByRole("button", { name: "发送", exact: true }).click();
+
+  await expect.poll(async () => (
+    await recordedCommandDetails(page)
+  ).filter((command) => command.type === "prompt.submit")).toHaveLength(2);
+  expect((await recordedCommandDetails(page)).filter((command) => command.type === "session.create"))
+    .toHaveLength(1);
+  await expect(composer).toHaveValue("");
+});
+
 test("rejects a task above the shared running limit without discarding its draft", async ({ page }) => {
   await openWorkbench(page);
   await markCurrentTaskRunning(page, 0, "session-test", "session-file-fixture-demo", 1);
 
   for (let index = 1; index < EXPECTED_MAX_RUNNING_TASKS; index += 1) {
     await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
+    const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
+    await composer.fill(`启动后台任务 ${index}`);
+    await page.getByRole("button", { name: "发送", exact: true }).click();
     await expect.poll(async () => (
       await recordedCommandDetails(page)
     ).filter((command) => command.type === "session.create")).toHaveLength(index);
@@ -284,9 +369,10 @@ test("rejects a task above the shared running limit without discarding its draft
   }
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
   await expect.poll(async () => (
     await recordedCommandDetails(page)
-  ).filter((command) => command.type === "session.create")).toHaveLength(EXPECTED_MAX_RUNNING_TASKS);
+  ).filter((command) => command.type === "session.create")).toHaveLength(EXPECTED_MAX_RUNNING_TASKS - 1);
   await clearRecordedCommands(page);
 
   const composer = page.getByRole("textbox", { name: "给 Pi 发送消息" });
@@ -303,106 +389,6 @@ test("rejects a task above the shared running limit without discarding its draft
     .toHaveLength(0);
 });
 
-test("stops a running task from its conversation row without deleting Pi JSONL history", async ({ page }) => {
-  await openWorkbench(page);
-  await markCurrentTaskRunning(page, 1, "session-test", "session-file-fixture-demo", 1);
-  await clearRecordedCommands(page);
-
-  await page.getByRole("button", { name: /未命名会话 对话菜单/u }).click();
-  await page.getByRole("menuitem", { name: "停止任务" }).click();
-
-  await expect.poll(async () => (
-    await recordedCommandDetails(page)
-  ).filter((command) => command.type === "task.close")).toHaveLength(1);
-  expect((await recordedCommandDetails(page)).find((command) => command.type === "task.close"))
-    .toMatchObject({ payload: { mode: "stop" } });
-  expect((await recordedCommandDetails(page)).filter((command) => command.type === "conversation.archive"))
-    .toHaveLength(0);
-  await expect(page.getByRole("heading", { name: "Pi 会话", exact: true })).toBeVisible();
-  await expect(page.getByText("会话未在运行，打开后可继续。", {
-    exact: true
-  })).toBeVisible();
-  await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
-});
-
-test("opens Settings, update, and help from the lower-left help menu", async ({ page }) => {
-  await openWorkbench(page);
-  const helpButton = page.getByRole("button", { name: "帮助与设置" });
-
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: "检查更新" }).click();
-  await expect(page.getByRole("dialog", { name: "Pi-67 更新" })).toBeVisible();
-  await page.getByRole("dialog", { name: "Pi-67 更新" })
-    .getByRole("button", { name: "关闭" }).click();
-
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
-  await expect(page.getByLabel("π 设置")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "外观", exact: true, level: 1 })).toBeVisible();
-
-  await page.getByRole("button", { name: "返回工作台" }).click();
-  await expect(helpButton).toBeVisible();
-
-  await helpButton.click();
-  await page.getByRole("menuitem", { name: /帮助/u }).click();
-  await expect(page.getByRole("heading", { name: "关于", exact: true })).toBeVisible();
-  await expect(page.getByText("Pi-first Desktop Workbench", { exact: true })).toBeVisible();
-});
-
-test("keeps long workspace and session names inside the navigation column", async ({ page }) => {
-  const longWorkspace: MockWorkspaceDescriptor = {
-    ...DEFAULT_MOCK_WORKSPACE,
-    id: "workspace-long-name",
-    displayName: "pi-enterprise-platform-with-a-very-long-workspace-name",
-    identity: {
-      ...DEFAULT_MOCK_WORKSPACE.identity,
-      canonicalPath: "/Users/test/Projects/pi-enterprise-platform-with-a-very-long-workspace-name",
-      inode: "99"
-    }
-  };
-  const longSession = sessionSummary(
-    longWorkspace,
-    1,
-    "重构跨工作区后台任务恢复协议并完成完整视觉验证的超长会话名称"
-  );
-  await openWorkbench(page, { pickerQueue: [longWorkspace] }, {
-    sessionCatalogItemsByWorkspace: { [longWorkspace.id]: [longSession] }
-  });
-
-  const navigation = page.getByRole("complementary", { name: "会话导航" });
-  const metrics = await navigation.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-    documentWidth: document.documentElement.clientWidth,
-    documentScrollWidth: document.documentElement.scrollWidth
-  }));
-  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
-  expect(metrics.documentScrollWidth).toBe(metrics.documentWidth);
-  await expect(workspaceGroup(page, longWorkspace.displayName).getByTestId("conversation-row").filter({ hasText: "重构跨工作区" }))
-    .toBeVisible();
-});
-
-function workspaceGroup(page: Page, workspaceName: string): Locator {
-  return page.getByRole("button", { name: `折叠工作区：${workspaceName}` })
-    .locator("xpath=ancestor::section");
-}
-
-function sessionSummary(
-  workspace: MockWorkspaceDescriptor,
-  index: number,
-  name: string
-): FixtureSessionSummary {
-  return {
-    id: `${workspace.id}-session-${index}`,
-    fileIdentity: `session-file-fixture-${workspace.id}-${index}`,
-    path: `/Users/test/.pi/agent/sessions/${workspace.id}-${index}.jsonl`,
-    cwd: workspace.identity.canonicalPath,
-    name,
-    modifiedAt: 1_800_000_000_000 - index * 60_000,
-    messageCount: index
-  };
-}
-
 function secondWorkspace(): MockWorkspaceDescriptor {
   return {
     ...DEFAULT_MOCK_WORKSPACE,
@@ -414,29 +400,4 @@ function secondWorkspace(): MockWorkspaceDescriptor {
       inode: "68"
     }
   };
-}
-
-async function markCurrentTaskRunning(
-  page: Page,
-  index: number,
-  sessionId: string,
-  sessionFileIdentity: string,
-  sessionGeneration: number
-): Promise<void> {
-  const operationId = `operation-workbench-running-${index}`;
-  await emitMockAgentEvent(page, {
-    type: "operation.started",
-    payload: {
-      operation: {
-        operationId,
-        kind: "prompt",
-        lifecycle: "running",
-        cancellable: true,
-        sessionId,
-        sessionFileIdentity,
-        sessionGeneration,
-        startedAt: Date.now()
-      }
-    }
-  }, { operationId, sessionId, sessionFileIdentity, sessionGeneration });
 }

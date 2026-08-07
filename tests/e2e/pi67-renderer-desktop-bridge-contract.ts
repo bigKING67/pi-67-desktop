@@ -1,4 +1,5 @@
 import type {
+  ComposerDraftPersistedState,
   PreviousRunExitStatus,
   RuntimeRecoveryRecord,
   SessionCreationRecoveryRecord,
@@ -28,6 +29,8 @@ export interface MockDesktopBridgeOptions {
   pickerQueue?: MockWorkspaceDescriptor[];
   initialRuntimeRecovery?: RuntimeRecoveryRecord[];
   initialSessionCreationRecovery?: SessionCreationRecoveryRecord[];
+  initialComposerDraftState?: ComposerDraftPersistedState;
+  composerDraftPersistence?: "available" | "unavailable";
   expandedWorkspaceIds?: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

@@ -3,6 +3,9 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { useNotificationStore } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
+  approveObservedExtensionPackage,
+  declineExtensionPackageOnboarding,
+  getExtensionPackageOnboarding,
   installExtensionPackage,
   loadExtensionPackages,
   setExtensionPackageEnabled,
@@ -90,6 +93,66 @@ describe("Extension package controller", () => {
       [],
       { context: { scope: "workspace", workspaceId: "workspace-a" } }
     );
+  });
+
+  it("allows content approval while Tasks are busy and reports deferred reload", async () => {
+    rendererWorkbenchStore.getState().openTask(task("task-b", "workspace-b", "running"));
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [{
+        source: "npm:example",
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        trustState: "user-approved-observed"
+      }],
+      total: 1,
+      changed: true,
+      receiptState: "active",
+      reloadRequired: true
+    } as never);
+
+    await expect(approveObservedExtensionPackage("npm:example", "global", "workspace-a"))
+      .resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith(
+      "extension.package.approveObserved",
+      { source: "npm:example", scope: "global" },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    );
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      title: "扩展包内容已确认",
+      message: expect.stringContaining("正在运行的任务继续使用原资源")
+    });
+  });
+
+  it("reads and persists the prompt-once onboarding decision through Agent Host", async () => {
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockResolvedValueOnce({
+        source: "npm:pi-observational-memory",
+        scope: "global",
+        state: "unseen"
+      } as never)
+      .mockResolvedValueOnce({
+        source: "npm:pi-observational-memory",
+        scope: "global",
+        state: "declined"
+      } as never);
+
+    await expect(getExtensionPackageOnboarding(
+      "npm:pi-observational-memory",
+      "global",
+      "workspace-a"
+    )).resolves.toBe("unseen");
+    await expect(declineExtensionPackageOnboarding(
+      "npm:pi-observational-memory",
+      "global",
+      "workspace-a"
+    )).resolves.toBe("declined");
+    expect(request.mock.calls.map(([type]) => type)).toEqual([
+      "extension.package.onboarding.get",
+      "extension.package.onboarding.decline"
+    ]);
   });
 
   it("rejects project mutation for an untrusted Workspace", async () => {

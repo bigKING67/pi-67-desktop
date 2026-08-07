@@ -1,5 +1,4 @@
-import type { RuntimeCapabilities, SessionSnapshot, WorkspaceChangesProjection,
-  WorkspaceDescriptor } from "@pi67/domain";
+import type { SessionSnapshot } from "@pi67/domain";
 import { eventEnvelope, type ProjectionResyncResult } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApprovalStore } from "../approval/approval-store.js";
@@ -16,12 +15,20 @@ import { installSessionProjectionFixture } from "../session/session-projection-t
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
 import {
   openRendererWorkspace,
-  openRendererWorkspaceDescriptor
+  openRendererWorkspaceDescriptor,
+  selectRendererWorkspaceDescriptor
 } from "../workspace/workspace-open-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import { useAppStore } from "./app-store.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
+import {
+  deferred,
+  emptyWorkspaceChanges,
+  workspaceConnectionIdentity,
+  workspaceDescriptorFixture,
+  workspaceRuntimeCapabilities
+} from "./workspace-open-test-fixtures.js";
 
 describe("App Store workspace open authority", () => {
   beforeEach(() => {
@@ -32,7 +39,7 @@ describe("App Store workspace open authority", () => {
       snapshot("session-1"),
       3
     );
-    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(connectionIdentity(9));
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(workspaceConnectionIdentity(9));
     vi.stubGlobal("window", {
       pi67: {
         system: {
@@ -52,7 +59,7 @@ describe("App Store workspace open authority", () => {
     vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "workspace.open") {
         const readySnapshot = snapshot("session-2");
-        const payload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
+        const payload = { capabilities: workspaceRuntimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
         useAppStore.getState().receiveAgentEvent(
           { type: "runtime.ready", payload },
           eventEnvelope("runtime.ready", payload, taskEventFixture({
@@ -64,7 +71,7 @@ describe("App Store workspace open authority", () => {
         );
         throw new Error("late workspace rejection");
       }
-      if (type === "workspace.changes") return emptyChanges("session-2") as never;
+      if (type === "workspace.changes") return emptyWorkspaceChanges("session-2") as never;
       if (type === "workspace.register") return { registered: true } as never;
       if (type === "session.catalog.query") return emptyCatalogPage() as never;
       throw new Error(`Unexpected request: ${type}`);
@@ -81,9 +88,10 @@ describe("App Store workspace open authority", () => {
   });
 
   it("fails closed when workspace.open returns without authoritative runtime.ready", async () => {
-    vi.spyOn(agentConnectionController, "request").mockResolvedValue(
-      projectionAcknowledgement("session-2", 4) as never
-    );
+    vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "session.catalog.query") return emptyCatalogPage() as never;
+      return projectionAcknowledgement("session-2", 4) as never;
+    });
 
     await openRendererWorkspace();
 
@@ -103,7 +111,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("opens a catalog Session in an independent Task Runtime", async () => {
-    const descriptor = workspaceDescriptor("workspace-catalog", "/workspace-catalog");
+    const descriptor = workspaceDescriptorFixture("workspace-catalog", "/workspace-catalog");
     const existingTaskId = "task-existing";
     rendererWorkbenchStore.getState().registerWorkspace(descriptor);
     rendererWorkbenchStore.getState().openTask({
@@ -144,7 +152,7 @@ describe("App Store workspace open authority", () => {
           cwd: descriptor.identity.canonicalPath,
           sessionPath
         };
-        const readyPayload = { capabilities: runtimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
+        const readyPayload = { capabilities: workspaceRuntimeCapabilities(), snapshot: readySnapshot, taskToolMode: "auto" as const };
         const envelope = eventEnvelope("runtime.ready", readyPayload, taskEventFixture({
           hostEpoch: 9,
           sequence: 2,
@@ -195,7 +203,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("resynchronizes after Session initialization when runtime.ready was blocked", async () => {
-    const descriptor = workspaceDescriptor("workspace-resync", "/workspace-resync");
+    const descriptor = workspaceDescriptorFixture("workspace-resync", "/workspace-resync");
     const sessionPath = "/sessions/resync-target.jsonl";
     const readySnapshot = { ...snapshot("session-resync-target"), cwd: descriptor.identity.canonicalPath, sessionPath };
     rendererWorkbenchStore.getState().registerWorkspace(descriptor);
@@ -227,7 +235,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("waits for Workspace registration before initializing a saved Session", async () => {
-    const descriptor = workspaceDescriptor(
+    const descriptor = workspaceDescriptorFixture(
       "workspace-registration-order",
       "/workspace-registration-order"
     );
@@ -267,7 +275,7 @@ describe("App Store workspace open authority", () => {
   });
 
   it("surfaces Workspace registration failure without starting the saved Session", async () => {
-    const descriptor = workspaceDescriptor(
+    const descriptor = workspaceDescriptorFixture(
       "workspace-registration-failure",
       "/workspace-registration-failure"
     );
@@ -300,6 +308,29 @@ describe("App Store workspace open authority", () => {
       level: "error",
       title: "无法打开会话",
       message: "Workspace registration failed"
+    });
+  });
+
+  it("selects and registers a Workspace without creating a provisional Session", async () => {
+    const descriptor = workspaceDescriptorFixture("workspace-select-only", "/workspace-select-only");
+    rendererWorkbenchStore.getState().registerWorkspace(descriptor);
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+
+    await expect(selectRendererWorkspaceDescriptor(descriptor)).resolves.toBe(true);
+
+    expect(request.mock.calls.map(([type]) => type)).toEqual(["workspace.register"]);
+    expect(rendererWorkbenchStore.getState().tasks).toEqual({});
+    expect(useAppStore.getState()).toMatchObject({
+      workspace: descriptor.identity.canonicalPath,
+      sessionTransitionPending: false,
+      workspaceOpenPending: false,
+      runtime: {
+        phase: "stopped",
+        detail: "工作区已就绪，可创建会话"
+      }
     });
   });
 });
@@ -345,33 +376,6 @@ function snapshot(sessionId: string): SessionSnapshot {
   };
 }
 
-function runtimeCapabilities(): RuntimeCapabilities {
-  return {
-    sdkVersion: "0.81.1",
-    supportsFollowUp: true,
-    supportsSessionTree: true,
-    extensionUi: {
-      primitives: [],
-      attribution: "none",
-      recognizedCompatibilityLevels: [],
-      adapterRegistry: {
-        available: false,
-        manifestSchemaVersions: [],
-        supportedSurfaces: [],
-        realtimeUiAttribution: false,
-        activeAdapterCount: 0
-      },
-      limitations: {
-        workingIndicator: "unsupported",
-        editorMutation: "unsupported",
-        customComponents: "tui-only",
-        autocomplete: "tui-only",
-        widgetPlacements: []
-      }
-    }
-  };
-}
-
 function projectionAcknowledgement(sessionId: string, sessionGeneration: number) {
   return {
     accepted: true as const,
@@ -380,19 +384,6 @@ function projectionAcknowledgement(sessionId: string, sessionGeneration: number)
     sessionGeneration,
     eventSequence: 2
   };
-}
-
-function connectionIdentity(hostEpoch: number) {
-  return {
-    appInstanceId: "app-1",
-    hostInstanceId: `host-${hostEpoch}`,
-    hostEpoch,
-    sdkVersion: "0.81.1",
-    eventSequence: 0
-  };
-}
-function emptyChanges(sessionId: string): WorkspaceChangesProjection {
-  return { sessionId, items: [], truncated: false, total: 0 };
 }
 
 function emptyCatalogPage() {
@@ -418,7 +409,7 @@ function projectionResyncResult(
     sessionId: value.sessionId,
     sessionFileIdentity: value.sessionFileIdentity,
     snapshot: value,
-    changes: emptyChanges(value.sessionId),
+    changes: emptyWorkspaceChanges(value.sessionId),
     extensionCatalog: { items: [], total: 0, truncated: false },
     sessionCatalogStatus: {
       revision: 1,
@@ -433,27 +424,5 @@ function projectionResyncResult(
     hostEpoch: 9,
     sessionGeneration,
     taskToolMode: "auto"
-  };
-}
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
-}
-
-function workspaceDescriptor(id: string, canonicalPath: string): WorkspaceDescriptor {
-  return {
-    id,
-    displayName: id,
-    identity: { canonicalPath, assurance: "path-only" },
-    trust: "trusted",
-    trustProvenance: "native-picker",
-    availability: "available"
   };
 }

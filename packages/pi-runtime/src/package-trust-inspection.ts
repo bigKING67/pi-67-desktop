@@ -14,6 +14,7 @@ const EXCLUDED_CONTENT_DIRECTORIES = new Set([".git", "node_modules"]);
 interface SafeObservation {
   status: "observed";
   observation: ExtensionPackageObservation;
+  baselineContentSha256: string;
 }
 
 interface FailedObservation {
@@ -50,7 +51,7 @@ export async function inspectPackageInstallation(
     if (!sameFileSnapshot(manifestInfo, manifestAfter)) return unsafeObservation();
     const manifest = parsePackageManifest(manifestBytes);
     if (!manifest) return unsafeObservation();
-    const contentSha256 = await boundedPackageContentSha256(canonicalRoot);
+    const { contentSha256, baselineContentSha256 } = await boundedPackageContentHashes(canonicalRoot);
     const canonicalAfter = await stat(canonicalRoot, { bigint: true });
     if (
       canonicalAfter.dev !== canonicalInfo.dev
@@ -67,7 +68,7 @@ export async function inspectPackageInstallation(
       ),
       observedAt: timestamp(now)
     };
-    return { status: "observed", observation };
+    return { status: "observed", observation, baselineContentSha256 };
   } catch (error) {
     if (error instanceof PackageInspectionLimitError) {
       return { status: "unavailable", reason: "inspection-limited" };
@@ -96,10 +97,31 @@ export function isContainedPackagePath(candidate: string, root: string): boolean
     && !isAbsolute(fromRoot);
 }
 
-function boundedPackageContentSha256(root: string): Promise<string> {
-  const hash = createHash("sha256");
+async function boundedPackageContentHashes(root: string): Promise<{
+  contentSha256: string;
+  baselineContentSha256: string;
+}> {
+  const contentHash = createHash("sha256");
+  const baselineFiles: BaselineFile[] = [];
   const budget = { files: 0, bytes: 0, startedAt: Date.now() };
-  return hashDirectory(root, "", 0, budget, hash).then(() => hash.digest("hex"));
+  await hashDirectory(root, "", 0, budget, contentHash, baselineFiles);
+  const baselineHash = createHash("sha256");
+  for (const file of baselineFiles.sort((left, right) => comparePaths(left.path, right.path))) {
+    baselineHash
+      .update(file.path)
+      .update("\0")
+      .update(canonicalBaselineBytes(file.bytes))
+      .update("\0");
+  }
+  return {
+    contentSha256: contentHash.digest("hex"),
+    baselineContentSha256: baselineHash.digest("hex")
+  };
+}
+
+interface BaselineFile {
+  path: string;
+  bytes: Uint8Array;
 }
 
 async function hashDirectory(
@@ -107,7 +129,8 @@ async function hashDirectory(
   relativeDirectory: string,
   depth: number,
   budget: { files: number; bytes: number; startedAt: number },
-  hash: ReturnType<typeof createHash>
+  hash: ReturnType<typeof createHash>,
+  baselineFiles: BaselineFile[]
 ): Promise<void> {
   if (
     depth > MAX_PACKAGE_CONTENT_DEPTH
@@ -126,7 +149,14 @@ async function hashDirectory(
     if (info.isSymbolicLink()) throw new Error("Package content contains a symbolic link.");
     if (info.isDirectory()) {
       hash.update("D\0").update(relativePath.replaceAll(sep, "/")).update("\0");
-      await hashDirectory(root, relativePath, depth + 1, budget, hash);
+      await hashDirectory(
+        root,
+        relativePath,
+        depth + 1,
+        budget,
+        hash,
+        baselineFiles
+      );
       continue;
     }
     if (!info.isFile() || info.nlink > 1) throw new Error("Package content has unsafe filesystem metadata.");
@@ -146,7 +176,22 @@ async function hashDirectory(
       .update(String(bytes.byteLength))
       .update("\0")
       .update(bytes);
+    if (!entry.name.endsWith(".map")) {
+      baselineFiles.push({ path: relativePath.replaceAll(sep, "/"), bytes });
+    }
   }
+}
+
+function canonicalBaselineBytes(bytes: Uint8Array): Uint8Array {
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (buffer.includes(0)) return bytes;
+  const text = buffer.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(buffer)) return bytes;
+  return Buffer.from(text.replace(/\r\n/gu, "\n"), "utf8");
+}
+
+function comparePaths(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function parsePackageManifest(bytes: Uint8Array): { name?: string; version?: string } | undefined {

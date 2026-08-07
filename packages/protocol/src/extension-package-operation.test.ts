@@ -21,6 +21,9 @@ describe("Extension package operation timeout contract", () => {
 
   it.each([
     "extension.package.list",
+    "extension.package.approveObserved",
+    "extension.package.onboarding.get",
+    "extension.package.onboarding.decline",
     "extension.package.setEnabled",
     "extension.package.restoreInheritance"
   ] as const)("keeps %s on the normal response contract", (type) => {

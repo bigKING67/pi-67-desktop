@@ -5,6 +5,7 @@ import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionGeneration,
+  selectSessionFileIdentity,
   selectSessionId,
   selectSessionModels
 } from "../session/session-projection-selectors.js";
@@ -48,14 +49,14 @@ import {
   type PiDesktopActionContext
 } from "../pi-actions/pi-desktop-actions.js";
 import { ToolModeSelector } from "./ToolModeSelector.js";
-
+import { submitRendererNewSessionIntent } from "../session/new-session-intent-controller.js";
+import { AttachmentPreviewLoading } from "./AttachmentPreviewLoading.js";
 const AttachmentPreview = lazy(() => import("../attachments/AttachmentPreview.js").then((module) => ({
   default: module.AttachmentPreview
 })));
 const SlashCommandPicker = lazy(() => import("./SlashCommandPicker.js").then((module) => ({
   default: module.SlashCommandPicker
 })));
-
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
@@ -64,11 +65,13 @@ export function Composer() {
   const workspace = useAppStore((state) => state.workspace);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
+  const sessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const resourcesRevision = useSessionProjectionStore((state) => state.revisions.resources);
   const models = useSessionProjectionStore(selectSessionModels) ?? [];
   const sessionReady = useSessionProjectionStore((state) => state.authority.phase === "active");
   const widgets = useExtensionUiStore((state) => state.widgets);
-  const activeTaskId = useWorkbenchStore((state) => selectedWorkbenchTask(state)?.id);
+  const activeTask = useWorkbenchStore(selectedWorkbenchTask);
+  const activeTaskId = activeTask?.id;
   const draft = useTaskDraftStore((state) => (
     activeTaskId ? state.drafts[activeTaskId] ?? EMPTY_TASK_DRAFT : EMPTY_TASK_DRAFT
   ));
@@ -87,16 +90,30 @@ export function Composer() {
   const fileInput = useRef<HTMLInputElement>(null);
   const textInput = useRef<HTMLTextAreaElement>(null);
   const streaming = useCommittedConversationStreaming();
+  const activeSessionAuthority = Boolean(
+    activeTask?.conversation.kind === "session"
+    && sessionReady
+    && activeTask.sessionId === sessionId
+    && activeTask.sessionFileIdentity === sessionFileIdentity
+    && activeTask.sessionGeneration === sessionGeneration
+  );
+  const activeStreaming = activeSessionAuthority && streaming;
   const hasDraft = text.trim().length > 0 || attachments.length > 0;
   const canSend = !submitting && !stagingAttachments && hasDraft;
   const canStop = Boolean(
-    operation?.cancellable
+    activeSessionAuthority
+    && operation?.cancellable
     && isActiveOperationLifecycle(operation.lifecycle)
     && operation.sessionId === sessionId
     && operation.sessionGeneration === sessionGeneration
   );
-  const widgetItems = Object.values(widgets);
-  const slashCatalog = useComposerSlashCatalog({ connected, hostEpoch, resourcesRevision, sessionId });
+  const widgetItems = activeSessionAuthority ? Object.values(widgets) : [];
+  const slashCatalog = useComposerSlashCatalog({
+    connected,
+    hostEpoch,
+    resourcesRevision,
+    sessionId: activeSessionAuthority ? sessionId : undefined
+  });
   const slashQuery = useMemo(() => slashQueryFromDraft(text), [text]);
   const slashCommands = useMemo(() => (
     slashQuery
@@ -107,12 +124,15 @@ export function Composer() {
   const piDesktopActionContext: PiDesktopActionContext = {
     connected,
     workspaceAvailable: Boolean(workspace),
-    sessionReady,
+    sessionReady: activeSessionAuthority,
     sessionTransitionPending,
-    activeOperation: Boolean(operation && isActiveOperationLifecycle(operation.lifecycle)),
+    activeOperation: Boolean(
+      activeSessionAuthority
+      && operation
+      && isActiveOperationLifecycle(operation.lifecycle)
+    ),
     configuredModels: models
   };
-
   const setText = (value: string) => {
     if (activeTaskId) useTaskDraftStore.getState().setText(activeTaskId, value);
   };
@@ -127,7 +147,6 @@ export function Composer() {
   const setStreamBehavior = (value: "steer" | "followUp") => {
     if (activeTaskId) useTaskDraftStore.getState().setStreamBehavior(activeTaskId, value);
   };
-
   useEffect(() => subscribeToComposerPrefill((nextText) => {
     submissionIdRef.current = undefined;
     setText(nextText);
@@ -136,7 +155,10 @@ export function Composer() {
 
   useEffect(() => {
     submissionIdRef.current = undefined;
-  }, [hostEpoch, sessionGeneration, sessionId]);
+    setAttachmentError(undefined);
+    setSubmissionError(undefined);
+    setDismissedSlashDraft(undefined);
+  }, [activeTaskId, hostEpoch, sessionGeneration, sessionId]);
 
   useEffect(() => {
     setSlashActiveIndex(0);
@@ -151,7 +173,7 @@ export function Composer() {
   }, [activeTaskId, attachments.length, text]);
 
   const submit = async () => {
-    if (!canSend || !activeTaskId) return;
+    if (!canSend || !activeTask || !activeTaskId) return;
     const nextText = text.trim();
     const nextAttachments = attachments;
     if (isSlashInvocation(nextText)) {
@@ -184,7 +206,7 @@ export function Composer() {
         return;
       }
       if (slashRoute.kind === "extension") {
-        if (streaming) {
+        if (activeStreaming) {
           setSubmissionError(messages.composer.commandUnavailableWhileRunning);
           return;
         }
@@ -214,12 +236,20 @@ export function Composer() {
     try {
       const submissionId = submissionIdRef.current ?? crypto.randomUUID();
       submissionIdRef.current = submissionId;
-      const result = await submitRendererPrompt(
-        nextText,
-        streaming ? streamBehavior : "send",
-        submissionId,
-        nextAttachments
-      );
+      const result = activeTask.conversation.kind === "provisional"
+        && activeTask.creationStatus === undefined
+        ? await submitRendererNewSessionIntent(
+            activeTask.id,
+            nextText,
+            submissionId,
+            nextAttachments
+          )
+        : await submitRendererPrompt(
+            nextText,
+            activeStreaming ? streamBehavior : "send",
+            submissionId,
+            nextAttachments
+          );
       if (!result.accepted) {
         setSubmissionError(result.error);
         return;
@@ -262,7 +292,7 @@ export function Composer() {
   return (
     <footer className={styles.region} data-testid="composer-region">
       <ExtensionWidgets items={widgetItems} placement="aboveEditor" />
-      <ComposerQueuePanel />
+      {activeSessionAuthority ? <ComposerQueuePanel /> : null}
       {slashPickerOpen ? (
         <Suspense fallback={null}>
           <SlashCommandPicker
@@ -340,7 +370,7 @@ export function Composer() {
           slashCatalog={slashCatalog.catalog}
           slashCommands={slashCommands}
           slashPickerOpen={slashPickerOpen}
-          streaming={streaming}
+          streaming={activeStreaming}
           text={text}
           onAddAttachments={(files) => void addAttachments(files)}
           onSlashActiveIndexChange={setSlashActiveIndex}
@@ -375,7 +405,7 @@ export function Composer() {
             />
             <Button className={`icon-button ${styles.attachmentButton}`} aria-label={messages.composer.addAttachment} isDisabled={submitting || stagingAttachments} onPress={() => fileInput.current?.click()}><Plus size={17} /></Button>
             <ToolModeSelector />
-            {streaming ? (
+            {activeStreaming ? (
               <div className={styles.streamMode} aria-label={messages.composer.streamingDelivery}>
                 <button
                   aria-pressed={streamBehavior === "steer"}
@@ -405,7 +435,7 @@ export function Composer() {
             ) : null}
           </div>
           <div className={styles.actions}>
-            <ComposerRuntimeControls submitting={submitting} />
+            {activeSessionAuthority ? <ComposerRuntimeControls submitting={submitting} /> : null}
             {!canStop || hasDraft ? (
               <Button
                 className={`${styles.sendButton} ${canStop ? styles.secondarySendButton : ""}`}
@@ -425,18 +455,5 @@ export function Composer() {
       </div>
       <ExtensionWidgets items={widgetItems} placement="belowEditor" />
     </footer>
-  );
-}
-
-function AttachmentPreviewLoading() {
-  return (
-    <div
-      aria-busy="true"
-      aria-label="正在加载附件预览"
-      role="status"
-      style={{ display: "grid", width: 218, height: 56, flex: "0 0 auto", placeItems: "center" }}
-    >
-      <span className="loading-line" />
-    </div>
   );
 }

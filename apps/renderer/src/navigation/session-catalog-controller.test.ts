@@ -305,6 +305,27 @@ describe("session catalog controller", () => {
     expect(catalog()).toMatchObject({ items: [SESSION_ONE], error: undefined });
   });
 
+  it("retries a rebuilding Catalog until an authoritative page is available", async () => {
+    vi.useFakeTimers();
+    const request = vi.spyOn(agentConnectionController, "request")
+      .mockResolvedValueOnce(page([], { state: "rebuilding", rebuilding: true }) as never)
+      .mockResolvedValueOnce(page([], { state: "rebuilding", rebuilding: true }) as never)
+      .mockResolvedValueOnce(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+    expect(request).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(request).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(catalog()).toMatchObject({
+      items: [SESSION_ONE],
+      catalogState: "ready",
+      rebuilding: false
+    });
+  });
+
   it("cancels a scheduled unavailable retry when a newer query succeeds", async () => {
     vi.useFakeTimers();
     const request = vi.spyOn(agentConnectionController, "request")

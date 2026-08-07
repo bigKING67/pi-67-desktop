@@ -12,7 +12,7 @@ import {
 import { messages } from "../localization/message-catalog.js";
 import { compactRendererSession } from "../operation/operation-controller.js";
 import { selectSessionModel, reloadSessionResources } from "../session/session-control-controller.js";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import { beginRendererSessionIntent } from "../session/session-lifecycle-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
 import {
   rendererWorkbenchStore,
@@ -63,7 +63,6 @@ export type PiDesktopActionExecutionResult =
 
 export const PI_DESKTOP_ACTIONS: readonly PiDesktopActionDescriptor[] = [
   action("new", messages.composer.piBuiltins.new, MessageSquarePlus, {
-    connection: true,
     workspace: true
   }),
   action("model", messages.composer.piBuiltins.model, Sparkles, {
@@ -147,7 +146,7 @@ export async function executePiDesktopAction(
   }
   switch (descriptor.name) {
     case "new":
-      await createRendererSession();
+      beginRendererSessionIntent();
       return { status: "handled" };
     case "model":
       return executeModelAction(args, context);

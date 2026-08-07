@@ -12,6 +12,7 @@ import {
   type WorkspaceFilePersistedTab,
   type WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
+import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import { WORKBENCH_STATE_DIRECTORY } from "./workbench-state-contract.js";
 
 const realpathNative = promisify(realpath.native);
@@ -34,11 +35,7 @@ interface StoredWorkspaceFileState {
   }>;
 }
 
-export interface WorkspaceFileEncryption {
-  isAvailable(): boolean;
-  encrypt(value: string): Buffer;
-  decrypt(value: Buffer): string;
-}
+export type WorkspaceFileEncryption = DesktopTextEncryption;
 
 export interface WorkspaceFileStateStoreOptions {
   encryption: WorkspaceFileEncryption;

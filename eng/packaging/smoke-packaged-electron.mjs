@@ -1,11 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   CONTROLLED_PROMPT_TEXT,
-  isProcessAlive,
-  writeControlledShutdownExtension
+  isProcessAlive
 } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import { preparePackagedSmokeProfile } from "./packaged-electron-smoke-profile.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -41,56 +39,15 @@ const {
   userDataDirectory,
   workspace
 } = await createPackagedTestDirectories("pi67-packaged-smoke-");
-const childPidPath = join(userDataDirectory, "child.pid");
-const lifecyclePath = join(userDataDirectory, "lifecycle.txt");
-const packagedCredential = "pi67-packaged-reveal-fixture";
-const localizedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
-const packagedSkillDirectory = join(agentDir, "skills/packaged-skill");
-const packagedPromptDirectory = join(agentDir, "prompts");
-await Promise.all([
-  mkdir(localizedExtensionDirectory, { recursive: true }),
-  mkdir(packagedSkillDirectory, { recursive: true }),
-  mkdir(packagedPromptDirectory, { recursive: true })
-]);
-await Promise.all([
-  writeFile(join(agentDir, "settings.json"), `${JSON.stringify({
-    packages: ["npm:pi-subagents"]
-  }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
-  writeFile(join(localizedExtensionDirectory, "package.json"), `${JSON.stringify({
-    name: "pi-subagents",
-    version: "0.35.1",
-    description: "Pi extension for delegating tasks to subagents with chains, parallel execution, and TUI clarification",
-    type: "module",
-    pi: { extensions: ["index.js"] }
-  }, null, 2)}\n`, "utf8"),
-  writeFile(join(localizedExtensionDirectory, "index.js"), "export default function packagedLocalizationFixture() {}\n", "utf8"),
-  writeFile(join(packagedSkillDirectory, "SKILL.md"), [
-    "---",
-    "name: packaged-skill",
-    "description: Validates the packaged Skill resource projection.",
-    "---",
-    "",
-    "# Packaged Skill",
-    ""
-  ].join("\n"), "utf8"),
-  writeFile(join(packagedPromptDirectory, "packaged-review.md"), [
-    "---",
-    "description: Validates the packaged prompt-template resource projection.",
-    "---",
-    "",
-    "Review the packaged Settings resource projection.",
-    ""
-  ].join("\n"), "utf8"),
-  writeFile(join(agentDir, "AGENTS.md"), "Packaged global context fixture.\n", "utf8"),
-  writeFile(join(workspace, "AGENTS.md"), "Packaged project context fixture.\n", "utf8")
-]);
-await writeFile(join(agentDir, "auth.json"), `${JSON.stringify({
-  anthropic: { type: "api_key", key: packagedCredential }
-}, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-await writeControlledShutdownExtension({
-  extensionPath: join(extensionsDirectory, "shutdown-fixture.ts"),
+const {
   childPidPath,
-  lifecyclePath
+  lifecyclePath,
+  packagedCredential
+} = await preparePackagedSmokeProfile({
+  agentDir,
+  extensionsDirectory,
+  userDataDirectory,
+  workspace
 });
 let application;
 let childPid;
@@ -126,7 +83,15 @@ try {
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
     throw new Error(`Packaged workspace open reported a failure: ${JSON.stringify(await inspectRendererSurface(window))}`);
   }
-  const sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
+  let sessionCreation;
+  try {
+    sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
+  } catch (error) {
+    throw new Error(
+      `Packaged Session creation failed: ${JSON.stringify(await inspectRendererSurface(window))}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`,
+      { cause: error }
+    );
+  }
   const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
   await workspaceSettings.getByRole("button", { name: /恢复与诊断/u }).click();
   const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
@@ -259,7 +224,7 @@ try {
   const settingsNavigation = workspaceSettings.getByRole("navigation", { name: "设置分类" });
   const extensionSettingsWorkspace = workspaceSettings.getByTestId("extension-settings-workspace");
   await extensionSettingsWorkspace.getByRole("tab", { name: "内置扩展", exact: true }).click();
-  await extensionSettingsWorkspace.getByText("pi-hy-memory", { exact: true })
+  await extensionSettingsWorkspace.getByText("pi-rules-loader", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await extensionSettingsWorkspace.getByText("xtalpi-pi-tools", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
@@ -423,7 +388,18 @@ try {
   await verifyColdProviderRestoration(window);
 
   if (!(await coldConversation.isVisible())) {
-    await window.keyboard.press(process.platform === "darwin" ? "Meta+N" : "Control+N");
+    if (await coldCreateConversation.isVisible()) await coldCreateConversation.click();
+    else await window.keyboard.press(process.platform === "darwin" ? "Meta+N" : "Control+N");
+    await window.getByRole("textbox", { name: "给 Pi 发送消息" })
+      .fill("Create the cold-start packaged smoke Session.");
+    await window.getByRole("button", { name: "发送", exact: true }).click();
+    await window.locator(
+      '[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]'
+    ).waitFor({ state: "visible", timeout: 30_000 });
+    const coldStop = window.getByRole("button", { name: "停止", exact: true });
+    await coldStop.waitFor({ state: "visible", timeout: 30_000 });
+    await coldStop.click();
+    await coldStop.waitFor({ state: "hidden", timeout: 30_000 });
   }
   try {
     await coldConversation.waitFor({ state: "visible", timeout: 30_000 });

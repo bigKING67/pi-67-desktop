@@ -15,6 +15,7 @@ import type { ConfirmedAction, PackageRow } from "./extension-management-model.j
 import {
   packageResourceEnabled,
   packageResourceTypes,
+  packageContentAdmitted,
   packageRowAccessibleName,
   packageRowName,
   packageRowState,
@@ -86,11 +87,12 @@ export function PackageList({ rows, selectedKey, loading, updateDisabled, onSele
   );
 }
 
-export function PackageDetails({ row, workspaceName, updatesChecked, updateDisabled, onBack, onPending, onRestore, onToggle }: {
+export function PackageDetails({ row, workspaceName, updatesChecked, updateDisabled, onApprove, onBack, onPending, onRestore, onToggle }: {
   row: PackageRow | undefined;
   workspaceName: string | undefined;
   updatesChecked: boolean;
   updateDisabled: boolean;
+  onApprove: (entry: ExtensionPackageEntry) => void;
   onBack: () => void;
   onPending: (action: ConfirmedAction) => void;
   onRestore: (entry: ExtensionPackageEntry) => void;
@@ -111,14 +113,20 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
     ? "已启用"
     : state === "partial"
       ? "部分启用"
-      : state === "blocked"
-        ? "已阻止执行"
-        : state === "unavailable" ? "不可用" : "已停用";
+      : state === "pending-confirmation"
+        ? "待确认"
+        : state === "changed-pending-confirmation"
+          ? "内容已变更，待重新确认"
+          : state === "not-installed" ? "未安装" : "已停用";
   const statusTone = state === "enabled"
     ? "ready"
     : state === "partial"
       ? "warning"
-      : state === "blocked" || state === "unavailable" ? "danger" : "neutral";
+      : state === "pending-confirmation" || state === "changed-pending-confirmation"
+        ? "warning"
+        : state === "not-installed" ? "danger" : "neutral";
+  const canApprove = row.entry.installed
+    && (row.entry.trustState === "unverified" || row.entry.trustState === "drifted");
   return (
     <section
       aria-label={`${packageRowName(row)} 详情`}
@@ -172,7 +180,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
               <Button
                 aria-label={`${resourceEnabled ? "停用" : "启用"} ${resourceTypeLabel(resourceType)} ${row.entry.source}`}
                 className={resourceEnabled ? "secondary-button" : "primary-button"}
-                isDisabled={state === "blocked" || state === "unavailable"}
+                isDisabled={!packageContentAdmitted(row.entry)}
                 onPress={() => onToggle(row.entry, row.inherited, resourceType)}
               >{resourceEnabled ? "停用" : "启用"}</Button>
             </div>
@@ -180,6 +188,14 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
         })}
       </div>
       <div className={styles.detailActions}>
+        {canApprove ? (
+          <Button
+            aria-label={`${row.entry.trustState === "drifted" ? "重新确认" : "确认"} ${row.entry.source} 当前内容`}
+            className="primary-button"
+            isDisabled={updateDisabled}
+            onPress={() => onApprove(row.entry)}
+          >{row.entry.trustState === "drifted" ? "重新确认当前内容" : "确认当前内容"}</Button>
+        ) : null}
         {row.update ? (
           <Button
             aria-label={`更新 ${row.entry.source}`}
@@ -230,11 +246,14 @@ function PackageState({ row }: { row: PackageRow }) {
   if (state === "partial") {
     return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>部分启用</span></span>;
   }
-  if (state === "unavailable") {
-    return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>缺失</span></span>;
+  if (state === "not-installed") {
+    return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>未安装</span></span>;
   }
-  if (state === "blocked") {
-    return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>已阻止</span></span>;
+  if (state === "pending-confirmation") {
+    return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>待确认</span></span>;
+  }
+  if (state === "changed-pending-confirmation") {
+    return <span className={styles.state} data-state="partial"><CircleAlert aria-hidden="true" size={15} /><span>内容已变更</span></span>;
   }
   return null;
 }

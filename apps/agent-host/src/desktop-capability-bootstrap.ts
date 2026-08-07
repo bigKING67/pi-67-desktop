@@ -13,37 +13,15 @@ import {
   writeFile
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  isContainedRelativePath,
+  parseCapabilityCatalog,
+  parseCapabilityManifest
+} from "./desktop-capability-catalog.js";
 import { managedSkillPackPackagePaths } from "./managed-skill-pack-state.js";
 
-const MANIFEST_SCHEMA = "pi67.desktop-capabilities.v1";
-const CATALOG_SCHEMA = "pi67.capability-catalog.v1";
 const STATE_SCHEMA = "pi67.desktop-capability-state.v1";
 const MAX_METADATA_BYTES = 1_000_000;
-const MAX_CAPABILITY_PACKAGES = 32;
-
-interface CapabilityManifestPackage {
-  id: string;
-  treeSha256: string;
-}
-
-interface CapabilityManifest {
-  schema: typeof MANIFEST_SCHEMA;
-  catalogVersion: string;
-  packages: CapabilityManifestPackage[];
-}
-
-interface CapabilityCatalogEntry {
-  id: string;
-  displayName: string;
-  packagePath: string;
-  resourceTypes: string[];
-}
-
-interface CapabilityCatalog {
-  schema: typeof CATALOG_SCHEMA;
-  catalogVersion: string;
-  entries: CapabilityCatalogEntry[];
-}
 
 export interface DesktopCapabilityBootstrapOptions {
   capabilitiesRoot?: string;
@@ -142,6 +120,20 @@ export async function bootstrapDesktopCapabilities(
   ];
   environment.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
   environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(packagePaths);
+  environment.PI67_KNOWN_PACKAGE_BASELINES = JSON.stringify(
+    catalog.recommendedExternal
+      .filter((entry) => (
+        entry.admissionPolicy === "known-baseline-or-user-approval"
+        && entry.baselineContentSha256 !== undefined
+        && entry.recommendedVersion !== undefined
+      ))
+      .map((entry) => ({
+        source: entry.source,
+        packageName: entry.source.slice("npm:".length),
+        packageVersion: entry.recommendedVersion,
+        baselineContentSha256: entry.baselineContentSha256
+      }))
+  );
   return {
     enabled: true,
     catalogVersion: catalog.catalogVersion,
@@ -319,58 +311,11 @@ async function writeState(root: string, value: unknown, createToken: () => strin
   if (process.platform !== "win32") await chmod(path, 0o600);
 }
 
-function parseCapabilityManifest(value: unknown): CapabilityManifest | undefined {
-  if (!isRecord(value) || value.schema !== MANIFEST_SCHEMA || !isVersion(value.catalogVersion)) return undefined;
-  if (!Array.isArray(value.packages) || value.packages.length > MAX_CAPABILITY_PACKAGES) return undefined;
-  const packages: CapabilityManifestPackage[] = [];
-  for (const item of value.packages) {
-    if (!isRecord(item) || !isId(item.id) || !isSha256(item.treeSha256)) return undefined;
-    packages.push({ id: item.id, treeSha256: item.treeSha256 });
-  }
-  if (new Set(packages.map((entry) => entry.id)).size !== packages.length) return undefined;
-  return { schema: MANIFEST_SCHEMA, catalogVersion: value.catalogVersion, packages };
-}
-
-function parseCapabilityCatalog(value: unknown): CapabilityCatalog | undefined {
-  if (!isRecord(value) || value.schema !== CATALOG_SCHEMA || !isVersion(value.catalogVersion)) return undefined;
-  if (!Array.isArray(value.entries) || value.entries.length > MAX_CAPABILITY_PACKAGES) return undefined;
-  const entries: CapabilityCatalogEntry[] = [];
-  for (const item of value.entries) {
-    if (
-      !isRecord(item)
-      || !isId(item.id)
-      || typeof item.displayName !== "string"
-      || item.displayName.length === 0
-      || item.displayName.length > 200
-      || !isContainedRelativePath(item.packagePath)
-      || !Array.isArray(item.resourceTypes)
-      || item.resourceTypes.some((type) => typeof type !== "string" || type.length === 0 || type.length > 40)
-    ) return undefined;
-    entries.push({
-      id: item.id,
-      displayName: item.displayName,
-      packagePath: item.packagePath,
-      resourceTypes: [...item.resourceTypes]
-    });
-  }
-  if (new Set(entries.map((entry) => entry.id)).size !== entries.length) return undefined;
-  return { schema: CATALOG_SCHEMA, catalogVersion: value.catalogVersion, entries };
-}
-
 function containedPath(root: string, path: string, label: string): string {
   if (!isContainedRelativePath(path)) throw new Error(`${label} is invalid.`);
   const candidate = resolve(root, path);
   if (!isContained(candidate, root)) throw new Error(`${label} escaped its root.`);
   return candidate;
-}
-
-function isContainedRelativePath(value: unknown): value is string {
-  return typeof value === "string"
-    && value.length > 0
-    && value.length <= 1_024
-    && !value.includes("\0")
-    && !isAbsolute(value)
-    && !value.split(/[\\/]/u).includes("..");
 }
 
 function isContained(candidate: string, root: string): boolean {
@@ -380,22 +325,6 @@ function isContained(candidate: string, root: string): boolean {
     && !fromRoot.startsWith(`..${sep}`)
     && !isAbsolute(fromRoot)
   );
-}
-
-function isVersion(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 100 && !value.includes("\0");
-}
-
-function isId(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/u.test(value);
-}
-
-function isSha256(value: unknown): value is string {
-  return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {

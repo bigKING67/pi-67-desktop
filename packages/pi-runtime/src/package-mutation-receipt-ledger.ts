@@ -16,7 +16,7 @@ const MAX_LEDGER_BYTES = 2 * 1024 * 1024;
 const MAX_LEDGER_RECORDS = 512;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
-export type PackageReceiptOperation = "install" | "update" | "uninstall";
+export type PackageReceiptOperation = "install" | "update" | "uninstall" | "admit";
 export type DurablePackageReceiptState = Exclude<ExtensionPackageReceiptState, "not-applicable">
   | "reserved"
   | "mutating";
@@ -254,7 +254,7 @@ function isReceiptState(value: unknown): value is DurablePackageReceiptState {
 }
 
 function isReceiptOperation(value: unknown): value is PackageReceiptOperation {
-  return value === "install" || value === "update" || value === "uninstall";
+  return value === "install" || value === "update" || value === "uninstall" || value === "admit";
 }
 
 function isSha256(value: unknown): value is string {

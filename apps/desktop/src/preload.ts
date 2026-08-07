@@ -1,7 +1,11 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
+  ComposerDraftPersistedState,
+  ComposerDraftStateSnapshot,
   DesktopCapabilitySnapshot,
   DesktopRecoverySnapshot,
+  NativeNotificationActivation,
+  NativeNotificationRequest,
   PackageNetworkSettings,
   PackageNetworkSnapshot,
   RuntimeDiagnostics,
@@ -48,6 +52,12 @@ const systemBridge = {
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
   loadWorkbenchState: (): Promise<WorkbenchStateV4> => ipcRenderer.invoke("pi67:workbench-load"),
+  loadComposerDraftState: (): Promise<ComposerDraftStateSnapshot> => (
+    ipcRenderer.invoke("pi67:composer-draft-state-load")
+  ),
+  updateComposerDraftState: (state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot> => (
+    ipcRenderer.invoke("pi67:composer-draft-state-update", state)
+  ),
   loadWorkspaceFileState: (): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-load")
   ),
@@ -75,7 +85,12 @@ const systemBridge = {
   saveDiagnostics: (diagnostics: RuntimeDiagnostics): Promise<string | undefined> => (
     ipcRenderer.invoke("pi67:save-diagnostics", diagnostics)
   ),
-  showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("pi67:notify", { title, body }),
+  showNativeNotification: (request: NativeNotificationRequest): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:native-notification-show", request)
+  ),
+  dismissNativeNotification: (notificationId: string): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:native-notification-dismiss", notificationId)
+  ),
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
   showWorkspaceEntryContextMenu: (
     entry: WorkspaceEntryRequest,
@@ -145,6 +160,15 @@ const systemBridge = {
     const handler = () => listener();
     ipcRenderer.on("pi67:power-resumed", handler);
     return () => ipcRenderer.removeListener("pi67:power-resumed", handler);
+  },
+  onNativeNotificationActivated: (
+    listener: (activation: NativeNotificationActivation) => void
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, activation: NativeNotificationActivation) => (
+      listener(activation)
+    );
+    ipcRenderer.on("pi67:native-notification-activated", handler);
+    return () => ipcRenderer.removeListener("pi67:native-notification-activated", handler);
   }
 };
 

@@ -186,14 +186,21 @@ test("serializes new-session transitions and keeps one terminal notification acr
 
   const createButton = page.getByRole("button", { name: "在 pi-demo 新建会话" });
   await createButton.click();
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
+  expect((await recordedCommands(page)).filter((command) => command === "session.create"))
+    .toHaveLength(0);
+  await page.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("验证新会话事务");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect(createButton).toBeDisabled();
   await expect(page.locator('[data-runtime-phase="starting"]')).toContainText("正在创建 Pi 新会话");
   await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
     command === "session.create"
   ))).toHaveLength(1);
-  await expect(page.locator('[data-runtime-phase="ready"]')).toContainText("Pi 新会话已就绪");
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "prompt.submit"
+  ))).toHaveLength(1);
 
-  const operationId = "operation-notice-test";
+  const operationId = "operation-1";
   const sessionId = "session-created-1";
   const sessionFileIdentity = "session-file-fixture-1";
   const sessionGeneration = 2;

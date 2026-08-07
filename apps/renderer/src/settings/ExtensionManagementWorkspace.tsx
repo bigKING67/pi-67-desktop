@@ -1,19 +1,18 @@
-import type { DesktopRecommendedPackage, ExtensionPackageEntry } from "@pi67/domain";
+import type {
+  DesktopRecommendedPackage,
+  ExtensionPackageEntry,
+  ExtensionPackageOnboardingState
+} from "@pi67/domain";
 import {
   CheckCircle2,
   Download,
   PackagePlus,
   RefreshCw,
-  Search,
-  ShieldCheck
+  Search
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
-  Dialog,
-  Heading,
-  Modal,
-  ModalOverlay,
   Tab,
   TabList,
   TabPanel,
@@ -22,7 +21,10 @@ import {
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
 import {
+  approveObservedExtensionPackage,
   checkExtensionPackageUpdates,
+  declineExtensionPackageOnboarding,
+  getExtensionPackageOnboarding,
   installExtensionPackage,
   loadExtensionPackages,
   restoreExtensionPackageInheritance,
@@ -32,14 +34,17 @@ import {
 } from "./extension-package-controller.js";
 import { useExtensionPackageStore } from "./extension-package-store.js";
 import { PackageDetails, PackageList } from "./ExtensionPackageBrowser.js";
+import {
+  InstallExtensionDialog,
+  ObservationalMemoryOnboardingDialog,
+  PackageActionDialog
+} from "./ExtensionManagementDialogs.js";
 import type { ConfirmedAction, PackageFilter, PackageRow } from "./extension-management-model.js";
 import {
   buildPackageRows,
   filterPackageRows,
-  inferSourceKind,
   packageResourceEnabled,
-  packageRowEnabled,
-  sourceKindLabel
+  packageRowEnabled
 } from "./extension-management-model.js";
 import styles from "./ExtensionManagementWorkspace.module.css";
 
@@ -75,11 +80,15 @@ export function ExtensionManagementWorkspace({ capability }: {
   const [installOpen, setInstallOpen] = useState(false);
   const [installSource, setInstallSource] = useState("");
   const [pending, setPending] = useState<ConfirmedAction>();
+  const [onboardingState, setOnboardingState] = useState<ExtensionPackageOnboardingState>();
   const [focusTarget, setFocusTarget] = useState<PackageFocusTarget>();
   const workspaceRef = useRef<HTMLElement>(null);
   const catalogScrollTopRef = useRef(0);
   const restoreCatalogScrollRef = useRef(false);
   const busy = phase === "loading" || phase === "checking" || phase === "mutating";
+  const promptOncePackage = capability.snapshot?.recommendedExternal.find((entry) => (
+    entry.installPolicy === "prompt-once"
+  ));
 
   useEffect(() => {
     if (workspaceId) void loadExtensionPackages(workspaceId);
@@ -89,6 +98,15 @@ export function ExtensionManagementWorkspace({ capability }: {
     catalogScrollTopRef.current = 0;
     restoreCatalogScrollRef.current = false;
   }, [workspaceId]);
+
+  useEffect(() => {
+    let current = true;
+    setOnboardingState(undefined);
+    if (!workspaceId || !promptOncePackage) return () => { current = false; };
+    void getExtensionPackageOnboarding(promptOncePackage.source, "global", workspaceId)
+      .then((state) => { if (current) setOnboardingState(state); });
+    return () => { current = false; };
+  }, [promptOncePackage?.source, workspaceId]);
 
   useLayoutEffect(() => {
     const scrollRegion = workspaceRef.current?.closest<HTMLElement>('[data-testid="settings-scroll-region"]');
@@ -143,6 +161,18 @@ export function ExtensionManagementWorkspace({ capability }: {
     setInstallOpen(false);
     setInstallSource("");
     setView("installed");
+  };
+  const confirmOnboardingInstall = async () => {
+    if (!workspaceId || !promptOncePackage) return;
+    setOnboardingState("installing");
+    const completed = await installExtensionPackage(promptOncePackage.source, "global", workspaceId);
+    const next = await getExtensionPackageOnboarding(promptOncePackage.source, "global", workspaceId);
+    setOnboardingState(next ?? (completed ? "installed" : "install-failed"));
+  };
+  const declineOnboarding = async () => {
+    if (!workspaceId || !promptOncePackage) return;
+    const next = await declineExtensionPackageOnboarding(promptOncePackage.source, "global", workspaceId);
+    if (next) setOnboardingState(next);
   };
   const confirmPackageAction = async () => {
     if (!pending || !workspaceId || phase === "mutating") return;
@@ -254,6 +284,11 @@ export function ExtensionManagementWorkspace({ capability }: {
               updateDisabled={busy}
             />
             <PackageDetails
+              onApprove={(entry) => void approveObservedExtensionPackage(
+                entry.source,
+                entry.scope,
+                workspaceId
+              )}
               onBack={closeDetails}
               row={selected}
               updatesChecked={updatesChecked}
@@ -304,6 +339,17 @@ export function ExtensionManagementWorkspace({ capability }: {
           onConfirm={() => void confirmPackageAction()}
         />
       ) : null}
+      {!installOpen && !pending && promptOncePackage && (
+        onboardingState === "unseen" || onboardingState === "install-failed"
+      ) ? (
+        <ObservationalMemoryOnboardingDialog
+          entry={promptOncePackage}
+          failed={onboardingState === "install-failed"}
+          busy={phase === "mutating"}
+          onDecline={() => void declineOnboarding()}
+          onInstall={() => void confirmOnboardingInstall()}
+        />
+      ) : null}
     </section>
   );
 }
@@ -350,96 +396,6 @@ function DiscoverExtensions({ entries, installed, loading, error, onInstall }: {
         npm 与 Git 可使用下载源设置中的公共镜像；包完整性、固定 commit 和最终运行时状态仍独立校验。
       </p>
     </section>
-  );
-}
-
-function InstallExtensionDialog({ source, scopeLabel, error, busy, onSourceChange, onCancel, onConfirm }: {
-  source: string;
-  scopeLabel: string;
-  error: string | undefined;
-  busy: boolean;
-  onSourceChange: (source: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const sourceKind = source.trim().length === 0 ? undefined : inferSourceKind(source);
-  return (
-    <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label="安装 Pi 扩展包" className={styles.dialog!}>
-          <span className="dialog-eyebrow">Pi 扩展包</span>
-          <Heading slot="title">安装 Pi 扩展包</Heading>
-          <p className={styles.dialogIntro}>输入 npm 包、Git URL 或本地目录。Pi 会在执行前验证来源格式。</p>
-          <label className={styles.sourceField}>
-            <span>npm 包、Git URL 或本地目录</span>
-            <input
-              autoFocus
-              disabled={busy}
-              maxLength={4_096}
-              onChange={(event) => onSourceChange(event.currentTarget.value)}
-              placeholder="npm:@scope/package、https://…git 或 /absolute/path"
-              value={source}
-            />
-          </label>
-          <dl className={styles.dialogFacts}>
-            <div><dt>识别类型</dt><dd>{sourceKind ? sourceKindLabel(sourceKind) : "等待输入"}</dd></div>
-            <div><dt>安装到</dt><dd>{scopeLabel}</dd></div>
-          </dl>
-          <div className={styles.permissionNotice}>
-            <ShieldCheck aria-hidden="true" size={17} />
-            <span>Pi 扩展包可能提供可执行扩展、技能或指令模板。可执行扩展拥有与 Agent 相同的运行权限，安装也可能访问网络。</span>
-          </div>
-          {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
-          <div className="dialog-actions">
-            <Button className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
-            <Button
-              className="primary-button"
-              isDisabled={busy || source.trim().length === 0}
-              onPress={onConfirm}
-            >{busy ? "安装中…" : "确认安装"}</Button>
-          </div>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
-  );
-}
-
-function PackageActionDialog({ action, error, busy, onCancel, onConfirm }: {
-  action: ConfirmedAction;
-  error: string | undefined;
-  busy: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const uninstall = action.kind === "uninstall";
-  const title = uninstall ? "卸载扩展包？" : "更新扩展包？";
-  return (
-    <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label={title} className={styles.dialog!}>
-          <span className="dialog-eyebrow">Pi 扩展包管理</span>
-          <Heading slot="title">{title}</Heading>
-          <dl className={styles.dialogFacts}>
-            <div><dt>来源</dt><dd className={styles.codeValue}>{action.entry.source}</dd></div>
-            <div><dt>作用域</dt><dd>{action.entry.scope === "global" ? "全局" : "当前项目"}</dd></div>
-          </dl>
-          <p className={styles.dialogIntro}>{uninstall
-            ? "npm/Git 安装内容会由 Pi 移除；本地目录只移除配置引用，不删除用户目录。"
-            : "更新可能访问网络并加载新的扩展包内容。现有配置会保留在当前作用域。"}</p>
-          {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
-          <div className="dialog-actions">
-            <Button autoFocus className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
-            <Button
-              className={uninstall ? styles.confirmDanger! : "primary-button"}
-              isDisabled={busy}
-              onPress={onConfirm}
-            >
-              {busy ? uninstall ? "卸载中…" : "更新中…" : uninstall ? "确认卸载" : "确认更新"}
-            </Button>
-          </div>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
   );
 }
 

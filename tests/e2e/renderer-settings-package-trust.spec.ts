@@ -6,7 +6,7 @@ import {
   type PackageEntry
 } from "./pi67-renderer-package-settings-fixture.js";
 
-test("blocks drifted packages and warns instead of reporting an ambiguous install as successful", async ({ page }) => {
+test("separates content confirmation from resource state and reports ambiguous installs", async ({ page }) => {
   const driftedSource = "npm:@example/drifted-extension";
   const ambiguousSource = "npm:@example/ambiguous-extension";
   const driftedEntry: PackageEntry = {
@@ -21,11 +21,22 @@ test("blocks drifted packages and warns instead of reporting an ambiguous instal
   const driftedRow = workspace.getByRole("button", {
     name: /drifted-extension，npm:@example\/drifted-extension · 全局/u
   });
-  await expect(driftedRow.locator("xpath=ancestor::li[1]").getByText("已阻止", { exact: true })).toBeVisible();
+  await expect(driftedRow.locator("xpath=ancestor::li[1]").getByText("内容已变更", { exact: true })).toBeVisible();
   await driftedRow.click();
-  await expect(workspace.getByText("安装内容已漂移", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("内容已变更，等待重新确认", { exact: true })).toBeVisible();
   await expect(workspace.getByText("包内容与安装记录不一致", { exact: true })).toBeVisible();
   await expect(workspace.getByRole("button", { name: `停用 扩展 ${driftedSource}` })).toBeDisabled();
+  const { trustReason: _trustReason, ...approvedEntry } = driftedEntry;
+  await setMockAgentResponseResult(page, "extension.package.approveObserved", {
+    changed: true,
+    receiptState: "active",
+    reloadRequired: true,
+    items: [{ ...approvedEntry, trustState: "user-approved-observed" }],
+    total: 1
+  });
+  await workspace.getByRole("button", { name: `重新确认 ${driftedSource} 当前内容` }).click();
+  await expect(page.getByText("扩展包内容已确认", { exact: true })).toBeVisible();
+  await expect(page.getByText("正在运行的任务继续使用原资源", { exact: false })).toBeVisible();
   await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
 
   await setMockAgentResponseResult(page, "extension.package.install", {
@@ -51,5 +62,5 @@ test("blocks drifted packages and warns instead of reporting an ambiguous instal
   const ambiguousRow = workspace.getByRole("button", {
     name: /ambiguous-extension，npm:@example\/ambiguous-extension · 全局/u
   });
-  await expect(ambiguousRow.locator("xpath=ancestor::li[1]").getByText("已阻止", { exact: true })).toBeVisible();
+  await expect(ambiguousRow.locator("xpath=ancestor::li[1]").getByText("待确认", { exact: true })).toBeVisible();
 });

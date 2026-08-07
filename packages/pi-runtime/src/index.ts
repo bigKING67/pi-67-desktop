@@ -6,6 +6,7 @@ export * from "./desktop-package-operation-runtime.js";
 export * from "./extension-capabilities.js";
 export * from "./extension-catalog.js";
 export * from "./extension-package-management.js";
+export * from "./extension-package-onboarding-store.js";
 export * from "./extension-commands.js";
 export * from "./extension-ui-bridge.js";
 export * from "./message-projection.js";

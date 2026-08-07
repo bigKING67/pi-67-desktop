@@ -1,6 +1,7 @@
 import {
   ProtocolRequestError,
-  type AgentConnectionIdentity
+  type AgentConnectionIdentity,
+  type TaskProtocolContext
 } from "@pi67/protocol";
 import { clearedTransientState } from "../app/app-state-projection.js";
 import type { AppState } from "../app/app-store.types.js";
@@ -40,6 +41,7 @@ type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppS
 export interface ProjectionRecoveryOptions {
   hostEpoch: number;
   operationId?: string;
+  context?: TaskProtocolContext;
   recoveringDetail: string;
   readyDetail: string;
   failureTitle: string;
@@ -371,7 +373,7 @@ export async function resynchronizeRendererProjection(
         options.readyDetail,
         workspaceId
       )
-    ));
+    ), options.context);
     return committed ? "committed" : "stale";
   } catch (error) {
     if (

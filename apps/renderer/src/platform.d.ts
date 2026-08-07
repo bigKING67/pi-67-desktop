@@ -1,7 +1,11 @@
 import type {
+  ComposerDraftPersistedState,
+  ComposerDraftStateSnapshot,
   PackageNetworkSettings,
   PackageNetworkSnapshot,
   DesktopCapabilitySnapshot,
+  NativeNotificationActivation,
+  NativeNotificationRequest,
   RuntimeRecoveryRecord,
   SessionCreationRecoveryRecord,
   WorkspaceEntryContextAction,
@@ -50,6 +54,8 @@ declare global {
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
         loadWorkbenchState(): Promise<WorkbenchStateV4>;
+        loadComposerDraftState(): Promise<ComposerDraftStateSnapshot>;
+        updateComposerDraftState(state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot>;
         loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
         updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
         updateWorkbenchLayout(layout: WorkbenchLayoutV4): Promise<WorkbenchStateV4>;
@@ -61,7 +67,8 @@ declare global {
         selectSessionFile(): Promise<string | undefined>;
         getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
         saveDiagnostics(diagnostics: RuntimeDiagnostics): Promise<string | undefined>;
-        showNotification(title: string, body: string): Promise<void>;
+        showNativeNotification(request: NativeNotificationRequest): Promise<boolean>;
+        dismissNativeNotification(notificationId: string): Promise<boolean>;
         requestOpenExternal(url: string): Promise<boolean>;
         showWorkspaceEntryContextMenu(
           entry: WorkspaceEntryRequest,
@@ -92,6 +99,7 @@ declare global {
         onUpdateStateChanged(listener: (state: unknown) => void): () => void;
         onAgentHostFailed(listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): () => void;
         onPowerResume(listener: () => void): () => void;
+        onNativeNotificationActivated(listener: (activation: NativeNotificationActivation) => void): () => void;
       };
     };
   }

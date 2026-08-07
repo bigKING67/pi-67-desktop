@@ -73,9 +73,20 @@ export function installMockCommandResponseHandler({
     if (type === "extension.catalog.list") return current.extensionCatalog;
     if (type === "extension.package.list") return { items: [], total: 0 };
     if (type === "extension.package.checkUpdates") return { items: [], total: 0 };
+    if (type === "extension.package.onboarding.get") return {
+      source: payload.source,
+      scope: payload.scope,
+      state: "suppressed-existing"
+    };
+    if (type === "extension.package.onboarding.decline") return {
+      source: payload.source,
+      scope: payload.scope,
+      state: "declined"
+    };
     if (
       type === "extension.package.install"
       || type === "extension.package.update"
+      || type === "extension.package.approveObserved"
       || type === "extension.package.setEnabled"
       || type === "extension.package.restoreInheritance"
       || type === "extension.package.uninstall"

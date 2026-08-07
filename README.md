@@ -82,9 +82,15 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - Pi JSONL 会话是真源；桌面索引只能是可丢弃投影
 - Workspace 注册以 canonical path 加文件系统物理身份校验；仅有 path-only 证据时，重启后必须由原生目录选择器重新确认，不能仅凭相同路径恢复信任
 - Pi 配置、Context Markdown 和 Workspace 文件保存共享同目录临时文件、file fsync 与 atomic replace；Windows 只对 `EACCES` / `EPERM` / `EBUSY` 做有界重试
-- 第三方 Pi Package 只有在 Desktop durable mutation receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；无记录、结果不明、内容漂移或检查超限均保持阻止执行，且不会触发 Pi 的隐式安装
-- `user-installed-observed` 不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
-- Peak Code 只作固定版本的产品/交互参考，不作为 merge upstream
+- 新建对话先进入离线可写的 Renderer Intent；只有首条消息发送时才 exactly-once 创建 Pi JSONL，再在精确 Session authority 下提交 Prompt。创建失败保留草稿；创建成功但 Prompt 失败不会再次创建 Session
+- Composer 非空文本和 `streamBehavior` 由 Electron Main 使用 `safeStorage` 加密持久化；附件 staging handle 不跨重启，安全存储不可用时不写明文
+- 后台/隐藏会话完成、失败或等待交互时可发原生系统通知；Main 使用固定隐私文案，点击按 opaque Workspace/Session identity 返回精确会话，不显示 Prompt、源码、Tool 结果、错误详情或绝对路径
+- 第三方 Pi Package 只有在匹配 Pi-67 已知内容基线，或 Desktop durable 安装/用户确认 receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；待确认、内容变更、结果不明或检查超限都不会加载，也不会触发 Pi 的隐式安装。确认操作只绑定当前已安装 bytes，不下载、不重装
+- 默认 Package 保持精简：只自动物化第一方 capability；`pi-observational-memory@3.0.3` 仅对 fresh profile 做一次明确安装确认，其余推荐 Package 由用户主动安装。`pi-hy-memory`、`@ff-labs/pi-fff` 和 `@victor-software-house/pi-curated-themes` 已退出默认目录
+- `known-baseline-observed`、`user-approved-observed` 与 `user-installed-observed` 都不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
+- `pi-gui` 是固定 commit 审阅、每周只读跟踪的首要产品/交互参考；只选择性重新实现，
+  不作为 merge upstream、Git Remote、Submodule 或自动源码同步源
+- Peak Code 保留为固定版本的工程血缘和历史信息架构参考
 
 选择 SDK 而非 RPC 的原因是本项目本身使用 Node/TypeScript。SDK 可以直接使用
 `AgentSession`、`SessionManager`、资源加载器和模型运行时，减少 JSONL RPC framing、

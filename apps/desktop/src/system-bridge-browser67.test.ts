@@ -107,6 +107,7 @@ function registerFixture() {
   registerSystemBridge({
     connectAgentHost: vi.fn(),
     getMainWindow: () => undefined,
+    activateMainWindow: async () => undefined,
     desktopToolchain: {},
     desktopCapabilities,
     packageNetworkSettings: {},

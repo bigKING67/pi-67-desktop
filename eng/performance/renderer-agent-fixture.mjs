@@ -398,7 +398,9 @@ export async function installPerformanceSystemBridge(page) {
           selectWorkspace: async () => "/tmp/pi67-performance-workspace",
           selectSessionFile: async () => undefined,
           saveDiagnostics: async () => undefined,
-          showNotification: async () => undefined,
+          showNativeNotification: async () => true,
+          dismissNativeNotification: async () => true,
+          onNativeNotificationActivated: () => () => undefined,
           requestOpenExternal: async () => false,
           getUpdateState: async () => ({
             phase: "disabled",

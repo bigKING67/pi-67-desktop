@@ -18,7 +18,6 @@ import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-compone
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { importRendererSessionFile } from "../session/session-import-controller.js";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import {
   rendererWorkbenchStore,
   rendererConversationIdentity,
@@ -30,6 +29,7 @@ import {
   repairAndOpenRendererWorkspace
 } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { ConversationRow } from "./ConversationRow.js";
 import styles from "./NavigationRail.module.css";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
@@ -214,7 +214,7 @@ function WorkspaceConversationGroup({
           aria-label={`在 ${workspace.displayName} 新建会话`}
           className={styles.workspaceQuickAction}
           disabled={workspace.availability !== "available" || sessionTransitionPending || workspaceOpenPending}
-          onClick={() => void createConversationInWorkspace(workspace)}
+          onClick={() => void beginRendererSessionIntentInWorkspace(workspace)}
           title="新建会话"
           type="button"
         ><Plus aria-hidden="true" size={13} /></button>
@@ -229,7 +229,7 @@ function WorkspaceConversationGroup({
         <div className={styles.workspaceConversations}>
           {priority.map((row) => (
             <ConversationRow
-              disabled={sessionTransitionPending}
+              disabled={sessionTransitionPending || workspaceOpenPending}
               key={row.identity}
               row={row}
               selected={row.identity === selectedIdentity}
@@ -239,7 +239,7 @@ function WorkspaceConversationGroup({
           {priority.length > 0 && visibleRecent.length > 0 ? <div className={styles.conversationDivider} /> : null}
           {visibleRecent.map((row) => (
             <ConversationRow
-              disabled={sessionTransitionPending}
+              disabled={sessionTransitionPending || workspaceOpenPending}
               key={row.identity}
               row={row}
               selected={row.identity === selectedIdentity}
@@ -346,18 +346,6 @@ function WorkspaceMenu({
       </Popover>
     </MenuTrigger>
   );
-}
-
-async function createConversationInWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
-  const state = useAppStore.getState();
-  if (state.sessionTransitionPending || state.workspaceOpenPending) return;
-  if (useAppStore.getState().workspace !== workspace.identity.canonicalPath) {
-    const opened = await openRendererWorkspaceDescriptor(workspace);
-    if (!opened) return;
-  } else {
-    rendererWorkbenchStore.getState().selectWorkspace(workspace.id);
-  }
-  await createRendererSession();
 }
 
 async function refreshWorkspace(workspace: WorkspaceDescriptor): Promise<void> {

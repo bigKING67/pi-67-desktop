@@ -108,6 +108,14 @@ export class HostTaskRuntimeLifecycle {
     if (!state.record.initialized) {
       const workspace = this.workspaces.get(state.record.context.workspaceId);
       if (workspace) {
+        if (process.env.PI67_DEBUG_AGENT_STDERR === "1") {
+          process.stderr.write(`[agent-host:init-trigger] ${JSON.stringify({
+            commandType: command.type,
+            taskId: state.record.context.taskId,
+            taskGeneration: state.record.context.taskGeneration,
+            hasSessionAuthority: state.record.context.sessionId !== undefined
+          })}\n`);
+        }
         await this.initializeRuntime(state, runtime, {
           ...workspace.initialization,
           ...(command.type === "session.create"

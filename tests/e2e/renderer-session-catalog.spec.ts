@@ -228,7 +228,7 @@ test("keeps Command Palette server search independent from navigation search", a
   await expect(navigationSearch).toHaveValue("navigation-only");
 });
 
-test("shows an automatic title before opening and supports explicit rename plus automatic restore", async ({ page }) => {
+test("renames the automatically opened catalog Session and restores its automatic title", async ({ page }) => {
   const automatic = {
     ...session(1, "检查冷启动标题"),
     nameSource: "latest-user" as const
@@ -252,10 +252,14 @@ test("shows an automatic title before opening and supports explicit rename plus 
 
   await expect(sessionButton(page, "显式保留的标题")).toBeVisible();
   await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
-    command.type === "session.nameByPath"
+    command.type === "session.name"
   ))).toMatchObject({
-    context: { scope: "workspace", workspaceId: "workspace-pi-demo" },
-    payload: { path: automatic.path, mutation: { action: "set", name: "显式保留的标题" } }
+    context: {
+      scope: "task",
+      workspaceId: "workspace-pi-demo",
+      sessionFileIdentity: automatic.fileIdentity
+    },
+    payload: { mutation: { action: "set", name: "显式保留的标题" } }
   });
 
   await page.getByRole("button", { name: "显式保留的标题 对话菜单" }).click();
@@ -263,9 +267,14 @@ test("shows an automatic title before opening and supports explicit rename plus 
   await page.getByRole("menuitem", { name: "恢复自动标题" }).click();
   await expect(sessionButton(page, automatic.name)).toBeVisible();
   await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
-    command.type === "session.nameByPath"
+    command.type === "session.name"
   )).at(-1)).toMatchObject({
-    payload: { path: automatic.path, mutation: { action: "clear" } }
+    context: {
+      scope: "task",
+      workspaceId: "workspace-pi-demo",
+      sessionFileIdentity: automatic.fileIdentity
+    },
+    payload: { mutation: { action: "clear" } }
   });
 });
 
@@ -318,7 +327,7 @@ test("executes /name with an argument and opens the same rename dialog without o
   await expect(page.getByRole("dialog", { name: "重命名对话" })).toBeVisible();
 });
 
-test("archives without deleting Pi history and restores from the undo action", async ({ page }) => {
+test("archives an active Session after releasing its Runtime and restores it without deleting Pi history", async ({ page }) => {
   const active = session(1, "可归档对话");
   await openCatalogWorkspace(page, { items: [active] });
   await clearRecordedCommands(page);
@@ -336,8 +345,16 @@ test("archives without deleting Pi history and restores from the undo action", a
 
   await expect(sessionButton(page, active.name)).toHaveCount(0);
   await expect(page.getByText("对话已归档", { exact: true })).toBeVisible();
-  expect((await recordedCommandDetails(page)).filter((command) => command.type === "task.close"))
-    .toHaveLength(0);
+  await expect.poll(async () => (await recordedCommandDetails(page)).find((command) => (
+    command.type === "task.close"
+  ))).toMatchObject({
+    context: {
+      scope: "task",
+      workspaceId: "workspace-pi-demo",
+      sessionFileIdentity: active.fileIdentity
+    },
+    payload: { mode: "dispose" }
+  });
 
   await page.getByRole("button", { name: "撤销" }).click();
   await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (

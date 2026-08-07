@@ -10,7 +10,6 @@ import { Composer } from "../composer/Composer.js";
 import { ContextPane } from "../context/ContextPane.js";
 import { NavigationRail } from "../navigation/NavigationRail.js";
 import { StreamingAnnouncer } from "../live-turn/StreamingAnnouncer.js";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
 import {
   dismissUnconfirmedRendererSession,
   recheckUnconfirmedRendererSession
@@ -33,6 +32,7 @@ import {
 } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import styles from "./WorkspaceShell.module.css";
@@ -102,6 +102,10 @@ export function WorkspaceShell({
     </section>
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
     <WorkspaceRecoveryState workspace={selectedWorkspace} />
+  ) : selectedTask?.conversation.kind === "provisional"
+    && selectedTask.creationStatus === undefined
+    && selectedWorkspace ? (
+      <NewSessionIntentSurface task={selectedTask} workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "provisional" && selectedWorkspace ? (
     <ProvisionalTaskState task={selectedTask} workspace={selectedWorkspace} />
   ) : selectedTask?.conversation.kind === "session" && selectedWorkspace ? (
@@ -346,6 +350,24 @@ function ProvisionalTaskState({ task, workspace }: {
   );
 }
 
+function NewSessionIntentSurface({ task, workspace }: {
+  task: RendererWorkbenchTask;
+  workspace: WorkspaceDescriptor;
+}) {
+  return (
+    <section aria-label="准备新对话" className="conversation-region" data-testid="new-session-intent">
+      <TrustBanner />
+      <div className={styles.newSessionIntent}>
+        <span className="section-label">{workspace.displayName}</span>
+        <h2>准备新对话</h2>
+        <p>先写下第一条消息。只有点击发送后才会创建 Pi JSONL 会话；创建或发送失败时，草稿会继续保留。</p>
+        {task.hasDraft ? <small>草稿会使用系统安全存储跨应用重启恢复。</small> : null}
+      </div>
+      <Composer />
+    </section>
+  );
+}
+
 export function canManageUnconfirmedProvisionalTask(task: RendererWorkbenchTask): boolean {
   return task.conversation.kind === "provisional" && task.creationStatus === "unconfirmed";
 }
@@ -400,7 +422,6 @@ function WorkspaceRecoveryState({ workspace }: { workspace: WorkspaceDescriptor 
 }
 
 function WorkspaceEmptyState() {
-  const liveWorkspacePath = useAppStore((state) => state.workspace);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const workspaceOpenPending = useAppStore((state) => state.workspaceOpenPending);
   const workspace = useWorkbenchStore((state) => (
@@ -408,8 +429,7 @@ function WorkspaceEmptyState() {
   ));
   const start = async () => {
     if (!workspace || workspace.availability !== "available") return;
-    if (liveWorkspacePath === workspace.identity.canonicalPath) await createRendererSession();
-    else await openRendererWorkspaceDescriptor(workspace);
+    await beginRendererSessionIntentInWorkspace(workspace);
   };
   return (
     <section className={styles.emptyWorkspace}>

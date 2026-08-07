@@ -38,9 +38,12 @@ export function useComposerSlashCatalog(options: {
   sessionId: string | undefined;
 }): ComposerSlashCatalogState {
   const [runtimeState, setRuntimeState] = useState<RuntimeCatalogState>({ status: "unavailable" });
+  const runtimeEnabled = options.connected
+    && options.hostEpoch !== undefined
+    && options.sessionId !== undefined;
 
   useEffect(() => {
-    if (!options.connected || options.hostEpoch === undefined || !options.sessionId) {
+    if (!runtimeEnabled) {
       setRuntimeState({ status: "unavailable" });
       return;
     }
@@ -56,12 +59,17 @@ export function useComposerSlashCatalog(options: {
     return () => {
       active = false;
     };
-  }, [options.connected, options.hostEpoch, options.resourcesRevision, options.sessionId]);
+  }, [options.hostEpoch, options.resourcesRevision, options.sessionId, runtimeEnabled]);
 
   const catalog = useMemo<ComposerSlashCatalog>(() => {
-    const runtimeCatalog = runtimeState.status === "ready" ? runtimeState.catalog : undefined;
+    const runtimeCatalog = runtimeEnabled && runtimeState.status === "ready"
+      ? runtimeState.catalog
+      : undefined;
     return buildComposerSlashCatalog(runtimeCatalog);
-  }, [runtimeState]);
+  }, [runtimeEnabled, runtimeState]);
 
-  return { runtimeStatus: runtimeState.status, catalog };
+  return {
+    runtimeStatus: runtimeEnabled ? runtimeState.status : "unavailable",
+    catalog
+  };
 }

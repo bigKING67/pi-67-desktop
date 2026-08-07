@@ -67,17 +67,24 @@
       "url": "https://github.com/minghinmatthewlam/pi-gui",
       "role": "product-reference",
       "tier": "S1",
-      "reviewState": "candidate",
+      "reviewState": "reviewed",
       "defaultReuse": "reimplement-preferred",
-      "reviewCadence": "monthly-and-feature",
+      "reviewCadence": "weekly-and-feature",
       "reviewTriggers": [
+        "workspace-session-bootstrap",
+        "session-creation-recovery",
         "conversation-timeline",
         "thread-navigation",
         "recorded-changes",
-        "workspace-navigation"
+        "workspace-navigation",
+        "worktree-terminal",
+        "multi-agent-orchestration"
       ],
       "constraints": [
+        "pi-gui is the primary product and interaction reference, not a merge upstream",
         "Pi JSONL remains the conversation source of truth",
+        "The Pi Runtime remains isolated in the Agent Host utility process",
+        "Reviews and reuse remain pinned to full commits with no automatic source synchronization",
         "Recorded Changes must not be presented as a complete Git diff",
         "Multi-agent UI concepts require an explicit Pi runtime contract"
       ]

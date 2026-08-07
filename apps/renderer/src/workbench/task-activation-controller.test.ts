@@ -4,8 +4,9 @@ import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
-import { rendererWorkbenchStore } from "./workbench-store.js";
-import { resumeRendererTask } from "./task-activation-controller.js";
+import { useTaskDraftStore } from "./task-draft-store.js";
+import { rendererWorkbenchStore, selectedWorkbenchTask } from "./workbench-store.js";
+import { activateRendererTask, resumeRendererTask } from "./task-activation-controller.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 
 vi.mock("../workspace/workspace-open-controller.js", () => ({
@@ -32,6 +33,7 @@ describe("task activation controller", () => {
     registerWorkspace.mockReset();
     registerWorkspace.mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
+    useTaskDraftStore.getState().dispose();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
       id: "workspace-a",
@@ -69,6 +71,111 @@ describe("task activation controller", () => {
       sdkVersion: "fixture",
       eventSequence: 0
     });
+  });
+
+  it("resynchronizes the exact selected Task and only reports committed activation as success", async () => {
+    markTaskActive();
+    resynchronize.mockResolvedValue("committed");
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(registerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      { queryCatalog: false }
+    );
+    expect(resynchronize).toHaveBeenCalledWith(
+      useAppStore.getState,
+      useAppStore.setState,
+      expect.objectContaining({
+        hostEpoch: 9,
+        deferRuntimeNotReady: true,
+        context: {
+          scope: "task",
+          workspaceId: "workspace-a",
+          taskId: "task-a",
+          taskGeneration: 3,
+          sessionId: "session-a",
+          sessionFileIdentity: "session-file-a",
+          sessionGeneration: 4
+        }
+      })
+    );
+  });
+
+  it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
+    "returns false when Task activation recovery is %s",
+    async (disposition) => {
+      markTaskActive();
+      resynchronize.mockResolvedValue(disposition);
+
+      await expect(activateRendererTask("task-a")).resolves.toBe(false);
+      expect(openWorkspace).not.toHaveBeenCalled();
+    }
+  );
+
+  it("reopens a cold formal Session once and transfers its draft to the replacement Task", async () => {
+    markTaskActive();
+    useTaskDraftStore.getState().setText("task-a", "保留这个草稿");
+    rendererWorkbenchStore.getState().updateTask("task-a", { hasDraft: true });
+    resynchronize.mockResolvedValue("runtime-not-ready");
+    openWorkspace.mockImplementation(async () => {
+      const replacement = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+      expect(replacement?.id).not.toBe("task-a");
+      expect(replacement).toMatchObject({
+        conversation: {
+          kind: "session",
+          workspaceId: "workspace-a",
+          sessionFileIdentity: "session-file-a",
+          sessionPath: "/sessions/a.jsonl"
+        },
+        sessionId: expect.stringMatching(/^pending:/u),
+        lifecycle: "initializing",
+        hasDraft: true
+      });
+      expect(replacement && useTaskDraftStore.getState().drafts[replacement.id]?.text)
+        .toBe("保留这个草稿");
+      return true;
+    });
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeUndefined();
+    expect(openWorkspace).toHaveBeenCalledOnce();
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      "/sessions/a.jsonl",
+      "session-file-a"
+    );
+  });
+
+  it("abandons a late activation before resync when a newer Task is selected", async () => {
+    markTaskActive();
+    rendererWorkbenchStore.getState().openTask({
+      ...rendererWorkbenchStore.getState().tasks["task-a"]!,
+      id: "task-b",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-b",
+        sessionPath: "/sessions/b.jsonl"
+      },
+      sessionId: "session-b",
+      sessionFileIdentity: "session-file-b",
+      sessionPath: "/sessions/b.jsonl",
+      title: "Task B"
+    });
+    rendererWorkbenchStore.getState().selectTask("task-a");
+    const registration = deferred<boolean>();
+    registerWorkspace.mockReturnValue(registration.promise);
+
+    const activation = activateRendererTask("task-a");
+    await vi.waitFor(() => expect(registerWorkspace).toHaveBeenCalledOnce());
+    rendererWorkbenchStore.getState().selectTask("task-b");
+    registration.resolve(true);
+
+    await expect(activation).resolves.toBe(false);
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id).toBe("task-b");
   });
 
   it("reattaches a surviving same-Host Runtime without incrementing the Task generation", async () => {
@@ -217,6 +324,14 @@ describe("task activation controller", () => {
     }
   );
 });
+
+function markTaskActive(): void {
+  rendererWorkbenchStore.getState().updateTask("task-a", {
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true },
+    sessionGeneration: 4
+  });
+}
 
 function deferred<T>(): {
   promise: Promise<T>;

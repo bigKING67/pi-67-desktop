@@ -11,7 +11,6 @@ import {
   activateCatalogSession,
   canonicalSessionPathFromIdentity,
   shouldCreateInitialRealUserSession,
-  verifyProviderConfiguration,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
@@ -230,49 +229,4 @@ describe("Windows installed real-user lifecycle", () => {
     expect(clicks).toEqual([]);
   });
 
-  it("requires the Provider configuration panel and returns to the workbench inside the gate", async () => {
-    const actions = [];
-    const unavailable = { isVisible: async () => false };
-    const panel = {
-      getByRole: (_role, options) => ({
-        waitFor: async ({ state }) => actions.push(`provider:${options.name}:${state}`)
-      }),
-      or: (other) => {
-        expect(other).toBe(unavailable);
-        return { waitFor: async ({ state }) => actions.push(`provider-or-error:${state}`) };
-      }
-    };
-    const settings = {
-      getByRole: (role, options) => role === "navigation"
-        ? asyncButton(actions, `section:${String(options.name)}`)
-        : asyncButton(actions, `settings:${String(options.name)}`),
-      getByTestId: () => panel,
-      getByText: () => unavailable,
-      waitFor: async ({ state }) => actions.push(`settings:${state}`)
-    };
-    const window = {
-      getByLabel: () => settings,
-      keyboard: { press: async (key) => actions.push(`key:${key}`) }
-    };
-
-    await expect(verifyProviderConfiguration(window)).resolves.toMatchObject({ outcome: "ready" });
-    expect(actions).toEqual([
-      "key:Control+,",
-      "settings:visible",
-      "click:section:设置分类:/^模型服务/u",
-      "provider-or-error:visible",
-      "provider:搜索 Pi Provider:visible",
-      "click:settings:返回工作台",
-      "settings:hidden"
-    ]);
-  });
 });
-
-function asyncButton(actions, prefix) {
-  return {
-    getByRole: (_role, options) => ({
-      click: async () => actions.push(`click:${prefix}:${String(options.name)}`)
-    }),
-    click: async () => actions.push(`click:${prefix}`)
-  };
-}

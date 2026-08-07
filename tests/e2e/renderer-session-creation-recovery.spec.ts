@@ -32,6 +32,8 @@ test("rechecks an unknown create outcome by exact creation identity without subm
   });
 
   await page.getByRole("button", { name: "在 pi-demo 新建会话" }).click();
+  await page.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("触发未知创建结果");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "对话创建结果尚未确认" })).toBeVisible();
   await expect(page.getByRole("button", { name: "重新检查" })).toBeVisible();
@@ -79,6 +81,8 @@ test("recovers an unknown create across Host replacement without assigning the o
   await setMockAgentResponseDelay(page, "session.create", 60_000);
 
   await page.getByRole("button", { name: "在 pi-demo 新建会话" }).click();
+  await page.getByRole("textbox", { name: "给 Pi 发送消息" }).fill("等待 Host replacement");
+  await page.getByRole("button", { name: "发送", exact: true }).click();
   await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
     command.type === "session.create"
   ))).toHaveLength(1);

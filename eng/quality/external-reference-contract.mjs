@@ -48,7 +48,12 @@ const ROLES = new Set([
 const TIERS = new Set(["S0", "S1", "S2", "S3"]);
 const REVIEW_STATES = new Set(["candidate", "contract-managed", "reviewed"]);
 const REUSE_POLICIES = new Set(["architecture-only", "dependency", "reimplement-preferred"]);
-const REVIEW_CADENCES = new Set(["feature-triggered", "monthly-and-feature", "pi-release-and-weekly"]);
+const REVIEW_CADENCES = new Set([
+  "feature-triggered",
+  "monthly-and-feature",
+  "pi-release-and-weekly",
+  "weekly-and-feature"
+]);
 const REVIEW_OUTCOMES = new Set([
   "adapted",
   "candidate",

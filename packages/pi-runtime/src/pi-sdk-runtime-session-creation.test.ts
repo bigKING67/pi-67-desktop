@@ -47,6 +47,7 @@ describe("PiSdkRuntime Session creation identity", () => {
         approvalMode: "guided",
         creationId: "session-creation-initial-task"
       });
+      expect(await jsonlFiles(root)).toHaveLength(1);
       expect(snapshot.sessionId).toBe(runtime.getIdentity().sessionId);
       await vi.waitFor(() => expect(catalogEvents).toContain("session-created"));
 

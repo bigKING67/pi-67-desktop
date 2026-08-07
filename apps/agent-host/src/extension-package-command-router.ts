@@ -3,10 +3,6 @@ import type {
   ExtensionPackageManagement,
   PiWorkspaceRuntimeServices
 } from "@pi67/pi-runtime";
-import {
-  PackageMutationReplayConflictError,
-  packageSourceKind
-} from "@pi67/pi-runtime";
 import type { ExtensionPackageMutationResult } from "@pi67/domain";
 import type {
   AgentCommand,
@@ -15,6 +11,10 @@ import type {
   WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
+import {
+  dispatchDurableExtensionPackageMutation,
+  type DurableExtensionPackageMutationCommand
+} from "./extension-package-durable-mutation.js";
 import {
   ResourceManagementCoordinator,
   type ResourceManagementTaskView
@@ -25,6 +25,9 @@ export type ExtensionPackageCommandType =
   | "extension.package.checkUpdates"
   | "extension.package.install"
   | "extension.package.update"
+  | "extension.package.approveObserved"
+  | "extension.package.onboarding.get"
+  | "extension.package.onboarding.decline"
   | "extension.package.setEnabled"
   | "extension.package.restoreInheritance"
   | "extension.package.uninstall";
@@ -60,6 +63,8 @@ interface MutationRecord {
 const MUTATION_TYPES = new Set<AgentCommandType>([
   "extension.package.install",
   "extension.package.update",
+  "extension.package.approveObserved",
+  "extension.package.onboarding.decline",
   "extension.package.setEnabled",
   "extension.package.restoreInheritance",
   "extension.package.uninstall"
@@ -126,6 +131,17 @@ export class ExtensionPackageCommandRouter {
       }
       case "extension.package.checkUpdates":
         return management.checkForUpdates();
+      case "extension.package.onboarding.get": {
+        const { source, scope } = command.payload;
+        const installed = management.list().items.some((entry) => (
+          entry.source === source && entry.scope === scope && entry.installed
+        ));
+        return this.options.getWorkspaceServices(workspaceId).packageOnboarding.status(
+          source,
+          scope,
+          installed
+        );
+      }
       default:
         throw new HostCommandError("INVALID_PAYLOAD", "The command is not an Extension package query.", false);
     }
@@ -138,6 +154,23 @@ export class ExtensionPackageCommandRouter {
     idempotencyKey: string,
     fingerprint: string
   ): Promise<ExtensionPackageResult> {
+    if (command.type === "extension.package.onboarding.decline") {
+      return this.coordinator.runMetadataMutation(
+        workspaceId,
+        scope,
+        () => this.options.getWorkspaceServices(workspaceId).packageOnboarding.decline(
+          command.payload.source,
+          command.payload.scope
+        )
+      );
+    }
+    if (command.type === "extension.package.approveObserved") {
+      return this.coordinator.runDeferredReloadMutation(
+        workspaceId,
+        scope,
+        () => this.dispatchDurableMutation(workspaceId, command, idempotencyKey, fingerprint)
+      ).then(({ result, reloadRequired }) => ({ ...result, reloadRequired }));
+    }
     return this.coordinator.runMutation(
       workspaceId,
       scope,
@@ -155,123 +188,14 @@ export class ExtensionPackageCommandRouter {
   ): Promise<ExtensionPackageMutationResult> {
     const services = this.options.getWorkspaceServices(workspaceId);
     const management = this.management(workspaceId);
-    const { source, scope } = command.payload;
-    const sourceKind = packageSourceKind(source);
-    if (sourceKind === "bundled") {
-      throw new HostCommandError(
-        "UNSUPPORTED",
-        "Bundled Pi-67 capabilities cannot be mutated through third-party package management.",
-        false
-      );
-    }
-    let reservation;
-    try {
-      reservation = await services.packageMutationReceipts.reserve({
-        source,
-        scope,
-        sourceKind,
-        operation: durableMutationOperation(command),
-        idempotencyKey,
-        fingerprint
-      });
-    } catch (error) {
-      if (error instanceof PackageMutationReplayConflictError) {
-        throw new HostCommandError(
-          "DUPLICATE_REQUEST",
-          "The idempotency key has already been used for a different durable Extension package mutation.",
-          false
-        );
-      }
-      throw error;
-    }
-    if (reservation.status === "replay") {
-      await services.packageTrustRegistry.refresh();
-      const current = management.list();
-      const target = current.items.find((entry) => entry.source === source && entry.scope === scope);
-      const receiptState = reservation.record.state === "active"
-        && target?.trustState === "user-installed-observed"
-        ? "active" as const
-        : reservation.record.state === "removed" && target === undefined
-          ? "removed" as const
-          : "ambiguous" as const;
-      return {
-        ...current,
-        changed: reservation.record.changed ?? false,
-        receiptState
-      };
-    }
-
-    await services.packageMutationReceipts.markMutating(source, scope, idempotencyKey);
-    let mutationCompleted = false;
-    try {
-      const result = await this.dispatchMutation(workspaceId, command) as ExtensionPackageMutationResult;
-      mutationCompleted = true;
-      await services.packageTrustRegistry.refresh();
-      if (command.type === "extension.package.uninstall") {
-        const stillConfigured = management.list().items.some((entry) => (
-          entry.source === source && entry.scope === scope
-        ));
-        if (stillConfigured) {
-          await services.packageMutationReceipts.markAmbiguous(source, scope, idempotencyKey);
-          await services.packageTrustRegistry.refresh();
-          return { ...management.list(), changed: result.changed, receiptState: "ambiguous" };
-        }
-        await services.packageMutationReceipts.commitRemoved(source, scope, idempotencyKey, result.changed);
-        await services.packageTrustRegistry.refresh();
-        return { ...management.list(), changed: result.changed, receiptState: "removed" };
-      }
-
-      const observed = services.packageTrustRegistry.observationFor(source, scope);
-      if (observed?.status !== "observed") {
-        await services.packageMutationReceipts.markAmbiguous(source, scope, idempotencyKey);
-        await services.packageTrustRegistry.refresh();
-        return { ...management.list(), changed: result.changed, receiptState: "ambiguous" };
-      }
-      await services.packageMutationReceipts.commitActive(
-        source,
-        scope,
-        idempotencyKey,
-        observed.observation,
-        result.changed
-      );
-      if (command.type === "extension.package.update") {
-        for (const candidateScope of ["global", "project"] as const) {
-          if (candidateScope === scope) continue;
-          const candidate = services.packageTrustRegistry.observationFor(source, candidateScope);
-          if (candidate?.status === "observed") {
-            await services.packageMutationReceipts.refreshActiveObservation(
-              source,
-              candidateScope,
-              candidate.observation
-            );
-          }
-        }
-      }
-      await services.packageTrustRegistry.refresh();
-      return { ...management.list(), changed: result.changed, receiptState: "active" };
-    } catch (error) {
-      try {
-        await services.packageMutationReceipts.markAmbiguous(source, scope, idempotencyKey);
-      } catch (receiptError) {
-        throw new HostCommandError(
-          "RUNTIME_POISONED",
-          "The Extension package mutation failed and its durable receipt could not be reconciled.",
-          false,
-          { packageReceiptConsistent: false },
-          { cause: new AggregateError([error, receiptError]) }
-        );
-      }
-      if (mutationCompleted) {
-        throw new HostCommandError(
-          "RUNTIME_POISONED",
-          "The Extension package mutation completed, but its durable receipt could not be committed safely.",
-          false,
-          { packageReceiptConsistent: true, packageMutationCompleted: true },
-          { cause: error }
-        );
-      }
-      throw error;
-    }
+    return dispatchDurableExtensionPackageMutation({
+      services,
+      management,
+      command,
+      idempotencyKey,
+      fingerprint,
+      dispatchMutation: () => this.dispatchMutation(workspaceId, command) as Promise<ExtensionPackageMutationResult>
+    });
   }
 
   private async dispatchMutation(
@@ -284,6 +208,11 @@ export class ExtensionPackageCommandRouter {
         return management.install(command.payload.source, command.payload.scope);
       case "extension.package.update":
         return management.update(command.payload.source, command.payload.scope);
+      case "extension.package.onboarding.decline":
+        return this.options.getWorkspaceServices(workspaceId).packageOnboarding.decline(
+          command.payload.source,
+          command.payload.scope
+        );
       case "extension.package.setEnabled":
         return management.setEnabled(
           command.payload.source,
@@ -345,25 +274,19 @@ export class ExtensionPackageCommandRouter {
   }
 }
 
-type DurablePackageMutationCommand = Extract<ExtensionPackageCommand, {
-  type: "extension.package.install" | "extension.package.update" | "extension.package.uninstall";
-}>;
+type DurablePackageMutationCommand = DurableExtensionPackageMutationCommand;
 
 function isDurablePackageMutation(command: ExtensionPackageCommand): command is DurablePackageMutationCommand {
   return command.type === "extension.package.install"
     || command.type === "extension.package.update"
+    || command.type === "extension.package.approveObserved"
     || command.type === "extension.package.uninstall";
-}
-
-function durableMutationOperation(command: DurablePackageMutationCommand): "install" | "update" | "uninstall" {
-  if (command.type === "extension.package.install") return "install";
-  if (command.type === "extension.package.update") return "update";
-  return "uninstall";
 }
 
 export function isExtensionPackageCommand(type: AgentCommandType): type is ExtensionPackageCommandType {
   return type === "extension.package.list"
     || type === "extension.package.checkUpdates"
+    || type === "extension.package.onboarding.get"
     || MUTATION_TYPES.has(type);
 }
 

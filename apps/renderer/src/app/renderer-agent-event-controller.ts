@@ -1,5 +1,6 @@
 import type { AgentEvent, EventEnvelope } from "@pi67/protocol";
 import { refreshWorkspaceChanges } from "../changes/workspace-changes-controller.js";
+import { handleNativeNotificationAgentEvent } from "../notifications/native-notification-controller.js";
 import {
   applyWorkbenchAgentEvent,
   classifyWorkbenchAgentEvent,
@@ -16,11 +17,13 @@ export function applyRendererAgentEvent(
   if (route === "stale") return route;
   if (route === "background") {
     applyWorkbenchAgentEvent(event, envelope);
+    handleNativeNotificationAgentEvent(event, envelope, route);
     return route;
   }
 
   if (!useAppStore.getState().receiveAgentEvent(event, envelope)) return route;
   if (route === "active") applyWorkbenchAgentEvent(event, envelope);
+  handleNativeNotificationAgentEvent(event, envelope, route);
   if (event.type === "runtime.ready" || event.type === "session.bootstrap") {
     void refreshWorkspaceChanges();
   }

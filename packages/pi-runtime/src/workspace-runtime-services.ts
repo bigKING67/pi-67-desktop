@@ -12,6 +12,7 @@ import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js"
 import { SessionCreationReceiptStore } from "./session-creation-receipt-store.js";
 import { PackageMutationReceiptStore } from "./package-mutation-receipt-store.js";
 import { PackageTrustRegistry } from "./package-trust-registry.js";
+import { ExtensionPackageOnboardingStore } from "./extension-package-onboarding-store.js";
 import {
   createPiWorkspaceProviderCatalog,
   type PiWorkspaceProviderCatalog
@@ -41,6 +42,7 @@ export interface PiWorkspaceRuntimeServices {
   readonly sessionCreationReceipts: SessionCreationReceiptStore;
   readonly packageMutationReceipts: PackageMutationReceiptStore;
   readonly packageTrustRegistry: PackageTrustRegistry;
+  readonly packageOnboarding: ExtensionPackageOnboardingStore;
   assertCompatible(cwd: string, agentDir: string): void;
   setProjectTrusted(trusted: boolean): void;
   dispose(): Promise<void>;
@@ -88,6 +90,11 @@ export function createPiWorkspaceRuntimeServices(
     settingsManager,
     receipts: packageMutationReceipts
   });
+  const packageOnboarding = sharedPackageOnboardingStore(
+    agentDir,
+    options.storageRoot,
+    process.env.PI67_AGENT_PROFILE_FRESH === "1"
+  );
   const unregisterConfiguration = options.configurationService?.registerWorkspace({
     cwd,
     settingsManager,
@@ -108,6 +115,7 @@ export function createPiWorkspaceRuntimeServices(
     sessionCreationReceipts,
     packageMutationReceipts,
     packageTrustRegistry,
+    packageOnboarding,
     assertCompatible(candidateCwd, candidateAgentDir) {
       if (
         normalizeSessionCatalogPathIdentity(candidateCwd) !== cwdIdentity
@@ -144,6 +152,24 @@ export function createPiWorkspaceRuntimeServices(
       }
     }
   };
+}
+
+const packageOnboardingStores = new Map<string, ExtensionPackageOnboardingStore>();
+
+function sharedPackageOnboardingStore(
+  agentDir: string,
+  storageRoot: string | undefined,
+  freshProfile: boolean
+): ExtensionPackageOnboardingStore {
+  const key = `${storageRoot === undefined ? "volatile" : resolve(storageRoot)}\0${agentDir}`;
+  const existing = packageOnboardingStores.get(key);
+  if (existing) return existing;
+  const store = new ExtensionPackageOnboardingStore({
+    ...(storageRoot === undefined ? {} : { storageRoot }),
+    freshProfile
+  });
+  packageOnboardingStores.set(key, store);
+  return store;
 }
 
 export function createInMemoryPiWorkspaceRuntimeServices(

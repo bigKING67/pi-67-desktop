@@ -50,7 +50,14 @@ export async function createDesktopCapabilityFixture() {
       independentUpdateState: "not-applicable",
       members: [{ packageId: "browser67", skillId: "browser67" }]
     }],
-    recommendedExternal: [{ id: "pi-subagents", source: "npm:pi-subagents", recommendedVersion: "0.34.0" }]
+    recommendedExternal: [{
+      id: "pi-subagents",
+      source: "npm:pi-subagents",
+      recommendedVersion: "0.34.0",
+      installPolicy: "user-initiated",
+      admissionPolicy: "known-baseline-or-user-approval",
+      baselineContentSha256: "a".repeat(64)
+    }]
   }), "utf8");
   await writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
     schema: "pi67.desktop-capability-state.v1",

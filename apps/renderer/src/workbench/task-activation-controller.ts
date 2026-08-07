@@ -4,15 +4,23 @@ import { resynchronizeRendererProjection } from "../connection/projection-recove
 import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
-import { rendererWorkbenchStore } from "./workbench-store.js";
+import {
+  rendererWorkbenchStore,
+  selectedWorkbenchTask,
+  type RendererWorkbenchTask
+} from "./workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
+import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
+import { rotateRendererTaskForSessionOpen } from "./task-runtime-reopen.js";
 
 export async function activateRendererTask(taskId: string): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
   if (!task || !workspace || !workbench.selectTask(taskId)) return false;
-  if (task.runtime.phase === "stopped" || task.lifecycle === "lost" || task.lifecycle === "stopped") return true;
+  if (task.runtime.phase === "stopped" || task.lifecycle === "lost" || task.lifecycle === "stopped") {
+    return task.conversation.kind === "session" ? resumeRendererTask(task.id) : true;
+  }
 
   const projection = useSessionProjectionStore.getState().authority;
   const projectionFileIdentity = useSessionProjectionStore.getState().identity?.sessionFileIdentity;
@@ -32,15 +40,23 @@ export async function activateRendererTask(taskId: string): Promise<boolean> {
     runtime: { phase: "recovering", detail: `正在切换任务：${task.title}`, recoverable: true }
   });
   try {
+    const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+    if (!registered) throw new Error("目标工作区当前不可用。");
     const identity = await ensureAgentConnection();
-    await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
+    if (!isSelectedRendererTask(task)) return false;
+    const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
       hostEpoch: identity.hostEpoch,
+      context: workbenchProtocolContextForTask(task),
       recoveringDetail: `正在恢复任务：${task.title}`,
       readyDetail: `已切换到任务：${task.title}`,
-      failureTitle: "无法切换任务"
+      failureTitle: "无法切换任务",
+      deferRuntimeNotReady: true
     });
-    return true;
+    if (recovery === "committed") return true;
+    if (recovery !== "runtime-not-ready" || !isSelectedRendererTask(task)) return false;
+    return reopenRendererTask(task, workspace);
   } catch (error) {
+    if (!isSelectedRendererTask(task)) return false;
     useAppStore.setState({ sessionTransitionPending: false });
     publishNotification({
       level: "error",
@@ -79,6 +95,7 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     if (sameHost) {
       const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
         hostEpoch: identity.hostEpoch,
+        context: workbenchProtocolContextForTask(task),
         recoveringDetail: `正在重新连接任务：${task.title}`,
         readyDetail: "Pi SDK 已就绪",
         failureTitle: "无法恢复任务",
@@ -96,16 +113,29 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
         return false;
       }
     }
-    workbench.removeRuntimeTask(task.id);
-    return openRendererWorkspaceDescriptor(
-      workspace,
-      task.conversation.sessionPath,
-      task.conversation.sessionFileIdentity
-    );
+    return reopenRendererTask(task, workspace);
   } catch (error) {
     markTaskRecoveryFailed(task.id, error);
     return false;
   }
+}
+
+async function reopenRendererTask(
+  task: RendererWorkbenchTask,
+  workspace: Parameters<typeof openRendererWorkspaceDescriptor>[0]
+): Promise<boolean> {
+  const replacement = rotateRendererTaskForSessionOpen(task);
+  if (!replacement) return false;
+  return openRendererWorkspaceDescriptor(
+    workspace,
+    replacement.conversation.kind === "session" ? replacement.conversation.sessionPath : undefined,
+    replacement.sessionFileIdentity
+  );
+}
+
+function isSelectedRendererTask(task: RendererWorkbenchTask): boolean {
+  const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+  return selected?.id === task.id && selected.taskGeneration === task.taskGeneration;
 }
 
 function markTaskRecoveryFailed(taskId: string, error?: unknown): void {

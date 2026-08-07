@@ -219,5 +219,6 @@ jobs:
             echo
             echo "- Source: \`$SOURCE_COMMIT\`"
             echo "- Artifact: \`windows-candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}\`"
+            echo '- Installed profile authority: localized path, seeded Pi configuration, and post-Main environment drift verified'
             echo '- Status: candidate only; no Tag or GitHub Release was created'
           } >> "$GITHUB_STEP_SUMMARY"

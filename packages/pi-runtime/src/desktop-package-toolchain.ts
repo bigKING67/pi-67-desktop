@@ -17,7 +17,6 @@ interface DesktopReloadHook {
 const desktopReloadHooks = new WeakMap<object, DesktopReloadHook>();
 
 const PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS = [
-  "-extensions/pi-hy-memory/index.ts",
   "-extensions/pi-rules-loader/index.ts",
   "-extensions/pi-vision-bridge/index.ts",
   "-extensions/xtalpi-pi-tools/index.ts"

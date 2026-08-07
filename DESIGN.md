@@ -60,8 +60,10 @@ completing a real session without learning terminal UI conventions first.
 
 ## Visual direction
 
-- Preserve Peak Code's useful three-region information architecture, not its
-  provider marketplace, exact pixels, assets, or giant component structure.
+- Use fixed-commit `pi-gui` reviews as the primary product and interaction reference,
+  while preserving Peak Code's useful three-region information architecture as historical
+  lineage. Neither source contributes branding, exact pixels, assets, process architecture,
+  or automatically synchronized components.
 - Transcript and composer form the dominant work plane. Navigation is quieter;
   files, tools, diffs, and resources appear only when they explain active work.
 - Use editorial utility composition, restrained surfaces, precise alignment,
@@ -535,6 +537,12 @@ loading error where the operation can produce those states
   projection merely because its Session ID still matches. Until Pi reacquires
   runtime authority, the center surface shows an explicit `打开会话` or `恢复任务`
   action and does not mount the Transcript, Composer, or Inspector projection.
+- Opening a Workspace with no known formal conversation keeps the center in one bounded
+  loading/recovery state while the first Catalog page is decided. Existing rows open before
+  any new Task is created; a verified empty Catalog creates exactly one first Session.
+  `正在建立 Session 目录…` may retry at one and three seconds, but a five-second opening
+  budget ends without a provisional row and leaves the Workspace selected with an explicit
+  retryable notice. The UI never converts "not indexed yet" into "no conversations".
 - If recovery confirms that the current Host has no Runtime for a persisted Task,
   Desktop retains the Pi JSONL Session identity but rotates the stale Task
   authority before initialization; an obsolete Task ID is never replayed into a
@@ -759,15 +767,19 @@ loading error where the operation can produce those states
   while focus remains visible on the exact detail or update trigger. The action
   uses pointer, hover, pressed, focus-visible, and disabled states and opens the
   same one-shot Package-wide confirmation instead of updating silently.
-  Package rows whose trust state is `unverified` or `drifted` show `已阻止`, are not
-  counted as enabled, and disable per-resource toggles. Missing or unsafe content
-  shows `缺失` / `不可用`. Package detail names the trust state, bounded integrity
-  reason, and last observation time without displaying install paths, directory
-  identities, receipt digests, or raw receipt content.
+  Package rows separate content admission from resource filters. Their six visible
+  states are `已启用`, `部分启用`, `已停用`, `未安装`, `待确认`, and
+  `内容已变更，待重新确认`. `unverified` content uses `待确认`; `drifted` content
+  uses the changed state. Neither is counted as enabled, and per-resource toggles
+  remain unavailable until the current bytes are admitted. Package detail offers
+  `确认当前内容` or `重新确认当前内容`; this records the observed bytes without
+  downloading or reinstalling. It names the trust state, bounded integrity reason,
+  and last observation time without displaying install paths, directory identities,
+  receipt digests, or raw receipt content.
   A successful mutation with an `active` or `removed` receipt produces one Package-specific floating result containing
   the display name, available version transition, scope, and completed resource
   reload. An `ambiguous` receipt instead shows one warning that the operation was not
-  replayed and the Package remains blocked; it never shows an install/update success
+  replayed and the Package remains pending confirmation; it never shows an install/update success
   toast. Routine `resource.changed` and informational Extension notifications stay
   in Notification history without creating additional floating toasts; warning and
   error Extension notifications remain immediately visible.
@@ -783,13 +795,19 @@ loading error where the operation can produce those states
   Recommended Packages prefill the same dialog and never bypass the one-shot
   installation confirmation. Loaded-resource evidence remains separate because
   installed configuration and the current Session projection are different states.
+  `pi-observational-memory@3.0.3` is the only `prompt-once` recommendation. A fresh
+  Agent profile gets one non-dismissible choice between explicit global installation
+  and `暂不安装`; the decision is persisted by Agent Host, existing profiles are
+  suppressed, a failed installation exposes explicit retry, and no download starts
+  before confirmation. All other recommended Packages remain `user-initiated`.
 - Package network mutations remain one logical Settings action while an isolated
   Agent Host worker owns the subprocess. A Host shutdown or worker-tree cleanup
   failure produces one explicit failed result and never a success toast; the UI does
   not infer completion from a closed dialog or a Settings reload. Worker stdout,
   stderr, inherited credentials, and raw IPC payloads never become notification or
   diagnostic content.
-- Package trust copy deliberately says `Desktop 安装记录已核对`, not `已签名` or
+- Package trust copy uses evidence-specific labels: `已核对 Pi-67 已知内容基线`,
+  `当前内容已由用户确认`, or `Desktop 安装记录已核对`, never `已签名` or
   `安全扩展`. The current observation excludes `.git` and `node_modules`; it proves
   bounded drift detection only. Package Worker is not an Extension runtime sandbox,
   and Settings must not imply that third-party module import, hooks, Tools, UI, or MCP
@@ -1128,6 +1146,12 @@ loading error where the operation can produce those states
   an idempotent retry;
   Host or Session authority changes retain the draft but rotate that ID before
   the next attempt.
+- Non-empty Composer text and `streamBehavior` persist by exact ConversationKey after a
+  500 ms debounce and restore without overwriting a newer live-window edit. Electron Main
+  encrypts the bounded state as one `safeStorage` payload with atomic primary/backup files.
+  Secure-storage unavailability keeps the draft in memory and writes no plaintext. Attachment
+  bytes, preview URLs, and opaque staging handles remain process-lifetime state and therefore
+  do not reappear after restart; attachment-only state is never presented as a durable draft.
 - One draft accepts at most 20 attachments, 100 MiB per file, and 250 MiB total;
   a pathless clipboard fallback is capped at 16 MiB, while supported Pi-native
   PNG/JPEG/GIF/WebP images have a separate 32 MiB aggregate boundary. Rejections
@@ -1206,8 +1230,13 @@ loading error where the operation can produce those states
   scope, normalized search, and sort contract. Query changes, revision changes,
   or Host epoch replacement clear old pages; stale results cannot append across
   result sets.
-- New Session creation opens one provisional conversation before the request is
-  acknowledged. An unknown create outcome stops the indefinite loading state and
+- A New Session action opens one selected provisional Composer intent without contacting Pi.
+  The surface states that Pi JSONL is created only when the first message is sent. Double-clicking
+  New while the current intent is empty reuses that intent; an intent with text remains distinct.
+  First submit gives the same Task one stable `creationId`, materializes it through exactly one
+  `session.create`, waits for exact active Session authority, and only then submits the Prompt.
+  Creation failure preserves the intent draft; Prompt failure after materialization preserves the
+  formal Session and cannot cause a second create. An unknown create outcome stops the indefinite loading state and
   shows `重新检查` plus `放弃此占位`; Desktop does not silently resubmit the create,
   and the provisional identity remains in persisted Workbench state across restart.
   Recheck asks `session.creation.resolve` for the exact Pi JSONL carrying the stable
@@ -1357,7 +1386,8 @@ loading error where the operation can produce those states
   persistent deletion, upload or external submit, credentials/authentication,
   dependencies, destructive or ambiguous Shell, publish, remote Git, system
   changes, and external writes retain the dedicated one-shot flow.
-- Verified `@ff-labs/pi-fff@0.10.1` `grep`/`find` and fallback
+- Retired `@ff-labs/pi-fff` is neither bundled nor recommended. If a user
+  explicitly installs and admits legacy `@ff-labs/pi-fff@0.10.1`, its `grep`/`find` and fallback
   `ffgrep`/`fffind` names share one source-and-contract profile. Workspace-local
   paths and globs follow normal read policy; `~`, absolute, `../`, and symlink
   escapes display the canonical external path before one-shot approval. An
@@ -1370,8 +1400,8 @@ loading error where the operation can produce those states
   and unsupported versions stay unverified.
 - The Desktop-only Pi settings projection gives verified managed `pi67-core`
   runtime precedence over its legacy auto-discovered copies. It adds exact
-  force-exclusions for `pi-hy-memory`, `pi-rules-loader`, `pi-vision-bridge`,
-  and `xtalpi-pi-tools` only while the managed Package path is active. No file
+  force-exclusions for `pi-rules-loader`, `pi-vision-bridge`, and
+  `xtalpi-pi-tools` only while the managed Package path is active. No file
   or persisted setting is mutated, unrelated Extensions are untouched, and
   removing managed `pi67-core` restores normal legacy discovery. The visible
   result is one Tool source, one rule activation notification, and no conflict
@@ -1549,6 +1579,12 @@ loading error where the operation can produce those states
 - `notifications/notification-store.ts` owns the bounded memory-only history, Toast
   admission, read state, redaction, and Operation terminal dedupe. App lifecycle state
   does not retain a parallel notice array or raw `AgentPortClient` reference.
+- `notifications/native-notification-controller.ts` admits only completed, failed, or
+  attention events for a background Session or a hidden/unfocused application. It sends
+  opaque Workspace/physical Session identity rather than user content. Electron Main's
+  `native-notification-manager.ts` owns fixed privacy-safe copy, bounded dedupe, platform
+  support checks, dismissal, window focus/recreation, and click activation back to the exact
+  Session identity. Windows notification claims still require installed NSIS/AUMID evidence.
 - Foundation and shell styles live under `styles/`; feature-specific layout and
   states use colocated CSS Modules. Deleted features remove their CSS rather
   than leaving a compatibility stylesheet.

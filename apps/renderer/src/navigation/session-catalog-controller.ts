@@ -51,7 +51,7 @@ async function runFirstSessionCatalogQuery(
         workspaceId,
         selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), workspaceId)
       );
-      if (page.state === "unavailable") {
+      if (page.state === "unavailable" || page.rebuilding) {
         scheduleSessionCatalogRetry(workspaceId, options, retryGeneration, retryAttempt);
       } else {
         finishRetrySequence(workspaceId, retryGeneration);

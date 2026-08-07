@@ -1,14 +1,17 @@
 import type { Page } from "@playwright/test";
-import type { RuntimeRecoveryRecord, SessionCreationRecoveryRecord } from "../../packages/domain/src/index.js";
-import {
-  createMockDesktopCapabilitySnapshot,
-  createMockPackageNetworkSnapshot
-} from "./pi67-renderer-system-fixtures.js";
+import type {
+  ComposerDraftPersistedState,
+  NativeNotificationActivation,
+  NativeNotificationRequest,
+  RuntimeRecoveryRecord,
+  SessionCreationRecoveryRecord
+} from "../../packages/domain/src/index.js";
 import {
   DEFAULT_MOCK_WORKSPACE,
   type MockDesktopBridgeOptions,
   type MockWorkspaceDescriptor
 } from "./pi67-renderer-desktop-bridge-contract.js";
+import { installMockDesktopCapabilityBridge } from "./pi67-renderer-desktop-capability-bridge.js";
 
 export {
   DEFAULT_MOCK_WORKSPACE,
@@ -26,23 +29,23 @@ export async function installMockDesktopBridge(
     pickerQueue: options.pickerQueue ?? [DEFAULT_MOCK_WORKSPACE],
     initialRuntimeRecovery: options.initialRuntimeRecovery ?? [],
     initialSessionCreationRecovery: options.initialSessionCreationRecovery ?? [],
+    initialComposerDraftState: options.initialComposerDraftState ?? {
+      version: 1 as const,
+      drafts: []
+    },
+    composerDraftPersistence: options.composerDraftPersistence ?? "available" as const,
     expandedWorkspaceIds: options.expandedWorkspaceIds ?? [],
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
     settings: options.settings ?? { section: "general" as const, scope: "global" as const },
-    capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0,
     deferInitialUpdateState: options.deferInitialUpdateState ?? false,
-    capabilitySnapshot: createMockDesktopCapabilitySnapshot(),
-    packageNetworkSnapshot: createMockPackageNetworkSnapshot(),
-    teamMcpStatus: {
-      serverName: "tavily-bridge",
-      url: "https://tavily.example.test/mcp",
-      tokenEnv: "TAVILY_BRIDGE_MCP_TOKEN",
-      tokenPath: "/Users/test/Library/Application Support/Pi-67 Desktop/team-mcp/tavily-bridge.token",
-      configured: false,
-      tokenPrefix: undefined as string | undefined
-    }
   };
+  await installMockDesktopCapabilityBridge(
+    page,
+    options.capabilityInitializingCalls === undefined
+      ? {}
+      : { capabilityInitializingCalls: options.capabilityInitializingCalls }
+  );
   await page.addInitScript((bridgeFixture) => {
     type FixtureWorkbenchState = {
       version: 4;
@@ -57,9 +60,7 @@ export async function installMockDesktopBridge(
       cleanExit: boolean;
     };
     let pickerIndex = 0;
-    let capabilitySnapshotCalls = 0;
     let promptAttachmentCounter = 0;
-    let teamMcpToken: string | undefined;
     let updateState: Record<string, unknown> = {
       phase: "idle",
       channel: "unsigned-preview",
@@ -85,6 +86,21 @@ export async function installMockDesktopBridge(
       }
     };
     let workspaceFileState = { version: 1 as const, workspaces: [] as Array<Record<string, unknown>> };
+    let composerDraftState: ComposerDraftPersistedState = structuredClone(
+      bridgeFixture.initialComposerDraftState
+    );
+    let nativeNotificationActivationListener: ((activation: NativeNotificationActivation) => void) | undefined;
+    const composerDraftTest = {
+      updates: 0,
+      state: () => structuredClone(composerDraftState)
+    };
+    const nativeNotificationTest = {
+      requests: [] as NativeNotificationRequest[],
+      dismissed: [] as string[],
+      activate(activation: NativeNotificationActivation) {
+        nativeNotificationActivationListener?.(structuredClone(activation));
+      }
+    };
     const workspaceEntryTest = {
       menus: [] as Array<Record<string, unknown>>,
       menuManagement: [] as boolean[],
@@ -93,15 +109,6 @@ export async function installMockDesktopBridge(
       copies: [] as Array<{ entry: Record<string, unknown>; kind: "absolute" | "relative" }>,
       trashes: [] as Array<Record<string, unknown>>
     };
-    const settingsActionsTest = {
-      packageSaves: [] as Array<Record<string, unknown>>,
-      packageResets: 0,
-      packageProbes: [] as Array<Record<string, unknown>>,
-      mcpSaves: 0,
-      mcpClears: 0,
-      platformInfoCalls: 0
-    };
-    let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     let workbenchState: FixtureWorkbenchState = {
       version: 4 as const,
       workspaces: structuredClone(bridgeFixture.initialWorkspaces),
@@ -114,16 +121,26 @@ export async function installMockDesktopBridge(
       settings: structuredClone(bridgeFixture.settings),
       cleanExit: false
     };
-    Object.defineProperty(window, "pi67", {
-      configurable: false,
-      value: {
-        system: {
-          getPlatformInfo: async () => {
-            settingsActionsTest.platformInfoCalls += 1;
-            return { platform: "darwin" as const, architecture: "arm64" as const, version: "0.1.0-alpha.1" };
-          },
+    type SystemFixtureRegistry = { methods: Record<string, unknown> };
+    const fixtureWindow = window as unknown as {
+      __pi67SystemFixture?: SystemFixtureRegistry;
+    };
+    const systemFixture = fixtureWindow.__pi67SystemFixture ??= { methods: {} };
+    Object.assign(systemFixture.methods, {
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
+          loadComposerDraftState: async () => ({
+            state: structuredClone(composerDraftState),
+            persistence: bridgeFixture.composerDraftPersistence
+          }),
+          updateComposerDraftState: async (state: ComposerDraftPersistedState) => {
+            composerDraftTest.updates += 1;
+            composerDraftState = structuredClone(state);
+            return {
+              state: structuredClone(composerDraftState),
+              persistence: bridgeFixture.composerDraftPersistence
+            };
+          },
           loadWorkspaceFileState: async () => ({
             state: structuredClone(workspaceFileState),
             draftPersistence: "available" as const
@@ -179,6 +196,17 @@ export async function installMockDesktopBridge(
                 : workbenchState.settings,
               cleanExit: false
             };
+            composerDraftState = {
+              version: 1,
+              drafts: composerDraftState.drafts.filter((draft) => (
+                draft.conversation.workspaceId !== workspaceId
+              )),
+              ...(composerDraftState.selectedConversation?.workspaceId === workspaceId
+                ? {}
+                : composerDraftState.selectedConversation
+                  ? { selectedConversation: composerDraftState.selectedConversation }
+                  : {})
+            };
             return structuredClone(workbenchState);
           },
           reorderWorkspaces: async (workspaceIds: string[]) => {
@@ -208,7 +236,22 @@ export async function installMockDesktopBridge(
             attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
           }),
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
-          showNotification: async () => undefined,
+          showNativeNotification: async (request: NativeNotificationRequest) => {
+            nativeNotificationTest.requests.push(structuredClone(request));
+            return true;
+          },
+          dismissNativeNotification: async (notificationId: string) => {
+            nativeNotificationTest.dismissed.push(notificationId);
+            return true;
+          },
+          onNativeNotificationActivated: (listener: (activation: NativeNotificationActivation) => void) => {
+            nativeNotificationActivationListener = listener;
+            return () => {
+              if (nativeNotificationActivationListener === listener) {
+                nativeNotificationActivationListener = undefined;
+              }
+            };
+          },
           stagePromptAttachments: async (files: File[]) => files.map((file) => ({
             id: `fixture_attachment_${++promptAttachmentCounter}`,
             name: file.name,
@@ -217,130 +260,6 @@ export async function installMockDesktopBridge(
             kind: promptAttachmentKind(file)
           })),
           releasePromptAttachments: async () => undefined,
-          getPackageNetworkSnapshot: async () => structuredClone(bridgeFixture.packageNetworkSnapshot),
-          savePackageNetworkSettings: async (settings: Record<string, unknown>) => {
-            settingsActionsTest.packageSaves.push(structuredClone(settings));
-            return {
-              ...structuredClone(bridgeFixture.packageNetworkSnapshot),
-              settings: structuredClone(settings)
-            };
-          },
-          resetPackageNetworkSettings: async () => {
-            settingsActionsTest.packageResets += 1;
-            return structuredClone(bridgeFixture.packageNetworkSnapshot);
-          },
-          probePackageSources: async (settings: Record<string, unknown>) => {
-            settingsActionsTest.packageProbes.push(structuredClone(settings));
-            return {
-              ...structuredClone(bridgeFixture.packageNetworkSnapshot),
-              settings: structuredClone(settings),
-              checkedAt: 1_784_800_000_000,
-              sources: bridgeFixture.packageNetworkSnapshot.sources.map((source) => ({
-                ...source,
-                status: "reachable",
-                latencyMs: 36
-              }))
-            };
-          },
-          getDesktopCapabilitySnapshot: async () => {
-            capabilitySnapshotCalls += 1;
-            const snapshot = structuredClone(bridgeFixture.capabilitySnapshot);
-            if (capabilitySnapshotCalls > bridgeFixture.capabilityInitializingCalls) return snapshot;
-            return {
-              ...snapshot,
-              phase: "initializing",
-              packages: snapshot.packages.map((entry) => ({ ...entry, installed: false })),
-              bundledExtensions: snapshot.bundledExtensions.map((entry) => ({ ...entry, installed: false })),
-              bundledSkills: snapshot.bundledSkills.map((entry) => ({ ...entry, installed: false })),
-              bundledSkillSuites: snapshot.bundledSkillSuites.map((suite) => ({
-                ...suite,
-                skills: suite.skills.map((entry) => ({ ...entry, installed: false }))
-              })),
-              managedContext: { rules: "unavailable", agents: "unavailable" }
-            };
-          },
-          setupBrowser67: async () => ({
-            ...structuredClone(bridgeFixture.capabilitySnapshot),
-            integrations: [{
-              id: "browser67",
-              displayName: "browser67",
-              bundled: true,
-              dependencyState: "prepared",
-              extensionState: "not-prepared",
-              doctorState: "degraded",
-              availableBrowsers: ["chrome", "edge"],
-              detail: "依赖与命令入口已验证；真实 managed browser 连接仍需独立检查。",
-              preparedAt: 1_784_800_000_000,
-              checkedAt: 1_784_800_000_000,
-              registry: "https://registry.npmmirror.com"
-            }]
-          }),
-          doctorBrowser67: async () => structuredClone(bridgeFixture.capabilitySnapshot),
-          prepareBrowser67Extension: async () => ({
-            ...structuredClone(bridgeFixture.capabilitySnapshot),
-            integrations: [{
-              id: "browser67",
-              displayName: "browser67",
-              bundled: true,
-              dependencyState: "prepared",
-              extensionState: "prepared",
-              doctorState: "degraded",
-              availableBrowsers: ["chrome", "edge"],
-              detail: "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。",
-              preparedAt: 1_784_800_000_000,
-              extensionPreparedAt: 1_784_800_000_000,
-              extensionCheckedAt: 1_784_800_000_000,
-              registry: "https://registry.npmmirror.com"
-            }]
-          }),
-          openBrowser67ExtensionPage: async () => true,
-          revealBrowser67Extension: async () => true,
-          copyBrowser67ExtensionPath: async () => true,
-          verifyBrowser67Extension: async () => ({
-            ...structuredClone(bridgeFixture.capabilitySnapshot),
-            integrations: [{
-              id: "browser67",
-              displayName: "browser67",
-              bundled: true,
-              dependencyState: "prepared",
-              extensionState: "connected",
-              doctorState: "ready",
-              availableBrowsers: ["chrome", "edge"],
-              detail: "browser67 扩展身份与当前内置版本一致，真实受管浏览器连接已就绪。",
-              preparedAt: 1_784_800_000_000,
-              checkedAt: 1_784_800_000_100,
-              extensionPreparedAt: 1_784_800_000_000,
-              extensionCheckedAt: 1_784_800_000_100,
-              registry: "https://registry.npmmirror.com"
-            }]
-          }),
-          getTeamMcpStatus: async () => structuredClone(teamMcpStatus),
-          revealTeamMcpToken: async () => teamMcpToken
-            ? { status: "revealed", token: teamMcpToken }
-            : { status: "missing" },
-          saveTeamMcpToken: async (token: string) => {
-            settingsActionsTest.mcpSaves += 1;
-            teamMcpToken = token;
-            teamMcpStatus = {
-              ...teamMcpStatus,
-              configured: true,
-              tokenPrefix: `${token.split(".")[0] ?? "mcp"}…`
-            };
-            return structuredClone(teamMcpStatus);
-          },
-          clearTeamMcpToken: async () => {
-            settingsActionsTest.mcpClears += 1;
-            teamMcpToken = undefined;
-            teamMcpStatus = {
-              serverName: bridgeFixture.teamMcpStatus.serverName,
-              url: bridgeFixture.teamMcpStatus.url,
-              tokenEnv: bridgeFixture.teamMcpStatus.tokenEnv,
-              tokenPath: bridgeFixture.teamMcpStatus.tokenPath,
-              configured: false,
-              tokenPrefix: undefined
-            };
-            return structuredClone(teamMcpStatus);
-          },
           requestOpenExternal: async (url: string) => {
             updateTest.openedUrls.push(url);
             return updateTest.allowOpen;
@@ -396,8 +315,10 @@ export async function installMockDesktopBridge(
           },
           onAgentHostFailed: () => () => undefined,
           onPowerResume: () => () => undefined
-        }
-      }
+    });
+    Object.defineProperty(window, "pi67", {
+      configurable: false,
+      value: { system: systemFixture.methods }
     });
     Object.defineProperty(window, "__pi67UpdateTest", {
       configurable: false,
@@ -407,9 +328,13 @@ export async function installMockDesktopBridge(
       configurable: false,
       value: workspaceEntryTest
     });
-    Object.defineProperty(window, "__pi67SettingsTest", {
+    Object.defineProperty(window, "__pi67ComposerDraftTest", {
       configurable: false,
-      value: settingsActionsTest
+      value: composerDraftTest
+    });
+    Object.defineProperty(window, "__pi67NativeNotificationTest", {
+      configurable: false,
+      value: nativeNotificationTest
     });
 
     function selectedWorkspaceId(surface: FixtureWorkbenchState["selectedSurface"]): string | undefined {

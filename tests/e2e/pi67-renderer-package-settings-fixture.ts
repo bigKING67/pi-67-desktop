@@ -12,7 +12,8 @@ export interface PackageEntry {
   enabled: boolean;
   filtered: boolean;
   installed: boolean;
-  trustState: "builtin-verified" | "user-installed-observed" | "unverified" | "drifted" | "unavailable";
+  trustState: "builtin-verified" | "known-baseline-observed" | "user-approved-observed"
+    | "user-installed-observed" | "unverified" | "drifted" | "unavailable";
   trustReason?: "receipt-missing" | "install-content-missing" | "package-identity-changed" | "manifest-changed"
     | "directory-identity-changed" | "content-hash-changed" | "receipt-invalid" | "inspection-limited"
     | "mutation-ambiguous";

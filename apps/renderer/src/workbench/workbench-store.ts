@@ -19,13 +19,10 @@ import type {
   RendererWorkbenchState,
   RendererWorkbenchTask
 } from "./workbench-store-contract.js";
-
 export type { RendererWorkbenchState, RendererWorkbenchTask } from "./workbench-store-contract.js";
-
 export function createRendererWorkbenchStore() {
   return createStore<RendererWorkbenchState>((set, get) => ({
     ...emptyWorkbenchState(),
-
     hydrate(state) {
       const workspaces = Object.fromEntries(state.workspaces.map((workspace) => [workspace.id, workspace]));
       const recoveredTasks = state.runtimeRecovery.map(taskFromRecovery);
@@ -63,7 +60,6 @@ export function createRendererWorkbenchStore() {
           : undefined
       });
     },
-
     registerWorkspace(workspace) {
       set((current) => ({
         workspaces: { ...current.workspaces, [workspace.id]: workspace },
@@ -77,7 +73,6 @@ export function createRendererWorkbenchStore() {
         selectedSurface: current.selectedSurface ?? { kind: "workspace", workspaceId: workspace.id }
       }));
     },
-
     unregisterWorkspace(workspaceId) {
       const current = get();
       if (!current.workspaces[workspaceId]) return false;
@@ -119,7 +114,6 @@ export function createRendererWorkbenchStore() {
       });
       return true;
     },
-
     reorderWorkspaces(workspaceIds) {
       const current = get();
       if (
@@ -130,7 +124,6 @@ export function createRendererWorkbenchStore() {
       set({ workspaceOrder: [...workspaceIds] });
       return true;
     },
-
     selectWorkspace(workspaceId) {
       const current = get();
       if (!current.workspaces[workspaceId]) return false;
@@ -146,7 +139,6 @@ export function createRendererWorkbenchStore() {
       });
       return true;
     },
-
     setWorkspaceExpanded(workspaceId, expanded) {
       const current = get();
       if (!current.workspaces[workspaceId]) return false;
@@ -178,6 +170,20 @@ export function createRendererWorkbenchStore() {
         settingsReturnSurface: current.selectedSurface?.kind === "settings" ? { kind: "conversation", conversation: nextTask.conversation } : current.settingsReturnSurface
       });
       return existing || matching ? "selected" : "opened";
+    },
+
+    restoreTask(task) {
+      const current = get();
+      if (!current.workspaces[task.workspaceId]) return undefined;
+      const matching = taskForConversation(current.tasks, task.conversation);
+      if (matching) return matching.id;
+      if (current.tasks[task.id]) return undefined;
+      const restored = normalizeMaterializedTask(task);
+      set({
+        tasks: { ...current.tasks, [restored.id]: restored },
+        runtimeTaskOrder: [...current.runtimeTaskOrder, restored.id]
+      });
+      return restored.id;
     },
 
     updateTask(taskId, patch) {

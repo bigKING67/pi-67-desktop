@@ -23,8 +23,10 @@ import {
   prepareRealUserSessionCreation,
   waitForRealUserCreatedSession
 } from "./windows-real-user-session-creation.mjs";
+import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
 
-export const REAL_USER_PROVIDER_TIMEOUT_MS = 10_000;
+export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
+
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
@@ -44,9 +46,13 @@ const INITIALIZATION_STAGES = new Set([
 export async function verifyInstalledRealUserLifecycle({
   agentDir,
   artifact,
+  environmentDriftAgentDir,
   userDataDirectory,
   workspace
 }) {
+  if (!environmentDriftAgentDir) {
+    throw new Error("Windows real-user lifecycle requires an environment-drift Agent directory.");
+  }
   const launches = [];
   let expectedSessionIdentity;
   let create;
@@ -55,6 +61,7 @@ export async function verifyInstalledRealUserLifecycle({
     const result = await runRealUserLaunch({
       agentDir,
       artifact,
+      environmentDriftAgentDir,
       expectedSessionIdentity,
       launchIndex,
       userDataDirectory,
@@ -80,6 +87,7 @@ export async function verifyInstalledRealUserLifecycle({
 async function runRealUserLaunch({
   agentDir,
   artifact,
+  environmentDriftAgentDir,
   expectedSessionIdentity,
   launchIndex,
   userDataDirectory,
@@ -94,6 +102,12 @@ async function runRealUserLaunch({
       offline: false,
       userDataDirectory
     });
+    const environmentDriftInjected = launchIndex === 0;
+    if (environmentDriftInjected) {
+      await application.evaluate((_electron, driftAgentDir) => {
+        process.env.PI_CODING_AGENT_DIR = driftAgentDir;
+      }, environmentDriftAgentDir);
+    }
     const processOutput = captureProcessOutput(application.process());
     const mainPid = application.process().pid;
     const window = await application.firstWindow();
@@ -170,6 +184,10 @@ async function runRealUserLaunch({
         launchToReadyMs: round(launchToReadyMs),
         lifecycleDurationMs: round(performance.now() - launchStartedAt),
         name: launchIndex === 0 ? "initial" : `restart-${launchIndex}`,
+        profileAuthority: {
+          environmentDriftInjected,
+          mainOwnedAgentDirectoryVerified: environmentDriftInjected
+        },
         providerConfiguration,
         runtimeReadyMs: round(runtimeReadyMs),
         startupSurface
@@ -278,40 +296,6 @@ async function waitForRealUserRuntimeReady(window) {
   const remaining = remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS);
   await window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: remaining });
   return performance.now() - startedAt;
-}
-
-export async function verifyProviderConfiguration(window) {
-  const startedAt = performance.now();
-  await window.keyboard.press("Control+,");
-  const settings = window.getByLabel("π 设置");
-  await settings.waitFor({ state: "visible", timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS) });
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u })
-    .click({ timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS) });
-  const panel = settings.getByTestId("provider-configuration-panel");
-  const unavailable = settings.getByText("Pi 配置尚不可用", { exact: true });
-  await panel.or(unavailable).waitFor({
-    state: "visible",
-    timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS)
-  });
-  if (await unavailable.isVisible()) {
-    throw new Error("Windows real-user Provider configuration became unavailable.");
-  }
-  await panel.getByRole("textbox", { name: "搜索 Pi Provider" }).waitFor({
-    state: "visible",
-    timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS)
-  });
-  await settings.getByRole("button", { name: "返回工作台", exact: true })
-    .click({ timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS) });
-  await settings.waitFor({
-    state: "hidden",
-    timeout: remainingTimeout(startedAt, REAL_USER_PROVIDER_TIMEOUT_MS)
-  });
-  const durationMs = performance.now() - startedAt;
-  if (durationMs > REAL_USER_PROVIDER_TIMEOUT_MS) {
-    throw new Error(`Windows real-user Provider configuration exceeded ${REAL_USER_PROVIDER_TIMEOUT_MS}ms.`);
-  }
-  return { durationMs: round(durationMs), outcome: "ready" };
 }
 
 async function createControlledConversation(window, agentDir) {

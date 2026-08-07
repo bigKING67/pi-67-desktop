@@ -1,4 +1,95 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/app-store.ts",
+      "sourceSha256": "615cf68135ca3652ec84588625c375066a6b687a5d3a60c1591d2e75c91428f4",
+      "targetPath": "apps/renderer/src/workbench/task-activation-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented fast selection, target-bound asynchronous hydration, and stale-selection rejection for Pi-67 Task authority, MessagePort recovery, and Utility Process isolation. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/app-store-workspace.ts",
+      "sourceSha256": "9bb2eee941706ae3a0d57086800c03348ebb8e2bc88c75a445998874a34f7edb",
+      "targetPath": "apps/renderer/src/workspace/workspace-open-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented Workspace synchronization before Session readiness as a Catalog-first, bounded, fail-closed Pi-67 flow. Pi JSONL remains authoritative and the Runtime remains in the Agent Host utility process. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/new-thread-view.tsx",
+      "sourceSha256": "0c37056e0d4ce657db8b27890e2a8818dedb67dba4ef6861714083b88cdba071",
+      "targetPath": "apps/renderer/src/session/new-session-intent-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented the new-thread Composer surface as a Renderer-only intent that creates exactly one Pi JSONL on first submit and preserves Pi-67 Task authority, recovery, and attachment staging. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/hooks/use-composer-draft-sync.ts",
+      "sourceSha256": "dbb0cf41a20334aeba181c218498c6257738233b0861cc6591faef82d0e42179",
+      "targetPath": "apps/renderer/src/workbench/task-draft-persistence.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented Conversation-keyed draft hydration, debounce, and stale-write protection over Pi-67 encrypted Main-owned storage. Attachments and staged handles remain process-local. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/notification-manager.ts",
+      "sourceSha256": "daf4ac20f3818f14a4c08626003b413aae435bffa49a5580c9fe1c9a6231e70c",
+      "targetPath": "apps/renderer/src/notifications/native-notification-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented background notification admission and exact Session activation with opaque identities, hydration ordering, and fixed privacy-safe content. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/notification-manager.ts",
+      "sourceSha256": "daf4ac20f3818f14a4c08626003b413aae435bffa49a5580c9fe1c9a6231e70c",
+      "targetPath": "apps/desktop/src/native-notification-manager.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented native notification lifecycle, dedupe, window recreation, and click delivery in Electron Main while keeping all user content out of the IPC contract. No pi-gui source code was copied."
+    }
+  ]
 }

@@ -94,7 +94,10 @@ describe("Extension management view model", () => {
     };
     const rows = buildPackageRows([unverified, drifted], [], "global");
 
-    expect(rows.map(packageRowState)).toEqual(["blocked", "blocked"]);
+    expect(rows.map(packageRowState)).toEqual([
+      "pending-confirmation",
+      "changed-pending-confirmation"
+    ]);
     expect(rows.map(packageRowEnabled)).toEqual([false, false]);
     expect(filterPackageRows(rows, "enabled", "")).toEqual([]);
   });

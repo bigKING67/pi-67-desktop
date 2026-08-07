@@ -14,7 +14,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.03.2");
+    expect(lock.catalogVersion).toBe("2026.08.07.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -42,13 +42,22 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual([
       "pi-subagents",
       "pi-observational-memory",
-      "pi-fff",
       "pi-web-access",
       "pi-smart-fetch",
       "pi-plan-mode",
       "pi-rewind",
       "pi-mcp-adapter"
     ]);
+    expect(lock.recommendedExternal.find((entry) => entry.id === "pi-observational-memory"))
+      .toMatchObject({
+        recommendedVersion: "3.0.3",
+        installPolicy: "prompt-once",
+        admissionPolicy: "known-baseline-or-user-approval",
+        baselineContentSha256: "bf6636a84e3ddb58ba54423cad9541ba954b43a35c5daab282e5144870be00cd"
+      });
+    expect(lock.recommendedExternal.every((entry) => (
+      entry.installPolicy === "prompt-once" || entry.installPolicy === "user-initiated"
+    ))).toBe(true);
   });
 
   it("rejects a branch-tracked Skill Pack without immutable generated hashes", () => {
@@ -80,7 +89,8 @@ describe("Desktop first-party capability source lock", () => {
       schema: "pi67.capability-catalog.v1",
       catalogVersion: lock.catalogVersion,
       generatedFrom,
-      entries
+      entries,
+      recommendedExternal: lock.recommendedExternal
     };
     const manifest = {
       schema: "pi67.desktop-capabilities.v1",

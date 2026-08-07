@@ -63,6 +63,97 @@ describe("PackageTrustRegistry", () => {
     expect(fixture.registry.runtimePackageAllowed(fixture.source, "global")).toBe(false);
   });
 
+  it("admits exact Pi-67 baselines and content-bound user approvals without conflating them", async () => {
+    const fixture = await trustFixture();
+    await fixture.registry.refresh();
+    const observed = fixture.registry.observationFor(fixture.source, "global");
+    if (observed?.status !== "observed") throw new Error("expected observation");
+    expect(observed.baselineContentSha256)
+      .toBe("9237bc90b8761ffbcffc441acd358c5a2fb1680ce58b56f1bdb3087981471d7d");
+    const environment = {
+      PI67_KNOWN_PACKAGE_BASELINES: JSON.stringify([{
+        source: fixture.source,
+        packageName: "@example/pi-package",
+        packageVersion: "1.0.0",
+        baselineContentSha256: observed.baselineContentSha256
+      }])
+    };
+    const baselineRegistry = new PackageTrustRegistry({
+      packageManager: fixture.packageManager,
+      settingsManager: fixture.settingsManager,
+      receipts: fixture.receipts,
+      environment,
+      now: () => 1_786_000_000_000
+    });
+    await baselineRegistry.refresh();
+    expect(baselineRegistry.projectionFor(fixture.source, "global")).toMatchObject({
+      trustState: "known-baseline-observed"
+    });
+    expect(baselineRegistry.runtimePackageAllowed(fixture.source, "global")).toBe(true);
+
+    environment.PI67_KNOWN_PACKAGE_BASELINES = "[]";
+    await fixture.receipts.reserve({
+      source: fixture.source,
+      scope: "global",
+      sourceKind: "npm",
+      operation: "admit",
+      idempotencyKey: "approve-1",
+      fingerprint: "approve-1"
+    });
+    await fixture.receipts.markMutating(fixture.source, "global", "approve-1");
+    await fixture.receipts.commitActive(
+      fixture.source,
+      "global",
+      "approve-1",
+      observed.observation,
+      true
+    );
+    await baselineRegistry.refresh();
+    expect(baselineRegistry.projectionFor(fixture.source, "global")).toMatchObject({
+      trustState: "user-approved-observed"
+    });
+
+    await writeFile(join(fixture.packageRoot, "index.js"), "export default 'changed';\n");
+    await baselineRegistry.refresh();
+    expect(baselineRegistry.projectionFor(fixture.source, "global")).toMatchObject({
+      trustState: "drifted",
+      trustReason: "content-hash-changed"
+    });
+  });
+
+  it("invalidates a known baseline when executable Python bytecode is added", async () => {
+    const fixture = await trustFixture();
+    await fixture.registry.refresh();
+    const observed = fixture.registry.observationFor(fixture.source, "global");
+    if (observed?.status !== "observed") throw new Error("expected observation");
+    const baselineRegistry = new PackageTrustRegistry({
+      packageManager: fixture.packageManager,
+      settingsManager: fixture.settingsManager,
+      receipts: fixture.receipts,
+      environment: {
+        PI67_KNOWN_PACKAGE_BASELINES: JSON.stringify([{
+          source: fixture.source,
+          packageName: "@example/pi-package",
+          packageVersion: "1.0.0",
+          baselineContentSha256: observed.baselineContentSha256
+        }])
+      }
+    });
+    await baselineRegistry.refresh();
+    expect(baselineRegistry.runtimePackageAllowed(fixture.source, "global")).toBe(true);
+
+    const bytecodeDirectory = join(fixture.packageRoot, "__pycache__");
+    await mkdir(bytecodeDirectory);
+    await writeFile(join(bytecodeDirectory, "payload.cpython-313.pyc"), "executable-bytecode");
+    await baselineRegistry.refresh();
+
+    expect(baselineRegistry.projectionFor(fixture.source, "global")).toMatchObject({
+      trustState: "unverified",
+      trustReason: "receipt-missing"
+    });
+    expect(baselineRegistry.runtimePackageAllowed(fixture.source, "global")).toBe(false);
+  });
+
   it("distinguishes manifest, directory identity, missing content, and unsafe manifests", async () => {
     const fixture = await trustedFixture();
 

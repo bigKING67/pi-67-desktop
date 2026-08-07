@@ -26,7 +26,6 @@ import {
   type RuntimeDiagnostics,
   type WorkspaceEntryContextAction
 } from "@pi67/protocol";
-import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
 import { createDesktopRecoverySnapshot } from "./desktop-recovery-snapshot.js";
 import {
   addOrRefreshWorkspace,
@@ -39,15 +38,22 @@ import {
 import { createNativeWorkspaceDescriptor, type NativeWorkspaceDescriptor } from "./workspace-identity.js";
 import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
+import type { ComposerDraftStateStore } from "./composer-draft-state.js";
+import { NativeNotificationManager } from "./native-notification-manager.js";
 import {
   openBrowser67ExtensionPage,
   type Browser67BrowserId
 } from "./browser67-integration.js";
-
+import {
+  asExternalUrl,
+  asNativeNotificationId,
+  asNativeNotificationRequest
+} from "./system-bridge-policy.js";
 export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
   getMainWindow: () => BrowserWindow | undefined;
+  activateMainWindow: () => Promise<BrowserWindow | undefined>;
   desktopToolchain: DesktopToolchain;
   desktopCapabilities: DesktopCapabilityService;
   packageNetworkSettings: PackageNetworkSettingsStore;
@@ -55,16 +61,27 @@ export interface SystemBridgeOptions {
   promptAttachments: PromptAttachmentStagingService;
   previousRunExit: PreviousRunExitStatus;
   workbenchState: WorkbenchStateStore;
+  composerDraftState: ComposerDraftStateStore;
   workspaceFileState: WorkspaceFileStateStore;
 }
-
 export interface SystemBridgeRegistration {
   handlePowerResume(): void;
   dispose(): void;
 }
-
 export function registerSystemBridge(options: SystemBridgeOptions): SystemBridgeRegistration {
   const workbenchState = options.workbenchState;
+  const nativeNotifications = new NativeNotificationManager({
+    isSupported: () => Notification.isSupported(),
+    create: (presentation) => new Notification(presentation),
+    activate: async (activation) => {
+      const window = await options.activateMainWindow();
+      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+      window.webContents.send("pi67:native-notification-activated", activation);
+    },
+    onError: (error) => {
+      console.error(redact(error instanceof Error ? error.message : String(error)));
+    }
+  });
   const updateController = new ManualUpdateController({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
@@ -76,7 +93,6 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     },
     sanitizeError: (error) => redact(error instanceof Error ? error.message : String(error))
   });
-
   const pickAndRegisterWorkspace = async (): Promise<NativeWorkspaceDescriptor | undefined> => {
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
       title: "选择 Pi 工作区",
@@ -93,13 +109,11 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     });
     return registered;
   };
-
   const recoverySnapshot = async (): Promise<DesktopRecoverySnapshot> => createDesktopRecoverySnapshot(
     (await workbenchState.load()).state,
     options.previousRunExit,
     await options.promptAttachments.diagnostics()
   );
-
   ipcMain.handle("pi67:platform-info", () => ({
     platform: process.platform,
     architecture: process.arch,
@@ -115,6 +129,10 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     options.promptAttachments.release(value)
   ));
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
+  ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
+  ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
+    options.composerDraftState.update(value)
+  ));
   ipcMain.handle("pi67:workspace-file-state-load", () => options.workspaceFileState.load());
   ipcMain.handle("pi67:workspace-file-state-update", (_event, value: unknown) => (
     options.workspaceFileState.update(value)
@@ -147,6 +165,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   ipcMain.handle("pi67:workspace-remove", async (_event, workspaceId: unknown) => {
     const id = assertWorkspaceId(workspaceId);
     const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
+    await options.composerDraftState.removeWorkspace(id);
     await options.workspaceFileState.removeWorkspace(id);
     return state;
   });
@@ -194,9 +213,13 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     await writeFile(result.filePath, redact(serialized), { encoding: "utf8", mode: 0o600 });
     return result.filePath;
   });
-  ipcMain.handle("pi67:notify", (_event, value: unknown) => {
-    const notification = asNotification(value);
-    if (notification) new Notification(notification).show();
+  ipcMain.handle("pi67:native-notification-show", (_event, value: unknown) => {
+    const request = asNativeNotificationRequest(value);
+    return request ? nativeNotifications.show(request) : false;
+  });
+  ipcMain.handle("pi67:native-notification-dismiss", (_event, value: unknown) => {
+    const notificationId = asNativeNotificationId(value);
+    return notificationId ? nativeNotifications.dismiss(notificationId) : false;
   });
   ipcMain.handle("pi67:open-external", async (_event, value: unknown) => {
     const target = asExternalUrl(value);
@@ -404,11 +427,13 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     return status;
   });
   ipcMain.handle("pi67:update-check", () => updateController.checkNow());
-
   updateController.startAutomaticChecks();
   return {
     handlePowerResume: () => updateController.checkIfDue(),
-    dispose: () => updateController.dispose()
+    dispose: () => {
+      nativeNotifications.dispose();
+      updateController.dispose();
+    }
   };
 }
 

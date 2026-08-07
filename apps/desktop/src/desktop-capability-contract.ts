@@ -398,11 +398,30 @@ function parseRecommendedPackage(value: unknown): DesktopRecommendedPackage {
   if (value.minimumCommit !== undefined && (
     typeof value.minimumCommit !== "string" || !/^[0-9a-f]{40}$/u.test(value.minimumCommit)
   )) throw new Error("Recommended Desktop package commit is invalid.");
+  if (value.installPolicy !== "prompt-once" && value.installPolicy !== "user-initiated") {
+    throw new Error("Recommended Desktop package install policy is invalid.");
+  }
+  if (
+    value.admissionPolicy !== "known-baseline-or-user-approval"
+    && value.admissionPolicy !== "user-approval"
+  ) throw new Error("Recommended Desktop package admission policy is invalid.");
+  if (value.baselineContentSha256 !== undefined && (
+    typeof value.baselineContentSha256 !== "string" || !/^[0-9a-f]{64}$/u.test(value.baselineContentSha256)
+  )) throw new Error("Recommended Desktop package content baseline is invalid.");
+  if (
+    value.admissionPolicy === "known-baseline-or-user-approval"
+    && value.baselineContentSha256 === undefined
+  ) throw new Error("Recommended Desktop package content baseline is required.");
   return {
     id: value.id,
     source: value.source,
     ...(value.recommendedVersion === undefined ? {} : { recommendedVersion: value.recommendedVersion }),
-    ...(value.minimumCommit === undefined ? {} : { minimumCommit: value.minimumCommit })
+    ...(value.minimumCommit === undefined ? {} : { minimumCommit: value.minimumCommit }),
+    installPolicy: value.installPolicy,
+    admissionPolicy: value.admissionPolicy,
+    ...(value.baselineContentSha256 === undefined
+      ? {}
+      : { baselineContentSha256: value.baselineContentSha256 })
   };
 }
 

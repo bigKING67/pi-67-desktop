@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
+  currentMockSessionAuthority,
   emitMockAgentEvent,
   installMockDesktopBridge,
   recordedCommandDetails,
@@ -197,6 +198,10 @@ test("matches Host scheduler availability while an operation is active", async (
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
   await waitForMockWorkspaceReady(page);
+  await expect.poll(async () => (await recordedCommandDetails(page)).some((command) => (
+    command.type === "runtime.initialize" && command.context?.scope === "task"
+  ))).toBe(true);
+  const sessionAuthority = await currentMockSessionAuthority(page);
   const operationId = "operation-palette-busy";
   await emitMockAgentEvent(page, {
     type: "operation.started",
@@ -206,13 +211,11 @@ test("matches Host scheduler availability while an operation is active", async (
         kind: "prompt",
         lifecycle: "running",
         cancellable: true,
-        sessionId: "session-test",
-        sessionFileIdentity: "session-file-fixture-demo",
-        sessionGeneration: 1,
+        ...sessionAuthority,
         startedAt: Date.now()
       }
     }
-  }, { operationId });
+  }, { operationId, ...sessionAuthority });
   await expect(page.getByRole("button", { name: "停止" })).toBeVisible();
   await page.keyboard.press("Control+k");
 

@@ -65,18 +65,22 @@ export function packageResourceTypes(entry: ExtensionPackageEntry): PackageResou
 }
 
 export function packageRowEnabled(row: PackageRow): boolean {
-  if (
-    !row.entry.installed
-    || row.entry.trustState === "unverified"
-    || row.entry.trustState === "drifted"
-    || row.entry.trustState === "unavailable"
-  ) return false;
+  if (!row.entry.installed || !packageContentAdmitted(row.entry)) return false;
   return packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
 }
 
-export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "blocked" | "unavailable" {
-  if (!row.entry.installed || row.entry.trustState === "unavailable") return "unavailable";
-  if (row.entry.trustState === "unverified" || row.entry.trustState === "drifted") return "blocked";
+export type PackageRowState =
+  | "enabled"
+  | "partial"
+  | "disabled"
+  | "not-installed"
+  | "pending-confirmation"
+  | "changed-pending-confirmation";
+
+export function packageRowState(row: PackageRow): PackageRowState {
+  if (!row.entry.installed || row.entry.trustReason === "install-content-missing") return "not-installed";
+  if (row.entry.trustState === "drifted") return "changed-pending-confirmation";
+  if (!packageContentAdmitted(row.entry)) return "pending-confirmation";
   const states = packageResourceTypes(row.entry).map((type) => packageResourceEnabled(row.entry, type));
   if (states.every(Boolean)) return "enabled";
   if (states.some(Boolean)) return "partial";
@@ -130,10 +134,12 @@ export function sourceKindLabel(kind: PackageSourceKind): string {
 
 export function packageTrustLabel(entry: ExtensionPackageEntry): string {
   if (entry.trustState === "builtin-verified") return "应用内置并已验证";
+  if (entry.trustState === "known-baseline-observed") return "已核对 Pi-67 已知内容基线";
+  if (entry.trustState === "user-approved-observed") return "当前内容已由用户确认";
   if (entry.trustState === "user-installed-observed") return "Desktop 安装记录已核对";
-  if (entry.trustState === "drifted") return "安装内容已漂移";
+  if (entry.trustState === "drifted") return "内容已变更，等待重新确认";
   if (entry.trustState === "unavailable") return "安装内容不可用";
-  return entry.trustReason === "mutation-ambiguous" ? "安装结果需要核对" : "未建立 Desktop 安装记录";
+  return entry.trustReason === "mutation-ambiguous" ? "安装结果等待确认" : "当前内容等待确认";
 }
 
 export function packageTrustReasonLabel(entry: ExtensionPackageEntry): string | undefined {
@@ -166,4 +172,11 @@ function packagesForScope(items: ExtensionPackageEntry[], scope: "global" | "pro
 
 function isBundledEntry(entry: ExtensionPackageEntry): boolean {
   return entry.sourceKind === "bundled" || entry.origin === "first-party";
+}
+
+export function packageContentAdmitted(entry: ExtensionPackageEntry): boolean {
+  return entry.trustState === "builtin-verified"
+    || entry.trustState === "known-baseline-observed"
+    || entry.trustState === "user-approved-observed"
+    || entry.trustState === "user-installed-observed";
 }

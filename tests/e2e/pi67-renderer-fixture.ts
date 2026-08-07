@@ -22,6 +22,7 @@ export type { FixtureMessage, MockAgentOptions } from "./pi67-renderer-fixture-t
 export { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 export {
   clearRecordedCommands,
+  currentMockSessionAuthority,
   emitMockAgentEvent,
   recordedCommandDetails,
   recordedCommands,

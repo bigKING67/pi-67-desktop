@@ -18,9 +18,10 @@ Pi-67 Desktop 会持续研究外部项目，但外部项目不是同一种“上
 `packages/pi-runtime/package.json`、`pnpm-workspace.yaml` overrides 和现有 release contract
 共同管理，不在 reference lock 里维护第二份版本常量。
 
-Peak Code 是工程血缘说明和固定产品参考，不是可 merge 的 Git upstream。仓库只保留
-`origin`，不增加外部 Remote、Submodule 或长期 vendored checkout。需要源码比较时使用
-只读审计命令，临时 checkout 必须位于系统临时目录。
+`pi-gui` 是首要产品与交互参考；Peak Code 保留为工程血缘和历史信息架构参考。两者都
+不是可 merge 的 Git upstream。仓库只保留 `origin`，不增加外部 Remote、Submodule 或
+长期 vendored checkout。需要源码比较时使用只读审计命令，临时 checkout 必须位于系统
+临时目录。
 
 ## Tiers
 
@@ -33,14 +34,17 @@ Peak Code 是工程血缘说明和固定产品参考，不是可 merge 的 Git u
 
 ### S1 - core product references
 
-- `PeakCode-AI/PeakCode`：Workspace、Session、Composer、Inspector 和桌面生命周期。
+- `minghinmatthewlam/pi-gui`：首要产品/交互参考，覆盖 Workspace、Thread、Session、
+  Timeline、Worktree、Terminal、Diff 和多 Agent 编排；吸收时仍按 Pi-67 Domain、Protocol
+  和进程边界重新实现。
+- `PeakCode-AI/PeakCode`：工程血缘、三栏信息架构和历史产品对照。
 - `justhil/pi-app`：Extension Adapter、Session Tree、Queue、Composer 和 Tool Card。
-- `minghinmatthewlam/pi-gui`：Timeline、Thread、Recorded Changes 和 Workspace 导航。
 - `heyhuynhgiabuu/openpi`：Electron 权限边界、Command Palette 和工作台结构。
 - `dodo-reach/apple-pi`：Session Catalog、Resume、Fork 和项目/会话导航。
 
-S1 每月只做远端 HEAD 和许可证漂移检查。只有 relevant path 变化或对应功能立项时，才做
-固定 commit 的源码深审。
+`pi-gui` 每周只读检查远端 HEAD 和许可证漂移，并在相关功能立项时做固定 commit 深审；
+其他 S1 保持每月与功能触发。漂移审计只生成 Git ignored artifact，不自动更新 Lock、
+Issue、PR、Remote 或源码。
 
 ### S2 - feature and contrast references
 
@@ -104,6 +108,7 @@ corepack pnpm run check:references
 
 ```bash
 corepack pnpm run audit:references -- --id peakcode --json
+corepack pnpm run audit:references -- --id pi-gui --json
 corepack pnpm run audit:references -- --tier S1 --json
 corepack pnpm run audit:references -- --all --json
 ```

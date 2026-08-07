@@ -4,6 +4,8 @@ export type PackageSourceKind = "bundled" | "npm" | "git" | "path";
 export type CapabilityOrigin = "first-party" | "third-party" | "external";
 export type ExtensionPackageTrustState =
   | "builtin-verified"
+  | "known-baseline-observed"
+  | "user-approved-observed"
   | "user-installed-observed"
   | "unverified"
   | "drifted"
@@ -19,6 +21,13 @@ export type ExtensionPackageIntegrityReason =
   | "inspection-limited"
   | "mutation-ambiguous";
 export type ExtensionPackageReceiptState = "active" | "removed" | "ambiguous" | "not-applicable";
+export type ExtensionPackageOnboardingState =
+  | "unseen"
+  | "installing"
+  | "installed"
+  | "declined"
+  | "install-failed"
+  | "suppressed-existing";
 
 export interface PackageResourceState {
   type: PackageResourceType;
@@ -62,7 +71,14 @@ export interface ExtensionPackageUpdatesResult {
   total: number;
 }
 
+export interface ExtensionPackageOnboardingResult {
+  source: string;
+  scope: ExtensionPackageScope;
+  state: ExtensionPackageOnboardingState;
+}
+
 export interface ExtensionPackageMutationResult extends ExtensionPackageListResult {
   changed: boolean;
   receiptState?: ExtensionPackageReceiptState;
+  reloadRequired?: boolean;
 }

@@ -36,7 +36,10 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
    并确认本地 HEAD 与目标远端分支的关系。未提交的并发 WIP 不得进入本轮候选。
 2. **Build Windows**：使用 `Windows candidate` workflow 构建精确 source SHA。只有 provenance、
    packaged smoke、synthetic scale/IME、candidate identity 和完整 NSIS lifecycle 全部成功后，才下载
-   `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。
+   `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。NSIS lifecycle 必须在中文且带空格的受控 Pi
+   profile 中写入测试用 `auth.json` / `settings.json`，在 Main 初始化后把进程环境指向另一个空目录，
+   并验证 Agent Host 仍显示 OpenAI 已配置和凭据已持久化到 Pi `auth.json`，随后再验证 Catalog、创建、
+   Prompt、退出和三次冷重启。该探针只使用测试凭据，不读取操作者的真实 Pi profile。
 3. **Build macOS**：在 Apple Silicon Mac 上运行相关 quality gate 和
    `corepack pnpm run preview:mac:unsigned`。该命令必须重新打包、执行 packaged smoke 并打开当前仓库
    artifact；不能用一次 `open` 冒充新包已加载。分发的是生成的 DMG 和 ZIP。
@@ -52,7 +55,9 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
    upload response 的远端 size 与本地 size。构建记录中的 SHA-256 继续作为内容身份，不以飞书文件名代替。
 8. **Manual test**：Windows x64 和 macOS Apple Silicon 分别下载并测试。人工结论必须记录所测文件的
    version、source SHA、size、SHA-256，以及 Windows run/attempt 和 identity；不得把一轮结论转移给
-   另一轮 bytes。
+   另一轮 bytes。Windows 必须另外使用测试者正常启动路径和自己的现有 Pi profile，确认模型服务不再
+   停留在“正在读取 Pi 配置”或暴露 acknowledgement timeout，已有 Workspace/Session 可打开，一次
+   New + Send 只新增一个 JSONL/侧栏行，完全退出并重启后仍恢复同一 Session identity。
 9. **Stop by default**：内部测试候选上传并复核后，本轮默认结束。不要因为测试通过而自动创建 Tag、
    GitHub Release、promotion、签名或公证任务。
 
@@ -64,6 +69,8 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
   有意复用尚未发布的 version/file token，必须记录新 source SHA 和 SHA-256，并明确废弃旧测试 receipt。
 - 三个新文件都上传成功并重新列目录复核之前，不清理旧候选。远端清理需要当前明确授权。
 - hosted Windows lifecycle、macOS packaged smoke 和飞书可下载都不能替代目标系统的人工真机结论。
+- hosted Windows 的受控配置探针证明 Main/Agent Host 目录一致性，但不覆盖真实凭据、历史 Session、
+  Defender/EDR、OneDrive、重解析点、网络盘或企业目录重定向；这些仍属于目标 Windows 的人工验收。
 
 ## Formal release boundary
 

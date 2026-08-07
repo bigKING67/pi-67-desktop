@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createRendererSession } from "../session/session-lifecycle-controller.js";
+import { beginRendererSessionIntent } from "../session/session-lifecycle-controller.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
@@ -10,14 +10,14 @@ import {
 } from "./global-shortcuts.js";
 
 vi.mock("../session/session-lifecycle-controller.js", () => ({
-  createRendererSession: vi.fn().mockResolvedValue(undefined)
+  beginRendererSessionIntent: vi.fn()
 }));
 
-const createSession = vi.mocked(createRendererSession);
+const beginIntent = vi.mocked(beginRendererSessionIntent);
 
 describe("global shortcuts", () => {
   beforeEach(() => {
-    createSession.mockReset().mockResolvedValue(undefined);
+    beginIntent.mockReset();
     rendererWorkbenchStore.getState().reset();
     useAppStore.setState(useAppStore.getInitialState(), true);
     useShellStore.setState(useShellStore.getInitialState(), true);
@@ -63,12 +63,12 @@ describe("global shortcuts", () => {
     const blocked = shortcut("n");
     handleGlobalShortcut(blocked.event);
     expect(blocked.preventDefault).not.toHaveBeenCalled();
-    expect(createSession).not.toHaveBeenCalled();
+    expect(beginIntent).not.toHaveBeenCalled();
 
     useAppStore.setState({ workspace: "/work/latest" });
     handleGlobalShortcut(shortcut("n").event);
     handleGlobalShortcut(shortcut("t").event);
-    expect(createSession).toHaveBeenCalledTimes(2);
+    expect(beginIntent).toHaveBeenCalledTimes(2);
   });
 
   it("toggles the latest navigation and context drawer state", () => {

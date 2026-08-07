@@ -77,12 +77,15 @@ export class PackageTrustRegistry {
     const environment = this.#options.environment ?? process.env;
     if (verifiedDesktopCapabilitySources(environment).has(normalizePackageAbsolutePath(source))) return true;
     const state = this.projectionFor(source, scope).trustState;
-    return state === "user-installed-observed";
+    return state === "known-baseline-observed"
+      || state === "user-approved-observed"
+      || state === "user-installed-observed";
   }
 
   async #refresh(): Promise<void> {
     const environment = this.#options.environment ?? process.env;
     const verifiedBuiltins = verifiedDesktopCapabilitySources(environment);
+    const knownBaselines = knownPackageBaselines(environment);
     const configured = resolveConfiguredInstallations(
       this.#options.packageManager,
       this.#options.settingsManager,
@@ -111,7 +114,19 @@ export class PackageTrustRegistry {
         projections.set(key, unavailableProjection(observation.reason));
         continue;
       }
-      const receipt = this.#options.receipts.read(entry.receiptSource, entry.receiptScope);
+      if (matchesKnownBaseline(entry.source, observation, knownBaselines)) {
+        projections.set(key, {
+          trustState: "known-baseline-observed",
+          trustObservedAt: observation.observation.observedAt,
+          manifestSha256: observation.observation.manifestSha256,
+          contentSha256: observation.observation.contentSha256
+        });
+        continue;
+      }
+      let receipt = this.#options.receipts.read(entry.receiptSource, entry.receiptScope);
+      if (receipt.status === "missing" && entry.fallbackReceiptScope !== undefined) {
+        receipt = this.#options.receipts.read(entry.receiptSource, entry.fallbackReceiptScope);
+      }
       projections.set(key, projectReceiptTrust(receipt, observation.observation, entry.sourceKind));
     }
     this.#projections.clear();
@@ -126,6 +141,7 @@ interface ConfiguredInstallation {
   scope: ExtensionPackageScope;
   receiptSource: string;
   receiptScope: ExtensionPackageScope;
+  fallbackReceiptScope?: ExtensionPackageScope;
   sourceKind: PackageSourceKind;
   installedPath?: string;
 }
@@ -153,7 +169,8 @@ function resolveConfiguredInstallations(
       source: entry.source,
       scope,
       receiptSource: entry.source,
-      receiptScope: inherited === undefined ? scope : "global",
+      receiptScope: scope,
+      ...(inherited === undefined ? {} : { fallbackReceiptScope: "global" as const }),
       sourceKind: packageSourceKind(entry.source, environment),
       ...(installedPath === undefined ? {} : { installedPath })
     };
@@ -193,7 +210,9 @@ function projectReceiptTrust(
     return driftedProjection("package-identity-changed", observation);
   }
   return {
-    trustState: "user-installed-observed",
+    trustState: record.lastOperation === "admit"
+      ? "user-approved-observed"
+      : "user-installed-observed",
     trustObservedAt: observation.observedAt,
     manifestSha256: observation.manifestSha256,
     contentSha256: observation.contentSha256
@@ -289,5 +308,73 @@ function timestamp(now: (() => number) | undefined): number {
 }
 
 export function trustStateBlocksRuntime(state: ExtensionPackageTrustState): boolean {
-  return state !== "builtin-verified" && state !== "user-installed-observed";
+  return state !== "builtin-verified"
+    && state !== "known-baseline-observed"
+    && state !== "user-approved-observed"
+    && state !== "user-installed-observed";
+}
+
+interface KnownPackageBaseline {
+  source: string;
+  packageName: string;
+  packageVersion: string;
+  baselineContentSha256: string;
+}
+
+function knownPackageBaselines(environment: NodeJS.ProcessEnv): KnownPackageBaseline[] {
+  const serialized = environment.PI67_KNOWN_PACKAGE_BASELINES;
+  if (!serialized) return [];
+  try {
+    const value = JSON.parse(serialized) as unknown;
+    if (!Array.isArray(value) || value.length > 64) return [];
+    const result: KnownPackageBaseline[] = [];
+    for (const entry of value) {
+      if (
+        !isRecord(entry)
+        || typeof entry.source !== "string"
+        || !entry.source.startsWith("npm:")
+        || entry.source.length > 4_096
+        || !boundedText(entry.packageName, 200)
+        || !boundedText(entry.packageVersion, 100)
+        || typeof entry.baselineContentSha256 !== "string"
+        || !/^[a-f0-9]{64}$/u.test(entry.baselineContentSha256)
+      ) return [];
+      result.push({
+        source: entry.source,
+        packageName: entry.packageName,
+        packageVersion: entry.packageVersion,
+        baselineContentSha256: entry.baselineContentSha256
+      });
+    }
+    if (new Set(result.map((entry) => entry.source)).size !== result.length) return [];
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function matchesKnownBaseline(
+  source: string,
+  observation: Extract<PackageObservationResult, { status: "observed" }>,
+  baselines: KnownPackageBaseline[]
+): boolean {
+  const baseline = baselines.find((entry) => entry.source === source);
+  return baseline !== undefined
+    && observation.observation.packageName === baseline.packageName
+    && observation.observation.packageVersion === baseline.packageVersion
+    && observation.baselineContentSha256 === baseline.baselineContentSha256;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function boundedText(value: unknown, maximum: number): value is string {
+  return typeof value === "string"
+    && value.length > 0
+    && value.length <= maximum
+    && !Array.from(value).some((character) => {
+      const codePoint = character.codePointAt(0);
+      return codePoint !== undefined && (codePoint <= 31 || codePoint === 127);
+    });
 }

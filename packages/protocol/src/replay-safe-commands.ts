@@ -32,6 +32,8 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "workspace.file.rename",
   "extension.package.install",
   "extension.package.update",
+  "extension.package.approveObserved",
+  "extension.package.onboarding.decline",
   "extension.package.setEnabled",
   "extension.package.restoreInheritance",
   "extension.package.uninstall",

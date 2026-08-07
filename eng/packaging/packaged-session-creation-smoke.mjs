@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 const SESSION_CREATION_TIMEOUT_MS = 30_000;
+const SESSION_CREATION_PROMPT = "Create the packaged smoke Session.";
 
 export async function verifyPackagedSessionCreation({ agentDir, window }) {
   const startedAt = Date.now();
@@ -14,11 +15,25 @@ export async function verifyPackagedSessionCreation({ agentDir, window }) {
     state: "visible",
     timeout: remainingTimeout(deadline, "show the provisional conversation")
   });
+  await window.getByRole("textbox", { name: "给 Pi 发送消息" }).fill(SESSION_CREATION_PROMPT);
+  await window.getByRole("button", { name: "发送", exact: true }).click({
+    timeout: remainingTimeout(deadline, "send the first Session message")
+  });
   await window.locator(
     '[data-testid="conversation-row"][aria-current="page"][data-conversation-id^="session:"]'
   ).waitFor({
     state: "visible",
     timeout: remainingTimeout(deadline, "materialize the authoritative Session")
+  });
+  const stop = window.getByRole("button", { name: "停止", exact: true });
+  await stop.waitFor({
+    state: "visible",
+    timeout: remainingTimeout(deadline, "start the controlled first turn")
+  });
+  await stop.click({ timeout: remainingTimeout(deadline, "stop the controlled first turn") });
+  await stop.waitFor({
+    state: "hidden",
+    timeout: remainingTimeout(deadline, "finish the controlled first turn")
   });
   await window.locator('[data-runtime-phase="ready"]').waitFor({
     state: "visible",

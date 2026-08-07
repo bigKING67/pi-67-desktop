@@ -60,6 +60,7 @@ export interface RendererWorkbenchState {
   setWorkspaceExpanded: (workspaceId: WorkspaceId, expanded: boolean) => boolean;
   toggleWorkspaceExpanded: (workspaceId: WorkspaceId) => boolean;
   openTask: (task: RendererWorkbenchTask) => TaskOpenResult;
+  restoreTask: (task: RendererWorkbenchTask) => TaskId | undefined;
   updateTask: (taskId: TaskId, patch: Partial<RendererWorkbenchTask>) => boolean;
   selectTask: (taskId: TaskId) => boolean;
   selectConversation: (conversation: ConversationKey) => boolean;

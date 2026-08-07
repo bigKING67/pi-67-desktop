@@ -77,6 +77,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isPackageTrustState(value: unknown): value is ExtensionPackageListResult["items"][number]["trustState"] {
   return value === "builtin-verified"
+    || value === "known-baseline-observed"
+    || value === "user-approved-observed"
     || value === "user-installed-observed"
     || value === "unverified"
     || value === "drifted"

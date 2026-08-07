@@ -28,7 +28,7 @@ export default defineConfig({
     },
     {
       name: "electron",
-      testMatch: /electron\.spec\.ts/u
+      testMatch: /electron(?:-[a-z-]+)?\.spec\.ts/u
     }
   ],
   webServer: {

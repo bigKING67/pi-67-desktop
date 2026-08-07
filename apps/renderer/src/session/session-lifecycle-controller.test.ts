@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
 import {
+  workspaceConnectionIdentity,
+  workspaceDescriptorFixture
+} from "../app/workspace-open-test-fixtures.js";
+import {
   runIncrementalSessionTransition,
   runSessionBootstrapTransition
 } from "../app/session-transition.js";
@@ -14,8 +18,11 @@ import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { useSessionProjectionStore } from "./session-projection-store.js";
 import { ensureRendererSessionCreationAuthority } from "./session-creation-authority.js";
 import { dismissUnconfirmedRendererSession } from "./session-creation-recovery-controller.js";
+import { sessionLifecycleTask } from "./session-lifecycle-test-fixture.js";
 import {
+  beginRendererSessionIntent,
   createRendererSession,
+  materializeRendererSessionIntent,
   openRendererSession,
   rollbackRendererSession
 } from "./session-lifecycle-controller.js";
@@ -52,14 +59,60 @@ describe("session lifecycle controller", () => {
     useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
     useAppStore.setState(useAppStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
-    rendererWorkbenchStore.getState().registerWorkspace(workspace());
+    rendererWorkbenchStore.getState().registerWorkspace(
+      workspaceDescriptorFixture("workspace-a", "/work/a", "filesystem")
+    );
     useAppStore.setState({
       workspace: "/work/a",
       trust: "trusted",
       connected: true,
       hostEpoch: 7,
-      connectionIdentity: connectionIdentity(7)
+      connectionIdentity: workspaceConnectionIdentity(7)
     });
+  });
+
+  it("opens an offline-capable new Session intent without creating Pi state", () => {
+    useAppStore.setState({ connected: false, connectionIdentity: undefined, hostEpoch: undefined });
+
+    const taskId = beginRendererSessionIntent();
+
+    expect(taskId).toMatch(/^task-/u);
+    expect(ensureCreationAuthority).not.toHaveBeenCalled();
+    expect(runBootstrap).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks[taskId!]).toMatchObject({
+      conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: taskId },
+      lifecycle: "draft",
+      runtime: { phase: "stopped", detail: "首条消息尚未发送" }
+    });
+    expect(rendererWorkbenchStore.getState().tasks[taskId!]?.creationId).toBeUndefined();
+    expect(rendererWorkbenchStore.getState().tasks[taskId!]?.creationStatus).toBeUndefined();
+  });
+
+  it("materializes the same intent Task exactly once when the first Prompt is submitted", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+    const taskId = beginRendererSessionIntent();
+    useTaskDraftStore.getState().setText(taskId!, "创建后发送");
+
+    await expect(materializeRendererSessionIntent(taskId!)).resolves.toEqual({ status: "materialized" });
+
+    expect(ensureCreationAuthority).toHaveBeenCalledOnce();
+    expect(runBootstrap).toHaveBeenCalledOnce();
+    const task = rendererWorkbenchStore.getState().tasks[taskId!];
+    expect(task).toMatchObject({
+      id: taskId,
+      lifecycle: "initializing",
+      creationStatus: "pending",
+      creationId: expect.stringMatching(/^session-creation-/u)
+    });
+    await runBootstrap.mock.calls[0]![2].request();
+    expect(request).toHaveBeenCalledWith(
+      "session.create",
+      { creationId: task!.creationId },
+      [],
+      expect.objectContaining({
+        context: expect.objectContaining({ taskId, taskGeneration: 1 })
+      })
+    );
   });
 
   it("opens a provisional Task before requesting a new Pi Session", async () => {
@@ -323,7 +376,9 @@ describe("session lifecycle controller", () => {
   });
 
   it("selects an already-open Session Task instead of creating a duplicate", async () => {
-    rendererWorkbenchStore.getState().openTask(task("task-existing", "/sessions/existing.jsonl"));
+    rendererWorkbenchStore.getState().openTask(
+      sessionLifecycleTask("task-existing", "/sessions/existing.jsonl")
+    );
 
     await openRendererSession("/sessions/existing.jsonl", "session-file-task-existing");
 
@@ -394,48 +449,3 @@ describe("session lifecycle controller", () => {
     });
   });
 });
-
-function workspace() {
-  return {
-    id: "workspace-a",
-    displayName: "A",
-    identity: { canonicalPath: "/work/a", assurance: "filesystem" as const },
-    trust: "trusted" as const,
-    trustProvenance: "native-picker" as const,
-    availability: "available" as const
-  };
-}
-
-function connectionIdentity(hostEpoch: number) {
-  return {
-    appInstanceId: "app-1",
-    hostInstanceId: `host-${hostEpoch}`,
-    hostEpoch,
-    sdkVersion: "0.81.1",
-    eventSequence: 0
-  };
-}
-
-function task(id: string, sessionPath: string) {
-  return {
-    id,
-    conversation: {
-      kind: "session" as const,
-      workspaceId: "workspace-a",
-      sessionFileIdentity: `session-file-${id}`,
-      sessionPath
-    },
-    workspaceId: "workspace-a",
-    sessionId: `session-${id}`,
-    taskGeneration: 1,
-    sessionGeneration: 2,
-    lifecycle: "idle" as const,
-    runtime: { phase: "ready" as const, detail: "Pi 会话已就绪", recoverable: true },
-    title: id,
-    sessionFileIdentity: `session-file-${id}`,
-    sessionPath,
-    hasDraft: false,
-    toolMode: "auto" as const,
-    attachmentCount: 0
-  };
-}

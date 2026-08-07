@@ -26,17 +26,17 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   const extensionWorkspace = settings.getByTestId("extension-settings-workspace");
   const extensionTabs = extensionWorkspace.getByRole("tablist", { name: "扩展管理分类" });
   await expect(extensionTabs.getByRole("tab", { name: "扩展包", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(extensionWorkspace.getByText("pi-hy-memory", { exact: true })).toBeHidden();
+  await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeHidden();
 
   await extensionTabs.getByRole("tab", { name: "内置扩展", exact: true }).click();
-  await expect(extensionWorkspace.getByText("pi-hy-memory", { exact: true })).toBeVisible();
+  await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("xtalpi-pi-tools", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("随应用更新", { exact: false }).first()).toBeVisible();
 
   await extensionTabs.getByRole("tab", { name: "本地扩展", exact: true }).click();
   await settings.getByRole("button", { name: `项目 · ${DEFAULT_MOCK_WORKSPACE.displayName}`, exact: true }).click();
   await expect(settings.getByText(".pi/extensions/project-tools.ts", { exact: true })).toBeVisible();
-  await expect(extensionWorkspace.getByText("pi-hy-memory", { exact: true })).toBeHidden();
+  await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeHidden();
 
   await navigation.getByRole("button", { name: "技能", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "技能", exact: true })).toBeVisible();
@@ -378,7 +378,7 @@ test("refreshes an initializing capability snapshot without requiring a manual r
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "扩展", exact: true }).click();
   await settings.getByRole("tab", { name: "内置扩展", exact: true }).click();
-  const coreExtensionRow = settings.getByText("pi-hy-memory", { exact: true }).locator("..").locator("..");
+  const coreExtensionRow = settings.getByText("pi-rules-loader", { exact: true }).locator("..").locator("..");
   await expect(coreExtensionRow).toContainText("已提供");
   await expect(coreExtensionRow).not.toContainText("准备中");
 });

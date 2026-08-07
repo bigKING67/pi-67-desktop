@@ -1,5 +1,5 @@
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
-import { createMessageId, ProtocolRequestError } from "@pi67/protocol";
+import { createMessageId } from "@pi67/protocol";
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { useAppStore } from "../app/app-store.js";
@@ -21,103 +21,18 @@ import { useSessionProjectionStore } from "./session-projection-store.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
-import {
-  ensureRendererSessionCreationAuthority,
-  selectPendingRendererSessionCreation
-} from "./session-creation-authority.js";
-import { markRendererSessionCreationUnconfirmed } from "./session-creation-lifecycle.js";
+import { beginPendingTask } from "./pending-session-task.js";
+import { reportSessionError, sessionErrorMessage } from "./session-controller-error.js";
+
+export {
+  beginRendererSessionIntent,
+  createRendererSession,
+  materializeRendererSessionIntent
+} from "./session-creation-controller.js";
+export type { RendererSessionMaterializationResult } from "./session-creation-controller.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
-export async function createRendererSession(): Promise<void> {
-  const get: StoreGet = useAppStore.getState;
-  const set: StoreSet = useAppStore.setState;
-  if (!get().workspace || get().sessionTransitionPending || get().workspaceOpenPending) return;
-  if (selectPendingRendererSessionCreation()) return;
-  const workspace = get().workspace;
-  const workspaceId = rendererWorkbenchStore.getState().currentWorkspaceId;
-  if (!workspaceId) return;
-  try {
-    await ensureRendererSessionCreationAuthority();
-  } catch (error) {
-    if (get().workspace === workspace) {
-      reportSessionError(error, set, messages.runtime.session.createFailed);
-    }
-    return;
-  }
-  if (
-    get().workspace !== workspace
-    || get().sessionTransitionPending
-    || get().workspaceOpenPending
-    || rendererWorkbenchStore.getState().currentWorkspaceId !== workspaceId
-    || selectPendingRendererSessionCreation()
-  ) return;
-  const creationId = createMessageId("session-creation");
-  const task = beginPendingTask(undefined, { creationId });
-  if (!task) return;
-  await runSessionBootstrapTransition(get, set, {
-    detail: messages.runtime.session.creating,
-    refreshSessionCatalogFor: task.workspaceId,
-    onError: (error) => {
-      if (error instanceof ProtocolRequestError && error.code === "REQUEST_OUTCOME_UNKNOWN") {
-        markRendererSessionCreationUnconfirmed(task, creationId);
-        set({
-          runtime: {
-            phase: "failed",
-            detail: messages.runtime.session.creationOutcomeUnknown,
-            recoverable: true
-          }
-        });
-        return;
-      }
-      const draft = useTaskDraftStore.getState().drafts[task.id];
-      if (!draft || (draft.text.trim().length === 0 && draft.attachments.length === 0)) {
-        useTaskDraftStore.getState().discard(task.id);
-        rendererWorkbenchStore.getState().removeRuntimeTask(task.id);
-      } else {
-        rendererWorkbenchStore.getState().updateTask(task.id, {
-          lifecycle: "draft",
-          creationId: undefined,
-          creationStatus: undefined,
-          runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
-        });
-      }
-      reportSessionError(error, set, messages.runtime.session.createFailed);
-    },
-    onMissingBootstrap: () => {
-      markRendererSessionCreationUnconfirmed(task, creationId);
-    },
-    onStale: () => {
-      markRendererSessionCreationUnconfirmed(task, creationId);
-    },
-    request: () => agentConnectionController.request("session.create", { creationId }, [], {
-      context: workbenchProtocolContextForTask(task),
-      onAcknowledgementDelayed: () => {
-        const current = rendererWorkbenchStore.getState().tasks[task.id];
-        if (
-          current?.taskGeneration !== task.taskGeneration
-          || current.creationId !== creationId
-          || current.creationStatus !== "pending"
-        ) return;
-        rendererWorkbenchStore.getState().updateTask(task.id, {
-          creationStatus: "confirming",
-          runtime: {
-            phase: "starting",
-            detail: messages.runtime.session.confirmingCreation,
-            recoverable: true
-          }
-        });
-        set({
-          runtime: {
-            phase: "starting",
-            detail: messages.runtime.session.confirmingCreation,
-            recoverable: true
-          }
-        });
-      }
-    })
-  });
-}
 
 export async function openRendererSession(path: string, sessionFileIdentity?: string): Promise<void> {
   const existing = sessionFileIdentity
@@ -389,39 +304,6 @@ function reportBlockedFork(title: string, message: string): false {
   return false;
 }
 
-function beginPendingTask(
-  sessionPath?: string,
-  options: {
-    workspaceId?: string;
-    title?: string;
-    creationId?: string;
-  } = {}
-): RendererWorkbenchTask | undefined {
-  const workbench = rendererWorkbenchStore.getState();
-  const workspaceId = options.workspaceId ?? workbench.currentWorkspaceId;
-  if (!workspaceId || !workbench.workspaces[workspaceId]) return undefined;
-  const taskId = createMessageId("task");
-  const task: RendererWorkbenchTask = {
-    id: taskId,
-    conversation: { kind: "provisional", workspaceId, draftId: taskId },
-    workspaceId,
-    sessionId: `pending:${taskId}`,
-    taskGeneration: 1,
-    lifecycle: "initializing",
-    runtime: { phase: "starting", detail: messages.runtime.session.starting, recoverable: true },
-    title: options.title ?? messages.runtime.workbench.unnamedSession,
-    ...(options.title ? { pendingTitle: options.title } : {}),
-    ...(options.creationId ? { creationId: options.creationId } : {}),
-    ...(sessionPath ? { sessionPath } : {}),
-    hasDraft: false,
-    attachmentCount: 0,
-    toolMode: "auto",
-    ...(options.creationId ? { creationStatus: "pending" as const } : {})
-  };
-  const result = workbench.openTask(task);
-  return result === "workspace-missing" ? undefined : task;
-}
-
 async function disposeContinuationTarget(task: RendererWorkbenchTask): Promise<string | undefined> {
   try {
     await agentConnectionController.request(
@@ -448,12 +330,6 @@ export async function rollbackRendererSession(entryId: string): Promise<void> {
   });
 }
 
-function reportSessionError(error: unknown, set: StoreSet, title: string): void {
-  const detail = errorMessage(error);
-  publishNotification({ level: "error", title, message: detail });
-  set({ runtime: { phase: "failed", detail: `${title}：${detail}`, recoverable: true } });
-}
-
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : messages.runtime.unknownError;
+  return sessionErrorMessage(error);
 }

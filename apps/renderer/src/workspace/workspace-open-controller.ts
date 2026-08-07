@@ -1,4 +1,7 @@
-import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
+import {
+  DEFAULT_APPROVAL_MODE,
+  type WorkspaceDescriptor
+} from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
@@ -8,6 +11,7 @@ import {
 } from "../connection/projection-recovery-controller.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { messages } from "../localization/message-catalog.js";
 import {
   captureRendererSessionTransition,
   classifyRendererSessionBootstrap,
@@ -27,6 +31,12 @@ import {
 import { rendererWorkspaceId } from "../workbench/renderer-workspace-identity.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
+import { rotateRendererTaskForSessionOpen } from "../workbench/task-runtime-reopen.js";
+import {
+  preferredWorkspaceSession,
+  waitForWorkspaceCatalogDecision,
+  workspaceCatalogDecision
+} from "./workspace-session-selection.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -38,8 +48,42 @@ export async function openRendererWorkspace(): Promise<void> {
     : await legacyWorkspaceSelection();
   if (!selected) return;
   rendererWorkbenchStore.getState().registerWorkspace(selected);
-  rendererWorkbenchStore.getState().selectWorkspace(selected.id);
   await openRendererWorkspaceDescriptor(selected);
+}
+
+export async function selectRendererWorkspaceDescriptor(
+  descriptor: WorkspaceDescriptor
+): Promise<boolean> {
+  if (!validateAvailableWorkspace(descriptor)) return false;
+  const get: StoreGet = useAppStore.getState;
+  const set: StoreSet = useAppStore.setState;
+  if (get().sessionTransitionPending || get().workspaceOpenPending) return false;
+  const workspace = beginWorkspaceTransition(descriptor, "正在准备工作区");
+  try {
+    await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
+    await ensureAgentConnection();
+    if (get().workspace !== workspace) return false;
+    set({
+      sessionTransitionPending: false,
+      runtime: { phase: "stopped", detail: "工作区已就绪，可创建会话", recoverable: true }
+    });
+    return true;
+  } catch (error) {
+    if (get().workspace !== workspace) return false;
+    const detail = errorMessage(error);
+    set({
+      sessionTransitionPending: false,
+      runtime: {
+        phase: "failed",
+        detail: `无法准备工作区：${detail}`,
+        recoverable: true
+      }
+    });
+    publishNotification({ level: "error", title: "无法准备工作区", message: detail });
+    return false;
+  } finally {
+    if (get().workspace === workspace) set({ workspaceOpenPending: false });
+  }
 }
 
 export async function openRendererWorkspaceDescriptor(
@@ -47,48 +91,66 @@ export async function openRendererWorkspaceDescriptor(
   sessionPath?: string,
   sessionFileIdentity?: string
 ): Promise<boolean> {
-  if (descriptor.availability !== "available") {
-    publishNotification({
-      level: "warning",
-      title: "工作区目录不可用",
-      message: descriptor.availability === "identity-changed"
-        ? "目录身份已变化，请重新选择并确认工作区目录。"
-        : "请重新选择工作区目录后再打开任务。"
-    });
-    return false;
-  }
+  if (!validateAvailableWorkspace(descriptor)) return false;
   const get: StoreGet = useAppStore.getState;
   const set: StoreSet = useAppStore.setState;
-  if (get().sessionTransitionPending) return false;
-  rendererWorkbenchStore.getState().selectWorkspace(descriptor.id);
-  const workspace = descriptor.identity.canonicalPath;
-  invalidateProjectionRecoveryGeneration();
-  invalidateWorkspaceTrustRequests();
-  prepareRendererSessionTransaction("workspace-replaced");
-  set({
-    ...clearedTransientState(),
-    workspace,
-    trust: descriptor.trust,
-    trustUpdating: false,
-    sessionTransitionPending: true,
-    workspaceOpenPending: true,
-    approvalMode: DEFAULT_APPROVAL_MODE,
-    runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
-  });
+  if (get().sessionTransitionPending || get().workspaceOpenPending) return false;
+  const preferredSession = sessionPath
+    ? undefined
+    : preferredWorkspaceSession(rendererWorkbenchStore.getState(), descriptor.id);
+  const workspace = beginWorkspaceTransition(descriptor, "正在加载 Pi SDK");
   let task: RendererWorkbenchTask | undefined;
   let target: RendererSessionTransitionTarget | undefined;
+  let runtimeSessionPath = sessionPath;
+  let runtimeSessionFileIdentity = sessionFileIdentity;
+  let refreshCatalogAfterBootstrap = Boolean(sessionPath);
   try {
     await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
     await ensureAgentConnection();
-    task = ensureWorkspaceRuntimeTask(descriptor, sessionPath, sessionFileIdentity);
+    if (!runtimeSessionPath) {
+      // Catalog IPC may itself time out after the product opening budget. Start it
+      // eagerly, then let the bounded store-level decision race its completion.
+      void queryFirstSessionCatalog(descriptor.id, { refresh: true }).catch(() => false);
+      let decision = workspaceCatalogDecision(descriptor.id, preferredSession);
+      if (decision.kind === "pending") {
+        decision = await waitForWorkspaceCatalogDecision(descriptor.id, preferredSession);
+      }
+      if (decision.kind === "pending") {
+        set({
+          sessionTransitionPending: false,
+          runtime: {
+            phase: "stopped",
+            detail: messages.navigation.catalogTemporarilyUnavailable,
+            recoverable: true
+          }
+        });
+        publishNotification({
+          level: "warning",
+          title: "会话目录尚未就绪",
+          message: messages.navigation.catalogTemporarilyUnavailable
+        });
+        return false;
+      }
+      if (decision.kind === "session") {
+        runtimeSessionPath = decision.target.sessionPath;
+        runtimeSessionFileIdentity = decision.target.sessionFileIdentity;
+      } else {
+        refreshCatalogAfterBootstrap = true;
+      }
+    }
+    task = ensureWorkspaceRuntimeTask(
+      descriptor,
+      runtimeSessionPath,
+      runtimeSessionFileIdentity
+    );
     const transitionTarget = requireRendererSessionTransition(get());
     target = transitionTarget;
-    const acknowledgement = sessionPath
+    const acknowledgement = runtimeSessionPath
       ? await agentConnectionController.request(
         "runtime.initialize",
         {
           cwd: workspace,
-          sessionPath,
+          sessionPath: runtimeSessionPath,
           trust: descriptor.trust,
           approvalMode: DEFAULT_APPROVAL_MODE
         },
@@ -111,9 +173,10 @@ export async function openRendererWorkspaceDescriptor(
       acknowledgement
     );
     if (disposition === "missing-bootstrap") {
-      if (sessionPath) {
+      if (runtimeSessionPath) {
         const recovery = await resynchronizeRendererProjection(get, set, {
           hostEpoch: acknowledgement.hostEpoch,
+          context: workbenchProtocolContextForTask(task),
           recoveringDetail: "正在同步会话状态",
           readyDetail: "Pi 会话已恢复",
           failureTitle: "无法打开会话"
@@ -122,7 +185,11 @@ export async function openRendererWorkspaceDescriptor(
       }
       throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
     }
-    if (disposition === "committed" && get().workspace === workspace) {
+    if (
+      disposition === "committed"
+      && refreshCatalogAfterBootstrap
+      && get().workspace === workspace
+    ) {
       await queryFirstSessionCatalog(descriptor.id, { refresh: true });
     }
     return disposition === "committed";
@@ -131,14 +198,16 @@ export async function openRendererWorkspaceDescriptor(
     if (target) {
       const disposition = classifyRendererSessionBootstrap(get(), target);
       if (disposition === "committed") {
-        await queryFirstSessionCatalog(descriptor.id, { refresh: true });
+        if (refreshCatalogAfterBootstrap) {
+          await queryFirstSessionCatalog(descriptor.id, { refresh: true });
+        }
         return true;
       }
       if (disposition === "stale") return false;
     }
-    const missingSession = task !== undefined && Boolean(sessionPath) && isMissingSessionError(error);
+    const missingSession = task !== undefined && Boolean(runtimeSessionPath) && isMissingSessionError(error);
     const detail = missingSession ? "对话记录已不存在" : errorMessage(error);
-    const failureTitle = sessionPath ? "无法打开会话" : "无法打开工作区";
+    const failureTitle = runtimeSessionPath ? "无法打开会话" : "无法打开工作区";
     const runtime = {
       phase: missingSession ? "stopped" as const : "failed" as const,
       detail: missingSession ? detail : `${failureTitle}：${detail}`,
@@ -182,6 +251,14 @@ function ensureWorkspaceRuntimeTask(
     };
     const matching = taskForConversation(workbench.tasks, conversation);
     if (matching) {
+      if (
+        matching.runtime.phase === "stopped"
+        || matching.lifecycle === "lost"
+        || matching.lifecycle === "stopped"
+      ) {
+        const replacement = rotateRendererTaskForSessionOpen(matching);
+        if (replacement) return replacement;
+      }
       workbench.selectTask(matching.id);
       return matching;
     }
@@ -231,6 +308,37 @@ function openWorkspaceRuntimeTask(
     throw new Error("无法为工作区创建会话。");
   }
   return task;
+}
+
+function beginWorkspaceTransition(descriptor: WorkspaceDescriptor, detail: string): string {
+  rendererWorkbenchStore.getState().selectWorkspace(descriptor.id);
+  const workspace = descriptor.identity.canonicalPath;
+  invalidateProjectionRecoveryGeneration();
+  invalidateWorkspaceTrustRequests();
+  prepareRendererSessionTransaction("workspace-replaced");
+  useAppStore.setState({
+    ...clearedTransientState(),
+    workspace,
+    trust: descriptor.trust,
+    trustUpdating: false,
+    sessionTransitionPending: true,
+    workspaceOpenPending: true,
+    approvalMode: DEFAULT_APPROVAL_MODE,
+    runtime: { phase: "starting", detail, recoverable: true }
+  });
+  return workspace;
+}
+
+function validateAvailableWorkspace(descriptor: WorkspaceDescriptor): boolean {
+  if (descriptor.availability === "available") return true;
+  publishNotification({
+    level: "warning",
+    title: "工作区目录不可用",
+    message: descriptor.availability === "identity-changed"
+      ? "目录身份已变化，请重新选择并确认工作区目录。"
+      : "请重新选择工作区目录后再打开任务。"
+  });
+  return false;
 }
 
 async function legacyWorkspaceSelection(): Promise<WorkspaceDescriptor | undefined> {

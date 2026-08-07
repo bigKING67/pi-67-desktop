@@ -23,7 +23,17 @@ import {
 } from "./packaged-electron-fixture.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
 import { launchInstalledApplication } from "./windows-installed-application-lifecycle.mjs";
+import {
+  parseWindowsInstallerLifecycleArguments,
+  resolveWindowsInstallerLifecycleContract,
+  WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
+} from "./windows-installer-lifecycle-contract.mjs";
 import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
+import {
+  prepareWindowsRealUserProfile,
+  resolveWindowsRealUserProfilePaths,
+  WINDOWS_REAL_USER_CONFIGURED_PROVIDER
+} from "./windows-real-user-profile.mjs";
 import {
   readLifecycleArtifactIdentity,
   resolveExpectedLifecycleSigner,
@@ -31,34 +41,15 @@ import {
   resolveUpgradeBaselineInstaller,
   resolveWindowsInstallerPath
 } from "./windows-installer-identity.mjs";
-
 export { resolveExpectedLifecycleSigner, resolveUpgradeBaselineInstaller, resolveWindowsInstallerPath };
-
-export const WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS = 180_000;
+export {
+  parseWindowsInstallerLifecycleArguments,
+  resolveWindowsInstallerLifecycleContract,
+  WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
+} from "./windows-installer-lifecycle-contract.mjs";
 const FILE_STATE_TIMEOUT_MS = 30_000;
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");
 const summaryPath = join(outputDirectory, "summary.json");
-
-export function parseWindowsInstallerLifecycleArguments(arguments_) {
-  if (arguments_.length === 0) return { quick: false };
-  if (arguments_.length === 1 && arguments_[0] === "--quick") return { quick: true };
-  throw new Error("Expected no arguments or --quick.");
-}
-
-export function resolveWindowsInstallerLifecycleContract({ baseline, quick }) {
-  if (baseline && quick) {
-    throw new Error("Quick Windows installer lifecycle cannot verify a cross-version upgrade baseline.");
-  }
-  return {
-    certificationMode: quick ? "quick" : "full",
-    evidenceLevel: baseline
-      ? "windows-nsis-cross-version-upgrade-real-user-lifecycle-uninstall"
-      : quick
-        ? "windows-nsis-silent-install-real-user-lifecycle-uninstall"
-        : "windows-nsis-silent-install-reinstall-real-user-lifecycle-uninstall",
-    verifyReinstall: !quick
-  };
-}
 
 export async function verifyWindowsInstallerLifecycle(options = {}) {
   if (process.platform !== "win32" || process.arch !== "x64") {
@@ -104,9 +95,13 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
 
   const root = await mkdtemp(join(tmpdir(), "pi67-windows-installer-"));
   const installDirectory = join(root, "Pi-67 Desktop 中文安装路径");
-  const userDataDirectory = join(root, "user-data");
-  const agentDir = join(root, "agent");
-  const extensionsDirectory = join(agentDir, "extensions");
+  const userDataDirectory = join(root, "用户数据 含空格");
+  const {
+    agentDir,
+    environmentDriftAgentDir,
+    extensionsDirectory,
+    lifecycleUserDataDirectory
+  } = resolveWindowsRealUserProfilePaths(root);
   const workspace = join(root, "中文工作区 包含空格");
   const childPidPath = join(root, "controlled-child.pid");
   const lifecyclePath = join(root, "controlled-lifecycle.txt");
@@ -136,6 +131,11 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       ...baselineIdentity,
       version: baseline.version
     } : null,
+    configurationProfile: {
+      agentDirectoryClass: "localized-space",
+      environmentDriftProbe: true,
+      expectedConfiguredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER
+    },
     phases: [],
     notVerified: [
       "interactive assisted installer UI",
@@ -143,15 +143,20 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       ...(baseline ? [] : ["upgrade from a distinct previously released version"]),
       ...(lifecycleContract.verifyReinstall ? [] : ["same-version reinstall and restored-startup persistence"]),
       "machine-wide installation",
-      "real user default-path uninstall data retention"
+      "real user default-path uninstall data retention", "existing user Pi profile, credentials, history, Defender/EDR, OneDrive or redirected storage"
     ]
   };
   await writeReport(report);
 
   try {
     await Promise.all([
-      mkdir(extensionsDirectory, { recursive: true }),
+      prepareWindowsRealUserProfile({
+        agentDir,
+        environmentDriftAgentDir,
+        extensionsDirectory
+      }),
       mkdir(userDataDirectory, { recursive: true }),
+      mkdir(lifecycleUserDataDirectory, { recursive: true }),
       mkdir(join(workspace, ".git"), { recursive: true })
     ]);
     await Promise.all([
@@ -263,7 +268,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     const realUserLifecycle = await verifyInstalledRealUserLifecycle({
       agentDir,
       artifact: finalInstalledArtifact,
-      userDataDirectory,
+      environmentDriftAgentDir,
+      userDataDirectory: lifecycleUserDataDirectory,
       workspace
     });
     report.phases.push({
@@ -278,8 +284,12 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       await waitForInstallationRemoval(installDirectory);
     });
     report.phases.push(uninstall);
-    const preservedEntries = await assertPreservedUserData(userDataDirectory);
+    const [preservedEntries, preservedLifecycleEntries] = await Promise.all([
+      assertPreservedUserData(userDataDirectory),
+      assertPreservedUserData(lifecycleUserDataDirectory)
+    ]);
     report.userData = {
+      lifecycleProfileTopLevelEntryCount: preservedLifecycleEntries.length,
       preservedAfterUninstall: true,
       topLevelEntryCount: preservedEntries.length
     };

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const controllers = vi.hoisted(() => ({
   compact: vi.fn(async () => undefined),
-  create: vi.fn(async () => undefined),
+  beginIntent: vi.fn(() => "task-intent"),
   reload: vi.fn(async () => undefined),
   rename: vi.fn(async () => true),
   selectModel: vi.fn(async () => undefined)
@@ -16,7 +16,7 @@ vi.mock("../session/session-control-controller.js", () => ({
   selectSessionModel: controllers.selectModel
 }));
 vi.mock("../session/session-lifecycle-controller.js", () => ({
-  createRendererSession: controllers.create
+  beginRendererSessionIntent: controllers.beginIntent
 }));
 vi.mock("../navigation/conversation-organization-controller.js", () => ({
   renameRendererConversation: controllers.rename
@@ -55,7 +55,7 @@ describe("Pi Desktop actions", () => {
     await executePiDesktopAction(piDesktopAction("reload")!, "", READY_CONTEXT);
     await executePiDesktopAction(piDesktopAction("model")!, "openai/gpt", READY_CONTEXT);
 
-    expect(controllers.create).toHaveBeenCalledOnce();
+    expect(controllers.beginIntent).toHaveBeenCalledOnce();
     expect(controllers.compact).toHaveBeenCalledWith("keep decisions");
     expect(controllers.reload).toHaveBeenCalledOnce();
     expect(controllers.selectModel).toHaveBeenCalledWith("openai", "gpt");

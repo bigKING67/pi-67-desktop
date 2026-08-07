@@ -102,12 +102,15 @@ count.
   `removed` additionally requires the exact source/scope to be absent after reload.
   Reserved, mutating, or ambiguous receipts are never replayed automatically after
   Host replacement.
-- Runtime Package admission is fail closed. Only exact verified Desktop capability
-  paths and user-installed Packages whose current directory identity, package
-  name/version, manifest hash, and bounded content hash match an active receipt are
-  exposed to Pi's Session Settings view. `user-installed-observed` is Desktop mutation
-  and drift evidence, not npm registry integrity, a signature/provenance proof, a
-  pinned Git commit, or process isolation. The bounded content hash excludes `.git`
+- Runtime Package admission is fail closed. Exact verified Desktop capability paths,
+  exact Packages matching a cataloged Pi-67 content baseline, and user-installed or
+  user-approved Packages whose current directory identity, package name/version,
+  manifest hash, and bounded content hash match their admission evidence are exposed
+  to Pi's Session Settings view. Approval observes the already-installed bytes and
+  never downloads or reinstalls a Package. `known-baseline-observed`,
+  `user-approved-observed`, and `user-installed-observed` are bounded admission and
+  drift evidence, not npm registry integrity, a signature/provenance proof, a pinned
+  Git commit, or process isolation. The bounded content hash excludes `.git`
   and `node_modules`, inspects at most 10,000 files / 128 MiB / depth 32 / five seconds,
   and blocks execution when that inspection is unsafe or incomplete. Package mirrors
   change transport only and never upgrade trust.
@@ -125,6 +128,13 @@ count.
   as pinned first-party capability snapshots. Desktop materializes verified
   copies under the Pi agent directory, preserves existing Package object filters,
   namespaces managed Rules, and never overwrites an existing global `AGENTS.md`.
+- The default Pi Package set stays minimal: only Pi-67 first-party capability
+  Packages are materialized automatically. Recommended third-party Packages remain
+  user-initiated. `pi-observational-memory@3.0.3` is the sole `prompt-once` option:
+  a truly fresh Agent profile gets one explicit install choice, existing profiles are
+  not interrupted, decline is persisted, and no network request occurs before
+  confirmation. `pi-hy-memory`, `@ff-labs/pi-fff`, and
+  `@victor-software-house/pi-curated-themes` are retired from the default catalog.
 - Settings manages rules and context as Markdown files in two availability scopes.
   Each scope uses a counted secondary category selector and renders only the selected
   category as a flat Catalog. `全局可用` separates user-owned global context,
@@ -310,8 +320,9 @@ count.
   AUTO. Calls that approval cannot make valid -- including unregistered or
   ambiguous Tools, reserved Tool identity mismatches, malformed MCP routing, and
   unverifiable opaque cursors -- are rejected with a corrective message and no
-  approval dialog. Verified
-  `@ff-labs/pi-fff@0.10.1` `grep`/`find` and `ffgrep`/`fffind` calls inherit this
+  approval dialog. The retired `@ff-labs/pi-fff@0.10.1` is not installed or
+  recommended by Desktop; if a user explicitly installs and admits that legacy
+  Package, its `grep`/`find` and `ffgrep`/`fffind` calls inherit this
   path policy only when their Package identity and input contract are exact:
   when pi-fff runs in `override` mode, `grep` and `find` are the FFF-backed live
   names rather than native fallbacks, and Desktop tells the model to use and
@@ -322,9 +333,9 @@ count.
   cursors fail closed outside `YOLO` because their original root cannot be
   proven.
 - While the verified managed `pi67-core` Package is active, the Task-local Pi
-  settings view force-excludes the four legacy auto-discovered copies under
-  `~/.pi/agent/extensions` (`pi-hy-memory`, `pi-rules-loader`,
-  `pi-vision-bridge`, and `xtalpi-pi-tools`). The legacy files and user settings
+  settings view force-excludes the three first-party legacy auto-discovered copies
+  under `~/.pi/agent/extensions` (`pi-rules-loader`, `pi-vision-bridge`, and
+  `xtalpi-pi-tools`). The legacy files and user settings
   are not deleted or rewritten; the managed Package becomes the single runtime
   source. If managed `pi67-core` is absent, Desktop applies no exclusion. This
   prevents duplicate Tool registrations, duplicate rule notifications, and
@@ -342,7 +353,8 @@ count.
   An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
   unsupported Package identity, or duplicate `mcp` source is rejected without a
   meaningless approval. A proxy call
-  that mistakenly addresses the current verified direct `pi-fff` Tool is not an
+  that mistakenly addresses a current, explicitly user-installed and admitted direct
+  `pi-fff` Tool is not an
   authorization decision: Desktop rejects it without opening Approval and tells
   the model to use the active direct name (`find`/`grep` in override mode or
   `fffind`/`ffgrep` in named mode). The corrected Workspace-local read then follows
@@ -529,6 +541,14 @@ count.
   use stable idempotency keys and a bounded same-key transport retry. Lost responses
   cannot duplicate Session creation or replay a control mutation into a newer Session
   generation.
+- `新建会话`, `Cmd/Ctrl+N`, `Cmd/Ctrl+T`, and `/new` first create only a
+  Renderer-owned New Session Intent. The intent is an offline-capable Composer surface,
+  not a Pi Session: it does not connect a Runtime, call `session.create`, or create Pi
+  JSONL until the first Prompt is submitted. That first submit materializes the same
+  Workbench Task under one stable creation authority and waits for its exact physical
+  Session identity before sending `prompt.submit`. Creation failure keeps the text and
+  attachments on the intent; if creation succeeds but Prompt submission fails, retry uses
+  the already materialized Session and never creates a second JSONL.
 - If `session.create` still ends with an unknown acknowledgement outcome, Desktop
   never submits a second create automatically. It keeps one provisional conversation
   in persisted Workbench state and reconciles it by the stable `creationId` written as
@@ -565,6 +585,16 @@ count.
   authority even while Catalog is unavailable or rebuilding. Catalog absence never
   proves that the JSONL is missing, and a failed background Catalog upsert cannot turn
   a successfully materialized Session into `REQUEST_OUTCOME_UNKNOWN`.
+- Opening a Workspace without a known SessionRef registers the Workspace and queries a
+  bounded first Catalog page before creating any Task. A real Catalog Session opens by
+  exact path and physical identity. Only an authoritative `ready`, complete, empty
+  Catalog may call `workspace.open` once to materialize the first Session. A rebuilding,
+  unavailable, errored, or incomplete empty Catalog remains recoverable after a five-second
+  decision budget and never creates a provisional ghost Task.
+- Starting a New Session Intent in another Workspace first selects and registers only that
+  Workspace. The later first-Prompt materialization issues one `session.create` under the
+  intent Task authority. It never reuses the default Workspace-open path and therefore cannot
+  create a hidden Session before the requested one.
 - Workbench persistence v4 stores formal Session identity as Workspace ID, opaque physical
   file identity, and the current path locator. It does not require a Catalog row before
   persisting a live Runtime recovery record. Legacy v3 formal path-keyed recovery is discarded
@@ -720,8 +750,13 @@ count.
 ## Privacy
 
 - Local-first and no analytics or PostHog in v1.
-- The renderer may persist only the non-sensitive appearance preference; it
-  does not persist credentials, prompts, source, tool payloads, or session data.
+- Renderer-local storage may persist only the non-sensitive appearance preference. Composer
+  text and `streamBehavior` use a separate bounded Desktop UI state document owned by Electron
+  Main and encrypted as one payload with `safeStorage`; Session paths inside its exact
+  conversation keys are encrypted with the text. If secure storage is unavailable, Desktop
+  keeps the current in-memory draft but writes no plaintext fallback. The document never stores
+  attachments, staged attachment handles, transcript, Tool payloads, source bodies, credentials,
+  or a second authoritative Session history.
 - Electron Main may persist a bounded, schema-validated Workbench V4 layout with
   Workspace identity and ordering, expanded Workspace IDs, the selected
   conversation or Settings surface, Settings scope, at most eight runtime recovery
@@ -746,6 +781,13 @@ count.
   It stores only bounded presentation text and terminal identity/timing metadata; it
   does not persist Prompt, source, command text, paths, credential values, Protocol
   error details, or raw payload objects in localStorage, SQLite, JSONL, or diagnostics.
+- Native operating-system notifications are emitted only for a background or hidden Session
+  completion, failure, or interactive-attention state. Renderer sends Main only a bounded
+  notification ID plus opaque Workspace/physical Session identity and a fixed kind; Main owns
+  all displayed title/body copy, so Prompt, source, Tool output, error detail, Session title,
+  and absolute paths cannot enter the native notification. Clicking one focuses or recreates
+  the main window and activates the exact matching Workbench Session; stale or missing identity
+  fails visibly instead of opening the newest Session.
 - Electron Main owns the disposable Session Catalog location. Its SQLite rows
   contain only bounded opaque physical identity/Session ID/path/cwd/explicit-name/count/time/parent
   metadata plus pin/archive timestamps projected from the organization store;

@@ -1,14 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
+import {
+  asExternalUrl,
+  asNativeNotificationId,
+  asNativeNotificationRequest
+} from "./system-bridge-policy.js";
 
 describe("system bridge input policy", () => {
-  it("accepts only bounded notification text", () => {
-    expect(asNotification({ title: "t".repeat(121), body: "b".repeat(501) })).toEqual({
-      title: "t".repeat(120),
-      body: "b".repeat(500)
+  it("accepts only bounded opaque native notification identities", () => {
+    expect(asNativeNotificationRequest({
+      notificationId: "native:9:operation-1:completed",
+      kind: "completed",
+      workspaceId: "workspace-1",
+      sessionFileIdentity: "session-file-1"
+    })).toEqual({
+      notificationId: "native:9:operation-1:completed",
+      kind: "completed",
+      workspaceId: "workspace-1",
+      sessionFileIdentity: "session-file-1"
     });
-    expect(asNotification({ title: "valid" })).toBeUndefined();
-    expect(asNotification("invalid")).toBeUndefined();
+    expect(asNativeNotificationRequest({
+      notificationId: "native:9:operation-1:completed",
+      kind: "completed",
+      workspaceId: "workspace-1",
+      sessionFileIdentity: "session-file-1",
+      title: "renderer-controlled text is not accepted"
+    })).toBeUndefined();
+    expect(asNativeNotificationRequest({
+      notificationId: "native/invalid",
+      kind: "completed",
+      workspaceId: "workspace-1",
+      sessionFileIdentity: "session-file-1"
+    })).toBeUndefined();
+    expect(asNativeNotificationRequest("invalid")).toBeUndefined();
+    expect(asNativeNotificationId("native:9:operation-1:completed")).toBe(
+      "native:9:operation-1:completed"
+    );
+    expect(asNativeNotificationId("native/invalid")).toBeUndefined();
   });
 
   it("accepts only valid HTTP and HTTPS external URLs", () => {

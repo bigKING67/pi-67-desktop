@@ -41,6 +41,14 @@ describe("Desktop first-party capability bootstrap", () => {
         displayName: "Pi-67 Core",
         packagePath: "packages/pi67-core",
         resourceTypes: ["extension", "skill", "prompt", "rule"]
+      }],
+      recommendedExternal: [{
+        id: "pi-observational-memory",
+        source: "npm:pi-observational-memory",
+        recommendedVersion: "3.0.3",
+        installPolicy: "prompt-once",
+        admissionPolicy: "known-baseline-or-user-approval",
+        baselineContentSha256: "a".repeat(64)
       }]
     }), "utf8");
     const environment: NodeJS.ProcessEnv = { PI67_DESKTOP: "1" };
@@ -57,6 +65,12 @@ describe("Desktop first-party capability bootstrap", () => {
       .toBe("desktop rule\n");
     expect(JSON.parse(environment.PI67_CAPABILITY_PACKAGE_PATHS ?? "[]")).toEqual(result.packagePaths);
     expect(environment.PI67_MANAGED_CAPABILITIES_ROOT).toBe(result.managedRoot);
+    expect(JSON.parse(environment.PI67_KNOWN_PACKAGE_BASELINES ?? "[]")).toEqual([{
+      source: "npm:pi-observational-memory",
+      packageName: "pi-observational-memory",
+      packageVersion: "3.0.3",
+      baselineContentSha256: "a".repeat(64)
+    }]);
   });
 
   it("fails closed when a bundled package does not match the locked tree hash", async () => {
@@ -78,7 +92,8 @@ describe("Desktop first-party capability bootstrap", () => {
         displayName: "Pi-67 Core",
         packagePath: "packages/pi67-core",
         resourceTypes: ["skill"]
-      }]
+      }],
+      recommendedExternal: []
     }), "utf8");
     await expect(bootstrapDesktopCapabilities({
       capabilitiesRoot,

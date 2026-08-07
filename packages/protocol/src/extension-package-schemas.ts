@@ -20,6 +20,8 @@ const PackageManifestTextSchema = (maximum: number) => Type.String({
 const Sha256Schema = Type.String({ pattern: "^[a-f0-9]{64}$" });
 const ExtensionPackageTrustStateSchema = Type.Union([
   Type.Literal("builtin-verified"),
+  Type.Literal("known-baseline-observed"),
+  Type.Literal("user-approved-observed"),
   Type.Literal("user-installed-observed"),
   Type.Literal("unverified"),
   Type.Literal("drifted"),
@@ -94,7 +96,8 @@ export const ExtensionPackageMutationResultSchema = strictObject({
     Type.Literal("removed"),
     Type.Literal("ambiguous"),
     Type.Literal("not-applicable")
-  ]))
+  ])),
+  reloadRequired: Type.Optional(Type.Boolean())
 });
 
 const ExtensionPackageUpdateSchema = strictObject({
@@ -107,6 +110,19 @@ const ExtensionPackageUpdateSchema = strictObject({
 export const ExtensionPackageUpdatesResultSchema = strictObject({
   items: Type.Array(ExtensionPackageUpdateSchema, { maxItems: 512 }),
   total: Type.Integer({ minimum: 0, maximum: 512 })
+});
+
+export const ExtensionPackageOnboardingResultSchema = strictObject({
+  source: PackageSourceSchema,
+  scope: PackageScopeSchema,
+  state: Type.Union([
+    Type.Literal("unseen"),
+    Type.Literal("installing"),
+    Type.Literal("installed"),
+    Type.Literal("declined"),
+    Type.Literal("install-failed"),
+    Type.Literal("suppressed-existing")
+  ])
 });
 
 function strictObject<T extends Parameters<typeof Type.Object>[0]>(properties: T) {

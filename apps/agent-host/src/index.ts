@@ -4,6 +4,7 @@ import {
   type AgentHostShutdownCompleteMessage,
   type ProtocolPort
 } from "@pi67/protocol";
+import { existsSync } from "node:fs";
 import { isAttachPortMessage } from "./connection-context.js";
 import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
 import { AgentHostServer } from "./host-server.js";
@@ -25,6 +26,7 @@ const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
 
 const agentDir = resolveAgentDirectory(undefined);
+process.env.PI67_AGENT_PROFILE_FRESH = existsSync(agentDir) ? "0" : "1";
 await bootstrapDesktopCapabilities({
   agentDir
 });

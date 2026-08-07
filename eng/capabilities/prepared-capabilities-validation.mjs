@@ -32,6 +32,7 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     || manifest.catalogVersion !== lock.catalogVersion
     || !Array.isArray(catalog.entries)
     || !Array.isArray(catalog.generatedFrom)
+    || !Array.isArray(catalog.recommendedExternal)
     || !Array.isArray(manifest.packages)
   ) throw new Error("Prepared capability metadata does not match the locked catalog.");
 
@@ -44,6 +45,9 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     || expectedSources.size !== entries.size
     || expectedSources.size !== packages.size
   ) throw new Error("Prepared capability package set does not match the source lock.");
+  if (JSON.stringify(catalog.recommendedExternal) !== JSON.stringify(lock.recommendedExternal)) {
+    throw new Error("Prepared recommended Extension catalog does not match the source lock.");
+  }
 
   for (const [id, source] of expectedSources) {
     const generatedSource = generated.get(id);
@@ -90,6 +94,7 @@ export function assertCapabilitySourceLock(lock) {
     lock.schema !== "pi67.capability-sources-lock.v1"
     || !Array.isArray(lock.sources)
     || !Array.isArray(lock.skillPacks)
+    || !Array.isArray(lock.recommendedExternal)
   ) throw new Error("Capability source lock is invalid.");
 
   const ids = lock.sources.map((source) => source.id);
@@ -108,6 +113,33 @@ export function assertCapabilitySourceLock(lock) {
     assertPi67SkillPackSource(pack);
     assertLocalSibling(pack.localSibling, "Skill Pack local sibling");
   }
+  const recommendedIds = lock.recommendedExternal.map((entry) => entry?.id);
+  if (new Set(recommendedIds).size !== recommendedIds.length || recommendedIds.length > 64) {
+    throw new Error("Recommended Extension package ids are invalid.");
+  }
+  for (const entry of lock.recommendedExternal) assertRecommendedPackage(entry);
+}
+
+function assertRecommendedPackage(entry) {
+  if (
+    !entry
+    || typeof entry.id !== "string"
+    || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(entry.id)
+    || typeof entry.source !== "string"
+    || entry.source.length === 0
+    || entry.source.length > 4_096
+    || (entry.recommendedVersion !== undefined && (
+      typeof entry.recommendedVersion !== "string" || entry.recommendedVersion.length > 100
+    ))
+    || (entry.minimumCommit !== undefined && !/^[0-9a-f]{40}$/u.test(entry.minimumCommit))
+    || !["prompt-once", "user-initiated"].includes(entry.installPolicy)
+    || !["known-baseline-or-user-approval", "user-approval"].includes(entry.admissionPolicy)
+    || (entry.baselineContentSha256 !== undefined && !/^[0-9a-f]{64}$/u.test(entry.baselineContentSha256))
+    || (
+      entry.admissionPolicy === "known-baseline-or-user-approval"
+      && (entry.baselineContentSha256 === undefined || entry.recommendedVersion === undefined)
+    )
+  ) throw new Error(`Recommended Extension package ${entry?.id ?? "unknown"} is invalid.`);
 }
 
 function assertLocalSibling(path, label) {
