@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveExistingSessionFileIdentity } from "../../packages/pi-runtime/src/session-path-identity.ts";
 import { createSessionCreationDiagnostic } from "./windows-installer-identity.mjs";
 
 const SESSION_CREATION_POLL_INTERVAL_MS = 50;
@@ -25,17 +26,28 @@ export async function waitForSelectedProvisionalSessionIntent(
   const existingFiles = [...existingSessionFileNames];
   let diagnostic = createSessionCreationDiagnostic(undefined, existing, existingFiles);
   while (performance.now() <= deadline) {
-    const observation = await observeSessionCreation(window, existing, existingFiles);
-    const currentSessionFileNames = await readRealUserSessionFileNames(agentDir);
-    const newPhysicalSessionFileCount = [...currentSessionFileNames]
-      .filter((fileName) => !existingSessionFileNames.has(fileName))
-      .length;
+    const observation = await observeSessionCreation(window, existing);
+    const newPhysicalSessionFiles = await readNewPhysicalSessionFiles(
+      agentDir,
+      existingSessionFileNames
+    );
+    const matchingSessionIdentities = correlateSessionRows(
+      observation.newSessionIdentities,
+      newPhysicalSessionFiles
+    );
     diagnostic = {
-      ...createSessionCreationDiagnostic(observation, existing, existingFiles),
-      newPhysicalSessionFileCount,
+      ...createSessionCreationDiagnostic({
+        ...observation,
+        newSessionIdentities: matchingSessionIdentities,
+        newSessionRowCount: matchingSessionIdentities.length,
+        selectedNewSession: matchingSessionIdentities.includes(observation.selectedIdentity)
+      }, existing, existingFiles),
+      candidateSessionRowCount: observation.newSessionIdentities.length,
+      newPhysicalSessionFileCount: newPhysicalSessionFiles.length,
+      newPhysicalSessionFileNames: newPhysicalSessionFiles.map((file) => file.fileName),
       newProvisionalRowCount: observation.newProvisionalIdentities.length
     };
-    if (observation.newSessionRowCount > 0 || newPhysicalSessionFileCount > 0) {
+    if (matchingSessionIdentities.length > 0 || newPhysicalSessionFiles.length > 0) {
       throw new Error(
         `Windows real-user new Session intent materialized before its first Prompt: ${JSON.stringify(diagnostic)}`
       );
@@ -60,19 +72,42 @@ export async function waitForRealUserCreatedSession(
   window,
   existingIdentities,
   existingSessionFileNames,
+  agentDir,
   deadline
 ) {
   const existing = [...existingIdentities];
   const existingFiles = [...existingSessionFileNames];
   let diagnostic = createSessionCreationDiagnostic(undefined, existing, existingFiles);
   while (performance.now() <= deadline) {
-    const observation = await observeSessionCreation(window, existing, existingFiles);
-    const newSessionIdentity = observation.newSessionIdentities[0] ?? null;
-    diagnostic = createSessionCreationDiagnostic(observation, existing, existingFiles);
-    if (observation.newSessionRowCount > 1) {
+    const observation = await observeSessionCreation(window, existing);
+    const newPhysicalSessionFiles = await readNewPhysicalSessionFiles(
+      agentDir,
+      existingSessionFileNames
+    );
+    const matchingSessionIdentities = correlateSessionRows(
+      observation.newSessionIdentities,
+      newPhysicalSessionFiles
+    );
+    const correlatedObservation = {
+      ...observation,
+      newSessionIdentities: matchingSessionIdentities,
+      newSessionRowCount: matchingSessionIdentities.length,
+      selectedNewSession: matchingSessionIdentities.includes(observation.selectedIdentity)
+    };
+    diagnostic = {
+      ...createSessionCreationDiagnostic(correlatedObservation, existing, existingFiles),
+      candidateSessionRowCount: observation.newSessionIdentities.length,
+      newPhysicalSessionFileCount: newPhysicalSessionFiles.length,
+      newPhysicalSessionFileNames: newPhysicalSessionFiles.map((file) => file.fileName)
+    };
+    if (newPhysicalSessionFiles.length > 1 || matchingSessionIdentities.length > 1) {
       throw new Error(`Windows real-user session.create materialized duplicate Sessions: ${JSON.stringify(diagnostic)}`);
     }
-    if (newSessionIdentity && observation.selectedNewSession) return newSessionIdentity;
+    const sessionIdentity = matchingSessionIdentities[0] ?? null;
+    const sessionPath = newPhysicalSessionFiles[0]?.path;
+    if (sessionIdentity && sessionPath && correlatedObservation.selectedNewSession) {
+      return { sessionIdentity, sessionPath };
+    }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, SESSION_CREATION_POLL_INTERVAL_MS));
   }
   throw new Error(
@@ -80,7 +115,7 @@ export async function waitForRealUserCreatedSession(
   );
 }
 
-function observeSessionCreation(window, existingIdentities, existingSessionFileNames) {
+function observeSessionCreation(window, existingIdentities) {
   return window.evaluate((baseline) => {
     const rows = [...document.querySelectorAll('[data-testid="conversation-row"]')];
     const sessionRows = rows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"));
@@ -89,13 +124,7 @@ function observeSessionCreation(window, existingIdentities, existingSessionFileN
     ));
     const newSessionRows = sessionRows.filter((row) => {
       const identity = row.getAttribute("data-conversation-id") ?? "";
-      if (baseline.identities.includes(identity)) return false;
-      const separatorIndex = Math.max(
-        identity.lastIndexOf("/"),
-        identity.lastIndexOf("\\"),
-        identity.lastIndexOf(":")
-      );
-      return !baseline.fileNames.includes(identity.slice(separatorIndex + 1));
+      return !baseline.identities.includes(identity);
     });
     const newProvisionalRows = provisionalRows.filter((row) => (
       !baseline.identities.includes(row.getAttribute("data-conversation-id") ?? "")
@@ -122,21 +151,45 @@ function observeSessionCreation(window, existingIdentities, existingSessionFileN
       sessionIdentities: sessionRows.map((row) => row.getAttribute("data-conversation-id") ?? ""),
       sessionRowCount: sessionRows.length
     };
-  }, { identities: existingIdentities, fileNames: existingSessionFileNames });
+  }, { identities: existingIdentities });
 }
 
 async function readRealUserSessionFileNames(agentDir) {
+  return new Set((await readRealUserSessionFiles(agentDir)).map((file) => file.fileName));
+}
+
+async function readNewPhysicalSessionFiles(agentDir, existingSessionFileNames) {
+  const files = (await readRealUserSessionFiles(agentDir))
+    .filter((file) => !existingSessionFileNames.has(file.fileName));
+  return Promise.all(files.map(async (file) => ({
+    ...file,
+    fileIdentity: await resolveExistingSessionFileIdentity(file.path)
+  })));
+}
+
+async function readRealUserSessionFiles(agentDir) {
   const sessionsRoot = join(agentDir, "sessions");
   const rootEntries = await readDirectoryEntries(sessionsRoot);
-  const directFileNames = rootEntries
+  const directFiles = rootEntries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
-    .map((entry) => entry.name);
-  const nestedFileNames = await Promise.all(rootEntries
+    .map((entry) => ({ fileName: entry.name, path: join(sessionsRoot, entry.name) }));
+  const nestedFiles = await Promise.all(rootEntries
     .filter((entry) => entry.isDirectory())
     .map(async (entry) => (await readDirectoryEntries(join(sessionsRoot, entry.name)))
       .filter((child) => child.isFile() && child.name.endsWith(".jsonl"))
-      .map((child) => child.name)));
-  return new Set([...directFileNames, ...nestedFileNames.flat()]);
+      .map((child) => ({
+        fileName: child.name,
+        path: join(sessionsRoot, entry.name, child.name)
+      }))));
+  return [...directFiles, ...nestedFiles.flat()];
+}
+
+function correlateSessionRows(sessionIdentities, physicalSessionFiles) {
+  const physicalIdentities = new Set(physicalSessionFiles.map((file) => file.fileIdentity));
+  return sessionIdentities.filter((identity) => {
+    const match = /^session:[^:]+:(.+)$/u.exec(identity);
+    return match ? physicalIdentities.has(match[1]) : false;
+  });
 }
 
 function readDirectoryEntries(path) {

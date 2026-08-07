@@ -22,7 +22,7 @@ import {
   readSelectedConversationIdentity,
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
-import { assertSessionPathContained, sessionPathFromIdentity } from "./windows-installer-identity.mjs";
+import { assertSessionPathContained } from "./windows-installer-identity.mjs";
 import {
   prepareRealUserSessionCreation,
   waitForSelectedProvisionalSessionIntent,
@@ -322,17 +322,18 @@ async function createControlledConversation(window, agentDir) {
 
   const materializationStartedAt = performance.now();
   await submitControlledPromptInput(window);
-  const sessionIdentity = await waitForRealUserCreatedSession(
+  const createdSession = await waitForRealUserCreatedSession(
     window,
     existingIdentities,
     existingSessionFileNames,
+    agentDir,
     materializationStartedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
   );
   const materializationDurationMs = performance.now() - materializationStartedAt;
   if (materializationDurationMs > REAL_USER_CREATE_HARD_TIMEOUT_MS) {
     throw new Error("Windows real-user session.create succeeded after its 15s hard gate.");
   }
-  await canonicalSessionPathFromIdentity(sessionIdentity, agentDir);
+  await canonicalContainedSessionPath(createdSession.sessionPath, agentDir);
 
   await waitForControlledModel(window, REAL_USER_CREATE_HARD_TIMEOUT_MS);
   await waitForControlledPromptRunning(window);
@@ -357,7 +358,7 @@ async function createControlledConversation(window, agentDir) {
       targetMet: materializationDurationMs <= REAL_USER_CREATE_TARGET_MS,
       targetMs: REAL_USER_CREATE_TARGET_MS
     },
-    sessionIdentity
+    sessionIdentity: createdSession.sessionIdentity
   };
 }
 
@@ -371,13 +372,13 @@ function catalogStateFromText(text, itemCount) {
   return undefined;
 }
 
-export async function canonicalSessionPathFromIdentity(identity, agentDir) {
+export async function canonicalContainedSessionPath(sessionPath, agentDir) {
   const canonicalAgentDir = await realpath(systemPath.resolve(agentDir)).catch(() => {
     throw new Error("Windows real-user isolated Agent directory could not be canonicalized.");
   });
-  const sessionPath = sessionPathFromIdentity(identity, canonicalAgentDir);
-  await waitForSessionJsonl(sessionPath);
-  const canonicalSessionPath = await realpath(sessionPath).catch(() => {
+  const resolvedSessionPath = systemPath.resolve(sessionPath);
+  await waitForSessionJsonl(resolvedSessionPath);
+  const canonicalSessionPath = await realpath(resolvedSessionPath).catch(() => {
     throw new Error("Windows real-user Pi Session JSONL could not be canonicalized.");
   });
   assertSessionPathContained(canonicalAgentDir, canonicalSessionPath);

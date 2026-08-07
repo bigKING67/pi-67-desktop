@@ -40,14 +40,6 @@ export function createSessionCreationDiagnostic(
   };
 }
 
-export function sessionPathFromIdentity(identity, agentDir, pathApi = systemPath) {
-  const match = /^session:[^:]+:(.+)$/u.exec(identity);
-  if (!match) throw new Error("Windows real-user Session identity is malformed.");
-  const sessionPath = pathApi.resolve(match[1]);
-  assertSessionPathContained(agentDir, sessionPath, pathApi);
-  return sessionPath;
-}
-
 export function assertSessionPathContained(agentDir, sessionPath, pathApi = systemPath) {
   const relativePath = pathApi.relative(
     comparablePath(agentDir, pathApi),

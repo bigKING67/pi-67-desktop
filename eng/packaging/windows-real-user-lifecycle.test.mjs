@@ -6,10 +6,10 @@ import {
   INSTALLED_SHUTDOWN_BUDGET_MS,
   measureInstalledApplicationShutdown
 } from "./windows-installed-application-lifecycle.mjs";
-import { sessionPathFromIdentity } from "./windows-installer-identity.mjs";
+import { assertSessionPathContained } from "./windows-installer-identity.mjs";
 import {
   activateCatalogSession,
-  canonicalSessionPathFromIdentity,
+  canonicalContainedSessionPath,
   shouldCreateInitialRealUserSession,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
@@ -47,8 +47,8 @@ describe("Windows installed real-user lifecycle", () => {
       await writeFile(sessionPath, "{\"type\":\"session\"}\n", "utf8");
       const canonicalSessionPath = await realpath(sessionPath);
 
-      await expect(canonicalSessionPathFromIdentity(
-        `session:workspace-12345678:${canonicalSessionPath}`,
+      await expect(canonicalContainedSessionPath(
+        canonicalSessionPath,
         aliasAgentDir
       )).resolves.toBe(canonicalSessionPath);
     } finally {
@@ -63,9 +63,7 @@ describe("Windows installed real-user lifecycle", () => {
     ["extended-length Session path", "C:\\isolated\\agent", "\\\\?\\C:\\isolated\\agent\\sessions\\session.jsonl"],
     ["extended-length Agent path", "\\\\?\\C:\\isolated\\agent", "C:\\isolated\\agent\\sessions\\session.jsonl"]
   ])("accepts a contained %s using Windows path semantics", (_label, agentDir, sessionPath) => {
-    const identity = `session:workspace-12345678:${sessionPath}`;
-
-    expect(sessionPathFromIdentity(identity, agentDir, win32)).toBe(win32.resolve(sessionPath));
+    expect(() => assertSessionPathContained(agentDir, sessionPath, win32)).not.toThrow();
   });
 
   it.each([
@@ -73,9 +71,7 @@ describe("Windows installed real-user lifecycle", () => {
     ["parent traversal", "C:\\isolated\\agent", "C:\\isolated\\agent\\..\\outside\\session.jsonl"],
     ["sibling prefix", "C:\\isolated\\agent", "C:\\isolated\\agent-other\\session.jsonl"]
   ])("rejects a %s outside the isolated Agent directory", (_label, agentDir, sessionPath) => {
-    const identity = `session:workspace-12345678:${sessionPath}`;
-
-    expect(() => sessionPathFromIdentity(identity, agentDir, win32)).toThrow(
+    expect(() => assertSessionPathContained(agentDir, sessionPath, win32)).toThrow(
       "Windows real-user Session JSONL resolved outside the isolated Agent directory."
     );
   });
