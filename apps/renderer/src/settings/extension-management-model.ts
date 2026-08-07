@@ -65,11 +65,18 @@ export function packageResourceTypes(entry: ExtensionPackageEntry): PackageResou
 }
 
 export function packageRowEnabled(row: PackageRow): boolean {
+  if (
+    !row.entry.installed
+    || row.entry.trustState === "unverified"
+    || row.entry.trustState === "drifted"
+    || row.entry.trustState === "unavailable"
+  ) return false;
   return packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
 }
 
-export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "unavailable" {
-  if (!row.entry.installed) return "unavailable";
+export function packageRowState(row: PackageRow): "enabled" | "partial" | "disabled" | "blocked" | "unavailable" {
+  if (!row.entry.installed || row.entry.trustState === "unavailable") return "unavailable";
+  if (row.entry.trustState === "unverified" || row.entry.trustState === "drifted") return "blocked";
   const states = packageResourceTypes(row.entry).map((type) => packageResourceEnabled(row.entry, type));
   if (states.every(Boolean)) return "enabled";
   if (states.some(Boolean)) return "partial";
@@ -119,6 +126,28 @@ export function sourceKindLabel(kind: PackageSourceKind): string {
   if (kind === "npm") return "npm";
   if (kind === "git") return "Git";
   return "本地目录";
+}
+
+export function packageTrustLabel(entry: ExtensionPackageEntry): string {
+  if (entry.trustState === "builtin-verified") return "应用内置并已验证";
+  if (entry.trustState === "user-installed-observed") return "Desktop 安装记录已核对";
+  if (entry.trustState === "drifted") return "安装内容已漂移";
+  if (entry.trustState === "unavailable") return "安装内容不可用";
+  return entry.trustReason === "mutation-ambiguous" ? "安装结果需要核对" : "未建立 Desktop 安装记录";
+}
+
+export function packageTrustReasonLabel(entry: ExtensionPackageEntry): string | undefined {
+  const reason = entry.trustReason;
+  if (reason === "receipt-missing") return "缺少 Desktop 持久化安装记录";
+  if (reason === "install-content-missing") return "配置存在，但安装目录缺失";
+  if (reason === "package-identity-changed") return "包名称、版本或已移除状态与记录不一致";
+  if (reason === "manifest-changed") return "package.json 与安装记录不一致";
+  if (reason === "directory-identity-changed") return "安装目录的物理身份已变化";
+  if (reason === "content-hash-changed") return "包内容与安装记录不一致";
+  if (reason === "receipt-invalid") return "安装记录或安装目录未通过完整性检查";
+  if (reason === "inspection-limited") return "包内容超过安全检查预算";
+  if (reason === "mutation-ambiguous") return "上一次安装操作无法证明最终结果";
+  return undefined;
 }
 
 function packagesForScope(items: ExtensionPackageEntry[], scope: "global" | "project") {

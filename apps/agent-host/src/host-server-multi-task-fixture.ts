@@ -8,6 +8,7 @@ import {
   isHostWelcome,
   isResponseEnvelope,
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   type AgentCommandType,
   type CommandPayloads,
   type ProtocolPort,
@@ -78,6 +79,7 @@ class FakeRuntime {
       subscribe: () => () => undefined,
       getIdentity: () => ({
         sessionId: `session-${this.id}`,
+        sessionFileIdentity: `session-file-session-${this.id}`,
         sessionGeneration: this.sessionGeneration,
         ...(this.sessionPath === undefined ? {} : { sessionPath: this.sessionPath })
       }),
@@ -121,6 +123,7 @@ class FakeRuntime {
   private snapshot(): SessionSnapshot {
     return {
       sessionId: `session-${this.id}`,
+      sessionFileIdentity: `session-file-session-${this.id}`,
       cwd: this.cwd,
       streaming: false,
       messages: [],
@@ -174,7 +177,7 @@ export async function attach(server: AgentHostServer, port: FakePort): Promise<v
     hostEpoch: 7
   });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-multi-task",
@@ -227,7 +230,7 @@ export async function command<T extends AgentCommandType>(
     ));
     expect(candidate).toBeDefined();
     response = candidate as ResponseEnvelope<T>;
-  });
+  }, { interval: 1, timeout: 1_000 });
   if (!response) throw new Error("Expected a correlated Host response.");
   return { response };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -42,6 +43,7 @@ describe("AgentHostServer operation replay", () => {
     const importedSnapshot = {
       ...emptySnapshot(),
       sessionId: "session-imported",
+      sessionFileIdentity: "session-file-session-imported",
       cwd: "/tmp/imported"
     };
     const importSession = vi.fn(() => new Promise<typeof importedSnapshot>((resolve) => {
@@ -52,7 +54,7 @@ describe("AgentHostServer operation replay", () => {
       };
     }));
     const { port, server } = await createHarness({
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       importSession
     });
 
@@ -223,7 +225,7 @@ async function createHarness(overrides: Partial<AgentRuntime>): Promise<{
   const runtime = {
     getSdkVersion: () => "0.81.1",
     subscribe: () => () => undefined,
-    getIdentity: () => ({ sessionId: "session-operation-replay", sessionGeneration: 7 }),
+    getIdentity: () => ({ sessionId: "session-operation-replay", sessionFileIdentity: "session-file-session-operation-replay", sessionGeneration: 7 }),
     getSnapshot: () => emptySnapshot(),
     getTaskToolMode: () => "auto" as const,
     getWorkspaceChanges: () => ({
@@ -258,7 +260,7 @@ async function createHarness(overrides: Partial<AgentRuntime>): Promise<{
     hostEpoch: 9
   });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-operation-replay",
@@ -316,6 +318,7 @@ function acceptedOperationId(response: unknown): string {
 function emptySnapshot() {
   return {
     sessionId: "session-operation-replay",
+    sessionFileIdentity: "session-file-session-operation-replay",
     cwd: "/tmp",
     streaming: false,
     messages: [],

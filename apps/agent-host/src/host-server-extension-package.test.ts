@@ -5,6 +5,7 @@ import type { SessionSnapshot } from "@pi67/domain";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isHostWelcome,
   isResponseEnvelope,
   type AgentCommandType,
@@ -35,17 +36,17 @@ const WORKSPACE_CONTEXT: WorkspaceProtocolContext = {
 describe("AgentHostServer Extension package commands", () => {
   it("routes Workspace queries and atomically fences the affected Task during mutation reload", async () => {
     const runtime = createRuntime();
-    let finishInstall!: () => void;
+    let finishMutation!: () => void;
     const list = vi.fn(() => ({ items: [], total: 0 }));
-    const install = vi.fn(() => new Promise<{ items: []; total: 0; changed: true }>((resolve) => {
-      finishInstall = () => resolve({ items: [], total: 0, changed: true });
+    const setEnabled = vi.fn(() => new Promise<{ items: []; total: 0; changed: true }>((resolve) => {
+      finishMutation = () => resolve({ items: [], total: 0, changed: true });
     }));
     const management = {
       list,
       checkForUpdates: vi.fn(async () => ({ items: [], total: 0 })),
-      install,
+      install: vi.fn(async () => ({ items: [], total: 0, changed: true })),
       update: vi.fn(async () => ({ items: [], total: 0, changed: true })),
-      setEnabled: vi.fn(async () => ({ items: [], total: 0, changed: true })),
+      setEnabled,
       restoreProjectInheritance: vi.fn(async () => ({ items: [], total: 0, changed: true })),
       uninstall: vi.fn(async () => ({ items: [], total: 0, changed: true }))
     };
@@ -68,11 +69,11 @@ describe("AgentHostServer Extension package commands", () => {
     expect(list).toHaveBeenCalledOnce();
 
     const mutation = commandEnvelopeForContext(
-      "extension.package.install",
-      { source: "npm:example", scope: "project" },
+      "extension.package.setEnabled",
+      { source: "npm:example", scope: "project", enabled: false, resourceType: "extension" },
       WORKSPACE_CONTEXT,
       3,
-      "install-project"
+      "disable-project-extension"
     );
     port.emit(mutation);
 
@@ -82,8 +83,8 @@ describe("AgentHostServer Extension package commands", () => {
       error: { code: "BUSY", details: { retryable: true } }
     });
 
-    await vi.waitFor(() => expect(install).toHaveBeenCalledOnce());
-    finishInstall();
+    await vi.waitFor(() => expect(setEnabled).toHaveBeenCalledOnce());
+    finishMutation();
     await expect(responseFor(port, mutation)).resolves.toMatchObject({
       ok: true,
       result: { changed: true }
@@ -239,7 +240,7 @@ async function attach(server: AgentHostServer): Promise<FakePort> {
   const port = new FakePort();
   server.attachPort(port, { appInstanceId: "app-extensions", hostInstanceId: "host-extensions", hostEpoch: 3 });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-extensions",
@@ -319,7 +320,7 @@ function createRuntime(): {
     }),
     initialize: async () => snapshot,
     subscribe: () => () => undefined,
-    getIdentity: () => ({ sessionId: snapshot.sessionId, sessionGeneration: 1 }),
+    getIdentity: () => ({ sessionId: snapshot.sessionId, sessionFileIdentity: snapshot.sessionFileIdentity, sessionGeneration: 1 }),
     getSnapshot: () => snapshot,
     getTaskToolMode: () => "auto" as const,
     getResources: () => [],
@@ -343,6 +344,7 @@ function createRuntime(): {
 function emptySnapshot(): SessionSnapshot {
   return {
     sessionId: "session-extensions",
+    sessionFileIdentity: "session-file-session-extensions",
     cwd: "/workspace",
     streaming: false,
     messages: [],

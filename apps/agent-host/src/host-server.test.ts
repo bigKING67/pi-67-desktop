@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
@@ -42,10 +43,24 @@ describe("AgentHostServer", () => {
       checks: []
     };
     const runDoctor = vi.fn(async () => doctor);
+    const runtimeDiagnostics = {
+      generatedAt: 1,
+      application: "π",
+      piSdkVersion: "0.81.1",
+      platform: "darwin",
+      architecture: "arm64",
+      node: "24.18.0",
+      sessionConfigured: false,
+      sessionFileConfigured: false,
+      extensionCount: 0,
+      extensionErrors: []
+    };
+    const collectDiagnostics = vi.fn(async () => runtimeDiagnostics);
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
       runDoctor,
+      collectDiagnostics,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
     } as unknown as AgentRuntime;
@@ -57,7 +72,7 @@ describe("AgentHostServer", () => {
       hostEpoch: 14
     });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-doctor",
@@ -74,6 +89,26 @@ describe("AgentHostServer", () => {
       result: doctor
     });
     expect(runDoctor).toHaveBeenCalledOnce();
+
+    const diagnosticsRequest = commandEnvelopeForContext("diagnostics.collect", {}, TEST_APP_CONTEXT, 14);
+    port.emit(diagnosticsRequest);
+    await expectProtocolResponse(port, diagnosticsRequest.requestId, {
+      ok: true,
+      context: TEST_APP_CONTEXT,
+      result: {
+        ...runtimeDiagnostics,
+        host: {
+          hostEpoch: 14,
+          taskCount: 0,
+          liveRuntimeCount: 0,
+          activeOperationCount: 0,
+          writerLeases: { activeCount: 0, pendingCount: 0, compromised: false },
+          workspaces: [],
+          workspacesTruncated: false
+        }
+      }
+    });
+    expect(collectDiagnostics).toHaveBeenCalledOnce();
     await server.shutdown();
   });
 
@@ -82,7 +117,7 @@ describe("AgentHostServer", () => {
     const createRuntime = () => ({
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-authority", sessionGeneration: 5 }),
+      getIdentity: () => ({ sessionId: "session-authority", sessionFileIdentity: "session-file-session-authority", sessionGeneration: 5 }),
       getSessionTree: () => tree,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -96,7 +131,7 @@ describe("AgentHostServer", () => {
       hostEpoch: 10
     });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-authority",
@@ -220,7 +255,7 @@ describe("AgentHostServer", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-tree", sessionGeneration: 5 }),
+      getIdentity: () => ({ sessionId: "session-tree", sessionFileIdentity: "session-file-session-tree", sessionGeneration: 5 }),
       getSessionTree,
       getSnapshot,
       cancelInteractiveRequests: () => [],
@@ -230,7 +265,7 @@ describe("AgentHostServer", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-tree", hostInstanceId: "host-tree", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-tree",
@@ -255,7 +290,7 @@ describe("AgentHostServer", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-queue", sessionGeneration: 1 }),
+      getIdentity: () => ({ sessionId: "session-queue", sessionFileIdentity: "session-file-session-queue", sessionGeneration: 1 }),
       clearQueue,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -264,7 +299,7 @@ describe("AgentHostServer", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-queue", hostInstanceId: "host-queue", hostEpoch: 3 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-queue",

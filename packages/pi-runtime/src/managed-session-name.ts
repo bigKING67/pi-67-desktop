@@ -3,7 +3,10 @@ import { dirname } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { SessionNameMutation } from "@pi67/protocol";
 import { resolveManagedSessionPath } from "./session-import.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  normalizeSessionCatalogPathIdentity,
+  resolveExistingSessionFileIdentity
+} from "./session-path-identity.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 
 export async function mutateManagedSessionName(options: {
@@ -19,6 +22,7 @@ export async function mutateManagedSessionName(options: {
   const header = manager.getHeader();
   const explicitName = manager.getSessionName()?.trim() || undefined;
   return {
+    fileIdentity: await resolveExistingSessionFileIdentity(path),
     id: manager.getSessionId(),
     path,
     cwd: manager.getCwd(),

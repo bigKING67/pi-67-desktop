@@ -8,7 +8,7 @@ import {
 } from "../workbench/workbench-store.js";
 
 export function selectAuthoritativeRecoveryTask(
-  recoverySessionPath: string | undefined
+  recoverySessionFileIdentity: string | undefined
 ): { context: ReturnType<typeof workbenchProtocolContextForTask>; restore(): void } | undefined {
   const workbench = rendererWorkbenchStore.getState();
   const selectedTaskId = selectedWorkbenchTask(workbench)?.id;
@@ -16,10 +16,9 @@ export function selectAuthoritativeRecoveryTask(
   const task = Object.values(workbench.tasks).find((candidate) => (
     candidate.conversation.kind === "session"
     && candidate.creationStatus === undefined
-    && (recoverySessionPath === undefined
+    && (recoverySessionFileIdentity === undefined
       ? candidate.id === selectedTaskId
-      : candidate.sessionPath === recoverySessionPath
-        || candidate.conversation.sessionPath === recoverySessionPath)
+      : candidate.sessionFileIdentity === recoverySessionFileIdentity)
   ));
   if (!task) return undefined;
   const resumePersistence = selectedTaskId === task.id

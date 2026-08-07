@@ -65,6 +65,7 @@ export function classifyRendererSessionBootstrap(
     && (
       acknowledgement.hostEpoch !== authority.hostEpoch
       || acknowledgement.sessionId !== authority.sessionId
+      || acknowledgement.sessionFileIdentity !== authority.sessionFileIdentity
       || acknowledgement.sessionGeneration !== authority.sessionGeneration
     )
   ) return "stale";

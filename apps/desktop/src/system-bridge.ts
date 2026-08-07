@@ -18,8 +18,16 @@ import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-s
 import { redact } from "./redaction.js";
 import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
-import { parsePackageNetworkSettings, type WorkspaceEntryContextAction } from "@pi67/protocol";
+import {
+  isRuntimeDiagnostics,
+  parsePackageNetworkSettings,
+  type DesktopRecoverySnapshot,
+  type PreviousRunExitStatus,
+  type RuntimeDiagnostics,
+  type WorkspaceEntryContextAction
+} from "@pi67/protocol";
 import { asExternalUrl, asNotification } from "./system-bridge-policy.js";
+import { createDesktopRecoverySnapshot } from "./desktop-recovery-snapshot.js";
 import {
   addOrRefreshWorkspace,
   removeWorkspaceRegistration,
@@ -36,7 +44,7 @@ import {
   type Browser67BrowserId
 } from "./browser67-integration.js";
 
-interface SystemBridgeOptions {
+export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
   getMainWindow: () => BrowserWindow | undefined;
@@ -45,6 +53,7 @@ interface SystemBridgeOptions {
   packageNetworkSettings: PackageNetworkSettingsStore;
   teamMcpSettings: TeamMcpSettingsStore;
   promptAttachments: PromptAttachmentStagingService;
+  previousRunExit: PreviousRunExitStatus;
   workbenchState: WorkbenchStateStore;
   workspaceFileState: WorkspaceFileStateStore;
 }
@@ -84,6 +93,12 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     });
     return registered;
   };
+
+  const recoverySnapshot = async (): Promise<DesktopRecoverySnapshot> => createDesktopRecoverySnapshot(
+    (await workbenchState.load()).state,
+    options.previousRunExit,
+    await options.promptAttachments.diagnostics()
+  );
 
   ipcMain.handle("pi67:platform-info", () => ({
     platform: process.platform,
@@ -153,15 +168,30 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     });
     return result.canceled ? undefined : result.filePaths[0];
   });
-  ipcMain.handle("pi67:save-diagnostics", async (_event, content: unknown) => {
-    if (typeof content !== "string" || content.length > 1_000_000) throw new Error("Invalid diagnostic payload.");
+  ipcMain.handle("pi67:recovery-snapshot", recoverySnapshot);
+  ipcMain.handle("pi67:save-diagnostics", async (_event, value: unknown) => {
+    if (!isRuntimeDiagnostics(value)) throw new Error("Invalid diagnostic payload.");
+    const diagnostics: RuntimeDiagnostics = value;
     const result = await dialog.showSaveDialog(options.getMainWindow()!, {
       title: "保存脱敏诊断",
       defaultPath: `pi67-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: "JSON", extensions: ["json"] }]
     });
     if (result.canceled || !result.filePath) return undefined;
-    await writeFile(result.filePath, redact(content), { encoding: "utf8", mode: 0o600 });
+    const supportDiagnostics = {
+      schema: "pi67-support-diagnostics.v1" as const,
+      generatedAt: Date.now(),
+      application: {
+        version: app.getVersion(),
+        platform: process.platform,
+        architecture: process.arch,
+        packaged: app.isPackaged
+      },
+      desktop: await recoverySnapshot(),
+      runtime: diagnostics
+    };
+    const serialized = `${JSON.stringify(supportDiagnostics, null, 2)}\n`;
+    await writeFile(result.filePath, redact(serialized), { encoding: "utf8", mode: 0o600 });
     return result.filePath;
   });
   ipcMain.handle("pi67:notify", (_event, value: unknown) => {

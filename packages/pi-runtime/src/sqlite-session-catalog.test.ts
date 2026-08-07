@@ -95,7 +95,7 @@ describe("SQLite Session Catalog", () => {
     catalog.close();
   });
 
-  it("rebuilds atomically, replaces a changed source and preserves duplicate ids by path", async () => {
+  it("rebuilds atomically, replaces a changed source and preserves duplicate ids by physical identity", async () => {
     const root = await temporaryRoot();
     const catalog = await openReady(root);
     catalog.replaceAll("source-a", [record(1), record(2, { id: "id-1" })], metadata(), 1);
@@ -142,6 +142,27 @@ describe("SQLite Session Catalog", () => {
     catalog.replaceAll("source", [record(1)], metadata(), 1);
     catalog.close();
     expect((await readdir(root)).filter((name) => name.includes("recovery"))).toEqual([]);
+  });
+
+  it("rebuilds a disposable schema v2 projection without touching Session JSONL", async () => {
+    const root = await temporaryRoot();
+    const location = join(root, SESSION_CATALOG_DATABASE_FILENAME);
+    const source = join(root, "authoritative-session.jsonl");
+    const payload = "{\"type\":\"session\",\"id\":\"authoritative\"}\n";
+    await writeFile(source, payload, "utf8");
+    const legacy = new DatabaseSync(location);
+    legacy.exec("CREATE TABLE legacy_sessions (path TEXT PRIMARY KEY) STRICT; PRAGMA user_version = 2;");
+    legacy.close();
+
+    const catalog = await openReady(root);
+    expect(catalog.getState()).toMatchObject({ sourceKey: "", revision: 0, itemCount: 0, incomplete: true });
+    expect((await readdir(root)).filter((name) => name.includes("recovery"))).toHaveLength(1);
+    expect(await readFile(source, "utf8")).toBe(payload);
+
+    catalog.replaceAll("source", [record(1)], metadata(), 1);
+    catalog.close();
+    expect((await readdir(root)).filter((name) => name.includes("recovery"))).toEqual([]);
+    expect(await readFile(source, "utf8")).toBe(payload);
   });
 
   it.runIf(process.platform !== "win32")(
@@ -377,6 +398,7 @@ function querySearch(catalog: SqliteSessionCatalog, search: string): SessionCata
 
 function record(index: number, overrides: Partial<SessionCatalogRecord> = {}): SessionCatalogRecord {
   return {
+    fileIdentity: `session-file-fixture-${index}`,
     id: `id-${index}`,
     path: `/sessions/${String(index).padStart(3, "0")}.jsonl`,
     cwd: WORKSPACE,

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -135,5 +135,63 @@ describe("bootstrapTeamMcpConfig", () => {
     });
     expect(result.status).toBe("invalid-json");
     expect(await readFile(join(agentDir, "mcp.json"), "utf8")).toBe("{not-json");
+  });
+
+  it("fails closed when mcp.json changes after it was read", async () => {
+    const agentDir = await tempAgentDir();
+    const path = join(agentDir, "mcp.json");
+    const initial = `${JSON.stringify({
+      mcpServers: { tmwd_browser: { command: "node", args: ["server.mjs"] } }
+    }, null, 2)}\n`;
+    const external = `${JSON.stringify({
+      mcpServers: { external: { command: "external-command" } }
+    }, null, 2)}\n`;
+    await writeFile(path, initial, "utf8");
+    let mutated = false;
+
+    const result = await bootstrapTeamMcpConfig({
+      agentDir,
+      environment: { PI67_DESKTOP: "1" },
+      readFile: async (filePath) => {
+        const bytes = await readFile(filePath);
+        if (!mutated) {
+          mutated = true;
+          await writeFile(path, external, "utf8");
+        }
+        return bytes;
+      }
+    });
+
+    expect(result.status).toBe("revision-conflict");
+    expect(await readFile(path, "utf8")).toBe(external);
+    expect(await readdir(agentDir)).toEqual(["mcp.json"]);
+  });
+
+  it("fails closed when mcp.json is created after an initial missing read", async () => {
+    const agentDir = await tempAgentDir();
+    const path = join(agentDir, "mcp.json");
+    const external = `${JSON.stringify({
+      mcpServers: { external: { command: "external-command" } }
+    }, null, 2)}\n`;
+    let reads = 0;
+
+    const result = await bootstrapTeamMcpConfig({
+      agentDir,
+      environment: { PI67_DESKTOP: "1" },
+      readFile: async (filePath) => {
+        reads += 1;
+        if (reads === 1) {
+          await writeFile(path, external, "utf8");
+          throw Object.assign(new Error(`ENOENT: no such file or directory, open '${filePath}'`), {
+            code: "ENOENT"
+          });
+        }
+        return readFile(filePath);
+      }
+    });
+
+    expect(result.status).toBe("revision-conflict");
+    expect(await readFile(path, "utf8")).toBe(external);
+    expect(await readdir(agentDir)).toEqual(["mcp.json"]);
   });
 });

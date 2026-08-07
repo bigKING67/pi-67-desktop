@@ -57,6 +57,8 @@ const samples = {
   searchHit10k: [],
   searchMiss10k: [],
   pageBytes10k: [],
+  rebuildingFirstPage10k: [],
+  rebuildingUpsert10k: [],
   reopen10k: []
 };
 
@@ -121,6 +123,36 @@ for (let sample = 0; sample < sampleCount; sample += 1) {
     assert.equal(searchMiss10k.value.total, 0, "Search-miss fixture unexpectedly matched a session.");
     assert.deepEqual(searchMiss10k.value.items, [], "Search-miss fixture must return an empty page.");
 
+    const liveRecord = createLiveRecord(largeRecords, sample);
+    const gatedRebuild = createGatedReconcileContext(largeContext);
+    const rebuilding = largeCatalog.reconcile(gatedRebuild.context);
+    await gatedRebuild.started;
+    const rebuildingFirstPage = await measureValue(() => largeCatalog.query({
+      scope: "workspace",
+      limit: pageLimit
+    }, largeContext));
+    samples.rebuildingFirstPage10k.push(rebuildingFirstPage.durationMs);
+    assertFirstPage(rebuildingFirstPage.value, SESSION_CATALOG_SIZES.large, largeRecords);
+    samples.rebuildingUpsert10k.push(await measureDuration(() => largeCatalog.upsert(
+      liveRecord,
+      largeContext,
+      "session-created"
+    )));
+    const liveSearch = await largeCatalog.query({
+      scope: "workspace",
+      search: liveRecord.explicitName,
+      limit: pageLimit
+    }, largeContext);
+    assert.equal(liveSearch.total, 1, "A Session upsert must remain queryable while reconciliation is pending.");
+    assert.equal(liveSearch.items[0]?.fileIdentity, liveRecord.fileIdentity);
+    gatedRebuild.release();
+    await rebuilding;
+    assertSqliteReady(largeCatalog, SESSION_CATALOG_SIZES.large + 1);
+
+    // Restore the stable 10,000-record baseline before measuring reopen.
+    await largeCatalog.reconcile(largeContext);
+    assertSqliteReady(largeCatalog, SESSION_CATALOG_SIZES.large);
+
     await largeCatalog.dispose();
     reopenedCatalog = createSessionCatalog({ directory: join(temporaryRoot, "large") });
     const gatedReopen = createGatedReconcileContext(largeContext);
@@ -163,18 +195,39 @@ async function measureValue(operation) {
 
 function createGatedReconcileContext(context) {
   let release;
+  let markStarted;
   const gate = new Promise((resolve) => {
     release = resolve;
+  });
+  const started = new Promise((resolve) => {
+    markStarted = resolve;
   });
   return {
     context: {
       ...context,
       discover: async () => {
+        markStarted();
         await gate;
         return context.discover();
       }
     },
-    release
+    release,
+    started
+  };
+}
+
+function createLiveRecord(records, sample) {
+  const workspace = records[0].cwd;
+  const suffix = String(sample).padStart(2, "0");
+  return {
+    fileIdentity: `session-file-live-${suffix}`,
+    id: `session-live-${suffix}`,
+    path: join(workspace, "sessions", `session-live-${suffix}.jsonl`),
+    cwd: workspace,
+    cwdKey: records[0].cwdKey,
+    explicitName: `Live rebuild session ${suffix}`,
+    modifiedAt: records[0].modifiedAt + 1_000 + sample,
+    messageCount: 0
   };
 }
 

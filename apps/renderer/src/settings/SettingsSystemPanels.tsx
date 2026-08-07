@@ -31,9 +31,9 @@ export function RuntimeSettings() {
         <SettingsRow title="单个会话写入实例" description="同一 Session 路径不会同时绑定两个 live writer。" value="1 个" />
         <SettingsRow
           leading={<Stethoscope aria-hidden="true" size={17} />}
-          title="运行环境诊断"
-          description="检查内置 Node、Pi SDK、SQLite、Shell 和 Git。"
-          actions={<Button aria-label="运行环境诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
+          title="恢复与诊断"
+          description="检查运行环境、Workspace 身份、Session 恢复、Writer Lease 和附件暂存状态。"
+          actions={<Button aria-label="恢复与诊断" className="secondary-button" onPress={() => setDoctorDialogOpen(true)}>打开诊断</Button>}
         />
       </SettingsRows>
     </SettingsSectionBlock>

@@ -5,6 +5,7 @@ import {
   MAX_SESSION_CATALOG_PAGE_ITEMS,
   MAX_SESSION_CATALOG_PATH_CHARS,
   MAX_SESSION_CATALOG_SEARCH_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS,
   SESSION_CATALOG_QUERY_KEY_CHARS
 } from "@pi67/domain";
 
@@ -35,6 +36,7 @@ export const SessionCatalogQuerySchema = strictObject({
 });
 
 const SessionSummarySchema = strictObject({
+  fileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
   id: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_ID_CHARS }),
   workspaceId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   path: CatalogPathSchema,

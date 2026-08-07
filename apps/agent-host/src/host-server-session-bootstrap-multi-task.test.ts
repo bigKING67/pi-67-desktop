@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -48,7 +49,7 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
       hostEpoch: 12
     });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-multi-task",
@@ -111,7 +112,11 @@ describe("AgentHostServer multi-Task session bootstrap", () => {
 function taskRuntime(initialSessionId: string, createdSessionId: string) {
   let sessionId = initialSessionId;
   let sessionGeneration = 1;
-  const snapshot = () => ({ ...emptySnapshot(), sessionId });
+  const snapshot = () => ({
+    ...emptySnapshot(),
+    sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`
+  });
   const initialize = vi.fn(async () => snapshot());
   const createSession = vi.fn(async () => {
     sessionId = createdSessionId;
@@ -128,7 +133,7 @@ function taskRuntime(initialSessionId: string, createdSessionId: string) {
       initialize,
       createSession,
       getSnapshot: snapshot,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       getTaskToolMode: () => "auto" as const,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -175,6 +180,7 @@ function successResult(port: BootstrapTaskPort, requestId: string): unknown {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     cwd: "/tmp",
     streaming: false,
     messages: [],

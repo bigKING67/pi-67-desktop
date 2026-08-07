@@ -77,13 +77,18 @@ export function ConversationRow({
             <Menu aria-label={`${row.title} 对话菜单`} className={styles.menu!}>
               <MenuItem className={styles.menuItem!} onAction={() => void setRendererConversationPinned(
                 sessionConversation.workspaceId,
-                { path: sessionConversation.sessionPath, ...(row.session?.pinnedAt === undefined ? {} : { pinnedAt: row.session.pinnedAt }) }
+                {
+                  fileIdentity: sessionConversation.sessionFileIdentity,
+                  path: sessionConversation.sessionPath,
+                  ...(row.session?.pinnedAt === undefined ? {} : { pinnedAt: row.session.pinnedAt })
+                }
               )} textValue={row.pinned ? "取消置顶" : "置顶对话"}>
                 {row.pinned ? <PinOff aria-hidden="true" size={13} /> : <Pin aria-hidden="true" size={13} />}
                 {row.pinned ? "取消置顶" : "置顶对话"}
               </MenuItem>
               <MenuItem className={styles.menuItem!} onAction={() => useConversationDialogStore.getState().openRename({
                 workspaceId: sessionConversation.workspaceId,
+                fileIdentity: sessionConversation.sessionFileIdentity,
                 path: sessionConversation.sessionPath,
                 title: row.title,
                 nameSource: row.titleSource
@@ -93,7 +98,10 @@ export function ConversationRow({
               {row.titleSource === "explicit" ? (
                 <MenuItem className={styles.menuItem!} onAction={() => void renameRendererConversation(
                   sessionConversation.workspaceId,
-                  sessionConversation.sessionPath,
+                  {
+                    fileIdentity: sessionConversation.sessionFileIdentity,
+                    path: sessionConversation.sessionPath
+                  },
                   undefined
                 )} textValue="恢复自动标题">
                   <RotateCcw aria-hidden="true" size={13} />恢复自动标题
@@ -105,7 +113,10 @@ export function ConversationRow({
                   kind: "session",
                   ...(task ? { lifecycle: task.lifecycle, hasDraft: task.hasDraft || task.attachmentCount > 0 } : {})
                 }))}
-                onAction={() => void archiveRendererConversation(sessionConversation.workspaceId, sessionConversation.sessionPath)}
+                onAction={() => void archiveRendererConversation(sessionConversation.workspaceId, {
+                  fileIdentity: sessionConversation.sessionFileIdentity,
+                  path: sessionConversation.sessionPath
+                })}
                 textValue="归档对话"
               ><Archive aria-hidden="true" size={13} />归档对话</MenuItem>
               {task && taskCanBeStopped(task.lifecycle) ? (
@@ -135,5 +146,9 @@ async function openConversation(row: ConversationRowModel): Promise<void> {
   const workspace = workbench.workspaces[row.conversation.workspaceId];
   if (!workspace || row.conversation.kind !== "session") return;
   workbench.selectConversation(row.conversation);
-  await openRendererWorkspaceDescriptor(workspace, row.conversation.sessionPath);
+  await openRendererWorkspaceDescriptor(
+    workspace,
+    row.conversation.sessionPath,
+    row.conversation.sessionFileIdentity
+  );
 }

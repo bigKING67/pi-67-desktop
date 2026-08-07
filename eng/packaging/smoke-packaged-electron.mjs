@@ -128,13 +128,13 @@ try {
   }
   const sessionCreation = await verifyPackagedSessionCreation({ agentDir, window });
   const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
-  await workspaceSettings.getByRole("button", { name: /运行环境诊断/u }).click();
-  const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
+  await workspaceSettings.getByRole("button", { name: /恢复与诊断/u }).click();
+  const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
   const sessionCatalogCheck = doctorDialog.getByLabel("运行环境检查结果")
     .locator(".doctor-check").filter({ hasText: "Session 目录" });
-  await doctorDialog.getByRole("button", { name: /重新运行检查/u }).click();
+  await doctorDialog.getByRole("button", { name: /重新检查/u }).click();
   await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v2; ready/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v3; ready/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^模型服务/u }).click();

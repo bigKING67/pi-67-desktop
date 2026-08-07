@@ -5,7 +5,7 @@ import type {
   TaskId,
   TaskLifecycle,
   TaskToolMode,
-  WorkbenchStateV3,
+  WorkbenchStateV4,
   WorkbenchSurface,
   WorkspaceDescriptor,
   WorkspaceId
@@ -18,6 +18,7 @@ export interface RendererWorkbenchTask {
   sessionId: string;
   taskGeneration: number;
   sessionGeneration?: number;
+  sessionFileIdentity?: string;
   lifecycle: TaskLifecycle;
   runtime: RuntimeStatus;
   title: string;
@@ -31,6 +32,7 @@ export interface RendererWorkbenchTask {
   operationId?: string | undefined;
   creationId?: string | undefined;
   creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
+  sessionMetadataStatus?: "indexing" | undefined;
   recoveryHostInstanceId?: string | undefined;
   recoveryHostEpoch?: number | undefined;
 }
@@ -50,7 +52,7 @@ export interface RendererWorkbenchState {
   settingsSection: SettingsSection;
   settingsScope: "global" | "project";
   settingsWorkspaceId: WorkspaceId | undefined;
-  hydrate: (state: WorkbenchStateV3) => void;
+  hydrate: (state: WorkbenchStateV4) => void;
   registerWorkspace: (workspace: WorkspaceDescriptor) => void;
   unregisterWorkspace: (workspaceId: WorkspaceId) => boolean;
   reorderWorkspaces: (workspaceIds: WorkspaceId[]) => boolean;

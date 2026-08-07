@@ -85,6 +85,7 @@ describe("renderer Operation submission replay", () => {
       cancellable: false,
       hostEpoch: 9,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 3
     });
     await invoking;
@@ -113,6 +114,7 @@ function terminalReceipt(
     cancellable: false as const,
     hostEpoch: 9,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 10,
     settledAt: 20
@@ -133,6 +135,7 @@ function terminalReceipt(
 function snapshot(sessionId = "session-1"): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

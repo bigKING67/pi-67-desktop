@@ -196,6 +196,7 @@ function terminalReceipt(options: {
     cancellable: false as const,
     hostEpoch: options.hostEpoch ?? 9,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 10,
     settledAt: 20

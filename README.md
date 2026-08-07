@@ -8,7 +8,8 @@
 文件、URL scheme、安装产物和 Release 的技术身份，避免破坏已有升级与分发合同。
 
 工作台不使用水平任务标签。左栏按 Workspace 分组显示活动任务、草稿和最近
-Session，点击会话直接切换中央工作面；最多四个真正运行或等待输入的 Pi Runtime
+Session，点击会话直接切换中央工作面；最多八个真正运行或等待输入的 Pi Runtime
+（统一合同 `MAX_RUNNING_TASKS = 8`）
 可以在切换会话后继续后台运行，普通 Session 历史由可重建 Catalog 分页承载。
 
 当前仓库处于 alpha 实施阶段。日常开发候选不提交到 Git，也不默认创建 GitHub
@@ -79,6 +80,10 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - Pi SDK 运行在 Electron Agent Host utility process，不进入 renderer
 - Welcome 不预启动 Agent Host；选择工作区或运行 Doctor 时按需启动，随后才动态加载 Pi SDK
 - Pi JSONL 会话是真源；桌面索引只能是可丢弃投影
+- Workspace 注册以 canonical path 加文件系统物理身份校验；仅有 path-only 证据时，重启后必须由原生目录选择器重新确认，不能仅凭相同路径恢复信任
+- Pi 配置、Context Markdown 和 Workspace 文件保存共享同目录临时文件、file fsync 与 atomic replace；Windows 只对 `EACCES` / `EPERM` / `EBUSY` 做有界重试
+- 第三方 Pi Package 只有在 Desktop durable mutation receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；无记录、结果不明、内容漂移或检查超限均保持阻止执行，且不会触发 Pi 的隐式安装
+- `user-installed-observed` 不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
 - Peak Code 只作固定版本的产品/交互参考，不作为 merge upstream
 
 选择 SDK 而非 RPC 的原因是本项目本身使用 Node/TypeScript。SDK 可以直接使用
@@ -108,15 +113,18 @@ Electron Main
 
 开发环境只允许 Vite 在 `127.0.0.1:5173` 提供静态资源和 HMR。
 
-## Protocol v3 与运行模型
+## Protocol v4 与运行模型
 
-跨进程控制面使用同仓 clean-break 的 Protocol v3：
+跨进程控制面使用同仓 clean-break 的 Protocol v4：
 
 - `hello` / `welcome` 协商 `appInstanceId`、`hostInstanceId`、`hostEpoch`、事件序列和消息上限；
 - 每个 command、response 和 event 都有 TypeBox schema；Session/Operation 事件还交叉校验 envelope 与
   payload authority，错误使用稳定 code，而不是解析报错字符串；
 - `prompt.submit`、extension command、compact 和 session import 先返回
   `accepted + operationId`，业务执行不受通用 30 秒请求超时约束；
+- 上述副作用 Operation 在进入 Pi 前先把 caller-stable submission fingerprint、Operation ID 和物理
+  Session authority 写入私有 durable receipt；replacement Host 将未确认的 accepted/running receipt
+  恢复为同一 Operation ID 的 `lost`，只返回收据而不重放 Prompt、command、compact 或 import；
 - Agent Host 关闭、`messageerror` 或 epoch 更换会立即终止旧 pending request，旧响应不能覆盖新状态；
 - 应用退出由 Main 异步 gate：Host 先关闭 admission、清理 Queue/交互请求、尝试 abort active Operation
   并 dispose Pi Runtime；超过有界 deadline 才强制 kill，退出期间不会再重启 Host 或 broker 新 Port；
@@ -125,7 +133,23 @@ Electron Main
 - Extension Catalog 独立于会话快照，过滤 Desktop 内部 hidden extension，并按 command、tool、
   shared UI 与 TUI custom surface 展示保守兼容性；证据不足明确显示为未知。
 - Session Catalog 通过 `session.catalog.query` 提供 revision-bound keyset 分页和服务端搜索；
-  changed event 只做失效通知，`projection.resync` 只恢复 Catalog status，不回传全量 Session。
+  changed event 只做失效通知，`projection.resync` 只恢复 Catalog status，不回传全量 Session。Pi JSONL
+  的 exact creation marker 和 header/path 负责证明 Session 已创建；Catalog 只补标题、时间、搜索和排序，
+  不门控已知 Session 的打开或创建恢复。Catalog schema v3 以 opaque 物理 JSONL identity 为主键，path
+  只是唯一 locator；同一物理文件的 alias 更新一行，相同 Session ID 的不同物理 JSONL 仍保持独立。
+- Renderer 和 Workbench v4 使用 `workspaceId + sessionFileIdentity` 作为正式会话实体键；`sessionId`
+  用于 Pi 业务校验，path 只用于显示和打开。Catalog 不会把 provisional 猜成正式 Session，也不门控
+  Runtime recovery 持久化。旧 v3 的 path-keyed 正式恢复记录会 fail closed 到 Workspace surface；带稳定
+  `creationId` 的 provisional creation recovery 会保留。
+- Session 创建副作用由私有 Durable Creation Journal 约束：`creationId` 在调用 Pi 前依次持久化
+  `reserved` / `materializing`，exact marker 与物理 JSONL 身份确认后进入 `materialized`，权威 bootstrap
+  构建完成后进入 `published`。`materializing` 且无 exact marker 的重启状态一律标记为 `ambiguous`，
+  不会再次调用 `newSession()`；Journal 丢失时可从 exact marker 重建，且从不保存 Prompt、源码或凭据。
+- Session writer authority 同时使用 Host 内 registry 与 `<storageRoot>/session-writer-leases-v1` 跨进程锁。
+  未创建路径先锁定物理 parent + 精确 leaf；JSONL 物化后在仍持有 provisional fence 时 rekey 到
+  `device + inode + birthtime` 物理身份。只有 Runtime dispose 成功后才释放 lease；heartbeat compromised
+  会触发 Host replacement。owner metadata 只保存 Host/epoch/PID 与 identity hash，不保存 Session path、
+  Workspace path、Prompt、源码或凭据。
 
 日常更新使用 `conversation.changed`、`queue.changed`、`session.metaChanged`、
 `tree.changed` 和 `usage.changed` 等窄事件。初始/恢复状态通过受控 bootstrap 或
@@ -197,6 +221,14 @@ corepack pnpm run preview:mac:unsigned
 PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
 ```
 
+每周原生性能认证还会运行 `100 MiB / 100,000 records` 的真实文件 Session JSONL
+工作负载。`500 MiB / 100,000 records` 仅允许显式启用，不进入普通 PR 验证：
+
+```bash
+PI67_PERF_LARGE_SESSION_PROFILE=standard corepack pnpm run performance:large-session
+PI67_PERF_LARGE_SESSION_PROFILE=extended corepack pnpm run performance:large-session
+```
+
 预算、测量定义和证据边界见 `docs/testing/performance.md`。
 
 ## 目录
@@ -208,7 +240,7 @@ apps/
   renderer/         React 产品界面、Connection Controller、增量投影和 feature UI
 packages/
   domain/           无运行时依赖的策略与视图模型
-  protocol/         Protocol v3 envelope、逐消息 schema 和 Port client
+  protocol/         Protocol v4 envelope、逐消息 schema 和 Port client
   extension-compat/ 声明式 Extension Adapter manifest、校验与 immutable registry
   pi-runtime/       AgentRuntime port、PiSdkRuntime、extension UI 与安全扩展
 eng/
@@ -259,6 +291,8 @@ Session 搜索、Queue 查看与原子清空，以及 Pi Session Recorded Change
 Diff、Queue 逐条编辑和 asset handle 仍是后续能力。Session 导航
 已经使用 disposable metadata-only SQLite Catalog：Pi JSONL 仍是唯一真源，SQLite 不保存
 Prompt、Assistant、Thinking、Tool payload、源码、Patch、图片或 transcript，也不提供 FTS。
+Catalog 继续使用 `BEGIN IMMEDIATE` + DELETE journal；在 WAL main/sidecar 的隔离、恢复和 Windows
+锁定合同被独立验证前，不把未经证明的 WAL 切换并入 identity schema 变更。
 
 产品、视觉与运行时边界分别由 `PRODUCT.md`、`DESIGN.md` / `DESIGN.dark.md`、
 `AGENTS.md` 和 `docs/architecture/processes-and-protocol.md` 管理。

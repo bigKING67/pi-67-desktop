@@ -242,7 +242,13 @@ function authority(
   sessionGeneration: number,
   projectionRevision: number
 ): SessionProjectionAuthority {
-  return { hostEpoch: 7, sessionId, sessionGeneration, projectionRevision };
+  return {
+    hostEpoch: 7,
+    sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
+    sessionGeneration,
+    projectionRevision
+  };
 }
 
 function active(authorityValue: SessionProjectionAuthority): SessionProjectionAuthorityState {
@@ -253,6 +259,7 @@ function snapshot(sessionId: string, count: number, hasOlder: boolean): SessionS
   const messages = Array.from({ length: count }, (_, index) => message(sessionId, index));
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     cwd: "/workspace",
     streaming: false,
     messages,

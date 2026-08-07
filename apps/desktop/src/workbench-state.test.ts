@@ -17,7 +17,7 @@ import {
   UnsupportedWorkbenchStateVersionError,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME,
-  type WorkbenchStateV3
+  type WorkbenchStateV4
 } from "./workbench-state.js";
 import {
   cleanupWorkbenchStateTestRoots,
@@ -29,8 +29,17 @@ import {
 
 afterEach(cleanupWorkbenchStateTestRoots);
 
-describe("WorkbenchStateV3 persistence", () => {
-  it("writes the canonical V3 state atomically with POSIX-private modes", async () => {
+describe("WorkbenchStateV4 persistence", () => {
+  it("marks a missing persisted state as first-run initialization", async () => {
+    const loaded = await testStore(await temporaryRoot()).load();
+
+    expect(loaded).toEqual({
+      state: createEmptyWorkbenchState(),
+      recovery: { kind: "initialized" }
+    });
+  });
+
+  it("writes the canonical V4 state atomically with POSIX-private modes", async () => {
     const userData = await temporaryRoot();
     const store = testStore(userData);
     const workspace = descriptorFixture("workspace-1", join(userData, "workspace-1"));
@@ -39,7 +48,7 @@ describe("WorkbenchStateV3 persistence", () => {
     const serialized = await readFile(store.requestedStatePath, "utf8");
     const directoryEntries = await readdir(join(userData, WORKBENCH_STATE_DIRECTORY));
 
-    expect(saved).toMatchObject({ version: 3, expandedWorkspaceIds: [workspace.id], runtimeRecovery: [] });
+    expect(saved).toMatchObject({ version: 4, expandedWorkspaceIds: [workspace.id], runtimeRecovery: [] });
     expect(JSON.parse(serialized)).toEqual(saved);
     expect(directoryEntries).toEqual([WORKBENCH_STATE_FILENAME]);
     if (process.platform !== "win32") {
@@ -64,7 +73,7 @@ describe("WorkbenchStateV3 persistence", () => {
     });
   });
 
-  it("quarantines malformed and oversized V3 state before resetting", async () => {
+  it("quarantines malformed and oversized V4 state before resetting", async () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
@@ -76,9 +85,9 @@ describe("WorkbenchStateV3 persistence", () => {
     expect(malformed.state).toEqual(createEmptyWorkbenchState());
     expect(malformed.recovery).toEqual({
       kind: "corrupt-reset",
-      quarantinedFileName: "state-v3.corrupt-1700000000000-token.json"
+      quarantinedFileName: "state-v4.corrupt-1700000000000-token.json"
     });
-    expect(await readdir(directory)).toEqual(["state-v3.corrupt-1700000000000-token.json"]);
+    expect(await readdir(directory)).toEqual(["state-v4.corrupt-1700000000000-token.json"]);
 
     await writeFile(statePath, "x".repeat(MAX_WORKBENCH_STATE_BYTES + 1), { mode: 0o600 });
     await expect(testStore(userData).load()).resolves.toMatchObject({ recovery: { kind: "corrupt-reset" } });
@@ -88,7 +97,7 @@ describe("WorkbenchStateV3 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const future = '{"version":4,"future":true}\n';
+    const future = '{"version":5,"future":true}\n';
     await mkdir(directory);
     await writeFile(statePath, future, { mode: 0o600 });
     const store = testStore(userData);
@@ -102,7 +111,7 @@ describe("WorkbenchStateV3 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const state = createEmptyWorkbenchState() as WorkbenchStateV3 & { prompt?: string; draft?: string; credential?: string };
+    const state = createEmptyWorkbenchState() as WorkbenchStateV4 & { prompt?: string; draft?: string; credential?: string };
     state.prompt = "do not persist";
     state.draft = "do not persist";
     state.credential = "do not persist";
@@ -147,11 +156,13 @@ describe("WorkbenchStateV3 persistence", () => {
     const firstConversation = {
       kind: "session" as const,
       workspaceId: first.id,
+      sessionFileIdentity: "session-file-first",
       sessionPath: "/sessions/first.jsonl"
     };
     const secondConversation = {
       kind: "session" as const,
       workspaceId: second.id,
+      sessionFileIdentity: "session-file-second",
       sessionPath: "/sessions/second.jsonl"
     };
     state = replaceWorkbenchLayout(state, {
@@ -184,12 +195,13 @@ describe("WorkbenchStateV3 persistence", () => {
     expect(() => reorderWorkspaceRegistrations(removed, [])).toThrow(/exact permutation/u);
   });
 
-  it("accepts only bounded referentially valid V3 layout metadata", () => {
+  it("accepts only bounded referentially valid V4 layout metadata", () => {
     const workspace = descriptorFixture("workspace-1", "/workspace/first", "31");
     const state = addOrRefreshWorkspace(createEmptyWorkbenchState(), workspace).state;
     const conversation = {
       kind: "session" as const,
       workspaceId: workspace.id,
+      sessionFileIdentity: "session-file-task-1",
       sessionPath: "/sessions/task-1.jsonl"
     };
     const layout = {
@@ -232,6 +244,7 @@ describe("WorkbenchStateV3 persistence", () => {
       {
         kind: "session" as const,
         workspaceId: workspace.id,
+        sessionFileIdentity: `session-file-task-${index}`,
         sessionPath: `/sessions/task-${index}.jsonl`
       },
       { sessionId: `session-${index}` }
@@ -245,6 +258,7 @@ describe("WorkbenchStateV3 persistence", () => {
         {
           kind: "session",
           workspaceId: workspace.id,
+          sessionFileIdentity: "session-file-task-over-limit",
           sessionPath: "/sessions/task-over-limit.jsonl"
         },
         { sessionId: "session-over-limit" }
@@ -258,6 +272,7 @@ describe("WorkbenchStateV3 persistence", () => {
     const conversation = {
       kind: "session" as const,
       workspaceId: workspace.id,
+      sessionFileIdentity: "session-file-v1\0device\0inode\0birthtime",
       sessionPath: "/sessions/running.jsonl"
     };
     const withRecovery = replaceWorkbenchLayout(base, {
@@ -272,6 +287,8 @@ describe("WorkbenchStateV3 persistence", () => {
     });
 
     expect(beginWorkbenchRun(withRecovery).runtimeRecovery[0]?.lastKnownLifecycle).toBe("lost");
+    expect(beginWorkbenchRun(withRecovery).runtimeRecovery[0]?.conversation.sessionFileIdentity)
+      .toBe("session-file-v1\0device\0inode\0birthtime");
     expect(finishWorkbenchRun(withRecovery)).toMatchObject({ cleanExit: true, runtimeRecovery: [] });
     expect(beginWorkbenchRun(finishWorkbenchRun(withRecovery)).runtimeRecovery).toEqual([]);
   });

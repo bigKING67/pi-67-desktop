@@ -36,6 +36,7 @@ test("keeps live turns in the Virtuoso footer and defers code highlighting until
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -100,6 +101,7 @@ test("projects assistant stream announcements without private reasoning and clea
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -411,6 +413,7 @@ test("returns extension input only with its authoritative session and operation 
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

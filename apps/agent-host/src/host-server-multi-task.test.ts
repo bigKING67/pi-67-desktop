@@ -286,4 +286,51 @@ describe("AgentHostServer multi-Task routing", () => {
     expect(fixture.port.close).toHaveBeenCalledOnce();
   });
 
+  it("reclaims Runtime authority across repeated Task create, run, complete, and dispose cycles", async () => {
+    const cycleCount = 32;
+    const fixture = await createServerFixture(cycleCount);
+    const workspace = await fixture.workspace("lifecycle-soak");
+    temporaryRoots.push(workspace.root);
+
+    for (let index = 0; index < cycleCount; index += 1) {
+      const context = task("workspace-soak", `task-soak-${index}`);
+      expect((await initialize(fixture.port, context, workspace)).response).toMatchObject({ ok: true });
+      expect((await submit(fixture.port, context, `run-soak-${index}`)).response).toMatchObject({ ok: true });
+      await vi.waitFor(
+        () => expect(fixture.runtimes[index]?.submitPrompt).toHaveBeenCalledOnce(),
+        { interval: 1, timeout: 1_000 }
+      );
+      fixture.runtimes[index]?.completePrompt();
+      await vi.waitFor(
+        () => expect(fixture.port.sent.some((value) => (
+          isEventEnvelope(value)
+          && value.type === "operation.completed"
+          && value.context.scope === "task"
+          && value.context.taskId === context.taskId
+        ))).toBe(true),
+        { interval: 1, timeout: 1_000 }
+      );
+
+      expect((await command(
+        fixture.port,
+        context,
+        "task.close",
+        { mode: "dispose" },
+        `close-soak-${index}`
+      )).response).toMatchObject({ ok: true, result: { closed: true, stopped: false } });
+      expect((await command(fixture.port, context, "session.tree", {})).response).toMatchObject({
+        ok: false,
+        error: { code: "RUNTIME_NOT_READY" }
+      });
+    }
+
+    expect(fixture.loader).toHaveBeenCalledTimes(cycleCount);
+    expect(fixture.runtimes.every((runtime) => runtime.initialize.mock.calls.length === 1)).toBe(true);
+    expect(fixture.runtimes.every((runtime) => runtime.submitPrompt.mock.calls.length === 1)).toBe(true);
+    expect(fixture.runtimes.every((runtime) => runtime.dispose.mock.calls.length === 1)).toBe(true);
+
+    await fixture.server.shutdown();
+    expect(fixture.runtimes.every((runtime) => runtime.dispose.mock.calls.length === 1)).toBe(true);
+  }, 10_000);
+
 });

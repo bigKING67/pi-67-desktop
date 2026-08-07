@@ -6,11 +6,17 @@ import type {
 } from "@pi67/protocol";
 import { ControlMutationLedger } from "./control-mutation-ledger.js";
 
-type ActiveRuntimeIdentity = Required<Pick<RuntimeIdentity, "sessionId" | "sessionGeneration">>;
+type ActiveRuntimeIdentity = Required<
+  Pick<RuntimeIdentity, "sessionId" | "sessionFileIdentity" | "sessionGeneration">
+>;
 
 describe("ControlMutationLedger", () => {
   it("shares one pending execution and replays the settled result", async () => {
-    let identity: ActiveRuntimeIdentity = { sessionId: "session-a", sessionGeneration: 1 };
+    let identity: ActiveRuntimeIdentity = {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 1
+    };
     let finish!: (value: ProjectionMutationAcknowledgement) => void;
     const execute = vi.fn(() => new Promise<ProjectionMutationAcknowledgement>((resolve) => {
       finish = resolve;
@@ -23,7 +29,11 @@ describe("ControlMutationLedger", () => {
     await Promise.resolve();
     expect(execute).toHaveBeenCalledOnce();
 
-    identity = { sessionId: "session-b", sessionGeneration: 2 };
+    identity = {
+      sessionId: "session-b",
+      sessionFileIdentity: "session-file-b",
+      sessionGeneration: 2
+    };
     finish(acknowledgement(identity));
     await expect(first).resolves.toMatchObject({ sessionId: "session-b" });
     await expect(retry).resolves.toMatchObject({ sessionId: "session-b" });
@@ -32,7 +42,11 @@ describe("ControlMutationLedger", () => {
   });
 
   it("rejects key reuse for a different payload without exposing secret values", async () => {
-    const identity = { sessionId: "session-a", sessionGeneration: 1 };
+    const identity = {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 1
+    };
     const ledger = new ControlMutationLedger(2, () => identity);
     const first = controlCommand("model.setRuntimeKey", { provider: "openai", apiKey: "sk-private-one" });
     await ledger.run("mutation-secret", first, async () => acknowledgement(identity));
@@ -49,11 +63,19 @@ describe("ControlMutationLedger", () => {
   });
 
   it("rejects replay after session authority changes or a newer mutation supersedes the result", async () => {
-    let identity: ActiveRuntimeIdentity = { sessionId: "session-a", sessionGeneration: 1 };
+    let identity: ActiveRuntimeIdentity = {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 1
+    };
     const ledger = new ControlMutationLedger(7, () => identity);
     const open = controlCommand("session.open", { path: "/tmp/b.jsonl" });
     await ledger.run("open-b", open, async () => {
-      identity = { sessionId: "session-b", sessionGeneration: 2 };
+      identity = {
+        sessionId: "session-b",
+        sessionFileIdentity: "session-file-b",
+        sessionGeneration: 2
+      };
       return acknowledgement(identity);
     });
 
@@ -62,14 +84,41 @@ describe("ControlMutationLedger", () => {
     expect(() => ledger.run("open-b", open, async () => acknowledgement(identity)))
       .toThrowError(expect.objectContaining({ code: "DUPLICATE_REQUEST" }));
 
-    identity = { sessionId: "session-c", sessionGeneration: 3 };
+    identity = {
+      sessionId: "session-c",
+      sessionFileIdentity: "session-file-c",
+      sessionGeneration: 3
+    };
     expect(() => ledger.run("select-model", select, async () => acknowledgement(identity)))
-      .toThrowError(expect.objectContaining({ code: "STALE_SESSION_GENERATION" }));
+      .toThrowError(expect.objectContaining({ code: "STALE_SESSION_IDENTITY" }));
+  });
+
+  it("rejects replay when the same Session ID points at another physical JSONL", async () => {
+    let identity = {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 1
+    };
+    const ledger = new ControlMutationLedger(4, () => identity);
+    const select = controlCommand("model.select", { provider: "openai", id: "gpt-5.6" });
+    await ledger.run("select-model", select, async () => acknowledgement(identity));
+
+    identity = {
+      ...identity,
+      sessionFileIdentity: "session-file-other"
+    };
+
+    expect(() => ledger.run("select-model", select, async () => acknowledgement(identity)))
+      .toThrowError(expect.objectContaining({ code: "STALE_SESSION_IDENTITY" }));
   });
 
   it("keeps the replay cache bounded and never evicts pending work", async () => {
     let now = 0;
-    const identity = { sessionId: "session-a", sessionGeneration: 1 };
+    const identity = {
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 1
+    };
     const ledger = new ControlMutationLedger(3, () => identity, {
       maxEntries: 2,
       maxPending: 1,
@@ -83,7 +132,11 @@ describe("ControlMutationLedger", () => {
     await Promise.resolve();
 
     expect(() => ledger.run("overflow", controlCommand("session.open", { path: "/tmp/other.jsonl" }), async () => (
-      acknowledgement({ sessionId: "other", sessionGeneration: 2 })
+      acknowledgement({
+        sessionId: "other",
+        sessionFileIdentity: "session-file-other",
+        sessionGeneration: 2
+      })
     )))
       .toThrowError(expect.objectContaining({ code: "RESOURCE_LIMIT_EXCEEDED" }));
     finish(acknowledgement(identity));
@@ -110,6 +163,7 @@ function acknowledgement(
     accepted: true,
     hostEpoch: 4,
     sessionId: identity.sessionId,
+    sessionFileIdentity: identity.sessionFileIdentity,
     sessionGeneration: identity.sessionGeneration,
     eventSequence: 1
   };

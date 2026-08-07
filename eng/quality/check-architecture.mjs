@@ -3,7 +3,8 @@ import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   protocolDocumentationViolations,
-  rendererSessionInstallationViolations
+  rendererSessionInstallationViolations,
+  runningTaskDocumentationViolations
 } from "./architecture-rules.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -35,6 +36,13 @@ checkManifestBoundaries(workspacePackages, violations);
 violations.push(...protocolDocumentationViolations(
   await readFile(join(root, "packages/protocol/src/protocol-version.ts"), "utf8"),
   await readFile(join(root, "docs/architecture/processes-and-protocol.md"), "utf8")
+));
+violations.push(...runningTaskDocumentationViolations(
+  await readFile(join(root, "packages/domain/src/workbench.ts"), "utf8"),
+  await Promise.all(["README.md", "PRODUCT.md", "DESIGN.md"].map(async (path) => ({
+    path,
+    source: await readFile(join(root, path), "utf8")
+  })))
 ));
 
 for (const cycle of findCycles(graph)) {

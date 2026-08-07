@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSessionCatalog, type SessionCatalogContext } from "./session-catalog.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  normalizeSessionCatalogPathIdentity,
+  resolveExistingSessionFileIdentity
+} from "./session-path-identity.js";
 
 const roots: string[] = [];
 
@@ -29,6 +32,7 @@ describe("Session Catalog automatic title projection", () => {
       workspaceCwd: root,
       discover: async () => ({
         records: [{
+          fileIdentity: await resolveExistingSessionFileIdentity(path),
           id: "session-1",
           path,
           cwd: root,

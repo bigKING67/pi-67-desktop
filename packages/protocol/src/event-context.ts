@@ -68,13 +68,15 @@ export function hasValidEventContext(envelope: EventContextEnvelope): boolean {
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap":
-      return event.payload.snapshot.sessionId === taskContext?.sessionId;
+      return event.payload.snapshot.sessionId === taskContext?.sessionId
+        && event.payload.snapshot.sessionFileIdentity === taskContext.sessionFileIdentity;
     case "conversation.changed":
     case "workspace.changeChanged":
       return event.payload.sessionId === taskContext?.sessionId;
     case "operation.started":
       return event.payload.operation.operationId === taskContext?.operationId
         && event.payload.operation.sessionId === taskContext.sessionId
+        && event.payload.operation.sessionFileIdentity === taskContext.sessionFileIdentity
         && event.payload.operation.sessionGeneration === taskContext.sessionGeneration;
     case "operation.heartbeat":
       return event.payload.operationId === taskContext?.operationId
@@ -109,9 +111,12 @@ export function correlateInvalidEvent(value: unknown): { hostEpoch: number } | u
 
 function hasSessionContext(context: TaskProtocolContext | undefined): context is TaskProtocolContext & {
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
 } {
-  return context?.sessionId !== undefined && context.sessionGeneration !== undefined;
+  return context?.sessionId !== undefined
+    && context.sessionFileIdentity !== undefined
+    && context.sessionGeneration !== undefined;
 }
 
 function matchesInteractiveContext(

@@ -181,6 +181,7 @@ describe("app events renderer session authority", () => {
     expect(useAppStore.getState().operation).toMatchObject({
       operationId: "operation-import",
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionGeneration: 7
     });
   });
@@ -229,6 +230,7 @@ function operation(sessionId: string, sessionGeneration: number): OperationView 
     lifecycle: "running",
     cancellable: true,
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionGeneration,
     startedAt: 1
   };
@@ -237,6 +239,7 @@ function operation(sessionId: string, sessionGeneration: number): OperationView 
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

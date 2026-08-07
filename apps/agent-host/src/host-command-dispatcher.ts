@@ -185,7 +185,7 @@ export async function dispatchHostCommand(
                   payload: { snapshot: runtime.getSnapshot(), reason: "session-import" }
                 });
               } catch {
-                context.operations().poisonSessionImportProjection();
+                await context.operations().poisonSessionImportProjection();
                 throw new HostCommandError(
                   "RUNTIME_POISONED",
                   "The imported Pi Session became authoritative, but the Pi runtime service could not capture its projection.",

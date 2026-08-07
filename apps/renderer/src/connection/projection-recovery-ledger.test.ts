@@ -62,6 +62,7 @@ function operation(
     lifecycle,
     cancellable: lifecycle !== "completed",
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionGeneration: 3,
     startedAt: 10
   };
@@ -76,6 +77,7 @@ function terminal(operationId: string): OperationSettled {
     cancellable: false,
     hostEpoch: 7,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionGeneration: 3,
     startedAt: 10,
     settledAt: 20

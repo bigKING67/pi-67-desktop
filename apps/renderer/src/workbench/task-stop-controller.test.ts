@@ -22,10 +22,12 @@ describe("task stop controller", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
         sessionPath: "/sessions/a.jsonl"
       },
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 3,
       taskGeneration: 2,
       lifecycle: "running",
@@ -63,6 +65,7 @@ describe("task stop controller", () => {
         taskId: "task-a",
         taskGeneration: 2,
         sessionId: "session-a",
+        sessionFileIdentity: "session-file-a",
         sessionGeneration: 3
       } }
     );
@@ -72,6 +75,7 @@ describe("task stop controller", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
         sessionPath: "/sessions/a.jsonl"
       }
     });

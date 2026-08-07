@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -58,7 +59,7 @@ describe("AgentHostServer Session Catalog", () => {
       const context: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-catalog" };
       server.attachPort(port, { appInstanceId: "app", hostInstanceId: "host", hostEpoch: 9 });
       port.emit({
-        protocolVersion: 3,
+        protocolVersion: PROTOCOL_VERSION,
         protocolRevision: PROTOCOL_REVISION,
         kind: "hello",
         rendererInstanceId: "renderer",
@@ -140,7 +141,7 @@ describe("AgentHostServer Session Catalog", () => {
       const context: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-organize" };
       server.attachPort(port, { appInstanceId: "app", hostInstanceId: "host", hostEpoch: 9 });
       port.emit({
-        protocolVersion: 3,
+        protocolVersion: PROTOCOL_VERSION,
         protocolRevision: PROTOCOL_REVISION,
         kind: "hello",
         rendererInstanceId: "renderer-organize",
@@ -227,7 +228,7 @@ describe("AgentHostServer Session Catalog", () => {
       expect(archivedItems[0]).not.toHaveProperty("pinnedAt");
 
       const organizationRaw = await readFile(
-        join(root, "conversation-organization", "organization-v1.json"),
+        join(root, "conversation-organization", "organization-v2.json"),
         "utf8"
       );
       expect(organizationRaw).not.toContain(sessionPath);

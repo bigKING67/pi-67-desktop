@@ -3,7 +3,6 @@ import {
   type SessionCatalogChangedReason,
   type SessionCatalogCursor,
   type SessionCatalogPage,
-  type SessionSummary,
   type SessionCatalogView,
   type WorkspaceId
 } from "@pi67/domain";
@@ -108,7 +107,11 @@ export function handleSessionCatalogChanged(
 ): void {
   const store = useSessionCatalogStore.getState();
   const catalog = store.byWorkspace[workspaceId];
-  if (reason === "automatic-title") {
+  if (
+    reason === "automatic-title"
+    || reason === "session-created"
+    || reason === "session-updated"
+  ) {
     void queryFirstSessionCatalog(workspaceId, { query: catalog?.query ?? "" });
     return;
   }
@@ -141,45 +144,6 @@ export async function queryWorkspaceSessionCatalogs(
   options: { query?: string; refresh?: boolean } = {}
 ): Promise<void> {
   await Promise.all(workspaceIds.map((workspaceId) => queryFirstSessionCatalog(workspaceId, options)));
-}
-
-export type SessionCatalogRecoveryLookup =
-  | { status: "found"; session: SessionSummary }
-  | { status: "missing" }
-  | { status: "unavailable"; detail: string };
-
-export async function findSessionForRecovery(
-  workspaceId: WorkspaceId,
-  sessionId: string,
-  sessionPath: string
-): Promise<SessionCatalogRecoveryLookup> {
-  const loaded = await queryFirstSessionCatalog(workspaceId, { query: "", refresh: true });
-  if (!loaded) return unavailableRecoveryLookup(workspaceId);
-
-  const visitedCursors = new Set<string>();
-  while (true) {
-    const catalog = useSessionCatalogStore.getState().byWorkspace[workspaceId];
-    if (!catalog) return { status: "unavailable", detail: "对话目录尚未就绪，请稍后重试。" };
-    const session = catalog.items.find((candidate) => (
-      candidate.id === sessionId && candidate.path === sessionPath
-    ));
-    if (session) return { status: "found", session };
-    if (catalog.error) return { status: "unavailable", detail: "对话目录暂时不可用，请稍后重试。" };
-    if (!catalog.hasMore) {
-      return isAuthoritativeCompleteCatalog(catalog)
-        ? { status: "missing" }
-        : { status: "unavailable", detail: "对话目录仍在重建，请稍后重试。" };
-    }
-    if (!catalog.nextCursor) {
-      return { status: "unavailable", detail: "对话目录尚未完整加载，请稍后重试。" };
-    }
-    const cursorKey = JSON.stringify(catalog.nextCursor);
-    if (visitedCursors.has(cursorKey)) {
-      return { status: "unavailable", detail: "对话目录分页未能继续，请稍后重试。" };
-    }
-    visitedCursors.add(cursorKey);
-    await loadMoreSessionCatalog(workspaceId);
-  }
 }
 
 function errorMessage(error: unknown): string {
@@ -221,52 +185,31 @@ function finishRetrySequence(workspaceId: WorkspaceId, generation: number): void
   retrySequences.delete(workspaceId);
 }
 
-function unavailableRecoveryLookup(workspaceId: WorkspaceId): SessionCatalogRecoveryLookup {
-  const catalog = useSessionCatalogStore.getState().byWorkspace[workspaceId];
-  return {
-    status: "unavailable",
-    detail: catalog?.error
-      ? "对话目录暂时不可用，请稍后重试。"
-      : "对话目录尚未就绪，请稍后重试。"
-  };
-}
-
-function isAuthoritativeCompleteCatalog(
-  catalog: WorkspaceSessionCatalogState
-): boolean {
-  return catalog.source === "sqlite"
-    && catalog.catalogState === "ready"
-    && !catalog.rebuilding
-    && !catalog.incomplete
-    && !catalog.loading
-    && !catalog.loadingMore
-    && !catalog.error;
-}
-
 function reconcileMaterializedSessions(
   workspaceId: WorkspaceId,
   catalog: WorkspaceSessionCatalogState
 ): void {
   const workbench = rendererWorkbenchStore.getState();
   for (const session of catalog.items) {
-    const task = Object.values(workbench.tasks).find((candidate) => (
+    const indexingTask = Object.values(workbench.tasks).find((candidate) => (
       candidate.workspaceId === workspaceId
       && candidate.sessionId === session.id
+      && candidate.sessionFileIdentity === session.fileIdentity
+      && candidate.sessionMetadataStatus === "indexing"
     ));
-    if (
-      !task
-      || task.conversation.kind === "session"
-      || task.creationStatus !== undefined
-      || task.creationId !== undefined
-    ) continue;
-    workbench.updateTask(task.id, {
-      conversation: { kind: "session", workspaceId, sessionPath: session.path },
-      sessionPath: session.path,
-      title: session.name,
-      titleSource: session.nameSource,
-      creationId: undefined,
-      creationStatus: undefined,
-      pendingTitle: undefined
-    });
+    if (indexingTask) {
+      workbench.updateTask(indexingTask.id, {
+        conversation: {
+          kind: "session",
+          workspaceId,
+          sessionFileIdentity: session.fileIdentity,
+          sessionPath: session.path
+        },
+        sessionPath: session.path,
+        title: session.name,
+        titleSource: session.nameSource,
+        sessionMetadataStatus: undefined
+      });
+    }
   }
 }

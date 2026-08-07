@@ -39,9 +39,7 @@ export function installResynchronizedProjection(
 ): boolean {
   if (!projectionRecoveryLedger.isCurrent(get(), hostEpoch, revision)) return false;
   if (!acceptRendererSessionTransitionResponse(get(), transitionTarget)) return false;
-  if (result.changes.sessionId !== result.snapshot.sessionId) {
-    throw new Error("Projection resync returned changes for a different Session.");
-  }
+  assertProjectionResyncAuthority(result);
   const recoveredTerminal = projectionRecoveryLedger.matchingInterruptedTerminal(
     result.latestOperationTerminal
   );
@@ -60,6 +58,7 @@ export function installResynchronizedProjection(
   if (
     selectedTask
     && selectedTask.sessionId === result.snapshot.sessionId
+    && selectedTask.sessionFileIdentity === result.sessionFileIdentity
     && (
       selectedTask.sessionGeneration === undefined
       || selectedTask.sessionGeneration === result.sessionGeneration
@@ -89,6 +88,36 @@ export function installResynchronizedProjection(
   projectionRecoveryLedger.clearInterruptedOperation();
   if (workspaceId) void queryFirstSessionCatalog(workspaceId);
   return true;
+}
+
+export function assertProjectionResyncAuthority(result: ProjectionResyncResult): void {
+  if (
+    result.sessionId !== result.snapshot.sessionId
+    || result.sessionFileIdentity !== result.snapshot.sessionFileIdentity
+  ) {
+    throw new Error("Projection resync returned a mismatched physical Session authority.");
+  }
+  if (result.changes.sessionId !== result.snapshot.sessionId) {
+    throw new Error("Projection resync returned changes for a different Session.");
+  }
+  if (result.activeOperation && !matchesResyncOperationAuthority(result, result.activeOperation)) {
+    throw new Error("Projection resync returned an active Operation for a different physical Session.");
+  }
+  if (
+    result.latestOperationTerminal
+    && !matchesResyncOperationAuthority(result, result.latestOperationTerminal)
+  ) {
+    throw new Error("Projection resync returned an Operation receipt for a different physical Session.");
+  }
+}
+
+function matchesResyncOperationAuthority(
+  result: ProjectionResyncResult,
+  operation: { sessionId: string; sessionFileIdentity: string; sessionGeneration: number }
+): boolean {
+  return operation.sessionId === result.sessionId
+    && operation.sessionFileIdentity === result.sessionFileIdentity
+    && operation.sessionGeneration === result.sessionGeneration;
 }
 
 export function failProjectionRecovery(

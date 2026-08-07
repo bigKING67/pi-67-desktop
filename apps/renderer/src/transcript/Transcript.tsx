@@ -1,6 +1,6 @@
-import type { LocatedMessageWindow, OperationView, SessionMessageView } from "@pi67/domain";
+import type { LocatedMessageWindow, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Components,
   ScrollSeekConfiguration,
@@ -15,16 +15,15 @@ import { loadOlderConversation } from "../conversation/conversation-controller.j
 import { useCommittedConversationProjection } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { messages as messagesCatalog } from "../localization/message-catalog.js";
-import {
-  hasVisibleOperationTimeline,
-  hasVisibleTurnActivity,
-  TurnActivity
-} from "../operation/TurnActivity.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import {
   timelineMatchesOperation,
   useOperationActivityTimelineStore
 } from "../operation/operation-activity-timeline-store.js";
+import {
+  hasVisibleOperationTimeline,
+  hasVisibleTurnActivity
+} from "../operation/turn-activity-visibility.js";
 import {
   continueRendererSessionFrom,
   editRendererUserMessage,
@@ -43,11 +42,17 @@ import type { TranscriptContext } from "./transcript-context.js";
 import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
+  createLiveProcessRow,
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows,
   type TranscriptRow
 } from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
+
+const TurnActivity = lazy(() => import("../operation/TurnActivity.js").then((module) => ({
+  default: module.TurnActivity
+})));
+
 export function Transcript() {
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
@@ -115,7 +120,7 @@ export function Transcript() {
     && operationMatchesSession
     && (operation.kind === "prompt" || operation.kind === "command")
     ? {
-      row: liveProcessRow(operation, currentProcessInterrupted, Boolean(liveText)),
+      row: createLiveProcessRow(operation, currentProcessInterrupted, Boolean(liveText)),
       operation,
       timeline: matchingOperationTimeline,
       running: currentProcessRunning,
@@ -416,11 +421,23 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
             ? {}
             : { timeline: context.liveProcess.timeline })}
         />
-      ) : context.hasTurnActivity ? <TurnActivity /> : null}
+      ) : context.hasTurnActivity ? (
+        <Suspense fallback={<TranscriptActivityLoading />}>
+          <TurnActivity />
+        </Suspense>
+      ) : null}
       {context.liveText
         ? <DeferredMessageCard message={liveMessage(context.liveText)} streaming />
         : null}
     </>
+  );
+}
+
+function TranscriptActivityLoading() {
+  return (
+    <div aria-busy="true" aria-label="正在加载任务状态" className={styles.rowLoading} role="status">
+      <span className="loading-line" />
+    </div>
   );
 }
 
@@ -429,22 +446,5 @@ function liveMessage(text: string): SessionMessageView {
     id: "live-assistant-message",
     role: "assistant",
     parts: [{ type: "text", text }]
-  };
-}
-
-function liveProcessRow(
-  operation: OperationView,
-  interrupted: boolean,
-  hasFinalAnswer: boolean
-): Extract<TranscriptRow, { kind: "process-group" }> {
-  return {
-    kind: "process-group",
-    key: `${operation.operationId}:live-process`,
-    items: [],
-    stepCount: 1,
-    toolCount: 0,
-    failedToolCount: 0,
-    failed: interrupted,
-    hasFinalAnswer
   };
 }

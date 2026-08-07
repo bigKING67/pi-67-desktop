@@ -6,7 +6,6 @@ import type {
   RuntimeOperationActivity
 } from "@pi67/domain";
 import {
-  createMessageId,
   type AgentHostRuntimePoisonedMessage,
   type AgentEvent,
   type OperationAccepted,
@@ -20,30 +19,24 @@ import {
   OperationHeartbeatController,
   type OperationHeartbeatControllerOptions
 } from "./operation-heartbeat-controller.js";
+import { assertOperationAuthority } from "./operation-authority.js";
+import { OperationExecutionRunner } from "./operation-execution-runner.js";
+import { isOperationReceiptIntegrityError } from "./operation-receipt-contract.js";
+import type { OperationReceiptStore } from "./operation-receipt-store.js";
 import {
-  assertCurrentOperationAuthority,
-  assertOperationAuthority
-} from "./operation-authority.js";
+  acceptedOperation,
+  createOperationView,
+  requireOperationSessionIdentity
+} from "./operation-registry-authority.js";
+import { OperationResultLedger } from "./operation-result-ledger.js";
 import {
-  OperationTerminalLedger,
-  type OperationTerminalDetails
-} from "./operation-terminal-ledger.js";
+  type ActiveOperation,
+  OperationTerminalCoordinator
+} from "./operation-terminal-coordinator.js";
 import {
-  authorityFromIdentity,
-  OperationSubmissionLedger,
-  type SubmissionAuthority
+  authorityFromIdentity
 } from "./operation-submission-ledger.js";
-import { HostCommandError, toProtocolError } from "./protocol-error.js";
-
-interface ActiveOperation {
-  view: OperationView;
-  submissionId: string;
-  abort?: () => Promise<void>;
-  beforeTerminal?: () => void;
-  terminalPrepared?: boolean;
-  terminalLifecycle?: "completed" | "failed" | "cancelled" | "lost";
-  settled?: { kind: "completed" } | { kind: "failed"; error: ProtocolError };
-}
+import { HostCommandError } from "./protocol-error.js";
 
 export type OperationShutdownResult = "none" | "cancelled" | "lost";
 
@@ -59,6 +52,7 @@ export interface AcceptOperationOptions {
 export interface OperationRegistryOptions extends OperationHeartbeatControllerOptions {
   maxSubmissions?: number;
   abortWatchdogMs?: number;
+  receiptStore?: OperationReceiptStore;
   onRuntimePoisoned?: (message: AgentHostRuntimePoisonedMessage) => void;
 }
 const DEFAULT_ABORT_WATCHDOG_MS = 10_000;
@@ -66,14 +60,17 @@ const DEFAULT_ABORT_WATCHDOG_MS = 10_000;
 export class OperationRegistry {
   private active: ActiveOperation | undefined;
   private terminating: ActiveOperation | undefined;
-  private readonly submissionLedger: OperationSubmissionLedger;
-  private readonly terminalLedger: OperationTerminalLedger;
+  private readonly results: OperationResultLedger;
   private readonly activity: OperationActivityController;
   private readonly heartbeat: OperationHeartbeatController;
+  private readonly terminals: OperationTerminalCoordinator;
+  private readonly executions: OperationExecutionRunner;
   private readonly maxSubmissions: number;
   private readonly abortWatchdogMs: number;
   private readonly now: () => number;
   private readonly onRuntimePoisoned: ((message: AgentHostRuntimePoisonedMessage) => void) | undefined;
+  private receiptFailure: HostCommandError | undefined;
+  private accepting = false;
   private poisoned = false;
 
   constructor(
@@ -83,21 +80,48 @@ export class OperationRegistry {
     options: OperationRegistryOptions = {}
   ) {
     this.maxSubmissions = positiveInteger(options.maxSubmissions, 512, "maxSubmissions");
-    this.submissionLedger = new OperationSubmissionLedger(this.maxSubmissions, getIdentity);
-    this.terminalLedger = new OperationTerminalLedger(hostEpoch, this.maxSubmissions);
     this.activity = new OperationActivityController(emit);
     this.abortWatchdogMs = positiveInteger(options.abortWatchdogMs, DEFAULT_ABORT_WATCHDOG_MS, "abortWatchdogMs");
     this.now = options.now ?? Date.now;
+    this.results = new OperationResultLedger(
+      hostEpoch,
+      this.maxSubmissions,
+      getIdentity,
+      options.receiptStore,
+      this.now
+    );
     this.heartbeat = new OperationHeartbeatController(emit, { ...options, now: this.now });
+    this.terminals = new OperationTerminalCoordinator({
+      activity: this.activity,
+      emit,
+      getIdentity,
+      heartbeat: this.heartbeat,
+      results: this.results,
+      withDurability: (operation) => this.withDurability(operation)
+    });
+    this.executions = new OperationExecutionRunner({
+      emit,
+      finishCompleted: (operationId) => this.finishCompleted(operationId),
+      finishFailed: (operationId, error) => this.finishFailed(operationId, error),
+      getIdentity,
+      hostEpoch,
+      isActive: (operationId) => this.active?.view.operationId === operationId,
+      results: this.results,
+      withDurability: (operation) => this.withDurability(operation)
+    });
     this.onRuntimePoisoned = options.onRuntimePoisoned;
   }
 
-  hasActive(): boolean { return this.poisoned || this.active !== undefined || this.terminating !== undefined; }
+  hasActive(): boolean { return this.poisoned || this.accepting || this.active !== undefined || this.terminating !== undefined; }
   isPoisoned(): boolean { return this.poisoned; }
-  canAcceptQueue(): boolean { return this.active !== undefined && acceptsPiQueue(this.active.view.kind); }
+  canAcceptQueue(): boolean {
+    return this.active !== undefined
+      && this.active.terminalLifecycle === undefined
+      && acceptsPiQueue(this.active.view.kind);
+  }
   activeAccepted(): OperationAccepted | undefined {
     const operation = this.active ?? this.terminating;
-    return operation ? this.toAccepted(operation.view) : undefined;
+    return operation ? acceptedOperation(operation.view, this.hostEpoch) : undefined;
   }
   activeView(): OperationView | undefined { return (this.active ?? this.terminating)?.view; }
   updateActivity(activity: RuntimeOperationActivity): boolean {
@@ -120,79 +144,93 @@ export class OperationRegistry {
     return this.activity.completeInteractive(this.active, requestId)
       && this.heartbeat.touch(this.active?.view.operationId);
   }
-  latestTerminal(): OperationSettled | undefined { return this.terminalLedger.latest(); }
+  latestTerminal(): OperationSettled | undefined { return this.results.latestTerminal(); }
+
+  async reconcile(): Promise<void> {
+    this.assertHealthy();
+    await this.withDurability(() => this.results.reconcile());
+  }
 
   submissionFor(
     submissionId: string,
     fingerprint: string
   ): OperationSubmissionResult | Promise<OperationSubmissionResult> | undefined {
     this.assertHealthy();
-    return this.submissionLedger.get(submissionId, fingerprint);
+    return this.results.get(submissionId, fingerprint);
   }
 
-  accept(options: AcceptOperationOptions): OperationSubmissionResult {
-    const existing = this.submissionFor(options.submissionId, options.fingerprint);
-    if (existing instanceof Promise) throw new HostCommandError("BUSY", "The submission is still being accepted.");
-    if (existing) return existing;
-    if (this.active) throw new HostCommandError("BUSY", "Another operation is already active.");
-    const identity = this.requireSessionIdentity();
-    this.activity.reset();
-    const startedAt = this.now();
-    const view: OperationView = {
-      operationId: createMessageId("operation"),
-      kind: options.kind,
-      lifecycle: "running",
-      cancellable: options.abort !== undefined,
-      sessionId: identity.sessionId,
-      sessionGeneration: identity.sessionGeneration,
-      startedAt
-    };
-    this.active = {
-      view,
-      submissionId: options.submissionId,
-      ...(options.abort === undefined ? {} : { abort: options.abort }),
-      ...(options.beforeTerminal === undefined ? {} : { beforeTerminal: options.beforeTerminal })
-    };
-    this.heartbeat.start(view.operationId, startedAt);
-    const accepted = this.rememberSubmission(
-      options.submissionId,
-      options.fingerprint,
-      this.toAccepted(view),
-      authorityFromIdentity(identity)
-    );
-    // Start on the next task so the accepted response is posted before operation events.
-    setTimeout(() => {
-      if (this.active?.view.operationId !== view.operationId) return;
-      this.emit({ type: "operation.started", payload: { operation: view } });
-      void options.execute().then(
-        () => this.finishCompleted(view.operationId),
-        (error: unknown) => this.finishFailed(view.operationId, toProtocolError(error))
-      );
-    }, 0);
-    return accepted;
+  async accept(options: AcceptOperationOptions): Promise<OperationSubmissionResult> {
+    if (this.accepting) throw new HostCommandError("BUSY", "Another operation is being accepted.");
+    this.accepting = true;
+    try {
+      await this.reconcile();
+      const existing = this.submissionFor(options.submissionId, options.fingerprint);
+      if (existing) return await existing;
+      if (this.active) throw new HostCommandError("BUSY", "Another operation is already active.");
+      const identity = requireOperationSessionIdentity(this.getIdentity());
+      const startedAt = this.now();
+      const view = createOperationView(identity, options.kind, options.abort !== undefined, startedAt);
+      const authority = authorityFromIdentity(identity);
+      const remembered = await this.withDurability(() => this.results.rememberAccepted({
+        submissionId: options.submissionId,
+        fingerprint: options.fingerprint,
+        operationKind: options.kind,
+        startedAt,
+        accepted: acceptedOperation(view, this.hostEpoch),
+        authority
+      }));
+      if (!remembered.created) return remembered.result;
+      this.activity.reset();
+      const operation: ActiveOperation = {
+        view,
+        submissionId: options.submissionId,
+        pendingQueues: new Set(),
+        ...(options.abort === undefined ? {} : { abort: options.abort }),
+        ...(options.beforeTerminal === undefined ? {} : { beforeTerminal: options.beforeTerminal })
+      };
+      this.active = operation;
+      this.heartbeat.start(view.operationId, startedAt);
+      // Start on the next task so the accepted response is posted before operation events.
+      setTimeout(() => void this.executions.start(
+        operation,
+        options.submissionId,
+        options.fingerprint,
+        options.execute
+      ).catch(() => undefined), 0);
+      return remembered.result;
+    } finally {
+      this.accepting = false;
+    }
   }
 
-  queueForActive(
+  async queueForActive(
     submissionId: string,
     fingerprint: string,
     execute: () => Promise<void>
   ): Promise<OperationSubmissionResult> {
     const existing = this.submissionFor(submissionId, fingerprint);
-    if (existing) return Promise.resolve(existing);
+    if (existing) return await existing;
     if (!this.active || !acceptsPiQueue(this.active.view.kind)) {
       throw new HostCommandError("OPERATION_NOT_FOUND", "There is no active turn operation to receive a queued prompt.");
     }
-    const authority = authorityFromIdentity(this.requireSessionIdentity());
+    const authority = authorityFromIdentity(
+      requireOperationSessionIdentity(this.getIdentity())
+    );
     assertOperationAuthority(authority, this.active.view);
-    const accepted = this.toAccepted(this.active.view);
-    const pending = execute()
-      .then(() => {
-        assertCurrentOperationAuthority(this.getIdentity(), authority);
-        return this.rememberSubmission(submissionId, fingerprint, accepted, authority);
-      })
-      .finally(() => this.submissionLedger.deletePending(submissionId));
-    this.submissionLedger.rememberPending(submissionId, fingerprint, pending, authority);
-    return pending;
+    const operation = this.active;
+    const pending = this.executions.queue(
+      operation,
+      submissionId,
+      fingerprint,
+      authority,
+      execute
+    );
+    operation.pendingQueues.add(pending);
+    this.results.rememberPending(submissionId, fingerprint, pending, authority);
+    return pending.finally(() => {
+      operation.pendingQueues.delete(pending);
+      this.results.deletePending(submissionId);
+    });
   }
 
   async abort(operationId: string | undefined): Promise<{ aborted: boolean; operationId?: string }> {
@@ -201,23 +239,23 @@ export class OperationRegistry {
     if (!active || !active.abort || (operationId !== undefined && operationId !== active.view.operationId)) {
       return { aborted: false, ...(operationId === undefined ? {} : { operationId }) };
     }
+    if (active.terminalLifecycle) {
+      await active.terminalPromise;
+      return { aborted: false, operationId: active.view.operationId };
+    }
     // Claim the terminal state before awaiting Pi so a resolving prompt cannot win the race.
     this.active = undefined;
     this.terminating = active;
     try {
       await withAbortWatchdog(active.abort(), this.abortWatchdogMs);
       const cancelledAt = this.now();
-      this.finalizeTerminal(
+      await this.terminals.finalize(
         active,
-        { lifecycle: "cancelled", settledAt: cancelledAt, reason: "Cancelled by the user." },
-        {
-          type: "operation.cancelled",
-          payload: { operationId: active.view.operationId, cancelledAt, reason: "Cancelled by the user." }
-        }
+        { lifecycle: "cancelled", settledAt: cancelledAt, reason: "Cancelled by the user." }
       );
     } catch (error) {
       if (error instanceof AbortWatchdogExpiredError) {
-        this.poisonAfterAbortTimeout(active);
+        await this.poisonAfterAbortTimeout(active);
         throw new HostCommandError(
           "RUNTIME_POISONED",
           "Pi did not acknowledge abort before the safety watchdog expired.",
@@ -225,7 +263,8 @@ export class OperationRegistry {
           { abortTimeoutMs: this.abortWatchdogMs }
         );
       }
-      this.restoreAfterAbortFailure(active);
+      if (isOperationReceiptIntegrityError(error)) throw error;
+      await this.restoreAfterAbortFailure(active);
       throw error;
     } finally {
       if (this.terminating?.view.operationId === active.view.operationId) this.terminating = undefined;
@@ -243,8 +282,13 @@ export class OperationRegistry {
 
     this.active = undefined;
     if (this.terminating?.view.operationId !== operation.view.operationId) this.terminating = operation;
-    if (wasAlreadyTerminating || !operation.abort || operation.terminalLifecycle) {
-      this.finalizeLost(operation, reason);
+    if (operation.terminalLifecycle) {
+      await operation.terminalPromise;
+      if (this.terminating?.view.operationId === operation.view.operationId) this.terminating = undefined;
+      return shutdownResultFor(operation.terminalLifecycle);
+    }
+    if (wasAlreadyTerminating || !operation.abort) {
+      await this.terminals.lost(operation, reason, this.now());
       if (this.terminating?.view.operationId === operation.view.operationId) this.terminating = undefined;
       return "lost";
     }
@@ -252,23 +296,19 @@ export class OperationRegistry {
     try {
       await withAbortWatchdog(operation.abort(), positiveInteger(timeoutMs, timeoutMs, "timeoutMs"));
       const cancelledAt = this.now();
-      this.finalizeTerminal(
+      await this.terminals.finalize(
         operation,
-        { lifecycle: "cancelled", settledAt: cancelledAt, reason },
-        {
-          type: "operation.cancelled",
-          payload: { operationId: operation.view.operationId, cancelledAt, reason }
-        }
+        { lifecycle: "cancelled", settledAt: cancelledAt, reason }
       );
     } catch {
-      this.finalizeLost(operation, reason);
+      await this.terminals.lost(operation, reason, this.now());
     } finally {
       if (this.terminating?.view.operationId === operation.view.operationId) this.terminating = undefined;
     }
     return operation.terminalLifecycle === "cancelled" ? "cancelled" : "lost";
   }
 
-  loseActive(reason: string): void {
+  async loseActive(reason: string): Promise<void> {
     if (this.poisoned) return;
     const active = this.active;
     const terminating = this.terminating;
@@ -277,17 +317,17 @@ export class OperationRegistry {
     this.terminating = undefined;
     this.activity.reset();
     const lost = active ?? terminating!;
-    this.finalizeLost(lost, reason);
+    await this.terminals.lost(lost, reason, this.now());
   }
 
-  poisonSessionImportProjection(): boolean {
+  async poisonSessionImportProjection(): Promise<boolean> {
     if (this.poisoned) return false;
     const active = this.active;
     if (active?.view.kind !== "session-import") return false;
     this.active = undefined;
     this.poisoned = true;
     const reason = "The imported Pi Session became authoritative, but its projection could not be captured; Pi runtime service recovery is required.";
-    this.finalizeLost(active, reason);
+    await this.terminals.lost(active, reason, this.now());
     this.onRuntimePoisoned?.({
       type: "agent-host-runtime-poisoned",
       code: "SESSION_IMPORT_PROJECTION_FAILED",
@@ -296,76 +336,63 @@ export class OperationRegistry {
     return true;
   }
 
-  private finishCompleted(operationId: string): void {
+  private async finishCompleted(operationId: string): Promise<void> {
     if (this.terminating?.view.operationId === operationId) {
       this.terminating.settled = { kind: "completed" };
-      this.prepareTerminal(this.terminating);
+      this.terminals.prepare(this.terminating);
       return;
     }
     if (this.active?.view.operationId !== operationId) return;
     const completedAt = this.now();
-    this.finalizeTerminal(
+    await this.terminals.finalize(
       this.active,
-      { lifecycle: "completed", settledAt: completedAt },
-      { type: "operation.completed", payload: { operationId, completedAt } }
+      { lifecycle: "completed", settledAt: completedAt }
     );
     this.active = undefined;
   }
 
-  private finishFailed(operationId: string, error: ProtocolError): void {
+  private async finishFailed(operationId: string, error: ProtocolError): Promise<void> {
     if (this.terminating?.view.operationId === operationId) {
       this.terminating.settled = { kind: "failed", error };
-      this.prepareTerminal(this.terminating);
+      this.terminals.prepare(this.terminating);
       return;
     }
     if (this.active?.view.operationId !== operationId) return;
     const failedAt = this.now();
-    this.finalizeTerminal(
+    await this.terminals.finalize(
       this.active,
-      { lifecycle: "failed", settledAt: failedAt, error },
-      { type: "operation.failed", payload: { operationId, failedAt, error } }
+      { lifecycle: "failed", settledAt: failedAt, error }
     );
     this.active = undefined;
   }
 
-  private restoreAfterAbortFailure(operation: ActiveOperation): void {
+  private async restoreAfterAbortFailure(operation: ActiveOperation): Promise<void> {
     this.terminating = undefined;
     if (operation.settled?.kind === "completed") {
       const completedAt = this.now();
-      this.finalizeTerminal(
+      await this.terminals.finalize(
         operation,
-        { lifecycle: "completed", settledAt: completedAt },
-        { type: "operation.completed", payload: { operationId: operation.view.operationId, completedAt } }
+        { lifecycle: "completed", settledAt: completedAt }
       );
       return;
     }
     if (operation.settled?.kind === "failed") {
       const failedAt = this.now();
-      this.finalizeTerminal(
+      await this.terminals.finalize(
         operation,
-        { lifecycle: "failed", settledAt: failedAt, error: operation.settled.error },
-        {
-          type: "operation.failed",
-          payload: { operationId: operation.view.operationId, failedAt, error: operation.settled.error }
-        }
+        { lifecycle: "failed", settledAt: failedAt, error: operation.settled.error }
       );
       return;
     }
     this.active = operation;
   }
 
-  private prepareTerminal(operation: ActiveOperation): void {
-    if (operation.terminalPrepared) return;
-    operation.terminalPrepared = true;
-    operation.beforeTerminal?.();
-  }
-
-  private poisonAfterAbortTimeout(operation: ActiveOperation): void {
+  private async poisonAfterAbortTimeout(operation: ActiveOperation): Promise<void> {
     if (this.terminating?.view.operationId !== operation.view.operationId) return;
     this.terminating = undefined;
     this.poisoned = true;
     const reason = `Pi abort did not settle within ${this.abortWatchdogMs} ms; Pi runtime service recovery is required.`;
-    this.finalizeLost(operation, reason);
+    await this.terminals.lost(operation, reason, this.now());
     this.onRuntimePoisoned?.({
       type: "agent-host-runtime-poisoned",
       code: "ABORT_WATCHDOG_EXPIRED",
@@ -376,6 +403,7 @@ export class OperationRegistry {
 
   private assertHealthy(): void {
     if (!this.poisoned) return;
+    if (this.receiptFailure) throw this.receiptFailure;
     throw new HostCommandError(
       "RUNTIME_POISONED",
       "The Pi runtime is poisoned and the Pi runtime service must be restarted.",
@@ -383,69 +411,31 @@ export class OperationRegistry {
     );
   }
 
-  private requireSessionIdentity(): RuntimeIdentity & { sessionId: string } {
-    const identity = this.getIdentity();
-    if (!identity.sessionId) throw new HostCommandError("RUNTIME_NOT_READY", "Pi SDK runtime is not initialized.");
-    return { ...identity, sessionId: identity.sessionId };
+  private async withDurability<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (isOperationReceiptIntegrityError(error)) this.poisonForReceiptFailure(error);
+      throw error;
+    }
   }
 
-  private toAccepted(view: OperationView): OperationAccepted {
-    return {
-      kind: "accepted",
-      operationId: view.operationId,
-      cancellable: view.cancellable,
-      hostEpoch: this.hostEpoch,
-      sessionId: view.sessionId,
-      sessionGeneration: view.sessionGeneration
-    };
-  }
-
-  private rememberSubmission(
-    submissionId: string,
-    fingerprint: string,
-    accepted: OperationAccepted,
-    authority: SubmissionAuthority
-  ): OperationSubmissionResult {
-    const terminal = this.terminalLedger.get(accepted.operationId);
-    return this.submissionLedger.remember(
-      submissionId,
-      fingerprint,
-      terminal ?? accepted,
-      terminal
-        ? { sessionId: terminal.sessionId, sessionGeneration: terminal.sessionGeneration }
-        : authority
-    );
-  }
-
-  private rememberTerminal(operation: ActiveOperation, details: OperationTerminalDetails): OperationSettled {
-    const terminal = this.terminalLedger.remember(operation.view, this.getIdentity(), details);
-    this.submissionLedger.updateTerminal(terminal);
-    return terminal;
-  }
-
-  private finalizeLost(operation: ActiveOperation, reason: string): boolean {
-    const lostAt = this.now();
-    return this.finalizeTerminal(
-      operation,
-      { lifecycle: "lost", settledAt: lostAt, reason },
-      { type: "operation.lost", payload: { operationId: operation.view.operationId, lostAt, reason } }
-    );
-  }
-
-  private finalizeTerminal(
-    operation: ActiveOperation,
-    details: OperationTerminalDetails,
-    event: AgentEvent
-  ): boolean {
-    if (operation.terminalLifecycle) return false;
-    operation.terminalLifecycle = details.lifecycle;
-    this.heartbeat.stop(operation.view.operationId);
-    this.prepareTerminal(operation);
-    this.rememberTerminal(operation, details);
-    this.emit(event);
+  private poisonForReceiptFailure(error: HostCommandError): void {
+    this.receiptFailure ??= error;
+    this.poisoned = true;
+    const operation = this.active ?? this.terminating;
+    this.active = undefined;
+    this.terminating = undefined;
+    if (operation) {
+      this.heartbeat.stop(operation.view.operationId);
+      this.terminals.prepare(operation);
+    }
     this.activity.reset();
-    return true;
   }
+}
+
+function shutdownResultFor(lifecycle: ActiveOperation["terminalLifecycle"]): OperationShutdownResult {
+  return lifecycle === "cancelled" ? "cancelled" : lifecycle === "lost" ? "lost" : "none";
 }
 
 function acceptsPiQueue(kind: OperationKind): boolean {

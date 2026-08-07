@@ -1,5 +1,4 @@
 import {
-  conversationIdentity,
   isBoundedId,
   isKnownWorkspaceId,
   isRecordWithAllowedKeys,
@@ -8,7 +7,7 @@ import {
   MAX_SESSION_ID_LENGTH,
   MAX_TASK_ID_LENGTH,
   MAX_WORKSPACES,
-  parseConversationKey,
+  parseLegacyConversationKey,
   parseExactWorkbenchIdOrder,
   parseWorkbenchIdSubset,
   parseWorkbenchSettings,
@@ -16,10 +15,12 @@ import {
   parseWorkspaces,
   selectedSurfaceWorkspaceId,
   WORKBENCH_STATE_VERSION,
-  parseWorkbenchStateV3,
+  parseWorkbenchStateV4,
   type RuntimeRecoveryRecordV2,
   type WorkbenchStateV2,
-  type WorkbenchStateV3,
+  type WorkbenchStateV4,
+  type LegacyConversationKey,
+  type LegacyWorkbenchSurface,
   type WorkbenchSurface
 } from "./workbench-state-contract.js";
 
@@ -81,11 +82,11 @@ export function parseWorkbenchStateV2(value: unknown): WorkbenchStateV2 | undefi
   };
 }
 
-export function parseAndMigrateWorkbenchStateV2(value: unknown): WorkbenchStateV3 | undefined {
+export function parseAndMigrateWorkbenchStateV2(value: unknown): WorkbenchStateV4 | undefined {
   const legacy = parseWorkbenchStateV2(value);
   if (!legacy) return undefined;
   const selectedSurface = migrateSelectedSurface(legacy.selectedSurface);
-  return parseWorkbenchStateV3({
+  return parseWorkbenchStateV4({
     version: WORKBENCH_STATE_VERSION,
     workspaces: legacy.workspaces,
     workspaceOrder: legacy.workspaceOrder,
@@ -112,7 +113,7 @@ function parseRuntimeRecoveryV2(
       ["taskId", "conversation", "sessionId", "taskGeneration", "lastKnownLifecycle"],
       ["taskId", "conversation", "sessionId", "taskGeneration", "lastKnownLifecycle"]
     )) return undefined;
-    const conversation = parseConversationKey(candidate.conversation, workspaceIds);
+    const conversation = parseLegacyConversationKey(candidate.conversation, workspaceIds);
     if (
       !conversation
       || !isBoundedId(candidate.taskId, MAX_TASK_ID_LENGTH)
@@ -121,7 +122,7 @@ function parseRuntimeRecoveryV2(
       || Number(candidate.taskGeneration) < 1
       || !isTaskLifecycle(candidate.lastKnownLifecycle)
     ) return undefined;
-    const identity = conversationIdentity(conversation);
+    const identity = legacyConversationIdentity(conversation);
     if (taskIds.has(candidate.taskId) || conversationIds.has(identity)) return undefined;
     taskIds.add(candidate.taskId);
     conversationIds.add(identity);
@@ -136,7 +137,17 @@ function parseRuntimeRecoveryV2(
   return records;
 }
 
-function migrateSelectedSurface(surface: WorkbenchSurface | undefined): WorkbenchSurface | undefined {
+function migrateSelectedSurface(surface: LegacyWorkbenchSurface | undefined): WorkbenchSurface | undefined {
   if (surface?.kind !== "conversation") return surface;
   return { kind: "workspace", workspaceId: surface.conversation.workspaceId };
+}
+
+function legacyConversationIdentity(conversation: LegacyConversationKey): string {
+  return conversation.kind === "session"
+    ? `session:${conversation.workspaceId}:${normalizeLegacyPath(conversation.sessionPath)}`
+    : `provisional:${conversation.workspaceId}:${conversation.draftId}`;
+}
+
+function normalizeLegacyPath(path: string): string {
+  return process.platform === "win32" ? path.toLowerCase() : path;
 }

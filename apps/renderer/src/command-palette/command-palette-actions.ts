@@ -31,7 +31,7 @@ export interface PaletteAvailability {
 }
 
 export interface PaletteActionHandlers {
-  openSession: (path: string) => Promise<void> | void;
+  openSession: (session: SessionSummary) => Promise<void> | void;
   invokeCommand: (name: string) => Promise<void> | void;
   executeDesktopAction: (action: PiDesktopActionDescriptor) => Promise<void> | void;
   openProvider: () => void;
@@ -43,7 +43,7 @@ export interface PaletteActionHandlers {
 interface BuildPaletteActionsOptions {
   sessions: readonly SessionSummary[];
   extensionCommands: readonly SlashCommandDescriptor[];
-  activeSessionPath: string | undefined;
+  activeSessionFileIdentity: string | undefined;
   availability: PaletteAvailability;
   desktopActionContext: PiDesktopActionContext;
   handlers: PaletteActionHandlers;
@@ -74,10 +74,10 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
   const sessionMutationReason = unavailableReason(options.availability, { session: true, idleOperation: true });
   const hostQueryReason = unavailableReason(options.availability, { connection: true });
   const sessionActions = options.sessions.slice(0, MAX_SESSION_CANDIDATES).map((session): PaletteAction => {
-    const current = session.path === options.activeSessionPath;
+    const current = session.fileIdentity === options.activeSessionFileIdentity;
     const disabledReason = current ? messages.commandPalette.currentSession : sessionMutationReason;
     return {
-      id: `session:${session.path}`,
+      id: `session:${session.fileIdentity}`,
       group: "sessions",
       label: session.name,
       detail: current
@@ -89,7 +89,7 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
       keywords: `${session.id} ${session.path} ${session.cwd}`,
       icon: MessageSquareText,
       ...(disabledReason ? { disabled: true, disabledReason } : {}),
-      run: () => options.handlers.openSession(session.path)
+      run: () => options.handlers.openSession(session)
     };
   });
   const extensionActions = options.extensionCommands

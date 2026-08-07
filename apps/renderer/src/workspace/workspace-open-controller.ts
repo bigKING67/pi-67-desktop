@@ -44,7 +44,8 @@ export async function openRendererWorkspace(): Promise<void> {
 
 export async function openRendererWorkspaceDescriptor(
   descriptor: WorkspaceDescriptor,
-  sessionPath?: string
+  sessionPath?: string,
+  sessionFileIdentity?: string
 ): Promise<boolean> {
   if (descriptor.availability !== "available") {
     publishNotification({
@@ -79,7 +80,7 @@ export async function openRendererWorkspaceDescriptor(
   try {
     await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
     await ensureAgentConnection();
-    task = ensureWorkspaceRuntimeTask(descriptor, sessionPath);
+    task = ensureWorkspaceRuntimeTask(descriptor, sessionPath, sessionFileIdentity);
     const transitionTarget = requireRendererSessionTransition(get());
     target = transitionTarget;
     const acknowledgement = sessionPath
@@ -168,11 +169,17 @@ export async function openRendererWorkspaceDescriptor(
 
 function ensureWorkspaceRuntimeTask(
   descriptor: WorkspaceDescriptor,
-  sessionPath?: string
+  sessionPath?: string,
+  sessionFileIdentity?: string
 ): RendererWorkbenchTask {
   const workbench = rendererWorkbenchStore.getState();
-  if (sessionPath) {
-    const conversation = { kind: "session" as const, workspaceId: descriptor.id, sessionPath };
+  if (sessionPath && sessionFileIdentity) {
+    const conversation = {
+      kind: "session" as const,
+      workspaceId: descriptor.id,
+      sessionFileIdentity,
+      sessionPath
+    };
     const matching = taskForConversation(workbench.tasks, conversation);
     if (matching) {
       workbench.selectTask(matching.id);
@@ -180,6 +187,7 @@ function ensureWorkspaceRuntimeTask(
     }
     return openWorkspaceRuntimeTask(descriptor, conversation, sessionPath);
   }
+  if (sessionPath) return openWorkspaceRuntimeTask(descriptor, undefined, sessionPath);
   const selected = selectedWorkbenchTask(workbench);
   if (selected?.workspaceId === descriptor.id) return selected;
 
@@ -210,6 +218,9 @@ function openWorkspaceRuntimeTask(
     lifecycle: "initializing",
     runtime: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true },
     title: "未命名会话",
+    ...(conversation?.kind === "session"
+      ? { sessionFileIdentity: conversation.sessionFileIdentity }
+      : {}),
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
     attachmentCount: 0,

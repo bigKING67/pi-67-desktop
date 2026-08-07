@@ -83,7 +83,12 @@ describe("Skill Pack controller", () => {
   it("blocks the global update while any Task consumes a run slot", async () => {
     rendererWorkbenchStore.getState().openTask({
       id: "task-running",
-      conversation: { kind: "session", workspaceId: "workspace-skills", sessionPath: "/sessions/task.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-skills",
+        sessionFileIdentity: "session-file-task",
+        sessionPath: "/sessions/task.jsonl"
+      },
       workspaceId: "workspace-skills",
       sessionId: "session-running",
       taskGeneration: 1,

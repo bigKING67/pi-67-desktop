@@ -20,11 +20,17 @@ import {
   useSessionCatalogStore
 } from "../navigation/session-catalog-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
-import { selectSessionId } from "../session/session-projection-selectors.js";
+import {
+  selectSessionFileIdentity,
+  selectSessionId
+} from "../session/session-projection-selectors.js";
 import { Transcript } from "../transcript/Transcript.js";
 import { TrustBanner } from "../workspace/TrustBanner.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import { resumeRendererTask } from "../workbench/task-activation-controller.js";
+import {
+  activateRendererTask,
+  resumeRendererTask
+} from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
@@ -67,12 +73,17 @@ export function WorkspaceShell({
     return selectConversationSessionSummary(state, conversation);
   });
   const liveSessionId = useSessionProjectionStore(selectSessionId);
+  const liveSessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const liveWorkspacePath = useAppStore((state) => state.workspace);
   const liveRuntime = useAppStore((state) => state.runtime);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const settingsSelected = selectedSurface?.kind === "settings";
   const taskSelected = selectedSurface?.kind === "conversation";
-  const liveTaskSelected = taskSelected && canRenderLiveTask(selectedTask, liveSessionId);
+  const liveTaskSelected = taskSelected && canRenderLiveTask(
+    selectedTask,
+    liveSessionId,
+    liveSessionFileIdentity
+  );
   const taskRecoveryPending = Boolean(
     taskSelected
     && selectedWorkspace?.identity.canonicalPath === liveWorkspacePath
@@ -100,6 +111,7 @@ export function WorkspaceShell({
     && selectedWorkspace ? (
       <StoppedConversationState
         sessionName={selectedSession?.name}
+        sessionFileIdentity={selectedSurface.conversation.sessionFileIdentity}
         sessionPath={selectedSurface.conversation.sessionPath}
         workspace={selectedWorkspace}
       />
@@ -197,26 +209,30 @@ export function WorkspaceShell({
 
 export function canRenderLiveTask(
   task: RendererWorkbenchTask | undefined,
-  liveSessionId: string | undefined
+  liveSessionId: string | undefined,
+  liveSessionFileIdentity: string | undefined
 ): boolean {
   return Boolean(
     task
     && liveSessionId
+    && liveSessionFileIdentity
     && task.sessionId === liveSessionId
+    && task.sessionFileIdentity === liveSessionFileIdentity
     && task.runtime.phase !== "stopped"
     && task.lifecycle !== "lost"
     && task.lifecycle !== "stopped"
   );
 }
 
-function StoppedConversationState({ sessionName, sessionPath, workspace }: {
+function StoppedConversationState({ sessionName, sessionFileIdentity, sessionPath, workspace }: {
   sessionName: string | undefined;
+  sessionFileIdentity: string;
   sessionPath: string;
   workspace: WorkspaceDescriptor;
 }) {
   const open = async () => {
     if (workspace.availability !== "available") return;
-    await openRendererWorkspaceDescriptor(workspace, sessionPath);
+    await openRendererWorkspaceDescriptor(workspace, sessionPath, sessionFileIdentity);
   };
   return (
     <section className={styles.emptyWorkspace}>
@@ -295,7 +311,7 @@ function ProvisionalTaskState({ task, workspace }: {
     if (checking) return;
     setChecking(true);
     try {
-      await recheckUnconfirmedRendererSession(task.id);
+      await recheckUnconfirmedRendererSession(task.id, { activateTask: activateRendererTask });
     } finally {
       setChecking(false);
     }
@@ -363,7 +379,8 @@ export function provisionalTaskStateCopy(task: RendererWorkbenchTask): {
 }
 
 function WorkspaceRecoveryState({ workspace }: { workspace: WorkspaceDescriptor }) {
-  const identityChanged = workspace.availability === "identity-changed";
+  const identityChanged = workspace.availability === "identity-changed"
+    || workspace.availability === "needs-confirmation";
   return (
     <section className={styles.emptyWorkspace}>
       <div role="status">

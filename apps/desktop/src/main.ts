@@ -13,8 +13,12 @@ import {
   DesktopCapabilityService
 } from "./desktop-capability-service.js";
 import { resolveDesktopAgentDirectory } from "./desktop-agent-directory.js";
+import { previousRunExitStatus } from "./desktop-recovery-snapshot.js";
 import { PackageNetworkSettingsStore } from "./package-network-settings.js";
-import { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
+import {
+  cleanupStalePromptAttachmentRuns,
+  PromptAttachmentStagingService
+} from "./prompt-attachment-staging.js";
 import { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import { redact } from "./redaction.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
@@ -115,12 +119,21 @@ if (hasSingleInstanceLock) {
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
     teamMcpSettings = new TeamMcpSettingsStore(app.getPath("userData"));
-    promptAttachments = new PromptAttachmentStagingService(join(
+    const promptAttachmentParent = join(
       app.getPath("userData"),
       "runtime",
-      "prompt-attachments",
-      appInstanceId
-    ));
+      "prompt-attachments"
+    );
+    promptAttachments = new PromptAttachmentStagingService(join(promptAttachmentParent, appInstanceId));
+    void cleanupStalePromptAttachmentRuns(promptAttachmentParent, appInstanceId).then((result) => {
+      if (result.removedRunCount === 0 && result.errorCount === 0) return;
+      console.info(
+        `Prompt attachment cleanup removed=${result.removedRunCount} errors=${result.errorCount}`
+        + (result.errorClasses.length > 0 ? ` classes=${result.errorClasses.join(",")}` : "")
+      );
+    }).catch(() => {
+      console.info("Prompt attachment cleanup removed=0 errors=1 classes=UnknownError");
+    });
     workspaceFileState = new WorkspaceFileStateStore(app.getPath("userData"), {
       encryption: {
         isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -134,6 +147,8 @@ if (hasSingleInstanceLock) {
       toolchain: desktopToolchain,
       packageNetworkSettings
     });
+    const initialWorkbenchLoad = await workbenchState.load();
+    const previousRunExit = previousRunExitStatus(initialWorkbenchLoad);
     await workbenchState.update(beginWorkbenchRun);
     const persistedWorkbench = (await workbenchState.load()).state;
     const refreshedWorkspaces = await Promise.all(
@@ -149,6 +164,7 @@ if (hasSingleInstanceLock) {
       packageNetworkSettings,
       teamMcpSettings,
       promptAttachments,
+      previousRunExit,
       workbenchState,
       workspaceFileState
     });

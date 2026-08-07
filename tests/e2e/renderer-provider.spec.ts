@@ -6,7 +6,7 @@ import {
 } from "./pi67-renderer-fixture.js";
 
 test.beforeEach(async ({ page }) => {
-  await installMockDesktopBridge(page);
+  await installMockDesktopBridge(page, { previousRunExitStatus: "not-run" });
 });
 
 test("shows Provider status while keeping runtime API keys ephemeral", async ({ page }, testInfo) => {
@@ -18,14 +18,25 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(settings.getByText("正在占用运行名额", { exact: true })).toBeVisible();
   await expect(settings.getByText("0 / 8", { exact: true })).toBeVisible();
   await expect(settings.getByText(/任务内部的子代理不单独占用/u)).toBeVisible();
-  await settings.getByRole("button", { name: /运行环境诊断/u }).click();
-  const doctorDialog = page.getByRole("dialog", { name: "运行环境诊断" });
+  await settings.getByRole("button", { name: /恢复与诊断/u }).click();
+  const doctorDialog = page.getByRole("dialog", { name: "恢复与诊断" });
   await expect(doctorDialog).toBeVisible();
-  await expect(doctorDialog.getByText(/运行检查以确认/u)).toBeVisible();
-  await doctorDialog.getByRole("button", { name: "运行检查" }).click();
-  await expect(page.getByText("当前运行环境的关键检查均已通过。")).toBeVisible();
+  await expect(doctorDialog.getByText(/检查 Workspace、Session/u)).toBeVisible();
+  await doctorDialog.getByRole("button", { name: "开始检查" }).click();
+  await expect(page.getByText("当前恢复状态和运行环境未发现阻断问题。")).toBeVisible();
   await expect(page.getByLabel("运行环境检查结果").getByText("Pi SDK")).toBeVisible();
+  await expect(page.getByLabel("恢复状态检查结果").getByText("Workspace 身份")).toBeVisible();
+  await expect(page.getByLabel("恢复状态检查结果").getByText("Writer Lease")).toBeVisible();
+  await expect(page.getByLabel("恢复状态检查结果").getByText(/上次退出 首次运行/u)).toBeVisible();
+  await expect(doctorDialog.getByRole("button", { name: "导出诊断" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("doctor-dialog.png"), animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 700 });
+  await expect(doctorDialog.getByRole("button", { name: "导出诊断" })).toBeInViewport();
+  await expect(doctorDialog.getByRole("button", { name: "重新检查" })).toBeInViewport();
+  await expectNoHorizontalPageOverflow(page);
+  await doctorDialog.locator(".doctor-results-scroll").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect(page.getByLabel("恢复状态检查结果").getByText("Attachment Staging")).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 920 });
   await doctorDialog.getByRole("button", { name: "关闭", exact: true }).click();
 
   await openProviderDialog(page);

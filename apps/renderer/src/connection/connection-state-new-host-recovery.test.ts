@@ -47,7 +47,8 @@ describe("new Host Session recovery", () => {
     resetStores();
     seedAuthoritativeRecoveryTask({
       workspaceId: "workspace-fixture",
-      taskId: "task-fixture"
+      taskId: "task-fixture",
+      sessionFileIdentity: "session-file-1"
     });
     const previousSnapshot = snapshot();
     useAppStore.setState({
@@ -107,6 +108,7 @@ describe("new Host Session recovery", () => {
       taskId: "task-fixture",
       taskGeneration: 1,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 3
     } });
     expect(useAppStore.getState()).toMatchObject({
@@ -193,6 +195,7 @@ describe("new Host Session recovery", () => {
 function snapshot(): SessionSnapshot {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionPath: "/sessions/session-1.jsonl",
     cwd: "/workspace",
     streaming: false,

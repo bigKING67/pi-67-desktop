@@ -26,6 +26,7 @@ export function projectSessionSnapshot(
   services: AgentSessionServices | undefined,
   extensionsResult: LoadExtensionsResult | undefined,
   projection: SessionProjectionIndex,
+  sessionFileIdentity?: string,
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
   projectImageAsset?: ImageAssetProjector
 ): SessionSnapshot {
@@ -35,6 +36,7 @@ export function projectSessionSnapshot(
   const modelCatalog = projectSessionModelCatalog(session);
   return {
     sessionId: session.sessionId,
+    ...(sessionFileIdentity ? { sessionFileIdentity } : {}),
     ...(session.sessionFile ? { sessionPath: session.sessionFile } : {}),
     ...(session.sessionName ? { sessionName: session.sessionName } : {}),
     cwd: session.sessionManager.getCwd(),

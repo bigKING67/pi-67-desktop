@@ -22,9 +22,7 @@ import { useAppStore } from "./app-store.js";
 const runningChange: WorkspaceChangeView = {
   kind: "edit", toolCallId: "tool-change-1",
   path: "src/file.ts", pathTruncated: false,
-  status: "running", patchTruncated: false
-};
-
+  status: "running", patchTruncated: false };
 describe("renderer projection state", () => {
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState(), true);
@@ -69,6 +67,8 @@ describe("renderer projection state", () => {
       total: 1
     };
     mockProjectionResync({
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       snapshot: snapshot("session-1"),
       changes: resyncedChanges,
       extensionCatalog: { items: [], total: 0, truncated: false },
@@ -139,10 +139,13 @@ describe("renderer projection state", () => {
       lifecycle: "running" as const,
       cancellable: true,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       startedAt: 1
     };
     const resync = mockProjectionResync({
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       snapshot: { ...snapshot("session-1"), streaming: true },
       changes: emptyChanges("session-1"),
       extensionCatalog: { items: [], total: 0, truncated: false },
@@ -172,6 +175,8 @@ describe("renderer projection state", () => {
   it("resynchronizes the active Session after an Electron power resume", async () => {
     useAppStore.setState({ workspace: "/workspace" });
     const resync = mockProjectionResync({
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       snapshot: snapshot("session-1"),
       changes: emptyChanges("session-1"),
       extensionCatalog: { items: [], total: 0, truncated: false },
@@ -242,6 +247,7 @@ describe("renderer projection state", () => {
         lifecycle: "running" as const,
         cancellable: true,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-session-1",
         sessionGeneration: 3,
         startedAt: 10
       };
@@ -249,6 +255,8 @@ describe("renderer projection state", () => {
       vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue(undefined);
       vi.spyOn(agentConnectionController, "waitForConnection").mockResolvedValue(connectionIdentity(9));
       mockProjectionResync({
+        sessionId: "session-1",
+        sessionFileIdentity: "session-file-session-1",
         snapshot: snapshot("session-1"),
         changes: emptyChanges("session-1"),
         extensionCatalog: { items: [], total: 0, truncated: false },
@@ -324,12 +332,13 @@ describe("renderer projection state", () => {
       cancellable: true,
       hostEpoch: 9,
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionGeneration: 4
     });
 
     await expect(sending).resolves.toEqual({
       accepted: false,
-      error: "发送期间 Pi 会话已切换，旧确认已忽略"
+      error: "发送期间 Pi 会话文件身份已变化，旧确认已忽略"
     });
     expect(useAppStore.getState().operation).toBeUndefined();
     expect(useAppStore.getState().runtime.phase).not.toBe("busy");
@@ -377,6 +386,7 @@ function emitChange(change: WorkspaceChangeView): void {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,
@@ -441,6 +451,7 @@ function terminalReceipt(operationId: string, operationKind: "prompt" | "command
     cancellable: false as const,
     hostEpoch: 9,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionGeneration: 3,
     startedAt: 10,
     settledAt: 20

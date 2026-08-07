@@ -7,7 +7,7 @@
     ".": "./dist/main.mjs"
   },
   "scripts": {
-    "build": "tsdown src/main.ts --format esm --dts false && tsdown src/preload.ts --format cjs --dts false --no-clean",
+    "build": "tsdown src/main.ts --format esm --dts false && tsdown src/preload.ts --config tsdown.preload.config.ts && node ../../eng/quality/verify-sandbox-preload-bundle.mjs dist/preload.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

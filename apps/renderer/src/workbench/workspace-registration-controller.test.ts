@@ -225,10 +225,12 @@ function task(options: { runtimePhase: "busy" | "stopped" }) {
     conversation: {
       kind: "session" as const,
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
     },
     workspaceId: "workspace-a",
     sessionId: "session-a",
+    sessionFileIdentity: "session-file-a",
     taskGeneration: 1,
     sessionGeneration: 2,
     lifecycle: stopped ? "stopped" as const : "running" as const,

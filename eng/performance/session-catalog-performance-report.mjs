@@ -9,6 +9,7 @@ import {
 export const SESSION_CATALOG_PERFORMANCE_BUDGETS = Object.freeze({
   warmFirstPage1kMs: 50,
   warmFirstPage10kMs: 100,
+  rebuildingFirstPage10kMs: 100,
   searchMiss10kMs: 150,
   pageBytes10k: 1_500_000
 });
@@ -105,6 +106,28 @@ export function createSessionCatalogPerformanceMetrics(samples) {
       limitations: NODE_EVIDENCE_LIMITATIONS
     }),
     summarizeMetric({
+      id: "sessionCatalogRebuildingFirstPage10k",
+      label: "10,000-session first page during a blocked background rebuild",
+      unit: "ms",
+      samples: samples.rebuildingFirstPage10k,
+      budget: SESSION_CATALOG_PERFORMANCE_BUDGETS.rebuildingFirstPage10kMs,
+      evidenceLevel: "node",
+      method: "Validated SQLite projection query while the same source's discovery phase is deliberately blocked",
+      limitations: NODE_EVIDENCE_LIMITATIONS
+    }),
+    summarizeMetric({
+      id: "sessionCatalogRebuildingUpsert10k",
+      label: "New Session metadata upsert during a blocked 10,000-session rebuild",
+      unit: "ms",
+      samples: samples.rebuildingUpsert10k,
+      evidenceLevel: "node",
+      method: "One identity-bearing session-created upsert is committed and queried while background discovery is blocked",
+      limitations: [
+        ...NODE_EVIDENCE_LIMITATIONS,
+        "This proves Catalog availability for an already-materialized metadata upsert; it does not measure Pi newSession or JSONL flush."
+      ]
+    }),
+    summarizeMetric({
       id: "sessionCatalogReopen10k",
       label: "10,000-session catalog reopen and first page",
       unit: "ms",
@@ -127,6 +150,7 @@ export async function writeSessionCatalogPerformanceReport({ root, outputPath, s
     unverified: [
       { id: "piSdkJsonlDiscovery", reason: "The metadata fixture deliberately excludes Pi JSONL discovery and transcript parsing." },
       { id: "packagedUtilityProcess", reason: "This Node-host suite does not launch packaged Electron or measure MessagePort transfer." },
+      { id: "sessionMaterialization", reason: "The rebuilding upsert scenario begins after authoritative JSONL materialization and does not time Pi Session creation." },
       { id: "windowsStorage", reason: "Real Windows x64, OneDrive, reparse-point, antivirus, and slow-storage evidence requires the native CI or release host." }
     ]
   });

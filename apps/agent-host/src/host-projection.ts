@@ -12,6 +12,7 @@ export function captureProjectionResync(
   operations: OperationRegistry | undefined
 ): CommandResults["projection.resync"] {
   const identity = runtime.getIdentity();
+  const session = requirePhysicalSessionIdentity(identity);
   const activeOperation = operations?.activeView();
   const latestOperationTerminal = operations?.latestTerminal();
   return {
@@ -21,7 +22,9 @@ export function captureProjectionResync(
     sessionCatalogStatus: runtime.getSessionCatalogStatus(),
     eventSequence,
     hostEpoch,
-    sessionGeneration: identity.sessionGeneration,
+    sessionId: session.sessionId,
+    sessionFileIdentity: session.sessionFileIdentity,
+    sessionGeneration: session.sessionGeneration,
     taskToolMode: runtime.getTaskToolMode(),
     ...(activeOperation === undefined ? {} : { activeOperation }),
     ...(latestOperationTerminal === undefined ? {} : { latestOperationTerminal })
@@ -34,14 +37,28 @@ export function captureProjectionMutationAcknowledgement(
   hostEpoch: number
 ): ProjectionMutationAcknowledgement {
   const identity = runtime.getIdentity();
-  if (!identity.sessionId) {
-    throw new Error("Pi SDK runtime is not initialized.");
-  }
+  const session = requirePhysicalSessionIdentity(identity);
   return {
     accepted: true,
     hostEpoch,
-    sessionId: identity.sessionId,
-    sessionGeneration: identity.sessionGeneration,
+    sessionId: session.sessionId,
+    sessionFileIdentity: session.sessionFileIdentity,
+    sessionGeneration: session.sessionGeneration,
     eventSequence
+  };
+}
+
+function requirePhysicalSessionIdentity(identity: ReturnType<AgentRuntime["getIdentity"]>): {
+  sessionId: string;
+  sessionFileIdentity: string;
+  sessionGeneration: number;
+} {
+  if (!identity.sessionId || !identity.sessionFileIdentity) {
+    throw new Error("Pi SDK runtime has no authoritative physical Session identity.");
+  }
+  return {
+    sessionId: identity.sessionId,
+    sessionFileIdentity: identity.sessionFileIdentity,
+    sessionGeneration: identity.sessionGeneration
   };
 }

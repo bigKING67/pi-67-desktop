@@ -1,5 +1,5 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync, gzipSync } from "node:zlib";
@@ -74,6 +74,19 @@ describe("prompt attachment extraction worker", () => {
     });
     expect(zipEntry).toEqual({ text: "zip text", truncated: false });
 
+    const largeZipPath = join(fixture.root, "large-entry.zip");
+    await writeFile(largeZipPath, storedZip([{
+      name: "large.txt",
+      data: Buffer.from("z".repeat(64 * 1024))
+    }]));
+    const largeZipEntry = await executePromptAttachmentTask({
+      ...task(fixture, largeZipPath, "large-entry.zip", "application/zip", "archive", "read_archive_entry"),
+      entry: "large.txt"
+    });
+    expect(largeZipEntry.truncated).toBe(true);
+    expect(largeZipEntry.text).toContain("zzzz");
+    expect(largeZipEntry.text).toContain("Attachment tool output truncated");
+
     const tarBytes = await tarArchive("docs/guide.txt", "tar text");
     const tarPath = join(fixture.root, "archive.tar");
     await writeFile(tarPath, tarBytes);
@@ -84,6 +97,16 @@ describe("prompt attachment extraction worker", () => {
       operation: "read_archive_entry",
       entry: "docs/guide.txt"
     })).toEqual({ text: "tar text", truncated: false });
+
+    const largeTarPath = join(fixture.root, "large-entry.tar");
+    await writeFile(largeTarPath, await tarArchive("large.txt", "t".repeat(64 * 1024)));
+    const largeTarEntry = await executePromptAttachmentTask({
+      ...task(fixture, largeTarPath, "large-entry.tar", "application/x-tar", "archive", "read_archive_entry"),
+      entry: "large.txt"
+    });
+    expect(largeTarEntry.truncated).toBe(true);
+    expect(largeTarEntry.text).toContain("tttt");
+    expect(largeTarEntry.text).toContain("Attachment tool output truncated");
 
     const gzipPath = join(fixture.root, "archive.tgz");
     await writeFile(gzipPath, gzipSync(tarBytes));
@@ -100,6 +123,51 @@ describe("prompt attachment extraction worker", () => {
       "archive",
       "list_archive"
     ))).rejects.toThrow(/unsafe entry path|invalid relative path/u);
+
+    const unsafeSuffixPath = join(fixture.root, "unsafe-suffix.zip");
+    await writeFile(unsafeSuffixPath, storedZip([
+      { name: "safe.txt", data: Buffer.from("safe") },
+      { name: "../suffix.txt", data: Buffer.from("unsafe") }
+    ]));
+    await expect(executePromptAttachmentTask({
+      ...task(fixture, unsafeSuffixPath, "unsafe-suffix.zip", "application/zip", "archive", "read_archive_entry"),
+      entry: "safe.txt"
+    })).rejects.toThrow(/unsafe entry path|invalid relative path/u);
+
+    const maximumZipPath = join(fixture.root, "maximum.zip");
+    const maximumEntries = Array.from({ length: 512 }, (_, index) => ({
+      name: `items/${index}.txt`,
+      data: index === 511 ? Buffer.from("last allowed entry") : Buffer.alloc(0)
+    }));
+    await writeFile(maximumZipPath, storedZip(maximumEntries));
+    await expect(executePromptAttachmentTask({
+      ...task(fixture, maximumZipPath, "maximum.zip", "application/zip", "archive", "read_archive_entry"),
+      entry: "items/511.txt"
+    })).resolves.toEqual({ text: "last allowed entry", truncated: false });
+
+    const overflowZipPath = join(fixture.root, "overflow.zip");
+    await writeFile(overflowZipPath, storedZip([
+      ...maximumEntries,
+      { name: "items/512.txt", data: Buffer.from("overflow") }
+    ]));
+    await expect(executePromptAttachmentTask({
+      ...task(fixture, overflowZipPath, "overflow.zip", "application/zip", "archive", "read_archive_entry"),
+      entry: "items/512.txt"
+    })).rejects.toThrow("bounded entry limit");
+
+    const deepZipPath = join(fixture.root, "deep.zip");
+    await writeFile(deepZipPath, storedZip([{
+      name: `${Array.from({ length: 33 }, () => "nested").join("/")}/file.txt`,
+      data: Buffer.from("deep")
+    }]));
+    await expect(executePromptAttachmentTask(task(
+      fixture,
+      deepZipPath,
+      "deep.zip",
+      "application/zip",
+      "archive",
+      "list_archive"
+    ))).rejects.toThrow("unsafe entry path");
   });
 
   it("extracts Office text and audio metadata from local files", async () => {
@@ -178,19 +246,24 @@ function task(
   kind: PromptAttachmentWorkerTask["attachment"]["kind"],
   operation: PromptAttachmentWorkerTask["operation"]
 ): PromptAttachmentWorkerTask {
+  const bytes = readFileSync(path);
   return {
     id: `task_${name.replace(/[^A-Za-z0-9]/gu, "_")}_${operation}`,
-    path,
+    bytes: toArrayBuffer(bytes),
     attachment: {
       id: "attachment_a",
       name,
       mimeType,
-      byteLength: statSync(path).size,
+      byteLength: bytes.byteLength,
       kind
     },
     operation,
     ocrDataRoot: fixture.ocrDataRoot
   };
+}
+
+function toArrayBuffer(bytes: Buffer): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function storedZip(entries: Array<{ name: string; data: Buffer }>): Buffer {

@@ -9,6 +9,7 @@ export * from "./operation.js";
 export * from "./package-network.js";
 export * from "./desktop-capability.js";
 export * from "./projection-limits.js";
+export * from "./recovery-diagnostics.js";
 export * from "./runtime-error.js";
 export * from "./safety-policy.js";
 export * from "./session-catalog.js";

@@ -18,6 +18,8 @@ import {
   packageRowAccessibleName,
   packageRowName,
   packageRowState,
+  packageTrustLabel,
+  packageTrustReasonLabel,
   resolveSourceKind,
   sourceKindLabel
 } from "./extension-management-model.js";
@@ -105,8 +107,18 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
   }
   const resourceTypes = packageResourceTypes(row.entry);
   const state = packageRowState(row);
-  const status = state === "enabled" ? "已启用" : state === "partial" ? "部分启用" : "已停用";
-  const statusTone = state === "enabled" ? "ready" : state === "partial" ? "warning" : "neutral";
+  const status = state === "enabled"
+    ? "已启用"
+    : state === "partial"
+      ? "部分启用"
+      : state === "blocked"
+        ? "已阻止执行"
+        : state === "unavailable" ? "不可用" : "已停用";
+  const statusTone = state === "enabled"
+    ? "ready"
+    : state === "partial"
+      ? "warning"
+      : state === "blocked" || state === "unavailable" ? "danger" : "neutral";
   return (
     <section
       aria-label={`${packageRowName(row)} 详情`}
@@ -142,6 +154,13 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
             : row.entry.scope === "global" ? "全局" : `项目 · ${workspaceName ?? "当前项目"}`}
         />
         <Fact label="资源过滤" value={row.entry.filtered ? "仅启用选定资源类型" : "使用包默认资源"} />
+        <Fact label="信任状态" value={packageTrustLabel(row.entry)} />
+        {packageTrustReasonLabel(row.entry)
+          ? <Fact label="完整性说明" value={packageTrustReasonLabel(row.entry)!} />
+          : null}
+        {row.entry.trustObservedAt
+          ? <Fact label="最后核对" value={new Date(row.entry.trustObservedAt).toLocaleString("zh-CN")} />
+          : null}
         <Fact label="更新" value={row.update ? "发现可用更新" : updatesChecked ? "未发现更新" : "尚未检查"} />
       </dl>
       <div className={styles.resourceControls} aria-label="资源启用状态">
@@ -153,6 +172,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
               <Button
                 aria-label={`${resourceEnabled ? "停用" : "启用"} ${resourceTypeLabel(resourceType)} ${row.entry.source}`}
                 className={resourceEnabled ? "secondary-button" : "primary-button"}
+                isDisabled={state === "blocked" || state === "unavailable"}
                 onPress={() => onToggle(row.entry, row.inherited, resourceType)}
               >{resourceEnabled ? "停用" : "启用"}</Button>
             </div>
@@ -212,6 +232,9 @@ function PackageState({ row }: { row: PackageRow }) {
   }
   if (state === "unavailable") {
     return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>缺失</span></span>;
+  }
+  if (state === "blocked") {
+    return <span className={styles.state} data-state="unavailable"><CircleAlert aria-hidden="true" size={15} /><span>已阻止</span></span>;
   }
   return null;
 }

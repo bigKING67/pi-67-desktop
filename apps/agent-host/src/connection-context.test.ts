@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isResponseEnvelope,
   type ProtocolError,
   type ProtocolPort,
@@ -186,7 +187,7 @@ describe("HostConnectionContext", () => {
       () => undefined
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-large-error",
@@ -234,7 +235,7 @@ describe("HostConnectionContext", () => {
       (origin) => { captured = origin; }
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-correlation",
@@ -287,7 +288,7 @@ describe("HostConnectionContext", () => {
       onRequest
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-malformed-context",
@@ -321,7 +322,7 @@ describe("HostConnectionContext", () => {
       () => { requests += 1; }
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-1",
@@ -356,7 +357,7 @@ describe("HostConnectionContext", () => {
       2
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-pending-limit",
@@ -389,7 +390,7 @@ describe("HostConnectionContext", () => {
       onRequest
     );
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-control",

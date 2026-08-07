@@ -79,6 +79,7 @@ export class PiSdkRuntime implements AgentRuntime {
     });
     this.projections = new RuntimeProjectionController({
       getSession: () => this.sessionBindings.requireSession(),
+      getSessionFileIdentity: () => this.sessionBindings.sessionFileIdentity,
       getSessionGeneration: () => this.sessionBindings.sessionGeneration,
       emit: (event) => this.emit(event),
       emitActivity: (activity) => this.emitOperationActivity(activity),
@@ -398,7 +399,13 @@ export class PiSdkRuntime implements AgentRuntime {
   getSnapshot(): SessionSnapshot { return this.projections.getSnapshot(this.sessionBindings.requireSession(), this.sessionBindings.services, this.sessionBindings.extensions); }
   getModels(): ModelSummary[] { return projectSessionModels(this.sessionBindings.requireSession()); }
   getResources(): ResourceSummary[] { return projectSessionResources(this.sessionBindings.services, this.sessionBindings.extensions); }
-  getIdentity(): RuntimeIdentity { return projectRuntimeIdentity(this.sessionBindings.runtime, this.sessionBindings.sessionGeneration); }
+  getIdentity(): RuntimeIdentity {
+    return projectRuntimeIdentity(
+      this.sessionBindings.runtime,
+      this.sessionBindings.sessionGeneration,
+      this.sessionBindings.sessionFileIdentity
+    );
+  }
   flushStream(): void { this.streamBatcher.flush(); }
 
   private assertSessionWritable(): Promise<void> {

@@ -97,14 +97,16 @@ export function applyWorkbenchAgentEvent(
       const sessionName = snapshot.sessionName?.trim();
       const sessionAuthority = eventSessionAuthority(envelope);
       workbench.updateTask(task.id, {
-        ...(snapshot.sessionPath === undefined
+        ...(snapshot.sessionPath === undefined || snapshot.sessionFileIdentity === undefined
           ? {}
           : {
               conversation: {
                 kind: "session" as const,
                 workspaceId: task.workspaceId,
+                sessionFileIdentity: snapshot.sessionFileIdentity,
                 sessionPath: snapshot.sessionPath
               },
+              sessionFileIdentity: snapshot.sessionFileIdentity,
               sessionPath: snapshot.sessionPath
             }),
         sessionId: snapshot.sessionId,

@@ -118,6 +118,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       taskToolMode: "auto" as const
     };
@@ -151,6 +153,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       taskToolMode: "auto" as const
     };
@@ -250,6 +254,8 @@ describe("renderer session transaction", () => {
       sessionCatalogStatus: catalogStatus(),
       eventSequence: 8,
       hostEpoch: 9,
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       taskToolMode: "auto" as const
     };
@@ -292,6 +298,7 @@ function seedFeatureStores(): void {
     lifecycle: "running",
     cancellable: true,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionGeneration: 3,
     startedAt: 1
   }, 9);
@@ -314,6 +321,7 @@ function seedFeatureStores(): void {
   useSessionCatalogStore.getState().finishFirstPage(
     useSessionCatalogStore.getState().beginFirstPage("workspace-1"),
     { ...catalogStatus(), items: [{
+      fileIdentity: "session-file-fixture-1",
       id: "session-1",
       path: "/sessions/session-1.jsonl",
       cwd: "/workspace",
@@ -339,6 +347,7 @@ function appState() {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

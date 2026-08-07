@@ -11,6 +11,7 @@ import { useSessionTreeStore } from "./session-tree-store.js";
 const AUTHORITY = {
   hostEpoch: 7,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-one",
   sessionGeneration: 3,
   projectionRevision: 1
 };
@@ -36,6 +37,7 @@ describe("session tree controller", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-1",
+        sessionFileIdentity: "session-file-one",
         sessionPath: "/sessions/one.jsonl"
       },
       workspaceId: "workspace-1",
@@ -69,6 +71,7 @@ describe("session tree controller", () => {
         taskId: "task-1",
         taskGeneration: 2,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-one",
         sessionGeneration: 3
       }
     });

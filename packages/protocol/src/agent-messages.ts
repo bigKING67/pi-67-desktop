@@ -47,6 +47,7 @@ import type {
   PiProviderConfigurationSnapshot
 } from "./provider-configuration-schemas.js";
 import type { ProtocolError } from "./protocol-error.js";
+import type { RuntimeDiagnostics } from "./runtime-diagnostics-contract.js";
 import type {
   WorkspaceFileCommandPayloads,
   WorkspaceFileCommandResults
@@ -54,6 +55,14 @@ import type {
 
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
+export {
+  MAX_PROMPT_ATTACHMENT_BYTES,
+  MAX_PROMPT_ATTACHMENT_COUNT,
+  MAX_PROMPT_ATTACHMENT_NAME_CHARS,
+  MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
+  MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
+  MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES
+} from "./prompt-attachment-limits.js";
 export type {
   SessionCatalogMutationResult,
   SessionNameMutation
@@ -67,6 +76,7 @@ export type SessionCreationResolution =
       status: "materialized";
       creationId: string;
       sessionId: string;
+      sessionFileIdentity: string;
       sessionPath: string;
     }
   | {
@@ -91,12 +101,6 @@ export interface StagedPromptAttachment {
   kind: PromptAttachmentKind;
 }
 
-export const MAX_PROMPT_ATTACHMENT_COUNT = 20;
-export const MAX_PROMPT_ATTACHMENT_NAME_CHARS = 512;
-export const MAX_PROMPT_ATTACHMENT_BYTES = 100 * 1024 * 1024;
-export const MAX_PROMPT_ATTACHMENT_TOTAL_BYTES = 250 * 1024 * 1024;
-export const MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES = 16 * 1024 * 1024;
-
 export type PromptDelivery = "new-turn" | "steer" | "follow-up";
 
 export interface PromptSubmitRequest {
@@ -112,6 +116,7 @@ export interface OperationAccepted {
   cancellable: boolean;
   hostEpoch: number;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
 }
 
@@ -122,6 +127,7 @@ interface OperationSettledBase {
   cancellable: false;
   hostEpoch: number;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   startedAt: number;
   settledAt: number;
@@ -146,6 +152,7 @@ export interface Acknowledgement {
 export interface ProjectionMutationAcknowledgement extends Acknowledgement {
   hostEpoch: number;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   eventSequence: number;
 }
@@ -171,24 +178,12 @@ export interface ProjectionResyncResult {
   sessionCatalogStatus: SessionCatalogStatus;
   eventSequence: number;
   hostEpoch: number;
+  sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   taskToolMode: TaskToolMode;
   activeOperation?: OperationView;
   latestOperationTerminal?: OperationSettled;
-}
-
-export interface RuntimeDiagnostics {
-  application: string;
-  piSdkVersion: string;
-  platform: string;
-  architecture: string;
-  node: string;
-  cwd?: string;
-  sessionConfigured: boolean;
-  sessionFileConfigured: boolean;
-  model?: string;
-  extensionCount: number;
-  extensionErrors: Array<{ path: string; error: string }>;
 }
 
 export type SlashCommandSource = "extension" | "prompt" | "skill";
@@ -259,6 +254,7 @@ export interface CommandPayloads extends
     sourceTaskId: string;
     sourceTaskGeneration: number;
     sourceSessionId: string;
+    sourceSessionFileIdentity: string;
     sourceSessionGeneration: number;
     entryId: string;
   };

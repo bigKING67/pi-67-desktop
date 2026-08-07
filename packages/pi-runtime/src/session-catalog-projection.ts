@@ -6,6 +6,7 @@ import {
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES,
   MAX_SESSION_CATALOG_PATH_CHARS,
   MAX_SESSION_CATALOG_SEARCH_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS,
   RuntimeError,
   type SessionCatalogPage,
   type SessionCatalogQuery,
@@ -13,6 +14,7 @@ import {
   type SessionSummary
 } from "@pi67/domain";
 import type { SessionCatalogRecord, SqliteCatalogQueryResult } from "./sqlite-session-catalog.js";
+import { SessionCatalogIdentityConflictError } from "./session-catalog-record-identity.js";
 
 const UNTITLED_SESSION_NAME = "未命名对话";
 
@@ -49,11 +51,30 @@ export function sanitizeSessionCatalogDiscovery(
   result: SessionCatalogDiscoveryResult
 ): SessionCatalogDiscoveryResult {
   const records = new Map<string, SessionCatalogRecord>();
+  const pathOwners = new Map<string, string>();
   let skippedCount = Math.max(0, Number.isSafeInteger(result.skippedCount) ? result.skippedCount : 0);
   for (const record of result.records) {
     const safe = sanitizeSessionCatalogRecord(record);
-    if (safe) records.set(safe.path, safe);
-    else skippedCount += 1;
+    if (!safe) {
+      skippedCount += 1;
+      continue;
+    }
+    const pathOwner = pathOwners.get(safe.path);
+    if (pathOwner !== undefined && pathOwner !== safe.fileIdentity) {
+      throw new SessionCatalogIdentityConflictError(
+        "One Session locator resolves to multiple physical Sessions."
+      );
+    }
+    const identityOwner = records.get(safe.fileIdentity);
+    if (identityOwner?.id !== undefined && identityOwner.id !== safe.id) {
+      throw new SessionCatalogIdentityConflictError(
+        "One physical Session carries contradictory Pi Session IDs."
+      );
+    }
+    pathOwners.set(safe.path, safe.fileIdentity);
+    if (!identityOwner || preferSessionCatalogRecord(safe, identityOwner)) {
+      records.set(safe.fileIdentity, safe);
+    }
   }
   return {
     records: sortSessionCatalogRecords([...records.values()]),
@@ -64,7 +85,8 @@ export function sanitizeSessionCatalogDiscovery(
 
 export function sanitizeSessionCatalogRecord(record: SessionCatalogRecord): SessionCatalogRecord | undefined {
   const explicitName = record.explicitName?.trim() || undefined;
-  if (!validText(record.id, MAX_SESSION_CATALOG_ID_CHARS)
+  if (!validText(record.fileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
+    || !validText(record.id, MAX_SESSION_CATALOG_ID_CHARS)
     || !validText(record.path, MAX_SESSION_CATALOG_PATH_CHARS)
     || !validText(record.cwd, MAX_SESSION_CATALOG_PATH_CHARS)
     || !validText(record.cwdKey, MAX_SESSION_CATALOG_PATH_CHARS)
@@ -187,6 +209,7 @@ function isAfterCursor(
 
 function toSummary(record: SessionCatalogRecord): SessionSummary {
   return {
+    fileIdentity: record.fileIdentity,
     id: record.id,
     path: record.path,
     cwd: record.cwd,
@@ -208,4 +231,12 @@ function validText(value: string, maximum: number): boolean {
 
 function comparePathBinary(left: string, right: string): number {
   return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+}
+
+function preferSessionCatalogRecord(candidate: SessionCatalogRecord, current: SessionCatalogRecord): boolean {
+  return candidate.modifiedAt > current.modifiedAt
+    || (candidate.modifiedAt === current.modifiedAt && candidate.messageCount > current.messageCount)
+    || (candidate.modifiedAt === current.modifiedAt
+      && candidate.messageCount === current.messageCount
+      && comparePathBinary(candidate.path, current.path) < 0);
 }

@@ -8,26 +8,14 @@ import {
   type RequestEnvelope
 } from "@pi67/protocol";
 import type { HostConnectionContext } from "./connection-context.js";
-import {
-  type ContextFileCommandRouter,
-  isContextFileCommand
-} from "./context-file-command-router.js";
-import {
-  type ExtensionPackageCommandRouter,
-  isExtensionPackageCommand
-} from "./extension-package-command-router.js";
+import { isContextFileCommand, type ContextFileCommandRouter } from "./context-file-command-router.js";
+import { isExtensionPackageCommand, type ExtensionPackageCommandRouter } from "./extension-package-command-router.js";
 import { operationSubmissionIdentity } from "./host-command-dispatcher.js";
-import {
-  type HostTaskStateCoordinator,
-  type TaskHostState
-} from "./host-task-state-coordinator.js";
+import type { HostTaskStateCoordinator, TaskHostState } from "./host-task-state-coordinator.js";
 import type { OperationRegistry } from "./operation-registry.js";
 import { HostCommandError, toProtocolError } from "./protocol-error.js";
 import { SessionCreationResolutionCoordinator } from "./session-creation-resolution-coordinator.js";
-import {
-  isSkillPackCommand,
-  type SkillPackCommandRouter
-} from "./skill-pack-command-router.js";
+import { isSkillPackCommand, type SkillPackCommandRouter } from "./skill-pack-command-router.js";
 import {
   isWorkspaceLifecycleCommand,
   isWorkspaceConversationCommand,
@@ -55,6 +43,7 @@ export interface HostRequestRouterOptions {
     state: TaskHostState,
     submissionFingerprint?: string
   ): Promise<CommandResults[AgentCommandType]>;
+  shutdownResources(deadlineMs?: number): Promise<void>;
 }
 
 export class HostRequestRouter {
@@ -72,8 +61,20 @@ export class HostRequestRouter {
     this.sessionCreationResolutions = new SessionCreationResolutionCoordinator(workspaceCommands);
   }
 
-  shutdown(): void {
+  async shutdown(deadlineMs?: number): Promise<void> {
     this.sessionCreationResolutions.shutdown();
+    let firstError: unknown;
+    try {
+      await this.options.shutdownResources(deadlineMs);
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      await this.workspaceCommands.shutdown();
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError !== undefined) throw firstError;
   }
 
   handle(origin: HostConnectionContext, request: RequestEnvelope): void {

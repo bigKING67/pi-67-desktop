@@ -18,10 +18,12 @@ export type TaskProtocolContext = {
   taskGeneration: number;
 } & ({
   sessionId?: never;
+  sessionFileIdentity?: never;
   sessionGeneration?: never;
   operationId?: never;
 } | {
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   operationId?: string;
 });
@@ -48,6 +50,7 @@ export const TaskProtocolContextWithSessionSchema = strictObject({
   taskId: ProtocolIdentifierSchema,
   taskGeneration: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   sessionId: ProtocolIdentifierSchema,
+  sessionFileIdentity: ProtocolIdentifierSchema,
   sessionGeneration: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   operationId: Type.Optional(ProtocolIdentifierSchema)
 });
@@ -129,6 +132,7 @@ export function protocolContextsEqual(left: ProtocolContext, right: ProtocolCont
     && left.taskId === right.taskId
     && left.taskGeneration === right.taskGeneration
     && left.sessionId === right.sessionId
+    && left.sessionFileIdentity === right.sessionFileIdentity
     && left.sessionGeneration === right.sessionGeneration
     && left.operationId === right.operationId;
 }

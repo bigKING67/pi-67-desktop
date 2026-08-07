@@ -21,6 +21,7 @@ describe("workbench operation replay routing", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-active",
         sessionPath: "/sessions/active.jsonl"
       },
       workspaceId: "workspace-a",
@@ -44,6 +45,7 @@ describe("workbench operation replay routing", () => {
       lifecycle: "running" as const,
       cancellable: true,
       sessionId: "session-active",
+      sessionFileIdentity: "session-file-active",
       sessionGeneration: 2,
       startedAt: 1
     } };

@@ -284,7 +284,7 @@ function createFixture(
   const cancelInteractiveRequests = vi.fn(() => []);
   let activeOperationId: string | undefined = "operation-events";
   const runtime = {
-    getIdentity: () => ({ sessionId: "session-events", sessionGeneration: 3 }),
+    getIdentity: () => ({ sessionId: "session-events", sessionFileIdentity: "session-file-session-events", sessionGeneration: 3 }),
     resolveApproval,
     resolveExtensionUi,
     cancelInteractiveRequests

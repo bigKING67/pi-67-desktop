@@ -25,6 +25,7 @@ const catalog: ExtensionCatalogResult = {
 const AUTHORITY: SessionProjectionAuthority = {
   hostEpoch: 9,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   projectionRevision: 4
 };

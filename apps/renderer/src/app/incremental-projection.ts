@@ -233,6 +233,7 @@ function reboundSessionImportOperation(
     operation: {
       ...operation,
       sessionId: eventAuthority.sessionId,
+      sessionFileIdentity: eventAuthority.sessionFileIdentity,
       sessionGeneration: eventAuthority.sessionGeneration
     }
   };

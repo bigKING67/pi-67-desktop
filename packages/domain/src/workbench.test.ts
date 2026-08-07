@@ -53,8 +53,9 @@ describe("conversation identity", () => {
     expect(conversationKeyIdentity({
       kind: "session",
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
-    })).toBe("session:workspace-a:/sessions/a.jsonl");
+    })).toBe("session:workspace-a:session-file-a");
     expect(conversationKeyIdentity({
       kind: "provisional",
       workspaceId: "workspace-b",

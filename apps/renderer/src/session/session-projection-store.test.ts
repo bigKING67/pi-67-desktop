@@ -16,6 +16,7 @@ import {
 const AUTHORITY: SessionProjectionAuthority = {
   hostEpoch: 9,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   projectionRevision: 1
 };
@@ -279,7 +280,7 @@ describe("session projection store", () => {
     installSessionProjectionFixture(CONNECTION, snapshot("session-1"), 3);
     const oldTarget = useSessionProjectionStore.getState().captureTransition(CONNECTION)!;
 
-    useSessionProjectionStore.getState().reset({ preserveRecoverySessionPath: true });
+    useSessionProjectionStore.getState().reset({ preserveRecoverySessionIdentity: true });
     const nextTarget = useSessionProjectionStore.getState().captureTransition(CONNECTION)!;
 
     expect(nextTarget.projectionRevision).toBe(oldTarget.projectionRevision + 1);
@@ -300,6 +301,7 @@ describe("session projection store", () => {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     sessionName: `Session ${sessionId}`,
     cwd: "/workspace",

@@ -73,6 +73,7 @@ export interface OperationView {
   lifecycle: OperationLifecycle;
   cancellable: boolean;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   startedAt: number;
   activity?: OperationActivity;
@@ -80,6 +81,7 @@ export interface OperationView {
 
 export interface RuntimeIdentity {
   sessionId?: string;
+  sessionFileIdentity?: string;
   sessionPath?: string;
   sessionGeneration: number;
 }

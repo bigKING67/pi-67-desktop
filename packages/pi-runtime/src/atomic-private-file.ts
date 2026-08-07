@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { chmod, link, mkdir, open, rename, stat, unlink } from "node:fs/promises";
+import { link, mkdir, open, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import lockfile from "proper-lockfile";
+import { safeAtomicReplaceFile } from "./safe-atomic-io.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 
@@ -23,25 +24,8 @@ export async function withConfigurationFileLock<T>(
 }
 
 export async function writePrivateFileAtomically(path: string, content: string): Promise<void> {
-  const directory = dirname(path);
-  await mkdir(directory, { recursive: true });
   const existingMode = await stat(path).then((value) => value.mode & 0o777, () => undefined);
-  const temporaryPath = join(directory, `.${randomUUID()}.pi67-tmp`);
-  const file = await open(temporaryPath, "wx", existingMode ?? PRIVATE_FILE_MODE);
-  try {
-    await file.writeFile(content, "utf8");
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-  try {
-    if (existingMode !== undefined) await chmod(temporaryPath, existingMode);
-    await rename(temporaryPath, path);
-    await syncDirectory(directory);
-  } catch (error) {
-    await unlink(temporaryPath).catch(() => undefined);
-    throw error;
-  }
+  await safeAtomicReplaceFile(path, content, { mode: existingMode ?? PRIVATE_FILE_MODE });
 }
 
 export async function createPrivateFileAtomically(path: string, content: string): Promise<void> {

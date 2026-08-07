@@ -73,6 +73,7 @@ describe("OperationTerminalLedger", () => {
       "lifecycle",
       "operationId",
       "operationKind",
+      "sessionFileIdentity",
       "sessionGeneration",
       "sessionId",
       "settledAt",
@@ -96,11 +97,16 @@ function operation(
     lifecycle: "running",
     cancellable: true,
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionGeneration,
     startedAt
   };
 }
 
 function identity(sessionId: string, sessionGeneration: number): RuntimeIdentity {
-  return { sessionId, sessionGeneration };
+  return {
+    sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
+    sessionGeneration
+  };
 }

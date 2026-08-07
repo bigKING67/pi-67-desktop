@@ -84,6 +84,7 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now(),
         activity: {

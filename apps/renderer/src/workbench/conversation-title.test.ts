@@ -5,6 +5,7 @@ import { conversationPrimaryTitle } from "./conversation-title.js";
 describe("conversation title", () => {
   it("uses the Catalog title for a recovered task with only a generic fallback title", () => {
     const session = {
+      fileIdentity: "session-file-recovered",
       id: "session-recovered",
       path: "/sessions/recovered.jsonl",
       cwd: "/Users/test/Projects/pi",
@@ -15,7 +16,12 @@ describe("conversation title", () => {
     };
     const task: RendererWorkbenchTask = {
       id: "task-recovered",
-      conversation: { kind: "session", workspaceId: "workspace-test", sessionPath: session.path },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-test",
+        sessionFileIdentity: session.fileIdentity,
+        sessionPath: session.path
+      },
       workspaceId: "workspace-test",
       sessionId: session.id,
       taskGeneration: 1,

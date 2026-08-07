@@ -35,6 +35,7 @@ export function operationFromSubmission(
       lifecycle: "accepted",
       cancellable: result.cancellable,
       sessionId: result.sessionId,
+      sessionFileIdentity: result.sessionFileIdentity,
       sessionGeneration: result.sessionGeneration,
       startedAt: Date.now()
     };
@@ -45,6 +46,7 @@ export function operationFromSubmission(
     lifecycle: result.lifecycle,
     cancellable: false,
     sessionId: result.sessionId,
+    sessionFileIdentity: result.sessionFileIdentity,
     sessionGeneration: result.sessionGeneration,
     startedAt: result.startedAt
   };

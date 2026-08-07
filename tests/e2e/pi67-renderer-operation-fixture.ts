@@ -23,6 +23,7 @@ export function installMockOperationFactories(): void {
     lifecycle,
     cancellable: kind === "prompt" || kind === "compaction",
     sessionId: String(state.snapshot.sessionId),
+    sessionFileIdentity: String(state.snapshot.sessionFileIdentity),
     sessionGeneration: state.sessionGeneration,
     startedAt: Date.now()
   });
@@ -30,6 +31,7 @@ export function installMockOperationFactories(): void {
     accepted: true,
     hostEpoch,
     sessionId: String(state.snapshot.sessionId),
+    sessionFileIdentity: String(state.snapshot.sessionFileIdentity),
     sessionGeneration: state.sessionGeneration,
     eventSequence: state.sequence
   });

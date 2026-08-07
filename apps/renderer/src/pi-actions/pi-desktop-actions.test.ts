@@ -101,7 +101,7 @@ describe("Pi Desktop actions", () => {
       .resolves.toEqual({ status: "handled" });
     expect(controllers.rename).toHaveBeenCalledWith(
       "workspace-a",
-      "/sessions/a.jsonl",
+      { fileIdentity: "session-file-a", path: "/sessions/a.jsonl" },
       "固定标题"
     );
 
@@ -111,6 +111,7 @@ describe("Pi Desktop actions", () => {
     expect(controllers.rename).not.toHaveBeenCalled();
     expect(useConversationDialogStore.getState().renameTarget).toEqual({
       workspaceId: "workspace-a",
+      fileIdentity: "session-file-a",
       path: "/sessions/a.jsonl",
       title: "当前标题",
       nameSource: "explicit"
@@ -132,6 +133,7 @@ function installConversation(): void {
     conversation: {
       kind: "session",
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
     },
     workspaceId: "workspace-a",

@@ -17,13 +17,13 @@ export function ConversationRenameDialog() {
     const next = name.trim();
     if (!next) return;
     setSaving(true);
-    const saved = await renameRendererConversation(target.workspaceId, target.path, next);
+    const saved = await renameRendererConversation(target.workspaceId, target, next);
     setSaving(false);
     if (saved) close();
   };
   const restoreAutomatic = async () => {
     setSaving(true);
-    const saved = await renameRendererConversation(target.workspaceId, target.path, undefined);
+    const saved = await renameRendererConversation(target.workspaceId, target, undefined);
     setSaving(false);
     if (saved) close();
   };

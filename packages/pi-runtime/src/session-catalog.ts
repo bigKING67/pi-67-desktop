@@ -25,7 +25,8 @@ import {
   type SessionCatalogDiscoveryResult,
   type ValidatedSessionCatalogQuery
 } from "./session-catalog-projection.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogPathIdentity, resolveExistingSessionFileIdentity } from "./session-path-identity.js";
+import { upsertSessionCatalogRecordByIdentity } from "./session-catalog-record-identity.js";
 import type {
   CreateSessionCatalogOptions,
   SessionCatalog,
@@ -153,7 +154,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       if (!this.isCurrentContext(context, contextGeneration)) return this.current.revision;
       const organization = await this.recordEnricher.organize(
         context.sourceKey,
-        path,
+        await resolveExistingSessionFileIdentity(path),
         mutation,
         this.now()
       );
@@ -181,7 +182,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     reason: Extract<SessionCatalogChangedReason, "session-created" | "session-updated" | "session-imported">
   ): void {
     const generation = ++this.mutationGeneration;
-    this.pendingUpserts.set(safe.path, { generation, record: safe });
+    this.pendingUpserts.set(safe.fileIdentity, { generation, record: safe });
     let recoveryScheduled = false;
     const sqliteAwaitingReconcile = this.sqlite !== undefined && this.current.source !== "sqlite";
     if (this.sqlite && this.current.source === "sqlite") {
@@ -189,7 +190,7 @@ class DefaultSessionCatalog implements SessionCatalog {
         if (this.sqlite.getState().sourceKey === context.sourceKey) {
           const state = this.sqlite.upsert(safe, this.current.revision);
           this.applySqliteState(state, false);
-          if (!this.reconcileFlight) this.pendingUpserts.delete(safe.path);
+          if (!this.reconcileFlight) this.pendingUpserts.delete(safe.fileIdentity);
           this.publish(reason);
           return;
         }
@@ -198,9 +199,9 @@ class DefaultSessionCatalog implements SessionCatalog {
         recoveryScheduled = true;
       }
     }
-    const records = new Map(this.fallbackRecords.map((item) => [item.path, item]));
-    records.set(safe.path, safe);
-    this.fallbackRecords = sortSessionCatalogRecords([...records.values()]);
+    this.fallbackRecords = sortSessionCatalogRecords(
+      upsertSessionCatalogRecordByIdentity(this.fallbackRecords, safe)
+    );
     this.fallbackReady = true;
     this.current = {
       ...this.current,
@@ -211,7 +212,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       itemCount: this.fallbackRecords.length,
       ...degradedReason(this.sqliteLifecycle.degradedReason)
     };
-    if (!this.reconcileFlight && !recoveryScheduled && !sqliteAwaitingReconcile) this.pendingUpserts.delete(safe.path);
+    if (!this.reconcileFlight && !recoveryScheduled && !sqliteAwaitingReconcile) this.pendingUpserts.delete(safe.fileIdentity);
     this.publish(reason);
   }
   async dispose(): Promise<void> {

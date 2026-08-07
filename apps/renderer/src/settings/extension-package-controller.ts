@@ -152,6 +152,14 @@ async function mutate<T extends MutationType>(
       (type === "extension.package.update" || type === "extension.package.uninstall")
       && "scope" in payload
     ) currentStore.removeUpdate(target.id, payload.source, payload.scope);
+    if (result.receiptState === "ambiguous") {
+      publishNotification({
+        level: "warning",
+        title: "扩展包操作结果需要核对",
+        message: "Pi-67 未自动重放这次操作；扩展包会保持阻止执行，直到重新安装或完整性核对完成。"
+      });
+      return false;
+    }
     publishNotification(type === "extension.package.update" && "scope" in payload
       ? updateNotification(
           payload.source,

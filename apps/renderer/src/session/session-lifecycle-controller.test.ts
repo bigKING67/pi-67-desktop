@@ -325,7 +325,7 @@ describe("session lifecycle controller", () => {
   it("selects an already-open Session Task instead of creating a duplicate", async () => {
     rendererWorkbenchStore.getState().openTask(task("task-existing", "/sessions/existing.jsonl"));
 
-    await openRendererSession("/sessions/existing.jsonl");
+    await openRendererSession("/sessions/existing.jsonl", "session-file-task-existing");
 
     expect(activateTask).toHaveBeenCalledWith("task-existing");
     expect(runBootstrap).not.toHaveBeenCalled();
@@ -345,9 +345,9 @@ describe("session lifecycle controller", () => {
     const [pending] = Object.values(rendererWorkbenchStore.getState().tasks);
     expect(pending).toMatchObject({
       conversation: {
-        kind: "session",
+        kind: "provisional",
         workspaceId: "workspace-a",
-        sessionPath: "/sessions/catalog.jsonl"
+        draftId: expect.any(String)
       },
       sessionPath: "/sessions/catalog.jsonl"
     });
@@ -419,7 +419,12 @@ function connectionIdentity(hostEpoch: number) {
 function task(id: string, sessionPath: string) {
   return {
     id,
-    conversation: { kind: "session" as const, workspaceId: "workspace-a", sessionPath },
+    conversation: {
+      kind: "session" as const,
+      workspaceId: "workspace-a",
+      sessionFileIdentity: `session-file-${id}`,
+      sessionPath
+    },
     workspaceId: "workspace-a",
     sessionId: `session-${id}`,
     taskGeneration: 1,
@@ -427,6 +432,7 @@ function task(id: string, sessionPath: string) {
     lifecycle: "idle" as const,
     runtime: { phase: "ready" as const, detail: "Pi 会话已就绪", recoverable: true },
     title: id,
+    sessionFileIdentity: `session-file-${id}`,
     sessionPath,
     hasDraft: false,
     toolMode: "auto" as const,

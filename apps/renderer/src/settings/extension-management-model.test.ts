@@ -81,6 +81,24 @@ describe("Extension management view model", () => {
     expect(packageResourceEnabled(mixed, "skill")).toBe(false);
   });
 
+  it("does not present unverified or drifted packages as enabled", () => {
+    const unverified = {
+      ...packageEntry("npm:unverified", "global", true),
+      trustState: "unverified" as const,
+      trustReason: "receipt-missing" as const
+    };
+    const drifted = {
+      ...packageEntry("npm:drifted", "global", true),
+      trustState: "drifted" as const,
+      trustReason: "content-hash-changed" as const
+    };
+    const rows = buildPackageRows([unverified, drifted], [], "global");
+
+    expect(rows.map(packageRowState)).toEqual(["blocked", "blocked"]);
+    expect(rows.map(packageRowEnabled)).toEqual([false, false]);
+    expect(filterPackageRows(rows, "enabled", "")).toEqual([]);
+  });
+
   it("recognizes npm, Git, POSIX paths, and Windows paths", () => {
     expect(inferSourceKind("npm:@scope/package")).toBe("npm");
     expect(inferSourceKind("https://example.test/repo.git")).toBe("git");
@@ -94,5 +112,12 @@ function packageEntry(
   scope: "global" | "project",
   enabled: boolean
 ): ExtensionPackageEntry {
-  return { source, scope, enabled, filtered: false, installed: true };
+  return {
+    source,
+    scope,
+    enabled,
+    filtered: false,
+    installed: true,
+    trustState: "user-installed-observed"
+  };
 }

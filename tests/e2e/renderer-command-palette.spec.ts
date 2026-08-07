@@ -177,6 +177,7 @@ test("matches Host scheduler availability while an operation is active", async (
     sessionCatalogItems: [
       {
         id: "session-test",
+        fileIdentity: "session-file-fixture-demo",
         path: "/Users/test/.pi/agent/sessions/demo.jsonl",
         cwd: "/Users/test/Projects/pi-demo",
         name: "Current Session",
@@ -185,6 +186,7 @@ test("matches Host scheduler availability while an operation is active", async (
       },
       {
         id: "session-other",
+        fileIdentity: "session-file-fixture-other",
         path: "/Users/test/.pi/agent/sessions/other.jsonl",
         cwd: "/Users/test/Projects/pi-demo",
         name: "Other Session",
@@ -205,6 +207,7 @@ test("matches Host scheduler availability while an operation is active", async (
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -217,7 +220,7 @@ test("matches Host scheduler availability while an operation is active", async (
   await expect(page.getByRole("option", { name: /\/inspect 当前任务结束后可用/u })).toHaveAttribute("aria-disabled", "true");
   const compact = page.getByRole("option", { name: /\/compact.*当前任务结束或停止后可用/u });
   await expect(compact).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByRole("option", { name: /运行环境诊断/u })).not.toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("option", { name: /恢复与诊断/u })).not.toHaveAttribute("aria-disabled", "true");
 
   await clearRecordedCommands(page);
   await compact.dispatchEvent("click");

@@ -23,6 +23,7 @@ describe("renderer session authority", () => {
     expect(currentRendererSessionAuthority(state())).toEqual({
       hostEpoch: 9,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       projectionRevision: 1
     });
@@ -52,6 +53,7 @@ describe("renderer session authority", () => {
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionGeneration: 7
     }));
     expect(acceptRendererSessionEvent(state(), envelope)).toBeUndefined();
@@ -61,6 +63,7 @@ describe("renderer session authority", () => {
     expect(acceptRendererSessionEvent(state(), envelope)).toEqual({
       hostEpoch: 9,
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionGeneration: 7,
       projectionRevision: 1
     });
@@ -72,6 +75,7 @@ describe("renderer session authority", () => {
       hostEpoch: 9,
       sequence: 1,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3
     }));
     expect(acceptRendererSessionEvent(current, exact, "session-1")).toBeDefined();
@@ -85,6 +89,17 @@ describe("renderer session authority", () => {
       "usage.changed",
       { tokens: 1, cost: 0 },
       taskEventFixture({ hostEpoch: 9, sequence: 1, sessionId: "session-1", sessionGeneration: 2 })
+    ))).toBeUndefined();
+    expect(acceptRendererSessionEvent(current, eventEnvelope(
+      "usage.changed",
+      { tokens: 1, cost: 0 },
+      taskEventFixture({
+        hostEpoch: 9,
+        sequence: 1,
+        sessionId: "session-1",
+        sessionFileIdentity: "session-file-other",
+        sessionGeneration: 3
+      })
     ))).toBeUndefined();
     expect(acceptRendererSessionEvent(current, exact, "session-old")).toBeUndefined();
   });
@@ -106,6 +121,7 @@ function state(overrides: Partial<RendererSessionAuthorityState> = {}): Renderer
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     cwd: "/workspace",
     streaming: false,
     messages: [],

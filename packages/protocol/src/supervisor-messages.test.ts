@@ -30,6 +30,15 @@ describe("Agent Host supervisor messages", () => {
     expect(isAgentHostRuntimePoisonedMessage({ ...message, error: "raw runtime failure" })).toBe(false);
   });
 
+  it("accepts only exact Session writer lease failures", () => {
+    const message = {
+      type: "agent-host-runtime-poisoned",
+      code: "SESSION_WRITER_LEASE_COMPROMISED"
+    };
+    expect(isAgentHostRuntimePoisonedMessage(message)).toBe(true);
+    expect(isAgentHostRuntimePoisonedMessage({ ...message, path: "/private/session.jsonl" })).toBe(false);
+  });
+
   it("accepts only exact bounded application shutdown requests", () => {
     const message = {
       type: "agent-host-shutdown",

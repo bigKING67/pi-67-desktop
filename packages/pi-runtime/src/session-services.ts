@@ -26,6 +26,7 @@ import {
   ConfiguredCapabilityCatalog
 } from "./configured-capability-catalog.js";
 import { createDesktopEnvironmentExtension } from "./desktop-environment-extension.js";
+import type { PackageTrustRegistry } from "./package-trust-registry.js";
 
 interface DesktopSessionServicesOptions {
   cwd: string;
@@ -38,15 +39,21 @@ interface DesktopSessionServicesOptions {
   requestApproval: DesktopApprovalRequester;
   recordToolAuthorization?: DesktopToolAuthorizationRecorder;
   promptAttachmentAccess?: PromptAttachmentAccess;
+  packageTrustRegistry?: Pick<PackageTrustRegistry, "refresh" | "runtimePackageAllowed">;
 }
 
 export async function createDesktopSessionServices(
   options: DesktopSessionServicesOptions
 ): Promise<AgentSessionServices> {
+  await options.packageTrustRegistry?.refresh();
   const loadedResourceReadAccess = createLoadedResourceReadAccess();
   const settingsManager = options.settingsManager === undefined
     ? undefined
-    : createDesktopPackageSettingsView(options.settingsManager);
+    : createDesktopPackageSettingsView(
+        options.settingsManager,
+        process.env,
+        options.packageTrustRegistry
+      );
   const configuredCapabilities = new ConfiguredCapabilityCatalog({
     agentDir: options.agentDir,
     settingsManager: settingsManager ?? { getPackages: () => [] }

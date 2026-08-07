@@ -5,7 +5,7 @@ import type {
 
 export interface PromptAttachmentWorkerTask {
   id: string;
-  path: string;
+  bytes: ArrayBuffer;
   attachment: PreparedPromptAttachment;
   operation: PromptAttachmentReadOperation;
   query?: string;

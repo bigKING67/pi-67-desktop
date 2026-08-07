@@ -15,6 +15,7 @@ const operation: OperationView = {
   lifecycle: "running",
   cancellable: true,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   startedAt: 1
 };
@@ -149,6 +150,7 @@ describe("handleAgentEvent operation activity authority", () => {
       ...operation,
       kind: "session-import",
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionGeneration: 7
     };
     installSessionProjectionFixture(
@@ -281,6 +283,7 @@ function dispatch<TState extends ReturnType<typeof eventState>>(
 function snapshot(sessionId: string) {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     cwd: "/workspace",
     streaming: false,
     messages: [],

@@ -54,7 +54,7 @@ export async function attachMockAgent(
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
     fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
   });
-  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureContextFiles, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolRevision }) => {
+  await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureContextFiles, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolVersion, fixtureProtocolRevision }) => {
     const testWindow = window as FixtureWindow;
     const readMockAsset = (testWindow as FixtureWindow & {
       __pi67ReadMockAsset: MockAssetReadHandler;
@@ -123,7 +123,7 @@ export async function attachMockAgent(
           if (envelope.kind === "hello") {
             state.ready = true;
             hostPort.postMessage({
-              protocolVersion: 3,
+              protocolVersion: fixtureProtocolVersion,
               protocolRevision: fixtureProtocolRevision,
               kind: "welcome",
               appInstanceId: state.appInstanceId,
@@ -167,7 +167,7 @@ export async function attachMockAgent(
             if (envelope.context?.scope === "task") activateTaskContext(envelope.context);
             if (failure) {
               hostPort.postMessage({
-                protocolVersion: 3,
+                protocolVersion: fixtureProtocolVersion,
                 kind: "response",
                 requestId: envelope.requestId,
                 hostEpoch,
@@ -182,7 +182,7 @@ export async function attachMockAgent(
               const assetResponse = readMockAsset(envelope.payload ?? {}, state);
               if (!assetResponse.ok) {
                 hostPort.postMessage({
-                  protocolVersion: 3,
+                  protocolVersion: fixtureProtocolVersion,
                   kind: "response",
                   requestId: envelope.requestId,
                   hostEpoch,
@@ -194,7 +194,7 @@ export async function attachMockAgent(
                 return;
               }
               hostPort.postMessage({
-                protocolVersion: 3,
+                protocolVersion: fixtureProtocolVersion,
                 kind: "response",
                 requestId: envelope.requestId,
                 hostEpoch,
@@ -217,7 +217,12 @@ export async function attachMockAgent(
                 envelope.type === "runtime.initialize"
                 && typeof envelope.payload?.sessionPath === "string"
                 && !hasConfiguredResult
-              ) testWindow.__pi67RotateMockSession(state, envelope.payload.sessionPath);
+              ) testWindow.__pi67RotateMockSession(
+                state,
+                envelope.payload.sessionPath,
+                undefined,
+                catalogSessionFileIdentity(envelope.payload.sessionPath)
+              );
               emitThrough(hostPort, hostEpoch, {
                 type: "extension.catalog.changed",
                 payload: state.extensionCatalog
@@ -244,7 +249,12 @@ export async function attachMockAgent(
                 envelope.type === "session.open"
                 && typeof envelope.payload?.path === "string"
                 && !hasConfiguredResult
-              ) testWindow.__pi67RotateMockSession(state, envelope.payload.path);
+              ) testWindow.__pi67RotateMockSession(
+                state,
+                envelope.payload.path,
+                undefined,
+                catalogSessionFileIdentity(envelope.payload.path)
+              );
               if (sessionForkCommands.has(envelope.type!) && !hasConfiguredResult) {
                 testWindow.__pi67ForkMockSession(
                   state,
@@ -271,7 +281,7 @@ export async function attachMockAgent(
               result = projectionMutationAcknowledgement(state, hostEpoch);
             }
             hostPort.postMessage({
-              protocolVersion: 3,
+              protocolVersion: fixtureProtocolVersion,
               kind: "response",
               requestId: envelope.requestId,
               hostEpoch,
@@ -325,8 +335,10 @@ export async function attachMockAgent(
                 state.snapshot = {
                   ...state.snapshot,
                   sessionId: "session-imported",
+                  sessionFileIdentity: "session-file-fixture-imported",
                   sessionPath: "/Users/test/.pi/agent/sessions/imported.jsonl"
                 };
+                state.workspaceChanges = { ...state.workspaceChanges, sessionId: "session-imported", items: [], total: 0 };
                 emitThrough(hostPort, hostEpoch, {
                   type: "session.bootstrap",
                   payload: { snapshot: state.snapshot, reason: "session-import" }
@@ -360,10 +372,12 @@ export async function attachMockAgent(
           ?? (targetEpoch === state.hostEpoch ? ++state.taskSequence : 1);
         if (targetEpoch === state.hostEpoch && taskSequence > state.taskSequence) state.taskSequence = taskSequence;
         const sessionId = emitOptions.sessionId ?? String(state.snapshot.sessionId);
+        const sessionFileIdentity = emitOptions.sessionFileIdentity
+          ?? String(state.snapshot.sessionFileIdentity);
         const sessionGeneration = emitOptions.sessionGeneration ?? state.sessionGeneration;
         const workspaceEvent = event.type === "provider.configuration.changed";
         state.activePort?.postMessage({
-          protocolVersion: 3,
+          protocolVersion: fixtureProtocolVersion,
           kind: "event",
           hostEpoch: targetEpoch,
           sequence,
@@ -375,6 +389,7 @@ export async function attachMockAgent(
                 taskId: state.taskId,
                 taskGeneration: state.taskGeneration,
                 sessionId,
+                sessionFileIdentity,
                 sessionGeneration,
                 ...(emitOptions.operationId === undefined ? {} : { operationId: emitOptions.operationId })
               },
@@ -411,7 +426,6 @@ export async function attachMockAgent(
       state.snapshot = structuredClone(state.snapshot);
       saveActiveTaskState();
     }
-
     function saveActiveTaskState(): void {
       if (fixtureOptions.isolateTaskSnapshots !== true) return;
       state.taskStates[activeTaskKey()] = {
@@ -423,11 +437,14 @@ export async function attachMockAgent(
         snapshot: state.snapshot
       };
     }
-
     function activeTaskKey(): string {
       return `${state.workspaceId}\u0000${state.taskId}`;
     }
-
+    function catalogSessionFileIdentity(path: string): string | undefined {
+      const sessions = [...(fixtureOptions.sessionCatalogItems ?? []),
+        ...Object.values(fixtureOptions.sessionCatalogItemsByWorkspace ?? {}).flat()];
+      return sessions.find((session) => session.path === path)?.fileIdentity;
+    }
     function emitThrough(port: TestPort, hostEpoch: number, event: { type: string; payload: unknown }, operationId?: string): void {
       if (hostEpoch !== state.hostEpoch || port !== state.activePort) return;
       state.emit(event, { hostEpoch, ...(operationId === undefined ? {} : { operationId }) });

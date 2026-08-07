@@ -1,67 +1,27 @@
 import type { Page } from "@playwright/test";
-import type {
-  RuntimeRecoveryRecord,
-  SessionCreationRecoveryRecord,
-  SettingsSection,
-  WorkbenchSurface
-} from "../../packages/domain/src/index.js";
+import type { RuntimeRecoveryRecord, SessionCreationRecoveryRecord } from "../../packages/domain/src/index.js";
 import {
   createMockDesktopCapabilitySnapshot,
   createMockPackageNetworkSnapshot
 } from "./pi67-renderer-system-fixtures.js";
+import {
+  DEFAULT_MOCK_WORKSPACE,
+  type MockDesktopBridgeOptions,
+  type MockWorkspaceDescriptor
+} from "./pi67-renderer-desktop-bridge-contract.js";
 
-export interface MockWorkspaceDescriptor {
-  id: string;
-  displayName: string;
-  identity: {
-    canonicalPath: string;
-    device?: string;
-    inode?: string;
-    birthtimeNs?: string;
-    assurance: "filesystem" | "path-only";
-  };
-  trust: "unknown" | "trusted" | "untrusted";
-  trustProvenance: "native-picker" | "user-confirmed" | "restored" | "identity-changed" | "indirect";
-  availability: "available" | "missing" | "identity-changed" | "unavailable";
-}
-
-export interface MockDesktopBridgeOptions {
-  initialWorkspaces?: MockWorkspaceDescriptor[];
-  pickerQueue?: MockWorkspaceDescriptor[];
-  initialRuntimeRecovery?: RuntimeRecoveryRecord[];
-  initialSessionCreationRecovery?: SessionCreationRecoveryRecord[];
-  expandedWorkspaceIds?: string[];
-  currentWorkspaceId?: string;
-  selectedSurface?: WorkbenchSurface;
-  settings?: {
-    section: SettingsSection;
-    scope: "global" | "project";
-    workspaceId?: string;
-  };
-  capabilityInitializingCalls?: number;
-  deferInitialUpdateState?: boolean;
-}
-
-export const DEFAULT_MOCK_WORKSPACE: MockWorkspaceDescriptor = {
-  id: "workspace-pi-demo",
-  displayName: "pi-demo",
-  identity: {
-    canonicalPath: "/Users/test/Projects/pi-demo",
-    device: "1",
-    inode: "67",
-    birthtimeNs: "1",
-    assurance: "filesystem"
-  },
-  trust: "trusted",
-  trustProvenance: "native-picker",
-  availability: "available"
-};
+export {
+  DEFAULT_MOCK_WORKSPACE,
+  type MockDesktopBridgeOptions,
+  type MockWorkspaceDescriptor
+} from "./pi67-renderer-desktop-bridge-contract.js";
 
 export async function installMockDesktopBridge(
   page: Page,
   options: MockDesktopBridgeOptions = {}
 ): Promise<void> {
   const fixture = {
+    previousRunExitStatus: options.previousRunExitStatus ?? "clean",
     initialWorkspaces: options.initialWorkspaces ?? [],
     pickerQueue: options.pickerQueue ?? [DEFAULT_MOCK_WORKSPACE],
     initialRuntimeRecovery: options.initialRuntimeRecovery ?? [],
@@ -85,7 +45,7 @@ export async function installMockDesktopBridge(
   };
   await page.addInitScript((bridgeFixture) => {
     type FixtureWorkbenchState = {
-      version: 3;
+      version: 4;
       workspaces: MockWorkspaceDescriptor[];
       workspaceOrder: string[];
       expandedWorkspaceIds: string[];
@@ -143,7 +103,7 @@ export async function installMockDesktopBridge(
     };
     let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     let workbenchState: FixtureWorkbenchState = {
-      version: 3 as const,
+      version: 4 as const,
       workspaces: structuredClone(bridgeFixture.initialWorkspaces),
       workspaceOrder: bridgeFixture.initialWorkspaces.map((workspace) => workspace.id),
       expandedWorkspaceIds: structuredClone(bridgeFixture.expandedWorkspaceIds),
@@ -202,7 +162,7 @@ export async function installMockDesktopBridge(
               ? (currentWorkspaceId ? { kind: "workspace" as const, workspaceId: currentWorkspaceId } : undefined)
               : workbenchState.selectedSurface;
             workbenchState = {
-              version: 3,
+              version: 4,
               workspaces: workbenchState.workspaces.filter((item) => item.id !== workspaceId),
               workspaceOrder,
               expandedWorkspaceIds: workbenchState.expandedWorkspaceIds.filter((id) => id !== workspaceId),
@@ -230,6 +190,23 @@ export async function installMockDesktopBridge(
               ?.identity.canonicalPath
           ),
           selectSessionFile: async () => "/Users/test/.pi/agent/sessions/demo.jsonl",
+          getRecoverySnapshot: async () => ({
+            generatedAt: Date.now(),
+            previousRunExitStatus: bridgeFixture.previousRunExitStatus,
+            workspaces: {
+              total: workbenchState.workspaces.length,
+              available: workbenchState.workspaces.filter((workspace) => workspace.availability === "available").length,
+              missing: workbenchState.workspaces.filter((workspace) => workspace.availability === "missing").length,
+              identityChanged: workbenchState.workspaces.filter((workspace) => workspace.availability === "identity-changed").length,
+              needsConfirmation: workbenchState.workspaces.filter((workspace) => workspace.availability === "needs-confirmation").length,
+              unavailable: workbenchState.workspaces.filter((workspace) => workspace.availability === "unavailable").length,
+              trusted: workbenchState.workspaces.filter((workspace) => workspace.trust === "trusted").length,
+              trustUnknown: workbenchState.workspaces.filter((workspace) => workspace.trust === "unknown").length,
+              pathOnlyIdentity: workbenchState.workspaces.filter((workspace) => workspace.identity.assurance === "path-only").length
+            },
+            pendingSessionCreations: workbenchState.sessionCreationRecovery.length,
+            attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
+          }),
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
           showNotification: async () => undefined,
           stagePromptAttachments: async (files: File[]) => files.map((file) => ({

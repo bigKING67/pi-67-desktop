@@ -6,6 +6,7 @@ export interface SessionProjectionConnection {
 export interface SessionProjectionAuthority {
   hostEpoch: number;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   projectionRevision: number;
 }
@@ -18,6 +19,7 @@ export type SessionProjectionAuthorityState =
       phase: "active";
       hostEpoch: number;
       sessionId: string;
+      sessionFileIdentity: string;
       sessionGeneration: number;
       projectionRevision: number;
     };
@@ -50,6 +52,7 @@ export function activeSessionProjectionAuthorityWithoutConnection(
   return {
     hostEpoch: authority.hostEpoch,
     sessionId: authority.sessionId,
+    sessionFileIdentity: authority.sessionFileIdentity,
     sessionGeneration: authority.sessionGeneration,
     projectionRevision: authority.projectionRevision
   };
@@ -73,6 +76,7 @@ export function matchesSessionProjectionAuthority(
   return current !== undefined
     && current.hostEpoch === incoming.hostEpoch
     && current.sessionId === incoming.sessionId
+    && current.sessionFileIdentity === incoming.sessionFileIdentity
     && current.sessionGeneration === incoming.sessionGeneration
     && current.projectionRevision === incoming.projectionRevision;
 }
@@ -83,6 +87,7 @@ export function featureProjectionAuthorityFromInstallation(
   return {
     hostEpoch: installation.hostEpoch,
     sessionId: installation.sessionId,
+    sessionFileIdentity: installation.sessionFileIdentity,
     sessionGeneration: installation.sessionGeneration,
     projectionRevision: installation.projectionRevision
   };

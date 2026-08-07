@@ -38,6 +38,7 @@ describe("native workspace identity", () => {
         birthtimeNs: expect.stringMatching(/^\d+$/u),
         assurance: expect.stringMatching(/^(?:filesystem|path-only)$/u)
       },
+      lastVerifiedAt: expect.any(Number),
       trust: "trusted",
       trustProvenance: "native-picker",
       availability: "available"
@@ -72,6 +73,17 @@ describe("native workspace identity", () => {
       {
         ...relocated,
         identity: {
+          ...relocated.identity,
+          canonicalPath: first.identity.canonicalPath,
+          inode: "different"
+        }
+      }
+    )).toBe(false);
+    expect(workspaceDescriptorsReferToSameDirectory(
+      first,
+      {
+        ...relocated,
+        identity: {
           canonicalPath: relocated.identity.canonicalPath,
           inode: relocated.identity.inode,
           birthtimeNs: relocated.identity.birthtimeNs,
@@ -79,6 +91,15 @@ describe("native workspace identity", () => {
         }
       }
     )).toBe(false);
+  });
+
+  it("uses exact spelling only when both Workspace identities are path-only", () => {
+    const upper = descriptorFixture("upper", "/Workspace/Project", "path-only");
+    const exact = descriptorFixture("exact", "/Workspace/Project", "path-only");
+    const lower = descriptorFixture("lower", "/workspace/project", "path-only");
+
+    expect(workspaceDescriptorsReferToSameDirectory(upper, exact)).toBe(true);
+    expect(workspaceDescriptorsReferToSameDirectory(upper, lower)).toBe(false);
   });
 
   it("rejects files and descriptors with unexpected persisted fields", async () => {
@@ -101,6 +122,7 @@ describe("native workspace identity", () => {
 
     expect(restored).toMatchObject({
       id: "restored",
+      lastVerifiedAt: expect.any(Number),
       trust: "trusted",
       trustProvenance: "restored",
       availability: "available"
@@ -126,7 +148,7 @@ describe("native workspace identity", () => {
     });
   });
 
-  it("preserves non-trusted provenance for matching and path-only restored registrations", async () => {
+  it("preserves non-trusted provenance for matching filesystem registrations", async () => {
     const root = await temporaryRoot();
     const workspace = join(root, "untrusted-workspace");
     await mkdir(workspace);
@@ -136,20 +158,37 @@ describe("native workspace identity", () => {
       trust: "untrusted",
       trustProvenance: "indirect"
     };
-    const pathOnly: WorkspaceDescriptor = {
-      ...untrusted,
-      identity: { ...untrusted.identity, assurance: "path-only" }
-    };
-
     await expect(refreshPersistedWorkspaceDescriptor(untrusted)).resolves.toMatchObject({
       trust: "untrusted",
       trustProvenance: "indirect",
       availability: "available"
     });
+  });
+
+  it("does not restore a Workspace registration from path spelling alone", async () => {
+    const root = await temporaryRoot();
+    const workspace = join(root, "path-only-workspace");
+    await mkdir(workspace);
+    const observed = await createNativeWorkspaceDescriptor(workspace, {
+      createId: () => "path-only",
+      now: () => 200
+    });
+    const pathOnly: WorkspaceDescriptor = {
+      ...observed,
+      identity: { canonicalPath: observed.identity.canonicalPath, assurance: "path-only" },
+      lastVerifiedAt: 100
+    };
+
     await expect(refreshPersistedWorkspaceDescriptor(pathOnly)).resolves.toMatchObject({
-      trust: "untrusted",
-      trustProvenance: "indirect",
-      availability: "available"
+      id: "path-only",
+      identity: {
+        canonicalPath: observed.identity.canonicalPath,
+        assurance: expect.stringMatching(/^(?:filesystem|path-only)$/u)
+      },
+      lastVerifiedAt: 100,
+      trust: "unknown",
+      trustProvenance: "identity-changed",
+      availability: "needs-confirmation"
     });
   });
 
@@ -176,6 +215,8 @@ describe("native workspace identity", () => {
       .rejects.toThrow("Workspace path is invalid.");
     await expect(createNativeWorkspaceDescriptor(workspace, { createId: () => "invalid id" }))
       .rejects.toThrow("Workspace id is invalid.");
+    await expect(createNativeWorkspaceDescriptor(workspace, { now: () => -1 }))
+      .rejects.toThrow("Workspace verification timestamp is invalid.");
   });
 
   it("rejects malformed workspace descriptor fields at the persistence boundary", () => {
@@ -186,6 +227,7 @@ describe("native workspace identity", () => {
       [],
       { ...valid, id: "invalid id" },
       { ...valid, displayName: "" },
+      { ...valid, lastVerifiedAt: -1 },
       { ...valid, trust: "invalid" },
       { ...valid, trustProvenance: "invalid" },
       { ...valid, availability: "invalid" },
@@ -199,6 +241,9 @@ describe("native workspace identity", () => {
     ];
 
     for (const value of invalidValues) expect(parseWorkspaceDescriptor(value)).toBeUndefined();
+    const legacy = { ...valid } as Record<string, unknown>;
+    delete legacy.lastVerifiedAt;
+    expect(parseWorkspaceDescriptor(legacy)).toMatchObject({ id: "valid", availability: "available" });
   });
 });
 
@@ -217,6 +262,7 @@ function descriptorFixture(
     id,
     displayName: id,
     identity: { canonicalPath, device: "1", inode: "2", birthtimeNs: "3", assurance },
+    lastVerifiedAt: 1,
     trust: "trusted",
     trustProvenance: "native-picker",
     availability: "available"

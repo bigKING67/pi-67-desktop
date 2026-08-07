@@ -17,7 +17,7 @@ export function ArchivedConversationsDialog({ workspace }: { workspace: Workspac
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const [restoringPath, setRestoringPath] = useState<string>();
+  const [restoringIdentity, setRestoringIdentity] = useState<string>();
   const loadRevision = useRef(0);
 
   const load = useCallback(async (revision: number, nextCursor?: SessionCatalogCursor) => {
@@ -50,17 +50,17 @@ export function ArchivedConversationsDialog({ workspace }: { workspace: Workspac
   }, [load]);
 
   const restore = async (session: SessionSummary, open: boolean) => {
-    if (restoringPath) return;
-    setRestoringPath(session.path);
+    if (restoringIdentity) return;
+    setRestoringIdentity(session.fileIdentity);
     try {
-      if (!await restoreRendererConversation(workspace.id, session.path)) return;
-      setItems((current) => current.filter((item) => item.path !== session.path));
+      if (!await restoreRendererConversation(workspace.id, session)) return;
+      setItems((current) => current.filter((item) => item.fileIdentity !== session.fileIdentity));
       if (open) {
         close();
-        await openRendererWorkspaceDescriptor(workspace, session.path);
+        await openRendererWorkspaceDescriptor(workspace, session.path, session.fileIdentity);
       }
     } finally {
-      setRestoringPath(undefined);
+      setRestoringIdentity(undefined);
     }
   };
 
@@ -78,14 +78,14 @@ export function ArchivedConversationsDialog({ workspace }: { workspace: Workspac
           </label>
           <div className={styles.archiveList}>
             {items.map((session) => (
-              <article className={styles.archiveRow} key={session.path}>
+              <article className={styles.archiveRow} key={session.fileIdentity}>
                 <ArchiveRestore aria-hidden="true" size={15} />
                 <span><strong>{session.name}</strong><small>{session.messageCount} 条消息 · 归档于 {formatDate(session.archivedAt)} · 最后修改 {formatSessionRelativeTime(session.modifiedAt)}</small></span>
                 <div>
-                  <Button className={styles.rowButton!} isDisabled={restoringPath !== undefined} onPress={() => void restore(session, false)}>
-                    {restoringPath === session.path ? "正在恢复…" : "恢复"}
+                  <Button className={styles.rowButton!} isDisabled={restoringIdentity !== undefined} onPress={() => void restore(session, false)}>
+                    {restoringIdentity === session.fileIdentity ? "正在恢复…" : "恢复"}
                   </Button>
-                  <Button className={styles.rowPrimaryButton!} isDisabled={restoringPath !== undefined} onPress={() => void restore(session, true)}>恢复并打开</Button>
+                  <Button className={styles.rowPrimaryButton!} isDisabled={restoringIdentity !== undefined} onPress={() => void restore(session, true)}>恢复并打开</Button>
                 </div>
               </article>
             ))}
@@ -94,7 +94,7 @@ export function ArchivedConversationsDialog({ workspace }: { workspace: Workspac
             {loading ? <p className={styles.empty} role="status">正在加载…</p> : null}
           </div>
           {hasMore && cursor ? (
-            <Button className={styles.loadMore!} isDisabled={loading || restoringPath !== undefined} onPress={() => void load(loadRevision.current, cursor)}>加载更多</Button>
+            <Button className={styles.loadMore!} isDisabled={loading || restoringIdentity !== undefined} onPress={() => void load(loadRevision.current, cursor)}>加载更多</Button>
           ) : null}
         </Dialog>
       </Modal>

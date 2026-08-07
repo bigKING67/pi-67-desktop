@@ -1,5 +1,10 @@
 import { MAX_RUNNING_TASKS } from "@pi67/domain";
-import { createMessageId } from "@pi67/protocol";
+import {
+  createMessageId,
+  type AgentCommand,
+  type AgentCommandType,
+  type CommandResults
+} from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
 
 export type RunAdmissionState =
@@ -11,6 +16,20 @@ export type RunAdmissionState =
 export interface RunAdmissionLease {
   readonly leaseId: string;
   readonly taskKey: string;
+}
+
+export function commandRequiresRunAdmission(command: AgentCommand): boolean {
+  return command.type === "session.import"
+    || command.type === "session.compact"
+    || command.type === "command.invoke"
+    || (command.type === "prompt.submit" && command.payload.delivery === "new-turn");
+}
+
+export function isSettledRunAdmissionResult(result: CommandResults[AgentCommandType]): boolean {
+  return typeof result === "object"
+    && result !== null
+    && "kind" in result
+    && result.kind === "settled";
 }
 
 interface AdmissionRecord extends RunAdmissionLease {

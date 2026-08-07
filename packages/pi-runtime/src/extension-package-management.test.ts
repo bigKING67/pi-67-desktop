@@ -19,6 +19,7 @@ describe("ExtensionPackageManagement", () => {
 
   afterEach(() => {
     delete process.env.PI67_MANAGED_CAPABILITIES_ROOT;
+    delete process.env.PI67_CAPABILITY_PACKAGE_PATHS;
   });
 
   it("lists Pi-configured packages without exposing installation paths", () => {
@@ -39,7 +40,9 @@ describe("ExtensionPackageManagement", () => {
           sourceKind: "npm",
           origin: "external",
           resourceTypes: ["extension"],
-          resourceStates: [{ type: "extension", enabled: true }]
+          resourceStates: [{ type: "extension", enabled: true }],
+          trustState: "unverified",
+          trustReason: "receipt-missing"
         },
         {
           source: "https://example.invalid/filtered.git",
@@ -50,7 +53,9 @@ describe("ExtensionPackageManagement", () => {
           sourceKind: "git",
           origin: "external",
           resourceTypes: ["extension"],
-          resourceStates: [{ type: "extension", enabled: false }]
+          resourceStates: [{ type: "extension", enabled: false }],
+          trustState: "unverified",
+          trustReason: "receipt-missing"
         },
         {
           source: "../local-extension",
@@ -61,7 +66,9 @@ describe("ExtensionPackageManagement", () => {
           sourceKind: "path",
           origin: "external",
           resourceTypes: ["extension"],
-          resourceStates: [{ type: "extension", enabled: true }]
+          resourceStates: [{ type: "extension", enabled: true }],
+          trustState: "unverified",
+          trustReason: "receipt-missing"
         }
       ],
       total: 3
@@ -229,6 +236,7 @@ describe("ExtensionPackageManagement", () => {
     const managedRoot = resolve("/managed/desktop-capabilities");
     const source = resolve(managedRoot, "packages/pi67-core");
     process.env.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
+    process.env.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([source]);
     fixture.global.push(source);
 
     await expect(management.setEnabled(source, "global", false, "skill")).resolves.toMatchObject({

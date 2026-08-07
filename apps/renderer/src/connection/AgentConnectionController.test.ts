@@ -204,6 +204,7 @@ describe("AgentConnectionController", () => {
       accepted: true as const,
       hostEpoch: 9,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 1,
       eventSequence: 1
     };
@@ -407,13 +408,13 @@ function identity(hostEpoch: number) {
     eventSequence: 0
   };
 }
-
 function readyStatus(detail: string) {
   return { phase: "ready" as const, detail, recoverable: true };
 }
-
 function projectionResyncResult(hostEpoch: number, eventSequence: number) {
   return {
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     snapshot: emptySnapshot(),
     changes: { sessionId: "session-1", items: [], truncated: false, total: 0 },
     extensionCatalog: { items: [], total: 0, truncated: false },
@@ -437,6 +438,7 @@ function projectionResyncResult(hostEpoch: number, eventSequence: number) {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     cwd: "/tmp",
     streaming: false,
     messages: [],

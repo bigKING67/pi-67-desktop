@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   attachMockAgent,
   clearRecordedCommands,
@@ -9,39 +9,7 @@ import {
   setMockAgentResponseResult
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
-
-interface PackageEntry {
-  source: string;
-  scope: "global" | "project";
-  enabled: boolean;
-  filtered: boolean;
-  installed: boolean;
-  displayName?: string;
-  version?: string;
-  description?: string;
-  resourceTypes?: Array<"extension" | "skill" | "prompt" | "theme">;
-  resourceStates?: Array<{
-    type: "extension" | "skill" | "prompt" | "theme";
-    enabled: boolean;
-  }>;
-}
-
-async function openPackageSettings(page: Page, items: PackageEntry[]): Promise<void> {
-  await installMockDesktopBridge(page);
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await setMockAgentResponseResult(page, "extension.package.list", {
-    items,
-    total: items.length
-  });
-  await page.getByRole("button", { name: "帮助与设置" }).click();
-  await page.getByRole("menuitem", { name: "设置", exact: true }).click();
-  await page.getByRole("button", { name: "扩展", exact: true }).click();
-  await expect.poll(async () => (
-    await recordedCommandDetails(page)
-  ).filter((command) => command.type === "extension.package.list").length).toBeGreaterThan(0);
-}
+import { openPackageSettings, packageEntry } from "./pi67-renderer-package-settings-fixture.js";
 
 test("lists package sources and keeps update eligibility bounded to npm and git", async ({ page }) => {
   const npmSource = "npm:@example/pi-extension";
@@ -266,6 +234,7 @@ test("blocks global package mutations while any task is running", async ({ page 
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -403,12 +372,3 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();
   await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
 });
-
-function packageEntry(
-  source: string,
-  scope: "global" | "project",
-  enabled = true,
-  metadata: Pick<PackageEntry, "displayName" | "version" | "description" | "resourceTypes" | "resourceStates"> = {}
-): PackageEntry {
-  return { source, scope, enabled, filtered: false, installed: true, ...metadata };
-}

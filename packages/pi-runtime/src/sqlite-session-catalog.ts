@@ -29,6 +29,10 @@ import {
   sessionCatalogFileExists,
   type SessionCatalogPermissionOperations
 } from "./session-catalog-storage.js";
+import {
+  assertSessionCatalogRecordSetConsistency,
+  SessionCatalogIdentityConflictError
+} from "./session-catalog-record-identity.js";
 
 export type { SqliteCatalogQueryResult } from "./sqlite-session-catalog-query.js";
 
@@ -41,6 +45,7 @@ const CATALOG_DATABASE_VERSION_SQL = `
 `;
 
 export interface SessionCatalogRecord {
+  fileIdentity: string;
   id: string;
   path: string;
   cwd: string;
@@ -230,12 +235,13 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     metadata: { reconciledAt: number; incomplete: boolean; skippedCount: number },
     minimumRevision: number
   ): SqliteCatalogState {
+    assertSessionCatalogRecordSetConsistency(records);
     this.assertDatabaseVersion();
     const insert = this.database.prepare(`
       INSERT INTO sessions (
-        path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+        file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
         modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.database.exec("BEGIN IMMEDIATE");
     try {
@@ -274,14 +280,15 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     this.database.exec("BEGIN IMMEDIATE");
     try {
       this.assertDatabaseVersion();
+      this.assertUpsertIdentity(record);
       const revision = Math.max(this.readState().revision, minimumRevision) + 1;
       this.database.prepare(`
         INSERT INTO sessions (
-          path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+          file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
           modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(path) DO UPDATE SET
-          session_id = excluded.session_id,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(file_identity) DO UPDATE SET
+          path = excluded.path,
           cwd = excluded.cwd,
           cwd_key = excluded.cwd_key,
           explicit_name = excluded.explicit_name,
@@ -334,6 +341,25 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     if (current.dataVersion !== this.openedVersion.dataVersion
       || current.schemaVersion !== this.openedVersion.schemaVersion) {
       throw new SessionCatalogChangedExternallyError();
+    }
+  }
+
+  private assertUpsertIdentity(record: SessionCatalogRecord): void {
+    const identityOwner = this.database.prepare(`
+      SELECT session_id FROM sessions WHERE file_identity = ?
+    `).get(record.fileIdentity);
+    if (identityOwner !== undefined && identityOwner.session_id !== record.id) {
+      throw new SessionCatalogIdentityConflictError(
+        "One physical Session carries contradictory Pi Session IDs."
+      );
+    }
+    const pathOwner = this.database.prepare(`
+      SELECT file_identity FROM sessions WHERE path = ?
+    `).get(record.path);
+    if (pathOwner !== undefined && pathOwner.file_identity !== record.fileIdentity) {
+      throw new SessionCatalogIdentityConflictError(
+        "The Session locator is already owned by another physical Session."
+      );
     }
   }
 }

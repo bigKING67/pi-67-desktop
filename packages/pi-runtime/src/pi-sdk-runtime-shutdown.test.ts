@@ -133,7 +133,6 @@ describe("PiSdkRuntime shutdown", () => {
         "dispose-current",
         "create-session",
         "reload-configuration",
-        "update-catalog",
         "project-snapshot"
       ]);
     } finally {

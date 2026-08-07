@@ -12,7 +12,7 @@ describe("Runtime Doctor Session Catalog status", () => {
     const report = await createDoctorReport(undefined, undefined, status());
     expect(report.checks.find((check) => check.id === "session-catalog")).toMatchObject({
       status: "pass",
-      detail: expect.stringContaining("schema v2; ready")
+      detail: expect.stringContaining("schema v3; ready")
     });
   });
 

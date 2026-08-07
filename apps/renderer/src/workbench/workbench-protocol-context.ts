@@ -22,6 +22,7 @@ export function workbenchProtocolContextForTask(
   task: RendererWorkbenchTask
 ): TaskProtocolContext {
   const hasSessionAuthority = !task.sessionId.startsWith("pending:")
+    && task.sessionFileIdentity !== undefined
     && task.sessionGeneration !== undefined;
   return {
     scope: "task",
@@ -31,6 +32,7 @@ export function workbenchProtocolContextForTask(
     ...(hasSessionAuthority
       ? {
           sessionId: task.sessionId,
+          sessionFileIdentity: task.sessionFileIdentity,
           sessionGeneration: task.sessionGeneration
         }
       : {})

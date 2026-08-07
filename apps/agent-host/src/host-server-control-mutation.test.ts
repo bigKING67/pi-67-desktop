@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -48,7 +49,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       createSession,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -108,7 +109,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
     renewedPort.emit(staleRetry);
     await expectResponse(renewedPort, staleRetry.requestId, {
       ok: false,
-      error: { code: "STALE_SESSION_GENERATION" }
+      error: { code: "STALE_SESSION_IDENTITY" }
     });
     await server.shutdown();
   });
@@ -132,7 +133,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
         listener = next;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-a", sessionGeneration: 3 }),
+      getIdentity: () => ({ sessionId: "session-a", sessionFileIdentity: "session-file-session-a", sessionGeneration: 3 }),
       rollback,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -197,7 +198,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
         listener = next;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-a", sessionGeneration: 3 }),
+      getIdentity: () => ({ sessionId: "session-a", sessionFileIdentity: "session-file-session-a", sessionGeneration: 3 }),
       rollback,
       getSessionTree,
       getMessagePage,
@@ -256,7 +257,7 @@ describe("AgentHostServer replay-safe control mutations", () => {
         listener = next;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-a", sessionGeneration: 3 }),
+      getIdentity: () => ({ sessionId: "session-a", sessionFileIdentity: "session-file-session-a", sessionGeneration: 3 }),
       setSessionName,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -302,7 +303,7 @@ async function attach(server: AgentHostServer): Promise<FakePort> {
   const port = new FakePort();
   server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 5 });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${rendererCounter += 1}`,
@@ -323,6 +324,7 @@ async function expectResponse(port: FakePort, requestId: string, expected: objec
 function snapshot(sessionId: string) {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     cwd: "/tmp",
     streaming: false,
     messages: [],

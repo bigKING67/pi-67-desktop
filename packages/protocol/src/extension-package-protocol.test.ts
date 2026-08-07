@@ -93,7 +93,11 @@ describe("Extension package management protocol", () => {
         resourceStates: [
           { type: "extension", enabled: true },
           { type: "skill", enabled: false }
-        ]
+        ],
+        trustState: "user-installed-observed",
+        trustObservedAt: 1_786_000_000_000,
+        manifestSha256: "a".repeat(64),
+        contentSha256: "b".repeat(64)
       }],
       total: 1
     } satisfies ExtensionPackageListResult;
@@ -133,5 +137,23 @@ describe("Extension package management protocol", () => {
       ...mutation,
       result: { ...listResult, changed: true, installedPath: "/private/pi" }
     })).toBe(false);
+    for (const internalField of ["installedPath", "directoryIdentity", "sourceDigest", "receipt"] as const) {
+      expect(isResponseEnvelope(responseEnvelope(`list-internal-${internalField}`, 2, WORKSPACE_CONTEXT, {
+        ok: true,
+        type: "extension.package.list",
+        result: {
+          ...listResult,
+          items: [{ ...listResult.items[0]!, [internalField]: "private-internal-value" }]
+        }
+      }))).toBe(false);
+    }
+    expect(isResponseEnvelope(responseEnvelope("list-invalid-trust", 2, WORKSPACE_CONTEXT, {
+      ok: true,
+      type: "extension.package.list",
+      result: {
+        ...listResult,
+        items: [{ ...listResult.items[0]!, trustState: "trusted" as never, manifestSha256: "abc" }]
+      }
+    }))).toBe(false);
   });
 });

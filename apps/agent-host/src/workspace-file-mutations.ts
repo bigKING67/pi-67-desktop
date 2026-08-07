@@ -1,7 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdir, open, rename, unlink } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { lstat, mkdir, open, rename } from "node:fs/promises";
+import { resolve } from "node:path";
 import { MAX_WORKSPACE_FILE_CONTENT_BYTES } from "@pi67/domain";
+import { safeAtomicReplaceFile } from "@pi67/pi-runtime";
 import type { AgentCommand, CommandResults, WorkspaceProtocolContext } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
 import {
@@ -92,30 +93,23 @@ export class WorkspaceFileMutations {
     if (this.access.revision(context.workspaceId, identity.relativePath, resolved.stats) !== payload.expectedRevision) {
       throw workspaceFileChanged();
     }
-    const temporaryPath = resolve(
-      dirname(resolved.path),
-      `.${basename(resolved.path)}.pi67-${process.pid}-${randomUUID()}.tmp`
-    );
-    assertWorkspacePathContained(workspace.canonicalCwd, temporaryPath);
-    let temporaryExists = false;
-    try {
-      const handle = await open(temporaryPath, "wx", resolved.stats.mode & 0o777);
-      temporaryExists = true;
-      try {
-        await handle.writeFile(payload.content, { encoding: "utf8" });
-        await handle.sync();
-      } finally {
-        await handle.close();
+    await safeAtomicReplaceFile(resolved.path, payload.content, {
+      mode: resolved.stats.mode & 0o777,
+      validateTemporaryPath: (temporaryPath) => {
+        assertWorkspacePathContained(workspace.canonicalCwd, temporaryPath);
+      },
+      beforeCommit: async () => {
+        const latest = await lstat(resolved.path).catch((error: unknown) => {
+          if (isNodeError(error, "ENOENT")) throw workspaceFileChanged();
+          throw error;
+        });
+        if (
+          !latest.isFile()
+          || latest.isSymbolicLink()
+          || this.access.revision(context.workspaceId, identity.relativePath, latest) !== payload.expectedRevision
+        ) throw workspaceFileChanged();
       }
-      const latest = await lstat(resolved.path);
-      if (this.access.revision(context.workspaceId, identity.relativePath, latest) !== payload.expectedRevision) {
-        throw workspaceFileChanged();
-      }
-      await rename(temporaryPath, resolved.path);
-      temporaryExists = false;
-    } finally {
-      if (temporaryExists) await unlink(temporaryPath).catch(() => undefined);
-    }
+    });
     return {
       entry: await this.access.entryForIdentity(
         context.workspaceId,

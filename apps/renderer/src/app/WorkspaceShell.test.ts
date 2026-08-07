@@ -11,14 +11,14 @@ describe("WorkspaceShell live task selection", () => {
     expect(canRenderLiveTask(task({
       lifecycle: "completed",
       runtime: { phase: "stopped", detail: "会话待打开", recoverable: true }
-    }), "session-a")).toBe(false);
+    }), "session-a", "session-file-a")).toBe(false);
   });
 
   it("does not render a lost task as a live conversation", () => {
     expect(canRenderLiveTask(task({
       lifecycle: "lost",
       runtime: { phase: "failed", detail: "上次运行已中断", recoverable: true }
-    }), "session-a")).toBe(false);
+    }), "session-a", "session-file-a")).toBe(false);
   });
 
   it("renders the selected task only when its live projection is current", () => {
@@ -27,9 +27,10 @@ describe("WorkspaceShell live task selection", () => {
       runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true }
     });
 
-    expect(canRenderLiveTask(ready, "session-a")).toBe(true);
-    expect(canRenderLiveTask(ready, "session-b")).toBe(false);
-    expect(canRenderLiveTask(undefined, "session-a")).toBe(false);
+    expect(canRenderLiveTask(ready, "session-a", "session-file-a")).toBe(true);
+    expect(canRenderLiveTask(ready, "session-b", "session-file-a")).toBe(false);
+    expect(canRenderLiveTask(ready, "session-a", "session-file-b")).toBe(false);
+    expect(canRenderLiveTask(undefined, "session-a", "session-file-a")).toBe(false);
   });
 });
 
@@ -65,7 +66,12 @@ describe("WorkspaceShell provisional task state", () => {
       creationStatus: "confirming"
     }))).toBe(false);
     expect(canManageUnconfirmedProvisionalTask(task({
-      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/sessions/a.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/sessions/a.jsonl"
+      },
       creationStatus: "unconfirmed"
     }))).toBe(false);
   });
@@ -77,10 +83,12 @@ function task(overrides: Partial<RendererWorkbenchTask>): RendererWorkbenchTask 
     conversation: {
       kind: "session",
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
     },
     workspaceId: "workspace-a",
     sessionId: "session-a",
+    sessionFileIdentity: "session-file-a",
     sessionPath: "/sessions/a.jsonl",
     taskGeneration: 1,
     lifecycle: "idle",

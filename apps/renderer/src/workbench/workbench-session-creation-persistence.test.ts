@@ -1,4 +1,4 @@
-import type { WorkbenchStateV3 } from "@pi67/domain";
+import type { WorkbenchStateV4 } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import { workbenchLayout } from "./workbench-controller.js";
 import { createRendererWorkbenchStore } from "./workbench-store.js";
@@ -10,8 +10,7 @@ describe("Renderer Session creation persistence", () => {
     store.getState().openTask(creationTask("confirming"));
 
     expect(workbenchLayout(store.getState(), {
-      identity: undefined,
-      sessionFor: () => undefined
+      identity: undefined
     })).toEqual({
       expandedWorkspaceIds: ["workspace-a"],
       currentWorkspaceId: "workspace-a",
@@ -36,8 +35,8 @@ describe("Renderer Session creation persistence", () => {
 
   it("hydrates a persisted creation as one unconfirmed provisional Task", () => {
     const store = createRendererWorkbenchStore();
-    const state: WorkbenchStateV3 = {
-      version: 3,
+    const state: WorkbenchStateV4 = {
+      version: 4,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],

@@ -16,6 +16,7 @@ export function taskContext(sessionGeneration: number, operationId?: string): Ta
     taskId: "task-1",
     taskGeneration: 1,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration,
     ...(operationId === undefined ? {} : { operationId })
   };
@@ -38,6 +39,7 @@ export function taskEventContext(
 export function emptySnapshot(): SessionSnapshot {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     cwd: "/tmp",
     streaming: false,
     messages: [],

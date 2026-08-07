@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -171,6 +171,28 @@ describe("Pi SDK Session Catalog discovery contract", () => {
     }).discover();
     expect(discovered).toMatchObject({ incomplete: true, skippedCount: 1 });
     expect(discovered.records).toHaveLength(1);
+  });
+
+  it("projects one Catalog row for hard-linked aliases of the same JSONL", async () => {
+    const fixture = await createFixture();
+    const session = SessionManager.create(fixture.cwd, fixture.sessionDirectory);
+    session.appendMessage({ role: "user", content: "hard link", timestamp: Date.now() });
+    session.appendMessage(assistantMessage("reply", Date.now() + 1));
+    await link(requirePersistedPath(session), join(fixture.sessionDirectory, "hard-link-alias.jsonl"));
+
+    const discovered = await createSessionCatalogContext({
+      agentDir: fixture.agentDir,
+      configuredSessionDir: fixture.sessionDirectory,
+      workspaceCwd: fixture.cwd
+    }).discover();
+
+    expect(discovered).toMatchObject({ incomplete: false, skippedCount: 0 });
+    expect(discovered.records).toHaveLength(1);
+    expect(discovered.records[0]?.id).toBe(session.getSessionId());
+    expect([
+      "session-file-v1\0",
+      "session-file-path-v1\0"
+    ].some((prefix) => discovered.records[0]?.fileIdentity.startsWith(prefix))).toBe(true);
   });
 });
 

@@ -12,7 +12,9 @@ import {
   createDesktopPackageOperationRuntime,
   type DesktopPackageOperationRuntime
 } from "@pi67/pi-runtime";
+import { isProtocolErrorCode } from "@pi67/protocol";
 import {
+  isPackageWorkerMessageWithinByteLimit,
   isPackageWorkerRequest,
   type PackageWorkerRequest,
   type PackageWorkerResponse
@@ -221,11 +223,12 @@ function classifyPackageSource(source: string): { npm: boolean; git: boolean } {
 
 function workerError(error: unknown): Extract<PackageWorkerResponse, { ok: false }>["error"] {
   if (isCodedError(error)) {
+    const message = boundedWorkerErrorMessage(error.message);
     return {
       code: error.code,
-      message: error.message,
+      message,
       recoverable: error.recoverable,
-      ...(error.details === undefined ? {} : { details: error.details })
+      ...(isBoundedErrorDetails(error.details) ? { details: error.details } : {})
     };
   }
   const message = error instanceof Error ? error.message : "";
@@ -255,13 +258,43 @@ function coded(
 function isCodedError(error: unknown): error is Error & Extract<PackageWorkerResponse, { ok: false }>["error"] {
   return error instanceof Error
     && "code" in error
-    && typeof error.code === "string"
+    && isProtocolErrorCode(error.code)
     && "recoverable" in error
     && typeof error.recoverable === "boolean";
 }
 
+function boundedWorkerErrorMessage(message: string): string {
+  const normalized = message.trim();
+  return (normalized || "The isolated Pi package operation failed.").slice(0, 2_048);
+}
+
+function isBoundedErrorDetails(value: unknown): value is Record<string, string | number | boolean> {
+  if (!isRecord(value) || Object.keys(value).length > 32) return false;
+  return Object.entries(value).every(([key, detail]) => (
+    key.length > 0
+    && key.length <= 128
+    && (
+      (typeof detail === "string" && detail.length <= 2_048)
+      || (typeof detail === "number" && Number.isFinite(detail))
+      || typeof detail === "boolean"
+    )
+  ));
+}
+
 function send(response: PackageWorkerResponse): void {
-  process.send?.(response, undefined, undefined, () => process.disconnect());
+  const boundedResponse: PackageWorkerResponse = isPackageWorkerMessageWithinByteLimit(response)
+    ? response
+    : {
+        type: "package-worker-response",
+        requestId: response.requestId,
+        ok: false,
+        error: {
+          code: "RESOURCE_LIMIT_EXCEEDED",
+          message: "The isolated Pi package worker result exceeded the IPC byte limit.",
+          recoverable: false
+        }
+      };
+  process.send?.(boundedResponse, undefined, undefined, () => process.disconnect());
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {

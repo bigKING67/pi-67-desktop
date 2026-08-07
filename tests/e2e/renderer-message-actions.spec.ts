@@ -266,6 +266,7 @@ test("continues from an Assistant answer in a new independent Workbench Task", a
     .find((command) => command.type === "workspace.open");
   const sourceTaskId = sourceTaskCommand?.context?.taskId;
   const sourceSessionId = sourceTaskCommand?.context?.sessionId ?? "session-test";
+  const sourceSessionFileIdentity = "session-file-fixture-demo";
   const sourceSessionGeneration = sourceTaskCommand?.context?.sessionGeneration ?? 1;
   expect(sourceTaskId).toEqual(expect.any(String));
   const sourceRow = page.getByTestId("conversation-row").first();
@@ -290,6 +291,7 @@ test("continues from an Assistant answer in a new independent Workbench Task", a
     sourceTaskId,
     sourceTaskGeneration: 1,
     sourceSessionId,
+    sourceSessionFileIdentity,
     sourceSessionGeneration,
     entryId: "assistant-continue-source"
   });

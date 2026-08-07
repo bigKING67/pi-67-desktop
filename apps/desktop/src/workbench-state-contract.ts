@@ -5,12 +5,38 @@ import { MAX_WORKSPACE_ID_LENGTH, MAX_WORKSPACE_PATH_LENGTH, parseWorkspaceDescr
 import type { TaskLifecycle } from "./workbench-state-lifecycle.js";
 import { parseRuntimeRecoveryV3 } from "./workbench-state-recovery-v3.js";
 import { parseSessionCreationRecovery, type SessionCreationRecoveryRecord } from "./workbench-state-session-creation.js";
+import {
+  WORKBENCH_STATE_VERSION,
+  type ConversationKey,
+  type LegacyConversationKey,
+  type LegacyWorkbenchSurface,
+  type RuntimeRecoveryRecordV2,
+  type SettingsSection,
+  type WorkbenchSettingsState,
+  type WorkbenchStateV4,
+  type WorkbenchSurface
+} from "./workbench-state-types.js";
 
 export { isTaskLifecycle, type TaskLifecycle } from "./workbench-state-lifecycle.js";
+export {
+  WORKBENCH_STATE_VERSION,
+  type LegacyConversationKey,
+  type LegacyWorkbenchSurface,
+  type RuntimeRecoveryRecord,
+  type RuntimeRecoveryRecordV2,
+  type SessionConversationKey,
+  type SettingsSection,
+  type WorkbenchLayoutV4,
+  type WorkbenchLoadResult,
+  type WorkbenchSettingsState,
+  type WorkbenchStateV2,
+  type WorkbenchStateV4,
+  type WorkbenchSurface
+} from "./workbench-state-types.js";
 
-export const WORKBENCH_STATE_VERSION = 3 as const;
 export const WORKBENCH_STATE_DIRECTORY = "workbench";
-export const WORKBENCH_STATE_FILENAME = "state-v3.json";
+export const WORKBENCH_STATE_FILENAME = "state-v4.json";
+export const LEGACY_WORKBENCH_STATE_V3_FILENAME = "state-v3.json";
 export const LEGACY_WORKBENCH_STATE_V2_FILENAME = "state-v2.json";
 export const LEGACY_WORKBENCH_STATE_FILENAME = "state-v1.json";
 export const MAX_WORKBENCH_STATE_BYTES = 512 * 1024;
@@ -19,103 +45,6 @@ export const MAX_RUNTIME_RECOVERY_RECORDS = MAX_RUNNING_TASKS;
 export const MAX_TASK_ID_LENGTH = 200;
 export const MAX_SESSION_ID_LENGTH = 1_024;
 const MAX_DRAFT_ID_LENGTH = 200;
-
-export type ConversationKey =
-  | { kind: "session"; workspaceId: string; sessionPath: string }
-  | { kind: "provisional"; workspaceId: string; draftId: string };
-
-export type SessionConversationKey = Extract<ConversationKey, { kind: "session" }>;
-
-export type SettingsSection =
-  | "account"
-  | "general"
-  | "providers"
-  | "packages"
-  | "extensions"
-  | "skills"
-  | "prompts"
-  | "rules"
-  | "mcp"
-  | "integrations"
-  | "runtime"
-  | "network"
-  | "updates"
-  | "about";
-
-export type WorkbenchSurface =
-  | { kind: "conversation"; conversation: ConversationKey }
-  | { kind: "settings" }
-  | { kind: "workspace"; workspaceId: string };
-
-export interface RuntimeRecoveryRecordV2 {
-  taskId: string;
-  conversation: ConversationKey;
-  sessionId: string;
-  taskGeneration: number;
-  lastKnownLifecycle: TaskLifecycle;
-}
-
-export interface RuntimeRecoveryRecord {
-  taskId: string;
-  conversation: SessionConversationKey;
-  sessionId: string;
-  taskGeneration: number;
-  sessionGeneration: number;
-  hostInstanceId: string;
-  hostEpoch: number;
-  lastKnownLifecycle: TaskLifecycle;
-}
-
-export interface WorkbenchSettingsState {
-  section: SettingsSection;
-  scope: "global" | "project";
-  workspaceId?: string;
-}
-
-export interface WorkbenchStateV2 {
-  version: 2;
-  workspaces: WorkspaceDescriptor[];
-  workspaceOrder: string[];
-  expandedWorkspaceIds: string[];
-  currentWorkspaceId?: string;
-  selectedSurface?: WorkbenchSurface;
-  runtimeRecovery: RuntimeRecoveryRecordV2[];
-  settings: WorkbenchSettingsState;
-  cleanExit: boolean;
-}
-
-export interface WorkbenchStateV3 {
-  version: typeof WORKBENCH_STATE_VERSION;
-  workspaces: WorkspaceDescriptor[];
-  workspaceOrder: string[];
-  expandedWorkspaceIds: string[];
-  currentWorkspaceId?: string;
-  selectedSurface?: WorkbenchSurface;
-  runtimeRecovery: RuntimeRecoveryRecord[];
-  sessionCreationRecovery: SessionCreationRecoveryRecord[];
-  settings: WorkbenchSettingsState;
-  cleanExit: boolean;
-}
-
-/** Renderer-owned fields. Main retains Workspace registrations, ordering, and clean-exit state. */
-export interface WorkbenchLayoutV3 {
-  expandedWorkspaceIds: string[];
-  currentWorkspaceId?: string;
-  selectedSurface?: WorkbenchSurface;
-  runtimeRecovery: RuntimeRecoveryRecord[];
-  sessionCreationRecovery: SessionCreationRecoveryRecord[];
-  settings: WorkbenchSettingsState;
-}
-
-interface WorkbenchLoadRecovery {
-  kind: "corrupt-reset" | "migrated-v1" | "migrated-v2";
-  quarantinedFileName?: string;
-}
-
-export interface WorkbenchLoadResult {
-  state: WorkbenchStateV3;
-  recovery?: WorkbenchLoadRecovery;
-}
 
 export class UnsupportedWorkbenchStateVersionError extends Error {
   readonly foundVersion: number;
@@ -127,7 +56,7 @@ export class UnsupportedWorkbenchStateVersionError extends Error {
   }
 }
 
-export function createEmptyWorkbenchState(): WorkbenchStateV3 {
+export function createEmptyWorkbenchState(): WorkbenchStateV4 {
   return {
     version: WORKBENCH_STATE_VERSION,
     workspaces: [],
@@ -140,7 +69,7 @@ export function createEmptyWorkbenchState(): WorkbenchStateV3 {
   };
 }
 
-export function beginWorkbenchRun(state: WorkbenchStateV3): WorkbenchStateV3 {
+export function beginWorkbenchRun(state: WorkbenchStateV4): WorkbenchStateV4 {
   const recoveredLifecycle = state.cleanExit ? "stopped" : "lost";
   return assertValidWorkbenchState({
     ...state,
@@ -153,14 +82,14 @@ export function beginWorkbenchRun(state: WorkbenchStateV3): WorkbenchStateV3 {
   }, "Workbench launch recovery produced invalid state.");
 }
 
-export function finishWorkbenchRun(state: WorkbenchStateV3): WorkbenchStateV3 {
+export function finishWorkbenchRun(state: WorkbenchStateV4): WorkbenchStateV4 {
   return assertValidWorkbenchState(
     { ...state, runtimeRecovery: [], cleanExit: true },
     "Workbench clean-exit update produced invalid state."
   );
 }
 
-export function parseWorkbenchStateV3(value: unknown): WorkbenchStateV3 | undefined {
+export function parseWorkbenchStateV4(value: unknown): WorkbenchStateV4 | undefined {
   if (!isRecordWithAllowedKeys(
     value,
     [
@@ -236,8 +165,8 @@ export function parseWorkbenchStateV3(value: unknown): WorkbenchStateV3 | undefi
   };
 }
 
-export function assertValidWorkbenchState(state: WorkbenchStateV3, message: string): WorkbenchStateV3 {
-  const parsed = parseWorkbenchStateV3(state);
+export function assertValidWorkbenchState(state: WorkbenchStateV4, message: string): WorkbenchStateV4 {
+  const parsed = parseWorkbenchStateV4(state);
   if (!parsed) throw new Error(message);
   return parsed;
 }
@@ -256,25 +185,30 @@ export function parseExactWorkbenchIdOrder(
   return new Set(value).size === value.length ? [...value] : undefined;
 }
 
-export function parseConversationKey(
+function parseConversationKey(
   value: unknown,
   workspaceIds: ReadonlySet<string>
 ): ConversationKey | undefined {
   if (!isRecord(value) || !isKnownWorkspaceId(value.workspaceId, workspaceIds)) return undefined;
-  if (value.kind === "session" && hasExactKeys(value, ["kind", "workspaceId", "sessionPath"])) {
-    if (!isAbsoluteBoundedPath(value.sessionPath)) return undefined;
-    return { kind: "session", workspaceId: value.workspaceId, sessionPath: value.sessionPath };
+  if (value.kind === "session" && hasExactKeys(
+    value,
+    ["kind", "workspaceId", "sessionFileIdentity", "sessionPath"]
+  )) {
+    if (!isBoundedSessionFileIdentity(value.sessionFileIdentity) || !isAbsoluteBoundedPath(value.sessionPath)) {
+      return undefined;
+    }
+    return {
+      kind: "session",
+      workspaceId: value.workspaceId,
+      sessionFileIdentity: value.sessionFileIdentity,
+      sessionPath: value.sessionPath
+    };
   }
   if (value.kind === "provisional" && hasExactKeys(value, ["kind", "workspaceId", "draftId"])) {
     if (!isBoundedId(value.draftId, MAX_DRAFT_ID_LENGTH)) return undefined;
     return { kind: "provisional", workspaceId: value.workspaceId, draftId: value.draftId };
   }
   return undefined;
-}
-
-export function conversationIdentity(conversation: ConversationKey): string {
-  const value = conversation.kind === "session" ? normalizePath(conversation.sessionPath) : conversation.draftId;
-  return `${conversation.kind}:${conversation.workspaceId}:${value}`;
 }
 
 function isSettingsSection(value: unknown): value is SettingsSection {
@@ -342,17 +276,19 @@ export function parseWorkbenchSurfaceV2(
   value: unknown,
   workspaceIds: ReadonlySet<string>,
   runtimeRecovery: readonly RuntimeRecoveryRecordV2[]
-): WorkbenchSurface | undefined {
+): LegacyWorkbenchSurface | undefined {
   if (isRecord(value) && hasExactKeys(value, ["kind"]) && value.kind === "settings") return { kind: "settings" };
   if (isRecord(value) && hasExactKeys(value, ["kind", "workspaceId"]) && value.kind === "workspace"
     && isKnownWorkspaceId(value.workspaceId, workspaceIds)) {
     return { kind: "workspace", workspaceId: value.workspaceId };
   }
   if (isRecord(value) && hasExactKeys(value, ["kind", "conversation"]) && value.kind === "conversation") {
-    const conversation = parseConversationKey(value.conversation, workspaceIds);
+    const conversation = parseLegacyConversationKey(value.conversation, workspaceIds);
     if (!conversation) return undefined;
     if (conversation.kind === "provisional" && !runtimeRecovery.some((record) => (
-      conversationIdentity(record.conversation) === conversationIdentity(conversation)
+      record.conversation.kind === "provisional"
+      && record.conversation.workspaceId === conversation.workspaceId
+      && record.conversation.draftId === conversation.draftId
     ))) return undefined;
     return { kind: "conversation", conversation };
   }
@@ -384,7 +320,9 @@ function parseWorkbenchSurfaceV3(
   return undefined;
 }
 
-export function selectedSurfaceWorkspaceId(surface: WorkbenchSurface | undefined): string | undefined {
+export function selectedSurfaceWorkspaceId(
+  surface: WorkbenchSurface | LegacyWorkbenchSurface | undefined
+): string | undefined {
   if (surface?.kind === "workspace") return surface.workspaceId;
   if (surface?.kind === "conversation") return surface.conversation.workspaceId;
   return undefined;
@@ -427,8 +365,24 @@ function isAbsoluteBoundedPath(value: unknown): value is string {
     && !value.includes("\0") && isAbsolute(value);
 }
 
-function normalizePath(path: string): string {
-  return process.platform === "win32" ? path.toLowerCase() : path;
+function isBoundedSessionFileIdentity(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_WORKSPACE_PATH_LENGTH + 64;
+}
+
+export function parseLegacyConversationKey(
+  value: unknown,
+  workspaceIds: ReadonlySet<string>
+): LegacyConversationKey | undefined {
+  if (!isRecord(value) || !isKnownWorkspaceId(value.workspaceId, workspaceIds)) return undefined;
+  if (value.kind === "session" && hasExactKeys(value, ["kind", "workspaceId", "sessionPath"])) {
+    if (!isAbsoluteBoundedPath(value.sessionPath)) return undefined;
+    return { kind: "session", workspaceId: value.workspaceId, sessionPath: value.sessionPath };
+  }
+  if (value.kind === "provisional" && hasExactKeys(value, ["kind", "workspaceId", "draftId"])) {
+    if (!isBoundedId(value.draftId, MAX_DRAFT_ID_LENGTH)) return undefined;
+    return { kind: "provisional", workspaceId: value.workspaceId, draftId: value.draftId };
+  }
+  return undefined;
 }
 
 export function isBoundedId(value: unknown, maximumLength: number): value is string {

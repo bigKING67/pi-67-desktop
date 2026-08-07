@@ -3,6 +3,7 @@ import { create } from "zustand";
 
 interface ConversationRenameTarget {
   workspaceId: WorkspaceId;
+  fileIdentity: string;
   path: string;
   title: string;
   nameSource: SessionSummary["nameSource"];

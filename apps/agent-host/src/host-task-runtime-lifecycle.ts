@@ -164,8 +164,11 @@ export class HostTaskRuntimeLifecycle {
     }
     await this.taskRuntimes.disposeTask(state.record.context);
     this.tasks.releaseTaskRun(state.record.taskKey);
-    this.sessionWriterLeases.releaseTask(state.record.taskKey);
-    this.tasks.clearActiveTask(state.record.taskKey);
+    try {
+      await this.sessionWriterLeases.releaseTask(state.record.taskKey);
+    } finally {
+      this.tasks.clearActiveTask(state.record.taskKey);
+    }
     return { closed: true, stopped: mode === "stop" && runtimeWasLoaded };
   }
 
@@ -181,8 +184,39 @@ export class HostTaskRuntimeLifecycle {
       : this.sessionWriterLeases.reserve(state.record.taskKey, targetPath);
   }
 
-  cancelWriterTransition(reservation: SessionWriterLeaseReservation): void {
-    this.sessionWriterLeases.cancel(reservation);
+  cancelWriterTransition(reservation: SessionWriterLeaseReservation): Promise<void> {
+    return this.sessionWriterLeases.cancel(reservation);
+  }
+
+  async cancelWriterTransitionAfterFailure(
+    reservation: SessionWriterLeaseReservation | undefined,
+    failure: unknown
+  ): Promise<unknown> {
+    if (!reservation) return failure;
+    try {
+      await this.cancelWriterTransition(reservation);
+      return failure;
+    } catch (cleanupError) {
+      return cleanupError;
+    }
+  }
+
+  async disposeAllForShutdown(onError: (error: unknown) => void): Promise<boolean> {
+    try {
+      await this.taskRuntimes.disposeAll();
+      return true;
+    } catch (error) {
+      onError(error);
+      return false;
+    }
+  }
+
+  async releaseWriterLeasesForShutdown(
+    runtimesDisposed: boolean,
+    onError: (error: unknown) => void
+  ): Promise<void> {
+    if (!runtimesDisposed) return;
+    await this.sessionWriterLeases.disposeAll().catch(onError);
   }
 
   async commitWriterTransition(
@@ -190,22 +224,22 @@ export class HostTaskRuntimeLifecycle {
     runtime: AgentRuntime,
     reservation?: SessionWriterLeaseReservation
   ): Promise<void> {
-    if (reservation) {
-      this.sessionWriterLeases.commit(reservation);
-      return;
-    }
-    const sessionPath = runtime.getIdentity().sessionPath;
-    if (!sessionPath) return;
     try {
+      const sessionPath = runtime.getIdentity().sessionPath;
+      if (reservation) {
+        await this.sessionWriterLeases.commit(reservation, sessionPath);
+        return;
+      }
+      if (!sessionPath) return;
       const discovered = await this.sessionWriterLeases.reserve(state.record.taskKey, sessionPath);
-      this.sessionWriterLeases.commit(discovered);
+      await this.sessionWriterLeases.commit(discovered, sessionPath);
     } catch (error) {
-      if (isSessionWriterLeaseConflict(error)) await this.fenceTaskAfterWriterConflict(state);
+      await this.fenceTaskAfterWriterLeaseFailure(state);
       throw error;
     }
   }
 
-  private async fenceTaskAfterWriterConflict(state: TaskHostState): Promise<void> {
+  private async fenceTaskAfterWriterLeaseFailure(state: TaskHostState): Promise<void> {
     state.scheduler?.shutdown();
     try {
       state.record.runtime?.cancelInteractiveRequests("runtime-dispose");
@@ -223,8 +257,18 @@ export class HostTaskRuntimeLifecycle {
       );
     }
     this.tasks.releaseTaskRun(state.record.taskKey);
-    this.sessionWriterLeases.releaseTask(state.record.taskKey);
-    this.tasks.clearActiveTask(state.record.taskKey);
+    try {
+      await this.sessionWriterLeases.releaseTask(state.record.taskKey);
+    } catch {
+      throw new HostCommandError(
+        "RUNTIME_POISONED",
+        "The Pi Session writer lease failure could not be safely fenced.",
+        true,
+        { hostReplacementRequired: true, sessionWriterLeaseConflict: true }
+      );
+    } finally {
+      this.tasks.clearActiveTask(state.record.taskKey);
+    }
   }
 }
 
@@ -234,7 +278,6 @@ function initializationStageDetail(stage: RuntimeInitializationStage): string {
     case "dispose-current": return "正在释放旧 Pi Runtime";
     case "create-session": return "正在创建 Pi Session";
     case "reload-configuration": return "正在加载 Pi 配置";
-    case "update-catalog": return "正在更新 Session 目录";
     case "project-snapshot": return "正在同步 Pi Session 状态";
   }
 }
@@ -255,11 +298,6 @@ function runtimeNotReady(): HostCommandError {
     "Initialize the Task Workspace before using its Pi Runtime.",
     true
   );
-}
-
-function isSessionWriterLeaseConflict(error: unknown): error is HostCommandError {
-  return error instanceof HostCommandError
-    && error.details?.sessionWriterLeaseConflict === true;
 }
 
 function connectionClosed(): HostCommandError {

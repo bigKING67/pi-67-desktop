@@ -20,6 +20,7 @@ describe("renderer Extension Adapter fixtures", () => {
           taskId: "task-test",
           taskGeneration: 1,
           sessionId: "session-test",
+          sessionFileIdentity: "session-file-test",
           sessionGeneration: 1
         },
         taskSequence: 1
@@ -34,6 +35,7 @@ describe("renderer Extension Adapter fixtures", () => {
         taskId: "task-test",
         taskGeneration: 1,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-test",
         sessionGeneration: 1
       },
       { ok: true, type: "extension.catalog.list", result: MOCK_EXTENSION_CATALOG }

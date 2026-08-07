@@ -98,6 +98,10 @@ export function isSlashInvocation(text: string): boolean {
   return /^\s*\/[^\s]+/u.test(text);
 }
 
+export function slashCommandOptionId(index: number): string {
+  return `composer-slash-command-${index}`;
+}
+
 function commandScore(command: ComposerSlashItem, needle: string): number {
   if (!needle) return 0;
   const name = normalize(command.name);

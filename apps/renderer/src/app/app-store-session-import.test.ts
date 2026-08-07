@@ -229,6 +229,7 @@ function importOperation(sessionId: string, sessionGeneration: number): Operatio
     lifecycle: "running",
     cancellable: false,
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionGeneration,
     startedAt: 1
   };
@@ -243,6 +244,7 @@ function completedReceipt(): OperationSettled {
     cancellable: false,
     hostEpoch: 9,
     sessionId: "session-imported",
+    sessionFileIdentity: "session-file-session-imported",
     sessionGeneration: 7,
     startedAt: 1,
     settledAt: 2
@@ -256,6 +258,7 @@ function acceptedReceipt(): OperationAccepted {
     cancellable: false,
     hostEpoch: 9,
     sessionId: "session-old",
+    sessionFileIdentity: "session-file-session-old",
     sessionGeneration: 3
   };
 }
@@ -276,6 +279,8 @@ function importResyncResult(): ProjectionResyncResult {
     },
     eventSequence: 2,
     hostEpoch: 9,
+    sessionId: "session-imported",
+    sessionFileIdentity: "session-file-session-imported",
     sessionGeneration: 7,
     taskToolMode: "auto",
     latestOperationTerminal: completedReceipt()
@@ -321,6 +326,7 @@ function emptyCatalogPage() {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

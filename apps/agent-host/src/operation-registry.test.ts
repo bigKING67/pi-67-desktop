@@ -11,7 +11,7 @@ describe("OperationRegistry", () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
@@ -19,20 +19,20 @@ describe("OperationRegistry", () => {
       execute: () => new Promise<void>((resolve) => { complete = resolve; })
     });
     expect(accepted).toMatchObject({ kind: "accepted", cancellable: true });
-    expect(registry.accept({
+    await expect(registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
       abort: async () => undefined,
       execute: vi.fn(async () => undefined)
-    })).toEqual(accepted);
-    expect(() => registry.accept({
+    })).resolves.toEqual(accepted);
+    await expect(registry.accept({
       submissionId: "submission-1",
       fingerprint: "different",
       kind: "prompt",
       abort: async () => undefined,
       execute: vi.fn(async () => undefined)
-    })).toThrow("cannot be reused");
+    })).rejects.toThrow("cannot be reused");
     await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
     complete();
     await vi.waitFor(() => expect(events.some((event) => event.type === "operation.completed")).toBe(true));
@@ -44,78 +44,21 @@ describe("OperationRegistry", () => {
       lifecycle: "completed",
       cancellable: false,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 2
     });
     expect(registry.latestTerminal()).toEqual(registry.submissionFor("submission-1", "same"));
   });
 
-  it("moves a completed Session import receipt to the resulting Session authority", async () => {
-    const events: AgentEvent[] = [];
-    let identity = { sessionId: "session-before-import", sessionGeneration: 2 };
-    let finish!: () => void;
-    const registry = new OperationRegistry(
-      3,
-      () => identity,
-      (event) => events.push(event)
-    );
-    const accepted = registry.accept({
-      submissionId: "session-import-stable",
-      fingerprint: "same-import",
-      kind: "session-import",
-      execute: () => new Promise<void>((resolve) => {
-        finish = () => {
-          identity = { sessionId: "session-after-import", sessionGeneration: 3 };
-          resolve();
-        };
-      })
-    });
-    await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
-    finish();
-    await vi.waitFor(() => expect(events.some((event) => event.type === "operation.completed")).toBe(true));
-
-    expect(registry.submissionFor("session-import-stable", "same-import")).toMatchObject({
-      kind: "settled",
-      operationId: accepted.operationId,
-      operationKind: "session-import",
-      lifecycle: "completed",
-      sessionId: "session-after-import",
-      sessionGeneration: 3
-    });
-
-    identity = { sessionId: "later-session", sessionGeneration: 4 };
-    expect(() => registry.submissionFor("session-import-stable", "same-import"))
-      .toThrowError(expect.objectContaining({ code: "STALE_SESSION_GENERATION" }));
-  });
-
-  it("does not replay a completed submission into a different Session with the same generation", () => {
-    let identity = { sessionId: "session-1", sessionGeneration: 2 };
-    const registry = new OperationRegistry(
-      3,
-      () => identity,
-      () => undefined
-    );
-    registry.accept({
-      submissionId: "submission-session-bound",
-      fingerprint: "same",
-      kind: "prompt",
-      execute: () => new Promise<void>(() => undefined)
-    });
-
-    identity = { sessionId: "session-2", sessionGeneration: 2 };
-
-    expect(() => registry.submissionFor("submission-session-bound", "same"))
-      .toThrowError(expect.objectContaining({ code: "STALE_SESSION_GENERATION" }));
-  });
-
   it("rejects a pending queued submission when its Session generation changes", async () => {
-    let identity = { sessionId: "session-1", sessionGeneration: 2 };
+    let identity = runtimeIdentity("session-1", 2);
     let finishQueue!: () => void;
     const registry = new OperationRegistry(
       3,
       () => identity,
       () => undefined
     );
-    registry.accept({
+    await registry.accept({
       submissionId: "active-turn",
       fingerprint: "active-turn",
       kind: "prompt",
@@ -126,8 +69,9 @@ describe("OperationRegistry", () => {
       "queued",
       () => new Promise<void>((resolve) => { finishQueue = resolve; })
     );
+    await vi.waitFor(() => expect(finishQueue).toBeTypeOf("function"));
 
-    identity = { sessionId: "session-1", sessionGeneration: 3 };
+    identity = runtimeIdentity("session-1", 3);
     expect(() => registry.submissionFor("queued-submission", "queued"))
       .toThrowError(expect.objectContaining({ code: "STALE_SESSION_GENERATION" }));
 
@@ -140,7 +84,7 @@ describe("OperationRegistry", () => {
     let complete!: () => void;
     let finishAbort!: () => void;
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
@@ -163,7 +107,7 @@ describe("OperationRegistry", () => {
   it("emits one structured failure after acceptance", async () => {
     const events: AgentEvent[] = [];
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "command",
@@ -185,28 +129,28 @@ describe("OperationRegistry", () => {
     for (const kind of ["compaction", "session-import"] as const) {
       const events: AgentEvent[] = [];
       const registry = createRegistry(events);
-      registry.accept({
+      await registry.accept({
         submissionId: `submission-${kind}`,
         fingerprint: kind,
         kind,
         execute: () => new Promise<void>(() => undefined)
       });
       expect(registry.canAcceptQueue()).toBe(false);
-      expect(() => registry.queueForActive("queued", "queued", async () => undefined))
-        .toThrow("no active turn operation");
-      registry.loseActive("test cleanup");
+      await expect(registry.queueForActive("queued", "queued", async () => undefined))
+        .rejects.toThrow("no active turn operation");
+      await registry.loseActive("test cleanup");
     }
 
     for (const kind of ["prompt", "command"] as const) {
       const registry = createRegistry([]);
-      registry.accept({
+      await registry.accept({
         submissionId: `submission-${kind}`,
         fingerprint: kind,
         kind,
         execute: () => new Promise<void>(() => undefined)
       });
       expect(registry.canAcceptQueue()).toBe(true);
-      registry.loseActive("test cleanup");
+      await registry.loseActive("test cleanup");
     }
   });
 
@@ -214,7 +158,7 @@ describe("OperationRegistry", () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
@@ -239,11 +183,11 @@ describe("OperationRegistry", () => {
     let finishAbort!: () => void;
     const registry = new OperationRegistry(
       3,
-      () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      () => runtimeIdentity("session-1", 2),
       (event) => events.push(event),
       { abortWatchdogMs: 25, onRuntimePoisoned }
     );
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-hung-abort",
       fingerprint: "same",
       kind: "prompt",
@@ -283,11 +227,11 @@ describe("OperationRegistry", () => {
     const onRuntimePoisoned = vi.fn();
     const registry = new OperationRegistry(
       3,
-      () => ({ sessionId: "session-imported", sessionGeneration: 7 }),
+      () => runtimeIdentity("session-imported", 7),
       (event) => events.push(event),
       { onRuntimePoisoned }
     );
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "submission-import",
       fingerprint: "same",
       kind: "session-import",
@@ -295,8 +239,8 @@ describe("OperationRegistry", () => {
     });
     await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
 
-    expect(registry.poisonSessionImportProjection()).toBe(true);
-    expect(registry.poisonSessionImportProjection()).toBe(false);
+    expect(await registry.poisonSessionImportProjection()).toBe(true);
+    expect(await registry.poisonSessionImportProjection()).toBe(false);
 
     expect(registry.isPoisoned()).toBe(true);
     expect(registry.hasActive()).toBe(true);
@@ -315,7 +259,7 @@ describe("OperationRegistry", () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "session-import:1",
       fingerprint: "session-import:1",
       kind: "session-import",
@@ -338,10 +282,10 @@ describe("OperationRegistry", () => {
     const order: string[] = [];
     const registry = new OperationRegistry(
       3,
-      () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      () => runtimeIdentity("session-1", 2),
       (event) => order.push(event.type)
     );
-    registry.accept({
+    await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
@@ -349,7 +293,7 @@ describe("OperationRegistry", () => {
       beforeTerminal: () => order.push("stream.flush")
     });
     await vi.waitFor(() => expect(order).toContain("operation.started"));
-    registry.loseActive("connection lost");
+    await registry.loseActive("connection lost");
     expect(order).toEqual(["operation.started", "stream.flush", "operation.lost"]);
   });
 
@@ -357,7 +301,7 @@ describe("OperationRegistry", () => {
     const events: AgentEvent[] = [];
     const abort = vi.fn(async () => undefined);
     const registry = createRegistry(events);
-    registry.accept({
+    await registry.accept({
       submissionId: "shutdown-cancel",
       fingerprint: "same",
       kind: "prompt",
@@ -380,11 +324,11 @@ describe("OperationRegistry", () => {
     const onRuntimePoisoned = vi.fn();
     const registry = new OperationRegistry(
       3,
-      () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      () => runtimeIdentity("session-1", 2),
       (event) => events.push(event),
       { onRuntimePoisoned }
     );
-    registry.accept({
+    await registry.accept({
       submissionId: "shutdown-lost",
       fingerprint: "same",
       kind: "prompt",
@@ -405,11 +349,11 @@ describe("OperationRegistry", () => {
     const onRuntimePoisoned = vi.fn();
     const registry = new OperationRegistry(
       3,
-      () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      () => runtimeIdentity("session-1", 2),
       (event) => events.push(event),
       { abortWatchdogMs: 10_000, onRuntimePoisoned }
     );
-    registry.accept({
+    await registry.accept({
       submissionId: "shutdown-timeout",
       fingerprint: "same",
       kind: "prompt",
@@ -430,7 +374,7 @@ describe("OperationRegistry", () => {
     const events: AgentEvent[] = [];
     let finishAbort!: () => void;
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "shutdown-abort-race",
       fingerprint: "same",
       kind: "prompt",
@@ -450,7 +394,15 @@ describe("OperationRegistry", () => {
 function createRegistry(events: AgentEvent[]): OperationRegistry {
   return new OperationRegistry(
     3,
-    () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+    () => runtimeIdentity("session-1", 2),
     (event) => events.push(event)
   );
+}
+
+function runtimeIdentity(sessionId: string, sessionGeneration: number) {
+  return {
+    sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
+    sessionGeneration
+  };
 }

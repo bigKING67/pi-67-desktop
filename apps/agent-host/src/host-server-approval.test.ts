@@ -1,6 +1,7 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -49,7 +50,7 @@ describe("AgentHostServer safety approval", () => {
         emit = listener;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-approval", sessionGeneration: 7 }),
+      getIdentity: () => ({ sessionId: "session-approval", sessionFileIdentity: "session-file-session-approval", sessionGeneration: 7 }),
       getTaskToolMode: () => "auto",
       submitPrompt: () => new Promise<void>((resolve) => {
         finishPrompt = resolve;
@@ -173,7 +174,7 @@ describe("AgentHostServer safety approval", () => {
         emit = listener;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-idle", sessionGeneration: 2 }),
+      getIdentity: () => ({ sessionId: "session-idle", sessionFileIdentity: "session-file-session-idle", sessionGeneration: 2 }),
       resolveApproval,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -250,7 +251,7 @@ describe("AgentHostServer safety approval", () => {
         emit = listener;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-disconnected", sessionGeneration: 9 }),
+      getIdentity: () => ({ sessionId: "session-disconnected", sessionFileIdentity: "session-file-session-disconnected", sessionGeneration: 9 }),
       submitPrompt: () => new Promise<void>((resolve) => { finishPrompt = resolve; }),
       resolveApproval,
       flushStream: () => undefined,
@@ -334,7 +335,7 @@ describe("AgentHostServer safety approval", () => {
 
 function handshake(port: FakePort, appInstanceId: string): void {
   port.emitMessage({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${appInstanceId}`,

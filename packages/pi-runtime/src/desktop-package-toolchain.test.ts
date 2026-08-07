@@ -126,6 +126,32 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     ]);
   });
 
+  it("admits only currently observed or verified packages to the Pi Runtime view", () => {
+    const settingsManager = SettingsManager.inMemory({
+      packages: ["npm:observed", "npm:unverified"]
+    });
+    settingsManager.setProjectPackages([
+      "npm:project-observed",
+      "npm:project-drifted"
+    ]);
+    const sessionView = createDesktopPackageSettingsView(settingsManager, environment, {
+      runtimePackageAllowed: (source, scope) => (
+        source.includes("desktop-capabilities")
+        || (scope === "global" && source === "npm:observed")
+        || (scope === "project" && source === "npm:project-observed")
+      )
+    });
+
+    expect(sessionView.getGlobalSettings().packages).toEqual([
+      "npm:observed",
+      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/design-craft"
+    ]);
+    expect(sessionView.getProjectSettings().packages).toEqual(["npm:project-observed"]);
+    expect(sessionView.getPackages()).not.toContain("npm:unverified");
+    expect(sessionView.getPackages()).not.toContain("npm:project-drifted");
+  });
+
   it("keeps legacy first-party extensions when the managed Pi-67 Core Package is absent", () => {
     const settingsManager = SettingsManager.inMemory({ extensions: ["extensions/pi-hy-memory/index.ts"] });
     const sessionView = createDesktopPackageSettingsView(settingsManager, {

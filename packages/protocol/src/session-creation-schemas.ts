@@ -1,3 +1,4 @@
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import { MAX_SESSION_CREATION_ID_CHARS } from "./agent-messages.js";
 import { Type } from "./typebox-schema.js";
 
@@ -12,6 +13,7 @@ export const SessionCreationResolutionSchema = Type.Union([
     status: Type.Literal("materialized"),
     creationId: SessionCreationIdSchema,
     sessionId: Type.String({ minLength: 1, maxLength: 1_024 }),
+    sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
     sessionPath: Type.String({ minLength: 1, maxLength: 32_768 })
   }, { additionalProperties: false }),
   Type.Object({

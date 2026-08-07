@@ -29,6 +29,10 @@ describe("event context validation", () => {
     for (const type of SESSION_SCOPED_EVENTS) {
       expect(hasValidEventContext(eventShape(type)), type).toBe(false);
       expect(hasValidEventContext(eventShape(type, { sessionId: "session-1" })), type).toBe(false);
+      expect(hasValidEventContext(eventShape(type, {
+        sessionId: "session-1",
+        sessionGeneration: 2
+      })), type).toBe(false);
       expect(hasValidEventContext(eventShape(type, { sessionGeneration: 2 })), type).toBe(false);
     }
   });
@@ -37,6 +41,7 @@ describe("event context validation", () => {
     for (const type of OPERATION_SCOPED_EVENTS) {
       expect(hasValidEventContext(eventShape(type, {
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 2
       })), type).toBe(false);
     }
@@ -69,6 +74,13 @@ describe("event context validation", () => {
       ...ready,
       context: { ...ready.context, sessionId: "session-other" }
     })).toBe(false);
+    expect(isEventEnvelope({
+      ...ready,
+      payload: {
+        ...ready.payload,
+        snapshot: { ...ready.payload.snapshot, sessionFileIdentity: "session-file-other" }
+      }
+    })).toBe(false);
 
     const conversation = eventEnvelope("conversation.changed", {
       sessionId: "session-1",
@@ -96,6 +108,7 @@ describe("event context validation", () => {
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 2,
         startedAt: 100
       }
@@ -105,6 +118,12 @@ describe("event context validation", () => {
       ...started,
       payload: {
         operation: { ...started.payload.operation, sessionGeneration: 3 }
+      }
+    })).toBe(false);
+    expect(isEventEnvelope({
+      ...started,
+      payload: {
+        operation: { ...started.payload.operation, sessionFileIdentity: "session-file-other" }
       }
     })).toBe(false);
 
@@ -153,7 +172,12 @@ describe("event context validation", () => {
 
 function eventShape(
   type: AgentEventType,
-  authority: { sessionId?: string; sessionGeneration?: number; operationId?: string } = {}
+  authority: {
+    sessionId?: string;
+    sessionFileIdentity?: string;
+    sessionGeneration?: number;
+    operationId?: string;
+  } = {}
 ): EventEnvelope {
   return {
     protocolVersion: PROTOCOL_VERSION,
@@ -183,6 +207,7 @@ function sessionContext(): EventEnvelopeContext {
       taskId: "task-1",
       taskGeneration: 1,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 2
     },
     taskSequence: 1
@@ -247,6 +272,7 @@ function runtimeCapabilities(): RuntimeCapabilities {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     cwd: "/workspace",
     streaming: false,
     messages: [],

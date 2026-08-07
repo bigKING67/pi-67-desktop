@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   type ProtocolPort,
   type RendererHello
 } from "@pi67/protocol";
@@ -40,7 +41,7 @@ describe("HostConnectionContext handshake", () => {
       () => undefined
     );
     const hello = {
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-handshake",
@@ -107,7 +108,7 @@ describe("HostConnectionContext handshake", () => {
     );
 
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: "f".repeat(64),
       kind: "hello",
       rendererInstanceId: "renderer-revision",

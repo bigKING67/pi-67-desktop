@@ -38,6 +38,7 @@ export function beginSessionSnapshotReplacement(
   transitionTarget?: SessionProjectionTransitionTarget
 ): SnapshotReplacementStart | undefined {
   if (!connection.connected || connection.hostEpoch === undefined) return undefined;
+  if (!snapshot.sessionFileIdentity) return undefined;
   if (
     transitionTarget !== undefined
     && (
@@ -48,7 +49,8 @@ export function beginSessionSnapshotReplacement(
   const current = state.authority;
   const canReuseGeneration = current.phase === "active"
     && current.hostEpoch === connection.hostEpoch
-    && current.sessionId === snapshot.sessionId;
+    && current.sessionId === snapshot.sessionId
+    && current.sessionFileIdentity === snapshot.sessionFileIdentity;
   const resolvedGeneration = sessionGeneration
     ?? (canReuseGeneration ? current.sessionGeneration : undefined);
   if (resolvedGeneration === undefined) return undefined;
@@ -56,6 +58,7 @@ export function beginSessionSnapshotReplacement(
   const installation: SessionProjectionInstallation = {
     hostEpoch: connection.hostEpoch,
     sessionId: snapshot.sessionId,
+    sessionFileIdentity: snapshot.sessionFileIdentity,
     sessionGeneration: resolvedGeneration,
     projectionRevision,
     baseProjectionRevision: current.projectionRevision
@@ -83,11 +86,13 @@ export function commitSessionSnapshotReplacement(
 ): SnapshotReplacementCommit | undefined {
   if (
     snapshot.sessionId !== installation.sessionId
+    || snapshot.sessionFileIdentity !== installation.sessionFileIdentity
     || !isCurrentSessionProjectionInstallation(state.authority, connection, installation)
   ) return undefined;
   const authority: SessionProjectionAuthority = {
     hostEpoch: installation.hostEpoch,
     sessionId: installation.sessionId,
+    sessionFileIdentity: installation.sessionFileIdentity,
     sessionGeneration: installation.sessionGeneration,
     projectionRevision: installation.projectionRevision
   };
@@ -101,6 +106,7 @@ export function commitSessionSnapshotReplacement(
       queue: queueProjectionFromSnapshot(snapshot),
       resources: snapshot.resources,
       usage: snapshot.stats,
+      recoverySessionFileIdentity: snapshot.sessionFileIdentity,
       recoverySessionPath: snapshot.sessionPath,
       revisions: incrementAllSessionProjectionRevisions(state.revisions)
     }
@@ -122,7 +128,10 @@ export function resetSessionProjection(
     queue: undefined,
     resources: undefined,
     usage: undefined,
-    recoverySessionPath: options?.preserveRecoverySessionPath
+    recoverySessionFileIdentity: options?.preserveRecoverySessionIdentity
+      ? state.recoverySessionFileIdentity
+      : undefined,
+    recoverySessionPath: options?.preserveRecoverySessionIdentity
       ? state.recoverySessionPath
       : undefined,
     revisions: incrementAllSessionProjectionRevisions(state.revisions)

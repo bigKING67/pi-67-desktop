@@ -17,6 +17,25 @@ const PackageManifestTextSchema = (maximum: number) => Type.String({
   maxLength: maximum,
   pattern: "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F])(?=[\\s\\S]*\\S)[\\s\\S]+$"
 });
+const Sha256Schema = Type.String({ pattern: "^[a-f0-9]{64}$" });
+const ExtensionPackageTrustStateSchema = Type.Union([
+  Type.Literal("builtin-verified"),
+  Type.Literal("user-installed-observed"),
+  Type.Literal("unverified"),
+  Type.Literal("drifted"),
+  Type.Literal("unavailable")
+]);
+const ExtensionPackageIntegrityReasonSchema = Type.Union([
+  Type.Literal("receipt-missing"),
+  Type.Literal("install-content-missing"),
+  Type.Literal("package-identity-changed"),
+  Type.Literal("manifest-changed"),
+  Type.Literal("directory-identity-changed"),
+  Type.Literal("content-hash-changed"),
+  Type.Literal("receipt-invalid"),
+  Type.Literal("inspection-limited"),
+  Type.Literal("mutation-ambiguous")
+]);
 
 export const ExtensionPackageTargetSchema = strictObject({
   source: PackageSourceSchema,
@@ -53,7 +72,12 @@ const ExtensionPackageEntrySchema = strictObject({
   resourceStates: Type.Optional(Type.Array(strictObject({
     type: PackageResourceTypeSchema,
     enabled: Type.Boolean()
-  }), { maxItems: 4 }))
+  }), { maxItems: 4 })),
+  trustState: ExtensionPackageTrustStateSchema,
+  trustReason: Type.Optional(ExtensionPackageIntegrityReasonSchema),
+  trustObservedAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  manifestSha256: Type.Optional(Sha256Schema),
+  contentSha256: Type.Optional(Sha256Schema)
 });
 
 export const ExtensionPackageListResultSchema = strictObject({
@@ -64,7 +88,13 @@ export const ExtensionPackageListResultSchema = strictObject({
 export const ExtensionPackageMutationResultSchema = strictObject({
   items: Type.Array(ExtensionPackageEntrySchema, { maxItems: 512 }),
   total: Type.Integer({ minimum: 0, maximum: 512 }),
-  changed: Type.Boolean()
+  changed: Type.Boolean(),
+  receiptState: Type.Optional(Type.Union([
+    Type.Literal("active"),
+    Type.Literal("removed"),
+    Type.Literal("ambiguous"),
+    Type.Literal("not-applicable")
+  ]))
 });
 
 const ExtensionPackageUpdateSchema = strictObject({

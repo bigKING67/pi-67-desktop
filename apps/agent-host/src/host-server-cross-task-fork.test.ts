@@ -1,6 +1,7 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -37,12 +38,14 @@ describe("AgentHostServer cross-Task Session fork", () => {
   it("forks an idle source Session without changing source authority", async () => {
     const sourceIdentity = {
       sessionId: "session-source",
+      sessionFileIdentity: "session-file-source",
       sessionGeneration: 4,
       sessionPath: "/sessions/source.jsonl"
     };
     const sourceRuntime = forkRuntime(sourceIdentity);
     const targetRuntime = forkRuntime({
       sessionId: "session-target-initial",
+      sessionFileIdentity: "session-file-target-initial",
       sessionGeneration: 1,
       sessionPath: "/sessions/target-initial.jsonl"
     });
@@ -51,6 +54,7 @@ describe("AgentHostServer cross-Task Session fork", () => {
       expect(entryId).toBe("assistant-entry-8");
       targetRuntime.identity = {
         sessionId: "session-target-forked",
+        sessionFileIdentity: "session-file-target-forked",
         sessionGeneration: 2,
         sessionPath: "/sessions/target-forked.jsonl"
       };
@@ -81,6 +85,7 @@ describe("AgentHostServer cross-Task Session fork", () => {
       sourceTaskId: "task-source",
       sourceTaskGeneration: 1,
       sourceSessionId: "session-source",
+      sourceSessionFileIdentity: "session-file-source",
       sourceSessionGeneration: 4,
       entryId: "assistant-entry-8"
     }, testTaskContext(1, { taskId: "task-target" }), 10, "fork-target-task");
@@ -89,6 +94,7 @@ describe("AgentHostServer cross-Task Session fork", () => {
 
     expect(successResult(port, fork.requestId)).toMatchObject({
       sessionId: "session-target-forked",
+      sessionFileIdentity: "session-file-target-forked",
       sessionGeneration: 2
     });
     expect(forkSessionFrom).toHaveBeenCalledOnce();
@@ -106,10 +112,14 @@ describe("AgentHostServer cross-Task Session fork", () => {
         taskId: "task-target",
         taskGeneration: 1,
         sessionId: "session-target-forked",
+        sessionFileIdentity: "session-file-target-forked",
         sessionGeneration: 2
       },
       payload: {
-        snapshot: { sessionId: "session-target-forked" },
+        snapshot: {
+          sessionId: "session-target-forked",
+          sessionFileIdentity: "session-file-target-forked"
+        },
         reason: "session-fork"
       }
     });
@@ -141,6 +151,24 @@ describe("AgentHostServer cross-Task Session fork", () => {
     expect(failureResult(harness.port, fork.requestId)).toMatchObject({
       code: "STALE_SESSION_GENERATION",
       message: "The source Session authority changed before the new Task was created."
+    });
+    expect(harness.targetForkSessionFrom).not.toHaveBeenCalled();
+    await harness.server.shutdown();
+  });
+
+  it("rejects a different physical source Session without exposing its identity", async () => {
+    const harness = await createForkHarness();
+    const fork = await harness.sendFork({
+      sourceSessionFileIdentity: "session-file-replaced"
+    });
+
+    expect(failureResult(harness.port, fork.requestId)).toMatchObject({
+      code: "STALE_SESSION_IDENTITY",
+      message: "The source Session authority changed before the new Task was created.",
+      details: {
+        sessionIdMatches: true,
+        sessionFileIdentityMatches: false
+      }
     });
     expect(harness.targetForkSessionFrom).not.toHaveBeenCalled();
     await harness.server.shutdown();
@@ -195,11 +223,13 @@ type CrossTaskForkPayload = Extract<
 async function createForkHarness() {
   const source = forkRuntime({
     sessionId: "session-source",
+    sessionFileIdentity: "session-file-source",
     sessionGeneration: 4,
     sessionPath: "/sessions/source.jsonl"
   });
   const target = forkRuntime({
     sessionId: "session-target-initial",
+    sessionFileIdentity: "session-file-target-initial",
     sessionGeneration: 1,
     sessionPath: "/sessions/target-initial.jsonl"
   });
@@ -236,6 +266,7 @@ async function createForkHarness() {
         sourceTaskId: "task-source",
         sourceTaskGeneration: 1,
         sourceSessionId: "session-source",
+        sourceSessionFileIdentity: "session-file-source",
         sourceSessionGeneration: 4,
         entryId: "assistant-entry-8",
         ...overrides
@@ -262,7 +293,7 @@ async function connect(server: AgentHostServer): Promise<FakePort> {
     hostEpoch: 10
   });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-cross-task-fork",
@@ -297,6 +328,7 @@ function failureResult(port: FakePort, requestId: string): unknown {
 
 function forkRuntime(initialIdentity: {
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   sessionPath: string;
 }) {
@@ -305,6 +337,7 @@ function forkRuntime(initialIdentity: {
     snapshot: () => ({
       ...emptySnapshot(),
       sessionId: fixture.identity.sessionId,
+      sessionFileIdentity: fixture.identity.sessionFileIdentity,
       sessionPath: fixture.identity.sessionPath
     }),
     runtime: undefined as unknown as AgentRuntime
@@ -349,6 +382,7 @@ function extensionUiCapabilities() {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionPath: "/sessions/session-1.jsonl",
     cwd: "/tmp/workspace",
     streaming: false,

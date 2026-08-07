@@ -9,7 +9,10 @@ import type {
 import type { AgentEvent } from "@pi67/protocol";
 import { createSessionCatalog, type SessionCatalog } from "./session-catalog.js";
 import { createSessionCatalogContext } from "./session-discovery.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  normalizeSessionCatalogPathIdentity,
+  resolveExistingSessionFileIdentity
+} from "./session-path-identity.js";
 import type { SessionProjectionMetadata } from "./session-projection-index.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 
@@ -152,6 +155,7 @@ async function projectCurrentSession(
   const header = manager.getHeader();
   const explicitName = manager.getSessionName()?.trim() || undefined;
   return {
+    fileIdentity: await resolveExistingSessionFileIdentity(path),
     id: manager.getSessionId(),
     path,
     cwd: manager.getCwd(),

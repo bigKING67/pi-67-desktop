@@ -146,6 +146,8 @@ export function resyncResult(
     },
     eventSequence: 3,
     hostEpoch: 9,
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     sessionGeneration: 3,
     taskToolMode: "auto"
   };
@@ -171,6 +173,7 @@ export function resetStores(): void {
 function snapshot(sessionId: string, overrides: Partial<SessionSnapshot> = {}): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     sessionName: sessionId,
     cwd: "/workspace",

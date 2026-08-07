@@ -3,8 +3,7 @@ import type {
   OperationFreshnessPhase,
   OperationKind,
   OperationLifecycle,
-  OperationView,
-  RuntimePhase
+  OperationView
 } from "@pi67/domain";
 import {
   Check,
@@ -31,6 +30,10 @@ import {
   useOperationActivityTimelineStore
 } from "./operation-activity-timeline-store.js";
 import { useOperationFreshnessStore } from "./operation-freshness-store.js";
+import {
+  hasVisibleOperationTimeline,
+  hasVisibleTurnActivity
+} from "./turn-activity-visibility.js";
 import styles from "./TurnActivity.module.css";
 
 const MAX_VISIBLE_LIVE_STEPS = 4;
@@ -107,32 +110,6 @@ export function TurnActivity() {
       </span>
     </div>
   );
-}
-
-export function hasVisibleTurnActivity(
-  runtimePhase: RuntimePhase,
-  operation: OperationView | undefined,
-  sessionId?: string,
-  sessionGeneration?: number
-): boolean {
-  if (
-    operation
-    && sessionId !== undefined
-    && sessionGeneration !== undefined
-    && (operation.sessionId !== sessionId || operation.sessionGeneration !== sessionGeneration)
-  ) return false;
-  if (runtimePhase === "recovering") return true;
-  return operation !== undefined && operation.lifecycle !== "completed";
-}
-
-export function hasVisibleOperationTimeline(
-  timeline: OperationActivityTimeline | undefined,
-  operation: OperationView | undefined,
-  sessionId?: string,
-  sessionGeneration?: number
-): boolean {
-  return timelineMatchesOperation(timeline, operation, sessionId, sessionGeneration)
-    && timeline.steps.length > 0;
 }
 
 export function operationPresentation(

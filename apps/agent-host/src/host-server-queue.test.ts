@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
@@ -54,7 +55,7 @@ describe("AgentHostServer queue lane", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-queue", sessionGeneration: 4 }),
+      getIdentity: () => ({ sessionId: "session-queue", sessionFileIdentity: "session-file-session-queue", sessionGeneration: 4 }),
       submitPrompt,
       steer,
       followUp,
@@ -67,7 +68,7 @@ describe("AgentHostServer queue lane", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-queue", hostInstanceId: "host-queue", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-queue",

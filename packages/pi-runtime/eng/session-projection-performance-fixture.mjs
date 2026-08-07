@@ -18,7 +18,11 @@ const ZERO_USAGE = Object.freeze({
   cost: Object.freeze({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 })
 });
 
-export const SESSION_PROJECTION_SIZES = Object.freeze({ small: 1_000, large: 10_000 });
+export const SESSION_PROJECTION_SIZES = Object.freeze({
+  small: 1_000,
+  large: 10_000,
+  certification: 100_000
+});
 
 export function createSessionProjectionFixture(messageCount) {
   if (!Number.isInteger(messageCount) || messageCount < 1) throw new Error("messageCount must be a positive integer.");

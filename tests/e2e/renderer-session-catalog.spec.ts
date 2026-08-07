@@ -404,6 +404,7 @@ async function openCatalogWorkspace(page: Page, options: Parameters<typeof insta
 function session(index: number, name: string, cwd = "/workspace/catalog"): FixtureSessionSummary {
   return {
     id: `catalog-session-${index}`,
+    fileIdentity: `session-file-fixture-${index}`,
     path: `/sessions/catalog-${String(index).padStart(3, "0")}.jsonl`,
     cwd,
     name,

@@ -8,6 +8,7 @@ export function assertCurrentOperationAuthority(
 ): void {
   if (
     current.sessionId === expected.sessionId
+    && current.sessionFileIdentity === expected.sessionFileIdentity
     && current.sessionGeneration === expected.sessionGeneration
   ) return;
   throw staleGeneration(
@@ -23,6 +24,7 @@ export function assertOperationAuthority(
 ): void {
   if (
     operation.sessionId === expected.sessionId
+    && operation.sessionFileIdentity === expected.sessionFileIdentity
     && operation.sessionGeneration === expected.sessionGeneration
   ) return;
   throw staleGeneration(

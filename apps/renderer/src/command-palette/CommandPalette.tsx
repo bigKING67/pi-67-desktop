@@ -12,7 +12,7 @@ import { openRendererSession } from "../session/session-lifecycle-controller.js"
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionModels,
-  selectSessionPath
+  selectSessionFileIdentity
 } from "../session/session-projection-selectors.js";
 import { useShellStore } from "../shell/shell-store.js";
 import {
@@ -51,7 +51,7 @@ export function CommandPalette() {
   const operation = useAppStore((state) => state.operation);
   const workspace = useAppStore((state) => state.workspace);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
-  const activeSessionPath = useSessionProjectionStore(selectSessionPath);
+  const activeSessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const models = useSessionProjectionStore(selectSessionModels);
   const sessionReady = useSessionProjectionStore((state) => state.authority.phase === "active");
   const [query, setQuery] = useState("");
@@ -63,7 +63,7 @@ export function CommandPalette() {
   const actions = useMemo(() => buildPaletteActions({
     sessions: sessionSearch.sessions,
     extensionCommands: extensionCommands.commands,
-    activeSessionPath,
+    activeSessionFileIdentity,
     availability: paletteAvailability({
       connected,
       sessionReady,
@@ -79,7 +79,7 @@ export function CommandPalette() {
       configuredModels: models ?? []
     },
     handlers: {
-      openSession: openRendererSession,
+      openSession: (session) => openRendererSession(session.path, session.fileIdentity),
       invokeCommand: (command) => void invokeRuntimeCommand(command),
       executeDesktopAction: async (descriptor) => {
         const result = await executePiDesktopAction(descriptor, "", {
@@ -104,7 +104,7 @@ export function CommandPalette() {
       saveDiagnostics: saveRuntimeDiagnostics
     }
   }), [
-    activeSessionPath,
+    activeSessionFileIdentity,
     connected,
     extensionCommands.commands,
     operation,
@@ -213,7 +213,7 @@ export function CommandPalette() {
           <CommandPaletteResults
             groups={projection.groups}
             selectedKey={selectedKey}
-            activeSessionPath={activeSessionPath}
+            activeSessionFileIdentity={activeSessionFileIdentity}
             onSelect={(key) => {
               setKeyboardNavigationActive(true);
               setSelectedKey(key);

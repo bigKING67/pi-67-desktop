@@ -83,10 +83,44 @@ count.
 - Windows x64 and macOS arm64 packages include pinned private Node, npm, and Git
   toolchains. Package operations fail closed when the bundled toolchain is
   missing or invalid and never fall back to unverified system executables.
-- Package downloads support public npm/Git mirrors with explicit official-source
-  fallback. A mirror changes transport only; npm integrity, a pinned Git commit,
-  deterministic content hashes, and application update signatures remain the
-  trust authority.
+- Networked Package check/install/update/uninstall operations run in one
+  Agent-Host-owned isolated worker per request. The worker receives an explicit
+  operating-system/toolchain environment allowlist rather than the Host environment,
+  returns at most 1 MiB of validated IPC data, and discards stdout/stderr. Host
+  shutdown rejects new Package work, terminates every active worker process tree in
+  two bounded phases, and waits for observed exit before reporting graceful cleanup.
+  POSIX uses a dedicated process group; Windows uses tree-aware `taskkill`, whose
+  final release evidence still requires real Windows validation. Windows does not
+  yet use a Job Object; when a dead root PID leaves descendant cleanup unprovable,
+  shutdown fails closed instead of reporting graceful cleanup.
+- Desktop-owned install/update/uninstall mutations use a private durable receipt
+  keyed by digests of the owner, source, idempotency key, and mutation fingerprint.
+  The receipt never stores a raw source URL/path, install path, Workspace path,
+  credential, Prompt, source body, stdout, stderr, or package file inventory.
+  `active` means the worker completed, Main-Host Pi Settings reloaded, the installed
+  directory was safely observed, and that observation was durably committed.
+  `removed` additionally requires the exact source/scope to be absent after reload.
+  Reserved, mutating, or ambiguous receipts are never replayed automatically after
+  Host replacement.
+- Runtime Package admission is fail closed. Only exact verified Desktop capability
+  paths and user-installed Packages whose current directory identity, package
+  name/version, manifest hash, and bounded content hash match an active receipt are
+  exposed to Pi's Session Settings view. `user-installed-observed` is Desktop mutation
+  and drift evidence, not npm registry integrity, a signature/provenance proof, a
+  pinned Git commit, or process isolation. The bounded content hash excludes `.git`
+  and `node_modules`, inspects at most 10,000 files / 128 MiB / depth 32 / five seconds,
+  and blocks execution when that inspection is unsafe or incomplete. Package mirrors
+  change transport only and never upgrade trust.
+- A committed Package receipt proves Settings/content convergence, not that every
+  already-live Task reloaded resources. A Task reload failure stays observable after
+  the receipt commit; Desktop does not roll back the receipt or rerun the Package
+  side effect blindly.
+- Package Worker isolation covers check/install/update/uninstall only. Pi SDK 0.83.0
+  still imports third-party Extension modules and executes their factory, hooks,
+  commands, Tools, Extension UI, and any MCP child launcher inside the Agent Host
+  utility process. Desktop must not describe those runtime surfaces as isolated until
+  Pi provides an executor/proxy boundary, Desktop maintains an audited loader fork,
+  or unsupported third-party execution is explicitly disabled.
 - Pi-67 Core, browser67, design-craft, and the commerce-growth-os Skill suite ship
   as pinned first-party capability snapshots. Desktop materializes verified
   copies under the Pi agent directory, preserves existing Package object filters,
@@ -154,6 +188,11 @@ count.
   live connection identity comes only from the Task/Agent Host projection after
   Pi establishes the MCP transport. `浏览器集成` owns browser-specific dependency
   preparation and runtime diagnostics. They never share one mixed Settings document.
+- Desktop Team MCP bootstrap preserves the exact bytes it read from `mcp.json` and
+  rechecks that revision immediately before an atomic same-directory replacement.
+  External edits, creation, or deletion win with `revision-conflict`; Desktop never
+  overwrites that newer file, and the configuration stores only `bearerTokenEnv`,
+  never the bearer token.
 - Download-source probing validates and checks the current in-memory draft without
   persisting it. Probe results identify whether they belong to unsaved settings and
   become stale as soon as the draft changes; only the explicit Save action writes
@@ -190,15 +229,19 @@ count.
   empty Pi `session_info` name and returns the conversation to the branch-derived
   title contract. A live Task uses Task authority for the mutation; a cold
   Catalog row uses Workspace authority and never creates a hidden Runtime.
-- The application admits at most eight top-level Session tasks in accepted,
+- The application admits at most eight top-level Session tasks (`MAX_RUNNING_TASKS = 8`) in accepted,
   running, approval-wait, or Extension-input-wait states. Subagents launched
   inside a Task do not consume additional top-level admission slots. The Renderer
   explains the limit early, but the Pi runtime service owns the atomic admission
   decision.
 - Each live task owns an independent Pi Runtime and projection. Selecting another
   conversation, collapsing a Workspace, or opening Settings does not stop
-  background work. One canonical Pi JSONL session path has at most one live
-  writer across the application.
+  background work. One physical Pi JSONL file has at most one live writer across
+  the application and overlapping Agent Host replacement windows, including
+  hard-link and canonical-path aliases. A pending path is rekeyed to physical file
+  identity before its provisional fence is released. Normal Task close or Host
+  shutdown releases the cross-process lease only after Pi Runtime disposal succeeds;
+  an unprovable or compromised lease forces Host replacement instead of reopening.
 - A conversation row menu owns `置顶对话` / `取消置顶`, `重命名对话`, optional
   `恢复自动标题`, and `归档对话`. Only a genuinely accepted, running, or waiting
   Task exposes `停止任务`; idle and terminal Tasks do not present a false stop
@@ -214,6 +257,14 @@ count.
   resource loading. Project trust and the current Task Runtime's Tool execution
   mode remain distinct: trust is a prerequisite for `YOLO`, not an implicit
   request to enable it.
+- Workspace registration persists the native canonical path, lossless filesystem
+  identity when available, and the last successful verification time. Startup
+  restores trust only when the physical directory identity still matches. A
+  missing or temporarily unreachable directory remains offline, a different
+  physical directory at the same path loses inherited trust, and path-only
+  evidence requires explicit native-picker confirmation. Selecting a relocated
+  directory is an explicit rebind; Desktop does not scan unrelated user folders
+  to guess where it moved.
 - Every Task Runtime created through the current Desktop default starts in
   `AUTO`; an explicit legacy `guided` initialization maps to `ASK` rather than
   silently broadening its former policy. The mode is memory-only, belongs to
@@ -316,6 +367,22 @@ count.
   runtime, network, updates, and About under System & Support. Category search
   searches these navigation targets rather than arbitrary page content. Narrow
   windows use the same grouped information architecture in a bounded popover.
+- `恢复与诊断` combines three read-only authorities without creating another
+  business source of truth: Pi runtime checks from `doctor.run`, bounded Agent
+  Host recovery facts from `diagnostics.collect`, and Electron Main Workspace,
+  previous-run exit, pending-creation, and attachment-staging facts. The exit
+  projection distinguishes first launch, clean exit, unclean exit, and an
+  unreadable/unknown prior state; first launch is not reported as a crash. Failure on one side
+  keeps the other results visible. Running checks does not create, reopen, replay,
+  delete, move, or repair a Session, Workspace, lease, Catalog, or attachment.
+- Diagnostic export accepts only the schema-validated `RuntimeDiagnostics`
+  projection at the Main boundary. Main adds its own current recovery snapshot
+  and application metadata and writes `pi67-support-diagnostics.v1`; Renderer
+  cannot submit arbitrary JSON. The support file contains hashes, categories,
+  counts, revisions, states, and bounded error classes, never raw Workspace paths,
+  prompts, source bodies, credentials, environment variables, or Tool payloads.
+  Alpha exposes only recheck and export actions here; it has no clear-all,
+  force-unlock, automatic replay, or unverified repair action.
 - Provider, Download Sources/Network, MCP credential, and Rules/Context drafts stay
   in Renderer memory. Leaving the category, changing an applicable page scope, or
   returning to the Workbench requires an explicit discard decision while dirty.
@@ -394,18 +461,44 @@ count.
   current conversation directly; bare `/name` opens the shared rename dialog.
   Runtime catalog loading or failure never removes the Desktop-native group.
 - A draft supports at most 20 local attachments, 100 MiB per file, and 250 MiB
-  total. Pathless clipboard files have a stricter 16 MiB boundary. Main stages
-  regular files into a private disposable root and sends only opaque references
-  through Preload and Protocol; the Agent Host claims and revalidates the files
-  before it accepts the operation. Images use Pi native image content, while
+  total. Pathless clipboard files have a stricter 16 MiB boundary, and supported
+  Pi-native PNG/JPEG/GIF/WebP images have an independent 32 MiB aggregate memory
+  boundary. Renderer reapplies that budget to the complete draft using Main's
+  authoritative staged `kind`, and Host applies it again before Operation acceptance.
+  Main opens a selected regular file without following its final link,
+  binds the handle to the selected size/mtime and physical identity, verifies the
+  same handle again after copying, and stages the resulting hash in a private
+  disposable root. Only opaque references cross Preload and Protocol; the Agent
+  Host copies each item from its revalidated non-following handle into a private
+  temporary claim, atomically publishes the complete set, and only then removes the
+  original draft copy. A pre-commit failure or Host crash therefore leaves the draft
+  references retryable. Images use Pi native image content, while
   ordinary files are inspected through the hidden bounded `read_attachment`
   Tool. Renderer projections contain names, types, sizes, and opaque identities,
-  never filesystem paths, source bodies, or raw attachment bytes.
+  never filesystem paths, source bodies, or raw attachment bytes. After obtaining
+  the single-instance lock, Main removes at most 16 abandoned UUID run roots older
+  than 24 hours by same-parent quarantine rename; it never touches the current run,
+  links/junctions, non-directories, or non-UUID entries, and cleanup failure does not
+  block startup.
+- A claimed attachment set is durably bound to the hashed Task and submission
+  directories for the current app run. A replacement Agent Host may recover only
+  the requested set from that same Task through a 128-set bounded scan, after
+  revalidating the claimed manifest, exact item inventory, regular-file identity,
+  size, metadata, and SHA-256. The same 128-set limit gates new claim admission;
+  idempotent replay does not consume another slot. Another Task cannot adopt the set.
+  Explicit Task disposal removes its claimed directory only after Runtime disposal
+  succeeds; a cleanup failure remains retryable. Host replacement preserves it, and
+  Main deletes the whole run-private root only after the Host has stopped. Operation
+  acknowledgement alone does not delete claimed bytes because the active Task may
+  still use `read_attachment` in a later turn.
 - Attachment extraction is offline and bounded. Text, Office/PDF, archives,
   audio/video metadata, binary strings/bytes, and image OCR run in cancellable
   worker threads with a two-worker ceiling, single-OCR concurrency, queue and
-  timeout limits, archive traversal/ratio/entry/expanded-size checks, and 32 KiB
-  Tool results. Failure stays observable and never falls back to a network OCR
+  timeout limits, archive traversal/path-depth/name-length/ratio/entry/expanded-size
+  checks across the complete archive (including entries after a requested ZIP item),
+  and 32 KiB truncation-aware Tool results. Agent Host transfers bytes read and hashed
+  from the verified handle; extraction workers never reopen the claimed payload by path.
+  Failure stays observable and never falls back to a network OCR
   service.
 - The collapsed Composer model control shows only the readable model name. Its
   open list keeps Provider ownership and the complete `provider/model-id`
@@ -440,24 +533,52 @@ count.
   never submits a second create automatically. It keeps one provisional conversation
   in persisted Workbench state and reconciles it by the stable `creationId` written as
   an exact marker in the created Pi JSONL. `session.creation.resolve` must return that
-  marker's exact Session ID and canonical path, and an authoritative, complete SQLite
-  Catalog must then expose the same identity before the placeholder materializes as a
-  resumable Session. Missing, ambiguous, unavailable, fallback, rebuilding, or
-  incomplete evidence stays provisional; Desktop never guesses from the newest empty
-  Session, a pre-create baseline, or a creation-time window. `重新检查` repeats only this
-  exact resolution and Catalog confirmation. `放弃此占位` removes only the empty
-  Renderer placeholder and never deletes or rewrites Pi JSONL. A draft or attachment
-  blocks dismissal so unsent user content cannot be discarded.
+  marker's exact Session ID, opaque physical JSONL identity, and canonical path. That exact JSONL evidence materializes
+  the placeholder as a resumable Session immediately; SQLite Catalog availability,
+  rebuilding, fallback, or projection failure affects metadata only. Missing,
+  ambiguous, or unavailable exact evidence stays provisional; Desktop never guesses
+  from the newest empty Session, a pre-create baseline, or a creation-time window.
+  `重新检查` repeats only exact marker resolution. A matching existing Task is reused;
+  its empty draft accepts the provisional draft, while two non-empty drafts remain
+  separate with an explicit conflict. Equal Session IDs on distinct physical JSONL files remain
+  distinct; one physical identity bound to contradictory Session IDs, or one path rebound to a
+  different physical identity, fails closed. `放弃此占位`
+  removes only the empty Renderer placeholder and never deletes or rewrites Pi JSONL.
+  A draft or attachment blocks dismissal so unsent user content cannot be discarded.
+- Session creation intent is durably journaled before Pi receives a creation side
+  effect. `reserved` must complete a bounded exact-marker scan before advancing to
+  `materializing`; only a proven missing result may call Pi `newSession()`. An exact
+  marker plus the physical JSONL identity commits `materialized`, and a constructed
+  authoritative bootstrap advances `published`. After restart, `materializing`
+  without an exact marker becomes `ambiguous` and cannot be replayed; a unique exact
+  marker rebuilds a missing or interrupted journal instead. The journal stores only
+  creation/workspace identity, lifecycle timestamps, Session identity, path, and
+  physical file identity. It never stores Prompt, Assistant, Thinking, Tool arguments,
+  source bodies, attachments, or credentials. Protocol v4 has no Renderer journal ACK;
+  `acknowledged` remains a reserved later transition and is not claimed by this flow.
+- Cross-process writer lease metadata is private, bounded diagnostic state rather
+  than Session truth. It contains the app/Host instance, Host epoch, PID, token,
+  timestamps, and hashes of Task and Session file identity. Raw Workspace/Session
+  paths and user content are forbidden. Lock heartbeat, not PID liveness, decides
+  stale recovery; a live Host cannot be displaced merely because a PID lookup fails.
+- A known Workbench SessionRef opens directly through Workspace and Pi Runtime
+  authority even while Catalog is unavailable or rebuilding. Catalog absence never
+  proves that the JSONL is missing, and a failed background Catalog upsert cannot turn
+  a successfully materialized Session into `REQUEST_OUTCOME_UNKNOWN`.
+- Workbench persistence v4 stores formal Session identity as Workspace ID, opaque physical
+  file identity, and the current path locator. It does not require a Catalog row before
+  persisting a live Runtime recovery record. Legacy v3 formal path-keyed recovery is discarded
+  rather than promoted into physical identity; creation-authorized provisional recovery remains.
 - Session import, compaction, and Extension command invocation use caller-stable
-  submission IDs and content fingerprints. They may retry one accepted acknowledgement
-  only while the same Host epoch remains authoritative; a replacement Host never
-  receives an automatic replay. Prompt image submissions remain user-retry-only because
-  their transferred buffers are consumed by the first transport attempt.
-  Once an Operation settles, same-Host replay returns its typed completed, failed,
-  cancelled, or lost receipt instead of downgrading the UI to accepted or busy.
-  Same-Host projection recovery may restore that receipt only when its Operation ID
-  matches the task interrupted by the connection gap; unrelated history and receipts
-  from a replacement Host never become current.
+  submission IDs and content fingerprints. Before Pi receives any side effect, Agent Host
+  durably records the accepted Operation ID and physical Session authority. A replacement
+  Host reconciles an unconfirmed accepted/running receipt to `lost` under its current epoch
+  and returns that same Operation ID without invoking Pi. Prompt image submissions remain
+  user-retry-only because their transferred buffers are consumed by the first transport attempt.
+  Once an Operation settles, same-Host or replacement-Host replay returns its typed completed,
+  failed, cancelled, or lost receipt instead of downgrading the UI to accepted or busy.
+  Projection recovery may restore a durable receipt only for the same Task generation and
+  matching physical Session authority; unrelated or stale-Session receipts remain inactive.
   Renderer notifications project those terminal receipts into one memory-only history
   entry keyed by `hostEpoch + operationId`, so realtime events, ACK replay, and resync
   cannot produce duplicate task outcomes. The history is capped at 50 entries, the
@@ -479,7 +600,13 @@ count.
   old Host state.
 - Session navigation uses a disposable, rebuildable metadata-only Catalog with
   bounded keyset pages. Pi JSONL remains authoritative; the Catalog never stores
-  Prompt, Assistant, Thinking, Tool, source, Patch, image, or transcript content.
+  Prompt, Assistant, Thinking, Tool, source, Patch, image, or transcript content,
+  and never authorizes Session creation, writer ownership, or opening a known JSONL.
+- Each Catalog row carries an opaque physical JSONL identity. SQLite schema v3 uses
+  that identity as the entity key and keeps path only as a unique open/display
+  locator. A locator change for the same physical file updates one row; equal Pi
+  Session IDs on distinct physical files remain distinct. An incremental identity
+  contradiction fails closed and requires full JSONL reconciliation.
 - For unnamed rows, the Agent Host reads only a bounded reverse JSONL stream and
   walks from the current leaf through `parentId` to find the latest topical user
   message on that branch. It does not open a cold Task Runtime, parse every
@@ -575,6 +702,10 @@ count.
   system permissions, Electron sandbox and preload boundaries, credential
   isolation, update/signing rules, or any capability outside the current Pi
   Task Runtime.
+- Production `app://pi67` assets accept only the exact scheme/host without
+  credentials, port, query, or fragment. Malformed or repeated percent encoding,
+  encoded separators, control bytes, dot segments, drive/UNC forms, ADS colons, and
+  any path outside the resolved Renderer root fail closed.
 
 ## Accessibility and localization
 
@@ -591,35 +722,48 @@ count.
 - Local-first and no analytics or PostHog in v1.
 - The renderer may persist only the non-sensitive appearance preference; it
   does not persist credentials, prompts, source, tool payloads, or session data.
-- Electron Main may persist a bounded, schema-validated Workbench V2 layout with
+- Electron Main may persist a bounded, schema-validated Workbench V4 layout with
   Workspace identity and ordering, expanded Workspace IDs, the selected
   conversation or Settings surface, Settings scope, at most eight runtime recovery
   identities, and clean-exit state. Ordinary idle Session rows are rebuilt from
   Catalog instead of being persisted as open UI objects. Draft text, attachments,
   transcript, runtime detail, private fallback titles, and credential material
   never enter that layout.
-- Operation terminal receipts are bounded, memory-only recovery metadata. They
-  contain lifecycle, timing, Host/Session authority, and redacted structured error
-  state only; Prompt text, import paths, commands, compaction instructions, source,
-  and raw tool payloads are never stored in the receipt ledger.
+- Revision-aware Pi configuration, Context Markdown, and Workspace-file saves use
+  one same-directory atomic-replace implementation: the new file is flushed before
+  a final revision fence and rename. On Windows only `EACCES`, `EPERM`, and `EBUSY`
+  replacement failures receive bounded backoff; semantic conflicts such as
+  `EEXIST`, a changed revision, invalid data, or a path-boundary failure are never
+  retried. Provider and Context validation failures retain their existing guarded
+  rollback instead of reporting a partial success.
+- Operation receipts are bounded private durable recovery metadata under application storage.
+  They contain caller-stable IDs, SHA-256 fingerprints, lifecycle, timing, Host/Task/physical
+  Session authority, and redacted structured terminal errors only; Prompt text, import paths,
+  commands, compaction instructions, source, attachments, credentials, and raw tool payloads
+  are never stored in the receipt ledger. POSIX storage uses private directory/file modes and
+  atomic locked replacement; corruption or unsafe filesystem metadata fails closed before Pi.
 - Renderer notification history is also memory-only and is cleared on application exit.
   It stores only bounded presentation text and terminal identity/timing metadata; it
   does not persist Prompt, source, command text, paths, credential values, Protocol
   error details, or raw payload objects in localStorage, SQLite, JSONL, or diagnostics.
 - Electron Main owns the disposable Session Catalog location. Its SQLite rows
-  contain only bounded Session identity/path/cwd/explicit-name/count/time/parent
+  contain only bounded opaque physical identity/Session ID/path/cwd/explicit-name/count/time/parent
   metadata plus pin/archive timestamps projected from the organization store;
   unnamed Sessions never store their automatic title there.
   POSIX catalog storage must remain current-user-owned with directory `0700` and
   database `0600` permissions or fail closed to the disposable SDK projection.
 - Conversation pin/archive state is a separate bounded private document under
   the Agent Host storage root. It stores only a version, a SHA-256 key derived
-  from Catalog source plus normalized Session path, and pin/archive timestamps;
+  from Catalog source plus opaque physical Session identity, and pin/archive timestamps;
   it stores no raw path, title, Prompt, transcript, source, or Tool content. The
   file is atomically replaced, limited to 10,000 records and 4 MiB, and uses
   `0700` directory / `0600` file permissions on POSIX. Corrupt state is
   quarantined and the rebuildable Catalog remains usable without inventing
   organization state.
+- Catalog schema v3 keeps the existing DELETE journal and `BEGIN IMMEDIATE`
+  transaction contract. WAL remains deferred until main DB, `-wal`, and `-shm`
+  ownership, corruption isolation, checkpoint, Windows locking, and recovery are
+  verified as one atomic storage bundle.
 - Catalog search may normalize user text, but filesystem source/workspace identity
   never uses Unicode compatibility normalization. Link-based storage indirection
   outside Electron `userData` fails closed instead of following the target.

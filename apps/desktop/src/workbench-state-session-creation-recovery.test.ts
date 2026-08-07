@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   finishWorkbenchRun,
-  parseWorkbenchStateV3,
-  type WorkbenchStateV3
+  parseWorkbenchStateV4,
+  type WorkbenchStateV4
 } from "./workbench-state-contract.js";
 import { replaceWorkbenchLayout } from "./workbench-state-mutations.js";
 import { workbenchDescriptorFixture } from "./workbench-state-test-fixture.js";
+import { parseAndMigrateWorkbenchStateV3 } from "./workbench-state-v3.js";
 
 describe("Workbench Session creation recovery state", () => {
   it("accepts legacy V3 state without creation recovery records", () => {
-    expect(parseWorkbenchStateV3({
+    expect(parseAndMigrateWorkbenchStateV3({
       version: 3,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
@@ -23,8 +24,8 @@ describe("Workbench Session creation recovery state", () => {
   });
 
   it("preserves an unconfirmed creation placeholder across a clean shutdown", () => {
-    const state: WorkbenchStateV3 = {
-      version: 3,
+    const state: WorkbenchStateV4 = {
+      version: 4,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],
@@ -58,7 +59,7 @@ describe("Workbench Session creation recovery state", () => {
 
   it("rejects duplicate creation identity or provisional selection without recovery authority", () => {
     const base = {
-      version: 3,
+      version: 4,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],
@@ -74,11 +75,11 @@ describe("Workbench Session creation recovery state", () => {
       taskGeneration: 1
     };
 
-    expect(parseWorkbenchStateV3({
+    expect(parseWorkbenchStateV4({
       ...base,
       sessionCreationRecovery: [record, { ...record, taskId: "task-other" }]
     })).toBeUndefined();
-    expect(parseWorkbenchStateV3({
+    expect(parseWorkbenchStateV4({
       ...base,
       selectedSurface: {
         kind: "conversation",
@@ -93,8 +94,8 @@ describe("Workbench Session creation recovery state", () => {
   });
 
   it("rejects a Renderer layout update that omits creation recovery state", () => {
-    const state = parseWorkbenchStateV3({
-      version: 3,
+    const state = parseWorkbenchStateV4({
+      version: 4,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],

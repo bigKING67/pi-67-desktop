@@ -25,7 +25,7 @@ import {
 
 const WORKSPACE_CONTEXT: ProtocolContext = { scope: "workspace", workspaceId: "workspace-1" };
 
-describe("protocol v3 envelopes", () => {
+describe("protocol v4 envelopes", () => {
   it("validates typed requests, events, responses and welcome", () => {
     const request = commandEnvelope("runtime.getStatus", {}, APP_PROTOCOL_CONTEXT, 7);
     const event = eventEnvelope("runtime.statusChanged", {
@@ -55,7 +55,7 @@ describe("protocol v3 envelopes", () => {
       maxEnvelopeBytes: 2 * 1024 * 1024
     });
 
-    expect(PROTOCOL_VERSION).toBe(3);
+    expect(PROTOCOL_VERSION).toBe(4);
     expect(PROTOCOL_REVISION).toMatch(/^[0-9a-f]{64}$/u);
     expect(isRequestEnvelope(request)).toBe(true);
     expect(isEventEnvelope(event)).toBe(true);
@@ -73,8 +73,8 @@ describe("protocol v3 envelopes", () => {
       command: { type: "runtime.getStatus", payload: {} }
     })).toBe(false);
 
-    const v3Request = commandEnvelope("runtime.getStatus", {}, APP_PROTOCOL_CONTEXT, 1);
-    expect(isRequestEnvelope({ ...v3Request, protocolVersion: 2 })).toBe(false);
+    const currentRequest = commandEnvelope("runtime.getStatus", {}, APP_PROTOCOL_CONTEXT, 1);
+    expect(isRequestEnvelope({ ...currentRequest, protocolVersion: 2 })).toBe(false);
 
     const event = eventEnvelope("runtime.statusChanged", {
       phase: "ready",
@@ -93,7 +93,7 @@ describe("protocol v3 envelopes", () => {
 
   it("rejects a response whose result does not match the correlated command", () => {
     const malformed = {
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       kind: "response",
       requestId: "r",
       hostEpoch: 1,
@@ -135,6 +135,7 @@ describe("protocol v3 envelopes", () => {
       cancellable: false,
       hostEpoch: 3,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 4
     };
     const response = responseEnvelope(request.requestId, 3, request.context, {
@@ -304,6 +305,7 @@ describe("protocol v3 envelopes", () => {
     }, WORKSPACE_CONTEXT, 3);
     const result = {
       items: [{
+        fileIdentity: "session-file-v1\0fixture-1",
         id: "session-1",
         path: "/sessions/one.jsonl",
         cwd: "/workspace",

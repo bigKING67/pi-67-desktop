@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { BrowserWindow, nativeTheme } from "electron";
-import { isExpectedRendererLocation } from "./renderer-security.js";
+import { installMainWindowSecurityPolicy } from "./main-window-security.js";
 import { titleBarOverlay } from "./title-bar-overlay.js";
 
 interface CreateMainWindowOptions {
@@ -31,23 +31,19 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      webviewTag: false,
       devTools: !options.isPackaged
     }
   });
 
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", (event, target) => {
-    if (!isExpectedRendererLocation(target, options.rendererUrl)) event.preventDefault();
-  });
-  window.webContents.on("will-redirect", (event, target) => {
-    if (!isExpectedRendererLocation(target, options.rendererUrl)) event.preventDefault();
-  });
+  const disposeSecurityPolicy = installMainWindowSecurityPolicy(window.webContents, options.rendererUrl);
   window.webContents.on("did-finish-load", () => options.onDidFinishLoad(window));
   window.once("ready-to-show", () => window.show());
 
   const updateTitleBar = () => window.setTitleBarOverlay(titleBarOverlay(nativeTheme.shouldUseDarkColors));
   nativeTheme.on("updated", updateTitleBar);
   window.on("closed", () => {
+    disposeSecurityPolicy();
     nativeTheme.off("updated", updateTitleBar);
     options.onClosed(window);
   });

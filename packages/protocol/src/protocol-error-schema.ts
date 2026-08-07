@@ -7,8 +7,9 @@ const ProtocolErrorDetailsSchema = Type.Object({}, {
 export const ProtocolErrorSchema = strictObject({
   code: Type.Union([
     Type.Literal("PROTOCOL_MISMATCH"), Type.Literal("INVALID_PAYLOAD"), Type.Literal("CONNECTION_CLOSED"),
-    Type.Literal("REQUEST_TIMEOUT"),
+    Type.Literal("REQUEST_TIMEOUT"), Type.Literal("REQUEST_OUTCOME_UNKNOWN"),
     Type.Literal("STALE_HOST_EPOCH"), Type.Literal("STALE_SESSION_GENERATION"),
+    Type.Literal("STALE_SESSION_IDENTITY"),
     Type.Literal("STALE_OPERATION"), Type.Literal("STALE_SESSION_CATALOG"),
     Type.Literal("DUPLICATE_REQUEST"), Type.Literal("BUSY"),
     Type.Literal("OPERATION_NOT_FOUND"), Type.Literal("SESSION_CHANGED_EXTERNALLY"),

@@ -1,0 +1,135 @@
+.slashPickerAnchor {
+  position: relative;
+  z-index: 8;
+  width: min(var(--conversation-track-width, 860px), 100%);
+  height: 0;
+  margin: 0 auto;
+}
+
+.slashPicker {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.slashPicker header,
+.slashPicker footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 10px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.slashPicker header {
+  border-bottom: 1px solid var(--border);
+}
+
+.slashPicker header strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.slashPicker > p {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.slashPicker footer {
+  border-top: 1px solid var(--border);
+}
+
+.slashCommandList {
+  display: grid;
+  max-height: min(320px, 42vh);
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.slashCommandGroup {
+  display: grid;
+}
+
+.slashCommandGroup + .slashCommandGroup {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.slashCommandGroupHeading {
+  padding: 5px 8px 3px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+}
+
+.slashPicker > p.slashRuntimeStatus {
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.slashCommandList button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 42px;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.slashCommandList button:hover,
+.slashCommandList button.slashCommandActive {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.slashCommandList button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.slashCommandList strong,
+.slashCommandList small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slashCommandList strong {
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.slashCommandList small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.slashCommandList em {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-style: normal;
+}

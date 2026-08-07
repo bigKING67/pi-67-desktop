@@ -1,6 +1,7 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
@@ -53,7 +54,7 @@ describe("AgentHostServer projection queries", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-changes", sessionGeneration: 3 }),
+      getIdentity: () => ({ sessionId: "session-changes", sessionFileIdentity: "session-file-session-changes", sessionGeneration: 3 }),
       getWorkspaceChanges,
       getSnapshot,
       cancelInteractiveRequests: () => [],
@@ -63,7 +64,7 @@ describe("AgentHostServer projection queries", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-changes", hostInstanceId: "host-changes", hostEpoch: 6 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-changes",
@@ -94,7 +95,7 @@ describe("AgentHostServer projection queries", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-extension", sessionGeneration: 4 }),
+      getIdentity: () => ({ sessionId: "session-extension", sessionFileIdentity: "session-file-session-extension", sessionGeneration: 4 }),
       getExtensionCatalog,
       getSnapshot,
       cancelInteractiveRequests: () => [],
@@ -104,7 +105,7 @@ describe("AgentHostServer projection queries", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-extension", hostInstanceId: "host-extension", hostEpoch: 7 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-extension",

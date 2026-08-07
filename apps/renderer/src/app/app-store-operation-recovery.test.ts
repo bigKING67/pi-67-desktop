@@ -145,6 +145,8 @@ function resyncResult(overrides: Partial<ProjectionResyncResult> = {}): Projecti
     sessionCatalogStatus: readyCatalogStatus(),
     eventSequence: 10,
     hostEpoch: 9,
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     taskToolMode: "auto",
     ...overrides
@@ -158,6 +160,7 @@ function mockProjectionResync(result: ProjectionResyncResult) {
 function snapshot(): SessionSnapshot {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionPath: "/sessions/session-1.jsonl",
     cwd: "/workspace",
     streaming: false,
@@ -185,6 +188,7 @@ function runningOperation(operationId: string, kind: OperationKind = "command"):
     lifecycle: "running",
     cancellable: true,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 10
   };
@@ -202,6 +206,7 @@ function terminalReceipt(
     cancellable: false as const,
     hostEpoch: 9,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 10,
     settledAt: 20
@@ -226,6 +231,7 @@ function operationFromTerminal(terminal: OperationSettled): OperationView {
     lifecycle: terminal.lifecycle,
     cancellable: false,
     sessionId: terminal.sessionId,
+    sessionFileIdentity: terminal.sessionFileIdentity,
     sessionGeneration: terminal.sessionGeneration,
     startedAt: terminal.startedAt
   };

@@ -16,7 +16,7 @@ export type SessionNavigationRow =
 
 interface BuildSessionNavigationOptions {
   sessions: readonly SessionSummary[];
-  activePath?: string;
+  activeFileIdentity?: string;
   activeSessionId?: string;
   operation?: OperationView;
 }
@@ -32,12 +32,12 @@ export function buildSessionNavigationRows(options: BuildSessionNavigationOption
   const seen = new Set<string>();
   const items = options.sessions
     .filter((session) => {
-      if (seen.has(session.path)) return false;
-      seen.add(session.path);
+      if (seen.has(session.fileIdentity)) return false;
+      seen.add(session.fileIdentity);
       return true;
     })
     .map((session): SessionNavigationItem => {
-      const active = session.path === options.activePath;
+      const active = session.fileIdentity === options.activeFileIdentity;
       const operationMatches = matchesActiveOperation(session, active, options);
       return {
         session,
@@ -69,8 +69,10 @@ function matchesActiveOperation(
   if (!operation || operation.kind === "session-import" || !ACTIVE_OPERATION_LIFECYCLES.has(operation.lifecycle)) {
     return false;
   }
-  return session.id === operation.sessionId
-    || Boolean(active && options.activeSessionId && options.activeSessionId === operation.sessionId);
+  return active && (
+    session.id === operation.sessionId
+    || Boolean(options.activeSessionId && options.activeSessionId === operation.sessionId)
+  );
 }
 
 function appendGroup(
@@ -81,5 +83,5 @@ function appendGroup(
 ): void {
   if (items.length === 0) return;
   rows.push({ kind: "group", id, label, count: items.length });
-  rows.push(...items.map((item) => ({ kind: "session" as const, key: item.session.path, item })));
+  rows.push(...items.map((item) => ({ kind: "session" as const, key: item.session.fileIdentity, item })));
 }

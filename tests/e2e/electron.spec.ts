@@ -54,11 +54,12 @@ test("boots the real sandboxed Electron shell over app://", async () => {
     await expect.poll(() => utilityProcessCount(activeApplication)).toBeGreaterThan(utilityProcessesBefore);
 
     const settings = await openRuntimeSettings(window);
-    const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
-    await settings.getByRole("button", { name: /运行环境诊断/u }).click();
+    const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
+    await settings.getByRole("button", { name: /恢复与诊断/u }).click();
     await expect(doctorDialog).toBeVisible();
-    await doctorDialog.getByRole("button", { name: "运行检查" }).click();
+    await doctorDialog.getByRole("button", { name: "开始检查" }).click();
     await expect(doctorDialog.getByLabel("运行环境检查结果").getByText("Pi SDK")).toBeVisible({ timeout: 30_000 });
+    await expect(doctorDialog.getByLabel("恢复状态检查结果").getByText(/上次退出 首次运行/u)).toBeVisible();
     await doctorDialog.getByRole("button", { name: "关闭" }).click();
 
     const security = await window.evaluate(() => {
@@ -117,12 +118,12 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await expect(window.getByTestId("inspector-toggle")).toBeVisible();
 
     const settings = await openRuntimeSettings(window);
-    const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
-    await settings.getByRole("button", { name: /运行环境诊断/u }).click();
-    await doctorDialog.getByRole("button", { name: "运行检查" }).click();
+    const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
+    await settings.getByRole("button", { name: /恢复与诊断/u }).click();
+    await doctorDialog.getByRole("button", { name: "开始检查" }).click();
     const catalogCheck = doctorDialog.locator(".doctor-check").filter({ hasText: "Session 目录" });
     await expect(catalogCheck.getByText("通过", { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(catalogCheck.getByText(/schema v2; ready/u)).toBeVisible();
+    await expect(catalogCheck.getByText(/schema v3; ready/u)).toBeVisible();
     await doctorDialog.getByRole("button", { name: "关闭" }).click();
     await settings.getByRole("button", { name: "返回工作台" }).click();
     await expect(window.getByLabel("Pi conversation")).toBeVisible();

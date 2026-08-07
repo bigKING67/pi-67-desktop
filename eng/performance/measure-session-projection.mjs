@@ -14,6 +14,7 @@ const outputPath = process.env.PI67_PERF_SESSION_PROJECTION_OUTPUT
   ?? join(root, "artifacts/performance", `session-projection-${process.platform}-${process.arch}.json`);
 const small = createSessionProjectionFixture(SESSION_PROJECTION_SIZES.small);
 const large = createSessionProjectionFixture(SESSION_PROJECTION_SIZES.large);
+const certification = createSessionProjectionFixture(SESSION_PROJECTION_SIZES.certification);
 const samples = {
   bind1k: [],
   bind10k: [],
@@ -21,7 +22,12 @@ const samples = {
   bootstrap1k: [],
   bootstrap10k: [],
   olderPage10k: [],
-  recentPageBytes10k: []
+  recentPageBytes10k: [],
+  bind100k: [],
+  entryScans100k: [],
+  bootstrap100k: [],
+  olderPage100k: [],
+  recentPageBytes100k: []
 };
 
 for (let index = 0; index < sampleCount; index += 1) {
@@ -35,6 +41,13 @@ for (let index = 0; index < sampleCount; index += 1) {
   samples.bootstrap10k.push(largeSample.bootstrapMs);
   samples.olderPage10k.push(largeSample.olderPageMs);
   samples.recentPageBytes10k.push(largeSample.recentPageBytes);
+
+  const certificationSample = measureSessionProjection(certification);
+  samples.bind100k.push(certificationSample.bindMs);
+  samples.entryScans100k.push(certificationSample.entryScans);
+  samples.bootstrap100k.push(certificationSample.bootstrapMs);
+  samples.olderPage100k.push(certificationSample.olderPageMs);
+  samples.recentPageBytes100k.push(certificationSample.recentPageBytes);
 }
 
 await writeSessionProjectionPerformanceReport({ root, outputPath, samples });

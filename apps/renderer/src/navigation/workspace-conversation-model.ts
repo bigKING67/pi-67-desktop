@@ -34,10 +34,12 @@ export function conversationRows(
   query: string
 ): ConversationRowModel[] {
   const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase();
-  const sessionByPath = new Map(sessions.map((session) => [session.path, session]));
+  const sessionByIdentity = new Map(sessions.map((session) => [session.fileIdentity, session]));
   const rows = tasks.map((task): SearchableConversationRow => {
-    const session = task.sessionPath ? sessionByPath.get(task.sessionPath) : undefined;
-    if (task.sessionPath) sessionByPath.delete(task.sessionPath);
+    const session = task.sessionFileIdentity
+      ? sessionByIdentity.get(task.sessionFileIdentity)
+      : undefined;
+    if (task.sessionFileIdentity) sessionByIdentity.delete(task.sessionFileIdentity);
     const status = taskStatus(task);
     const stableTitle = conversationStableTitle(task, session);
     const title = conversationPrimaryTitle(task, session);
@@ -63,8 +65,13 @@ export function conversationRows(
         : `${title} ${stableTitle} ${meta}`
     };
   });
-  rows.push(...[...sessionByPath.values()].map((session): SearchableConversationRow => {
-    const conversation = { kind: "session" as const, workspaceId, sessionPath: session.path };
+  rows.push(...[...sessionByIdentity.values()].map((session): SearchableConversationRow => {
+    const conversation = {
+      kind: "session" as const,
+      workspaceId,
+      sessionFileIdentity: session.fileIdentity,
+      sessionPath: session.path
+    };
     const meta = sessionMeta(session);
     return {
       identity: rendererConversationIdentity(conversation),
@@ -108,11 +115,12 @@ export function statusLabel(status: NonNullable<ConversationRowModel["status"]>)
 }
 
 export function workspaceStatus(workspace: {
-  availability: "available" | "missing" | "identity-changed" | "unavailable";
+  availability: "available" | "missing" | "identity-changed" | "needs-confirmation" | "unavailable";
   trust: "unknown" | "trusted" | "untrusted";
 }): string {
   if (workspace.availability === "missing") return "目录已移动或删除";
   if (workspace.availability === "identity-changed") return "目录身份已变化";
+  if (workspace.availability === "needs-confirmation") return "需要重新确认";
   if (workspace.availability === "unavailable") return "暂不可用";
   return workspace.trust === "trusted" ? "本地工作区" : "等待信任";
 }

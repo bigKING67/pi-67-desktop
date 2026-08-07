@@ -69,6 +69,7 @@ function accepted(): OperationAccepted {
     cancellable: false,
     hostEpoch: 9,
     sessionId: "session-old",
+    sessionFileIdentity: "session-file-session-old",
     sessionGeneration: 3
   };
 }
@@ -82,6 +83,7 @@ function completed(): OperationSettled {
     cancellable: false,
     hostEpoch: 9,
     sessionId: "session-imported",
+    sessionFileIdentity: "session-file-session-imported",
     sessionGeneration: 7,
     startedAt: 1,
     settledAt: 2
@@ -97,6 +99,7 @@ function failed(): OperationSettled {
     cancellable: false,
     hostEpoch: 9,
     sessionId: "session-old",
+    sessionFileIdentity: "session-file-session-old",
     sessionGeneration: 3,
     startedAt: 1,
     settledAt: 2,
@@ -107,6 +110,7 @@ function failed(): OperationSettled {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

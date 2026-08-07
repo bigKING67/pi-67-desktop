@@ -50,6 +50,7 @@ export interface SessionMessageView {
 }
 
 export interface SessionSummary {
+  fileIdentity: string;
   id: string;
   path: string;
   cwd: string;
@@ -126,6 +127,7 @@ export interface SessionResourceCatalogResult extends SessionModelCatalogResult 
 
 export interface SessionSnapshot {
   sessionId: string;
+  sessionFileIdentity?: string;
   sessionPath?: string;
   sessionName?: string;
   cwd: string;

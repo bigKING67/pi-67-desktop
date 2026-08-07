@@ -195,6 +195,7 @@ test("serializes new-session transitions and keeps one terminal notification acr
 
   const operationId = "operation-notice-test";
   const sessionId = "session-created-1";
+  const sessionFileIdentity = "session-file-fixture-1";
   const sessionGeneration = 2;
   await emitMockAgentEvent(page, {
     type: "operation.started",
@@ -205,11 +206,12 @@ test("serializes new-session transitions and keeps one terminal notification acr
         lifecycle: "running",
         cancellable: true,
         sessionId,
+        sessionFileIdentity,
         sessionGeneration,
         startedAt: Date.now()
       }
     }
-  }, { operationId, sessionId, sessionGeneration });
+  }, { operationId, sessionId, sessionFileIdentity, sessionGeneration });
   const failure = {
     type: "operation.failed",
     payload: {
@@ -218,8 +220,8 @@ test("serializes new-session transitions and keeps one terminal notification acr
       error: { code: "INTERNAL", message: "重复错误", recoverable: true }
     }
   };
-  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionGeneration });
-  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionGeneration });
+  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionFileIdentity, sessionGeneration });
+  await emitMockAgentEvent(page, failure, { operationId, sessionId, sessionFileIdentity, sessionGeneration });
   const toast = page.locator("[data-notification-id]").filter({ hasText: "任务失败" });
   await expect(toast).toHaveCount(1);
   const closeToast = toast.getByRole("button", { name: "关闭通知：任务失败" });
@@ -256,6 +258,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -345,6 +348,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: completedStartedAt
       }
@@ -411,6 +415,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
         lifecycle: "running",
         cancellable: false,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

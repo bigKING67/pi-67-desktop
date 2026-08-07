@@ -3,7 +3,6 @@ import { chmod, lstat, mkdir, readFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ConversationOrganization } from "@pi67/domain";
 import { writePrivateFileAtomically } from "./atomic-private-file.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 
 const MAX_RECORDS = 10_000;
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
@@ -13,7 +12,7 @@ interface StoredRecord extends ConversationOrganization {
 }
 
 interface StoredDocument {
-  version: 1;
+  version: 2;
   records: StoredRecord[];
 }
 
@@ -25,7 +24,7 @@ export class ConversationOrganizationStore {
   constructor(storageRoot?: string) {
     this.path = storageRoot === undefined
       ? undefined
-      : join(storageRoot, "conversation-organization", "organization-v1.json");
+      : join(storageRoot, "conversation-organization", "organization-v2.json");
   }
 
   async initialize(): Promise<void> {
@@ -33,13 +32,13 @@ export class ConversationOrganizationStore {
     await this.ready;
   }
 
-  get(sourceKey: string, path: string): ConversationOrganization {
-    return { ...this.records.get(sessionKey(sourceKey, path)) };
+  get(sourceKey: string, fileIdentity: string): ConversationOrganization {
+    return { ...this.records.get(sessionKey(sourceKey, fileIdentity)) };
   }
 
-  async set(sourceKey: string, path: string, value: ConversationOrganization): Promise<void> {
+  async set(sourceKey: string, fileIdentity: string, value: ConversationOrganization): Promise<void> {
     await this.initialize();
-    const key = sessionKey(sourceKey, path);
+    const key = sessionKey(sourceKey, fileIdentity);
     const previous = this.records.get(key);
     if (value.pinnedAt === undefined && value.archivedAt === undefined) this.records.delete(key);
     else this.records.set(key, { ...value });
@@ -87,7 +86,7 @@ export class ConversationOrganizationStore {
   private async persist(): Promise<void> {
     if (!this.path) return;
     const document: StoredDocument = {
-      version: 1,
+      version: 2,
       records: [...this.records].map(([sessionKey, value]) => ({ sessionKey, ...value }))
     };
     const serialized = `${JSON.stringify(document)}\n`;
@@ -104,16 +103,16 @@ export class ConversationOrganizationStore {
   }
 }
 
-function sessionKey(sourceKey: string, path: string): string {
+function sessionKey(sourceKey: string, fileIdentity: string): string {
   return createHash("sha256")
     .update(sourceKey)
     .update("\0")
-    .update(normalizeSessionCatalogPathIdentity(path))
+    .update(fileIdentity)
     .digest("hex");
 }
 
 function isStoredDocument(value: unknown): value is StoredDocument {
-  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.records) || value.records.length > MAX_RECORDS) {
+  if (!isRecord(value) || value.version !== 2 || !Array.isArray(value.records) || value.records.length > MAX_RECORDS) {
     return false;
   }
   return value.records.every((record) => isRecord(record)

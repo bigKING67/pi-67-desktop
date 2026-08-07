@@ -63,6 +63,7 @@ export function taskContext(taskGeneration: number): Extract<ProtocolContext, { 
 export function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     cwd: "/tmp",
     streaming: false,
     messages: [],
@@ -86,6 +87,8 @@ export function projectionResyncResult(hostEpoch: number, eventSequence: number)
     sessionCatalogStatus: sessionCatalogStatus(),
     eventSequence,
     hostEpoch,
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 1,
     taskToolMode: "auto" as const
   };

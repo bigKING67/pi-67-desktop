@@ -1,5 +1,7 @@
 import type { ExtensionPackageScope } from "@pi67/domain";
-import type { ProtocolErrorCode } from "@pi67/protocol";
+import { isProtocolErrorCode, type ProtocolErrorCode } from "@pi67/protocol";
+
+export const MAX_PACKAGE_WORKER_MESSAGE_BYTES = 1_024 * 1_024;
 
 export type PackageWorkerAction =
   | "check-updates"
@@ -39,12 +41,40 @@ export type PackageWorkerResponse =
     };
 
 export function isPackageWorkerResponse(value: unknown, requestId: string): value is PackageWorkerResponse {
-  if (!isRecord(value) || value.type !== "package-worker-response" || value.requestId !== requestId) return false;
+  if (
+    !isCorrelatedPackageWorkerResponse(value, requestId)
+    || !isPackageWorkerMessageWithinByteLimit(value)
+  ) return false;
   if (value.ok === true) return Object.hasOwn(value, "result");
   if (value.ok !== false || !isRecord(value.error)) return false;
-  return typeof value.error.code === "string"
+  return isProtocolErrorCode(value.error.code)
     && typeof value.error.message === "string"
-    && typeof value.error.recoverable === "boolean";
+    && value.error.message.length > 0
+    && value.error.message.length <= 2_048
+    && typeof value.error.recoverable === "boolean"
+    && isBoundedErrorDetails(value.error.details);
+}
+
+export function isCorrelatedPackageWorkerResponse(
+  value: unknown,
+  requestId: string
+): value is Record<string, unknown> & {
+  type: "package-worker-response";
+  requestId: string;
+} {
+  return isRecord(value)
+    && value.type === "package-worker-response"
+    && value.requestId === requestId;
+}
+
+export function isPackageWorkerMessageWithinByteLimit(value: unknown): boolean {
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized !== undefined
+      && Buffer.byteLength(serialized, "utf8") <= MAX_PACKAGE_WORKER_MESSAGE_BYTES;
+  } catch {
+    return false;
+  }
 }
 
 export function isPackageWorkerRequest(value: unknown): value is PackageWorkerRequest {
@@ -76,6 +106,20 @@ export function isPackageWorkerRequest(value: unknown): value is PackageWorkerRe
 
 function isPackageWorkerAction(value: unknown): value is PackageWorkerAction {
   return value === "check-updates" || value === "install" || value === "update" || value === "uninstall";
+}
+
+function isBoundedErrorDetails(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!isRecord(value) || Object.keys(value).length > 32) return false;
+  return Object.entries(value).every(([key, detail]) => (
+    key.length > 0
+    && key.length <= 128
+    && (
+      (typeof detail === "string" && detail.length <= 2_048)
+      || (typeof detail === "number" && Number.isFinite(detail))
+      || typeof detail === "boolean"
+    )
+  ));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

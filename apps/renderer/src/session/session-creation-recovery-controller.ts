@@ -2,8 +2,8 @@ import type { SessionCreationResolution } from "@pi67/protocol";
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { messages } from "../localization/message-catalog.js";
-import { findSessionForRecovery } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { useSessionProjectionStore } from "./session-projection-store.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask
@@ -17,7 +17,10 @@ export type RendererSessionCreationRecheckResult =
 
 export async function recheckUnconfirmedRendererSession(
   taskId: string,
-  options: { notify?: boolean } = {}
+  options: {
+    notify?: boolean;
+    activateTask?: (taskId: string) => Promise<boolean>;
+  } = {}
 ): Promise<RendererSessionCreationRecheckResult> {
   const task = rendererWorkbenchStore.getState().tasks[taskId];
   if (
@@ -48,33 +51,10 @@ export async function recheckUnconfirmedRendererSession(
     return "still-unconfirmed";
   }
 
-  const catalog = await findSessionForRecovery(
-    task.workspaceId,
-    resolution.sessionId,
-    resolution.sessionPath
-  );
-  if (catalog.status === "unavailable") {
-    notifyUnavailable(options.notify);
-    return "unavailable";
-  }
-  if (catalog.status === "missing") {
-    notifyUnresolved(options.notify);
-    return "still-unconfirmed";
-  }
-
   const workbench = rendererWorkbenchStore.getState();
   const current = workbench.tasks[taskId];
-  const existingOwner = Object.values(workbench.tasks).find((candidate) => (
-    candidate.id !== taskId
-    && candidate.workspaceId === task.workspaceId
-    && (
-      candidate.sessionId === resolution.sessionId
-      || candidate.sessionPath === resolution.sessionPath
-    )
-  ));
   if (
-    existingOwner
-    || !current
+    !current
     || current.taskGeneration !== task.taskGeneration
     || current.creationId !== task.creationId
     || current.creationStatus !== "unconfirmed"
@@ -82,6 +62,80 @@ export async function recheckUnconfirmedRendererSession(
   ) {
     notifyUnresolved(options.notify);
     return "still-unconfirmed";
+  }
+  const identityConflict = Object.values(workbench.tasks).find((candidate) => (
+    candidate.id !== taskId
+    && candidate.workspaceId === task.workspaceId
+    && (
+      (
+        candidate.sessionFileIdentity === resolution.sessionFileIdentity
+        && candidate.sessionId !== resolution.sessionId
+      )
+      || (
+        candidate.sessionPath === resolution.sessionPath
+        && candidate.sessionFileIdentity !== undefined
+        && candidate.sessionFileIdentity !== resolution.sessionFileIdentity
+      )
+    )
+  ));
+  if (identityConflict) {
+    notifyUnresolved(options.notify);
+    return "still-unconfirmed";
+  }
+  const existingOwner = Object.values(workbench.tasks).find((candidate) => (
+    candidate.id !== taskId
+    && candidate.workspaceId === task.workspaceId
+    && candidate.sessionFileIdentity === resolution.sessionFileIdentity
+    && candidate.sessionId === resolution.sessionId
+  ));
+  if (existingOwner) {
+    const wasSelected = selectedWorkbenchTask(workbench)?.id === current.id;
+    const ownerIsStopped = existingOwner.runtime.phase === "stopped"
+      || existingOwner.lifecycle === "stopped";
+    const projection = useSessionProjectionStore.getState().authority;
+    const projectionFileIdentity = useSessionProjectionStore.getState().identity?.sessionFileIdentity;
+    const ownerProjectionIsActive = projection.phase === "active"
+      && projection.sessionId === existingOwner.sessionId
+      && projection.sessionGeneration === existingOwner.sessionGeneration
+      && projectionFileIdentity === existingOwner.sessionFileIdentity;
+    if (wasSelected && !ownerIsStopped && !ownerProjectionIsActive && !options.activateTask) {
+      notifyUnresolved(options.notify);
+      return "still-unconfirmed";
+    }
+    const transfer = useTaskDraftStore.getState().transfer(current.id, existingOwner.id);
+    const sourceHasContent = current.hasDraft || current.attachmentCount > 0;
+    if (transfer === "conflict" || (transfer === "empty" && sourceHasContent)) {
+      if (options.notify !== false) {
+        publishNotification({
+          level: "warning",
+          title: messages.runtime.session.creationRecheckMatched,
+          message: messages.runtime.session.creationMergeConflict
+        });
+      }
+      return "still-unconfirmed";
+    }
+    if (transfer === "moved") {
+      const moved = useTaskDraftStore.getState().drafts[existingOwner.id];
+      workbench.updateTask(existingOwner.id, {
+        hasDraft: Boolean(moved?.text.trim()),
+        attachmentCount: moved?.attachments.length ?? 0
+      });
+    }
+    workbench.removeRuntimeTask(current.id);
+    if (wasSelected) {
+      workbench.selectTask(existingOwner.id);
+      if (ownerIsStopped || ownerProjectionIsActive) {
+        useAppStore.setState({
+          sessionTransitionPending: false,
+          sessionBootstrapTransitionPending: false,
+          runtime: existingOwner.runtime
+        });
+      } else {
+        await options.activateTask!(existingOwner.id);
+      }
+    }
+    notifyMaterialized(options.notify);
+    return "materialized";
   }
   const materializedRuntime = {
     phase: "stopped" as const,
@@ -92,16 +146,17 @@ export async function recheckUnconfirmedRendererSession(
     conversation: {
       kind: "session",
       workspaceId: task.workspaceId,
+      sessionFileIdentity: resolution.sessionFileIdentity,
       sessionPath: resolution.sessionPath
     },
     sessionId: resolution.sessionId,
+    sessionFileIdentity: resolution.sessionFileIdentity,
     sessionPath: resolution.sessionPath,
     lifecycle: "stopped",
     runtime: materializedRuntime,
-    title: catalog.session.name,
-    titleSource: catalog.session.nameSource,
     creationId: undefined,
-    creationStatus: undefined
+    creationStatus: undefined,
+    sessionMetadataStatus: "indexing"
   });
   if (selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === taskId) {
     useAppStore.setState({
@@ -110,13 +165,7 @@ export async function recheckUnconfirmedRendererSession(
       runtime: materializedRuntime
     });
   }
-  if (options.notify !== false) {
-    publishNotification({
-      level: "success",
-      title: messages.runtime.session.creationRecheckMatched,
-      message: messages.runtime.session.creationRecheckMatchedDetail
-    });
-  }
+  notifyMaterialized(options.notify);
   return "materialized";
 }
 
@@ -190,5 +239,14 @@ function notifyUnresolved(notify = true): void {
     level: "warning",
     title: messages.runtime.session.creationRecheckUnresolved,
     message: messages.runtime.session.creationRecheckUnresolvedDetail
+  });
+}
+
+function notifyMaterialized(notify = true): void {
+  if (!notify) return;
+  publishNotification({
+    level: "success",
+    title: messages.runtime.session.creationRecheckMatched,
+    message: messages.runtime.session.creationRecheckMatchedDetail
   });
 }

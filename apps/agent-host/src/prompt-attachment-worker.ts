@@ -1,12 +1,12 @@
 import { createRequire } from "node:module";
-import { copyFile, mkdir, open, stat } from "node:fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { parentPort } from "node:worker_threads";
 import { detect } from "chardet";
-import { fileTypeFromFile } from "file-type";
+import { fileTypeFromBuffer } from "file-type";
 import mediaInfoFactory from "mediainfo.js";
-import { parseFile as parseAudioFile } from "music-metadata";
-import { OfficeParser } from "officeparser";
+import { parseBuffer as parseAudioBuffer } from "music-metadata";
+import { OfficeParser, type SupportedFileType } from "officeparser";
 import { createWorker as createOcrWorker } from "tesseract.js";
 import {
   listPromptAttachmentArchive,
@@ -51,20 +51,21 @@ export async function executePromptAttachmentTask(
     case "search":
       return boundText(await searchText(task));
     case "strings":
-      return boundText(await binaryStrings(task.path));
+      return boundText(binaryStrings(taskBytes(task)));
     case "read_bytes":
       return boundText(await readBytes(task));
     case "list_archive":
       return boundText(JSON.stringify(await listArchive(task), null, 2));
     case "read_archive_entry":
-      return boundText(await readArchiveEntry(task));
+      return readArchiveEntry(task);
     default:
       throw new Error(`Unsupported attachment worker operation: ${task.operation}`);
   }
 }
 
 async function metadata(task: PromptAttachmentWorkerTask): Promise<Record<string, unknown>> {
-  const detected = await fileTypeFromFile(task.path).catch(() => undefined);
+  const bytes = taskBytes(task);
+  const detected = await fileTypeFromBuffer(bytes).catch(() => undefined);
   const base: Record<string, unknown> = {
     id: task.attachment.id,
     name: task.attachment.name,
@@ -75,7 +76,7 @@ async function metadata(task: PromptAttachmentWorkerTask): Promise<Record<string
     kind: task.attachment.kind
   };
   if (task.attachment.kind === "audio") {
-    const parsed = await parseAudioFile(task.path, { duration: true, skipCovers: true });
+    const parsed = await parseAudioBuffer(bytes, task.attachment.mimeType, { duration: true, skipCovers: true });
     base.media = {
       format: parsed.format.container,
       codec: parsed.format.codec,
@@ -85,12 +86,12 @@ async function metadata(task: PromptAttachmentWorkerTask): Promise<Record<string
       channels: parsed.format.numberOfChannels
     };
   } else if (task.attachment.kind === "video") {
-    base.media = await videoMetadata(task.path, task.attachment.byteLength);
+    base.media = await videoMetadata(bytes);
   }
   return base;
 }
 
-async function videoMetadata(path: string, byteLength: number): Promise<unknown> {
+async function videoMetadata(bytes: Buffer): Promise<unknown> {
   const require = createRequire(import.meta.url);
   const wasmPath = require.resolve("mediainfo.js/MediaInfoModule.wasm");
   const mediaInfo = await mediaInfoFactory({
@@ -99,23 +100,19 @@ async function videoMetadata(path: string, byteLength: number): Promise<unknown>
     full: false,
     locateFile: () => wasmPath
   });
-  const handle = await open(path, "r");
   try {
-    return await mediaInfo.analyzeData(byteLength, async (size, offset) => {
-      const buffer = Buffer.alloc(Math.min(size, Math.max(0, byteLength - offset)));
-      const result = await handle.read(buffer, 0, buffer.byteLength, offset);
-      return buffer.subarray(0, result.bytesRead);
-    });
+    return await mediaInfo.analyzeData(bytes.byteLength, (size, offset) => (
+      bytes.subarray(offset, Math.min(bytes.byteLength, offset + size))
+    ));
   } finally {
     mediaInfo.close();
-    await handle.close();
   }
 }
 
 async function readText(task: PromptAttachmentWorkerTask): Promise<string> {
   if (task.attachment.kind === "image") return ocrImage(task);
   if (isOfficeDocument(task.attachment.name, task.attachment.mimeType)) return extractOfficeText(task);
-  const bytes = await readBoundedFile(task.path, MAX_CACHE_BYTES);
+  const bytes = taskBytes(task).subarray(0, MAX_CACHE_BYTES);
   return decodeText(bytes);
 }
 
@@ -123,8 +120,11 @@ async function extractOfficeText(task: PromptAttachmentWorkerTask): Promise<stri
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 115_000);
   try {
-    let ast = await OfficeParser.parseOffice(task.path, {
+    const officeInput = taskBytes(task);
+    const fileType = officeFileType(task.attachment.name);
+    let ast = await OfficeParser.parseOffice(officeInput, {
       abortSignal: controller.signal,
+      ...(fileType === undefined ? {} : { fileType }),
       decompressionLimits: {
         maxZipEntries: MAX_ARCHIVE_ENTRIES,
         maxUncompressedBytes: MAX_ARCHIVE_UNCOMPRESSED_BYTES,
@@ -138,8 +138,9 @@ async function extractOfficeText(task: PromptAttachmentWorkerTask): Promise<stri
         return `${text}\n[OCR skipped: PDF has ${pages} pages; the per-attachment limit is 50.]`;
       }
       const langPath = await prepareOcrData(task.ocrDataRoot);
-      ast = await OfficeParser.parseOffice(task.path, {
+      ast = await OfficeParser.parseOffice(officeInput, {
         abortSignal: controller.signal,
+        ...(fileType === undefined ? {} : { fileType }),
         extractAttachments: true,
         ocr: true,
         ocrConfig: {
@@ -170,7 +171,7 @@ async function ocrImage(task: PromptAttachmentWorkerTask): Promise<string> {
     cacheMethod: "none"
   });
   try {
-    const result = await worker.recognize(task.path);
+    const result = await worker.recognize(taskBytes(task));
     return result.data.text;
   } finally {
     await worker.terminate();
@@ -208,8 +209,8 @@ async function searchText(task: PromptAttachmentWorkerTask): Promise<string> {
     : matches.map((item) => `${item.line}: ${item.text}`).join("\n");
 }
 
-async function binaryStrings(path: string): Promise<string> {
-  const bytes = await readBoundedFile(path, MAX_CACHE_BYTES);
+function binaryStrings(payload: Buffer): string {
+  const bytes = payload.subarray(0, MAX_CACHE_BYTES);
   const ascii = Buffer.from(bytes).toString("latin1").match(/[\x20-\x7e]{4,}/gu) ?? [];
   const utf16 = Buffer.from(bytes).toString("utf16le").match(/[\x20-\x7e\u0080-\uffff]{4,}/gu) ?? [];
   return [...new Set([...ascii, ...utf16])].slice(0, 1_000).join("\n");
@@ -219,44 +220,31 @@ async function readBytes(task: PromptAttachmentWorkerTask): Promise<string> {
   const offset = task.offset ?? 0;
   const length = Math.min(task.length ?? 4_096, 8_192);
   if (offset >= task.attachment.byteLength) throw new Error("Byte offset is outside the attachment.");
-  const handle = await open(task.path, "r");
-  try {
-    const bytes = Buffer.alloc(Math.min(length, task.attachment.byteLength - offset));
-    const result = await handle.read(bytes, 0, bytes.byteLength, offset);
-    const value = bytes.subarray(0, result.bytesRead);
-    return [
-      `offset=${offset} length=${value.byteLength}`,
-      `hex=${value.toString("hex")}`,
-      `base64=${value.toString("base64")}`
-    ].join("\n");
-  } finally {
-    await handle.close();
-  }
+  const value = taskBytes(task).subarray(offset, offset + Math.min(
+    length,
+    task.attachment.byteLength - offset
+  ));
+  return [
+    `offset=${offset} length=${value.byteLength}`,
+    `hex=${value.toString("hex")}`,
+    `base64=${value.toString("base64")}`
+  ].join("\n");
 }
 
 async function listArchive(task: PromptAttachmentWorkerTask): Promise<unknown[]> {
   return listPromptAttachmentArchive(task);
 }
 
-async function readArchiveEntry(task: PromptAttachmentWorkerTask): Promise<string> {
+async function readArchiveEntry(
+  task: PromptAttachmentWorkerTask
+): Promise<{ text: string; truncated: boolean }> {
   const entry = task.entry;
   if (!entry) throw new Error("read_archive_entry requires an entry name.");
-  const bytes = await readPromptAttachmentArchiveEntry(task, entry);
-  if (looksText(bytes)) return decodeText(bytes);
-  return `entry=${entry}\nbase64=${Buffer.from(bytes).toString("base64")}`;
-}
-
-async function readBoundedFile(path: string, limit: number): Promise<Buffer> {
-  const fileStat = await stat(path);
-  const length = Math.min(fileStat.size, limit);
-  const handle = await open(path, "r");
-  try {
-    const bytes = Buffer.alloc(length);
-    const result = await handle.read(bytes, 0, length, 0);
-    return bytes.subarray(0, result.bytesRead);
-  } finally {
-    await handle.close();
-  }
+  const result = await readPromptAttachmentArchiveEntry(task, entry);
+  const text = looksText(result.bytes)
+    ? decodeText(result.bytes)
+    : `entry=${entry}\nbase64=${result.bytes.toString("base64")}`;
+  return boundText(text, result.truncated);
 }
 
 function decodeText(bytes: Uint8Array): string {
@@ -276,14 +264,32 @@ function normalizeEncoding(value: string | null): string {
   return normalized;
 }
 
-function boundText(value: string): { text: string; truncated: boolean } {
+function boundText(value: string, forceTruncated = false): { text: string; truncated: boolean } {
   const bytes = Buffer.from(value, "utf8");
-  if (bytes.byteLength <= MAX_RESULT_BYTES) return { text: value, truncated: false };
+  if (bytes.byteLength <= MAX_RESULT_BYTES && !forceTruncated) return { text: value, truncated: false };
   const suffix = "\n[Attachment tool output truncated at 32 KiB.]";
   const budget = MAX_RESULT_BYTES - Buffer.byteLength(suffix);
   let prefix = bytes.subarray(0, budget).toString("utf8");
   while (prefix.endsWith("\uFFFD")) prefix = prefix.slice(0, -1);
   return { text: `${prefix}${suffix}`, truncated: true };
+}
+
+function taskBytes(task: PromptAttachmentWorkerTask): Buffer {
+  const bytes = Buffer.from(task.bytes);
+  if (bytes.byteLength !== task.attachment.byteLength) {
+    throw new Error("Prompt attachment worker bytes do not match the claimed metadata.");
+  }
+  return bytes;
+}
+
+function officeFileType(name: string): SupportedFileType | undefined {
+  const extension = /\.([A-Za-z0-9]+)$/u.exec(name)?.[1]?.toLowerCase();
+  return extension === "docx" || extension === "pptx" || extension === "xlsx"
+    || extension === "odt" || extension === "odp" || extension === "ods"
+    || extension === "pdf" || extension === "rtf" || extension === "md"
+    || extension === "html" || extension === "csv" || extension === "epub"
+    ? extension
+    : undefined;
 }
 
 function boundedError(error: unknown): string {

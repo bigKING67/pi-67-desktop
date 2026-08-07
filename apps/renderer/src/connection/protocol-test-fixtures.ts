@@ -8,12 +8,14 @@ interface TaskEventFixtureOptions {
   taskGeneration?: number;
   taskSequence?: number;
   sessionId?: string;
+  sessionFileIdentity?: string;
   sessionGeneration?: number;
   operationId?: string;
 }
 
 export function taskEventFixture(options: TaskEventFixtureOptions): EventEnvelopeContext {
-  const context = options.sessionId === undefined || options.sessionGeneration === undefined
+  const context = options.sessionId === undefined
+    || options.sessionGeneration === undefined
     ? {
         scope: "task" as const,
         workspaceId: options.workspaceId ?? "workspace-fixture",
@@ -26,6 +28,7 @@ export function taskEventFixture(options: TaskEventFixtureOptions): EventEnvelop
         taskId: options.taskId ?? "task-fixture",
         taskGeneration: options.taskGeneration ?? 1,
         sessionId: options.sessionId,
+        sessionFileIdentity: options.sessionFileIdentity ?? `session-file-${options.sessionId}`,
         sessionGeneration: options.sessionGeneration,
         ...(options.operationId === undefined ? {} : { operationId: options.operationId })
       };

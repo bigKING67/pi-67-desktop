@@ -135,7 +135,7 @@ describe("SQLite Session Catalog integrity", () => {
   });
 
   it("replaces quick-check-clean catalogs with all-whitespace required metadata", async () => {
-    for (const field of ["path", "session_id", "cwd", "cwd_key", "source_key"] as const) {
+    for (const field of ["file_identity", "path", "session_id", "cwd", "cwd_key", "source_key"] as const) {
       const root = await temporaryRoot();
       const damaged = await openCatalogDatabase(root, true);
       if (field === "source_key") {
@@ -143,6 +143,7 @@ describe("SQLite Session Catalog integrity", () => {
       } else {
         replaceCatalogState(damaged, { sourceKey: "source", revision: 1, itemCount: 1, incomplete: 0 });
         const values = {
+          file_identity: "session-file-fixture-1",
           path: "/sessions/001.jsonl",
           session_id: "id-1",
           cwd: WORKSPACE,
@@ -151,10 +152,11 @@ describe("SQLite Session Catalog integrity", () => {
         };
         damaged.prepare(`
           INSERT INTO sessions (
-            path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+            file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
             modified_at_ms, message_count, parent_session_path
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
+          values.file_identity,
           values.path,
           values.session_id,
           values.cwd,
@@ -292,6 +294,7 @@ async function openReady(root: string): Promise<SqliteSessionCatalog> {
 
 function record(index: number): SessionCatalogRecord {
   return {
+    fileIdentity: `session-file-fixture-${index}`,
     id: `id-${index}`,
     path: `/sessions/${String(index).padStart(3, "0")}.jsonl`,
     cwd: WORKSPACE,

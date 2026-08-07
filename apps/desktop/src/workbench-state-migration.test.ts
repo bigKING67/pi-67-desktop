@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   LEGACY_WORKBENCH_STATE_FILENAME,
   LEGACY_WORKBENCH_STATE_V2_FILENAME,
+  LEGACY_WORKBENCH_STATE_V3_FILENAME,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME
 } from "./workbench-state.js";
@@ -50,7 +51,7 @@ describe("Workbench state migration", () => {
 
     expect(loaded.recovery).toEqual({ kind: "migrated-v2" });
     expect(loaded.state).toMatchObject({
-      version: 3,
+      version: 4,
       workspaces: [workspace],
       workspaceOrder: [workspace.id],
       expandedWorkspaceIds: [workspace.id],
@@ -121,11 +122,93 @@ describe("Workbench state migration", () => {
 
     expect(loaded.recovery).toEqual({ kind: "migrated-v1" });
     expect(loaded.state).toMatchObject({
-      version: 3,
+      version: 4,
       selectedSurface: { kind: "workspace", workspaceId: workspace.id },
       runtimeRecovery: [],
       settings: { section: "extensions", scope: "project", workspaceId: workspace.id }
     });
     expect(await readdir(directory)).toEqual([LEGACY_WORKBENCH_STATE_FILENAME, WORKBENCH_STATE_FILENAME]);
+  });
+
+  it("drops path-keyed V3 Session recovery without promoting its locator to physical identity", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = workbenchDescriptorFixture("workspace-1", "/workspace/first", "52");
+    const conversation = {
+      kind: "session" as const,
+      workspaceId: workspace.id,
+      sessionPath: "/sessions/legacy.jsonl"
+    };
+    await mkdir(directory);
+    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_V3_FILENAME), JSON.stringify({
+      version: 3,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "conversation", conversation },
+      runtimeRecovery: [{
+        taskId: "legacy-task",
+        conversation,
+        sessionId: "legacy-session",
+        taskGeneration: 1,
+        sessionGeneration: 2,
+        hostInstanceId: "legacy-host",
+        hostEpoch: 1,
+        lastKnownLifecycle: "running"
+      }],
+      sessionCreationRecovery: [],
+      settings: { section: "general", scope: "global" },
+      cleanExit: false
+    }), { mode: 0o600 });
+
+    const loaded = await workbenchStateTestStore(userData).load();
+
+    expect(loaded.recovery).toEqual({ kind: "migrated-v3" });
+    expect(loaded.state).toMatchObject({
+      version: 4,
+      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
+      runtimeRecovery: [],
+      sessionCreationRecovery: []
+    });
+  });
+
+  it("preserves creation-authorized V3 provisional recovery", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = workbenchDescriptorFixture("workspace-1", "/workspace/first", "53");
+    const conversation = {
+      kind: "provisional" as const,
+      workspaceId: workspace.id,
+      draftId: "creation-task"
+    };
+    const creationRecovery = [{
+      taskId: "creation-task",
+      workspaceId: workspace.id,
+      creationId: "session-creation-persisted",
+      taskGeneration: 3
+    }];
+    await mkdir(directory);
+    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_V3_FILENAME), JSON.stringify({
+      version: 3,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "conversation", conversation },
+      runtimeRecovery: [],
+      sessionCreationRecovery: creationRecovery,
+      settings: { section: "general", scope: "global" },
+      cleanExit: false
+    }), { mode: 0o600 });
+
+    const loaded = await workbenchStateTestStore(userData).load();
+
+    expect(loaded.state).toMatchObject({
+      version: 4,
+      selectedSurface: { kind: "conversation", conversation },
+      runtimeRecovery: [],
+      sessionCreationRecovery: creationRecovery
+    });
   });
 });

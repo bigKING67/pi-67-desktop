@@ -1,13 +1,14 @@
 import {
   MAX_SESSION_CATALOG_ID_CHARS,
   MAX_SESSION_CATALOG_NAME_CHARS,
-  MAX_SESSION_CATALOG_PATH_CHARS
+  MAX_SESSION_CATALOG_PATH_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import { fingerprintSchemaSql, SchemaSqlFingerprintError } from "./sqlite-schema-fingerprint.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import type { SessionCatalogRecord, SqliteCatalogState } from "./sqlite-session-catalog.js";
 
-export const SESSION_CATALOG_SCHEMA_VERSION = 2;
+export const SESSION_CATALOG_SCHEMA_VERSION = 3;
 const SQLITE_BUSY_TIMEOUT_MS = 100;
 const CATALOG_STATE_TABLE_SQL = `CREATE TABLE catalog_state (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -19,7 +20,8 @@ const CATALOG_STATE_TABLE_SQL = `CREATE TABLE catalog_state (
   skipped_count INTEGER NOT NULL CHECK (skipped_count >= 0)
 ) STRICT`;
 const SESSIONS_TABLE_SQL = `CREATE TABLE sessions (
-  path TEXT PRIMARY KEY CHECK (length(trim(path)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
+  file_identity TEXT PRIMARY KEY CHECK (length(trim(file_identity)) BETWEEN 1 AND ${MAX_SESSION_FILE_IDENTITY_CHARS}),
+  path TEXT NOT NULL UNIQUE CHECK (length(trim(path)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
   session_id TEXT NOT NULL CHECK (length(trim(session_id)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_ID_CHARS}),
   cwd TEXT NOT NULL CHECK (length(trim(cwd)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
   cwd_key TEXT NOT NULL CHECK (length(trim(cwd_key)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
@@ -38,21 +40,21 @@ const REQUIRED_SESSION_INDEXES = [
     name: "sessions_workspace_organized",
     sql: "CREATE INDEX sessions_workspace_organized ON sessions(cwd_key, archived_at_ms, pinned_at_ms DESC, modified_at_ms DESC, path DESC)",
     columns: [
-      { cid: 3, name: "cwd_key", descending: false },
-      { cid: 12, name: "archived_at_ms", descending: false },
-      { cid: 11, name: "pinned_at_ms", descending: true },
-      { cid: 8, name: "modified_at_ms", descending: true },
-      { cid: 0, name: "path", descending: true }
+      { cid: 4, name: "cwd_key", descending: false },
+      { cid: 13, name: "archived_at_ms", descending: false },
+      { cid: 12, name: "pinned_at_ms", descending: true },
+      { cid: 9, name: "modified_at_ms", descending: true },
+      { cid: 1, name: "path", descending: true }
     ]
   },
   {
     name: "sessions_all_organized",
     sql: "CREATE INDEX sessions_all_organized ON sessions(archived_at_ms, pinned_at_ms DESC, modified_at_ms DESC, path DESC)",
     columns: [
-      { cid: 12, name: "archived_at_ms", descending: false },
-      { cid: 11, name: "pinned_at_ms", descending: true },
-      { cid: 8, name: "modified_at_ms", descending: true },
-      { cid: 0, name: "path", descending: true }
+      { cid: 13, name: "archived_at_ms", descending: false },
+      { cid: 12, name: "pinned_at_ms", descending: true },
+      { cid: 9, name: "modified_at_ms", descending: true },
+      { cid: 1, name: "path", descending: true }
     ]
   }
 ] as const;
@@ -76,7 +78,8 @@ const CATALOG_STATE_COLUMNS = [
   { name: "skipped_count", type: "INTEGER", notNull: 1, primaryKey: 0 }
 ] as const;
 const SESSION_COLUMNS = [
-  { name: "path", type: "TEXT", notNull: 1, primaryKey: 1 },
+  { name: "file_identity", type: "TEXT", notNull: 1, primaryKey: 1 },
+  { name: "path", type: "TEXT", notNull: 1, primaryKey: 0 },
   { name: "session_id", type: "TEXT", notNull: 1, primaryKey: 0 },
   { name: "cwd", type: "TEXT", notNull: 1, primaryKey: 0 },
   { name: "cwd_key", type: "TEXT", notNull: 1, primaryKey: 0 },
@@ -140,13 +143,14 @@ export function validateCatalogDatabase(database: DatabaseLike): void {
   if (check?.quick_check !== "ok") throw new CorruptCatalogError("Catalog integrity check failed.");
   validateTable(database, "catalog_state", CATALOG_STATE_COLUMNS);
   validateTable(database, "sessions", SESSION_COLUMNS);
-  const primaryKeyIndex = validateSessionIndexes(database);
-  validateSchemaFingerprint(database, primaryKeyIndex);
+  const implicitIndexes = validateSessionIndexes(database);
+  validateSchemaFingerprint(database, implicitIndexes);
   validateLogicalState(database);
 }
 
 export function recordValues(record: SessionCatalogRecord): SqlValue[] {
   return [
+    record.fileIdentity,
     record.path,
     record.id,
     record.cwd,
@@ -177,6 +181,11 @@ export function recordFromRow(row: Record<string, unknown>): SessionCatalogRecor
     ? undefined
     : readNonNegativeInteger(row.archived_at_ms, "archived_at_ms");
   return {
+    fileIdentity: readText(
+      row.file_identity,
+      "file_identity",
+      MAX_SESSION_FILE_IDENTITY_CHARS
+    ),
     id: readText(row.session_id, "session_id", MAX_SESSION_CATALOG_ID_CHARS),
     path: readText(row.path, "path", MAX_SESSION_CATALOG_PATH_CHARS),
     cwd: readText(row.cwd, "cwd", MAX_SESSION_CATALOG_PATH_CHARS),
@@ -225,7 +234,8 @@ function validateLogicalState(database: DatabaseLike): void {
   }
   const invalid = readNonNegativeInteger(database.prepare(`
     SELECT COUNT(*) AS total FROM sessions
-    WHERE length(trim(path)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}
+    WHERE length(trim(file_identity)) NOT BETWEEN 1 AND ${MAX_SESSION_FILE_IDENTITY_CHARS}
+       OR length(trim(path)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}
        OR length(trim(session_id)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_ID_CHARS}
        OR length(trim(cwd)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}
        OR length(trim(cwd_key)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}
@@ -256,7 +266,7 @@ function isConsistentCatalogState(state: SqliteCatalogState, total: number): boo
 
 function validateDerivedSessionMetadata(database: DatabaseLike): void {
   const rows = database.prepare(`
-    SELECT path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+    SELECT file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
            modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
     FROM sessions
   `).all();
@@ -264,9 +274,9 @@ function validateDerivedSessionMetadata(database: DatabaseLike): void {
     const record = recordFromRow(row);
     const expected = recordValues(record);
     if (row.cwd_key !== normalizeSessionCatalogPathIdentity(record.cwd)
-      || row.search_name !== expected[5]
-      || row.search_path !== expected[6]
-      || row.search_id !== expected[7]) {
+      || row.search_name !== expected[6]
+      || row.search_path !== expected[7]
+      || row.search_id !== expected[8]) {
       throw new SchemaMismatchError("Catalog derived session metadata is invalid.");
     }
   }
@@ -300,12 +310,12 @@ function validateTable(
   }
 }
 
-function validateSchemaFingerprint(database: DatabaseLike, primaryKeyIndex: string): void {
+function validateSchemaFingerprint(database: DatabaseLike, implicitIndexes: string[]): void {
   const actual = database.prepare(`
     SELECT type, name, tbl_name, sql
     FROM main.sqlite_schema
   `).all();
-  if (actual.length !== REQUIRED_SCHEMA_OBJECTS.length + 1) {
+  if (actual.length !== REQUIRED_SCHEMA_OBJECTS.length + implicitIndexes.length) {
     throw new SchemaMismatchError("Catalog schema object inventory does not match.");
   }
   const byIdentity = new Map(actual.map((row) => [`${String(row.type)}:${String(row.name)}`, row]));
@@ -329,16 +339,18 @@ function validateSchemaFingerprint(database: DatabaseLike, primaryKeyIndex: stri
       throw error;
     }
   }
-  const primaryKey = byIdentity.get(`index:${primaryKeyIndex}`);
-  if (!primaryKey || primaryKey.tbl_name !== "sessions" || primaryKey.sql !== null) {
-    throw new SchemaMismatchError("Catalog primary-key schema object does not match.");
+  for (const name of implicitIndexes) {
+    const index = byIdentity.get(`index:${name}`);
+    if (!index || index.tbl_name !== "sessions" || index.sql !== null) {
+      throw new SchemaMismatchError("Catalog implicit index schema object does not match.");
+    }
   }
 }
 
-function validateSessionIndexes(database: DatabaseLike): string {
+function validateSessionIndexes(database: DatabaseLike): string[] {
   const indexes = database.prepare("PRAGMA index_list(sessions)").all();
   if (database.prepare("PRAGMA index_list(catalog_state)").all().length !== 0
-    || indexes.length !== REQUIRED_SESSION_INDEXES.length + 1) {
+    || indexes.length !== REQUIRED_SESSION_INDEXES.length + 2) {
     throw new SchemaMismatchError("Catalog index inventory does not match.");
   }
   for (const required of REQUIRED_SESSION_INDEXES) {
@@ -362,26 +374,38 @@ function validateSessionIndexes(database: DatabaseLike): string {
       throw new SchemaMismatchError(`Catalog index ${required.name} does not match.`);
     }
   }
-  const primaryIndexes = indexes.filter((index) => index.origin === "pk");
-  const primaryIndex = primaryIndexes[0];
-  if (primaryIndexes.length !== 1
-    || typeof primaryIndex?.name !== "string"
-    || primaryIndex.unique !== 1
-    || primaryIndex.partial !== 0) {
-    throw new SchemaMismatchError("Catalog primary-key index does not match.");
+  const primaryIndex = validateImplicitIndex(database, indexes, "pk", "file_identity", 0);
+  const pathIndex = validateImplicitIndex(database, indexes, "u", "path", 1);
+  return [primaryIndex, pathIndex];
+}
+
+function validateImplicitIndex(
+  database: DatabaseLike,
+  indexes: Record<string, unknown>[],
+  origin: "pk" | "u",
+  columnName: string,
+  columnId: number
+): string {
+  const matches = indexes.filter((index) => index.origin === origin);
+  const index = matches[0];
+  if (matches.length !== 1
+    || typeof index?.name !== "string"
+    || index.unique !== 1
+    || index.partial !== 0) {
+    throw new SchemaMismatchError(`Catalog ${columnName} identity index does not match.`);
   }
-  const primaryColumns = database.prepare(`PRAGMA index_xinfo(${primaryIndex.name})`).all()
+  const columns = database.prepare(`PRAGMA index_xinfo(${index.name})`).all()
     .filter((row) => row.key === 1);
-  const primaryColumn = primaryColumns[0];
-  if (primaryColumns.length !== 1
-    || primaryColumn?.seqno !== 0
-    || primaryColumn.cid !== 0
-    || primaryColumn.name !== "path"
-    || primaryColumn.desc !== 0
-    || primaryColumn.coll !== "BINARY") {
-    throw new SchemaMismatchError("Catalog primary-key index does not match.");
+  const column = columns[0];
+  if (columns.length !== 1
+    || column?.seqno !== 0
+    || column.cid !== columnId
+    || column.name !== columnName
+    || column.desc !== 0
+    || column.coll !== "BINARY") {
+    throw new SchemaMismatchError(`Catalog ${columnName} identity index does not match.`);
   }
-  return primaryIndex.name;
+  return index.name;
 }
 
 function normalizeSearch(value: string): string {

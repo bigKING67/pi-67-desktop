@@ -7,6 +7,7 @@ import type {
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -227,7 +228,7 @@ class ActivityRuntime {
         this.activityListener = listener;
         return () => undefined;
       },
-      getIdentity: () => ({ sessionId: "session-activity", sessionGeneration: 4 }),
+      getIdentity: () => ({ sessionId: "session-activity", sessionFileIdentity: "session-file-session-activity", sessionGeneration: 4 }),
       getTaskToolMode: () => "auto",
       setTaskToolMode: (mode: TaskToolMode) => mode,
       getSnapshot: () => snapshot(),
@@ -343,7 +344,7 @@ function connect(server: AgentHostServer, hostEpoch: number): FakePort {
     hostEpoch
   });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${hostEpoch}`,

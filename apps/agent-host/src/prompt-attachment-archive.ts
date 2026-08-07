@@ -1,21 +1,28 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { createGunzip } from "node:zlib";
 import { extract as createTarExtractor } from "tar-stream";
-import { open as openZip, type Entry, type ZipFile } from "yauzl";
+import { fromBuffer as openZipBuffer, type Entry, type ZipFile } from "yauzl";
 import type { PromptAttachmentWorkerTask } from "./prompt-attachment-worker-contract.js";
 
 const MAX_RESULT_BYTES = 32 * 1024;
 const MAX_ARCHIVE_ENTRIES = 512;
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
 const MAX_ARCHIVE_RATIO = 100;
+const MAX_ARCHIVE_ENTRY_NAME_CHARS = 4_096;
+const MAX_ARCHIVE_PATH_DEPTH = 32;
+
+export interface PromptAttachmentArchiveEntryResult {
+  bytes: Buffer;
+  truncated: boolean;
+}
 
 export async function listPromptAttachmentArchive(
   task: PromptAttachmentWorkerTask
 ): Promise<unknown[]> {
-  if (isZip(task.attachment)) return listZip(task.path);
+  const bytes = Buffer.from(task.bytes);
+  if (isZip(task.attachment)) return listZip(bytes);
   if (isTar(task.attachment)) {
-    const result = await inspectTar(task.path, task.attachment.mimeType, undefined);
+    const result = await inspectTar(bytes, task.attachment.mimeType, undefined);
     if (!Array.isArray(result)) throw new Error("Archive listing returned an invalid result.");
     return result;
   }
@@ -25,17 +32,18 @@ export async function listPromptAttachmentArchive(
 export async function readPromptAttachmentArchiveEntry(
   task: PromptAttachmentWorkerTask,
   entry: string
-): Promise<Buffer> {
+): Promise<PromptAttachmentArchiveEntryResult> {
   assertArchiveEntryName(entry);
+  const payload = Buffer.from(task.bytes);
   const bytes = isZip(task.attachment)
-    ? await readZipEntry(task.path, entry)
-    : await inspectTar(task.path, task.attachment.mimeType, entry);
+    ? await readZipEntry(payload, entry)
+    : await inspectTar(payload, task.attachment.mimeType, entry);
   if (!bytes || Array.isArray(bytes)) throw new Error(`Archive entry was not found: ${entry}`);
   return bytes;
 }
 
-function listZip(path: string): Promise<unknown[]> {
-  return withZip(path, (zip) => new Promise((resolve, reject) => {
+function listZip(bytes: Buffer): Promise<unknown[]> {
+  return withZip(bytes, (zip) => new Promise((resolve, reject) => {
     const entries: unknown[] = [];
     let total = 0;
     zip.on("entry", (entry: Entry) => {
@@ -58,9 +66,10 @@ function listZip(path: string): Promise<unknown[]> {
   }));
 }
 
-function readZipEntry(path: string, target: string): Promise<Buffer> {
-  return withZip(path, (zip) => new Promise((resolve, reject) => {
+function readZipEntry(bytes: Buffer, target: string): Promise<PromptAttachmentArchiveEntryResult> {
+  return withZip(bytes, (zip) => new Promise((resolve, reject) => {
     let total = 0;
+    let found: PromptAttachmentArchiveEntryResult | undefined;
     zip.on("entry", (entry: Entry) => {
       try {
         validateZipEntry(entry);
@@ -70,20 +79,17 @@ function readZipEntry(path: string, target: string): Promise<Buffer> {
           zip.readEntry();
           return;
         }
+        if (found) throw new Error(`Archive contains duplicate entries named: ${target}`);
         zip.openReadStream(entry, (error, stream) => {
           if (error || !stream) {
             reject(error ?? new Error("Archive entry stream is unavailable."));
             return;
           }
-          const chunks: Buffer[] = [];
-          let bytes = 0;
-          stream.on("data", (chunk: Buffer) => {
-            bytes += chunk.byteLength;
-            if (bytes <= MAX_RESULT_BYTES) chunks.push(chunk);
-          });
+          const collector = createBoundedCollector();
+          stream.on("data", (chunk: Buffer) => collector.add(chunk));
           stream.once("end", () => {
-            zip.close();
-            resolve(Buffer.concat(chunks).subarray(0, MAX_RESULT_BYTES));
+            found = collector.result();
+            zip.readEntry();
           });
           stream.once("error", reject);
         });
@@ -92,17 +98,25 @@ function readZipEntry(path: string, target: string): Promise<Buffer> {
         reject(error);
       }
     });
-    zip.once("end", () => reject(new Error(`Archive entry was not found: ${target}`)));
+    zip.once("end", () => {
+      if (found) resolve(found);
+      else reject(new Error(`Archive entry was not found: ${target}`));
+    });
     zip.once("error", reject);
     zip.readEntry();
   }));
 }
 
-function withZip<T>(path: string, operation: (zip: ZipFile) => Promise<T>): Promise<T> {
+function withZip<T>(bytes: Buffer, operation: (zip: ZipFile) => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    openZip(path, { lazyEntries: true, autoClose: false, decodeStrings: true }, (error, zip) => {
+    openZipBuffer(bytes, { lazyEntries: true, autoClose: false, decodeStrings: true }, (error, zip) => {
       if (error || !zip) {
         reject(error ?? new Error("ZIP archive could not be opened."));
+        return;
+      }
+      if (zip.entryCount > MAX_ARCHIVE_ENTRIES) {
+        zip.close();
+        reject(new Error("Archive exceeds the bounded entry limit."));
         return;
       }
       operation(zip).then(resolve, reject).finally(() => zip.close());
@@ -120,14 +134,14 @@ function validateZipEntry(entry: Entry): void {
 }
 
 function inspectTar(
-  path: string,
+  bytes: Buffer,
   mimeType: string,
   target: string | undefined
-): Promise<unknown[] | Buffer> {
+): Promise<unknown[] | PromptAttachmentArchiveEntryResult> {
   return new Promise((resolve, reject) => {
     const entries: unknown[] = [];
     let total = 0;
-    let found: Buffer | undefined;
+    let found: PromptAttachmentArchiveEntryResult | undefined;
     const extract = createTarExtractor();
     extract.on("entry", (header, stream, next) => {
       try {
@@ -139,15 +153,12 @@ function inspectTar(
           throw new Error("Archive exceeds the bounded entry or uncompressed-size limit.");
         }
         entries.push({ name: header.name, byteLength: size, type: header.type });
-        const chunks: Buffer[] = [];
-        let bytes = 0;
+        const collector = header.name === target ? createBoundedCollector() : undefined;
         stream.on("data", (chunk: Buffer) => {
-          if (header.name !== target) return;
-          bytes += chunk.byteLength;
-          if (bytes <= MAX_RESULT_BYTES) chunks.push(chunk);
+          collector?.add(chunk);
         });
         stream.once("end", () => {
-          if (header.name === target) found = Buffer.concat(chunks).subarray(0, MAX_RESULT_BYTES);
+          if (collector && !found) found = collector.result();
           next();
         });
         stream.once("error", reject);
@@ -160,8 +171,7 @@ function inspectTar(
     extract.once("finish", () => {
       void (async () => {
         if (mimeType === "application/gzip") {
-          const archiveStat = await stat(path);
-          if (archiveStat.size > 0 && total / archiveStat.size > MAX_ARCHIVE_RATIO) {
+          if (bytes.byteLength > 0 && total / bytes.byteLength > MAX_ARCHIVE_RATIO) {
             throw new Error("Archive exceeds the 100:1 compression-ratio limit.");
           }
         }
@@ -171,7 +181,7 @@ function inspectTar(
       })().catch(reject);
     });
     extract.once("error", reject);
-    const source = createReadStream(path);
+    const source = Readable.from([bytes]);
     source.once("error", reject);
     if (mimeType === "application/gzip") {
       const gunzip = createGunzip();
@@ -183,9 +193,36 @@ function inspectTar(
   });
 }
 
+function createBoundedCollector(): {
+  add(chunk: Buffer): void;
+  result(): PromptAttachmentArchiveEntryResult;
+} {
+  const chunks: Buffer[] = [];
+  let collectedBytes = 0;
+  let truncated = false;
+  return {
+    add(chunk) {
+      const remaining = MAX_RESULT_BYTES - collectedBytes;
+      if (remaining > 0) {
+        const retained = chunk.subarray(0, remaining);
+        chunks.push(retained);
+        collectedBytes += retained.byteLength;
+      }
+      if (chunk.byteLength > remaining) truncated = true;
+    },
+    result() {
+      return { bytes: Buffer.concat(chunks, collectedBytes), truncated };
+    }
+  };
+}
+
 function assertArchiveEntryName(value: string): void {
   const normalized = value.replaceAll("\\", "/");
-  if (normalized.startsWith("/") || normalized.includes("\0") || normalized.split("/").includes("..")) {
+  const segments = normalized.split("/").filter((segment) => segment.length > 0);
+  if (normalized.length === 0 || normalized.length > MAX_ARCHIVE_ENTRY_NAME_CHARS
+    || normalized.startsWith("/") || /^[A-Za-z]:\//u.test(normalized)
+    || normalized.includes("\0") || segments.length > MAX_ARCHIVE_PATH_DEPTH
+    || segments.includes(".") || segments.includes("..")) {
     throw new Error("Archive contains an unsafe entry path.");
   }
 }

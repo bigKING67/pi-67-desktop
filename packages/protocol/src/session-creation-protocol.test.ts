@@ -58,6 +58,7 @@ describe("Session creation identity protocol", () => {
         status: "materialized",
         creationId: "session-creation-1",
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-fixture-1",
         sessionPath: "/sessions/session-1.jsonl"
       }
     });

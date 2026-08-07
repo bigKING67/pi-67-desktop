@@ -21,6 +21,7 @@ interface TaskDraftState {
   setText: (taskId: string, text: string) => void;
   setAttachments: (taskId: string, attachments: DraftAttachment[]) => void;
   setStreamBehavior: (taskId: string, streamBehavior: TaskDraft["streamBehavior"]) => void;
+  transfer: (sourceTaskId: string, targetTaskId: string) => "empty" | "moved" | "conflict";
   discard: (taskId: string) => void;
   dispose: () => void;
 }
@@ -46,6 +47,19 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
     }));
   },
 
+  transfer(sourceTaskId, targetTaskId) {
+    if (sourceTaskId === targetTaskId) return "conflict";
+    const current = get();
+    const source = current.drafts[sourceTaskId];
+    if (!source || !hasDraftContent(source)) return "empty";
+    const target = current.drafts[targetTaskId];
+    if (target && hasDraftContent(target)) return "conflict";
+    const drafts = { ...current.drafts, [targetTaskId]: source };
+    delete drafts[sourceTaskId];
+    set({ drafts });
+    return "moved";
+  },
+
   discard(taskId) {
     const current = get();
     const draft = current.drafts[taskId];
@@ -67,4 +81,8 @@ function emptyTaskDraft(): TaskDraft {
 
 function draftFor(state: TaskDraftState, taskId: string): TaskDraft {
   return state.drafts[taskId] ?? emptyTaskDraft();
+}
+
+function hasDraftContent(draft: TaskDraft): boolean {
+  return draft.text.trim().length > 0 || draft.attachments.length > 0;
 }

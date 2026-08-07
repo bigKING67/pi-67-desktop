@@ -24,9 +24,9 @@ import {
 import { NotificationCenter } from "../notifications/NotificationCenter.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
+  selectSessionFileIdentity,
   selectSessionId,
-  selectSessionName,
-  selectSessionPath
+  selectSessionName
 } from "../session/session-projection-selectors.js";
 import { useShellStore } from "./shell-store.js";
 import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
@@ -48,7 +48,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const workspace = useAppStore((state) => state.workspace);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionId = useSessionProjectionStore(selectSessionId);
-  const sessionPath = useSessionProjectionStore(selectSessionPath);
+  const sessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const operation = useAppStore((state) => state.operation);
   const operationDetail = useAppStore((state) => state.operationDetail);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
@@ -76,8 +76,8 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const selectedTaskIsLive = Boolean(selectedTask && sessionId && selectedTask.sessionId === sessionId);
   const selectedConversationIsLive = selectedTaskIsLive || Boolean(
     selectedConversation?.kind === "session"
-    && sessionPath
-    && selectedConversation.sessionPath === sessionPath
+    && sessionFileIdentity
+    && selectedConversation.sessionFileIdentity === sessionFileIdentity
   );
   const selectedTaskOwnsLiveWorkspace = Boolean(
     selectedTask

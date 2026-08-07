@@ -26,7 +26,7 @@ export class SessionCatalogRecordEnricher {
   }
 
   withOrganization(sourceKey: string, record: SessionCatalogRecord): SessionCatalogRecord {
-    return { ...record, ...this.organizationStore.get(sourceKey, record.path) };
+    return { ...record, ...this.organizationStore.get(sourceKey, record.fileIdentity) };
   }
 
   withOrganizations(sourceKey: string, records: SessionCatalogRecord[]): SessionCatalogRecord[] {
@@ -50,11 +50,11 @@ export class SessionCatalogRecordEnricher {
 
   async organize(
     sourceKey: string,
-    path: string,
+    fileIdentity: string,
     mutation: { kind: "pin" | "archive"; value: boolean },
     now: number
   ): Promise<SessionCatalogOrganization> {
-    const current = this.organizationStore.get(sourceKey, path);
+    const current = this.organizationStore.get(sourceKey, fileIdentity);
     if (mutation.kind === "pin" && mutation.value && current.archivedAt !== undefined) {
       throw new RuntimeError("INVALID_PAYLOAD", "Archived conversations must be restored before pinning.");
     }
@@ -63,7 +63,7 @@ export class SessionCatalogRecordEnricher {
       : mutation.value
         ? { ...current, pinnedAt: now }
         : current.archivedAt === undefined ? {} : { archivedAt: current.archivedAt };
-    await this.organizationStore.set(sourceKey, path, organization);
+    await this.organizationStore.set(sourceKey, fileIdentity, organization);
     return organization;
   }
 

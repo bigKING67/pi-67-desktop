@@ -9,8 +9,8 @@ import {
 export function sessionSnapshotFixture(
   overrides: Partial<SessionSnapshot> = {}
 ): SessionSnapshot {
+  const sessionId = overrides.sessionId ?? "session-1";
   return {
-    sessionId: "session-1",
     cwd: "/workspace",
     streaming: false,
     messages: [],
@@ -23,7 +23,9 @@ export function sessionSnapshotFixture(
     followUpQueue: [],
     tree: { nodes: [], truncated: false, total: 0 },
     resources: [],
-    ...overrides
+    ...overrides,
+    sessionId,
+    sessionFileIdentity: overrides.sessionFileIdentity ?? `session-file-${sessionId}`
   };
 }
 

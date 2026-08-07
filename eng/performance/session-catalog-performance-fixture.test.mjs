@@ -14,6 +14,7 @@ const ALLOWED_KEYS = [
   "cwd",
   "cwdKey",
   "explicitName",
+  "fileIdentity",
   "id",
   "messageCount",
   "modifiedAt",
@@ -43,6 +44,7 @@ describe("Session Catalog performance fixture", () => {
 
     expect(records).toHaveLength(10_000);
     expect(new Set(records.map((record) => record.id))).toHaveLength(10_000);
+    expect(new Set(records.map((record) => record.fileIdentity))).toHaveLength(10_000);
     expect(new Set(records.map((record) => record.path))).toHaveLength(10_000);
     expect(new Set(records.map((record) => record.explicitName))).toHaveLength(10_000);
     expect(records.every((record, index) => index === 0 || record.modifiedAt < records[index - 1].modifiedAt)).toBe(true);
@@ -66,6 +68,7 @@ describe("Session Catalog performance report", () => {
     expect(SESSION_CATALOG_PERFORMANCE_BUDGETS).toEqual({
       warmFirstPage1kMs: 50,
       warmFirstPage10kMs: 100,
+      rebuildingFirstPage10kMs: 100,
       searchMiss10kMs: 150,
       pageBytes10k: 1_500_000
     });
@@ -95,6 +98,8 @@ function createSamples() {
     searchHit10k: [10],
     searchMiss10k: [149],
     pageBytes10k: [1_499_999],
+    rebuildingFirstPage10k: [99],
+    rebuildingUpsert10k: [20],
     reopen10k: [10]
   };
 }

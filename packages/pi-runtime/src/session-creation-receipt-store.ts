@@ -1,18 +1,21 @@
-import { createHash } from "node:crypto";
-import { chmod, lstat, mkdir, readFile, readdir, rename } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { SessionCreationResolution } from "@pi67/protocol";
 import {
-  createPrivateFileAtomically,
-  withConfigurationFileLock,
-  writePrivateFileAtomically
-} from "./atomic-private-file.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+  normalizeSessionCatalogPathIdentity,
+  resolveExistingSessionFileIdentity
+} from "./session-path-identity.js";
+import {
+  assertSessionCreationId,
+  SessionCreationJournal,
+  SESSION_CREATION_JOURNAL_VERSION,
+  type SessionCreationJournalEntry,
+  type SessionCreationJournalOptions,
+  type SessionCreationJournalState
+} from "./session-creation-journal.js";
 import {
   inspectSessionCreationMarker,
-  SESSION_CREATION_MARKER_SCHEMA_VERSION,
-  SESSION_CREATION_MARKER_TYPE,
   SessionCreationScanBudgetTracker,
   SessionCreationScanLimitError,
   throwIfAborted,
@@ -21,26 +24,21 @@ import {
   type SessionCreationScanBudget
 } from "./session-creation-marker-inspection.js";
 
-export { SESSION_CREATION_MARKER_TYPE };
+export {
+  appendSessionCreationMarker,
+  SESSION_CREATION_MARKER_TYPE
+} from "./session-creation-marker-persistence.js";
+export type { SessionCreationJournalEntry, SessionCreationJournalState };
 export type { SessionCreationScanBudget };
 
-const RECEIPT_VERSION = 1;
-const MAX_RECEIPT_BYTES = 64 * 1024;
 const MAX_FALLBACK_SESSION_FILES = 10_000;
 const FALLBACK_SCAN_BATCH_SIZE = 8;
 
-interface SessionCreationReceipt {
-  version: typeof RECEIPT_VERSION;
-  creationId: string;
-  workspaceKey: string;
-  sessionId: string;
-  sessionPath: string;
-}
+export type SessionCreationMaterializationStart =
+  | { status: "started"; creationId: string }
+  | Exclude<SessionCreationResolution, { status: "missing" }>;
 
-export interface SessionCreationReceiptStoreOptions {
-  cwd: string;
-  agentDir: string;
-  storageRoot?: string;
+export interface SessionCreationReceiptStoreOptions extends SessionCreationJournalOptions {
   getConfiguredSessionDir(): string | undefined;
 }
 
@@ -54,40 +52,138 @@ export type SessionCreationManager = Pick<
   "getCwd" | "getSessionId" | "getSessionFile"
 >;
 
-/** Disposable receipt cache backed by exact markers in Pi JSONL Sessions. */
+export type SessionCreationMaterializedIdentity = SessionCreationIdentity & {
+  sessionFileIdentity: string;
+};
+
+/** Durable creation journal backed by exact markers in Pi JSONL Sessions. */
 export class SessionCreationReceiptStore {
   private readonly cwd: string;
   private readonly agentDir: string;
-  private readonly workspaceKey: string;
-  private readonly receiptDirectory: string | undefined;
+  private readonly journal: SessionCreationJournal;
 
   constructor(private readonly options: SessionCreationReceiptStoreOptions) {
     this.cwd = resolve(options.cwd);
     this.agentDir = resolve(options.agentDir);
-    this.workspaceKey = createHash("sha256")
-      .update(normalizeSessionCatalogPathIdentity(this.cwd))
-      .update("\0")
-      .update(normalizeSessionCatalogPathIdentity(this.agentDir))
-      .digest("hex");
-    this.receiptDirectory = options.storageRoot === undefined
-      ? undefined
-      : join(options.storageRoot, "session-creation-receipts-v1");
+    this.journal = new SessionCreationJournal(options);
   }
 
-  async record(creationId: string, manager: SessionCreationManager): Promise<SessionCreationIdentity> {
+  async reserve(creationId: string): Promise<SessionCreationJournalEntry> {
+    assertSessionCreationId(creationId);
+    return this.journal.withLock(creationId, async () => {
+      const existing = await this.journal.readUnlocked(creationId);
+      if (existing) {
+        this.journal.assertWorkspace(existing);
+        return existing;
+      }
+      const now = this.journal.timestamp();
+      const entry: SessionCreationJournalEntry = {
+        version: SESSION_CREATION_JOURNAL_VERSION,
+        creationId,
+        workspaceKey: this.journal.workspaceKey,
+        state: "reserved",
+        createdAt: now,
+        updatedAt: now
+      };
+      await this.journal.writeUnlocked(entry);
+      return entry;
+    });
+  }
+
+  async beginMaterialization(
+    creationId: string,
+    options: SessionCreationResolutionOptions = {}
+  ): Promise<SessionCreationMaterializationStart> {
+    assertSessionCreationId(creationId);
+    return this.journal.withLock(creationId, async () => {
+      throwIfAborted(options.signal);
+      let entry = await this.journal.readUnlocked(creationId);
+      if (!entry) {
+        const now = this.journal.timestamp();
+        entry = {
+          version: SESSION_CREATION_JOURNAL_VERSION,
+          creationId,
+          workspaceKey: this.journal.workspaceKey,
+          state: "reserved",
+          createdAt: now,
+          updatedAt: now
+        };
+        await this.journal.writeUnlocked(entry);
+      }
+      this.journal.assertWorkspace(entry);
+      if (entry.state === "reserved") {
+        const resolution = await this.resolveJournalEntryLocked(creationId, entry, options);
+        if (resolution.status !== "missing") return resolution;
+        await this.journal.writeUnlocked({
+          ...entry,
+          state: "materializing",
+          updatedAt: this.journal.timestamp()
+        });
+        return { status: "started", creationId };
+      }
+
+      const resolution = await this.resolveJournalEntryLocked(creationId, entry, options);
+      return resolution.status === "missing"
+        ? { status: "ambiguous", creationId }
+        : resolution;
+    });
+  }
+
+  async record(
+    creationId: string,
+    manager: SessionCreationManager
+  ): Promise<SessionCreationMaterializedIdentity> {
+    assertSessionCreationId(creationId);
     const sessionPath = manager.getSessionFile();
     if (!sessionPath) throw new Error("The created Pi Session does not have a persisted JSONL path.");
     const inspection = await inspectSessionCreationMarker(sessionPath, creationId, this.cwd);
     if (inspection.status !== "match" || inspection.identity.sessionId !== manager.getSessionId()) {
       throw new Error("The created Pi Session does not contain its exact creation marker.");
     }
-    await this.persistReceipt({
-      version: RECEIPT_VERSION,
-      creationId,
-      workspaceKey: this.workspaceKey,
-      ...inspection.identity
+    const sessionFileIdentity = await resolveExistingSessionFileIdentity(inspection.identity.sessionPath);
+    await this.journal.withLock(creationId, async () => {
+      const existing = await this.journal.readUnlocked(creationId);
+      if (existing) {
+        this.journal.assertWorkspace(existing);
+        if (!sameJournalIdentity(existing, inspection.identity, sessionFileIdentity)) {
+          await this.journal.writeUnlocked({
+            ...existing,
+            state: "ambiguous",
+            updatedAt: this.journal.timestamp()
+          });
+          throw new Error("The Session creation id is already bound to another Pi JSONL Session.");
+        }
+      }
+      const now = this.journal.timestamp();
+      await this.journal.writeUnlocked({
+        version: SESSION_CREATION_JOURNAL_VERSION,
+        creationId,
+        workspaceKey: this.journal.workspaceKey,
+        state: "materialized",
+        ...inspection.identity,
+        sessionFileIdentity,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      });
     });
-    return inspection.identity;
+    return { ...inspection.identity, sessionFileIdentity };
+  }
+
+  async markPublished(creationId: string, identity: SessionCreationIdentity): Promise<void> {
+    await this.advancePublishedState(creationId, identity);
+  }
+
+  async journalEntry(creationId: string): Promise<SessionCreationJournalEntry | undefined> {
+    assertSessionCreationId(creationId);
+    return this.journal.withLock(creationId, async () => {
+      const entry = await this.journal.readUnlocked(creationId);
+      if (!entry || entry.workspaceKey !== this.journal.workspaceKey) return undefined;
+      return { ...entry };
+    });
+  }
+
+  diagnostics() {
+    return this.journal.diagnostics();
   }
 
   async resolve(
@@ -95,39 +191,12 @@ export class SessionCreationReceiptStore {
     options: SessionCreationResolutionOptions = {}
   ): Promise<SessionCreationResolution> {
     try {
-      throwIfAborted(options.signal);
-      const receipt = await this.readReceipt(creationId);
-      if (receipt?.workspaceKey === this.workspaceKey) {
-        const inspection = await inspectSessionCreationMarker(
-          receipt.sessionPath,
-          creationId,
-          this.cwd,
-          options.signal === undefined ? {} : { signal: options.signal }
-        );
-        if (
-          inspection.status === "match"
-          && inspection.identity.sessionId === receipt.sessionId
-        ) {
-          return materialized(creationId, inspection.identity);
-        }
-        if (inspection.status === "ambiguous") return { status: "ambiguous", creationId };
-      }
-
-      const scanned = await this.scanSessionDirectories(creationId, options);
-      if (scanned.status !== "match") {
-        return scanned.status === "ambiguous"
-          ? { status: "ambiguous", creationId }
-          : scanned.status === "unavailable"
-            ? { status: "unavailable", creationId, reason: scanned.reason }
-            : { status: "missing", creationId };
-      }
-      await this.persistReceipt({
-        version: RECEIPT_VERSION,
-        creationId,
-        workspaceKey: this.workspaceKey,
-        ...scanned.identity
-      }).catch(() => undefined);
-      return materialized(creationId, scanned.identity);
+      assertSessionCreationId(creationId);
+      return await this.journal.withLock(creationId, async () => {
+        throwIfAborted(options.signal);
+        const entry = await this.journal.readUnlocked(creationId);
+        return this.resolveJournalEntryLocked(creationId, entry, options);
+      });
     } catch (error) {
       if (options.signal?.aborted) throw error;
       if (error instanceof SessionCreationScanLimitError) {
@@ -135,6 +204,69 @@ export class SessionCreationReceiptStore {
       }
       return { status: "unavailable", creationId, reason: "storage-error" };
     }
+  }
+
+  private async resolveJournalEntryLocked(
+    creationId: string,
+    entry: SessionCreationJournalEntry | undefined,
+    options: SessionCreationResolutionOptions
+  ): Promise<SessionCreationResolution> {
+    if (entry && entry.workspaceKey !== this.journal.workspaceKey) {
+      return { status: "ambiguous", creationId };
+    }
+    if (entry?.sessionPath) {
+      const inspection = await inspectSessionCreationMarker(
+        entry.sessionPath,
+        creationId,
+        this.cwd,
+        options.signal === undefined ? {} : { signal: options.signal }
+      );
+      if (inspection.status === "match") {
+        const fileIdentity = await resolveExistingSessionFileIdentity(inspection.identity.sessionPath);
+        if (sameJournalIdentity(entry, inspection.identity, fileIdentity)) {
+          await this.persistResolvedIdentity(entry, inspection.identity, fileIdentity);
+          return materialized(creationId, inspection.identity, fileIdentity);
+        }
+        await this.persistAmbiguous(entry);
+        return { status: "ambiguous", creationId };
+      }
+      if (inspection.status === "ambiguous") {
+        await this.persistAmbiguous(entry);
+        return { status: "ambiguous", creationId };
+      }
+    }
+
+    const scanned = await this.scanSessionDirectories(creationId, options);
+    if (scanned.status === "match") {
+      const fileIdentity = await resolveExistingSessionFileIdentity(scanned.identity.sessionPath);
+      if (entry && !sameJournalIdentity(entry, scanned.identity, fileIdentity)) {
+        await this.persistAmbiguous(entry);
+        return { status: "ambiguous", creationId };
+      }
+      const now = this.journal.timestamp();
+      const resolvedEntry: SessionCreationJournalEntry = {
+        version: SESSION_CREATION_JOURNAL_VERSION,
+        creationId,
+        workspaceKey: this.journal.workspaceKey,
+        state: materializedState(entry?.state),
+        ...scanned.identity,
+        sessionFileIdentity: fileIdentity,
+        createdAt: entry?.createdAt ?? now,
+        updatedAt: now
+      };
+      await this.journal.writeUnlocked(resolvedEntry);
+      return materialized(creationId, scanned.identity, fileIdentity);
+    }
+    if (scanned.status === "unavailable") {
+      return { status: "unavailable", creationId, reason: scanned.reason };
+    }
+    if (scanned.status === "ambiguous") {
+      if (entry) await this.persistAmbiguous(entry);
+      return { status: "ambiguous", creationId };
+    }
+    if (!entry || entry.state === "reserved") return { status: "missing", creationId };
+    await this.persistAmbiguous(entry);
+    return { status: "ambiguous", creationId };
   }
 
   private async scanSessionDirectories(
@@ -158,8 +290,9 @@ export class SessionCreationReceiptStore {
         throwIfAborted(options.signal);
         for (const entry of entries) {
           if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+          budget.assertAvailable();
           const path = join(directory, entry.name);
-          const identity = normalizeSessionCatalogPathIdentity(path);
+          const identity = await resolveExistingSessionFileIdentity(path);
           if (seen.has(identity)) continue;
           seen.add(identity);
           paths.push(path);
@@ -216,136 +349,66 @@ export class SessionCreationReceiptStore {
     ])).values()];
   }
 
-  private async readReceipt(creationId: string): Promise<SessionCreationReceipt | undefined> {
-    const path = this.receiptPath(creationId);
-    if (!path) return undefined;
-    const info = await lstat(path).catch((error: unknown) => (
-      isNodeError(error, "ENOENT") ? undefined : Promise.reject(error)
-    ));
-    if (!info) return undefined;
-    if (!info.isFile() || info.isSymbolicLink() || info.nlink > 1 || info.size > MAX_RECEIPT_BYTES) {
-      await quarantine(path);
-      return undefined;
+  private async advancePublishedState(
+    creationId: string,
+    identity: SessionCreationIdentity
+  ): Promise<void> {
+    assertSessionCreationId(creationId);
+    const inspection = await inspectSessionCreationMarker(identity.sessionPath, creationId, this.cwd);
+    if (inspection.status !== "match" || inspection.identity.sessionId !== identity.sessionId) {
+      throw new Error("The Session creation journal cannot advance without an exact JSONL marker.");
     }
-    try {
-      if (process.platform !== "win32") await chmod(path, 0o600);
-      const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
-      if (!isReceipt(parsed) || parsed.creationId !== creationId) throw new Error("Invalid receipt.");
-      return parsed;
-    } catch {
-      await quarantine(path);
-      return undefined;
-    }
-  }
-
-  private async persistReceipt(receipt: SessionCreationReceipt): Promise<void> {
-    const path = this.receiptPath(receipt.creationId);
-    if (!path) return;
-    await mkdir(this.receiptDirectory!, { recursive: true, mode: 0o700 });
-    if (process.platform !== "win32") await chmod(this.receiptDirectory!, 0o700);
-    await withConfigurationFileLock(path, async () => {
-      const existing = await this.readReceipt(receipt.creationId);
-      if (existing) {
-        if (
-          existing.workspaceKey === receipt.workspaceKey
-          && existing.sessionId === receipt.sessionId
-          && normalizeSessionCatalogPathIdentity(existing.sessionPath)
-            === normalizeSessionCatalogPathIdentity(receipt.sessionPath)
-        ) return;
-        const inspection = await inspectSessionCreationMarker(
-          existing.sessionPath,
-          receipt.creationId,
-          this.cwd
-        );
-        if (inspection.status === "match" || inspection.status === "ambiguous") {
-          throw new Error("The Session creation id is already bound to another Pi JSONL Session.");
-        }
+    const fileIdentity = await resolveExistingSessionFileIdentity(inspection.identity.sessionPath);
+    await this.journal.withLock(creationId, async () => {
+      const entry = await this.journal.readUnlocked(creationId);
+      if (!entry) throw new Error("The Session creation journal entry is missing.");
+      this.journal.assertWorkspace(entry);
+      if (!sameJournalIdentity(entry, inspection.identity, fileIdentity)) {
+        await this.persistAmbiguous(entry);
+        throw new Error("The Session creation journal identity changed before publication.");
       }
-      const serialized = `${JSON.stringify(receipt)}\n`;
-      if (Buffer.byteLength(serialized, "utf8") > MAX_RECEIPT_BYTES) {
-        throw new Error("The Session creation receipt exceeds its storage limit.");
-      }
-      await writePrivateFileAtomically(path, serialized);
-      if (process.platform !== "win32") await chmod(path, 0o600);
+      const nextState = entry.state === "acknowledged" ? "acknowledged" : "published";
+      await this.journal.writeUnlocked({
+        ...entry,
+        ...inspection.identity,
+        sessionFileIdentity: fileIdentity,
+        state: nextState,
+        updatedAt: this.journal.timestamp()
+      });
     });
   }
 
-  private receiptPath(creationId: string): string | undefined {
-    if (!this.receiptDirectory) return undefined;
-    const name = createHash("sha256").update(creationId, "utf8").digest("hex");
-    return join(this.receiptDirectory, `${name}.json`);
+  private async persistResolvedIdentity(
+    entry: SessionCreationJournalEntry,
+    identity: SessionCreationIdentity,
+    fileIdentity: string
+  ): Promise<void> {
+    await this.journal.writeUnlocked({
+      ...entry,
+      ...identity,
+      sessionFileIdentity: fileIdentity,
+      state: materializedState(entry.state),
+      updatedAt: this.journal.timestamp()
+    });
   }
-}
 
-export async function appendSessionCreationMarker(
-  manager: Pick<
-    SessionManager,
-    | "appendCustomEntry"
-    | "getCwd"
-    | "getEntries"
-    | "getHeader"
-    | "getSessionId"
-    | "getSessionFile"
-    | "isPersisted"
-    | "setSessionFile"
-  >,
-  creationId: string
-): Promise<void> {
-  manager.appendCustomEntry(SESSION_CREATION_MARKER_TYPE, {
-    schemaVersion: SESSION_CREATION_MARKER_SCHEMA_VERSION,
-    creationId
-  });
-  if (!manager.isPersisted()) return;
+  private async persistAmbiguous(entry: SessionCreationJournalEntry): Promise<void> {
+    if (entry.state === "ambiguous") return;
+    await this.journal.writeUnlocked({
+      ...entry,
+      state: "ambiguous",
+      updatedAt: this.journal.timestamp()
+    });
+  }
 
-  const sessionPath = manager.getSessionFile();
-  const header = manager.getHeader();
-  if (!sessionPath || !header) {
-    throw new Error("The created Pi Session cannot persist its creation marker.");
-  }
-  const existing = await lstat(sessionPath).catch((error: unknown) => (
-    isNodeError(error, "ENOENT") ? undefined : Promise.reject(error)
-  ));
-  if (existing) {
-    const inspection = await inspectSessionCreationMarker(
-      sessionPath,
-      creationId,
-      manager.getCwd()
-    );
-    if (
-      inspection.status !== "match"
-      || inspection.identity.sessionId !== manager.getSessionId()
-    ) {
-      throw new Error("The existing Pi Session does not contain its exact creation marker.");
-    }
-    manager.setSessionFile(inspection.identity.sessionPath);
-    return;
-  }
-  const serialized = [header, ...manager.getEntries()]
-    .map((entry) => JSON.stringify(entry))
-    .join("\n") + "\n";
-  await createPrivateFileAtomically(sessionPath, serialized);
-
-  // Pi normally defers the first JSONL write until an assistant message exists.
-  // Reloading the exact file marks this manager as flushed so future entries append safely.
-  const inspection = await inspectSessionCreationMarker(
-    sessionPath,
-    creationId,
-    manager.getCwd()
-  );
-  if (
-    inspection.status !== "match"
-    || inspection.identity.sessionId !== manager.getSessionId()
-  ) {
-    throw new Error("The persisted Pi Session does not contain its exact creation marker.");
-  }
-  manager.setSessionFile(inspection.identity.sessionPath);
 }
 
 function materialized(
   creationId: string,
-  identity: SessionCreationIdentity
+  identity: SessionCreationIdentity,
+  sessionFileIdentity: string
 ): SessionCreationResolution {
-  return { status: "materialized", creationId, ...identity };
+  return { status: "materialized", creationId, ...identity, sessionFileIdentity };
 }
 
 function defaultSessionDirectory(cwd: string, agentDir: string): string {
@@ -353,27 +416,23 @@ function defaultSessionDirectory(cwd: string, agentDir: string): string {
   return join(resolve(agentDir), "sessions", safePath);
 }
 
-function isReceipt(value: unknown): value is SessionCreationReceipt {
-  return isRecord(value)
-    && value.version === RECEIPT_VERSION
-    && typeof value.creationId === "string"
-    && /^[A-Za-z0-9_-]{1,128}$/u.test(value.creationId)
-    && typeof value.workspaceKey === "string"
-    && /^[0-9a-f]{64}$/u.test(value.workspaceKey)
-    && typeof value.sessionId === "string"
-    && value.sessionId.length > 0
-    && value.sessionId.length <= 1_024
-    && typeof value.sessionPath === "string"
-    && value.sessionPath.length > 0
-    && value.sessionPath.length <= 32_768;
+function sameJournalIdentity(
+  entry: SessionCreationJournalEntry,
+  identity: SessionCreationIdentity,
+  fileIdentity: string
+): boolean {
+  if (entry.sessionId === undefined && entry.sessionPath === undefined) return true;
+  if (entry.sessionId !== identity.sessionId) return false;
+  if (entry.sessionFileIdentity !== undefined) return entry.sessionFileIdentity === fileIdentity;
+  return entry.sessionPath !== undefined
+    && normalizeSessionCatalogPathIdentity(entry.sessionPath)
+      === normalizeSessionCatalogPathIdentity(identity.sessionPath);
 }
 
-async function quarantine(path: string): Promise<void> {
-  await rename(path, `${path}.corrupt-${Date.now()}`).catch(() => undefined);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function materializedState(
+  state: SessionCreationJournalState | undefined
+): "materialized" | "published" | "acknowledged" {
+  return state === "published" || state === "acknowledged" ? state : "materialized";
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {

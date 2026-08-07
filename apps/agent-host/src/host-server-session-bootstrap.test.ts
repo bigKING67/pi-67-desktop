@@ -1,6 +1,7 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -55,7 +56,7 @@ describe("AgentHostServer session bootstrap", () => {
       hostEpoch: 5
     });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-initialize-failure",
@@ -100,7 +101,7 @@ describe("AgentHostServer session bootstrap", () => {
   it("publishes the authoritative generation before workspace and session transition responses", async () => {
     let sessionId = "session-workspace";
     let sessionGeneration = 1;
-    const currentSnapshot = () => ({ ...emptySnapshot(), sessionId });
+    const currentSnapshot = () => emptySnapshot(sessionId);
     const forkSession = vi.fn(async (_entryId: string, _position?: "before" | "at") => {
       sessionId = "session-forked";
       sessionGeneration += 1;
@@ -135,7 +136,7 @@ describe("AgentHostServer session bootstrap", () => {
         return currentSnapshot();
       },
       forkSession,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       getTaskToolMode: () => "auto" as const,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -144,7 +145,7 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-bootstrap", hostInstanceId: "host-bootstrap", hostEpoch: 6 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-bootstrap",
@@ -174,6 +175,7 @@ describe("AgentHostServer session bootstrap", () => {
       accepted: true,
       hostEpoch: 6,
       sessionId: "session-workspace",
+      sessionFileIdentity: "session-file-session-workspace",
       sessionGeneration: 1,
       eventSequence: eventSequenceAt(port, readyIndex)
     });
@@ -195,6 +197,7 @@ describe("AgentHostServer session bootstrap", () => {
       accepted: true,
       hostEpoch: 6,
       sessionId: "session-created",
+      sessionFileIdentity: "session-file-session-created",
       sessionGeneration: 2,
       eventSequence: eventSequenceAt(port, bootstrapIndex)
     });
@@ -218,6 +221,7 @@ describe("AgentHostServer session bootstrap", () => {
       accepted: true,
       hostEpoch: 6,
       sessionId: "session-forked",
+      sessionFileIdentity: "session-file-session-forked",
       sessionGeneration: 3,
       eventSequence: eventSequenceAt(port, forkBootstrapIndex)
     });
@@ -229,11 +233,11 @@ describe("AgentHostServer session bootstrap", () => {
     let sessionId = "session-before-open";
     let sessionGeneration = 4;
     let finishOpen!: () => void;
-    const currentSnapshot = () => ({ ...emptySnapshot(), sessionId });
+    const currentSnapshot = () => emptySnapshot(sessionId);
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       getSnapshot: currentSnapshot,
       getTaskToolMode: () => "auto" as const,
       getWorkspaceChanges: () => ({ sessionId, items: [], truncated: false, total: 0 }),
@@ -261,7 +265,7 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-recovery", hostInstanceId: "host-recovery", hostEpoch: 7 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-recovery",
@@ -297,11 +301,11 @@ describe("AgentHostServer session bootstrap", () => {
   it("publishes bootstrap before a failed import terminal when runtime authority already changed", async () => {
     let sessionId = "session-before-import";
     let sessionGeneration = 2;
-    const currentSnapshot = () => ({ ...emptySnapshot(), sessionId });
+    const currentSnapshot = () => emptySnapshot(sessionId);
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       getSnapshot: currentSnapshot,
       importSession: async () => {
         sessionId = "session-after-import";
@@ -315,7 +319,7 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-import", hostInstanceId: "host-import", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-import",
@@ -364,7 +368,7 @@ describe("AgentHostServer session bootstrap", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       getSnapshot: () => {
         throw new Error("Projection unavailable after session switch");
       },
@@ -380,7 +384,7 @@ describe("AgentHostServer session bootstrap", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-import", hostInstanceId: "host-import", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-import",
@@ -438,19 +442,17 @@ function eventSequenceAt(port: FakePort, index: number): number {
   return event.sequence;
 }
 
-function emptySnapshot() {
+function emptySnapshot(sessionId = "session-1") {
   return {
-    sessionId: "session-1",
+    sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     cwd: "/tmp",
     streaming: false,
     messages: [],
     messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
+    models: [], providers: [],
+    thinkingLevel: "off", availableThinkingLevels: ["off"],
+    steeringQueue: [], followUpQueue: [],
     tree: { nodes: [], truncated: false, total: 0 },
     resources: []
   };

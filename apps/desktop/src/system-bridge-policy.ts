@@ -6,10 +6,12 @@ export function asNotification(value: unknown): { title: string; body: string } 
 }
 
 export function asExternalUrl(value: unknown): URL | undefined {
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== "string" || value.length === 0 || value.length > 2_048) return undefined;
   try {
     const target = new URL(value);
-    return target.protocol === "http:" || target.protocol === "https:" ? target : undefined;
+    if ((target.protocol !== "http:" && target.protocol !== "https:")
+      || target.hostname === "" || target.username !== "" || target.password !== "") return undefined;
+    return target;
   } catch {
     return undefined;
   }

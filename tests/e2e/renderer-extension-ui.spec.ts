@@ -30,6 +30,7 @@ test("clears stale Extension UI and restores the session after Host epoch replac
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

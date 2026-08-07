@@ -3,6 +3,7 @@ import {
   isEventEnvelope,
   isResponseEnvelope,
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   responseEnvelope
 } from "../../packages/protocol/dist/index.mjs";
 
@@ -21,7 +22,7 @@ export async function attachMockAgent(page, messageCount) {
     }
     return envelope;
   });
-  await page.evaluate(({ count, protocolRevision }) => {
+  await page.evaluate(({ count, protocolVersion, protocolRevision }) => {
     let messages = Array.from({ length: count }, (_, index) => ({
       id: `message-${index}`,
       role: index % 2 === 0 ? "user" : "assistant",
@@ -30,6 +31,7 @@ export async function attachMockAgent(page, messageCount) {
     }));
     let snapshot = {
       sessionId: "performance-session",
+      sessionFileIdentity: "session-file-performance-session",
       sessionPath: "/tmp/pi67-performance-session.jsonl",
       cwd: "/tmp/pi67-performance-workspace",
       streaming: false,
@@ -129,7 +131,7 @@ export async function attachMockAgent(page, messageCount) {
       const envelope = event.data;
       if (envelope?.kind === "hello") {
         channel.port2.postMessage({
-          protocolVersion: 3,
+          protocolVersion,
           kind: "welcome",
           appInstanceId,
           hostInstanceId: "performance-host",
@@ -166,6 +168,8 @@ export async function attachMockAgent(page, messageCount) {
           ? snapshot.tree
           : type === "session.catalog.query"
             ? { ...sessionCatalogStatus, items: [], total: 0, hasMore: false }
+          : type === "workspace.file.list"
+            ? { workspaceId: "workspace-performance", entries: [], truncated: false }
           : type === "command.list"
             ? []
             : type === "workspace.changes"
@@ -180,6 +184,8 @@ export async function attachMockAgent(page, messageCount) {
                     sessionCatalogStatus,
                     eventSequence: messageSequence,
                     hostEpoch,
+                    sessionId: snapshot.sessionId,
+                    sessionFileIdentity: snapshot.sessionFileIdentity,
                     sessionGeneration: 1,
                     taskToolMode: "auto"
                   }
@@ -189,6 +195,7 @@ export async function attachMockAgent(page, messageCount) {
             ? {
                 ...envelope.context,
                 sessionId: snapshot.sessionId,
+                sessionFileIdentity: snapshot.sessionFileIdentity,
                 sessionGeneration: 1
               }
             : undefined;
@@ -227,6 +234,7 @@ export async function attachMockAgent(page, messageCount) {
             lifecycle: "running",
             cancellable: true,
             sessionId: snapshot.sessionId,
+            sessionFileIdentity: snapshot.sessionFileIdentity,
             sessionGeneration: 1,
             startedAt: Date.now()
           }
@@ -263,6 +271,7 @@ export async function attachMockAgent(page, messageCount) {
         snapshot = {
           ...snapshot,
           sessionId: `performance-${marker}`,
+          sessionFileIdentity: `session-file-performance-${marker}`,
           sessionPath: `/tmp/performance-${marker}.jsonl`,
           streaming: false,
           messages: visibleMessages,
@@ -278,6 +287,7 @@ export async function attachMockAgent(page, messageCount) {
           activeTaskContext = {
             ...activeTaskContext,
             sessionId: snapshot.sessionId,
+            sessionFileIdentity: snapshot.sessionFileIdentity,
             sessionGeneration: 1
           };
         }
@@ -324,6 +334,7 @@ export async function attachMockAgent(page, messageCount) {
         accepted: true,
         hostEpoch,
         sessionId: snapshot.sessionId,
+        sessionFileIdentity: snapshot.sessionFileIdentity,
         sessionGeneration: 1,
         eventSequence: messageSequence
       };
@@ -333,7 +344,11 @@ export async function attachMockAgent(page, messageCount) {
       window.location.origin,
       [channel.port1]
     );
-  }, { count: messageCount, protocolRevision: PROTOCOL_REVISION });
+  }, {
+    count: messageCount,
+    protocolVersion: PROTOCOL_VERSION,
+    protocolRevision: PROTOCOL_REVISION
+  });
 }
 
 export async function installPerformanceSystemBridge(page) {
@@ -350,11 +365,12 @@ export async function installPerformanceSystemBridge(page) {
       availability: "available"
     };
     let workbenchState = {
-      version: 3,
+      version: 4,
       workspaces: [],
       workspaceOrder: [],
       expandedWorkspaceIds: [],
       runtimeRecovery: [],
+      sessionCreationRecovery: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     };
@@ -396,6 +412,7 @@ export async function installPerformanceSystemBridge(page) {
             currentVersion: "performance",
             detail: "Performance fixture"
           }),
+          onUpdateStateChanged: () => () => undefined,
           onAgentHostFailed: () => () => undefined,
           onPowerResume: () => () => undefined
         }

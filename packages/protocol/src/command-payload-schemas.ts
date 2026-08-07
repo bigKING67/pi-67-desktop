@@ -30,7 +30,10 @@ import {
   WorkspaceFileSavePayloadSchema,
   WorkspaceFileSearchPayloadSchema
 } from "./workspace-file-schemas.js";
-import { MAX_USER_MESSAGE_INDEX_PAGE_ITEMS } from "@pi67/domain";
+import {
+  MAX_SESSION_FILE_IDENTITY_CHARS,
+  MAX_USER_MESSAGE_INDEX_PAGE_ITEMS
+} from "@pi67/domain";
 
 const EmptyPayloadSchema = strictObject({});
 const TrustSchema = Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]);
@@ -105,6 +108,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     sourceTaskId: Type.String({ minLength: 1, maxLength: 512 }),
     sourceTaskGeneration: Type.Integer({ minimum: 1 }),
     sourceSessionId: Type.String({ minLength: 1, maxLength: 512 }),
+    sourceSessionFileIdentity: Type.String({
+      minLength: 1,
+      maxLength: MAX_SESSION_FILE_IDENTITY_CHARS
+    }),
     sourceSessionGeneration: Type.Integer({ minimum: 1 }),
     entryId: Type.String({ minLength: 1 })
   }),

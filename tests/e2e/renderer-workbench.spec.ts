@@ -39,6 +39,7 @@ async function openWorkbench(
 
 test("restores persisted Workspace authority without asking for the Workspace again", async ({ page }, testInfo) => {
   const sessionPath = "/Users/test/.pi/agent/sessions/persisted.jsonl";
+  const sessionFileIdentity = "session-file-fixture-persisted";
   await installMockDesktopBridge(page, {
     initialWorkspaces: [DEFAULT_MOCK_WORKSPACE],
     expandedWorkspaceIds: [DEFAULT_MOCK_WORKSPACE.id],
@@ -48,6 +49,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
       conversation: {
         kind: "session",
         workspaceId: DEFAULT_MOCK_WORKSPACE.id,
+        sessionFileIdentity,
         sessionPath
       }
     }
@@ -57,6 +59,7 @@ test("restores persisted Workspace authority without asking for the Workspace ag
     sessionCatalogItemsByWorkspace: {
       [DEFAULT_MOCK_WORKSPACE.id]: [{
         id: "session-persisted",
+        fileIdentity: sessionFileIdentity,
         path: sessionPath,
         cwd: DEFAULT_MOCK_WORKSPACE.identity.canonicalPath,
         name: "已保存的会话",
@@ -264,14 +267,20 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
 
 test("rejects a task above the shared running limit without discarding its draft", async ({ page }) => {
   await openWorkbench(page);
-  await markCurrentTaskRunning(page, 0, "session-test", 1);
+  await markCurrentTaskRunning(page, 0, "session-test", "session-file-fixture-demo", 1);
 
   for (let index = 1; index < EXPECTED_MAX_RUNNING_TASKS; index += 1) {
     await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
     await expect.poll(async () => (
       await recordedCommandDetails(page)
     ).filter((command) => command.type === "session.create")).toHaveLength(index);
-    await markCurrentTaskRunning(page, index, `session-created-${index}`, index + 1);
+    await markCurrentTaskRunning(
+      page,
+      index,
+      `session-created-${index}`,
+      `session-file-fixture-${index}`,
+      index + 1
+    );
   }
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+n`);
@@ -296,7 +305,7 @@ test("rejects a task above the shared running limit without discarding its draft
 
 test("stops a running task from its conversation row without deleting Pi JSONL history", async ({ page }) => {
   await openWorkbench(page);
-  await markCurrentTaskRunning(page, 1, "session-test", 1);
+  await markCurrentTaskRunning(page, 1, "session-test", "session-file-fixture-demo", 1);
   await clearRecordedCommands(page);
 
   await page.getByRole("button", { name: /未命名会话 对话菜单/u }).click();
@@ -385,6 +394,7 @@ function sessionSummary(
 ): FixtureSessionSummary {
   return {
     id: `${workspace.id}-session-${index}`,
+    fileIdentity: `session-file-fixture-${workspace.id}-${index}`,
     path: `/Users/test/.pi/agent/sessions/${workspace.id}-${index}.jsonl`,
     cwd: workspace.identity.canonicalPath,
     name,
@@ -410,6 +420,7 @@ async function markCurrentTaskRunning(
   page: Page,
   index: number,
   sessionId: string,
+  sessionFileIdentity: string,
   sessionGeneration: number
 ): Promise<void> {
   const operationId = `operation-workbench-running-${index}`;
@@ -422,9 +433,10 @@ async function markCurrentTaskRunning(
         lifecycle: "running",
         cancellable: true,
         sessionId,
+        sessionFileIdentity,
         sessionGeneration,
         startedAt: Date.now()
       }
     }
-  }, { operationId, sessionId, sessionGeneration });
+  }, { operationId, sessionId, sessionFileIdentity, sessionGeneration });
 }

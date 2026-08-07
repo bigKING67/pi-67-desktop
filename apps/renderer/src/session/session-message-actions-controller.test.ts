@@ -81,6 +81,7 @@ describe("session message actions controller", () => {
       sourceTaskId: "task-active",
       sourceTaskGeneration: 1,
       sourceSessionId: "session-1",
+      sourceSessionFileIdentity: "session-file-1",
       sourceSessionGeneration: 3,
       entryId: "assistant-entry-1"
     });
@@ -135,6 +136,7 @@ describe("session message actions controller", () => {
           taskId: "task-active",
           taskGeneration: 1,
           sessionId: "session-1",
+          sessionFileIdentity: "session-file-1",
           sessionGeneration: 3
         }
       }
@@ -203,6 +205,7 @@ describe("session message actions controller", () => {
           taskId: "task-active",
           taskGeneration: 1,
           sessionId: "session-1",
+          sessionFileIdentity: "session-file-1",
           sessionGeneration: 3
         }
       }
@@ -238,6 +241,7 @@ describe("session message actions controller", () => {
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 3,
         startedAt: 1
       }
@@ -305,6 +309,7 @@ describe("session message actions controller", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-1",
         sessionPath: "/sessions/session-1.jsonl"
       }
     });
@@ -319,7 +324,7 @@ describe("session message actions controller", () => {
 
 function installActiveSession(): void {
   rendererWorkbenchStore.getState().openTask({
-    ...task("task-active", "/sessions/session-1.jsonl"),
+    ...task("task-active", "/sessions/session-1.jsonl", "session-file-1"),
     sessionId: "session-1",
     sessionGeneration: 3
   });
@@ -340,6 +345,7 @@ function installActiveSession(): void {
 function snapshot(sessionId: string) {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId.replace(/^session-/u, "")}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/work/a",
     streaming: false,
@@ -367,10 +373,15 @@ function workspace() {
   };
 }
 
-function task(id: string, sessionPath: string) {
+function task(id: string, sessionPath: string, sessionFileIdentity = `session-file-${id}`) {
   return {
     id,
-    conversation: { kind: "session" as const, workspaceId: "workspace-a", sessionPath },
+    conversation: {
+      kind: "session" as const,
+      workspaceId: "workspace-a",
+      sessionFileIdentity,
+      sessionPath
+    },
     workspaceId: "workspace-a",
     sessionId: `session-${id}`,
     taskGeneration: 1,
@@ -378,6 +389,7 @@ function task(id: string, sessionPath: string) {
     lifecycle: "idle" as const,
     runtime: { phase: "ready" as const, detail: "Pi 会话已就绪", recoverable: true },
     title: id,
+    sessionFileIdentity,
     sessionPath,
     hasDraft: false,
     toolMode: "auto" as const,

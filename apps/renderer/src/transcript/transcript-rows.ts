@@ -1,5 +1,6 @@
 import type {
   ImagePart,
+  OperationView,
   SessionMessageView,
   ToolCallPart
 } from "@pi67/domain";
@@ -166,6 +167,23 @@ export function hasProcessGroupAfterLatestUser(rows: readonly TranscriptRow[]): 
     }
   }
   return rows.slice(latestUserIndex + 1).some((row) => row.kind === "process-group");
+}
+
+export function createLiveProcessRow(
+  operation: OperationView,
+  interrupted: boolean,
+  hasFinalAnswer: boolean
+): Extract<TranscriptRow, { kind: "process-group" }> {
+  return {
+    kind: "process-group",
+    key: `${operation.operationId}:live-process`,
+    items: [],
+    stepCount: 1,
+    toolCount: 0,
+    failedToolCount: 0,
+    failed: interrupted,
+    hasFinalAnswer
+  };
 }
 
 function isProcessMessage(message: SessionMessageView): boolean {

@@ -316,6 +316,7 @@ async function installPackageFixture(page: Page): Promise<void> {
       enabled: true,
       filtered: false,
       installed: true,
+      trustState: "user-installed-observed",
       displayName: "pi-subagents",
       resourceTypes: ["extension"]
     }],

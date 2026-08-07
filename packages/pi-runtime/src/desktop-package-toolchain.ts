@@ -1,6 +1,7 @@
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { PackageSource, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
+import type { PackageTrustRegistry } from "./package-trust-registry.js";
 
 type ReloadableDesktopSettingsManager = Pick<
   SettingsManager,
@@ -129,7 +130,8 @@ export function installDesktopPackageToolchainReloadHook(
 
 export function createDesktopPackageSettingsView(
   settingsManager: SettingsManager,
-  environment: NodeJS.ProcessEnv = process.env
+  environment: NodeJS.ProcessEnv = process.env,
+  trustRegistry?: Pick<PackageTrustRegistry, "runtimePackageAllowed">
 ): SettingsManager {
   if (!resolveDesktopPackageToolchain(environment).desktop) return settingsManager;
   return new Proxy(settingsManager, {
@@ -137,13 +139,34 @@ export function createDesktopPackageSettingsView(
       if (property === "getGlobalSettings") {
         return () => {
           const settings = target.getGlobalSettings();
-          const packages = desktopCapabilityPackages(settings.packages ?? [], environment);
+          const packages = runtimeAdmittedPackages(
+            desktopCapabilityPackages(settings.packages ?? [], environment),
+            "global",
+            trustRegistry
+          );
           return {
             ...settings,
             packages,
             extensions: desktopExtensionOverrides(settings.extensions ?? [], packages, environment)
           };
         };
+      }
+      if (property === "getProjectSettings") {
+        return () => {
+          const settings = target.getProjectSettings();
+          return {
+            ...settings,
+            packages: runtimeAdmittedPackages(settings.packages ?? [], "project", trustRegistry)
+          };
+        };
+      }
+      if (property === "getPackages") {
+        return () => target.getPackages().filter((entry) => {
+          const source = typeof entry === "string" ? entry : entry.source;
+          return trustRegistry === undefined
+            || trustRegistry.runtimePackageAllowed(source, "global")
+            || trustRegistry.runtimePackageAllowed(source, "project");
+        });
       }
       if (property === "setPackages") {
         return (packages: PackageSource[]) => {
@@ -153,6 +176,18 @@ export function createDesktopPackageSettingsView(
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === "function" ? value.bind(target) : value;
     }
+  });
+}
+
+function runtimeAdmittedPackages(
+  configured: PackageSource[],
+  scope: "global" | "project",
+  trustRegistry: Pick<PackageTrustRegistry, "runtimePackageAllowed"> | undefined
+): PackageSource[] {
+  if (!trustRegistry) return configured;
+  return configured.filter((entry) => {
+    const source = typeof entry === "string" ? entry : entry.source;
+    return trustRegistry.runtimePackageAllowed(source, scope);
   });
 }
 

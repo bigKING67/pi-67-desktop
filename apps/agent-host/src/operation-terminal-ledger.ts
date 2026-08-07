@@ -29,9 +29,26 @@ export class OperationTerminalLedger {
     current: RuntimeIdentity,
     details: OperationTerminalDetails
   ): OperationSettled {
+    return this.insert(this.create(operation, current, details));
+  }
+
+  create(
+    operation: OperationView,
+    current: RuntimeIdentity,
+    details: OperationTerminalDetails
+  ): OperationSettled {
     const authority = current.sessionId
-      ? { sessionId: current.sessionId, sessionGeneration: current.sessionGeneration }
-      : { sessionId: operation.sessionId, sessionGeneration: operation.sessionGeneration };
+      && current.sessionFileIdentity
+      ? {
+          sessionId: current.sessionId,
+          sessionFileIdentity: current.sessionFileIdentity,
+          sessionGeneration: current.sessionGeneration
+        }
+      : {
+          sessionId: operation.sessionId,
+          sessionFileIdentity: operation.sessionFileIdentity,
+          sessionGeneration: operation.sessionGeneration
+        };
     const base = {
       kind: "settled" as const,
       operationId: operation.operationId,
@@ -39,6 +56,7 @@ export class OperationTerminalLedger {
       cancellable: false as const,
       hostEpoch: this.hostEpoch,
       sessionId: authority.sessionId,
+      sessionFileIdentity: authority.sessionFileIdentity,
       sessionGeneration: authority.sessionGeneration,
       startedAt: operation.startedAt,
       settledAt: details.settledAt
@@ -48,6 +66,18 @@ export class OperationTerminalLedger {
       : details.lifecycle === "completed"
         ? { ...base, lifecycle: details.lifecycle }
         : { ...base, lifecycle: details.lifecycle, reason: details.reason };
+    return terminal;
+  }
+
+  restore(terminal: OperationSettled): OperationSettled {
+    const restored = {
+      ...terminal,
+      hostEpoch: this.hostEpoch
+    } as OperationSettled;
+    return this.insert(restored);
+  }
+
+  private insert(terminal: OperationSettled): OperationSettled {
     this.terminals.delete(terminal.operationId);
     this.terminals.set(terminal.operationId, terminal);
     while (this.terminals.size > this.maxTerminals) {

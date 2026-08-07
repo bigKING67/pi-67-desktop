@@ -53,7 +53,7 @@ describe("ExtensionPackageCommandRouter", () => {
       WORKSPACE_A,
       command("extension.package.update", { source: "npm:example", scope: "project" }),
       "update-project"
-    )).resolves.toEqual(MUTATED_LIST);
+    )).resolves.toMatchObject({ ...MUTATED_LIST, receiptState: "active" });
 
     expect(runtimeA.reloadResources).toHaveBeenCalledOnce();
     expect(runtimeB.reloadResources).not.toHaveBeenCalled();
@@ -70,7 +70,10 @@ describe("ExtensionPackageCommandRouter", () => {
 
     const first = router.dispatch(WORKSPACE_A, installCommand, "same-key");
     const replay = router.dispatch(WORKSPACE_A, installCommand, "same-key");
-    await expect(Promise.all([first, replay])).resolves.toEqual([MUTATED_LIST, MUTATED_LIST]);
+    await expect(Promise.all([first, replay])).resolves.toEqual([
+      { ...MUTATED_LIST, receiptState: "active" },
+      { ...MUTATED_LIST, receiptState: "active" }
+    ]);
     expect(install).toHaveBeenCalledOnce();
 
     expect(() => router.dispatch(
@@ -97,7 +100,7 @@ describe("ExtensionPackageCommandRouter", () => {
       .toThrow(expect.objectContaining({ code: "BUSY" }));
     expect(() => router.assertTaskCommandAllowed("workspace-b")).not.toThrow();
 
-    await Promise.resolve();
+    await vi.waitFor(() => expect(install).toHaveBeenCalledOnce());
     finishInstall();
     await pending;
     expect(() => router.assertTaskCommandAllowed("workspace-a")).not.toThrow();
@@ -122,18 +125,229 @@ describe("ExtensionPackageCommandRouter", () => {
     expect(failedRuntime.reloadResources).toHaveBeenCalledOnce();
     expect(laterRuntime.reloadResources).toHaveBeenCalledOnce();
   });
+
+  it("does not replay a worker mutation after a durable terminal receipt", async () => {
+    const install = vi.fn(async () => MUTATED_LIST);
+    const terminalList: ExtensionPackageListResult = {
+      items: [{
+        source: "npm:example",
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        trustState: "user-installed-observed"
+      }],
+      total: 1
+    };
+    const services = workspaceServices({
+      reserve: vi.fn(async () => ({
+        status: "replay" as const,
+        record: {
+          recordKey: "a".repeat(64),
+          sourceDigest: "b".repeat(64),
+          scope: "global" as const,
+          sourceKind: "npm" as const,
+          state: "active" as const,
+          lastOperation: "install" as const,
+          mutationKeyDigest: "c".repeat(64),
+          fingerprintDigest: "d".repeat(64),
+          startedAt: 1,
+          completedAt: 2,
+          changed: true,
+          observation: observedPackage()
+        }
+      }))
+    });
+    const router = createRouter({ install, list: () => terminalList }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.install", { source: "npm:example", scope: "global" }),
+      "already-complete"
+    )).resolves.toEqual({ ...terminalList, changed: true, receiptState: "active" });
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it("returns ambiguous without replaying when a durable active receipt has drifted", async () => {
+    const install = vi.fn(async () => MUTATED_LIST);
+    const driftedList: ExtensionPackageListResult = {
+      items: [{
+        source: "npm:example",
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        trustState: "drifted",
+        trustReason: "content-hash-changed"
+      }],
+      total: 1
+    };
+    const services = workspaceServices({
+      reserve: vi.fn(async () => ({
+        status: "replay" as const,
+        record: {
+          recordKey: "a".repeat(64),
+          sourceDigest: "b".repeat(64),
+          scope: "global" as const,
+          sourceKind: "npm" as const,
+          state: "active" as const,
+          lastOperation: "install" as const,
+          mutationKeyDigest: "c".repeat(64),
+          fingerprintDigest: "d".repeat(64),
+          startedAt: 1,
+          completedAt: 2,
+          changed: true,
+          observation: observedPackage()
+        }
+      }))
+    });
+    const router = createRouter({ install, list: () => driftedList }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.install", { source: "npm:example", scope: "global" }),
+      "drifted-replay"
+    )).resolves.toEqual({ ...driftedList, changed: true, receiptState: "ambiguous" });
+    expect(install).not.toHaveBeenCalled();
+  });
+
+  it("persists an ambiguous receipt when the completed mutation cannot be observed safely", async () => {
+    const install = vi.fn(async () => MUTATED_LIST);
+    const markAmbiguous = vi.fn(async () => undefined);
+    const commitActive = vi.fn(async () => undefined);
+    const services = workspaceServices(
+      { markAmbiguous, commitActive },
+      { observationFor: vi.fn(() => ({ status: "unavailable", reason: "receipt-invalid" })) }
+    );
+    const router = createRouter({ install }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.install", { source: "npm:example", scope: "project" }),
+      "observation-failed"
+    )).resolves.toMatchObject({ changed: true, receiptState: "ambiguous" });
+    expect(commitActive).not.toHaveBeenCalled();
+    expect(markAmbiguous).toHaveBeenCalledWith("npm:example", "project", "observation-failed");
+  });
+
+  it("fails closed when a completed mutation cannot commit its durable receipt", async () => {
+    const install = vi.fn(async () => MUTATED_LIST);
+    const markAmbiguous = vi.fn(async () => undefined);
+    const services = workspaceServices({
+      commitActive: vi.fn(async () => { throw new Error("receipt write failed"); }),
+      markAmbiguous
+    });
+    const router = createRouter({ install }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.install", { source: "npm:example", scope: "project" }),
+      "receipt-write-failed"
+    )).rejects.toMatchObject({
+      code: "RUNTIME_POISONED",
+      details: { packageReceiptConsistent: true, packageMutationCompleted: true }
+    });
+    expect(install).toHaveBeenCalledOnce();
+    expect(markAmbiguous).toHaveBeenCalledWith("npm:example", "project", "receipt-write-failed");
+  });
+
+  it("only commits an uninstall receipt after the target scope is absent", async () => {
+    const uninstall = vi.fn(async () => MUTATED_LIST);
+    const commitRemoved = vi.fn(async () => undefined);
+    const markAmbiguous = vi.fn(async () => undefined);
+    const stillConfigured: ExtensionPackageListResult = {
+      items: [{
+        source: "npm:example",
+        scope: "project",
+        enabled: false,
+        filtered: true,
+        installed: true,
+        trustState: "unverified",
+        trustReason: "mutation-ambiguous"
+      }],
+      total: 1
+    };
+    const services = workspaceServices({ commitRemoved, markAmbiguous });
+    const router = createRouter({ uninstall, list: () => stillConfigured }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.uninstall", { source: "npm:example", scope: "project" }),
+      "uninstall-still-configured"
+    )).resolves.toMatchObject({ changed: true, receiptState: "ambiguous" });
+    expect(commitRemoved).not.toHaveBeenCalled();
+    expect(markAmbiguous).toHaveBeenCalledWith("npm:example", "project", "uninstall-still-configured");
+  });
+
+  it("refreshes the other active scope after Pi updates a matching package identity", async () => {
+    const update = vi.fn(async () => MUTATED_LIST);
+    const commitActive = vi.fn(async () => undefined);
+    const refreshActiveObservation = vi.fn(async () => true);
+    const services = workspaceServices({ commitActive, refreshActiveObservation });
+    const router = createRouter({ update }, [], services);
+
+    await expect(router.dispatch(
+      WORKSPACE_A,
+      command("extension.package.update", { source: "npm:example", scope: "project" }),
+      "update-both-scopes"
+    )).resolves.toMatchObject({ changed: true, receiptState: "active" });
+    expect(commitActive).toHaveBeenCalledWith(
+      "npm:example",
+      "project",
+      "update-both-scopes",
+      observedPackage(),
+      true
+    );
+    expect(refreshActiveObservation).toHaveBeenCalledWith(
+      "npm:example",
+      "global",
+      observedPackage()
+    );
+  });
 });
 
 function createRouter(
   overrides: Partial<ReturnType<typeof management>> = {},
-  tasks: ExtensionPackageTaskView[] = []
+  tasks: ExtensionPackageTaskView[] = [],
+  services: PiWorkspaceRuntimeServices = workspaceServices()
 ): ExtensionPackageCommandRouter {
   const packages = management(overrides);
   return new ExtensionPackageCommandRouter({
-    getWorkspaceServices: (workspaceId) => ({ workspaceId }) as unknown as PiWorkspaceRuntimeServices,
+    getWorkspaceServices: () => services,
     listTasks: () => tasks,
     createManagement: () => packages
   });
+}
+
+function workspaceServices(
+  receiptOverrides: Record<string, unknown> = {},
+  trustOverrides: Record<string, unknown> = {}
+): PiWorkspaceRuntimeServices {
+  return {
+    packageMutationReceipts: {
+      reserve: vi.fn(async () => ({ status: "reserved", record: {} })),
+      markMutating: vi.fn(async () => undefined),
+      commitActive: vi.fn(async () => undefined),
+      commitRemoved: vi.fn(async () => undefined),
+      markAmbiguous: vi.fn(async () => undefined),
+      refreshActiveObservation: vi.fn(async () => false),
+      ...receiptOverrides
+    },
+    packageTrustRegistry: {
+      refresh: vi.fn(async () => undefined),
+      observationFor: vi.fn(() => ({ status: "observed", observation: observedPackage() })),
+      ...trustOverrides
+    }
+  } as unknown as PiWorkspaceRuntimeServices;
+}
+
+function observedPackage() {
+  return {
+    manifestSha256: "1".repeat(64),
+    contentSha256: "2".repeat(64),
+    directoryIdentityDigest: "3".repeat(64),
+    observedAt: 1
+  };
 }
 
 function management(overrides: Partial<{

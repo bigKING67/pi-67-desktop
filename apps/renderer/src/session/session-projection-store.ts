@@ -45,6 +45,7 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
   queue: undefined,
   resources: undefined,
   usage: undefined,
+  recoverySessionFileIdentity: undefined,
   recoverySessionPath: undefined,
   revisions: INITIAL_SESSION_PROJECTION_REVISIONS,
 
@@ -111,6 +112,7 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
       || current.hostEpoch !== connection.hostEpoch
       || envelope.hostEpoch !== current.hostEpoch
       || eventAuthority?.sessionId !== current.sessionId
+      || eventAuthority?.sessionFileIdentity !== current.sessionFileIdentity
       || sessionGeneration === undefined
       || (payloadSessionId !== undefined && payloadSessionId !== current.sessionId)
       || current.sessionGeneration !== sessionGeneration
@@ -119,6 +121,7 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
     return {
       hostEpoch: current.hostEpoch,
       sessionId: current.sessionId,
+      sessionFileIdentity: current.sessionFileIdentity,
       sessionGeneration,
       projectionRevision: current.projectionRevision
     };

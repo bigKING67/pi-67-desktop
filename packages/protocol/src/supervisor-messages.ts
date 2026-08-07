@@ -14,6 +14,10 @@ export const AgentHostRuntimePoisonedMessageSchema = Type.Union([
     type: Type.Literal("agent-host-runtime-poisoned"),
     code: Type.Literal("SESSION_IMPORT_PROJECTION_FAILED"),
     operationId: OperationIdSchema
+  }),
+  strictObject({
+    type: Type.Literal("agent-host-runtime-poisoned"),
+    code: Type.Literal("SESSION_WRITER_LEASE_COMPROMISED")
   })
 ]);
 

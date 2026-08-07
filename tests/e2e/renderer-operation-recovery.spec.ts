@@ -80,6 +80,7 @@ function terminalReceipt(operationId: string) {
     cancellable: false as const,
     hostEpoch: 1,
     sessionId: "session-test",
+    sessionFileIdentity: "session-file-fixture-demo",
     sessionGeneration: 1,
     startedAt: 10,
     settledAt: 20

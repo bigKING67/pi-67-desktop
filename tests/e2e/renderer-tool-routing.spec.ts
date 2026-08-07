@@ -256,6 +256,7 @@ test("expands the current execution process and collapses it when the operation 
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }
@@ -316,6 +317,7 @@ test("shows Runtime-authored AUTO reasons while running and preserves them after
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

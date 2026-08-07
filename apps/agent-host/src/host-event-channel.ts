@@ -87,7 +87,11 @@ export class HostEventChannel {
     );
     if (
       blockingInteractiveRequest
-      && (identity.sessionId === undefined || operationId === undefined)
+      && (
+        identity.sessionId === undefined
+        || identity.sessionFileIdentity === undefined
+        || operationId === undefined
+      )
     ) {
       rejectInteractiveRequest(runtime, event);
       return false;
@@ -194,13 +198,18 @@ function enrichTaskContext(
   identity: ReturnType<AgentRuntime["getIdentity"]>,
   operationId: string | undefined
 ): ProtocolContext {
-  if (context.scope !== "task" || identity.sessionId === undefined) return context;
+  if (
+    context.scope !== "task"
+    || identity.sessionId === undefined
+    || identity.sessionFileIdentity === undefined
+  ) return context;
   return {
     scope: "task",
     workspaceId: context.workspaceId,
     taskId: context.taskId,
     taskGeneration: context.taskGeneration,
     sessionId: identity.sessionId,
+    sessionFileIdentity: identity.sessionFileIdentity,
     sessionGeneration: identity.sessionGeneration,
     ...(operationId === undefined ? {} : { operationId })
   };

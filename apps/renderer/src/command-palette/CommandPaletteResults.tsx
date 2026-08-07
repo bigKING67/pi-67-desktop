@@ -6,7 +6,7 @@ import styles from "./CommandPalette.module.css";
 interface CommandPaletteResultsProps {
   groups: readonly PaletteGroup[];
   selectedKey: string | undefined;
-  activeSessionPath: string | undefined;
+  activeSessionFileIdentity: string | undefined;
   onSelect: (key: string) => void;
   onExecute: (item: PaletteAction) => void;
 }
@@ -14,7 +14,7 @@ interface CommandPaletteResultsProps {
 export function CommandPaletteResults({
   groups,
   selectedKey,
-  activeSessionPath,
+  activeSessionFileIdentity,
   onSelect,
   onExecute
 }: CommandPaletteResultsProps) {
@@ -70,7 +70,7 @@ export function CommandPaletteResults({
                 <strong>{item.label}</strong>
                 <small>{item.disabledReason ?? item.detail}</small>
               </span>
-              {item.group === "sessions" && item.id === `session:${activeSessionPath ?? ""}` ? (
+              {item.group === "sessions" && item.id === `session:${activeSessionFileIdentity ?? ""}` ? (
                 <span className={styles.currentBadge}>{messages.commandPalette.current}</span>
               ) : null}
             </div>

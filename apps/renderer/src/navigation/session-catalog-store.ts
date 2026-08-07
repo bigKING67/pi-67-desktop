@@ -129,7 +129,7 @@ export const useSessionCatalogStore = create<SessionCatalogUiState>((set, get) =
     const current = catalogForWorkspace(get(), target.workspaceId);
     installWorkspaceCatalog(set, target.workspaceId, {
       ...pageState(page),
-      items: mergeByPath(current.items, page.items),
+      items: mergeByFileIdentity(current.items, page.items),
       query: current.query,
       loading: false,
       loadingMore: false,
@@ -221,7 +221,7 @@ export function selectConversationSessionSummary(
 ): SessionSummary | undefined {
   if (conversation?.kind !== "session") return undefined;
   return selectWorkspaceSessionCatalog(state, conversation.workspaceId).items.find((session) => (
-    session.path === conversation.sessionPath
+    session.fileIdentity === conversation.sessionFileIdentity
   ));
 }
 
@@ -281,9 +281,14 @@ function installWorkspaceCatalog(
   }));
 }
 
-function mergeByPath(current: SessionSummary[], next: SessionSummary[]): SessionSummary[] {
-  const seen = new Set(current.map((session) => session.path));
-  return [...current, ...next.filter((session) => !seen.has(session.path))];
+function mergeByFileIdentity(current: SessionSummary[], next: SessionSummary[]): SessionSummary[] {
+  const nextByIdentity = new Map(next.map((session) => [session.fileIdentity, session]));
+  const merged = current.map((session) => nextByIdentity.get(session.fileIdentity) ?? session);
+  const seen = new Set(current.map((session) => session.fileIdentity));
+  return [
+    ...merged,
+    ...[...nextByIdentity.values()].filter((session) => !seen.has(session.fileIdentity))
+  ];
 }
 
 export function normalizeSessionCatalogQuery(query: string): string {

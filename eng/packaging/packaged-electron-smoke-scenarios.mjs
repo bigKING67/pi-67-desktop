@@ -22,10 +22,10 @@ export async function verifyInitialRuntimeSettings(window, packagedProcessOutput
     .waitFor({ state: "visible", timeout: 15_000 });
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^运行服务/u }).click();
-  await settings.getByRole("button", { name: /运行环境诊断/u }).click();
-  const doctorDialog = window.getByRole("dialog", { name: "运行环境诊断" });
+  await settings.getByRole("button", { name: /恢复与诊断/u }).click();
+  const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
   await doctorDialog.waitFor({ state: "visible", timeout: 15_000 });
-  await doctorDialog.getByRole("button", { name: "运行检查" }).click();
+  await doctorDialog.getByRole("button", { name: "开始检查" }).click();
   const doctorResults = doctorDialog.getByLabel("运行环境检查结果");
   const doctorError = doctorDialog.locator(".doctor-error");
   await doctorResults.or(doctorError).waitFor({ state: "visible", timeout: 30_000 });
@@ -42,7 +42,7 @@ export async function verifyInitialRuntimeSettings(window, packagedProcessOutput
     .waitFor({ state: "visible", timeout: 30_000 });
   const sessionCatalogCheck = doctorResults.locator(".doctor-check").filter({ hasText: "Session 目录" });
   await sessionCatalogCheck.getByText("需注意", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v2; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v3; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await settings.getByRole("button", { name: "返回工作台" }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });
@@ -126,13 +126,22 @@ export async function runControlledShutdownScenario({
 }
 
 export async function waitForPersistedRuntimeRecovery(userDataDirectory, timeoutMs = 10_000) {
-  const statePath = join(userDataDirectory, "workbench", "state-v3.json");
+  const statePath = join(userDataDirectory, "workbench", "state-v4.json");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
     const state = await readFile(statePath, "utf8")
       .then((value) => JSON.parse(value))
       .catch(() => undefined);
-    if (state?.version === 3 && Array.isArray(state.runtimeRecovery) && state.runtimeRecovery.length > 0) {
+    const hasMaterializedRecovery = Array.isArray(state?.runtimeRecovery) && state.runtimeRecovery.some((record) => (
+      record?.conversation?.kind === "session"
+      && typeof record.conversation.sessionFileIdentity === "string"
+      && record.conversation.sessionFileIdentity.length > 0
+      && typeof record.conversation.sessionPath === "string"
+      && record.conversation.sessionPath.length > 0
+      && typeof record.sessionId === "string"
+      && record.sessionId.length > 0
+    ));
+    if (state?.version === 4 && hasMaterializedRecovery) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 50));

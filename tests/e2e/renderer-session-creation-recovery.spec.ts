@@ -42,28 +42,25 @@ test("rechecks an unknown create outcome by exact creation identity without subm
   const creationId = creationIdFrom(await recordedCommandDetails(page));
 
   const created = session("created", "未命名对话", Date.now(), 0, "fallback");
-  const tui = session("tui", "TUI 同时创建", Date.now() + 1, 0, "fallback");
   await setMockAgentResponseResult(page, "session.creation.resolve", {
     status: "materialized",
     creationId,
     sessionId: created.id,
+    sessionFileIdentity: created.fileIdentity,
     sessionPath: created.path
   });
-  await queueSessionCatalogRefresh(page, { revision: 2, items: [tui, created, existing] });
   await clearRecordedCommands(page);
   await page.getByRole("button", { name: "重新检查" }).click();
 
   await expect(page.getByRole("button", { name: "恢复任务" })).toBeVisible();
   await expect(page.getByRole("button", { name: "重新检查" })).toHaveCount(0);
-  await expect.poll(async () => (await recordedCommandDetails(page)).some((command) => (
-    command.type === "session.catalog.query"
-  ))).toBe(true);
   const recoveryCommands = await recordedCommandDetails(page);
   expect(recoveryCommands).toContainEqual(expect.objectContaining({
     type: "session.creation.resolve",
     payload: { creationId },
     context: { scope: "workspace", workspaceId: expect.any(String) }
   }));
+  expect(recoveryCommands.some((command) => command.type === "session.catalog.query")).toBe(false);
   expect(recoveryCommands.some((command) => command.type === "session.create")).toBe(false);
 });
 
@@ -95,6 +92,7 @@ test("recovers an unknown create across Host replacement without assigning the o
     status: "materialized",
     creationId,
     sessionId: created.id,
+    sessionFileIdentity: created.fileIdentity,
     sessionPath: created.path
   });
   await queueSessionCatalogRefresh(page, { revision: 2, items: [tui, created, existing] });
@@ -136,6 +134,7 @@ test("restores a persisted creation placeholder and reconciles it after the init
         status: "materialized",
         creationId,
         sessionId: created.id,
+        sessionFileIdentity: created.fileIdentity,
         sessionPath: created.path
       }
     }
@@ -169,6 +168,7 @@ test("reconciles a creation-only Workbench after Host replacement without invent
     status: "materialized",
     creationId,
     sessionId: created.id,
+    sessionFileIdentity: created.fileIdentity,
     sessionPath: created.path
   });
   await clearRecordedCommands(page);
@@ -200,6 +200,7 @@ function session(
 ): FixtureSessionSummary {
   return {
     id: `catalog-session-${id}`,
+    fileIdentity: `session-file-fixture-${id}`,
     path: `/sessions/catalog-${id}.jsonl`,
     cwd: "/workspace/catalog",
     name,

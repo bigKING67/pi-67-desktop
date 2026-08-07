@@ -1,10 +1,7 @@
 import { isAbsolute } from "node:path";
 import { isTaskLifecycle } from "./workbench-state-lifecycle.js";
 import { MAX_WORKSPACE_PATH_LENGTH } from "./workspace-identity.js";
-import type {
-  RuntimeRecoveryRecord,
-  SessionConversationKey
-} from "./workbench-state-contract.js";
+import type { RuntimeRecoveryRecord, SessionConversationKey } from "./workbench-state-types.js";
 
 const MAX_TASK_ID_LENGTH = 200;
 const MAX_SESSION_ID_LENGTH = 1_024;
@@ -68,16 +65,26 @@ function parseSessionConversationKey(
   workspaceIds: ReadonlySet<string>
 ): SessionConversationKey | undefined {
   if (
-    !isRecordWithAllowedKeys(value, ["kind", "workspaceId", "sessionPath"])
+    !isRecordWithAllowedKeys(value, ["kind", "workspaceId", "sessionFileIdentity", "sessionPath"])
     || value.kind !== "session"
     || !isKnownWorkspaceId(value.workspaceId, workspaceIds)
+    || !isBoundedSessionFileIdentity(value.sessionFileIdentity)
     || !isAbsoluteBoundedPath(value.sessionPath)
   ) return undefined;
-  return { kind: "session", workspaceId: value.workspaceId, sessionPath: value.sessionPath };
+  return {
+    kind: "session",
+    workspaceId: value.workspaceId,
+    sessionFileIdentity: value.sessionFileIdentity,
+    sessionPath: value.sessionPath
+  };
 }
 
 function conversationIdentity(conversation: SessionConversationKey): string {
-  return `session:${conversation.workspaceId}:${normalizePath(conversation.sessionPath)}`;
+  return `session:${conversation.workspaceId}:${conversation.sessionFileIdentity}`;
+}
+
+function isBoundedSessionFileIdentity(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= MAX_WORKSPACE_PATH_LENGTH + 64;
 }
 
 function isKnownWorkspaceId(value: unknown, workspaceIds: ReadonlySet<string>): value is string {
@@ -89,10 +96,6 @@ function isAbsoluteBoundedPath(value: unknown): value is string {
     && value.length > 0
     && value.length <= MAX_WORKSPACE_PATH_LENGTH
     && isAbsolute(value);
-}
-
-function normalizePath(path: string): string {
-  return process.platform === "win32" ? path.toLowerCase() : path;
 }
 
 function isBoundedId(value: unknown, maximumLength: number): value is string {

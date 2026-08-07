@@ -23,6 +23,7 @@ const operation: OperationView = {
   lifecycle: "waiting-input",
   cancellable: true,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   startedAt: 1
 };
@@ -89,6 +90,7 @@ function installSession(sessionGeneration: number): void {
 function snapshot(): SessionSnapshot {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     cwd: "/workspace",
     streaming: false,
     messages: [],

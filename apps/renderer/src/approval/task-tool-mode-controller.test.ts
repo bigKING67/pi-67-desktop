@@ -39,6 +39,7 @@ describe("task Tool mode controller", () => {
         taskId: "task-a",
         taskGeneration: 1,
         sessionId: "session-task-a",
+        sessionFileIdentity: "session-file-task-a",
         sessionGeneration: 3
       } }
     );
@@ -81,6 +82,7 @@ function task(id: string, toolMode: "ask" | "auto" | "yolo") {
     conversation: {
       kind: "session" as const,
       workspaceId: "workspace-a",
+      sessionFileIdentity: `session-file-${id}`,
       sessionPath: `/sessions/${id}.jsonl`
     },
     workspaceId: "workspace-a",

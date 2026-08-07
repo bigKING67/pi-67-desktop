@@ -1,14 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
-import { constants, createReadStream, createWriteStream } from "node:fs";
+import {
+  constants,
+  createReadStream,
+  createWriteStream,
+  type BigIntStats
+} from "node:fs";
 import {
   chmod,
   lstat,
   mkdir,
   open,
-  realpath,
+  readdir,
   rename,
   rm,
-  stat,
   writeFile
 } from "node:fs/promises";
 import { basename, isAbsolute, join, resolve } from "node:path";
@@ -17,9 +21,11 @@ import { Transform } from "node:stream";
 import {
   MAX_PROMPT_ATTACHMENT_BYTES,
   MAX_PROMPT_ATTACHMENT_COUNT,
+  MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   MAX_PROMPT_ATTACHMENT_NAME_CHARS,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES,
+  type PromptAttachmentStagingDiagnostics,
   type PromptAttachmentKind,
   type StagedPromptAttachment
 } from "@pi67/protocol";
@@ -33,11 +39,17 @@ export interface PromptAttachmentStageCandidate {
   data?: ArrayBuffer;
 }
 
+export {
+  cleanupStalePromptAttachmentRuns
+} from "./prompt-attachment-stale-run-cleanup.js";
+
 interface PromptAttachmentManifest extends StagedPromptAttachment {
   version: 1;
   sha256: string;
   stagedAt: number;
 }
+
+const MAX_DIAGNOSTIC_STAGING_ENTRIES = 256;
 
 export class PromptAttachmentStagingService {
   readonly root: string;
@@ -54,8 +66,17 @@ export class PromptAttachmentStagingService {
     const candidates = validateCandidates(value);
     await this.ensureRoots();
     const staged: StagedPromptAttachment[] = [];
+    let inlineImageBytes = 0;
     try {
-      for (const candidate of candidates) staged.push(await this.stageOne(candidate));
+      for (const candidate of candidates) {
+        const attachment = await this.stageOne(candidate);
+        staged.push(attachment);
+        if (attachment.kind !== "image") continue;
+        inlineImageBytes += attachment.byteLength;
+        if (inlineImageBytes > MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES) {
+          throw new Error("Inline images exceed the 32 MiB per-draft limit.");
+        }
+      }
       return staged;
     } catch (error) {
       await Promise.all(staged.map((attachment) => this.releaseOne(attachment.id)));
@@ -75,6 +96,19 @@ export class PromptAttachmentStagingService {
     await rm(this.root, { recursive: true, force: true });
   }
 
+  async diagnostics(): Promise<PromptAttachmentStagingDiagnostics> {
+    const [drafts, claimed] = await Promise.all([
+      inspectStagingDirectory(this.draftRoot),
+      inspectStagingDirectory(this.claimedRoot)
+    ]);
+    return {
+      draftCount: drafts.directoryCount,
+      claimedCount: claimed.directoryCount,
+      invalidEntryCount: drafts.invalidEntryCount + claimed.invalidEntryCount,
+      truncated: drafts.truncated || claimed.truncated
+    };
+  }
+
   private async ensureRoots(): Promise<void> {
     await mkdir(this.draftRoot, { recursive: true, mode: 0o700 });
     await mkdir(this.claimedRoot, { recursive: true, mode: 0o700 });
@@ -90,7 +124,7 @@ export class PromptAttachmentStagingService {
     await mkdir(directory, { mode: 0o700 });
     try {
       const copied = candidate.path
-        ? await copyPathCandidate(candidate.path, payloadPath)
+        ? await copyPathCandidate(candidate, payloadPath)
         : await copyBufferCandidate(candidate, payloadPath);
       if (copied.byteLength !== candidate.byteLength) {
         throw new Error(`${candidate.name} changed while it was being attached. Select it again.`);
@@ -120,6 +154,32 @@ export class PromptAttachmentStagingService {
   private async releaseOne(id: string): Promise<void> {
     await rm(join(this.draftRoot, id), { recursive: true, force: true });
   }
+}
+
+async function inspectStagingDirectory(path: string): Promise<{
+  directoryCount: number;
+  invalidEntryCount: number;
+  truncated: boolean;
+}> {
+  const entries = await readdir(path, { withFileTypes: true }).catch((error: unknown) => {
+    if (isNodeError(error, "ENOENT")) return [];
+    throw error;
+  });
+  let directoryCount = 0;
+  let invalidEntryCount = 0;
+  for (const entry of entries.slice(0, MAX_DIAGNOSTIC_STAGING_ENTRIES)) {
+    if (entry.isDirectory() && !entry.isSymbolicLink()) directoryCount += 1;
+    else invalidEntryCount += 1;
+  }
+  return {
+    directoryCount,
+    invalidEntryCount,
+    truncated: entries.length > MAX_DIAGNOSTIC_STAGING_ENTRIES
+  };
+}
+
+function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function validateCandidates(value: unknown): PromptAttachmentStageCandidate[] {
@@ -166,30 +226,59 @@ function validateCandidates(value: unknown): PromptAttachmentStageCandidate[] {
   });
 }
 
-async function copyPathCandidate(sourcePath: string, destination: string): Promise<{ byteLength: number; sha256: string }> {
-  const sourceLstat = await lstat(sourcePath);
+async function copyPathCandidate(
+  candidate: PromptAttachmentStageCandidate,
+  destination: string
+): Promise<{ byteLength: number; sha256: string }> {
+  const sourcePath = candidate.path!;
+  const sourceLstat = await lstat(sourcePath, { bigint: true });
   if (sourceLstat.isSymbolicLink() || !sourceLstat.isFile()) {
     throw new Error("Attachment source must be a regular file, not a link or directory.");
   }
-  const canonicalPath = await realpath(sourcePath);
-  const canonicalStat = await stat(canonicalPath);
-  if (!canonicalStat.isFile()) throw new Error("Attachment source is not a regular file.");
-  if (canonicalStat.size > MAX_PROMPT_ATTACHMENT_BYTES) {
+  if (sourceLstat.size > BigInt(MAX_PROMPT_ATTACHMENT_BYTES)) {
     throw new Error("Attachment exceeds the 100 MiB per-file limit.");
   }
-  const handle = await open(canonicalPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const handle = await open(sourcePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
-    const openedStat = await handle.stat();
-    if (!openedStat.isFile() || openedStat.size !== canonicalStat.size) {
+    const openedStat = await handle.stat({ bigint: true });
+    if (!openedStat.isFile() || !samePhysicalFile(sourceLstat, openedStat)) {
       throw new Error("Attachment changed before it could be staged.");
     }
-    return await copyAndHash(
-      createReadStream(canonicalPath, { fd: handle.fd, autoClose: false }),
+    if (openedStat.size !== BigInt(candidate.byteLength) || selectedMtimeChanged(candidate.lastModified, openedStat)) {
+      throw new Error(`${candidate.name} changed after it was selected. Select it again.`);
+    }
+    const copied = await copyAndHash(
+      createReadStream(sourcePath, { fd: handle.fd, autoClose: false }),
       destination
     );
+    const completedStat = await handle.stat({ bigint: true });
+    if (!sameFileSnapshot(openedStat, completedStat) || copied.byteLength !== Number(completedStat.size)) {
+      throw new Error(`${candidate.name} changed while it was being attached. Select it again.`);
+    }
+    return copied;
   } finally {
     await handle.close();
   }
+}
+
+function samePhysicalFile(left: BigIntStats, right: BigIntStats): boolean {
+  return left.dev === right.dev
+    && left.ino === right.ino
+    && left.birthtimeNs === right.birthtimeNs;
+}
+
+function sameFileSnapshot(left: BigIntStats, right: BigIntStats): boolean {
+  return samePhysicalFile(left, right)
+    && left.size === right.size
+    && left.mtimeNs === right.mtimeNs
+    && left.ctimeNs === right.ctimeNs;
+}
+
+function selectedMtimeChanged(lastModified: number, opened: BigIntStats): boolean {
+  if (lastModified <= 0) return false;
+  const selectedMs = Math.trunc(lastModified);
+  const openedMs = Number(opened.mtimeNs / 1_000_000n);
+  return Math.abs(selectedMs - openedMs) > 1;
 }
 
 async function copyBufferCandidate(
@@ -248,7 +337,8 @@ function detectMimeType(header: Uint8Array, declared: string, name: string): str
 }
 
 function attachmentKind(mimeType: string, name: string): PromptAttachmentKind {
-  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "image/png" || mimeType === "image/jpeg"
+    || mimeType === "image/gif" || mimeType === "image/webp") return "image";
   if (mimeType.startsWith("audio/")) return "audio";
   if (mimeType.startsWith("video/")) return "video";
   if (/zip|gzip|tar|7z|rar/iu.test(mimeType) || /\.(?:zip|tar|tgz|gz)$/iu.test(name)) return "archive";

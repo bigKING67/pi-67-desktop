@@ -1,5 +1,6 @@
 import {
   MAX_RUNNING_TASKS,
+  conversationKeyIdentity,
   taskConsumesRunSlot,
   type ConversationKey,
   type RuntimeRecoveryRecord,
@@ -165,7 +166,7 @@ export function createRendererWorkbenchStore() {
       const matching = taskForConversation(current.tasks, task.conversation);
       const id = matching?.id ?? task.id;
       const existing = current.tasks[id];
-      const nextTask = { ...existing, ...task, id };
+      const nextTask = normalizeMaterializedTask({ ...existing, ...task, id });
       set({
         tasks: { ...current.tasks, [id]: nextTask },
         runtimeTaskOrder: existing ? current.runtimeTaskOrder : [...current.runtimeTaskOrder, id],
@@ -183,7 +184,7 @@ export function createRendererWorkbenchStore() {
       const current = get();
       const task = current.tasks[taskId];
       if (!task) return false;
-      const next = { ...task, ...patch, id: taskId };
+      const next = normalizeMaterializedTask({ ...task, ...patch, id: taskId });
       const taskWasSelected = current.selectedSurface?.kind === "conversation"
         && sameConversation(current.selectedSurface.conversation, task.conversation);
       const taskWasSettingsReturn = current.settingsReturnSurface?.kind === "conversation"
@@ -311,15 +312,11 @@ export function taskForConversation(
   tasks: Record<TaskId, RendererWorkbenchTask>,
   conversation: ConversationKey
 ): RendererWorkbenchTask | undefined {
-  const identity = rendererConversationIdentity(conversation);
-  return Object.values(tasks).find((task) => rendererConversationIdentity(task.conversation) === identity);
+  const identity = conversationKeyIdentity(conversation);
+  return Object.values(tasks).find((task) => conversationKeyIdentity(task.conversation) === identity);
 }
 
-export function rendererConversationIdentity(conversation: ConversationKey): string {
-  return conversation.kind === "session"
-    ? `session:${conversation.workspaceId}:${conversation.sessionPath}`
-    : `provisional:${conversation.workspaceId}:${conversation.draftId}`;
-}
+export { conversationKeyIdentity as rendererConversationIdentity };
 
 export function selectedWorkbenchTask(state: RendererWorkbenchState): RendererWorkbenchTask | undefined {
   return state.selectedSurface?.kind === "conversation"
@@ -355,7 +352,8 @@ function taskFromRecovery(record: RuntimeRecoveryRecord): RendererWorkbenchTask 
     runtime: stoppedRuntime(record.lastKnownLifecycle),
     title: "未命名会话",
     titleSource: "fallback",
-    ...(record.conversation.kind === "session" ? { sessionPath: record.conversation.sessionPath } : {}),
+    sessionFileIdentity: record.conversation.sessionFileIdentity,
+    sessionPath: record.conversation.sessionPath,
     hasDraft: false,
     attachmentCount: 0,
     toolMode: "auto",
@@ -434,7 +432,17 @@ function workspaceForSurface(surface: WorkbenchSurface | undefined): WorkspaceId
 }
 
 function sameConversation(left: ConversationKey, right: ConversationKey): boolean {
-  return rendererConversationIdentity(left) === rendererConversationIdentity(right);
+  return conversationKeyIdentity(left) === conversationKeyIdentity(right);
+}
+
+function normalizeMaterializedTask(task: RendererWorkbenchTask): RendererWorkbenchTask {
+  return task.conversation.kind === "session"
+    ? {
+        ...task,
+        sessionFileIdentity: task.conversation.sessionFileIdentity,
+        sessionPath: task.conversation.sessionPath
+      }
+    : task;
 }
 
 function uniqueWorkspaceIds(

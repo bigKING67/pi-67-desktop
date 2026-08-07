@@ -39,6 +39,7 @@ describe("renderer Agent event projection matrix", () => {
       lifecycle: "running" as const,
       cancellable: true,
       sessionId: "session-background",
+      sessionFileIdentity: "session-file-session-background",
       sessionGeneration: 2,
       startedAt: 1
     } };
@@ -135,6 +136,7 @@ function task(id: "active" | "background") {
     conversation: {
       kind: "session" as const,
       workspaceId: "workspace-a",
+      sessionFileIdentity: `session-file-${id}`,
       sessionPath: `/sessions/${id}.jsonl`
     },
     workspaceId: "workspace-a",

@@ -1,4 +1,5 @@
 import type { DoctorReport } from "@pi67/domain";
+import type { DesktopRecoverySnapshot, RuntimeDiagnostics } from "@pi67/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { doctorStore } from "./doctor-store.js";
 
@@ -16,11 +17,15 @@ describe("doctor store", () => {
     doctorStore.getState().begin();
     expect(doctorStore.getState()).toMatchObject({
       report: undefined,
+      diagnostics: undefined,
+      recovery: undefined,
       running: true,
+      recoveryLoading: true,
       error: undefined
     });
 
     doctorStore.getState().complete(report);
+    doctorStore.getState().finish();
     expect(doctorStore.getState()).toMatchObject({
       report,
       running: false,
@@ -37,4 +42,52 @@ describe("doctor store", () => {
       error: "Doctor unavailable"
     });
   });
+
+  it("keeps Host and Desktop recovery projections independent", () => {
+    doctorStore.getState().begin();
+    doctorStore.getState().completeRecovery(recoverySnapshot);
+    doctorStore.getState().completeDiagnostics(runtimeDiagnostics);
+    doctorStore.getState().complete(report);
+    doctorStore.getState().fail("Host response timed out after the event completed");
+
+    expect(doctorStore.getState()).toMatchObject({
+      report,
+      diagnostics: runtimeDiagnostics,
+      recovery: recoverySnapshot,
+      running: false,
+      recoveryLoading: false,
+      error: "Host response timed out after the event completed"
+    });
+  });
 });
+
+const recoverySnapshot: DesktopRecoverySnapshot = {
+  generatedAt: 2,
+  previousRunExitStatus: "clean",
+  workspaces: {
+    total: 1,
+    available: 1,
+    missing: 0,
+    identityChanged: 0,
+    needsConfirmation: 0,
+    unavailable: 0,
+    trusted: 1,
+    trustUnknown: 0,
+    pathOnlyIdentity: 0
+  },
+  pendingSessionCreations: 0,
+  attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
+};
+
+const runtimeDiagnostics: RuntimeDiagnostics = {
+  generatedAt: 3,
+  application: "π",
+  piSdkVersion: "0.81.1",
+  platform: "darwin",
+  architecture: "arm64",
+  node: "24.18.0",
+  sessionConfigured: false,
+  sessionFileConfigured: false,
+  extensionCount: 0,
+  extensionErrors: []
+};

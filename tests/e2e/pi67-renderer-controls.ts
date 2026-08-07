@@ -1,20 +1,14 @@
 import type { Page } from "@playwright/test";
-import type { FixtureMessage } from "./pi67-renderer-fixture.js";
-import type { FixtureResyncOperations } from "./pi67-renderer-fixture-types.js";
+import type {
+  FixtureMessage,
+  FixtureResyncOperations,
+  MockEventOptions
+} from "./pi67-renderer-fixture-types.js";
 
 interface MockProtocolError {
   code: string;
   message: string;
   recoverable: boolean;
-}
-
-interface MockEventOptions {
-  hostEpoch?: number;
-  operationId?: string;
-  sequence?: number;
-  taskSequence?: number;
-  sessionId?: string;
-  sessionGeneration?: number;
 }
 
 export interface RecordedCommand {
@@ -98,6 +92,7 @@ export async function replaceMockSessionProjection(
     state.snapshot = {
       ...state.snapshot,
       sessionId: nextSessionId,
+      sessionFileIdentity: `session-file-fixture-${nextSessionId}`,
       messages: visibleMessages,
       messagePage: {
         ...(visibleMessages[0] === undefined ? {} : { startCursor: visibleMessages[0].id }),

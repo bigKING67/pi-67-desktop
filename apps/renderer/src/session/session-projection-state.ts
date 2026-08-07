@@ -38,7 +38,7 @@ export interface SessionUsageUpdate {
 }
 
 export interface SessionProjectionResetOptions {
-  preserveRecoverySessionPath?: boolean;
+  preserveRecoverySessionIdentity?: boolean;
 }
 
 export interface SessionProjectionData {
@@ -49,6 +49,7 @@ export interface SessionProjectionData {
   queue: SessionQueueProjection | undefined;
   resources: ResourceSummary[] | undefined;
   usage: SessionSnapshot["stats"];
+  recoverySessionFileIdentity: string | undefined;
   recoverySessionPath: string | undefined;
   revisions: SessionProjectionRevisions;
 }

@@ -36,6 +36,7 @@ export function workbenchDescriptorFixture(
     id,
     displayName: id,
     identity: { canonicalPath, device: "1", inode: ino, birthtimeNs: "3", assurance: "filesystem" },
+    lastVerifiedAt: 1,
     trust: "trusted",
     trustProvenance: "native-picker",
     availability: "available"

@@ -130,7 +130,8 @@ describe("Extension package controller", () => {
       filtered: false,
       installed: true,
       displayName: "Pi Settings",
-      version: "1.2.3"
+      version: "1.2.3",
+      trustState: "user-installed-observed"
     }]);
     store.begin("workspace-a", "checking");
     store.installUpdates("workspace-a", [{
@@ -161,6 +162,29 @@ describe("Extension package controller", () => {
       message: "1.2.3 → 1.3.0 · 全局扩展包 · Pi 资源已重新加载。"
     });
   });
+
+  it("does not announce success when the durable package result is ambiguous", async () => {
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [{
+        source: "npm:example",
+        scope: "global",
+        enabled: true,
+        filtered: false,
+        installed: true,
+        trustState: "unverified",
+        trustReason: "mutation-ambiguous"
+      }],
+      total: 1,
+      changed: true,
+      receiptState: "ambiguous"
+    } as never);
+
+    await expect(installExtensionPackage("npm:example", "global", "workspace-a")).resolves.toBe(false);
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "扩展包操作结果需要核对"
+    });
+  });
 });
 
 function registerWorkspace(
@@ -184,6 +208,7 @@ function task(id: string, workspaceId: string, lifecycle: "running") {
     conversation: {
       kind: "session" as const,
       workspaceId,
+      sessionFileIdentity: `session-file-${id}`,
       sessionPath: `/sessions/${id}.jsonl`
     },
     workspaceId,

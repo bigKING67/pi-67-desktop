@@ -51,7 +51,6 @@ export type RuntimeInitializationStage =
   | "dispose-current"
   | "create-session"
   | "reload-configuration"
-  | "update-catalog"
   | "project-snapshot";
 
 export interface RuntimeInitializationObservation {

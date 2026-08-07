@@ -19,6 +19,7 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
   const recentMessages = messages.slice(-100);
   return {
     sessionId: "session-test",
+    sessionFileIdentity: "session-file-fixture-demo",
     sessionPath: "/Users/test/.pi/agent/sessions/demo.jsonl",
     cwd: "/Users/test/Projects/pi-demo",
     streaming: false,

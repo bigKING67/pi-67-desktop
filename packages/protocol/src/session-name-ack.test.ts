@@ -22,6 +22,7 @@ describe("session name acknowledgement", () => {
         accepted: true,
         hostEpoch: 5,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 3,
         eventSequence: 12
       }

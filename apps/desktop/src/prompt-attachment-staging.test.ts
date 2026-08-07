@@ -1,14 +1,30 @@
-import { access, lstat, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MAX_PROMPT_ATTACHMENT_BYTES,
   MAX_PROMPT_ATTACHMENT_COUNT,
+  MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES
 } from "@pi67/protocol";
 import { afterEach, describe, expect, it } from "vitest";
-import { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
+import {
+  cleanupStalePromptAttachmentRuns,
+  PromptAttachmentStagingService
+} from "./prompt-attachment-staging.js";
 
 const roots: string[] = [];
 
@@ -17,15 +33,40 @@ afterEach(async () => {
 });
 
 describe("PromptAttachmentStagingService", () => {
+  it("reports bounded draft, claimed, invalid, and truncated staging counts", async () => {
+    const fixture = await createFixture();
+    await Promise.all([
+      mkdir(join(fixture.service.draftRoot, "draft-valid"), { recursive: true }),
+      mkdir(join(fixture.service.claimedRoot, "claimed-valid"), { recursive: true })
+    ]);
+    await writeFile(join(fixture.service.draftRoot, "invalid-file"), "invalid", "utf8");
+
+    await expect(fixture.service.diagnostics()).resolves.toEqual({
+      draftCount: 1,
+      claimedCount: 1,
+      invalidEntryCount: 1,
+      truncated: false
+    });
+
+    await Promise.all(Array.from({ length: 257 }, (_, index) => (
+      mkdir(join(fixture.service.claimedRoot, `claimed-${String(index).padStart(3, "0")}`))
+    )));
+    const truncated = await fixture.service.diagnostics();
+    expect(truncated.truncated).toBe(true);
+    expect(truncated.claimedCount).toBeLessThanOrEqual(256);
+  });
+
   it("streams a regular path into a private draft with detected metadata and integrity", async () => {
     const fixture = await createFixture();
     const source = join(fixture.parent, "input.txt");
     await writeFile(source, "attachment body", "utf8");
+    const selected = await stat(source);
 
     const [attachment] = await fixture.service.stage([candidate({
       name: "input.txt",
       mimeType: "",
       byteLength: 15,
+      lastModified: selected.mtimeMs,
       path: source
     })]);
 
@@ -78,12 +119,43 @@ describe("PromptAttachmentStagingService", () => {
       name: "source.txt",
       byteLength: 3,
       path: source
-    })])).rejects.toThrow("changed while it was being attached");
+    })])).rejects.toThrow("changed after it was selected");
     await expect(fixture.service.stage([candidate({
       name: "clipboard.bin",
       byteLength: MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES + 1,
       data: new ArrayBuffer(MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES + 1)
     })])).rejects.toThrow("16 MiB clipboard attachment limit");
+  });
+
+  it("rejects a same-size path replacement after the picker metadata was captured", async () => {
+    const fixture = await createFixture();
+    const source = join(fixture.parent, "selected.txt");
+    await writeFile(source, "first", "utf8");
+    const selected = await stat(source);
+    await writeFile(source, "later", "utf8");
+    await utimes(source, new Date(selected.atimeMs), new Date(selected.mtimeMs + 5_000));
+
+    await expect(fixture.service.stage([candidate({
+      name: "selected.txt",
+      byteLength: 5,
+      lastModified: selected.mtimeMs,
+      path: source
+    })])).rejects.toThrow("changed after it was selected");
+    expect(await draftDirectories(fixture.service.draftRoot)).toEqual([]);
+  });
+
+  it("bounds native inline image bytes independently from ordinary attachment storage", async () => {
+    const fixture = await createFixture();
+    const first = pngBuffer(MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES / 2);
+    const second = pngBuffer(MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES / 2);
+    const overflow = pngBuffer(4);
+
+    await expect(fixture.service.stage([
+      candidate({ name: "first.png", byteLength: first.byteLength, data: first }),
+      candidate({ name: "second.png", byteLength: second.byteLength, data: second }),
+      candidate({ name: "overflow.png", byteLength: overflow.byteLength, data: overflow })
+    ])).rejects.toThrow("32 MiB per-draft limit");
+    expect(await draftDirectories(fixture.service.draftRoot)).toEqual([]);
   });
 
   it("enforces count, per-file, and aggregate limits before writing drafts", async () => {
@@ -178,6 +250,7 @@ describe("PromptAttachmentStagingService", () => {
       bufferCandidate("archive.gz", [0x1f, 0x8b]),
       bufferCandidate("track.bin", [0], "audio/wav"),
       bufferCandidate("movie.bin", [0], "video/mp4"),
+      bufferCandidate("vector.svg", [0], "image/svg+xml"),
       bufferCandidate("document.rtf", [0]),
       bufferCandidate("archive.tar", [0]),
       bufferCandidate("note.txt", [0]),
@@ -197,6 +270,7 @@ describe("PromptAttachmentStagingService", () => {
       { mimeType: "application/gzip", kind: "archive" },
       { mimeType: "audio/wav", kind: "audio" },
       { mimeType: "video/mp4", kind: "video" },
+      { mimeType: "image/svg+xml", kind: "file" },
       { mimeType: "application/rtf", kind: "document" },
       { mimeType: "application/x-tar", kind: "archive" },
       { mimeType: "text/plain", kind: "document" },
@@ -216,6 +290,83 @@ describe("PromptAttachmentStagingService", () => {
 
     await expect(lstat(fixture.service.root)).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("quarantines and removes only stale UUID run directories", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "pi67-attachment-cleanup-"));
+    roots.push(parent);
+    const runs = join(parent, "runs");
+    const current = "00000000-0000-4000-8000-000000000001";
+    const stale = "00000000-0000-4000-8000-000000000002";
+    const fresh = "00000000-0000-4000-8000-000000000003";
+    await Promise.all([
+      mkdir(join(runs, current), { recursive: true }),
+      mkdir(join(runs, stale), { recursive: true }),
+      mkdir(join(runs, fresh), { recursive: true })
+    ]);
+    const now = Date.now();
+    await Promise.all([
+      utimes(join(runs, current), new Date(now - 48 * 60 * 60 * 1_000), new Date(now - 48 * 60 * 60 * 1_000)),
+      utimes(join(runs, stale), new Date(now - 48 * 60 * 60 * 1_000), new Date(now - 48 * 60 * 60 * 1_000)),
+      utimes(join(runs, fresh), new Date(now), new Date(now))
+    ]);
+
+    await expect(cleanupStalePromptAttachmentRuns(runs, current, {
+      now,
+      createQuarantineId: () => "00000000-0000-4000-8000-000000000004"
+    })).resolves.toMatchObject({ removedRunCount: 1, errorCount: 0 });
+
+    await expect(lstat(join(runs, stale))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(lstat(join(runs, current))).resolves.toMatchObject({});
+    await expect(lstat(join(runs, fresh))).resolves.toMatchObject({});
+  });
+
+  it("refuses links, non-directories, and non-UUID entries during stale cleanup", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "pi67-attachment-cleanup-safety-"));
+    roots.push(parent);
+    const runs = join(parent, "runs");
+    const outside = join(parent, "outside");
+    const linked = "00000000-0000-4000-8000-000000000010";
+    const file = "00000000-0000-4000-8000-000000000011";
+    await Promise.all([mkdir(runs), mkdir(outside)]);
+    await symlink(outside, join(runs, linked), process.platform === "win32" ? "junction" : "dir");
+    await writeFile(join(runs, file), "not a run directory");
+    await mkdir(join(runs, "not-a-uuid"));
+
+    await expect(cleanupStalePromptAttachmentRuns(
+      runs,
+      "00000000-0000-4000-8000-000000000012",
+      { staleAfterMs: 0 }
+    )).resolves.toMatchObject({ removedRunCount: 0, errorCount: 0 });
+
+    await expect(lstat(outside)).resolves.toMatchObject({});
+    await expect(lstat(join(runs, linked))).resolves.toMatchObject({});
+    await expect(lstat(join(runs, file))).resolves.toMatchObject({});
+  });
+
+  it("bounds each stale-run cleanup pass to sixteen directories", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "pi67-attachment-cleanup-bound-"));
+    roots.push(parent);
+    const runs = join(parent, "runs");
+    await mkdir(runs);
+    const now = Date.now();
+    const runIds = Array.from({ length: 18 }, (_, index) => (
+      `00000000-0000-4000-8000-${String(index + 100).padStart(12, "0")}`
+    ));
+    await Promise.all(runIds.map(async (runId) => {
+      const path = join(runs, runId);
+      await mkdir(path);
+      await utimes(path, new Date(now - 48 * 60 * 60 * 1_000), new Date(now - 48 * 60 * 60 * 1_000));
+    }));
+
+    const result = await cleanupStalePromptAttachmentRuns(
+      runs,
+      "00000000-0000-4000-8000-000000000099",
+      { now }
+    );
+
+    expect(result).toMatchObject({ removedRunCount: 16, errorCount: 0 });
+    expect(await readdir(runs)).toHaveLength(2);
+  });
 });
 
 function candidate(overrides: {
@@ -224,15 +375,22 @@ function candidate(overrides: {
   path?: string;
   data?: ArrayBuffer;
   mimeType?: string;
+  lastModified?: number;
 }) {
   return {
     name: overrides.name,
     mimeType: overrides.mimeType ?? "application/octet-stream",
     byteLength: overrides.byteLength,
-    lastModified: 1,
+    lastModified: overrides.lastModified ?? 0,
     ...(overrides.path === undefined ? {} : { path: overrides.path }),
     ...(overrides.data === undefined ? {} : { data: overrides.data })
   };
+}
+
+function pngBuffer(byteLength: number): ArrayBuffer {
+  const bytes = new Uint8Array(byteLength);
+  bytes.set([0x89, 0x50, 0x4e, 0x47]);
+  return bytes.buffer;
 }
 
 function bufferCandidate(name: string, bytes: number[], mimeType = "") {

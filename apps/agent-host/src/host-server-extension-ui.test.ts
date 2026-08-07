@@ -1,6 +1,7 @@
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   type ProtocolPort,
@@ -21,7 +22,7 @@ describe("AgentHostServer extension UI", () => {
         return () => undefined;
       },
       initialize: async () => emptySnapshot(),
-      getIdentity: () => ({ sessionId: "session-extension", sessionGeneration: 4 }),
+      getIdentity: () => ({ sessionId: "session-extension", sessionFileIdentity: "session-file-session-extension", sessionGeneration: 4 }),
       getSnapshot: () => emptySnapshot(),
       getTaskToolMode: () => "auto" as const,
       submitPrompt: async () => {
@@ -42,7 +43,7 @@ describe("AgentHostServer extension UI", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-extension", hostInstanceId: "host-extension", hostEpoch: 9 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-extension",
@@ -136,6 +137,7 @@ class FakePort implements ProtocolPort {
 function emptySnapshot() {
   return {
     sessionId: "session-extension",
+    sessionFileIdentity: "session-file-session-extension",
     cwd: "/tmp",
     streaming: false,
     messages: [],

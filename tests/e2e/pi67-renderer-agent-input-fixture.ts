@@ -1,4 +1,7 @@
-import { PROTOCOL_REVISION } from "../../packages/protocol/src/index.js";
+import {
+  PROTOCOL_REVISION,
+  PROTOCOL_VERSION
+} from "../../packages/protocol/src/index.js";
 import {
   MOCK_EXTENSION_CATALOG,
   MOCK_RUNTIME_CAPABILITIES
@@ -30,6 +33,7 @@ export function createMockAgentFixtureInput(
       ))
     ),
     fixtureSnapshot: createMockSessionSnapshot(messages),
+    fixtureProtocolVersion: PROTOCOL_VERSION,
     fixtureProtocolRevision: PROTOCOL_REVISION
   };
 }

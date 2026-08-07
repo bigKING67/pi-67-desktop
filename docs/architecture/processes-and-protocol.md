@@ -21,7 +21,8 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 - `packages/domain`：无运行时依赖的策略、状态和 renderer-facing view。
 - `packages/protocol`：command/event/response envelope、schema 验证和请求相关性。
 - `packages/pi-runtime`：Pi SDK 适配、session/resource/model、stream batch、extension UI、
-  project trust、一次性批准和 disposable metadata Session Catalog。
+  project trust、一次性批准、disposable metadata Session Catalog，以及由 Pi 配置与 Agent Host
+  Workspace 文件共同复用的有界原子文件 replace。
   `PiSdkRuntime` 只保留 `AgentRuntime` 操作语义；`RuntimeSessionBindings` 独占 Pi SDK
   `AgentSessionRuntime`、services、session generation、extension rebind 和 transition 生命周期。
 - `apps/agent-host`：protocol command router、错误脱敏和 runtime 生命周期。
@@ -30,10 +31,27 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 
 依赖方向由 `eng/quality/check-architecture.mjs` 检查，并包含循环依赖检测。
 
+## Workspace identity and atomic file mutations
+
+Electron Main 的 Workspace Registry 保存稳定 `workspaceId`、native canonical path、lossless
+`dev` / `ino` / `birthtimeNs` 物理身份（可用时）和最近一次成功验证时间。启动恢复只在物理身份仍匹配时
+恢复原 trust；路径缺失按 offline 状态保留注册但禁止 Host admission，相同路径出现不同物理目录时标记
+identity changed 并撤销继承 trust。只有 path-only 证据时，即使 canonical path 字符串相同也进入
+`needs-confirmation`，必须经 native picker 明确修复。用户通过 picker 选择移动后的同一目录或明确选择替代
+目录属于显式 rebind；Main 不扫描无关用户目录猜测 relocation。
+
+Pi Provider/configuration、Context Markdown 和 Agent Host Workspace file save 使用同一
+`safeAtomicReplaceFile`：在目标同目录以 `wx` 创建临时文件、写入并执行 file fsync，在调用方最后一次
+opaque revision 校验后 atomic rename，再 best-effort sync parent directory。Windows rename 仅对
+`EACCES` / `EPERM` / `EBUSY` 使用 25/50/100/200/400 ms 有界退避；`EEXIST`、revision conflict、
+path escape、invalid payload 和其他错误不重试。Pi 配置仍在 path-scoped lock 内校验 aggregate revision；
+Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍等于本次写入版本才允许回滚，外部
+再次修改会保留冲突而不是覆盖。该合同不把多个独立用户操作伪装成不存在的多文件事务。
+
 ## Startup and recovery
 
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。
-2. 用户选定 workspace 或运行依赖 Agent Host 的 Doctor 后，renderer 通过窄 IPC 请求按需启动。
+2. 用户选定 workspace 或运行依赖 Agent Host 的恢复与诊断后，renderer 通过窄 IPC 请求按需启动。
 3. Agent Host `spawn` 后，Main 转移新的 MessagePort；窗口 reload 的 `did-finish-load` 以及 renderer
    的显式恢复请求都会为仍存活的同一 Host broker 新 Port，而不会 fork 第二个 Host。若 Host 正处于
    supervised restart backoff，恢复请求不能绕过退避计时器。
@@ -56,7 +74,10 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
    `hostEpoch` 变化才用当前 workspace、trust、approval mode 与 session path 重新初始化。
 
 打包环境无条件忽略 `PI67_RENDERER_DEV_URL`，只加载 `app://pi67/index.html`；开发环境只接受
-精确的 `http://127.0.0.1:5173`。导航、redirect 和 Port attach 都重新验证当前 document。
+精确的 `http://127.0.0.1:5173`。生产协议解析只接受 exact `app://pi67` authority，拒绝 credentials、
+port、query、fragment、malformed/repeated percent encoding、encoded separator、control byte、dot segment、
+drive/UNC/ADS 形式，并在单次解码后验证 resolved Renderer root containment。导航、redirect 和 Port attach
+都重新验证当前 document。
 恢复不是成功声明：same-host renewal 必须完成握手和权威 resync，Host replacement 必须完成握手、
 `runtime.initialize`、`runtime.ready` 携带的新 `SessionSnapshot` 和对应窄 acknowledgement，之后 UI
 才能离开 recovering。
@@ -68,8 +89,11 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 
 1. 清除 Host restart、poisoned-runtime replacement 和 Port renewal；新的 connect、attach 与窗口创建全部拒绝。
 2. Main 发送严格校验的 `agent-host-shutdown` parent message，只携带 reason 和 100-10000ms deadline。
-3. Agent Host 关闭 Scheduler admission，使未开始的 exclusive/recovery/Queue work 失效；新的请求返回
-   `CONNECTION_CLOSED`，不能在关闭过程中静默执行。
+3. Agent Host 关闭 Scheduler 与 managed-resource admission，使未开始的 exclusive/recovery/Queue/Package
+   work 失效；新的请求返回 `CONNECTION_CLOSED`，不能在关闭过程中静默执行。Host-owned Package Worker
+   supervisor 同时拒绝新操作，对所有 active worker 执行 graceful tree termination，再在有界 grace 后执行
+   forced tree termination，并等待 root exit。POSIX worker 以 detached process group 启动；Windows 使用
+   `taskkill /PID <pid> /T` 与 `/F` 的两阶段 tree cleanup。只有观察到退出才算该 worker 已清理。
 4. Runtime 以 `runtime-dispose` 取消 Extension/Approval 请求；Operation Registry 使用关闭专用语义尝试
    abort active Operation。成功产生一次 `operation.cancelled`，不可取消、abort failure 或 abort timeout 产生
    一次 `operation.lost`，但不触发 poisoned-runtime restart。
@@ -82,16 +106,64 @@ Supervisor `stop()` 是 idempotent Promise。graceful 路径等待 Host 实际�
 路径都保持 stopping fence，不能因 late exit、late parent message、`activate` 或 `did-finish-load` 复活 Host。
 Shutdown metadata 不包含 Prompt、Session path、命令、source、raw Tool payload 或错误堆栈。
 
+## Package operation isolation
+
+Extension Package 的 check/install/update/uninstall 不在长期存活的 Pi Runtime 对象中执行。Agent Host
+为每个操作启动一个 Electron-as-Node worker，但由同一个 Host-owned supervisor 持有全部 child record；
+Workspace 间不会各自创建无法统一关闭的 worker owner。每个 request 使用独立 correlation ID、最长 1 MiB
+的 JSON IPC response、最多 512 个结果项和字段级长度校验。oversize 或 malformed correlated response
+立即 fail closed，不能等待超时后猜测成功。
+
+Package worker 不继承 Agent Host 的完整环境。只允许私有 Node/npm/Git 路径、Package network settings
+locator、PATH、临时目录、home/profile locator、Windows system process variables 和 locale；Provider key、
+MCP bearer token、OAuth/Cookie、任意 npm auth 环境变量和 Session/Workspace secret 不传入。stdout/stderr
+均丢弃且不进入日志。Package worker 仅隔离 Package mutation；它不证明已安装第三方 Extension 的
+module import、factory、hook、Tool 或 MCP child 已隔离。
+
+Package mutation 的业务提交点位于 worker 返回之后。Host 先 reload 自己持有的 Pi Settings，再由
+`PackageTrustRegistry` 对当前安装目录做 bounded observation，最后把 redacted receipt 持久化到
+`<storageRoot>/package-mutation-receipts-v1/<owner digest>.json`。receipt 使用 `0700` 目录、`0600`
+文件、进程内串行化、跨进程 lock、2 MiB/512-record 上限和 `SafeAtomicIo` replace。它只保存 source、
+idempotency key、fingerprint、owner 的 SHA-256 digest，以及 bounded package name/version、manifest hash、
+content hash、directory identity digest 和时间戳；不保存 raw source、Git URL、安装路径、Workspace 路径、
+凭据、Prompt、源码正文、stdout/stderr 或文件列表。
+
+状态为 `reserved -> mutating -> active|removed|ambiguous`。`active` 需要 Main-Host Settings reload、当前
+observation 与 durable commit 全部成功；`removed` 需要目标 `(source, scope)` 在 reload 后确实不存在。
+Host replacement 遇到 terminal receipt 只重验当前 trust projection；`reserved`、`mutating`、`ambiguous`
+或 active receipt 对应的当前 drift 都返回 `ambiguous`，绝不再次调用 worker。Pi SDK 的 update 可能同时
+改变 global/project 同一 package identity，Host 会刷新另一 scope 已有 active receipt 的 observation。
+receipt commit 后的 Task `reloadResources()` 仍是独立阶段：失败会返回错误，但不撤销已证明的 Package
+提交，也不盲目重放副作用。
+
+`PackageTrustRegistry` 只把 `builtin-verified` 与 `user-installed-observed` 暴露给 Session 专用 Settings
+view，因此缺失、无 receipt、mutation ambiguous、identity/hash drift 或 inspection limited 的 configured
+Package 不会被 Pi ResourceLoader 隐式安装或加载。第三方 bounded content hash 排除 `.git` 与
+`node_modules`，限制 10,000 files、128 MiB、depth 32 和五秒；它不是 registry integrity、签名、provenance、
+完整依赖树证明或不可变文件系统 snapshot。
+
+当前 Pi SDK 0.83.0 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
+injection point。`DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
+utility process 内运行。Package worker 也不拥有第三方 Extension 自行启动的 MCP child。真正的 runtime
+isolation 需要上游 executor/proxy port、经审计的 loader/runner fork，或明确禁用 unsupported third-party
+execution；仓库不创建无真实调用方的 Extension Worker 空壳。
+
+Team MCP bootstrap 对 `<agentDir>/mcp.json` 使用 `SafeAtomicIo`：保留首次读取的 exact bytes 或 missing
+revision，写同目录私有临时文件并 flush，在 rename 前重新读取。revision 不一致返回
+`revision-conflict`，保留外部版本并清理临时文件；invalid JSON 仍保持原文件不变。文件只保存
+`bearerTokenEnv`，不会保存 bearer token。
+
 ## Protocol
 
-所有 envelope 使用 `protocolVersion: 3`：
+所有 envelope 使用 `protocolVersion: 4`：
 
 - hello/welcome：协商 `appInstanceId`、`hostInstanceId`、`hostEpoch`、初始 event sequence、
   capability、`idempotentControlMutations` 和 envelope byte budget；
 - request：`requestId`、`hostEpoch`、typed command/payload；replay-safe control mutation 还必须携带
   caller-stable `idempotencyKey`；
 - response：复用 `requestId` 和 command type，返回 typed result 或 redacted structured error；
-- event：单调递增 sequence，并按需携带 `sessionId`、`sessionGeneration` 与 `operationId`。
+- event：单调递增 sequence，并按需携带 `sessionId`、`sessionFileIdentity`、
+  `sessionGeneration` 与 `operationId`。
 
 Agent Host 对不可信 renderer 消息先执行 TypeBox envelope validation。命令 payload 的
 业务边界由 command handler 和 Pi SDK 再校验。可安全关联的无效请求立即返回
@@ -101,7 +173,8 @@ GIF，最多 8 张、单张最多 10 MiB、总计最多 30 MiB；每个 `data` �
 `AssetReference` / `asset.read` 合同，不复用 Prompt 输入数组。
 
 Renderer 对 Host event 不只校验 type-specific payload schema，还按完整事件清单校验 context：Session-scoped
-事件必须同时携带 `sessionId + sessionGeneration`，Operation/Turn/Approval 事件还必须携带
+事件必须同时携带 `sessionId + sessionFileIdentity + sessionGeneration`，Operation/Turn/Approval
+事件还必须携带
 `operationId`；bootstrap snapshot、Operation view、Workspace Change、Approval 和 Extension UI payload
 中的 authority 必须与 envelope 一致。新增事件类型若未声明 context requirement 会在 TypeScript 编译期失败。
 当前 Host 发来的 event-shaped 非法帧会立即以 `INVALID_PAYLOAD` teardown Port 并拒绝所有 pending request，
@@ -114,16 +187,19 @@ Renderer 对 Host event 不只校验 type-specific payload schema，还按完整
 
 `prompt.submit`、`command.invoke`、`session.compact` 和 `session.import` 使用 accepted Operation 合同，
 并由 caller-stable `submissionId` 与 SHA-256 payload fingerprint 去重：同一 submission 重试返回同一
-accepted Operation，同一 ID 携带不同内容则拒绝。Prompt fingerprint 覆盖 delivery、text 与图片元数据/
-bytes；其他三类文本 Operation 使用 `command type + NUL + canonical text field`。Host replay ledger 只保存
-fingerprint，不保存 import path、compaction instructions、Extension command 或 Prompt 原文。Host 的
-completed/pending submission record 同时绑定创建时的 Session ID 和 generation；当前 Runtime authority
-改变后，同一 `submissionId` 不能重放旧 accepted Operation，而是返回
-`STALE_SESSION_GENERATION`。Renderer 在发出 Prompt 前捕获 Host epoch、Session ID、generation
-和本地 projection revision，并在清空 Composer 前同时校验 accepted response 与当前 Session authority；
-Host 替换、Session 切换或同 Session projection transaction 已推进时，迟到确认都会被忽略，草稿和附件保留，
-下一次发送生成新的 `submissionId`。Host 必须先发送 accepted response，再异步发送
-`operation.started`；完成、失败、取消和 Host 丢失是互斥 terminal state。Session transition
+Operation，同一 ID 携带不同内容则拒绝。Prompt fingerprint 覆盖 delivery、text 与图片元数据/bytes；
+其他三类文本 Operation 使用 `command type + NUL + canonical text field`。Host receipt 只保存 fingerprint，
+不保存 import path、compaction instructions、Extension command 或 Prompt 原文。Host 的 accepted/running/
+settled submission record 同时绑定创建时的 Session ID、opaque physical identity 和 generation；
+当前 Runtime 的物理 Session identity 改变后，同一 `submissionId` 不能重放旧 accepted Operation，
+而是返回 `STALE_SESSION_IDENTITY`；只有 generation 单独推进时返回
+`STALE_SESSION_GENERATION`。Renderer 在发出 Prompt 前捕获 Host epoch、Session ID、opaque physical
+identity、generation 和本地 projection revision，并在清空 Composer 前同时校验 accepted response 与当前
+Session authority；
+Host 替换、Session 切换或同 Session projection transaction 已推进时，迟到确认都会被忽略，草稿和附件保留。
+Host 必须在 accepted receipt 持久化成功后才返回 accepted response，并在 running receipt 持久化后异步发送
+`operation.started` 和调用 Pi；完成、失败、取消和 Host 丢失是互斥 terminal state，terminal receipt 必须
+先提交再发布对应 event。Session transition
 串行执行，Turn 互斥，steer/follow-up 只在 active Operation 可接收队列时进入独立的严格 FIFO Queue
 Lane。Queue Lane 默认最多 admission 32 条正在执行或等待执行的 delivery，容量耗尽返回可恢复的
 `RESOURCE_LIMIT_EXCEEDED`，不创建无界 Promise 链。abort、`queue.clear` 和 extension response 仍通过
@@ -135,20 +211,56 @@ coordinator 管理。同一 `workspaceId + creationId` 共享一次 single-fligh
 `RESOURCE_LIMIT_EXCEEDED`。单个 Renderer Port 最多保留 256 个 pending request；Port retire/close 会取消
 该连接的 waiter，只有最后一个 waiter 离开或 Host shutdown 才取消共享扫描。JSONL fallback scan 还受
 10,000 个文件、64 MiB 总读取量和 10 秒总时间预算约束，预算耗尽返回 `unavailable: scan-limit`，不能
-退化成无界目录/文件读取或伪装成 storage error。
+退化成无界目录/文件读取或伪装成 storage error。exact marker 与 matching header/canonical path 是
+创建事实；Renderer 不再等待 SQLite Catalog 二次确认。Catalog upsert 在 authoritative bootstrap 之后
+异步执行，失败只触发 metadata refresh/rebuild，不能把已创建结果改写为 `REQUEST_OUTCOME_UNKNOWN`。
 
-Agent Host 维护最多 512 条 insertion-ordered terminal receipt，与 submission replay ledger 使用相同
-容量边界。Operation 进入 completed、failed、cancelled 或 lost 后，指向该 Operation 的 submission
-record 会从 `OperationAccepted` 原子更新为 typed `OperationSettled`；ACK 丢失后的同 Host 重放因而直接
-返回 terminal receipt，不会让 Renderer 回到 accepted/busy。Session import 的 receipt 绑定导入完成后
-实际生效的 Session ID/generation，后续 Session authority 改变时仍返回
-`STALE_SESSION_GENERATION`。receipt 只保存 lifecycle、时间、Host/Session authority 和脱敏的结构化错误；
-不保存 Prompt、import path、command、compaction instructions、source 或 raw tool payload。账本仅存在于
-当前 Agent Host 内存，新 Host epoch 不继承、持久化或自动重放旧 receipt。
+Pi Runtime 在 `session-creation-journal-v1` 中维护私有 Durable Creation Journal，并通过 per-creation
+跨进程文件锁串行化状态推进。事务顺序是 `reserved -> materializing -> materialized -> published`：
+`reserved` 在任何 Pi 创建副作用前持久化，并必须先完成上述有界 exact-marker 扫描；只有明确 `missing`
+才写入 `materializing` 并调用 Pi。marker 持久化且 Session ID、path 与物理 JSONL identity 一致后写入
+`materialized`；权威 Snapshot/bootstrap 构建完成后写入 `published`，Catalog upsert 不在提交关键路径。
+进程在 `materializing` 后死亡时，唯一 exact marker 可恢复 `materialized`；没有 marker 或存在多个 marker
+则写入 `ambiguous`，后续创建请求返回 `REQUEST_OUTCOME_UNKNOWN`，绝不再次调用 `newSession()`。Journal
+丢失或旧 `session-creation-receipts-v1` 存在时，只能经 exact marker 验证后重建/迁移。entry 仅保存
+creation/workspace key、状态、Session ID/path、物理文件 identity 与时间戳，不保存 Prompt、Assistant、
+Thinking、Tool 参数、源码、附件或凭据。Protocol v4 尚无 Renderer-to-Journal ACK，因此生产路径当前止于
+`published`；`acknowledged` 仅保留为后续显式协议状态，不能作为当前完成声明。
 
-Renderer 对 `session.import`、`session.compact` 和 `command.invoke` 的 accepted ACK 只允许一次有界
-transport retry，并复用原 payload 中的 `submissionId`。retry 前必须重新连接且确认 `hostEpoch` 与首次
-提交相同；新 Host epoch 因内存 replay ledger 已丢失而 fail closed，不能自动重复业务操作。
+Session writer lease 使用两层 authority：Agent Host 内 Map 负责同进程 Task transition，Main-owned
+`PI67_STORAGE_ROOT/session-writer-leases-v1` 下的 `proper-lockfile` 锁负责 Host replacement 的跨进程窗口。
+每组 identity 去重、稳定排序后依次 acquire，失败按逆序 release，避免多 key 获取次序漂移。未物化 JSONL
+先持有物理 parent + 精确 leaf；commit 在该 provisional fence 仍存活时重新 canonicalize Runtime 最终路径，
+取得 `device + inode + birthtime` 物理 key 和 canonical leaf key 后才完成 rekey。replacement transition 会同时
+保留 old active 与 new pending lease：cancel 只释放 new，commit 才在新 physical fence 成功后释放 old。
+
+跨进程 lock directory 的 mtime heartbeat 是 stale 判定依据，PID 只作诊断，不能单独授权抢锁。默认 stale
+阈值为 30 秒、lock heartbeat 为 10 秒；明确 stale 才允许 `proper-lockfile` 原子恢复。每个 identity 的私有
+metadata 只记录 version/token、app/Host instance、Host epoch、PID、acquired/heartbeat time 以及 Task/Session
+identity hash，不记录 Workspace/Session path、Prompt、源码或凭据。metadata 可在崩溃中损坏且不参与所有权
+判断；真实 fence 是原子 lock directory。heartbeat compromised 会发送严格无 payload 的
+`SESSION_WRITER_LEASE_COMPROMISED` supervisor message 并触发 Host replacement。Task close、replacement 和
+Host shutdown 只在 Pi Runtime dispose 成功后异步 release；dispose 无法证明完成时保持 lease 到进程退出，
+绝不提前授权新 writer。
+
+Agent Host 为每个 Task generation 在 `PI67_STORAGE_ROOT/operation-receipts-v1` 维护最多 512 条
+insertion-ordered durable receipt。目录和文件在 POSIX 上分别收紧为 `0700` / `0600`；写入使用
+`proper-lockfile`、同目录临时文件、file fsync、atomic rename 和 directory fsync，Windows 只对
+`EACCES` / `EPERM` / `EBUSY` 做有界退避。symlink、hard-link、超限、损坏或不可写 ledger 返回带
+`operationReceiptIntegrity` 的 `RUNTIME_POISONED`，且不会调用 Pi。容量只淘汰 settled receipt；若 512 条
+全部未确认则返回 `RESOURCE_LIMIT_EXCEEDED`。
+
+Operation 进入 completed、failed、cancelled 或 lost 后，指向该 Operation 的主 submission 与 queued
+steer/follow-up submission 会在一个 locked atomic commit 中统一更新为同一 typed `OperationSettled`。
+Session import 的 terminal receipt 可绑定导入后实际生效的 Session ID、opaque physical identity 和 generation。
+receipt 只保存 lifecycle、时间、Host/Task/Session authority 和脱敏结构化错误；不保存 Prompt、import path、
+command、compaction instructions、source、attachments、credentials 或 raw tool payload。
+
+replacement Host 在 `projection.resync` 或下一次副作用接纳前读取同一 Task ledger：settled receipt 以当前
+Host epoch 恢复；accepted/running receipt 原子提交为同一 Operation ID 的 `lost`，reason 明确表示旧 Host
+终态未确认且没有重放。旧 Host 的迟到 completed/failed 只能读取并发布已经存在的 canonical `lost`，不能覆盖。
+Renderer 对 `session.import`、`session.compact` 和 `command.invoke` 的 accepted ACK 仍只允许同 Host epoch
+的一次有界 transport retry；新 Host 只做 receipt reconciliation，从不自动发送原业务 payload。
 `prompt.submit` 不进入这条自动 retry 分类：图片通过 transferable `ArrayBuffer` 移交，第一次发送后
 buffer 已 detached；Composer 保留草稿和附件，由用户在当前 authority 下显式重试。
 
@@ -326,7 +438,7 @@ POSIX 上 Catalog 目录必须收紧并验证为当前用户拥有的 `0700`，D
 `chmod`、最终 mode 或 owner 验证失败都会 fail closed 到 SDK fallback。Windows ACL 需要独立平台证据，
 不从 POSIX mode 测试外推。
 Renderer 和 command payload 都不能选择数据库位置。Agent Host 的
-SQLite 只保存 bounded metadata：Session path/id/cwd、显式 `session_info.name`、modified time、
+SQLite 只保存 bounded metadata：opaque physical JSONL identity、Session path/id/cwd、显式 `session_info.name`、modified time、
 message count、parent path 和 Catalog revision/status。它禁止保存 Prompt、Assistant、Thinking、
 Tool payload/output、源码、Patch、图片/data URL、transcript 或 FTS 数据；无显式名称时仅返回固定
 `Untitled session`，不从首条 Prompt 派生名称。
@@ -343,9 +455,14 @@ request revision，Workspace/Host reset、Catalog revision change 或 resync sta
 `STALE_SESSION_CATALOG` 首屏重载和 changed-event refresh；Command Palette 的独立服务端搜索也经过
 该 Controller，但不写入 Navigation Catalog Store。
 
-NFKC 只用于用户搜索和 SQLite search columns，不参与 source/workspace 文件系统身份。路径身份使用
-平台原生 resolved path 语义，Windows 仅执行大小写折叠；source-key 算法带版本前缀，变更后旧的
-可丢弃 projection 会自动 rebuild。任何 transaction 或 upsert 改变数据集时 revision 必须严格
+NFKC 只用于用户搜索和 SQLite search columns，不参与 source/workspace 文件系统身份。路径 fallback
+保留平台原生 resolved path 的精确拼写，不再对整条 Windows 路径 lowercase；现存 JSONL 以
+`device + inode + birthtime` 物理身份去重，writer lease 还为未创建路径绑定物理 parent 与精确 leaf。
+Catalog schema v3 将该 opaque 物理身份贯穿 discovery、pending upsert、fallback、Protocol 和 SQLite，
+以 `file_identity` 为 PK、`path` 为唯一 locator；相同 Pi Session ID 的不同物理文件仍保留为两行。
+增量 upsert 遇到同物理身份不同 Session ID，或同 locator 不同物理身份时 fail closed 并触发完整 reconcile。
+source-key 算法使用 `session-catalog-source-v3` 前缀，变更后旧的可丢弃 projection 会自动 rebuild。
+任何 transaction 或 upsert 改变数据集时 revision 必须严格
 递增；后台 discovery 开始后完成的 current-Session upsert 通过 mutation generation 合并，不能被
 较旧的 reconcile 结果覆盖。
 
@@ -358,7 +475,7 @@ configured Session directory 改变。损坏或 schema mismatch 只替换可丢�
 逻辑损坏与 schema mismatch 一样只替换可丢弃 Catalog。Schema 创建与校验复用同一组 canonical DDL，
 open 时精确验证两张 `STRICT` table 的 `table_xinfo`（列顺序、declared type、nullability、default、
 PK、hidden/generated、rowid mode）、foreign-key 空集合、两个分页 index 的 key column/cid/order/collation、
-`sessions.path` PK autoindex，以及完整 `sqlite_schema` object inventory。额外 table/view/trigger/index、
+`sessions.file_identity` PK 与 `sessions.path` UNIQUE autoindex，以及完整 `sqlite_schema` object inventory。额外 table/view/trigger/index、
 `ANALYZE` 生成的未受控统计表、缺失或放宽的 `CHECK`、PK/`STRICT`/index 合同变化都会触发 rebuild。
 `sqlite_schema.sql` 使用有界 token fingerprint：最多 32 KiB / 4096 tokens，只忽略 token 间 whitespace
 和 comments，对未引用 token 做 ASCII case fold，保留 quoted value/identifier、Blob、number、operator 和
@@ -377,6 +494,8 @@ rebuilding 并调度 bounded discovery。Retry 重新打开 SQLite 后，在完�
 由下一次完整 reconcile 合并后再切回 SQLite，外部独有 rows 不得重新进入公开 projection。
 该合同用于 fail-closed 检测，不等于同用户恶意进程隔离或跨平台
 single-owner lock；文件替换、恶意重写 version cookie、多 utility-process 和 Windows lock timing 仍需独立证据。
+Catalog 当前继续使用 DELETE journal。WAL 的 main/`-wal`/`-shm` private-file 校验、checkpoint、整组隔离、
+外部 writer detection 和 Windows Defender/同步盘锁定尚未形成同等证据，因此不与 schema v3 同时切换。
 当前 Pi SDK `0.83.0` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
 丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
@@ -418,6 +537,16 @@ background Task lifecycle and runtime summaries, but it must not own a backgroun
 second full Session projection. App, Session, Conversation, Live Turn and their feature stores own
 detail for the selected Task only. A Task-scoped event rejected as `background` or `stale` must not
 reach the selected live projection.
+
+Formal Workbench identity is `workspaceId + sessionFileIdentity`; `sessionId` remains a Pi business
+check and `sessionPath` remains a display/open locator. Workbench persistence v4 therefore accepts
+the opaque physical identity emitted by the authoritative Snapshot even though its internal format
+may contain separators. It persists live Runtime recovery without consulting the disposable Catalog.
+The v3 migration never promotes a path-only formal record into physical identity: it drops formal
+runtime recovery and falls back to the Workspace surface, while retaining a provisional selection
+only when a matching durable `creationId` recovery record exists. Catalog reconciliation may update
+title and locator metadata for an already materialized identity, but it cannot materialize a
+provisional Task.
 
 The two views are intentionally allowed to differ only at explicit transition boundaries: a lost
 Workbench Task may coexist briefly with a recovering live projection, and Settings keeps its return
@@ -517,6 +646,35 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   including a final line without a trailing newline.
 - Diagnostics and tool summaries use bounded redaction; credential values、raw
   Prompt、source bodies and raw tool payloads do not enter default logs.
+- Prompt attachment staging uses one UUID run root per app instance. After Main owns
+  the single-instance lock it scans only direct UUID directories, skips the current
+  run, links/junctions and non-directories, and removes at most 16 roots older than
+  24 hours through a same-parent atomic quarantine rename. Failure is background-only;
+  logs contain bounded counts and error classes, never attachment names or paths.
+- Path-backed staging binds picker size/mtime and physical file identity to one
+  non-following handle, copies and hashes from that handle, then compares a second
+  handle stat before publishing the manifest. Supported PNG/JPEG/GIF/WebP content
+  has a 32 MiB aggregate native-image budget independent from the 250 MiB ordinary
+  attachment budget. Renderer applies it to the complete draft from Main's staged
+  metadata and Host applies it before accepted publication; unknown `image/*`
+  declarations remain ordinary files instead of entering Pi native image content.
+- Agent Host claims are stored under hashed Task and submission directories. A
+  claim copies from each revalidated non-following payload handle into a temporary
+  directory, syncs its payloads/manifests, atomically publishes the set, and removes
+  draft copies only after commit. Pre-commit failure therefore preserves retryable
+  opaque draft references. New claim admission and replacement recovery share the
+  same 128-set Task ceiling; an existing submission replay does not consume a slot.
+  A replacement Host may recover only the requested set for that exact Task, scans at
+  most 128 claimed sets, and revalidates the directory inventory, item metadata,
+  regular-file identity, byte length, and SHA-256 before restoring the in-memory
+  index. Tool reads revalidate and read the selected item from one handle, then
+  transfer immutable bytes to a Worker without reopening a payload path. Explicit
+  Task disposal removes its claimed directory only after Runtime disposal succeeds;
+  cleanup failure remains retryable. Host replacement does not remove it, and Main
+  removes the complete run root only after Host shutdown. Archive workers enforce the same
+  entry limit for list and read plus full-archive path depth/name length, expanded
+  bytes and compression-ratio validation, bounded execution time and worker memory,
+  and truncation-aware output size.
 
 ## Extension UI
 

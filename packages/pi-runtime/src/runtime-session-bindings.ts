@@ -27,6 +27,7 @@ import {
   type DesktopToolAliasBinding
 } from "./tool-routing-extension.js";
 import type { PromptAttachmentAccess } from "./prompt-attachment.js";
+import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
@@ -54,6 +55,7 @@ export class RuntimeSessionBindings {
   private sessionUnsubscribe: (() => void) | undefined;
   private transition: Promise<unknown> | undefined;
   private generation = 0;
+  private activeSessionFileIdentity: string | undefined;
 
   constructor(private readonly options: RuntimeSessionBindingsOptions) {}
 
@@ -63,6 +65,7 @@ export class RuntimeSessionBindings {
   get settingsManager(): SettingsManager | undefined { return this.activeSettingsManager; }
   get extensions(): LoadExtensionsResult | undefined { return this.activeExtensions; }
   get sessionGeneration(): number { return this.generation; }
+  get sessionFileIdentity(): string | undefined { return this.activeSessionFileIdentity; }
 
   refreshExtensions(): LoadExtensionsResult | undefined {
     this.activeExtensions = this.activeServices?.resourceLoader.getExtensions();
@@ -118,6 +121,7 @@ export class RuntimeSessionBindings {
     this.activeSettingsManager = undefined;
     this.activeExtensions = undefined;
     this.activeToolAliases = undefined;
+    this.activeSessionFileIdentity = undefined;
   }
 
   requireSession(): AgentSession {
@@ -173,7 +177,10 @@ export class RuntimeSessionBindings {
       runtimeCredentialOverrides: this.options.getRuntimeCredentialOverrides(),
       ...(workspaceServices === undefined
         ? {}
-        : { settingsManager: workspaceServices.settingsManager }),
+        : {
+            settingsManager: workspaceServices.settingsManager,
+            packageTrustRegistry: workspaceServices.packageTrustRegistry
+          }),
       ...(modelRuntime === undefined ? {} : { modelRuntime }),
       getSafety: this.options.getSafety,
       requestApproval: this.options.requestApproval,
@@ -184,6 +191,7 @@ export class RuntimeSessionBindings {
 
   private async bindSession(session: AgentSession): Promise<void> {
     await this.materializeSession(session.sessionManager);
+    this.activeSessionFileIdentity = await this.resolveSessionFileIdentity(session.sessionManager);
     // Advance authority before extension hooks run so no event is attributed to the previous session.
     this.generation += 1;
     this.activeServices = this.requireRuntime().services;
@@ -208,6 +216,7 @@ export class RuntimeSessionBindings {
       }
       this.options.externalChangeGuard.detach();
       this.options.projections.reset();
+      this.activeSessionFileIdentity = undefined;
       throw error;
     }
   }
@@ -236,6 +245,11 @@ export class RuntimeSessionBindings {
 
     // Reopen through Pi so its append state matches the newly materialized file.
     sessionManager.setSessionFile(await realpath(sessionPath));
+  }
+
+  private async resolveSessionFileIdentity(sessionManager: SessionManager): Promise<string | undefined> {
+    const sessionPath = sessionManager.getSessionFile();
+    return sessionPath ? resolveExistingSessionFileIdentity(sessionPath) : undefined;
   }
 
   private detachSessionBindings(): void {

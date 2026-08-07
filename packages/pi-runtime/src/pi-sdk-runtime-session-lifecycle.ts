@@ -52,8 +52,12 @@ export class PiSdkRuntimeSessionLifecycle {
     observeStage?: RuntimeInitializationObserver
   ): Promise<SessionSnapshot> {
     return this.options.sessionBindings.runTransition(async () => {
-      let creationMaterialized = false;
+      let creationStarted = false;
       try {
+        const creationJournal = input.creationId
+          ? this.creationReceipts(input.cwd)
+          : undefined;
+        if (input.creationId) await creationJournal!.reserve(input.creationId);
         this.options.cancelInteractiveRequests("runtime-dispose");
         const nextAgentDir = input.agentDir ?? getAgentDir();
         this.options.workspaceServices?.assertCompatible(input.cwd, nextAgentDir);
@@ -78,32 +82,41 @@ export class PiSdkRuntimeSessionLifecycle {
         this.options.toolSafety.initialize(input.cwd, input.trust, input.approvalMode);
         this.options.workspaceServices?.setProjectTrusted(input.trust === "trusted");
         await runRuntimeInitializationStage(observeStage, "create-session", async () => {
+          if (input.creationId) {
+            const start = await creationJournal!.beginMaterialization(input.creationId);
+            if (start.status !== "started") throw sessionCreationOutcomeUnknown(input.creationId);
+            creationStarted = true;
+          }
           await this.options.sessionBindings.createInitial(input.cwd, sessionManager);
           if (!input.creationId) return;
           const manager = this.options.sessionBindings.requireSession().sessionManager;
           await appendSessionCreationMarker(manager, input.creationId);
-          creationMaterialized = true;
-          await this.creationReceipts(manager).record(input.creationId, manager);
+          await creationJournal!.record(input.creationId, manager);
         });
         await runRuntimeInitializationStage(
           observeStage,
           "reload-configuration",
           () => this.options.configurationReload.apply()
         );
-        await runRuntimeInitializationStage(
-          observeStage,
-          "update-catalog",
-          () => this.options.sessionCatalog.upsertCurrent(
-            input.creationId ? "session-created" : "session-updated"
-          )
-        );
-        return runRuntimeInitializationStage(
+        const snapshot = await runRuntimeInitializationStage(
           observeStage,
           "project-snapshot",
           () => this.options.getSnapshot()
         );
+        if (input.creationId) {
+          const manager = this.options.sessionBindings.requireSession().sessionManager;
+          const sessionPath = manager.getSessionFile();
+          if (!sessionPath) throw new Error("The created Pi Session does not have a persisted JSONL path.");
+          await creationJournal!.markPublished(input.creationId, {
+            sessionId: manager.getSessionId(),
+            sessionPath
+          });
+        }
+        this.queueCatalogUpsert(input.creationId ? "session-created" : "session-updated");
+        return snapshot;
       } catch (error) {
-        if (!input.creationId || !creationMaterialized) throw error;
+        if (!input.creationId || !creationStarted) throw error;
+        if (error instanceof RuntimeError && error.code === "REQUEST_OUTCOME_UNKNOWN") throw error;
         throw sessionCreationOutcomeUnknown(input.creationId);
       }
     });
@@ -111,26 +124,35 @@ export class PiSdkRuntimeSessionLifecycle {
 
   async create(creationId: string): Promise<SessionSnapshot> {
     return this.options.sessionBindings.runTransition(async () => {
-      let materialized = false;
+      let creationStarted = false;
       try {
+        const journal = this.creationReceipts(
+          this.options.sessionBindings.requireSession().sessionManager.getCwd()
+        );
+        await journal.reserve(creationId);
         this.options.cancelInteractiveRequests("session-transition");
         this.options.dropStream();
+        const start = await journal.beginMaterialization(creationId);
+        if (start.status !== "started") throw sessionCreationOutcomeUnknown(creationId);
+        creationStarted = true;
         let createdManager: SessionCreationManager | undefined;
         const result = await this.options.sessionBindings.requireRuntime().newSession({
           setup: async (manager) => {
             await appendSessionCreationMarker(manager, creationId);
             createdManager = manager;
-            materialized = true;
           }
         });
         if (result.cancelled) throw new Error("A Pi extension cancelled the new session.");
         if (!createdManager) throw new Error("The Pi Session creation marker was not installed.");
-        await this.creationReceipts(createdManager).record(creationId, createdManager);
-        await this.options.sessionCatalog.upsertCurrent("session-created");
+        const identity = await journal.record(creationId, createdManager);
         await this.options.configurationReload.apply();
-        return this.options.getSnapshot();
+        const snapshot = this.options.getSnapshot();
+        await journal.markPublished(creationId, identity);
+        this.queueCatalogUpsert("session-created");
+        return snapshot;
       } catch (error) {
-        if (!materialized) throw error;
+        if (!creationStarted) throw error;
+        if (error instanceof RuntimeError && error.code === "REQUEST_OUTCOME_UNKNOWN") throw error;
         throw sessionCreationOutcomeUnknown(creationId);
       }
     });
@@ -175,16 +197,26 @@ export class PiSdkRuntimeSessionLifecycle {
     });
   }
 
-  private creationReceipts(manager: SessionCreationManager): SessionCreationReceiptStore {
+  private creationReceipts(cwd: string): SessionCreationReceiptStore {
     return this.options.workspaceServices?.sessionCreationReceipts
       ?? new SessionCreationReceiptStore({
-        cwd: manager.getCwd(),
+        cwd,
         agentDir: this.options.getAgentDir(),
         getConfiguredSessionDir: () => this.options.sessionBindings.settingsManager?.getSessionDir(),
         ...(process.env.PI67_STORAGE_ROOT === undefined
           ? {}
           : { storageRoot: process.env.PI67_STORAGE_ROOT })
       });
+  }
+
+  private queueCatalogUpsert(reason: "session-created" | "session-updated"): void {
+    void this.options.sessionCatalog.upsertCurrent(reason).catch(() => {
+      const status = this.options.sessionCatalog.status();
+      this.options.emit({
+        type: "session.catalog.changed",
+        payload: { revision: status.revision, reason }
+      });
+    });
   }
 }
 

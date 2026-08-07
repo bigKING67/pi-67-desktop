@@ -81,6 +81,7 @@ describe("operationSubmissionIdentity", () => {
       sourceTaskId: "task-source",
       sourceTaskGeneration: 3,
       sourceSessionId: "session-source",
+      sourceSessionFileIdentity: "session-file-source",
       sourceSessionGeneration: 5,
       entryId: "assistant-entry-8"
     } as const;

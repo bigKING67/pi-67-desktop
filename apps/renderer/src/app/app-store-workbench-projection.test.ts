@@ -168,9 +168,11 @@ describe("Workbench-selected App projection", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-1",
+        sessionFileIdentity: "session-file-session-2",
         sessionPath: "/sessions/session-2.jsonl"
       },
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-session-2",
       sessionPath: "/sessions/session-2.jsonl",
       sessionGeneration: 4,
       lifecycle: "idle",
@@ -224,6 +226,7 @@ describe("Workbench-selected App projection", () => {
       if (!targetTask) throw new Error("Expected pending Session Task.");
       targetTaskId = targetTask.id;
       const initialSnapshot = snapshot("session-target-initial");
+      delete initialSnapshot.sessionFileIdentity;
       const readyEvent = {
         type: "runtime.ready",
         payload: {
@@ -245,9 +248,8 @@ describe("Workbench-selected App projection", () => {
       expect(applyRendererAgentEvent(readyEvent, readyEnvelope)).toBe("active");
       expect(rendererWorkbenchStore.getState().tasks[targetTask.id]).toMatchObject({
         conversation: {
-          kind: "session",
-          workspaceId: "workspace-1",
-          sessionPath: requestedPath
+          kind: "provisional",
+          workspaceId: "workspace-1"
         },
         sessionId: targetTask.sessionId,
         sessionPath: requestedPath,
@@ -264,9 +266,8 @@ describe("Workbench-selected App projection", () => {
       : undefined;
     expect(failedTask).toMatchObject({
       conversation: {
-        kind: "session",
-        workspaceId: "workspace-1",
-        sessionPath: requestedPath
+        kind: "provisional",
+        workspaceId: "workspace-1"
       },
       sessionPath: requestedPath,
       lifecycle: "failed",
@@ -298,6 +299,7 @@ function openWorkbenchTask(taskId: string, sessionId: string, sessionGeneration:
     conversation: {
       kind: "session",
       workspaceId: "workspace-1",
+      sessionFileIdentity: `session-file-${sessionId}`,
       sessionPath: `/sessions/${sessionId}.jsonl`
     },
     workspaceId: "workspace-1",
@@ -326,6 +328,7 @@ function emitChange(change: WorkspaceChangeView): void {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,
@@ -349,6 +352,7 @@ function importOperation(sessionId: string, sessionGeneration: number): Operatio
     lifecycle: "running",
     cancellable: false,
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionGeneration,
     startedAt: 1
   };

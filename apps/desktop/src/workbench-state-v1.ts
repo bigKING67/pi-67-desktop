@@ -11,13 +11,13 @@ import {
   MAX_WORKSPACES,
   isTaskLifecycle,
   parseExactWorkbenchIdOrder,
-  type ConversationKey,
+  type LegacyConversationKey,
   type RuntimeRecoveryRecordV2,
   type SettingsSection,
   type TaskLifecycle,
   type WorkbenchSettingsState,
   type WorkbenchStateV2,
-  type WorkbenchSurface
+  type LegacyWorkbenchSurface
 } from "./workbench-state-contract.js";
 import { parseWorkbenchStateV2 } from "./workbench-state-v2.js";
 
@@ -263,7 +263,7 @@ function migrateRuntimeRecoveryRecord(task: LegacyTaskState): RuntimeRecoveryRec
 function migrateSelectedSurface(
   legacy: LegacyStateV1,
   runtimeRecovery: readonly RuntimeRecoveryRecordV2[]
-): WorkbenchSurface | undefined {
+): LegacyWorkbenchSurface | undefined {
   const selected = legacy.selectedSurface;
   if (selected?.kind === "settings" && legacy.settings.open) return { kind: "settings" };
   if (selected?.kind === "workspace") return selected;
@@ -278,7 +278,7 @@ function migrateSelectedSurface(
     : undefined;
 }
 
-function conversationForLegacyTask(task: LegacyTaskState): ConversationKey {
+function conversationForLegacyTask(task: LegacyTaskState): LegacyConversationKey {
   return task.sessionPath
     ? { kind: "session", workspaceId: task.workspaceId, sessionPath: task.sessionPath }
     : { kind: "provisional", workspaceId: task.workspaceId, draftId: task.taskId };

@@ -14,6 +14,7 @@ import { useConversationStore } from "./conversation-store.js";
 const AUTHORITY: FeatureProjectionAuthority = {
   hostEpoch: 7,
   sessionId: "session-a",
+  sessionFileIdentity: "session-file-a",
   sessionGeneration: 3,
   projectionRevision: 1
 };
@@ -41,6 +42,7 @@ describe("conversation controller", () => {
     const nextAuthority: FeatureProjectionAuthority = {
       ...AUTHORITY,
       sessionId: "session-b",
+      sessionFileIdentity: "session-file-b",
       sessionGeneration: 4,
       projectionRevision: 2
     };
@@ -188,6 +190,7 @@ function operation(operationId = "operation-a"): OperationView {
     lifecycle: "running",
     cancellable: true,
     sessionId: AUTHORITY.sessionId,
+    sessionFileIdentity: AUTHORITY.sessionFileIdentity,
     sessionGeneration: AUTHORITY.sessionGeneration,
     startedAt: 1
   };

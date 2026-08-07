@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -44,7 +45,7 @@ describe("AgentHostServer abort watchdog", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      getIdentity: () => ({ sessionId: "session-1", sessionFileIdentity: "session-file-session-1", sessionGeneration: 2 }),
       submitPrompt: () => new Promise<void>(() => undefined),
       abort: () => new Promise<void>(() => undefined),
       flushStream,
@@ -58,7 +59,7 @@ describe("AgentHostServer abort watchdog", () => {
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 5 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-1",

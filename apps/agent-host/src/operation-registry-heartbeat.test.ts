@@ -12,7 +12,7 @@ describe("OperationRegistry heartbeat", () => {
     vi.setSystemTime(1_000);
     const events: AgentEvent[] = [];
     const registry = createRegistry(events);
-    const accepted = registry.accept({
+    const accepted = await registry.accept({
       submissionId: "heartbeat-active",
       fingerprint: "same",
       kind: "prompt",
@@ -40,7 +40,7 @@ describe("OperationRegistry heartbeat", () => {
     expect(heartbeats(events).at(-1)).toMatchObject({
       payload: { observedAt: 11_000, lastActivityAt: 7_000 }
     });
-    registry.loseActive("test cleanup");
+    await registry.loseActive("test cleanup");
   });
 
   it("keeps heartbeats active while waiting for input and stops them after terminal settlement", async () => {
@@ -49,7 +49,7 @@ describe("OperationRegistry heartbeat", () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
     const registry = createRegistry(events);
-    registry.accept({
+    await registry.accept({
       submissionId: "heartbeat-waiting",
       fingerprint: "same",
       kind: "prompt",
@@ -79,7 +79,11 @@ describe("OperationRegistry heartbeat", () => {
 function createRegistry(events: AgentEvent[]): OperationRegistry {
   return new OperationRegistry(
     3,
-    () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+    () => ({
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
+      sessionGeneration: 2
+    }),
     (event) => events.push(event),
     { heartbeatIntervalMs: 5_000 }
   );

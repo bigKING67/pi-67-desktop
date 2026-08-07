@@ -38,7 +38,6 @@ const INITIALIZATION_STAGES = new Set([
   "dispose-current",
   "create-session",
   "reload-configuration",
-  "update-catalog",
   "project-snapshot"
 ]);
 

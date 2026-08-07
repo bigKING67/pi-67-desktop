@@ -47,15 +47,18 @@ describe("PiSdkRuntime Session fork", () => {
       expect(forked.sessionPath).not.toBe(original.sessionPath);
       expect(forked.messages).toHaveLength(2);
       expect(await readFile(fixture.sessionPath, "utf8")).toBe(originalJsonl);
-      expect(runtime.getIdentity()).toEqual({
+      const forkIdentity = runtime.getIdentity();
+      expect(forkIdentity).toEqual({
         sessionId: forked.sessionId,
+        sessionFileIdentity: forked.sessionFileIdentity,
         sessionPath: forked.sessionPath,
         sessionGeneration: originalIdentity.sessionGeneration + 1
       });
+      expect(forkIdentity.sessionFileIdentity).toEqual(expect.any(String));
+      expect(forkIdentity.sessionFileIdentity).not.toBe(originalIdentity.sessionFileIdentity);
       expect(events.some((event) => event.type === "conversation.changed")).toBe(false);
 
       events.length = 0;
-      const forkIdentity = runtime.getIdentity();
       await runtime.rollback(fixture.firstUserEntryId, false);
 
       expect(runtime.getIdentity()).toEqual(forkIdentity);
@@ -154,11 +157,16 @@ describe("PiSdkRuntime Session fork", () => {
       ]);
       expect(forked.sessionId).not.toBe(sourceIdentity.sessionId);
       expect(forked.sessionPath).not.toBe(sourceIdentity.sessionPath);
-      expect(targetRuntime.getIdentity()).toEqual({
+      const forkIdentity = targetRuntime.getIdentity();
+      expect(forkIdentity).toEqual({
         sessionId: forked.sessionId,
+        sessionFileIdentity: forked.sessionFileIdentity,
         sessionPath: forked.sessionPath,
         sessionGeneration: targetIdentity.sessionGeneration + 1
       });
+      expect(forkIdentity.sessionFileIdentity).toEqual(expect.any(String));
+      expect(forkIdentity.sessionFileIdentity).not.toBe(sourceIdentity.sessionFileIdentity);
+      expect(forkIdentity.sessionFileIdentity).not.toBe(targetIdentity.sessionFileIdentity);
       expect(sourceRuntime.getIdentity()).toEqual(sourceIdentity);
       expect(await readFile(fixture.sessionPath, "utf8")).toBe(sourceJsonl);
     } finally {

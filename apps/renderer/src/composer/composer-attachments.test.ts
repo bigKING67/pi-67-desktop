@@ -2,11 +2,13 @@ import {
   MAX_PROMPT_ATTACHMENT_BYTES,
   MAX_PROMPT_ATTACHMENT_COUNT,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
+  MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   type PromptAttachmentKind,
   type StagedPromptAttachment
 } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type DraftAttachment,
   filesFromTransfer,
   removeDraftAttachment,
   revokeDraftAttachments,
@@ -107,6 +109,33 @@ describe("Composer attachments", () => {
       attachmentFile("second.txt", 1, "text/plain")
     ], [])).rejects.toThrow("附件暂存结果不完整，请重新选择。");
     expect(releasePromptAttachments).toHaveBeenCalledWith(["partial"]);
+  });
+
+  it("releases a newly staged image when authoritative metadata would overflow the full draft", async () => {
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:new-image");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const current: DraftAttachment[] = [{
+      id: "current-image",
+      name: "current.png",
+      mimeType: "image/png",
+      byteLength: MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
+      kind: "image",
+      identity: "current-image"
+    }];
+    stagePromptAttachments.mockResolvedValueOnce([{
+      id: "new-image",
+      name: "next.png",
+      mimeType: "image/png",
+      byteLength: 1,
+      kind: "image"
+    }]);
+
+    await expect(stageDraftAttachments([
+      attachmentFile("next.png", 1, "image/png")
+    ], current)).rejects.toThrow("图片总大小超过每条消息 32 MiB 限制。");
+
+    expect(releasePromptAttachments).toHaveBeenCalledWith(["new-image"]);
+    expect(current).toHaveLength(1);
   });
 
   it("extracts only file items from clipboard and drag transfers", () => {

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PiSdkRuntime, type AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -230,7 +231,7 @@ function connect(server: AgentHostServer, hostEpoch: number): FakePort {
     hostEpoch
   });
   port.emit({
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: `renderer-${hostEpoch}`,

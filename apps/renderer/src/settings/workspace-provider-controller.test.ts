@@ -91,6 +91,7 @@ describe("workspace Provider controller", () => {
         taskId: "task-a",
         taskGeneration: 3,
         sessionId: "session-a",
+        sessionFileIdentity: "session-file-a",
         sessionGeneration: 4
       }
     );
@@ -152,6 +153,7 @@ function installActiveTask(): void {
     conversation: {
       kind: "session",
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
     },
     workspaceId: "workspace-a",
@@ -172,6 +174,7 @@ function installActiveTask(): void {
       phase: "active",
       hostEpoch: 9,
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 4,
       projectionRevision: 1
     },

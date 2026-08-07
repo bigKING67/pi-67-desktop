@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { PROTOCOL_VERSION } from "../../packages/protocol/src/index.js";
 import { normalizedSessionCatalogOptions } from "./pi67-session-catalog-model-fixture.js";
 import type {
   SessionCatalogDegradedReason,
@@ -26,7 +27,10 @@ export async function installSessionCatalogFixture(
   page: Page,
   options: SessionCatalogFixtureOptions = {}
 ): Promise<void> {
-  const initial = normalizedSessionCatalogOptions(options);
+  const initial = {
+    ...normalizedSessionCatalogOptions(options),
+    protocolVersion: PROTOCOL_VERSION
+  };
   await page.evaluate((fixture) => {
     type CatalogCursor = {
       revision: number;
@@ -39,6 +43,7 @@ export async function installSessionCatalogFixture(
     const fixtureQueryKey = "0".repeat(64);
     type CatalogItem = {
       id: string;
+      fileIdentity: string;
       path: string;
       cwd: string;
       name: string;
@@ -132,7 +137,7 @@ export async function installSessionCatalogFixture(
         agent.commands.push({ type: commandType, payload: structuredClone(payload), hostEpoch: agent.hostEpoch });
         if (isProjectionResync) {
           port.postMessage({
-            protocolVersion: 3,
+            protocolVersion: fixture.protocolVersion,
             kind: "response",
             requestId: envelope.requestId,
             hostEpoch: agent.hostEpoch,
@@ -140,6 +145,8 @@ export async function installSessionCatalogFixture(
             type: envelope.type,
             ok: true,
             result: {
+              sessionId: String(agent.snapshot.sessionId),
+              sessionFileIdentity: String(agent.snapshot.sessionFileIdentity),
               snapshot: agent.snapshot,
               changes: agent.workspaceChanges,
               extensionCatalog: agent.extensionCatalog,
@@ -167,7 +174,7 @@ export async function installSessionCatalogFixture(
         if (cursorIsStale) {
           if (catalog.staleCursorResponses > 0) catalog.staleCursorResponses -= 1;
           port.postMessage({
-            protocolVersion: 3,
+            protocolVersion: fixture.protocolVersion,
             kind: "response",
             requestId: envelope.requestId,
             hostEpoch: agent.hostEpoch,
@@ -184,7 +191,7 @@ export async function installSessionCatalogFixture(
         }
 
         port.postMessage({
-          protocolVersion: 3,
+          protocolVersion: fixture.protocolVersion,
           kind: "response",
           requestId: envelope.requestId,
           hostEpoch: agent.hostEpoch,
@@ -336,7 +343,7 @@ export async function emitSessionCatalogChanged(
   revision: number,
   reason: "reconciled" | "session-created" | "session-updated" | "session-imported" | "source-changed" = "reconciled"
 ): Promise<void> {
-  await page.evaluate(({ nextRevision, changeReason }) => {
+  await page.evaluate(({ nextRevision, changeReason, protocolVersion }) => {
     const agent = (window as unknown as {
       __pi67TestAgent: {
         activePort?: MessagePort;
@@ -347,7 +354,7 @@ export async function emitSessionCatalogChanged(
     }).__pi67TestAgent;
     agent.sequence += 1;
     agent.activePort?.postMessage({
-      protocolVersion: 3,
+      protocolVersion,
       kind: "event",
       hostEpoch: agent.hostEpoch,
       sequence: agent.sequence,
@@ -355,7 +362,11 @@ export async function emitSessionCatalogChanged(
       type: "session.catalog.changed",
       payload: { revision: nextRevision, reason: changeReason }
     });
-  }, { nextRevision: revision, changeReason: reason });
+  }, {
+    nextRevision: revision,
+    changeReason: reason,
+    protocolVersion: PROTOCOL_VERSION
+  });
 }
 
 export async function emitSessionCatalogSequenceGap(page: Page): Promise<void> {

@@ -193,6 +193,7 @@ function finishOperation<TState extends AppEventState>(
       ...(state.operation.kind === "session-import"
         ? {
             sessionId: authority.sessionId,
+            sessionFileIdentity: authority.sessionFileIdentity,
             sessionGeneration: authority.sessionGeneration
           }
         : {})
@@ -214,8 +215,9 @@ function acceptOperationTerminal(
   authority: RendererSessionAuthority
 ): boolean {
   const operation = state.operation;
-  return operation?.operationId === operationId
+    return operation?.operationId === operationId
     && operation.sessionId === authority.sessionId
+    && operation.sessionFileIdentity === authority.sessionFileIdentity
     && operation.sessionGeneration === authority.sessionGeneration;
 }
 
@@ -289,6 +291,7 @@ function recordRealtimeOperationTerminal(
     cancellable: false as const,
     hostEpoch: envelope.hostEpoch,
     sessionId: authority.sessionId,
+    sessionFileIdentity: authority.sessionFileIdentity,
     sessionGeneration: authority.sessionGeneration,
     startedAt: operation.startedAt,
     settledAt: input.settledAt

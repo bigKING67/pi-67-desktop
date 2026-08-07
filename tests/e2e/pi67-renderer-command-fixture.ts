@@ -52,6 +52,8 @@ export function installMockCommandResponseHandler({
     if (type === "workspace.register") return { registered: true };
     if (type === "workspace.unregister") return { unregistered: true };
     if (type === "projection.resync") return {
+      sessionId: String(current.snapshot.sessionId),
+      sessionFileIdentity: String(current.snapshot.sessionFileIdentity),
       snapshot: current.snapshot,
       changes: current.workspaceChanges,
       extensionCatalog: current.extensionCatalog,
@@ -222,17 +224,30 @@ export function installMockCommandResponseHandler({
       ]
     };
     if (type === "diagnostics.collect") return {
+      generatedAt: Date.now(),
       application: "π",
       piSdkVersion: "0.81.1",
       platform: "darwin",
       architecture: "arm64",
       node: "24.18.0",
-      cwd: current.snapshot.cwd,
+      workspace: {
+        pathHash: "a".repeat(64),
+        pathKind: "posix"
+      },
       sessionConfigured: true,
       sessionFileConfigured: true,
       model: "openai/gpt-test",
       extensionCount: 0,
-      extensionErrors: []
+      extensionErrors: [],
+      host: {
+        hostEpoch,
+        taskCount: 1,
+        liveRuntimeCount: 1,
+        activeOperationCount: 0,
+        writerLeases: { activeCount: 1, pendingCount: 0, compromised: false },
+        workspaces: [],
+        workspacesTruncated: false
+      }
     };
     const controlCommand = applyMockSessionControlCommand(type, payload, current.snapshot);
     if (controlCommand) {
@@ -254,6 +269,7 @@ export function installMockCommandResponseHandler({
       cancellable,
       hostEpoch,
       sessionId: String(current.snapshot.sessionId),
+      sessionFileIdentity: String(current.snapshot.sessionFileIdentity),
       sessionGeneration: current.sessionGeneration
     };
   }

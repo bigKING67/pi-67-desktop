@@ -10,6 +10,7 @@ import { useWorkspaceChangesStore } from "./workspace-changes-store.js";
 const AUTHORITY = {
   hostEpoch: 7,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-one",
   sessionGeneration: 3,
   projectionRevision: 1
 };
@@ -35,6 +36,7 @@ describe("workspace changes controller", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-1",
+        sessionFileIdentity: "session-file-one",
         sessionPath: "/sessions/one.jsonl"
       },
       workspaceId: "workspace-1",
@@ -68,6 +70,7 @@ describe("workspace changes controller", () => {
         taskId: "task-1",
         taskGeneration: 2,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-one",
         sessionGeneration: 3
       }
     });
@@ -85,6 +88,7 @@ describe("workspace changes controller", () => {
     useWorkspaceChangesStore.getState().beginSession({
       hostEpoch: 7,
       sessionId: "session-2",
+      sessionFileIdentity: "session-file-two",
       sessionGeneration: 4,
       projectionRevision: 2
     });

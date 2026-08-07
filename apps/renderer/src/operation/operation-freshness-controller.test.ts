@@ -75,6 +75,7 @@ function operation(overrides: Partial<OperationView> = {}): OperationView {
     lifecycle: "running",
     cancellable: true,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 100_000,
     ...overrides

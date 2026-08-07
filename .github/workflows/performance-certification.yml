@@ -8,6 +8,14 @@ on:
         required: false
         default: main
         type: string
+      large_session_profile:
+        description: Large Session JSONL certification size
+        required: false
+        default: standard
+        type: choice
+        options:
+          - standard
+          - extended
   schedule:
     - cron: "17 3 * * 1"
 
@@ -54,6 +62,11 @@ jobs:
           PI67_PERF_JSONL_BOUNDARY_SAMPLES: 3
           PI67_PERF_ENFORCE: 1
         run: corepack pnpm run performance:measure
+      - name: Measure large Session JSONL certification
+        env:
+          PI67_PERF_LARGE_SESSION_PROFILE: ${{ inputs.large_session_profile || 'standard' }}
+          PI67_PERF_LARGE_SESSION_SAMPLES: 1
+        run: corepack pnpm run performance:large-session
       - uses: actions/upload-artifact@v7
         if: always()
         with:

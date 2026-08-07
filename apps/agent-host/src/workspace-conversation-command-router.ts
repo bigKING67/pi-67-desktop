@@ -49,7 +49,7 @@ export class WorkspaceConversationCommandRouter {
         await workspace.sessionCatalog.upsertRecord(record, "session-updated");
         return { revision: workspace.sessionCatalog.status().revision };
       } finally {
-        this.sessionWriterLeases.cancel(lease);
+        await this.sessionWriterLeases.cancel(lease);
       }
     }
     const revision = await workspace.sessionCatalog.organize(

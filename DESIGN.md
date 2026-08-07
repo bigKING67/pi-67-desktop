@@ -543,7 +543,7 @@ loading error where the operation can produce those states
   successful Session initialization is followed by an authoritative projection
   resync before the live surface mounts. The initialization acknowledgement alone
   never substitutes for the Session snapshot.
-- At most eight top-level Session Tasks may be accepted, running, waiting for
+- At most eight top-level Session Tasks (`MAX_RUNNING_TASKS = 8`) may be accepted, running, waiting for
   safety approval, or waiting for blocking Extension input. Subagents launched
   inside one Task do not consume additional top-level slots. Reaching the limit
   explains which state is preserved and that an existing Task must settle or stop
@@ -759,9 +759,16 @@ loading error where the operation can produce those states
   while focus remains visible on the exact detail or update trigger. The action
   uses pointer, hover, pressed, focus-visible, and disabled states and opens the
   same one-shot Package-wide confirmation instead of updating silently.
-  A successful mutation produces one Package-specific floating result containing
+  Package rows whose trust state is `unverified` or `drifted` show `已阻止`, are not
+  counted as enabled, and disable per-resource toggles. Missing or unsafe content
+  shows `缺失` / `不可用`. Package detail names the trust state, bounded integrity
+  reason, and last observation time without displaying install paths, directory
+  identities, receipt digests, or raw receipt content.
+  A successful mutation with an `active` or `removed` receipt produces one Package-specific floating result containing
   the display name, available version transition, scope, and completed resource
-  reload. Routine `resource.changed` and informational Extension notifications stay
+  reload. An `ambiguous` receipt instead shows one warning that the operation was not
+  replayed and the Package remains blocked; it never shows an install/update success
+  toast. Routine `resource.changed` and informational Extension notifications stay
   in Notification history without creating additional floating toasts; warning and
   error Extension notifications remain immediately visible.
   Destructive removal stays in an independent danger section below ordinary
@@ -776,6 +783,17 @@ loading error where the operation can produce those states
   Recommended Packages prefill the same dialog and never bypass the one-shot
   installation confirmation. Loaded-resource evidence remains separate because
   installed configuration and the current Session projection are different states.
+- Package network mutations remain one logical Settings action while an isolated
+  Agent Host worker owns the subprocess. A Host shutdown or worker-tree cleanup
+  failure produces one explicit failed result and never a success toast; the UI does
+  not infer completion from a closed dialog or a Settings reload. Worker stdout,
+  stderr, inherited credentials, and raw IPC payloads never become notification or
+  diagnostic content.
+- Package trust copy deliberately says `Desktop 安装记录已核对`, not `已签名` or
+  `安全扩展`. The current observation excludes `.git` and `node_modules`; it proves
+  bounded drift detection only. Package Worker is not an Extension runtime sandbox,
+  and Settings must not imply that third-party module import, hooks, Tools, UI, or MCP
+  subprocesses execute outside the Agent Host.
 - The Download Sources/Network section uses compact forms and status rows rather
   than a card marketplace. It shows the private Node/npm/Git versions, source mode,
   ordered mirror and official candidates, not-checked/reachable/unreachable state,
@@ -791,6 +809,10 @@ loading error where the operation can produce those states
   `设置页未验证连接`; real MCP connection identity belongs to the active Pi Task and
   Agent Host projection. Its current single `Tavily Bridge` service remains a flat
   Settings section until another independently manageable MCP service exists.
+  If Team MCP bootstrap detects that `mcp.json` changed between read and atomic
+  commit, the external file wins. The UI/recovery surface must call this a revision
+  conflict rather than connection failure or invalid credentials, and must not offer
+  a blind retry that overwrites the external edit.
 - Browser integrations do not equate copied source with readiness. The browser67
   section reports separate rows for bundled source, runtime dependencies, browser
   extension files, and the managed connection. Its three-step dialog prepares the
@@ -1107,13 +1129,19 @@ loading error where the operation can produce those states
   Host or Session authority changes retain the draft but rotate that ID before
   the next attempt.
 - One draft accepts at most 20 attachments, 100 MiB per file, and 250 MiB total;
-  a pathless clipboard fallback is capped at 16 MiB. Rejections remain visible
-  beside the Composer instead of being truncated silently. Main streams regular
-  path-backed files into a private `0700` staging root, hashes them, records a
-  bounded manifest, rejects links and changed files, and exposes only opaque IDs
+  a pathless clipboard fallback is capped at 16 MiB, while supported Pi-native
+  PNG/JPEG/GIF/WebP images have a separate 32 MiB aggregate boundary. Rejections
+  remain visible beside the Composer instead of being truncated silently. Main
+  binds the selected size/mtime and physical identity to a non-following file
+  handle, streams that same handle into a private `0700` staging root, verifies it
+  again after copying, hashes the bytes, records a bounded manifest, rejects links
+  and changed files, and exposes only opaque IDs
   plus name/type/size/kind metadata to Renderer and Protocol. The Agent Host
-  atomically claims and revalidates the staged set before returning Operation
-  acceptance. Claim failure creates no accepted Operation.
+  copies from revalidated non-following handles into a temporary claim, atomically
+  publishes the complete set, and removes draft copies only after that commit.
+  Renderer validates the complete draft from Main's authoritative staged kinds,
+  while Host repeats the image aggregate gate before returning Operation acceptance.
+  Claim failure creates no accepted Operation and leaves the original draft retryable.
 - Images enter Pi as native `ImageContent`. Ordinary files are announced by one
   hidden `pi67.desktop-attachments.v1` custom message and remain inspectable only
   through the Desktop-owned hidden `read_attachment` Tool. That Tool is
@@ -1127,9 +1155,20 @@ loading error where the operation can produce those states
   threads, with one OCR task at a time, a 16-task admission boundary, 60-second
   ordinary and 120-second OCR deadlines, cancellation, and worker replacement on
   error or exit. Text/Office/PDF/archive/media/binary operations are bounded;
-  archive entry count, expanded bytes, compression ratio, and traversal are
-  validated, Tool output stops at 32 KiB, and OCR uses packaged Chinese and
+  verified payload bytes are transferred rather than reopened by filesystem path;
+  archive entry count (for both list and read), expanded bytes, compression ratio,
+  path depth/name length, and traversal are
+  validated across the complete archive, Tool output stops at 32 KiB with explicit
+  truncation state, and OCR uses packaged Chinese and
   English data without network fallback.
+- Claimed attachments remain Task-owned rather than acknowledgement-owned so the
+  same live Task can use `read_attachment` in later turns. A replacement Host
+  recovers only the requested set from the same hashed Task directory through a
+  bounded scan and full manifest/item/hash revalidation. New claims use the same
+  128-set admission ceiling, while replay remains idempotent. Explicit Task disposal
+  deletes that Task's claimed directory only after Runtime disposal succeeds and
+  retries a failed attachment cleanup; Host replacement preserves it, while
+  normal application shutdown stops the Host before Main deletes the run root.
 - Queue content is currently inspectable with bounded previews and can be
   cleared atomically after confirmation. Agent Host delivery is strict FIFO and
   bounded to 32 admitted commands by default; capacity exhaustion is an explicit
@@ -1151,6 +1190,14 @@ loading error where the operation can produce those states
   Workspace bindings that share the Main-owned storage identity. Workspace and
   Task services dispose only their bindings; competing SQLite owners must never
   treat another Workspace in the same Host as an external writer.
+- Catalog rows expose an opaque physical JSONL identity to Renderer projections.
+  The identity is the entity join key; `path` remains the displayed/open locator
+  and the existing binary pagination tie-breaker, not proof of entity equality.
+- Formal Workbench conversations, row selection, Command Palette Session actions,
+  provisional merge, recovery persistence, and Catalog joins compare the opaque identity.
+  A changed alias updates the locator without replacing the Task or draft. Workbench v4
+  drops legacy path-only formal recovery instead of inventing a physical identity, while
+  preserving creation-authorized provisional recovery.
 - `sdk-fallback` during ordinary rebuilding does not by itself produce a fallback
   warning. The warning is reserved for the typed `fallback` state; the Renderer
   retains its typed degraded reason for bounded user copy without exposing internal
@@ -1164,12 +1211,36 @@ loading error where the operation can produce those states
   shows `重新检查` plus `放弃此占位`; Desktop does not silently resubmit the create,
   and the provisional identity remains in persisted Workbench state across restart.
   Recheck asks `session.creation.resolve` for the exact Pi JSONL carrying the stable
-  `creationId` marker, then walks the active SQLite Catalog until an authoritative,
-  complete result confirms the same Session ID and canonical path. Only that exact
-  identity materializes the provisional row as a stopped, resumable Session. Missing,
-  ambiguous, unavailable, fallback, rebuilding, or incomplete results remain visibly
-  unconfirmed. Desktop never selects a latest empty Session or uses Catalog deltas,
-  message count, timestamps, or a bounded creation window as identity evidence.
+  `creationId` marker and matching header/path/physical identity. That exact identity materializes the
+  provisional row as a stopped, resumable Session immediately and shows its existing
+  title while Catalog metadata is indexing in the background. Missing, ambiguous, or
+  unavailable exact evidence remains visibly unconfirmed; Catalog fallback, rebuilding,
+  or incompleteness does not reverse materialization or block a known Session from
+  opening. Desktop never selects a latest empty Session or uses Catalog deltas, message
+  count, timestamps, or a bounded creation window as identity evidence.
+- Before invoking Pi, the Host-side runtime persists the stable `creationId` as
+  `reserved`, performs a bounded exact-marker scan, and advances to `materializing`
+  only after a proven missing result. Exact marker plus physical JSONL identity advances
+  the private journal to `materialized`; a constructed authoritative bootstrap advances
+  it to `published`. Restarting from `materializing` without exact evidence becomes an
+  `ambiguous` recovery state and never invokes `newSession()` again. A unique exact
+  marker can rebuild a missing journal. The journal contains no conversation, source,
+  Tool, attachment, or credential content. Protocol v4 does not yet send a Renderer
+  acknowledgement back to this journal.
+- Writer ownership is a two-layer fence: an in-Host registry protects Task transitions,
+  and a private storage-root lock protects overlapping Agent Host processes. Lock files
+  are keyed by SHA-256 of the physical or pending identity; their bounded owner metadata
+  uses hashed Task/Session identity and never exposes a path or user content. A missing
+  JSONL initially holds its physical-parent + exact-leaf key. Commit acquires the final
+  physical JSONL key while that provisional key is still held, then releases the old
+  Session only after the Runtime switch succeeds. Replacement cancel preserves the old
+  lease. Heartbeat compromise requests Host replacement; UI does not offer manual retry
+  or lease stealing from the Workbench.
+- If an exact recovered identity already has a Workbench Task, the provisional row
+  merges into that owner. A sole provisional draft and its attachments move without
+  release; two different non-empty drafts remain visible and produce a conflict notice.
+  Equal Session IDs on different physical JSONL identities remain separate rows. Equal
+  paths carrying different physical identities or Session IDs remain unconfirmed and fail closed.
 - `放弃此占位` removes only the empty in-memory Renderer provisional and returns to
   the Workspace surface. It never opens, moves, rewrites, or deletes Pi JSONL. A
   draft or attachment disables the destructive interpretation and keeps the
@@ -1387,10 +1458,29 @@ loading error where the operation can produce those states
   primary path; an explicitly runtime-only key states that it is cleared when the
   Agent Host exits or restarts and remains available only across Desktop-created
   session transitions within that Agent Host lifetime.
-- Doctor reports use text and icons for pass, warning, and failure and keep
-  retry available without changing the active Pi session.
-- Before Doctor has run, it presents an explicit invitation to run checks and
-  never renders an inferred all-passed state.
+- `恢复与诊断` is a compact advanced-user control plane, not a dashboard or
+  onboarding surface. It retains the existing environment rows and adds one
+  equally dense recovery group for Workspace identity, Session Creation Journal,
+  Session Catalog, Writer Lease, Host authority, and Attachment Staging. Every
+  row uses an icon, text status, and bounded detail; color is never the only cue.
+- Runtime Doctor, Host diagnostics, and Desktop recovery are independent
+  projections. Loading or failure in one region cannot erase a completed result
+  from another region, and a late `doctor.completed` event cannot clear the
+  recovery snapshot. Recheck and diagnostic export remain available without
+  changing the active Pi Session.
+- The Host authority row renders previous-run exit as one of first launch,
+  clean, unclean, or unknown. First launch is neutral; unclean and unknown are
+  warnings. The persisted `cleanExit=false` launch marker remains unchanged so a
+  crash after initialization is still recovered as unclean on the next run.
+- Before the first check, the dialog presents an explicit invitation and never
+  renders an inferred all-passed state. While collecting, its dimensions remain
+  stable and the dialog cannot be dismissed into an ambiguous partial request.
+  The scroll region is bounded on desktop and mobile; footer actions wrap without
+  overlapping status content.
+- The export action uses an icon-plus-command label and sends only typed
+  `RuntimeDiagnostics` to Main. Main composes the fixed support schema with its
+  own recovery snapshot. No destructive repair, force unlock, replay, or
+  clear-all action appears in this surface.
 - Settings and the update dialog disclose that automatic checks request only
   public GitHub Release metadata and send no Workspace, Session, model-service,
   or credential data. Packaged builds check 10 seconds after startup and at most

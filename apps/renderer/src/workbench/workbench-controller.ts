@@ -3,7 +3,6 @@ import {
   MAX_SESSION_CREATION_RECOVERY_RECORDS,
   type RuntimeRecoveryRecord,
   type SessionCreationRecoveryRecord,
-  type SessionSummary,
   type WorkbenchSettingsState,
   type WorkbenchSurface
 } from "@pi67/domain";
@@ -14,16 +13,11 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
 import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
-import {
-  selectConversationSessionSummary,
-  useSessionCatalogStore
-} from "../navigation/session-catalog-store.js";
 import { registerAvailableRendererWorkspaces } from "./workspace-host-registration-controller.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
-  type RendererWorkbenchState,
-  type RendererWorkbenchTask
+  type RendererWorkbenchState
 } from "./workbench-store.js";
 
 let initialization: Promise<void> | undefined;
@@ -51,13 +45,12 @@ export function suspendRendererWorkbenchPersistence(): () => void {
 
 export interface WorkbenchPersistenceAuthority {
   identity: Pick<AgentConnectionIdentity, "hostInstanceId" | "hostEpoch"> | undefined;
-  sessionFor(task: RendererWorkbenchTask): SessionSummary | undefined;
 }
 
 export function workbenchLayout(
   state: RendererWorkbenchState,
   authority: WorkbenchPersistenceAuthority = livePersistenceAuthority()
-): WorkbenchLayoutV3 {
+): WorkbenchLayoutV4 {
   const runtimeRecovery = state.runtimeTaskOrder.flatMap((taskId): RuntimeRecoveryRecord[] => {
     const task = state.tasks[taskId];
     const identity = authority.identity;
@@ -70,13 +63,7 @@ export function workbenchLayout(
       || task.lifecycle === "failed"
       || task.creationStatus !== undefined
       || task.sessionGeneration === undefined
-      || task.sessionPath !== task.conversation.sessionPath
-    ) return [];
-    const catalogSession = authority.sessionFor(task);
-    if (
-      !catalogSession
-      || catalogSession.id !== task.sessionId
-      || catalogSession.path !== task.conversation.sessionPath
+      || task.sessionFileIdentity !== task.conversation.sessionFileIdentity
     ) return [];
     return [{
       taskId: task.id,
@@ -141,7 +128,6 @@ async function initialize(): Promise<void> {
   observedPersistenceFingerprint = persistenceFingerprint(rendererWorkbenchStore.getState());
   persistenceBound = true;
   rendererWorkbenchStore.subscribe(observePersistenceChange);
-  useSessionCatalogStore.subscribe(observePersistenceChange);
 }
 
 export function bindPersistedRendererWorkbenchAuthority(
@@ -261,7 +247,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : messages.runtime.unknownError;
 }
 
-interface WorkbenchLayoutV3 {
+interface WorkbenchLayoutV4 {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -272,10 +258,6 @@ interface WorkbenchLayoutV3 {
 
 function livePersistenceAuthority(): WorkbenchPersistenceAuthority {
   return {
-    identity: agentConnectionController.identity,
-    sessionFor: (task) => selectConversationSessionSummary(
-      useSessionCatalogStore.getState(),
-      task.conversation
-    )
+    identity: agentConnectionController.identity
   };
 }

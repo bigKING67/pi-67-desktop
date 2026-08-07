@@ -6,6 +6,7 @@ export type SessionCatalogDegradedReason = "busy" | "unavailable" | "runtime-loa
 
 export interface FixtureSessionSummary {
   id: string;
+  fileIdentity: string;
   path: string;
   cwd: string;
   name: string;

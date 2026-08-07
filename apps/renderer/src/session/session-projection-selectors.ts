@@ -10,6 +10,7 @@ export const selectHasSession = (state: SessionProjectionState) => (
   state.authority.phase !== "inactive"
 );
 export const selectSessionPath = (state: SessionProjectionState) => state.identity?.sessionPath;
+export const selectSessionFileIdentity = (state: SessionProjectionState) => state.identity?.sessionFileIdentity;
 export const selectSessionName = (state: SessionProjectionState) => state.identity?.sessionName;
 export const selectSessionModels = (state: SessionProjectionState) => state.modelCatalog?.models;
 export const selectSelectedModel = (state: SessionProjectionState) => state.controls?.selectedModel;

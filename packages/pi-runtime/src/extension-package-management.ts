@@ -1,13 +1,12 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type {
   ExtensionPackageEntry,
   ExtensionPackageListResult,
   ExtensionPackageMutationResult,
   ExtensionPackageScope,
   ExtensionPackageUpdatesResult,
-  PackageResourceType,
-  PackageSourceKind
+  PackageResourceType
 } from "@pi67/domain";
 import type {
   DefaultPackageManager,
@@ -15,6 +14,7 @@ import type {
   SettingsManager
 } from "@earendil-works/pi-coding-agent";
 import { RuntimeError } from "@pi67/domain";
+import { packageSourceKind, type PackageTrustRegistry } from "./package-trust-registry.js";
 
 const MAX_PACKAGE_SOURCE_LENGTH = 4_096;
 const MAX_PACKAGE_MANIFEST_BYTES = 1_000_000;
@@ -43,10 +43,13 @@ export interface ExtensionPackageManagementServices {
 }
 
 export class ExtensionPackageManagement {
-  constructor(private readonly services: ExtensionPackageManagementServices) {}
+  constructor(
+    private readonly services: ExtensionPackageManagementServices,
+    private readonly trustRegistry?: PackageTrustRegistry
+  ) {}
 
   list(): ExtensionPackageListResult {
-    return packageList(this.services);
+    return packageList(this.services, this.trustRegistry);
   }
 
   async checkForUpdates(): Promise<ExtensionPackageUpdatesResult> {
@@ -130,7 +133,10 @@ export class ExtensionPackageManagement {
   }
 }
 
-function packageList(services: ExtensionPackageManagementServices): ExtensionPackageListResult {
+function packageList(
+  services: ExtensionPackageManagementServices,
+  trustRegistry: PackageTrustRegistry | undefined
+): ExtensionPackageListResult {
   const configured = services.packageManager.listConfiguredPackages();
   const globalSettings = services.settingsManager.getGlobalSettings();
   const projectSettings = services.settingsManager.getProjectSettings();
@@ -147,6 +153,14 @@ function packageList(services: ExtensionPackageManagementServices): ExtensionPac
     const installedPath = entry.installedPath ?? inheritedPath;
     const manifest = installedPath ? readPackageManifest(installedPath) : undefined;
     const resourceTypes = packageResourceTypes(installedPath, raw, manifest?.pi);
+    const sourceKind = packageSourceKind(entry.source);
+    const trust = trustRegistry?.projectionFor(entry.source, scope) ?? (
+      sourceKind === "bundled"
+        ? { trustState: "builtin-verified" as const }
+        : installedPath === undefined
+          ? { trustState: "unavailable" as const, trustReason: "install-content-missing" as const }
+          : { trustState: "unverified" as const, trustReason: "receipt-missing" as const }
+    );
     return {
       source: entry.source,
       scope,
@@ -156,13 +170,14 @@ function packageList(services: ExtensionPackageManagementServices): ExtensionPac
       ...(manifest?.displayName === undefined ? {} : { displayName: manifest.displayName }),
       ...(manifest?.version === undefined ? {} : { version: manifest.version }),
       ...(manifest?.description === undefined ? {} : { description: manifest.description }),
-      sourceKind: packageSourceKind(entry.source),
-      origin: packageSourceKind(entry.source) === "bundled" ? "first-party" : "external",
+      sourceKind,
+      origin: sourceKind === "bundled" ? "first-party" : "external",
       resourceTypes,
       resourceStates: resourceTypes.map((type) => ({
         type,
         enabled: raw === undefined ? true : packageResourceEnabled(raw, type)
-      }))
+      })),
+      ...trust
     };
   });
   return { items, total: items.length };
@@ -296,7 +311,11 @@ interface PackageManifestProjection {
 function readPackageManifest(installedPath: string): PackageManifestProjection | undefined {
   const path = join(installedPath, "package.json");
   try {
-    if (!existsSync(path) || statSync(path).size > MAX_PACKAGE_MANIFEST_BYTES) return undefined;
+    if (!existsSync(path)) return undefined;
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink > 1 || info.size > MAX_PACKAGE_MANIFEST_BYTES) {
+      return undefined;
+    }
     const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
     if (!isRecord(value)) return undefined;
     const displayName = boundedManifestText(value.name, MAX_PACKAGE_DISPLAY_NAME_LENGTH);
@@ -326,33 +345,6 @@ function boundedManifestText(value: unknown, maximum: number): string | undefine
     .trim();
   if (!normalized) return undefined;
   return normalized.slice(0, maximum).trimEnd();
-}
-
-function packageSourceKind(source: string): PackageSourceKind {
-  const capabilitiesRoot = process.env.PI67_MANAGED_CAPABILITIES_ROOT
-    ?? process.env.PI67_CAPABILITIES_ROOT;
-  if (
-    source.startsWith("pi67-bundled:")
-    || (capabilitiesRoot && isPathWithin(source, capabilitiesRoot))
-  ) return "bundled";
-  if (source.startsWith("git+") || source.startsWith("git@") || source.includes("github.com/") || source.endsWith(".git")) {
-    return "git";
-  }
-  if (isAbsolute(source) || source.startsWith("./") || source.startsWith("../")) return "path";
-  return "npm";
-}
-
-function isPathWithin(candidate: string, root: string): boolean {
-  if (!isAbsolute(candidate)) return false;
-  const normalize = process.platform === "win32"
-    ? (value: string) => resolve(value).toLowerCase()
-    : (value: string) => resolve(value);
-  const fromRoot = relative(normalize(root), normalize(candidate));
-  return fromRoot === "" || (
-    fromRoot !== ".."
-    && !fromRoot.startsWith(`..${sep}`)
-    && !isAbsolute(fromRoot)
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

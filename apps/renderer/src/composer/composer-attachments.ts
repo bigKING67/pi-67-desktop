@@ -3,6 +3,7 @@ import {
   MAX_PROMPT_ATTACHMENT_COUNT,
   MAX_PROMPT_ATTACHMENT_NAME_CHARS,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
+  MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   type StagedPromptAttachment
 } from "@pi67/protocol";
 
@@ -36,6 +37,12 @@ export async function stageDraftAttachments(
         identity: fileIdentity(file),
         ...(attachment.kind === "image" ? { previewUrl: URL.createObjectURL(file) } : {})
       });
+    }
+    const inlineImageBytes = [...current, ...created]
+      .filter((attachment) => attachment.kind === "image")
+      .reduce((sum, attachment) => sum + attachment.byteLength, 0);
+    if (inlineImageBytes > MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES) {
+      throw new Error("图片总大小超过每条消息 32 MiB 限制。");
     }
     return [...current, ...created];
   } catch (error) {

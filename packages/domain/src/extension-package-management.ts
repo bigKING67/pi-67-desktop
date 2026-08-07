@@ -2,6 +2,23 @@ export type ExtensionPackageScope = "global" | "project";
 export type PackageResourceType = "extension" | "skill" | "prompt" | "theme";
 export type PackageSourceKind = "bundled" | "npm" | "git" | "path";
 export type CapabilityOrigin = "first-party" | "third-party" | "external";
+export type ExtensionPackageTrustState =
+  | "builtin-verified"
+  | "user-installed-observed"
+  | "unverified"
+  | "drifted"
+  | "unavailable";
+export type ExtensionPackageIntegrityReason =
+  | "receipt-missing"
+  | "install-content-missing"
+  | "package-identity-changed"
+  | "manifest-changed"
+  | "directory-identity-changed"
+  | "content-hash-changed"
+  | "receipt-invalid"
+  | "inspection-limited"
+  | "mutation-ambiguous";
+export type ExtensionPackageReceiptState = "active" | "removed" | "ambiguous" | "not-applicable";
 
 export interface PackageResourceState {
   type: PackageResourceType;
@@ -21,6 +38,11 @@ export interface ExtensionPackageEntry {
   origin?: CapabilityOrigin;
   resourceTypes?: PackageResourceType[];
   resourceStates?: PackageResourceState[];
+  trustState: ExtensionPackageTrustState;
+  trustReason?: ExtensionPackageIntegrityReason;
+  trustObservedAt?: number;
+  manifestSha256?: string;
+  contentSha256?: string;
 }
 
 export interface ExtensionPackageUpdate {
@@ -42,4 +64,5 @@ export interface ExtensionPackageUpdatesResult {
 
 export interface ExtensionPackageMutationResult extends ExtensionPackageListResult {
   changed: boolean;
+  receiptState?: ExtensionPackageReceiptState;
 }

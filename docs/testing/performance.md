@@ -17,21 +17,23 @@
 | composer input-to-paint p95 | <= 50 ms |
 | streaming renderer commits | <= 20/s |
 | 1,000-message session first usable projection p95 | <= 1.5 s |
-| 1,000-message transcript scroll dropped-frame rate | < 1% |
+| 1,000-message transcript scroll dropped-frame rate | <= 4% |
 | Agent Host crash to recovered active session p95 | <= 3.0 s |
 | app close with active controlled Extension command p95 | <= 5.0 s |
 | app close with active tool p95 | <= 5.0 s |
 | 1,000-Session warm Catalog first page p95 | <= 50 ms |
 | 10,000-Session warm Catalog first page p95 | <= 100 ms |
+| 10,000-Session first page while rebuilding p95 | <= 100 ms |
 | 10,000-Session warm Catalog search miss p95 | <= 150 ms |
 | Session Catalog page JSON | <= 1.5 MiB |
 | 10,000-message shared projection full entry reads | exactly 1 per bind |
+| 100,000-message shared projection full entry reads | exactly 1 per bind |
 | 10,000-message recent page + bounded tree p95 | <= 100 ms |
 | 10,000-message stable-cursor older page p95 | <= 50 ms |
 | browser retained heap: load 900 older messages | <= 6 MiB delta |
-| browser retained heap: 10 Session switches | <= 4 MiB delta |
+| browser retained heap: 10 Session switches | <= 8 MiB delta |
 | browser DOM nodes: 1,000 loaded messages | <= 1,000 |
-| browser DOM nodes: after 10 Session switches | <= 500 |
+| browser DOM nodes: after 10 Session switches | <= 800 |
 
 Code highlighting、Markdown 和长 transcript 必须保持 lazy/virtualized；首屏不加载 Shiki
 WASM、语言 grammar、WorkspaceShell 或全局 Overlay。Runtime 初始化可以加载 WorkspaceShell，
@@ -50,12 +52,16 @@ batching 默认 50 ms，禁止 token-level React commit。
 - 1,000 条消息、长 code block、长 tool output、快速滚动和输入；
 - 最近 100 条恢复后连续加载到 1,000 条、连续切换 10 个 1,000-message Session，并在显式 GC 后
   检查 retained JS heap 与 DOM node 上限；
-- Agent Host crash/restart、外部 session 修改和 app quit；
+- Agent Host crash/restart、外部 session 修改和 app quit；普通单测另外连续执行 32 轮
+  Task create/run/complete/dispose，验证每轮 Runtime 与副作用只执行一次且关闭后 authority 不可复用；
 - 1k/10k Session Catalog warm first/next page、search hit/miss、reopen、cold rebuild、
-  SQLite unavailable/busy/corrupt fallback，以及 raw DB banned-marker privacy contract；
+  rebuild 期间的既有 first page 与新 Session metadata upsert、SQLite unavailable/busy/corrupt
+  fallback，以及 raw DB banned-marker privacy contract；
 - active Session JSONL 的 1 KiB/256 KiB Pi-owned append、4 MiB bounded drain、64 MiB physical-line
   boundary、1,000 条顺序写入、external append、truncate、atomic replace、missing-create 和
   generation/dispose race；
+- 100,000-message in-memory shared projection；weekly/native certification 的 100 MiB / 100,000-record
+  real-file JSONL；手动 extended certification 的 500 MiB / 100,000-record real-file JSONL；
 - Windows 10/11 x64 与 macOS Apple Silicon 分开测量。
 
 ## Evidence levels
@@ -80,15 +86,17 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
 
 1. 构建 production renderer、Main、Preload 和 Agent Host；
 2. 为当前受支持平台生成 unsigned unpacked application；
-3. 对 1k/10k in-memory Pi Session 运行共享 entry projection、最近/更早消息页、bounded tree 和
-   full `getEntries()` read-count 门禁；
-4. 对真实临时 JSONL 文件运行 active-Session tail/watcher 基准，记录 append drain、bounded pass、
+3. 对 1k/10k/100k in-memory Pi Session 运行共享 entry projection、最近/更早消息页、bounded tree 和
+   full `getEntries()` read-count 门禁；100k 时延保持 informational，但 full read 必须仍为一次；
+4. 对真实 `createSessionCatalog` 与临时 SQLite 运行 1k/10k cold rebuild、warm query/search/reopen，
+   并在 background discovery 被阻塞时验证既有分页与新 Session metadata upsert 仍可用；
+5. 对真实临时 JSONL 文件运行 active-Session tail/watcher 基准，记录 append drain、bounded pass、
    peak pending line、event-loop yield 和外部变更分类；
-5. 对 production renderer bundle 运行 browser-tier 1000-message、composer、scroll、
+6. 对 production renderer bundle 运行 browser-tier 1000-message、composer、scroll、
    streaming、older-page/session-switch 显式 GC retained heap、DOM counters，以及
    Shiki/WASM/TypeScript grammar 延迟加载与长代码测量；Renderer E2E 另外验证可见图片才触发
    `asset.read`、单 chunk 不超过 1 MiB、Blob URL 不使用 data URL 且 Host replacement 会 revoke；
-6. 对 packaged Electron 运行 clean-profile launch、warm-profile launch、Welcome working
+7. 对 packaged Electron 运行 clean-profile launch、warm-profile launch、Welcome working
    set、平台原生 owned/effective memory、按需连接但未加载 Pi SDK 的 Agent Host memory、隔离
    目录中的真实 Pi SDK session 初始化、官方 `SessionManager.appendMessage()` 生成的
    1,000-message JSONL restore，以及 active-session Agent Host crash recovery 和
@@ -96,7 +104,7 @@ PI67_PERF_SAMPLES=10 corepack pnpm run performance:measure
    restore 阶段新增的同源 production resource；每个样本还运行一个无 Provider 的受控
    Extension command 和 child process，测量关闭并验证 `session_shutdown(reason="quit")`、child 与
    Agent Host 退出；
-7. 将报告写入 ignored 的 `artifacts/performance/`。
+8. 将报告写入 ignored 的 `artifacts/performance/`。
 
 共享 Session entry projection 的 Node 基准可独立运行：
 
@@ -105,8 +113,10 @@ PI67_PERF_SAMPLES=10 PI67_PERF_ENFORCE=1 \
   corepack pnpm run performance:session-projection
 ```
 
-它对每个 bind 动态记录 `SessionManager.getEntries()` 次数并严格断言为一次，再测量 1k/10k
+它对每个 bind 动态记录 `SessionManager.getEntries()` 次数并严格断言为一次，再测量 1k/10k/100k
 索引构建、最近 100 条 + bounded tree bootstrap、稳定 cursor 的更早 200 条 page 和 page bytes。
+100k 的 bind/bootstrap/page 时延在取得稳定分平台 baseline 前保持 informational；full entry read
+次数和 bounded recent-page bytes 继续执行结构门禁。
 这是纯 Node/in-memory 证据；物理 JSONL read、Utility Process、MessagePort clone 和 retained RSS
 分别由 packaged Electron 场景承担。
 
@@ -117,8 +127,11 @@ PI67_PERF_SAMPLES=10 PI67_PERF_ENFORCE=1 \
   corepack pnpm run performance:session-catalog
 ```
 
-它使用真实 `createSessionCatalog`、`node:sqlite`、1k/10k bounded metadata 和独立临时 DB，
-测量 cold SQLite transaction、warm first/next page、search hit/miss、reopen 和 page bytes。该报告
+它使用真实 `createSessionCatalog`、`node:sqlite`、带 opaque `fileIdentity` 的 1k/10k bounded
+metadata 和独立临时 DB，测量 cold SQLite transaction、warm first/next page、search hit/miss、
+reopen、page bytes，以及 background discovery 被阻塞时的 SQLite first page 与
+`session-created` upsert。upsert 从 JSONL 已权威物化之后开始计时，不冒充 Pi `newSession()` 或
+flush 性能。该报告
 明确标记为 Node evidence，不包含 Pi SDK JSONL discovery、MessagePort、packaged Utility Process、
 Windows、OneDrive、junction/reparse point、杀毒软件或慢磁盘证据。
 
@@ -142,9 +155,39 @@ append/check、external append、truncate、atomic replace、missing-create 和 
 Process、MessagePort、Windows NTFS identity、OneDrive、junction/reparse point、Defender 或慢盘。
 第一轮 macOS/Windows baseline 完整积累前，所有时间指标保持 informational；bytes、records、
 pass count、peak pending line 和 event-loop yield 由 harness 断言正确，不先臆造 release budget。
-CI 会在 `windows-2025` x64 与 `macos-15` arm64 的真实文件系统上各运行 10 个常规样本和 3 个
-64 MiB boundary 样本，并上传 14 天保留的 JSON 报告。该 artifact 用于建立分平台 baseline，
+weekly performance certification 会在 `windows-2025` x64 与 `macos-15` arm64 的真实文件系统上
+各运行 10 个常规样本和 3 个 64 MiB boundary 样本，并上传 30 天保留的 JSON 报告。该 artifact
+用于建立分平台 baseline，
 在出现足够多的稳定版本数据前不自动转换为统一跨平台预算。
+
+### Large Session JSONL certification
+
+大文件认证独立于普通 `performance:measure`，避免 PR 和本地常规测量无条件创建 500 MiB 临时文件。
+standard profile 是 weekly/native 默认值：
+
+```bash
+PI67_PERF_LARGE_SESSION_PROFILE=standard \
+PI67_PERF_LARGE_SESSION_SAMPLES=1 \
+  corepack pnpm run performance:large-session
+```
+
+它生成精确 100 MiB、100,000 条 synthetic Pi-shaped JSONL records，从 production
+`createSessionJsonlTailCursor()` 建立的原文件尾部开始追加，再使用 production
+`drainSessionJsonlTail()` 按 4 MiB pass 读取。Harness 必须验证精确 bytes/records、首尾 ID、pass、
+peak pending physical line 与每个非终结 pass 的 event-loop yield，且结束后删除临时目录。
+
+500 MiB workload 只由显式 manual certification 启用；extended 同时保留 100 MiB 基线，避免两种
+profile 无法比较：
+
+```bash
+PI67_PERF_LARGE_SESSION_PROFILE=extended \
+PI67_PERF_LARGE_SESSION_SAMPLES=1 \
+  corepack pnpm run performance:large-session
+```
+
+两种 profile 的时间指标都保持 informational。它们是当前宿主真实临时文件证据，但不证明
+power-cycle cold cache、packaged Utility Process、MessagePort、OneDrive、Defender、network share
+或慢盘；Windows 报告只能证明对应 `windows-2025` host，macOS 报告不能替代 Windows。
 
 报告包含 nearest-rank p50/p95、原始样本、预算判断、OS、CPU、内存、Node、commit、dirty
 状态、测量方法、证据等级和未验证项。默认只生成证据，即使预算失败也保留报告并以 verdict

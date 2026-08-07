@@ -1,4 +1,5 @@
 import type { SessionSnapshot } from "@pi67/domain";
+import type { OperationSettled } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
@@ -10,6 +11,7 @@ import {
 const expected = {
   hostEpoch: 4,
   sessionId: "session-a",
+  sessionFileIdentity: "session-file-a",
   sessionGeneration: 7,
   projectionRevision: 1
 };
@@ -20,6 +22,7 @@ const accepted = {
   cancellable: true,
   hostEpoch: 4,
   sessionId: "session-a",
+  sessionFileIdentity: "session-file-a",
   sessionGeneration: 7
 };
 
@@ -44,7 +47,11 @@ describe("prompt submission authority", () => {
     expect(validatePromptSubmissionAcceptance(expected, {
       ...accepted,
       sessionId: "session-b"
-    }, connection())).toBe("STALE_SESSION_GENERATION");
+    }, connection())).toBe("STALE_SESSION_IDENTITY");
+    expect(validatePromptSubmissionAcceptance(expected, {
+      ...accepted,
+      sessionFileIdentity: "session-file-other"
+    }, connection())).toBe("STALE_SESSION_IDENTITY");
     installSessionProjectionFixture(connection(), snapshot(), 8);
     expect(validatePromptSubmissionAcceptance(expected, accepted, connection()))
       .toBe("STALE_SESSION_GENERATION");
@@ -58,6 +65,25 @@ describe("prompt submission authority", () => {
 
   it("accepts only an acknowledgement that still matches the captured authority", () => {
     expect(validatePromptSubmissionAcceptance(expected, accepted, connection())).toBeUndefined();
+  });
+
+  it("rejects a replayed terminal receipt from another physical Session", () => {
+    const terminal: OperationSettled = {
+      kind: "settled",
+      operationId: accepted.operationId,
+      operationKind: "prompt",
+      lifecycle: "completed",
+      cancellable: false,
+      hostEpoch: accepted.hostEpoch,
+      sessionId: accepted.sessionId,
+      sessionFileIdentity: "session-file-other",
+      sessionGeneration: accepted.sessionGeneration,
+      startedAt: 1,
+      settledAt: 2
+    };
+
+    expect(validatePromptSubmissionAcceptance(expected, terminal, connection()))
+      .toBe("STALE_SESSION_IDENTITY");
   });
 });
 
@@ -77,6 +103,7 @@ function connection() {
 function snapshot(): SessionSnapshot {
   return {
     sessionId: "session-a",
+    sessionFileIdentity: "session-file-a",
     cwd: "/workspace",
     streaming: false,
     messages: [],

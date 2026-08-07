@@ -23,9 +23,10 @@ export interface WorkspaceDescriptor {
   id: string;
   displayName: string;
   identity: WorkspacePathIdentity;
+  lastVerifiedAt?: number;
   trust: "unknown" | "trusted" | "untrusted";
   trustProvenance: "native-picker" | "user-confirmed" | "restored" | "identity-changed" | "indirect";
-  availability: "available" | "missing" | "identity-changed" | "unavailable";
+  availability: "available" | "missing" | "identity-changed" | "needs-confirmation" | "unavailable";
 }
 
 export interface NativeWorkspaceDescriptor extends WorkspaceDescriptor {
@@ -34,6 +35,7 @@ export interface NativeWorkspaceDescriptor extends WorkspaceDescriptor {
     inode: string;
     birthtimeNs: string;
   };
+  lastVerifiedAt: number;
   trust: "trusted";
   trustProvenance: "native-picker";
   availability: "available";
@@ -41,6 +43,7 @@ export interface NativeWorkspaceDescriptor extends WorkspaceDescriptor {
 
 export interface WorkspaceIdentityOptions {
   createId?: () => string;
+  now?: () => number;
 }
 
 export async function refreshPersistedWorkspaceDescriptor(
@@ -68,10 +71,13 @@ export async function refreshPersistedWorkspaceDescriptor(
   }
   if (existing.identity.assurance === "path-only") {
     return {
-      ...observed,
       id: existing.id,
-      trust: existing.trust,
-      trustProvenance: existing.trust === "trusted" ? "restored" : existing.trustProvenance
+      displayName: observed.displayName,
+      identity: observed.identity,
+      ...(existing.lastVerifiedAt === undefined ? {} : { lastVerifiedAt: existing.lastVerifiedAt }),
+      trust: "unknown",
+      trustProvenance: "identity-changed",
+      availability: "needs-confirmation"
     };
   }
   return {
@@ -105,6 +111,8 @@ export async function createNativeWorkspaceDescriptor(
 
   const id = (options.createId ?? randomUUID)();
   if (!isWorkspaceId(id)) throw new Error("Workspace id is invalid.");
+  const lastVerifiedAt = (options.now ?? Date.now)();
+  if (!isTimestamp(lastVerifiedAt)) throw new Error("Workspace verification timestamp is invalid.");
 
   const hasFilesystemIdentity = metadata.dev !== 0n && metadata.ino !== 0n;
   return {
@@ -117,6 +125,7 @@ export async function createNativeWorkspaceDescriptor(
       birthtimeNs: metadata.birthtimeNs.toString(10),
       assurance: hasFilesystemIdentity ? "filesystem" : "path-only"
     },
+    lastVerifiedAt,
     trust: "trusted",
     trustProvenance: "native-picker",
     availability: "available"
@@ -127,16 +136,11 @@ export function workspaceDescriptorsReferToSameDirectory(
   left: WorkspaceDescriptor,
   right: WorkspaceDescriptor
 ): boolean {
-  if (normalizeCanonicalPath(left.identity.canonicalPath) === normalizeCanonicalPath(right.identity.canonicalPath)) {
-    return true;
+  if (left.identity.assurance === "filesystem" && right.identity.assurance === "filesystem") {
+    return workspaceIdentityMatches(left.identity, right.identity);
   }
-  if (left.identity.assurance !== "filesystem" || right.identity.assurance !== "filesystem") return false;
-  return left.identity.device !== undefined
-    && left.identity.inode !== undefined
-    && left.identity.birthtimeNs !== undefined
-    && left.identity.device === right.identity.device
-    && left.identity.inode === right.identity.inode
-    && left.identity.birthtimeNs === right.identity.birthtimeNs;
+  if (left.identity.assurance !== "path-only" || right.identity.assurance !== "path-only") return false;
+  return left.identity.canonicalPath === right.identity.canonicalPath;
 }
 
 export function refreshNativeWorkspaceDescriptor(
@@ -163,21 +167,24 @@ export function parseNativeWorkspaceDescriptor(value: unknown): NativeWorkspaceD
   const descriptor = parseWorkspaceDescriptor(value);
   if (!descriptor || descriptor.trust !== "trusted" || descriptor.trustProvenance !== "native-picker"
     || descriptor.availability !== "available" || descriptor.identity.device === undefined
-    || descriptor.identity.inode === undefined || descriptor.identity.birthtimeNs === undefined) return undefined;
+    || descriptor.identity.inode === undefined || descriptor.identity.birthtimeNs === undefined
+    || descriptor.lastVerifiedAt === undefined) return undefined;
   return descriptor as NativeWorkspaceDescriptor;
 }
 
 export function parseWorkspaceDescriptor(value: unknown): WorkspaceDescriptor | undefined {
-  if (!isRecordWithExactKeys(value, [
+  if (!isRecordWithAllowedKeys(value, [
     "id",
     "displayName",
     "identity",
+    "lastVerifiedAt",
     "trust",
     "trustProvenance",
     "availability"
-  ])) return undefined;
+  ], ["id", "displayName", "identity", "trust", "trustProvenance", "availability"])) return undefined;
   if (!isWorkspaceId(value.id)) return undefined;
   if (!isBoundedString(value.displayName, MAX_WORKSPACE_DISPLAY_NAME_LENGTH)) return undefined;
+  if (value.lastVerifiedAt !== undefined && !isTimestamp(value.lastVerifiedAt)) return undefined;
   if (value.trust !== "unknown" && value.trust !== "trusted" && value.trust !== "untrusted") return undefined;
   if (!isOneOf(value.trustProvenance, [
     "native-picker",
@@ -186,7 +193,13 @@ export function parseWorkspaceDescriptor(value: unknown): WorkspaceDescriptor | 
     "identity-changed",
     "indirect"
   ])) return undefined;
-  if (!isOneOf(value.availability, ["available", "missing", "identity-changed", "unavailable"])) return undefined;
+  if (!isOneOf(value.availability, [
+    "available",
+    "missing",
+    "identity-changed",
+    "needs-confirmation",
+    "unavailable"
+  ])) return undefined;
   if (!isRecordWithAllowedKeys(
     value.identity,
     ["canonicalPath", "device", "inode", "birthtimeNs", "assurance"],
@@ -204,10 +217,6 @@ export function parseWorkspaceDescriptor(value: unknown): WorkspaceDescriptor | 
   return value as unknown as WorkspaceDescriptor;
 }
 
-function normalizeCanonicalPath(path: string): string {
-  return process.platform === "win32" ? path.toLowerCase() : path;
-}
-
 function isBoundedString(value: unknown, maximumLength: number): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= maximumLength && !value.includes("\0");
 }
@@ -220,12 +229,12 @@ function isDecimalBigint(value: unknown): value is string {
   return typeof value === "string" && /^(?:0|[1-9][0-9]*)$/u.test(value) && value.length <= 40;
 }
 
-function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === code;
+function isTimestamp(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isRecordWithExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
-  return isRecordWithAllowedKeys(value, keys, keys);
+function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function isRecordWithAllowedKeys(

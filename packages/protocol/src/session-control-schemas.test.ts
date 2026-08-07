@@ -8,6 +8,7 @@ const TASK_CONTEXT: ProtocolContext = {
   taskId: "task-1",
   taskGeneration: 1,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-1",
   sessionGeneration: 1
 };
 

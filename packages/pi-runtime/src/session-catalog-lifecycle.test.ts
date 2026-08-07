@@ -199,6 +199,7 @@ function discovery(records: SessionCatalogRecord[]): SessionCatalogDiscoveryResu
 
 function record(index: number, overrides: Partial<SessionCatalogRecord> = {}): SessionCatalogRecord {
   return {
+    fileIdentity: `session-file-fixture-${index}`,
     id: `id-${index}`,
     path: `/session-${index}.jsonl`,
     cwd: "/workspace",

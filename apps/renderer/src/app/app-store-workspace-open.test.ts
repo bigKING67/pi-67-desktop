@@ -121,6 +121,7 @@ describe("App Store workspace open authority", () => {
       attachmentCount: 0
     });
     const sessionPath = "/sessions/catalog-target.jsonl";
+    const sessionFileIdentity = "session-file-fixture-session-catalog-target";
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (
       type,
       payload,
@@ -161,7 +162,7 @@ describe("App Store workspace open authority", () => {
       throw new Error(`Unexpected request: ${type}`);
     });
 
-    await openRendererWorkspaceDescriptor(descriptor, sessionPath);
+    await openRendererWorkspaceDescriptor(descriptor, sessionPath, sessionFileIdentity);
 
     expect(request).toHaveBeenCalledWith(
       "runtime.initialize",
@@ -179,8 +180,9 @@ describe("App Store workspace open authority", () => {
     });
     expect(Object.values(workbench.tasks)).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        conversation: { kind: "session", workspaceId: descriptor.id, sessionPath },
+        conversation: { kind: "session", workspaceId: descriptor.id, sessionFileIdentity, sessionPath },
         sessionId: "session-catalog-target",
+        sessionFileIdentity,
         sessionPath,
         lifecycle: "idle"
       })
@@ -195,11 +197,7 @@ describe("App Store workspace open authority", () => {
   it("resynchronizes after Session initialization when runtime.ready was blocked", async () => {
     const descriptor = workspaceDescriptor("workspace-resync", "/workspace-resync");
     const sessionPath = "/sessions/resync-target.jsonl";
-    const readySnapshot = {
-      ...snapshot("session-resync-target"),
-      cwd: descriptor.identity.canonicalPath,
-      sessionPath
-    };
+    const readySnapshot = { ...snapshot("session-resync-target"), cwd: descriptor.identity.canonicalPath, sessionPath };
     rendererWorkbenchStore.getState().registerWorkspace(descriptor);
     vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
       if (type === "workspace.register") return { registered: true } as never;
@@ -212,7 +210,8 @@ describe("App Store workspace open authority", () => {
     const resync = vi.spyOn(agentConnectionController, "resyncProjection")
       .mockImplementation(async (install) => install(projectionResyncResult(readySnapshot, 1)));
 
-    await expect(openRendererWorkspaceDescriptor(descriptor, sessionPath)).resolves.toBe(true);
+    await expect(openRendererWorkspaceDescriptor(descriptor, sessionPath, readySnapshot.sessionFileIdentity))
+      .resolves.toBe(true);
 
     expect(resync).toHaveBeenCalledOnce();
     expect(useSessionProjectionStore.getState().authority).toMatchObject({
@@ -329,6 +328,7 @@ function expectFailedWorkbenchTask(detail: string): void {
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-fixture-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,
@@ -391,7 +391,6 @@ function connectionIdentity(hostEpoch: number) {
     eventSequence: 0
   };
 }
-
 function emptyChanges(sessionId: string): WorkspaceChangesProjection {
   return { sessionId, items: [], truncated: false, total: 0 };
 }
@@ -410,12 +409,14 @@ function emptyCatalogPage() {
     hasMore: false
   };
 }
-
 function projectionResyncResult(
   value: SessionSnapshot,
   sessionGeneration: number
 ): ProjectionResyncResult {
+  if (!value.sessionFileIdentity) throw new Error("Expected projection fixture physical Session identity.");
   return {
+    sessionId: value.sessionId,
+    sessionFileIdentity: value.sessionFileIdentity,
     snapshot: value,
     changes: emptyChanges(value.sessionId),
     extensionCatalog: { items: [], total: 0, truncated: false },

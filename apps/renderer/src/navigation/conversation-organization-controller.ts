@@ -17,14 +17,14 @@ import { queryFirstSessionCatalog } from "./session-catalog-controller.js";
 
 export async function renameRendererConversation(
   workspaceId: WorkspaceId,
-  path: string,
+  session: RendererSessionLocator,
   name: string | undefined
 ): Promise<boolean> {
   const mutation = name === undefined
     ? { action: "clear" as const }
     : { action: "set" as const, name: name.trim() };
   if (mutation.action === "set" && !mutation.name) return false;
-  const task = taskForSession(workspaceId, path);
+  const task = taskForSession(workspaceId, session);
   try {
     if (task && task.sessionGeneration !== undefined && task.runtime.phase !== "stopped") {
       await agentConnectionController.request(
@@ -44,7 +44,7 @@ export async function renameRendererConversation(
     } else {
       await agentConnectionController.request(
         "session.nameByPath",
-        { path, mutation },
+        { path: session.path, mutation },
         [],
         { context: { scope: "workspace", workspaceId } }
       );
@@ -67,7 +67,7 @@ export async function renameRendererConversation(
 
 export async function setRendererConversationPinned(
   workspaceId: WorkspaceId,
-  session: Pick<SessionSummary, "path" | "pinnedAt">
+  session: RendererSessionLocator & Pick<SessionSummary, "pinnedAt">
 ): Promise<boolean> {
   const pinned = session.pinnedAt === undefined;
   try {
@@ -91,9 +91,9 @@ export async function setRendererConversationPinned(
 
 export async function archiveRendererConversation(
   workspaceId: WorkspaceId,
-  path: string
+  session: RendererSessionLocator
 ): Promise<boolean> {
-  const task = taskForSession(workspaceId, path);
+  const task = taskForSession(workspaceId, session);
   const blocker = conversationArchiveBlocker({
     kind: "session",
     ...(task ? { lifecycle: task.lifecycle, hasDraft: hasTaskDraft(task) } : {})
@@ -121,11 +121,16 @@ export async function archiveRendererConversation(
     }
   }
   try {
-    await setArchived(workspaceId, path, true);
+    await setArchived(workspaceId, session.path, true);
     const workbench = rendererWorkbenchStore.getState();
-    if (workbench.selectedSurface?.kind === "conversation"
+    if (session && workbench.selectedSurface?.kind === "conversation"
       && rendererConversationIdentity(workbench.selectedSurface.conversation)
-        === rendererConversationIdentity({ kind: "session", workspaceId, sessionPath: path })) {
+        === rendererConversationIdentity({
+          kind: "session",
+          workspaceId,
+          sessionFileIdentity: session.fileIdentity,
+          sessionPath: session.path
+        })) {
       workbench.selectWorkspace(workspaceId);
     }
     await queryFirstSessionCatalog(workspaceId);
@@ -134,7 +139,7 @@ export async function archiveRendererConversation(
       title: "对话已归档",
       action: {
         label: "撤销",
-        run: async () => { await restoreRendererConversation(workspaceId, path); }
+        run: async () => { await restoreRendererConversation(workspaceId, session); }
       }
     });
     return true;
@@ -146,15 +151,20 @@ export async function archiveRendererConversation(
 
 export async function restoreRendererConversation(
   workspaceId: WorkspaceId,
-  path: string,
+  session: RendererSessionLocator,
   open = false
 ): Promise<boolean> {
   try {
-    await setArchived(workspaceId, path, false);
+    await setArchived(workspaceId, session.path, false);
     await queryFirstSessionCatalog(workspaceId);
     if (open) {
       const workbench = rendererWorkbenchStore.getState();
-      workbench.selectConversation({ kind: "session", workspaceId, sessionPath: path });
+      workbench.selectConversation({
+        kind: "session",
+        workspaceId,
+        sessionFileIdentity: session.fileIdentity,
+        sessionPath: session.path
+      });
     }
     publishNotification({ level: "success", title: "对话已恢复" });
     return true;
@@ -173,12 +183,21 @@ async function setArchived(workspaceId: WorkspaceId, path: string, archived: boo
   );
 }
 
-function taskForSession(workspaceId: WorkspaceId, path: string): RendererWorkbenchTask | undefined {
+function taskForSession(
+  workspaceId: WorkspaceId,
+  session: RendererSessionLocator
+): RendererWorkbenchTask | undefined {
   return taskForConversation(rendererWorkbenchStore.getState().tasks, {
     kind: "session",
     workspaceId,
-    sessionPath: path
+    sessionFileIdentity: session.fileIdentity,
+    sessionPath: session.path
   });
+}
+
+export interface RendererSessionLocator {
+  fileIdentity: string;
+  path: string;
 }
 
 function hasTaskDraft(task: RendererWorkbenchTask): boolean {

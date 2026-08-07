@@ -100,6 +100,9 @@ importers:
       officeparser:
         specifier: 7.5.1
         version: 7.5.1(supports-color@8.1.1)
+      proper-lockfile:
+        specifier: 4.1.2
+        version: 4.1.2
       tar-stream:
         specifier: 3.2.0
         version: 3.2.0
@@ -113,6 +116,9 @@ importers:
       '@types/node':
         specifier: 24.10.1
         version: 24.10.1
+      '@types/proper-lockfile':
+        specifier: 4.1.4
+        version: 4.1.4
       '@types/tar-stream':
         specifier: 3.1.4
         version: 3.1.4

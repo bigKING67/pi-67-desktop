@@ -9,9 +9,15 @@ describe("WorkbenchProjectionBridge", () => {
   it("atomically replaces a stale Task lifecycle and runtime from the active projection", () => {
     const existing: RendererWorkbenchTask = {
       id: "task-a",
-      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/work/a/session-a.jsonl"
+      },
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       taskGeneration: 3,
       lifecycle: "idle",
@@ -28,6 +34,7 @@ describe("WorkbenchProjectionBridge", () => {
       existing,
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       operation: {
         operationId: "operation-a",
@@ -35,6 +42,7 @@ describe("WorkbenchProjectionBridge", () => {
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-a",
+        sessionFileIdentity: "session-file-a",
         sessionGeneration: 2,
         startedAt: 1
       },
@@ -57,6 +65,7 @@ describe("WorkbenchProjectionBridge", () => {
     const projected = workbenchTaskFromProjection({
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       operation: {
         operationId: "operation-a",
@@ -64,6 +73,7 @@ describe("WorkbenchProjectionBridge", () => {
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-a",
+        sessionFileIdentity: "session-file-a",
         sessionGeneration: 2,
         startedAt: 1
       },
@@ -75,8 +85,10 @@ describe("WorkbenchProjectionBridge", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
         sessionPath: "/work/a/session-a.jsonl"
       },
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/work/a/session-a.jsonl",
       lifecycle: "running",
       runtime: { phase: "busy", detail: "running" },
@@ -108,6 +120,7 @@ describe("WorkbenchProjectionBridge", () => {
       existing,
       workspaceId: "workspace-a",
       sessionId: "session-created",
+      sessionFileIdentity: "session-file-created",
       sessionGeneration: 1,
       runtime: { phase: "ready", detail: "ready", recoverable: true },
       sessionPath: "/work/a/session-created.jsonl"
@@ -116,9 +129,11 @@ describe("WorkbenchProjectionBridge", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-created",
         sessionPath: "/work/a/session-created.jsonl"
       },
       sessionId: "session-created",
+      sessionFileIdentity: "session-file-created",
       sessionPath: "/work/a/session-created.jsonl",
       lifecycle: "idle",
       creationStatus: undefined
@@ -128,9 +143,15 @@ describe("WorkbenchProjectionBridge", () => {
   it("projects an idle ready Task when no operation matches the Session authority", () => {
     const existing: RendererWorkbenchTask = {
       id: "task-a",
-      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/work/a/session-a.jsonl"
+      },
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       taskGeneration: 3,
       lifecycle: "running",
@@ -147,6 +168,7 @@ describe("WorkbenchProjectionBridge", () => {
       existing,
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       operation: {
         operationId: "other-session-operation",
@@ -154,10 +176,12 @@ describe("WorkbenchProjectionBridge", () => {
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-b",
+        sessionFileIdentity: "session-file-b",
         sessionGeneration: 1,
         startedAt: 1
       },
-      runtime: { phase: "busy", detail: "other Session", recoverable: true }
+      runtime: { phase: "busy", detail: "other Session", recoverable: true },
+      sessionPath: "/work/a/session-a.jsonl"
     })).toMatchObject({
       lifecycle: "idle",
       runtime: { phase: "ready", detail: "Pi SDK 已就绪" }
@@ -167,9 +191,15 @@ describe("WorkbenchProjectionBridge", () => {
   it("keeps an accepted prompt ahead of a stale conversation page until Session authority changes", () => {
     const existing: RendererWorkbenchTask = {
       id: "task-a",
-      conversation: { kind: "session", workspaceId: "workspace-a", sessionPath: "/work/a/session-a.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/work/a/session-a.jsonl"
+      },
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       taskGeneration: 3,
       lifecycle: "accepted",
@@ -186,6 +216,7 @@ describe("WorkbenchProjectionBridge", () => {
       existing,
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 2,
       runtime: { phase: "busy", detail: "running", recoverable: true },
       recentUserMessagePreview: "尚未刷新的旧消息",
@@ -197,6 +228,7 @@ describe("WorkbenchProjectionBridge", () => {
       existing,
       workspaceId: "workspace-a",
       sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
       sessionGeneration: 3,
       runtime: { phase: "ready", detail: "ready", recoverable: true },
       recentUserMessagePreview: "新分支中的最新消息",
@@ -208,9 +240,15 @@ describe("WorkbenchProjectionBridge", () => {
   it("does not attach a known Session projection to a different Workspace during Task switching", () => {
     const task: RendererWorkbenchTask = {
       id: "task-b",
-      conversation: { kind: "session", workspaceId: "workspace-b", sessionPath: "/work/b/session-b.jsonl" },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-b",
+        sessionFileIdentity: "session-file-b",
+        sessionPath: "/work/b/session-b.jsonl"
+      },
       workspaceId: "workspace-b",
       sessionId: "session-b",
+      sessionFileIdentity: "session-file-b",
       sessionGeneration: 2,
       taskGeneration: 1,
       lifecycle: "idle",
@@ -221,8 +259,126 @@ describe("WorkbenchProjectionBridge", () => {
       attachmentCount: 0
     };
 
-    expect(shouldProjectSession({ [task.id]: task }, "workspace-a", "session-b")).toBe(false);
-    expect(shouldProjectSession({ [task.id]: task }, "workspace-b", "session-b")).toBe(true);
-    expect(shouldProjectSession({ [task.id]: task }, "workspace-a", "session-new")).toBe(true);
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-a",
+      "session-b",
+      "session-file-b"
+    )).toBe(false);
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-b",
+      "session-b",
+      "session-file-b"
+    )).toBe(true);
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-a",
+      "session-b",
+      "session-file-other"
+    )).toBe(true);
+  });
+
+  it("keeps one Task when the same physical Session is projected through a path alias", () => {
+    const existing: RendererWorkbenchTask = {
+      id: "task-a",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/sessions/original.jsonl"
+      },
+      workspaceId: "workspace-a",
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 2,
+      taskGeneration: 3,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "Task A",
+      sessionPath: "/sessions/original.jsonl",
+      hasDraft: true,
+      toolMode: "auto",
+      attachmentCount: 1
+    };
+
+    expect(workbenchTaskFromProjection({
+      existing,
+      workspaceId: "workspace-a",
+      sessionId: "session-a",
+      sessionFileIdentity: "session-file-a",
+      sessionGeneration: 2,
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      sessionPath: "/junction/sessions/alias.jsonl"
+    })).toMatchObject({
+      id: "task-a",
+      conversation: {
+        kind: "session",
+        sessionFileIdentity: "session-file-a",
+        sessionPath: "/junction/sessions/alias.jsonl"
+      },
+      sessionPath: "/junction/sessions/alias.jsonl",
+      hasDraft: true,
+      attachmentCount: 1
+    });
+  });
+
+  it("keeps equal Session ids on distinct physical files independent", () => {
+    const task = physicalTask("task-a", "session-file-a", "/sessions/a.jsonl");
+
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-a",
+      "shared-session-id",
+      "session-file-b",
+      "/sessions/b.jsonl"
+    )).toBe(true);
+  });
+
+  it("fails closed on physical identity or locator contradictions", () => {
+    const task = physicalTask("task-a", "session-file-a", "/sessions/a.jsonl");
+
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-a",
+      "different-session-id",
+      "session-file-a",
+      "/junction/sessions/a.jsonl"
+    )).toBe(false);
+    expect(shouldProjectSession(
+      { [task.id]: task },
+      "workspace-a",
+      "shared-session-id",
+      "session-file-b",
+      "/sessions/a.jsonl"
+    )).toBe(false);
   });
 });
+
+function physicalTask(
+  id: string,
+  sessionFileIdentity: string,
+  sessionPath: string
+): RendererWorkbenchTask {
+  return {
+    id,
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-a",
+      sessionFileIdentity,
+      sessionPath
+    },
+    workspaceId: "workspace-a",
+    sessionId: "shared-session-id",
+    sessionFileIdentity,
+    sessionGeneration: 2,
+    taskGeneration: 1,
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "ready", recoverable: true },
+    title: id,
+    sessionPath,
+    hasDraft: false,
+    toolMode: "auto",
+    attachmentCount: 0
+  };
+}

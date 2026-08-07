@@ -17,6 +17,7 @@ import {
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { submitRendererPrompt } from "../composer/prompt-submission-controller.js";
 import { currentRendererSessionAuthority } from "./session-authority.js";
+import { useSessionProjectionStore } from "./session-projection-store.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
@@ -118,8 +119,12 @@ export async function createRendererSession(): Promise<void> {
   });
 }
 
-export async function openRendererSession(path: string): Promise<void> {
-  const existing = Object.values(rendererWorkbenchStore.getState().tasks).find((task) => task.sessionPath === path);
+export async function openRendererSession(path: string, sessionFileIdentity?: string): Promise<void> {
+  const existing = sessionFileIdentity
+    ? Object.values(rendererWorkbenchStore.getState().tasks).find((task) => (
+        task.sessionFileIdentity === sessionFileIdentity
+      ))
+    : undefined;
   if (existing) {
     await activateRendererTask(existing.id);
     return;
@@ -153,17 +158,16 @@ export function sessionForkActionBlockedReason(): string | undefined {
   const authority = currentRendererSessionAuthority(state);
   const task = selectedWorkbenchTask(rendererWorkbenchStore.getState());
   if (
-    !state.workspace
-    || !authority
-    || !task
-    || !task.sessionPath
+    !state.workspace || !authority || !task || !task.sessionPath || !task.sessionFileIdentity
     || task.sessionId !== authority.sessionId
     || task.sessionGeneration !== authority.sessionGeneration
+    || task.sessionFileIdentity !== useSessionProjectionStore.getState().identity?.sessionFileIdentity
   ) return messages.transcript.actionUnavailable;
   if (
     state.operation
     && isActiveOperationLifecycle(state.operation.lifecycle)
     && state.operation.sessionId === authority.sessionId
+    && state.operation.sessionFileIdentity === authority.sessionFileIdentity
     && state.operation.sessionGeneration === authority.sessionGeneration
   ) return messages.transcript.actionWhileRunning;
   return undefined;
@@ -182,7 +186,9 @@ export async function continueRendererSessionFrom(entryId: string): Promise<bool
   if (
     !sourceTask
     || !sourceAuthority
-    || sourceTask.sessionGeneration === undefined
+    || sourceTask.sessionGeneration === undefined || sourceTask.sessionFileIdentity === undefined
+    || sourceTask.sessionId !== sourceAuthority.sessionId
+    || sourceTask.sessionFileIdentity !== sourceAuthority.sessionFileIdentity
     || sourceTask.sessionGeneration !== sourceAuthority.sessionGeneration
   ) {
     return reportBlockedFork(
@@ -206,6 +212,7 @@ export async function continueRendererSessionFrom(entryId: string): Promise<bool
       sourceTaskId: sourceTask.id,
       sourceTaskGeneration: sourceTask.taskGeneration,
       sourceSessionId: sourceAuthority.sessionId,
+      sourceSessionFileIdentity: sourceAuthority.sessionFileIdentity,
       sourceSessionGeneration: sourceAuthority.sessionGeneration,
       entryId
     }, [], { context: workbenchProtocolContextForTask(targetTask) })
@@ -396,9 +403,7 @@ function beginPendingTask(
   const taskId = createMessageId("task");
   const task: RendererWorkbenchTask = {
     id: taskId,
-    conversation: sessionPath
-      ? { kind: "session", workspaceId, sessionPath }
-      : { kind: "provisional", workspaceId, draftId: taskId },
+    conversation: { kind: "provisional", workspaceId, draftId: taskId },
     workspaceId,
     sessionId: `pending:${taskId}`,
     taskGeneration: 1,

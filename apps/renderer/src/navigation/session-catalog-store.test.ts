@@ -7,6 +7,7 @@ import {
 } from "./session-catalog-store.js";
 
 const SESSION_ONE: SessionSummary = {
+  fileIdentity: "session-file-fixture-1",
   id: "session-1",
   path: "/sessions/one.jsonl",
   cwd: "/work",
@@ -17,6 +18,7 @@ const SESSION_ONE: SessionSummary = {
 };
 
 const SESSION_TWO: SessionSummary = {
+  fileIdentity: "session-file-fixture-2",
   id: "session-2",
   path: "/sessions/two.jsonl",
   cwd: "/work",
@@ -71,6 +73,7 @@ describe("session catalog store", () => {
     expect(selectConversationSessionSummary(useSessionCatalogStore.getState(), {
       kind: "session",
       workspaceId: WORKSPACE_ID,
+      sessionFileIdentity: SESSION_ONE.fileIdentity,
       sessionPath: SESSION_ONE.path
     })).toEqual(SESSION_ONE);
     expect(selectConversationSessionSummary(useSessionCatalogStore.getState(), {
@@ -80,7 +83,7 @@ describe("session catalog store", () => {
     })).toBeUndefined();
   });
 
-  it("appends a keyset page without duplicating paths", () => {
+  it("appends a keyset page without duplicating physical identities", () => {
     const first = page([SESSION_ONE], {
       total: 2,
       hasMore: true,
@@ -95,6 +98,42 @@ describe("session catalog store", () => {
 
     expect(catalog().items).toEqual([SESSION_ONE, SESSION_TWO]);
     expect(catalog().hasMore).toBe(false);
+  });
+
+  it("updates the locator for one physical Session when a later page returns an alias", () => {
+    const alias = { ...SESSION_ONE, path: "/junction/sessions/one.jsonl", modifiedAt: 30 };
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), page([SESSION_ONE], {
+      total: 2,
+      hasMore: true,
+      nextCursor: { revision: 1, queryKey: QUERY_KEY, modifiedAt: 20, path: SESSION_ONE.path }
+    }));
+    const target = store.beginNextPage(WORKSPACE_ID);
+
+    expect(store.finishNextPage(target!, page([alias, alias, SESSION_TWO], { total: 2 }))).toBe(true);
+    expect(catalog().items).toEqual([alias, SESSION_TWO]);
+  });
+
+  it("does not collapse equal paths or Session ids when physical identities differ", () => {
+    const samePath = {
+      ...SESSION_TWO,
+      id: SESSION_ONE.id,
+      path: SESSION_ONE.path,
+      fileIdentity: "session-file-replacement"
+    };
+    const store = useSessionCatalogStore.getState();
+    store.finishFirstPage(store.beginFirstPage(WORKSPACE_ID), page([SESSION_ONE], {
+      total: 2,
+      hasMore: true,
+      nextCursor: { revision: 1, queryKey: QUERY_KEY, modifiedAt: 20, path: SESSION_ONE.path }
+    }));
+    const target = store.beginNextPage(WORKSPACE_ID);
+
+    expect(store.finishNextPage(target!, page([samePath], { total: 2 }))).toBe(true);
+    expect(catalog().items.map((session) => session.fileIdentity)).toEqual([
+      SESSION_ONE.fileIdentity,
+      samePath.fileIdentity
+    ]);
   });
 
   it("clears loaded pages and invalidates pending requests when status revision changes", () => {

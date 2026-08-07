@@ -12,6 +12,7 @@ const operation: OperationView = {
   lifecycle: "running",
   cancellable: true,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   startedAt: 1
 };
@@ -46,6 +47,7 @@ describe("runtime crash event", () => {
     extensionStore.installCatalog({
       hostEpoch: 9,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 3,
       projectionRevision: 1
     }, { items: [], total: 0, truncated: false });

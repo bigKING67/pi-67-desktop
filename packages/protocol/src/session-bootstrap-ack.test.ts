@@ -69,6 +69,7 @@ function projectionAcknowledgement() {
     accepted: true as const,
     hostEpoch: 5,
     sessionId: "session-2",
+    sessionFileIdentity: "session-file-2",
     sessionGeneration: 4,
     eventSequence: 12
   };

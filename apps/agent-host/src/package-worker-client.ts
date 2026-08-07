@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import type {
-  ExtensionPackageListResult,
-  ExtensionPackageMutationResult,
-  ExtensionPackageUpdatesResult
-} from "@pi67/domain";
+import type { ExtensionPackageMutationResult } from "@pi67/domain";
 import {
   ExtensionPackageManagement,
   reloadDesktopSettings,
@@ -16,18 +12,73 @@ import { EXTENSION_PACKAGE_WORKER_TIMEOUT_MS } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
 import type { ExtensionPackageManagementPort } from "./extension-package-command-router.js";
 import {
+  isCorrelatedPackageWorkerResponse,
+  isPackageWorkerMessageWithinByteLimit,
   isPackageWorkerResponse,
   type PackageWorkerAction,
   type PackageWorkerRequest
 } from "./package-worker-protocol.js";
+import {
+  inspectPackageWorkerProcessTree,
+  terminateAndWaitForPackageWorkerProcessTree,
+  terminatePackageWorkerProcessTree,
+  type PackageWorkerProcessTreeInspector,
+  type PackageWorkerProcessTreeTerminator
+} from "./package-worker-process-tree.js";
+import {
+  invalidPackageWorkerResult,
+  parsePackageWorkerMutationResult,
+  parsePackageWorkerUpdatesResult
+} from "./package-worker-result.js";
+
+export type {
+  PackageWorkerProcessTreeInspector,
+  PackageWorkerProcessTreeTerminator
+} from "./package-worker-process-tree.js";
 
 const packageWorkerEntry = fileURLToPath(new URL("./package-worker.mjs", import.meta.url));
+const DEFAULT_PACKAGE_WORKER_TERMINATION_GRACE_MS = 500;
+const MIN_PACKAGE_WORKER_TERMINATION_GRACE_MS = 20;
+const MAX_PACKAGE_WORKER_TERMINATION_GRACE_MS = 5_000;
+const PACKAGE_WORKER_ENVIRONMENT_KEYS = [
+  "APPDATA",
+  "ComSpec",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LOCALAPPDATA",
+  "LOGNAME",
+  "PATH",
+  "PATHEXT",
+  "SHELL",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USER",
+  "USERPROFILE",
+  "WINDIR"
+] as const;
+const PACKAGE_WORKER_LOCALE_ENVIRONMENT_KEYS = [
+  "LC_ALL",
+  "LC_COLLATE",
+  "LC_CTYPE",
+  "LC_MESSAGES",
+  "LC_MONETARY",
+  "LC_NUMERIC",
+  "LC_TIME"
+] as const;
 
 export interface PackageWorkerClientOptions {
   workerEntry?: string;
   environment?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  terminationGraceMs?: number;
+  platform?: NodeJS.Platform;
   spawnWorker?: (executable: string, arguments_: string[], options: Parameters<typeof spawn>[2]) => ChildProcess;
+  terminateProcessTree?: PackageWorkerProcessTreeTerminator;
+  inspectProcessTree?: PackageWorkerProcessTreeInspector;
 }
 
 export interface PackageWorkerPort {
@@ -36,21 +87,45 @@ export interface PackageWorkerPort {
     services: PiWorkspaceRuntimeServices,
     target?: { source: string; scope: "global" | "project" }
   ): Promise<unknown>;
+  shutdown?(deadlineMs?: number): Promise<void>;
+}
+
+interface ActivePackageWorker {
+  cancel(deadlineMs: number): void;
+  done: Promise<unknown>;
 }
 
 export class PackageWorkerClient implements PackageWorkerPort {
   readonly #workerEntry: string;
   readonly #environment: NodeJS.ProcessEnv;
   readonly #timeoutMs: number;
+  readonly #terminationGraceMs: number;
+  readonly #platform: NodeJS.Platform;
   readonly #spawnWorker: NonNullable<PackageWorkerClientOptions["spawnWorker"]>;
+  readonly #terminateProcessTree: PackageWorkerProcessTreeTerminator;
+  readonly #inspectProcessTree: PackageWorkerProcessTreeInspector;
+  readonly #activeWorkers = new Set<ActivePackageWorker>();
+  #shuttingDown = false;
+  #shutdownPromise: Promise<void> | undefined;
 
   constructor(options: PackageWorkerClientOptions = {}) {
     this.#workerEntry = options.workerEntry ?? packageWorkerEntry;
     this.#environment = options.environment ?? process.env;
     this.#timeoutMs = options.timeoutMs ?? EXTENSION_PACKAGE_WORKER_TIMEOUT_MS;
+    this.#terminationGraceMs = options.terminationGraceMs ?? DEFAULT_PACKAGE_WORKER_TERMINATION_GRACE_MS;
+    this.#platform = options.platform ?? process.platform;
     this.#spawnWorker = options.spawnWorker ?? spawn;
+    this.#terminateProcessTree = options.terminateProcessTree ?? terminatePackageWorkerProcessTree;
+    this.#inspectProcessTree = options.inspectProcessTree ?? inspectPackageWorkerProcessTree;
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 1_000 || this.#timeoutMs > 10 * 60_000) {
       throw new RangeError("Package worker timeout must be between 1000 and 600000 milliseconds.");
+    }
+    if (
+      !Number.isSafeInteger(this.#terminationGraceMs)
+      || this.#terminationGraceMs < MIN_PACKAGE_WORKER_TERMINATION_GRACE_MS
+      || this.#terminationGraceMs > MAX_PACKAGE_WORKER_TERMINATION_GRACE_MS
+    ) {
+      throw new RangeError("Package worker termination grace must be between 20 and 5000 milliseconds.");
     }
   }
 
@@ -59,14 +134,17 @@ export class PackageWorkerClient implements PackageWorkerPort {
     services: PiWorkspaceRuntimeServices,
     target?: { source: string; scope: "global" | "project" }
   ): Promise<unknown> {
+    if (this.#shuttingDown) return Promise.reject(packageWorkerShuttingDown());
     const toolchain = resolveDesktopPackageToolchain(this.#environment);
     if (
       !toolchain.desktop
       || !toolchain.ready
+      || !toolchain.root
       || !toolchain.electronExecutable
       || !toolchain.nodeExecutable
       || !toolchain.npmCli
       || !toolchain.gitExecutable
+      || !toolchain.gitExecPath
     ) {
       return Promise.reject(new HostCommandError(
         "TOOLCHAIN_MISSING",
@@ -86,48 +164,139 @@ export class PackageWorkerClient implements PackageWorkerPort {
         : { networkSettingsPath: toolchain.networkSettingsPath }),
       ...(target === undefined ? {} : target)
     };
-    return this.#execute(toolchain.electronExecutable, request);
+    return this.#execute(
+      toolchain.electronExecutable,
+      request,
+      packageWorkerEnvironment(this.#environment, toolchain)
+    );
   }
 
-  #execute(executable: string, request: PackageWorkerRequest): Promise<unknown> {
+  shutdown(deadlineMs = this.#terminationGraceMs): Promise<void> {
+    if (this.#shutdownPromise) return this.#shutdownPromise;
+    if (
+      !Number.isSafeInteger(deadlineMs)
+      || deadlineMs < MIN_PACKAGE_WORKER_TERMINATION_GRACE_MS
+      || deadlineMs > 10_000
+    ) {
+      return Promise.reject(new RangeError("Package worker shutdown deadline must be between 20 and 10000 milliseconds."));
+    }
+    this.#shuttingDown = true;
+    const activeWorkers = [...this.#activeWorkers];
+    for (const worker of activeWorkers) worker.cancel(deadlineMs);
+    this.#shutdownPromise = Promise.all(activeWorkers.map((worker) => worker.done)).then((errors) => {
+      const error = errors.find((value) => value !== undefined);
+      if (error !== undefined) throw error;
+    });
+    return this.#shutdownPromise;
+  }
+
+  #execute(
+    executable: string,
+    request: PackageWorkerRequest,
+    environment: NodeJS.ProcessEnv
+  ): Promise<unknown> {
     return new Promise((resolvePromise, reject) => {
-      const child = this.#spawnWorker(executable, [this.#workerEntry], {
-        stdio: ["ignore", "ignore", "pipe", "ipc"],
-        env: {
-          ...this.#environment,
-          ELECTRON_RUN_AS_NODE: "1",
-          PI_TELEMETRY: "0"
-        }
-      });
-      let settled = false;
-      const finish = (operation: () => void): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        child.removeAllListeners();
-        child.stderr?.removeAllListeners();
-        if (child.connected) child.disconnect();
-        if (child.exitCode === null && child.signalCode === null) child.kill();
-        operation();
+      let child: ChildProcess;
+      try {
+        child = this.#spawnWorker(executable, [this.#workerEntry], {
+          stdio: ["ignore", "ignore", "ignore", "ipc"],
+          env: environment,
+          detached: this.#platform !== "win32",
+          windowsHide: true
+        });
+      } catch (error) {
+        reject(packageWorkerStartFailure(error));
+        return;
+      }
+
+      let finalizing = false;
+      let timer: NodeJS.Timeout | undefined;
+      let resolveExited!: () => void;
+      let resolveDone!: (error: unknown) => void;
+      const exited = new Promise<void>((resolve) => { resolveExited = resolve; });
+      const activeWorker: ActivePackageWorker = {
+        cancel: (deadlineMs) => finish(() => reject(packageWorkerShuttingDown()), deadlineMs),
+        done: new Promise((resolve) => { resolveDone = resolve; })
       };
-      const timer = setTimeout(() => finish(() => reject(new HostCommandError(
+      this.#activeWorkers.add(activeWorker);
+
+      const cleanup = (): void => {
+        if (timer) clearTimeout(timer);
+        child.removeAllListeners();
+        if (child.connected) {
+          try {
+            child.disconnect();
+          } catch {
+            // The process exit listener remains the authority for cleanup completion.
+          }
+        }
+      };
+      const finish = (operation: () => void, deadlineMs = this.#terminationGraceMs): void => {
+        if (finalizing) return;
+        finalizing = true;
+        if (timer) clearTimeout(timer);
+        if (child.connected) {
+          try {
+            child.disconnect();
+          } catch {
+            // Continue with process-tree termination.
+          }
+        }
+        void terminateAndWaitForPackageWorkerProcessTree(
+          child,
+          exited,
+          deadlineMs,
+          this.#platform,
+          this.#environment,
+          this.#terminateProcessTree,
+          this.#inspectProcessTree
+        )
+          .then(() => {
+            operation();
+            resolveDone(undefined);
+          })
+          .catch((error: unknown) => {
+            reject(error);
+            resolveDone(error);
+          })
+          .finally(() => {
+            cleanup();
+            this.#activeWorkers.delete(activeWorker);
+          });
+      };
+
+      timer = setTimeout(() => finish(() => reject(new HostCommandError(
         "REQUEST_TIMEOUT",
         "The isolated Pi package operation timed out.",
         true
       ))), this.#timeoutMs);
-      child.stderr?.on("data", () => undefined);
-      child.once("error", (error) => finish(() => reject(new HostCommandError(
-        "INTERNAL",
-        `The isolated Pi package worker could not start: ${error.message}`,
-        true
-      ))));
-      child.once("exit", (code, signal) => finish(() => reject(new HostCommandError(
-        "INTERNAL",
-        `The isolated Pi package worker exited before responding (${signal ?? code}).`,
-        true
-      ))));
+      timer.unref?.();
+      child.once("error", (error) => {
+        if (child.pid === undefined) resolveExited();
+        finish(() => reject(packageWorkerStartFailure(error)));
+      });
+      child.once("exit", (code, signal) => {
+        resolveExited();
+        finish(() => reject(new HostCommandError(
+          "INTERNAL",
+          `The isolated Pi package worker exited before responding (${signal ?? code}).`,
+          true
+        )));
+      });
       child.on("message", (message: unknown) => {
-        if (!isPackageWorkerResponse(message, request.requestId)) return;
+        if (!isCorrelatedPackageWorkerResponse(message, request.requestId)) return;
+        if (!isPackageWorkerMessageWithinByteLimit(message)) {
+          finish(() => reject(new HostCommandError(
+            "RESOURCE_LIMIT_EXCEEDED",
+            "The isolated Pi package worker result exceeded the IPC byte limit.",
+            false
+          )));
+          return;
+        }
+        if (!isPackageWorkerResponse(message, request.requestId)) {
+          finish(() => reject(invalidPackageWorkerResult()));
+          return;
+        }
         if (!message.ok) {
           finish(() => reject(new HostCommandError(
             message.error.code,
@@ -139,15 +308,82 @@ export class PackageWorkerClient implements PackageWorkerPort {
         }
         finish(() => resolvePromise(message.result));
       });
-      child.send?.(request, (error) => {
-        if (error) finish(() => reject(new HostCommandError(
-          "CONNECTION_CLOSED",
-          "The isolated Pi package worker request could not be delivered.",
-          true
-        )));
-      });
+      if (!child.send) {
+        finish(() => reject(packageWorkerConnectionClosed()));
+        return;
+      }
+      try {
+        child.send(request, (error) => {
+          if (error) finish(() => reject(new HostCommandError(
+            "CONNECTION_CLOSED",
+            "The isolated Pi package worker request could not be delivered.",
+            true
+          )));
+        });
+      } catch {
+        finish(() => reject(packageWorkerConnectionClosed()));
+      }
     });
   }
+
+}
+
+function packageWorkerEnvironment(
+  source: NodeJS.ProcessEnv,
+  toolchain: ReturnType<typeof resolveDesktopPackageToolchain>
+): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {};
+  for (const key of PACKAGE_WORKER_ENVIRONMENT_KEYS) copyEnvironmentValue(source, environment, key);
+  for (const key of PACKAGE_WORKER_LOCALE_ENVIRONMENT_KEYS) copyEnvironmentValue(source, environment, key);
+  Object.assign(environment, {
+    ELECTRON_RUN_AS_NODE: "1",
+    PI_TELEMETRY: "0",
+    PI67_DESKTOP: "1",
+    PI67_PACKAGED: toolchain.packaged ? "1" : "0",
+    PI67_TOOLCHAIN_ROOT: toolchain.root,
+    PI67_NODE_EXECUTABLE: toolchain.nodeExecutable,
+    PI67_NPM_CLI: toolchain.npmCli,
+    PI67_GIT_EXECUTABLE: toolchain.gitExecutable,
+    PI67_GIT_EXEC_PATH: toolchain.gitExecPath
+  });
+  if (toolchain.networkSettingsPath) {
+    environment.PI67_PACKAGE_NETWORK_SETTINGS = toolchain.networkSettingsPath;
+  }
+  return environment;
+}
+
+function copyEnvironmentValue(
+  source: NodeJS.ProcessEnv,
+  destination: NodeJS.ProcessEnv,
+  key: string
+): void {
+  const value = source[key];
+  if (typeof value === "string") destination[key] = value;
+}
+
+function packageWorkerStartFailure(error: unknown): HostCommandError {
+  return new HostCommandError(
+    "INTERNAL",
+    `The isolated Pi package worker could not start: ${error instanceof Error ? error.message : "unknown error"}`,
+    true
+  );
+}
+
+function packageWorkerConnectionClosed(): HostCommandError {
+  return new HostCommandError(
+    "CONNECTION_CLOSED",
+    "The isolated Pi package worker request could not be delivered.",
+    true
+  );
+}
+
+function packageWorkerShuttingDown(): HostCommandError {
+  return new HostCommandError(
+    "CONNECTION_CLOSED",
+    "The isolated Pi package worker is shutting down.",
+    true,
+    { shuttingDown: true }
+  );
 }
 
 export function createWorkerBackedExtensionPackageManagement(
@@ -157,10 +393,10 @@ export function createWorkerBackedExtensionPackageManagement(
   const local = new ExtensionPackageManagement({
     packageManager: services.packageManager,
     settingsManager: services.settingsManager
-  });
+  }, services.packageTrustRegistry);
   return {
     list: () => local.list(),
-    checkForUpdates: async () => parseUpdatesResult(await worker.run("check-updates", services)),
+    checkForUpdates: async () => parsePackageWorkerUpdatesResult(await worker.run("check-updates", services)),
     install: async (source, scope) => mutateWithWorker("install", source, scope),
     update: async (source, scope) => mutateWithWorker("update", source, scope),
     setEnabled: (source, scope, enabled, resourceType) => local.setEnabled(source, scope, enabled, resourceType),
@@ -173,71 +409,9 @@ export function createWorkerBackedExtensionPackageManagement(
     source: string,
     scope: "global" | "project"
   ): Promise<ExtensionPackageMutationResult> {
-    const result = parseMutationResult(await worker.run(action, services, { source, scope }));
+    const result = parsePackageWorkerMutationResult(await worker.run(action, services, { source, scope }));
     await reloadDesktopSettings(services.settingsManager);
     const current = local.list();
     return { ...current, changed: result.changed };
   }
-}
-
-function parseMutationResult(value: unknown): ExtensionPackageMutationResult {
-  if (!isRecord(value) || typeof value.changed !== "boolean") throw invalidWorkerResult();
-  const list = parseListResult(value);
-  return { ...list, changed: value.changed };
-}
-
-function parseUpdatesResult(value: unknown): ExtensionPackageUpdatesResult {
-  if (!isRecord(value) || !Array.isArray(value.items) || value.items.length > 512) throw invalidWorkerResult();
-  const items = value.items.map((item) => {
-    if (
-      !isRecord(item)
-      || typeof item.source !== "string"
-      || (item.scope !== "global" && item.scope !== "project")
-      || (item.type !== "npm" && item.type !== "git")
-      || typeof item.displayName !== "string"
-    ) throw invalidWorkerResult();
-    return {
-      source: item.source,
-      scope: item.scope as "global" | "project",
-      type: item.type as "npm" | "git",
-      displayName: item.displayName
-    };
-  });
-  if (value.total !== items.length) throw invalidWorkerResult();
-  return { items, total: items.length };
-}
-
-function parseListResult(value: Record<string, unknown>): ExtensionPackageListResult {
-  if (!Array.isArray(value.items) || value.items.length > 512) throw invalidWorkerResult();
-  const items = value.items.map((item) => {
-    if (
-      !isRecord(item)
-      || typeof item.source !== "string"
-      || (item.scope !== "global" && item.scope !== "project")
-      || typeof item.enabled !== "boolean"
-      || typeof item.filtered !== "boolean"
-      || typeof item.installed !== "boolean"
-    ) throw invalidWorkerResult();
-    return {
-      source: item.source,
-      scope: item.scope as "global" | "project",
-      enabled: item.enabled,
-      filtered: item.filtered,
-      installed: item.installed
-    };
-  });
-  if (value.total !== items.length) throw invalidWorkerResult();
-  return { items, total: items.length };
-}
-
-function invalidWorkerResult(): HostCommandError {
-  return new HostCommandError(
-    "INTERNAL",
-    "The isolated Pi package worker returned an invalid result.",
-    true
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

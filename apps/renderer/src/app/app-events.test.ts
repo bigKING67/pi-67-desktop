@@ -24,6 +24,7 @@ const operation: OperationView = {
   lifecycle: "running",
   cancellable: true,
   sessionId: "session-1",
+  sessionFileIdentity: "session-file-session-1",
   sessionGeneration: 3,
   startedAt: 1
 };

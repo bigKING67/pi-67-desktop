@@ -6,6 +6,7 @@ import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionGeneration,
+  selectSessionFileIdentity,
   selectSessionId,
   selectSessionName,
   selectSessionPath
@@ -24,6 +25,7 @@ export function WorkbenchProjectionBridge() {
   const trust = useAppStore((state) => state.trust);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const sessionId = useSessionProjectionStore(selectSessionId);
+  const sessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionPath = useSessionProjectionStore(selectSessionPath);
@@ -68,13 +70,19 @@ export function WorkbenchProjectionBridge() {
   }, [trust, workspacePath]);
 
   useEffect(() => {
-    if (!workspacePath || !sessionId || sessionTransitionPending) return;
+    if (
+      !workspacePath
+      || !sessionId
+      || !sessionFileIdentity
+      || !sessionPath
+      || sessionTransitionPending
+    ) return;
     const workspaceId = workspaceIdForPath(workspacePath);
     const workbench = rendererWorkbenchStore.getState();
-    if (!shouldProjectSession(workbench.tasks, workspaceId, sessionId)) return;
+    if (!shouldProjectSession(workbench.tasks, workspaceId, sessionId, sessionFileIdentity, sessionPath)) return;
     const selected = selectedWorkbenchTask(workbench);
     const matchingSession = Object.values(workbench.tasks).find((task) => (
-      task.workspaceId === workspaceId && task.sessionId === sessionId
+      task.workspaceId === workspaceId && task.sessionFileIdentity === sessionFileIdentity
     ));
     const provisional = selected?.workspaceId === workspaceId
       && selected.sessionId.startsWith("pending:")
@@ -85,12 +93,13 @@ export function WorkbenchProjectionBridge() {
       ...(existing ? { existing } : {}),
       workspaceId,
       sessionId,
+      sessionFileIdentity,
       ...(sessionGeneration === undefined ? {} : { sessionGeneration }),
       ...(operation === undefined ? {} : { operation }),
       runtime,
       ...(recentUserMessagePreview === undefined ? {} : { recentUserMessagePreview }),
       ...(sessionName === undefined ? {} : { sessionName }),
-      ...(sessionPath === undefined ? {} : { sessionPath })
+      sessionPath
     });
     const taskId = task.id;
     if (existing) {
@@ -104,6 +113,7 @@ export function WorkbenchProjectionBridge() {
     operation,
     runtime,
     sessionGeneration,
+    sessionFileIdentity,
     sessionId,
     sessionName,
     sessionPath,
@@ -118,18 +128,20 @@ interface WorkbenchTaskProjectionInput {
   existing?: RendererWorkbenchTask;
   workspaceId: string;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration?: number;
   operation?: OperationView;
   runtime: RuntimeStatus;
   recentUserMessagePreview?: string;
   sessionName?: string;
-  sessionPath?: string;
+  sessionPath: string;
 }
 
 export function workbenchTaskFromProjection({
   existing,
   workspaceId,
   sessionId,
+  sessionFileIdentity,
   sessionGeneration,
   operation,
   runtime,
@@ -138,6 +150,7 @@ export function workbenchTaskFromProjection({
   sessionPath
 }: WorkbenchTaskProjectionInput): RendererWorkbenchTask {
   const projectionMatchesExistingSession = existing?.sessionId === sessionId
+    && existing.sessionFileIdentity === sessionFileIdentity
     && (
       existing.sessionGeneration === undefined
       || sessionGeneration === undefined
@@ -146,11 +159,6 @@ export function workbenchTaskFromProjection({
   const effectiveUserMessagePreview = projectionMatchesExistingSession
     ? existing.recentUserMessagePreview ?? recentUserMessagePreview
     : recentUserMessagePreview;
-  const existingMaterializedPath = projectionMatchesExistingSession
-    && existing?.conversation.kind === "session"
-    ? existing.sessionPath ?? existing.conversation.sessionPath
-    : undefined;
-  const materializedPath = sessionPath ?? existingMaterializedPath;
   const authoritativeOperation = operation
     && sessionGeneration !== undefined
     && operation.sessionId === sessionId
@@ -161,16 +169,11 @@ export function workbenchTaskFromProjection({
     ? runtime
     : { phase: "ready" as const, detail: "Pi SDK 已就绪", recoverable: true };
   return {
-    id: existing?.id ?? `${workspaceId}:${sessionId}`,
-    conversation: materializedPath
-      ? { kind: "session", workspaceId, sessionPath: materializedPath }
-      : existing?.conversation ?? {
-          kind: "provisional",
-          workspaceId,
-          draftId: existing?.id ?? sessionId
-        },
+    id: existing?.id ?? `session-task:${crypto.randomUUID()}`,
+    conversation: { kind: "session", workspaceId, sessionFileIdentity, sessionPath },
     workspaceId,
     sessionId,
+    sessionFileIdentity,
     taskGeneration: existing?.taskGeneration ?? 1,
     ...(sessionGeneration === undefined ? {} : { sessionGeneration }),
     lifecycle: taskLifecycle(authoritativeOperation),
@@ -180,7 +183,7 @@ export function workbenchTaskFromProjection({
     ...(effectiveUserMessagePreview
       ? { recentUserMessagePreview: effectiveUserMessagePreview }
       : {}),
-    ...(materializedPath ? { sessionPath: materializedPath } : {}),
+    sessionPath,
     hasDraft: existing?.hasDraft ?? false,
     attachmentCount: existing?.attachmentCount ?? 0,
     toolMode: existing?.toolMode ?? "auto",
@@ -195,10 +198,24 @@ export function workbenchTaskFromProjection({
 export function shouldProjectSession(
   tasks: Record<string, RendererWorkbenchTask>,
   workspaceId: string,
-  sessionId: string
+  sessionId: string,
+  sessionFileIdentity: string,
+  sessionPath?: string
 ): boolean {
-  const knownOwner = Object.values(tasks).find((task) => task.sessionId === sessionId);
-  return knownOwner === undefined || knownOwner.workspaceId === workspaceId;
+  const physicalOwner = Object.values(tasks).find((task) => (
+    task.sessionFileIdentity === sessionFileIdentity
+  ));
+  if (physicalOwner && (
+    physicalOwner.workspaceId !== workspaceId
+    || physicalOwner.sessionId !== sessionId
+  )) return false;
+  if (sessionPath && Object.values(tasks).some((task) => (
+    task.workspaceId === workspaceId
+    && task.sessionPath === sessionPath
+    && task.sessionFileIdentity !== undefined
+    && task.sessionFileIdentity !== sessionFileIdentity
+  ))) return false;
+  return true;
 }
 
 function taskLifecycle(operation: OperationView | undefined): TaskLifecycle {

@@ -58,18 +58,26 @@ export function forkSessionFromTask(
     const identity = sourceRuntime.getIdentity();
     if (
       identity.sessionId !== payload.sourceSessionId
-      || identity.sessionGeneration !== payload.sourceSessionGeneration
+      || identity.sessionFileIdentity !== payload.sourceSessionFileIdentity
     ) {
+      throw new HostCommandError(
+        "STALE_SESSION_IDENTITY",
+        "The source Session authority changed before the new Task was created.",
+        true,
+        {
+          sessionIdMatches: identity.sessionId === payload.sourceSessionId,
+          sessionFileIdentityMatches:
+            identity.sessionFileIdentity === payload.sourceSessionFileIdentity
+        }
+      );
+    }
+    if (identity.sessionGeneration !== payload.sourceSessionGeneration) {
       throw new HostCommandError(
         "STALE_SESSION_GENERATION",
         "The source Session authority changed before the new Task was created.",
         true,
         {
-          ...(identity.sessionId ? { expectedSessionId: identity.sessionId } : {}),
-          ...(identity.sessionGeneration === undefined
-            ? {}
-            : { expectedSessionGeneration: identity.sessionGeneration }),
-          receivedSessionId: payload.sourceSessionId,
+          expectedSessionGeneration: identity.sessionGeneration,
           receivedSessionGeneration: payload.sourceSessionGeneration
         }
       );

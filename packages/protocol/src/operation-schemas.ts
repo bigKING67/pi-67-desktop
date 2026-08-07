@@ -47,6 +47,7 @@ export const OperationViewSchema = strictObject({
   ]),
   cancellable: Type.Boolean(),
   sessionId: Type.String(),
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 }),
   sessionGeneration: Type.Integer({ minimum: 0 }),
   startedAt: Type.Number(),
   activity: Type.Optional(OperationActivitySchema)
@@ -58,6 +59,7 @@ export const OperationAcceptedSchema = strictObject({
   cancellable: Type.Boolean(),
   hostEpoch: Type.Integer({ minimum: 0 }),
   sessionId: Type.String(),
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 }),
   sessionGeneration: Type.Integer({ minimum: 0 })
 });
 

@@ -5,6 +5,7 @@ import { SessionManager, type SessionInfo } from "@earendil-works/pi-coding-agen
 import type { SessionCatalogContext, SessionCatalogDiscoveryResult } from "./session-catalog.js";
 import {
   normalizeSessionCatalogPathIdentity,
+  resolveExistingSessionFileIdentity,
   versionSessionCatalogSourceIdentity
 } from "./session-path-identity.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
@@ -12,9 +13,14 @@ import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 const MAX_CONCURRENT_SESSION_DIRECTORIES = 4;
 
 interface SessionDiscoveryScan {
-  sessions: SessionInfo[];
+  sessions: IdentifiedSession[];
   scannedCount: number;
   incomplete: boolean;
+}
+
+interface IdentifiedSession {
+  session: SessionInfo;
+  fileIdentity: string;
 }
 
 async function listAgentSessions(agentDir: string): Promise<SessionDiscoveryScan> {
@@ -24,7 +30,7 @@ async function listAgentSessions(agentDir: string): Promise<SessionDiscoveryScan
     throw error;
   });
   const directories = entries.filter((entry) => entry.isDirectory()).map((entry) => join(sessionsRoot, entry.name));
-  const sessions: SessionInfo[] = [];
+  const sessions: IdentifiedSession[] = [];
   const scanned = { count: 0, incomplete: false };
   const workerCount = Math.min(MAX_CONCURRENT_SESSION_DIRECTORIES, directories.length);
   await Promise.all(
@@ -32,8 +38,13 @@ async function listAgentSessions(agentDir: string): Promise<SessionDiscoveryScan
       listSessionLane(directories, index, workerCount, sessions, scanned)
     ))
   );
-  sessions.sort((left, right) => right.modified.getTime() - left.modified.getTime());
-  return { sessions, scannedCount: scanned.count, incomplete: scanned.incomplete };
+  const unique = deduplicateIdentifiedSessions(sessions);
+  unique.sessions.sort((left, right) => right.session.modified.getTime() - left.session.modified.getTime());
+  return {
+    sessions: unique.sessions,
+    scannedCount: Math.max(0, scanned.count - unique.duplicateCount),
+    incomplete: scanned.incomplete
+  };
 }
 
 export interface SessionCatalogDiscoveryOptions {
@@ -58,7 +69,7 @@ async function discoverSessionCatalog(
     : await listAgentSessions(options.agentDir);
   const skippedCount = Math.max(0, scan.scannedCount - scan.sessions.length);
   return {
-    records: scan.sessions.map(toCatalogRecord),
+    records: scan.sessions.map(({ session, fileIdentity }) => toCatalogRecord(session, fileIdentity)),
     incomplete: scan.incomplete || skippedCount > 0,
     skippedCount
   };
@@ -73,8 +84,9 @@ export function createSessionCatalogSourceKey(options: SessionCatalogDiscoveryOp
   return createHash("sha256").update(versionSessionCatalogSourceIdentity(identity)).digest("hex");
 }
 
-function toCatalogRecord(session: SessionInfo): SessionCatalogRecord {
+function toCatalogRecord(session: SessionInfo, fileIdentity: string): SessionCatalogRecord {
   return {
+    fileIdentity,
     id: session.id,
     path: session.path,
     cwd: session.cwd,
@@ -90,7 +102,7 @@ async function listSessionLane(
   directories: string[],
   index: number,
   stride: number,
-  sessions: SessionInfo[],
+  sessions: IdentifiedSession[],
   scanned: { count: number; incomplete: boolean }
 ): Promise<void> {
   const directory = directories[index];
@@ -115,12 +127,41 @@ async function listConfiguredSessions(sessionDirectory: string): Promise<Session
     )
   );
   let progressCount = 0;
-  const sessions = await SessionManager.listAll(canonicalSessionDirectory, (_loaded, total) => {
+  const discovered = await SessionManager.listAll(canonicalSessionDirectory, (_loaded, total) => {
     progressCount = total;
   });
+  const identified = await identifyPhysicalSessions(discovered);
+  const { sessions, duplicateCount } = deduplicateIdentifiedSessions(identified.sessions);
   return {
     sessions,
-    scannedCount: expectedCount ?? progressCount,
-    incomplete: expectedCount === undefined
+    scannedCount: Math.max(0, (expectedCount ?? progressCount) - duplicateCount),
+    incomplete: expectedCount === undefined || identified.failedCount > 0
   };
+}
+
+async function identifyPhysicalSessions(
+  sessions: SessionInfo[]
+): Promise<{ sessions: IdentifiedSession[]; failedCount: number }> {
+  const results = await Promise.all(sessions.map(async (session) => (
+    resolveExistingSessionFileIdentity(session.path)
+      .then((fileIdentity) => ({ session, fileIdentity }))
+      .catch(() => undefined)
+  )));
+  return {
+    sessions: results.filter((session): session is IdentifiedSession => session !== undefined),
+    failedCount: results.filter((session) => session === undefined).length
+  };
+}
+
+function deduplicateIdentifiedSessions(
+  sessions: IdentifiedSession[]
+): { sessions: IdentifiedSession[]; duplicateCount: number } {
+  const seen = new Set<string>();
+  const unique: IdentifiedSession[] = [];
+  for (const session of sessions) {
+    if (seen.has(session.fileIdentity)) continue;
+    seen.add(session.fileIdentity);
+    unique.push(session);
+  }
+  return { sessions: unique, duplicateCount: sessions.length - unique.length };
 }

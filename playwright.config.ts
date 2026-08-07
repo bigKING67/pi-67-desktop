@@ -32,7 +32,9 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `corepack pnpm --filter @pi67/renderer exec vite --host 127.0.0.1 --port ${rendererPort} --strictPort`,
+    // Workspace protocol/domain builds can change without the lockfile changing.
+    // Force Vite to refresh optimized workspace dependencies for each E2E server.
+    command: `corepack pnpm --filter @pi67/renderer exec vite --host 127.0.0.1 --port ${rendererPort} --strictPort --force`,
     url: rendererUrl,
     reuseExistingServer: !process.env.CI && !rendererPortWasExplicit,
     timeout: 30_000

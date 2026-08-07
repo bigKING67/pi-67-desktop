@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -37,6 +38,7 @@ describe("AgentHostServer shutdown", () => {
   it("fences admission, aborts the active operation and disposes once", async () => {
     const order: string[] = [];
     let finishDispose!: () => void;
+    let finishPackageShutdown!: () => void;
     const cancelInteractiveRequests = vi.fn((reason: string) => {
       order.push(`interactive.cancel:${reason}`);
       return reason === "runtime-dispose" ? ["extension-1", "approval-1"] : [];
@@ -49,17 +51,27 @@ describe("AgentHostServer shutdown", () => {
       finishDispose = resolve;
     }));
     const flushStream = vi.fn(() => order.push("stream.flush"));
+    const packageWorker = {
+      run: vi.fn(async () => undefined),
+      shutdown: vi.fn((deadlineMs?: number) => new Promise<void>((resolve) => {
+        order.push(`package-worker.shutdown:${deadlineMs}`);
+        finishPackageShutdown = resolve;
+      }))
+    };
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-1", sessionGeneration: 2 }),
+      getIdentity: () => ({ sessionId: "session-1", sessionFileIdentity: "session-file-session-1", sessionGeneration: 2 }),
       submitPrompt: () => new Promise<void>(() => undefined),
       abort,
       flushStream,
       cancelInteractiveRequests,
       dispose
     } as unknown as AgentRuntime;
-    const server = new AgentHostServer(async () => runtime, { abortWatchdogMs: 100 });
+    const server = new AgentHostServer(async () => runtime, {
+      abortWatchdogMs: 100,
+      packageWorker
+    });
     const port = new FakePort();
     server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 4 });
     port.emit(hello("app-1"));
@@ -81,6 +93,7 @@ describe("AgentHostServer shutdown", () => {
     const secondShutdown = server.shutdown(1_000);
     expect(secondShutdown).toBe(firstShutdown);
     await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce());
+    expect(packageWorker.shutdown).toHaveBeenCalledOnce();
 
     const lateRequest = commandEnvelope("runtime.getStatus", {}, 4);
     port.emit(lateRequest);
@@ -90,12 +103,15 @@ describe("AgentHostServer shutdown", () => {
     });
 
     finishDispose();
+    await Promise.resolve();
+    finishPackageShutdown();
     await expect(firstShutdown).resolves.toEqual({
       activeOperation: "cancelled",
       queuedCommandsDropped: 0,
       extensionRequestsCancelled: 2
     });
     expect(order).toEqual([
+      "package-worker.shutdown:250",
       "interactive.cancel:runtime-dispose",
       "operation.abort",
       "stream.flush",
@@ -104,6 +120,7 @@ describe("AgentHostServer shutdown", () => {
     ]);
     expect(abort).toHaveBeenCalledOnce();
     expect(dispose).toHaveBeenCalledOnce();
+    expect(packageWorker.shutdown).toHaveBeenCalledOnce();
     expect(port.close).toHaveBeenCalledOnce();
 
     const latePort = new FakePort();
@@ -114,7 +131,7 @@ describe("AgentHostServer shutdown", () => {
 
 function hello(appInstanceId: string): RendererHello {
   return {
-    protocolVersion: 3,
+    protocolVersion: PROTOCOL_VERSION,
     protocolRevision: PROTOCOL_REVISION,
     kind: "hello",
     rendererInstanceId: "renderer-1",

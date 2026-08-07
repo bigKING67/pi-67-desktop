@@ -1,7 +1,6 @@
 import { useAppStore } from "../app/app-store.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
-import { findSessionForRecovery } from "../navigation/session-catalog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
@@ -16,10 +15,12 @@ export async function activateRendererTask(taskId: string): Promise<boolean> {
   if (task.runtime.phase === "stopped" || task.lifecycle === "lost" || task.lifecycle === "stopped") return true;
 
   const projection = useSessionProjectionStore.getState().authority;
+  const projectionFileIdentity = useSessionProjectionStore.getState().identity?.sessionFileIdentity;
   const appState = useAppStore.getState();
   if (
     projection.phase === "active"
     && projection.sessionId === task.sessionId
+    && projectionFileIdentity === task.sessionFileIdentity
     && projection.sessionGeneration === task.sessionGeneration
     && appState.workspace === workspace.identity.canonicalPath
   ) return true;
@@ -58,8 +59,8 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     !task
     || !workspace
     || task.conversation.kind !== "session"
-    || !task.sessionPath
-    || task.sessionPath !== task.conversation.sessionPath
+    || !task.sessionFileIdentity
+    || task.sessionFileIdentity !== task.conversation.sessionFileIdentity
     || !workbench.selectTask(taskId)
   ) return false;
   workbench.updateTask(task.id, {
@@ -73,24 +74,6 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
   try {
     await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     const identity = await ensureAgentConnection();
-    const catalog = await findSessionForRecovery(
-      workspace.id,
-      task.sessionId,
-      task.sessionPath
-    );
-    if (catalog.status === "missing") {
-      removeMissingRecoveryTask(task.id, workspace.id);
-      return false;
-    }
-    if (catalog.status === "unavailable") {
-      markTaskRecoveryFailed(task.id, new Error(catalog.detail));
-      return false;
-    }
-    workbench.updateTask(task.id, {
-      title: catalog.session.name,
-      titleSource: catalog.session.nameSource
-    });
-
     const sameHost = task.recoveryHostInstanceId === identity.hostInstanceId
       && task.recoveryHostEpoch === identity.hostEpoch;
     if (sameHost) {
@@ -114,26 +97,15 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
       }
     }
     workbench.removeRuntimeTask(task.id);
-    return openRendererWorkspaceDescriptor(workspace, task.sessionPath);
+    return openRendererWorkspaceDescriptor(
+      workspace,
+      task.conversation.sessionPath,
+      task.conversation.sessionFileIdentity
+    );
   } catch (error) {
     markTaskRecoveryFailed(task.id, error);
     return false;
   }
-}
-
-function removeMissingRecoveryTask(taskId: string, workspaceId: string): void {
-  const workbench = rendererWorkbenchStore.getState();
-  workbench.removeRuntimeTask(taskId);
-  workbench.selectWorkspace(workspaceId);
-  useAppStore.setState({
-    sessionTransitionPending: false,
-    runtime: { phase: "stopped", detail: "对话记录已不存在", recoverable: true }
-  });
-  publishNotification({
-    level: "warning",
-    title: "对话记录已不存在",
-    message: "该对话可能已被移动或删除，请从左侧选择其他对话。"
-  });
 }
 
 function markTaskRecoveryFailed(taskId: string, error?: unknown): void {

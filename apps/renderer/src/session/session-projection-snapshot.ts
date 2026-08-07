@@ -5,6 +5,7 @@ import type {
 } from "@pi67/domain";
 
 export interface SessionIdentityProjection {
+  sessionFileIdentity: string | undefined;
   sessionPath: string | undefined;
   sessionName: string | undefined;
   cwd: string;
@@ -22,6 +23,7 @@ export function identityProjectionFromSnapshot(
   snapshot: SessionSnapshot
 ): SessionIdentityProjection {
   return {
+    sessionFileIdentity: snapshot.sessionFileIdentity,
     sessionPath: snapshot.sessionPath,
     sessionName: snapshot.sessionName,
     cwd: snapshot.cwd

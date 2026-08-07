@@ -9,11 +9,15 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot,
   WorkbenchSettingsState,
-  WorkbenchStateV3,
+  WorkbenchStateV4,
   WorkbenchSurface,
   WorkspaceDescriptor
 } from "@pi67/domain";
-import type { StagedPromptAttachment } from "@pi67/protocol";
+import type {
+  DesktopRecoverySnapshot,
+  RuntimeDiagnostics,
+  StagedPromptAttachment
+} from "@pi67/protocol";
 
 export type TeamMcpStatus = {
   serverName: string;
@@ -28,7 +32,7 @@ export type TeamMcpRevealResult =
   | { status: "revealed"; token: string }
   | { status: "missing" };
 
-export type WorkbenchLayoutV3 = {
+export type WorkbenchLayoutV4 = {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -45,17 +49,18 @@ declare global {
         connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
-        loadWorkbenchState(): Promise<WorkbenchStateV3>;
+        loadWorkbenchState(): Promise<WorkbenchStateV4>;
         loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
         updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
-        updateWorkbenchLayout(layout: WorkbenchLayoutV3): Promise<WorkbenchStateV3>;
+        updateWorkbenchLayout(layout: WorkbenchLayoutV4): Promise<WorkbenchStateV4>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
         repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
-        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV3>;
-        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV3>;
+        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV4>;
+        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV4>;
         selectWorkspace(): Promise<string | undefined>;
         selectSessionFile(): Promise<string | undefined>;
-        saveDiagnostics(content: string): Promise<string | undefined>;
+        getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
+        saveDiagnostics(diagnostics: RuntimeDiagnostics): Promise<string | undefined>;
         showNotification(title: string, body: string): Promise<void>;
         requestOpenExternal(url: string): Promise<boolean>;
         showWorkspaceEntryContextMenu(

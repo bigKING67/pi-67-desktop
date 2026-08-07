@@ -4,6 +4,7 @@ import { HostCommandError } from "./protocol-error.js";
 
 export interface SubmissionAuthority {
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
 }
 
@@ -93,28 +94,47 @@ export class OperationSubmissionLedger {
   }
 
   private assertCurrentAuthority(authority: SubmissionAuthority): void {
-    const current = this.getIdentity();
-    if (
-      current.sessionId === authority.sessionId
-      && current.sessionGeneration === authority.sessionGeneration
-    ) return;
-    throw new HostCommandError(
-      "STALE_SESSION_GENERATION",
-      "The submission belongs to a stale Pi session generation.",
-      true,
-      {
-        expectedSessionGeneration: current.sessionGeneration,
-        receivedSessionGeneration: authority.sessionGeneration
-      }
-    );
+    assertCurrentSubmissionAuthority(this.getIdentity(), authority);
   }
 }
 
+export function assertCurrentSubmissionAuthority(
+  current: RuntimeIdentity,
+  authority: SubmissionAuthority
+): void {
+  if (
+    current.sessionId !== authority.sessionId
+    || current.sessionFileIdentity !== authority.sessionFileIdentity
+  ) {
+    throw new HostCommandError(
+      "STALE_SESSION_IDENTITY",
+      "The submission belongs to a different physical Pi Session.",
+      true,
+      {
+        sessionIdMatches: current.sessionId === authority.sessionId,
+        sessionFileIdentityMatches:
+          current.sessionFileIdentity === authority.sessionFileIdentity
+      }
+    );
+  }
+  if (current.sessionGeneration === authority.sessionGeneration) return;
+  throw new HostCommandError(
+    "STALE_SESSION_GENERATION",
+    "The submission belongs to a stale Pi session generation.",
+    true,
+    {
+      expectedSessionGeneration: current.sessionGeneration,
+      receivedSessionGeneration: authority.sessionGeneration
+    }
+  );
+}
+
 export function authorityFromIdentity(
-  identity: RuntimeIdentity & { sessionId: string }
+  identity: RuntimeIdentity & { sessionId: string; sessionFileIdentity: string }
 ): SubmissionAuthority {
   return {
     sessionId: identity.sessionId,
+    sessionFileIdentity: identity.sessionFileIdentity,
     sessionGeneration: identity.sessionGeneration
   };
 }
@@ -122,6 +142,7 @@ export function authorityFromIdentity(
 function authorityFromTerminal(terminal: OperationSettled): SubmissionAuthority {
   return {
     sessionId: terminal.sessionId,
+    sessionFileIdentity: terminal.sessionFileIdentity,
     sessionGeneration: terminal.sessionGeneration
   };
 }

@@ -72,7 +72,8 @@ export function recoverConnectedRendererProjection(
 ): void {
   const revision = invalidateProjectionRecoveryGeneration();
   const recoverySessionPath = useSessionProjectionStore.getState().recoverySessionPath;
-  const recoverySelection = selectAuthoritativeRecoveryTask(recoverySessionPath);
+  const recoverySessionFileIdentity = useSessionProjectionStore.getState().recoverySessionFileIdentity;
+  const recoverySelection = selectAuthoritativeRecoveryTask(recoverySessionFileIdentity);
   if (!recoverySelection) {
     if (input.workspaceId && hasPendingSessionCreation(input.workspaceId)) {
       recoverCreationOnlyWorkbench(get, set, {

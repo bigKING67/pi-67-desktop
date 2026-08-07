@@ -40,6 +40,7 @@ import { projectWorkspaceChanges } from "./workspace-change-projection.js";
 
 interface RuntimeProjectionTarget {
   getSession: () => AgentSession;
+  getSessionFileIdentity: () => string | undefined;
   getSessionGeneration: () => number;
   emit: (event: AgentEvent) => void;
   emitActivity: (activity: RuntimeOperationActivity) => void;
@@ -196,6 +197,7 @@ export class RuntimeProjectionController {
       services,
       extensions,
       this.session,
+      this.target.getSessionFileIdentity(),
       (toolCallId) => this.resolveToolAdapter(toolCallId),
       (source) => this.projectImageAsset(source)
     );

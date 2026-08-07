@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isPackageWorkerRequest, isPackageWorkerResponse } from "./package-worker-protocol.js";
+import {
+  MAX_PACKAGE_WORKER_MESSAGE_BYTES,
+  isPackageWorkerRequest,
+  isPackageWorkerResponse
+} from "./package-worker-protocol.js";
 
 describe("Package worker IPC contract", () => {
   it("accepts bounded package mutations and correlated responses", () => {
@@ -53,6 +57,21 @@ describe("Package worker IPC contract", () => {
       requestId: "request-1",
       ok: false,
       error: { code: "INTERNAL", message: "failed" }
+    }, "request-1")).toBe(false);
+    expect(isPackageWorkerResponse({
+      type: "package-worker-response",
+      requestId: "request-1",
+      ok: false,
+      error: { code: "NOT_A_PROTOCOL_CODE", message: "failed", recoverable: true }
+    }, "request-1")).toBe(false);
+  });
+
+  it("rejects correlated responses that exceed the total IPC byte budget", () => {
+    expect(isPackageWorkerResponse({
+      type: "package-worker-response",
+      requestId: "request-1",
+      ok: true,
+      result: { value: "x".repeat(MAX_PACKAGE_WORKER_MESSAGE_BYTES) }
     }, "request-1")).toBe(false);
   });
 });

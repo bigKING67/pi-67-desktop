@@ -185,13 +185,17 @@ async function executeNameAction(name: string): Promise<PiDesktopActionExecution
   }
   const session = selectConversationSessionSummary(useSessionCatalogStore.getState(), conversation);
   if (name) {
-    const renamed = await renameRendererConversation(conversation.workspaceId, conversation.sessionPath, name);
+    const renamed = await renameRendererConversation(conversation.workspaceId, {
+      fileIdentity: conversation.sessionFileIdentity,
+      path: conversation.sessionPath
+    }, name);
     return renamed
       ? { status: "handled" }
       : { status: "blocked", message: "对话名称未能保存。" };
   }
   useConversationDialogStore.getState().openRename({
     workspaceId: conversation.workspaceId,
+    fileIdentity: conversation.sessionFileIdentity,
     path: conversation.sessionPath,
     title: task ? conversationPrimaryTitle(task, session) : session?.name ?? "未命名对话",
     nameSource: task?.titleSource === "explicit" ? "explicit" : session?.nameSource ?? "fallback"

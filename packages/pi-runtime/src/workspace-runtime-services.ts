@@ -10,6 +10,8 @@ import { installDesktopPackageToolchainReloadHook } from "./desktop-package-tool
 import { createRuntimeSessionCatalogOwner, type RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import { SessionCreationReceiptStore } from "./session-creation-receipt-store.js";
+import { PackageMutationReceiptStore } from "./package-mutation-receipt-store.js";
+import { PackageTrustRegistry } from "./package-trust-registry.js";
 import {
   createPiWorkspaceProviderCatalog,
   type PiWorkspaceProviderCatalog
@@ -37,6 +39,8 @@ export interface PiWorkspaceRuntimeServices {
   readonly configurationService?: PiConfigurationService;
   readonly sessionCatalog: RuntimeSessionCatalogOwner;
   readonly sessionCreationReceipts: SessionCreationReceiptStore;
+  readonly packageMutationReceipts: PackageMutationReceiptStore;
+  readonly packageTrustRegistry: PackageTrustRegistry;
   assertCompatible(cwd: string, agentDir: string): void;
   setProjectTrusted(trusted: boolean): void;
   dispose(): Promise<void>;
@@ -74,6 +78,16 @@ export function createPiWorkspaceRuntimeServices(
     getConfiguredSessionDir: () => settingsManager.getSessionDir(),
     ...(options.storageRoot === undefined ? {} : { storageRoot: options.storageRoot })
   });
+  const packageMutationReceipts = new PackageMutationReceiptStore({
+    cwd,
+    agentDir,
+    ...(options.storageRoot === undefined ? {} : { storageRoot: options.storageRoot })
+  });
+  const packageTrustRegistry = new PackageTrustRegistry({
+    packageManager,
+    settingsManager,
+    receipts: packageMutationReceipts
+  });
   const unregisterConfiguration = options.configurationService?.registerWorkspace({
     cwd,
     settingsManager,
@@ -92,6 +106,8 @@ export function createPiWorkspaceRuntimeServices(
       : { configurationService: options.configurationService }),
     sessionCatalog,
     sessionCreationReceipts,
+    packageMutationReceipts,
+    packageTrustRegistry,
     assertCompatible(candidateCwd, candidateAgentDir) {
       if (
         normalizeSessionCatalogPathIdentity(candidateCwd) !== cwdIdentity

@@ -12,6 +12,7 @@ const ALLOWED_RECORD_KEYS = new Set([
   "cwd",
   "cwdKey",
   "explicitName",
+  "fileIdentity",
   "id",
   "messageCount",
   "modifiedAt",
@@ -35,6 +36,7 @@ export function createSessionCatalogRecords(count, workspace, normalizeCwd = def
   return Array.from({ length: count }, (_, index) => {
     const padded = index.toString().padStart(5, "0");
     return {
+      fileIdentity: `session-file-${padded}`,
       id: `session-${padded}`,
       path: join(workspace, "sessions", `session-${padded}.jsonl`),
       cwd: workspace,
@@ -80,7 +82,7 @@ export function assertMetadataOnlyRecords(records) {
         throw new Error(`Session Catalog fixture record ${index} contains non-metadata field ${key}.`);
       }
     }
-    for (const key of ["id", "path", "cwd", "cwdKey", "explicitName"]) {
+    for (const key of ["fileIdentity", "id", "path", "cwd", "cwdKey", "explicitName"]) {
       if (typeof record[key] !== "string" || record[key].length === 0) {
         throw new Error(`Session Catalog fixture record ${index} has invalid ${key} metadata.`);
       }

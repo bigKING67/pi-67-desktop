@@ -93,6 +93,7 @@ test("fails closed when the lazy approval surface cannot load", async ({ page })
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

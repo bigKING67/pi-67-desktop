@@ -41,6 +41,7 @@ describe("accepted operation envelopes", () => {
       cancellable: false as const,
       hostEpoch: 4,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 2,
       startedAt: 10,
       settledAt: 20
@@ -60,5 +61,15 @@ describe("accepted operation envelopes", () => {
       ...response,
       result: { ...completed, lifecycle: "failed" }
     })).toBe(false);
+    const { sessionFileIdentity: _sessionFileIdentity, ...withoutPhysicalIdentity } = completed;
+    expect(isResponseEnvelope({
+      ...response,
+      result: withoutPhysicalIdentity
+    })).toBe(false);
+  });
+
+  it("rejects Protocol v3 frames after the v4 clean break", () => {
+    const request = commandEnvelope("doctor.run", {}, APP_PROTOCOL_CONTEXT, 4);
+    expect(isRequestEnvelope({ ...request, protocolVersion: 3 })).toBe(false);
   });
 });

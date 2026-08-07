@@ -6,7 +6,8 @@ import {
   MAX_SESSION_CATALOG_PAGE_ITEMS,
   MAX_SESSION_CATALOG_PAGE_JSON_BYTES,
   MAX_SESSION_CATALOG_PATH_CHARS,
-  MAX_SESSION_CATALOG_SEARCH_CHARS
+  MAX_SESSION_CATALOG_SEARCH_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import type { SessionCatalogStatus } from "@pi67/domain";
 import type { SessionCatalogPageResult, SessionCatalogResultItem } from "./agent-messages.js";
@@ -91,6 +92,7 @@ describe("Session Catalog protocol schemas", () => {
 
   it("bounds page items and every SessionSummary field", () => {
     const boundaryItem = sessionSummary({
+      fileIdentity: "f".repeat(MAX_SESSION_FILE_IDENTITY_CHARS),
       id: "i".repeat(MAX_SESSION_CATALOG_ID_CHARS),
       path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS),
       cwd: "c".repeat(MAX_SESSION_CATALOG_PATH_CHARS),
@@ -108,6 +110,7 @@ describe("Session Catalog protocol schemas", () => {
     }))).toBe(false);
 
     for (const item of [
+      sessionSummary({ fileIdentity: "f".repeat(MAX_SESSION_FILE_IDENTITY_CHARS + 1) }),
       sessionSummary({ id: "i".repeat(MAX_SESSION_CATALOG_ID_CHARS + 1) }),
       sessionSummary({ path: "p".repeat(MAX_SESSION_CATALOG_PATH_CHARS + 1) }),
       sessionSummary({ cwd: "c".repeat(MAX_SESSION_CATALOG_PATH_CHARS + 1) }),
@@ -270,6 +273,7 @@ describe("Session Catalog protocol schemas", () => {
 
 function sessionSummary(overrides: Partial<SessionCatalogResultItem> = {}): SessionCatalogResultItem {
   return {
+    fileIdentity: "session-file-v1\0fixture-1",
     id: "session-1",
     path: "/sessions/one.jsonl",
     cwd: "/workspace",

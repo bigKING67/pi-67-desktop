@@ -70,6 +70,7 @@ function operation(operationId: string): OperationView {
     lifecycle: "running",
     cancellable: true,
     sessionId: "session-a",
+    sessionFileIdentity: "session-file-a",
     sessionGeneration: 3,
     startedAt: 1
   };

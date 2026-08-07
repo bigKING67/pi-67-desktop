@@ -3,6 +3,7 @@ import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
   MAX_SLASH_COMMAND_ITEMS,
   MAX_SLASH_COMMAND_NAME_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS,
   MAX_TREE_NODES
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
@@ -84,6 +85,7 @@ import {
 import {
   WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema
 } from "./workspace-registration-schemas.js";
+import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
 
 export { ProtocolErrorSchema } from "./protocol-error-schema.js";
 export { CommandPayloadSchemas } from "./command-payload-schemas.js";
@@ -105,6 +107,10 @@ const SessionTreeProjectionSchema = strictObject({
 
 const SessionSnapshotSchema = strictObject({
   sessionId: Type.String(),
+  sessionFileIdentity: Type.Optional(Type.String({
+    minLength: 1,
+    maxLength: MAX_SESSION_FILE_IDENTITY_CHARS
+  })),
   sessionPath: Type.Optional(Type.String()),
   sessionName: Type.Optional(Type.String()),
   cwd: Type.String(),
@@ -202,21 +208,9 @@ const ProjectionMutationAcknowledgementSchema = strictObject({
   accepted: Type.Literal(true),
   hostEpoch: Type.Integer({ minimum: 0 }),
   sessionId: Type.String(),
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
   sessionGeneration: Type.Integer({ minimum: 0 }),
   eventSequence: Type.Integer({ minimum: 0 })
-});
-const RuntimeDiagnosticsSchema = strictObject({
-  application: Type.String(),
-  piSdkVersion: Type.String(),
-  platform: Type.String(),
-  architecture: Type.String(),
-  node: Type.String(),
-  cwd: Type.Optional(Type.String()),
-  sessionConfigured: Type.Boolean(),
-  sessionFileConfigured: Type.Boolean(),
-  model: Type.Optional(Type.String()),
-  extensionCount: Type.Number(),
-  extensionErrors: Type.Array(strictObject({ path: Type.String(), error: Type.String() }))
 });
 const SlashCommandDescriptorSchema = strictObject({
   name: Type.String({ minLength: 1, maxLength: MAX_SLASH_COMMAND_NAME_CHARS }),
@@ -240,6 +234,8 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
     sessionCatalogStatus: SessionCatalogStatusSchema,
     eventSequence: Type.Integer({ minimum: 0 }),
     hostEpoch: Type.Integer({ minimum: 0 }),
+    sessionId: Type.String(),
+    sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
     sessionGeneration: Type.Integer({ minimum: 0 }),
     taskToolMode: TaskToolModeSchema,
     activeOperation: Type.Optional(OperationViewSchema),
@@ -424,7 +420,6 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "diagnostics.progress": strictObject({ step: Type.String(), completed: Type.Boolean() }),
   "doctor.completed": DoctorReportSchema
 };
-
 function operationSubmissionResultSchema(operationKind: TSchema): TSchema {
   return Type.Union([OperationAcceptedSchema, operationSettledSchema(operationKind)]);
 }
@@ -437,6 +432,7 @@ function operationSettledSchema(operationKind: TSchema): TSchema {
     cancellable: Type.Literal(false),
     hostEpoch: Type.Integer({ minimum: 0 }),
     sessionId: Type.String(),
+    sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
     sessionGeneration: Type.Integer({ minimum: 0 }),
     startedAt: Type.Number(),
     settledAt: Type.Number()
@@ -448,5 +444,4 @@ function operationSettledSchema(operationKind: TSchema): TSchema {
     strictObject({ ...base, lifecycle: Type.Literal("lost"), reason: Type.String() })
   ]);
 }
-
 export function strictObject<T extends TProperties>(properties: T) { return Type.Object(properties, { additionalProperties: false }); }

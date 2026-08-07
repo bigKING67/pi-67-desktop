@@ -7,7 +7,9 @@ import type {
 } from "./prompt-attachment-worker-contract.js";
 
 interface QueuedTask {
-  task: PromptAttachmentWorkerTask;
+  input: Omit<PromptAttachmentWorkerTask, "id" | "ocrDataRoot" | "bytes">;
+  loadBytes: () => Promise<ArrayBuffer>;
+  workerTask?: PromptAttachmentWorkerTask;
   signal?: AbortSignal;
   queueAbortCleanup?: () => void;
   resolve: (result: { text: string; truncated: boolean }) => void;
@@ -15,7 +17,7 @@ interface QueuedTask {
 }
 
 export interface PromptAttachmentWorkerHandle {
-  postMessage(value: PromptAttachmentWorkerTask): void;
+  postMessage(value: PromptAttachmentWorkerTask, transferList: ArrayBuffer[]): void;
   terminate(): Promise<number>;
   on(event: "message", listener: (response: PromptAttachmentWorkerResponse) => void): this;
   on(event: "error", listener: (error: Error) => void): this;
@@ -68,6 +70,15 @@ export class PromptAttachmentWorkerPool {
     input: Omit<PromptAttachmentWorkerTask, "id" | "ocrDataRoot">,
     signal?: AbortSignal
   ): Promise<{ text: string; truncated: boolean }> {
+    const { bytes, ...metadata } = input;
+    return this.runDeferred(metadata, async () => bytes, signal);
+  }
+
+  runDeferred(
+    input: Omit<PromptAttachmentWorkerTask, "id" | "ocrDataRoot" | "bytes">,
+    loadBytes: () => Promise<ArrayBuffer>,
+    signal?: AbortSignal
+  ): Promise<{ text: string; truncated: boolean }> {
     if (this.disposed) return Promise.reject(new Error("Prompt attachment extraction is unavailable."));
     if (this.queue.length + this.activeCount() >= this.maxQueue) {
       return Promise.reject(new Error("Prompt attachment extraction queue is full."));
@@ -75,7 +86,8 @@ export class PromptAttachmentWorkerPool {
     if (signal?.aborted) return Promise.reject(abortError());
     return new Promise((resolve, reject) => {
       const queued: QueuedTask = {
-        task: { ...input, id: randomUUID(), ocrDataRoot: this.ocrDataRoot },
+        input,
+        loadBytes,
         ...(signal === undefined ? {} : { signal }),
         resolve,
         reject
@@ -118,7 +130,7 @@ export class PromptAttachmentWorkerPool {
     }
     for (const slot of this.slots) {
       if (slot.active) continue;
-      const index = this.queue.findIndex((task) => !requiresOcr(task.task.attachment) || !this.ocrActive);
+      const index = this.queue.findIndex((task) => !requiresOcr(task.input.attachment) || !this.ocrActive);
       if (index < 0) continue;
       const [queued] = this.queue.splice(index, 1);
       if (!queued) continue;
@@ -129,15 +141,35 @@ export class PromptAttachmentWorkerPool {
         continue;
       }
       slot.active = queued;
-      if (requiresOcr(queued.task.attachment)) this.ocrActive = true;
-      const timeoutMs = requiresOcr(queued.task.attachment) ? this.ocrTimeoutMs : this.parseTimeoutMs;
+      if (requiresOcr(queued.input.attachment)) this.ocrActive = true;
+      const timeoutMs = requiresOcr(queued.input.attachment) ? this.ocrTimeoutMs : this.parseTimeoutMs;
       slot.timeout = setTimeout(() => this.failSlot(slot, new Error("Prompt attachment extraction timed out.")), timeoutMs);
       if (queued.signal) {
         const listener = () => this.failSlot(slot, abortError());
         queued.signal.addEventListener("abort", listener, { once: true });
         slot.abortListener = () => queued.signal?.removeEventListener("abort", listener);
       }
-      slot.worker.postMessage(queued.task);
+      void this.loadAndPost(slot, queued);
+    }
+  }
+
+  private async loadAndPost(slot: WorkerSlot, queued: QueuedTask): Promise<void> {
+    try {
+      const bytes = await queued.loadBytes();
+      if (slot.active !== queued || this.disposed) return;
+      if (!(bytes instanceof ArrayBuffer) || bytes.byteLength !== queued.input.attachment.byteLength) {
+        throw new Error("Prompt attachment payload length changed before extraction.");
+      }
+      const task: PromptAttachmentWorkerTask = {
+        ...queued.input,
+        bytes,
+        id: randomUUID(),
+        ocrDataRoot: this.ocrDataRoot
+      };
+      queued.workerTask = task;
+      slot.worker.postMessage(task, [task.bytes]);
+    } catch (error) {
+      if (slot.active === queued) this.failBeforePost(slot, error);
     }
   }
 
@@ -159,7 +191,7 @@ export class PromptAttachmentWorkerPool {
 
   private handleResponse(slot: WorkerSlot, response: PromptAttachmentWorkerResponse): void {
     const active = slot.active;
-    if (!active || response.id !== active.task.id) return;
+    if (!active?.workerTask || response.id !== active.workerTask.id) return;
     this.clearSlot(slot);
     if (response.ok) active.resolve({ text: response.text, truncated: response.truncated });
     else active.reject(new Error(response.error));
@@ -175,8 +207,15 @@ export class PromptAttachmentWorkerPool {
     void slot.worker.terminate().finally(() => this.dispatch());
   }
 
+  private failBeforePost(slot: WorkerSlot, error: unknown): void {
+    const active = slot.active;
+    this.clearSlot(slot);
+    active?.reject(error);
+    this.dispatch();
+  }
+
   private clearSlot(slot: WorkerSlot): void {
-    if (slot.active && requiresOcr(slot.active.task.attachment)) this.ocrActive = false;
+    if (slot.active && requiresOcr(slot.active.input.attachment)) this.ocrActive = false;
     if (slot.timeout) clearTimeout(slot.timeout);
     slot.abortListener?.();
     delete slot.active;

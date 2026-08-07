@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { AgentCommand, CommandResults, WorkspaceProtocolContext } from "@pi67/protocol";
 import type { RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import type { HostEventChannel } from "./host-event-channel.js";
@@ -14,6 +13,7 @@ import {
   type WorkspaceConversationResult
 } from "./workspace-conversation-command-router.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
+import { mutationFingerprint } from "./workspace-mutation-fingerprint.js";
 
 export { isWorkspaceConversationCommand };
 
@@ -69,6 +69,7 @@ const LEDGER_RETENTION_MS = 5 * 60_000;
 
 export class WorkspaceCommandRouter {
   private readonly ledgers = new Map<string, WorkspaceMutationLedger>();
+  private readonly pendingMutations = new Set<Promise<WorkspaceMutationResult>>();
   private readonly conversations: WorkspaceConversationCommandRouter;
 
   constructor(
@@ -86,6 +87,10 @@ export class WorkspaceCommandRouter {
         context: { scope: "workspace", workspaceId }
       });
     });
+  }
+
+  async shutdown(): Promise<void> {
+    await Promise.allSettled(this.pendingMutations);
   }
 
   dispatch(
@@ -331,6 +336,11 @@ export class WorkspaceCommandRouter {
     );
     record = { fingerprint, promise, state: "pending" };
     ledger.records.set(idempotencyKey, record);
+    this.pendingMutations.add(promise);
+    void promise.then(
+      () => this.pendingMutations.delete(promise),
+      () => this.pendingMutations.delete(promise)
+    );
     return promise;
   }
 
@@ -401,57 +411,4 @@ function pruneLedger(records: Map<string, MutationRecord>): void {
   for (const [key, record] of records) {
     if (record.state === "settled" && (record.settledAt ?? 0) <= cutoff) records.delete(key);
   }
-}
-
-function mutationFingerprint(command: WorkspaceMutationCommand): string {
-  const hash = createHash("sha256");
-  hash.update(command.type, "utf8").update("\0");
-  writeCanonicalValue(hash, command.payload);
-  return hash.digest("hex");
-}
-
-interface HashWriter {
-  update(data: string, inputEncoding?: BufferEncoding): HashWriter;
-}
-
-function writeCanonicalValue(hash: HashWriter, value: unknown): void {
-  if (value === null) {
-    hash.update("null");
-    return;
-  }
-  if (typeof value === "string" || (typeof value === "number" && Number.isFinite(value))) {
-    hash.update(JSON.stringify(value));
-    return;
-  }
-  if (typeof value === "boolean") {
-    hash.update(value ? "true" : "false");
-    return;
-  }
-  if (Array.isArray(value)) {
-    hash.update("[");
-    value.forEach((item, index) => {
-      if (index > 0) hash.update(",");
-      writeCanonicalValue(hash, item);
-    });
-    hash.update("]");
-    return;
-  }
-  if (typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype) {
-    hash.update("{");
-    const entries = Object.entries(value)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right));
-    entries.forEach(([key, item], index) => {
-      if (index > 0) hash.update(",");
-      hash.update(JSON.stringify(key)).update(":");
-      writeCanonicalValue(hash, item);
-    });
-    hash.update("}");
-    return;
-  }
-  throw new HostCommandError(
-    "INVALID_PAYLOAD",
-    "The Workspace mutation payload cannot be fingerprinted.",
-    false
-  );
 }

@@ -5,10 +5,10 @@ import { filesFromTransfer } from "./composer-attachments.js";
 import {
   exactSlashCommand,
   resolveSlashSubmission,
+  slashCommandOptionId,
   type ComposerSlashCatalog,
   type ComposerSlashItem
 } from "./composer-slash-commands.js";
-import { slashCommandOptionId } from "./SlashCommandPicker.js";
 
 export function ComposerTextarea({
   inputRef,

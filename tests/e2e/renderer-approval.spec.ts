@@ -243,6 +243,7 @@ async function startApprovalOperation(page: Page, operationId: string): Promise<
         lifecycle: "running",
         cancellable: true,
         sessionId: "session-test",
+        sessionFileIdentity: "session-file-fixture-demo",
         sessionGeneration: 1,
         startedAt: Date.now()
       }

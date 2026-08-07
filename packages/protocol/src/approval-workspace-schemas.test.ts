@@ -204,6 +204,8 @@ describe("workspace change protocol schemas", () => {
         },
         eventSequence: 12,
         hostEpoch: 2,
+        sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 4,
         taskToolMode: "auto"
       }
@@ -222,6 +224,7 @@ function taskContext(sessionGeneration = 3): TaskProtocolContext {
     taskId: "task-1",
     taskGeneration: 1,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration,
     operationId: "operation-1"
   };
@@ -264,6 +267,7 @@ function approvalPayload() {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     cwd: "/workspace",
     streaming: false,
     messages: [],

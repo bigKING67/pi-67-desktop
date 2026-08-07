@@ -7,8 +7,8 @@ import {
 } from "./command-palette-actions.js";
 
 const SESSIONS: SessionSummary[] = [
-  { id: "current", path: "/sessions/current.jsonl", cwd: "/work", name: "Current", nameSource: "explicit", modifiedAt: 2, messageCount: 2 },
-  { id: "other", path: "/sessions/other.jsonl", cwd: "/work", name: "Other", nameSource: "explicit", modifiedAt: 1, messageCount: 1 }
+  { fileIdentity: "session-file-current", id: "current", path: "/sessions/current.jsonl", cwd: "/work", name: "Current", nameSource: "explicit", modifiedAt: 2, messageCount: 2 },
+  { fileIdentity: "session-file-other", id: "other", path: "/sessions/other.jsonl", cwd: "/work", name: "Other", nameSource: "explicit", modifiedAt: 1, messageCount: 1 }
 ];
 
 describe("command palette actions", () => {
@@ -25,7 +25,7 @@ describe("command palette actions", () => {
   it("matches the Host scheduler by disabling turn and exclusive actions during an active operation", () => {
     const actions = build(true, operation());
 
-    expect(byId(actions, "session:/sessions/other.jsonl")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
+    expect(byId(actions, "session:session-file-other")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
     expect(byId(actions, "extension:inspect")).toMatchObject({ disabled: true, disabledReason: "当前任务结束后可用" });
     expect(byId(actions, "pi:reload")).toMatchObject({ disabled: true, disabledReason: "当前任务结束或停止后可用。" });
     expect(byId(actions, "pi:compact")).toMatchObject({ disabled: true, disabledReason: "当前任务结束或停止后可用。" });
@@ -39,7 +39,7 @@ describe("command palette actions", () => {
         { name: "model", source: "extension" },
         { name: "inspect", source: "extension" }
       ],
-      activeSessionPath: undefined,
+      activeSessionFileIdentity: undefined,
       availability: paletteAvailability({
         connected: true,
         sessionReady: true,
@@ -58,8 +58,8 @@ describe("command palette actions", () => {
   it("marks the current Session without making it the enabled selection", () => {
     const actions = build(true, undefined);
 
-    expect(byId(actions, "session:/sessions/current.jsonl")).toMatchObject({ disabled: true, disabledReason: "当前会话" });
-    expect(byId(actions, "session:/sessions/other.jsonl").disabled).toBeUndefined();
+    expect(byId(actions, "session:session-file-current")).toMatchObject({ disabled: true, disabledReason: "当前会话" });
+    expect(byId(actions, "session:session-file-other").disabled).toBeUndefined();
   });
 });
 
@@ -67,7 +67,7 @@ function build(connected: boolean, activeOperation: OperationView | undefined) {
   return buildPaletteActions({
     sessions: SESSIONS,
     extensionCommands: [{ name: "inspect", source: "extension" }],
-    activeSessionPath: "/sessions/current.jsonl",
+    activeSessionFileIdentity: "session-file-current",
     availability: paletteAvailability({
       connected,
       sessionReady: connected,
@@ -103,6 +103,7 @@ function operation(): OperationView {
     lifecycle: "running",
     cancellable: true,
     sessionId: "current",
+    sessionFileIdentity: "session-file-current",
     sessionGeneration: 1,
     startedAt: 1
   };

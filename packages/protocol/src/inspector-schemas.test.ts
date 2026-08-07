@@ -57,6 +57,7 @@ describe("Inspector protocol", () => {
       taskId: "task-1",
       taskGeneration: 1,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 1
     };
     expect(hasValidCommandContext("workspace.file.list", workspace)).toBe(true);

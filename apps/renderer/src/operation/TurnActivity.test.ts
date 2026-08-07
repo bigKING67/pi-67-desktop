@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  hasVisibleOperationTimeline,
-  hasVisibleTurnActivity,
   isActiveOperationLifecycle,
   operationPresentation
 } from "./TurnActivity.js";
 import { createOperationActivityTimeline } from "./operation-activity-timeline-store.js";
+import {
+  hasVisibleOperationTimeline,
+  hasVisibleTurnActivity
+} from "./turn-activity-visibility.js";
 
 describe("TurnActivity projection", () => {
   it("shows a non-terminal quiet warning while preserving an active lifecycle", () => {
@@ -54,6 +56,7 @@ describe("TurnActivity projection", () => {
       lifecycle: "completed" as const,
       cancellable: false,
       sessionId: "session",
+      sessionFileIdentity: "session-file",
       sessionGeneration: 1,
       startedAt: 1
     };
@@ -70,6 +73,7 @@ describe("TurnActivity projection", () => {
       lifecycle: "completed" as const,
       cancellable: false,
       sessionId: "session",
+      sessionFileIdentity: "session-file",
       sessionGeneration: 1,
       startedAt: 1
     };

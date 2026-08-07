@@ -41,7 +41,7 @@ describe("conversation organization controller", () => {
     installTask("running", { phase: "busy", detail: "running", recoverable: true });
     const request = vi.spyOn(agentConnectionController, "request");
 
-    await expect(archiveRendererConversation("workspace-a", "/sessions/a.jsonl")).resolves.toBe(false);
+    await expect(archiveRendererConversation("workspace-a", session("a"))).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
@@ -53,7 +53,7 @@ describe("conversation organization controller", () => {
       runtime: { phase: "ready", detail: "ready", recoverable: true }
     });
     useTaskDraftStore.getState().setText("task-a", "尚未发送");
-    await expect(archiveRendererConversation("workspace-a", "/sessions/a.jsonl")).resolves.toBe(false);
+    await expect(archiveRendererConversation("workspace-a", session("a"))).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       message: "输入框中仍有未发送内容，请发送或清空草稿。"
@@ -68,7 +68,7 @@ describe("conversation organization controller", () => {
         : { revision: type === "conversation.archive" ? 7 : 0 }
     ) as never);
 
-    await expect(archiveRendererConversation("workspace-a", "/sessions/a.jsonl")).resolves.toBe(true);
+    await expect(archiveRendererConversation("workspace-a", session("a"))).resolves.toBe(true);
     expect(request.mock.calls.map(([type]) => type)).toEqual(["task.close", "conversation.archive"]);
     expect(request.mock.calls[1]).toEqual([
       "conversation.archive",
@@ -102,7 +102,7 @@ describe("conversation organization controller", () => {
     installTask("completed", { phase: "ready", detail: "ready", recoverable: true });
     const request = vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("busy"));
 
-    await expect(archiveRendererConversation("workspace-a", "/sessions/a.jsonl")).resolves.toBe(false);
+    await expect(archiveRendererConversation("workspace-a", session("a"))).resolves.toBe(false);
     expect(request).toHaveBeenCalledOnce();
     expect(request.mock.calls[0]?.[0]).toBe("task.close");
     expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeDefined();
@@ -120,7 +120,7 @@ describe("conversation organization controller", () => {
     });
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
 
-    await expect(renameRendererConversation("workspace-a", "/sessions/a.jsonl", "固定标题"))
+    await expect(renameRendererConversation("workspace-a", session("a"), "固定标题"))
       .resolves.toBe(true);
     expect(request.mock.calls[0]).toEqual([
       "session.name",
@@ -133,7 +133,7 @@ describe("conversation organization controller", () => {
       titleSource: "explicit"
     });
 
-    await expect(renameRendererConversation("workspace-a", "/sessions/a.jsonl", undefined))
+    await expect(renameRendererConversation("workspace-a", session("a"), undefined))
       .resolves.toBe(true);
     expect(request.mock.calls[1]).toEqual([
       "session.name",
@@ -150,9 +150,10 @@ describe("conversation organization controller", () => {
   it("uses Workspace authority for cold renames and pin mutations", async () => {
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({ revision: 3 } as never);
 
-    await expect(renameRendererConversation("workspace-a", "/sessions/cold.jsonl", "冷对话"))
+    await expect(renameRendererConversation("workspace-a", session("cold"), "冷对话"))
       .resolves.toBe(true);
     await expect(setRendererConversationPinned("workspace-a", {
+      fileIdentity: "session-file-cold",
       path: "/sessions/cold.jsonl"
     })).resolves.toBe(true);
 
@@ -171,7 +172,27 @@ describe("conversation organization controller", () => {
       ]
     ]);
   });
+
+  it("does not attach a replacement physical file to a stale live Task at the same path", async () => {
+    installTask("running", { phase: "busy", detail: "running", recoverable: true });
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({ revision: 3 } as never);
+
+    await expect(archiveRendererConversation("workspace-a", {
+      fileIdentity: "session-file-replacement",
+      path: "/sessions/a.jsonl"
+    })).resolves.toBe(true);
+
+    expect(request.mock.calls.map(([type]) => type)).toEqual(["conversation.archive"]);
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeDefined();
+  });
 });
+
+function session(name: string) {
+  return {
+    fileIdentity: `session-file-${name}`,
+    path: `/sessions/${name}.jsonl`
+  };
+}
 
 function installTask(lifecycle: TaskLifecycle, runtime: RendererWorkbenchTask["runtime"]): void {
   rendererWorkbenchStore.getState().openTask({
@@ -179,6 +200,7 @@ function installTask(lifecycle: TaskLifecycle, runtime: RendererWorkbenchTask["r
     conversation: {
       kind: "session",
       workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
       sessionPath: "/sessions/a.jsonl"
     },
     workspaceId: "workspace-a",
@@ -203,6 +225,7 @@ function taskContext() {
     taskId: "task-a",
     taskGeneration: 2,
     sessionId: "session-a",
+    sessionFileIdentity: "session-file-a",
     sessionGeneration: 3
   };
 }

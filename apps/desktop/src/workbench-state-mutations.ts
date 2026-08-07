@@ -5,9 +5,9 @@ import {
   assertValidWorkbenchState,
   assertWorkbenchId,
   parseExactWorkbenchIdOrder,
-  parseWorkbenchStateV3,
-  type WorkbenchLayoutV3,
-  type WorkbenchStateV3
+  parseWorkbenchStateV4,
+  type WorkbenchLayoutV4,
+  type WorkbenchStateV4
 } from "./workbench-state-contract.js";
 import {
   refreshNativeWorkspaceDescriptor,
@@ -16,9 +16,9 @@ import {
 } from "./workspace-identity.js";
 
 export function addOrRefreshWorkspace(
-  state: WorkbenchStateV3,
+  state: WorkbenchStateV4,
   selected: NativeWorkspaceDescriptor
-): { state: WorkbenchStateV3; workspace: NativeWorkspaceDescriptor } {
+): { state: WorkbenchStateV4; workspace: NativeWorkspaceDescriptor } {
   const existingIndex = state.workspaces.findIndex((workspace) => (
     workspaceDescriptorsReferToSameDirectory(workspace, selected)
   ));
@@ -35,7 +35,7 @@ export function addOrRefreshWorkspace(
     workspaces[existingIndex] = workspace;
   }
   const firstRegistration = state.currentWorkspaceId === undefined;
-  const next: WorkbenchStateV3 = {
+  const next: WorkbenchStateV4 = {
     ...state,
     workspaces,
     workspaceOrder,
@@ -51,10 +51,10 @@ export function addOrRefreshWorkspace(
 }
 
 export function repairWorkspaceRegistration(
-  state: WorkbenchStateV3,
+  state: WorkbenchStateV4,
   workspaceId: string,
   selected: NativeWorkspaceDescriptor
-): { state: WorkbenchStateV3; workspace: NativeWorkspaceDescriptor } {
+): { state: WorkbenchStateV4; workspace: NativeWorkspaceDescriptor } {
   assertWorkbenchId(workspaceId, "Workspace id");
   const existingIndex = state.workspaces.findIndex((workspace) => workspace.id === workspaceId);
   if (existingIndex === -1) throw new Error("Workspace registration was not found.");
@@ -76,9 +76,9 @@ export function repairWorkspaceRegistration(
 }
 
 export function replaceWorkspaceRegistrations(
-  state: WorkbenchStateV3,
+  state: WorkbenchStateV4,
   workspaces: readonly WorkspaceDescriptor[]
-): WorkbenchStateV3 {
+): WorkbenchStateV4 {
   if (
     workspaces.length !== state.workspaces.length
     || workspaces.some((workspace, index) => workspace.id !== state.workspaces[index]?.id)
@@ -91,7 +91,7 @@ export function replaceWorkspaceRegistrations(
   );
 }
 
-export function removeWorkspaceRegistration(state: WorkbenchStateV3, workspaceId: string): WorkbenchStateV3 {
+export function removeWorkspaceRegistration(state: WorkbenchStateV4, workspaceId: string): WorkbenchStateV4 {
   assertWorkbenchId(workspaceId, "Workspace id");
   if (!state.workspaces.some((workspace) => workspace.id === workspaceId)) return state;
   const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
@@ -108,7 +108,7 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV3, workspaceId
   const selectedSurface = selectedRemoved
     ? (currentWorkspaceId ? { kind: "workspace" as const, workspaceId: currentWorkspaceId } : undefined)
     : state.selectedSurface;
-  const next: WorkbenchStateV3 = {
+  const next: WorkbenchStateV4 = {
     version: WORKBENCH_STATE_VERSION,
     workspaces,
     workspaceOrder,
@@ -126,19 +126,19 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV3, workspaceId
 }
 
 export function reorderWorkspaceRegistrations(
-  state: WorkbenchStateV3,
+  state: WorkbenchStateV4,
   workspaceIds: readonly string[]
-): WorkbenchStateV3 {
+): WorkbenchStateV4 {
   const expected = new Set(state.workspaceOrder);
   const workspaceOrder = parseExactWorkbenchIdOrder(workspaceIds, expected, MAX_WORKSPACES);
   if (!workspaceOrder) throw new Error("Workspace order must be an exact permutation.");
   return { ...state, workspaceOrder };
 }
 
-export function replaceWorkbenchLayout(state: WorkbenchStateV3, value: unknown): WorkbenchStateV3 {
+export function replaceWorkbenchLayout(state: WorkbenchStateV4, value: unknown): WorkbenchStateV4 {
   const layout = parseWorkbenchLayout(value, state.workspaces, state.workspaceOrder);
   if (!layout) throw new Error("Workbench layout is invalid.");
-  const next: WorkbenchStateV3 = {
+  const next: WorkbenchStateV4 = {
     version: WORKBENCH_STATE_VERSION,
     workspaces: state.workspaces,
     workspaceOrder: state.workspaceOrder,
@@ -152,7 +152,7 @@ function parseWorkbenchLayout(
   value: unknown,
   workspaces: readonly WorkspaceDescriptor[],
   workspaceOrder: readonly string[]
-): WorkbenchLayoutV3 | undefined {
+): WorkbenchLayoutV4 | undefined {
   if (!isWorkbenchLayoutRecord(value)) return undefined;
   const candidate = {
     version: WORKBENCH_STATE_VERSION,
@@ -161,7 +161,7 @@ function parseWorkbenchLayout(
     ...value,
     cleanExit: false
   };
-  const parsed = parseWorkbenchStateV3(candidate);
+  const parsed = parseWorkbenchStateV4(candidate);
   if (!parsed) return undefined;
   return {
     expandedWorkspaceIds: parsed.expandedWorkspaceIds,

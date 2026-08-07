@@ -75,6 +75,7 @@ describe("Workspace open Catalog ordering", () => {
           taskId: context.taskId,
           taskGeneration: context.taskGeneration,
           sessionId: initialSnapshot.sessionId,
+          sessionFileIdentity: initialSnapshot.sessionFileIdentity,
           sessionGeneration: 1
         }));
         const event = { type: "runtime.ready", payload } as const;
@@ -112,6 +113,7 @@ describe("Workspace open Catalog ordering", () => {
       expect.objectContaining({
         conversation: expect.objectContaining({
           kind: "session",
+          sessionFileIdentity: initialSnapshot.sessionFileIdentity,
           sessionPath: initialSnapshot.sessionPath
         }),
         sessionId: initialSnapshot.sessionId,
@@ -143,6 +145,7 @@ describe("Workspace open Catalog ordering", () => {
       expect.objectContaining({
         conversation: expect.objectContaining({
           kind: "session",
+          sessionFileIdentity: initialSnapshot.sessionFileIdentity,
           sessionPath: initialSnapshot.sessionPath
         }),
         sessionId: initialSnapshot.sessionId,
@@ -169,9 +172,10 @@ function resetStores(): void {
   rendererWorkbenchStore.getState().reset();
 }
 
-function snapshot(): SessionSnapshot & { sessionPath: string } {
+function snapshot(): SessionSnapshot & { sessionFileIdentity: string; sessionPath: string } {
   return {
     sessionId: "session-initial",
+    sessionFileIdentity: "session-file-fixture-session-initial",
     sessionPath: "/sessions/session-initial.jsonl",
     cwd: "/workspace-next",
     streaming: false,
@@ -189,7 +193,7 @@ function snapshot(): SessionSnapshot & { sessionPath: string } {
 }
 
 function catalogPageForSnapshot(
-  value: SessionSnapshot & { sessionPath: string }
+  value: SessionSnapshot & { sessionFileIdentity: string; sessionPath: string }
 ): SessionCatalogPage {
   return {
     revision: 1,
@@ -200,6 +204,7 @@ function catalogPageForSnapshot(
     incomplete: false,
     skippedCount: 0,
     items: [{
+      fileIdentity: `session-file-fixture-${value.sessionId}`,
       id: value.sessionId,
       path: value.sessionPath,
       cwd: value.cwd,
@@ -260,6 +265,7 @@ function projectionAcknowledgement(sessionId: string) {
     accepted: true as const,
     hostEpoch: 9,
     sessionId,
+    sessionFileIdentity: `session-file-fixture-${sessionId}`,
     sessionGeneration: 1,
     eventSequence: 2
   };

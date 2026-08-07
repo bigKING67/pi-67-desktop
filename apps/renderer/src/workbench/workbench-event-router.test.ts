@@ -40,6 +40,7 @@ describe("workbench event routing", () => {
       lifecycle: "running" as const,
       cancellable: true,
       sessionId: "session-background",
+      sessionFileIdentity: "session-file-session-background",
       sessionGeneration: 2,
       startedAt: 1
     } };
@@ -65,6 +66,7 @@ describe("workbench event routing", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-session-active",
         sessionPath: "/sessions/active.jsonl"
       }
     });
@@ -287,6 +289,7 @@ function staleSessionEventCases(): ReadonlyArray<readonly [string, StaleSessionE
         lifecycle: "running" as const,
         cancellable: true,
         sessionId: authority.sessionId,
+        sessionFileIdentity: `session-file-${authority.sessionId}`,
         sessionGeneration: authority.sessionGeneration,
         startedAt: 1
       } };
@@ -379,6 +382,7 @@ function openActiveProvisionalTask(): void {
 function snapshot(sessionId: string, sessionPath: string, sessionName: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath,
     sessionName,
     cwd: "/work/a",
@@ -429,10 +433,12 @@ function task(id: string) {
     conversation: {
       kind: "session" as const,
       workspaceId: "workspace-a",
+      sessionFileIdentity: `session-file-session-${id}`,
       sessionPath: `/sessions/${id}.jsonl`
     },
     workspaceId: "workspace-a",
     sessionId: `session-${id}`,
+    sessionFileIdentity: `session-file-session-${id}`,
     sessionGeneration: 2,
     taskGeneration: 1,
     lifecycle: "idle" as const,
@@ -444,10 +450,7 @@ function task(id: string) {
   };
 }
 
-function routeWorkbenchAgentEvent(
-  event: AgentEvent,
-  envelope: EventEnvelope
-): WorkbenchEventRoute {
+function routeWorkbenchAgentEvent(event: AgentEvent, envelope: EventEnvelope): WorkbenchEventRoute {
   const route = classifyWorkbenchAgentEvent(event, envelope);
   if (route === "active" || route === "background") {
     applyWorkbenchAgentEvent(event, envelope);

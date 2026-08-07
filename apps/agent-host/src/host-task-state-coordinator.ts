@@ -16,6 +16,7 @@ import { GlobalRunAdmission, type RunAdmissionLease } from "./global-run-admissi
 import type { HostEventChannel } from "./host-event-channel.js";
 import { isContextFileCommand } from "./context-file-command-router.js";
 import { OperationRegistry } from "./operation-registry.js";
+import { OperationReceiptStore } from "./operation-receipt-store.js";
 import { HostCommandError } from "./protocol-error.js";
 import { isSkillPackCommand } from "./skill-pack-command-router.js";
 import type { TaskRuntimeRecord, TaskRuntimeRegistry } from "./task-runtime-registry.js";
@@ -36,6 +37,7 @@ export interface TaskHostState {
 export interface HostTaskStateCoordinatorOptions {
   abortWatchdogMs?: number;
   operationHeartbeatIntervalMs?: number;
+  operationReceiptStorageRoot?: string;
   maxQueuedCommands?: number;
   onRuntimePoisoned?: (message: AgentHostRuntimePoisonedMessage) => void;
   getHostEpoch(): number;
@@ -126,6 +128,7 @@ export class HostTaskStateCoordinator {
       return undefined;
     }
     const record = this.taskRuntimes.admit(context);
+    this.taskRuntimes.assertSessionAuthority(context);
     const state = this.stateForRecord(record);
     if (record.closed && request.type !== "task.close") {
       throw new HostCommandError("RUNTIME_NOT_READY", "The Task Runtime has been closed.", true);
@@ -165,6 +168,16 @@ export class HostTaskStateCoordinator {
         ...(this.options.operationHeartbeatIntervalMs === undefined
           ? {}
           : { heartbeatIntervalMs: this.options.operationHeartbeatIntervalMs }),
+        receiptStore: new OperationReceiptStore(
+          {
+            workspaceId: state.record.context.workspaceId,
+            taskId: state.record.context.taskId,
+            taskGeneration: state.record.context.taskGeneration
+          },
+          this.options.operationReceiptStorageRoot === undefined
+            ? {}
+            : { storageRoot: this.options.operationReceiptStorageRoot }
+        ),
         onRuntimePoisoned: (message) => this.handleRuntimePoisoned(state, message)
       }
     );

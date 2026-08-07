@@ -81,6 +81,8 @@ describe("renderer interactive projection resync", () => {
       sessionCatalogStatus: readyCatalogStatus(),
       eventSequence: 10,
       hostEpoch: 9,
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
       sessionGeneration: 3,
       taskToolMode: "auto",
       activeOperation
@@ -174,6 +176,7 @@ function runningToolOperation(): OperationView {
     lifecycle: "running",
     cancellable: true,
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     startedAt: 1,
     activity: {
@@ -189,6 +192,7 @@ function runningToolOperation(): OperationView {
 function snapshot(): SessionSnapshot {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionPath: "/sessions/session-1.jsonl",
     cwd: "/workspace",
     streaming: false,
@@ -217,6 +221,8 @@ function resyncResult(eventSequence: number): ProjectionResyncResult {
     sessionCatalogStatus: readyCatalogStatus(),
     eventSequence,
     hostEpoch: 9,
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-1",
     sessionGeneration: 3,
     taskToolMode: "auto"
   };

@@ -323,6 +323,7 @@ function rollbackAcknowledgement() {
     accepted: true as const,
     hostEpoch: 9,
     sessionId: "session-old",
+    sessionFileIdentity: "session-file-session-old",
     sessionGeneration: 3,
     eventSequence: 8
   };
@@ -336,6 +337,7 @@ function bootstrapAcknowledgement(
     accepted: true,
     hostEpoch: 9,
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionGeneration,
     eventSequence: 1
   };
@@ -344,6 +346,7 @@ function bootstrapAcknowledgement(
 function snapshot(sessionId: string): SessionSnapshot {
   return {
     sessionId,
+    sessionFileIdentity: `session-file-${sessionId}`,
     sessionPath: `/sessions/${sessionId}.jsonl`,
     cwd: "/workspace",
     streaming: false,

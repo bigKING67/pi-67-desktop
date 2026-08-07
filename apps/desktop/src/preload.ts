@@ -1,24 +1,27 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   DesktopCapabilitySnapshot,
+  DesktopRecoverySnapshot,
   PackageNetworkSettings,
   PackageNetworkSnapshot,
+  RuntimeDiagnostics,
   WorkspaceEntryContextAction,
   WorkspaceEntryRequest,
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
+import { stagePromptAttachmentsFromPreload } from "./prompt-attachment-preload.js";
 import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
 import type {
-  WorkbenchLayoutV3,
-  WorkbenchStateV3
+  WorkbenchLayoutV4,
+  WorkbenchStateV4
 } from "./workbench-state.js";
 import type { WorkspaceDescriptor } from "./workspace-identity.js";
 
 export type {
-  WorkbenchLayoutV3,
-  WorkbenchStateV3,
+  WorkbenchLayoutV4,
+  WorkbenchStateV4,
 } from "./workbench-state.js";
 export type {
   NativeWorkspaceDescriptor,
@@ -37,30 +40,21 @@ const systemBridge = {
   connectAgentHost: (options?: { replaceCurrent?: boolean }): Promise<void> => (
     ipcRenderer.invoke("pi67:agent-host-connect", options?.replaceCurrent === true)
   ),
-  stagePromptAttachments: async (files: File[]) => ipcRenderer.invoke(
-    "pi67:prompt-attachments-stage",
-    await Promise.all(files.map(async (file) => {
-      const path = webUtils.getPathForFile(file);
-      return {
-        name: file.name,
-        mimeType: file.type,
-        byteLength: file.size,
-        lastModified: file.lastModified,
-        ...(path ? { path } : { data: await file.arrayBuffer() })
-      };
-    }))
-  ),
+  stagePromptAttachments: (files: File[]) => stagePromptAttachmentsFromPreload(files, {
+    getPathForFile: (file) => webUtils.getPathForFile(file),
+    invoke: (channel, value) => ipcRenderer.invoke(channel, value)
+  }),
   releasePromptAttachments: (ids: string[]): Promise<void> => (
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
-  loadWorkbenchState: (): Promise<WorkbenchStateV3> => ipcRenderer.invoke("pi67:workbench-load"),
+  loadWorkbenchState: (): Promise<WorkbenchStateV4> => ipcRenderer.invoke("pi67:workbench-load"),
   loadWorkspaceFileState: (): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-load")
   ),
   updateWorkspaceFileState: (state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-update", state)
   ),
-  updateWorkbenchLayout: (layout: WorkbenchLayoutV3): Promise<WorkbenchStateV3> => (
+  updateWorkbenchLayout: (layout: WorkbenchLayoutV4): Promise<WorkbenchStateV4> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
   ),
   pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
@@ -69,15 +63,18 @@ const systemBridge = {
   repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
   ),
-  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV3> => (
+  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV4> => (
     ipcRenderer.invoke("pi67:workspace-remove", workspaceId)
   ),
-  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV3> => (
+  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV4> => (
     ipcRenderer.invoke("pi67:workspace-reorder", workspaceIds)
   ),
   selectWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-workspace"),
   selectSessionFile: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-session-file"),
-  saveDiagnostics: (content: string): Promise<string | undefined> => ipcRenderer.invoke("pi67:save-diagnostics", content),
+  getRecoverySnapshot: (): Promise<DesktopRecoverySnapshot> => ipcRenderer.invoke("pi67:recovery-snapshot"),
+  saveDiagnostics: (diagnostics: RuntimeDiagnostics): Promise<string | undefined> => (
+    ipcRenderer.invoke("pi67:save-diagnostics", diagnostics)
+  ),
   showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("pi67:notify", { title, body }),
   requestOpenExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("pi67:open-external", url),
   showWorkspaceEntryContextMenu: (

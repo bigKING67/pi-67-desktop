@@ -87,6 +87,7 @@ function operationTarget(): OperationActivityTarget {
       lifecycle: "running" as const,
       cancellable: true,
       sessionId: "session-1",
+      sessionFileIdentity: "session-file-session-1",
       sessionGeneration: 1,
       startedAt: 1
     }

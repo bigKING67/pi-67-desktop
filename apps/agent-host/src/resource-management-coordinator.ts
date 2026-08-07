@@ -29,8 +29,11 @@ const DEFAULT_MAX_CONCURRENT_QUERIES = 4;
 
 export class ResourceManagementCoordinator {
   private readonly activeQueries = new Map<string, number>();
+  private readonly activeCommands = new Set<Promise<unknown>>();
   private readonly maxConcurrentQueries: number;
   private activeMutation: ActiveMutation | undefined;
+  private shuttingDown = false;
+  private shutdownPromise: Promise<void> | undefined;
 
   constructor(private readonly options: ResourceManagementCoordinatorOptions) {
     const maximum = options.maxConcurrentQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES;
@@ -41,19 +44,20 @@ export class ResourceManagementCoordinator {
   }
 
   runQuery<T>(workspaceId: string, query: () => Promise<T>): Promise<T> {
+    this.assertAcceptingCommands();
     this.assertQueryAllowed(workspaceId);
     const active = this.activeQueries.get(workspaceId) ?? 0;
     if (active >= this.maxConcurrentQueries) {
       return Promise.reject(busy("Too many resource management queries are already running."));
     }
     this.activeQueries.set(workspaceId, active + 1);
-    return Promise.resolve()
+    return this.trackCommand(Promise.resolve()
       .then(query)
       .finally(() => {
         const remaining = (this.activeQueries.get(workspaceId) ?? 1) - 1;
         if (remaining <= 0) this.activeQueries.delete(workspaceId);
         else this.activeQueries.set(workspaceId, remaining);
-      });
+      }));
   }
 
   runMutation<T>(
@@ -114,6 +118,19 @@ export class ResourceManagementCoordinator {
     throw busy("Managed resources are being changed for this Task Workspace.");
   }
 
+  shutdown(deadlineMs = 1_000): Promise<void> {
+    if (this.shutdownPromise) return this.shutdownPromise;
+    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 10_000) {
+      return Promise.reject(new RangeError("Resource shutdown deadline must be between 1 and 10000 milliseconds."));
+    }
+    this.shuttingDown = true;
+    const commands = [...this.activeCommands];
+    this.shutdownPromise = commands.length === 0
+      ? Promise.resolve()
+      : waitForCommands(commands, deadlineMs);
+    return this.shutdownPromise;
+  }
+
   private assertQueryAllowed(workspaceId: string): void {
     if (!this.activeMutation) return;
     if (this.activeMutation.scope === "project" && this.activeMutation.workspaceId !== workspaceId) return;
@@ -139,6 +156,7 @@ export class ResourceManagementCoordinator {
     scope: ActiveMutation["scope"],
     operation: (affectedTasks: ResourceManagementTaskView[]) => Promise<T>
   ): Promise<T> {
+    this.assertAcceptingCommands();
     if (this.activeMutation) throw busy("Another managed resource mutation is already running.");
     this.assertNoConflictingQueries(workspaceId, scope);
     const affectedTasks = this.affectedTasks(workspaceId, scope);
@@ -154,11 +172,46 @@ export class ResourceManagementCoordinator {
       );
     }
     this.activeMutation = { scope, workspaceId };
-    return Promise.resolve()
+    return this.trackCommand(Promise.resolve()
       .then(() => operation(affectedTasks))
       .finally(() => {
         this.activeMutation = undefined;
-      });
+      }));
+  }
+
+  private assertAcceptingCommands(): void {
+    if (this.shuttingDown) {
+      throw new HostCommandError(
+        "CONNECTION_CLOSED",
+        "Managed resource operations are shutting down.",
+        true,
+        { shuttingDown: true }
+      );
+    }
+  }
+
+  private trackCommand<T>(command: Promise<T>): Promise<T> {
+    this.activeCommands.add(command);
+    void command.finally(() => this.activeCommands.delete(command)).catch(() => undefined);
+    return command;
+  }
+}
+
+async function waitForCommands(commands: Promise<unknown>[], deadlineMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new HostCommandError(
+      "RUNTIME_POISONED",
+      "Managed resource operations did not settle before shutdown.",
+      false,
+      { resourceCommandShutdown: false }
+    )), deadlineMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([Promise.allSettled(commands), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

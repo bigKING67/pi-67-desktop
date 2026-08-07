@@ -8,6 +8,7 @@ export interface EventTaskAuthority {
 
 export interface EventSessionAuthority extends EventTaskAuthority {
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   operationId?: string;
 }
@@ -27,6 +28,7 @@ export function eventSessionAuthority(envelope: EventEnvelope): EventSessionAuth
   if (
     context.scope !== "task"
     || context.sessionId === undefined
+    || context.sessionFileIdentity === undefined
     || context.sessionGeneration === undefined
   ) return undefined;
   return {
@@ -34,6 +36,7 @@ export function eventSessionAuthority(envelope: EventEnvelope): EventSessionAuth
     taskId: context.taskId,
     taskGeneration: context.taskGeneration,
     sessionId: context.sessionId,
+    sessionFileIdentity: context.sessionFileIdentity,
     sessionGeneration: context.sessionGeneration,
     ...(context.operationId === undefined ? {} : { operationId: context.operationId })
   };

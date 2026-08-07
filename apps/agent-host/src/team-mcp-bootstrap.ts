@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { safeAtomicReplaceFile } from "@pi67/pi-runtime";
 
 const TEAM_MCP_SERVER_NAME = "tavily-bridge";
 const TEAM_MCP_TOKEN_ENV = "TAVILY_BRIDGE_MCP_TOKEN";
@@ -30,7 +29,8 @@ type TeamMcpBootstrapStatus =
   | "merged"
   | "unchanged"
   | "preserved-user"
-  | "invalid-json";
+  | "invalid-json"
+  | "revision-conflict";
 
 export interface TeamMcpBootstrapResult {
   status: TeamMcpBootstrapStatus;
@@ -42,12 +42,7 @@ export interface TeamMcpBootstrapOptions {
   agentDir: string;
   environment?: NodeJS.ProcessEnv;
   baseline?: TeamMcpServerBaseline;
-  createToken?: () => string;
-  readFile?: (path: string) => Promise<string>;
-  writeFile?: (path: string, data: string, options?: { mode?: number }) => Promise<void>;
-  rename?: (from: string, to: string) => Promise<void>;
-  mkdir?: (path: string, options?: { recursive?: boolean; mode?: number }) => Promise<unknown>;
-  exists?: (path: string) => boolean;
+  readFile?: (path: string) => Promise<Uint8Array>;
 }
 
 /**
@@ -65,25 +60,10 @@ export async function bootstrapTeamMcpConfig(
   }
 
   const baseline = options.baseline ?? DEFAULT_TEAM_MCP_BASELINE;
-  const read = options.readFile ?? ((filePath: string) => readFile(filePath, "utf8"));
-  const write = options.writeFile
-    ?? ((filePath: string, data: string, fileOptions?: { mode?: number }) =>
-      writeFile(filePath, data, { mode: fileOptions?.mode ?? 0o600 }));
-  const move = options.rename ?? rename;
-  const makeDir = options.mkdir
-    ?? ((dir: string, dirOptions?: { recursive?: boolean; mode?: number }) =>
-      mkdir(dir, { recursive: dirOptions?.recursive ?? true, mode: dirOptions?.mode ?? 0o700 }));
-  const exists = options.exists ?? existsSync;
-  const createToken = options.createToken ?? randomUUID;
-
-  let raw: string | undefined;
-  if (exists(path)) {
-    try {
-      raw = await read(path);
-    } catch {
-      return { status: "invalid-json", path, serverName };
-    }
-  }
+  const read = options.readFile ?? ((filePath: string) => readFile(filePath));
+  const revision = await readTeamMcpRevision(path, read).catch(() => undefined);
+  if (!revision) return { status: "invalid-json", path, serverName };
+  const raw = revision.kind === "present" ? revision.bytes.toString("utf8") : undefined;
 
   let config: Record<string, unknown>;
   if (raw === undefined) {
@@ -125,15 +105,58 @@ export async function bootstrapTeamMcpConfig(
     return { status: "unchanged", path, serverName };
   }
 
-  await makeDir(options.agentDir, { recursive: true, mode: 0o700 });
-  const temporary = `${path}.${createToken()}.tmp`;
-  await write(temporary, next, { mode: 0o600 });
-  await move(temporary, path);
+  try {
+    await mkdir(options.agentDir, { recursive: true, mode: 0o700 });
+    await safeAtomicReplaceFile(path, next, {
+      mode: 0o600,
+      beforeCommit: async () => {
+        const latest = await readTeamMcpRevision(path, read);
+        if (!sameTeamMcpRevision(revision, latest)) throw new TeamMcpRevisionConflictError();
+      }
+    });
+  } catch (error) {
+    if (error instanceof TeamMcpRevisionConflictError) {
+      return { status: "revision-conflict", path, serverName };
+    }
+    throw error;
+  }
   return {
     status: raw === undefined ? "created" : "merged",
     path,
     serverName
   };
+}
+
+type TeamMcpRevision =
+  | { readonly kind: "missing" }
+  | { readonly kind: "present"; readonly bytes: Buffer };
+
+class TeamMcpRevisionConflictError extends Error {
+  constructor() {
+    super("mcp.json changed while Team MCP bootstrap was preparing its update.");
+  }
+}
+
+async function readTeamMcpRevision(
+  path: string,
+  read: (path: string) => Promise<Uint8Array>
+): Promise<TeamMcpRevision> {
+  try {
+    return { kind: "present", bytes: Buffer.from(await read(path)) };
+  } catch (error) {
+    if (isMissingFileError(error)) return { kind: "missing" };
+    throw error;
+  }
+}
+
+function sameTeamMcpRevision(expected: TeamMcpRevision, actual: TeamMcpRevision): boolean {
+  if (expected.kind !== actual.kind) return false;
+  if (expected.kind === "missing") return true;
+  return actual.kind === "present" && expected.bytes.equals(actual.bytes);
+}
+
+function isMissingFileError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 export function planTeamMcpMerge(

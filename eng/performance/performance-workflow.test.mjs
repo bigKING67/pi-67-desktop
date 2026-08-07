@@ -24,6 +24,25 @@ describe("release performance workflow gates", () => {
     expect(packageJson.scripts["performance:prepare"]).toBe(
       "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && node eng/performance/prepare-packaged-app.mjs"
     );
+    expect(packageJson.scripts["performance:measure"]).toContain("measure-session-catalog.mjs");
+  });
+
+  it("keeps 500 MiB large-Session work explicit and outside ordinary CI", async () => {
+    const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
+    const certification = await readFile(
+      new URL("../../.github/workflows/performance-certification.yml", import.meta.url),
+      "utf8"
+    );
+    const ordinaryCi = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+
+    expect(packageJson.scripts["performance:large-session"]).toContain("measure-large-session-jsonl.mjs");
+    expect(certification).toContain("large_session_profile:");
+    expect(certification).toContain("- standard");
+    expect(certification).toContain("- extended");
+    expect(certification).toContain("PI67_PERF_LARGE_SESSION_PROFILE:");
+    expect(certification).toContain("PI67_PERF_LARGE_SESSION_SAMPLES: 1");
+    expect(certification).toContain("run: corepack pnpm run performance:large-session");
+    expect(ordinaryCi).not.toContain("performance:large-session");
   });
 
   it("scopes push validation while preserving native platform evidence", async () => {

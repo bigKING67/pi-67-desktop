@@ -5,7 +5,6 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   cancelSessionCatalogRetries,
-  findSessionForRecovery,
   handleSessionCatalogChanged,
   loadMoreSessionCatalog,
   queryFirstSessionCatalog,
@@ -19,6 +18,7 @@ import {
 const WORKSPACE_ID = "workspace-a";
 
 const SESSION_ONE: SessionSummary = {
+  fileIdentity: "session-file-fixture-1",
   id: "session-1",
   path: "/sessions/one.jsonl",
   cwd: "/work",
@@ -29,6 +29,7 @@ const SESSION_ONE: SessionSummary = {
 };
 
 const SESSION_TWO: SessionSummary = {
+  fileIdentity: "session-file-fixture-2",
   id: "session-2",
   path: "/sessions/two.jsonl",
   cwd: "/work",
@@ -57,6 +58,47 @@ describe("session catalog controller", () => {
     vi.restoreAllMocks();
   });
 
+  it("fills metadata for an exact JSONL-materialized Session without owning its identity", async () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: WORKSPACE_ID,
+      displayName: "A",
+      identity: { canonicalPath: "/work", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask({
+      id: "task-indexing",
+      conversation: {
+        kind: "session",
+        workspaceId: WORKSPACE_ID,
+        sessionFileIdentity: SESSION_ONE.fileIdentity,
+        sessionPath: SESSION_ONE.path
+      },
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ONE.id,
+      sessionPath: SESSION_ONE.path,
+      taskGeneration: 1,
+      lifecycle: "stopped",
+      runtime: { phase: "stopped", detail: "会话待打开", recoverable: true },
+      title: "未命名对话",
+      hasDraft: false,
+      attachmentCount: 0,
+      toolMode: "auto",
+      sessionMetadataStatus: "indexing"
+    });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-indexing"]).toMatchObject({
+      title: SESSION_ONE.name,
+      titleSource: SESSION_ONE.nameSource,
+      sessionMetadataStatus: undefined
+    });
+  });
+
   it("owns the bounded first-page transport request", async () => {
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
 
@@ -76,7 +118,7 @@ describe("session catalog controller", () => {
     });
   });
 
-  it("materializes an ordinary matching provisional Task only after the Catalog returns its path", async () => {
+  it("does not materialize a provisional Task from Catalog Session metadata", async () => {
     const workbench = rendererWorkbenchStore.getState();
     workbench.registerWorkspace({
       id: WORKSPACE_ID,
@@ -104,16 +146,51 @@ describe("session catalog controller", () => {
 
     await queryFirstSessionCatalog(WORKSPACE_ID);
 
-    expect(rendererWorkbenchStore.getState().tasks["task-pending"]).toMatchObject({
+    expect(rendererWorkbenchStore.getState().tasks["task-pending"]).toEqual(expect.objectContaining({
       conversation: {
-        kind: "session",
+        kind: "provisional",
         workspaceId: WORKSPACE_ID,
-        sessionPath: SESSION_ONE.path
+        draftId: "task-pending"
       },
-      sessionPath: SESSION_ONE.path,
-      title: SESSION_ONE.name,
-      titleSource: SESSION_ONE.nameSource
+      sessionId: SESSION_ONE.id,
+      title: "未命名对话"
+    }));
+    expect(rendererWorkbenchStore.getState().tasks["task-pending"]?.sessionPath).toBeUndefined();
+    expect(rendererWorkbenchStore.getState().tasks["task-pending"]?.sessionFileIdentity).toBeUndefined();
+  });
+
+  it("keeps an ordinary provisional ambiguous when one Session id has multiple paths", async () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: WORKSPACE_ID,
+      displayName: "A",
+      identity: { canonicalPath: "/work", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
     });
+    workbench.openTask({
+      id: "task-ambiguous",
+      conversation: { kind: "provisional", workspaceId: WORKSPACE_ID, draftId: "task-ambiguous" },
+      workspaceId: WORKSPACE_ID,
+      sessionId: SESSION_ONE.id,
+      taskGeneration: 1,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true },
+      title: "未命名对话",
+      hasDraft: false,
+      attachmentCount: 0,
+      toolMode: "auto"
+    });
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([
+      SESSION_ONE,
+      { ...SESSION_ONE, path: "/sessions/one-copy.jsonl" }
+    ]) as never);
+
+    await queryFirstSessionCatalog(WORKSPACE_ID);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-ambiguous"]?.conversation)
+      .toEqual({ kind: "provisional", workspaceId: WORKSPACE_ID, draftId: "task-ambiguous" });
   });
 
   it("does not bypass exact creation recovery with a matching Catalog Session id", async () => {
@@ -169,46 +246,6 @@ describe("session catalog controller", () => {
     await loadMoreSessionCatalog(WORKSPACE_ID);
 
     expect(catalog().items).toEqual([SESSION_ONE, SESSION_TWO]);
-  });
-
-  it("walks Catalog pages until the exact recovery Session id and path match", async () => {
-    vi.spyOn(agentConnectionController, "request")
-      .mockResolvedValueOnce(page([SESSION_ONE], { total: 2, hasMore: true, nextCursor: NEXT_CURSOR }) as never)
-      .mockResolvedValueOnce(page([SESSION_TWO], { total: 2 }) as never);
-
-    await expect(findSessionForRecovery(
-      WORKSPACE_ID,
-      SESSION_TWO.id,
-      SESSION_TWO.path
-    )).resolves.toEqual({ status: "found", session: SESSION_TWO });
-  });
-
-  it("reports a missing recovery Session only from a complete ready SQLite Catalog", async () => {
-    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);
-
-    await expect(findSessionForRecovery(
-      WORKSPACE_ID,
-      SESSION_TWO.id,
-      SESSION_TWO.path
-    )).resolves.toEqual({ status: "missing" });
-  });
-
-  it("does not turn an incomplete fallback Catalog miss into Session deletion", async () => {
-    vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE], {
-      source: "sdk-fallback",
-      state: "fallback",
-      incomplete: true,
-      degradedReason: "runtime-query"
-    }) as never);
-
-    await expect(findSessionForRecovery(
-      WORKSPACE_ID,
-      SESSION_TWO.id,
-      SESSION_TWO.path
-    )).resolves.toEqual({
-      status: "unavailable",
-      detail: "对话目录仍在重建，请稍后重试。"
-    });
   });
 
   it("reloads the first page when a keyset cursor becomes stale", async () => {
@@ -296,17 +333,20 @@ describe("session catalog controller", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
-  it("refreshes an unchanged revision when background automatic titles become available", async () => {
-    useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, status(3));
-    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
-      page([SESSION_ONE], { revision: 3 }) as never
-    );
+  it.each(["automatic-title", "session-created", "session-updated"] as const)(
+    "refreshes an unchanged revision for background %s projection work",
+    async (reason) => {
+      useSessionCatalogStore.getState().applyStatus(WORKSPACE_ID, status(3));
+      const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(
+        page([SESSION_ONE], { revision: 3 }) as never
+      );
 
-    handleSessionCatalogChanged(WORKSPACE_ID, 3, "automatic-title");
+      handleSessionCatalogChanged(WORKSPACE_ID, 3, reason);
 
-    await vi.waitFor(() => expect(catalog().items).toEqual([SESSION_ONE]));
-    expect(request).toHaveBeenCalledOnce();
-  });
+      await vi.waitFor(() => expect(catalog().items).toEqual([SESSION_ONE]));
+      expect(request).toHaveBeenCalledOnce();
+    }
+  );
 
   it("keeps command-palette page queries outside Store mutation", async () => {
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(page([SESSION_ONE]) as never);

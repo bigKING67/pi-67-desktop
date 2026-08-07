@@ -15,6 +15,7 @@ describe("external Session change protocol", () => {
         taskId: "task-1",
         taskGeneration: 1,
         sessionId: "session-1",
+        sessionFileIdentity: "session-file-1",
         sessionGeneration: 3
       },
       taskSequence: 1

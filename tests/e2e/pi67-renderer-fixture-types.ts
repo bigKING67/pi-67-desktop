@@ -61,12 +61,13 @@ export interface FixtureContextFiles {
   contents: Record<string, { content: string; revision: string }>;
 }
 
-interface MockEventOptions {
+export interface MockEventOptions {
   hostEpoch?: number;
   operationId?: string;
   sequence?: number;
   taskSequence?: number;
   sessionId?: string;
+  sessionFileIdentity?: string;
   sessionGeneration?: number;
 }
 
@@ -86,6 +87,7 @@ interface FixtureOperationView {
   lifecycle: "submitting" | "accepted" | "running" | "waiting-input" | "completed" | "failed" | "cancelled" | "lost";
   cancellable: boolean;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   startedAt: number;
 }
@@ -97,6 +99,7 @@ interface FixtureOperationSettledBase {
   cancellable: false;
   hostEpoch: number;
   sessionId: string;
+  sessionFileIdentity: string;
   sessionGeneration: number;
   startedAt: number;
   settledAt: number;
@@ -162,7 +165,8 @@ export type FixtureWindow = Window & typeof globalThis & {
   __pi67RotateMockSession(
     current: FixtureAgentState,
     sessionPath?: string,
-    messages?: FixtureMessage[]
+    messages?: FixtureMessage[],
+    sessionFileIdentity?: string
   ): void;
   __pi67ForkMockSession(current: FixtureAgentState, entryId: unknown, position: unknown): void;
 };

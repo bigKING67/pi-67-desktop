@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
-import { conversationRows } from "./workspace-conversation-model.js";
+import { conversationRows, workspaceStatus } from "./workspace-conversation-model.js";
 
 describe("workspace conversation model", () => {
   it.each([
@@ -9,6 +9,7 @@ describe("workspace conversation model", () => {
     ["id", "session-identity-67"]
   ])("keeps a server result visible when the query matches its %s", (_field, query) => {
     const rows = conversationRows("workspace-test", [], [{
+      fileIdentity: "session-file-fixture-67",
       id: "session-identity-67",
       path: "/Users/test/.pi/agent/sessions/session-source.jsonl",
       cwd: "/Users/test/Projects/hidden-folder",
@@ -24,6 +25,7 @@ describe("workspace conversation model", () => {
 
   it("uses the latest in-memory user message as the row title without losing the stable Session name", () => {
     const session = {
+      fileIdentity: "session-file-fixture-67",
       id: "session-identity-67",
       path: "/Users/test/.pi/agent/sessions/session-source.jsonl",
       cwd: "/Users/test/Projects/pi",
@@ -34,9 +36,15 @@ describe("workspace conversation model", () => {
     };
     const task: RendererWorkbenchTask = {
       id: "task-67",
-      conversation: { kind: "session", workspaceId: "workspace-test", sessionPath: session.path },
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-test",
+        sessionFileIdentity: session.fileIdentity,
+        sessionPath: session.path
+      },
       workspaceId: "workspace-test",
       sessionId: session.id,
+      sessionFileIdentity: session.fileIdentity,
       taskGeneration: 1,
       lifecycle: "idle",
       runtime: { phase: "ready", detail: "ready", recoverable: true },
@@ -64,6 +72,7 @@ describe("workspace conversation model", () => {
       conversation: {
         kind: "session",
         workspaceId: "workspace-test",
+        sessionFileIdentity: "session-file-continuation",
         sessionPath: "/sessions/continuation.jsonl"
       },
       workspaceId: "workspace-test",
@@ -87,4 +96,78 @@ describe("workspace conversation model", () => {
     });
   });
 
+  it("joins a Task to Catalog metadata by physical identity while accepting a new locator", () => {
+    const task = materializedTask({
+      sessionFileIdentity: "session-file-shared",
+      sessionPath: "/sessions/original.jsonl"
+    });
+    const session = {
+      fileIdentity: "session-file-shared",
+      id: "session-shared",
+      path: "/junction/sessions/alias.jsonl",
+      cwd: "/work",
+      name: "Alias title",
+      nameSource: "explicit" as const,
+      modifiedAt: 100,
+      messageCount: 2
+    };
+
+    const rows = conversationRows("workspace-test", [task], [session], "");
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      identity: "session:workspace-test:session-file-shared",
+      session: { path: "/junction/sessions/alias.jsonl" }
+    });
+  });
+
+  it("keeps equal Session ids on distinct physical files as separate rows", () => {
+    const sessions = ["a", "b"].map((suffix, index) => ({
+      fileIdentity: `session-file-${suffix}`,
+      id: "duplicate-session-id",
+      path: `/sessions/${suffix}.jsonl`,
+      cwd: "/work",
+      name: suffix,
+      nameSource: "explicit" as const,
+      modifiedAt: 100 - index,
+      messageCount: 1
+    }));
+
+    expect(conversationRows("workspace-test", [], sessions, "").map((row) => row.identity)).toEqual([
+      "session:workspace-test:session-file-a",
+      "session:workspace-test:session-file-b"
+    ]);
+  });
+
+  it("keeps path-only recovery visibly gated on explicit confirmation", () => {
+    expect(workspaceStatus({ availability: "needs-confirmation", trust: "unknown" }))
+      .toBe("需要重新确认");
+  });
+
 });
+
+function materializedTask({ sessionFileIdentity, sessionPath }: {
+  sessionFileIdentity: string;
+  sessionPath: string;
+}): RendererWorkbenchTask {
+  return {
+    id: "task-shared",
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-test",
+      sessionFileIdentity,
+      sessionPath
+    },
+    workspaceId: "workspace-test",
+    sessionId: "session-shared",
+    sessionFileIdentity,
+    sessionPath,
+    taskGeneration: 1,
+    lifecycle: "idle",
+    runtime: { phase: "ready", detail: "ready", recoverable: true },
+    title: "Task title",
+    hasDraft: false,
+    toolMode: "auto",
+    attachmentCount: 0
+  };
+}

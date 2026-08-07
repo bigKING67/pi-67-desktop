@@ -33,10 +33,14 @@ export function testTaskContext(
     taskId: overrides.taskId ?? TEST_TASK_CONTEXT.taskId,
     taskGeneration
   };
-  if (overrides.sessionId === undefined || overrides.sessionGeneration === undefined) return base;
+  if (
+    overrides.sessionId === undefined
+    || overrides.sessionGeneration === undefined
+  ) return base;
   return {
     ...base,
     sessionId: overrides.sessionId,
+    sessionFileIdentity: overrides.sessionFileIdentity ?? `session-file-${overrides.sessionId}`,
     sessionGeneration: overrides.sessionGeneration,
     ...(overrides.operationId === undefined ? {} : { operationId: overrides.operationId })
   };

@@ -21,9 +21,13 @@ describe("PromptAttachmentWorkerPool", () => {
     const second = fixture.pool.run(input("second.txt"));
     const third = fixture.pool.run(input("third.txt"));
 
-    expect(fixture.workers).toHaveLength(2);
+    await vi.waitFor(() => expect(fixture.workers).toHaveLength(2));
+    await vi.waitFor(() => expect(fixture.workers[0]?.tasks).toHaveLength(1));
+    await vi.waitFor(() => expect(fixture.workers[1]?.tasks).toHaveLength(1));
     expect(fixture.workers[0]?.tasks[0]?.attachment.name).toBe("first.txt");
     expect(fixture.workers[1]?.tasks[0]?.attachment.name).toBe("second.txt");
+    expect(fixture.workers[0]?.tasks[0]).not.toHaveProperty("path");
+    expect(fixture.workers[0]?.tasks[0]?.bytes).toBeInstanceOf(ArrayBuffer);
 
     fixture.workers[0]?.succeed("first");
     await expect(first).resolves.toEqual({ text: "first", truncated: false });
@@ -42,7 +46,9 @@ describe("PromptAttachmentWorkerPool", () => {
     const pdf = fixture.pool.run(input("scan.pdf", "document", "application/pdf"));
     const text = fixture.pool.run(input("notes.txt"));
 
-    expect(fixture.workers).toHaveLength(2);
+    await vi.waitFor(() => expect(fixture.workers).toHaveLength(2));
+    await vi.waitFor(() => expect(fixture.workers[0]?.tasks).toHaveLength(1));
+    await vi.waitFor(() => expect(fixture.workers[1]?.tasks).toHaveLength(1));
     expect(fixture.workers[0]?.tasks.map(task => task.attachment.name)).toEqual(["image.png"]);
     expect(fixture.workers[1]?.tasks.map(task => task.attachment.name)).toEqual(["notes.txt"]);
 
@@ -74,6 +80,38 @@ describe("PromptAttachmentWorkerPool", () => {
     activeController.abort();
     await expect(active).rejects.toMatchObject({ name: "AbortError" });
     expect(fixture.workers[0]?.terminateCalls).toBe(1);
+    await fixture.pool.dispose();
+  });
+
+  it("loads bytes only after a worker slot admits the queued task", async () => {
+    const fixture = createPool({ maxWorkers: 1, maxQueue: 2 });
+    const firstBytes = vi.fn(async () => new Uint8Array(10).buffer);
+    const secondBytes = vi.fn(async () => new Uint8Array(10).buffer);
+    const first = fixture.pool.runDeferred(deferredInput("first.txt"), firstBytes);
+    const second = fixture.pool.runDeferred(deferredInput("second.txt"), secondBytes);
+
+    await vi.waitFor(() => expect(firstBytes).toHaveBeenCalledOnce());
+    expect(secondBytes).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(fixture.workers[0]?.tasks).toHaveLength(1));
+
+    fixture.workers[0]?.succeed("first");
+    await expect(first).resolves.toEqual({ text: "first", truncated: false });
+    await vi.waitFor(() => expect(secondBytes).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(fixture.workers[0]?.tasks).toHaveLength(2));
+
+    fixture.workers[0]?.succeed("second");
+    await expect(second).resolves.toEqual({ text: "second", truncated: false });
+    await fixture.pool.dispose();
+  });
+
+  it("rejects a deferred payload whose verified length no longer matches metadata", async () => {
+    const fixture = createPool({ maxWorkers: 1 });
+
+    await expect(fixture.pool.runDeferred(
+      deferredInput("changed.txt"),
+      async () => new Uint8Array(9).buffer
+    )).rejects.toThrow("payload length changed");
+    expect(fixture.workers[0]?.tasks).toHaveLength(0);
     await fixture.pool.dispose();
   });
 
@@ -134,7 +172,7 @@ function input(
   mimeType = "text/plain"
 ): Omit<PromptAttachmentWorkerTask, "id" | "ocrDataRoot"> {
   return {
-    path: `/private/${name}`,
+    bytes: new Uint8Array(10).buffer,
     attachment: {
       id: `attachment_${name.replace(/[^A-Za-z0-9]/gu, "_")}`,
       name,
@@ -146,11 +184,21 @@ function input(
   };
 }
 
+function deferredInput(
+  name: string,
+  kind: PreparedPromptAttachment["kind"] = "document",
+  mimeType = "text/plain"
+): Omit<PromptAttachmentWorkerTask, "id" | "ocrDataRoot" | "bytes"> {
+  const { bytes: _bytes, ...metadata } = input(name, kind, mimeType);
+  return metadata;
+}
+
 class FakeWorker extends EventEmitter implements PromptAttachmentWorkerHandle {
   readonly tasks: PromptAttachmentWorkerTask[] = [];
   terminateCalls = 0;
 
-  postMessage(task: PromptAttachmentWorkerTask): void {
+  postMessage(task: PromptAttachmentWorkerTask, transferList: ArrayBuffer[]): void {
+    expect(transferList).toEqual([task.bytes]);
     this.tasks.push(task);
   }
 

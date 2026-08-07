@@ -26,7 +26,7 @@ export function prepareRendererSessionTransaction(
   resetConversationRequests();
   if (policy.resetProjection) {
     useSessionProjectionStore.getState().reset({
-      preserveRecoverySessionPath: policy.preserveRecoverySessionPath
+      preserveRecoverySessionIdentity: policy.preserveRecoverySessionPath
     });
   }
   if (policy.resetCatalog) {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isHostWelcome,
   isResponseEnvelope,
   type ProtocolPort,
@@ -47,7 +48,7 @@ describe("AgentHostServer assets", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-assets", sessionGeneration: 5 }),
+      getIdentity: () => ({ sessionId: "session-assets", sessionFileIdentity: "session-file-session-assets", sessionGeneration: 5 }),
       readAsset,
       cancelInteractiveRequests: () => [],
       dispose: async () => undefined
@@ -56,7 +57,7 @@ describe("AgentHostServer assets", () => {
     const port = new AssetPort();
     server.attachPort(port, { appInstanceId: "app-assets", hostInstanceId: "host-assets", hostEpoch: 8 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-assets",

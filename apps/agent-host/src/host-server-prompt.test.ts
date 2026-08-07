@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   PROTOCOL_REVISION,
+  PROTOCOL_VERSION,
   isEventEnvelope,
   isHostWelcome,
   isResponseEnvelope,
@@ -39,7 +40,7 @@ describe("AgentHostServer prompt routing", () => {
       getSdkVersion: () => "0.81.1",
       getExtensionUiCapabilities: extensionUiCapabilities,
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId: "session-1", sessionGeneration: 3 }),
+      getIdentity: () => ({ sessionId: "session-1", sessionFileIdentity: "session-file-session-1", sessionGeneration: 3 }),
       getSnapshot: () => emptySnapshot(),
       getTaskToolMode: () => "auto" as const,
       getWorkspaceChanges: () => emptyChanges(),
@@ -55,7 +56,7 @@ describe("AgentHostServer prompt routing", () => {
     const port = new PromptPort();
     server.attachPort(port, { appInstanceId: "app-1", hostInstanceId: "host-1", hostEpoch: 6 });
     const hello: RendererHello = {
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-1",
@@ -187,7 +188,7 @@ describe("AgentHostServer prompt routing", () => {
     const runtime = {
       getSdkVersion: () => "0.81.1",
       subscribe: () => () => undefined,
-      getIdentity: () => ({ sessionId, sessionGeneration }),
+      getIdentity: () => ({ sessionId, sessionFileIdentity: `session-file-${sessionId}`, sessionGeneration }),
       submitPrompt,
       flushStream: () => undefined,
       cancelInteractiveRequests: () => [],
@@ -197,7 +198,7 @@ describe("AgentHostServer prompt routing", () => {
     const port = new PromptPort();
     server.attachPort(port, { appInstanceId: "app-bound", hostInstanceId: "host-bound", hostEpoch: 7 });
     port.emit({
-      protocolVersion: 3,
+      protocolVersion: PROTOCOL_VERSION,
       protocolRevision: PROTOCOL_REVISION,
       kind: "hello",
       rendererInstanceId: "renderer-bound",
@@ -227,7 +228,7 @@ describe("AgentHostServer prompt routing", () => {
     port.emit(replay);
     await vi.waitFor(() => {
       const response = port.sent.find((value) => isResponseEnvelope(value) && value.requestId === replay.requestId);
-      expect(response).toMatchObject({ ok: false, error: { code: "STALE_SESSION_GENERATION" } });
+      expect(response).toMatchObject({ ok: false, error: { code: "STALE_SESSION_IDENTITY" } });
     });
     await vi.waitFor(() => expect(submitPrompt).toHaveBeenCalledOnce());
     await server.shutdown();
@@ -237,6 +238,7 @@ describe("AgentHostServer prompt routing", () => {
 function emptySnapshot() {
   return {
     sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
     cwd: "/tmp",
     streaming: false,
     messages: [],

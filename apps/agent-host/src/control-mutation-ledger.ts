@@ -111,7 +111,20 @@ export class ControlMutationLedger {
   private assertReplayIsCurrent(record: MutationRecord): void {
     if (record.state === "pending") return;
     const current = this.getIdentity();
-    if (!record.settledAuthority || !sameAuthority(current, record.settledAuthority)) {
+    if (!record.settledAuthority || !sameSessionIdentity(current, record.settledAuthority)) {
+      throw new HostCommandError(
+        "STALE_SESSION_IDENTITY",
+        "The control mutation result belongs to a different physical Pi Session.",
+        true,
+        {
+          sessionIdMatches:
+            current.sessionId === record.settledAuthority?.sessionId,
+          sessionFileIdentityMatches:
+            current.sessionFileIdentity === record.settledAuthority?.sessionFileIdentity
+        }
+      );
+    }
+    if (current.sessionGeneration !== record.settledAuthority.sessionGeneration) {
       throw new HostCommandError(
         "STALE_SESSION_GENERATION",
         "The control mutation result belongs to a stale session generation.",
@@ -229,8 +242,11 @@ function writeCanonicalValue(hash: HashWriter, value: unknown): void {
   );
 }
 
-function sameAuthority(left: RuntimeIdentity, right: RuntimeIdentity): boolean {
-  return left.sessionId === right.sessionId && left.sessionGeneration === right.sessionGeneration;
+function sameSessionIdentity(left: RuntimeIdentity, right: RuntimeIdentity): boolean {
+  return (
+    left.sessionId === right.sessionId
+    && left.sessionFileIdentity === right.sessionFileIdentity
+  );
 }
 
 function positiveInteger(value: number | undefined, fallback: number, name: string): number {

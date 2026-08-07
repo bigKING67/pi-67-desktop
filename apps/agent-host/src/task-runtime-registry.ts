@@ -18,6 +18,7 @@ export interface TaskRuntimeRecord {
   workspaceServices: PiWorkspaceRuntimeServices | undefined;
   initialized: boolean;
   compatibilityRuntime: boolean;
+  attachmentCleanupPending: boolean;
   closed: boolean;
 }
 
@@ -44,6 +45,7 @@ export class TaskRuntimeRegistry {
         existing.closed
         && existing.runtime === undefined
         && existing.runtimeLoad === undefined
+        && !existing.attachmentCleanupPending
         && context.taskGeneration > existing.context.taskGeneration
       ) {
         this.records.delete(taskKey);
@@ -70,6 +72,7 @@ export class TaskRuntimeRegistry {
       workspaceServices: undefined,
       initialized: false,
       compatibilityRuntime: false,
+      attachmentCleanupPending: false,
       closed: false
     };
     this.records.set(taskKey, record);
@@ -130,6 +133,38 @@ export class TaskRuntimeRegistry {
     return this.records.get(taskRuntimeKey(context.workspaceId, context.taskId));
   }
 
+  assertSessionAuthority(context: TaskProtocolContext): void {
+    if (context.sessionId === undefined) return;
+    const runtime = this.get(context)?.runtime;
+    if (!runtime) return;
+    const current = runtime.getIdentity();
+    if (current.sessionGeneration !== context.sessionGeneration) {
+      throw new HostCommandError(
+        "STALE_SESSION_GENERATION",
+        "The request targets a stale Pi Session generation.",
+        true,
+        {
+          expectedSessionGeneration: current.sessionGeneration,
+          receivedSessionGeneration: context.sessionGeneration
+        }
+      );
+    }
+    if (
+      current.sessionId === context.sessionId
+      && current.sessionFileIdentity === context.sessionFileIdentity
+    ) return;
+    throw new HostCommandError(
+      "STALE_SESSION_IDENTITY",
+      "The request targets a different physical Pi Session.",
+      true,
+      {
+        sessionIdMatches: current.sessionId === context.sessionId,
+        sessionFileIdentityMatches:
+          current.sessionFileIdentity === context.sessionFileIdentity
+      }
+    );
+  }
+
   recordsForWorkspace(workspaceId: string): TaskRuntimeRecord[] {
     return [...this.records.values()].filter((record) => record.context.workspaceId === workspaceId);
   }
@@ -140,20 +175,24 @@ export class TaskRuntimeRegistry {
 
   async disposeTask(context: TaskProtocolContext): Promise<boolean> {
     const record = this.admit(context);
-    if (record.closed && record.runtime === undefined && record.runtimeLoad === undefined) return false;
+    if (record.closed && record.runtime === undefined && record.runtimeLoad === undefined
+      && !record.attachmentCleanupPending) return false;
     record.closed = true;
     const runtime = record.runtime ?? await record.runtimeLoad?.catch(() => undefined);
+    let disposed = false;
     if (!runtime) {
       record.runtimeLoad = undefined;
       record.initialized = false;
-      return false;
+    } else {
+      await runtime.dispose();
+      this.runtimeOwners.delete(runtime);
+      record.runtime = undefined;
+      record.runtimeLoad = undefined;
+      record.initialized = false;
+      disposed = true;
     }
-    await runtime.dispose();
-    this.runtimeOwners.delete(runtime);
-    record.runtime = undefined;
-    record.runtimeLoad = undefined;
-    record.initialized = false;
-    return true;
+    await this.releaseAttachments(record);
+    return disposed;
   }
 
   async disposeAll(): Promise<void> {
@@ -171,14 +210,24 @@ export class TaskRuntimeRegistry {
           record.runtimeLoad = undefined;
         }
       }
-      if (!runtime || disposed.has(runtime)) continue;
-      disposed.add(runtime);
+      let runtimeDisposed = runtime === undefined;
+      if (runtime && !disposed.has(runtime)) {
+        disposed.add(runtime);
+        try {
+          await runtime.dispose();
+          this.runtimeOwners.delete(runtime);
+          record.runtime = undefined;
+          record.runtimeLoad = undefined;
+          record.initialized = false;
+          runtimeDisposed = true;
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+      if (!runtimeDisposed) continue;
       try {
-        await runtime.dispose();
-        this.runtimeOwners.delete(runtime);
-        record.runtime = undefined;
-        record.runtimeLoad = undefined;
-        record.initialized = false;
+        await this.releaseAttachments(record);
+        this.records.delete(record.taskKey);
       } catch (error) {
         firstError ??= error;
       }
@@ -186,6 +235,13 @@ export class TaskRuntimeRegistry {
     if (firstError !== undefined) throw firstError;
     this.records.clear();
     this.runtimeOwners.clear();
+  }
+
+  private async releaseAttachments(record: TaskRuntimeRecord): Promise<void> {
+    record.attachmentCleanupPending = true;
+    await this.promptAttachments?.releaseTask(record.taskKey);
+    if (record.compatibilityRuntime) await this.promptAttachments?.releaseTask("compatibility");
+    record.attachmentCleanupPending = false;
   }
 
   private claimRuntime(record: TaskRuntimeRecord, runtime: AgentRuntime): void {

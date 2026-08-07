@@ -13,33 +13,27 @@ import {
 } from "@pi67/protocol";
 import { HostConnectionContext, type HostConnectionIdentity } from "./connection-context.js";
 import { forkSessionFromTask } from "./cross-task-session-fork.js";
+import { commandRequiresRunAdmission, isSettledRunAdmissionResult } from "./global-run-admission.js";
 import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostRequestRouter } from "./host-request-router.js";
+import { collectHostRuntimeDiagnostics } from "./host-runtime-diagnostics.js";
 import { defaultRuntimeLoader, parseHostEpoch } from "./host-runtime-loader.js";
 import type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 import { HostSdkVersionLoader } from "./host-sdk-version-loader.js";
+import { createHostSessionWriterLeaseRegistry } from "./host-session-writer-leases.js";
 import { boundedMetadataCount, shutdownDeadline } from "./host-shutdown-contract.js";
 import { HostTaskStateCoordinator, type TaskHostState } from "./host-task-state-coordinator.js";
 import { HostTaskRuntimeLifecycle } from "./host-task-runtime-lifecycle.js";
-import {
-  captureProjectionMutationAcknowledgement,
-  captureProjectionResync
-} from "./host-projection.js";
+import { captureProjectionMutationAcknowledgement, captureProjectionResync } from "./host-projection.js";
 import { HostCommandError } from "./protocol-error.js";
 import { createResourceManagementRouters, type ResourceManagementRouters } from "./resource-management-routers.js";
-import { SessionWriterLeaseRegistry, type SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
+import type { SessionWriterLeaseRegistry, SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
-export type {
-  AgentHostServerOptions,
-  AgentHostShutdownResult,
-  AgentRuntimeLoader,
-  AttachPortOptions
-} from "./host-server-contract.js";
-
+export type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
 const MAX_RESYNC_INTERACTIVE_REQUESTS = 512;
 export class AgentHostServer {
@@ -48,7 +42,7 @@ export class AgentHostServer {
   private compatibilityRuntimeLoad: Promise<AgentRuntime> | undefined;
   private compatibilityRuntimeUnsubscribe: (() => void) | undefined;
   private readonly workspaces = new WorkspaceContextRegistry();
-  private readonly sessionWriterLeases = new SessionWriterLeaseRegistry();
+  private readonly sessionWriterLeases: SessionWriterLeaseRegistry;
   private readonly workspaceCommands: WorkspaceCommandRouter;
   private readonly workspaceFiles: WorkspaceFileCommandRouter;
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
@@ -66,13 +60,14 @@ export class AgentHostServer {
   private readonly events: HostEventChannel;
   private readonly runtimeLoader: AgentRuntimeLoader;
   private readonly usesCompatibilityRuntime: boolean;
-
   constructor(
     runtimeLoader?: AgentRuntimeLoader,
     private readonly options: AgentHostServerOptions = {}
   ) {
     this.runtimeLoader = runtimeLoader ?? defaultRuntimeLoader;
     this.usesCompatibilityRuntime = runtimeLoader !== undefined && options.sdkVersionLoader === undefined;
+    this.sessionWriterLeases = options.sessionWriterLeaseRegistry
+      ?? createHostSessionWriterLeaseRegistry(() => this.hostIdentity, options.onRuntimePoisoned);
     this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
       ?? createRuntimeCredentialOverrideStore();
     this.taskRuntimes = new TaskRuntimeRegistry(
@@ -86,6 +81,9 @@ export class AgentHostServer {
       ...(this.options.operationHeartbeatIntervalMs === undefined
         ? {}
         : { operationHeartbeatIntervalMs: this.options.operationHeartbeatIntervalMs }),
+      ...((this.options.operationReceiptStorageRoot ?? process.env.PI67_STORAGE_ROOT) === undefined ? {} : {
+        operationReceiptStorageRoot: this.options.operationReceiptStorageRoot ?? process.env.PI67_STORAGE_ROOT!
+      }),
       ...(this.options.maxQueuedCommands === undefined
         ? {}
         : { maxQueuedCommands: this.options.maxQueuedCommands }),
@@ -105,6 +103,9 @@ export class AgentHostServer {
       ...(this.options.extensionPackageManagementFactory === undefined
         ? {}
         : { extensionPackageManagementFactory: this.options.extensionPackageManagementFactory }),
+      ...(this.options.packageWorker === undefined
+        ? {}
+        : { packageWorker: this.options.packageWorker }),
       ...(this.options.contextFileManagementFactory === undefined
         ? {}
         : { contextFileManagementFactory: this.options.contextFileManagementFactory }),
@@ -160,11 +161,11 @@ export class AgentHostServer {
         handleProjectionResync: (origin, request, state) => this.handleProjectionResync(origin, request, state),
         loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
         closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
-        dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint)
+        dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint),
+        shutdownResources: (deadlineMs) => resourceManagement.shutdown(deadlineMs)
       }
     );
   }
-
   attachPort(port: ProtocolPort, options: AttachPortOptions = {}): void {
     if (this.shuttingDown) {
       port.close?.();
@@ -204,7 +205,7 @@ export class AgentHostServer {
     if (command.type === "task.close") return this.taskLifecycle.closeTask(state, command.payload.mode);
     const initializedBeforeCommand = state.record.initialized;
     const runtime = await this.taskLifecycle.loadRuntimeForCommand(state, command);
-    const admissionLease = consumesRunAdmission(command)
+    const admissionLease = commandRequiresRunAdmission(command)
       ? this.tasks.reserveRun(state.record.taskKey)
       : undefined;
     let writerReservation: SessionWriterLeaseReservation | undefined;
@@ -239,12 +240,15 @@ export class AgentHostServer {
         reuseInitializedSessionForCreate: command.type === "session.create" && !initializedBeforeCommand && state.record.initialized,
         sendEvent: (event) => this.tasks.sendEvent(state, event)
       }, submissionFingerprint);
-      if (admissionLease && isSettledSubmission(result)) this.tasks.releaseRun(admissionLease);
+      if (admissionLease && isSettledRunAdmissionResult(result)) this.tasks.releaseRun(admissionLease);
       return result;
     } catch (error) {
-      if (writerReservation) this.taskLifecycle.cancelWriterTransition(writerReservation);
+      const failure = await this.taskLifecycle.cancelWriterTransitionAfterFailure(
+        writerReservation,
+        error
+      );
       if (admissionLease) this.tasks.releaseRun(admissionLease);
-      throw error;
+      throw failure;
     }
   }
 
@@ -277,13 +281,16 @@ export class AgentHostServer {
   }
 
   private async performShutdown(deadlineMs: number): Promise<AgentHostShutdownResult> {
-    this.requests.shutdown();
+    let firstError: unknown;
+    const rememberError = (error: unknown): void => { firstError ??= error; };
+    const resourceShutdownBudget = Math.max(20, Math.min(750, Math.floor(deadlineMs / 4)));
+    // Package-tree termination and resource-command fencing must not consume the
+    // window needed to abort Pi operations and release JSONL writers.
+    const requestShutdown = this.requests.shutdown(resourceShutdownBudget).catch(rememberError);
     const connectionCloseRuntimes = new Set(this.taskRuntimes.values()
       .map((record) => record.runtime)
       .filter((runtime): runtime is AgentRuntime => runtime !== undefined));
     if (this.compatibilityRuntime) connectionCloseRuntimes.add(this.compatibilityRuntime);
-    let firstError: unknown;
-    const rememberError = (error: unknown): void => { firstError ??= error; };
     let queuedCommandsDropped = 0;
     for (const state of this.tasks.values()) {
       queuedCommandsDropped += state.scheduler?.shutdown().queuedCommandsDropped ?? 0;
@@ -317,11 +324,7 @@ export class AgentHostServer {
       ? "lost"
       : operationResults.includes("cancelled") ? "cancelled" : "none";
 
-    try {
-      await this.taskRuntimes.disposeAll();
-    } catch (error) {
-      rememberError(error);
-    }
+    const writerRuntimesDisposed = await this.taskLifecycle.disposeAllForShutdown(rememberError);
 
     let compatibilityRuntime = this.compatibilityRuntime;
     if (!compatibilityRuntime && this.compatibilityRuntimeLoad) {
@@ -345,6 +348,10 @@ export class AgentHostServer {
     }
     this.compatibilityRuntime = undefined;
     this.compatibilityRuntimeLoad = undefined;
+
+    await this.taskLifecycle.releaseWriterLeasesForShutdown(writerRuntimesDisposed, rememberError);
+
+    await requestShutdown;
 
     try {
       await this.workspaces.disposeAll();
@@ -395,6 +402,7 @@ export class AgentHostServer {
       const requestId = cancelledRequestIds[index];
       if (requestId) state.operations?.completeInteractiveWait(requestId);
     }
+    await this.tasks.requireOperations(state).reconcile();
     // Projection and sequence are captured before the synchronous response so later events stay ordered after it.
     origin.sendSuccess(request.requestId, request.type, this.captureProjectionResync(runtime, state));
   }
@@ -417,7 +425,13 @@ export class AgentHostServer {
     const runtime = this.tasks.activeState()?.record.runtime ?? await this.loadCompatibilityRuntime();
     switch (command.type) {
       case "diagnostics.collect":
-        return runtime.collectDiagnostics();
+        return collectHostRuntimeDiagnostics({
+          runtime,
+          hostEpoch: this.hostIdentity?.hostEpoch ?? 0,
+          taskStates: this.tasks.values(),
+          workspaceRecords: this.workspaces.values(),
+          writerLeases: this.sessionWriterLeases
+        });
       case "doctor.run":
         return runtime.runDoctor();
       case "session.catalog.query":
@@ -442,18 +456,4 @@ export class AgentHostServer {
     }
     return this.hostIdentity;
   }
-}
-
-function consumesRunAdmission(command: AgentCommand): boolean {
-  return command.type === "session.import"
-    || command.type === "session.compact"
-    || command.type === "command.invoke"
-    || (command.type === "prompt.submit" && command.payload.delivery === "new-turn");
-}
-
-function isSettledSubmission(result: CommandResults[AgentCommandType]): boolean {
-  return typeof result === "object"
-    && result !== null
-    && "kind" in result
-    && result.kind === "settled";
 }

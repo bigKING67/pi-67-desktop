@@ -11,7 +11,12 @@ export type WorkspaceTrustProvenance =
   | "indirect";
 
 export type WorkspaceIdentityAssurance = "filesystem" | "path-only";
-export type WorkspaceAvailability = "available" | "missing" | "identity-changed" | "unavailable";
+export type WorkspaceAvailability =
+  | "available"
+  | "missing"
+  | "identity-changed"
+  | "needs-confirmation"
+  | "unavailable";
 
 export interface WorkspacePathIdentity {
   canonicalPath: string;
@@ -25,6 +30,7 @@ export interface WorkspaceDescriptor {
   id: WorkspaceId;
   displayName: string;
   identity: WorkspacePathIdentity;
+  lastVerifiedAt?: number;
   trust: WorkspaceTrust;
   trustProvenance: WorkspaceTrustProvenance;
   availability: WorkspaceAvailability;
@@ -48,6 +54,7 @@ export type ConversationKey =
   | {
       kind: "session";
       workspaceId: WorkspaceId;
+      sessionFileIdentity: string;
       sessionPath: string;
     }
   | {
@@ -83,6 +90,13 @@ export interface RuntimeRecoveryRecordV2 {
   sessionId: string;
   taskGeneration: number;
   lastKnownLifecycle: TaskLifecycle;
+}
+
+export interface SessionRef {
+  workspaceId: WorkspaceId;
+  sessionId: string;
+  sessionFileIdentity: string;
+  sessionPath: string;
 }
 
 export interface WorkbenchSettingsState {
@@ -121,8 +135,8 @@ export interface SessionCreationRecoveryRecord {
   taskGeneration: number;
 }
 
-export interface WorkbenchStateV3 {
-  version: 3;
+export interface WorkbenchStateV4 {
+  version: 4;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: WorkspaceId[];
   expandedWorkspaceIds: WorkspaceId[];
@@ -164,6 +178,6 @@ export function conversationArchiveBlocker(options: {
 
 export function conversationKeyIdentity(conversation: ConversationKey): string {
   return conversation.kind === "session"
-    ? `session:${conversation.workspaceId}:${conversation.sessionPath}`
+    ? `session:${conversation.workspaceId}:${conversation.sessionFileIdentity}`
     : `provisional:${conversation.workspaceId}:${conversation.draftId}`;
 }

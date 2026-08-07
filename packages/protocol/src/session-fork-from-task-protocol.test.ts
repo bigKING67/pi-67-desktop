@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_SESSION_FILE_IDENTITY_CHARS } from "@pi67/domain";
 import { isReplaySafeControlMutation } from "./agent-messages.js";
 import {
   APP_PROTOCOL_CONTEXT,
@@ -28,6 +29,7 @@ const PAYLOAD = {
   sourceTaskId: "task-source",
   sourceTaskGeneration: 4,
   sourceSessionId: "session-source",
+  sourceSessionFileIdentity: "session-file-source",
   sourceSessionGeneration: 7,
   entryId: "assistant-entry-9"
 } as const;
@@ -64,6 +66,8 @@ describe("session.forkFromTask protocol", () => {
     for (const payload of [
       { ...PAYLOAD, sourceTaskId: "" },
       { ...PAYLOAD, sourceTaskGeneration: 0 },
+      { ...PAYLOAD, sourceSessionFileIdentity: "" },
+      { ...PAYLOAD, sourceSessionFileIdentity: "f".repeat(MAX_SESSION_FILE_IDENTITY_CHARS + 1) },
       { ...PAYLOAD, sourceSessionGeneration: 0 },
       { ...PAYLOAD, entryId: "" },
       { ...PAYLOAD, sourcePath: "/private/source.jsonl" },
@@ -78,6 +82,7 @@ describe("session.forkFromTask protocol", () => {
       accepted: true as const,
       hostEpoch: 6,
       sessionId: "session-target",
+      sessionFileIdentity: "session-file-target",
       sessionGeneration: 2,
       eventSequence: 11
     };

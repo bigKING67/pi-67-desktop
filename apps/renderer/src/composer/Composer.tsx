@@ -1,7 +1,6 @@
 import { ArrowUp, ListPlus, Plus, Send, Square } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "react-aria-components";
-import { AttachmentPreview } from "../attachments/AttachmentPreview.js";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
@@ -42,7 +41,6 @@ import {
   resolveSlashSubmission,
   slashQueryFromDraft
 } from "./composer-slash-commands.js";
-import { SlashCommandPicker } from "./SlashCommandPicker.js";
 import { useComposerSlashCatalog } from "./use-composer-slash-catalog.js";
 import { ComposerTextarea } from "./ComposerTextarea.js";
 import {
@@ -50,6 +48,13 @@ import {
   type PiDesktopActionContext
 } from "../pi-actions/pi-desktop-actions.js";
 import { ToolModeSelector } from "./ToolModeSelector.js";
+
+const AttachmentPreview = lazy(() => import("../attachments/AttachmentPreview.js").then((module) => ({
+  default: module.AttachmentPreview
+})));
+const SlashCommandPicker = lazy(() => import("./SlashCommandPicker.js").then((module) => ({
+  default: module.SlashCommandPicker
+})));
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
@@ -259,7 +264,7 @@ export function Composer() {
       <ExtensionWidgets items={widgetItems} placement="aboveEditor" />
       <ComposerQueuePanel />
       {slashPickerOpen ? (
-        <div className={styles.slashPickerAnchor}>
+        <Suspense fallback={null}>
           <SlashCommandPicker
             activeIndex={slashActiveIndex}
             commands={slashCommands}
@@ -273,7 +278,7 @@ export function Composer() {
               requestAnimationFrame(() => textInput.current?.focus());
             }}
           />
-        </div>
+        </Suspense>
       ) : null}
       <div
         className={`${styles.shell} ${attachmentDragActive ? styles.dropActive : ""}`}
@@ -315,15 +320,17 @@ export function Composer() {
         ) : null}
         {attachments.length > 0 ? (
           <div className={styles.attachmentRow} aria-label={messages.composer.pendingAttachments}>
-            {attachments.map((attachment) => (
-              <AttachmentPreview
-                attachment={attachment}
-                disabled={submitting || stagingAttachments}
-                key={attachment.id}
-                removeLabel={messages.composer.removeAttachment(attachment.name)}
-                onRemove={() => removeAttachment(attachment.id)}
-              />
-            ))}
+            <Suspense fallback={<AttachmentPreviewLoading />}>
+              {attachments.map((attachment) => (
+                <AttachmentPreview
+                  attachment={attachment}
+                  disabled={submitting || stagingAttachments}
+                  key={attachment.id}
+                  removeLabel={messages.composer.removeAttachment(attachment.name)}
+                  onRemove={() => removeAttachment(attachment.id)}
+                />
+              ))}
+            </Suspense>
           </div>
         ) : null}
         <ComposerTextarea
@@ -418,5 +425,18 @@ export function Composer() {
       </div>
       <ExtensionWidgets items={widgetItems} placement="belowEditor" />
     </footer>
+  );
+}
+
+function AttachmentPreviewLoading() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="正在加载附件预览"
+      role="status"
+      style={{ display: "grid", width: 218, height: 56, flex: "0 0 auto", placeItems: "center" }}
+    >
+      <span className="loading-line" />
+    </div>
   );
 }

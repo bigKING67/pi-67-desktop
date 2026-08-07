@@ -36,3 +36,26 @@ export function protocolDocumentationViolations(protocolSource, documentationSou
           + `protocolVersion ${documentationMatch[1]} does not match source ${sourceMatch[1]}`
       ];
 }
+
+export function runningTaskDocumentationViolations(domainSource, documents) {
+  const sourceMatch = domainSource.match(
+    /export const MAX_RUNNING_TASKS\s*=\s*(\d+)\s*;/u
+  );
+  if (!sourceMatch?.[1]) {
+    return ["packages/domain/src/workbench.ts: cannot resolve MAX_RUNNING_TASKS"];
+  }
+  const violations = [];
+  for (const document of documents) {
+    const documentationMatch = document.source.match(/`MAX_RUNNING_TASKS\s*=\s*(\d+)`/u);
+    if (!documentationMatch?.[1]) {
+      violations.push(`${document.path}: missing the canonical MAX_RUNNING_TASKS declaration`);
+      continue;
+    }
+    if (documentationMatch[1] !== sourceMatch[1]) {
+      violations.push(
+        `${document.path}: MAX_RUNNING_TASKS ${documentationMatch[1]} does not match source ${sourceMatch[1]}`
+      );
+    }
+  }
+  return violations;
+}

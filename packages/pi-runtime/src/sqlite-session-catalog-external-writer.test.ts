@@ -252,6 +252,7 @@ async function temporaryRoot(): Promise<string> {
 
 function record(index: number): SessionCatalogRecord {
   return {
+    fileIdentity: `session-file-fixture-${index}`,
     id: `id-${index}`,
     path: `/sessions/${String(index).padStart(3, "0")}.jsonl`,
     cwd: WORKSPACE,

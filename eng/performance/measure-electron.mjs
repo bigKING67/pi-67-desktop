@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +10,7 @@ import {
 import { DEFAULT_MESSAGE_PAGE_SIZE } from "../../packages/pi-runtime/dist/index.mjs";
 import { writeElectronPerformanceReport } from "./electron-performance-report.mjs";
 import { collectProcessOwnedMemoryBytes } from "./electron-process-memory.mjs";
+import { collectProcessTree } from "./electron-process-tree.mjs";
 import {
   assertRendererResourceBoundaries,
   createRendererResourceCollector
@@ -358,11 +358,35 @@ async function measureAgentHostRecovery(application, window) {
   await waitForReplacementAgentHost(application.process().pid, agentHost.pid, 10_000);
   await waitForRuntimeReady(window, 30_000);
   if (projectionBefore?.sessionId) {
-    await window.waitForFunction(({ sessionId, messageCount }) => {
-      const region = document.querySelector('[data-transcript-region="true"]');
-      return region?.getAttribute("data-session-id") === sessionId
-        && Number(region.getAttribute("data-message-count") ?? 0) === messageCount;
-    }, projectionBefore, { timeout: 30_000 });
+    try {
+      await window.waitForFunction(({ sessionId, messageCount }) => {
+        const region = document.querySelector('[data-transcript-region="true"]');
+        return region?.getAttribute("data-session-id") === sessionId
+          && Number(region.getAttribute("data-message-count") ?? 0) === messageCount;
+      }, projectionBefore, { timeout: 30_000 });
+    } catch (error) {
+      const current = await window.evaluate(() => {
+        const region = document.querySelector('[data-transcript-region="true"]');
+        const messageCards = [...document.querySelectorAll('[data-testid="message-card"]')];
+        return {
+          sessionId: region?.getAttribute("data-session-id"),
+          messageCount: Number(region?.getAttribute("data-message-count") ?? 0),
+          historicalWindow: region?.getAttribute("data-historical-window"),
+          firstMessageId: messageCards.at(0)?.getAttribute("data-message-id"),
+          lastMessageId: messageCards.at(-1)?.getAttribute("data-message-id"),
+          runtimePhase: document.querySelector("[data-runtime-phase]")?.getAttribute("data-runtime-phase"),
+          statusText: [...document.querySelectorAll('[role="status"], [role="alert"], [data-notification-id]')]
+            .map((element) => element.textContent?.trim())
+            .filter(Boolean)
+            .slice(0, 12),
+          bodyText: document.body.innerText.slice(0, 800)
+        };
+      });
+      throw new Error(
+        `Agent Host recovery projection did not restore: ${JSON.stringify({ expected: projectionBefore, current })}.`,
+        { cause: error }
+      );
+    }
   }
   return performance.now() - started;
 }
@@ -401,45 +425,4 @@ function processRoles(rootPid, requireAgentHost = true) {
   ]);
   if (agentHost) roles.set("agentHost", agentHost);
   return roles;
-}
-
-function collectProcessTree(rootPid) {
-  const rows = process.platform === "win32" ? windowsProcesses() : macProcesses();
-  const processIds = new Set([rootPid]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const row of rows) {
-      if (processIds.has(row.parentPid) && !processIds.has(row.pid)) {
-        processIds.add(row.pid);
-        changed = true;
-      }
-    }
-  }
-  return rows.filter((row) => processIds.has(row.pid));
-}
-
-function macProcesses() {
-  const output = execFileSync("ps", ["-axo", "pid=,ppid=,rss=,command="], { encoding: "utf8" });
-  return output.trim().split("\n").flatMap((line) => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/u);
-    return match ? [{ pid: Number(match[1]), parentPid: Number(match[2]), rssBytes: Number(match[3]) * 1024, command: match[4] }] : [];
-  });
-}
-
-function windowsProcesses() {
-  const script = [
-    "Get-CimInstance Win32_Process",
-    "Select-Object ProcessId,ParentProcessId,WorkingSetSize,PrivatePageCount,CommandLine",
-    "ConvertTo-Json -Compress"
-  ].join(" | ");
-  const output = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { encoding: "utf8" });
-  const parsed = JSON.parse(output);
-  return (Array.isArray(parsed) ? parsed : [parsed]).map((row) => ({
-    pid: Number(row.ProcessId),
-    parentPid: Number(row.ParentProcessId),
-    rssBytes: Number(row.WorkingSetSize),
-    privateBytes: Number(row.PrivatePageCount),
-    command: typeof row.CommandLine === "string" ? row.CommandLine : ""
-  }));
 }
