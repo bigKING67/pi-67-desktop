@@ -199,6 +199,14 @@ jobs:
             --expected-run-attempt $env:GITHUB_RUN_ATTEMPT
       - name: Verify full Windows NSIS installer lifecycle
         run: corepack pnpm run package:smoke:windows-installer
+      - name: Upload Windows installer lifecycle diagnostics
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-installer-lifecycle-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-installer-lifecycle/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload testable Windows candidate
         uses: actions/upload-artifact@v7
         with:

@@ -4,10 +4,18 @@ import {
 } from "./controlled-shutdown-fixture.ts";
 
 export async function startControlledPrompt(page) {
+  await submitControlledPrompt(page);
+  await waitForControlledPromptRunning(page);
+}
+
+export async function submitControlledPrompt(page, timeoutMs = 30_000) {
   await page.getByRole("button", { name: "Pi 模型", exact: true })
     .getByText(CONTROLLED_MODEL_LABEL, { exact: true })
-    .waitFor({ state: "visible", timeout: 30_000 });
+    .waitFor({ state: "visible", timeout: timeoutMs });
   await page.getByLabel("给 Pi 发送消息").fill(CONTROLLED_PROMPT_TEXT);
   await page.getByRole("button", { name: "发送" }).click();
-  await page.getByRole("button", { name: "停止" }).waitFor({ state: "visible", timeout: 10_000 });
+}
+
+export async function waitForControlledPromptRunning(page, timeoutMs = 10_000) {
+  await page.getByRole("button", { name: "停止" }).waitFor({ state: "visible", timeout: timeoutMs });
 }

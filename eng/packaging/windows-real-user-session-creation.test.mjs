@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   prepareRealUserSessionCreation,
+  waitForSelectedProvisionalSessionIntent,
   waitForRealUserCreatedSession
 } from "./windows-real-user-session-creation.mjs";
 
@@ -38,6 +39,127 @@ describe("Windows installed real-user Session creation", () => {
       expect([...prepared.existingSessionFileNames]).toEqual(["initial.jsonl"]);
       expect(createAction.click).toHaveBeenCalledOnce();
       expect(evaluateAll).toHaveBeenCalledOnce();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("admits one selected provisional intent without eagerly creating a Pi JSONL", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-intent-"));
+    const agentDir = join(root, "agent");
+    const sessionDirectory = join(agentDir, "sessions", "workspace");
+    await mkdir(sessionDirectory, { recursive: true });
+    await writeFile(join(sessionDirectory, "existing.jsonl"), "{\"type\":\"session\"}\n", "utf8");
+    const window = {
+      evaluate: vi.fn().mockResolvedValue({
+        errorNotificationCount: 0,
+        errorNotificationTitles: [],
+        newProvisionalIdentities: ["provisional:workspace:new"],
+        newSessionIdentities: [],
+        newSessionRowCount: 0,
+        provisionalRowCount: 1,
+        rowCount: 2,
+        runtimePhase: "stopped",
+        runtimeStatus: "当前状态：首条消息尚未发送",
+        selectedIdentity: "provisional:workspace:new",
+        selectedNewSession: false,
+        selectedProvisional: true,
+        sessionIdentities: ["session:workspace:existing.jsonl"],
+        sessionRowCount: 1
+      })
+    };
+
+    try {
+      await expect(waitForSelectedProvisionalSessionIntent(
+        window,
+        agentDir,
+        new Set(["session:workspace:existing.jsonl"]),
+        new Set(["existing.jsonl"]),
+        performance.now() + 1_000
+      )).resolves.toBe("provisional:workspace:new");
+      expect(window.evaluate).toHaveBeenCalledOnce();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when New materializes a Pi JSONL before the first Prompt", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-eager-session-"));
+    const agentDir = join(root, "agent");
+    const sessionDirectory = join(agentDir, "sessions", "workspace");
+    await mkdir(sessionDirectory, { recursive: true });
+    await writeFile(join(sessionDirectory, "eager.jsonl"), "{\"type\":\"session\"}\n", "utf8");
+    const window = {
+      evaluate: vi.fn().mockResolvedValue({
+        errorNotificationCount: 0,
+        errorNotificationTitles: [],
+        newProvisionalIdentities: ["provisional:workspace:new"],
+        newSessionIdentities: [],
+        newSessionRowCount: 0,
+        provisionalRowCount: 1,
+        rowCount: 1,
+        runtimePhase: "stopped",
+        runtimeStatus: "当前状态：首条消息尚未发送",
+        selectedIdentity: "provisional:workspace:new",
+        selectedNewSession: false,
+        selectedProvisional: true,
+        sessionIdentities: [],
+        sessionRowCount: 0
+      })
+    };
+
+    try {
+      await expect(waitForSelectedProvisionalSessionIntent(
+        window,
+        agentDir,
+        new Set(),
+        new Set(),
+        performance.now() + 1_000
+      )).rejects.toThrow(expect.objectContaining({
+        message: expect.stringContaining('"newPhysicalSessionFileCount":1')
+      }));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects duplicate provisional intents without exposing their identities", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-duplicate-intent-"));
+    const agentDir = join(root, "agent");
+    const firstIdentity = "provisional:workspace:sensitive-first";
+    const secondIdentity = "provisional:workspace:sensitive-second";
+    const window = {
+      evaluate: vi.fn().mockResolvedValue({
+        errorNotificationCount: 0,
+        errorNotificationTitles: [],
+        newProvisionalIdentities: [firstIdentity, secondIdentity],
+        newSessionIdentities: [],
+        newSessionRowCount: 0,
+        provisionalRowCount: 2,
+        rowCount: 2,
+        runtimePhase: "stopped",
+        runtimeStatus: "当前状态：首条消息尚未发送",
+        selectedIdentity: firstIdentity,
+        selectedNewSession: false,
+        selectedProvisional: true,
+        sessionIdentities: [],
+        sessionRowCount: 0
+      })
+    };
+
+    try {
+      let failure;
+      await waitForSelectedProvisionalSessionIntent(
+        window,
+        agentDir,
+        new Set(),
+        new Set(),
+        performance.now() + 1_000
+      ).catch((error) => { failure = String(error); });
+
+      expect(failure).toContain('"newProvisionalRowCount":2');
+      expect(failure).not.toContain(firstIdentity);
+      expect(failure).not.toContain(secondIdentity);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

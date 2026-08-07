@@ -3,7 +3,10 @@ import * as systemPath from "node:path";
 import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
-import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import {
+  submitControlledPrompt,
+  waitForControlledPromptRunning
+} from "./controlled-provider-interaction.mjs";
 import {
   installWorkspaceDialogResult,
   launchPackagedApplication
@@ -21,6 +24,7 @@ import {
 import { assertSessionPathContained, sessionPathFromIdentity } from "./windows-installer-identity.mjs";
 import {
   prepareRealUserSessionCreation,
+  waitForSelectedProvisionalSessionIntent,
   waitForRealUserCreatedSession
 } from "./windows-real-user-session-creation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
@@ -304,21 +308,32 @@ async function createControlledConversation(window, agentDir) {
     agentDir,
     REAL_USER_CREATE_HARD_TIMEOUT_MS
   );
-  const startedAt = performance.now();
+  const intentStartedAt = performance.now();
   await createAction.click({ timeout: REAL_USER_CREATE_HARD_TIMEOUT_MS });
+  await waitForSelectedProvisionalSessionIntent(
+    window,
+    agentDir,
+    existingIdentities,
+    existingSessionFileNames,
+    intentStartedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
+  );
+  const intentDurationMs = performance.now() - intentStartedAt;
+
+  await submitControlledPrompt(window, REAL_USER_CREATE_HARD_TIMEOUT_MS);
+  const materializationStartedAt = performance.now();
   const sessionIdentity = await waitForRealUserCreatedSession(
     window,
     existingIdentities,
     existingSessionFileNames,
-    startedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
+    materializationStartedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
   );
-  const createDurationMs = performance.now() - startedAt;
-  if (createDurationMs > REAL_USER_CREATE_HARD_TIMEOUT_MS) {
+  const materializationDurationMs = performance.now() - materializationStartedAt;
+  if (materializationDurationMs > REAL_USER_CREATE_HARD_TIMEOUT_MS) {
     throw new Error("Windows real-user session.create succeeded after its 15s hard gate.");
   }
   await canonicalSessionPathFromIdentity(sessionIdentity, agentDir);
 
-  await startControlledPrompt(window);
+  await waitForControlledPromptRunning(window);
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
   await window.getByRole("button", { name: "停止", exact: true })
     .waitFor({ state: "hidden", timeout: 10_000 });
@@ -330,11 +345,14 @@ async function createControlledConversation(window, agentDir) {
 
   return {
     report: {
-      durationMs: round(createDurationMs),
+      durationMs: round(materializationDurationMs),
       hardGateMs: REAL_USER_CREATE_HARD_TIMEOUT_MS,
+      intentDurationMs: round(intentDurationMs),
       jsonlMaterialized: true,
+      materializationTrigger: "first-prompt",
       operationOutcome: "user-stopped",
-      targetMet: createDurationMs <= REAL_USER_CREATE_TARGET_MS,
+      provisionalIntentObserved: true,
+      targetMet: materializationDurationMs <= REAL_USER_CREATE_TARGET_MS,
       targetMs: REAL_USER_CREATE_TARGET_MS
     },
     sessionIdentity

@@ -29,6 +29,19 @@ describe("unsigned preview candidate and promotion workflow security", () => {
     expect(source).toContain("windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}");
   });
 
+  it("preserves bounded installer lifecycle diagnostics when candidate certification fails", async () => {
+    const source = await readFile(candidateUrl, "utf8");
+    const diagnosticUpload = source.slice(
+      source.indexOf("      - name: Upload Windows installer lifecycle diagnostics"),
+      source.indexOf("      - name: Upload testable Windows candidate")
+    );
+
+    expect(diagnosticUpload).toContain("if: always()");
+    expect(diagnosticUpload).toContain("artifacts/validation/windows-installer-lifecycle/");
+    expect(diagnosticUpload).toContain("if-no-files-found: warn");
+    expect(diagnosticUpload).not.toContain("artifacts/release/");
+  });
+
   it("requires explicit manual test confirmation and publishes only a verified bundle", async () => {
     const source = await readFile(promotionUrl, "utf8");
     expect(source).toContain("confirm_windows_tested:");

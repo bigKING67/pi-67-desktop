@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -14,6 +14,26 @@ import {
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
+  it("materializes a New Session only after the controlled first Prompt", async () => {
+    const source = await readFile(
+      new URL("./windows-real-user-lifecycle.mjs", import.meta.url),
+      "utf8"
+    );
+    const createFlow = source.slice(source.indexOf("async function createControlledConversation"));
+    const clickIntent = createFlow.indexOf("await createAction.click");
+    const provisionalObserved = createFlow.indexOf("await waitForSelectedProvisionalSessionIntent");
+    const promptSubmitted = createFlow.indexOf("await submitControlledPrompt");
+    const sessionMaterialized = createFlow.indexOf("await waitForRealUserCreatedSession");
+    const operationRunning = createFlow.indexOf("await waitForControlledPromptRunning");
+
+    expect(clickIntent).toBeGreaterThan(-1);
+    expect(provisionalObserved).toBeGreaterThan(clickIntent);
+    expect(promptSubmitted).toBeGreaterThan(provisionalObserved);
+    expect(sessionMaterialized).toBeGreaterThan(promptSubmitted);
+    expect(operationRunning).toBeGreaterThan(sessionMaterialized);
+    expect(createFlow).not.toContain("await startControlledPrompt(window)");
+  });
+
   it("canonicalizes the Agent root before checking a real Session path", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-real-user-path-"));
     const canonicalAgentDir = join(root, "canonical-agent");
