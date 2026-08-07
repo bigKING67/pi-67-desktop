@@ -4,7 +4,8 @@ import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
 import {
-  submitControlledPrompt,
+  submitControlledPromptInput,
+  waitForControlledModel,
   waitForControlledPromptRunning
 } from "./controlled-provider-interaction.mjs";
 import {
@@ -319,8 +320,8 @@ async function createControlledConversation(window, agentDir) {
   );
   const intentDurationMs = performance.now() - intentStartedAt;
 
-  await submitControlledPrompt(window, REAL_USER_CREATE_HARD_TIMEOUT_MS);
   const materializationStartedAt = performance.now();
+  await submitControlledPromptInput(window);
   const sessionIdentity = await waitForRealUserCreatedSession(
     window,
     existingIdentities,
@@ -333,6 +334,7 @@ async function createControlledConversation(window, agentDir) {
   }
   await canonicalSessionPathFromIdentity(sessionIdentity, agentDir);
 
+  await waitForControlledModel(window, REAL_USER_CREATE_HARD_TIMEOUT_MS);
   await waitForControlledPromptRunning(window);
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
   await window.getByRole("button", { name: "停止", exact: true })

@@ -22,15 +22,17 @@ describe("Windows installed real-user lifecycle", () => {
     const createFlow = source.slice(source.indexOf("async function createControlledConversation"));
     const clickIntent = createFlow.indexOf("await createAction.click");
     const provisionalObserved = createFlow.indexOf("await waitForSelectedProvisionalSessionIntent");
-    const promptSubmitted = createFlow.indexOf("await submitControlledPrompt");
+    const promptSubmitted = createFlow.indexOf("await submitControlledPromptInput");
     const sessionMaterialized = createFlow.indexOf("await waitForRealUserCreatedSession");
+    const controlledModelSelected = createFlow.indexOf("await waitForControlledModel");
     const operationRunning = createFlow.indexOf("await waitForControlledPromptRunning");
 
     expect(clickIntent).toBeGreaterThan(-1);
     expect(provisionalObserved).toBeGreaterThan(clickIntent);
     expect(promptSubmitted).toBeGreaterThan(provisionalObserved);
     expect(sessionMaterialized).toBeGreaterThan(promptSubmitted);
-    expect(operationRunning).toBeGreaterThan(sessionMaterialized);
+    expect(controlledModelSelected).toBeGreaterThan(sessionMaterialized);
+    expect(operationRunning).toBeGreaterThan(controlledModelSelected);
     expect(createFlow).not.toContain("await startControlledPrompt(window)");
   });
 
