@@ -43,14 +43,12 @@ export async function verifyProviderConfiguration(window) {
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
-  const credentialProvider = credentialDialog.getByRole("button", { name: /^OpenAI\b/u });
+  const credentialProvider = credentialDialog.getByRole("button", { name: /^OpenAI\s+openai\b/u });
   await credentialProvider.waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
-  if (await credentialProvider.getAttribute("aria-pressed") !== "true") {
-    throw new Error("Windows real-user Provider credential dialog did not preserve the selected Provider.");
-  }
+  await waitForSelectedProvider(credentialProvider, startedAt);
   await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true }).waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
@@ -83,6 +81,14 @@ function remainingTimeout(startedAt) {
     throw new Error(`Windows real-user Provider configuration exceeded ${REAL_USER_PROVIDER_TIMEOUT_MS}ms.`);
   }
   return remaining;
+}
+
+async function waitForSelectedProvider(provider, startedAt) {
+  while (performance.now() - startedAt < REAL_USER_PROVIDER_TIMEOUT_MS) {
+    if (await provider.getAttribute("aria-pressed") === "true") return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("Windows real-user Provider credential dialog did not preserve the selected Provider.");
 }
 
 function round(value) {

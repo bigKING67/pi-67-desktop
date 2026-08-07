@@ -8,7 +8,7 @@ describe("Windows installed Provider configuration", () => {
   it("requires the seeded Provider and persisted Pi credential before returning to the workbench", async () => {
     const actions = [];
     const unavailable = { isVisible: async () => false };
-    const credentialDialog = dialogLocator(actions);
+    const credentialDialog = dialogLocator(actions, ["false", "true"]);
     const configuredProvider = providerLocator(actions);
     const panel = {
       getByRole: (role, options) => role === "textbox"
@@ -52,6 +52,8 @@ describe("Windows installed Provider configuration", () => {
       "click:settings:管理凭据",
       "credential-dialog:visible",
       "credential-provider:visible",
+      "credential-provider:selected:false",
+      "credential-provider:selected:true",
       "credential-persistence:visible",
       "click:credential-close",
       "credential-dialog:hidden",
@@ -76,11 +78,15 @@ function providerLocator(actions) {
   };
 }
 
-function dialogLocator(actions) {
+function dialogLocator(actions, selectedStates) {
   return {
     getByRole: (_role, options) => String(options.name).includes("OpenAI")
       ? {
-          getAttribute: async () => "true",
+          getAttribute: async () => {
+            const selected = selectedStates.shift() ?? "true";
+            actions.push(`credential-provider:selected:${selected}`);
+            return selected;
+          },
           waitFor: async ({ state }) => actions.push(`credential-provider:${state}`)
         }
       : clickLocator(actions, "credential-close"),
