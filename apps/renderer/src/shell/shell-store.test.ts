@@ -19,6 +19,7 @@ describe("shell store", () => {
       commandPaletteOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,
+      credentialDialogProviderId: undefined,
       updateDialogOpen: false
     });
   });
@@ -81,23 +82,31 @@ describe("shell store", () => {
   it("owns application dialog visibility", () => {
     const shell = useShellStore.getState();
     shell.setDoctorDialogOpen(true);
-    shell.setCredentialDialogOpen(true);
+    shell.setCredentialDialogOpen(true, "openai");
     shell.setUpdateDialogOpen(true);
 
     expect(useShellStore.getState()).toMatchObject({
       doctorDialogOpen: true,
       credentialDialogOpen: true,
+      credentialDialogProviderId: "openai",
       updateDialogOpen: true
+    });
+
+    shell.setCredentialDialogOpen(false);
+    expect(useShellStore.getState()).toMatchObject({
+      credentialDialogOpen: false,
+      credentialDialogProviderId: undefined
     });
   });
 
   it("closes runtime-secret dialogs after Agent Host replacement", () => {
-    useShellStore.getState().setCredentialDialogOpen(true);
+    useShellStore.getState().setCredentialDialogOpen(true, "openai");
     useShellStore.getState().setDoctorDialogOpen(true);
     useShellStore.getState().closeRuntimeBoundDialogs();
 
     expect(useShellStore.getState()).toMatchObject({
       credentialDialogOpen: false,
+      credentialDialogProviderId: undefined,
       doctorDialogOpen: true
     });
   });

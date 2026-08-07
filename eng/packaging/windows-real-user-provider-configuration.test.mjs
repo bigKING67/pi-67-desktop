@@ -35,6 +35,7 @@ describe("Windows installed Provider configuration", () => {
     const result = await verifyProviderConfiguration(window);
     expect(result).toMatchObject({
       configuredProvider: "openai",
+      credentialProviderSelection: "openai",
       credentialPersistence: "pi-auth-json",
       outcome: "ready"
     });
@@ -50,6 +51,7 @@ describe("Windows installed Provider configuration", () => {
       "click:configured-provider",
       "click:settings:管理凭据",
       "credential-dialog:visible",
+      "credential-provider:visible",
       "credential-persistence:visible",
       "click:credential-close",
       "credential-dialog:hidden",
@@ -76,7 +78,12 @@ function providerLocator(actions) {
 
 function dialogLocator(actions) {
   return {
-    getByRole: () => clickLocator(actions, "credential-close"),
+    getByRole: (_role, options) => String(options.name).includes("OpenAI")
+      ? {
+          getAttribute: async () => "true",
+          waitFor: async ({ state }) => actions.push(`credential-provider:${state}`)
+        }
+      : clickLocator(actions, "credential-close"),
     getByText: () => waitLocator(actions, "credential-persistence"),
     waitFor: async ({ state }) => actions.push(`credential-dialog:${state}`)
   };

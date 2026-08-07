@@ -912,6 +912,10 @@ loading error where the operation can produce those states
   `仅本次运行` is secondary and clearly states that the value disappears with
   the runtime. If a persistent credential exists while a runtime override is
   active, the UI names both facts rather than implying the stored value is active.
+- `管理凭据` opened from a Provider editor preserves that exact Provider as the
+  credential-dialog selection, even when the active Session uses another model.
+  Generic credential entry points may prefer the active model Provider and then
+  fall back to the first available Provider.
 - The API-key input is masked by default and provides an accessible eye control
   to reveal or hide only the value currently entered by the user. It never
   refills from storage. The separate current-authentication row may provide a

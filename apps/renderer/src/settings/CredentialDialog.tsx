@@ -23,6 +23,7 @@ import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 
 export function CredentialDialog() {
   const open = useShellStore((state) => state.credentialDialogOpen);
+  const targetProviderId = useShellStore((state) => state.credentialDialogProviderId);
   const selectedModel = useSessionProjectionStore(selectSelectedModel);
   const setOpen = useShellStore((state) => state.setCredentialDialogOpen);
   const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId ?? state.currentWorkspaceId);
@@ -74,12 +75,15 @@ export function CredentialDialog() {
   useEffect(() => {
     if (!open) return;
     setProviderId((current) => {
+      if (targetProviderId && providerList.some((provider) => provider.id === targetProviderId)) {
+        return targetProviderId;
+      }
       if (providerList.some((provider) => provider.id === current)) return current;
       return providerList.some((provider) => provider.id === selectedModel?.provider)
         ? selectedModel?.provider ?? ""
         : providerList[0]?.id ?? "";
     });
-  }, [open, providerList, selectedModel?.provider]);
+  }, [open, providerList, selectedModel?.provider, targetProviderId]);
 
   const filteredProviderList = useMemo(() => {
     const query = providerQuery.trim().toLocaleLowerCase();

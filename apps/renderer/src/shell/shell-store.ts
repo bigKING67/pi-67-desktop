@@ -14,6 +14,7 @@ interface ShellState {
   commandPaletteOpen: boolean;
   doctorDialogOpen: boolean;
   credentialDialogOpen: boolean;
+  credentialDialogProviderId: string | undefined;
   updateDialogOpen: boolean;
   setNavigationVisible: (visible: boolean) => void;
   openSessionCatalog: () => void;
@@ -25,7 +26,7 @@ interface ShellState {
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setDoctorDialogOpen: (open: boolean) => void;
-  setCredentialDialogOpen: (open: boolean) => void;
+  setCredentialDialogOpen: (open: boolean, providerId?: string) => void;
   setUpdateDialogOpen: (open: boolean) => void;
   closeRuntimeBoundDialogs: () => void;
 }
@@ -42,6 +43,7 @@ export const useShellStore = create<ShellState>((set) => ({
   commandPaletteOpen: false,
   doctorDialogOpen: false,
   credentialDialogOpen: false,
+  credentialDialogProviderId: undefined,
   updateDialogOpen: false,
   setNavigationVisible(navigationVisible) { set({ navigationVisible }); },
   openSessionCatalog() {
@@ -68,7 +70,18 @@ export const useShellStore = create<ShellState>((set) => ({
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setDoctorDialogOpen(doctorDialogOpen) { set({ doctorDialogOpen }); },
-  setCredentialDialogOpen(credentialDialogOpen) { set({ credentialDialogOpen }); },
+  setCredentialDialogOpen(credentialDialogOpen, credentialDialogProviderId) {
+    set({
+      credentialDialogOpen,
+      credentialDialogProviderId: credentialDialogOpen ? credentialDialogProviderId : undefined
+    });
+  },
   setUpdateDialogOpen(updateDialogOpen) { set({ updateDialogOpen }); },
-  closeRuntimeBoundDialogs() { set({ credentialDialogOpen: false, sessionTreeDialogOpen: false }); }
+  closeRuntimeBoundDialogs() {
+    set({
+      credentialDialogOpen: false,
+      credentialDialogProviderId: undefined,
+      sessionTreeDialogOpen: false
+    });
+  }
 }));

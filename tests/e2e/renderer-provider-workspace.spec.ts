@@ -230,12 +230,17 @@ test("persists a Provider credential from a registered Workspace without startin
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^模型服务/u }).click();
-  await settings.getByTestId("provider-configuration-list").getByRole("button").first().click();
+  await settings.getByTestId("provider-configuration-panel")
+    .getByRole("tab", { name: "可配置 1" })
+    .click();
+  await settings.getByTestId("provider-configuration-list")
+    .getByRole("button", { name: /Anthropic/u })
+    .click();
   await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
   await expect(dialog.getByText("OpenAI", { exact: true }).first()).toBeVisible();
-  await dialog.getByRole("button", { name: /Anthropic/u }).click();
+  await expect(dialog.getByRole("button", { name: /Anthropic/u })).toHaveAttribute("aria-pressed", "true");
   const apiKeyInput = page.getByLabel("Provider API 密钥", { exact: true });
   await expect(apiKeyInput).toHaveAttribute("type", "password");
   await apiKeyInput.fill("workspace-secret-1234");

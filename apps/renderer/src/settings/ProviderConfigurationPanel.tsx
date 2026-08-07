@@ -224,7 +224,10 @@ export function ProviderConfigurationPanel() {
                     <small>{editable ? "保存会原子更新 Pi models.json" : "Pi 内置 Provider 只能管理凭据与默认模型"}</small>
                   </span>
                   <div>
-                    <Button className="secondary-button" onPress={() => setCredentialDialogOpen(true)}>
+                    <Button
+                      className="secondary-button"
+                      onPress={() => setCredentialDialogOpen(true, selectedProviderId)}
+                    >
                       <KeyRound aria-hidden="true" size={14} />管理凭据
                     </Button>
                     {selectedProviderId && editable ? (

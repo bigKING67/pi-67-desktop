@@ -43,6 +43,14 @@ export async function verifyProviderConfiguration(window) {
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
+  const credentialProvider = credentialDialog.getByRole("button", { name: /^OpenAI\b/u });
+  await credentialProvider.waitFor({
+    state: "visible",
+    timeout: remainingTimeout(startedAt)
+  });
+  if (await credentialProvider.getAttribute("aria-pressed") !== "true") {
+    throw new Error("Windows real-user Provider credential dialog did not preserve the selected Provider.");
+  }
   await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true }).waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
@@ -62,6 +70,7 @@ export async function verifyProviderConfiguration(window) {
   const durationMs = performance.now() - startedAt;
   return {
     configuredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
+    credentialProviderSelection: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
     credentialPersistence: "pi-auth-json",
     durationMs: round(durationMs),
     outcome: "ready"
