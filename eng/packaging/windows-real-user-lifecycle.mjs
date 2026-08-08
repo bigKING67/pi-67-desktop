@@ -106,6 +106,7 @@ async function runRealUserLaunch({
     application = await launchPackagedApplication({
       agentDir,
       artifact,
+      environment: { PI67_TEST_CAPTURE_AGENT_INIT: "1" },
       offline: false,
       userDataDirectory
     });

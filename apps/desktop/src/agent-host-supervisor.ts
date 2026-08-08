@@ -17,6 +17,7 @@ import {
   type AgentHostStoragePaths
 } from "./agent-host-environment.js";
 import { planAgentHostRestart } from "./agent-host-restart.js";
+import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 import { redact } from "./redaction.js";
 import { isExpectedRendererLocation } from "./renderer-security.js";
 
@@ -236,7 +237,12 @@ export class AgentHostSupervisor {
     host.on("message", (message) => this.#handleMessage(host, message));
     host.on("exit", (code) => this.#handleExit(host, code));
     host.stdout?.on("data", () => undefined);
+    const initializationOutput = process.env.NODE_ENV === "test"
+      && process.env.PI67_TEST_CAPTURE_AGENT_INIT === "1"
+      ? new AgentHostInitializationOutputForwarder((line) => process.stderr.write(`${line}\n`))
+      : undefined;
     host.stderr?.on("data", (chunk) => {
+      initializationOutput?.write(chunk);
       if (process.env.PI67_DEBUG_AGENT_STDERR !== "1") return;
       const message = redact(String(chunk)).slice(0, 2_000);
       if (message) console.error(`[agent-host] ${message}`);

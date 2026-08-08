@@ -26,6 +26,29 @@ describe("AgentHostSupervisor", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("forwards only sanitized Agent Host initialization output in the test capture lane", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("PI67_TEST_CAPTURE_AGENT_INIT", "1");
+    const write = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const host = fakeUtilityProcess();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(fakeWindow("app://pi67/index.html").value);
+
+    supervisor.connect();
+    host.emitStderr([
+      "private utility output",
+      '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":12.4,"private":"drop"}',
+      ""
+    ].join("\n"));
+
+    expect(write).toHaveBeenCalledOnce();
+    expect(write).toHaveBeenCalledWith(
+      '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":12}\n'
+    );
   });
 
   it("reuses the MessagePort for the same Renderer document", () => {
@@ -338,12 +361,31 @@ function fakeWindow(url: string) {
 
 function fakeUtilityProcess() {
   const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
-  const stream = { on: vi.fn() };
+  const stdout = fakeStream();
+  const stderr = fakeStream();
   return {
     postMessage: vi.fn(),
     kill: vi.fn(),
-    stdout: stream,
-    stderr: stream,
+    stdout,
+    stderr,
+    on(event: string, listener: (...args: unknown[]) => void) {
+      const eventListeners = listeners.get(event) ?? [];
+      eventListeners.push(listener);
+      listeners.set(event, eventListeners);
+      return this;
+    },
+    emit(event: string, ...args: unknown[]) {
+      for (const listener of listeners.get(event) ?? []) listener(...args);
+    },
+    emitStderr(chunk: string) {
+      stderr.emit("data", chunk);
+    }
+  };
+}
+
+function fakeStream() {
+  const listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+  return {
     on(event: string, listener: (...args: unknown[]) => void) {
       const eventListeners = listeners.get(event) ?? [];
       eventListeners.push(listener);
