@@ -113,6 +113,20 @@ describe("workspace changes store", () => {
     expect(useWorkspaceChangesStore.getState().status).toBe("stale");
   });
 
+  it("retains the current projection and exposes a bounded refresh error", () => {
+    const store = useWorkspaceChangesStore.getState();
+    store.beginSession(AUTHORITY);
+    store.installProjection(AUTHORITY, projection("session-1", [change("cached", "completed")]));
+    const target = store.beginRefresh(CANONICAL)!;
+
+    expect(store.failRefresh(target, "read failed")).toBe(true);
+    expect(useWorkspaceChangesStore.getState()).toMatchObject({
+      error: "read failed",
+      status: "error",
+      projection: { sessionId: "session-1", total: 1 }
+    });
+  });
+
   it("hides staged changes until canonical authority commits and on every mismatch", () => {
     const staged = projection("session-1", [change("staged", "completed")]);
     useWorkspaceChangesStore.getState().installProjection(AUTHORITY, staged);

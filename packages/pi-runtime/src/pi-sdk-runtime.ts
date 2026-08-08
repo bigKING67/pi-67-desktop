@@ -7,6 +7,7 @@ import {
   type SessionCatalogPage, type SessionCatalogQuery, type SessionCatalogStatus,
   type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
   type SessionSnapshot, type SessionTreeProjection,
+  type SessionInteractionMode,
   type WorkspaceTrust, type TaskToolMode
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
@@ -226,7 +227,8 @@ export class PiSdkRuntime implements AgentRuntime {
   getSessionTree(): SessionTreeProjection { return this.projections.getTree(); }
   getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage { return this.projections.getMessagePage(options); }
   getUserMessageIndex(options: { offset?: number; limit?: number }) { return this.projections.getUserMessageIndex(options); }
-  locateUserMessage(id: string) { return this.projections.locateUserMessage(id); }
+  searchMessages(query: string) { return this.projections.searchMessages(query); }
+  locateMessage(id: string) { return this.projections.locateMessage(id); }
   readAsset(options: {
     assetId: string;
     sessionGeneration: number;
@@ -288,6 +290,22 @@ export class PiSdkRuntime implements AgentRuntime {
     session.setSessionName(name?.trim() ?? "");
     await this.sessionCatalog.upsertCurrent("session-updated");
     this.emit(sessionMetaChangedEvent(session));
+  }
+  async setInteractionMode(mode: SessionInteractionMode): Promise<void> {
+    await this.assertSessionWritable();
+    this.sessionBindings.setInteractionMode(mode);
+    await this.sessionCatalog.upsertCurrent("session-updated");
+  }
+
+  async implementPlan(planId: string): Promise<void> {
+    await this.assertSessionWritable();
+    await this.configurationReload.assertReady();
+    try {
+      await this.sessionBindings.implementPlan(planId);
+    } finally {
+      await this.sessionCatalog.upsertCurrent("session-updated");
+      await this.configurationReload.apply();
+    }
   }
 
   async preparePromptAttachments(submissionId: string, refs: readonly PromptAttachmentRef[]): Promise<PreparedPromptAttachmentSet | undefined> {
@@ -396,7 +414,16 @@ export class PiSdkRuntime implements AgentRuntime {
     return report;
   }
 
-  getSnapshot(): SessionSnapshot { return this.projections.getSnapshot(this.sessionBindings.requireSession(), this.sessionBindings.services, this.sessionBindings.extensions); }
+  getSnapshot(): SessionSnapshot {
+    return {
+      ...this.projections.getSnapshot(
+        this.sessionBindings.requireSession(),
+        this.sessionBindings.services,
+        this.sessionBindings.extensions
+      ),
+      ...this.sessionBindings.interactionState
+    };
+  }
   getModels(): ModelSummary[] { return projectSessionModels(this.sessionBindings.requireSession()); }
   getResources(): ResourceSummary[] { return projectSessionResources(this.sessionBindings.services, this.sessionBindings.extensions); }
   getIdentity(): RuntimeIdentity {

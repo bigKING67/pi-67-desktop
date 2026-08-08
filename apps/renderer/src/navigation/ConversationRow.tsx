@@ -3,6 +3,8 @@ import {
   Archive,
   Circle,
   Clock3,
+  ArrowDown,
+  ArrowUp,
   Ellipsis,
   LoaderCircle,
   Pencil,
@@ -17,14 +19,22 @@ import { activateRendererTask } from "../workbench/task-activation-controller.js
 import { stopRendererTask } from "../workbench/task-stop-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
+import {
+  conversationNeedsAttention,
+  useConversationAttentionStore
+} from "./conversation-attention-store.js";
 import styles from "./NavigationRail.module.css";
 import {
   archiveRendererConversation,
+  moveRendererPinnedConversation,
+  placeRendererPinnedConversationBefore,
   renameRendererConversation,
   setRendererConversationPinned
 } from "./conversation-organization-controller.js";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { statusLabel, type ConversationRowModel } from "./workspace-conversation-model.js";
+
+const PINNED_CONVERSATION_DRAG_TYPE = "application/x-pi67-pinned-conversation";
 
 export function ConversationRow({
   row,
@@ -40,8 +50,44 @@ export function ConversationRow({
   const StatusIcon = row.status === "running" ? LoaderCircle : row.status === "waiting" ? Clock3 : Circle;
   const task = row.task;
   const sessionConversation = row.conversation.kind === "session" ? row.conversation : undefined;
+  const needsAttention = useConversationAttentionStore((state) => (
+    sessionConversation
+      ? conversationNeedsAttention(
+          state,
+          sessionConversation.workspaceId,
+          sessionConversation.sessionFileIdentity
+        )
+      : false
+  ));
   return (
-    <div className={styles.conversationRow}>
+    <div
+      className={styles.conversationRow}
+      draggable={row.pinned && Boolean(sessionConversation)}
+      onDragStart={(event) => {
+        if (!row.pinned || !sessionConversation) return;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(PINNED_CONVERSATION_DRAG_TYPE, JSON.stringify({
+          workspaceId: sessionConversation.workspaceId,
+          fileIdentity: sessionConversation.sessionFileIdentity
+        }));
+      }}
+      onDragOver={(event) => {
+        if (!row.pinned || !sessionConversation || !event.dataTransfer.types.includes(PINNED_CONVERSATION_DRAG_TYPE)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(event) => {
+        if (!row.pinned || !sessionConversation) return;
+        const source = parsePinnedDrag(event.dataTransfer.getData(PINNED_CONVERSATION_DRAG_TYPE));
+        if (!source || source.workspaceId !== sessionConversation.workspaceId) return;
+        event.preventDefault();
+        void placeRendererPinnedConversationBefore(
+          sessionConversation.workspaceId,
+          source.fileIdentity,
+          sessionConversation.sessionFileIdentity
+        );
+      }}
+    >
       <button
         {...(selected ? { "aria-current": "page" as const } : {})}
         className={`${styles.conversationItem} ${selected ? styles.activeConversation : ""}`}
@@ -61,8 +107,11 @@ export function ConversationRow({
           <strong>{row.title}</strong>
           <small>{row.meta}</small>
         </span>
-        {row.pinned ? <Pin aria-label="已置顶" className={styles.pinnedIcon} size={11} /> : null}
-        {row.status ? <span className={styles.conversationState}>{statusLabel(row.status)}</span> : null}
+        <span className={styles.conversationIndicators}>
+          {row.pinned ? <Pin aria-label="已置顶" className={styles.pinnedIcon} size={11} /> : null}
+          {needsAttention ? <span className={styles.conversationAttention}>待查看</span> : null}
+          {row.status ? <span className={styles.conversationState}>{statusLabel(row.status)}</span> : null}
+        </span>
       </button>
       {sessionConversation ? (
         <MenuTrigger>
@@ -86,6 +135,30 @@ export function ConversationRow({
                 {row.pinned ? <PinOff aria-hidden="true" size={13} /> : <Pin aria-hidden="true" size={13} />}
                 {row.pinned ? "取消置顶" : "置顶对话"}
               </MenuItem>
+              {row.pinned ? (
+                <>
+                  <MenuItem
+                    className={styles.menuItem!}
+                    isDisabled={!row.canMovePinnedUp}
+                    onAction={() => void moveRendererPinnedConversation(
+                      sessionConversation.workspaceId,
+                      sessionConversation.sessionFileIdentity,
+                      "up"
+                    )}
+                    textValue="上移置顶对话"
+                  ><ArrowUp aria-hidden="true" size={13} />上移置顶对话</MenuItem>
+                  <MenuItem
+                    className={styles.menuItem!}
+                    isDisabled={!row.canMovePinnedDown}
+                    onAction={() => void moveRendererPinnedConversation(
+                      sessionConversation.workspaceId,
+                      sessionConversation.sessionFileIdentity,
+                      "down"
+                    )}
+                    textValue="下移置顶对话"
+                  ><ArrowDown aria-hidden="true" size={13} />下移置顶对话</MenuItem>
+                </>
+              ) : null}
               <MenuItem className={styles.menuItem!} onAction={() => useConversationDialogStore.getState().openRename({
                 workspaceId: sessionConversation.workspaceId,
                 fileIdentity: sessionConversation.sessionFileIdentity,
@@ -135,6 +208,21 @@ export function ConversationRow({
       ) : null}
     </div>
   );
+}
+
+function parsePinnedDrag(value: string): { workspaceId: string; fileIdentity: string } | undefined {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (
+      typeof parsed !== "object"
+      || parsed === null
+      || typeof (parsed as { workspaceId?: unknown }).workspaceId !== "string"
+      || typeof (parsed as { fileIdentity?: unknown }).fileIdentity !== "string"
+    ) return undefined;
+    return parsed as { workspaceId: string; fileIdentity: string };
+  } catch {
+    return undefined;
+  }
 }
 
 async function openConversation(row: ConversationRowModel): Promise<void> {

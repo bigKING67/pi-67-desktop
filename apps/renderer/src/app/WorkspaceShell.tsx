@@ -24,6 +24,7 @@ import {
   selectSessionId
 } from "../session/session-projection-selectors.js";
 import { Transcript } from "../transcript/Transcript.js";
+import { ActivePlanActionBar } from "../transcript/PlanProposalCard.js";
 import { TrustBanner } from "../workspace/TrustBanner.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
@@ -35,6 +36,7 @@ import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-con
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
 import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
+import { NewSessionIntentSurface } from "./NewSessionIntentSurface.js";
 import styles from "./WorkspaceShell.module.css";
 
 const SettingsWorkbench = lazy(() => import("../settings/SettingsWorkbench.js").then((module) => ({
@@ -98,6 +100,7 @@ export function WorkspaceShell({
       <TrustBanner />
       <StreamingAnnouncer />
       <Transcript />
+      <ActivePlanActionBar />
       <Composer />
     </section>
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (
@@ -346,24 +349,6 @@ function ProvisionalTaskState({ task, workspace }: {
           </div>
         ) : null}
       </div>
-    </section>
-  );
-}
-
-function NewSessionIntentSurface({ task, workspace }: {
-  task: RendererWorkbenchTask;
-  workspace: WorkspaceDescriptor;
-}) {
-  return (
-    <section aria-label="准备新对话" className="conversation-region" data-testid="new-session-intent">
-      <TrustBanner />
-      <div className={styles.newSessionIntent}>
-        <span className="section-label">{workspace.displayName}</span>
-        <h2>准备新对话</h2>
-        <p>先写下第一条消息。只有点击发送后才会创建 Pi JSONL 会话；创建或发送失败时，草稿会继续保留。</p>
-        {task.hasDraft ? <small>草稿会使用系统安全存储跨应用重启恢复。</small> : null}
-      </div>
-      <Composer />
     </section>
   );
 }

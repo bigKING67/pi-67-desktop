@@ -169,10 +169,11 @@ describe("PiConfigurationService", () => {
     }
   }, 20_000);
 
-  it("installs the offline validation runtime without starting an unbounded SDK reload", async () => {
+  it("keeps the Provider registration refresh inside the offline validation budget", async () => {
     const fixture = await createFixture({
       fallbackPollMs: 60_000,
-      watchDebounceMs: 60_000
+      watchDebounceMs: 60_000,
+      validationRuntimeWaitMs: 10
     });
     const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
     const releaseRefresh = deferred<Awaited<ReturnType<ModelRuntime["refresh"]>>>();
@@ -185,13 +186,143 @@ describe("PiConfigurationService", () => {
       ]);
 
       expect(result).not.toBe("timed-out");
-      expect(result).toMatchObject({ syncState: "current" });
+      expect(result).toMatchObject({
+        syncState: "invalid",
+        diagnostics: [{
+          file: "models",
+          message: expect.stringContaining("bounded startup budget")
+        }]
+      });
       expect(createRuntime).toHaveBeenCalledOnce();
-      expect(refresh).not.toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh).toHaveBeenCalledWith({ allowNetwork: false });
     } finally {
       releaseRefresh.resolve({ errors: new Map(), aborted: false });
       createRuntime.mockRestore();
       refresh.mockRestore();
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("returns an invalid snapshot before a stalled offline Provider validation can exhaust IPC", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      validationRuntimeWaitMs: 10
+    });
+    const stalled = new Promise<ModelRuntime>(() => undefined);
+    const createRuntime = vi.spyOn(ModelRuntime, "create").mockReturnValue(stalled);
+    try {
+      const result = await Promise.race([
+        fixture.service.get(fixture.cwd),
+        delay(500).then(() => "acknowledgement-timeout" as const)
+      ]);
+
+      expect(result).not.toBe("acknowledgement-timeout");
+      expect(result).toMatchObject({
+        syncState: "invalid",
+        providers: [],
+        credentials: [],
+        diagnostics: [expect.objectContaining({
+          file: "models",
+          message: expect.stringContaining("bounded startup budget")
+        })]
+      });
+      expect((result as Exclude<typeof result, string>).files).toHaveLength(4);
+
+      createRuntime.mockRestore();
+      await expect(fixture.service.reload(fixture.cwd)).resolves.toMatchObject({ syncState: "current" });
+    } finally {
+      createRuntime.mockRestore();
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("fails Task model runtime creation within the Host budget and can recover on retry", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      validationRuntimeWaitMs: 10
+    });
+    const stalled = new Promise<ModelRuntime>(() => undefined);
+    const createRuntime = vi.spyOn(ModelRuntime, "create").mockReturnValue(stalled);
+    try {
+      const failure = await Promise.race([
+        fixture.service.createModelRuntime().catch((error: unknown) => error),
+        delay(500).then(() => "acknowledgement-timeout" as const)
+      ]);
+
+      expect(failure).not.toBe("acknowledgement-timeout");
+      expect(failure).toMatchObject({
+        code: "RUNTIME_NOT_READY",
+        recoverable: true,
+        details: { stage: "session-model-runtime", waitMs: 10 }
+      });
+
+      createRuntime.mockRestore();
+      await expect(fixture.service.createModelRuntime()).resolves.toBeInstanceOf(ModelRuntime);
+    } finally {
+      createRuntime.mockRestore();
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("does not let an unrelated Workspace settings reload delay the requested configuration", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      settingsReloadWaitMs: 10
+    });
+    const otherCwd = join(fixture.root, "other-workspace");
+    await mkdir(otherCwd);
+    const otherSettings = SettingsManager.create(otherCwd, fixture.service.agentDir, { projectTrusted: true });
+    const otherReload = vi.spyOn(otherSettings, "reload").mockReturnValue(new Promise(() => undefined));
+    const unregisterOther = fixture.service.registerWorkspace({
+      cwd: otherCwd,
+      settingsManager: otherSettings,
+      projectTrusted: true
+    });
+    try {
+      const result = await Promise.race([
+        fixture.service.get(fixture.cwd),
+        delay(500).then(() => "acknowledgement-timeout" as const)
+      ]);
+
+      expect(result).not.toBe("acknowledgement-timeout");
+      expect(result).toMatchObject({ syncState: "current" });
+      expect(otherReload).not.toHaveBeenCalled();
+    } finally {
+      unregisterOther();
+      otherReload.mockRestore();
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("returns an invalid snapshot when the requested Workspace settings reload stalls", async () => {
+    const fixture = await createFixture({
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      settingsReloadWaitMs: 10
+    });
+    const reload = vi.spyOn(fixture.settingsManager, "reload").mockReturnValue(new Promise(() => undefined));
+    try {
+      const result = await Promise.race([
+        fixture.service.get(fixture.cwd),
+        delay(500).then(() => "acknowledgement-timeout" as const)
+      ]);
+
+      expect(result).not.toBe("acknowledgement-timeout");
+      expect(result).toMatchObject({
+        syncState: "invalid",
+        diagnostics: [expect.objectContaining({
+          file: "global-settings",
+          message: expect.stringContaining("bounded startup budget")
+        })]
+      });
+      reload.mockRestore();
+      await expect(fixture.service.reload(fixture.cwd)).resolves.toMatchObject({ syncState: "current" });
+    } finally {
+      reload.mockRestore();
       await fixture.dispose();
     }
   }, 20_000);
@@ -201,6 +332,9 @@ async function createFixture(options: {
   fallbackPollMs?: number;
   watchDebounceMs?: number;
   runtimeReloadWaitMs?: number;
+  fileAccessWaitMs?: number;
+  validationRuntimeWaitMs?: number;
+  settingsReloadWaitMs?: number;
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "pi67-configuration-service-"));
   temporaryDirectories.push(root);
@@ -211,7 +345,9 @@ async function createFixture(options: {
   const service = new PiConfigurationService(agentDir, options);
   const unregister = service.registerWorkspace({ cwd, settingsManager, projectTrusted: true });
   return {
+    root,
     cwd,
+    settingsManager,
     service,
     async dispose() {
       unregister();

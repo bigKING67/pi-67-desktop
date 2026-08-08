@@ -1,0 +1,63 @@
+.status {
+  display: inline-flex;
+  min-width: 0;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 560;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.status:hover {
+  background: var(--surface-hover);
+}
+
+.status:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.status span {
+  max-width: 112px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status svg {
+  flex: 0 0 auto;
+}
+
+.neutral { color: var(--text-tertiary); }
+.success { color: var(--success); }
+.warning { color: var(--warning); }
+.danger { color: var(--danger); }
+
+.spinning {
+  animation: repository-status-spin 1s linear infinite;
+}
+
+@keyframes repository-status-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .status span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning { animation: none; }
+}

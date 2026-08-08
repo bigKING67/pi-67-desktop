@@ -80,6 +80,24 @@ describe("projectWorkspaceChanges", () => {
     expect(JSON.stringify(projection)).not.toContain("privateSourceMarker");
   });
 
+  it("groups historical changes by the nearest preceding user Turn entry", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "turn-grouped-changes" });
+    const firstTurnId = manager.appendMessage({ role: "user", content: "First turn", timestamp: 1 });
+    manager.appendMessage(assistantToolCall("edit-first", "edit", { path: "first.ts", edits: [] }));
+    manager.appendMessage(toolResult("edit-first", "edit", false, { diff: "valid", patch: "+first" }));
+    const secondTurnId = manager.appendMessage({ role: "user", content: "Second turn", timestamp: 2 });
+    manager.appendMessage(assistantToolCall("write-second", "write", { path: "second.ts", content: "second" }));
+    manager.appendMessage(toolResult("write-second", "write", false, undefined));
+
+    expect(projectWorkspaceChanges(manager).items.map((item) => ({
+      toolCallId: item.toolCallId,
+      turnId: item.turnId
+    }))).toEqual([
+      { toolCallId: "edit-first", turnId: firstTurnId },
+      { toolCallId: "write-second", turnId: secondTurnId }
+    ]);
+  });
+
   it("bounds item count, paths, patches and the complete projection", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "bounded-changes" });
     for (let index = 0; index < MAX_WORKSPACE_CHANGES + 20; index += 1) {

@@ -2,8 +2,10 @@ import type { LucideIcon } from "lucide-react";
 import {
   GitBranch,
   History,
+  ListTodo,
   MessageSquarePlus,
   Pencil,
+  Play,
   RefreshCw,
   Scissors,
   Settings,
@@ -22,6 +24,8 @@ import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
 import { selectConversationSessionSummary, useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { useConversationDialogStore } from "../navigation/conversation-dialog-store.js";
 import { renameRendererConversation } from "../navigation/conversation-organization-controller.js";
+import { setRendererSessionInteractionMode } from "../session/session-plan-controller.js";
+import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 
 type PiDesktopActionName =
   | "new"
@@ -31,6 +35,8 @@ type PiDesktopActionName =
   | "resume"
   | "tree"
   | "reload"
+  | "plan"
+  | "default"
   | "settings";
 
 export interface PiDesktopActionDescriptor {
@@ -86,6 +92,14 @@ export const PI_DESKTOP_ACTIONS: readonly PiDesktopActionDescriptor[] = [
     session: true,
     idle: true
   }),
+  action("plan", messages.composer.piBuiltins.plan, ListTodo, {
+    workspace: true,
+    idle: true
+  }),
+  action("default", messages.composer.piBuiltins.default, Play, {
+    workspace: true,
+    idle: true
+  }),
   action("settings", messages.composer.piBuiltins.settings, Settings, {})
 ];
 
@@ -94,7 +108,7 @@ const ACTION_BY_NAME = new Map(PI_DESKTOP_ACTIONS.map((descriptor) => [descripto
 const PI_TUI_BUILTIN_NAMES = new Set([
   "settings", "model", "scoped-models", "export", "import", "share", "copy", "name", "session",
   "changelog", "hotkeys", "fork", "clone", "tree", "trust", "login", "logout", "new", "compact",
-  "resume", "reload", "quit"
+  "resume", "reload", "plan", "default", "quit"
 ]);
 
 export function piDesktopAction(name: string): PiDesktopActionDescriptor | undefined {
@@ -167,10 +181,32 @@ export async function executePiDesktopAction(
     case "reload":
       await reloadSessionResources();
       return { status: "handled" };
+    case "plan":
+      return executeInteractionModeAction("plan", context);
+    case "default":
+      return executeInteractionModeAction("execute", context);
     case "settings":
       rendererWorkbenchStore.getState().openSettings("general");
       return { status: "handled" };
   }
+}
+
+async function executeInteractionModeAction(
+  mode: "execute" | "plan",
+  context: PiDesktopActionContext
+): Promise<PiDesktopActionExecutionResult> {
+  const task = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+  if (!task) return { status: "blocked", message: messages.composer.piActionUnavailable.session };
+  if (task.conversation.kind === "provisional") {
+    useTaskDraftStore.getState().setInteractionMode(task.id, mode);
+    return { status: "handled" };
+  }
+  if (!context.connected || !context.sessionReady) {
+    return { status: "blocked", message: messages.composer.piActionUnavailable.session };
+  }
+  return await setRendererSessionInteractionMode(mode)
+    ? { status: "handled" }
+    : { status: "blocked", message: "交互模式未能确认，请重试。" };
 }
 
 async function executeNameAction(name: string): Promise<PiDesktopActionExecutionResult> {

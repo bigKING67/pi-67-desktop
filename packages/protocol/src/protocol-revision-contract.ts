@@ -8,10 +8,20 @@ import {
 } from "./envelope.js";
 import { CommandPayloadSchemas, CommandResultSchemas, EventPayloadSchemas } from "./schemas.js";
 import {
+  RepositoryEnvironmentInspectionRequestSchema,
+  RepositoryEnvironmentSnapshotSchema
+} from "./repository-environment-schema.js";
+import {
   AgentHostRuntimePoisonedMessageSchema,
   AgentHostShutdownCompleteMessageSchema,
   AgentHostShutdownRequestSchema
 } from "./supervisor-messages.js";
+import {
+  WorktreeCreationAdvanceRequestSchema,
+  WorktreeCreationAdvanceResultSchema,
+  WorktreeCreationRequestSchema,
+  WorktreeCreationResultSchema
+} from "./worktree-creation-schema.js";
 
 export function canonicalProtocolRevisionMaterial(): string {
   return stableJson({
@@ -28,6 +38,18 @@ export function canonicalProtocolRevisionMaterial(): string {
       results: CommandResultSchemas
     },
     events: EventPayloadSchemas,
+    desktop: {
+      repositoryEnvironment: {
+        inspectionRequest: RepositoryEnvironmentInspectionRequestSchema,
+        snapshot: RepositoryEnvironmentSnapshotSchema
+      },
+      worktreeCreation: {
+        advanceRequest: WorktreeCreationAdvanceRequestSchema,
+        advanceResult: WorktreeCreationAdvanceResultSchema,
+        request: WorktreeCreationRequestSchema,
+        result: WorktreeCreationResultSchema
+      }
+    },
     supervisor: {
       runtimePoisoned: AgentHostRuntimePoisonedMessageSchema,
       shutdownRequest: AgentHostShutdownRequestSchema,

@@ -26,10 +26,10 @@ test("groups Pi Desktop actions and routes exact Enter without sending native ac
   for (const group of ["desktop-action", "extension", "prompt", "skill"]) {
     await expect(picker.locator(`#composer-slash-group-${group}`)).toBeVisible();
   }
-  for (const name of ["new", "model", "compact", "resume", "tree", "reload", "settings"]) {
+  for (const name of ["new", "model", "compact", "resume", "tree", "reload", "plan", "default", "settings"]) {
     await expect(picker.getByRole("option", { name: new RegExp(`/${name}\\b`, "u") })).toBeVisible();
   }
-  await expect(picker.getByRole("option", { name: /\/plan/u })).toBeVisible();
+  await expect(picker.getByRole("option", { name: /\/plan/u })).toContainText("Pi 内置");
   await page.screenshot({
     path: "artifacts/visual-review/composer-slash-desktop-actions.png",
     animations: "disabled"
@@ -47,6 +47,20 @@ test("groups Pi Desktop actions and routes exact Enter without sending native ac
   await expect(composer).toHaveValue("");
   expect(await scenarioCommandTypes(page)).toEqual([]);
   await page.keyboard.press("Escape");
+
+  await composer.fill("/plan");
+  await composer.press("Enter");
+  await expect(page.getByRole("button", { name: "计划", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(composer).toHaveValue("");
+  await expect.poll(() => scenarioCommandTypes(page)).toContain("session.interactionMode.set");
+  expect((await scenarioCommandTypes(page)).filter((type) => (
+    type === "command.invoke" || type === "prompt.submit"
+  ))).toEqual([]);
+
+  await composer.fill("/default");
+  await composer.press("Enter");
+  await expect(page.getByRole("button", { name: "执行", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await clearRecordedCommands(page);
 
   await composer.fill("/share");
   await composer.press("Enter");

@@ -24,6 +24,35 @@ export const zhCNRuntimeMessages = {
     rolledBack: "Pi 会话已回退",
     rollbackFailed: "无法回退 Pi 会话"
   },
+  worktreeCreation: {
+    creating: "正在创建隔离 Worktree",
+    registeringWorkspace: "正在注册隔离工作区",
+    creatingSession: "正在隔离工作区中创建 Pi 会话",
+    failed: "无法创建隔离 Worktree",
+    recoveryRequired: "隔离 Worktree 的创建结果需要恢复确认。为避免重复创建，当前草稿和创建标识已保留。",
+    invalidTask: "当前新对话草稿已变化，无法继续创建隔离 Worktree。",
+    environmentHeading: "运行环境",
+    localLabel: "当前工作区",
+    localDescription: "直接在已选择的目录中工作",
+    worktreeLabel: "隔离 Worktree",
+    worktreeDescription: "首次发送时创建独立目录和 pi67/* branch",
+    noSideEffect: "选择环境不会修改 Git；只有首次发送才开始创建。",
+    retryInspection: "重新检查",
+    availability: {
+      ready: "可以创建隔离 Worktree。",
+      "creation-started": "创建恢复尚未完成，当前环境选择已锁定。",
+      "workspace-unavailable": "当前工作区目录不可用。",
+      "workspace-untrusted": "请先信任当前工作区。",
+      inspecting: "正在检查 Repository。",
+      "inspection-failed": "Repository 检查失败。",
+      "non-git": "当前工作区不是 Git Repository。",
+      "toolchain-unavailable": "内置 Git 工具不可用。",
+      "repository-stale": "Repository 状态已过期。",
+      "binding-unavailable": "Git 绑定待保存。",
+      "worktree-unavailable": "当前 Worktree 状态不可用于隔离创建。",
+      "repository-unavailable": "Repository 当前不可用于隔离创建。"
+    }
+  },
   workbench: {
     restoreFailedTitle: "无法恢复工作台",
     layoutNotSavedTitle: "工作台布局未保存",

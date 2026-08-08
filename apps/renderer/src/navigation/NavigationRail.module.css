@@ -635,6 +635,28 @@
   white-space: nowrap;
 }
 
+.conversationIndicators {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.conversationIndicators:empty {
+  display: none;
+}
+
+.conversationAttention {
+  padding: 2px var(--space-1);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .conversationDivider {
   height: 1px;
   margin: var(--space-1) 7px;

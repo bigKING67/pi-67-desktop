@@ -42,7 +42,10 @@ describe("task draft store", () => {
     expect(useTaskDraftStore.getState().drafts["target"]).toEqual({
       text: "preserve this draft",
       attachments: [attachment],
-      streamBehavior: "steer"
+      workspaceFiles: [],
+      promptStash: [],
+      streamBehavior: "steer",
+      interactionMode: "execute"
     });
     expect(revoke).not.toHaveBeenCalled();
     expect(releasePromptAttachments).not.toHaveBeenCalled();
@@ -73,7 +76,10 @@ describe("task draft store", () => {
     expect(useTaskDraftStore.getState().drafts["task-a"]).toEqual({
       text: "restored",
       attachments: [],
-      streamBehavior: "steer"
+      workspaceFiles: [],
+      promptStash: [],
+      streamBehavior: "steer",
+      interactionMode: "execute"
     });
 
     useTaskDraftStore.getState().setText("task-a", "live");
@@ -95,8 +101,58 @@ describe("task draft store", () => {
     expect(useTaskDraftStore.getState().drafts["task-b"]).toEqual({
       text: "",
       attachments: [],
-      streamBehavior: "steer"
+      workspaceFiles: [],
+      promptStash: [],
+      streamBehavior: "steer",
+      interactionMode: "execute"
     });
+  });
+
+  it("moves and restores Workspace file references without treating them as attachment bytes", () => {
+    const reference = {
+      id: "file-a",
+      revision: "revision-a",
+      relativePath: "src/main.ts"
+    };
+    const store = useTaskDraftStore.getState();
+    store.setText("source", "inspect @[src/main.ts]");
+    store.setWorkspaceFiles("source", [reference]);
+
+    expect(store.transfer("source", "target")).toBe("moved");
+    expect(useTaskDraftStore.getState().drafts.target?.workspaceFiles).toEqual([reference]);
+    useTaskDraftStore.getState().discard("target");
+    expect(releasePromptAttachments).not.toHaveBeenCalled();
+
+    expect(useTaskDraftStore.getState().restore("restored", {
+      text: "inspect @[src/main.ts]",
+      streamBehavior: "followUp",
+      workspaceFiles: [reference]
+    })).toBe("restored");
+    expect(useTaskDraftStore.getState().drafts.restored?.workspaceFiles).toEqual([reference]);
+  });
+
+  it("rejects Prompt stash entries that cannot fit the encrypted persistence contract", () => {
+    const store = useTaskDraftStore.getState();
+    expect(store.addPromptStash("task", {
+      id: "oversized",
+      text: "x".repeat(256 * 1024 + 1),
+      createdAt: 1
+    })).toBe("too-large");
+    expect(useTaskDraftStore.getState().drafts.task).toBeUndefined();
+
+    for (let index = 0; index < 8; index += 1) {
+      expect(useTaskDraftStore.getState().addPromptStash("task", {
+        id: `stash-${index}`,
+        text: `${index}${"x".repeat(256 * 1024 - 1)}`,
+        createdAt: index
+      })).toBe("added");
+    }
+    expect(useTaskDraftStore.getState().addPromptStash("task", {
+      id: "stash-over-total",
+      text: "last byte",
+      createdAt: 9
+    })).toBe("too-large");
+    expect(useTaskDraftStore.getState().drafts.task?.promptStash).toHaveLength(8);
   });
 });
 

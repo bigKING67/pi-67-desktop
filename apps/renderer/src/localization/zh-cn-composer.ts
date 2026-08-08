@@ -55,6 +55,8 @@ export const zhCNComposerMessages = {
     resume: "查找并恢复已有会话",
     tree: "打开当前会话树",
     reload: "重新加载扩展、技能、提示词与上下文",
+    plan: "切换到只读计划模式",
+    default: "切换到默认执行模式",
     settings: "打开 Desktop 设置"
   },
   piActionUnavailable: {

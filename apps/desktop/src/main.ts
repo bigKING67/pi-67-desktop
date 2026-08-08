@@ -32,6 +32,12 @@ import {
 import { refreshPersistedWorkspaceDescriptor } from "./workspace-identity.js";
 import { WorkspaceFileStateStore } from "./workspace-file-state.js";
 import { ComposerDraftStateStore } from "./composer-draft-state.js";
+import { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
+import { WorktreeCatalogStore } from "./worktree-catalog-store.js";
+import { WorktreeCreationService } from "./worktree-creation-service.js";
+import { WorktreeInspectionService } from "./worktree-inspection-service.js";
+import { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
+import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-service.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -50,6 +56,7 @@ const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
 const desktopAppId = "com.pi67.desktop";
 const desktopAgentDirectory = resolveDesktopAgentDirectory();
+const desktopAgentDirectorySource = process.env.PI_CODING_AGENT_DIR ? "environment" : "default";
 const supportedTarget = (process.platform === "win32" && process.arch === "x64")
   || (process.platform === "darwin" && process.arch === "arm64");
 
@@ -165,6 +172,43 @@ if (hasSingleInstanceLock) {
       persistedWorkbench.workspaces.map(refreshPersistedWorkspaceDescriptor)
     );
     await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
+    const privateGitRunner = new BoundedPrivateGitRunner(desktopToolchain);
+    const repositoryMutationScheduler = new RepositoryMutationScheduler();
+    try {
+      const recovery = await new WorktreeStartupReconcileService({
+        userData: app.getPath("userData"),
+        runner: privateGitRunner,
+        scheduler: repositoryMutationScheduler,
+        workbenchState
+      }).reconcile();
+      if (recovery.inspected > 0 || recovery.protected > 0 || recovery.indeterminate > 0) {
+        console.info(
+          `Worktree startup reconcile inspected=${recovery.inspected}`
+          + ` resumed=${recovery.resumed} committed=${recovery.committed}`
+          + ` failed=${recovery.failed} rolledBack=${recovery.rolledBack}`
+          + ` protected=${recovery.protected} indeterminate=${recovery.indeterminate}`
+        );
+      }
+    } catch {
+      for (const record of persistedWorkbench.environmentMutations) {
+        if (!["committed", "rolled-back", "failed"].includes(record.state)) {
+          repositoryMutationScheduler.fence(record.repositoryGroupId);
+        }
+      }
+      console.info("Worktree startup reconcile was not completed; incomplete repositories were fenced.");
+    }
+    const repositoryEnvironmentInspection = new WorktreeInspectionService({
+      runner: privateGitRunner,
+      workbenchState,
+      catalog: new WorktreeCatalogStore(app.getPath("userData"))
+    });
+    const worktreeCreation = new WorktreeCreationService({
+      userData: app.getPath("userData"),
+      runner: privateGitRunner,
+      scheduler: repositoryMutationScheduler,
+      workbenchState,
+      inspection: repositoryEnvironmentInspection
+    });
     systemBridgeRegistration = registerSystemBridge({
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       restartAgentHost: () => agentHostSupervisor.restart(),
@@ -178,7 +222,13 @@ if (hasSingleInstanceLock) {
       previousRunExit,
       workbenchState,
       composerDraftState,
-      workspaceFileState
+      workspaceFileState,
+      repositoryEnvironmentInspection,
+      worktreeCreation,
+      repositoryMutationScheduler,
+      agentDirectory: desktopAgentDirectory,
+      agentDirectorySource: desktopAgentDirectorySource,
+      getAgentHostDiagnostics: () => agentHostSupervisor.diagnostics()
     });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
       getMainWindow: () => mainWindow,

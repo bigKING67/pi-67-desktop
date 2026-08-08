@@ -36,6 +36,7 @@ export interface RuntimeSessionCatalog {
   upsertCurrent(reason: UpsertReason): Promise<void>;
   upsertRecord(record: SessionCatalogRecord, reason: UpsertReason): Promise<void>;
   organize(path: string, mutation: { kind: "pin" | "archive"; value: boolean }): Promise<number>;
+  reorderPinned(paths: readonly string[]): Promise<number>;
   dispose(): Promise<void>;
 }
 
@@ -84,6 +85,10 @@ export function createRuntimeSessionCatalogOwner(
           if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
           return catalog.organize(path, mutation, createContext(target));
         },
+        reorderPinned(paths) {
+          if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
+          return catalog.reorderPinned(paths, createContext(target));
+        },
         async dispose() {
           if (bindingDisposed) return;
           bindingDisposed = true;
@@ -114,6 +119,7 @@ export function createRuntimeSessionCatalog(
     upsertCurrent: (reason) => binding.upsertCurrent(reason),
     upsertRecord: (record, reason) => binding.upsertRecord(record, reason),
     organize: (path, mutation) => binding.organize(path, mutation),
+    reorderPinned: (paths) => binding.reorderPinned(paths),
     async dispose() {
       await binding.dispose();
       await owner.dispose();

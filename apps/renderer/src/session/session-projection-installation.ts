@@ -12,6 +12,7 @@ import { incrementAllSessionProjectionRevisions } from "./session-projection-rev
 import {
   controlProjectionFromSnapshot,
   identityProjectionFromSnapshot,
+  interactionProjectionFromSnapshot,
   modelCatalogProjectionFromSnapshot,
   queueProjectionFromSnapshot
 } from "./session-projection-snapshot.js";
@@ -70,6 +71,7 @@ export function beginSessionSnapshotReplacement(
       identity: undefined,
       modelCatalog: undefined,
       controls: undefined,
+      interaction: undefined,
       queue: undefined,
       resources: undefined,
       usage: undefined,
@@ -103,6 +105,7 @@ export function commitSessionSnapshotReplacement(
       identity: identityProjectionFromSnapshot(snapshot),
       modelCatalog: modelCatalogProjectionFromSnapshot(snapshot),
       controls: controlProjectionFromSnapshot(snapshot),
+      interaction: interactionProjectionFromSnapshot(snapshot),
       queue: queueProjectionFromSnapshot(snapshot),
       resources: snapshot.resources,
       usage: snapshot.stats,
@@ -125,6 +128,7 @@ export function resetSessionProjection(
     identity: undefined,
     modelCatalog: undefined,
     controls: undefined,
+    interaction: undefined,
     queue: undefined,
     resources: undefined,
     usage: undefined,

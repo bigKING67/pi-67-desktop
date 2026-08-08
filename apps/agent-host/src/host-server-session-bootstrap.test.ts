@@ -40,7 +40,7 @@ describe("AgentHostServer session bootstrap", () => {
         _options: Parameters<AgentRuntime["initialize"]>[0],
         observeStage?: Parameters<AgentRuntime["initialize"]>[1]
       ) => {
-        observeStage?.({ stage: "create-session", outcome: "started", durationMs: 0 });
+        observeStage?.({ stage: "load-model-runtime", outcome: "started", durationMs: 0 });
         throw new Error("token=private-fixture initialization failed");
       },
       cancelInteractiveRequests: () => [],
@@ -82,7 +82,7 @@ describe("AgentHostServer session bootstrap", () => {
         payload: { phase: "starting", detail: "正在加载 Pi SDK", recoverable: true }
       }),
       expect.objectContaining({
-        payload: { phase: "starting", detail: "正在创建 Pi Session", recoverable: true }
+        payload: { phase: "starting", detail: "正在读取 Pi Provider 配置", recoverable: true }
       }),
       expect.objectContaining({
         payload: {

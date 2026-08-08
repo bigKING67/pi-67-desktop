@@ -211,7 +211,7 @@ describe("renderer workbench persistence boundary", () => {
   it("binds a persisted Workspace and Session to the App runtime authority without replaying it", () => {
     const store = createRendererWorkbenchStore();
     store.getState().hydrate({
-      version: 4,
+      version: 5,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-1"],
       expandedWorkspaceIds: ["workspace-1"],
@@ -227,6 +227,8 @@ describe("renderer workbench persistence boundary", () => {
       },
       runtimeRecovery: [],
       sessionCreationRecovery: [],
+      workspaceEnvironments: [{ workspaceId: "workspace-1", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     });
@@ -243,7 +245,7 @@ describe("renderer workbench persistence boundary", () => {
   it("preserves the explicit interrupted-task recovery state on cold start", () => {
     const store = createRendererWorkbenchStore();
     store.getState().hydrate({
-      version: 4,
+      version: 5,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-1"],
       expandedWorkspaceIds: ["workspace-1"],
@@ -273,6 +275,8 @@ describe("renderer workbench persistence boundary", () => {
         lastKnownLifecycle: "running"
       }],
       sessionCreationRecovery: [],
+      workspaceEnvironments: [{ workspaceId: "workspace-1", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     });

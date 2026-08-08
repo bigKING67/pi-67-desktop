@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { ensurePackagedNewSessionIntent } from "./packaged-electron-smoke-scenarios.mjs";
 
 const SESSION_CREATION_TIMEOUT_MS = 30_000;
 const SESSION_CREATION_PROMPT = "Create the packaged smoke Session.";
@@ -8,9 +9,10 @@ export async function verifyPackagedSessionCreation({ agentDir, window }) {
   const startedAt = Date.now();
   const deadline = startedAt + SESSION_CREATION_TIMEOUT_MS;
   const conversationRows = window.locator('[data-testid="conversation-row"]');
-  await window.getByRole("button", { name: /新建会话$/u }).first().click({
-    timeout: remainingTimeout(deadline, "start Session creation")
-  });
+  await ensurePackagedNewSessionIntent(
+    window,
+    remainingTimeout(deadline, "start Session creation")
+  );
   await conversationRows.nth(1).waitFor({
     state: "visible",
     timeout: remainingTimeout(deadline, "show the provisional conversation")

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ShellContextTab = "files" | "messages" | "context";
+type ShellContextTab = "files" | "changes" | "messages" | "context";
 
 interface ShellState {
   navigationVisible: boolean;
@@ -12,6 +12,7 @@ interface ShellState {
   contextTab: ShellContextTab;
   sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
+  keyboardShortcutsDialogOpen: boolean;
   doctorDialogOpen: boolean;
   credentialDialogOpen: boolean;
   credentialDialogProviderId: string | undefined;
@@ -25,9 +26,11 @@ interface ShellState {
   setContextTab: (tab: ShellContextTab) => void;
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
+  setKeyboardShortcutsDialogOpen: (open: boolean) => void;
   setDoctorDialogOpen: (open: boolean) => void;
   setCredentialDialogOpen: (open: boolean, providerId?: string) => void;
   setUpdateDialogOpen: (open: boolean) => void;
+  closeNonBlockingDialogs: () => void;
   closeRuntimeBoundDialogs: () => void;
 }
 
@@ -41,6 +44,7 @@ export const useShellStore = create<ShellState>((set) => ({
   contextTab: "files",
   sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
+  keyboardShortcutsDialogOpen: false,
   doctorDialogOpen: false,
   credentialDialogOpen: false,
   credentialDialogProviderId: undefined,
@@ -69,6 +73,7 @@ export const useShellStore = create<ShellState>((set) => ({
   setContextTab(contextTab) { set({ contextTab }); },
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
+  setKeyboardShortcutsDialogOpen(keyboardShortcutsDialogOpen) { set({ keyboardShortcutsDialogOpen }); },
   setDoctorDialogOpen(doctorDialogOpen) { set({ doctorDialogOpen }); },
   setCredentialDialogOpen(credentialDialogOpen, credentialDialogProviderId) {
     set({
@@ -77,6 +82,17 @@ export const useShellStore = create<ShellState>((set) => ({
     });
   },
   setUpdateDialogOpen(updateDialogOpen) { set({ updateDialogOpen }); },
+  closeNonBlockingDialogs() {
+    set({
+      commandPaletteOpen: false,
+      keyboardShortcutsDialogOpen: false,
+      doctorDialogOpen: false,
+      credentialDialogOpen: false,
+      credentialDialogProviderId: undefined,
+      updateDialogOpen: false,
+      sessionTreeDialogOpen: false
+    });
+  },
   closeRuntimeBoundDialogs() {
     set({
       credentialDialogOpen: false,

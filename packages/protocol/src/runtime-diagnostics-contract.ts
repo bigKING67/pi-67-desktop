@@ -16,6 +16,25 @@ export interface RuntimeDiagnostics {
   host?: RuntimeHostDiagnostics;
 }
 
+export type RuntimeDiagnosticsCollectionFailure =
+  | "acknowledgement-timeout"
+  | "connection-unavailable"
+  | "host-replaced"
+  | "protocol-error"
+  | "unknown";
+
+export type SupportDiagnosticsExportRequest =
+  | {
+      runtimeCollection: { status: "available" };
+      runtime: RuntimeDiagnostics;
+    }
+  | {
+      runtimeCollection: {
+        status: "unavailable";
+        failure: RuntimeDiagnosticsCollectionFailure;
+      };
+    };
+
 export interface SessionCreationJournalDiagnostics {
   entryCount: number;
   stateCounts: Record<

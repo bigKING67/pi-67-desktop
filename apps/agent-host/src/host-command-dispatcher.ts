@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import type {
   AgentCommand,
@@ -7,7 +6,13 @@ import type {
   ProjectionMutationAcknowledgement
 } from "@pi67/protocol";
 import type { OperationRegistry } from "./operation-registry.js";
+import {
+  promptSubmissionFingerprint,
+  textOperationSubmissionIdentity
+} from "./operation-submission-identity.js";
 import { HostCommandError } from "./protocol-error.js";
+
+export { operationSubmissionIdentity } from "./operation-submission-identity.js";
 
 export type RuntimeLoadedCommand = Exclude<
   AgentCommand,
@@ -53,9 +58,11 @@ export type RuntimeLoadedCommand = Exclude<
       | "skill.pack.update"
       | "skill.pack.restore"
       | "session.creation.resolve"
+      | "session.catalog.contentSearch"
       | "session.nameByPath"
       | "conversation.pin"
       | "conversation.archive"
+      | "conversation.reorderPinned"
   }
 >;
 
@@ -126,8 +133,10 @@ export async function dispatchHostCommand(
       return runtime.getMessagePage(command.payload);
     case "message.index":
       return runtime.getUserMessageIndex(command.payload);
+    case "message.search":
+      return runtime.searchMessages(command.payload.query);
     case "message.locate":
-      return runtime.locateUserMessage(command.payload.id);
+      return runtime.locateMessage(command.payload.id);
     case "asset.read": {
       const identity = runtime.getIdentity();
       if (identity.sessionGeneration !== command.payload.sessionGeneration) {
@@ -244,6 +253,24 @@ export async function dispatchHostCommand(
         command.payload.mutation.action === "set" ? command.payload.mutation.name : undefined
       );
       return context.captureProjectionMutationAcknowledgement(runtime);
+    case "session.interactionMode.set":
+      await runtime.setInteractionMode(command.payload.mode);
+      return context.captureProjectionMutationAcknowledgement(runtime);
+    case "plan.implement": {
+      const submission = textOperationSubmissionIdentity(
+        command.payload.submissionId,
+        command.type,
+        command.payload.planId
+      );
+      return context.operations().accept({
+        submissionId: submission.submissionId,
+        fingerprint: submissionFingerprint ?? submission.fingerprint,
+        kind: "prompt",
+        execute: () => runtime.implementPlan(command.payload.planId),
+        abort: () => runtime.abort(),
+        beforeTerminal: () => runtime.flushStream()
+      });
+    }
     case "prompt.submit": {
       const operations = context.operations();
       const fingerprint = submissionFingerprint ?? promptSubmissionFingerprint(command.payload);
@@ -361,64 +388,6 @@ function interactiveResponse(
 ): { resolved: boolean } {
   if (resolved) completeInteractiveWait(requestId);
   return { resolved };
-}
-
-function promptSubmissionFingerprint(
-  payload: Extract<AgentCommand, { type: "prompt.submit" }>["payload"]
-): string {
-  const hash = createHash("sha256");
-  const updateText = (value: string) => hash.update(value, "utf8").update("\0");
-  updateText(payload.delivery);
-  updateText(payload.text);
-  for (const attachment of payload.attachments ?? []) {
-    updateText(attachment.id);
-  }
-  return hash.digest("hex");
-}
-
-export interface OperationSubmissionIdentity {
-  submissionId: string;
-  fingerprint: string;
-}
-
-export function operationSubmissionIdentity(command: AgentCommand): OperationSubmissionIdentity | undefined {
-  switch (command.type) {
-    case "prompt.submit":
-      return {
-        submissionId: command.payload.submissionId,
-        fingerprint: promptSubmissionFingerprint(command.payload)
-      };
-    case "session.import":
-      return textOperationSubmissionIdentity(
-        command.payload.submissionId,
-        command.type,
-        command.payload.path
-      );
-    case "session.compact":
-      return textOperationSubmissionIdentity(
-        command.payload.submissionId,
-        command.type,
-        command.payload.instructions ?? ""
-      );
-    case "command.invoke":
-      return textOperationSubmissionIdentity(
-        command.payload.submissionId,
-        command.type,
-        command.payload.command
-      );
-    default:
-      return undefined;
-  }
-}
-
-function textOperationSubmissionIdentity(
-  submissionId: string,
-  type: "session.import" | "session.compact" | "command.invoke",
-  value: string
-): OperationSubmissionIdentity {
-  const hash = createHash("sha256");
-  hash.update(type, "utf8").update("\0").update(value, "utf8");
-  return { submissionId, fingerprint: hash.digest("hex") };
 }
 
 function assertInteractiveResponseContext(

@@ -10,6 +10,7 @@ import {
   resynchronizeRendererProjection
 } from "../connection/projection-recovery-controller.js";
 import { queryFirstSessionCatalog } from "../navigation/session-catalog-controller.js";
+import { clearConversationAttention } from "../navigation/conversation-attention-store.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
 import {
@@ -181,6 +182,7 @@ export async function openRendererWorkspaceDescriptor(
           readyDetail: "Pi 会话已恢复",
           failureTitle: "无法打开会话"
         });
+        if (recovery === "committed") clearOpenedConversationAttention(task.id);
         return recovery === "committed";
       }
       throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
@@ -192,6 +194,7 @@ export async function openRendererWorkspaceDescriptor(
     ) {
       await queryFirstSessionCatalog(descriptor.id, { refresh: true });
     }
+    if (disposition === "committed") clearOpenedConversationAttention(task.id);
     return disposition === "committed";
   } catch (error) {
     if (get().workspace !== workspace) return false;
@@ -201,6 +204,7 @@ export async function openRendererWorkspaceDescriptor(
         if (refreshCatalogAfterBootstrap) {
           await queryFirstSessionCatalog(descriptor.id, { refresh: true });
         }
+        if (task) clearOpenedConversationAttention(task.id);
         return true;
       }
       if (disposition === "stale") return false;
@@ -233,6 +237,13 @@ export async function openRendererWorkspaceDescriptor(
     return false;
   } finally {
     if (get().workspace === workspace) set({ workspaceOpenPending: false });
+  }
+}
+
+function clearOpenedConversationAttention(taskId: string): void {
+  const task = rendererWorkbenchStore.getState().tasks[taskId];
+  if (task?.conversation.kind === "session") {
+    clearConversationAttention(task.workspaceId, task.conversation.sessionFileIdentity);
   }
 }
 

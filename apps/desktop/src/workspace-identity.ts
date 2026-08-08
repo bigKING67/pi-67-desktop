@@ -46,6 +46,11 @@ export interface WorkspaceIdentityOptions {
   now?: () => number;
 }
 
+export interface AppOwnedWorkspaceIdentityOptions {
+  id: string;
+  now?: () => number;
+}
+
 export async function refreshPersistedWorkspaceDescriptor(
   existing: WorkspaceDescriptor
 ): Promise<WorkspaceDescriptor> {
@@ -128,6 +133,43 @@ export async function createNativeWorkspaceDescriptor(
     lastVerifiedAt,
     trust: "trusted",
     trustProvenance: "native-picker",
+    availability: "available"
+  };
+}
+
+export async function createAppOwnedWorkspaceDescriptor(
+  selectedPath: string,
+  options: AppOwnedWorkspaceIdentityOptions
+): Promise<WorkspaceDescriptor> {
+  if (!isBoundedString(selectedPath, MAX_WORKSPACE_PATH_LENGTH) || !isWorkspaceId(options.id)) {
+    throw new Error("App-owned Workspace identity input is invalid.");
+  }
+  const canonicalPath = await realpathNative(selectedPath);
+  if (!isAbsolute(canonicalPath) || !isBoundedString(canonicalPath, MAX_WORKSPACE_PATH_LENGTH)) {
+    throw new Error("Workspace canonical path is invalid.");
+  }
+  const metadata = await stat(canonicalPath, { bigint: true });
+  if (!metadata.isDirectory()) throw new Error("Selected workspace must be a directory.");
+  const displayName = basename(canonicalPath) || canonicalPath;
+  if (!isBoundedString(displayName, MAX_WORKSPACE_DISPLAY_NAME_LENGTH)) {
+    throw new Error("Workspace display name is invalid.");
+  }
+  const lastVerifiedAt = (options.now ?? Date.now)();
+  if (!isTimestamp(lastVerifiedAt)) throw new Error("Workspace verification timestamp is invalid.");
+  const hasFilesystemIdentity = metadata.dev !== 0n && metadata.ino !== 0n;
+  return {
+    id: options.id,
+    displayName,
+    identity: {
+      canonicalPath,
+      device: metadata.dev.toString(10),
+      inode: metadata.ino.toString(10),
+      birthtimeNs: metadata.birthtimeNs.toString(10),
+      assurance: hasFilesystemIdentity ? "filesystem" : "path-only"
+    },
+    lastVerifiedAt,
+    trust: "trusted",
+    trustProvenance: "indirect",
     availability: "available"
   };
 }

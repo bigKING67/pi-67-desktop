@@ -1,5 +1,7 @@
 import {
   conversationArchiveBlocker,
+  MAX_PINNED_CONVERSATION_ORDER_ITEMS,
+  MAX_SESSION_CATALOG_PAGE_ITEMS,
   type SessionSummary,
   type WorkspaceId
 } from "@pi67/domain";
@@ -13,7 +15,7 @@ import {
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
-import { queryFirstSessionCatalog } from "./session-catalog-controller.js";
+import { queryFirstSessionCatalog, querySessionCatalogPage } from "./session-catalog-controller.js";
 
 export async function renameRendererConversation(
   workspaceId: WorkspaceId,
@@ -87,6 +89,99 @@ export async function setRendererConversationPinned(
     });
     return false;
   }
+}
+
+export async function moveRendererPinnedConversation(
+  workspaceId: WorkspaceId,
+  fileIdentity: string,
+  direction: "up" | "down"
+): Promise<boolean> {
+  try {
+    const pinned = await loadPinnedSessions(workspaceId);
+    const index = pinned.findIndex((session) => session.fileIdentity === fileIdentity);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < 0 || targetIndex >= pinned.length) return false;
+    const order = [...pinned];
+    [order[index], order[targetIndex]] = [order[targetIndex]!, order[index]!];
+    return persistPinnedOrder(workspaceId, order.map((session) => session.path));
+  } catch (error) {
+    publishPinnedOrderError(error);
+    return false;
+  }
+}
+
+export async function placeRendererPinnedConversationBefore(
+  workspaceId: WorkspaceId,
+  draggedFileIdentity: string,
+  targetFileIdentity: string
+): Promise<boolean> {
+  if (draggedFileIdentity === targetFileIdentity) return false;
+  try {
+    const pinned = await loadPinnedSessions(workspaceId);
+    const dragged = pinned.find((session) => session.fileIdentity === draggedFileIdentity);
+    const targetIndex = pinned.findIndex((session) => session.fileIdentity === targetFileIdentity);
+    if (!dragged || targetIndex < 0) return false;
+    const withoutDragged = pinned.filter((session) => session.fileIdentity !== draggedFileIdentity);
+    const insertionIndex = withoutDragged.findIndex((session) => session.fileIdentity === targetFileIdentity);
+    withoutDragged.splice(insertionIndex < 0 ? targetIndex : insertionIndex, 0, dragged);
+    return persistPinnedOrder(workspaceId, withoutDragged.map((session) => session.path));
+  } catch (error) {
+    publishPinnedOrderError(error);
+    return false;
+  }
+}
+
+async function loadPinnedSessions(workspaceId: WorkspaceId): Promise<SessionSummary[]> {
+  const pinned: SessionSummary[] = [];
+  let cursor: Awaited<ReturnType<typeof querySessionCatalogPage>>["nextCursor"];
+  while (true) {
+    const page = await querySessionCatalogPage({
+      workspaceId,
+      limit: MAX_SESSION_CATALOG_PAGE_ITEMS,
+      ...(cursor === undefined ? {} : { cursor })
+    });
+    if (page.rebuilding || page.state === "unavailable" || page.incomplete) {
+      throw new Error("Session 目录尚未完成，暂时不能调整置顶顺序。");
+    }
+    for (const session of page.items) {
+      if (session.pinnedAt === undefined) return pinned;
+      pinned.push(session);
+      if (pinned.length > MAX_PINNED_CONVERSATION_ORDER_ITEMS) {
+        throw new Error("置顶对话数量超过支持上限。");
+      }
+    }
+    if (!page.hasMore) return pinned;
+    if (!page.nextCursor) throw new Error("Session 目录分页信息不完整。");
+    cursor = page.nextCursor;
+  }
+}
+
+async function persistPinnedOrder(workspaceId: WorkspaceId, paths: string[]): Promise<boolean> {
+  try {
+    await agentConnectionController.request(
+      "conversation.reorderPinned",
+      { paths },
+      [],
+      { context: { scope: "workspace", workspaceId } }
+    );
+    await queryFirstSessionCatalog(workspaceId);
+    return true;
+  } catch (error) {
+    publishNotification({
+      level: "error",
+      title: "无法调整置顶顺序",
+      message: errorMessage(error)
+    });
+    return false;
+  }
+}
+
+function publishPinnedOrderError(error: unknown): void {
+  publishNotification({
+    level: "error",
+    title: "无法调整置顶顺序",
+    message: errorMessage(error)
+  });
 }
 
 export async function archiveRendererConversation(
@@ -204,7 +299,11 @@ function hasTaskDraft(task: RendererWorkbenchTask): boolean {
   const draft = useTaskDraftStore.getState().drafts[task.id];
   return task.hasDraft
     || task.attachmentCount > 0
-    || Boolean(draft && (draft.text.trim() || draft.attachments.length > 0));
+    || Boolean(draft && (
+      draft.text.trim()
+      || draft.attachments.length > 0
+      || draft.workspaceFiles.length > 0
+    ));
 }
 
 function archiveBlockerMessage(blocker: NonNullable<ReturnType<typeof conversationArchiveBlocker>>): string {

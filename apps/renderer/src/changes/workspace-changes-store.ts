@@ -19,18 +19,20 @@ export interface WorkspaceChangesTarget extends WorkspaceChangesAuthority {
 
 export interface WorkspaceChangesProjectionView {
   authority: WorkspaceChangesAuthority | undefined;
+  error: string | undefined;
   projection: WorkspaceChangesProjection | undefined;
   byToolCallId: ReadonlyMap<string, WorkspaceChangeView>;
-  status: "idle" | "stale" | "loading" | "ready";
+  status: "idle" | "stale" | "loading" | "ready" | "error";
 }
 
 interface WorkspaceChangesState {
   authority: WorkspaceChangesAuthority | undefined;
   contentRevision: number;
   requestRevision: number;
+  error: string | undefined;
   projection: WorkspaceChangesProjection | undefined;
   byToolCallId: ReadonlyMap<string, WorkspaceChangeView>;
-  status: "idle" | "stale" | "loading" | "ready";
+  status: "idle" | "stale" | "loading" | "ready" | "error";
   beginSession: (authority: WorkspaceChangesAuthority) => void;
   installProjection: (
     authority: WorkspaceChangesAuthority,
@@ -45,12 +47,13 @@ interface WorkspaceChangesState {
     target: WorkspaceChangesTarget,
     projection: WorkspaceChangesProjection
   ) => boolean;
-  failRefresh: (target: WorkspaceChangesTarget) => boolean;
+  failRefresh: (target: WorkspaceChangesTarget, error?: string) => boolean;
 }
 
 const EMPTY_CHANGE_INDEX: ReadonlyMap<string, WorkspaceChangeView> = new Map();
 const EMPTY_WORKSPACE_CHANGES_PROJECTION: WorkspaceChangesProjectionView = {
   authority: undefined,
+  error: undefined,
   projection: undefined,
   byToolCallId: EMPTY_CHANGE_INDEX,
   status: "stale"
@@ -60,6 +63,7 @@ export const useWorkspaceChangesStore = create<WorkspaceChangesState>((set, get)
   authority: undefined,
   contentRevision: 0,
   requestRevision: 0,
+  error: undefined,
   projection: undefined,
   byToolCallId: new Map(),
   status: "idle",
@@ -70,6 +74,7 @@ export const useWorkspaceChangesStore = create<WorkspaceChangesState>((set, get)
     set((state) => ({
       authority,
       contentRevision: state.contentRevision + 1,
+      error: undefined,
       projection: undefined,
       byToolCallId: new Map(),
       status: "stale"
@@ -81,6 +86,7 @@ export const useWorkspaceChangesStore = create<WorkspaceChangesState>((set, get)
     set((state) => ({
       authority,
       contentRevision: state.contentRevision + 1,
+      error: undefined,
       projection,
       byToolCallId: indexProjection(projection),
       status: "ready"
@@ -104,6 +110,7 @@ export const useWorkspaceChangesStore = create<WorkspaceChangesState>((set, get)
     set((state) => ({
       authority: undefined,
       contentRevision: state.contentRevision + 1,
+      error: undefined,
       projection: undefined,
       byToolCallId: new Map(),
       status
@@ -115,19 +122,22 @@ export const useWorkspaceChangesStore = create<WorkspaceChangesState>((set, get)
     if (!matchesCommittedSessionProjection(state.authority, canonicalAuthority)) return undefined;
     const target = currentTarget(state, state.requestRevision + 1);
     if (!target) return undefined;
-    set({ requestRevision: target.requestRevision, status: "loading" });
+    set({ requestRevision: target.requestRevision, error: undefined, status: "loading" });
     return target;
   },
 
   finishRefresh(target, projection) {
     if (!matchesCurrentTarget(get(), target) || projection.sessionId !== target.sessionId) return false;
-    set({ projection, byToolCallId: indexProjection(projection), status: "ready" });
+    set({ error: undefined, projection, byToolCallId: indexProjection(projection), status: "ready" });
     return true;
   },
 
-  failRefresh(target) {
+  failRefresh(target, error) {
     if (!matchesCurrentTarget(get(), target)) return false;
-    set({ status: "stale" });
+    set({
+      error,
+      status: error === undefined ? "stale" : "error"
+    });
     return true;
   }
 }));

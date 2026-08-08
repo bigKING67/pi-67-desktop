@@ -192,7 +192,11 @@ export function dismissUnconfirmedRendererSession(taskId: string): boolean {
   if (
     task.hasDraft
     || task.attachmentCount > 0
-    || Boolean(draft && (draft.text.trim().length > 0 || draft.attachments.length > 0))
+    || Boolean(draft && (
+      draft.text.trim().length > 0
+      || draft.attachments.length > 0
+      || draft.workspaceFiles.length > 0
+    ))
   ) {
     publishNotification({
       level: "warning",

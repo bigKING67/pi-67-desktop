@@ -28,9 +28,13 @@ import {
   WorkspaceFileRenamePayloadSchema,
   WorkspaceFileResolvePayloadSchema,
   WorkspaceFileSavePayloadSchema,
-  WorkspaceFileSearchPayloadSchema
+  WorkspaceFileSearchPayloadSchema,
+  WorkspaceFilePromptRefSchema
 } from "./workspace-file-schemas.js";
 import {
+  MAX_COMPOSER_WORKSPACE_FILE_REFS,
+  MAX_MESSAGE_SEARCH_QUERY_CHARS,
+  MAX_PINNED_CONVERSATION_ORDER_ITEMS,
   MAX_SESSION_FILE_IDENTITY_CHARS,
   MAX_USER_MESSAGE_INDEX_PAGE_ITEMS
 } from "@pi67/domain";
@@ -46,10 +50,14 @@ const TaskToolModeSchema = Type.Union([
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
 const PromptSchema = Type.String({ maxLength: 2_000_000 });
 const SubmissionIdSchema = Type.String({ minLength: 1, maxLength: 512 });
+const PlanIdSchema = Type.String({ minLength: 1, maxLength: 128 });
 const PromptAttachmentRefSchema = strictObject({
   id: Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" })
 });
 const PromptAttachmentsSchema = Type.Optional(Type.Array(PromptAttachmentRefSchema, { maxItems: 20 }));
+const PromptWorkspaceFilesSchema = Type.Optional(Type.Array(WorkspaceFilePromptRefSchema, {
+  maxItems: MAX_COMPOSER_WORKSPACE_FILE_REFS
+}));
 const PromptPayloadSchema = strictObject({ text: PromptSchema });
 const SessionNameMutationSchema = Type.Union([
   strictObject({
@@ -85,6 +93,9 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "task.close": strictObject({ mode: Type.Union([Type.Literal("stop"), Type.Literal("dispose")]) }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogQuerySchema,
+  "session.catalog.contentSearch": strictObject({
+    query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
+  }),
   "session.tree": EmptyPayloadSchema,
   "message.page": strictObject({
     direction: Type.Union([Type.Literal("older"), Type.Literal("newer")]),
@@ -94,6 +105,9 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "message.index": strictObject({
     offset: Type.Optional(Type.Integer({ minimum: 0 })),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_USER_MESSAGE_INDEX_PAGE_ITEMS }))
+  }),
+  "message.search": strictObject({
+    query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
   }),
   "message.locate": strictObject({ id: Type.String({ minLength: 1, maxLength: 512 }) }),
   "session.create": strictObject({ creationId: SessionCreationIdSchema }),
@@ -118,13 +132,21 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "session.rollback": strictObject({ entryId: Type.String({ minLength: 1 }), summarize: Type.Optional(Type.Boolean()) }),
   "session.compact": strictObject({ submissionId: SubmissionIdSchema, instructions: Type.Optional(PromptSchema) }),
   "session.name": strictObject({ mutation: SessionNameMutationSchema }),
+  "session.interactionMode.set": strictObject({
+    mode: Type.Union([Type.Literal("execute"), Type.Literal("plan")])
+  }),
+  "plan.implement": strictObject({ submissionId: SubmissionIdSchema, planId: PlanIdSchema }),
   "session.nameByPath": strictObject({ path: PathSchema, mutation: SessionNameMutationSchema }),
   "conversation.pin": strictObject({ path: PathSchema, pinned: Type.Boolean() }),
   "conversation.archive": strictObject({ path: PathSchema, archived: Type.Boolean() }),
+  "conversation.reorderPinned": strictObject({
+    paths: Type.Array(PathSchema, { minItems: 1, maxItems: MAX_PINNED_CONVERSATION_ORDER_ITEMS })
+  }),
   "prompt.submit": strictObject({
     submissionId: SubmissionIdSchema,
     text: PromptSchema,
     attachments: PromptAttachmentsSchema,
+    workspaceFiles: PromptWorkspaceFilesSchema,
     delivery: Type.Union([Type.Literal("new-turn"), Type.Literal("steer"), Type.Literal("follow-up")])
   }),
   "prompt.steer": PromptPayloadSchema,

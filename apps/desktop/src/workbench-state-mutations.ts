@@ -1,13 +1,21 @@
 import type { WorkspaceDescriptor } from "./workspace-identity.js";
 import {
+  advanceEnvironmentCreation,
+  isEnvironmentMutationRecoveryRecord,
+  type EnvironmentCreationState,
+  type EnvironmentMutationRecoveryRecord,
+  type WorkspaceEnvironmentKind
+} from "@pi67/protocol";
+import {
+  MAX_ENVIRONMENT_MUTATION_RECORDS,
   MAX_WORKSPACES,
   WORKBENCH_STATE_VERSION,
   assertValidWorkbenchState,
   assertWorkbenchId,
   parseExactWorkbenchIdOrder,
-  parseWorkbenchStateV4,
-  type WorkbenchLayoutV4,
-  type WorkbenchStateV4
+  parseWorkbenchStateV5,
+  type WorkbenchLayoutV5,
+  type WorkbenchStateV5
 } from "./workbench-state-contract.js";
 import {
   refreshNativeWorkspaceDescriptor,
@@ -16,9 +24,9 @@ import {
 } from "./workspace-identity.js";
 
 export function addOrRefreshWorkspace(
-  state: WorkbenchStateV4,
+  state: WorkbenchStateV5,
   selected: NativeWorkspaceDescriptor
-): { state: WorkbenchStateV4; workspace: NativeWorkspaceDescriptor } {
+): { state: WorkbenchStateV5; workspace: NativeWorkspaceDescriptor } {
   const existingIndex = state.workspaces.findIndex((workspace) => (
     workspaceDescriptorsReferToSameDirectory(workspace, selected)
   ));
@@ -35,10 +43,13 @@ export function addOrRefreshWorkspace(
     workspaces[existingIndex] = workspace;
   }
   const firstRegistration = state.currentWorkspaceId === undefined;
-  const next: WorkbenchStateV4 = {
+  const next: WorkbenchStateV5 = {
     ...state,
     workspaces,
     workspaceOrder,
+    workspaceEnvironments: existingIndex === -1
+      ? [...state.workspaceEnvironments, { workspaceId: workspace.id, kind: "plain", ownership: "user" }]
+      : state.workspaceEnvironments,
     expandedWorkspaceIds: firstRegistration
       ? [workspace.id]
       : state.expandedWorkspaceIds,
@@ -51,10 +62,10 @@ export function addOrRefreshWorkspace(
 }
 
 export function repairWorkspaceRegistration(
-  state: WorkbenchStateV4,
+  state: WorkbenchStateV5,
   workspaceId: string,
   selected: NativeWorkspaceDescriptor
-): { state: WorkbenchStateV4; workspace: NativeWorkspaceDescriptor } {
+): { state: WorkbenchStateV5; workspace: NativeWorkspaceDescriptor } {
   assertWorkbenchId(workspaceId, "Workspace id");
   const existingIndex = state.workspaces.findIndex((workspace) => workspace.id === workspaceId);
   if (existingIndex === -1) throw new Error("Workspace registration was not found.");
@@ -76,9 +87,9 @@ export function repairWorkspaceRegistration(
 }
 
 export function replaceWorkspaceRegistrations(
-  state: WorkbenchStateV4,
+  state: WorkbenchStateV5,
   workspaces: readonly WorkspaceDescriptor[]
-): WorkbenchStateV4 {
+): WorkbenchStateV5 {
   if (
     workspaces.length !== state.workspaces.length
     || workspaces.some((workspace, index) => workspace.id !== state.workspaces[index]?.id)
@@ -91,9 +102,186 @@ export function replaceWorkspaceRegistrations(
   );
 }
 
-export function removeWorkspaceRegistration(state: WorkbenchStateV4, workspaceId: string): WorkbenchStateV4 {
+export function recordObservedWorkspaceEnvironment(
+  state: WorkbenchStateV5,
+  observation: {
+    workspaceId: string;
+    kind: Exclude<WorkspaceEnvironmentKind, "plain">;
+    repositoryGroupId: string;
+  }
+): WorkbenchStateV5 {
+  assertWorkbenchId(observation.workspaceId, "Workspace id");
+  const bindingIndex = state.workspaceEnvironments.findIndex((binding) => (
+    binding.workspaceId === observation.workspaceId
+  ));
+  if (bindingIndex === -1) throw new Error("Workspace environment binding was not found.");
+  const current = state.workspaceEnvironments[bindingIndex]!;
+  if (current.ownership === "app" && (
+    observation.kind !== "repository-worktree"
+    || current.repositoryGroupId !== observation.repositoryGroupId
+  )) {
+    throw new Error("App-owned Workspace environment identity changed.");
+  }
+  const nextBinding = {
+    workspaceId: current.workspaceId,
+    kind: observation.kind,
+    ownership: current.ownership,
+    repositoryGroupId: observation.repositoryGroupId,
+    ...(current.creationId ? { creationId: current.creationId } : {})
+  };
+  if (
+    current.kind === nextBinding.kind
+    && current.repositoryGroupId === nextBinding.repositoryGroupId
+    && current.ownership === nextBinding.ownership
+    && current.creationId === nextBinding.creationId
+  ) return state;
+  const workspaceEnvironments = [...state.workspaceEnvironments];
+  workspaceEnvironments[bindingIndex] = nextBinding;
+  return assertValidWorkbenchState(
+    { ...state, workspaceEnvironments },
+    "Observed Workspace environment binding is invalid."
+  );
+}
+
+export function reserveEnvironmentMutation(
+  state: WorkbenchStateV5,
+  record: EnvironmentMutationRecoveryRecord
+): WorkbenchStateV5 {
+  if (record.state !== "reserved" || !isEnvironmentMutationRecoveryRecord(record)) {
+    throw new Error("Environment mutation reservation is invalid.");
+  }
+  if (state.environmentMutations.length >= MAX_ENVIRONMENT_MUTATION_RECORDS) {
+    throw new Error("Environment mutation recovery limit reached.");
+  }
+  const sourceBinding = state.workspaceEnvironments.find((binding) => (
+    binding.workspaceId === record.sourceWorkspaceId
+  ));
+  if (
+    !sourceBinding
+    || sourceBinding.kind === "plain"
+    || sourceBinding.repositoryGroupId !== record.repositoryGroupId
+  ) throw new Error("Environment mutation source binding is not ready.");
+  if (state.environmentMutations.some((current) => (
+    current.creationId === record.creationId
+    || current.requestId === record.requestId
+    || (current.repositoryGroupId === record.repositoryGroupId && current.worktreeToken === record.worktreeToken)
+  ))) throw new Error("Environment mutation identity already exists.");
+  return assertValidWorkbenchState(
+    { ...state, environmentMutations: [...state.environmentMutations, record] },
+    "Environment mutation reservation produced invalid Workbench state."
+  );
+}
+
+export function advanceEnvironmentMutation(
+  state: WorkbenchStateV5,
+  creationId: string,
+  next: EnvironmentCreationState,
+  updatedAt: number,
+  patch: {
+    workspaceId?: string | undefined;
+    sessionFileIdentity?: string | undefined;
+    rollbackSafety?: EnvironmentMutationRecoveryRecord["rollbackSafety"] | undefined;
+  } = {}
+): WorkbenchStateV5 {
+  const index = state.environmentMutations.findIndex((record) => record.creationId === creationId);
+  if (index === -1) throw new Error("Environment mutation recovery record was not found.");
+  const environmentMutations = [...state.environmentMutations];
+  environmentMutations[index] = advanceEnvironmentCreation(environmentMutations[index]!, next, updatedAt, patch);
+  return assertValidWorkbenchState(
+    { ...state, environmentMutations },
+    "Environment mutation transition produced invalid Workbench state."
+  );
+}
+
+export function registerCreatedWorktreeWorkspace(
+  state: WorkbenchStateV5,
+  creationId: string,
+  workspace: WorkspaceDescriptor,
+  updatedAt: number
+): WorkbenchStateV5 {
+  const record = state.environmentMutations.find((candidate) => candidate.creationId === creationId);
+  if (!record || record.state !== "git-materialized") {
+    throw new Error("Worktree creation is not ready for Workspace registration.");
+  }
+  if (state.workspaces.length >= MAX_WORKSPACES) throw new Error("Workspace registration limit reached.");
+  if (
+    state.workspaces.some((current) => (
+      current.id === workspace.id || workspaceDescriptorsReferToSameDirectory(current, workspace)
+    ))
+    || workspace.trust !== "trusted"
+    || workspace.trustProvenance !== "indirect"
+    || workspace.availability !== "available"
+  ) throw new Error("Created Worktree Workspace identity is invalid or already registered.");
+  const nextRecord = advanceEnvironmentCreation(record, "workspace-registered", updatedAt, {
+    workspaceId: workspace.id
+  });
+  return assertValidWorkbenchState({
+    ...state,
+    workspaces: [...state.workspaces, workspace],
+    workspaceOrder: [...state.workspaceOrder, workspace.id],
+    workspaceEnvironments: [
+      ...state.workspaceEnvironments,
+      {
+        workspaceId: workspace.id,
+        kind: "repository-worktree",
+        ownership: "app",
+        repositoryGroupId: record.repositoryGroupId,
+        creationId
+      }
+    ],
+    environmentMutations: state.environmentMutations.map((candidate) => (
+      candidate.creationId === creationId ? nextRecord : candidate
+    ))
+  }, "Created Worktree registration produced invalid Workbench state.");
+}
+
+export function removeWorkspaceRegistration(state: WorkbenchStateV5, workspaceId: string): WorkbenchStateV5 {
   assertWorkbenchId(workspaceId, "Workspace id");
   if (!state.workspaces.some((workspace) => workspace.id === workspaceId)) return state;
+  if (state.environmentMutations.some((record) => (
+    record.sourceWorkspaceId === workspaceId || record.workspaceId === workspaceId
+  ))) {
+    throw new Error("Workspace is referenced by Worktree recovery state.");
+  }
+  return removeWorkspaceRegistrationState(state, workspaceId, state.environmentMutations);
+}
+
+export function finalizeRolledBackWorktreeWorkspace(
+  state: WorkbenchStateV5,
+  creationId: string,
+  workspaceId: string,
+  updatedAt: number
+): WorkbenchStateV5 {
+  assertWorkbenchId(workspaceId, "Workspace id");
+  const record = state.environmentMutations.find((candidate) => candidate.creationId === creationId);
+  const binding = state.workspaceEnvironments.find((candidate) => candidate.workspaceId === workspaceId);
+  if (
+    !record
+    || record.state !== "rollback-pending"
+    || record.rollbackSafety !== "pre-host-confirmed"
+    || record.workspaceId !== workspaceId
+    || !state.workspaces.some((workspace) => workspace.id === workspaceId)
+    || binding?.kind !== "repository-worktree"
+    || binding.ownership !== "app"
+    || binding.creationId !== creationId
+    || binding.repositoryGroupId !== record.repositoryGroupId
+    || state.runtimeRecovery.some((candidate) => candidate.conversation.workspaceId === workspaceId)
+    || state.sessionCreationRecovery.some((candidate) => candidate.workspaceId === workspaceId)
+  ) throw new Error("Worktree rollback Workspace authority is not safe to retire.");
+  const rolledBack = advanceEnvironmentCreation(record, "rolled-back", updatedAt, {
+    workspaceId: undefined
+  });
+  const environmentMutations = state.environmentMutations.map((candidate) => (
+    candidate.creationId === creationId ? rolledBack : candidate
+  ));
+  return removeWorkspaceRegistrationState(state, workspaceId, environmentMutations);
+}
+
+function removeWorkspaceRegistrationState(
+  state: WorkbenchStateV5,
+  workspaceId: string,
+  environmentMutations: readonly EnvironmentMutationRecoveryRecord[]
+): WorkbenchStateV5 {
   const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
   const workspaceOrder = state.workspaceOrder.filter((id) => id !== workspaceId);
   const currentWorkspaceId = state.currentWorkspaceId === workspaceId
@@ -108,7 +296,7 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV4, workspaceId
   const selectedSurface = selectedRemoved
     ? (currentWorkspaceId ? { kind: "workspace" as const, workspaceId: currentWorkspaceId } : undefined)
     : state.selectedSurface;
-  const next: WorkbenchStateV4 = {
+  const next: WorkbenchStateV5 = {
     version: WORKBENCH_STATE_VERSION,
     workspaces,
     workspaceOrder,
@@ -119,6 +307,8 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV4, workspaceId
     sessionCreationRecovery: state.sessionCreationRecovery.filter((record) => (
       record.workspaceId !== workspaceId
     )),
+    workspaceEnvironments: state.workspaceEnvironments.filter((binding) => binding.workspaceId !== workspaceId),
+    environmentMutations: [...environmentMutations],
     settings,
     cleanExit: state.cleanExit
   };
@@ -126,22 +316,24 @@ export function removeWorkspaceRegistration(state: WorkbenchStateV4, workspaceId
 }
 
 export function reorderWorkspaceRegistrations(
-  state: WorkbenchStateV4,
+  state: WorkbenchStateV5,
   workspaceIds: readonly string[]
-): WorkbenchStateV4 {
+): WorkbenchStateV5 {
   const expected = new Set(state.workspaceOrder);
   const workspaceOrder = parseExactWorkbenchIdOrder(workspaceIds, expected, MAX_WORKSPACES);
   if (!workspaceOrder) throw new Error("Workspace order must be an exact permutation.");
   return { ...state, workspaceOrder };
 }
 
-export function replaceWorkbenchLayout(state: WorkbenchStateV4, value: unknown): WorkbenchStateV4 {
-  const layout = parseWorkbenchLayout(value, state.workspaces, state.workspaceOrder);
+export function replaceWorkbenchLayout(state: WorkbenchStateV5, value: unknown): WorkbenchStateV5 {
+  const layout = parseWorkbenchLayout(value, state);
   if (!layout) throw new Error("Workbench layout is invalid.");
-  const next: WorkbenchStateV4 = {
+  const next: WorkbenchStateV5 = {
     version: WORKBENCH_STATE_VERSION,
     workspaces: state.workspaces,
     workspaceOrder: state.workspaceOrder,
+    workspaceEnvironments: state.workspaceEnvironments,
+    environmentMutations: state.environmentMutations,
     ...layout,
     cleanExit: state.cleanExit
   };
@@ -150,18 +342,22 @@ export function replaceWorkbenchLayout(state: WorkbenchStateV4, value: unknown):
 
 function parseWorkbenchLayout(
   value: unknown,
-  workspaces: readonly WorkspaceDescriptor[],
-  workspaceOrder: readonly string[]
-): WorkbenchLayoutV4 | undefined {
+  state: Pick<
+    WorkbenchStateV5,
+    "workspaces" | "workspaceOrder" | "workspaceEnvironments" | "environmentMutations"
+  >
+): WorkbenchLayoutV5 | undefined {
   if (!isWorkbenchLayoutRecord(value)) return undefined;
   const candidate = {
     version: WORKBENCH_STATE_VERSION,
-    workspaces,
-    workspaceOrder,
+    workspaces: state.workspaces,
+    workspaceOrder: state.workspaceOrder,
+    workspaceEnvironments: state.workspaceEnvironments,
+    environmentMutations: state.environmentMutations,
     ...value,
     cleanExit: false
   };
-  const parsed = parseWorkbenchStateV4(candidate);
+  const parsed = parseWorkbenchStateV5(candidate);
   if (!parsed) return undefined;
   return {
     expandedWorkspaceIds: parsed.expandedWorkspaceIds,

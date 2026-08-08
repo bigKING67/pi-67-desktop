@@ -134,6 +134,7 @@ describe("workspace change protocol schemas", () => {
     const editChange = {
       kind: "edit" as const,
       toolCallId: "edit-1",
+      turnId: "user-turn-1",
       path: "src/index.ts",
       pathTruncated: false,
       status: "completed" as const,
@@ -164,6 +165,10 @@ describe("workspace change protocol schemas", () => {
 
     expect(isEventEnvelope(edit)).toBe(true);
     expect(isEventEnvelope(write)).toBe(true);
+    expect(isEventEnvelope({
+      ...edit,
+      payload: { ...edit.payload, change: { ...edit.payload.change, turnId: "" } }
+    })).toBe(false);
     expect(isEventEnvelope({
       ...edit,
       payload: { ...edit.payload, change: { ...edit.payload.change, metricsTruncated: false } }

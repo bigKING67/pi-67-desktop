@@ -5,11 +5,19 @@ import type {
   TaskId,
   TaskLifecycle,
   TaskToolMode,
-  WorkbenchStateV4,
+  WorkbenchStateV5,
   WorkbenchSurface,
   WorkspaceDescriptor,
   WorkspaceId
 } from "@pi67/domain";
+import type { WorktreeCreationProgressState } from "@pi67/protocol";
+
+export type RendererTaskEnvironmentIntent = "local" | "worktree";
+type RendererTaskEnvironmentCreationState =
+  | "creating"
+  | WorktreeCreationProgressState
+  | "failed"
+  | "recovery-required";
 
 export interface RendererWorkbenchTask {
   id: TaskId;
@@ -32,6 +40,10 @@ export interface RendererWorkbenchTask {
   operationId?: string | undefined;
   creationId?: string | undefined;
   creationStatus?: "pending" | "confirming" | "unconfirmed" | undefined;
+  environmentIntent?: RendererTaskEnvironmentIntent | undefined;
+  environmentCreationId?: string | undefined;
+  environmentSourceWorkspaceId?: WorkspaceId | undefined;
+  environmentCreationState?: RendererTaskEnvironmentCreationState | undefined;
   sessionMetadataStatus?: "indexing" | undefined;
   recoveryHostInstanceId?: string | undefined;
   recoveryHostEpoch?: number | undefined;
@@ -52,7 +64,7 @@ export interface RendererWorkbenchState {
   settingsSection: SettingsSection;
   settingsScope: "global" | "project";
   settingsWorkspaceId: WorkspaceId | undefined;
-  hydrate: (state: WorkbenchStateV4) => void;
+  hydrate: (state: WorkbenchStateV5) => void;
   registerWorkspace: (workspace: WorkspaceDescriptor) => void;
   unregisterWorkspace: (workspaceId: WorkspaceId) => boolean;
   reorderWorkspaces: (workspaceIds: WorkspaceId[]) => boolean;
@@ -61,6 +73,10 @@ export interface RendererWorkbenchState {
   toggleWorkspaceExpanded: (workspaceId: WorkspaceId) => boolean;
   openTask: (task: RendererWorkbenchTask) => TaskOpenResult;
   restoreTask: (task: RendererWorkbenchTask) => TaskId | undefined;
+  transferProvisionalTaskToWorkspace: (
+    taskId: TaskId,
+    workspace: WorkspaceDescriptor
+  ) => boolean;
   updateTask: (taskId: TaskId, patch: Partial<RendererWorkbenchTask>) => boolean;
   selectTask: (taskId: TaskId) => boolean;
   selectConversation: (conversation: ConversationKey) => boolean;

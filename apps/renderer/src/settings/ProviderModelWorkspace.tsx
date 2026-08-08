@@ -15,12 +15,13 @@ import {
   SettingsCatalogRow
 } from "./SettingsPrimitives.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
+import { modelCapabilityView } from "./provider-model-capabilities.js";
 import panelStyles from "./ProviderConfigurationPanel.module.css";
 import modelStyles from "./ProviderModelWorkspace.module.css";
 
 const styles = { ...panelStyles, ...modelStyles };
 
-type ModelFilter = "all" | "image" | "reasoning" | "custom";
+type ModelFilter = "all" | "image" | "reasoning" | "native-search" | "custom";
 
 interface ModelRow {
   index: number;
@@ -32,6 +33,7 @@ const MODEL_FILTERS: Array<{ id: ModelFilter; label: string }> = [
   { id: "all", label: "全部" },
   { id: "image", label: "支持图片" },
   { id: "reasoning", label: "支持推理" },
+  { id: "native-search", label: "原生搜索" },
   { id: "custom", label: "自定义覆盖" }
 ];
 
@@ -89,8 +91,8 @@ export function ProviderModelWorkspace({
   const normalizedQuery = normalizeSearch(query);
   const filteredRows = useMemo(() => rows.filter((row) => (
     matchesModelQuery(row.model, normalizedQuery)
-    && matchesModelFilter(row, filter)
-  )), [filter, normalizedQuery, rows]);
+    && matchesModelFilter(row, filter, selectedView?.id ?? draft.id, draft.api)
+  )), [draft.api, draft.id, filter, normalizedQuery, rows, selectedView?.id]);
   const activeRow = filteredRows.find((row) => row.index === preferredModelIndex) ?? filteredRows[0];
   const providerId = selectedView?.id ?? draft.id;
 
@@ -194,10 +196,18 @@ export function ProviderModelWorkspace({
             {filteredRows.map((row) => {
               const isDefault = isDefaultModel(defaults, providerId, row.model.id);
               const isSelected = row.index === activeRow?.index;
+              const capability = modelCapabilityView(
+                providerId,
+                row.model,
+                row.existingView,
+                draft.api
+              );
               const capabilities = [
                 isDefault ? "默认" : undefined,
-                row.model.input?.includes("image") ? "图片" : undefined,
-                row.model.reasoning ? "推理" : undefined,
+                `协议 ${capability.protocol}`,
+                capability.image ? "图片" : "仅文本",
+                capability.reasoning ? "推理" : "无推理",
+                capability.search === "native-declared" ? "原生搜索 · 已声明" : "搜索 · Exa 回退",
                 hasCustomOverrides(row) ? "覆盖" : undefined
               ].filter((item): item is string => item !== undefined);
               return (
@@ -375,9 +385,18 @@ function matchesModelQuery(model: PiModelConfigurationInput, normalizedQuery: st
     || normalizeSearch(model.id).includes(normalizedQuery);
 }
 
-function matchesModelFilter(row: ModelRow, filter: ModelFilter): boolean {
+function matchesModelFilter(
+  row: ModelRow,
+  filter: ModelFilter,
+  providerId: string,
+  providerApi: string | undefined
+): boolean {
   if (filter === "image") return row.model.input?.includes("image") ?? false;
   if (filter === "reasoning") return row.model.reasoning ?? false;
+  if (filter === "native-search") {
+    return modelCapabilityView(providerId, row.model, row.existingView, providerApi).search
+      === "native-declared";
+  }
   if (filter === "custom") return hasCustomOverrides(row);
   return true;
 }

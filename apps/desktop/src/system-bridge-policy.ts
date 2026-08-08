@@ -50,6 +50,21 @@ export function asExternalUrl(value: unknown): URL | undefined {
   }
 }
 
+export function assertWorkspaceId(value: unknown): string {
+  if (
+    typeof value !== "string"
+    || value.length === 0
+    || value.length > 200
+    || !WORKSPACE_ID_PATTERN.test(value)
+  ) throw new Error("Workspace id is invalid.");
+  return value;
+}
+
+export function assertWorkspaceIds(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 100) throw new Error("Workspace order is invalid.");
+  return value.map(assertWorkspaceId);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

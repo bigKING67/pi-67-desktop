@@ -1,5 +1,13 @@
 import { Type, type TProperties } from "./typebox-schema.js";
 import {
+  MAX_MESSAGE_SEARCH_QUERY_CHARS,
+  MAX_MESSAGE_SEARCH_RESULTS,
+  MAX_MESSAGE_SEARCH_SNIPPET_CHARS,
+  MAX_PLAN_MARKDOWN_CHARS,
+  MAX_SESSION_CATALOG_NAME_CHARS,
+  MAX_SESSION_CATALOG_PATH_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS,
+  MAX_WORKSPACE_MESSAGE_SEARCH_RESULTS,
   MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
   MAX_USER_MESSAGE_PREVIEW_CHARS,
   MAX_PROJECTED_MESSAGE_PARTS,
@@ -50,11 +58,27 @@ const AttachmentPartSchema = messageObject({
     Type.Literal("file")
   ])
 });
+const PlanProposalPartSchema = messageObject({
+  type: Type.Literal("plan-proposal"),
+  plan: messageObject({
+    entryId: Type.String({ minLength: 1, maxLength: 512 }),
+    planId: Type.String({ minLength: 1, maxLength: 128 }),
+    sourceOperationId: Type.String({ minLength: 1, maxLength: 512 }),
+    markdown: Type.String({ minLength: 1, maxLength: MAX_PLAN_MARKDOWN_CHARS }),
+    createdAt: Type.Integer({ minimum: 0 }),
+    status: Type.Union([
+      Type.Literal("proposed"),
+      Type.Literal("implemented"),
+      Type.Literal("dismissed")
+    ])
+  })
+});
 const MessagePartSchema = Type.Union([
   TextPartSchema,
   ToolCallPartSchema,
   ImagePartSchema,
-  AttachmentPartSchema
+  AttachmentPartSchema,
+  PlanProposalPartSchema
 ]);
 
 export const SessionMessageSchema = messageObject({
@@ -99,6 +123,43 @@ export const UserMessageIndexPageSchema = messageObject({
   total: Type.Integer({ minimum: 0 }),
   offset: Type.Integer({ minimum: 0 }),
   items: Type.Array(UserMessageIndexItemSchema, { maxItems: MAX_USER_MESSAGE_INDEX_PAGE_ITEMS })
+});
+
+const MessageSearchItemSchema = messageObject({
+  id: Type.String({ minLength: 1, maxLength: 512 }),
+  role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
+  snippet: Type.String({ maxLength: MAX_MESSAGE_SEARCH_SNIPPET_CHARS }),
+  createdAt: Type.Optional(Type.Number())
+});
+
+export const MessageSearchResultSchema = messageObject({
+  sessionId: Type.String({ minLength: 1, maxLength: 512 }),
+  revision: Type.Integer({ minimum: 1 }),
+  query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS }),
+  total: Type.Integer({ minimum: 0 }),
+  items: Type.Array(MessageSearchItemSchema, { maxItems: MAX_MESSAGE_SEARCH_RESULTS }),
+  truncated: Type.Boolean()
+});
+
+const WorkspaceMessageSearchItemSchema = messageObject({
+  sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
+  sessionPath: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_PATH_CHARS }),
+  sessionName: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_NAME_CHARS }),
+  messageId: Type.String({ minLength: 1, maxLength: 512 }),
+  role: Type.Union([Type.Literal("user"), Type.Literal("assistant")]),
+  snippet: Type.String({ maxLength: MAX_MESSAGE_SEARCH_SNIPPET_CHARS }),
+  createdAt: Type.Optional(Type.Number())
+});
+
+export const WorkspaceMessageSearchResultSchema = messageObject({
+  workspaceId: Type.String({ minLength: 1, maxLength: 512 }),
+  query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS }),
+  items: Type.Array(WorkspaceMessageSearchItemSchema, { maxItems: MAX_WORKSPACE_MESSAGE_SEARCH_RESULTS }),
+  sessionsVisited: Type.Integer({ minimum: 0 }),
+  entriesVisited: Type.Integer({ minimum: 0 }),
+  skippedCount: Type.Integer({ minimum: 0 }),
+  incomplete: Type.Boolean(),
+  truncated: Type.Boolean()
 });
 
 export const LocatedMessageWindowSchema = messageObject({

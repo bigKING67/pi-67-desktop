@@ -229,9 +229,9 @@ export function installMockInspectorCommandHandler(): void {
   ): Record<string, unknown> {
     const anchorId = String(payload.id);
     const anchorIndex = current.conversationMessages.findIndex((message) => (
-      message.id === anchorId && message.role === "user"
+      message.id === anchorId && (message.role === "user" || message.role === "assistant")
     ));
-    if (anchorIndex < 0) throw new Error("Mock user message does not exist.");
+    if (anchorIndex < 0) throw new Error("Mock conversation message does not exist.");
     const start = Math.max(0, anchorIndex - 20);
     const end = Math.min(current.conversationMessages.length, anchorIndex + 80);
     const messages = current.conversationMessages.slice(start, end);

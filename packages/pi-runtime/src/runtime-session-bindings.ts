@@ -22,12 +22,17 @@ import type {
 import { createDesktopSessionServices } from "./session-services.js";
 import type { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import type { RuntimeInitializationObserver } from "./agent-runtime.js";
+import { runRuntimeInitializationStage } from "./runtime-initialization-observer.js";
 import {
   createDesktopToolAliasBinding,
   type DesktopToolAliasBinding
 } from "./tool-routing-extension.js";
 import type { PromptAttachmentAccess } from "./prompt-attachment.js";
 import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
+import { createFirstPartyWebTools } from "./first-party-web-tools.js";
+import { PlanModeController } from "./plan-mode-controller.js";
+import type { SessionInteractionMode, SessionInteractionState } from "@pi67/domain";
 
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
@@ -56,8 +61,11 @@ export class RuntimeSessionBindings {
   private transition: Promise<unknown> | undefined;
   private generation = 0;
   private activeSessionFileIdentity: string | undefined;
+  private readonly planMode: PlanModeController;
 
-  constructor(private readonly options: RuntimeSessionBindingsOptions) {}
+  constructor(private readonly options: RuntimeSessionBindingsOptions) {
+    this.planMode = new PlanModeController(options.emit);
+  }
 
   get runtime(): AgentSessionRuntime | undefined { return this.activeRuntime; }
   get session(): AgentSession | undefined { return this.activeRuntime?.session; }
@@ -66,6 +74,11 @@ export class RuntimeSessionBindings {
   get extensions(): LoadExtensionsResult | undefined { return this.activeExtensions; }
   get sessionGeneration(): number { return this.generation; }
   get sessionFileIdentity(): string | undefined { return this.activeSessionFileIdentity; }
+  get interactionMode(): SessionInteractionMode { return this.planMode.interactionMode; }
+  get interactionState(): SessionInteractionState { return this.planMode.snapshot(); }
+
+  setInteractionMode(mode: SessionInteractionMode): void { this.planMode.setInteractionMode(mode); }
+  implementPlan(planId: string): Promise<void> { return this.planMode.implementPlan(planId); }
 
   refreshExtensions(): LoadExtensionsResult | undefined {
     this.activeExtensions = this.activeServices?.resourceLoader.getExtensions();
@@ -73,18 +86,27 @@ export class RuntimeSessionBindings {
     return this.activeExtensions;
   }
 
-  async createInitial(cwd: string, sessionManager?: SessionManager): Promise<void> {
-    const services = await this.createServices(cwd);
+  async createInitial(
+    cwd: string,
+    sessionManager?: SessionManager,
+    observeStage?: RuntimeInitializationObserver
+  ): Promise<void> {
+    const services = await this.createServices(cwd, observeStage);
     const toolAliases = createDesktopToolAliasBinding();
+    const customTools = [
+      ...createFirstPartyWebTools(),
+      ...this.planMode.createTools(),
+      ...toolAliases.tools
+    ];
     const result = sessionManager
-      ? await createAgentSessionFromServices({ services, sessionManager, customTools: toolAliases.tools })
+      ? await createAgentSessionFromServices({ services, sessionManager, customTools })
       : await createAgentSession({
         cwd,
         agentDir: this.options.getAgentDir(),
         modelRuntime: services.modelRuntime,
         settingsManager: services.settingsManager,
         resourceLoader: services.resourceLoader,
-        customTools: toolAliases.tools
+        customTools
       });
     toolAliases.bind(result.session);
     this.activeToolAliases = toolAliases;
@@ -111,6 +133,7 @@ export class RuntimeSessionBindings {
     if (!runtime) {
       this.options.externalChangeGuard.detach();
       this.options.projections.reset();
+      this.planMode.unbind();
       return;
     }
     if (runtime.session.isStreaming) await runtime.session.abort();
@@ -154,10 +177,15 @@ export class RuntimeSessionBindings {
     return async ({ cwd, sessionManager, sessionStartEvent }) => {
       const services = await this.createServices(cwd);
       const toolAliases = createDesktopToolAliasBinding();
+      const customTools = [
+        ...createFirstPartyWebTools(),
+        ...this.planMode.createTools(),
+        ...toolAliases.tools
+      ];
       const result = await createAgentSessionFromServices({
         services,
         sessionManager,
-        customTools: toolAliases.tools,
+        customTools,
         ...(sessionStartEvent ? { sessionStartEvent } : {})
       });
       toolAliases.bind(result.session);
@@ -166,11 +194,21 @@ export class RuntimeSessionBindings {
     };
   }
 
-  private async createServices(cwd: string): Promise<AgentSessionServices> {
+  private async createServices(
+    cwd: string,
+    observeStage?: RuntimeInitializationObserver
+  ): Promise<AgentSessionServices> {
     const workspaceServices = this.options.getWorkspaceServices();
     const promptAttachmentAccess = this.options.getPromptAttachmentAccess();
     workspaceServices?.assertCompatible(cwd, this.options.getAgentDir());
-    const modelRuntime = await workspaceServices?.configurationService?.createModelRuntime();
+    const configurationService = workspaceServices?.configurationService;
+    const modelRuntime = configurationService
+      ? await runRuntimeInitializationStage(
+          observeStage,
+          "load-model-runtime",
+          () => configurationService.createModelRuntime()
+        )
+      : undefined;
     return createDesktopSessionServices({
       cwd,
       agentDir: this.options.getAgentDir(),
@@ -185,6 +223,7 @@ export class RuntimeSessionBindings {
       getSafety: this.options.getSafety,
       requestApproval: this.options.requestApproval,
       recordToolAuthorization: this.options.recordToolAuthorization,
+      getInteractionMode: () => this.planMode.interactionMode,
       ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess })
     });
   }
@@ -206,6 +245,7 @@ export class RuntimeSessionBindings {
       // Subscribe before the first await so async session_start mutations cannot
       // land between the initial projection snapshot and event observation.
       await this.options.projections.bind(session, this.activeExtensions);
+      this.planMode.bind(session);
       await this.options.rebindExtensionUi(session);
       this.options.emit({ type: "extension.catalog.changed", payload: this.options.projections.getCatalog() });
       await this.options.externalChangeGuard.bind(session, this.generation, this.options.emit);
@@ -216,6 +256,7 @@ export class RuntimeSessionBindings {
       }
       this.options.externalChangeGuard.detach();
       this.options.projections.reset();
+      this.planMode.unbind();
       this.activeSessionFileIdentity = undefined;
       throw error;
     }
@@ -258,6 +299,7 @@ export class RuntimeSessionBindings {
     this.sessionUnsubscribe = undefined;
     this.options.projections.reset();
     this.options.cancelInteractiveRequests("session-transition");
+    this.planMode.unbind();
   }
 }
 

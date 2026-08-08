@@ -15,6 +15,8 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "conversation.changed": { session: true, operation: false },
   "queue.changed": { session: true, operation: false },
   "session.metaChanged": { session: true, operation: false },
+  "session.interactionModeChanged": { session: true, operation: false },
+  "plan.proposed": { session: true, operation: false },
   "model.catalog.changed": { session: true, operation: false },
   "tree.changed": { session: true, operation: false },
   "usage.changed": { session: true, operation: false },

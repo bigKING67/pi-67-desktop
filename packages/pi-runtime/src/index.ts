@@ -1,4 +1,6 @@
 export * from "./agent-runtime.js";
+export * from "./first-party-model-providers.js";
+export * from "./first-party-web-tools.js";
 export * from "./conversation-organization-store.js";
 export * from "./context-file-management.js";
 export * from "./desktop-package-toolchain.js";
@@ -24,6 +26,7 @@ export * from "./runtime-session-catalog.js";
 export * from "./safe-atomic-io.js";
 export * from "./safety-extension.js";
 export * from "./session-catalog.js";
+export * from "./session-content-search.js";
 export * from "./session-creation-receipt-store.js";
 export * from "./session-projection-index.js";
 export * from "./session-tree-projection.js";

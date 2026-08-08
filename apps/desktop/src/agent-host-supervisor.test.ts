@@ -119,6 +119,61 @@ describe("AgentHostSupervisor", () => {
     ).hostEpoch)).toEqual([1, 2]);
   });
 
+  it("exposes a bounded Main-owned lifecycle snapshot without Host identity", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const firstHost = fakeUtilityProcess();
+    const secondHost = fakeUtilityProcess();
+    const window = fakeWindow("app://pi67/index.html");
+    electronMocks.fork
+      .mockReturnValueOnce(firstHost as unknown as UtilityProcess)
+      .mockReturnValueOnce(secondHost as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value);
+
+    expect(supervisor.diagnostics()).toEqual({
+      phase: "idle",
+      portHandoffCount: 0,
+      poisonedRuntimeReplacementPending: false
+    });
+
+    supervisor.connect();
+    expect(supervisor.diagnostics()).toMatchObject({ phase: "starting", hostEpoch: 1 });
+
+    firstHost.emit("spawn");
+    expect(supervisor.diagnostics()).toEqual({
+      phase: "running",
+      hostEpoch: 1,
+      processStartedAt: 10_000,
+      portHandoffCount: 1,
+      lastPortHandoffAt: 10_000,
+      poisonedRuntimeReplacementPending: false
+    });
+
+    vi.setSystemTime(11_000);
+    firstHost.emit("exit", 17);
+    expect(supervisor.diagnostics()).toEqual({
+      phase: "restart-scheduled",
+      lastExit: {
+        at: 11_000,
+        code: 17,
+        recoverable: true,
+        attempt: 1
+      },
+      restartScheduledAt: 11_500,
+      portHandoffCount: 1,
+      lastPortHandoffAt: 10_000,
+      poisonedRuntimeReplacementPending: false
+    });
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(supervisor.diagnostics()).toMatchObject({
+      phase: "starting",
+      hostEpoch: 2,
+      portHandoffCount: 1
+    });
+    expect(JSON.stringify(supervisor.diagnostics())).not.toContain("hostInstanceId");
+  });
+
   it("does not transfer a renewed Port to an unexpected renderer location", () => {
     const host = fakeUtilityProcess();
     const window = fakeWindow("https://example.invalid/");

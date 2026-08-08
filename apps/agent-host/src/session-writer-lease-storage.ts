@@ -136,15 +136,18 @@ export class SessionWriterLeaseStorage {
       onCompromised: compromise
     } as const;
     let releaseLock: (() => Promise<void>) | undefined;
+    let releaseReclaimClaim: (() => Promise<void>) | undefined;
     try {
       releaseLock = await lockfile.lock(metadataPath, lockOptions);
     } catch (error) {
       if (nodeErrorCode(error) !== "ELOCKED") throw error;
-      const reclaimed = await this.reclaimDeadOwner(metadataPath, identityHash);
-      if (!reclaimed) throw new SessionWriterLeaseHeldError();
+      releaseReclaimClaim = await this.claimDeadOwnerReclamation(metadataPath, identityHash);
+      if (!releaseReclaimClaim) throw new SessionWriterLeaseHeldError();
       try {
         releaseLock = await lockfile.lock(metadataPath, lockOptions);
       } catch (retryError) {
+        await releaseReclaimClaim();
+        releaseReclaimClaim = undefined;
         if (nodeErrorCode(retryError) === "ELOCKED") throw new SessionWriterLeaseHeldError();
         throw retryError;
       }
@@ -152,8 +155,12 @@ export class SessionWriterLeaseStorage {
 
     try {
       await writePrivateMetadata(metadataPath, metadata(acquiredAt));
+      await releaseReclaimClaim?.();
+      releaseReclaimClaim = undefined;
     } catch (error) {
+      await unlink(metadataPath).catch(() => undefined);
       await releaseLock().catch(() => undefined);
+      await releaseReclaimClaim?.().catch(() => undefined);
       throw error;
     }
 
@@ -182,19 +189,32 @@ export class SessionWriterLeaseStorage {
     };
   }
 
-  private async reclaimDeadOwner(metadataPath: string, identityHash: string): Promise<boolean> {
-    const metadata = await readPrivateMetadata(metadataPath, identityHash);
-    if (!metadata || this.isProcessAlive(metadata.processId)) return false;
+  private async claimDeadOwnerReclamation(
+    metadataPath: string,
+    identityHash: string
+  ): Promise<(() => Promise<void>) | undefined> {
+    const claimPath = `${metadataPath}.reclaim`;
     try {
-      await unlink(metadataPath);
+      await mkdir(claimPath, { mode: PRIVATE_DIRECTORY_MODE });
     } catch (error) {
-      if (nodeErrorCode(error) === "ENOENT") return false;
+      if (nodeErrorCode(error) === "EEXIST") return undefined;
       throw error;
     }
-    await rmdir(`${metadataPath}.lock`).catch((error: unknown) => {
-      if (nodeErrorCode(error) !== "ENOENT") throw error;
-    });
-    return true;
+    let claimed = false;
+    try {
+      const metadata = await readPrivateMetadata(metadataPath, identityHash);
+      if (!metadata || this.isProcessAlive(metadata.processId)) return undefined;
+      try {
+        await rmdir(`${metadataPath}.lock`);
+      } catch (error) {
+        if (nodeErrorCode(error) === "ENOENT") return undefined;
+        throw error;
+      }
+      claimed = true;
+      return () => removeReclaimClaim(claimPath);
+    } finally {
+      if (!claimed) await removeReclaimClaim(claimPath);
+    }
   }
 }
 
@@ -273,4 +293,10 @@ function nodeErrorCode(error: unknown): string {
   return error instanceof Error && "code" in error && typeof error.code === "string"
     ? error.code
     : "UNKNOWN";
+}
+
+async function removeReclaimClaim(path: string): Promise<void> {
+  await rmdir(path).catch((error: unknown) => {
+    if (nodeErrorCode(error) !== "ENOENT") throw error;
+  });
 }

@@ -1,4 +1,9 @@
-import type { ExtensionPackageEntry, PackageResourceType } from "@pi67/domain";
+import {
+  nativeCapabilityReplacement,
+  nativeCapabilityReplacementLabel,
+  type ExtensionPackageEntry,
+  type PackageResourceType
+} from "@pi67/domain";
 import {
   ArrowLeft,
   Box,
@@ -109,7 +114,10 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
   }
   const resourceTypes = packageResourceTypes(row.entry);
   const state = packageRowState(row);
-  const status = state === "enabled"
+  const replacement = nativeCapabilityReplacement(row.entry.source);
+  const status = state === "native-replaced"
+    ? "原生能力替代"
+    : state === "enabled"
     ? "已启用"
     : state === "partial"
       ? "部分启用"
@@ -118,7 +126,9 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
         : state === "changed-pending-confirmation"
           ? "内容已变更，待重新确认"
           : state === "not-installed" ? "未安装" : "已停用";
-  const statusTone = state === "enabled"
+  const statusTone = state === "native-replaced"
+    ? "ready"
+    : state === "enabled"
     ? "ready"
     : state === "partial"
       ? "warning"
@@ -150,6 +160,9 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
           row.entry.description
         )}
       </p>
+      {replacement ? (
+        <p className={styles.detailDescription}><strong>{nativeCapabilityReplacementLabel(replacement)}</strong>。现有用户配置保持不变，但 Desktop Task 不再加载该扩展。</p>
+      ) : null}
       <CapabilitySummary resourceTypes={resourceTypes} />
       <dl className={styles.facts}>
         <Fact label="来源" value={row.entry.source} code />
@@ -180,7 +193,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
               <Button
                 aria-label={`${resourceEnabled ? "停用" : "启用"} ${resourceTypeLabel(resourceType)} ${row.entry.source}`}
                 className={resourceEnabled ? "secondary-button" : "primary-button"}
-                isDisabled={!packageContentAdmitted(row.entry)}
+                isDisabled={replacement !== undefined || !packageContentAdmitted(row.entry)}
                 onPress={() => onToggle(row.entry, row.inherited, resourceType)}
               >{resourceEnabled ? "停用" : "启用"}</Button>
             </div>
@@ -237,6 +250,9 @@ function PackageRowMeta({ row }: { row: PackageRow }) {
 
 function PackageState({ row }: { row: PackageRow }) {
   const state = packageRowState(row);
+  if (state === "native-replaced") {
+    return <span className={styles.state} data-state="enabled"><CheckCircle2 aria-hidden="true" size={15} /><span>原生替代</span></span>;
+  }
   if (state === "enabled") {
     return <span className={styles.state} data-state="enabled"><CheckCircle2 aria-hidden="true" size={15} /><span>已启用</span></span>;
   }

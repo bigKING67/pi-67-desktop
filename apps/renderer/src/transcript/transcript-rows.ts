@@ -1,6 +1,7 @@
 import type {
   ImagePart,
   OperationView,
+  PlanProposalTimelineView,
   SessionMessageView,
   ToolCallPart
 } from "@pi67/domain";
@@ -33,6 +34,7 @@ export type TranscriptProcessItem =
 
 export type TranscriptRow =
   | { kind: "message"; key: string; message: SessionMessageView }
+  | { kind: "plan-proposal"; key: string; plan: PlanProposalTimelineView }
   | {
     kind: "process-group";
     key: string;
@@ -65,6 +67,12 @@ export function projectTranscriptRows(messages: readonly SessionMessageView[]): 
   };
 
   for (const message of messages) {
+    const plan = message.parts.find((part) => part.type === "plan-proposal")?.plan;
+    if (plan) {
+      flushProcess();
+      rows.push({ kind: "plan-proposal", key: plan.entryId, plan });
+      continue;
+    }
     for (const segment of splitAssistantResult(message)) {
       if (isProcessMessage(segment)) {
         processMessages.push(segment);

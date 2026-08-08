@@ -21,7 +21,8 @@ const requiredPaths = [
   "docs/architecture/processes-and-protocol.md",
   "docs/compatibility/pi-sdk.md",
   "docs/provenance/external-references.md",
-  "docs/provenance/peak-code-reference.md",
+  "docs/provenance/pi-gui-reference.md",
+  "docs/provenance/t3code-reference.md",
   "licenses/provenance.json",
   "docs/release/signing.md",
   "docs/testing/performance.md"

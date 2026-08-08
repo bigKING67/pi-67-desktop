@@ -9,6 +9,8 @@ import {
   type ComposerSlashCatalog,
   type ComposerSlashItem
 } from "./composer-slash-commands.js";
+import { composerFileMentionOptionId } from "./composer-file-mentions.js";
+import type { WorkspaceFileEntry } from "@pi67/domain";
 
 export function ComposerTextarea({
   inputRef,
@@ -19,11 +21,18 @@ export function ComposerTextarea({
   slashCommands,
   slashActiveIndex,
   slashCatalog,
+  filePickerOpen,
+  fileEntries,
+  fileActiveIndex,
   onTextChange,
   onAddAttachments,
   onSlashActiveIndexChange,
   onSlashComplete,
   onSlashDismiss,
+  onFileActiveIndexChange,
+  onFileComplete,
+  onFileDismiss,
+  onCursorChange,
   onSubmit
 }: {
   inputRef: RefObject<HTMLTextAreaElement | null>;
@@ -34,14 +43,22 @@ export function ComposerTextarea({
   slashCommands: readonly ComposerSlashItem[];
   slashActiveIndex: number;
   slashCatalog: ComposerSlashCatalog;
-  onTextChange: (text: string) => void;
+  filePickerOpen: boolean;
+  fileEntries: readonly WorkspaceFileEntry[];
+  fileActiveIndex: number;
+  onTextChange: (text: string, cursor: number) => void;
   onAddAttachments: (files: Iterable<File>) => void;
   onSlashActiveIndexChange: (index: number) => void;
   onSlashComplete: (command: ComposerSlashItem) => void;
   onSlashDismiss: () => void;
+  onFileActiveIndexChange: (index: number) => void;
+  onFileComplete: (entry: WorkspaceFileEntry) => void;
+  onFileDismiss: () => void;
+  onCursorChange: (cursor: number) => void;
   onSubmit: () => void;
 }) {
   const activeCommand = slashCommands[Math.min(slashActiveIndex, slashCommands.length - 1)];
+  const activeFile = fileEntries[Math.min(fileActiveIndex, fileEntries.length - 1)];
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = filesFromTransfer(event.clipboardData);
     if (files.length === 0) return;
@@ -49,6 +66,32 @@ export function ComposerTextarea({
     onAddAttachments(files);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (filePickerOpen && !isImeConfirmationKey(event.nativeEvent)) {
+      if (event.key === "ArrowDown" && fileEntries.length > 0) {
+        event.preventDefault();
+        onFileActiveIndexChange((fileActiveIndex + 1) % fileEntries.length);
+        return;
+      }
+      if (event.key === "ArrowUp" && fileEntries.length > 0) {
+        event.preventDefault();
+        onFileActiveIndexChange((fileActiveIndex - 1 + fileEntries.length) % fileEntries.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && activeFile) {
+        event.preventDefault();
+        onFileComplete(activeFile);
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onFileDismiss();
+        return;
+      }
+    }
     if (slashPickerOpen && !isImeConfirmationKey(event.nativeEvent)) {
       if (event.key === "ArrowDown" && slashCommands.length > 0) {
         event.preventDefault();
@@ -90,20 +133,25 @@ export function ComposerTextarea({
   return (
     <textarea
       ref={inputRef}
-      aria-activedescendant={slashPickerOpen && activeCommand
-        ? slashCommandOptionId(Math.min(slashActiveIndex, slashCommands.length - 1))
-        : undefined}
+      aria-activedescendant={filePickerOpen && activeFile
+        ? composerFileMentionOptionId(Math.min(fileActiveIndex, fileEntries.length - 1))
+        : slashPickerOpen && activeCommand
+          ? slashCommandOptionId(Math.min(slashActiveIndex, slashCommands.length - 1))
+          : undefined}
       aria-autocomplete="list"
-      aria-controls={slashPickerOpen ? "composer-slash-command-list" : undefined}
-      aria-expanded={slashPickerOpen}
+      aria-controls={filePickerOpen
+        ? "composer-file-mention-list"
+        : slashPickerOpen ? "composer-slash-command-list" : undefined}
+      aria-expanded={filePickerOpen || slashPickerOpen}
       aria-label={messages.composer.inputLabel}
       disabled={disabled}
       value={text}
       placeholder={streaming
         ? messages.composer.streamingPlaceholder
         : messages.composer.idlePlaceholder}
-      onChange={(event) => onTextChange(event.target.value)}
+      onChange={(event) => onTextChange(event.target.value, event.target.selectionStart)}
       onKeyDown={onKeyDown}
+      onSelect={(event) => onCursorChange(event.currentTarget.selectionStart)}
       onPaste={onPaste}
     />
   );

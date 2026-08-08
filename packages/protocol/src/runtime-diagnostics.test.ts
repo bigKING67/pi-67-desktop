@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isRuntimeDiagnostics } from "./runtime-diagnostics.js";
+import {
+  isRuntimeDiagnostics,
+  isSupportDiagnosticsExportRequest
+} from "./runtime-diagnostics.js";
 
 const diagnostics = {
   generatedAt: 1,
@@ -42,6 +45,36 @@ describe("runtime diagnostics boundary", () => {
     expect(isRuntimeDiagnostics({
       ...diagnostics,
       extensionErrors: [{ sourceHash: "b".repeat(64), errorClass: "contains spaces" }]
+    })).toBe(false);
+  });
+
+  it("accepts only correlated available or unavailable export requests", () => {
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: { status: "available" },
+      runtime: diagnostics
+    })).toBe(true);
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "acknowledgement-timeout"
+      }
+    })).toBe(true);
+
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: { status: "available" }
+    })).toBe(false);
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "acknowledgement-timeout"
+      },
+      runtime: diagnostics
+    })).toBe(false);
+    expect(isSupportDiagnosticsExportRequest({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "raw-message-must-not-cross"
+      }
     })).toBe(false);
   });
 });

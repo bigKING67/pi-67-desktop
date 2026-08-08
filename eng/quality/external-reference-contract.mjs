@@ -34,23 +34,13 @@ const PROVENANCE_KEYS = new Set([
 ]);
 
 const ROLES = new Set([
-  "architecture-reference",
-  "contrast-reference",
-  "feature-reference",
-  "future-reference",
-  "lineage-reference",
-  "minimal-reference",
-  "product-reference",
-  "security-reference",
-  "specification",
-  "ux-reference"
+  "comprehensive-reference",
+  "specification"
 ]);
-const TIERS = new Set(["S0", "S1", "S2", "S3"]);
+const TIERS = new Set(["S0", "S1"]);
 const REVIEW_STATES = new Set(["candidate", "contract-managed", "reviewed"]);
-const REUSE_POLICIES = new Set(["architecture-only", "dependency", "reimplement-preferred"]);
+const REUSE_POLICIES = new Set(["dependency", "reimplement-preferred"]);
 const REVIEW_CADENCES = new Set([
-  "feature-triggered",
-  "monthly-and-feature",
   "pi-release-and-weekly",
   "weekly-and-feature"
 ]);
@@ -70,6 +60,7 @@ const IDENTIFIER = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const CANONICAL_GITHUB = /^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]+$/u;
 const SOURCE_REF = /^(?!refs\/)(?!.*\.\.)(?!.*[~^:?*\\])[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/u;
 const SPDX = /^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$/u;
+const REQUIRED_CATALOG_IDS = new Set(["pi", "pi-gui", "t3code"]);
 
 export function collectExternalReferenceIssues({
   catalog,
@@ -132,8 +123,20 @@ function validateCatalog(catalog, issues) {
     }
   }
 
+  validateCatalogIdentifierSet(repositories, issues);
   validatePiCatalogRecord(repositories.get("pi"), issues);
-  validatePeakCodeCatalogRecord(repositories.get("peakcode"), issues);
+  validateComprehensiveCatalogRecord(
+    "pi-gui",
+    repositories.get("pi-gui"),
+    "https://github.com/minghinmatthewlam/pi-gui",
+    issues
+  );
+  validateComprehensiveCatalogRecord(
+    "t3code",
+    repositories.get("t3code"),
+    "https://github.com/pingdotgg/t3code",
+    issues
+  );
   return repositories;
 }
 
@@ -267,8 +270,15 @@ function validateRepositoryEvidence(repositories, reviews, repositoryFiles, repo
       issues.push(`review lock ${id} notesPath does not contain reviewedCommit ${review.reviewedCommit}`);
     }
   }
-  if (!repositories.has("pi")) issues.push("catalog must register the Pi specification repository");
-  if (!repositories.has("peakcode")) issues.push("catalog must register the Peak Code lineage reference");
+}
+
+function validateCatalogIdentifierSet(repositories, issues) {
+  for (const id of REQUIRED_CATALOG_IDS) {
+    if (!repositories.has(id)) issues.push(`catalog must register required repository ${id}`);
+  }
+  for (const id of repositories.keys()) {
+    if (!REQUIRED_CATALOG_IDS.has(id)) issues.push(`catalog repository ${id} is not an allowed reference`);
+  }
 }
 
 function validatePiCatalogRecord(record, issues) {
@@ -286,13 +296,18 @@ function validatePiCatalogRecord(record, issues) {
   }
 }
 
-function validatePeakCodeCatalogRecord(record, issues) {
+function validateComprehensiveCatalogRecord(id, record, url, issues) {
   if (!record) return;
-  if (record.url !== "https://github.com/PeakCode-AI/PeakCode") {
-    issues.push("catalog repository peakcode must use the canonical PeakCode-AI/PeakCode URL");
-  }
-  if (record.role !== "lineage-reference" || record.defaultReuse !== "architecture-only") {
-    issues.push("catalog repository peakcode must remain an architecture-only lineage reference");
+  const expected = {
+    defaultReuse: "reimplement-preferred",
+    reviewCadence: "weekly-and-feature",
+    reviewState: "reviewed",
+    role: "comprehensive-reference",
+    tier: "S1",
+    url
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (record[key] !== value) issues.push(`catalog repository ${id} ${key} must equal ${value}`);
   }
 }
 

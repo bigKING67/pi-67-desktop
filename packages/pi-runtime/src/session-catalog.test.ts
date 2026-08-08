@@ -45,7 +45,6 @@ describe("Session Catalog orchestration", () => {
     expect(discover).toHaveBeenCalledTimes(1);
     await catalog.dispose();
   });
-
   it("recognizes stale cursors after an upsert and keeps duplicate ids on distinct paths", async () => {
     const catalog = createSessionCatalog();
     const context = makeContext("source", async () => discovery([
@@ -63,7 +62,6 @@ describe("Session Catalog orchestration", () => {
     expect(updated.items.filter((item) => item.id === "duplicate")).toHaveLength(2);
     await catalog.dispose();
   });
-
   it("binds cursors to scope, normalized search and workspace identity", async () => {
     const catalog = createSessionCatalog();
     const discover = async () => discovery([record(1), record(2), record(3)]);
@@ -107,7 +105,6 @@ describe("Session Catalog orchestration", () => {
     }, otherWorkspace)).rejects.toMatchObject({ code: "STALE_SESSION_CATALOG" });
     await catalog.dispose();
   });
-
   it("normalizes fallback search without treating percent, underscore or backslash as wildcards", async () => {
     const catalog = createSessionCatalog();
     const context = makeContext("source", async () => discovery([
@@ -124,7 +121,6 @@ describe("Session Catalog orchestration", () => {
     expect((await catalog.query({ scope: "all", search: "\\" }, context)).items[0]?.name).toBe("literal \\");
     await catalog.dispose();
   });
-
   it("falls back on an injected SQLite busy result without retrying discovery on warm queries", async () => {
     const openSqlite = vi.fn(async (): Promise<SqliteCatalogOpenResult> => ({
       kind: "fallback",
@@ -148,7 +144,6 @@ describe("Session Catalog orchestration", () => {
     expect(discover).toHaveBeenCalledTimes(1);
     await catalog.dispose();
   });
-
   it("uses the same bounded metadata fallback when SQLite cannot load", async () => {
     const openSqlite = vi.fn(async (): Promise<SqliteCatalogOpenResult> => ({
       kind: "fallback",
@@ -168,7 +163,6 @@ describe("Session Catalog orchestration", () => {
     expect((await catalog.query({ scope: "all", limit: 100 }, context)).items).toHaveLength(1);
     await catalog.dispose();
   });
-
   it("runs discovery single-flight and discards results from a replaced source", async () => {
     let releaseA!: (value: SessionCatalogDiscoveryResult) => void;
     const discoverA = vi.fn(() => new Promise<SessionCatalogDiscoveryResult>((resolve) => {
@@ -193,7 +187,6 @@ describe("Session Catalog orchestration", () => {
     expect(page.items.map((item) => item.path)).toEqual(["/source-b.jsonl"]);
     await catalog.dispose();
   });
-
   it("does not let an old source generation overwrite a newer A-B-A lifecycle", async () => {
     let releaseOldA!: (value: SessionCatalogDiscoveryResult) => void;
     let callsA = 0;
@@ -222,7 +215,6 @@ describe("Session Catalog orchestration", () => {
     expect(revisions.every((revision, index) => index === 0 || revision > revisions[index - 1]!)).toBe(true);
     await catalog.dispose();
   });
-
   it("opens SQLite only once for concurrent callers", async () => {
     let releaseOpen!: (value: SqliteCatalogOpenResult) => void;
     const openSqlite = vi.fn(() => new Promise<SqliteCatalogOpenResult>((resolve) => { releaseOpen = resolve; }));
@@ -239,7 +231,6 @@ describe("Session Catalog orchestration", () => {
     expect(discover).toHaveBeenCalledOnce();
     await catalog.dispose();
   });
-
   it("merges a newer upsert that completes while stale discovery is pending", async () => {
     let release!: (value: SessionCatalogDiscoveryResult) => void;
     const discover = vi.fn(() => new Promise<SessionCatalogDiscoveryResult>((resolve) => {
@@ -269,7 +260,6 @@ describe("Session Catalog orchestration", () => {
     });
     await catalog.dispose();
   });
-
   it("rebuilds the complete SDK fallback after a runtime SQLite query failure", async () => {
     const state: SqliteCatalogState = {
       sourceKey: "source",
@@ -404,6 +394,41 @@ describe("Session Catalog orchestration", () => {
     release(discovery([record(1)]));
     await rebuilding;
     expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it("reorders the exact pinned Workspace permutation and rejects stale orders", async () => {
+    const changed = vi.fn();
+    const catalog = createSessionCatalog({ now: () => 50_000, onChanged: changed });
+    const context = makeContext("source", async () => discovery([
+      record(1, { pinnedAt: 30_000 }),
+      record(2, { pinnedAt: 20_000 }),
+      record(3, { pinnedAt: 10_000 }),
+      record(4)
+    ]));
+    await catalog.reconcile(context);
+    changed.mockClear();
+
+    const revision = await catalog.reorderPinned([
+      "/session-3.jsonl",
+      "/session-1.jsonl",
+      "/session-2.jsonl"
+    ], context);
+
+    const page = await catalog.query({ scope: "workspace", limit: 10 }, context);
+    expect(page.revision).toBe(revision);
+    expect(page.items.slice(0, 3).map((item) => item.path)).toEqual([
+      "/session-3.jsonl",
+      "/session-1.jsonl",
+      "/session-2.jsonl"
+    ]);
+    expect(changed).toHaveBeenCalledOnce();
+    expect(changed).toHaveBeenCalledWith({ revision, reason: "conversation-organized" });
+
+    await expect(catalog.reorderPinned([
+      "/session-3.jsonl",
+      "/session-1.jsonl"
+    ], context)).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await catalog.dispose();
   });
 });
 

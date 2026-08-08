@@ -8,7 +8,10 @@
   RPC adapter, system `pi` fallback, or non-Pi provider adapters.
 - Pi JSONL sessions remain the conversation source of truth. Any application
   index is disposable and rebuildable.
-- Peak Code is a pinned product and interaction reference, not a merge upstream.
+- `pi-gui` and `t3code` are the only comprehensive implementation references.
+  Either may inform product, interaction, UI, design, architecture, Harness,
+  runtime lifecycle, recovery, tests, and engineering quality. Neither is a
+  merge upstream or overrides Pi-67 product and security contracts.
 
 ## Platform and runtime
 
@@ -87,7 +90,16 @@
   changes. Do not infer runtime quality from source alone.
 - Renderer-owned Pi Desktop Slash actions must call the existing feature
   Controllers. Do not send `/new`, `/model`, `/compact`, `/resume`, `/tree`,
-  `/reload`, or `/settings` through `command.invoke` or as model Prompts.
+  `/reload`, `/settings`, `/plan`, or `/default` through `command.invoke` or as
+  model Prompts.
+- Plan and Search are first-party Pi SDK capabilities. Desktop Tasks must not load
+  `@narumitw/pi-plan-mode`, `pi-web-access`, or `pi-smart-fetch`; preserve existing
+  user settings until an explicit uninstall. Renderer Plan implementation requests
+  contain only `planId + submissionId`, never Plan Markdown.
+- `Groland` is one built-in mixed-protocol Provider with one credential. Keep its
+  five Claude models on Anthropic Messages and two GPT models on OpenAI Responses;
+  all seven support text, image, and reasoning. Native-search UI is a declaration,
+  not live verification, and a sent native request must never silently fall back.
 - Windows claims require real Windows evidence; macOS claims require real
   Apple Silicon evidence. Browser previews do not prove packaged Electron
   behavior.

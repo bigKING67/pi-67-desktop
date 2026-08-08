@@ -9,11 +9,27 @@ import {
 import { assertSessionPathContained } from "./windows-installer-identity.mjs";
 import {
   activateCatalogSession,
+  assertModelRuntimeInitialization,
   canonicalContainedSessionPath,
   shouldCreateInitialRealUserSession,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
+  it("requires every observed Pi Provider ModelRuntime startup to complete within budget", () => {
+    expect(assertModelRuntimeInitialization([
+      { stage: "load-model-runtime", outcome: "started", durationMs: 0 },
+      { stage: "load-model-runtime", outcome: "completed", durationMs: 126 }
+    ])).toEqual({ attemptCount: 1, maxDurationMs: 126 });
+
+    expect(() => assertModelRuntimeInitialization([])).toThrow(
+      "did not observe Pi Provider ModelRuntime startup"
+    );
+    expect(() => assertModelRuntimeInitialization([
+      { stage: "load-model-runtime", outcome: "started", durationMs: 0 },
+      { stage: "load-model-runtime", outcome: "failed", durationMs: 4_000 }
+    ])).toThrow("did not complete cleanly");
+  });
+
   it("materializes a New Session only after the controlled first Prompt", async () => {
     const source = await readFile(
       new URL("./windows-real-user-lifecycle.mjs", import.meta.url),

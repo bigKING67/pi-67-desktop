@@ -41,6 +41,7 @@ export interface AgentPortHandoffTarget {
 export interface AgentConnectionRequestOptions {
   context?: ProtocolContext;
   onAcknowledgementDelayed?: () => void;
+  ackTimeoutMs?: number;
 }
 
 export class AgentConnectionController {
@@ -133,7 +134,7 @@ export class AgentConnectionController {
         () => this.prepareSameHostRetry(expectedHostEpoch)
       ) as Promise<CommandResults[T]>;
     }
-    return this.requestOnce(type, payload, transfer, context);
+    return this.requestOnce(type, payload, transfer, context, undefined, options.ackTimeoutMs);
   }
 
   private async prepareSameHostRetry(expectedHostEpoch: number | undefined): Promise<boolean> {

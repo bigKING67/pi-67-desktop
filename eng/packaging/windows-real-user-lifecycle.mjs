@@ -29,8 +29,17 @@ import {
   waitForRealUserCreatedSession
 } from "./windows-real-user-session-creation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
+import {
+  assertModelRuntimeInitialization,
+  parseInitializationObservations
+} from "./windows-real-user-initialization.mjs";
 
 export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
+export {
+  assertModelRuntimeInitialization,
+  parseInitializationObservations,
+  REAL_USER_MODEL_RUNTIME_TIMEOUT_MS
+} from "./windows-real-user-initialization.mjs";
 
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
@@ -40,13 +49,6 @@ export const REAL_USER_RESTART_COUNT = 3;
 
 const POLL_INTERVAL_MS = 50;
 const SESSION_JSONL_TIMEOUT_MS = 10_000;
-const INITIALIZATION_STAGES = new Set([
-  "resolve-session",
-  "dispose-current",
-  "create-session",
-  "reload-configuration",
-  "project-snapshot"
-]);
 
 export async function verifyInstalledRealUserLifecycle({
   agentDir,
@@ -178,6 +180,8 @@ async function runRealUserLaunch({
     }
     if (mainPid !== undefined) await waitForProcessExit(mainPid);
     for (const pid of utilityPids) await waitForProcessExit(pid);
+    const initialization = parseInitializationObservations(processOutput());
+    const modelRuntimeInitialization = assertModelRuntimeInitialization(initialization);
 
     return {
       ...(create ? { create } : {}),
@@ -185,7 +189,7 @@ async function runRealUserLaunch({
         catalog,
         closeDurationMs: round(closeDurationMs),
         fileProjection,
-        initialization: parseInitializationObservations(processOutput()),
+        initialization,
         launchToReadyMs: round(launchToReadyMs),
         lifecycleDurationMs: round(performance.now() - launchStartedAt),
         name: launchIndex === 0 ? "initial" : `restart-${launchIndex}`,
@@ -194,6 +198,7 @@ async function runRealUserLaunch({
           mainOwnedAgentDirectoryVerified: environmentDriftInjected
         },
         providerConfiguration,
+        modelRuntimeInitialization,
         runtimeReadyMs: round(runtimeReadyMs),
         startupSurface
       },
@@ -390,26 +395,6 @@ async function waitForSessionJsonl(sessionPath) {
     const metadata = await stat(sessionPath).catch(() => undefined);
     return metadata?.isFile() && metadata.size > 0 ? true : undefined;
   }, SESSION_JSONL_TIMEOUT_MS, "Windows real-user Pi Session JSONL did not materialize");
-}
-
-export function parseInitializationObservations(output) {
-  return output.split(/\r?\n/u).flatMap((line) => {
-    if (!line.startsWith("[agent-host:init] ")) return [];
-    try {
-      const observation = JSON.parse(line.slice("[agent-host:init] ".length));
-      return INITIALIZATION_STAGES.has(observation.stage)
-        && ["started", "completed", "failed"].includes(observation.outcome)
-        && Number.isFinite(observation.durationMs)
-        ? [{
-            durationMs: Math.max(0, Math.round(observation.durationMs)),
-            outcome: observation.outcome,
-            stage: observation.stage
-          }]
-        : [];
-    } catch {
-      return [];
-    }
-  });
 }
 
 async function waitForCondition(action, timeoutMs, failureMessage) {

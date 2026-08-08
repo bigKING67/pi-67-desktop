@@ -1,8 +1,12 @@
 import type { WorkspaceDescriptor } from "./workspace-identity.js";
+import type {
+  EnvironmentMutationRecoveryRecord,
+  WorkspaceEnvironmentBinding
+} from "@pi67/protocol";
 import type { TaskLifecycle } from "./workbench-state-lifecycle.js";
 import type { SessionCreationRecoveryRecord } from "./workbench-state-session-creation.js";
 
-export const WORKBENCH_STATE_VERSION = 4 as const;
+export const WORKBENCH_STATE_VERSION = 5 as const;
 
 export type ConversationKey =
   | { kind: "session"; workspaceId: string; sessionFileIdentity: string; sessionPath: string }
@@ -78,7 +82,7 @@ export interface WorkbenchStateV2 {
 }
 
 export interface WorkbenchStateV4 {
-  version: typeof WORKBENCH_STATE_VERSION;
+  version: 4;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: string[];
   expandedWorkspaceIds: string[];
@@ -90,8 +94,14 @@ export interface WorkbenchStateV4 {
   cleanExit: boolean;
 }
 
+export interface WorkbenchStateV5 extends Omit<WorkbenchStateV4, "version"> {
+  version: typeof WORKBENCH_STATE_VERSION;
+  workspaceEnvironments: WorkspaceEnvironmentBinding[];
+  environmentMutations: EnvironmentMutationRecoveryRecord[];
+}
+
 /** Renderer-owned fields. Main retains Workspace registrations, ordering, and clean-exit state. */
-export interface WorkbenchLayoutV4 {
+export interface WorkbenchLayoutV5 {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -101,11 +111,11 @@ export interface WorkbenchLayoutV4 {
 }
 
 interface WorkbenchLoadRecovery {
-  kind: "initialized" | "corrupt-reset" | "migrated-v1" | "migrated-v2" | "migrated-v3";
+  kind: "initialized" | "corrupt-reset" | "migrated-v1" | "migrated-v2" | "migrated-v3" | "migrated-v4";
   quarantinedFileName?: string;
 }
 
 export interface WorkbenchLoadResult {
-  state: WorkbenchStateV4;
+  state: WorkbenchStateV5;
   recovery?: WorkbenchLoadRecovery;
 }

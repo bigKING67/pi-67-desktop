@@ -16,9 +16,11 @@ import {
   clearedSessionQueuePatch,
   sessionControlResultPatch,
   sessionMetaProjectionPatch,
+  sessionInteractionModeProjectionPatch,
   sessionModelCatalogResultPatch,
   sessionQueueProjectionPatch,
   sessionResourceCatalogResultPatch,
+  proposedPlanProjectionPatch,
   sessionSnapshotProjectionPatch,
   sessionUsageProjectionPatch
 } from "./session-projection-mutations.js";
@@ -42,6 +44,7 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
   identity: undefined,
   modelCatalog: undefined,
   controls: undefined,
+  interaction: undefined,
   queue: undefined,
   resources: undefined,
   usage: undefined,
@@ -170,6 +173,14 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
 
   applyUsage(authority, update) {
     return applyPatch(sessionUsageProjectionPatch(get(), authority, update), set);
+  },
+
+  applyInteractionMode(authority, mode) {
+    return applyPatch(sessionInteractionModeProjectionPatch(get(), authority, mode), set);
+  },
+
+  applyProposedPlan(authority, plan) {
+    return applyPatch(proposedPlanProjectionPatch(get(), authority, plan), set);
   },
 
   clearQueue(target) {

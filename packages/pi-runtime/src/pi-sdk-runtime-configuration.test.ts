@@ -1,12 +1,13 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { ModelRuntime, type AgentSession } from "@earendil-works/pi-coding-agent";
 import type { PiProviderConfigurationChanged } from "@pi67/protocol";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiConfigurationService } from "./pi-configuration-service.js";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
 import { createPiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import type { RuntimeInitializationObservation } from "./agent-runtime.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -15,6 +16,62 @@ afterEach(async () => {
 });
 
 describe("PiSdkRuntime configuration reload", () => {
+  it("returns a structured failure when Task model runtime startup stalls and retries cleanly", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-runtime-configuration-budget-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+    const configurationService = new PiConfigurationService(agentDir, {
+      fallbackPollMs: 60_000,
+      watchDebounceMs: 60_000,
+      validationRuntimeWaitMs: 10
+    });
+    const workspaceServices = createPiWorkspaceRuntimeServices({
+      cwd,
+      agentDir,
+      projectTrusted: true,
+      configurationService
+    });
+    const runtime = new PiSdkRuntime({ workspaceServices });
+    const stalled = new Promise<ModelRuntime>(() => undefined);
+    const createRuntime = vi.spyOn(ModelRuntime, "create").mockReturnValue(stalled);
+    const observations: RuntimeInitializationObservation[] = [];
+    try {
+      const failure = await Promise.race([
+        runtime.initialize({ cwd, agentDir, trust: "trusted", approvalMode: "guided" }, (observation) => {
+          observations.push(observation);
+        })
+          .catch((error: unknown) => error),
+        delay(500).then(() => "acknowledgement-timeout" as const)
+      ]);
+
+      expect(failure).not.toBe("acknowledgement-timeout");
+      expect(failure).toMatchObject({
+        code: "RUNTIME_NOT_READY",
+        recoverable: true,
+        details: { stage: "session-model-runtime", waitMs: 10 }
+      });
+      expect(observations).toEqual(expect.arrayContaining([
+        { stage: "load-model-runtime", outcome: "started", durationMs: 0 },
+        expect.objectContaining({ stage: "load-model-runtime", outcome: "failed" })
+      ]));
+
+      createRuntime.mockRestore();
+      await expect(runtime.initialize({
+        cwd,
+        agentDir,
+        trust: "trusted",
+        approvalMode: "guided"
+      })).resolves.toMatchObject({ sessionId: expect.any(String) });
+    } finally {
+      createRuntime.mockRestore();
+      await runtime.dispose();
+      await workspaceServices.dispose();
+      await configurationService.dispose();
+    }
+  }, 20_000);
+
   it("hot-reloads model metadata and requires reselection after the active model is removed", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-runtime-configuration-"));
     temporaryDirectories.push(root);
@@ -152,6 +209,10 @@ function customModels(name: string, contextWindow: number) {
 
 function writeModels(agentDir: string, models: object): Promise<void> {
   return writeFile(join(agentDir, "models.json"), `${JSON.stringify(models, null, 2)}\n`, "utf8");
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function activeSession(runtime: PiSdkRuntime): AgentSession {

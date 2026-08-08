@@ -1,4 +1,4 @@
-import { MAX_RUNNING_TASKS } from "@pi67/domain";
+import { MAX_RUNNING_TASKS, type ComposerWorkspaceFileRef } from "@pi67/domain";
 import { publishNotification } from "../notifications/notification-store.js";
 import type { DraftAttachment } from "../composer/composer-attachments.js";
 import {
@@ -11,6 +11,8 @@ import {
 } from "../workbench/workbench-store.js";
 import { useSessionProjectionStore } from "./session-projection-store.js";
 import { materializeRendererSessionIntent } from "./session-lifecycle-controller.js";
+import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { setRendererSessionInteractionMode } from "./session-plan-controller.js";
 
 const MATERIALIZATION_TIMEOUT_MS = 5_000;
 const inFlightByTask = new Map<string, Promise<PromptSubmissionResult>>();
@@ -19,11 +21,12 @@ export function submitRendererNewSessionIntent(
   taskId: string,
   text: string,
   submissionId: string,
-  attachments: readonly DraftAttachment[] = []
+  attachments: readonly DraftAttachment[] = [],
+  workspaceFiles: readonly ComposerWorkspaceFileRef[] = []
 ): Promise<PromptSubmissionResult> {
   const existing = inFlightByTask.get(taskId);
   if (existing) return existing;
-  const submission = submitIntent(taskId, text, submissionId, attachments).finally(() => {
+  const submission = submitIntent(taskId, text, submissionId, attachments, workspaceFiles).finally(() => {
     if (inFlightByTask.get(taskId) === submission) inFlightByTask.delete(taskId);
   });
   inFlightByTask.set(taskId, submission);
@@ -34,7 +37,8 @@ async function submitIntent(
   taskId: string,
   text: string,
   submissionId: string,
-  attachments: readonly DraftAttachment[]
+  attachments: readonly DraftAttachment[],
+  workspaceFiles: readonly ComposerWorkspaceFileRef[]
 ): Promise<PromptSubmissionResult> {
   const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
   if (
@@ -55,6 +59,8 @@ async function submitIntent(
     return { accepted: false, error };
   }
 
+  const interactionMode = useTaskDraftStore.getState().drafts[taskId]?.interactionMode ?? "execute";
+
   const materialized = await materializeRendererSessionIntent(taskId);
   if (materialized.status !== "materialized") {
     return { accepted: false, error: materialized.error };
@@ -64,7 +70,15 @@ async function submitIntent(
     publishNotification({ level: "warning", title: "首条消息尚未发送", message: error });
     return { accepted: false, error };
   }
-  return submitRendererPrompt(text, "send", submissionId, attachments);
+  if (
+    interactionMode === "plan"
+    && !await setRendererSessionInteractionMode("plan")
+  ) {
+    const error = "对话已经创建，但计划模式未能确认。草稿和附件已保留，请重试。";
+    publishNotification({ level: "warning", title: "首条消息尚未发送", message: error });
+    return { accepted: false, error };
+  }
+  return submitRendererPrompt(text, "send", submissionId, attachments, workspaceFiles);
 }
 
 function waitForMaterializedTask(taskId: string): Promise<boolean> {

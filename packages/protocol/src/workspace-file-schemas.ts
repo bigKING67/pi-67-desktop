@@ -8,8 +8,12 @@ import {
 } from "@pi67/domain";
 import { Type, type TProperties } from "./typebox-schema.js";
 
-const OpaqueFileIdSchema = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" });
-const OpaqueFileRevisionSchema = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" });
+export const OpaqueFileIdSchema = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" });
+export const OpaqueFileRevisionSchema = Type.String({ minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_-]+$" });
+export const WorkspaceFilePromptRefSchema = strictObject({
+  id: OpaqueFileIdSchema,
+  revision: OpaqueFileRevisionSchema
+});
 const WorkspaceFileKindSchema = Type.Union([
   Type.Literal("directory"),
   Type.Literal("file"),

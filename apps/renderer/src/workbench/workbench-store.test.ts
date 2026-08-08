@@ -2,7 +2,7 @@ import {
   MAX_RUNNING_TASKS,
   type RuntimeStatus,
   type TaskLifecycle,
-  type WorkbenchStateV4,
+  type WorkbenchStateV5,
   type WorkspaceDescriptor
 } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
@@ -139,11 +139,65 @@ describe("renderer workbench store", () => {
     expect(store.getState().workspaceOrder).toEqual(["b"]);
   });
 
+  it("atomically transfers a provisional Task and its conversation identity to a created Workspace", () => {
+    const store = createRendererWorkbenchStore();
+    store.getState().registerWorkspace(workspace("source", "/work/source"));
+    store.getState().openTask({
+      id: "task-draft",
+      conversation: {
+        kind: "provisional",
+        workspaceId: "source",
+        draftId: "task-draft"
+      },
+      workspaceId: "source",
+      sessionId: "pending:task-draft",
+      taskGeneration: 1,
+      lifecycle: "draft",
+      runtime: { phase: "stopped", detail: "draft", recoverable: true },
+      title: "Draft",
+      hasDraft: true,
+      toolMode: "auto",
+      attachmentCount: 1,
+      environmentIntent: "worktree"
+    });
+
+    expect(store.getState().transferProvisionalTaskToWorkspace(
+      "task-draft",
+      workspace("created", "/work/created")
+    )).toBe(true);
+
+    expect(store.getState()).toMatchObject({
+      currentWorkspaceId: "created",
+      workspaceOrder: ["source", "created"],
+      selectedSurface: {
+        kind: "conversation",
+        conversation: {
+          kind: "provisional",
+          workspaceId: "created",
+          draftId: "task-draft"
+        }
+      },
+      tasks: {
+        "task-draft": {
+          workspaceId: "created",
+          conversation: {
+            kind: "provisional",
+            workspaceId: "created",
+            draftId: "task-draft"
+          },
+          hasDraft: true,
+          attachmentCount: 1,
+          environmentIntent: "worktree"
+        }
+      }
+    });
+  });
+
   it("normalizes a previously persisted Settings surface to its recoverable task", () => {
     const store = createRendererWorkbenchStore();
     const conversation = sessionConversation("task-a", "a");
-    const persisted: WorkbenchStateV4 = {
-      version: 4,
+    const persisted: WorkbenchStateV5 = {
+      version: 5,
       workspaces: [workspace("a", "/work/a")],
       workspaceOrder: ["a"],
       expandedWorkspaceIds: ["a"],
@@ -160,6 +214,8 @@ describe("renderer workbench store", () => {
         lastKnownLifecycle: "running"
       }],
       sessionCreationRecovery: [],
+      workspaceEnvironments: [{ workspaceId: "a", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "runtime", scope: "global" },
       cleanExit: false
     };

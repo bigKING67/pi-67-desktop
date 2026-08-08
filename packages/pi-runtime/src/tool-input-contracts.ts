@@ -31,6 +31,18 @@ export function hasPiWebAccessReadContract(
   return false;
 }
 
+export function hasPi67PlanToolContract(
+  toolName: string,
+  record: Record<string, unknown>
+): boolean {
+  if (toolName === "plan_complete") {
+    return stringField(record, "markdown") !== undefined;
+  }
+  if (toolName !== "plan_ask" || stringField(record, "question") === undefined) return false;
+  return optionalStringIsValid(record, "placeholder")
+    && optionalStringArrayIsValid(record.options);
+}
+
 export function networkReadTarget(
   record: Record<string, unknown>,
   fallback: string

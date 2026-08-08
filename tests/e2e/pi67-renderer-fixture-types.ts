@@ -23,6 +23,14 @@ export interface FixtureMessage {
     name?: string;
     status?: string;
     summary?: string;
+    plan?: {
+      entryId: string;
+      planId: string;
+      sourceOperationId: string;
+      markdown: string;
+      createdAt: number;
+      status: "proposed" | "implemented" | "dismissed";
+    };
     asset?: {
       id: string;
       byteLength: number;
@@ -48,6 +56,7 @@ export interface MockAgentOptions {
   contextFiles?: FixtureContextFiles;
   sessionCatalogItems?: FixtureSessionSummary[];
   sessionCatalogItemsByWorkspace?: Record<string, FixtureSessionSummary[]>;
+  sessionMessagesByPath?: Record<string, FixtureMessage[]>;
   responseResults?: Record<string, unknown>;
   assets?: Record<string, {
     mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";

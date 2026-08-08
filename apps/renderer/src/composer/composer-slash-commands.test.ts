@@ -14,11 +14,10 @@ import {
 const CATALOG = {
   items: [
     ...PI_DESKTOP_ACTIONS,
-    { name: "plan", source: "extension", description: "Create a plan" },
     { name: "review", source: "prompt", description: "Review changes" },
     { name: "skill:design-craft", source: "skill", description: "Frontend design" }
   ],
-  total: PI_DESKTOP_ACTIONS.length + 3,
+  total: PI_DESKTOP_ACTIONS.length + 2,
   truncated: false
 } as const;
 
@@ -43,7 +42,7 @@ describe("Composer Slash commands", () => {
     expect(sources.slice(0, PI_DESKTOP_ACTIONS.length)).toEqual(
       Array.from({ length: PI_DESKTOP_ACTIONS.length }, () => "desktop-action")
     );
-    expect(sources.slice(PI_DESKTOP_ACTIONS.length)).toEqual(["extension", "prompt", "skill"]);
+    expect(sources.slice(PI_DESKTOP_ACTIONS.length)).toEqual(["prompt", "skill"]);
   });
 
   it("keeps Desktop builtins available and prevents runtime aliases from overriding reserved names", () => {
@@ -59,12 +58,12 @@ describe("Composer Slash commands", () => {
     expect(catalog.items.filter((command) => command.name === "model")).toEqual([
       expect.objectContaining({ source: "desktop-action" })
     ]);
-    expect(catalog.items).toContainEqual(expect.objectContaining({ name: "plan", source: "extension" }));
+    expect(catalog.items).toContainEqual(expect.objectContaining({ name: "plan", source: "desktop-action" }));
     expect(buildComposerSlashCatalog().items).toHaveLength(PI_DESKTOP_ACTIONS.length);
   });
 
   it("resolves exact invocation source for submission routing", () => {
-    expect(exactSlashCommand(" /plan ship it", CATALOG)?.source).toBe("extension");
+    expect(exactSlashCommand(" /plan", CATALOG)?.source).toBe("desktop-action");
     expect(exactSlashCommand("/skill:design-craft polish", CATALOG)?.source).toBe("skill");
     expect(exactSlashCommand("/unknown", CATALOG)).toBeUndefined();
     expect(isSlashInvocation(" /unknown value")).toBe(true);
@@ -94,6 +93,13 @@ describe("Composer Slash commands", () => {
       name: "share"
     });
     expect(resolveSlashSubmission("/unknown compatibility", CATALOG)).toEqual({ kind: "prompt" });
-    expect(resolveSlashSubmission("/plan now", CATALOG)).toEqual({ kind: "extension", command: "plan now" });
+    expect(resolveSlashSubmission("/plan", CATALOG)).toMatchObject({
+      kind: "desktop-action",
+      action: { name: "plan" }
+    });
+    expect(resolveSlashSubmission("/default", CATALOG)).toMatchObject({
+      kind: "desktop-action",
+      action: { name: "default" }
+    });
   });
 });

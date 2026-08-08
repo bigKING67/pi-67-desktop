@@ -17,11 +17,14 @@ const PI_WEB_ACCESS_TOOLS = new Set([
   "fetch_content",
   "get_search_content"
 ]);
+const PI67_PLAN_TOOLS = new Set(["plan_ask", "plan_complete"]);
 const PI_FFF_GREP_TOOLS = new Set(["grep", "ffgrep"]);
 const PI_FFF_FIND_TOOLS = new Set(["find", "fffind"]);
 
 export type ToolSafetyProfile =
   | { kind: "builtin"; toolName: string; sourceLabel: "Pi 内置" }
+  | { kind: "pi67-web"; toolName: string; sourceLabel: "Pi-67 原生搜索" }
+  | { kind: "pi67-plan"; toolName: string; sourceLabel: "Pi-67 原生计划" }
   | { kind: "pi-web-access"; toolName: string; sourceLabel: "pi-web-access@0.17.0" }
   | {
       kind: "pi-mcp-adapter";
@@ -84,6 +87,15 @@ export function createToolSafetyProfileResolver(catalog?: ConfiguredCapabilityCa
     const source = matches[0]!.sourceInfo;
     if (isBuiltinIdentity(toolName, source)) {
       return { kind: "builtin", toolName, sourceLabel: "Pi 内置" };
+    }
+    if (PI_WEB_ACCESS_TOOLS.has(toolName) && isFirstPartyWebIdentity(toolName, source)) {
+      return { kind: "pi67-web", toolName, sourceLabel: "Pi-67 原生搜索" };
+    }
+    if (PI67_PLAN_TOOLS.has(toolName) && isFirstPartySdkIdentity(toolName, source)) {
+      return { kind: "pi67-plan", toolName, sourceLabel: "Pi-67 原生计划" };
+    }
+    if (PI67_PLAN_TOOLS.has(toolName)) {
+      return reservedIdentityMismatch(toolName, "Pi-67 native Plan Mode");
     }
     if (
       PI_WEB_ACCESS_TOOLS.has(toolName)
@@ -217,6 +229,17 @@ function isBuiltinIdentity(toolName: string, source: SourceInfo): boolean {
   return BUILTIN_TOOLS.has(toolName)
     && source.source === "builtin"
     && source.path === `<builtin:${toolName}>`
+    && source.scope === "temporary"
+    && source.origin === "top-level";
+}
+
+function isFirstPartyWebIdentity(toolName: string, source: SourceInfo): boolean {
+  return isFirstPartySdkIdentity(toolName, source);
+}
+
+function isFirstPartySdkIdentity(toolName: string, source: SourceInfo): boolean {
+  return source.source === "sdk"
+    && source.path === `<sdk:${toolName}>`
     && source.scope === "temporary"
     && source.origin === "top-level";
 }

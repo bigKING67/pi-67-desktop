@@ -1,4 +1,5 @@
 import type { DoctorReport } from "@pi67/domain";
+import { ProtocolRequestError } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useNotificationStore } from "../notifications/notification-store.js";
@@ -79,11 +80,20 @@ describe("runtime diagnostics controller", () => {
   });
 
   it("saves a redacted report through the system bridge", async () => {
-    vi.spyOn(agentConnectionController, "request").mockResolvedValue({ safe: true } as never);
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({ safe: true } as never);
 
     await saveRuntimeDiagnostics();
 
-    expect(saveDiagnostics).toHaveBeenCalledWith({ safe: true });
+    expect(request).toHaveBeenCalledWith(
+      "diagnostics.collect",
+      {},
+      [],
+      { ackTimeoutMs: 3_000 }
+    );
+    expect(saveDiagnostics).toHaveBeenCalledWith({
+      runtimeCollection: { status: "available" },
+      runtime: { safe: true }
+    });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "info",
       title: "脱敏诊断已保存"
@@ -120,16 +130,44 @@ describe("runtime diagnostics controller", () => {
     });
   });
 
-  it("turns diagnostics transport failures into a bounded notification", async () => {
-    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("Port closed"));
+  it("exports Main-owned diagnostics when Host acknowledgement times out", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new ProtocolRequestError({
+      code: "REQUEST_TIMEOUT",
+      message: "Agent request acknowledgement timed out: diagnostics.collect",
+      recoverable: true
+    }));
 
     await saveRuntimeDiagnostics();
 
-    expect(saveDiagnostics).not.toHaveBeenCalled();
+    expect(saveDiagnostics).toHaveBeenCalledWith({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "acknowledgement-timeout"
+      }
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "info",
+      title: "脱敏诊断已保存",
+      message: "Agent Host 当前不可用；诊断包已保留 Main、配置可读性与恢复状态。"
+    });
+  });
+
+  it("turns Main export failures into a bounded notification", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("Port closed"));
+    saveDiagnostics.mockRejectedValue(new Error("Save failed"));
+
+    await saveRuntimeDiagnostics();
+
+    expect(saveDiagnostics).toHaveBeenCalledWith({
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "unknown"
+      }
+    });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
       title: "无法导出脱敏诊断",
-      message: "Port closed"
+      message: "Save failed"
     });
   });
 });

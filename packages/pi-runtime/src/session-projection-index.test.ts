@@ -126,6 +126,31 @@ describe("SessionProjectionIndex", () => {
       expect.objectContaining({ id: newBranchId, ordinal: 2, preview: "New branch message", imageCount: 1 })
     ]);
   });
+
+  it("searches visible user and assistant text only on the active branch", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "projection-search" });
+    const rootId = manager.appendMessage({ role: "user", content: "Find the release marker", timestamp: 1 });
+    const assistantId = manager.appendMessage(assistantMessage("The release marker is alpha.12", 2));
+    manager.appendMessage({ role: "user", content: "Original branch marker", timestamp: 3 });
+    const projection = new SessionProjectionIndex();
+    projection.bind(manager);
+
+    expect(projection.searchMessages("release marker", 100)).toEqual({
+      total: 2,
+      items: [
+        expect.objectContaining({ id: rootId, role: "user", createdAt: 1 }),
+        expect.objectContaining({ id: assistantId, role: "assistant", createdAt: 2 })
+      ]
+    });
+    expect(projection.searchMessages("marker", 1)).toMatchObject({ total: 3, items: [{ id: rootId }] });
+
+    manager.branch(rootId);
+    const branchId = manager.appendMessage(assistantMessage("Replacement branch marker", 4));
+    projection.observe(manager, appended(manager, branchId));
+    const branchSearch = projection.searchMessages("marker", 100);
+    expect(branchSearch.items.map((item) => item.id)).toEqual([rootId, branchId]);
+    expect(branchSearch.items.every((item) => Array.from(item.snippet).length <= 240)).toBe(true);
+  });
 });
 
 function appended(manager: SessionManager, id: string): AgentSessionEvent {

@@ -102,6 +102,7 @@ export function FilesPanel() {
       ) : null}
       {error ? <p className="inspector-error" role="alert">{error}</p> : null}
       <WorkspaceFileTree
+        workspaceId={workspaceId}
         directories={directories}
         entries={visibleEntries}
         expanded={expanded}

@@ -31,6 +31,16 @@ a provider marketplace, an RPC wrapper, or a full IDE. It favors truthful
 state, fast interaction, safe recovery, and Pi compatibility over feature
 count.
 
+## Reference policy
+
+Pi-67 only follows `pi-gui` and `t3code` as comprehensive implementation
+references. Either may inform product behavior, interaction, UI, design,
+architecture, Harness, runtime lifecycle, recovery, tests, and engineering
+quality. `pi-gui` is the current primary baseline, not an exclusive authority,
+and `t3code` is not limited to Harness concerns. Reference observations do not
+automatically enter the roadmap or override this product contract. Pi remains
+the only Runtime and behavior specification source.
+
 ## Product vocabulary
 
 - `对话` is the user-visible, long-lived navigation object that may be renamed,
@@ -306,15 +316,18 @@ count.
   Session may run according to the selected mode without duplicate dialogs.
   Loaded Skill directories grant only read/search/list access within the
   canonical directory; other loaded resources grant only exact-file read/search,
-  never write or symlink escape. Verified `pi-web-access` read-only calls cover
-  `web_search`, `source_check`, HTTP(S) `fetch_content`, and bounded
-  `get_search_content` retrieval from the current in-memory result store; these
-  are the network/read-capability exception. When a verified search, source
-  check, or fetch successfully stores a result, Desktop exposes the Package's
-  existing bounded result reference to the model so a following
-  `get_search_content` call can address it. This projection neither performs a
-  second network request nor broadens Tool authority. External paths,
-  persistent-state deletion, upload or external submit, authentication or
+  never write or symlink escape. Pi-67 registers `web_search`, `source_check`,
+  HTTP(S) `fetch_content`, and bounded `get_search_content` as first-party Pi SDK
+  `customTools`; they are not Extension Packages. `web_search` and
+  `source_check` prefer the selected model's declared native protocol, otherwise
+  use a bounded per-call Exa Streamable HTTP MCP Session. Once a native request
+  has actually been sent, an authentication, quota, rate-limit, server, malformed,
+  oversized, or empty-result failure remains visible and the same query is not
+  silently resent to Exa. `fetch_content` rejects URL credentials, non-public DNS
+  results, unsafe redirects, and responses over 2 MiB. Successful search or fetch
+  results receive an in-memory bounded `responseId` for `get_search_content`; the
+  reference neither performs a second network request nor broadens Tool authority.
+  External paths, persistent-state deletion, upload or external submit, authentication or
   credential actions, dependency changes, destructive commands, publishing,
   remote Git, system changes, and external writes retain one-shot approval in
   AUTO. Calls that approval cannot make valid -- including unregistered or
@@ -371,6 +384,37 @@ count.
   identity before project resources load. A missing or replaced directory stays
   inactive until the user explicitly repairs it through the native directory
   picker; repairing it is a fresh trust gesture.
+- Repository inspection is an independent, read-only Electron Main capability.
+  It resolves the registered Workspace through the pinned private Git toolchain,
+  groups primary and linked Worktrees by physical Git common-directory identity,
+  and exposes only opaque Repository/Worktree IDs plus bounded branch, HEAD, and
+  state observations. A non-Git directory, missing private Git, timeout, corrupt
+  disposable Worktree Catalog, or stale inspection never blocks ordinary Workspace
+  registration, Session Catalog access, Session creation, or Prompt submission.
+  The Catalog can be deleted and rebuilt from Git; raw paths, Git output, private
+  executable paths, prompts, and source bodies do not cross to the Renderer or enter
+  the projection. Inspection itself exposes no arbitrary Git action or argument surface.
+- A provisional conversation defaults to `当前工作区` and may select
+  `隔离 Worktree` only from a fresh, ready Repository observation whose current
+  Worktree has an exact HEAD. Selecting either environment is Renderer state
+  only and never mutates Git. The provisional draft and environment intent are
+  checkpointed together, so restarting the application does not silently fall
+  back to another environment. Non-Git, stale, missing, untrusted, toolchain-
+  unavailable, binding-error, and creation-recovery states remain explicit and
+  keep the Worktree option disabled without blocking ordinary Local Sessions.
+- The first Prompt from a Worktree intent starts one caller-stable, Main-owned
+  creation transaction: private Git materialization, native Workspace
+  registration, Host registration, Pi JSONL Session materialization, exact
+  Session binding, and commit. Workbench V5 durably records environment bindings
+  and mutation recovery while the disposable Catalog remains rebuildable.
+  Unknown results preserve the Worktree and resume by exact creation identity;
+  repeated clicks or recovery never create another branch, Worktree, or Session.
+  Automatic cleanup is limited to an exact, clean, profile-owned artifact while
+  the durable record is still `workspace-registered`, no Host/Session recovery
+  authority exists, and Main writes `rollbackSafety = pre-host-confirmed` before
+  cleanup. Later, dirty, mismatched, locked, prunable, or uncertain outcomes are
+  retained and fence Repository mutations. Worktree removal and force actions
+  are not exposed in this phase.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
@@ -387,12 +431,16 @@ count.
   unreadable/unknown prior state; first launch is not reported as a crash. Failure on one side
   keeps the other results visible. Running checks does not create, reopen, replay,
   delete, move, or repair a Session, Workspace, lease, Catalog, or attachment.
-- Diagnostic export accepts only the schema-validated `RuntimeDiagnostics`
-  projection at the Main boundary. Main adds its own current recovery snapshot
-  and application metadata and writes `pi67-support-diagnostics.v1`; Renderer
-  cannot submit arbitrary JSON. The support file contains hashes, categories,
-  counts, revisions, states, and bounded error classes, never raw Workspace paths,
-  prompts, source bodies, credentials, environment variables, or Tool payloads.
+- Diagnostic export accepts only a schema-validated request at the Main boundary.
+  Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
+  budget preserves it when available, while timeout, disconnection, or Host
+  replacement still exports Main-owned recovery, Supervisor lifecycle, and Pi
+  configuration readability metadata. Main writes `pi67-support-diagnostics.v2`;
+  Renderer cannot submit arbitrary JSON or raw error text. The support file
+  contains hashes, categories, counts, revisions, states, bounded timestamps,
+  and bounded error classes, never raw Workspace or Agent Directory paths,
+  configuration bodies, prompts, source bodies, credentials, environment values,
+  stdout/stderr, or Tool payloads.
   Alpha exposes only recheck and export actions here; it has no clear-all,
   force-unlock, automatic replay, or unverified repair action.
 - Provider, Download Sources/Network, MCP credential, and Rules/Context drafts stay
@@ -425,6 +473,11 @@ count.
   compatibility requires Pi-resolved package manifest evidence, canonical installed
   SemVer, Registry version matching, and final runtime surface ownership; it never
   implies shared `ctx.ui` caller attribution.
+- `npm:@narumitw/pi-plan-mode`, `npm:pi-web-access`, and `npm:pi-smart-fetch`
+  are replaced by first-party Plan/Search capabilities. Existing Pi user settings
+  are not deleted or rewritten, but Desktop Tasks do not load those Packages and
+  Settings identifies the native replacement before an explicit user uninstall.
+  This retirement does not close the third-party Pi Package ecosystem.
 - Production starts no local HTTP server and listens on no application TCP port.
 - Welcome does not start the internal Agent Host utility process or load the Pi
   SDK until a Workspace or Pi-runtime diagnostic action needs it.
@@ -439,6 +492,27 @@ count.
   `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
   `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
   model configuration copy.
+- Desktop registers one built-in `Groland` Provider with one Pi credential and
+  seven image-capable reasoning models. `claude-opus-4-6`, `claude-opus-4-7`,
+  `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-sonnet-5` use Anthropic
+  Messages at `https://api.sciencetoken.ai/proxy/anthropic` with protocol-native
+  `x-api-key` authentication. `gpt-5.4` and `gpt-5.5` use OpenAI Responses at
+  `https://api.sciencetoken.ai/proxy/openai/v1` with protocol-native Bearer
+  authentication. No credential is embedded in source, model metadata, snapshots,
+  or diagnostics.
+- Native-search capability is declared only for a protocol-matching built-in
+  model: Groland Claude uses Anthropic Web Search, Groland GPT uses Responses
+  `web_search`, Pi's official Anthropic/OpenAI Providers use their corresponding
+  protocols, and Pi's official DeepSeek Provider declares native search only for
+  `deepseek-v4-flash`. Other models use Exa fallback. The Settings label
+  `原生搜索 · 已声明` describes routing metadata, not a completed live request.
+- Web Search has no product switch and no persisted enable/disable preference. The
+  model decides when the Pi SDK or protocol-native Provider search capability is
+  needed for the task. Pi-67 only presents search execution, sources, and citations
+  after the model actually invokes it. `Cmd/Ctrl+F` current-conversation body find,
+  `Cmd/Ctrl+Shift+F` bounded Workspace conversation search, and `@file` Workspace
+  references are separate local navigation/input capabilities and never toggle Web
+  Search.
 - Removing a custom Provider deletes only its `models.json` definition and does not
   silently remove a same-named `auth.json` credential. Persistent credential removal
   is an independent confirmed operation against `auth.json`.
@@ -446,6 +520,18 @@ count.
   view adopts external TUI, script, or manual edits automatically; an unsaved
   draft remains intact and must explicitly adopt the newer revision before it
   can overwrite anything.
+- Initial Provider configuration reads are independent of Task Runtime and
+  Session Catalog initialization. Manual get/reload refreshes only the requested
+  Workspace, while file access, offline Pi model validation, settings reload, and
+  Renderer acknowledgement each have nested budgets. A stalled validation returns
+  an `invalid` snapshot with bounded diagnostics; a stalled file read returns a
+  structured recoverable error before the Renderer transport budget expires.
+- Creating the Pi `ModelRuntime` for a real Task uses the same 4-second Host-side
+  offline startup budget. If Pi configuration loading stalls, Workspace/Session
+  initialization returns a structured recoverable `RUNTIME_NOT_READY` failure with
+  stage `session-model-runtime` instead of waiting for the Renderer acknowledgement
+  timeout; a later retry creates a fresh runtime attempt rather than adopting the
+  timed-out result.
 - An idle Task applies a valid model-catalog change immediately. A running Task
   marks the reload pending and applies it after the current Operation settles.
   Removing the selected model clears the selection and blocks the next Prompt
@@ -462,9 +548,9 @@ count.
 - The Composer exposes one `+` attachment action and one in-editor `/` catalog.
   The catalog presents four explicit groups: `Pi 内置`, `扩展命令`, `提示词`, and
   `技能`. The first Desktop-native set is `/new`, `/model`, `/name`, `/compact`,
-  `/resume`, `/tree`, `/reload`, and `/settings`; these call existing Renderer/Workbench
-  Controllers rather than Runtime `command.invoke`. Pi-resolved Extension
-  commands, Prompt Templates, and Skills such as `/plan` and
+  `/resume`, `/tree`, `/reload`, `/settings`, `/plan`, and `/default`; these call
+  existing Renderer/Workbench Controllers rather than Runtime `command.invoke`.
+  Pi-resolved Extension commands, Prompt Templates, and Skills such as
   `/skill:design-craft` retain their current Runtime or Prompt paths. Click and
   Tab insert, Arrow keys only move selection, and an exact command plus Enter
   executes it; a partial token plus Enter completes it. IME confirmation does
@@ -472,6 +558,32 @@ count.
   compatibility error and are never sent to the model. `/name 新标题` renames the
   current conversation directly; bare `/name` opens the shared rename dialog.
   Runtime catalog loading or failure never removes the Desktop-native group.
+- Every provisional draft and materialized Pi Session owns `execute | plan`
+  interaction mode. A provisional choice is checkpointed with the draft; after
+  Session creation, only an authority-matching Host acknowledgement changes the
+  visible mode. Plan Mode admits only read-only inspection, first-party search,
+  and Plan interaction, with `PLAN_MODE_READ_ONLY` enforced before YOLO or any
+  one-shot approval decision. `plan_complete` stores the complete Markdown Plan
+  in the current Pi JSONL and publishes a persistent Timeline review card; it never
+  starts work. Only the active proposal owns a compact action bar above the Composer
+  with `继续完善`, `复制`, and `开始执行`. `继续完善` prefills the Composer, while
+  `开始执行` sends only `planId` and a fresh `submissionId`. Agent Host reads the
+  active stored Plan, records the decision, returns the same Session to execute mode,
+  and starts one Prompt Operation in that same Pi Session. The action bar then
+  disappears, while the Timeline entry remains with `implemented` status. Historical
+  Plans may be expanded and copied but never executed again. Renderer never supplies
+  Plan Markdown in the implementation request or creates a separate durable Plan
+  store.
+- Prompt Stash preserves exact text in Task-scoped encrypted draft state. It accepts
+  at most 20 text-only items, 256 KiB per item, and 2 MiB total; drafts containing
+  `@file` references are rejected. Stashing clears the Composer only after both
+  persistence phases are acknowledged, and any failure preserves or rolls back to a
+  non-lossy state. Restore is allowed only into an empty Composer, is durably removed
+  from the stash, closes the Popover, and returns focus to input.
+- Composer context pressure becomes warning state at 75% and critical state at 92%.
+  Manual compression uses Pi's native `session.compact`; automatic and manual
+  compaction are labeled separately, never show duplicate actions, and remain legible
+  with Reduced Motion.
 - A draft supports at most 20 local attachments, 100 MiB per file, and 250 MiB
   total. Pathless clipboard files have a stricter 16 MiB boundary, and supported
   Pi-native PNG/JPEG/GIF/WebP images have an independent 32 MiB aggregate memory
@@ -652,7 +764,7 @@ count.
   latches the Session read-only, interrupts an active turn, and requires reopen or
   repair before another mutation. The renderer receives only a typed reason and
   recoverability flag, never the Session path.
-- The Inspector has three primary views: `文件`, `消息`, and `上下文`. Files is a
+- The Inspector has four primary views: `文件`, `修改`, `消息`, and `上下文`. Files is a
   lazy, bounded navigator for the registered trusted Workspace and remains
   available without initializing a Task Runtime. Directory clicks expand in
   place; ordinary file clicks open or focus the file in Pi-67. A compact
@@ -699,15 +811,32 @@ count.
   plaintext and exit remains guarded. Limits are 32 tabs per Workspace, 128 per
   app, and 20 MiB of dirty draft text. File bodies never enter Workbench state,
   Pi JSONL, notifications, diagnostics, logs, or telemetry.
+- Changes presents only the current active branch's bounded Pi Session `edit` and
+  `write` facts. It summarizes retained files and total records, lists the newest
+  records first, preserves cached content while a refresh is pending or fails,
+  and owns explicit loading, empty, stale, error, and truncation states. Every
+  projection remains fenced by Host epoch, physical Session identity, Session
+  generation, and projection revision, so a delayed response from another Task
+  cannot replace the visible list.
+- Changes groups completed records by `第 N 轮` and keeps not-yet-settled live facts
+  under `当前操作`. A selected record becomes `已查看` only for its exact content
+  fingerprint; a later path/status/Patch/metrics revision for that `toolCallId`
+  returns to `未查看` without silently changing the selected detail.
+- An `edit` record may expose the Host-bounded Patch, additions/deletions, first
+  changed line, Tool status, and truncated-path/Patch notices. The Renderer caps
+  the rendered Patch at 600 rows independently of the 64 KiB Host Patch budget.
+  A `write` record shows only bounded bytes/lines metadata because Pi does not
+  provide a before-version. Changes never reads Workspace files or Git from the
+  Renderer to manufacture missing history.
 - Messages is a paged index of only the user's messages on the current Pi Session
   active branch. It excludes Assistant, System, Tool, Thinking, and Session
   control entries, and can locate an unloaded message through one bounded
   historical conversation window without transferring the complete JSONL.
   Historical mode is visibly read-only and offers `回到最新消息`.
 - Active-branch `edit` and `write` facts enrich their matching Tool cards by
-  `toolCallId`; Files does not contain a Recorded Changes or Diff drill-down.
-  These facts never claim to be a complete Git or Workspace diff, and `write`
-  results never invent a before-version. Session branching and rollback lives in
+  `toolCallId` and feed the Changes view from the same authority-safe projection.
+  These facts never claim to be a complete Git or Workspace diff. Session
+  branching and rollback lives in
   the dedicated `会话分支与回退` dialog opened by `/tree` or the command palette
   rather than appearing as an Inspector tab.
 - Safety approval is a dedicated, fail-closed single-Tool-Call flow bound to

@@ -7,6 +7,7 @@ import { Type, type TProperties } from "./typebox-schema.js";
 
 const WorkspaceChangeBaseSchema = {
   toolCallId: Type.String({ minLength: 1, maxLength: 512 }),
+  turnId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   path: Type.String({ minLength: 1, maxLength: MAX_WORKSPACE_CHANGE_PATH_BYTES }),
   pathTruncated: Type.Boolean(),
   status: Type.Union([

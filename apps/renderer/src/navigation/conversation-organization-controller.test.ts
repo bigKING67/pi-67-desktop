@@ -7,23 +7,28 @@ import {
   rendererWorkbenchStore,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
-import { queryFirstSessionCatalog } from "./session-catalog-controller.js";
+import { queryFirstSessionCatalog, querySessionCatalogPage } from "./session-catalog-controller.js";
 import {
   archiveRendererConversation,
+  moveRendererPinnedConversation,
+  placeRendererPinnedConversationBefore,
   renameRendererConversation,
   setRendererConversationPinned
 } from "./conversation-organization-controller.js";
 
 vi.mock("./session-catalog-controller.js", () => ({
-  queryFirstSessionCatalog: vi.fn().mockResolvedValue(true)
+  queryFirstSessionCatalog: vi.fn().mockResolvedValue(true),
+  querySessionCatalogPage: vi.fn()
 }));
 
 const refreshCatalog = vi.mocked(queryFirstSessionCatalog);
+const queryCatalogPage = vi.mocked(querySessionCatalogPage);
 
 describe("conversation organization controller", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     refreshCatalog.mockReset().mockResolvedValue(true);
+    queryCatalogPage.mockReset().mockResolvedValue(catalogPage());
     rendererWorkbenchStore.getState().reset();
     useTaskDraftStore.getState().dispose();
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
@@ -185,7 +190,85 @@ describe("conversation organization controller", () => {
     expect(request.mock.calls.map(([type]) => type)).toEqual(["conversation.archive"]);
     expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeDefined();
   });
+
+  it("loads the complete pinned order before moving or dropping a conversation", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({ revision: 9 } as never);
+
+    await expect(moveRendererPinnedConversation("workspace-a", "session-file-b", "up"))
+      .resolves.toBe(true);
+    expect(request).toHaveBeenLastCalledWith(
+      "conversation.reorderPinned",
+      { paths: ["/sessions/b.jsonl", "/sessions/a.jsonl", "/sessions/c.jsonl"] },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    );
+
+    await expect(placeRendererPinnedConversationBefore(
+      "workspace-a",
+      "session-file-c",
+      "session-file-a"
+    )).resolves.toBe(true);
+    expect(request).toHaveBeenLastCalledWith(
+      "conversation.reorderPinned",
+      { paths: ["/sessions/c.jsonl", "/sessions/a.jsonl", "/sessions/b.jsonl"] },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    );
+    expect(queryCatalogPage).toHaveBeenCalledWith({
+      workspaceId: "workspace-a",
+      limit: 100
+    });
+  });
+
+  it("does not submit a partial order while the Session Catalog is incomplete", async () => {
+    queryCatalogPage.mockResolvedValue(catalogPage({ incomplete: true }));
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await expect(moveRendererPinnedConversation("workspace-a", "session-file-b", "up"))
+      .resolves.toBe(false);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "error",
+      title: "无法调整置顶顺序"
+    });
+  });
 });
+
+function catalogPage(overrides: Record<string, unknown> = {}) {
+  return {
+    revision: 4,
+    itemCount: 4,
+    source: "sqlite" as const,
+    state: "ready" as const,
+    rebuilding: false,
+    incomplete: false,
+    skippedCount: 0,
+    total: 4,
+    hasMore: false,
+    items: [
+      catalogSession("a", 300),
+      catalogSession("b", 200),
+      catalogSession("c", 100),
+      catalogSession("d")
+    ],
+    ...overrides
+  };
+}
+
+function catalogSession(name: string, pinnedAt?: number) {
+  return {
+    fileIdentity: `session-file-${name}`,
+    id: `session-${name}`,
+    path: `/sessions/${name}.jsonl`,
+    cwd: "/work/a",
+    name,
+    nameSource: "explicit" as const,
+    modifiedAt: 100,
+    messageCount: 1,
+    ...(pinnedAt === undefined ? {} : { pinnedAt })
+  };
+}
 
 function session(name: string) {
   return {

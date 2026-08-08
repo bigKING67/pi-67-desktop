@@ -16,6 +16,11 @@ import {
 import type { ReactNode } from "react";
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
+import {
+  desktopAction,
+  desktopShortcutAriaKeys,
+  formatDesktopShortcut
+} from "../app/desktop-action-registry.js";
 import { messages } from "../localization/message-catalog.js";
 import {
   selectConversationSessionSummary,
@@ -30,6 +35,7 @@ import {
 } from "../session/session-projection-selectors.js";
 import { useShellStore } from "./shell-store.js";
 import { conversationPrimaryTitle } from "../workbench/conversation-title.js";
+import { RepositoryEnvironmentStatus } from "../worktree/RepositoryEnvironmentStatus.js";
 import {
   selectedWorkbenchTask,
   useWorkbenchStore,
@@ -107,6 +113,9 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
     ? `${contextWorkspaceName} / ${currentTitle}`
     : currentTitle;
   const showBrandMark = !settingsSelected && !navigationAvailable && currentTitle === "π";
+  const navigationShortcut = desktopAction("toggle-navigation");
+  const paletteShortcut = desktopAction("command-palette");
+  const contextShortcut = desktopAction("toggle-context");
 
   return (
     <header className={`title-bar ${styles.header}`}>
@@ -117,15 +126,15 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             aria-controls="session-navigation"
             aria-describedby="navigation-toggle-tooltip"
             aria-expanded={navigationVisible}
-            aria-keyshortcuts="Control+B Meta+B"
+            aria-keyshortcuts={desktopShortcutAriaKeys(navigationShortcut)}
             aria-label={navigationVisible ? messages.shell.hideNavigation : messages.shell.showNavigation}
             onClick={onToggleNavigation}
             type="button"
           >
             {navigationVisible ? <PanelLeftClose aria-hidden="true" size={16} /> : <PanelLeftOpen aria-hidden="true" size={16} />}
-            <ControlTooltip id="navigation-toggle-tooltip">{navigationVisible
+            <ControlTooltip id="navigation-toggle-tooltip">{`${navigationVisible
               ? messages.shell.hideNavigation
-              : messages.shell.showNavigation}</ControlTooltip>
+              : messages.shell.showNavigation} · ${formatDesktopShortcut(navigationShortcut)}`}</ControlTooltip>
           </button>
         ) : null}
         <div className={`brand-lockup ${styles.brand}`} title={fullContextTitle}>
@@ -152,6 +161,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             </strong>
           </span>
         </div>
+        {!settingsSelected ? <RepositoryEnvironmentStatus workspaceId={selectedWorkspace?.id} /> : null}
       </div>
 
       <div className={`title-actions ${styles.actions}`}>
@@ -168,13 +178,13 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
         <button
           className={`icon-button ${styles.iconButton}`}
           aria-describedby="command-palette-tooltip"
-          aria-keyshortcuts="Control+K Meta+K"
+          aria-keyshortcuts={desktopShortcutAriaKeys(paletteShortcut)}
           aria-label={messages.shell.openCommandPalette}
           onClick={() => setCommandPaletteOpen(true)}
           type="button"
         >
           <Command aria-hidden="true" size={16} />
-          <ControlTooltip id="command-palette-tooltip">{messages.shell.commandPalette}</ControlTooltip>
+          <ControlTooltip id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
         </button>
         {selectedWorkspace && !settingsSelected ? (
           <button
@@ -182,16 +192,16 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             aria-controls="task-inspector"
             aria-describedby="context-toggle-tooltip"
             aria-expanded={contextVisible}
-            aria-keyshortcuts="Control+Shift+B Meta+Shift+B"
+            aria-keyshortcuts={desktopShortcutAriaKeys(contextShortcut)}
             aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
             data-testid="inspector-toggle"
             onClick={() => setContextVisible(!contextVisible)}
             type="button"
           >
             {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
-            <ControlTooltip id="context-toggle-tooltip">{contextVisible
+            <ControlTooltip id="context-toggle-tooltip">{`${contextVisible
               ? messages.shell.hideContextPanel
-              : messages.shell.showContextPanel}</ControlTooltip>
+              : messages.shell.showContextPanel} · ${formatDesktopShortcut(contextShortcut)}`}</ControlTooltip>
           </button>
         ) : null}
       </div>

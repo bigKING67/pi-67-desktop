@@ -1,5 +1,6 @@
 import type {
   ApprovalRequestView,
+  ActiveProposedPlan,
   DoctorReport,
   ExtensionCatalogResult,
   ExtensionCompatibilityEventView,
@@ -12,6 +13,7 @@ import type {
   SessionCatalogChangedEvent,
   SessionModelCatalogResult,
   SessionSnapshot,
+  SessionInteractionMode,
   TaskToolMode,
   ApprovalResponseDecision,
   WorkspaceChangeView
@@ -49,6 +51,8 @@ export interface EventPayloads {
     thinkingLevel: string;
     selectedModel?: { provider: string; id: string };
   };
+  "session.interactionModeChanged": { interactionMode: SessionInteractionMode };
+  "plan.proposed": { plan: ActiveProposedPlan };
   "model.catalog.changed": SessionModelCatalogResult;
   "tree.changed": { reason: "session-entry" | "compacted" | "rollback" };
   "usage.changed": { tokens: number; cost: number; contextPercent?: number };

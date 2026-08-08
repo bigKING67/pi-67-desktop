@@ -69,10 +69,64 @@
 .tools,
 .actions,
 .streamMode,
+.interactionMode,
 .runtimeControls,
 .runtimeField {
   display: flex;
   align-items: center;
+}
+
+.interactionMode {
+  flex: 0 0 auto;
+  gap: 2px;
+  height: 29px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.interactionMode[data-mode="plan"] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-muted));
+}
+
+.interactionMode button {
+  display: inline-flex;
+  align-items: center;
+  height: 23px;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.interactionMode button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.interactionMode button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.interactionMode button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.interactionMode .interactionModeActive {
+  background: var(--surface-raised);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-color, #000) 16%, transparent);
+  color: var(--text-primary);
+}
+
+.interactionMode[data-mode="plan"] .interactionModeActive {
+  color: var(--accent-strong);
 }
 
 .toolbar {
@@ -479,6 +533,223 @@
   font-size: 10px;
   font-weight: 680;
   letter-spacing: 0.035em;
+}
+
+.contextPressure {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 7px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.contextPressure[data-tone="warning"] {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  color: var(--warning);
+}
+
+.contextPressure[data-tone="critical"] {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+}
+
+.contextPressure small,
+.contextPressure button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+}
+
+.contextPressure small {
+  color: inherit;
+}
+
+.contextPressure button {
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-weight: 650;
+}
+
+.contextPressure button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.contextPressureSpin {
+  animation: context-pressure-spin 900ms linear infinite;
+}
+
+.promptStashButton {
+  position: relative;
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.promptStashButton[data-hovered] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.promptStashButton[data-focus-visible] {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.promptStashButton > span {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding-inline: 3px;
+  border: 1px solid var(--surface);
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: var(--canvas);
+  font-size: 8px;
+  font-weight: 720;
+  line-height: 12px;
+}
+
+.promptStashPopover {
+  z-index: 92;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(440px, calc(100vh - 120px));
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.promptStashDialog {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  outline: none;
+}
+
+.promptStashDialog > header {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.promptStashDialog > header > span {
+  display: grid;
+  gap: 1px;
+  padding-left: 3px;
+}
+
+.promptStashDialog > header strong,
+.promptStashItem strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.promptStashDialog > header small,
+.promptStashItem small {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+.promptStashSave {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.promptStashList {
+  min-height: 0;
+  padding: 5px;
+  overflow: auto;
+}
+
+.promptStashList > p,
+.promptStashDialog > footer {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-align: center;
+}
+
+.promptStashItem {
+  display: grid;
+  width: 100%;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-tertiary);
+  text-align: left;
+}
+
+.promptStashItem[data-hovered] {
+  border-color: var(--border);
+  background: var(--surface-hover);
+}
+
+.promptStashItem > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.promptStashItem strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promptStashDialog > footer {
+  border-top: 1px solid var(--border);
+}
+
+@keyframes context-pressure-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contextPressureSpin {
+    animation: none;
+  }
 }
 
 .toolModeButton[data-mode="auto"] {

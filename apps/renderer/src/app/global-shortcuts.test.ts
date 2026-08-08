@@ -3,6 +3,7 @@ import { beginRendererSessionIntent } from "../session/session-lifecycle-control
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
+import { subscribeConversationFind } from "../search/conversation-find-events.js";
 import {
   handleGlobalShortcut,
   installGlobalShortcuts,
@@ -59,6 +60,15 @@ describe("global shortcuts", () => {
     expect(useShellStore.getState().commandPaletteOpen).toBe(true);
   });
 
+  it("opens keyboard help without Workspace authority", () => {
+    const help = shortcut("/");
+
+    handleGlobalShortcut(help.event);
+
+    expect(help.preventDefault).toHaveBeenCalledOnce();
+    expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(true);
+  });
+
   it("creates Sessions only when the latest state has Workspace authority", () => {
     const blocked = shortcut("n");
     handleGlobalShortcut(blocked.event);
@@ -84,6 +94,36 @@ describe("global shortcuts", () => {
     useShellStore.setState({ contextVisible: false });
     handleGlobalShortcut(shortcut("b", { shiftKey: true }).event);
     expect(useShellStore.getState().contextVisible).toBe(true);
+  });
+
+  it("routes current and Workspace text search without introducing a search toggle", () => {
+    const scopes: string[] = [];
+    const unsubscribe = subscribeConversationFind((scope) => scopes.push(scope));
+    useAppStore.setState({ workspace: "/work/latest" });
+    const current = shortcut("f");
+    const workspace = shortcut("f", { shiftKey: true });
+
+    handleGlobalShortcut(current.event);
+    handleGlobalShortcut(workspace.event);
+
+    expect(scopes).toEqual(["current", "workspace"]);
+    expect(current.preventDefault).toHaveBeenCalledOnce();
+    expect(workspace.preventDefault).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
+
+  it("does not intercept an owned or IME-composition shortcut", () => {
+    const owned = shortcut("f");
+    Object.assign(owned.event, { defaultPrevented: true });
+    const composing = shortcut("f");
+    Object.assign(composing.event, { isComposing: true });
+    useAppStore.setState({ workspace: "/work/latest" });
+
+    handleGlobalShortcut(owned.event);
+    handleGlobalShortcut(composing.event);
+
+    expect(owned.preventDefault).not.toHaveBeenCalled();
+    expect(composing.preventDefault).not.toHaveBeenCalled();
   });
 });
 

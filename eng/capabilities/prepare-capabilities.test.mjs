@@ -49,9 +49,6 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual([
       "pi-subagents",
       "pi-observational-memory",
-      "pi-web-access",
-      "pi-smart-fetch",
-      "pi-plan-mode",
       "pi-rewind",
       "pi-mcp-adapter"
     ]);

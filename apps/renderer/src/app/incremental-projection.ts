@@ -27,6 +27,8 @@ type ProjectionAgentEventType =
   | "conversation.changed"
   | "queue.changed"
   | "session.metaChanged"
+  | "session.interactionModeChanged"
+  | "plan.proposed"
   | "model.catalog.changed"
   | "tree.changed"
   | "usage.changed";
@@ -109,6 +111,17 @@ export function handleProjectionEvent(
       });
       return "applied";
     }
+    case "session.interactionModeChanged":
+      return applyScopedSessionProjection(envelope, get, (authority) => {
+        useSessionProjectionStore.getState().applyInteractionMode(
+          authority,
+          event.payload.interactionMode
+        );
+      });
+    case "plan.proposed":
+      return applyScopedSessionProjection(envelope, get, (authority) => {
+        useSessionProjectionStore.getState().applyProposedPlan(authority, event.payload.plan);
+      });
     case "model.catalog.changed": {
       const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
       if (!authority) return "ignored";
@@ -145,6 +158,8 @@ export function isProjectionAgentEvent(event: AgentEvent): event is ProjectionAg
     case "conversation.changed":
     case "queue.changed":
     case "session.metaChanged":
+    case "session.interactionModeChanged":
+    case "plan.proposed":
     case "model.catalog.changed":
     case "tree.changed":
     case "usage.changed":

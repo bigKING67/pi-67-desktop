@@ -103,7 +103,8 @@ function registerFixture() {
     teamMcpSettings: {},
     promptAttachments: {},
     workbenchState: {},
-    workspaceFileState: {}
+    workspaceFileState: {},
+    repositoryEnvironmentInspection: { inspect: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn() }
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
   return packageNetworkSettings;
 }

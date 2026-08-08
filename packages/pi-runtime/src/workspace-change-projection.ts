@@ -30,6 +30,7 @@ export function projectWorkspaceChanges(
   sessionStreaming = false
 ): WorkspaceChangesProjection {
   const entries = sessionManager.getBranch();
+  const turnIds = collectWorkspaceChangeTurnIds(entries);
   const results = new Map<string, ToolResultRecord>();
   const recentReverse: WorkspaceChangeView[] = [];
   let total = 0;
@@ -50,7 +51,7 @@ export function projectWorkspaceChanges(
     for (let partIndex = message.content.length - 1; partIndex >= 0; partIndex -= 1) {
       const part = asRecord(message.content[partIndex]);
       if (part.type !== "toolCall") continue;
-      const start = projectChangeStart(part.id, part.name, part.arguments);
+      const start = projectChangeStart(part.id, part.name, part.arguments, turnIds.get(String(part.id)));
       if (!start) continue;
       total += 1;
       if (recentReverse.length >= MAX_WORKSPACE_CHANGES) continue;
@@ -99,7 +100,12 @@ export function projectLiveWorkspaceChangeEnd(
   return finishChange({ change }, { toolName, details: asRecord(result).details, isError });
 }
 
-function projectChangeStart(toolCallIdValue: unknown, toolNameValue: unknown, argsValue: unknown): LiveChangeStart | undefined {
+function projectChangeStart(
+  toolCallIdValue: unknown,
+  toolNameValue: unknown,
+  argsValue: unknown,
+  turnId?: string
+): LiveChangeStart | undefined {
   const toolCallId = boundedIdentifier(toolCallIdValue);
   const toolName = typeof toolNameValue === "string" ? toolNameValue : undefined;
   if (!toolCallId || (toolName !== "edit" && toolName !== "write")) return undefined;
@@ -109,6 +115,7 @@ function projectChangeStart(toolCallIdValue: unknown, toolNameValue: unknown, ar
   const path = boundUtf8(rawPath, MAX_WORKSPACE_CHANGE_PATH_BYTES);
   const common = {
     toolCallId,
+    ...(turnId ? { turnId } : {}),
     path: path.value,
     pathTruncated: path.truncated,
     status: "running" as const
@@ -129,6 +136,31 @@ function projectChangeStart(toolCallIdValue: unknown, toolNameValue: unknown, ar
       ...metrics
     }
   };
+}
+
+function collectWorkspaceChangeTurnIds(
+  entries: ReturnType<ChangeSessionManager["getBranch"]>
+): ReadonlyMap<string, string> {
+  const turnIds = new Map<string, string>();
+  let currentTurnId: string | undefined;
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const message = asRecord(entry.message);
+    if (message.role === "user") {
+      currentTurnId = entry.id;
+      continue;
+    }
+    if (message.role !== "assistant" || !currentTurnId || !Array.isArray(message.content)) continue;
+    for (const value of message.content) {
+      const part = asRecord(value);
+      if (
+        part.type === "toolCall"
+        && (part.name === "edit" || part.name === "write")
+        && typeof part.id === "string"
+      ) turnIds.set(part.id, currentTurnId);
+    }
+  }
+  return turnIds;
 }
 
 function finishChange(start: LiveChangeStart, result: ToolResultRecord): WorkspaceChangeView {

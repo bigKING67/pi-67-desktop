@@ -117,7 +117,7 @@ export class HostTaskStateCoordinator {
         this.workspaces.require(context.workspaceId);
         return undefined;
       }
-      if (request.type !== "session.catalog.query") {
+      if (request.type !== "session.catalog.query" && request.type !== "session.catalog.contentSearch") {
         throw new HostCommandError(
           "INVALID_PAYLOAD",
           `Command requires Task authority: ${request.type}`,

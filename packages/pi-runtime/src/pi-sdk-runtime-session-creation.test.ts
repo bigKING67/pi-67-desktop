@@ -349,6 +349,7 @@ function catalogOwner(shouldFail: () => boolean): RuntimeSessionCatalogOwner {
           if (shouldFail()) throw new Error("catalog unavailable after marker");
         },
         organize: async () => 0,
+        reorderPinned: async () => 0,
         dispose: async () => undefined
       };
     },

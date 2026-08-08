@@ -3,11 +3,7 @@ import {
   conversationKeyIdentity,
   taskConsumesRunSlot,
   type ConversationKey,
-  type RuntimeRecoveryRecord,
-  type SessionCreationRecoveryRecord,
-  type RuntimeStatus,
   type TaskId,
-  type TaskLifecycle,
   type WorkbenchSurface,
   type WorkspaceDescriptor,
   type WorkspaceId
@@ -19,13 +15,18 @@ import type {
   RendererWorkbenchState,
   RendererWorkbenchTask
 } from "./workbench-store-contract.js";
+import {
+  taskFromRuntimeRecovery,
+  taskFromSessionCreationRecovery
+} from "./workbench-task-recovery.js";
 export type { RendererWorkbenchState, RendererWorkbenchTask } from "./workbench-store-contract.js";
+export type { RendererTaskEnvironmentIntent } from "./workbench-store-contract.js";
 export function createRendererWorkbenchStore() {
   return createStore<RendererWorkbenchState>((set, get) => ({
     ...emptyWorkbenchState(),
     hydrate(state) {
       const workspaces = Object.fromEntries(state.workspaces.map((workspace) => [workspace.id, workspace]));
-      const recoveredTasks = state.runtimeRecovery.map(taskFromRecovery);
+      const recoveredTasks = state.runtimeRecovery.map(taskFromRuntimeRecovery);
       const creationTasks = state.sessionCreationRecovery.map(taskFromSessionCreationRecovery);
       const tasks = Object.fromEntries([...recoveredTasks, ...creationTasks].map((task) => (
         [task.id, task]
@@ -186,6 +187,52 @@ export function createRendererWorkbenchStore() {
       return restored.id;
     },
 
+    transferProvisionalTaskToWorkspace(taskId, workspace) {
+      const current = get();
+      const task = current.tasks[taskId];
+      if (!task || task.conversation.kind !== "provisional" || workspace.availability !== "available") {
+        return false;
+      }
+      const conversation = {
+        kind: "provisional" as const,
+        workspaceId: workspace.id,
+        draftId: task.conversation.draftId
+      };
+      const collision = Object.values(current.tasks).some((candidate) => (
+        candidate.id !== taskId
+        && sameConversation(candidate.conversation, conversation)
+      ));
+      if (collision) return false;
+      const nextTask = { ...task, workspaceId: workspace.id, conversation };
+      const taskWasSelected = current.selectedSurface?.kind === "conversation"
+        && sameConversation(current.selectedSurface.conversation, task.conversation);
+      const taskWasSettingsReturn = current.settingsReturnSurface?.kind === "conversation"
+        && sameConversation(current.settingsReturnSurface.conversation, task.conversation);
+      set({
+        workspaces: { ...current.workspaces, [workspace.id]: workspace },
+        workspaceOrder: current.workspaces[workspace.id]
+          ? current.workspaceOrder
+          : [...current.workspaceOrder, workspace.id],
+        expandedWorkspaceIds: current.expandedWorkspaceIds.includes(workspace.id)
+          ? current.expandedWorkspaceIds
+          : [...current.expandedWorkspaceIds, workspace.id],
+        tasks: { ...current.tasks, [taskId]: nextTask },
+        ...(taskWasSelected
+          ? {
+              currentWorkspaceId: workspace.id,
+              selectedSurface: { kind: "conversation" as const, conversation }
+            }
+          : {}),
+        ...(taskWasSettingsReturn
+          ? { settingsReturnSurface: { kind: "conversation" as const, conversation } }
+          : {}),
+        ...(taskWasSelected && current.settingsScope === "project"
+          ? { settingsWorkspaceId: workspace.id }
+          : {})
+      });
+      return true;
+    },
+
     updateTask(taskId, patch) {
       const current = get();
       const task = current.tasks[taskId];
@@ -343,66 +390,6 @@ function emptyWorkbenchState() {
     settingsSection: "general" as const,
     settingsScope: "global" as const,
     settingsWorkspaceId: undefined
-  };
-}
-
-function taskFromRecovery(record: RuntimeRecoveryRecord): RendererWorkbenchTask {
-  return {
-    id: record.taskId,
-    conversation: record.conversation,
-    workspaceId: record.conversation.workspaceId,
-    sessionId: record.sessionId,
-    taskGeneration: record.taskGeneration,
-    sessionGeneration: record.sessionGeneration,
-    lifecycle: record.lastKnownLifecycle,
-    runtime: stoppedRuntime(record.lastKnownLifecycle),
-    title: "未命名会话",
-    titleSource: "fallback",
-    sessionFileIdentity: record.conversation.sessionFileIdentity,
-    sessionPath: record.conversation.sessionPath,
-    hasDraft: false,
-    attachmentCount: 0,
-    toolMode: "auto",
-    recoveryHostInstanceId: record.hostInstanceId,
-    recoveryHostEpoch: record.hostEpoch
-  };
-}
-
-function taskFromSessionCreationRecovery(
-  record: SessionCreationRecoveryRecord
-): RendererWorkbenchTask {
-  return {
-    id: record.taskId,
-    conversation: {
-      kind: "provisional",
-      workspaceId: record.workspaceId,
-      draftId: record.taskId
-    },
-    workspaceId: record.workspaceId,
-    sessionId: `pending:${record.taskId}`,
-    taskGeneration: record.taskGeneration,
-    lifecycle: "draft",
-    runtime: {
-      phase: "failed",
-      detail: "对话创建结果尚未确认",
-      recoverable: true
-    },
-    title: "未命名会话",
-    titleSource: "fallback",
-    hasDraft: false,
-    attachmentCount: 0,
-    toolMode: "auto",
-    creationId: record.creationId,
-    creationStatus: "unconfirmed"
-  };
-}
-
-function stoppedRuntime(lifecycle: TaskLifecycle): RuntimeStatus {
-  const lost = taskConsumesRunSlot(lifecycle);
-  return {
-    phase: lost ? "failed" : "stopped",
-    detail: lost ? "上次运行已中断" : "会话尚未运行",
-    recoverable: true
   };
 }
 

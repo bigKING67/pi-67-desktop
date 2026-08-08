@@ -16,6 +16,24 @@ describe("operationSubmissionIdentity", () => {
     expect(first.fingerprint).toBe(second.fingerprint);
   });
 
+  it("binds Prompt replay identity to opaque Workspace file identity and revision", () => {
+    const base = {
+      submissionId: "prompt-a",
+      text: "inspect @[src/main.ts]",
+      delivery: "new-turn" as const,
+      workspaceFiles: [{ id: "file-a", revision: "revision-a" }]
+    };
+    const first = identity("prompt.submit", base);
+    const same = identity("prompt.submit", { ...base, submissionId: "prompt-b" });
+    const changed = identity("prompt.submit", {
+      ...base,
+      workspaceFiles: [{ id: "file-a", revision: "revision-b" }]
+    });
+
+    expect(first.fingerprint).toBe(same.fingerprint);
+    expect(changed.fingerprint).not.toBe(first.fingerprint);
+  });
+
   it.each([
     [{ entryId: "entry-before", position: "before" as const }, "before" as const],
     [{ entryId: "entry-default" }, "at" as const]
@@ -322,7 +340,7 @@ describe("operationSubmissionIdentity", () => {
   });
 });
 
-function identity<T extends "session.import" | "session.compact" | "command.invoke">(
+function identity<T extends "prompt.submit" | "session.import" | "session.compact" | "command.invoke">(
   type: T,
   payload: Extract<AgentCommand, { type: T }>["payload"]
 ) {

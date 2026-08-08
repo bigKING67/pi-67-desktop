@@ -410,7 +410,15 @@ function uniqueToolInfo(tools: readonly ToolInfo[], name: string): ToolInfo | un
 
 function isExpectedCanonicalSource(name: CanonicalToolName, tool: ToolInfo): boolean {
   if (name === "web_search" || name === "fetch_content") {
-    return tool.sourceInfo.origin === "package" && PI_WEB_ACCESS_SOURCE_PATTERN.test(tool.sourceInfo.source);
+    return (
+      tool.sourceInfo.source === "sdk"
+      && tool.sourceInfo.path === `<sdk:${name}>`
+      && tool.sourceInfo.scope === "temporary"
+      && tool.sourceInfo.origin === "top-level"
+    ) || (
+      tool.sourceInfo.origin === "package"
+      && PI_WEB_ACCESS_SOURCE_PATTERN.test(tool.sourceInfo.source)
+    );
   }
   return tool.sourceInfo.source === "builtin"
     && tool.sourceInfo.path === `<builtin:${name}>`

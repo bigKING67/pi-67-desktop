@@ -125,6 +125,7 @@ export function NavigationRail({
 
 function HelpMenu() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
+  const setKeyboardShortcutsDialogOpen = useShellStore((state) => state.setKeyboardShortcutsDialogOpen);
   const update = useUpdateStore((state) => state.update);
   const updateAvailable = update.phase === "available";
   const updateLabel = updateAvailable ? `发现新版本 ${update.version}` : "检查更新";
@@ -156,9 +157,14 @@ function HelpMenu() {
           </MenuItem>
           <MenuItem
             className={styles.menuItem!}
+            onAction={() => setKeyboardShortcutsDialogOpen(true)}
+            textValue="键盘快捷键"
+          ><Info aria-hidden="true" size={14} />键盘快捷键</MenuItem>
+          <MenuItem
+            className={styles.menuItem!}
             onAction={() => rendererWorkbenchStore.getState().openSettings("about")}
-            textValue="帮助"
-          ><Info aria-hidden="true" size={14} />帮助</MenuItem>
+            textValue="关于"
+          ><Info aria-hidden="true" size={14} />关于</MenuItem>
         </Menu>
       </Popover>
     </MenuTrigger>

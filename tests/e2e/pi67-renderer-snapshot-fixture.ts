@@ -23,6 +23,7 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
     sessionPath: "/Users/test/.pi/agent/sessions/demo.jsonl",
     cwd: "/Users/test/Projects/pi-demo",
     streaming: false,
+    interactionMode: "execute",
     messages: recentMessages,
     messagePage: {
       ...(recentMessages[0] === undefined ? {} : { startCursor: recentMessages[0].id }),
@@ -159,6 +160,17 @@ export function installMockSessionControlCommandHandler(): void {
     }
     if (type === "workspace.setTrust" || type === "resource.reload") {
       return { snapshot, result: resourceCatalogResult(snapshot) };
+    }
+    if (
+      type === "session.interactionMode.set"
+      && (payload.mode === "execute" || payload.mode === "plan")
+    ) {
+      const nextSnapshot = {
+        ...snapshot,
+        interactionMode: payload.mode,
+        ...(payload.mode === "execute" ? { activeProposedPlan: undefined } : {})
+      };
+      return { snapshot: nextSnapshot, result: undefined };
     }
     return undefined;
   };

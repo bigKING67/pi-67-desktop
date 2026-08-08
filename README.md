@@ -87,10 +87,16 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - 后台/隐藏会话完成、失败或等待交互时可发原生系统通知；Main 使用固定隐私文案，点击按 opaque Workspace/Session identity 返回精确会话，不显示 Prompt、源码、Tool 结果、错误详情或绝对路径
 - 第三方 Pi Package 只有在匹配 Pi-67 已知内容基线，或 Desktop durable 安装/用户确认 receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；待确认、内容变更、结果不明或检查超限都不会加载，也不会触发 Pi 的隐式安装。确认操作只绑定当前已安装 bytes，不下载、不重装
 - 默认 Package 保持精简：只自动物化第一方 capability；`pi-observational-memory@3.0.3` 仅对 fresh profile 做一次明确安装确认，其余推荐 Package 由用户主动安装。`pi-hy-memory`、`@ff-labs/pi-fff` 和 `@victor-software-house/pi-curated-themes` 已退出默认目录
+- Plan Mode 与 Search 已改为 Pi SDK 第一方能力，不依赖 Extension Package。`/plan` 与 `/default` 是 Desktop-owned action；Plan Markdown 以 Pi JSONL 为真源，点击开始执行时 Renderer 只提交 `planId + submissionId`
+- `web_search`、`source_check`、`fetch_content`、`get_search_content` 由 Pi-67 原生注册：协议匹配时优先模型原生 Search，未发出原生请求时才可选择 Exa fallback；原生请求失败不会把同一查询静默重发给 Exa。UI 的“原生搜索 · 已声明”不是 live verification
+- 内置 `Groland` 是一个 Provider、一个 Credential、七个图片+推理模型：五个 Claude 走 Anthropic Messages/x-api-key，两个 GPT 走 OpenAI Responses/Bearer。DeepSeek 继续走 Pi 官方 Provider，目前仅 `deepseek-v4-flash` 声明原生搜索
+- `@narumitw/pi-plan-mode`、`pi-web-access`、`pi-smart-fetch` 的既有用户配置不会被自动删除或改写，但 Desktop Task 不再加载；Settings 会显示原生替代并保留显式卸载入口
 - `known-baseline-observed`、`user-approved-observed` 与 `user-installed-observed` 都不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
-- `pi-gui` 是固定 commit 审阅、每周只读跟踪的首要产品/交互参考；只选择性重新实现，
-  不作为 merge upstream、Git Remote、Submodule 或自动源码同步源
-- Peak Code 保留为固定版本的工程血缘和历史信息架构参考
+- 后续只跟踪 `pi-gui` 与 `t3code` 两个综合参考源。两者的产品、功能、交互、UI、设计、
+  架构、Harness、runtime lifecycle、恢复、测试与工程质量都可选择性吸收；`pi-gui` 是
+  当前主力基线，但不是排他权威，`t3code` 也不局限于 Harness
+- 所有吸收都固定 commit 并按 Pi-67 合同重新实现；两者都不是 merge upstream、Git Remote、
+  Submodule 或自动源码同步源。Pi 仍是唯一 Runtime 与行为规范源
 
 选择 SDK 而非 RPC 的原因是本项目本身使用 Node/TypeScript。SDK 可以直接使用
 `AgentSession`、`SessionManager`、资源加载器和模型运行时，减少 JSONL RPC framing、

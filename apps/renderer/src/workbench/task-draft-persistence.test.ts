@@ -35,6 +35,61 @@ describe("task draft persistence", () => {
     });
   });
 
+  it("persists Workspace file refs separately from the durable text token", () => {
+    const task = sessionTask("task-session-file", "session-file-ref");
+    expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);
+    useTaskDraftStore.getState().setText(task.id, "inspect @[src/main.ts]");
+    useTaskDraftStore.getState().setWorkspaceFiles(task.id, [{
+      id: "file-a",
+      revision: "revision-a",
+      relativePath: "src/main.ts"
+    }]);
+
+    expect(serializeTaskDraftState(124).drafts[0]).toMatchObject({
+      text: "inspect @[src/main.ts]",
+      workspaceFiles: [{
+        id: "file-a",
+        revision: "revision-a",
+        relativePath: "src/main.ts"
+      }]
+    });
+  });
+
+  it("serializes text-only Prompt stash without attachment metadata or bytes", () => {
+    const task = sessionTask("task-session-stash", "session-file-stash");
+    expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);
+    useTaskDraftStore.getState().addPromptStash(task.id, {
+      id: "stash-1",
+      text: "run this after the current task",
+      createdAt: 125
+    });
+    useTaskDraftStore.getState().setAttachments(task.id, [{
+      id: "attachment-secret",
+      name: "private.png",
+      mimeType: "image/png",
+      byteLength: 1024,
+      kind: "image",
+      identity: "private-attachment-identity",
+      previewUrl: "blob:private-preview"
+    }]);
+
+    const state = serializeTaskDraftState(126);
+    expect(state.drafts).toEqual([{
+      conversation: task.conversation,
+      text: "",
+      streamBehavior: "followUp",
+      updatedAt: 126,
+      promptStash: [{
+        id: "stash-1",
+        text: "run this after the current task",
+        createdAt: 125
+      }]
+    }]);
+    expect(JSON.stringify(state)).not.toContain("attachment-secret");
+    expect(JSON.stringify(state)).not.toContain("private-preview");
+    useTaskDraftStore.getState().setAttachments(task.id, []);
+  });
+
   it("rotates a provisional draft to the materialized Session identity", () => {
     const task = provisionalTask("task-intent-a");
     expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);
@@ -61,6 +116,51 @@ describe("task draft persistence", () => {
     useTaskDraftStore.getState().setStreamBehavior(task.id, "steer");
 
     expect(serializeTaskDraftState(789)).toEqual({ version: 1, drafts: [] });
+  });
+
+  it("persists Worktree intent with a non-empty provisional draft but never on a materialized Session", () => {
+    const provisional = provisionalTask("task-intent-worktree");
+    provisional.environmentIntent = "worktree";
+    expect(rendererWorkbenchStore.getState().restoreTask(provisional)).toBe(provisional.id);
+    useTaskDraftStore.getState().setText(provisional.id, "在隔离目录中完成");
+    expect(serializeTaskDraftState(800).drafts).toEqual([{
+      conversation: provisional.conversation,
+      text: "在隔离目录中完成",
+      streamBehavior: "followUp",
+      updatedAt: 800,
+      environmentIntent: "worktree"
+    }]);
+
+    const conversation = sessionTask(provisional.id, "session-file-worktree").conversation;
+    if (conversation.kind !== "session") throw new Error("Expected a Session conversation.");
+    rendererWorkbenchStore.getState().updateTask(provisional.id, {
+      conversation,
+      sessionFileIdentity: conversation.sessionFileIdentity,
+      sessionPath: conversation.sessionPath
+    });
+    expect(serializeTaskDraftState(801).drafts[0]?.environmentIntent).toBeUndefined();
+  });
+
+  it("persists Plan Mode for a provisional first message but defers materialized state to Pi JSONL", () => {
+    const provisional = provisionalTask("task-intent-plan");
+    expect(rendererWorkbenchStore.getState().restoreTask(provisional)).toBe(provisional.id);
+    useTaskDraftStore.getState().setText(provisional.id, "先制定计划");
+    useTaskDraftStore.getState().setInteractionMode(provisional.id, "plan");
+
+    expect(serializeTaskDraftState(802).drafts[0]).toMatchObject({
+      conversation: provisional.conversation,
+      text: "先制定计划",
+      interactionMode: "plan"
+    });
+
+    const conversation = sessionTask(provisional.id, "session-file-plan").conversation;
+    if (conversation.kind !== "session") throw new Error("Expected a Session conversation.");
+    rendererWorkbenchStore.getState().updateTask(provisional.id, {
+      conversation,
+      sessionFileIdentity: conversation.sessionFileIdentity,
+      sessionPath: conversation.sessionPath
+    });
+    expect(serializeTaskDraftState(803).drafts[0]?.interactionMode).toBeUndefined();
   });
 });
 

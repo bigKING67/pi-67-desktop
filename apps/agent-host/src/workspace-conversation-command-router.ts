@@ -10,7 +10,8 @@ import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 export type WorkspaceConversationCommandType =
   | "session.nameByPath"
   | "conversation.pin"
-  | "conversation.archive";
+  | "conversation.archive"
+  | "conversation.reorderPinned";
 export type WorkspaceConversationCommand = AgentCommand<WorkspaceConversationCommandType>;
 export type WorkspaceConversationResult = CommandResults[WorkspaceConversationCommandType];
 
@@ -26,6 +27,18 @@ export class WorkspaceConversationCommandRouter {
     idempotencyKey: string
   ): Promise<WorkspaceConversationResult> {
     const workspace = this.workspaces.require(workspaceId);
+    if (command.type === "conversation.reorderPinned") {
+      const paths = await Promise.all(command.payload.paths.map((candidate) => (
+        resolveManagedSessionPath(candidate, workspace.cwd, workspace.agentDir)
+      ))).catch((error: unknown) => {
+        throw new HostCommandError(
+          "INVALID_PAYLOAD",
+          error instanceof Error ? error.message : "A Pi Session path is not managed.",
+          false
+        );
+      });
+      return { revision: await workspace.sessionCatalog.reorderPinned(paths) };
+    }
     const path = await resolveManagedSessionPath(command.payload.path, workspace.cwd, workspace.agentDir)
       .catch((error: unknown) => {
         throw new HostCommandError(
@@ -67,5 +80,6 @@ export function isWorkspaceConversationCommand(
 ): type is WorkspaceConversationCommandType {
   return type === "session.nameByPath"
     || type === "conversation.pin"
-    || type === "conversation.archive";
+    || type === "conversation.archive"
+    || type === "conversation.reorderPinned";
 }

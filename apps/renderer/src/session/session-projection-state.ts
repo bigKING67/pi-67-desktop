@@ -1,9 +1,11 @@
 import type {
+  ActiveProposedPlan,
   ResourceSummary,
   SessionControlResult,
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
-  SessionSnapshot
+  SessionSnapshot,
+  SessionInteractionMode
 } from "@pi67/domain";
 import type { EventEnvelope } from "@pi67/protocol";
 import type {
@@ -21,6 +23,7 @@ import type {
 import type {
   SessionControlProjection,
   SessionIdentityProjection,
+  SessionInteractionProjection,
   SessionModelCatalogProjection,
   SessionQueueProjection
 } from "./session-projection-snapshot.js";
@@ -46,6 +49,7 @@ export interface SessionProjectionData {
   identity: SessionIdentityProjection | undefined;
   modelCatalog: SessionModelCatalogProjection | undefined;
   controls: SessionControlProjection | undefined;
+  interaction: SessionInteractionProjection | undefined;
   queue: SessionQueueProjection | undefined;
   resources: ResourceSummary[] | undefined;
   usage: SessionSnapshot["stats"];
@@ -119,6 +123,14 @@ export interface SessionProjectionState extends SessionProjectionData {
   applyUsage: (
     authority: SessionProjectionAuthority,
     update: SessionUsageUpdate
+  ) => boolean;
+  applyInteractionMode: (
+    authority: SessionProjectionAuthority,
+    mode: SessionInteractionMode
+  ) => boolean;
+  applyProposedPlan: (
+    authority: SessionProjectionAuthority,
+    plan: ActiveProposedPlan
   ) => boolean;
   clearQueue: (target: SessionProjectionTarget) => boolean;
 }

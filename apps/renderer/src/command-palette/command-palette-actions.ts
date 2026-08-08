@@ -1,13 +1,24 @@
 import type { OperationView, SessionSummary } from "@pi67/domain";
 import type { SlashCommandDescriptor } from "@pi67/protocol";
 import {
+  BookOpenText,
   Command,
   DownloadCloud,
   HeartPulse,
   KeyRound,
+  PanelLeft,
+  PanelRight,
+  Search,
+  Settings2,
   MessageSquareText,
-  PackageOpen
+  PackageOpen,
+  SquarePlus
 } from "lucide-react";
+import {
+  DESKTOP_ACTIONS,
+  formatDesktopShortcut,
+  type DesktopActionId
+} from "../app/desktop-action-registry.js";
 import { formatRelativeTime } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
 import {
@@ -47,6 +58,7 @@ interface BuildPaletteActionsOptions {
   availability: PaletteAvailability;
   desktopActionContext: PiDesktopActionContext;
   handlers: PaletteActionHandlers;
+  applicationHandlers?: Partial<Record<DesktopActionId, () => Promise<void> | void>>;
 }
 
 const ACTIVE_OPERATION_LIFECYCLES = new Set<OperationView["lifecycle"]>([
@@ -117,9 +129,29 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
       run: () => options.handlers.executeDesktopAction(descriptor)
     });
   });
+  const applicationActions = options.applicationHandlers
+    ? DESKTOP_ACTIONS.filter((descriptor) => descriptor.id !== "command-palette").map((descriptor): PaletteAction => {
+        const run = options.applicationHandlers?.[descriptor.id];
+        const disabledReason = descriptor.requiresWorkspace && !options.desktopActionContext.workspaceAvailable
+          ? "请先打开一个工作区"
+          : run ? undefined : "当前界面不可用";
+        return {
+          id: `app:${descriptor.id}`,
+          group: "actions",
+          label: descriptor.label,
+          detail: descriptor.detail,
+          keywords: descriptor.keywords,
+          icon: APPLICATION_ACTION_ICONS[descriptor.id],
+          shortcut: formatDesktopShortcut(descriptor),
+          ...(disabledReason ? { disabled: true, disabledReason } : {}),
+          run: run ?? (() => undefined)
+        };
+      })
+    : [];
   return [
     ...sessionActions,
     ...extensionActions,
+    ...applicationActions,
     ...desktopActions,
     {
       id: "settings:provider",
@@ -161,6 +193,17 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
     })
   ];
 }
+
+const APPLICATION_ACTION_ICONS = {
+  settings: Settings2,
+  "command-palette": Command,
+  "new-session": SquarePlus,
+  "toggle-navigation": PanelLeft,
+  "toggle-context": PanelRight,
+  "find-current-conversation": Search,
+  "find-workspace-conversations": Search,
+  "keyboard-shortcuts": BookOpenText
+} satisfies Record<DesktopActionId, typeof Command>;
 
 function unavailableReason(
   availability: PaletteAvailability,

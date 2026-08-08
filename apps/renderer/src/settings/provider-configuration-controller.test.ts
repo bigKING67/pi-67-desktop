@@ -57,7 +57,10 @@ describe("provider configuration controller", () => {
       "provider.configuration.get",
       {},
       [],
-      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+      {
+        context: { scope: "workspace", workspaceId: "workspace-a" },
+        ackTimeoutMs: 12_000
+      }
     );
     expect(useProviderConfigurationStore.getState()).toMatchObject({
       workspaceId: "workspace-a",

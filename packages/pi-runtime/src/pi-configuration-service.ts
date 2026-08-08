@@ -38,28 +38,24 @@ import {
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
 import { refreshPiConfigurationProjection } from "./pi-configuration-projection.js";
+import {
+  resolvePiConfigurationServiceOptions,
+  withPiConfigurationBudget,
+  type PiConfigurationServiceOptions,
+  type ResolvedPiConfigurationServiceOptions
+} from "./pi-configuration-service-options.js";
 import { normalizeSessionCatalogPathIdentity as workspaceIdentity } from "./session-path-identity.js";
+import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 
-const FALLBACK_POLL_MS = 2_000;
-const WATCH_DEBOUNCE_MS = 200;
-const RUNTIME_RELOAD_WAIT_MS = 1_000;
-
+export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 export interface PiConfigurationReloadTarget {
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
 }
-
 export interface RegisterPiConfigurationWorkspaceOptions {
   cwd: string;
   settingsManager: PiSettingsManager;
   projectTrusted: boolean;
 }
-
-export interface PiConfigurationServiceOptions {
-  fallbackPollMs?: number;
-  watchDebounceMs?: number;
-  runtimeReloadWaitMs?: number;
-}
-
 export class PiConfigurationService {
   readonly agentDir: string;
   readonly modelsPath: string;
@@ -69,12 +65,13 @@ export class PiConfigurationService {
   private readonly credentials: PiAuthCredentialStore;
   private readonly workspaces = new Map<string, WorkspaceConfigurationState>();
   private readonly watcher: PiConfigurationWatcher;
-  private readonly runtimeReloadWaitMs: number;
+  private readonly limits: ResolvedPiConfigurationServiceOptions;
   private modelRuntime: ModelRuntime | undefined;
   private operationTail: Promise<unknown> = Promise.resolve();
   private disposed = false;
 
   constructor(agentDir: string, options: PiConfigurationServiceOptions = {}) {
+    this.limits = resolvePiConfigurationServiceOptions(options);
     this.agentDir = resolve(agentDir);
     this.modelsPath = join(this.agentDir, "models.json");
     this.authPath = join(this.agentDir, "auth.json");
@@ -84,15 +81,16 @@ export class PiConfigurationService {
       authPath: this.authPath,
       globalSettingsPath: this.globalSettingsPath
     };
-    this.credentials = new PiAuthCredentialStore(this.authPath);
-    this.runtimeReloadWaitMs = boundedWaitMilliseconds(options.runtimeReloadWaitMs, RUNTIME_RELOAD_WAIT_MS);
+    this.credentials = new PiAuthCredentialStore(this.authPath, {
+      readWaitMs: this.limits.fileAccessWaitMs
+    });
     this.watcher = new PiConfigurationWatcher({
       agentDir: this.agentDir,
-      fallbackPollMs: options.fallbackPollMs ?? FALLBACK_POLL_MS,
-      watchDebounceMs: options.watchDebounceMs ?? WATCH_DEBOUNCE_MS,
+      fallbackPollMs: this.limits.fallbackPollMs,
+      watchDebounceMs: this.limits.watchDebounceMs,
       workspaces: this.workspaces,
       isDisposed: () => this.disposed,
-      refresh: () => this.serial(() => this.refreshAllLocked("external", true, false))
+      refresh: () => this.serial(() => this.refreshLocked("external", true, false))
     });
   }
 
@@ -141,17 +139,17 @@ export class PiConfigurationService {
 
   createModelRuntime(): Promise<ModelRuntime> {
     this.assertActive();
-    return ModelRuntime.create({
-      credentials: this.credentials,
-      modelsPath: this.modelsPath,
-      allowModelNetwork: false
-    });
+    return withPiConfigurationBudget(
+      this.createPiModelRuntime(),
+      this.limits.validationRuntimeWaitMs,
+      "session-model-runtime"
+    );
   }
 
   get(cwd: string): Promise<PiProviderConfigurationSnapshot> {
     return this.serial(async () => {
       const state = this.requireWorkspace(cwd);
-      await this.refreshAllLocked("manual", false, state.snapshot === undefined);
+      await this.refreshLocked("manual", false, state.snapshot === undefined, [state]);
       return this.requireSnapshot(state);
     });
   }
@@ -159,7 +157,7 @@ export class PiConfigurationService {
   reload(cwd: string): Promise<PiProviderConfigurationSnapshot> {
     return this.serial(async () => {
       const state = this.requireWorkspace(cwd);
-      await this.refreshAllLocked("manual", true, true);
+      await this.refreshLocked("manual", true, true, [state]);
       return this.requireSnapshot(state);
     });
   }
@@ -245,7 +243,7 @@ export class PiConfigurationService {
   revealCredential(cwd: string, expectedRevision: string, providerId: string): Promise<PiCredentialRevealResult> {
     return this.serial(async () => {
       const state = this.requireWorkspace(cwd);
-      const bundle = await readWorkspaceConfigurationBundle(this.paths, state);
+      const bundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
       assertExpectedConfigurationRevision(bundle, expectedRevision);
       return {
         provider: providerId,
@@ -320,7 +318,7 @@ export class PiConfigurationService {
     let previousContent: string | undefined;
     let writtenContent = "";
     await withConfigurationFileLock(path, async () => {
-      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state);
+      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
       assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
       previousContent = beforeBundle.byKind[target].content;
       writtenContent = ensureTrailingNewline(update(previousContent));
@@ -330,7 +328,7 @@ export class PiConfigurationService {
       await validate();
     } catch (error) {
       await withConfigurationFileLock(path, async () => {
-        const current = await readOptionalConfigurationFile(path);
+        const current = await readOptionalConfigurationFile(path, this.limits.fileAccessWaitMs);
         if (current !== writtenContent) {
           throw new RuntimeError(
             "CONFIGURATION_CHANGED_EXTERNALLY",
@@ -342,7 +340,7 @@ export class PiConfigurationService {
       });
       throw error;
     }
-    await this.refreshAllLocked("desktop", true, true);
+    await this.refreshLocked("desktop", true, true);
     return this.requireSnapshot(state);
   }
 
@@ -353,7 +351,7 @@ export class PiConfigurationService {
   ): Promise<PiProviderConfigurationSnapshot> {
     return this.serial(async () => {
       const state = this.requireWorkspace(cwd);
-      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state);
+      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
       assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
       let mutationResult: PiAuthCredentialMutationResult | undefined;
       try {
@@ -364,7 +362,7 @@ export class PiConfigurationService {
         if (!(error instanceof PiAuthContentChangedError) && mutationResult) {
           const failedMutation = mutationResult;
           await withConfigurationFileLock(this.authPath, async () => {
-            const current = await readOptionalConfigurationFile(this.authPath);
+            const current = await readOptionalConfigurationFile(this.authPath, this.limits.fileAccessWaitMs);
             if (current !== failedMutation.writtenContent) {
               throw new RuntimeError(
                 "CONFIGURATION_CHANGED_EXTERNALLY",
@@ -378,45 +376,55 @@ export class PiConfigurationService {
         }
         throw normalizeConfigurationMutationError(error);
       }
-      await this.refreshAllLocked("desktop", true, true);
+      await this.refreshLocked("desktop", true, true);
       return this.requireSnapshot(state);
     });
   }
 
-  private async refreshAllLocked(
+  private async refreshLocked(
     source: PiConfigurationChangeSource,
     emit: boolean,
-    force: boolean
+    force: boolean,
+    states: WorkspaceConfigurationState[] = [...this.workspaces.values()]
   ): Promise<void> {
     this.watcher.ensureDirectoryWatchers();
     await refreshPiConfigurationProjection({
-      states: [...this.workspaces.values()],
+      states,
       paths: this.paths,
       credentials: this.credentials,
       source,
       emit,
       force,
-      runtimeReloadWaitMs: this.runtimeReloadWaitMs,
+      runtimeReloadWaitMs: this.limits.runtimeReloadWaitMs,
+      fileAccessWaitMs: this.limits.fileAccessWaitMs,
+      validationRuntimeWaitMs: this.limits.validationRuntimeWaitMs,
+      settingsReloadWaitMs: this.limits.settingsReloadWaitMs,
       createValidationRuntime: () => this.createPiValidationRuntime(),
       installModelRuntime: (runtime) => { this.modelRuntime = runtime; }
     });
   }
 
   private async createPiValidationRuntime(): Promise<ModelRuntime> {
-    return ModelRuntime.create({
-      credentials: this.credentials,
-      modelsPath: this.modelsPath,
-      allowModelNetwork: false
-    });
+    return withPiConfigurationBudget(
+      this.createPiModelRuntime(),
+      this.limits.validationRuntimeWaitMs,
+      "provider-validation-runtime"
+    );
   }
 
   private async requireModelRuntime(): Promise<ModelRuntime> {
-    this.modelRuntime ??= await ModelRuntime.create({
+    this.modelRuntime ??= await this.createModelRuntime();
+    return this.modelRuntime;
+  }
+
+  private async createPiModelRuntime(): Promise<ModelRuntime> {
+    const runtime = await ModelRuntime.create({
       credentials: this.credentials,
       modelsPath: this.modelsPath,
       allowModelNetwork: false
     });
-    return this.modelRuntime;
+    await installFirstPartyModelProviders(runtime);
+    return runtime;
   }
 
   private unregisterWorkspace(cwd: string): void {
@@ -448,12 +456,4 @@ export class PiConfigurationService {
   private assertActive(): void {
     if (this.disposed) throw new RuntimeError("RUNTIME_NOT_READY", "Pi configuration service is disposed.");
   }
-}
-
-function boundedWaitMilliseconds(value: number | undefined, fallback: number): number {
-  if (value === undefined) return fallback;
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error("Pi configuration runtime reload wait must be a finite non-negative number.");
-  }
-  return Math.floor(value);
 }

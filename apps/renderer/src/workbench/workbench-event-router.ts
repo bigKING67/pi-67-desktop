@@ -4,6 +4,7 @@ import {
   eventTaskAuthority
 } from "../connection/event-authority.js";
 import { messages } from "../localization/message-catalog.js";
+import { markConversationAttention } from "../navigation/conversation-attention-store.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
@@ -47,6 +48,7 @@ export function classifyWorkbenchAgentEvent(
     && sessionAuthority
     && (
       task.sessionId !== sessionAuthority.sessionId
+      || task.sessionFileIdentity !== sessionAuthority.sessionFileIdentity
       || task.sessionGeneration !== sessionAuthority.sessionGeneration
     )
   ) return "stale";
@@ -177,7 +179,30 @@ export function applyWorkbenchAgentEvent(
     default:
       break;
   }
+  if (
+    route === "background"
+    && eventRequiresConversationAttention(event)
+    && task.conversation.kind === "session"
+    && eventSessionAuthority(envelope)?.sessionFileIdentity === task.conversation.sessionFileIdentity
+  ) {
+    markConversationAttention(task.workspaceId, task.conversation.sessionFileIdentity);
+  }
   return true;
+}
+
+function eventRequiresConversationAttention(event: AgentEvent): boolean {
+  switch (event.type) {
+    case "runtime.crashed":
+    case "operation.completed":
+    case "operation.failed":
+    case "operation.lost":
+      return true;
+    case "operation.activityChanged":
+      return event.payload.activity?.kind === "approval"
+        || event.payload.activity?.kind === "extension-input";
+    default:
+      return false;
+  }
 }
 
 function operationIdForEvent(event: AgentEvent): string | undefined {

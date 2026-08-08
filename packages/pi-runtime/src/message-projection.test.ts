@@ -5,8 +5,74 @@ import {
   MAX_MESSAGE_PAGE_SIZE,
   projectMessagePage
 } from "./message-projection.js";
+import {
+  PLAN_DECISION_ENTRY_TYPE,
+  PROPOSED_PLAN_ENTRY_TYPE
+} from "./plan-mode-controller.js";
 
 describe("projectMessagePage", () => {
+  it("projects Plan proposals in branch order and resolves their historical status", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "plan-timeline-session" });
+    manager.appendMessage({ role: "user", content: "Prepare a plan", timestamp: 1 });
+    manager.appendCustomEntry(PROPOSED_PLAN_ENTRY_TYPE, proposedPlan("plan-1", 2));
+    manager.appendMessage(assistantText("Plan refined", 3));
+    manager.appendCustomEntry(PROPOSED_PLAN_ENTRY_TYPE, proposedPlan("plan-2", 4));
+    manager.appendCustomEntry(PLAN_DECISION_ENTRY_TYPE, {
+      planId: "plan-2",
+      decision: "implement",
+      decidedAt: 5
+    });
+    manager.appendCustomEntry(PROPOSED_PLAN_ENTRY_TYPE, proposedPlan("plan-3", 6));
+    manager.appendCustomEntry(PLAN_DECISION_ENTRY_TYPE, {
+      planId: "plan-3",
+      decision: "dismissed",
+      decidedAt: 7
+    });
+
+    const page = projectMessagePage(manager);
+    const proposals = page.messages.flatMap((message) => message.parts.flatMap((part) => (
+      part.type === "plan-proposal" ? [part.plan] : []
+    )));
+
+    expect(page.messages.map((message) => message.role)).toEqual([
+      "user",
+      "system",
+      "assistant",
+      "system",
+      "system"
+    ]);
+    expect(proposals.map((plan) => ({ planId: plan.planId, status: plan.status }))).toEqual([
+      { planId: "plan-1", status: "dismissed" },
+      { planId: "plan-2", status: "implemented" },
+      { planId: "plan-3", status: "dismissed" }
+    ]);
+  });
+
+  it("uses a Plan proposal as a valid page cursor without rendering decision records", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "plan-cursor-session" });
+    manager.appendMessage({ role: "user", content: "Before", timestamp: 1 });
+    const planEntryId = manager.appendCustomEntry(
+      PROPOSED_PLAN_ENTRY_TYPE,
+      proposedPlan("plan-cursor", 2)
+    );
+    manager.appendCustomEntry(PLAN_DECISION_ENTRY_TYPE, {
+      planId: "plan-cursor",
+      decision: "implement",
+      decidedAt: 3
+    });
+    manager.appendMessage(assistantText("After", 4));
+
+    const older = projectMessagePage(manager, { direction: "older", cursor: planEntryId, limit: 10 });
+    const newer = projectMessagePage(manager, { direction: "newer", cursor: planEntryId, limit: 10 });
+
+    expect(older.messages.map((message) => message.parts[0])).toEqual([
+      { type: "text", text: "Before" }
+    ]);
+    expect(newer.messages.map((message) => message.parts[0])).toEqual([
+      { type: "text", text: "After" }
+    ]);
+  });
+
   it("bootstraps only the newest 100 messages and pages older history without overlap", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "projection-session" });
     const entryIds: string[] = [];
@@ -132,3 +198,32 @@ describe("projectMessagePage", () => {
     expect(JSON.stringify(page)).not.toContain("dataUrl");
   });
 });
+
+function proposedPlan(planId: string, createdAt: number) {
+  return {
+    planId,
+    sourceOperationId: `operation-${planId}`,
+    markdown: `# ${planId}`,
+    createdAt
+  };
+}
+
+function assistantText(text: string, timestamp: number) {
+  return {
+    role: "assistant" as const,
+    content: [{ type: "text" as const, text }],
+    api: "openai-responses" as const,
+    provider: "fixture",
+    model: "fixture",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+    },
+    stopReason: "stop" as const,
+    timestamp
+  };
+}

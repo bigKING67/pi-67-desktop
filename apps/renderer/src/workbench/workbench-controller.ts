@@ -12,7 +12,7 @@ import { INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { messages } from "../localization/message-catalog.js";
-import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
+import { installRendererWorktreeRecoveryTasks } from "../worktree/worktree-recovery-task-installation.js";
 import { registerAvailableRendererWorkspaces } from "./workspace-host-registration-controller.js";
 import {
   rendererWorkbenchStore,
@@ -23,6 +23,7 @@ import {
 let initialization: Promise<void> | undefined;
 let persistenceTimer: ReturnType<typeof setTimeout> | undefined;
 let persistenceRevision = 0;
+let persistenceWriteTail: Promise<void> = Promise.resolve();
 let observedPersistenceFingerprint: string | undefined;
 let persistenceSuspensionDepth = 0;
 let persistenceBound = false;
@@ -50,7 +51,7 @@ export interface WorkbenchPersistenceAuthority {
 export function workbenchLayout(
   state: RendererWorkbenchState,
   authority: WorkbenchPersistenceAuthority = livePersistenceAuthority()
-): WorkbenchLayoutV4 {
+): WorkbenchLayoutV5 {
   const runtimeRecovery = state.runtimeTaskOrder.flatMap((taskId): RuntimeRecoveryRecord[] => {
     const task = state.tasks[taskId];
     const identity = authority.identity;
@@ -115,9 +116,9 @@ async function initialize(): Promise<void> {
   try {
     const state = await window.pi67.system.loadWorkbenchState();
     rendererWorkbenchStore.getState().hydrate(state);
+    installRendererWorktreeRecoveryTasks(state);
     bindPersistedRendererWorkbenchAuthority();
     await registerAvailableRendererWorkspaces();
-    void reconcileUnconfirmedRendererSessions();
   } catch (error) {
     publishNotification({
       level: "error",
@@ -187,6 +188,23 @@ function schedulePersistence(): void {
   }, 120);
 }
 
+export async function persistRendererWorkbenchCheckpoint(): Promise<void> {
+  persistenceRevision += 1;
+  if (persistenceTimer) {
+    clearTimeout(persistenceTimer);
+    persistenceTimer = undefined;
+  }
+  const state = rendererWorkbenchStore.getState();
+  const layout = workbenchLayout(state);
+  observedPersistenceFingerprint = JSON.stringify(layout);
+  try {
+    await enqueuePersistenceWrite(layout);
+  } catch (error) {
+    publishPersistenceFailure(error);
+    throw error;
+  }
+}
+
 function observePersistenceChange(): void {
   if (persistenceSuspensionDepth > 0) return;
   const next = persistenceFingerprint(rendererWorkbenchStore.getState());
@@ -196,16 +214,29 @@ function observePersistenceChange(): void {
 }
 
 async function persist(revision: number): Promise<void> {
+  const layout = workbenchLayout(rendererWorkbenchStore.getState());
   try {
-    await window.pi67.system.updateWorkbenchLayout(workbenchLayout(rendererWorkbenchStore.getState()));
+    await enqueuePersistenceWrite(layout);
   } catch (error) {
     if (revision !== persistenceRevision) return;
-    publishNotification({
-      level: "warning",
-      title: messages.runtime.workbench.layoutNotSavedTitle,
-      message: errorMessage(error)
-    });
+    publishPersistenceFailure(error);
   }
+}
+
+function enqueuePersistenceWrite(layout: WorkbenchLayoutV5): Promise<void> {
+  const write = persistenceWriteTail.then(async () => {
+    await window.pi67.system.updateWorkbenchLayout(layout);
+  });
+  persistenceWriteTail = write.catch(() => undefined);
+  return write;
+}
+
+function publishPersistenceFailure(error: unknown): void {
+  publishNotification({
+    level: "warning",
+    title: messages.runtime.workbench.layoutNotSavedTitle,
+    message: errorMessage(error)
+  });
 }
 
 function persistedSelectedSurface(
@@ -247,7 +278,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : messages.runtime.unknownError;
 }
 
-interface WorkbenchLayoutV4 {
+interface WorkbenchLayoutV5 {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

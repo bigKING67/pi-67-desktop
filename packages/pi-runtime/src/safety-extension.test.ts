@@ -1,19 +1,21 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { MAX_APPROVAL_CWD_BYTES, MAX_APPROVAL_TARGET_BYTES } from "@pi67/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createDesktopSafetyExtension,
-  type DesktopApprovalRequester,
-  type SafetyPolicyState
+  type DesktopApprovalRequester
 } from "./safety-extension.js";
-
-type SafetyHandler = (
-  event: { toolCallId: string; toolName: string; input: Record<string, unknown> },
-  context: { hasUI: boolean; signal?: AbortSignal }
-) => Promise<{ block?: boolean; reason?: string } | undefined>;
+import {
+  builtinTool,
+  desktopAttachmentTool,
+  extensionTool,
+  packageTool,
+  safetyHandler,
+  sdkTool,
+  trustedPolicy
+} from "./safety-extension-test-fixture.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -108,6 +110,41 @@ describe("createDesktopSafetyExtension", () => {
     }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();
     expect(recordToolAuthorization).toHaveBeenCalledWith("tool-call-workspace-command", "workspace-command");
+  });
+
+  it("enforces Plan Mode before YOLO and permits only verified read-only capabilities", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    let tools = [builtinTool("bash")];
+    const handler = safetyHandler(
+      { ...trustedPolicy(), taskToolMode: "yolo" },
+      requestApproval,
+      () => tools,
+      undefined,
+      undefined,
+      () => "plan"
+    );
+
+    await expect(handler({
+      toolCallId: "plan-read",
+      toolName: "bash",
+      input: { command: "git status --short && git diff --check" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    await expect(handler({
+      toolCallId: "plan-build",
+      toolName: "bash",
+      input: { command: "corepack pnpm run build" }
+    }, { hasUI: true })).resolves.toMatchObject({
+      block: true,
+      reason: expect.stringContaining("PLAN_MODE_READ_ONLY")
+    });
+
+    tools = [sdkTool("plan_complete")];
+    await expect(handler({
+      toolCallId: "plan-complete",
+      toolName: "plan_complete",
+      input: { markdown: "# Plan" }
+    }, { hasUI: true })).resolves.toBeUndefined();
+    expect(requestApproval).not.toHaveBeenCalled();
   });
 
   it("auto-allows only the exact internal Desktop attachment Tool and its bounded input", async () => {
@@ -335,105 +372,3 @@ describe("createDesktopSafetyExtension", () => {
     expect(requestApproval).not.toHaveBeenCalled();
   });
 });
-
-function trustedPolicy(): SafetyPolicyState {
-  return {
-    cwd: "/workspace",
-    trust: "trusted",
-    approvalMode: "guided",
-    taskToolMode: "ask"
-  };
-}
-
-function safetyHandler(
-  policy: SafetyPolicyState,
-  requestApproval: DesktopApprovalRequester,
-  getAllTools: () => ReturnType<ExtensionAPI["getAllTools"]> = () => [builtinTool("bash")],
-  getActiveTools?: () => string[],
-  recordToolAuthorization?: Parameters<typeof createDesktopSafetyExtension>[4]
-): SafetyHandler {
-  let handler: SafetyHandler | undefined;
-  const api = {
-    getAllTools,
-    getActiveTools: getActiveTools ?? (() => getAllTools().map((tool) => tool.name)),
-    on(event: string, candidate: SafetyHandler) {
-      if (event === "tool_call") handler = candidate;
-    }
-  } as unknown as ExtensionAPI;
-  const extension = createDesktopSafetyExtension(
-    () => policy,
-    requestApproval,
-    undefined,
-    undefined,
-    recordToolAuthorization
-  );
-  if (!("factory" in extension)) throw new Error("Expected the named Desktop safety extension factory.");
-  void extension.factory(api);
-  if (!handler) throw new Error("Desktop safety extension did not register a tool_call handler.");
-  return handler;
-}
-
-function sdkTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
-  return {
-    ...builtinTool(name),
-    sourceInfo: {
-      path: `<sdk:${name}>`,
-      source: "sdk",
-      scope: "temporary",
-      origin: "top-level"
-    }
-  };
-}
-
-function builtinTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
-  return {
-    name,
-    description: name,
-    parameters: { type: "object" },
-    sourceInfo: {
-      path: `<builtin:${name}>`,
-      source: "builtin",
-      scope: "temporary",
-      origin: "top-level"
-    }
-  } as ReturnType<ExtensionAPI["getAllTools"]>[number];
-}
-
-function extensionTool(name: string): ReturnType<ExtensionAPI["getAllTools"]>[number] {
-  return {
-    ...builtinTool(name),
-    sourceInfo: {
-      path: `/extensions/${name}.ts`,
-      source: "extension",
-      scope: "user",
-      origin: "top-level"
-    }
-  };
-}
-
-function packageTool(
-  name: string,
-  source: string
-): ReturnType<ExtensionAPI["getAllTools"]>[number] {
-  return {
-    ...builtinTool(name),
-    sourceInfo: {
-      path: source,
-      source,
-      scope: "user",
-      origin: "package"
-    }
-  };
-}
-
-function desktopAttachmentTool(): ReturnType<ExtensionAPI["getAllTools"]>[number] {
-  return {
-    ...builtinTool("read_attachment"),
-    sourceInfo: {
-      path: "<inline:pi67-desktop-attachments>",
-      source: "inline",
-      scope: "temporary",
-      origin: "top-level"
-    }
-  };
-}

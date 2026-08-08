@@ -1,0 +1,249 @@
+.timelineCard {
+  width: min(var(--conversation-track-width, 860px), calc(100% - 48px));
+  margin: 10px auto 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 97%, var(--accent) 3%);
+}
+
+.header,
+.disclosure,
+.copyButton,
+.status,
+.actionBar,
+.actionLabel,
+.compactActions,
+.compactActions button {
+  display: flex;
+  align-items: center;
+}
+
+.header {
+  min-height: 48px;
+  gap: 6px;
+  padding: 5px 7px;
+}
+
+.disclosure {
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 9px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.disclosure:hover,
+.copyButton:hover,
+.compactActions button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.disclosure:focus-visible,
+.copyButton:focus-visible,
+.compactActions button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-muted));
+  color: var(--accent-strong);
+}
+
+.heading {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.heading strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.status {
+  width: fit-content;
+  gap: 4px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.status[data-status="implemented"] {
+  color: var(--success);
+}
+
+.status[data-status="dismissed"] {
+  color: var(--text-tertiary);
+}
+
+.disclosure > svg:last-child {
+  flex: 0 0 auto;
+  transition: transform 140ms ease;
+}
+
+.chevronExpanded {
+  transform: rotate(180deg);
+}
+
+.copyButton,
+.compactActions button {
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.copyButton {
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.body {
+  max-height: min(440px, 52vh);
+  padding: 14px 16px 16px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.body > div {
+  font-size: 12px;
+}
+
+.actionRegion {
+  z-index: 3;
+  grid-area: plan;
+  padding: 0 20px 6px;
+  background: var(--surface);
+}
+
+.actionBar,
+.actionError {
+  width: min(var(--conversation-track-width, 860px), 100%);
+  margin: 0 auto;
+}
+
+.actionBar {
+  min-height: 44px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-raised) 96%, var(--accent) 4%);
+}
+
+.actionLabel {
+  min-width: 0;
+  gap: 8px;
+  padding-left: 4px;
+  color: var(--accent-strong);
+}
+
+.actionLabel > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.actionLabel strong,
+.actionLabel small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionLabel strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.actionLabel small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.compactActions {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.compactActions button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.compactActions .implementButton {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  background: var(--accent);
+  color: var(--canvas);
+}
+
+.compactActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.actionError {
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface-raised));
+  color: var(--danger);
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .timelineCard {
+    width: calc(100% - 24px);
+  }
+
+  .actionRegion {
+    padding-inline: 12px;
+  }
+
+  .actionBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .actionLabel small {
+    display: none;
+  }
+
+  .compactActions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure > svg:last-child {
+    transition: none;
+  }
+}

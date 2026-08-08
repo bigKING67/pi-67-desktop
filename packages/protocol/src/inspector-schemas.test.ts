@@ -63,7 +63,40 @@ describe("Inspector protocol", () => {
     expect(hasValidCommandContext("workspace.file.list", workspace)).toBe(true);
     expect(hasValidCommandContext("workspace.file.list", task)).toBe(false);
     expect(hasValidCommandContext("message.index", task)).toBe(true);
+    expect(hasValidCommandContext("message.search", task)).toBe(true);
+    expect(hasValidCommandContext("session.catalog.contentSearch", workspace)).toBe(true);
     expect(hasValidCommandContext("message.locate", workspace)).toBe(false);
+  });
+
+  it("validates bounded current and Workspace message search projections", () => {
+    expect(Value.Check(CommandPayloadSchemas["message.search"], { query: "release marker" })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["message.search"], { query: "" })).toBe(false);
+    expect(Value.Check(CommandResultSchemas["message.search"], {
+      sessionId: "session-1",
+      revision: 2,
+      query: "release marker",
+      total: 1,
+      items: [{ id: "message-1", role: "assistant", snippet: "release marker" }],
+      truncated: false
+    })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["session.catalog.contentSearch"], { query: "release" })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["session.catalog.contentSearch"], {
+      workspaceId: "workspace-1",
+      query: "release",
+      items: [{
+        sessionFileIdentity: "session-file-1",
+        sessionPath: "/sessions/one.jsonl",
+        sessionName: "Release work",
+        messageId: "message-1",
+        role: "user",
+        snippet: "release"
+      }],
+      sessionsVisited: 1,
+      entriesVisited: 2,
+      skippedCount: 0,
+      incomplete: false,
+      truncated: false
+    })).toBe(true);
   });
 
   it("validates user-only index pages and located conversation windows", () => {

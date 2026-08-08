@@ -1,25 +1,30 @@
-import type {
-  RuntimeCapabilities,
-  RuntimeStatus,
-  SessionSnapshot
-} from "@pi67/domain";
+import type { RuntimeStatus } from "@pi67/domain";
 import {
-  eventEnvelope,
-  type AgentEvent,
-  type EventEnvelope,
-  type EventPayloads
+  eventEnvelope
 } from "@pi67/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { taskEventFixture } from "../connection/protocol-test-fixtures.js";
+import {
+  conversationNeedsAttention,
+  useConversationAttentionStore
+} from "../navigation/conversation-attention-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 import {
-  applyWorkbenchAgentEvent,
-  classifyWorkbenchAgentEvent,
-  type WorkbenchEventRoute
-} from "./workbench-event-router.js";
+  openActiveProvisionalTask,
+  openActiveTask,
+  routeWorkbenchAgentEvent,
+  routedEvent,
+  runtimeCapabilities,
+  snapshot,
+  staleSessionEventCases,
+  task
+} from "./workbench-event-router-test-fixture.js";
 
 describe("workbench event routing", () => {
-  beforeEach(() => rendererWorkbenchStore.getState().reset());
+  beforeEach(() => {
+    rendererWorkbenchStore.getState().reset();
+    useConversationAttentionStore.getState().reset();
+  });
 
   it("updates a background task without making its projection active", () => {
     const workbench = rendererWorkbenchStore.getState();
@@ -70,6 +75,68 @@ describe("workbench event routing", () => {
         sessionPath: "/sessions/active.jsonl"
       }
     });
+  });
+
+  it("marks terminal and interactive background events for later review", () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: "workspace-a",
+      displayName: "A",
+      identity: { canonicalPath: "/work/a", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask(task("active"));
+    workbench.openTask(task("background"));
+    workbench.selectTask("active");
+    workbench.updateTask("background", { lifecycle: "running", operationId: "operation-background" });
+    const authority = taskEventFixture({
+      hostEpoch: 9,
+      sequence: 2,
+      workspaceId: "workspace-a",
+      taskId: "background",
+      taskGeneration: 1,
+      sessionId: "session-background",
+      sessionGeneration: 2,
+      operationId: "operation-background"
+    });
+    const completed = { operationId: "operation-background", completedAt: 2 };
+
+    expect(routeWorkbenchAgentEvent(
+      { type: "operation.completed", payload: completed },
+      eventEnvelope("operation.completed", completed, authority)
+    )).toBe("background");
+    expect(conversationNeedsAttention(
+      useConversationAttentionStore.getState(),
+      "workspace-a",
+      "session-file-session-background"
+    )).toBe(true);
+
+    useConversationAttentionStore.getState().clear("workspace-a", "session-file-session-background");
+    workbench.updateTask("background", { lifecycle: "running", operationId: "operation-background-2" });
+    const waiting = {
+      operationId: "operation-background-2",
+      activity: { kind: "approval" as const, requestId: "approval-1" }
+    };
+    expect(routeWorkbenchAgentEvent(
+      { type: "operation.activityChanged", payload: waiting },
+      eventEnvelope("operation.activityChanged", waiting, taskEventFixture({
+        hostEpoch: 9,
+        operationId: "operation-background-2",
+        sequence: 3,
+        workspaceId: "workspace-a",
+        taskId: "background",
+        taskGeneration: 1,
+        sessionId: "session-background",
+        sessionGeneration: 2
+      }))
+    )).toBe("background");
+    expect(conversationNeedsAttention(
+      useConversationAttentionStore.getState(),
+      "workspace-a",
+      "session-file-session-background"
+    )).toBe(true);
   });
 
   it("routes Tool mode changes to the addressed background Task only", () => {
@@ -266,194 +333,3 @@ describe("workbench event routing", () => {
     });
   });
 });
-
-interface SessionAuthorityFixture {
-  sessionId: string;
-  sessionGeneration: number;
-}
-
-interface RoutedEventFixture {
-  event: AgentEvent;
-  envelope: EventEnvelope;
-}
-
-type StaleSessionEventFactory = (authority: SessionAuthorityFixture) => RoutedEventFixture;
-
-function staleSessionEventCases(): ReadonlyArray<readonly [string, StaleSessionEventFactory]> {
-  return [
-    ["operation.started", (authority) => {
-      const operationId = "operation-stale";
-      const payload = { operation: {
-        operationId,
-        kind: "prompt" as const,
-        lifecycle: "running" as const,
-        cancellable: true,
-        sessionId: authority.sessionId,
-        sessionFileIdentity: `session-file-${authority.sessionId}`,
-        sessionGeneration: authority.sessionGeneration,
-        startedAt: 1
-      } };
-      return routedEvent("operation.started", payload, authority, operationId);
-    }],
-    ["operation.completed", (authority) => {
-      const operationId = "operation-stale";
-      return routedEvent(
-        "operation.completed",
-        { operationId, completedAt: 2 },
-        authority,
-        operationId
-      );
-    }],
-    ["runtime.statusChanged", (authority) => routedEvent(
-      "runtime.statusChanged",
-      { phase: "busy", detail: "stale", recoverable: true },
-      authority
-    )],
-    ["task.toolMode.changed", (authority) => routedEvent(
-      "task.toolMode.changed",
-      { mode: "yolo", reason: "user-selected" },
-      authority
-    )],
-    ["session.metaChanged", (authority) => routedEvent(
-      "session.metaChanged",
-      {
-        streaming: false,
-        sessionName: "Stale Session",
-        thinkingLevel: "off"
-      },
-      authority
-    )]
-  ];
-}
-
-function routedEvent<Type extends AgentEvent["type"]>(
-  type: Type,
-  payload: EventPayloads[Type],
-  authority: SessionAuthorityFixture,
-  operationId?: string
-): RoutedEventFixture {
-  return {
-    event: { type, payload } as AgentEvent,
-    envelope: eventEnvelope(type, payload, taskEventFixture({
-      hostEpoch: 9,
-      sequence: 2,
-      workspaceId: "workspace-a",
-      taskId: "active",
-      taskGeneration: 1,
-      sessionId: authority.sessionId,
-      sessionGeneration: authority.sessionGeneration,
-      ...(operationId === undefined ? {} : { operationId })
-    })) as EventEnvelope
-  };
-}
-
-function openActiveTask(): void {
-  const workbench = rendererWorkbenchStore.getState();
-  workbench.reset();
-  rendererWorkbenchStore.getState().registerWorkspace({
-    id: "workspace-a",
-    displayName: "A",
-    identity: { canonicalPath: "/work/a", assurance: "filesystem" },
-    trust: "trusted",
-    trustProvenance: "native-picker",
-    availability: "available"
-  });
-  rendererWorkbenchStore.getState().openTask(task("active"));
-}
-
-function openActiveProvisionalTask(): void {
-  const workbench = rendererWorkbenchStore.getState();
-  workbench.reset();
-  workbench.registerWorkspace({
-    id: "workspace-a",
-    displayName: "A",
-    identity: { canonicalPath: "/work/a", assurance: "filesystem" },
-    trust: "trusted",
-    trustProvenance: "native-picker",
-    availability: "available"
-  });
-  workbench.openTask({
-    ...task("active"),
-    conversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "active" },
-    creationStatus: "pending"
-  });
-}
-
-function snapshot(sessionId: string, sessionPath: string, sessionName: string): SessionSnapshot {
-  return {
-    sessionId,
-    sessionFileIdentity: `session-file-${sessionId}`,
-    sessionPath,
-    sessionName,
-    cwd: "/work/a",
-    streaming: false,
-    messages: [],
-    messagePage: { hasOlder: false, hasNewer: false },
-    models: [],
-    providers: [],
-    thinkingLevel: "off",
-    availableThinkingLevels: ["off"],
-    steeringQueue: [],
-    followUpQueue: [],
-    tree: { nodes: [], truncated: false, total: 0 },
-    resources: []
-  };
-}
-
-function runtimeCapabilities(): RuntimeCapabilities {
-  return {
-    sdkVersion: "test",
-    supportsFollowUp: true,
-    supportsSessionTree: true,
-    extensionUi: {
-      primitives: [],
-      attribution: "none",
-      recognizedCompatibilityLevels: [],
-      adapterRegistry: {
-        available: false,
-        manifestSchemaVersions: [],
-        supportedSurfaces: [],
-        realtimeUiAttribution: false,
-        activeAdapterCount: 0
-      },
-      limitations: {
-        workingIndicator: "unsupported",
-        editorMutation: "unsupported",
-        customComponents: "tui-only",
-        autocomplete: "tui-only",
-        widgetPlacements: []
-      }
-    }
-  };
-}
-
-function task(id: string) {
-  return {
-    id,
-    conversation: {
-      kind: "session" as const,
-      workspaceId: "workspace-a",
-      sessionFileIdentity: `session-file-session-${id}`,
-      sessionPath: `/sessions/${id}.jsonl`
-    },
-    workspaceId: "workspace-a",
-    sessionId: `session-${id}`,
-    sessionFileIdentity: `session-file-session-${id}`,
-    sessionGeneration: 2,
-    taskGeneration: 1,
-    lifecycle: "idle" as const,
-    runtime: { phase: "ready" as const, detail: "ready", recoverable: true },
-    title: id,
-    hasDraft: false,
-    toolMode: "auto" as const,
-    attachmentCount: 0
-  };
-}
-
-function routeWorkbenchAgentEvent(event: AgentEvent, envelope: EventEnvelope): WorkbenchEventRoute {
-  const route = classifyWorkbenchAgentEvent(event, envelope);
-  if (route === "active" || route === "background") {
-    applyWorkbenchAgentEvent(event, envelope);
-  }
-  return route;
-}

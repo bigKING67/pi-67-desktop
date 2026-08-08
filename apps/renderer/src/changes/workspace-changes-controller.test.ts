@@ -161,7 +161,7 @@ describe("workspace changes controller", () => {
 
     await refreshWorkspaceChanges();
 
-    expect(useWorkspaceChangesStore.getState().status).toBe("stale");
+    expect(useWorkspaceChangesStore.getState()).toMatchObject({ status: "error", error: "read failed" });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "无法加载本会话修改记录",
@@ -176,7 +176,11 @@ describe("workspace changes controller", () => {
 
     await refreshWorkspaceChanges();
 
-    expect(useWorkspaceChangesStore.getState()).toMatchObject({ projection: undefined, status: "stale" });
+    expect(useWorkspaceChangesStore.getState()).toMatchObject({
+      error: "Workspace changes response belongs to a different Session.",
+      projection: undefined,
+      status: "error"
+    });
     expect(useNotificationStore.getState().items.at(-1)?.message).toContain("different Session");
   });
 });

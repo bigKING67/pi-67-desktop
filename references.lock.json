@@ -1,32 +1,11 @@
 {
   "schemaVersion": 1,
   "reviews": {
-    "peakcode": {
-      "reviewedCommit": "5aee9cfcbb29283f9320a132693d4a250033fb9e",
-      "remoteHeadAtReview": "5aee9cfcbb29283f9320a132693d4a250033fb9e",
-      "sourceRef": "main",
-      "reviewedAt": "2026-07-27",
-      "reviewedPaths": [
-        "README.md",
-        "apps/desktop",
-        "apps/server",
-        "apps/web",
-        "packages/contracts",
-        "packages/shared"
-      ],
-      "outcome": "reference-only",
-      "license": {
-        "spdx": "MIT",
-        "path": "LICENSE",
-        "sha256": "751360828204a1cb884f65314275949f83a1420a8dbe42ea5509f066c9a7ebad"
-      },
-      "notesPath": "docs/provenance/peak-code-reference.md"
-    },
     "pi-gui": {
       "reviewedCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
       "remoteHeadAtReview": "eb9a7380705dffad36db3efa771ee825aafbef6f",
       "sourceRef": "main",
-      "reviewedAt": "2026-08-07",
+      "reviewedAt": "2026-08-08",
       "reviewedPaths": [
         "README.md",
         "LICENSE",
@@ -34,12 +13,31 @@
         "apps/desktop/electron/app-store-workspace.ts",
         "apps/desktop/electron/app-store-persistence.ts",
         "apps/desktop/electron/app-store-composer.ts",
+        "apps/desktop/electron/app-store-worktree.ts",
         "apps/desktop/electron/session-state-map.ts",
         "apps/desktop/electron/notification-manager.ts",
         "apps/desktop/electron/notification-permission.ts",
+        "apps/desktop/electron/app-store-diff.ts",
+        "apps/desktop/electron/worktree-manager.ts",
+        "apps/desktop/src/App.tsx",
+        "apps/desktop/src/desktop-state.ts",
+        "apps/desktop/src/diff-inline.tsx",
+        "apps/desktop/src/diff-panel-types.ts",
+        "apps/desktop/src/diff-panel.tsx",
         "apps/desktop/src/hooks/use-composer-draft-sync.ts",
+        "apps/desktop/src/hooks/use-workspace-menu.tsx",
         "apps/desktop/src/new-thread-view.tsx",
         "apps/desktop/src/hooks/use-new-thread-controller.tsx",
+        "apps/desktop/src/thread-groups.ts",
+        "apps/desktop/tests/core/mentions-diff.spec.ts",
+        "apps/desktop/tests/core/persistence.spec.ts",
+        "apps/desktop/tests/core/terminal-diff-layout.spec.ts",
+        "apps/desktop/tests/core/worktree-manager.spec.ts",
+        "apps/desktop/tests/core/worktrees.spec.ts",
+        "packages/catalogs/src/storage.ts",
+        "packages/catalogs/src/types.ts",
+        "packages/pi-sdk-driver/src/atomic-write.ts",
+        "packages/pi-sdk-driver/src/json-catalog-store.ts",
         "packages/pi-sdk-driver/src/session-supervisor.ts"
       ],
       "outcome": "reimplemented",
@@ -49,6 +47,51 @@
         "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
       },
       "notesPath": "docs/provenance/pi-gui-reference.md"
+    },
+    "t3code": {
+      "reviewedCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "remoteHeadAtReview": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourceRef": "main",
+      "reviewedAt": "2026-08-08",
+      "reviewedPaths": [
+        "README.md",
+        "LICENSE",
+        "apps/web/src/AppRoot.tsx",
+        "apps/web/src/components/AppSidebarLayout.tsx",
+        "apps/web/src/components/SidebarV2.tsx",
+        "apps/web/src/components/ChatView.tsx",
+        "apps/web/src/components/chat/ChatComposer.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.tsx",
+        "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+        "apps/web/src/components/chat/timelineScrollAnchoring.ts",
+        "apps/web/src/components/CommandPalette.tsx",
+        "apps/web/src/components/CommandPalette.logic.ts",
+        "apps/web/src/components/DiffPanel.tsx",
+        "apps/web/src/components/ThreadTerminalDrawer.tsx",
+        "apps/web/src/components/ThreadStatusIndicators.tsx",
+        "apps/web/src/components/AgentsPanel.tsx",
+        "apps/web/src/components/RightPanelTabs.tsx",
+        "apps/web/src/components/BranchToolbar.tsx",
+        "packages/shared/src/DrainableWorker.ts",
+        "packages/shared/src/KeyedCoalescingWorker.ts",
+        "apps/server/src/orchestration/Services/OrchestrationEngine.ts",
+        "apps/server/src/orchestration/Services/ProviderRuntimeIngestion.ts",
+        "apps/server/src/orchestration/Services/RuntimeReceiptBus.ts",
+        "apps/server/src/orchestration/Services/CheckpointReactor.ts",
+        "apps/server/src/orchestration/ThreadBackgroundLiveness.ts",
+        "apps/server/src/provider/Services/ProviderAdapter.ts",
+        "apps/server/src/provider/Services/ProviderSessionReaper.ts",
+        "apps/server/src/vcs/testing/VcsDriverContractHarness.ts",
+        "packages/contracts/src/providerRuntime.ts",
+        "packages/client-runtime/src/errors/safeLog.ts"
+      ],
+      "outcome": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "notesPath": "docs/provenance/t3code-reference.md"
     }
   }
 }

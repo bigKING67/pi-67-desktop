@@ -15,10 +15,11 @@ import {
   parseWorkspaces,
   selectedSurfaceWorkspaceId,
   WORKBENCH_STATE_VERSION,
-  parseWorkbenchStateV4,
+  parseWorkbenchStateV5,
+  plainWorkspaceEnvironmentBindings,
   type RuntimeRecoveryRecordV2,
   type WorkbenchStateV2,
-  type WorkbenchStateV4,
+  type WorkbenchStateV5,
   type LegacyConversationKey,
   type LegacyWorkbenchSurface,
   type WorkbenchSurface
@@ -82,11 +83,11 @@ export function parseWorkbenchStateV2(value: unknown): WorkbenchStateV2 | undefi
   };
 }
 
-export function parseAndMigrateWorkbenchStateV2(value: unknown): WorkbenchStateV4 | undefined {
+export function parseAndMigrateWorkbenchStateV2(value: unknown): WorkbenchStateV5 | undefined {
   const legacy = parseWorkbenchStateV2(value);
   if (!legacy) return undefined;
   const selectedSurface = migrateSelectedSurface(legacy.selectedSurface);
-  return parseWorkbenchStateV4({
+  return parseWorkbenchStateV5({
     version: WORKBENCH_STATE_VERSION,
     workspaces: legacy.workspaces,
     workspaceOrder: legacy.workspaceOrder,
@@ -94,6 +95,8 @@ export function parseAndMigrateWorkbenchStateV2(value: unknown): WorkbenchStateV
     ...(legacy.currentWorkspaceId ? { currentWorkspaceId: legacy.currentWorkspaceId } : {}),
     ...(selectedSurface ? { selectedSurface } : {}),
     runtimeRecovery: [],
+    workspaceEnvironments: plainWorkspaceEnvironmentBindings(legacy.workspaces),
+    environmentMutations: [],
     settings: legacy.settings,
     cleanExit: legacy.cleanExit
   });

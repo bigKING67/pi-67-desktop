@@ -1,3 +1,8 @@
+import {
+  ProtocolRequestError,
+  type RuntimeDiagnosticsCollectionFailure,
+  type SupportDiagnosticsExportRequest
+} from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { messages } from "../localization/message-catalog.js";
@@ -5,11 +10,19 @@ import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { doctorStore } from "./doctor-store.js";
 
+const DIAGNOSTIC_EXPORT_ACK_TIMEOUT_MS = 3_000;
+
 export async function saveRuntimeDiagnostics(): Promise<void> {
   try {
-    const diagnostics = await agentConnectionController.request("diagnostics.collect", {});
-    const path = await window.pi67.system.saveDiagnostics(diagnostics);
-    if (path) publishNotification({ level: "info", title: "脱敏诊断已保存" });
+    const request = await collectDiagnosticsExportRequest();
+    const path = await window.pi67.system.saveDiagnostics(request);
+    if (path) publishNotification({
+      level: "info",
+      title: "脱敏诊断已保存",
+      ...(request.runtimeCollection.status === "unavailable"
+        ? { message: messages.doctor.exportedWithoutRuntime }
+        : {})
+    });
   } catch (error) {
     publishNotification({
       level: "error",
@@ -17,6 +30,33 @@ export async function saveRuntimeDiagnostics(): Promise<void> {
       message: errorMessage(error)
     });
   }
+}
+
+async function collectDiagnosticsExportRequest(): Promise<SupportDiagnosticsExportRequest> {
+  try {
+    const runtime = await agentConnectionController.request(
+      "diagnostics.collect",
+      {},
+      [],
+      { ackTimeoutMs: DIAGNOSTIC_EXPORT_ACK_TIMEOUT_MS }
+    );
+    return { runtimeCollection: { status: "available" }, runtime };
+  } catch (error) {
+    return {
+      runtimeCollection: {
+        status: "unavailable",
+        failure: diagnosticsCollectionFailure(error)
+      }
+    };
+  }
+}
+
+function diagnosticsCollectionFailure(error: unknown): RuntimeDiagnosticsCollectionFailure {
+  if (!(error instanceof ProtocolRequestError)) return "unknown";
+  if (error.code === "REQUEST_TIMEOUT") return "acknowledgement-timeout";
+  if (error.code === "CONNECTION_CLOSED" || error.code === "RUNTIME_NOT_READY") return "connection-unavailable";
+  if (error.code === "STALE_HOST_EPOCH") return "host-replaced";
+  return "protocol-error";
 }
 
 export async function runRuntimeDoctor(): Promise<void> {

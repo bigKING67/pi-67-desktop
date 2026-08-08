@@ -142,6 +142,41 @@ describe("WorkspaceFileCommandRouter", () => {
     })).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
   });
 
+  it("revalidates Prompt file references against current Workspace identity and revision", async () => {
+    const root = await workspaceRoot();
+    await mkdir(join(root, "src"));
+    await writeFile(join(root, "src", "main.ts"), "first\n", "utf8");
+    const router = routerFor(root);
+    const context = { scope: "workspace" as const, workspaceId: "workspace-1" };
+    const search = await router.dispatch(context, {
+      type: "workspace.file.search",
+      payload: { query: "main" }
+    });
+    if (!("entries" in search) || !search.entries[0]) throw new Error("Expected a file search result.");
+    const reference = { id: search.entries[0].id, revision: search.entries[0].revision };
+
+    await expect(router.validatePromptReferences("workspace-1", [reference])).resolves.toBeUndefined();
+    await expect(router.validatePromptReferences("workspace-1", [reference, reference]))
+      .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
+    await expect(router.validatePromptReferences("workspace-1", [{
+      id: "forged-reference",
+      revision: reference.revision
+    }])).rejects.toMatchObject({ code: "RESOURCE_NOT_FOUND" });
+
+    await writeFile(join(root, "src", "main.ts"), "externally changed and larger\n", "utf8");
+    await expect(router.validatePromptReferences("workspace-1", [reference]))
+      .rejects.toMatchObject({ code: "RESOURCE_CHANGED_EXTERNALLY" });
+
+    const rootPage = await router.dispatch(context, { type: "workspace.file.list", payload: {} });
+    if (!("entries" in rootPage)) throw new Error("Expected a Workspace file page.");
+    const directory = rootPage.entries.find((entry) => entry.name === "src");
+    if (!directory) throw new Error("Expected the source directory.");
+    await expect(router.validatePromptReferences("workspace-1", [{
+      id: directory.id,
+      revision: directory.revision
+    }])).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  });
+
   it("creates, saves and renames with idempotency and revision conflict protection", async () => {
     const root = await workspaceRoot();
     const router = routerFor(root);

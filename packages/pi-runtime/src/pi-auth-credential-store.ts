@@ -11,6 +11,7 @@ import {
   withConfigurationFileLock,
   writePrivateFileAtomically
 } from "./atomic-private-file.js";
+import { withPiConfigurationBudget } from "./pi-configuration-service-options.js";
 
 type CredentialData = Record<string, Credential>;
 
@@ -26,12 +27,15 @@ export type StoredApiKeyReveal =
 /** Pi auth.json-compatible CredentialStore with explicit external reload support. */
 export class PiAuthCredentialStore implements CredentialStore {
   private data: CredentialData = {};
+  private readonly readWaitMs: number;
 
-  constructor(readonly path: string) {}
+  constructor(readonly path: string, options: { readWaitMs?: number } = {}) {
+    this.readWaitMs = options.readWaitMs ?? 2_000;
+  }
 
   async reload(): Promise<string | undefined> {
     try {
-      this.data = parseCredentialData(await readOptionalFile(this.path));
+      this.data = parseCredentialData(await readOptionalFile(this.path, this.readWaitMs));
       return undefined;
     } catch (error) {
       return errorMessage(error);
@@ -63,7 +67,7 @@ export class PiAuthCredentialStore implements CredentialStore {
     update: (current: Credential | undefined) => Promise<Credential | undefined>
   ): Promise<Credential | undefined> {
     return withConfigurationFileLock(this.path, async () => {
-      const content = await readOptionalFile(this.path);
+      const content = await readOptionalFile(this.path, this.readWaitMs);
       const current = parseCredentialData(content);
       const nextCredential = await update(current[providerId]);
       if (nextCredential === undefined) {
@@ -79,7 +83,7 @@ export class PiAuthCredentialStore implements CredentialStore {
 
   async delete(providerId: string): Promise<void> {
     await withConfigurationFileLock(this.path, async () => {
-      const content = await readOptionalFile(this.path);
+      const content = await readOptionalFile(this.path, this.readWaitMs);
       const next = parseCredentialData(content);
       delete next[providerId];
       await writePrivateFileAtomically(this.path, `${JSON.stringify(next, null, 2)}\n`);
@@ -108,7 +112,7 @@ export class PiAuthCredentialStore implements CredentialStore {
     expectedRevision: string
   ): Promise<PiAuthCredentialMutationResult> {
     return withConfigurationFileLock(this.path, async () => {
-      const previousContent = await readOptionalFile(this.path);
+      const previousContent = await readOptionalFile(this.path, this.readWaitMs);
       if (contentRevision(previousContent) !== expectedRevision) {
         throw new PiAuthContentChangedError();
       }
@@ -165,8 +169,12 @@ function parseCredentialData(content: string | undefined): CredentialData {
   return result;
 }
 
-async function readOptionalFile(path: string): Promise<string | undefined> {
-  return readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
+async function readOptionalFile(path: string, waitMs: number): Promise<string | undefined> {
+  return withPiConfigurationBudget(
+    readFile(path, "utf8"),
+    waitMs,
+    "configuration-file-access"
+  ).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });

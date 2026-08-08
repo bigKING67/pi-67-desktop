@@ -64,9 +64,14 @@
 }
 
 .modelCapabilities {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: min(520px, 52vw);
   color: var(--text-tertiary);
   font-size: 11px;
-  white-space: nowrap;
+  line-height: 1.4;
+  text-align: right;
 }
 
 .modelEmpty,

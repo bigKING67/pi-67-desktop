@@ -25,15 +25,16 @@ import {
   type SessionCatalogDiscoveryResult,
   type ValidatedSessionCatalogQuery
 } from "./session-catalog-projection.js";
-import { normalizeSessionCatalogPathIdentity, resolveExistingSessionFileIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import { upsertSessionCatalogRecordByIdentity } from "./session-catalog-record-identity.js";
-import type {
-  CreateSessionCatalogOptions,
-  SessionCatalog,
-  SessionCatalogContext
-} from "./session-catalog-contract.js";
+import type { CreateSessionCatalogOptions, SessionCatalog, SessionCatalogContext } from "./session-catalog-contract.js";
 import { SessionCatalogRecordEnricher } from "./session-catalog-record-enricher.js";
 import { SessionCatalogAutomaticTitlePublisher } from "./session-catalog-automatic-title-publisher.js";
+import {
+  organizeSessionCatalogRecord,
+  reorderPinnedSessionCatalogRecords,
+  type SessionCatalogOrganizationHost
+} from "./session-catalog-organization.js";
 import { SessionCatalogSqliteLifecycle } from "./session-catalog-sqlite-lifecycle.js";
 import {
   openSqliteSessionCatalog,
@@ -41,11 +42,7 @@ import {
   type SqliteSessionCatalog
 } from "./sqlite-session-catalog.js";
 export type { SessionCatalogDiscoveryResult } from "./session-catalog-projection.js";
-export type {
-  CreateSessionCatalogOptions,
-  SessionCatalog,
-  SessionCatalogContext
-} from "./session-catalog-contract.js";
+export type { CreateSessionCatalogOptions, SessionCatalog, SessionCatalogContext } from "./session-catalog-contract.js";
 interface ReconcileFlight {
   sourceKey: string;
   contextGeneration: number;
@@ -150,31 +147,32 @@ class DefaultSessionCatalog implements SessionCatalog {
     mutation: { kind: "pin" | "archive"; value: boolean },
     context: SessionCatalogContext
   ): Promise<number> {
-    return this.withPreparedContext(context, async (contextGeneration) => {
-      if (!this.isCurrentContext(context, contextGeneration)) return this.current.revision;
-      const organization = await this.recordEnricher.organize(
-        context.sourceKey,
-        await resolveExistingSessionFileIdentity(path),
-        mutation,
-        this.now()
-      );
-      if (!this.isCurrentContext(context, contextGeneration)) return this.current.revision;
-      if (this.sqlite && this.current.source === "sqlite") {
-        try {
-          if (!this.sqlite.organize) throw new Error("Session Catalog organization projection is unavailable.");
-          const state = this.sqlite.organize(path, organization, this.current.revision);
-          this.applySqliteState(state, false);
-          this.publish("conversation-organized");
-          return this.current.revision;
-        } catch {
-          this.demoteSqlite(true);
-        }
-      }
-      this.fallbackRecords = this.recordEnricher.applyOrganization(this.fallbackRecords, path, organization);
-      this.current = { ...this.current, revision: this.current.revision + 1 };
-      this.publish("conversation-organized");
-      return this.current.revision;
-    });
+    return this.withPreparedContext(context, (generation) => organizeSessionCatalogRecord(
+      this.organizationHost(), path, mutation, context, generation
+    ));
+  }
+  reorderPinned(paths: readonly string[], context: SessionCatalogContext): Promise<number> {
+    return this.withPreparedContext(context, (generation) => reorderPinnedSessionCatalogRecords(
+      this.organizationHost(), paths, context, generation
+    ));
+  }
+  private organizationHost(): SessionCatalogOrganizationHost {
+    return {
+      recordEnricher: this.recordEnricher,
+      now: this.now,
+      current: () => this.current,
+      sqlite: () => this.sqlite,
+      isCurrentContext: (context, generation) => this.isCurrentContext(context, generation),
+      readProjection: (query) => this.readProjection(query),
+      applySqliteState: (state) => this.applySqliteState(state, false),
+      demoteSqlite: () => this.demoteSqlite(true),
+      fallbackRecords: () => this.fallbackRecords,
+      commitFallback: (records) => {
+        this.fallbackRecords = records;
+        this.current = { ...this.current, revision: this.current.revision + 1 };
+      },
+      publish: () => this.publish("conversation-organized")
+    };
   }
   private upsertPrepared(
     safe: SessionCatalogRecord,

@@ -1,5 +1,8 @@
 import type { AgentCommand, CommandResults, WorkspaceProtocolContext } from "@pi67/protocol";
-import type { RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
+import {
+  searchWorkspaceSessionContent,
+  type RuntimeCredentialOverrideStore
+} from "@pi67/pi-runtime";
 import type { HostEventChannel } from "./host-event-channel.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { HostCommandError } from "./protocol-error.js";
@@ -217,6 +220,25 @@ export class WorkspaceCommandRouter {
     command: AgentCommand<"session.catalog.query">
   ): Promise<CommandResults["session.catalog.query"]> {
     return this.workspaces.queryCatalog(context.workspaceId, command.payload);
+  }
+
+  async searchCatalogContent(
+    context: WorkspaceProtocolContext,
+    command: AgentCommand<"session.catalog.contentSearch">
+  ): Promise<CommandResults["session.catalog.contentSearch"]> {
+    const page = await this.workspaces.queryCatalog(context.workspaceId, {
+      scope: "workspace",
+      view: "active",
+      limit: 100
+    });
+    return searchWorkspaceSessionContent({
+      workspaceId: context.workspaceId,
+      query: command.payload.query,
+      sessions: page.items,
+      catalogTotal: page.total,
+      catalogIncomplete: page.incomplete || page.rebuilding || page.state === "unavailable",
+      catalogSkippedCount: page.skippedCount
+    });
   }
 
   resolveSessionCreation(

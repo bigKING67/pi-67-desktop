@@ -8,24 +8,38 @@ import type {
   NativeNotificationRequest,
   PackageNetworkSettings,
   PackageNetworkSnapshot,
-  RuntimeDiagnostics,
+  RepositoryEnvironmentInspectionRequest,
+  RepositoryEnvironmentSnapshot,
+  SupportDiagnosticsExportRequest,
+  WorktreeCreationRequest,
+  WorktreeCreationAdvanceRequest,
+  WorktreeCreationAdvanceResult,
+  WorktreeCreationResult,
+  WorktreeCreationRollbackRequest,
+  WorktreeCreationRollbackResult,
   WorkspaceEntryContextAction,
   WorkspaceEntryRequest,
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
+import { isRepositoryEnvironmentSnapshot } from "@pi67/protocol/repository-environment-snapshot-validation";
+import {
+  isWorktreeCreationAdvanceResult,
+  isWorktreeCreationResult,
+  isWorktreeCreationRollbackResult
+} from "@pi67/protocol/worktree-creation-result-validation";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
 import { stagePromptAttachmentsFromPreload } from "./prompt-attachment-preload.js";
 import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
 import type {
-  WorkbenchLayoutV4,
-  WorkbenchStateV4
+  WorkbenchLayoutV5,
+  WorkbenchStateV5
 } from "./workbench-state.js";
 import type { WorkspaceDescriptor } from "./workspace-identity.js";
 
 export type {
-  WorkbenchLayoutV4,
-  WorkbenchStateV4,
+  WorkbenchLayoutV5,
+  WorkbenchStateV5,
 } from "./workbench-state.js";
 export type {
   NativeWorkspaceDescriptor,
@@ -51,7 +65,43 @@ const systemBridge = {
   releasePromptAttachments: (ids: string[]): Promise<void> => (
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
-  loadWorkbenchState: (): Promise<WorkbenchStateV4> => ipcRenderer.invoke("pi67:workbench-load"),
+  loadWorkbenchState: (): Promise<WorkbenchStateV5> => ipcRenderer.invoke("pi67:workbench-load"),
+  inspectRepositoryEnvironment: async (
+    request: RepositoryEnvironmentInspectionRequest
+  ): Promise<RepositoryEnvironmentSnapshot> => {
+    const value = await ipcRenderer.invoke("pi67:repository-environment-inspect", request) as unknown;
+    if (!isRepositoryEnvironmentSnapshot(value)) {
+      throw new Error("Repository environment response is invalid.");
+    }
+    return value;
+  },
+  createWorktreeEnvironment: async (
+    request: WorktreeCreationRequest
+  ): Promise<WorktreeCreationResult> => {
+    const value = await ipcRenderer.invoke("pi67:worktree-environment-create", request) as unknown;
+    if (!isWorktreeCreationResult(value)) {
+      throw new Error("Worktree creation response is invalid.");
+    }
+    return value;
+  },
+  advanceWorktreeEnvironment: async (
+    request: WorktreeCreationAdvanceRequest
+  ): Promise<WorktreeCreationAdvanceResult> => {
+    const value = await ipcRenderer.invoke("pi67:worktree-environment-advance", request) as unknown;
+    if (!isWorktreeCreationAdvanceResult(value)) {
+      throw new Error("Worktree creation advance response is invalid.");
+    }
+    return value;
+  },
+  rollbackWorktreeEnvironment: async (
+    request: WorktreeCreationRollbackRequest
+  ): Promise<WorktreeCreationRollbackResult> => {
+    const value = await ipcRenderer.invoke("pi67:worktree-environment-rollback", request) as unknown;
+    if (!isWorktreeCreationRollbackResult(value)) {
+      throw new Error("Worktree creation rollback response is invalid.");
+    }
+    return value;
+  },
   loadComposerDraftState: (): Promise<ComposerDraftStateSnapshot> => (
     ipcRenderer.invoke("pi67:composer-draft-state-load")
   ),
@@ -64,7 +114,7 @@ const systemBridge = {
   updateWorkspaceFileState: (state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot> => (
     ipcRenderer.invoke("pi67:workspace-file-state-update", state)
   ),
-  updateWorkbenchLayout: (layout: WorkbenchLayoutV4): Promise<WorkbenchStateV4> => (
+  updateWorkbenchLayout: (layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
   ),
   pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
@@ -73,17 +123,17 @@ const systemBridge = {
   repairWorkspace: (workspaceId: string): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-repair", workspaceId)
   ),
-  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV4> => (
+  removeWorkspace: (workspaceId: string): Promise<WorkbenchStateV5> => (
     ipcRenderer.invoke("pi67:workspace-remove", workspaceId)
   ),
-  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV4> => (
+  reorderWorkspaces: (workspaceIds: string[]): Promise<WorkbenchStateV5> => (
     ipcRenderer.invoke("pi67:workspace-reorder", workspaceIds)
   ),
   selectWorkspace: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-workspace"),
   selectSessionFile: (): Promise<string | undefined> => ipcRenderer.invoke("pi67:select-session-file"),
   getRecoverySnapshot: (): Promise<DesktopRecoverySnapshot> => ipcRenderer.invoke("pi67:recovery-snapshot"),
-  saveDiagnostics: (diagnostics: RuntimeDiagnostics): Promise<string | undefined> => (
-    ipcRenderer.invoke("pi67:save-diagnostics", diagnostics)
+  saveDiagnostics: (request: SupportDiagnosticsExportRequest): Promise<string | undefined> => (
+    ipcRenderer.invoke("pi67:save-diagnostics", request)
   ),
   showNativeNotification: (request: NativeNotificationRequest): Promise<boolean> => (
     ipcRenderer.invoke("pi67:native-notification-show", request)

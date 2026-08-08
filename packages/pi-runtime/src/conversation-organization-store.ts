@@ -37,19 +37,37 @@ export class ConversationOrganizationStore {
   }
 
   async set(sourceKey: string, fileIdentity: string, value: ConversationOrganization): Promise<void> {
+    await this.setMany(sourceKey, [{ fileIdentity, value }]);
+  }
+
+  highestPinnedAt(): number {
+    let highest = -1;
+    for (const value of this.records.values()) highest = Math.max(highest, value.pinnedAt ?? -1);
+    return highest;
+  }
+
+  async setMany(
+    sourceKey: string,
+    updates: readonly { fileIdentity: string; value: ConversationOrganization }[]
+  ): Promise<void> {
     await this.initialize();
-    const key = sessionKey(sourceKey, fileIdentity);
-    const previous = this.records.get(key);
-    if (value.pinnedAt === undefined && value.archivedAt === undefined) this.records.delete(key);
-    else this.records.set(key, { ...value });
+    const previous = new Map<string, ConversationOrganization | undefined>();
+    for (const update of updates) {
+      const key = sessionKey(sourceKey, update.fileIdentity);
+      if (!previous.has(key)) previous.set(key, this.records.get(key));
+      if (update.value.pinnedAt === undefined && update.value.archivedAt === undefined) this.records.delete(key);
+      else this.records.set(key, { ...update.value });
+    }
     try {
       if (this.records.size > MAX_RECORDS) {
         throw new Error("Conversation organization storage reached its record limit.");
       }
       await this.persist();
     } catch (error) {
-      if (previous === undefined) this.records.delete(key);
-      else this.records.set(key, previous);
+      for (const [key, value] of previous) {
+        if (value === undefined) this.records.delete(key);
+        else this.records.set(key, value);
+      }
       throw error;
     }
   }

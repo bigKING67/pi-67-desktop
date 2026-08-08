@@ -9,6 +9,7 @@ export type SessionProjectionGroup =
   | "identity"
   | "modelCatalog"
   | "controls"
+  | "interaction"
   | "queue"
   | "resources"
   | "usage";
@@ -17,6 +18,7 @@ export interface SessionProjectionRevisions {
   identity: number;
   modelCatalog: number;
   controls: number;
+  interaction: number;
   queue: number;
   resources: number;
   usage: number;
@@ -30,6 +32,7 @@ export const INITIAL_SESSION_PROJECTION_REVISIONS: SessionProjectionRevisions = 
   identity: 0,
   modelCatalog: 0,
   controls: 0,
+  interaction: 0,
   queue: 0,
   resources: 0,
   usage: 0
@@ -49,6 +52,7 @@ export function incrementAllSessionProjectionRevisions(
     identity: revisions.identity + 1,
     modelCatalog: revisions.modelCatalog + 1,
     controls: revisions.controls + 1,
+    interaction: revisions.interaction + 1,
     queue: revisions.queue + 1,
     resources: revisions.resources + 1,
     usage: revisions.usage + 1

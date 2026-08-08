@@ -1,5 +1,7 @@
 import type {
+  ActiveProposedPlan,
   SessionControlsView,
+  SessionInteractionMode,
   SessionModelCatalogView,
   SessionSnapshot
 } from "@pi67/domain";
@@ -17,6 +19,11 @@ export type SessionModelCatalogProjection = SessionModelCatalogView;
 export interface SessionQueueProjection {
   steeringQueue: string[];
   followUpQueue: string[];
+}
+
+export interface SessionInteractionProjection {
+  interactionMode: SessionInteractionMode;
+  activeProposedPlan?: ActiveProposedPlan;
 }
 
 export function identityProjectionFromSnapshot(
@@ -55,5 +62,16 @@ export function queueProjectionFromSnapshot(
   return {
     steeringQueue: snapshot.steeringQueue,
     followUpQueue: snapshot.followUpQueue
+  };
+}
+
+export function interactionProjectionFromSnapshot(
+  snapshot: SessionSnapshot
+): SessionInteractionProjection {
+  return {
+    interactionMode: snapshot.interactionMode ?? "execute",
+    ...(snapshot.activeProposedPlan === undefined
+      ? {}
+      : { activeProposedPlan: snapshot.activeProposedPlan })
   };
 }

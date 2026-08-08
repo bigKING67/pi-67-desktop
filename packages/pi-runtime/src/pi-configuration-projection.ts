@@ -21,6 +21,7 @@ import {
 } from "./pi-configuration-documents.js";
 import type { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import { reloadDesktopSettings } from "./desktop-package-toolchain.js";
+import { withPiConfigurationBudget } from "./pi-configuration-service-options.js";
 import { projectRuntimeProviders } from "./session-snapshot.js";
 
 interface RefreshPiConfigurationOptions {
@@ -31,6 +32,9 @@ interface RefreshPiConfigurationOptions {
   emit: boolean;
   force: boolean;
   runtimeReloadWaitMs: number;
+  fileAccessWaitMs: number;
+  validationRuntimeWaitMs: number;
+  settingsReloadWaitMs: number;
   createValidationRuntime(): Promise<ModelRuntime>;
   installModelRuntime(runtime: ModelRuntime): void;
 }
@@ -38,7 +42,7 @@ interface RefreshPiConfigurationOptions {
 export async function refreshPiConfigurationProjection(options: RefreshPiConfigurationOptions): Promise<void> {
   if (options.states.length === 0) return;
   const bundles = await Promise.all(options.states.map((state) => (
-    readWorkspaceConfigurationBundle(options.paths, state)
+    readWorkspaceConfigurationBundle(options.paths, state, options.fileAccessWaitMs)
   )));
   if (
     !options.force
@@ -65,7 +69,11 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
 
   if (modelsDocument && !authError) {
     try {
-      const probe = await options.createValidationRuntime();
+      const probe = await withConfigurationProjectionBudget(
+        options.createValidationRuntime(),
+        options.validationRuntimeWaitMs,
+        "provider-validation-runtime"
+      );
       const error = probe.getError();
       if (error) throw new Error(error);
       options.installModelRuntime(probe);
@@ -104,7 +112,15 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       }
     }
     if (diagnostics.length === 0) {
-      await reloadDesktopSettings(state.settingsManager);
+      try {
+        await withConfigurationProjectionBudget(
+          reloadDesktopSettings(state.settingsManager),
+          options.settingsReloadWaitMs,
+          "settings-reload"
+        );
+      } catch (error) {
+        diagnostics.push({ file: "global-settings", message: configurationErrorMessage(error) });
+      }
       for (const item of state.settingsManager.drainErrors()) {
         diagnostics.push({
           file: item.scope === "global" ? "global-settings" : "project-settings",
@@ -175,6 +191,14 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       state.listeners.forEach((listener) => listener(change));
     }
   }
+}
+
+async function withConfigurationProjectionBudget<T>(
+  operation: Promise<T>,
+  waitMs: number,
+  stage: "provider-validation-runtime" | "settings-reload"
+): Promise<T> {
+  return withPiConfigurationBudget(operation, waitMs, stage);
 }
 
 async function requestBoundedRuntimeReload(

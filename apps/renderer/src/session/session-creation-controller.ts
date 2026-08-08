@@ -7,10 +7,15 @@ import { runSessionBootstrapTransition } from "../app/session-transition.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
+  type RendererTaskEnvironmentIntent,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
+import {
+  commitWorktreeSessionEnvironment,
+  prepareWorktreeSessionEnvironment
+} from "../worktree/worktree-session-environment-controller.js";
 import {
   ensureRendererSessionCreationAuthority,
   selectPendingRendererSessionCreation
@@ -26,7 +31,10 @@ export type RendererSessionMaterializationResult =
   | { status: "materialized" }
   | { status: "failed" | "unconfirmed"; error: string };
 
-export function beginRendererSessionIntent(workspaceId?: string): string | undefined {
+export function beginRendererSessionIntent(
+  workspaceId?: string,
+  options: { environmentIntent?: RendererTaskEnvironmentIntent } = {}
+): string | undefined {
   const state = useAppStore.getState();
   if (state.sessionTransitionPending || state.workspaceOpenPending) return undefined;
   if (selectPendingRendererSessionCreation()) return undefined;
@@ -41,8 +49,13 @@ export function beginRendererSessionIntent(workspaceId?: string): string | undef
     && selected.creationStatus === undefined
     && !selectedDraft?.text.trim()
     && (selectedDraft?.attachments.length ?? 0) === 0
+    && (selectedDraft?.workspaceFiles.length ?? 0) === 0
   ) return selected.id;
-  return beginPendingTask(undefined, { workspaceId: targetWorkspaceId, intent: true })?.id;
+  return beginPendingTask(undefined, {
+    workspaceId: targetWorkspaceId,
+    intent: true,
+    ...(options.environmentIntent ? { environmentIntent: options.environmentIntent } : {})
+  })?.id;
 }
 
 export async function createRendererSession(): Promise<void> {
@@ -109,6 +122,21 @@ export async function materializeRendererSessionIntent(
   ) {
     return { status: "failed", error: "当前新对话草稿已变化，请重新确认后再发送。" };
   }
+  if (current.environmentIntent === "worktree") {
+    const prepared = await prepareWorktreeSessionEnvironment(taskId);
+    if (prepared.status !== "prepared") return prepared;
+    const materialized = await runRendererSessionCreation(
+      prepared.task,
+      prepared.creationId,
+      get,
+      set
+    );
+    if (materialized.status !== "materialized") return materialized;
+    const committed = await commitWorktreeSessionEnvironment(taskId, prepared.creationId);
+    return committed.status === "committed"
+      ? materialized
+      : { status: "unconfirmed", error: committed.error };
+  }
   const creationId = createMessageId("session-creation");
   const startingRuntime = {
     phase: "starting" as const,
@@ -150,7 +178,19 @@ async function runRendererSessionCreation(
         return;
       }
       const draft = useTaskDraftStore.getState().drafts[task.id];
-      if (!draft || (draft.text.trim().length === 0 && draft.attachments.length === 0)) {
+      if (task.environmentIntent === "worktree") {
+        rendererWorkbenchStore.getState().updateTask(task.id, {
+          lifecycle: "draft",
+          creationId: undefined,
+          creationStatus: undefined,
+          environmentCreationState: "recovery-required",
+          runtime: { phase: "failed", detail: messages.runtime.session.createFailed, recoverable: true }
+        });
+      } else if (!draft || (
+        draft.text.trim().length === 0
+        && draft.attachments.length === 0
+        && draft.workspaceFiles.length === 0
+      )) {
         useTaskDraftStore.getState().discard(task.id);
         rendererWorkbenchStore.getState().removeRuntimeTask(task.id);
       } else {

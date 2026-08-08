@@ -60,11 +60,12 @@ async function executeRefresh(
     }
     store.finishRefresh(target, projection);
   } catch (error) {
-    if (!store.failRefresh(target)) return;
+    const message = errorMessage(error);
+    if (!store.failRefresh(target, message)) return;
     publishNotification({
       level: "warning",
       title: "无法加载本会话修改记录",
-      message: errorMessage(error)
+      message
     });
   }
 }

@@ -16,6 +16,7 @@ import type {
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
   SessionSnapshot,
+  SessionInteractionMode,
   SessionTreeProjection,
   WorkspaceChangesProjection,
   WorkspaceTrust,
@@ -23,7 +24,8 @@ import type {
   ApprovalResponseDecision,
   ApprovalResolution,
   UserMessageIndexPage,
-  LocatedMessageWindow
+  LocatedMessageWindow,
+  MessageSearchResult
 } from "@pi67/domain";
 import type {
   AgentEvent,
@@ -50,6 +52,7 @@ export type RuntimeInitializationStage =
   | "resolve-session"
   | "dispose-current"
   | "create-session"
+  | "load-model-runtime"
   | "reload-configuration"
   | "project-snapshot";
 
@@ -81,7 +84,8 @@ export interface AgentRuntime {
   getWorkspaceChanges(): WorkspaceChangesProjection;
   getMessagePage(options: { direction: "older" | "newer"; cursor?: string; limit?: number }): ConversationPage;
   getUserMessageIndex(options: { offset?: number; limit?: number }): UserMessageIndexPage;
-  locateUserMessage(id: string): LocatedMessageWindow;
+  searchMessages(query: string): MessageSearchResult;
+  locateMessage(id: string): LocatedMessageWindow;
   readAsset(options: { assetId: string; sessionGeneration: number; offset: number; length?: number }): AssetReadResult;
   createSession(creationId: string): Promise<SessionSnapshot>;
   openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot>;
@@ -91,6 +95,8 @@ export interface AgentRuntime {
   rollback(entryId: string, summarize?: boolean): Promise<void>;
   compact(instructions?: string): Promise<void>;
   setSessionName(name?: string): Promise<void>;
+  setInteractionMode(mode: SessionInteractionMode): Promise<void>;
+  implementPlan(planId: string): Promise<void>;
   preparePromptAttachments(
     submissionId: string,
     refs: readonly PromptAttachmentRef[]

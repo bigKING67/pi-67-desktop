@@ -136,7 +136,7 @@ function task(id: "active" | "background") {
     conversation: {
       kind: "session" as const,
       workspaceId: "workspace-a",
-      sessionFileIdentity: `session-file-${id}`,
+      sessionFileIdentity: `session-file-session-${id}`,
       sessionPath: `/sessions/${id}.jsonl`
     },
     workspaceId: "workspace-a",

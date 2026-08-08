@@ -4,6 +4,7 @@ export type WorkspaceChangeStatus = "pending" | "running" | "completed" | "faile
 
 interface WorkspaceChangeBase {
   toolCallId: string;
+  turnId?: string;
   path: string;
   pathTruncated: boolean;
   status: WorkspaceChangeStatus;

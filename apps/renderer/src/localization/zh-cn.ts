@@ -2,6 +2,7 @@ import { zhCNCommandPaletteMessages } from "./zh-cn-command-palette.js";
 import { zhCNComposerMessages } from "./zh-cn-composer.js";
 import { zhCNExtensionPackageMessages } from "./zh-cn-extension-packages.js";
 import { zhCNOperationMessages } from "./zh-cn-operation.js";
+import { zhCNRepositoryEnvironmentMessages } from "./zh-cn-repository-environment.js";
 import { zhCNRuntimeMessages } from "./zh-cn-runtime.js";
 
 export const zhCNMessages = {
@@ -120,6 +121,7 @@ export const zhCNMessages = {
     localData: "数据保存在本机",
     localDataDetail: "工作区内容不会成为应用遥测"
   },
+  repositoryEnvironment: zhCNRepositoryEnvironmentMessages,
   shell: {
     sessionFallback: (id: string) => `会话 ${id}`,
     hideNavigation: "隐藏会话导航",
@@ -205,6 +207,7 @@ export const zhCNMessages = {
     rerun: "重新检查",
     run: "开始检查",
     export: "导出诊断",
+    exportedWithoutRuntime: "Agent Host 当前不可用；诊断包已保留 Main、配置可读性与恢复状态。",
     loadingInterface: "正在加载恢复与诊断",
     interfaceFailureTitle: "恢复与诊断界面未能加载",
     interfaceFailureDescription: "恢复与诊断界面模块发生错误。可以关闭后继续使用，或重新加载界面恢复该功能。",

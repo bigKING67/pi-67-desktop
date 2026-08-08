@@ -90,6 +90,96 @@
       },
       "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
       "modifications": "Reimplemented native notification lifecycle, dedupe, window recreation, and click delivery in Electron Main while keeping all user content out of the IPC contract. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/app-store.ts",
+      "sourceSha256": "615cf68135ca3652ec84588625c375066a6b687a5d3a60c1591d2e75c91428f4",
+      "targetPath": "packages/pi-runtime/src/pi-configuration-service.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented partial-startup availability as bounded, target-Workspace Pi configuration loading with structured file-access failure and invalid-snapshot fallback when offline Provider validation stalls. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/electron/app-store.ts",
+      "sourceSha256": "615cf68135ca3652ec84588625c375066a6b687a5d3a60c1591d2e75c91428f4",
+      "targetPath": "apps/desktop/src/support-diagnostics.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented failure-visible startup diagnostics as a Main-owned, Host-optional support export with fixed Pi configuration metadata, path hashing, and strict content exclusion. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/App.tsx",
+      "sourceSha256": "6f5a9d372e9a9a8c6b9198a9016902766ce5d17c5879abfdd7f44a03dbae6f30",
+      "targetPath": "apps/renderer/src/doctor/runtime-diagnostics-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented visible partial-startup diagnostics as a bounded fallback export success state when Runtime collection times out or disconnects. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/diff-panel.tsx",
+      "sourceSha256": "edab7dc404304c0c956e11da380553117ddce673ba4181d8d9b16bd65d222a12",
+      "targetPath": "apps/renderer/src/changes/ChangesPanel.tsx",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented the changed-record summary, explicit selection, bounded viewer, and loading/empty/unavailable product flow over Pi-67 Session authority. Git status, staging, file preview, and source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/diff-inline.tsx",
+      "sourceSha256": "5d440aac8d82179f6fb065973342ab1381575eadfcc2e637b9814ab8b9dfafa4",
+      "targetPath": "apps/renderer/src/changes/ChangesPanel.tsx",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented a bounded unified-Patch presentation with Pi-67 theme tokens, metadata classification, reduced-motion behavior, and a separate 600-row DOM budget. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "packages/shared/src/DrainableWorker.ts",
+      "sourceSha256": "c0632786c0985a7b899646a053c2b00b9f8b28675ed4ebbf03034e4c29f7e229",
+      "targetPath": "apps/agent-host/src/session-creation-resolution-coordinator.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented the outstanding-work drain invariant with bounded Promise-native Agent Host shutdown semantics. Effect, TxQueue, TxRef, and t3code source code were not copied."
     }
   ]
 }

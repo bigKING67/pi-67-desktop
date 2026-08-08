@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyShellCommand, decideApproval } from "./safety-policy.js";
+import {
+  classifyShellCommand,
+  decideApproval,
+  isPlanModeReadOnlyShellCommand
+} from "./safety-policy.js";
 
 describe("classifyShellCommand", () => {
   it("classifies bounded inspection commands as workspace commands", () => {
@@ -216,6 +220,27 @@ describe("classifyShellCommand", () => {
       "pnpm exec playwright test --update-snapshots=all",
       "pnpm exec prettier --write apps"
     ]) expect(classifyShellCommand(command), command).toBe("ambiguous-command");
+  });
+});
+
+describe("isPlanModeReadOnlyShellCommand", () => {
+  it("allows bounded inspection without allowing verification commands that may write output", () => {
+    for (const command of [
+      "pwd",
+      "rg -n TODO apps packages | head -n 20",
+      "git status --short && git diff --check",
+      "git show HEAD:README.md",
+      "sed -n '1,80p' README.md"
+    ]) expect(isPlanModeReadOnlyShellCommand(command), command).toBe(true);
+
+    for (const command of [
+      "pnpm test",
+      "corepack pnpm run build",
+      "cargo check",
+      "git fetch origin",
+      "git status && touch output",
+      "cat ../outside.txt"
+    ]) expect(isPlanModeReadOnlyShellCommand(command), command).toBe(false);
   });
 });
 

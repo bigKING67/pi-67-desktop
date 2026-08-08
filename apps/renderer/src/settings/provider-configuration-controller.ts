@@ -7,6 +7,7 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 
 const providerLoadFlights = new Map<string, Promise<boolean>>();
+const PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS = 12_000;
 
 export function loadProviderConfiguration(workspaceId?: string): Promise<boolean> {
   const target = resolveWorkspace(workspaceId);
@@ -28,7 +29,12 @@ async function performProviderConfigurationLoad(workspaceId: string): Promise<bo
   try {
     await ensureAgentConnection();
     await registerRendererWorkspaceWithHost(target, { queryCatalog: false });
-    const snapshot = await request(target.id, "provider.configuration.get", {});
+    const snapshot = await request(
+      target.id,
+      "provider.configuration.get",
+      {},
+      PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS
+    );
     useProviderConfigurationStore.getState().install(target.id, snapshot);
     return true;
   } catch (error) {
@@ -132,7 +138,12 @@ export async function reloadProviderConfiguration(workspaceId?: string): Promise
   const target = resolveWorkspace(workspaceId);
   if (!target) return false;
   try {
-    const snapshot = await request(target.id, "provider.configuration.reload", {});
+    const snapshot = await request(
+      target.id,
+      "provider.configuration.reload",
+      {},
+      PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS
+    );
     useProviderConfigurationStore.getState().install(target.id, snapshot);
     publishNotification({ level: "info", title: "已从 Pi 配置文件重新加载" });
     return true;
@@ -186,10 +197,12 @@ type ConfigurationMutationType = Extract<AgentCommandType,
 function request<T extends AgentCommandType>(
   workspaceId: string,
   type: T,
-  payload: CommandPayloads[T]
+  payload: CommandPayloads[T],
+  ackTimeoutMs?: number
 ): Promise<CommandResults[T]> {
   return agentConnectionController.request(type, payload, [], {
-    context: { scope: "workspace", workspaceId }
+    context: { scope: "workspace", workspaceId },
+    ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs })
   });
 }
 

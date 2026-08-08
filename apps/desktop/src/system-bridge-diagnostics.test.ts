@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -60,24 +63,64 @@ describe("system bridge recovery diagnostics", () => {
       pendingSessionCreations: 0,
       attachmentStaging: { draftCount: 2, claimedCount: 1 }
     });
-    await expect(invoke("pi67:save-diagnostics", runtimeDiagnostics)).resolves.toBe("/tmp/pi67-diagnostics.json");
+    await expect(invoke("pi67:save-diagnostics", {
+      runtimeCollection: { status: "available" },
+      runtime: runtimeDiagnostics
+    })).resolves.toBe("/tmp/pi67-diagnostics.json");
 
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     expect(typeof serialized).toBe("string");
     expect(JSON.parse(serialized as string)).toEqual(expect.objectContaining({
-      schema: "pi67-support-diagnostics.v1",
+      schema: "pi67-support-diagnostics.v2",
       application: expect.objectContaining({ version: "0.1.0-alpha.10" }),
       desktop: expect.objectContaining({ previousRunExitStatus: "unclean" }),
+      agentHost: expect.objectContaining({ phase: "running", hostEpoch: 4 }),
+      piConfiguration: expect.objectContaining({
+        agentDirectory: expect.objectContaining({ state: "missing" }),
+        files: [
+          { file: "auth.json", state: "directory-unavailable" },
+          { file: "settings.json", state: "directory-unavailable" },
+          { file: "models.json", state: "directory-unavailable" }
+        ]
+      }),
+      runtimeCollection: { status: "available" },
       runtime: runtimeDiagnostics
     }));
+  });
+
+  it("exports Main-owned diagnostics when the Agent Host does not acknowledge collection", async () => {
+    registerFixture();
+
+    await expect(invoke("pi67:save-diagnostics", {
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "acknowledgement-timeout"
+      }
+    })).resolves.toBe("/tmp/pi67-diagnostics.json");
+
+    const serialized = mocks.writeFile.mock.calls[0]?.[1];
+    const document = JSON.parse(String(serialized)) as Record<string, unknown>;
+    expect(document).toMatchObject({
+      schema: "pi67-support-diagnostics.v2",
+      runtimeCollection: {
+        status: "unavailable",
+        failure: "acknowledgement-timeout"
+      },
+      agentHost: { phase: "running", hostEpoch: 4 },
+      piConfiguration: expect.any(Object)
+    });
+    expect(document).not.toHaveProperty("runtime");
   });
 
   it("rejects Renderer-supplied raw paths before opening the save dialog", async () => {
     registerFixture();
 
     await expect(invoke("pi67:save-diagnostics", {
-      ...runtimeDiagnostics,
-      cwd: "/private/workspace"
+      runtimeCollection: { status: "available" },
+      runtime: {
+        ...runtimeDiagnostics,
+        cwd: "/private/workspace"
+      }
     })).rejects.toThrow("Invalid diagnostic payload.");
 
     expect(mocks.showSaveDialog).not.toHaveBeenCalled();
@@ -117,8 +160,17 @@ function registerFixture(): void {
       }))
     },
     previousRunExit: "unclean",
+    agentDirectory: join(tmpdir(), `pi67-missing-agent-${randomUUID()}`),
+    agentDirectorySource: "default",
+    getAgentHostDiagnostics: vi.fn(() => ({
+      phase: "running",
+      hostEpoch: 4,
+      portHandoffCount: 1,
+      poisonedRuntimeReplacementPending: false
+    })),
     workbenchState: { load: vi.fn(async () => ({ state })) },
-    workspaceFileState: {}
+    workspaceFileState: {},
+    repositoryEnvironmentInspection: { inspect: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn() }
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
 }
 

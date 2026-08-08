@@ -31,6 +31,7 @@ export interface SessionCatalog {
     mutation: { kind: "pin" | "archive"; value: boolean },
     context: SessionCatalogContext
   ): Promise<number>;
+  reorderPinned(paths: readonly string[], context: SessionCatalogContext): Promise<number>;
   dispose(): Promise<void>;
 }
 

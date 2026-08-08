@@ -52,9 +52,11 @@ import {
 import {
   ConversationPageSchema,
   LocatedMessageWindowSchema,
+  MessageSearchResultSchema,
   MessagePageMetadataSchema,
   SessionMessageSchema,
-  UserMessageIndexPageSchema
+  UserMessageIndexPageSchema,
+  WorkspaceMessageSearchResultSchema
 } from "./message-schemas.js";
 import {
   WorkspaceFileEntryResultSchema,
@@ -87,10 +89,9 @@ import {
   WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema
 } from "./workspace-registration-schemas.js";
 import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
-
+import { ActiveProposedPlanSchema, SessionInteractionModeSchema } from "./session-plan-schemas.js";
 export { ProtocolErrorSchema } from "./protocol-error-schema.js";
 export { CommandPayloadSchemas } from "./command-payload-schemas.js";
-
 const SessionTreeNodeSchema = strictObject({
   id: Type.String({ minLength: 1, maxLength: 512 }),
   parentId: Type.Union([Type.String({ minLength: 1, maxLength: 512 }), Type.Null()]),
@@ -105,7 +106,6 @@ const SessionTreeProjectionSchema = strictObject({
   truncated: Type.Boolean(),
   total: Type.Integer({ minimum: 0 })
 });
-
 const SessionSnapshotSchema = strictObject({
   sessionId: Type.String(),
   sessionFileIdentity: Type.Optional(Type.String({
@@ -127,13 +127,14 @@ const SessionSnapshotSchema = strictObject({
   followUpQueue: Type.Array(Type.String()),
   tree: SessionTreeProjectionSchema,
   resources: Type.Array(ResourceSummarySchema),
+  interactionMode: Type.Optional(SessionInteractionModeSchema),
+  activeProposedPlan: Type.Optional(ActiveProposedPlanSchema),
   stats: Type.Optional(strictObject({
     tokens: Type.Number(),
     cost: Type.Number(),
     contextPercent: Type.Optional(Type.Number())
   }))
 });
-
 const RuntimeStatusSchema = strictObject({
   phase: Type.Union([
     Type.Literal("idle"),
@@ -148,13 +149,11 @@ const RuntimeStatusSchema = strictObject({
   recoverable: Type.Boolean(),
   attempt: Type.Optional(Type.Number())
 });
-
 const TaskToolModeSchema = Type.Union([
   Type.Literal("ask"),
   Type.Literal("auto"),
   Type.Literal("yolo")
 ]);
-
 const RuntimeCapabilitiesSchema = strictObject({
   sdkVersion: Type.String(),
   supportsFollowUp: Type.Literal(true),
@@ -258,9 +257,11 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "task.close": strictObject({ closed: Type.Literal(true), stopped: Type.Boolean() }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogPageSchema,
+  "session.catalog.contentSearch": WorkspaceMessageSearchResultSchema,
   "session.tree": SessionTreeProjectionSchema,
   "message.page": ConversationPageSchema,
   "message.index": UserMessageIndexPageSchema,
+  "message.search": MessageSearchResultSchema,
   "message.locate": LocatedMessageWindowSchema,
   "session.create": ProjectionMutationAcknowledgementSchema,
   "session.creation.resolve": SessionCreationResolutionSchema,
@@ -271,9 +272,12 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "session.rollback": ProjectionMutationAcknowledgementSchema,
   "session.compact": operationSubmissionResultSchema(Type.Literal("compaction")),
   "session.name": ProjectionMutationAcknowledgementSchema,
+  "session.interactionMode.set": ProjectionMutationAcknowledgementSchema,
+  "plan.implement": operationSubmissionResultSchema(Type.Literal("prompt")),
   "session.nameByPath": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.pin": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.archive": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
+  "conversation.reorderPinned": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "prompt.submit": operationSubmissionResultSchema(Type.Literal("prompt")),
   "prompt.steer": AcknowledgementSchema,
   "prompt.followUp": AcknowledgementSchema,
@@ -371,6 +375,10 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
     thinkingLevel: Type.String(),
     selectedModel: Type.Optional(strictObject({ provider: Type.String(), id: Type.String() }))
   }),
+  "session.interactionModeChanged": strictObject({
+    interactionMode: SessionInteractionModeSchema
+  }),
+  "plan.proposed": strictObject({ plan: ActiveProposedPlanSchema }),
   "model.catalog.changed": SessionModelCatalogResultSchema,
   "tree.changed": strictObject({
     reason: Type.Union([Type.Literal("session-entry"), Type.Literal("compacted"), Type.Literal("rollback")])

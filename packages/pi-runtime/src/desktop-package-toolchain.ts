@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { PackageSource, SettingsManager } from "@earendil-works/pi-coding-agent";
-import { RuntimeError } from "@pi67/domain";
+import { nativeCapabilityReplacement, RuntimeError } from "@pi67/domain";
 import type { PackageTrustRegistry } from "./package-trust-registry.js";
 
 type ReloadableDesktopSettingsManager = Pick<
@@ -84,7 +84,9 @@ export function applyDesktopPackageToolchain(
       { recoverable: false, details: { packaged: toolchain.packaged } }
     );
   }
-  const packages = desktopCapabilityPackages(settingsManager.getPackages(), environment);
+  const packages = withoutNativeReplacedPackages(
+    desktopCapabilityPackages(settingsManager.getPackages(), environment)
+  );
   settingsManager.applyOverrides({
     npmCommand: [toolchain.nodeExecutable, toolchain.npmCli],
     ...(packages.length === 0 ? {} : { packages })
@@ -139,7 +141,7 @@ export function createDesktopPackageSettingsView(
         return () => {
           const settings = target.getGlobalSettings();
           const packages = runtimeAdmittedPackages(
-            desktopCapabilityPackages(settings.packages ?? [], environment),
+            withoutNativeReplacedPackages(desktopCapabilityPackages(settings.packages ?? [], environment)),
             "global",
             trustRegistry
           );
@@ -155,12 +157,16 @@ export function createDesktopPackageSettingsView(
           const settings = target.getProjectSettings();
           return {
             ...settings,
-            packages: runtimeAdmittedPackages(settings.packages ?? [], "project", trustRegistry)
+            packages: runtimeAdmittedPackages(
+              withoutNativeReplacedPackages(settings.packages ?? []),
+              "project",
+              trustRegistry
+            )
           };
         };
       }
       if (property === "getPackages") {
-        return () => target.getPackages().filter((entry) => {
+        return () => withoutNativeReplacedPackages(target.getPackages()).filter((entry) => {
           const source = typeof entry === "string" ? entry : entry.source;
           return trustRegistry === undefined
             || trustRegistry.runtimePackageAllowed(source, "global")
@@ -175,6 +181,13 @@ export function createDesktopPackageSettingsView(
       const value = Reflect.get(target, property, target) as unknown;
       return typeof value === "function" ? value.bind(target) : value;
     }
+  });
+}
+
+function withoutNativeReplacedPackages(configured: PackageSource[]): PackageSource[] {
+  return configured.filter((entry) => {
+    const source = typeof entry === "string" ? entry : entry.source;
+    return nativeCapabilityReplacement(source) === undefined;
   });
 }
 

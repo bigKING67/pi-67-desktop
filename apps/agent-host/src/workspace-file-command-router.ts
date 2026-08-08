@@ -12,6 +12,7 @@ import type {
   AgentCommand,
   AgentCommandType,
   CommandResults,
+  PromptWorkspaceFileRef,
   WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
@@ -64,6 +65,37 @@ export class WorkspaceFileCommandRouter {
   constructor(workspaces: WorkspaceContextRegistry) {
     this.access = new WorkspaceFileAccess(workspaces);
     this.mutations = new WorkspaceFileMutations(this.access);
+  }
+
+  async validatePromptReferences(
+    workspaceId: string,
+    references: readonly PromptWorkspaceFileRef[]
+  ): Promise<void> {
+    const workspace = this.access.requireTrustedWorkspace(workspaceId);
+    const seen = new Set<string>();
+    for (const reference of references) {
+      if (seen.has(reference.id)) {
+        throw new HostCommandError("INVALID_PAYLOAD", "Workspace file references must be unique.", false);
+      }
+      seen.add(reference.id);
+      const identity = this.access.requireIdentity(workspaceId, reference.id);
+      if (identity.kind !== "file" || isGitMetadataPath(identity.relativePath)) {
+        throw new HostCommandError(
+          "UNSUPPORTED",
+          "Only regular Workspace files can be referenced from a Prompt.",
+          true
+        );
+      }
+      const entry = await this.access.entryForIdentity(
+        workspaceId,
+        workspace.canonicalCwd,
+        reference.id,
+        identity
+      );
+      if (entry.revision !== reference.revision) {
+        throw workspaceFileChanged("引用的工作区文件已变化，请重新选择后再发送。");
+      }
+    }
   }
 
   dispatch(

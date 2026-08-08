@@ -167,7 +167,11 @@ export async function editRendererUserMessage(
     return blockedMessageEdit(messages.transcript.actionUnavailable);
   }
   const draft = useTaskDraftStore.getState().drafts[task.id];
-  if (draft && (draft.text.trim().length > 0 || draft.attachments.length > 0)) {
+  if (draft && (
+    draft.text.trim().length > 0
+    || draft.attachments.length > 0
+    || draft.workspaceFiles.length > 0
+  )) {
     return blockedMessageEdit(messages.composer.editBlockedByDraft);
   }
   if (!text.trim()) {
@@ -191,7 +195,11 @@ export async function submitRendererEditedMessage(
     return blockedMessageEdit(messages.transcript.actionUnavailable);
   }
   const draft = useTaskDraftStore.getState().drafts[task.id];
-  if (draft && (draft.text.trim().length > 0 || draft.attachments.length > 0)) {
+  if (draft && (
+    draft.text.trim().length > 0
+    || draft.attachments.length > 0
+    || draft.workspaceFiles.length > 0
+  )) {
     return blockedMessageEdit(messages.composer.editBlockedByDraft);
   }
   let result: Awaited<ReturnType<typeof submitRendererPrompt>>;

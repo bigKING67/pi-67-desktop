@@ -29,9 +29,11 @@ const QUERY_COMMANDS = new Set<AgentCommandType>([
   "workspace.file.resolve",
   "workspace.file.open",
   "session.catalog.query",
+  "session.catalog.contentSearch",
   "session.tree",
   "message.page",
   "message.index",
+  "message.search",
   "message.locate",
   "asset.read",
   "model.list",
@@ -48,9 +50,11 @@ const QUERY_COMMANDS = new Set<AgentCommandType>([
 const TRANSITION_DEFERRED_QUERY_COMMANDS = new Set<AgentCommandType>([
   "workspace.changes",
   "session.catalog.query",
+  "session.catalog.contentSearch",
   "session.tree",
   "message.page",
   "message.index",
+  "message.search",
   "message.locate"
 ]);
 

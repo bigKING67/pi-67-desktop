@@ -13,6 +13,7 @@ import type {
 } from "@pi67/protocol";
 import { writePrivateFileAtomically } from "./atomic-private-file.js";
 import { PiAuthContentChangedError } from "./pi-auth-credential-store.js";
+import { withPiConfigurationBudget } from "./pi-configuration-service-options.js";
 
 export interface PiConfigurationPaths {
   modelsPath: string;
@@ -100,14 +101,15 @@ export class PiConfigurationWatcher {
 
 export async function readWorkspaceConfigurationBundle(
   paths: PiConfigurationPaths,
-  state: WorkspaceConfigurationState
+  state: WorkspaceConfigurationState,
+  fileAccessWaitMs: number
 ): Promise<WorkspaceBundle> {
   const projectPath = join(state.cwd, ".pi", "settings.json");
   const entries = await Promise.all([
-    readConfigurationPath("models", paths.modelsPath, true),
-    readConfigurationPath("auth", paths.authPath, true),
-    readConfigurationPath("global-settings", paths.globalSettingsPath, true),
-    readConfigurationPath("project-settings", projectPath, state.projectTrusted)
+    readConfigurationPath("models", paths.modelsPath, true, fileAccessWaitMs),
+    readConfigurationPath("auth", paths.authPath, true, fileAccessWaitMs),
+    readConfigurationPath("global-settings", paths.globalSettingsPath, true, fileAccessWaitMs),
+    readConfigurationPath("project-settings", projectPath, state.projectTrusted, fileAccessWaitMs)
   ]);
   const byKind = Object.fromEntries(entries.map((entry) => [entry.kind, entry])) as WorkspaceBundle["byKind"];
   const hash = createHash("sha256");
@@ -126,8 +128,12 @@ export function configurationPath(
   return join(state.cwd, ".pi", "settings.json");
 }
 
-export async function readOptionalConfigurationFile(path: string): Promise<string | undefined> {
-  return readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
+export async function readOptionalConfigurationFile(path: string, fileAccessWaitMs: number): Promise<string | undefined> {
+  return withPiConfigurationBudget(
+    readFile(path, "utf8"),
+    fileAccessWaitMs,
+    "configuration-file-access"
+  ).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
@@ -204,13 +210,24 @@ export function configurationErrorMessage(error: unknown): string {
 async function readConfigurationPath(
   kind: PiConfigurationFileKind,
   path: string,
-  readContent: boolean
+  readContent: boolean,
+  fileAccessWaitMs: number
 ): Promise<ConfigurationPathState> {
-  const metadata = await stat(path).catch((error: NodeJS.ErrnoException) => {
+  const metadata = await withPiConfigurationBudget(
+    stat(path),
+    fileAccessWaitMs,
+    "configuration-file-access"
+  ).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
     throw error;
   });
-  const content = metadata && readContent ? await readFile(path, "utf8") : undefined;
+  const content = metadata && readContent
+    ? await withPiConfigurationBudget(
+        readFile(path, "utf8"),
+        fileAccessWaitMs,
+        "configuration-file-access"
+      )
+    : undefined;
   const revision = createHash("sha256")
     .update(metadata ? "present\0" : "missing\0")
     .update(readContent ? content ?? "" : "untrusted")

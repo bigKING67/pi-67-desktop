@@ -126,12 +126,13 @@ export function querySessionCatalogPage(options: {
   cursor?: SessionCatalogCursor;
   refresh?: boolean;
   view?: SessionCatalogView;
+  limit?: number;
 }): Promise<SessionCatalogPage> {
   const { workspaceId } = options;
   const query = normalizeSessionCatalogQuery(options.query ?? "");
   return agentConnectionController.request("session.catalog.query", {
     scope: "workspace",
-    limit: DEFAULT_SESSION_CATALOG_PAGE_ITEMS,
+    limit: options.limit ?? DEFAULT_SESSION_CATALOG_PAGE_ITEMS,
     ...(options.view && options.view !== "active" ? { view: options.view } : {}),
     ...(query ? { search: query } : {}),
     ...(options.cursor ? { cursor: options.cursor } : {}),

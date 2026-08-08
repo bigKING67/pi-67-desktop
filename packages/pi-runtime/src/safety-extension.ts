@@ -7,12 +7,14 @@ import {
   MAX_APPROVAL_TARGET_BYTES,
   classifyShellCommand,
   decideApproval,
+  isPlanModeReadOnlyShellCommand,
   type ApprovalTargetKind,
   type ApprovalRequestDetails,
   type ApprovalMode,
   type ExtensionUiCancellationReason,
   type RiskCategory,
   type TaskToolMode,
+  type SessionInteractionMode,
   type ToolAutoAuthorizationReason,
   type ToolIntent,
   type WorkspaceTrust
@@ -35,6 +37,7 @@ import {
 import {
   asToolInputRecord,
   hasBuiltinInputContract,
+  hasPi67PlanToolContract,
   hasPiFffInputContract,
   hasPiWebAccessReadContract,
   networkReadTarget,
@@ -79,7 +82,8 @@ export function createDesktopSafetyExtension(
   requestApproval: DesktopApprovalRequester,
   loadedResourceReadAccess?: LoadedResourceReadAccess,
   configuredCapabilities?: ConfiguredCapabilityCatalog,
-  recordToolAuthorization?: DesktopToolAuthorizationRecorder
+  recordToolAuthorization?: DesktopToolAuthorizationRecorder,
+  getInteractionMode?: () => SessionInteractionMode
 ): InlineExtension {
   const resolveToolProfile = createToolSafetyProfileResolver(configuredCapabilities);
   return {
@@ -89,7 +93,6 @@ export function createDesktopSafetyExtension(
       pi.on("tool_call", async (event, ctx) => {
         if (isVerifiedDesktopAttachmentTool(pi, event.toolName, event.input)) return undefined;
         const state = getState();
-        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         let intent: ClassifiedToolIntent;
         try {
           intent = await classifyToolIntent(
@@ -104,6 +107,14 @@ export function createDesktopSafetyExtension(
         } catch {
           return { block: true, reason: "π could not establish a safe canonical target." };
         }
+        if (getInteractionMode?.() === "plan") {
+          if (isPlanModeAllowedIntent(intent, event.toolName, event.input)) return undefined;
+          return {
+            block: true,
+            reason: "PLAN_MODE_READ_ONLY: 当前会话处于计划模式，只允许只读检查、原生搜索和计划交互。请切换到执行模式后再修改或运行可能写入的命令。"
+          };
+        }
+        if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         if (intent.nonApprovableReason) {
           return { block: true, reason: intent.nonApprovableReason };
         }
@@ -174,6 +185,21 @@ function autoAuthorizationReason(category: RiskCategory): ToolAutoAuthorizationR
   return undefined;
 }
 
+function isPlanModeAllowedIntent(
+  intent: ClassifiedToolIntent,
+  toolName: string,
+  input: unknown
+): boolean {
+  if (
+    intent.category === "workspace-read"
+    || intent.category === "resource-read"
+    || intent.category === "capability-read"
+    || intent.category === "network-read"
+  ) return true;
+  if (toolName !== "bash" || intent.category !== "workspace-command") return false;
+  return isPlanModeReadOnlyShellCommand(stringField(asToolInputRecord(input), "command") ?? "");
+}
+
 function approvalCancellationReason(
   reason: ExtensionUiCancellationReason | "unavailable"
 ): string {
@@ -211,6 +237,15 @@ async function classifyToolIntent(
     );
   }
   const profile = await resolveToolProfile(pi, toolName);
+  if (profile.kind === "pi67-plan" && hasPi67PlanToolContract(toolName, record)) {
+    return {
+      toolName,
+      category: "capability-read",
+      target: toolName,
+      targetKind: "tool",
+      sourceLabel: profile.sourceLabel
+    };
+  }
   if (toolName === "bash" && profile.kind === "builtin") {
     const command = stringField(record, "command") ?? "";
     return {
@@ -256,7 +291,10 @@ async function classifyToolIntent(
     );
   }
 
-  if (profile.kind === "pi-web-access" && hasPiWebAccessReadContract(toolName, record)) {
+  if (
+    (profile.kind === "pi67-web" || profile.kind === "pi-web-access")
+    && hasPiWebAccessReadContract(toolName, record)
+  ) {
     return {
       toolName,
       category: "network-read",

@@ -9,6 +9,8 @@ import {
 import { installSessionProjectionFixture } from "./session-projection-test-support.js";
 import {
   selectSessionModels,
+  selectActiveProposedPlan,
+  selectInteractionMode,
   selectSessionResources,
   selectSessionStats
 } from "./session-projection-selectors.js";
@@ -51,10 +53,48 @@ describe("session projection store", () => {
         selectedModel: { provider: "openai", id: "gpt-5.6" },
         thinkingLevel: "high"
       },
+      interaction: { interactionMode: "execute" },
       queue: { steeringQueue: ["steer"], followUpQueue: ["follow"] },
       resources: [{ kind: "skill", id: "testing", label: "Testing", status: "ready" }],
       usage: { tokens: 10, cost: 0.1, contextPercent: 5 }
     });
+  });
+
+  it("projects restored Plan state and clears a consumed plan on execute mode", () => {
+    const proposedPlan = {
+      planId: "plan-1",
+      sourceOperationId: "operation-plan",
+      markdown: "# Plan\n\n1. Inspect",
+      createdAt: 67
+    };
+    installSessionProjectionFixture(CONNECTION, {
+      ...snapshot("session-1"),
+      interactionMode: "plan",
+      activeProposedPlan: proposedPlan
+    }, 3);
+
+    expect(selectInteractionMode(useSessionProjectionStore.getState())).toBe("plan");
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toEqual(proposedPlan);
+
+    expect(useSessionProjectionStore.getState().applyInteractionMode(AUTHORITY, "execute")).toBe(true);
+    expect(selectInteractionMode(useSessionProjectionStore.getState())).toBe("execute");
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
+  });
+
+  it("rejects proposed plans from stale Session authority", () => {
+    installSessionProjectionFixture(CONNECTION, snapshot("session-1"), 3);
+    const plan = {
+      planId: "plan-stale",
+      sourceOperationId: "operation-stale",
+      markdown: "stale",
+      createdAt: 68
+    };
+
+    expect(useSessionProjectionStore.getState().applyProposedPlan({
+      ...AUTHORITY,
+      sessionGeneration: 4
+    }, plan)).toBe(false);
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
   });
 
   it("keeps canonical Session authority inactive until a snapshot installation commits", () => {

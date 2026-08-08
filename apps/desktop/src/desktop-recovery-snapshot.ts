@@ -3,7 +3,7 @@ import type {
   PreviousRunExitStatus,
   PromptAttachmentStagingDiagnostics
 } from "@pi67/protocol";
-import type { WorkbenchLoadResult, WorkbenchStateV4 } from "./workbench-state.js";
+import type { WorkbenchLoadResult, WorkbenchStateV5 } from "./workbench-state.js";
 
 export function previousRunExitStatus(loadResult: WorkbenchLoadResult): PreviousRunExitStatus {
   if (loadResult.recovery?.kind === "initialized") return "not-run";
@@ -12,7 +12,7 @@ export function previousRunExitStatus(loadResult: WorkbenchLoadResult): Previous
 }
 
 export function createDesktopRecoverySnapshot(
-  state: WorkbenchStateV4,
+  state: WorkbenchStateV5,
   previousRunExit: PreviousRunExitStatus,
   attachmentStaging: PromptAttachmentStagingDiagnostics,
   generatedAt = Date.now()

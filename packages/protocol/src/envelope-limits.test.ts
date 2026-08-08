@@ -23,6 +23,22 @@ describe("protocol envelope limits", () => {
     expect(isRequestEnvelope(submit([{ id: "../outside" }]))).toBe(false);
   });
 
+  it("accepts only bounded opaque Workspace file references across the Host boundary", () => {
+    const submit = (workspaceFiles: Array<{ id: string; revision: string }>) => commandEnvelope("prompt.submit", {
+      submissionId: "submission-file-ref",
+      text: "inspect @[src/main.ts]",
+      delivery: "new-turn",
+      workspaceFiles
+    }, APP_PROTOCOL_CONTEXT, 1);
+    expect(isRequestEnvelope(submit([{ id: "file_123", revision: "revision_123" }]))).toBe(true);
+    expect(isRequestEnvelope(submit(Array.from({ length: 65 }, (_, index) => ({
+      id: `file_${index}`,
+      revision: `revision_${index}`
+    }))))).toBe(false);
+    expect(isRequestEnvelope(submit([{ id: "../outside", revision: "revision_123" }]))).toBe(false);
+    expect(isRequestEnvelope(submit([{ id: "file_123", revision: "stale/revision" }]))).toBe(false);
+  });
+
   it("enforces UTF-8 envelope bytes without charging transferred ArrayBuffer contents", () => {
     expect(isEnvelopeWithinByteLimit({ text: "中" }, 14)).toBe(true);
     expect(isEnvelopeWithinByteLimit({ text: "中" }, 13)).toBe(false);

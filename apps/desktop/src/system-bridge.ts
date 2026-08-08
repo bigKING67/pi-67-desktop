@@ -1,4 +1,3 @@
-import { writeFile } from "node:fs/promises";
 import {
   app,
   clipboard,
@@ -19,11 +18,9 @@ import { redact } from "./redaction.js";
 import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import {
-  isRuntimeDiagnostics,
   parsePackageNetworkSettings,
   type DesktopRecoverySnapshot,
   type PreviousRunExitStatus,
-  type RuntimeDiagnostics,
   type WorkspaceEntryContextAction
 } from "@pi67/protocol";
 import { createDesktopRecoverySnapshot } from "./desktop-recovery-snapshot.js";
@@ -47,8 +44,22 @@ import {
 import {
   asExternalUrl,
   asNativeNotificationId,
-  asNativeNotificationRequest
+  asNativeNotificationRequest,
+  assertWorkspaceId,
+  assertWorkspaceIds
 } from "./system-bridge-policy.js";
+import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js";
+import { registerSupportDiagnosticsBridge } from "./support-diagnostics.js";
+import {
+  registerRepositoryEnvironmentBridge,
+  type RepositoryEnvironmentInspectionBridge
+} from "./repository-environment-bridge.js";
+import {
+  registerWorktreeCreationBridge,
+  type WorktreeCreationBridge
+} from "./worktree-creation-bridge.js";
+import type { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
+
 export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
@@ -63,6 +74,12 @@ export interface SystemBridgeOptions {
   workbenchState: WorkbenchStateStore;
   composerDraftState: ComposerDraftStateStore;
   workspaceFileState: WorkspaceFileStateStore;
+  repositoryEnvironmentInspection: RepositoryEnvironmentInspectionBridge;
+  worktreeCreation: WorktreeCreationBridge;
+  repositoryMutationScheduler: Pick<RepositoryMutationScheduler, "dispose">;
+  agentDirectory: string;
+  agentDirectorySource: "default" | "environment";
+  getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
 }
 export interface SystemBridgeRegistration {
   handlePowerResume(): void;
@@ -114,6 +131,13 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     options.previousRunExit,
     await options.promptAttachments.diagnostics()
   );
+  registerSupportDiagnosticsBridge({
+    agentDirectory: options.agentDirectory,
+    agentDirectorySource: options.agentDirectorySource,
+    getAgentHostDiagnostics: options.getAgentHostDiagnostics,
+    getMainWindow: options.getMainWindow,
+    recoverySnapshot
+  });
   ipcMain.handle("pi67:platform-info", () => ({
     platform: process.platform,
     architecture: process.arch,
@@ -129,6 +153,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     options.promptAttachments.release(value)
   ));
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
+  registerRepositoryEnvironmentBridge(options.repositoryEnvironmentInspection);
+  registerWorktreeCreationBridge(options.worktreeCreation);
   ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
   ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
     options.composerDraftState.update(value)
@@ -167,6 +193,9 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
     await options.composerDraftState.removeWorkspace(id);
     await options.workspaceFileState.removeWorkspace(id);
+    await options.repositoryEnvironmentInspection.removeWorkspace(id).catch(() => {
+      console.warn("Worktree Catalog cleanup failed after Workspace removal.");
+    });
     return state;
   });
   ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
@@ -188,31 +217,6 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     return result.canceled ? undefined : result.filePaths[0];
   });
   ipcMain.handle("pi67:recovery-snapshot", recoverySnapshot);
-  ipcMain.handle("pi67:save-diagnostics", async (_event, value: unknown) => {
-    if (!isRuntimeDiagnostics(value)) throw new Error("Invalid diagnostic payload.");
-    const diagnostics: RuntimeDiagnostics = value;
-    const result = await dialog.showSaveDialog(options.getMainWindow()!, {
-      title: "保存脱敏诊断",
-      defaultPath: `pi67-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
-      filters: [{ name: "JSON", extensions: ["json"] }]
-    });
-    if (result.canceled || !result.filePath) return undefined;
-    const supportDiagnostics = {
-      schema: "pi67-support-diagnostics.v1" as const,
-      generatedAt: Date.now(),
-      application: {
-        version: app.getVersion(),
-        platform: process.platform,
-        architecture: process.arch,
-        packaged: app.isPackaged
-      },
-      desktop: await recoverySnapshot(),
-      runtime: diagnostics
-    };
-    const serialized = `${JSON.stringify(supportDiagnostics, null, 2)}\n`;
-    await writeFile(result.filePath, redact(serialized), { encoding: "utf8", mode: 0o600 });
-    return result.filePath;
-  });
   ipcMain.handle("pi67:native-notification-show", (_event, value: unknown) => {
     const request = asNativeNotificationRequest(value);
     return request ? nativeNotifications.show(request) : false;
@@ -433,6 +437,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     dispose: () => {
       nativeNotifications.dispose();
       updateController.dispose();
+      options.repositoryMutationScheduler.dispose();
+      options.repositoryEnvironmentInspection.dispose();
     }
   };
 }
@@ -444,16 +450,4 @@ async function openSystemPath(path: string): Promise<void> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function assertWorkspaceId(value: unknown): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > 200 || !/^[A-Za-z0-9._:-]+$/u.test(value)) {
-    throw new Error("Workspace id is invalid.");
-  }
-  return value;
-}
-
-function assertWorkspaceIds(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > 100) throw new Error("Workspace order is invalid.");
-  return value.map(assertWorkspaceId);
 }

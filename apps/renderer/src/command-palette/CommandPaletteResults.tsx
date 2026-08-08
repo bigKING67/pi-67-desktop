@@ -72,7 +72,7 @@ export function CommandPaletteResults({
               </span>
               {item.group === "sessions" && item.id === `session:${activeSessionFileIdentity ?? ""}` ? (
                 <span className={styles.currentBadge}>{messages.commandPalette.current}</span>
-              ) : null}
+              ) : item.shortcut ? <kbd className={styles.currentBadge}>{item.shortcut}</kbd> : null}
             </div>
           ))}
         </section>

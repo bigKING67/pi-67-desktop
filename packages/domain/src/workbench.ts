@@ -1,4 +1,8 @@
 import type { WorkspaceTrust } from "./runtime-state.js";
+import type {
+  EnvironmentMutationRecoveryRecord,
+  WorkspaceEnvironmentBinding
+} from "./worktree-environment.js";
 
 export type WorkspaceId = string;
 export type TaskId = string;
@@ -135,8 +139,8 @@ export interface SessionCreationRecoveryRecord {
   taskGeneration: number;
 }
 
-export interface WorkbenchStateV4 {
-  version: 4;
+export interface WorkbenchStateV5 {
+  version: 5;
   workspaces: WorkspaceDescriptor[];
   workspaceOrder: WorkspaceId[];
   expandedWorkspaceIds: WorkspaceId[];
@@ -144,6 +148,8 @@ export interface WorkbenchStateV4 {
   selectedSurface?: WorkbenchSurface;
   runtimeRecovery: RuntimeRecoveryRecord[];
   sessionCreationRecovery: SessionCreationRecoveryRecord[];
+  workspaceEnvironments: WorkspaceEnvironmentBinding[];
+  environmentMutations: EnvironmentMutationRecoveryRecord[];
   settings: WorkbenchSettingsState;
   cleanExit: boolean;
 }

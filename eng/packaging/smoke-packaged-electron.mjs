@@ -1,7 +1,5 @@
-import {
-  CONTROLLED_PROMPT_TEXT,
-  isProcessAlive
-} from "./controlled-shutdown-fixture.ts";
+import { mkdir } from "node:fs/promises";
+import { CONTROLLED_PROMPT_TEXT, isProcessAlive } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import { preparePackagedSmokeProfile } from "./packaged-electron-smoke-profile.mjs";
 import {
@@ -19,12 +17,13 @@ import {
   runControlledShutdownScenario,
   waitForPersistedRuntimeRecovery,
   verifyColdProviderRestoration,
-  verifyInitialRuntimeSettings
+  verifyInitialRuntimeSettings,
+  verifyPackagedPrivateGitWorktreeContract
 } from "./packaged-electron-smoke-scenarios.mjs";
+import { verifyPackagedMainOnlyDiagnostics } from "./packaged-diagnostics-smoke.mjs";
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
-
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
@@ -53,7 +52,6 @@ let application;
 let childPid;
 const shutdownState = { childPid: undefined };
 let packagedProcessOutput = () => "";
-
 try {
   application = await launchPackagedApplication({
     agentDir,
@@ -68,6 +66,14 @@ try {
     throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
   }
   await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
+  await verifyPackagedMainOnlyDiagnostics({
+    agentDir,
+    application,
+    packagedCredential,
+    userDataDirectory,
+    window,
+    workspace
+  });
   await capturePackagedScreenshot(window, "00-welcome-system.png");
   await window.evaluate(() => window.pi67.system.connectAgentHost());
   await verifyInitialRuntimeSettings(window, packagedProcessOutput);
@@ -80,6 +86,7 @@ try {
   if ((await initialConversationRows.count()) !== 1) {
     throw new Error(`Expected one initial packaged conversation row, received ${await initialConversationRows.count()}.`);
   }
+  await verifyPackagedPrivateGitWorktreeContract(window);
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
     throw new Error(`Packaged workspace open reported a failure: ${JSON.stringify(await inspectRendererSurface(window))}`);
   }
@@ -92,6 +99,7 @@ try {
       { cause: error }
     );
   }
+  await verifyPackagedChangesInspector(window);
   const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
   await workspaceSettings.getByRole("button", { name: /恢复与诊断/u }).click();
   const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
@@ -360,7 +368,6 @@ try {
     throw new Error(`Packaged task did not resume after reload: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
   await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
-
   await application.close();
   application = undefined;
   application = await launchPackagedApplication({
@@ -417,7 +424,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();
@@ -432,4 +439,21 @@ async function assertNoWorkspaceChangesAuthorityWarning(window) {
   if (await window.getByText("无法加载本会话修改记录", { exact: true }).count()) {
     throw new Error("Packaged workspace-only Settings requested Task-scoped workspace changes.");
   }
+}
+
+async function verifyPackagedChangesInspector(window) {
+  let inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
+  if (!(await inspector.isVisible())) {
+    await window.getByRole("button", { name: "显示任务检查器", exact: true }).click();
+    inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
+  }
+  await inspector.waitFor({ state: "visible", timeout: 15_000 });
+  await inspector.getByRole("tab", { name: "修改", exact: true }).click();
+  await inspector.getByText("0 个文件 · 0 条记录", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await inspector.getByText("Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await inspector.getByText("当前活动分支还没有 edit 或 write 修改记录。", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "01-changes-empty.png");
 }

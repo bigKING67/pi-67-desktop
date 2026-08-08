@@ -139,6 +139,36 @@ describe("workspace conversation model", () => {
     ]);
   });
 
+  it("exposes movement boundaries from the authoritative pinned order", () => {
+    const sessions = [
+      { suffix: "a", pinnedAt: 300 },
+      { suffix: "b", pinnedAt: 200 },
+      { suffix: "c", pinnedAt: 100 },
+      { suffix: "d", pinnedAt: undefined }
+    ].map(({ suffix, pinnedAt }, index) => ({
+      fileIdentity: `session-file-${suffix}`,
+      id: `session-${suffix}`,
+      path: `/sessions/${suffix}.jsonl`,
+      cwd: "/work",
+      name: suffix,
+      nameSource: "explicit" as const,
+      modifiedAt: 100 - index,
+      messageCount: 1,
+      ...(pinnedAt === undefined ? {} : { pinnedAt })
+    }));
+
+    expect(conversationRows("workspace-test", [], sessions, "").map((row) => ({
+      title: row.title,
+      up: row.canMovePinnedUp,
+      down: row.canMovePinnedDown
+    }))).toEqual([
+      { title: "a", up: false, down: true },
+      { title: "b", up: true, down: true },
+      { title: "c", up: true, down: false },
+      { title: "d", up: false, down: false }
+    ]);
+  });
+
   it("keeps path-only recovery visibly gated on explicit confirmation", () => {
     expect(workspaceStatus({ availability: "needs-confirmation", trust: "unknown" }))
       .toBe("需要重新确认");

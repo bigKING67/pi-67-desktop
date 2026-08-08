@@ -9,8 +9,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_USER_MESSAGE_INDEX_PAGE_ITEMS,
+  MAX_MESSAGE_SEARCH_RESULTS,
   MAX_USER_MESSAGE_INDEX_PAGE_ITEMS,
   type LocatedMessageWindow,
+  type MessageSearchResult,
   type ConversationPage,
   type ExtensionCatalogResult,
   type RuntimeCapabilities,
@@ -155,10 +157,22 @@ export class RuntimeProjectionController {
     };
   }
 
-  locateUserMessage(id: string): LocatedMessageWindow {
-    const userMessage = this.session.getUserMessages().find((item) => item.id === id);
+  searchMessages(query: string): MessageSearchResult {
+    const normalized = sanitizeSearchQuery(query);
+    const result = this.session.searchMessages(normalized, MAX_MESSAGE_SEARCH_RESULTS);
+    return {
+      sessionId: this.session.getSessionId(),
+      revision: this.session.getRevision(),
+      query: normalized,
+      total: result.total,
+      items: result.items,
+      truncated: result.total > result.items.length
+    };
+  }
+
+  locateMessage(id: string): LocatedMessageWindow {
     const entryIndex = this.session.findBranchEntryIndex(id);
-    if (!userMessage || entryIndex === undefined) throw missingUserMessage();
+    if (entryIndex === undefined) throw missingMessage();
     const branch = this.session.getBranch();
     let cursor: string | undefined;
     for (let index = entryIndex - 1; index >= 0; index -= 1) {
@@ -174,7 +188,7 @@ export class RuntimeProjectionController {
       (toolCallId) => this.resolveToolAdapter(toolCallId),
       (source) => this.projectImageAsset(source)
     );
-    if (!page.messages.some((message) => message.id === id)) throw missingUserMessage();
+    if (!page.messages.some((message) => message.id === id)) throw missingMessage();
     return { ...page, anchorId: id, revision: this.session.getRevision() };
   }
 
@@ -216,10 +230,20 @@ export class RuntimeProjectionController {
   }
 }
 
-function missingUserMessage(): ProtocolRequestError {
+function sanitizeSearchQuery(query: string): string {
+  const normalized = query.replace(/\s+/gu, " ").trim();
+  if (normalized) return normalized;
+  throw new ProtocolRequestError({
+    code: "INVALID_PAYLOAD",
+    message: "A non-empty message search query is required.",
+    recoverable: true
+  });
+}
+
+function missingMessage(): ProtocolRequestError {
   return new ProtocolRequestError({
     code: "RESOURCE_NOT_FOUND",
-    message: "The user message no longer exists in the active Session branch.",
+    message: "The message no longer exists in the active Session branch.",
     recoverable: true
   });
 }

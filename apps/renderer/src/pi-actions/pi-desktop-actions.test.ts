@@ -5,7 +5,8 @@ const controllers = vi.hoisted(() => ({
   beginIntent: vi.fn(() => "task-intent"),
   reload: vi.fn(async () => undefined),
   rename: vi.fn(async () => true),
-  selectModel: vi.fn(async () => undefined)
+  selectModel: vi.fn(async () => undefined),
+  setInteractionMode: vi.fn(async () => true)
 }));
 
 vi.mock("../operation/operation-controller.js", () => ({
@@ -17,6 +18,9 @@ vi.mock("../session/session-control-controller.js", () => ({
 }));
 vi.mock("../session/session-lifecycle-controller.js", () => ({
   beginRendererSessionIntent: controllers.beginIntent
+}));
+vi.mock("../session/session-plan-controller.js", () => ({
+  setRendererSessionInteractionMode: controllers.setInteractionMode
 }));
 vi.mock("../navigation/conversation-organization-controller.js", () => ({
   renameRendererConversation: controllers.rename
@@ -81,6 +85,17 @@ describe("Pi Desktop actions", () => {
       piDesktopAction("new")!,
       { ...READY_CONTEXT, sessionTransitionPending: true }
     )).toBe("正在切换会话，请稍候。");
+  });
+
+  it("routes /plan and /default through the native Session Plan controller", async () => {
+    installConversation();
+
+    await expect(executePiDesktopAction(piDesktopAction("plan")!, "", READY_CONTEXT))
+      .resolves.toEqual({ status: "handled" });
+    await expect(executePiDesktopAction(piDesktopAction("default")!, "", READY_CONTEXT))
+      .resolves.toEqual({ status: "handled" });
+
+    expect(controllers.setInteractionMode.mock.calls).toEqual([["plan"], ["execute"]]);
   });
 
   it("rejects unexpected arguments before any Controller runs", async () => {

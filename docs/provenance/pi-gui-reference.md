@@ -36,6 +36,31 @@ SHA-256：
   覆盖更新的本地编辑；
 - `run terminal/attention -> background notification -> exact Session selection`：只为非活跃
   会话或非前台窗口通知，并在点击后回到对应会话。
+- `startup recovery -> bounded diagnostics -> keep healthy state usable`：启动同步或持久化恢复
+  局部失败时保留已恢复状态并呈现 bounded diagnostic，而不是把整个产品入口变成失败页。
+- `changed files -> selected file -> inline Diff`：把修改摘要、明确选择、加载/空/不可用状态和
+  bounded Inline Diff 组织成一条用户可完成的审阅路径。
+
+Worktree 产品模型已从规划进入实现。正式合同和分阶段门禁见
+`docs/architecture/worktree-product-model.md`。当前重新实现包括：
+
+- read-only Repository inspection、Git common-dir 分组和 primary/linked identity；
+- provisional `Local | Worktree` 新对话 intent，以及创建锁定期间的真实状态表达；
+- profile-owned Worktree root、packaged private Git transaction、创建失败回滚、保守 branch
+  cleanup 和 orphan reconcile；
+- Catalog mutation serialization、startup reconcile 和 dirty/unmerged/manual/detached 保护；
+- system Git 不可用、无 origin、空格/非 ASCII/特殊路径的 packaged smoke fixture。
+
+上述 source/type/unit/targeted hosted Chromium E2E 已验证；packaged private Git smoke 仍需在
+本次候选交付中 fresh 执行。fixture 存在不等于 packaged smoke 或 Windows 真机已经通过。
+
+规划明确不复制：
+
+- 直接依赖系统 `git` 的 runner；Pi-67 使用 packaged private Git；
+- 无 timeout/进程树证明的 Git mutation；
+- 从 Prompt/title 派生 branch/path；
+- `window.confirm` 删除和 Renderer 提交任意 path/branch/Git args；
+- 将 Worktree Git authority 放入 Pi Agent Host 或 Renderer。
 
 Pi-67 的实现不是源码移植：
 
@@ -55,6 +80,23 @@ Pi-67 的实现不是源码移植：
   bounded state；附件 bytes/preview/staging handle 不跨重启，安全存储不可用时 fail closed；
 - 原生通知只接收固定 kind 与 opaque Workspace/Session identity。Main 生成固定隐私文案，
   不复用 `pi-gui` 可显示 Session title/error body 的内容策略；点击后按 exact identity 激活。
+- 诊断导出由 Electron Main 拥有。Renderer 对 Host 诊断只等待 3 秒；Host 不回
+  acknowledgement 时仍导出 Supervisor 生命周期、Desktop recovery 和固定
+  `auth.json/settings.json/models.json` 的存在性、大小与 JSON 可解析状态。文件正文、绝对路径、
+  原始错误、stdout/stderr、Prompt 和凭据均不进入支持包。
+- Provider 配置读取沿用“局部失败不阻断健康入口”的恢复模式，但在 Pi-67 Runtime 边界内
+  重做：文件访问、离线 ModelRuntime 校验、Settings reload 和 Renderer acknowledgement
+  使用嵌套预算；手动读取只刷新目标 Workspace。校验超时返回 invalid snapshot，文件访问超时
+  返回不含绝对路径的 recoverable error，不依赖 Task Runtime 或 Session Catalog。
+- 真正 Workspace/Session 使用的 Task ModelRuntime 也在 Agent Host 内采用 4 秒离线创建预算；
+  超时返回 `RUNTIME_NOT_READY`/`session-model-runtime`，重试重新创建，迟到结果不进入 Task 权威状态。
+- `apps/renderer/src/changes/ChangesPanel.tsx` 重新实现 `pi-gui` 的修改列表、选择和 Inline Diff
+  产品闭环，但只消费既有 `WorkspaceChangesProjection`。Pi-67 保留 Host epoch、物理 Session
+  identity、Session generation 和 projection revision 栅栏，并对 Renderer Patch DOM 另设 600 行
+  上限。`write` 没有 before-version 时只显示规模，不补造 Diff。
+- 审阅了 `apps/desktop/electron/app-store-diff.ts`，但明确没有吸收其 Renderer-facing Git status、
+  Git diff 或 Stage 路径。Pi-67 Renderer 不获得 Git/文件系统权限，完整 Git/Workspace Diff 和
+  Stage 仍不在本次数据合同内。
 
 ## 源文件证据
 
@@ -88,6 +130,63 @@ SHA-256 daf4ac20f3818f14a4c08626003b413aae435bffa49a5580c9fe1c9a6231e70c
 
 apps/desktop/electron/notification-permission.ts
 SHA-256 bdac040068480076d25364eef0ad6ed1f871a086fb00725561899696c9b9b81a
+
+apps/desktop/src/App.tsx
+SHA-256 6f5a9d372e9a9a8c6b9198a9016902766ce5d17c5879abfdd7f44a03dbae6f30
+
+apps/desktop/src/desktop-state.ts
+SHA-256 7ba73893a26ec58b0f0feed8a399b4046f773f9e833a8ee52ca84d57d8ecbe0e
+
+apps/desktop/tests/core/persistence.spec.ts
+SHA-256 2e41787c35d5df1d6d79336b2ae4ece7f75d06bfd0e8925900c149d72b9ce76a
+
+apps/desktop/src/diff-inline.tsx
+SHA-256 5d440aac8d82179f6fb065973342ab1381575eadfcc2e637b9814ab8b9dfafa4
+
+apps/desktop/src/diff-panel-types.ts
+SHA-256 68da5a50944d064e17b52f9d06e132abb483a5e32224ff08b2ce92d2267e8067
+
+apps/desktop/src/diff-panel.tsx
+SHA-256 edab7dc404304c0c956e11da380553117ddce673ba4181d8d9b16bd65d222a12
+
+apps/desktop/electron/app-store-diff.ts
+SHA-256 fc605d7e74721d308bcbfe76873e8df2937d0479f258a309587e5d8d2071536b
+
+apps/desktop/tests/core/mentions-diff.spec.ts
+SHA-256 37eb95ce122b477016a9d0814f0ea5c3fa738bb74d0bfe254343f1091c5d4f2d
+
+apps/desktop/tests/core/terminal-diff-layout.spec.ts
+SHA-256 0ce9b5919b37dd1eb6b4aefbb2b9d898111c7e1456481d159b9785b9d129e82d
+
+apps/desktop/electron/worktree-manager.ts
+SHA-256 78daf097b978eb8dce3cf5162b87bdc61fe22dacf95670a554ab06772e40dd27
+
+apps/desktop/electron/app-store-worktree.ts
+SHA-256 0c51b6a898e051bd0c135d2e1a11452803dc2c483be025a2c3816fc5de574548
+
+apps/desktop/src/hooks/use-workspace-menu.tsx
+SHA-256 0b6a2a855a8640f2bdfeae60d300c5f4756e9b509e2171a88f09f6b4d3178f4a
+
+apps/desktop/src/thread-groups.ts
+SHA-256 432bd1f856e6f0cd243897ada97a8c11c9cb4c2bb576f879ecc04ea2aa8922ad
+
+packages/catalogs/src/types.ts
+SHA-256 04edc97342d9935ec2f86dd1a8f2fe6db3c0915123f8f99764955d7e43baa150
+
+packages/catalogs/src/storage.ts
+SHA-256 f7324a8ffef1e9a8258bb2c3ab6075bc177a02d12581c226a08e74f957ab8640
+
+packages/pi-sdk-driver/src/json-catalog-store.ts
+SHA-256 c9a1b4e88a6437bf9f1e36fd593935de65e83cace6b4089c98f3b7cfbac734b1
+
+packages/pi-sdk-driver/src/atomic-write.ts
+SHA-256 8a08c8c33f25ed333814860a477b8e9c5dbda00e57973e0ce0b809f7edc49f7d
+
+apps/desktop/tests/core/worktree-manager.spec.ts
+SHA-256 2d6ccee502b29c6aa4efcea30769870bbb18dfe3dfca32144bb2db4ee11339f3
+
+apps/desktop/tests/core/worktrees.spec.ts
+SHA-256 49e66c3dd5e2947cf63b6ed6d4516559d4d8c75941764843623ca8ad00cb7fe7
 ```
 
 ## 保留的 Pi-67 边界

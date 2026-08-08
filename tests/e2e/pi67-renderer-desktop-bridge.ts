@@ -34,11 +34,14 @@ export async function installMockDesktopBridge(
       drafts: []
     },
     composerDraftPersistence: options.composerDraftPersistence ?? "available" as const,
+    composerDraftUpdateDelayMs: options.composerDraftUpdateDelayMs ?? 0,
+    composerDraftFailureCalls: options.composerDraftFailureCalls ?? [],
     expandedWorkspaceIds: options.expandedWorkspaceIds ?? [],
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
     settings: options.settings ?? { section: "general" as const, scope: "global" as const },
     deferInitialUpdateState: options.deferInitialUpdateState ?? false,
+    repositoryEnvironmentSnapshot: options.repositoryEnvironmentSnapshot,
   };
   await installMockDesktopCapabilityBridge(
     page,
@@ -47,8 +50,10 @@ export async function installMockDesktopBridge(
       : { capabilityInitializingCalls: options.capabilityInitializingCalls }
   );
   await page.addInitScript((bridgeFixture) => {
+    // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.
+    performance.setResourceTimingBufferSize(2_048);
     type FixtureWorkbenchState = {
-      version: 4;
+      version: 5;
       workspaces: MockWorkspaceDescriptor[];
       workspaceOrder: string[];
       expandedWorkspaceIds: string[];
@@ -56,6 +61,12 @@ export async function installMockDesktopBridge(
       selectedSurface?: MockDesktopBridgeOptions["selectedSurface"];
       runtimeRecovery: RuntimeRecoveryRecord[];
       sessionCreationRecovery: SessionCreationRecoveryRecord[];
+      workspaceEnvironments: Array<{
+        workspaceId: string;
+        kind: "plain";
+        ownership: "user";
+      }>;
+      environmentMutations: [];
       settings: NonNullable<MockDesktopBridgeOptions["settings"]>;
       cleanExit: boolean;
     };
@@ -94,6 +105,11 @@ export async function installMockDesktopBridge(
       updates: 0,
       state: () => structuredClone(composerDraftState)
     };
+    const worktreeTest = {
+      createCalls: 0,
+      advanceCalls: 0,
+      rollbackCalls: 0
+    };
     const nativeNotificationTest = {
       requests: [] as NativeNotificationRequest[],
       dismissed: [] as string[],
@@ -110,7 +126,7 @@ export async function installMockDesktopBridge(
       trashes: [] as Array<Record<string, unknown>>
     };
     let workbenchState: FixtureWorkbenchState = {
-      version: 4 as const,
+      version: 5 as const,
       workspaces: structuredClone(bridgeFixture.initialWorkspaces),
       workspaceOrder: bridgeFixture.initialWorkspaces.map((workspace) => workspace.id),
       expandedWorkspaceIds: structuredClone(bridgeFixture.expandedWorkspaceIds),
@@ -118,6 +134,12 @@ export async function installMockDesktopBridge(
       ...(bridgeFixture.selectedSurface ? { selectedSurface: structuredClone(bridgeFixture.selectedSurface) } : {}),
       runtimeRecovery: structuredClone(bridgeFixture.initialRuntimeRecovery),
       sessionCreationRecovery: structuredClone(bridgeFixture.initialSessionCreationRecovery),
+      workspaceEnvironments: bridgeFixture.initialWorkspaces.map((workspace) => ({
+        workspaceId: workspace.id,
+        kind: "plain" as const,
+        ownership: "user" as const
+      })),
+      environmentMutations: [],
       settings: structuredClone(bridgeFixture.settings),
       cleanExit: false
     };
@@ -129,12 +151,64 @@ export async function installMockDesktopBridge(
     Object.assign(systemFixture.methods, {
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
+          inspectRepositoryEnvironment: async ({ workspaceId }: { workspaceId: string }) => ({
+            ...(bridgeFixture.repositoryEnvironmentSnapshot
+              ? structuredClone(bridgeFixture.repositoryEnvironmentSnapshot)
+              : {
+                  workspaceId,
+                  status: "non-git" as const,
+                  revision: 1,
+                  observedAt: Date.now(),
+                  stale: false,
+                  worktrees: []
+                }),
+            workspaceId
+          }),
+          createWorktreeEnvironment: async () => {
+            worktreeTest.createCalls += 1;
+            return {
+              status: "rejected" as const,
+              error: {
+                stage: "preflight" as const,
+                code: "repository-not-ready" as const,
+                recoverable: true
+              }
+            };
+          },
+          advanceWorktreeEnvironment: async () => {
+            worktreeTest.advanceCalls += 1;
+            return {
+              status: "rejected" as const,
+              error: {
+                stage: "state" as const,
+                code: "recovery-required" as const,
+                recoverable: true
+              }
+            };
+          },
+          rollbackWorktreeEnvironment: async () => {
+            worktreeTest.rollbackCalls += 1;
+            return {
+              status: "rejected" as const,
+              error: {
+                stage: "state" as const,
+                code: "recovery-required" as const,
+                recoverable: true
+              }
+            };
+          },
           loadComposerDraftState: async () => ({
             state: structuredClone(composerDraftState),
             persistence: bridgeFixture.composerDraftPersistence
           }),
           updateComposerDraftState: async (state: ComposerDraftPersistedState) => {
             composerDraftTest.updates += 1;
+            if (bridgeFixture.composerDraftUpdateDelayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, bridgeFixture.composerDraftUpdateDelayMs));
+            }
+            if (bridgeFixture.composerDraftFailureCalls.includes(composerDraftTest.updates)) {
+              throw new Error(`Mock Composer draft update ${composerDraftTest.updates} failed.`);
+            }
             composerDraftState = structuredClone(state);
             return {
               state: structuredClone(composerDraftState),
@@ -165,6 +239,10 @@ export async function installMockDesktopBridge(
                 workspaces: [...workbenchState.workspaces, workspace],
                 workspaceOrder: [...workbenchState.workspaceOrder, workspace.id],
                 expandedWorkspaceIds: [...workbenchState.expandedWorkspaceIds, workspace.id],
+                workspaceEnvironments: [
+                  ...workbenchState.workspaceEnvironments,
+                  { workspaceId: workspace.id, kind: "plain", ownership: "user" }
+                ],
                 currentWorkspaceId: workspace.id
               };
             }
@@ -179,7 +257,7 @@ export async function installMockDesktopBridge(
               ? (currentWorkspaceId ? { kind: "workspace" as const, workspaceId: currentWorkspaceId } : undefined)
               : workbenchState.selectedSurface;
             workbenchState = {
-              version: 4,
+              version: 5,
               workspaces: workbenchState.workspaces.filter((item) => item.id !== workspaceId),
               workspaceOrder,
               expandedWorkspaceIds: workbenchState.expandedWorkspaceIds.filter((id) => id !== workspaceId),
@@ -191,6 +269,10 @@ export async function installMockDesktopBridge(
               sessionCreationRecovery: workbenchState.sessionCreationRecovery.filter((record) => (
                 record.workspaceId !== workspaceId
               )),
+              workspaceEnvironments: workbenchState.workspaceEnvironments.filter((binding) => (
+                binding.workspaceId !== workspaceId
+              )),
+              environmentMutations: [],
               settings: workbenchState.settings.workspaceId === workspaceId
                 ? { section: workbenchState.settings.section, scope: "global" }
                 : workbenchState.settings,
@@ -331,6 +413,10 @@ export async function installMockDesktopBridge(
     Object.defineProperty(window, "__pi67ComposerDraftTest", {
       configurable: false,
       value: composerDraftTest
+    });
+    Object.defineProperty(window, "__pi67WorktreeTest", {
+      configurable: false,
+      value: worktreeTest
     });
     Object.defineProperty(window, "__pi67NativeNotificationTest", {
       configurable: false,

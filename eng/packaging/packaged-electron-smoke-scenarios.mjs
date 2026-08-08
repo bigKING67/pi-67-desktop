@@ -48,6 +48,33 @@ export async function verifyInitialRuntimeSettings(window, packagedProcessOutput
   await settings.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
+export async function verifyPackagedPrivateGitWorktreeContract(window) {
+  await window.locator('[data-repository-status="primary"]')
+    .waitFor({ state: "visible", timeout: 30_000 });
+  await ensurePackagedNewSessionIntent(window);
+  const selector = window.getByTestId("new-session-environment-selector");
+  await selector.waitFor({ state: "visible", timeout: 30_000 });
+  const local = selector.getByRole("radio", { name: /当前工作区/u });
+  const worktree = selector.getByRole("radio", { name: /隔离 Worktree/u });
+  const localOption = selector.locator("label").filter({ hasText: "当前工作区" });
+  const worktreeOption = selector.locator("label").filter({ hasText: "隔离 Worktree" });
+  if (!(await worktree.isEnabled())) {
+    throw new Error("Packaged private Git inspection did not admit Worktree intent for the no-origin fixture.");
+  }
+  await worktreeOption.click();
+  if (!(await worktree.isChecked())) throw new Error("Packaged Worktree intent was not selected.");
+  await localOption.click();
+  if (!(await local.isChecked())) throw new Error("Packaged Local intent was not restored without Git mutation.");
+}
+
+export async function ensurePackagedNewSessionIntent(window, timeoutMs = 30_000) {
+  const intent = window.getByTestId("new-session-intent");
+  if (!(await intent.isVisible())) {
+    await window.getByRole("button", { name: /新建会话$/u }).first().click({ timeout: timeoutMs });
+  }
+  await intent.waitFor({ state: "visible", timeout: timeoutMs });
+}
+
 export async function verifyColdProviderRestoration(window) {
   const settings = await openSettingsSection(window, /^模型服务/u);
   const providerPanel = settings.getByTestId("provider-configuration-panel");
@@ -126,7 +153,7 @@ export async function runControlledShutdownScenario({
 }
 
 export async function waitForPersistedRuntimeRecovery(userDataDirectory, timeoutMs = 10_000) {
-  const statePath = join(userDataDirectory, "workbench", "state-v4.json");
+  const statePath = join(userDataDirectory, "workbench", "state-v5.json");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
     const state = await readFile(statePath, "utf8")
@@ -141,7 +168,7 @@ export async function waitForPersistedRuntimeRecovery(userDataDirectory, timeout
       && typeof record.sessionId === "string"
       && record.sessionId.length > 0
     ));
-    if (state?.version === 4 && hasMaterializedRecovery) {
+    if (state?.version === 5 && hasMaterializedRecovery) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 50));

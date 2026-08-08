@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   finishWorkbenchRun,
-  parseWorkbenchStateV4,
-  type WorkbenchStateV4
+  parseWorkbenchStateV5,
+  type WorkbenchStateV5
 } from "./workbench-state-contract.js";
 import { replaceWorkbenchLayout } from "./workbench-state-mutations.js";
 import { workbenchDescriptorFixture } from "./workbench-state-test-fixture.js";
@@ -24,8 +24,8 @@ describe("Workbench Session creation recovery state", () => {
   });
 
   it("preserves an unconfirmed creation placeholder across a clean shutdown", () => {
-    const state: WorkbenchStateV4 = {
-      version: 4,
+    const state: WorkbenchStateV5 = {
+      version: 5,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],
@@ -45,6 +45,8 @@ describe("Workbench Session creation recovery state", () => {
         creationId: "session-creation-persisted",
         taskGeneration: 3
       }],
+      workspaceEnvironments: [{ workspaceId: "workspace-a", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     };
@@ -59,12 +61,14 @@ describe("Workbench Session creation recovery state", () => {
 
   it("rejects duplicate creation identity or provisional selection without recovery authority", () => {
     const base = {
-      version: 4,
+      version: 5,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],
       currentWorkspaceId: "workspace-a",
       runtimeRecovery: [],
+      workspaceEnvironments: [{ workspaceId: "workspace-a", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     } as const;
@@ -75,11 +79,11 @@ describe("Workbench Session creation recovery state", () => {
       taskGeneration: 1
     };
 
-    expect(parseWorkbenchStateV4({
+    expect(parseWorkbenchStateV5({
       ...base,
       sessionCreationRecovery: [record, { ...record, taskId: "task-other" }]
     })).toBeUndefined();
-    expect(parseWorkbenchStateV4({
+    expect(parseWorkbenchStateV5({
       ...base,
       selectedSurface: {
         kind: "conversation",
@@ -94,8 +98,8 @@ describe("Workbench Session creation recovery state", () => {
   });
 
   it("rejects a Renderer layout update that omits creation recovery state", () => {
-    const state = parseWorkbenchStateV4({
-      version: 4,
+    const state = parseWorkbenchStateV5({
+      version: 5,
       workspaces: [workspace()],
       workspaceOrder: ["workspace-a"],
       expandedWorkspaceIds: ["workspace-a"],
@@ -103,6 +107,8 @@ describe("Workbench Session creation recovery state", () => {
       selectedSurface: { kind: "workspace", workspaceId: "workspace-a" },
       runtimeRecovery: [],
       sessionCreationRecovery: [],
+      workspaceEnvironments: [{ workspaceId: "workspace-a", kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "general", scope: "global" },
       cleanExit: false
     });

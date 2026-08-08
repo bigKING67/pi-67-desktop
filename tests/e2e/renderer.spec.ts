@@ -28,6 +28,8 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
   await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
+  await expect(page.locator('[data-repository-status="non-git"]')).toContainText("非 Git 目录");
+  await expect(page.getByRole("button", { name: /创建 Worktree|删除 Worktree|强制删除/u })).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
   await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();

@@ -1,6 +1,11 @@
 import type { ExtensionToolAdapterView } from "./extension-compatibility.js";
 import type { ExtensionCompatibility } from "./runtime-state.js";
 import type { AssetReference } from "./asset.js";
+import type {
+  ActiveProposedPlan,
+  PlanProposalPart,
+  SessionInteractionMode
+} from "./plan-mode.js";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 
@@ -36,7 +41,7 @@ export interface AttachmentPart {
   kind: AttachmentKind;
 }
 
-export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart;
+export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart | PlanProposalPart;
 
 export interface SessionMessageView {
   id: string;
@@ -143,6 +148,8 @@ export interface SessionSnapshot {
   followUpQueue: string[];
   tree: SessionTreeProjection;
   resources: ResourceSummary[];
+  interactionMode?: SessionInteractionMode;
+  activeProposedPlan?: ActiveProposedPlan;
   stats?: {
     tokens: number;
     cost: number;

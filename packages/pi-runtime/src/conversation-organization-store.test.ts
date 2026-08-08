@@ -41,4 +41,23 @@ describe("ConversationOrganizationStore", () => {
     expect(store.get("source", "session-file-v1\0physical-a")).toEqual({ archivedAt: 456 });
     expect(store.get("source", "session-file-v1\0physical-b")).toEqual({});
   });
+
+  it("persists a bounded ordering update in one document", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-conversation-order-"));
+    roots.push(root);
+    const store = new ConversationOrganizationStore(root);
+
+    await store.setMany("source", [
+      { fileIdentity: "session-file-v1\0one", value: { pinnedAt: 300 } },
+      { fileIdentity: "session-file-v1\0two", value: { pinnedAt: 200 } },
+      { fileIdentity: "session-file-v1\0three", value: { pinnedAt: 100 } }
+    ]);
+
+    expect(store.highestPinnedAt()).toBe(300);
+    const restored = new ConversationOrganizationStore(root);
+    await restored.initialize();
+    expect(restored.get("source", "session-file-v1\0one")).toEqual({ pinnedAt: 300 });
+    expect(restored.get("source", "session-file-v1\0two")).toEqual({ pinnedAt: 200 });
+    expect(restored.get("source", "session-file-v1\0three")).toEqual({ pinnedAt: 100 });
+  });
 });

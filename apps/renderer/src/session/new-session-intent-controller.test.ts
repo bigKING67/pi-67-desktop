@@ -17,6 +17,8 @@ import {
   type RendererSessionMaterializationResult
 } from "./session-lifecycle-controller.js";
 import { useSessionProjectionStore } from "./session-projection-store.js";
+import { useTaskDraftStore } from "../workbench/task-draft-store.js";
+import { setRendererSessionInteractionMode } from "./session-plan-controller.js";
 import {
   installSessionProjectionFixture,
   sessionSnapshotFixture
@@ -29,20 +31,65 @@ vi.mock("../composer/prompt-submission-controller.js", () => ({
 vi.mock("./session-lifecycle-controller.js", () => ({
   materializeRendererSessionIntent: vi.fn()
 }));
+vi.mock("./session-plan-controller.js", () => ({
+  setRendererSessionInteractionMode: vi.fn(async () => true)
+}));
 
 const materializeIntent = vi.mocked(materializeRendererSessionIntent);
 const submitPrompt = vi.mocked(submitRendererPrompt);
+const setInteractionMode = vi.mocked(setRendererSessionInteractionMode);
 
 describe("new Session intent controller", () => {
   beforeEach(() => {
     vi.useRealTimers();
     materializeIntent.mockReset();
     submitPrompt.mockReset();
+    setInteractionMode.mockReset().mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
+    useTaskDraftStore.getState().dispose();
     useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
     useNotificationStore.setState(useNotificationStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace(workspace());
     rendererWorkbenchStore.getState().openTask(provisionalTask());
+  });
+
+  it("confirms provisional Plan Mode before submitting the first Prompt", async () => {
+    useTaskDraftStore.getState().setInteractionMode("task-intent", "plan");
+    materializeIntent.mockImplementation(async () => {
+      installMaterializedTask();
+      return { status: "materialized" };
+    });
+    submitPrompt.mockResolvedValue(acceptedPrompt());
+
+    await expect(submitRendererNewSessionIntent(
+      "task-intent",
+      "先制定计划",
+      "submission-plan"
+    )).resolves.toEqual(acceptedPrompt());
+
+    expect(setInteractionMode).toHaveBeenCalledWith("plan");
+    expect(setInteractionMode.mock.invocationCallOrder[0]).toBeLessThan(
+      submitPrompt.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it("keeps the first Prompt when provisional Plan Mode cannot be confirmed", async () => {
+    useTaskDraftStore.getState().setInteractionMode("task-intent", "plan");
+    materializeIntent.mockImplementation(async () => {
+      installMaterializedTask();
+      return { status: "materialized" };
+    });
+    setInteractionMode.mockResolvedValue(false);
+
+    await expect(submitRendererNewSessionIntent(
+      "task-intent",
+      "先制定计划",
+      "submission-plan"
+    )).resolves.toMatchObject({
+      accepted: false,
+      error: expect.stringContaining("计划模式未能确认")
+    });
+    expect(submitPrompt).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -65,7 +112,7 @@ describe("new Session intent controller", () => {
     expect(materializeIntent).toHaveBeenCalledOnce();
     expect(materializeIntent).toHaveBeenCalledWith("task-intent");
     expect(submitPrompt).toHaveBeenCalledOnce();
-    expect(submitPrompt).toHaveBeenCalledWith("第一条消息", "send", "submission-1", []);
+    expect(submitPrompt).toHaveBeenCalledWith("第一条消息", "send", "submission-1", [], []);
   });
 
   it("shares one in-flight materialization and Prompt submission for duplicate clicks", async () => {

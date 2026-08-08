@@ -87,7 +87,7 @@ export class PiSdkRuntimeSessionLifecycle {
             if (start.status !== "started") throw sessionCreationOutcomeUnknown(input.creationId);
             creationStarted = true;
           }
-          await this.options.sessionBindings.createInitial(input.cwd, sessionManager);
+          await this.options.sessionBindings.createInitial(input.cwd, sessionManager, observeStage);
           if (!input.creationId) return;
           const manager = this.options.sessionBindings.requireSession().sessionManager;
           await appendSessionCreationMarker(manager, input.creationId);

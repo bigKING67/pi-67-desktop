@@ -119,12 +119,18 @@ describe("AgentHostServer Session Catalog", () => {
     const sessionDirectory = join(agentDir, "sessions", "fixture");
     const catalogDirectory = join(root, "catalog");
     const sessionPath = join(sessionDirectory, "conversation.jsonl");
+    const secondSessionPath = join(sessionDirectory, "conversation-two.jsonl");
+    const thirdSessionPath = join(sessionDirectory, "conversation-three.jsonl");
     await Promise.all([
       mkdir(cwd),
       mkdir(sessionDirectory, { recursive: true }),
       mkdir(catalogDirectory)
     ]);
-    await writeFile(sessionPath, sessionJsonl(cwd), "utf8");
+    await Promise.all([
+      writeFile(sessionPath, sessionJsonl(cwd), "utf8"),
+      writeFile(secondSessionPath, sessionJsonl(cwd), "utf8"),
+      writeFile(thirdSessionPath, sessionJsonl(cwd), "utf8")
+    ]);
     const previous = {
       agentDir: process.env.PI_CODING_AGENT_DIR,
       catalogDirectory: process.env.PI67_SESSION_CATALOG_DIR,
@@ -208,8 +214,27 @@ describe("AgentHostServer Session Catalog", () => {
           name: "显式固定标题",
           nameSource: "explicit",
           pinnedAt: expect.any(Number)
-        })
+        }),
+        expect.any(Object),
+        expect.any(Object)
       ]);
+
+      for (const [index, path] of [secondSessionPath, thirdSessionPath].entries()) {
+        const pin = commandEnvelopeForContext("conversation.pin", {
+          path,
+          pinned: true
+        }, context, 9, `pin-cold-conversation-${index + 2}`);
+        port.emit(pin);
+        expect(await responseFor(port, pin.requestId)).toMatchObject({ ok: true });
+      }
+      const reorder = commandEnvelopeForContext("conversation.reorderPinned", {
+        paths: [sessionPath, thirdSessionPath, secondSessionPath]
+      }, context, 9, "reorder-cold-conversations");
+      port.emit(reorder);
+      expect(await responseFor(port, reorder.requestId)).toMatchObject({ ok: true });
+      expect((await queryCatalog(port, context, { view: "active" })).items
+        .filter((item) => item.pinnedAt !== undefined)
+        .map((item) => item.path)).toEqual([sessionPath, thirdSessionPath, secondSessionPath]);
 
       const archived = commandEnvelopeForContext("conversation.archive", {
         path: sessionPath,
@@ -217,7 +242,8 @@ describe("AgentHostServer Session Catalog", () => {
       }, context, 9, "archive-cold-conversation");
       port.emit(archived);
       expect(await responseFor(port, archived.requestId)).toMatchObject({ ok: true });
-      expect((await queryCatalog(port, context, { view: "active" })).items).toEqual([]);
+      expect((await queryCatalog(port, context, { view: "active" })).items.map((item) => item.path))
+        .toEqual([thirdSessionPath, secondSessionPath]);
       const archivedItems = (await queryCatalog(port, context, { view: "archived" })).items;
       expect(archivedItems).toEqual([
         expect.objectContaining({
@@ -249,25 +275,24 @@ describe("AgentHostServer Session Catalog", () => {
       expect(await responseFor(port, clearName.requestId)).toMatchObject({ ok: true });
       const automaticTitleEventsBefore = port.sent.filter(isAutomaticTitleCatalogEvent).length;
       const pendingAutomatic = await queryCatalog(port, context, { view: "active" });
-      expect(pendingAutomatic.items).toEqual([
+      expect(pendingAutomatic.items.find((item) => item.path === sessionPath)).toEqual(
         expect.objectContaining({
           path: sessionPath,
           name: "未命名对话",
           nameSource: "fallback"
         })
-      ]);
+      );
       await vi.waitFor(() => expect(port.sent.filter(isAutomaticTitleCatalogEvent).length)
         .toBeGreaterThan(automaticTitleEventsBefore));
       const automatic = await queryCatalog(port, context, { view: "active" });
-      expect(automatic.items).toEqual([
-        expect.objectContaining({
-          path: sessionPath,
-          name: "修复冷启动对话标题",
-          nameSource: "latest-user"
-        })
-      ]);
-      expect(automatic.items[0]).not.toHaveProperty("pinnedAt");
-      expect(automatic.items[0]).not.toHaveProperty("archivedAt");
+      const restoredItem = automatic.items.find((item) => item.path === sessionPath);
+      expect(restoredItem).toEqual(expect.objectContaining({
+        path: sessionPath,
+        name: "修复冷启动对话标题",
+        nameSource: "latest-user"
+      }));
+      expect(restoredItem).not.toHaveProperty("pinnedAt");
+      expect(restoredItem).not.toHaveProperty("archivedAt");
       expect(runtimeLoader).not.toHaveBeenCalled();
     } finally {
       await server.shutdown();

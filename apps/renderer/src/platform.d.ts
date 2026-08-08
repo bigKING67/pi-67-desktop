@@ -13,14 +13,22 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot,
   WorkbenchSettingsState,
-  WorkbenchStateV4,
+  WorkbenchStateV5,
   WorkbenchSurface,
   WorkspaceDescriptor
 } from "@pi67/domain";
 import type {
   DesktopRecoverySnapshot,
-  RuntimeDiagnostics,
-  StagedPromptAttachment
+  RepositoryEnvironmentInspectionRequest,
+  RepositoryEnvironmentSnapshot,
+  SupportDiagnosticsExportRequest,
+  StagedPromptAttachment,
+  WorktreeCreationAdvanceRequest,
+  WorktreeCreationAdvanceResult,
+  WorktreeCreationRequest,
+  WorktreeCreationResult,
+  WorktreeCreationRollbackRequest,
+  WorktreeCreationRollbackResult
 } from "@pi67/protocol";
 
 export type TeamMcpStatus = {
@@ -36,7 +44,7 @@ export type TeamMcpRevealResult =
   | { status: "revealed"; token: string }
   | { status: "missing" };
 
-export type WorkbenchLayoutV4 = {
+export type WorkbenchLayoutV5 = {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -53,20 +61,30 @@ declare global {
         connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
-        loadWorkbenchState(): Promise<WorkbenchStateV4>;
+        loadWorkbenchState(): Promise<WorkbenchStateV5>;
+        inspectRepositoryEnvironment(
+          request: RepositoryEnvironmentInspectionRequest
+        ): Promise<RepositoryEnvironmentSnapshot>;
+        createWorktreeEnvironment(request: WorktreeCreationRequest): Promise<WorktreeCreationResult>;
+        advanceWorktreeEnvironment(
+          request: WorktreeCreationAdvanceRequest
+        ): Promise<WorktreeCreationAdvanceResult>;
+        rollbackWorktreeEnvironment(
+          request: WorktreeCreationRollbackRequest
+        ): Promise<WorktreeCreationRollbackResult>;
         loadComposerDraftState(): Promise<ComposerDraftStateSnapshot>;
         updateComposerDraftState(state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot>;
         loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
         updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
-        updateWorkbenchLayout(layout: WorkbenchLayoutV4): Promise<WorkbenchStateV4>;
+        updateWorkbenchLayout(layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
         repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
-        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV4>;
-        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV4>;
+        removeWorkspace(workspaceId: string): Promise<WorkbenchStateV5>;
+        reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV5>;
         selectWorkspace(): Promise<string | undefined>;
         selectSessionFile(): Promise<string | undefined>;
         getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
-        saveDiagnostics(diagnostics: RuntimeDiagnostics): Promise<string | undefined>;
+        saveDiagnostics(request: SupportDiagnosticsExportRequest): Promise<string | undefined>;
         showNativeNotification(request: NativeNotificationRequest): Promise<boolean>;
         dismissNativeNotification(notificationId: string): Promise<boolean>;
         requestOpenExternal(url: string): Promise<boolean>;

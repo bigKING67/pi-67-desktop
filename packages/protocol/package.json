@@ -1,6 +1,6 @@
 {
   "name": "@pi67/protocol",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.12",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,10 +11,18 @@
     "./prompt-attachment-limits": {
       "types": "./src/prompt-attachment-limits.ts",
       "import": "./dist/prompt-attachment-limits.mjs"
+    },
+    "./repository-environment-snapshot-validation": {
+      "types": "./src/repository-environment-snapshot-validation.ts",
+      "import": "./dist/repository-environment-snapshot-validation.mjs"
+    },
+    "./worktree-creation-result-validation": {
+      "types": "./src/worktree-creation-result-validation.ts",
+      "import": "./dist/worktree-creation-result-validation.mjs"
     }
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/prompt-attachment-limits.ts --format esm --dts",
+    "build": "tsdown src/index.ts src/prompt-attachment-limits.ts src/repository-environment-snapshot-validation.ts src/worktree-creation-result-validation.ts --format esm --dts",
     "build:revision-inputs": "pnpm --filter @pi67/protocol... run build",
     "check:revision": "pnpm run build:revision-inputs && node scripts/generate-protocol-revision.mjs --check",
     "generate:revision": "pnpm run build:revision-inputs && node scripts/generate-protocol-revision.mjs",

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { WorkbenchStateStore } from "./workbench-state.js";
+import { addOrRefreshWorkspace, WorkbenchStateStore } from "./workbench-state.js";
 import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
 import { createNativeWorkspaceDescriptor } from "./workspace-identity.js";
 
@@ -23,11 +23,7 @@ describe("resolveRegisteredWorkspaceEntry", () => {
     const workspace = await createNativeWorkspaceDescriptor(workspaceRoot, { createId: () => "workspace-1" });
     const store = new WorkbenchStateStore(userData);
     await store.update((state) => ({
-      ...state,
-      workspaces: [workspace],
-      workspaceOrder: [workspace.id],
-      currentWorkspaceId: workspace.id,
-      expandedWorkspaceIds: [workspace.id],
+      ...addOrRefreshWorkspace(state, workspace).state,
       selectedSurface: { kind: "workspace", workspaceId: workspace.id }
     }));
 

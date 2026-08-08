@@ -5,12 +5,14 @@ Desktop 内置团队搜索中转（Tavily Bridge）的 **server 定义**。
 
 ## 两条链路（不要混）
 
-| 能力 | 扩展 | 凭据 |
+| 能力 | 实现 | 凭据 |
 | --- | --- | --- |
-| `web_search` / `fetch_content` | `pi-web-access` | 官方 `tvly-…` 等 provider key（可选） |
+| `web_search` / `source_check` / `fetch_content` / `get_search_content` | Pi-67 第一方 Pi SDK Tools | 所选模型的 Pi Provider Credential；无已声明原生路由时使用内置 Exa fallback |
 | `tavily_bridge_tavily_search` 等 | `pi-mcp-adapter` + 本 server | 自建中转 `mcp_<prefix>.<secret>` Client Token |
 
-把 `mcp_…` 填进 pi-web-access 的 `tavilyApiKey` **不会**走你的中转服务。
+Pi-67 Search 不经过本 Team Tavily Bridge，也不需要安装 `pi-web-access`。
+把 `mcp_…` Token 填进任意 Provider 或 Search Credential **不会**走中转服务；它只用于
+显式的 `tavily_bridge_*` MCP Tools。
 
 ## 文件
 

@@ -76,30 +76,6 @@
       "baselineContentSha256": "bf6636a84e3ddb58ba54423cad9541ba954b43a35c5daab282e5144870be00cd"
     },
     {
-      "id": "pi-web-access",
-      "source": "npm:pi-web-access",
-      "recommendedVersion": "0.13.0",
-      "installPolicy": "user-initiated",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "f6b68a4641d3160eb314c37260766024f20a1d46839e57ccba73df516526aa11"
-    },
-    {
-      "id": "pi-smart-fetch",
-      "source": "npm:pi-smart-fetch",
-      "recommendedVersion": "0.3.12",
-      "installPolicy": "user-initiated",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "3f5511ea95ac83a2b91b80a95b97e450ebfdae4815957111507edfa9c37debcd"
-    },
-    {
-      "id": "pi-plan-mode",
-      "source": "npm:@narumitw/pi-plan-mode",
-      "recommendedVersion": "0.11.0",
-      "installPolicy": "user-initiated",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "5c22f5f3ba0ae79cd2bb227929694639c6836803ab386b0b6c7e523aa380280e"
-    },
-    {
       "id": "pi-rewind",
       "source": "https://github.com/arpagon/pi-rewind.git",
       "minimumCommit": "91611ad87992fb7b635a41ba68f67916ff6e6ae3",

@@ -17,7 +17,7 @@ import {
   UnsupportedWorkbenchStateVersionError,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME,
-  type WorkbenchStateV4
+  type WorkbenchStateV5
 } from "./workbench-state.js";
 import {
   cleanupWorkbenchStateTestRoots,
@@ -29,7 +29,7 @@ import {
 
 afterEach(cleanupWorkbenchStateTestRoots);
 
-describe("WorkbenchStateV4 persistence", () => {
+describe("WorkbenchStateV5 persistence", () => {
   it("marks a missing persisted state as first-run initialization", async () => {
     const loaded = await testStore(await temporaryRoot()).load();
 
@@ -39,7 +39,7 @@ describe("WorkbenchStateV4 persistence", () => {
     });
   });
 
-  it("writes the canonical V4 state atomically with POSIX-private modes", async () => {
+  it("writes the canonical V5 state atomically with POSIX-private modes", async () => {
     const userData = await temporaryRoot();
     const store = testStore(userData);
     const workspace = descriptorFixture("workspace-1", join(userData, "workspace-1"));
@@ -48,7 +48,13 @@ describe("WorkbenchStateV4 persistence", () => {
     const serialized = await readFile(store.requestedStatePath, "utf8");
     const directoryEntries = await readdir(join(userData, WORKBENCH_STATE_DIRECTORY));
 
-    expect(saved).toMatchObject({ version: 4, expandedWorkspaceIds: [workspace.id], runtimeRecovery: [] });
+    expect(saved).toMatchObject({
+      version: 5,
+      expandedWorkspaceIds: [workspace.id],
+      runtimeRecovery: [],
+      workspaceEnvironments: [{ workspaceId: workspace.id, kind: "plain", ownership: "user" }],
+      environmentMutations: []
+    });
     expect(JSON.parse(serialized)).toEqual(saved);
     expect(directoryEntries).toEqual([WORKBENCH_STATE_FILENAME]);
     if (process.platform !== "win32") {
@@ -73,7 +79,7 @@ describe("WorkbenchStateV4 persistence", () => {
     });
   });
 
-  it("quarantines malformed and oversized V4 state before resetting", async () => {
+  it("quarantines malformed and oversized V5 state before resetting", async () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
@@ -85,9 +91,9 @@ describe("WorkbenchStateV4 persistence", () => {
     expect(malformed.state).toEqual(createEmptyWorkbenchState());
     expect(malformed.recovery).toEqual({
       kind: "corrupt-reset",
-      quarantinedFileName: "state-v4.corrupt-1700000000000-token.json"
+      quarantinedFileName: "state-v5.corrupt-1700000000000-token.json"
     });
-    expect(await readdir(directory)).toEqual(["state-v4.corrupt-1700000000000-token.json"]);
+    expect(await readdir(directory)).toEqual(["state-v5.corrupt-1700000000000-token.json"]);
 
     await writeFile(statePath, "x".repeat(MAX_WORKBENCH_STATE_BYTES + 1), { mode: 0o600 });
     await expect(testStore(userData).load()).resolves.toMatchObject({ recovery: { kind: "corrupt-reset" } });
@@ -97,7 +103,7 @@ describe("WorkbenchStateV4 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const future = '{"version":5,"future":true}\n';
+    const future = '{"version":6,"future":true}\n';
     await mkdir(directory);
     await writeFile(statePath, future, { mode: 0o600 });
     const store = testStore(userData);
@@ -111,7 +117,11 @@ describe("WorkbenchStateV4 persistence", () => {
     const userData = await temporaryRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
     const statePath = join(directory, WORKBENCH_STATE_FILENAME);
-    const state = createEmptyWorkbenchState() as WorkbenchStateV4 & { prompt?: string; draft?: string; credential?: string };
+    const state = createEmptyWorkbenchState() as WorkbenchStateV5 & {
+      prompt?: string;
+      draft?: string;
+      credential?: string;
+    };
     state.prompt = "do not persist";
     state.draft = "do not persist";
     state.credential = "do not persist";

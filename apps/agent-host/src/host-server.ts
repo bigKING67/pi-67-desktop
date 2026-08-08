@@ -191,18 +191,22 @@ export class AgentHostServer {
     this.currentConnection?.retire();
     this.currentConnection = connection;
   }
-
   shutdown(deadlineMs = DEFAULT_SHUTDOWN_DEADLINE_MS): Promise<AgentHostShutdownResult> {
     if (this.shutdownPromise) return this.shutdownPromise;
     this.shuttingDown = true;
     this.shutdownPromise = this.performShutdown(shutdownDeadline(deadlineMs));
     return this.shutdownPromise;
   }
-
   private async dispatch(
     command: AgentCommand, state: TaskHostState, submissionFingerprint?: string
   ): Promise<CommandResults[AgentCommandType]> {
     if (command.type === "task.close") return this.taskLifecycle.closeTask(state, command.payload.mode);
+    if (command.type === "prompt.submit" && command.payload.workspaceFiles?.length) {
+      await this.workspaceFiles.validatePromptReferences(
+        state.record.context.workspaceId,
+        command.payload.workspaceFiles
+      );
+    }
     const initializedBeforeCommand = state.record.initialized;
     const runtime = await this.taskLifecycle.loadRuntimeForCommand(state, command);
     const admissionLease = commandRequiresRunAdmission(command)
@@ -251,7 +255,6 @@ export class AgentHostServer {
       throw failure;
     }
   }
-
   private loadCompatibilityRuntime(): Promise<AgentRuntime> {
     if (this.compatibilityRuntime) return Promise.resolve(this.compatibilityRuntime);
     this.compatibilityRuntimeLoad ??= this.runtimeLoader({
@@ -269,7 +272,6 @@ export class AgentHostServer {
     });
     return this.compatibilityRuntimeLoad;
   }
-
   private takeCompatibilityRuntime(): AgentRuntime | undefined {
     if (!this.compatibilityRuntime || !this.usesCompatibilityRuntime) return undefined;
     const runtime = this.compatibilityRuntime;
@@ -279,7 +281,6 @@ export class AgentHostServer {
     this.compatibilityRuntimeLoad = undefined;
     return runtime;
   }
-
   private async performShutdown(deadlineMs: number): Promise<AgentHostShutdownResult> {
     let firstError: unknown;
     const rememberError = (error: unknown): void => { firstError ??= error; };
@@ -310,7 +311,6 @@ export class AgentHostServer {
     } catch (error) {
       rememberError(error);
     }
-
     const operationResults = await Promise.all(this.tasks.values().map(async (state) => (
       state.operations?.shutdown(
         "Cancelled because the application is shutting down.",

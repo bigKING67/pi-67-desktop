@@ -52,6 +52,27 @@ export const RuntimeDiagnosticsSchema = strictObject({
   }))
 });
 
+const RuntimeDiagnosticsCollectionFailureSchema = Type.Union([
+  Type.Literal("acknowledgement-timeout"),
+  Type.Literal("connection-unavailable"),
+  Type.Literal("host-replaced"),
+  Type.Literal("protocol-error"),
+  Type.Literal("unknown")
+]);
+
+export const SupportDiagnosticsExportRequestSchema = Type.Union([
+  strictObject({
+    runtimeCollection: strictObject({ status: Type.Literal("available") }),
+    runtime: RuntimeDiagnosticsSchema
+  }),
+  strictObject({
+    runtimeCollection: strictObject({
+      status: Type.Literal("unavailable"),
+      failure: RuntimeDiagnosticsCollectionFailureSchema
+    })
+  })
+]);
+
 function strictObject<T extends TProperties>(properties: T) {
   return Type.Object(properties, { additionalProperties: false });
 }

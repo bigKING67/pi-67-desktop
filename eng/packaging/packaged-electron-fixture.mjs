@@ -186,6 +186,15 @@ export async function installWorkspaceDialogResult(application, workspace) {
   }, workspace);
 }
 
+export async function installSaveDialogResult(application, filePath) {
+  await application.evaluate(({ dialog }, selectedPath) => {
+    Object.defineProperty(dialog, "showSaveDialog", {
+      configurable: true,
+      value: async () => ({ canceled: false, filePath: selectedPath })
+    });
+  }, filePath);
+}
+
 export async function setPackagedContentSize(application, width, height) {
   await application.evaluate(({ BrowserWindow }, size) => {
     const window = BrowserWindow.getAllWindows()[0];

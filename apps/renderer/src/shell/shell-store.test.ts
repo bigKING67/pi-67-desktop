@@ -60,11 +60,11 @@ describe("shell store", () => {
   });
 
   it("updates the context tab without changing visibility or the palette", () => {
-    useShellStore.getState().setContextTab("messages");
+    useShellStore.getState().setContextTab("changes");
 
     expect(useShellStore.getState()).toMatchObject({
       contextVisible: true,
-      contextTab: "messages",
+      contextTab: "changes",
       commandPaletteOpen: false
     });
   });
@@ -108,6 +108,28 @@ describe("shell store", () => {
       credentialDialogOpen: false,
       credentialDialogProviderId: undefined,
       doctorDialogOpen: true
+    });
+  });
+
+  it("closes every non-blocking dialog when a blocking request takes priority", () => {
+    const shell = useShellStore.getState();
+    shell.setCommandPaletteOpen(true);
+    shell.setKeyboardShortcutsDialogOpen(true);
+    shell.setDoctorDialogOpen(true);
+    shell.setCredentialDialogOpen(true, "openai");
+    shell.setUpdateDialogOpen(true);
+    shell.setSessionTreeDialogOpen(true);
+
+    shell.closeNonBlockingDialogs();
+
+    expect(useShellStore.getState()).toMatchObject({
+      commandPaletteOpen: false,
+      keyboardShortcutsDialogOpen: false,
+      doctorDialogOpen: false,
+      credentialDialogOpen: false,
+      credentialDialogProviderId: undefined,
+      updateDialogOpen: false,
+      sessionTreeDialogOpen: false
     });
   });
 });

@@ -3,6 +3,10 @@ import type { ProjectionRecoveryDisposition } from "../connection/projection-rec
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
+import {
+  conversationNeedsAttention,
+  useConversationAttentionStore
+} from "../navigation/conversation-attention-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "./workbench-store.js";
@@ -33,6 +37,7 @@ describe("task activation controller", () => {
     registerWorkspace.mockReset();
     registerWorkspace.mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
+    useConversationAttentionStore.getState().reset();
     useTaskDraftStore.getState().dispose();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -75,6 +80,7 @@ describe("task activation controller", () => {
 
   it("resynchronizes the exact selected Task and only reports committed activation as success", async () => {
     markTaskActive();
+    useConversationAttentionStore.getState().mark("workspace-a", "session-file-a");
     resynchronize.mockResolvedValue("committed");
 
     await expect(activateRendererTask("task-a")).resolves.toBe(true);
@@ -100,16 +106,27 @@ describe("task activation controller", () => {
         }
       })
     );
+    expect(conversationNeedsAttention(
+      useConversationAttentionStore.getState(),
+      "workspace-a",
+      "session-file-a"
+    )).toBe(false);
   });
 
   it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
     "returns false when Task activation recovery is %s",
     async (disposition) => {
       markTaskActive();
+      useConversationAttentionStore.getState().mark("workspace-a", "session-file-a");
       resynchronize.mockResolvedValue(disposition);
 
       await expect(activateRendererTask("task-a")).resolves.toBe(false);
       expect(openWorkspace).not.toHaveBeenCalled();
+      expect(conversationNeedsAttention(
+        useConversationAttentionStore.getState(),
+        "workspace-a",
+        "session-file-a"
+      )).toBe(true);
     }
   );
 

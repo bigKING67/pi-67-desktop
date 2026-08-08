@@ -19,6 +19,16 @@ describe("command palette model", () => {
     expect(projection).toMatchObject({ totalMatchCount: 40, visibleMatchCount: 12, truncated: true });
   });
 
+  it("keeps the complete bounded first-party action registry in the default view", () => {
+    const projection = buildPaletteProjection(
+      Array.from({ length: 17 }, (_, index) => action(`action:${index}`, "actions", `Action ${index}`)),
+      ""
+    );
+
+    expect(projection.groups[0]?.items).toHaveLength(17);
+    expect(projection).toMatchObject({ totalMatchCount: 17, visibleMatchCount: 17, truncated: false });
+  });
+
   it("supports bounded subsequence matching and keeps category grouping", () => {
     const actions = [
       action("settings:provider", "settings", "Provider 与凭据", "authentication api key"),

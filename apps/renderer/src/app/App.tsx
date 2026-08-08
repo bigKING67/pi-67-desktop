@@ -20,6 +20,7 @@ import { LazySurfaceBoundary } from "./LazySurfaceBoundary.js";
 import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
 import { initializeUpdateProjection } from "../updates/update-store.js";
+import { dismissConversationFind } from "../search/conversation-find-events.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -29,6 +30,8 @@ const ExtensionDialog = lazy(() => import("../extension-ui/ExtensionDialog.js").
 const CredentialDialog = lazy(() => import("../settings/CredentialDialog.js").then((module) => ({ default: module.CredentialDialog })));
 const UpdateDialog = lazy(() => import("../updates/UpdateDialog.js").then((module) => ({ default: module.UpdateDialog })));
 const SessionTreeDialog = lazy(() => import("../session-tree/SessionTreeDialog.js").then((module) => ({ default: module.SessionTreeDialog })));
+const WorkspaceConversationSearchDialog = lazy(() => import("../search/WorkspaceConversationSearchDialog.js").then((module) => ({ default: module.WorkspaceConversationSearchDialog })));
+const KeyboardShortcutsDialog = lazy(() => import("../help/KeyboardShortcutsDialog.js").then((module) => ({ default: module.KeyboardShortcutsDialog })));
 
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
@@ -45,6 +48,8 @@ export function App() {
   const updateDialogOpen = useShellStore((state) => state.updateDialogOpen);
   const commandPaletteOpen = useShellStore((state) => state.commandPaletteOpen);
   const sessionTreeDialogOpen = useShellStore((state) => state.sessionTreeDialogOpen);
+  const keyboardShortcutsDialogOpen = useShellStore((state) => state.keyboardShortcutsDialogOpen);
+  const blockingOverlayOpen = approvalDialogOpen || extensionDialogOpen;
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
@@ -117,6 +122,12 @@ export function App() {
   useEffect(() => installGlobalShortcuts(), []);
 
   useEffect(() => {
+    if (!blockingOverlayOpen) return;
+    useShellStore.getState().closeNonBlockingDialogs();
+    dismissConversationFind();
+  }, [blockingOverlayOpen]);
+
+  useEffect(() => {
     const breakpoint = window.matchMedia("(max-width: 760px)");
     const syncNavigationMode = (matches: boolean) => {
       setNavigationIsDrawer(matches);
@@ -176,6 +187,18 @@ export function App() {
         </LazySurfaceBoundary>
       )}
       <NotificationToasts />
+      <Suspense fallback={null}><WorkspaceConversationSearchDialog /></Suspense>
+      {keyboardShortcutsDialogOpen && !blockingOverlayOpen ? (
+        <LazySurfaceBoundary
+          description="关闭后可通过 Cmd/Ctrl+/ 或帮助菜单重新打开。"
+          kind="overlay"
+          onDismiss={() => useShellStore.getState().setKeyboardShortcutsDialogOpen(false)}
+          surface="keyboard-shortcuts-dialog"
+          title="快捷键帮助未能加载"
+        >
+          <Suspense fallback={<OverlayLoading label="正在加载快捷键帮助" />}><KeyboardShortcutsDialog /></Suspense>
+        </LazySurfaceBoundary>
+      ) : null}
       {approvalDialogOpen ? (
         <LazySurfaceBoundary
           description="工具仍保持阻止状态，没有授权结果会被自动发送。重新加载界面后可继续处理这次请求。"
@@ -186,7 +209,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label="正在加载授权界面" />}><ApprovalDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {extensionDialogOpen ? (
+      {extensionDialogOpen && !approvalDialogOpen ? (
         <LazySurfaceBoundary
           description="Extension 请求仍保持等待状态，没有输入会被自动提交。重新加载界面后可继续处理这次请求。"
           kind="blocking-overlay"
@@ -196,7 +219,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label="正在加载 Extension 输入界面" />}><ExtensionDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {doctorDialogOpen ? (
+      {doctorDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description={messages.doctor.interfaceFailureDescription}
           kind="overlay"
@@ -207,7 +230,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label={messages.doctor.loadingInterface} />}><DoctorDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {credentialDialogOpen ? (
+      {credentialDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description={messages.credentials.interfaceFailureDescription}
           kind="overlay"
@@ -218,7 +241,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label={messages.credentials.loadingInterface} />}><CredentialDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {updateDialogOpen ? (
+      {updateDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description="更新界面模块发生错误。不会自动下载或安装任何更新。"
           kind="overlay"
@@ -229,7 +252,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label="正在加载更新界面" />}><UpdateDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {sessionTreeDialogOpen ? (
+      {sessionTreeDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description="关闭后可通过 /tree 或命令面板重新打开。"
           kind="overlay"
@@ -240,7 +263,7 @@ export function App() {
           <Suspense fallback={<OverlayLoading label="正在加载会话分支" />}><SessionTreeDialog /></Suspense>
         </LazySurfaceBoundary>
       ) : null}
-      {commandPaletteOpen ? (
+      {commandPaletteOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description="命令面板模块发生错误。可以关闭后继续使用当前工作区，或重新加载界面恢复该功能。"
           kind="overlay"

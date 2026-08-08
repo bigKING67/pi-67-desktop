@@ -5,6 +5,7 @@ import {
   LEGACY_WORKBENCH_STATE_FILENAME,
   LEGACY_WORKBENCH_STATE_V2_FILENAME,
   LEGACY_WORKBENCH_STATE_V3_FILENAME,
+  LEGACY_WORKBENCH_STATE_V4_FILENAME,
   WORKBENCH_STATE_DIRECTORY,
   WORKBENCH_STATE_FILENAME
 } from "./workbench-state.js";
@@ -19,6 +20,35 @@ import {
 afterEach(cleanupWorkbenchStateTestRoots);
 
 describe("Workbench state migration", () => {
+  it("migrates V4 Workspace registrations to plain user-owned environment bindings without running Git", async () => {
+    const userData = await temporaryWorkbenchStateRoot();
+    const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
+    const workspace = workbenchDescriptorFixture("workspace-1", "/workspace/first", "34");
+    await mkdir(directory);
+    await writeFile(join(directory, LEGACY_WORKBENCH_STATE_V4_FILENAME), JSON.stringify({
+      version: 4,
+      workspaces: [workspace],
+      workspaceOrder: [workspace.id],
+      expandedWorkspaceIds: [workspace.id],
+      currentWorkspaceId: workspace.id,
+      selectedSurface: { kind: "workspace", workspaceId: workspace.id },
+      runtimeRecovery: [],
+      sessionCreationRecovery: [],
+      settings: { section: "general", scope: "global" },
+      cleanExit: true
+    }), { mode: 0o600 });
+
+    const loaded = await workbenchStateTestStore(userData).load();
+
+    expect(loaded.recovery).toEqual({ kind: "migrated-v4" });
+    expect(loaded.state).toMatchObject({
+      version: 5,
+      workspaceEnvironments: [{ workspaceId: workspace.id, kind: "plain", ownership: "user" }],
+      environmentMutations: []
+    });
+    expect(await readdir(directory)).toEqual([LEGACY_WORKBENCH_STATE_V4_FILENAME, WORKBENCH_STATE_FILENAME]);
+  });
+
   it("migrates V2 layout metadata while clearing every legacy recovery shell", async () => {
     const userData = await temporaryWorkbenchStateRoot();
     const directory = join(userData, WORKBENCH_STATE_DIRECTORY);
@@ -51,13 +81,15 @@ describe("Workbench state migration", () => {
 
     expect(loaded.recovery).toEqual({ kind: "migrated-v2" });
     expect(loaded.state).toMatchObject({
-      version: 4,
+      version: 5,
       workspaces: [workspace],
       workspaceOrder: [workspace.id],
       expandedWorkspaceIds: [workspace.id],
       currentWorkspaceId: workspace.id,
       selectedSurface: { kind: "workspace", workspaceId: workspace.id },
       runtimeRecovery: [],
+      workspaceEnvironments: [{ workspaceId: workspace.id, kind: "plain", ownership: "user" }],
+      environmentMutations: [],
       settings: { section: "extensions", scope: "project", workspaceId: workspace.id }
     });
     expect(await readdir(directory)).toEqual([
@@ -122,7 +154,7 @@ describe("Workbench state migration", () => {
 
     expect(loaded.recovery).toEqual({ kind: "migrated-v1" });
     expect(loaded.state).toMatchObject({
-      version: 4,
+      version: 5,
       selectedSurface: { kind: "workspace", workspaceId: workspace.id },
       runtimeRecovery: [],
       settings: { section: "extensions", scope: "project", workspaceId: workspace.id }
@@ -166,7 +198,7 @@ describe("Workbench state migration", () => {
 
     expect(loaded.recovery).toEqual({ kind: "migrated-v3" });
     expect(loaded.state).toMatchObject({
-      version: 4,
+      version: 5,
       selectedSurface: { kind: "workspace", workspaceId: workspace.id },
       runtimeRecovery: [],
       sessionCreationRecovery: []
@@ -205,7 +237,7 @@ describe("Workbench state migration", () => {
     const loaded = await workbenchStateTestStore(userData).load();
 
     expect(loaded.state).toMatchObject({
-      version: 4,
+      version: 5,
       selectedSurface: { kind: "conversation", conversation },
       runtimeRecovery: [],
       sessionCreationRecovery: creationRecovery

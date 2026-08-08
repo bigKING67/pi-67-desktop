@@ -4,30 +4,25 @@ import { chmod, lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import {
-  MAX_COMPOSER_DRAFTS,
-  MAX_COMPOSER_DRAFT_TEXT_BYTES,
-  MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
   type ComposerDraftPersistedState,
-  type ComposerDraftRecord,
   type ComposerDraftStateSnapshot
 } from "@pi67/protocol";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
+import {
+  emptyComposerDraftState,
+  encodeStoredComposerDraftState,
+  MAX_STORED_COMPOSER_DRAFT_STATE_BYTES,
+  parseComposerDraftPersistedState,
+  parseStoredComposerDraftState,
+  type StoredComposerDraftState
+} from "./composer-draft-state-parser.js";
 import { WORKBENCH_STATE_DIRECTORY } from "./workbench-state-contract.js";
+
+export { parseComposerDraftPersistedState } from "./composer-draft-state-parser.js";
 
 const realpathNative = promisify(realpath.native);
 const STATE_FILENAME = "composer-drafts-v1.json";
 const BACKUP_FILENAME = "composer-drafts-v1.bak.json";
-const MAX_STORED_STATE_BYTES = 8 * 1024 * 1024;
-const MAX_ID_CHARS = 1_024;
-const MAX_DRAFT_ID_CHARS = 200;
-const MAX_SESSION_FILE_IDENTITY_CHARS = 32_832;
-const MAX_SESSION_PATH_CHARS = 32_768;
-
-interface StoredComposerDraftState {
-  version: 1;
-  encryptedState?: string;
-}
-
 type StoredReadResult =
   | { kind: "missing" }
   | { kind: "invalid" }
@@ -128,20 +123,20 @@ export class ComposerDraftStateStore {
       decodedPrimary?.kind === "decrypt-failed"
       || decodedBackup?.kind === "decrypt-failed"
     ) {
-      const state = emptyState();
+      const state = emptyComposerDraftState();
       this.#memoryState = state;
       return { ...this.#snapshot(state), recovery: "draft-decrypt-failed" };
     }
 
     if (primary.kind === "missing" && backup.kind === "missing") {
-      const state = emptyState();
+      const state = emptyComposerDraftState();
       this.#memoryState = state;
       return this.#snapshot(state);
     }
 
     await this.#quarantine(statePath);
     await this.#quarantine(backupPath);
-    const state = emptyState();
+    const state = emptyComposerDraftState();
     this.#memoryState = state;
     return { ...this.#snapshot(state), recovery: "corrupt-reset" };
   }
@@ -161,7 +156,7 @@ export class ComposerDraftStateStore {
       if (isNodeError(error, "ENOENT")) return { kind: "missing" };
       throw error;
     }
-    if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > MAX_STORED_STATE_BYTES) {
+    if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > MAX_STORED_COMPOSER_DRAFT_STATE_BYTES) {
       return { kind: "invalid" };
     }
     const handle = await open(path, "r");
@@ -171,10 +166,10 @@ export class ComposerDraftStateStore {
     } finally {
       await handle.close();
     }
-    if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_STATE_BYTES) return { kind: "invalid" };
+    if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_COMPOSER_DRAFT_STATE_BYTES) return { kind: "invalid" };
     try {
       const value = JSON.parse(serialized) as unknown;
-      const state = parseStoredState(value);
+      const state = parseStoredComposerDraftState(value);
       return state ? { kind: "state", state } : { kind: "invalid" };
     } catch {
       return { kind: "invalid" };
@@ -182,7 +177,7 @@ export class ComposerDraftStateStore {
   }
 
   #decodeStoredState(stored: StoredComposerDraftState): DecodedState {
-    if (stored.encryptedState === undefined) return { kind: "state", state: emptyState() };
+    if (stored.encryptedState === undefined) return { kind: "state", state: emptyComposerDraftState() };
     if (!this.#encryption.isAvailable()) return { kind: "decrypt-failed" };
     try {
       const decrypted = this.#encryption.decrypt(Buffer.from(stored.encryptedState, "base64"));
@@ -194,9 +189,9 @@ export class ComposerDraftStateStore {
   }
 
   async #writeUnlocked(state: ComposerDraftPersistedState): Promise<void> {
-    const stored = encodeStoredState(state, this.#encryption);
+    const stored = encodeStoredComposerDraftState(state, this.#encryption);
     const serialized = `${JSON.stringify(stored)}\n`;
-    if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_STATE_BYTES) {
+    if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_COMPOSER_DRAFT_STATE_BYTES) {
       throw new Error("Composer draft state exceeds the persistence size limit.");
     }
     const directory = await this.#ensureStorageDirectory();
@@ -255,142 +250,6 @@ export class ComposerDraftStateStore {
     if (process.platform !== "win32") await chmod(canonicalDirectory, 0o700);
     return canonicalDirectory;
   }
-}
-
-export function parseComposerDraftPersistedState(value: unknown): ComposerDraftPersistedState | undefined {
-  if (!isRecordWithAllowedKeys(value, ["version", "drafts", "selectedConversation"], ["version", "drafts"])) {
-    return undefined;
-  }
-  if (value.version !== 1 || !Array.isArray(value.drafts) || value.drafts.length > MAX_COMPOSER_DRAFTS) {
-    return undefined;
-  }
-  const drafts: ComposerDraftRecord[] = [];
-  const identities = new Set<string>();
-  let totalTextBytes = 0;
-  for (const candidate of value.drafts) {
-    if (!isRecordWithAllowedKeys(
-      candidate,
-      ["conversation", "text", "streamBehavior", "updatedAt"],
-      ["conversation", "text", "streamBehavior", "updatedAt"]
-    )) return undefined;
-    const conversation = parseConversation(candidate.conversation);
-    if (!conversation || typeof candidate.text !== "string" || candidate.text.length === 0) return undefined;
-    const textBytes = Buffer.byteLength(candidate.text, "utf8");
-    totalTextBytes += textBytes;
-    if (
-      textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES
-      || totalTextBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL
-      || (candidate.streamBehavior !== "steer" && candidate.streamBehavior !== "followUp")
-      || !Number.isSafeInteger(candidate.updatedAt)
-      || Number(candidate.updatedAt) < 0
-    ) return undefined;
-    const identity = conversationIdentity(conversation);
-    if (identities.has(identity)) return undefined;
-    identities.add(identity);
-    drafts.push({
-      conversation,
-      text: candidate.text,
-      streamBehavior: candidate.streamBehavior,
-      updatedAt: Number(candidate.updatedAt)
-    });
-  }
-  const selectedConversation = value.selectedConversation === undefined
-    ? undefined
-    : parseConversation(value.selectedConversation);
-  if (value.selectedConversation !== undefined && !selectedConversation) return undefined;
-  if (selectedConversation && !identities.has(conversationIdentity(selectedConversation))) return undefined;
-  return {
-    version: 1,
-    drafts,
-    ...(selectedConversation ? { selectedConversation } : {})
-  };
-}
-
-function parseStoredState(value: unknown): StoredComposerDraftState | undefined {
-  if (!isRecordWithAllowedKeys(value, ["version", "encryptedState"], ["version"]) || value.version !== 1) {
-    return undefined;
-  }
-  if (value.encryptedState === undefined) return { version: 1 };
-  if (
-    typeof value.encryptedState !== "string"
-    || value.encryptedState.length === 0
-    || value.encryptedState.length > MAX_STORED_STATE_BYTES
-    || !/^[A-Za-z0-9+/]+={0,2}$/u.test(value.encryptedState)
-  ) return undefined;
-  return { version: 1, encryptedState: value.encryptedState };
-}
-
-function encodeStoredState(
-  state: ComposerDraftPersistedState,
-  encryption: DesktopTextEncryption
-): StoredComposerDraftState {
-  if (!encryption.isAvailable()) return { version: 1 };
-  return {
-    version: 1,
-    encryptedState: encryption.encrypt(JSON.stringify(state)).toString("base64")
-  };
-}
-
-function parseConversation(value: unknown): ComposerDraftRecord["conversation"] | undefined {
-  if (!isRecord(value) || !isBoundedString(value.workspaceId, MAX_ID_CHARS)) return undefined;
-  if (
-    value.kind === "provisional"
-    && hasExactKeys(value, ["kind", "workspaceId", "draftId"])
-    && isBoundedString(value.draftId, MAX_DRAFT_ID_CHARS)
-  ) {
-    return { kind: "provisional", workspaceId: value.workspaceId, draftId: value.draftId };
-  }
-  if (
-    value.kind === "session"
-    && hasExactKeys(value, ["kind", "workspaceId", "sessionFileIdentity", "sessionPath"])
-    && isBoundedString(value.sessionFileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
-    && typeof value.sessionPath === "string"
-    && value.sessionPath.length > 0
-    && value.sessionPath.length <= MAX_SESSION_PATH_CHARS
-    && !value.sessionPath.includes("\0")
-    && isAbsolute(value.sessionPath)
-  ) {
-    return {
-      kind: "session",
-      workspaceId: value.workspaceId,
-      sessionFileIdentity: value.sessionFileIdentity,
-      sessionPath: value.sessionPath
-    };
-  }
-  return undefined;
-}
-
-function conversationIdentity(conversation: ComposerDraftRecord["conversation"]): string {
-  return conversation.kind === "session"
-    ? `session:${conversation.workspaceId}:${conversation.sessionFileIdentity}`
-    : `provisional:${conversation.workspaceId}:${conversation.draftId}`;
-}
-
-function emptyState(): ComposerDraftPersistedState {
-  return { version: 1, drafts: [] };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isRecordWithAllowedKeys(
-  value: unknown,
-  allowed: readonly string[],
-  required: readonly string[]
-): value is Record<string, unknown> {
-  if (!isRecord(value)) return false;
-  const keys = Object.keys(value);
-  return keys.every((key) => allowed.includes(key)) && required.every((key) => Object.hasOwn(value, key));
-}
-
-function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  const actual = Object.keys(value);
-  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-}
-
-function isBoundedString(value: unknown, maximum: number): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= maximum && !value.includes("\0");
 }
 
 function assertContained(root: string, candidate: string): void {

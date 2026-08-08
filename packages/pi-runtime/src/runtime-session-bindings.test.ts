@@ -1,8 +1,10 @@
+import { RuntimeError } from "@pi67/domain";
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import { createRuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
+import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 
 describe("RuntimeSessionBindings", () => {
   it("owns the structured not-ready boundary", () => {
@@ -38,9 +40,30 @@ describe("RuntimeSessionBindings", () => {
     })).rejects.toThrow("transition failed");
     await expect(bindings.runTransition(async () => "recovered")).resolves.toBe("recovered");
   });
+
+  it("preserves the bounded Task model runtime failure before creating a Pi Session", async () => {
+    const createModelRuntime = vi.fn().mockRejectedValue(new RuntimeError(
+      "RUNTIME_NOT_READY",
+      "Pi Task model runtime did not initialize within the bounded startup budget.",
+      { recoverable: true, details: { stage: "session-model-runtime", waitMs: 10 } }
+    ));
+    const bindings = createBindings(() => ({
+      assertCompatible: vi.fn(),
+      configurationService: { createModelRuntime }
+    } as unknown as PiWorkspaceRuntimeServices));
+
+    await expect(bindings.createInitial("/tmp/pi67-workspace")).rejects.toMatchObject({
+      code: "RUNTIME_NOT_READY",
+      recoverable: true,
+      details: { stage: "session-model-runtime", waitMs: 10 }
+    });
+    expect(createModelRuntime).toHaveBeenCalledOnce();
+  });
 });
 
-function createBindings(): RuntimeSessionBindings {
+function createBindings(
+  getWorkspaceServices: () => PiWorkspaceRuntimeServices | undefined = () => undefined
+): RuntimeSessionBindings {
   return new RuntimeSessionBindings({
     cancelInteractiveRequests: vi.fn(),
     emit: vi.fn(),
@@ -53,7 +76,7 @@ function createBindings(): RuntimeSessionBindings {
       approvalMode: "guided",
       taskToolMode: "ask"
     }),
-    getWorkspaceServices: () => undefined,
+    getWorkspaceServices,
     getPromptAttachmentAccess: () => undefined,
     projections: { reset: vi.fn() } as unknown as RuntimeProjectionController,
     rebindExtensionUi: vi.fn(async () => undefined),

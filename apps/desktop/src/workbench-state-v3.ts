@@ -13,8 +13,9 @@ import {
   parseWorkbenchIdSubset,
   parseWorkbenchSettings,
   parseWorkspaces,
+  plainWorkspaceEnvironmentBindings,
   type LegacyConversationKey,
-  type WorkbenchStateV4,
+  type WorkbenchStateV5,
   type WorkbenchSurface
 } from "./workbench-state-contract.js";
 import {
@@ -23,7 +24,7 @@ import {
 } from "./workbench-state-session-creation.js";
 
 /** Migrates path-keyed v3 state without promoting a persisted path into physical identity. */
-export function parseAndMigrateWorkbenchStateV3(value: unknown): WorkbenchStateV4 | undefined {
+export function parseAndMigrateWorkbenchStateV3(value: unknown): WorkbenchStateV5 | undefined {
   if (!isRecordWithAllowedKeys(
     value,
     [
@@ -85,6 +86,8 @@ export function parseAndMigrateWorkbenchStateV3(value: unknown): WorkbenchStateV
     ...(selectedSurface ? { selectedSurface } : {}),
     runtimeRecovery: [],
     sessionCreationRecovery,
+    workspaceEnvironments: plainWorkspaceEnvironmentBindings(workspaces),
+    environmentMutations: [],
     settings,
     cleanExit: value.cleanExit
   };

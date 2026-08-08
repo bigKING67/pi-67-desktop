@@ -100,6 +100,151 @@ describe("parseComposerDraftPersistedState", () => {
       selectedConversation: { kind: "provisional", workspaceId: "workspace-a", draftId: "missing" }
     })).toBeUndefined();
   });
+
+  it("accepts Worktree intent only for provisional draft conversations", () => {
+    const provisional = {
+      version: 1 as const,
+      drafts: [{
+        conversation: {
+          kind: "provisional" as const,
+          workspaceId: "workspace-a",
+          draftId: "draft-a"
+        },
+        text: "隔离修改",
+        streamBehavior: "followUp" as const,
+        updatedAt: 10,
+        environmentIntent: "worktree" as const
+      }]
+    };
+    expect(parseComposerDraftPersistedState(provisional)).toEqual(provisional);
+    expect(parseComposerDraftPersistedState({
+      ...draftState(),
+      drafts: [{ ...draftState().drafts[0], environmentIntent: "worktree" }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...provisional,
+      drafts: [{ ...provisional.drafts[0], environmentIntent: "remote" }]
+    })).toBeUndefined();
+  });
+
+  it("accepts native interaction mode only for provisional draft conversations", () => {
+    const provisional = {
+      version: 1 as const,
+      drafts: [{
+        conversation: {
+          kind: "provisional" as const,
+          workspaceId: "workspace-a",
+          draftId: "draft-plan"
+        },
+        text: "先制定计划",
+        streamBehavior: "followUp" as const,
+        interactionMode: "plan" as const,
+        updatedAt: 11
+      }]
+    };
+    expect(parseComposerDraftPersistedState(provisional)).toEqual(provisional);
+    expect(parseComposerDraftPersistedState({
+      ...draftState(),
+      drafts: [{ ...draftState().drafts[0], interactionMode: "plan" }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...provisional,
+      drafts: [{ ...provisional.drafts[0], interactionMode: "review" }]
+    })).toBeUndefined();
+  });
+
+  it("accepts bounded Workspace file refs and rejects forged or duplicate identities", () => {
+    const state = draftState();
+    const withReference = {
+      ...state,
+      drafts: [{
+        ...state.drafts[0],
+        workspaceFiles: [{
+          id: "file-a",
+          revision: "revision-a",
+          relativePath: "src/main.ts"
+        }]
+      }]
+    };
+    const references = withReference.drafts[0]!.workspaceFiles!;
+    expect(parseComposerDraftPersistedState(withReference)).toEqual(withReference);
+    expect(parseComposerDraftPersistedState({
+      ...withReference,
+      drafts: [{
+        ...withReference.drafts[0],
+        workspaceFiles: [
+          ...references,
+          ...references
+        ]
+      }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...withReference,
+      drafts: [{
+        ...withReference.drafts[0],
+        workspaceFiles: [{ id: "../outside", revision: "revision-a", relativePath: "src/main.ts" }]
+      }]
+    })).toBeUndefined();
+  });
+
+  it("validates Prompt stash count, identity, timestamps and global text budget", () => {
+    const state = draftState();
+    const stashItem = { id: "stash-1", text: "later prompt", createdAt: 10 };
+    const stashOnly = {
+      ...state,
+      drafts: [{ ...state.drafts[0], text: "", promptStash: [stashItem] }]
+    };
+    expect(parseComposerDraftPersistedState(stashOnly)).toEqual(stashOnly);
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{ ...state.drafts[0], text: "", promptStash: [] }]
+    })).toBeUndefined();
+
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{
+        ...state.drafts[0],
+        promptStash: Array.from({ length: 21 }, (_, index) => ({
+          id: `stash-${index}`,
+          text: `prompt-${index}`,
+          createdAt: index
+        }))
+      }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{ ...state.drafts[0], promptStash: [stashItem, { ...stashItem, text: "other" }] }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{ ...state.drafts[0], promptStash: [{ ...stashItem, id: "../forged" }] }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{ ...state.drafts[0], promptStash: [{ ...stashItem, createdAt: -1 }] }]
+    })).toBeUndefined();
+
+    const largeItems = (prefix: string) => Array.from({ length: 5 }, (_, index) => ({
+      id: `${prefix}-${index}`,
+      text: "x".repeat(256 * 1024),
+      createdAt: index
+    }));
+    expect(parseComposerDraftPersistedState({
+      version: 1,
+      drafts: [
+        { ...state.drafts[0], promptStash: largeItems("a") },
+        {
+          ...state.drafts[0],
+          conversation: {
+            kind: "provisional",
+            workspaceId: "workspace-a",
+            draftId: "stash-draft-b"
+          },
+          promptStash: largeItems("b")
+        }
+      ]
+    })).toBeUndefined();
+  });
 });
 
 function draftState() {

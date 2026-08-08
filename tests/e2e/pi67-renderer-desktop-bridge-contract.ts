@@ -1,6 +1,7 @@
 import type {
   ComposerDraftPersistedState,
   PreviousRunExitStatus,
+  RepositoryEnvironmentSnapshot,
   RuntimeRecoveryRecord,
   SessionCreationRecoveryRecord,
   SettingsSection,
@@ -31,6 +32,8 @@ export interface MockDesktopBridgeOptions {
   initialSessionCreationRecovery?: SessionCreationRecoveryRecord[];
   initialComposerDraftState?: ComposerDraftPersistedState;
   composerDraftPersistence?: "available" | "unavailable";
+  composerDraftUpdateDelayMs?: number;
+  composerDraftFailureCalls?: number[];
   expandedWorkspaceIds?: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;
@@ -41,6 +44,7 @@ export interface MockDesktopBridgeOptions {
   };
   capabilityInitializingCalls?: number;
   deferInitialUpdateState?: boolean;
+  repositoryEnvironmentSnapshot?: RepositoryEnvironmentSnapshot;
 }
 
 export const DEFAULT_MOCK_WORKSPACE: MockWorkspaceDescriptor = {

@@ -13,6 +13,7 @@ import {
   type DatabaseLike
 } from "./sqlite-session-catalog-schema.js";
 import {
+  organizeManySqliteSessionCatalog,
   organizeSqliteSessionCatalog,
   type SessionCatalogOrganization
 } from "./sqlite-session-catalog-organization.js";
@@ -93,6 +94,10 @@ export interface SqliteSessionCatalog {
   ): SqliteCatalogState;
   upsert(record: SessionCatalogRecord, minimumRevision: number): SqliteCatalogState;
   organize?(path: string, organization: SessionCatalogOrganization, minimumRevision: number): SqliteCatalogState;
+  organizeMany?(
+    organizations: readonly { path: string; organization: SessionCatalogOrganization }[],
+    minimumRevision: number
+  ): SqliteCatalogState;
   close(): void;
 }
 
@@ -324,6 +329,20 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
       this.database,
       path,
       organization,
+      minimumRevision,
+      () => this.readState().revision
+    );
+    return this.getState();
+  }
+
+  organizeMany(
+    organizations: readonly { path: string; organization: SessionCatalogOrganization }[],
+    minimumRevision: number
+  ): SqliteCatalogState {
+    this.assertDatabaseVersion();
+    organizeManySqliteSessionCatalog(
+      this.database,
+      organizations,
       minimumRevision,
       () => this.readState().revision
     );

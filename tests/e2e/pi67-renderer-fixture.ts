@@ -1,16 +1,10 @@
 import type { Page } from "@playwright/test";
-import { MOCK_EXTENSION_COMMANDS } from "./pi67-extension-catalog-fixture.js";
-import { MOCK_SESSION_CATALOG_STATUS } from "./pi67-session-catalog-fixture.js";
-import { installMockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
-import { installMockAssetReadHandler, type MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
-import { installMockCommandResponseHandler, type MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
-import { installMockSessionRotationHandler } from "./pi67-renderer-session-fixture.js";
-import { installMockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
-import { installMockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
-import { installMockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
-import { installMockPayloadSanitizer, type MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
-import { installMockOperationFactories, type MockOperationViewFactory, type MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
+import type { MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
+import type { MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
+import type { MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
+import type { MockOperationViewFactory, MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
 import { createMockAgentFixtureInput } from "./pi67-renderer-agent-input-fixture.js";
+import { installMockAgentHandlers } from "./pi67-renderer-agent-installation.js";
 import type {
   FixtureAgentState,
   FixtureMessage,
@@ -43,23 +37,10 @@ export async function attachMockAgent(
   responseDelays: Record<string, number> = {},
   options: MockAgentOptions = {}
 ): Promise<void> {
-  await page.evaluate(installMockSessionControlCommandHandler);
-  await page.evaluate(installMockAssetReadHandler);
-  await page.evaluate(installMockSessionRotationHandler);
-  await page.evaluate(installMockPayloadSanitizer);
-  await page.evaluate(installMockOperationFactories);
-  await page.evaluate(installMockContextFileCommandHandler);
-  await page.evaluate(installMockInspectorCommandHandler);
-  await page.evaluate(installMockProviderConfigurationCommandHandler);
-  await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
-    fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
-    fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
-  });
+  await installMockAgentHandlers(page);
   await page.evaluate(({ fixtureMessages, fixtureResponseDelays, fixtureOptions, fixtureExtensionCatalog, fixtureRuntimeCapabilities, fixtureProviderConfiguration, fixtureContextFiles, fixtureSessionCatalogPage, fixtureSessionCatalogPagesByWorkspace, fixtureSnapshot, fixtureProtocolVersion, fixtureProtocolRevision }) => {
     const testWindow = window as FixtureWindow;
-    const readMockAsset = (testWindow as FixtureWindow & {
-      __pi67ReadMockAsset: MockAssetReadHandler;
-    }).__pi67ReadMockAsset;
+    const readMockAsset = (testWindow as FixtureWindow & { __pi67ReadMockAsset: MockAssetReadHandler }).__pi67ReadMockAsset;
     const resolveMockCommand = (testWindow as FixtureWindow & {
       __pi67ResolveMockCommand: MockCommandResponseHandler;
     }).__pi67ResolveMockCommand;
@@ -253,7 +234,7 @@ export async function attachMockAgent(
               ) testWindow.__pi67RotateMockSession(
                 state,
                 envelope.payload.path,
-                undefined,
+                fixtureOptions.sessionMessagesByPath?.[envelope.payload.path],
                 catalogSessionFileIdentity(envelope.payload.path)
               );
               if (sessionForkCommands.has(envelope.type!) && !hasConfiguredResult) {
@@ -281,6 +262,13 @@ export async function attachMockAgent(
             if (envelope.type === "session.name" && !hasConfiguredResult) {
               result = projectionMutationAcknowledgement(state, hostEpoch);
             }
+            if (envelope.type === "session.interactionMode.set") {
+              emitThrough(hostPort, hostEpoch, {
+                type: "session.interactionModeChanged",
+                payload: { interactionMode: state.snapshot.interactionMode }
+              });
+              result = projectionMutationAcknowledgement(state, hostEpoch);
+            }
             hostPort.postMessage({
               protocolVersion: fixtureProtocolVersion,
               kind: "response",
@@ -306,7 +294,7 @@ export async function attachMockAgent(
                 payload: { mode: state.taskToolMode, reason: "approval-enabled-yolo" }
               }, typeof envelope.payload.operationId === "string" ? envelope.payload.operationId : undefined);
             }
-            if (envelope.type === "prompt.submit") {
+            if (envelope.type === "prompt.submit" || envelope.type === "plan.implement") {
               const accepted = result as { operationId: string };
               state.snapshot = { ...state.snapshot, streaming: true };
               if (state.autoStartOperation) setTimeout(() => emitThrough(hostPort, hostEpoch, {
@@ -315,6 +303,18 @@ export async function attachMockAgent(
                   operation: operationView(accepted.operationId, "prompt", "running", state)
                 }
               }, accepted.operationId), 0);
+              if (envelope.type === "plan.implement") setTimeout(() => {
+                const snapshot: Record<string, unknown> = {
+                  ...state.snapshot,
+                  interactionMode: "execute"
+                };
+                delete snapshot.activeProposedPlan;
+                state.snapshot = snapshot;
+                emitThrough(hostPort, hostEpoch, {
+                  type: "session.interactionModeChanged",
+                  payload: { interactionMode: "execute" }
+                });
+              }, 0);
               if (state.terminalDelayMs !== undefined) setTimeout(() => {
                 state.snapshot = { ...state.snapshot, streaming: false };
                 emitThrough(hostPort, hostEpoch, {

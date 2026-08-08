@@ -75,10 +75,10 @@ export function CredentialDialog() {
   useEffect(() => {
     if (!open) return;
     setProviderId((current) => {
+      if (providerList.some((provider) => provider.id === current)) return current;
       if (targetProviderId && providerList.some((provider) => provider.id === targetProviderId)) {
         return targetProviderId;
       }
-      if (providerList.some((provider) => provider.id === current)) return current;
       return providerList.some((provider) => provider.id === selectedModel?.provider)
         ? selectedModel?.provider ?? ""
         : providerList[0]?.id ?? "";

@@ -2,6 +2,8 @@ import {
   MAX_COMPOSER_DRAFTS,
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
   MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
+  MAX_PROMPT_STASH_ITEMS,
+  MAX_PROMPT_STASH_TEXT_BYTES_TOTAL,
   conversationKeyIdentity,
   type ComposerDraftPersistedState,
   type ComposerDraftRecord
@@ -103,8 +105,9 @@ function restorePersistedDrafts(state: ComposerDraftPersistedState): void {
     if (restored === "conflict") continue;
     const draft = useTaskDraftStore.getState().drafts[taskId];
     rendererWorkbenchStore.getState().updateTask(taskId, {
-      hasDraft: Boolean(draft?.text.trim()),
-      attachmentCount: draft?.attachments.length ?? 0
+      hasDraft: Boolean(draft && (draft.text.trim() || draft.promptStash.length > 0)),
+      attachmentCount: draft?.attachments.length ?? 0,
+      ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {})
     });
     restoredTaskByConversation.set(identity, taskId);
   }
@@ -140,6 +143,7 @@ function restoredTask(record: ComposerDraftRecord): RendererWorkbenchTask {
     },
     title: "未命名会话",
     titleSource: "fallback",
+    ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {}),
     hasDraft: true,
     attachmentCount: 0,
     toolMode: "auto"
@@ -151,7 +155,12 @@ function synchronizeTaskDraftFlags(drafts: Record<string, TaskDraft>): void {
   const workbench = rendererWorkbenchStore.getState();
   for (const task of Object.values(workbench.tasks)) {
     const draft = drafts[task.id];
-    const hasDraft = Boolean(draft && (draft.text.trim().length > 0 || draft.attachments.length > 0));
+    const hasDraft = Boolean(draft && (
+      draft.text.trim().length > 0
+      || draft.attachments.length > 0
+      || draft.workspaceFiles.length > 0
+      || draft.promptStash.length > 0
+    ));
     const attachmentCount = draft?.attachments.length ?? 0;
     if (task.hasDraft === hasDraft && task.attachmentCount === attachmentCount) continue;
     workbench.updateTask(task.id, { hasDraft, attachmentCount });
@@ -167,21 +176,35 @@ function schedulePersistence(): void {
   }, PERSISTENCE_DELAY_MS);
 }
 
-function persistTaskDraftState(): Promise<void> {
+function persistTaskDraftState(requiredTaskId?: string): Promise<boolean> {
   if (persistenceTimer !== undefined) {
     window.clearTimeout(persistenceTimer);
     persistenceTimer = undefined;
   }
   const state = serializeTaskDraftState();
-  persistencePromise = persistencePromise.then(async () => {
+  if (requiredTaskId && !serializedStateIncludesTaskDraft(state, requiredTaskId)) {
+    return Promise.resolve(false);
+  }
+  let succeeded = false;
+  const operation = persistencePromise.then(async () => {
     try {
       await window.pi67.system.updateComposerDraftState(state);
       lastError = undefined;
+      succeeded = true;
     } catch (error) {
       reportPersistenceError(error);
     }
   });
-  return persistencePromise;
+  persistencePromise = operation;
+  return operation.then(() => succeeded);
+}
+
+export async function persistTaskDraftStateCheckpoint(): Promise<void> {
+  await persistTaskDraftState();
+}
+
+export function persistTaskDraftStateAcknowledged(taskId?: string): Promise<boolean> {
+  return persistTaskDraftState(taskId);
 }
 
 export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersistedState {
@@ -190,14 +213,19 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
   const candidates: ComposerDraftRecord[] = [];
   for (const [taskId, draft] of Object.entries(drafts)) {
     const task = workbench.tasks[taskId];
-    if (!task || draft.text.length === 0) continue;
+    if (!task || (draft.text.length === 0 && draft.promptStash.length === 0)) continue;
     const textBytes = encoder.encode(draft.text).byteLength;
-    if (textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES) {
+    const stashBytes = draft.promptStash.reduce((total, item) => total + encoder.encode(item.text).byteLength, 0);
+    if (
+      textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES
+      || draft.promptStash.length > MAX_PROMPT_STASH_ITEMS
+      || stashBytes > MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
+    ) {
       publishLimitWarning();
       continue;
     }
     const identity = conversationKeyIdentity(task.conversation);
-    const fingerprint = taskDraftFingerprint(draft);
+    const fingerprint = taskDraftFingerprint(draft, task.environmentIntent);
     if (contentFingerprintByConversation.get(identity) !== fingerprint) {
       contentFingerprintByConversation.set(identity, fingerprint);
       updatedAtByConversation.set(identity, now);
@@ -206,24 +234,44 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       conversation: task.conversation,
       text: draft.text,
       streamBehavior: draft.streamBehavior,
-      updatedAt: updatedAtByConversation.get(identity) ?? now
+      updatedAt: updatedAtByConversation.get(identity) ?? now,
+      ...(draft.workspaceFiles.length > 0
+        ? { workspaceFiles: draft.workspaceFiles.map((reference) => ({ ...reference })) }
+        : {}),
+      ...(draft.promptStash.length > 0
+        ? { promptStash: draft.promptStash.map((item) => ({ ...item })) }
+        : {}),
+      ...(task.conversation.kind === "provisional" && task.environmentIntent === "worktree"
+        ? { environmentIntent: "worktree" as const }
+        : {}),
+      ...(task.conversation.kind === "provisional" && draft.interactionMode === "plan"
+        ? { interactionMode: "plan" as const }
+        : {})
     });
   }
 
   candidates.sort((left, right) => right.updatedAt - left.updatedAt);
   const bounded: ComposerDraftRecord[] = [];
   let totalTextBytes = 0;
+  let totalPromptStashBytes = 0;
   for (const candidate of candidates) {
-    const textBytes = encoder.encode(candidate.text).byteLength;
+    const textBytes = encoder.encode(candidate.text).byteLength
+      + (candidate.promptStash ?? []).reduce((total, item) => total + encoder.encode(item.text).byteLength, 0);
+    const promptStashBytes = (candidate.promptStash ?? []).reduce(
+      (total, item) => total + encoder.encode(item.text).byteLength,
+      0
+    );
     if (
       bounded.length >= MAX_COMPOSER_DRAFTS
       || totalTextBytes + textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL
+      || totalPromptStashBytes + promptStashBytes > MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
     ) {
       publishLimitWarning();
       continue;
     }
     bounded.push(candidate);
     totalTextBytes += textBytes;
+    totalPromptStashBytes += promptStashBytes;
   }
   const included = new Set(bounded.map((draft) => conversationKeyIdentity(draft.conversation)));
   const selected = selectedWorkbenchTask(workbench);
@@ -236,12 +284,44 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
   };
 }
 
-function taskDraftFingerprint(draft: TaskDraft): string {
-  return `${draft.streamBehavior}\0${draft.text}`;
+function serializedStateIncludesTaskDraft(
+  state: ComposerDraftPersistedState,
+  taskId: string
+): boolean {
+  const workbench = rendererWorkbenchStore.getState();
+  const task = workbench.tasks[taskId];
+  const draft = useTaskDraftStore.getState().drafts[taskId];
+  if (!task || !draft) return false;
+  const record = state.drafts.find((candidate) => (
+    conversationKeyIdentity(candidate.conversation) === conversationKeyIdentity(task.conversation)
+  ));
+  return Boolean(
+    record
+    && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent)
+  );
+}
+
+function taskDraftFingerprint(
+  draft: TaskDraft,
+  environmentIntent: RendererWorkbenchTask["environmentIntent"]
+): string {
+  return `${draft.streamBehavior}\0${draft.interactionMode}\0${environmentIntent ?? "local"}\0${draft.text}\0${workspaceFileFingerprint(draft.workspaceFiles)}\0${promptStashFingerprint(draft.promptStash)}`;
 }
 
 function draftContentFingerprint(record: ComposerDraftRecord): string {
-  return `${record.streamBehavior}\0${record.text}`;
+  return `${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
+}
+
+function promptStashFingerprint(items: readonly { id: string; text: string; createdAt: number }[]): string {
+  return items.map((item) => `${item.id}\0${item.createdAt}\0${item.text}`).join("\0");
+}
+
+function workspaceFileFingerprint(
+  references: readonly { id: string; revision: string; relativePath: string }[]
+): string {
+  return references.map((reference) => (
+    `${reference.id}\0${reference.revision}\0${reference.relativePath}`
+  )).join("\0");
 }
 
 function publishLimitWarning(): void {

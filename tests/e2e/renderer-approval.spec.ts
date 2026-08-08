@@ -133,6 +133,67 @@ test("renders a host-authored network-read approval when one is required", async
   await expect(page.getByRole("button", { name: "本任务开启 YOLO" })).toBeVisible();
 });
 
+test("opens keyboard help from the shared action registry without a Web Search toggle", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.focus();
+
+  await page.keyboard.press("Control+/");
+  const shortcuts = page.getByRole("dialog", { name: "键盘快捷键" });
+  await expect(shortcuts).toBeVisible();
+  await expect(shortcuts).toContainText("这里没有搜索开关");
+  await page.keyboard.press("Escape");
+  await expect(shortcuts).toHaveCount(0);
+  await expect(composer).toBeFocused();
+});
+
+test("keeps one blocking overlay owner and gives Approval priority over Extension UI", async ({ page }) => {
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  await page.getByLabel("给 Pi 发送消息").focus();
+  await page.keyboard.press("Control+k");
+  await expect(page.getByRole("dialog", { name: "命令面板" })).toBeVisible();
+
+  const operationId = "operation-overlay-priority";
+  await startApprovalOperation(page, operationId);
+  await emitMockAgentEvent(page, {
+    type: "extension.ui.requested",
+    payload: {
+      requestId: "extension-overlay-priority",
+      extensionId: "fixture-extension",
+      hostEpoch: 1,
+      sessionId: "session-test",
+      sessionGeneration: 1,
+      operationId,
+      kind: "confirm",
+      title: "Extension 等待输入",
+      message: "确认 Extension 选项",
+      blocking: true
+    }
+  }, { operationId });
+  await expect(page.getByRole("dialog", { name: "Extension 等待输入" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "命令面板" })).toHaveCount(0);
+
+  await emitMockAgentEvent(page, approvalRequest(
+    operationId,
+    "approval-overlay-priority",
+    "git push origin main"
+  ), { operationId });
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Extension 等待输入" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toBeVisible();
+
+  await page.getByRole("button", { name: "拒绝" }).click();
+  await expect(page.getByRole("heading", { name: "需要单次授权" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Extension 等待输入" })).toBeVisible();
+});
+
 test("renders suspicious approval bytes safely and keeps decisions reachable at constrained height", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 360 });
   await page.goto("/");

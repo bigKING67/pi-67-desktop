@@ -10,7 +10,12 @@ import {
 
 describe("conversation organization protocol", () => {
   it("uses replay-safe Workspace mutations with bounded payloads", () => {
-    for (const type of ["session.nameByPath", "conversation.pin", "conversation.archive"] as const) {
+    for (const type of [
+      "session.nameByPath",
+      "conversation.pin",
+      "conversation.archive",
+      "conversation.reorderPinned"
+    ] as const) {
       expect(isReplaySafeControlMutation(type)).toBe(true);
       expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type]).toBe("workspace");
       expect(hasValidCommandContext(type, { scope: "workspace", workspaceId: "workspace-a" })).toBe(true);
@@ -31,5 +36,9 @@ describe("conversation organization protocol", () => {
       1,
       "archive-one"
     ))).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["conversation.reorderPinned"], {
+      paths: ["/sessions/two.jsonl", "/sessions/one.jsonl"]
+    })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["conversation.reorderPinned"], { paths: [] })).toBe(false);
   });
 });

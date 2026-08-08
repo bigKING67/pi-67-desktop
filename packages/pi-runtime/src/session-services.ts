@@ -27,6 +27,9 @@ import {
 } from "./configured-capability-catalog.js";
 import { createDesktopEnvironmentExtension } from "./desktop-environment-extension.js";
 import type { PackageTrustRegistry } from "./package-trust-registry.js";
+import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
+import { createDesktopPlanModeExtension } from "./plan-mode-controller.js";
+import type { SessionInteractionMode } from "@pi67/domain";
 
 interface DesktopSessionServicesOptions {
   cwd: string;
@@ -40,11 +43,13 @@ interface DesktopSessionServicesOptions {
   recordToolAuthorization?: DesktopToolAuthorizationRecorder;
   promptAttachmentAccess?: PromptAttachmentAccess;
   packageTrustRegistry?: Pick<PackageTrustRegistry, "refresh" | "runtimePackageAllowed">;
+  getInteractionMode?: () => SessionInteractionMode;
 }
 
 export async function createDesktopSessionServices(
   options: DesktopSessionServicesOptions
 ): Promise<AgentSessionServices> {
+  const getInteractionMode = options.getInteractionMode ?? (() => "execute" as const);
   await options.packageTrustRegistry?.refresh();
   const loadedResourceReadAccess = createLoadedResourceReadAccess();
   const settingsManager = options.settingsManager === undefined
@@ -75,8 +80,10 @@ export async function createDesktopSessionServices(
           options.requestApproval,
           loadedResourceReadAccess,
           configuredCapabilities,
-          options.recordToolAuthorization
+          options.recordToolAuthorization,
+          getInteractionMode
         ),
+        createDesktopPlanModeExtension(getInteractionMode),
         createDesktopEnvironmentExtension()
       ]
     },
@@ -84,6 +91,7 @@ export async function createDesktopSessionServices(
       resolveProjectTrust: async () => options.getSafety().trust === "trusted"
     }
   });
+  await installFirstPartyModelProviders(services.modelRuntime);
   configuredCapabilities.useSettingsManager(services.settingsManager);
   await Promise.all([
     loadedResourceReadAccess.refresh(services.resourceLoader),

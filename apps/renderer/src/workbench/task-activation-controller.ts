@@ -2,6 +2,7 @@ import { useAppStore } from "../app/app-store.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { clearConversationAttention } from "../navigation/conversation-attention-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import {
@@ -31,7 +32,10 @@ export async function activateRendererTask(taskId: string): Promise<boolean> {
     && projectionFileIdentity === task.sessionFileIdentity
     && projection.sessionGeneration === task.sessionGeneration
     && appState.workspace === workspace.identity.canonicalPath
-  ) return true;
+  ) {
+    clearTaskConversationAttention(task.id);
+    return true;
+  }
 
   useAppStore.setState({
     workspace: workspace.identity.canonicalPath,
@@ -52,7 +56,10 @@ export async function activateRendererTask(taskId: string): Promise<boolean> {
       failureTitle: "无法切换任务",
       deferRuntimeNotReady: true
     });
-    if (recovery === "committed") return true;
+    if (recovery === "committed") {
+      clearTaskConversationAttention(task.id);
+      return true;
+    }
     if (recovery !== "runtime-not-ready" || !isSelectedRendererTask(task)) return false;
     return reopenRendererTask(task, workspace);
   } catch (error) {
@@ -106,6 +113,7 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
           recoveryHostInstanceId: undefined,
           recoveryHostEpoch: undefined
         });
+        clearTaskConversationAttention(task.id);
         return true;
       }
       if (recovery !== "runtime-not-ready") {
@@ -146,4 +154,11 @@ function markTaskRecoveryFailed(taskId: string, error?: unknown): void {
     lifecycle: "lost",
     runtime: { phase: "failed", detail, recoverable: true }
   });
+}
+
+function clearTaskConversationAttention(taskId: string): void {
+  const task = rendererWorkbenchStore.getState().tasks[taskId];
+  if (task?.conversation.kind === "session") {
+    clearConversationAttention(task.workspaceId, task.conversation.sessionFileIdentity);
+  }
 }

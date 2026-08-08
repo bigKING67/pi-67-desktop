@@ -74,6 +74,10 @@ spacing, component states, and motion as `DESIGN.md`.
 - Provider task-view tabs use neutral selected surfaces and explicit counts;
   configured state may use the semantic success role, but custom source and model
   counts remain secondary text rather than additional glowing badges.
+- Groland's mixed-protocol model rows use the same restrained metadata grammar as
+  every other Provider. Protocol, image/reasoning, and `原生搜索 · 已声明` or Exa
+  fallback remain legible secondary text; they never become a glowing capability
+  badge pile, and `已声明` never changes color to imply live verification.
 - Provider file status, revision conflict, invalid-file, pending reload, and
   model-reselection states use the same semantic success, warning, and danger
   roles as light mode. The API-key eye control may reveal only the current user
@@ -84,6 +88,37 @@ spacing, component states, and motion as `DESIGN.md`.
   the tertiary role remains limited to decorative status dots and nonessential marks.
 - Focus, semantic state, diff foregrounds, and code syntax colors must be
   checked in the rendered dark theme.
+- The Title Bar Repository status uses the same neutral, success, warning, danger,
+  focus, and hover roles as light mode. Primary/linked identity never relies on a
+  glowing badge, and stale or unavailable state remains legible by icon and text.
+- The provisional `运行环境` radio family keeps the same topology, copy, focus
+  order, and one-column breakpoint as light mode. Selected state uses
+  `accent-soft` plus border, Check, icon, and text contrast; disabled, checking,
+  stale/error, and creation-locked states use semantic text and explicit copy,
+  never opacity alone or a green glow.
+- The Changes Inspector keeps its list on neutral dark surfaces and its bounded
+  Patch on `codeSurface`; selected rows, metadata, additions, deletions, focus,
+  stale/error notices, and truncation disclosure remain distinct without glow or
+  theme-specific information architecture. `第 N 轮`/`当前操作` grouping and
+  `未查看`/`已查看` state remain readable by text and luminance rather than hue; a
+  revision returning to unread never becomes a glowing attention badge.
+- The Timeline Plan proposal card uses a neutral raised surface with a restrained
+  accent border, not a luminous green panel. Markdown owns a bounded scroll region;
+  disclosure, copy, focus, and historical status remain visible, but execution
+  controls never move into the card. The independent compact action bar above the
+  Composer owns busy, disabled, inline-error, `继续完善`, `复制`, and `开始执行`
+  states. `继续完善` stays neutral, while `开始执行` uses `accent` with `canvas`
+  text for the same primary-action contrast as light mode. At 720x480 the Composer
+  may wrap to two rows, but both Timeline card and action bar remain reachable
+  without overlap.
+- Prompt Stash uses one raised neutral Popover above the Composer. Exact text preview,
+  count, disabled restore, persistence failure, focus return, and 20-item limit stay
+  legible without a green success surface. Current/Workspace conversation search uses
+  the same neutral overlay grammar; match selection, incomplete results, and focused
+  navigation never resemble a Web Search on/off state.
+- Warning and critical context pressure use semantic text, icon, and border roles in
+  addition to color. Automatic/manual compression copy remains visible, and Reduced
+  Motion removes rotation rather than suppressing the progress state.
 - Transcript action tooltips use the same raised neutral surface below message
   actions as light mode and never create an opaque patch over the answer text.
 - Avoid pure black, pure white, neon outlines, glowing cards, and transparent

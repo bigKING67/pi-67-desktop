@@ -13,9 +13,11 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "session.forkFromTask",
   "session.rollback",
   "session.name",
+  "session.interactionMode.set",
   "session.nameByPath",
   "conversation.pin",
   "conversation.archive",
+  "conversation.reorderPinned",
   "model.select",
   "model.setRuntimeKey",
   "provider.setRuntimeKey",
@@ -54,6 +56,7 @@ export function isReplaySafeControlMutation(
 export const REPLAY_SAFE_OPERATION_ACK_TYPES = [
   "session.import",
   "session.compact",
+  "plan.implement",
   "command.invoke"
 ] as const satisfies readonly AgentCommandType[];
 

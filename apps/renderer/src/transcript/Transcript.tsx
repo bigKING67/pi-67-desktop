@@ -1,12 +1,7 @@
 import type { LocatedMessageWindow, SessionMessageView } from "@pi67/domain";
 import { CircleAlert, MessageSquareText } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  Components,
-  ScrollSeekConfiguration,
-  ScrollSeekPlaceholderProps,
-  VirtuosoHandle
-} from "react-virtuoso";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ListRange, VirtuosoHandle } from "react-virtuoso";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
@@ -38,28 +33,39 @@ import {
 import { DeferredMessageCard, DeferredTranscriptProcessGroup } from "./DeferredTranscriptRows.js";
 import { DeferredTranscriptList } from "./DeferredTranscriptList.js";
 import { editableUserMessageText } from "./message-actions.js";
-import type { TranscriptContext } from "./transcript-context.js";
+import { PlanProposalCard } from "./PlanProposalCard.js";
 import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
   createLiveProcessRow,
   hasProcessGroupAfterLatestUser,
-  projectTranscriptRows,
-  type TranscriptRow
+  projectTranscriptRows
 } from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
-
-const TurnActivity = lazy(() => import("../operation/TurnActivity.js").then((module) => ({
-  default: module.TurnActivity
-})));
+import { ConversationFindBar } from "../search/ConversationFindBar.js";
+import {
+  conversationReadPositionKey,
+  useConversationReadPositionStore
+} from "./conversation-read-position-store.js";
+import {
+  TRANSCRIPT_COMPONENTS,
+  TRANSCRIPT_SCROLL_SEEK
+} from "./TranscriptVirtuosoComponents.js";
 
 export function Transcript() {
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
   const [historicalWindow, setHistoricalWindow] = useState<LocatedMessageWindow>();
   const [highlightedMessageId, setHighlightedMessageId] = useState<string>();
+  const [atBottom, setAtBottom] = useState(true);
+  const [unseenRowCount, setUnseenRowCount] = useState(0);
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<VirtuosoHandle>(null);
+  const previousRowsRef = useRef<{
+    readKey: string | undefined;
+    count: number;
+    lastKey: string | undefined;
+  } | undefined>(undefined);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const runtime = useAppStore((state) => state.runtime);
@@ -88,6 +94,19 @@ export function Transcript() {
   ), [currentEdit, messages]);
   const visibleMessages = historicalWindow?.messages ?? transcriptMessages;
   const transcriptRows = useMemo(() => projectTranscriptRows(visibleMessages), [visibleMessages]);
+  const readKey = conversationReadPositionKey(
+    selectedTask?.workspaceId,
+    selectedTask?.sessionFileIdentity
+  );
+  const savedReadPosition = readKey
+    ? useConversationReadPositionStore.getState().positions[readKey]
+    : undefined;
+  const transcriptFirstItemIndex = historicalWindow
+    ? 0
+    : firstItemIndex + transcriptMessages.length - transcriptRows.length;
+  const restoredAnchorRowIndex = !historicalWindow && savedReadPosition && !savedReadPosition.atBottom
+    ? transcriptRows.findIndex((row) => row.key === savedReadPosition.anchorKey)
+    : -1;
   const historicalAnchorRowIndex = historicalWindow
     ? Math.max(0, transcriptRows.findIndex((row) => (
       row.kind === "message" && row.message.id === historicalWindow.anchorId
@@ -145,6 +164,51 @@ export function Transcript() {
   }, [sessionId]);
 
   useEffect(() => {
+    const saved = readKey
+      ? useConversationReadPositionStore.getState().positions[readKey]
+      : undefined;
+    setAtBottom(saved?.atBottom ?? true);
+    setUnseenRowCount(saved?.unseenCount ?? 0);
+    previousRowsRef.current = {
+      readKey,
+      count: transcriptRows.length,
+      lastKey: transcriptRows.at(-1)?.key
+    };
+  }, [readKey]);
+
+  useEffect(() => {
+    if (historicalWindow) return;
+    const previous = previousRowsRef.current;
+    const lastKey = transcriptRows.at(-1)?.key;
+    if (
+      readKey
+      && previous?.readKey === readKey
+      && !atBottom
+      && lastKey !== previous.lastKey
+    ) {
+      const added = Math.max(1, transcriptRows.length - previous.count);
+      useConversationReadPositionStore.getState().addUnseen(readKey, added);
+      setUnseenRowCount((current) => Math.min(999, current + added));
+    }
+    previousRowsRef.current = { readKey, count: transcriptRows.length, lastKey };
+  }, [atBottom, historicalWindow, readKey, transcriptRows]);
+
+  useEffect(() => {
+    const region = transcriptRegionRef.current;
+    if (!region || !atBottom || historicalWindow || typeof ResizeObserver === "undefined") return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
+    });
+    observer.observe(region);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [atBottom, historicalWindow, readKey]);
+
+  useEffect(() => {
     if (!pendingUserTurn) return;
     setHistoricalWindow(undefined);
     setHighlightedMessageId(undefined);
@@ -198,6 +262,7 @@ export function Transcript() {
       data-transcript-region="true"
       ref={transcriptRegionRef}
     >
+      {selectedTask ? <ConversationFindBar task={selectedTask} /> : null}
       {historicalWindow ? (
         <div className={styles.historicalBanner} role="status">
           <span>正在查看较早消息</span>
@@ -206,7 +271,7 @@ export function Transcript() {
             onClick={() => {
               setHistoricalWindow(undefined);
               setHighlightedMessageId(undefined);
-              requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
+              returnToLatest();
             }}
           >回到最新消息</button>
         </div>
@@ -231,14 +296,30 @@ export function Transcript() {
         data={transcriptRows}
         computeItemKey={(_index, row) => row.key}
         defaultItemHeight={120}
-        firstItemIndex={historicalWindow ? 0 : firstItemIndex + transcriptMessages.length - transcriptRows.length}
+        firstItemIndex={transcriptFirstItemIndex}
         followOutput={!historicalWindow && (streaming || hasTurnActivity) ? "auto" : false}
         increaseViewportBy={{ top: 400, bottom: 100 }}
         scrollSeekConfiguration={TRANSCRIPT_SCROLL_SEEK}
         initialTopMostItemIndex={historicalAnchorRowIndex === undefined
-          ? { index: "LAST", align: "end" }
+          ? restoredAnchorRowIndex >= 0
+            ? { index: transcriptFirstItemIndex + restoredAnchorRowIndex, align: "start" }
+            : { index: "LAST", align: "end" }
           : { index: historicalAnchorRowIndex, align: "center" }}
+        atBottomStateChange={(nextAtBottom) => {
+          if (historicalWindow) return;
+          setAtBottom(nextAtBottom);
+          if (nextAtBottom) setUnseenRowCount(0);
+          if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, nextAtBottom);
+        }}
+        rangeChanged={(range: ListRange) => {
+          if (!readKey || historicalWindow) return;
+          const row = transcriptRows[range.startIndex - transcriptFirstItemIndex];
+          if (row) useConversationReadPositionStore.getState().observeAnchor(readKey, row.key);
+        }}
         itemContent={(_index, row) => {
+          if (row.kind === "plan-proposal") {
+            return <PlanProposalCard plan={row.plan} />;
+          }
           if (row.kind === "process-group") {
             const current = row.key === currentProcessGroupKey;
             const currentOperation = current && operationMatchesSession ? operation : undefined;
@@ -282,8 +363,22 @@ export function Transcript() {
           );
         }}
       />
+      {!historicalWindow && !atBottom ? (
+        <button className={styles.latestButton} onClick={returnToLatest} type="button">
+          回到最新{unseenRowCount > 0 ? ` · ${unseenRowCount} 条新内容` : ""}
+        </button>
+      ) : null}
     </div>
   );
+
+  function returnToLatest(): void {
+    setHistoricalWindow(undefined);
+    setHighlightedMessageId(undefined);
+    setAtBottom(true);
+    setUnseenRowCount(0);
+    if (readKey) useConversationReadPositionStore.getState().setAtBottom(readKey, true);
+    requestAnimationFrame(() => transcriptRef.current?.scrollToIndex({ index: "LAST", align: "end" }));
+  }
 
   function beginMessageEdit(message: SessionMessageView): void {
     const text = editableUserMessageText(message);
@@ -356,95 +451,3 @@ const STARTER_PROMPTS = [
   "检查当前 Git 改动并找出风险",
   "实现一个有测试覆盖的小功能"
 ] as const;
-
-const TRANSCRIPT_SCROLL_SEEK: ScrollSeekConfiguration = {
-  enter: (velocity) => Math.abs(velocity) > 600,
-  exit: (velocity) => Math.abs(velocity) < 100
-};
-
-const TRANSCRIPT_COMPONENTS: Components<TranscriptRow, TranscriptContext> = {
-  Header: OlderMessagesHeader,
-  Footer: LiveTurnFooter,
-  ScrollSeekPlaceholder: TranscriptScrollSeekPlaceholder
-};
-
-function TranscriptScrollSeekPlaceholder({ height }: ScrollSeekPlaceholderProps) {
-  return <div aria-hidden="true" style={{ height }} />;
-}
-
-function OlderMessagesHeader({ context }: { context: TranscriptContext }) {
-  if (!context.hasOlder && !context.loadingOlder && !context.conversationError) return null;
-  return (
-    <div className={styles.pagination} role="status">
-      <button
-        className="small-button"
-        data-testid="load-older-messages"
-        disabled={context.loadingOlder}
-        onClick={() => void context.loadOlderMessages()}
-        type="button"
-      >
-        {context.loadingOlder ? "正在加载更早消息" : "加载更早消息"}
-      </button>
-      {context.conversationError ? <span role="alert">{context.conversationError}</span> : null}
-    </div>
-  );
-}
-
-function LiveTurnFooter({ context }: { context: TranscriptContext }) {
-  if (!context.pendingUserTurn && !context.hasTurnActivity && !context.hasLiveTurn) return null;
-  return (
-    <>
-      {context.pendingUserTurn ? (
-        <DeferredMessageCard
-          deliveryStatus={context.pendingUserTurn.status}
-          localImages={context.pendingUserTurn.attachments.flatMap((attachment) => (
-            attachment.kind === "image" && attachment.previewUrl
-              ? [{
-                  mimeType: attachment.mimeType,
-                  name: attachment.name,
-                  objectUrl: attachment.previewUrl
-                }]
-              : []
-          ))}
-          message={context.pendingUserTurn.message}
-        />
-      ) : null}
-      {context.liveProcess ? (
-        <DeferredTranscriptProcessGroup
-          completed={context.liveProcess.completed}
-          interrupted={context.liveProcess.interrupted}
-          liveThinking={context.liveThinking}
-          operation={context.liveProcess.operation}
-          row={context.liveProcess.row}
-          running={context.liveProcess.running}
-          {...(context.liveProcess.timeline === undefined
-            ? {}
-            : { timeline: context.liveProcess.timeline })}
-        />
-      ) : context.hasTurnActivity ? (
-        <Suspense fallback={<TranscriptActivityLoading />}>
-          <TurnActivity />
-        </Suspense>
-      ) : null}
-      {context.liveText
-        ? <DeferredMessageCard message={liveMessage(context.liveText)} streaming />
-        : null}
-    </>
-  );
-}
-
-function TranscriptActivityLoading() {
-  return (
-    <div aria-busy="true" aria-label="正在加载任务状态" className={styles.rowLoading} role="status">
-      <span className="loading-line" />
-    </div>
-  );
-}
-
-function liveMessage(text: string): SessionMessageView {
-  return {
-    id: "live-assistant-message",
-    role: "assistant",
-    parts: [{ type: "text", text }]
-  };
-}

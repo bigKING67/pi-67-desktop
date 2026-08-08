@@ -6,6 +6,34 @@ import {
 } from "./transcript-rows.js";
 
 describe("projectTranscriptRows", () => {
+  it("renders a Plan proposal as its own Timeline row instead of a system message", () => {
+    const rows = projectTranscriptRows([
+      message("user-1", "user", [{ type: "text", text: "先做计划" }]),
+      message("plan-entry-1", "system", [{
+        type: "plan-proposal",
+        plan: {
+          entryId: "plan-entry-1",
+          planId: "plan-1",
+          sourceOperationId: "operation-1",
+          markdown: "# 实施计划",
+          createdAt: 2,
+          status: "implemented"
+        }
+      }]),
+      message("assistant-1", "assistant", [{ type: "text", text: "开始执行。" }])
+    ]);
+
+    expect(rows).toEqual([
+      expect.objectContaining({ kind: "message", key: "user-1" }),
+      {
+        kind: "plan-proposal",
+        key: "plan-entry-1",
+        plan: expect.objectContaining({ planId: "plan-1", status: "implemented" })
+      },
+      expect.objectContaining({ kind: "message", key: "assistant-1" })
+    ]);
+  });
+
   it("collapses a Tool chain into one terminal process row", () => {
     const rows = projectTranscriptRows([
       message("user-1", "user", [{ type: "text", text: "查天气" }]),

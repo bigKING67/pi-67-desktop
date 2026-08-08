@@ -15,6 +15,21 @@ Pi-67 Desktop 直接使用以下 `0.83.0` 包：
 上游：<https://github.com/earendil-works/pi>，MIT License。应用不依赖系统安装的
 `pi` 可执行文件，也不复制 Pi TUI UI。
 
+## External reference provenance
+
+Pi-67 对以下 MIT 项目做了固定 commit 的只读研究，并按自身 Product、Protocol、安全与
+进程合同重新实现选定模式；它们不是依赖、Submodule 或 merge upstream，且没有复制上游
+源码：
+
+- `minghinmatthewlam/pi-gui` commit
+  `eb9a7380705dffad36db3efa771ee825aafbef6f`，Copyright (c) 2026 Matthew Lam；
+- `pingdotgg/t3code` commit
+  `5661c6116c9d6e9e93e59cf067fc02dd3303ceef`，Copyright (c) 2026 T3 Tools Inc.
+
+精确审阅路径、文件 hash、许可证 hash 与重实现映射见
+`docs/provenance/pi-gui-reference.md`、`docs/provenance/t3code-reference.md` 和
+`licenses/provenance.json`。
+
 ## Maple Mono
 
 代码字体来自 `subframe7536/maple-font` v7.9 的 `MapleMono-Woff2.zip`：
@@ -57,14 +72,3 @@ Copyright 2022 The Maple Mono Project Authors。许可证为 SIL Open Font Licen
 这些组件只在 Agent Host 的有界 worker 中处理用户明确附加的本地文件。英文和简体
 中文 OCR 数据随应用离线打包；运行时不下载语言数据，也不把附件发送给网络 OCR
 服务。完整版权、许可证文本和 NOTICE 仍随对应 npm package 保留在打包内容中。
-
-## Peak Code reference
-
-产品信息架构参考 PeakCode-AI/PeakCode commit：
-
-```text
-5aee9cfcbb29283f9320a132693d4a250033fb9e
-```
-
-Peak Code 使用 MIT License。本仓库没有 merge Peak Code，也不复制其品牌、资产、多
-Provider 架构或巨型组件；来源边界见 `docs/provenance/peak-code-reference.md`。

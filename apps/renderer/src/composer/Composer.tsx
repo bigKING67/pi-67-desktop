@@ -1,38 +1,31 @@
-import { ArrowUp, ListPlus, Plus, Send, Square } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "react-aria-components";
+import type { ComposerWorkspaceFileRef, WorkspaceFileEntry } from "@pi67/domain";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionGeneration,
   selectSessionFileIdentity,
   selectSessionId,
+  selectInteractionMode,
   selectSessionModels
 } from "../session/session-projection-selectors.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
 import { subscribeToComposerPrefill } from "./composer-events.js";
 import { submitRendererPrompt } from "./prompt-submission-controller.js";
-import { ExtensionWidgets } from "./ExtensionWidgets.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { messages } from "../localization/message-catalog.js";
-import styles from "./Composer.module.css";
 import {
-  filesFromTransfer,
   removeDraftAttachment,
   revokeDraftAttachments,
   stageDraftAttachments,
-  transferContainsFiles,
   type DraftAttachment
 } from "./composer-attachments.js";
-import { ComposerQueuePanel } from "./ComposerQueuePanel.js";
-import { ComposerRuntimeControls } from "./ComposerRuntimeControls.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
   useWorkbenchStore
 } from "../workbench/workbench-store.js";
 import { EMPTY_TASK_DRAFT, useTaskDraftStore } from "../workbench/task-draft-store.js";
-import { abortActiveOperation } from "../operation/operation-controller.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 import {
@@ -43,20 +36,21 @@ import {
   slashQueryFromDraft
 } from "./composer-slash-commands.js";
 import { useComposerSlashCatalog } from "./use-composer-slash-catalog.js";
-import { ComposerTextarea } from "./ComposerTextarea.js";
 import {
   executePiDesktopAction,
   type PiDesktopActionContext
 } from "../pi-actions/pi-desktop-actions.js";
-import { ToolModeSelector } from "./ToolModeSelector.js";
 import { submitRendererNewSessionIntent } from "../session/new-session-intent-controller.js";
-import { AttachmentPreviewLoading } from "./AttachmentPreviewLoading.js";
-const AttachmentPreview = lazy(() => import("../attachments/AttachmentPreview.js").then((module) => ({
-  default: module.AttachmentPreview
-})));
-const SlashCommandPicker = lazy(() => import("./SlashCommandPicker.js").then((module) => ({
-  default: module.SlashCommandPicker
-})));
+import { setRendererSessionInteractionMode } from "../session/session-plan-controller.js";
+import {
+  composerFileMentionQuery,
+  insertComposerFileMention,
+  insertComposerFileMentionAtCursor,
+  mergeComposerFileReference,
+  referencesPresentInComposerText
+} from "./composer-file-mentions.js";
+import { useComposerFileMentionSearch } from "./use-composer-file-mention-search.js";
+import { ComposerSurface } from "./ComposerSurface.js";
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
@@ -68,23 +62,33 @@ export function Composer() {
   const sessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
   const resourcesRevision = useSessionProjectionStore((state) => state.revisions.resources);
   const models = useSessionProjectionStore(selectSessionModels) ?? [];
+  const authoritativeInteractionMode = useSessionProjectionStore(selectInteractionMode);
   const sessionReady = useSessionProjectionStore((state) => state.authority.phase === "active");
   const widgets = useExtensionUiStore((state) => state.widgets);
   const activeTask = useWorkbenchStore(selectedWorkbenchTask);
   const activeTaskId = activeTask?.id;
+  const activeWorkspace = useWorkbenchStore((state) => {
+    const selected = selectedWorkbenchTask(state);
+    return selected ? state.workspaces[selected.workspaceId] : undefined;
+  });
   const draft = useTaskDraftStore((state) => (
     activeTaskId ? state.drafts[activeTaskId] ?? EMPTY_TASK_DRAFT : EMPTY_TASK_DRAFT
   ));
   const text = draft.text;
   const attachments = draft.attachments;
+  const workspaceFiles = draft.workspaceFiles;
   const streamBehavior = draft.streamBehavior;
   const [attachmentError, setAttachmentError] = useState<string>();
   const [submissionError, setSubmissionError] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
   const [stagingAttachments, setStagingAttachments] = useState(false);
+  const [changingInteractionMode, setChangingInteractionMode] = useState(false);
   const [attachmentDragActive, setAttachmentDragActive] = useState(false);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+  const [fileActiveIndex, setFileActiveIndex] = useState(0);
+  const [textCursor, setTextCursor] = useState(0);
   const [dismissedSlashDraft, setDismissedSlashDraft] = useState<string>();
+  const [dismissedFileMention, setDismissedFileMention] = useState<string>();
   const attachmentDragDepth = useRef(0);
   const submissionIdRef = useRef<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -97,9 +101,17 @@ export function Composer() {
     && activeTask.sessionFileIdentity === sessionFileIdentity
     && activeTask.sessionGeneration === sessionGeneration
   );
+  const interactionMode = activeSessionAuthority
+    ? authoritativeInteractionMode
+    : draft.interactionMode;
   const activeStreaming = activeSessionAuthority && streaming;
-  const hasDraft = text.trim().length > 0 || attachments.length > 0;
+  const hasDraft = text.trim().length > 0 || attachments.length > 0 || workspaceFiles.length > 0;
   const canSend = !submitting && !stagingAttachments && hasDraft;
+  const activeOperation = Boolean(
+    activeSessionAuthority
+    && operation
+    && isActiveOperationLifecycle(operation.lifecycle)
+  );
   const canStop = Boolean(
     activeSessionAuthority
     && operation?.cancellable
@@ -121,16 +133,25 @@ export function Composer() {
       : []
   ), [slashCatalog, slashQuery]);
   const slashPickerOpen = slashQuery !== undefined && dismissedSlashDraft !== text;
+  const fileMentionQuery = useMemo(
+    () => composerFileMentionQuery(text, textCursor),
+    [text, textCursor]
+  );
+  const fileMentionDismissKey = `${text}\0${textCursor}`;
+  const filePickerOpen = fileMentionQuery !== undefined
+    && !slashPickerOpen
+    && dismissedFileMention !== fileMentionDismissKey;
+  const fileMentionSearch = useComposerFileMentionSearch(
+    activeWorkspace,
+    filePickerOpen ? fileMentionQuery?.query : undefined,
+    hostEpoch
+  );
   const piDesktopActionContext: PiDesktopActionContext = {
     connected,
     workspaceAvailable: Boolean(workspace),
     sessionReady: activeSessionAuthority,
     sessionTransitionPending,
-    activeOperation: Boolean(
-      activeSessionAuthority
-      && operation
-      && isActiveOperationLifecycle(operation.lifecycle)
-    ),
+    activeOperation,
     configuredModels: models
   };
   const setText = (value: string) => {
@@ -144,39 +165,80 @@ export function Composer() {
       typeof value === "function" ? value(current) : value
     );
   };
+  const setWorkspaceFiles = (
+    value: ComposerWorkspaceFileRef[] | ((current: ComposerWorkspaceFileRef[]) => ComposerWorkspaceFileRef[])
+  ) => {
+    if (!activeTaskId) return;
+    const current = useTaskDraftStore.getState().drafts[activeTaskId]?.workspaceFiles ?? [];
+    useTaskDraftStore.getState().setWorkspaceFiles(
+      activeTaskId,
+      typeof value === "function" ? value(current) : value
+    );
+  };
   const setStreamBehavior = (value: "steer" | "followUp") => {
     if (activeTaskId) useTaskDraftStore.getState().setStreamBehavior(activeTaskId, value);
+  };
+  const setInteractionMode = async (mode: "execute" | "plan") => {
+    if (!activeTaskId || mode === interactionMode || changingInteractionMode) return;
+    submissionIdRef.current = undefined;
+    setSubmissionError(undefined);
+    if (!activeSessionAuthority) {
+      useTaskDraftStore.getState().setInteractionMode(activeTaskId, mode);
+      return;
+    }
+    setChangingInteractionMode(true);
+    try {
+      if (!await setRendererSessionInteractionMode(mode)) {
+        setSubmissionError("交互模式未能确认，请重试。");
+      }
+    } finally {
+      setChangingInteractionMode(false);
+    }
   };
   useEffect(() => subscribeToComposerPrefill((nextText) => {
     submissionIdRef.current = undefined;
     setText(nextText);
-    requestAnimationFrame(() => textInput.current?.focus());
+    setTextCursor(nextText.length);
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(nextText.length, nextText.length);
+    });
   }), []);
-
   useEffect(() => {
     submissionIdRef.current = undefined;
     setAttachmentError(undefined);
     setSubmissionError(undefined);
     setDismissedSlashDraft(undefined);
+    setDismissedFileMention(undefined);
+    setTextCursor(0);
   }, [activeTaskId, hostEpoch, sessionGeneration, sessionId]);
-
   useEffect(() => {
     setSlashActiveIndex(0);
   }, [slashCatalog.runtimeStatus, text]);
+  useEffect(() => {
+    setFileActiveIndex(0);
+  }, [fileMentionQuery?.query, fileMentionSearch.status]);
 
   useEffect(() => {
     if (!activeTaskId) return;
     rendererWorkbenchStore.getState().updateTask(activeTaskId, {
-      hasDraft: text.trim().length > 0,
+      hasDraft: text.trim().length > 0
+        || attachments.length > 0
+        || workspaceFiles.length > 0
+        || draft.promptStash.length > 0,
       attachmentCount: attachments.length
     });
-  }, [activeTaskId, attachments.length, text]);
-
+  }, [activeTaskId, attachments.length, draft.promptStash.length, text, workspaceFiles.length]);
   const submit = async () => {
     if (!canSend || !activeTask || !activeTaskId) return;
     const nextText = text.trim();
     const nextAttachments = attachments;
+    const nextWorkspaceFiles = referencesPresentInComposerText(nextText, workspaceFiles);
     if (isSlashInvocation(nextText)) {
+      if (nextWorkspaceFiles.length > 0) {
+        setSubmissionError(messages.composer.commandAttachmentsUnsupported);
+        return;
+      }
       const slashRoute = resolveSlashSubmission(nextText, slashCatalog.catalog);
       if (slashRoute.kind === "desktop-action") {
         setSubmitting(true);
@@ -242,19 +304,22 @@ export function Composer() {
             activeTask.id,
             nextText,
             submissionId,
-            nextAttachments
+            nextAttachments,
+            nextWorkspaceFiles
           )
         : await submitRendererPrompt(
             nextText,
             activeStreaming ? streamBehavior : "send",
             submissionId,
-            nextAttachments
+            nextAttachments,
+            nextWorkspaceFiles
           );
       if (!result.accepted) {
         setSubmissionError(result.error);
         return;
       }
       setText("");
+      setWorkspaceFiles([]);
       submissionIdRef.current = undefined;
       if (!result.retainsAttachmentPreviews) revokeDraftAttachments(nextAttachments);
       useTaskDraftStore.getState().setAttachments(activeTaskId, []);
@@ -264,13 +329,11 @@ export function Composer() {
       setSubmitting(false);
     }
   };
-
   const removeAttachment = (id: string) => {
     submissionIdRef.current = undefined;
     setSubmissionError(undefined);
     setAttachments((items) => removeDraftAttachment(items, id));
   };
-
   const addAttachments = async (files: Iterable<File>) => {
     if (stagingAttachments) return;
     setAttachmentError(undefined);
@@ -288,172 +351,100 @@ export function Composer() {
       setStagingAttachments(false);
     }
   };
-
-  return (
-    <footer className={styles.region} data-testid="composer-region">
-      <ExtensionWidgets items={widgetItems} placement="aboveEditor" />
-      {activeSessionAuthority ? <ComposerQueuePanel /> : null}
-      {slashPickerOpen ? (
-        <Suspense fallback={null}>
-          <SlashCommandPicker
-            activeIndex={slashActiveIndex}
-            commands={slashCommands}
-            state={slashCatalog}
-            onActiveIndexChange={setSlashActiveIndex}
-            onSelect={(command) => {
-              submissionIdRef.current = undefined;
-              setSubmissionError(undefined);
-              setDismissedSlashDraft(undefined);
-              setText(insertSlashCommand(text, command));
-              requestAnimationFrame(() => textInput.current?.focus());
-            }}
-          />
-        </Suspense>
-      ) : null}
-      <div
-        className={`${styles.shell} ${attachmentDragActive ? styles.dropActive : ""}`}
-        data-testid="composer-shell"
-        onDragEnter={(event) => {
-          if (!transferContainsFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepth.current += 1;
-          setAttachmentDragActive(true);
-        }}
-        onDragLeave={(event) => {
-          if (!transferContainsFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepth.current = Math.max(0, attachmentDragDepth.current - 1);
-          if (attachmentDragDepth.current === 0) setAttachmentDragActive(false);
-        }}
-        onDragOver={(event) => {
-          if (!transferContainsFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "copy";
-        }}
-        onDrop={(event) => {
-          if (!transferContainsFiles(event.dataTransfer)) return;
-          event.preventDefault();
-          attachmentDragDepth.current = 0;
-          setAttachmentDragActive(false);
-          void addAttachments(filesFromTransfer(event.dataTransfer));
-        }}
-      >
-        {attachmentDragActive ? (
-          <div className={styles.dropIndicator} role="status">{messages.composer.dropAttachments}</div>
-        ) : null}
-        {attachmentError ? <div className={styles.attachmentError} role="alert">{attachmentError}</div> : null}
-        {submissionError ? (
-          <div className={styles.attachmentError} role="alert">
-            <strong>{messages.composer.submissionFailed}</strong>
-            <span>{submissionError}</span>
-          </div>
-        ) : null}
-        {attachments.length > 0 ? (
-          <div className={styles.attachmentRow} aria-label={messages.composer.pendingAttachments}>
-            <Suspense fallback={<AttachmentPreviewLoading />}>
-              {attachments.map((attachment) => (
-                <AttachmentPreview
-                  attachment={attachment}
-                  disabled={submitting || stagingAttachments}
-                  key={attachment.id}
-                  removeLabel={messages.composer.removeAttachment(attachment.name)}
-                  onRemove={() => removeAttachment(attachment.id)}
-                />
-              ))}
-            </Suspense>
-          </div>
-        ) : null}
-        <ComposerTextarea
-          disabled={submitting}
-          inputRef={textInput}
-          slashActiveIndex={slashActiveIndex}
-          slashCatalog={slashCatalog.catalog}
-          slashCommands={slashCommands}
-          slashPickerOpen={slashPickerOpen}
-          streaming={activeStreaming}
-          text={text}
-          onAddAttachments={(files) => void addAttachments(files)}
-          onSlashActiveIndexChange={setSlashActiveIndex}
-          onSlashComplete={(command) => {
-            submissionIdRef.current = undefined;
-            setSubmissionError(undefined);
-            setText(insertSlashCommand(text, command));
-          }}
-          onSlashDismiss={() => setDismissedSlashDraft(text)}
-          onSubmit={() => void submit()}
-          onTextChange={(value) => {
-            submissionIdRef.current = undefined;
-            setSubmissionError(undefined);
-            setDismissedSlashDraft(undefined);
-            setText(value);
-          }}
-        />
-        <div className={styles.toolbar}>
-          <div className={styles.tools}>
-            <input
-              ref={fileInput}
-              aria-label={messages.composer.chooseAttachment}
-              className="sr-only"
-              type="file"
-              disabled={submitting || stagingAttachments}
-              multiple
-              onChange={(event) => {
-                const input = event.currentTarget;
-                void addAttachments(input.files ?? []);
-                input.value = "";
-              }}
-            />
-            <Button className={`icon-button ${styles.attachmentButton}`} aria-label={messages.composer.addAttachment} isDisabled={submitting || stagingAttachments} onPress={() => fileInput.current?.click()}><Plus size={17} /></Button>
-            <ToolModeSelector />
-            {activeStreaming ? (
-              <div className={styles.streamMode} aria-label={messages.composer.streamingDelivery}>
-                <button
-                  aria-pressed={streamBehavior === "steer"}
-                  className={streamBehavior === "steer" ? styles.streamModeActive : ""}
-                  disabled={submitting}
-                  title={messages.composer.steerDetail}
-                  type="button"
-                  onClick={() => {
-                    submissionIdRef.current = undefined;
-                    setSubmissionError(undefined);
-                    setStreamBehavior("steer");
-                  }}
-                ><ArrowUp size={13} />{messages.composer.steer}</button>
-                <button
-                  aria-pressed={streamBehavior === "followUp"}
-                  className={streamBehavior === "followUp" ? styles.streamModeActive : ""}
-                  disabled={submitting}
-                  title={messages.composer.followUpDetail}
-                  type="button"
-                  onClick={() => {
-                    submissionIdRef.current = undefined;
-                    setSubmissionError(undefined);
-                    setStreamBehavior("followUp");
-                  }}
-                ><ListPlus size={13} />{messages.composer.followUp}</button>
-              </div>
-            ) : null}
-          </div>
-          <div className={styles.actions}>
-            {activeSessionAuthority ? <ComposerRuntimeControls submitting={submitting} /> : null}
-            {!canStop || hasDraft ? (
-              <Button
-                className={`${styles.sendButton} ${canStop ? styles.secondarySendButton : ""}`}
-                isDisabled={!canSend}
-                onPress={() => void submit()}
-              >
-                <Send size={15} />{submitting ? messages.composer.sending : messages.composer.send}
-              </Button>
-            ) : null}
-            {canStop ? (
-              <Button className={styles.stopButton!} onPress={() => void abortActiveOperation()}>
-                <Square aria-hidden="true" size={12} />{messages.common.stop}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-      <ExtensionWidgets items={widgetItems} placement="belowEditor" />
-    </footer>
-  );
+  const selectWorkspaceFile = (entry: WorkspaceFileEntry) => {
+    if (!fileMentionQuery) return;
+    submissionIdRef.current = undefined;
+    setSubmissionError(undefined);
+    const inserted = insertComposerFileMention(text, fileMentionQuery, entry);
+    setText(inserted.text);
+    setWorkspaceFiles((current) => mergeComposerFileReference(current, inserted.reference));
+    setTextCursor(inserted.cursor);
+    setDismissedFileMention(undefined);
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(inserted.cursor, inserted.cursor);
+    });
+  };
+  const insertDroppedWorkspaceFile = (reference: ComposerWorkspaceFileRef) => {
+    submissionIdRef.current = undefined;
+    setSubmissionError(undefined);
+    const inserted = insertComposerFileMentionAtCursor(text, textCursor, reference);
+    setText(inserted.text);
+    setWorkspaceFiles((current) => mergeComposerFileReference(current, reference));
+    setTextCursor(inserted.cursor);
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(inserted.cursor, inserted.cursor);
+    });
+  };
+  return <ComposerSurface
+    activeOperation={activeOperation}
+    activeSessionAuthority={activeSessionAuthority}
+    activeStreaming={activeStreaming}
+    activeTaskId={activeTaskId}
+    activeWorkspaceId={activeWorkspace?.id}
+    attachmentDragActive={attachmentDragActive}
+    attachmentDragDepth={attachmentDragDepth}
+    attachmentError={attachmentError}
+    canSend={canSend}
+    canStop={canStop}
+    changingInteractionMode={changingInteractionMode}
+    draft={draft}
+    fileActiveIndex={fileActiveIndex}
+    fileInput={fileInput}
+    fileMentionDismissKey={fileMentionDismissKey}
+    fileMentionQuery={fileMentionQuery}
+    fileMentionSearch={fileMentionSearch}
+    filePickerOpen={filePickerOpen}
+    hasDraft={hasDraft}
+    interactionMode={interactionMode}
+    sessionTransitionPending={sessionTransitionPending}
+    slashActiveIndex={slashActiveIndex}
+    slashCatalog={slashCatalog}
+    slashCommands={slashCommands}
+    slashPickerOpen={slashPickerOpen}
+    stagingAttachments={stagingAttachments}
+    submissionError={submissionError}
+    submitting={submitting}
+    textInput={textInput}
+    widgetItems={widgetItems}
+    onAddAttachments={(files) => void addAttachments(files)}
+    onDroppedWorkspaceFile={insertDroppedWorkspaceFile}
+    onFileSelect={selectWorkspaceFile}
+    onInteractionModeChange={(mode) => void setInteractionMode(mode)}
+    onRemoveAttachment={removeAttachment}
+    onSlashComplete={(command) => {
+      submissionIdRef.current = undefined;
+      setSubmissionError(undefined);
+      setDismissedSlashDraft(undefined);
+      const nextText = insertSlashCommand(text, command);
+      setText(nextText);
+      setTextCursor(nextText.length);
+      requestAnimationFrame(() => {
+        textInput.current?.focus();
+        textInput.current?.setSelectionRange(nextText.length, nextText.length);
+      });
+    }}
+    onStreamBehaviorChange={(mode) => {
+      submissionIdRef.current = undefined;
+      setSubmissionError(undefined);
+      setStreamBehavior(mode);
+    }}
+    onSubmit={() => void submit()}
+    onTextChange={(value, cursor) => {
+      submissionIdRef.current = undefined;
+      setSubmissionError(undefined);
+      setDismissedSlashDraft(undefined);
+      setDismissedFileMention(undefined);
+      setTextCursor(cursor);
+      setText(value);
+      setWorkspaceFiles((current) => referencesPresentInComposerText(value, current));
+    }}
+    setAttachmentDragActive={setAttachmentDragActive}
+    setDismissedFileMention={setDismissedFileMention}
+    setDismissedSlashDraft={setDismissedSlashDraft}
+    setFileActiveIndex={setFileActiveIndex}
+    setSlashActiveIndex={setSlashActiveIndex}
+    setTextCursor={setTextCursor}
+  />;
 }

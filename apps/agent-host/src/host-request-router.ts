@@ -26,7 +26,6 @@ import {
   isWorkspaceFileCommand,
   type WorkspaceFileCommandRouter
 } from "./workspace-file-command-router.js";
-
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
   runtimeStatus(): CommandResults["runtime.getStatus"];
@@ -45,10 +44,8 @@ export interface HostRequestRouterOptions {
   ): Promise<CommandResults[AgentCommandType]>;
   shutdownResources(deadlineMs?: number): Promise<void>;
 }
-
 export class HostRequestRouter {
   private readonly sessionCreationResolutions: SessionCreationResolutionCoordinator;
-
   constructor(
     private readonly tasks: HostTaskStateCoordinator,
     private readonly contextFiles: ContextFileCommandRouter,
@@ -60,23 +57,17 @@ export class HostRequestRouter {
   ) {
     this.sessionCreationResolutions = new SessionCreationResolutionCoordinator(workspaceCommands);
   }
-
   async shutdown(deadlineMs?: number): Promise<void> {
-    this.sessionCreationResolutions.shutdown();
-    let firstError: unknown;
-    try {
-      await this.options.shutdownResources(deadlineMs);
-    } catch (error) {
-      firstError = error;
-    }
-    try {
-      await this.workspaceCommands.shutdown();
-    } catch (error) {
-      firstError ??= error;
-    }
-    if (firstError !== undefined) throw firstError;
+    const results = await Promise.allSettled([
+      invokeShutdown(() => this.sessionCreationResolutions.shutdown(deadlineMs)),
+      invokeShutdown(() => this.options.shutdownResources(deadlineMs)),
+      invokeShutdown(() => this.workspaceCommands.shutdown())
+    ]);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
+    if (rejected) throw rejected.reason;
   }
-
   handle(origin: HostConnectionContext, request: RequestEnvelope): void {
     if (this.options.isShuttingDown()) {
       origin.sendError(request.requestId, request.type, toProtocolError(connectionClosed()));
@@ -108,6 +99,13 @@ export class HostRequestRouter {
     if (request.type === "session.catalog.query" && request.context.scope === "workspace") {
       const command = { type: request.type, payload: request.payload } as AgentCommand<"session.catalog.query">;
       void this.workspaceCommands.queryCatalog(request.context, command)
+        .then((result) => origin.sendSuccess(request.requestId, request.type, result))
+        .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
+      return;
+    }
+    if (request.type === "session.catalog.contentSearch" && request.context.scope === "workspace") {
+      const command = { type: request.type, payload: request.payload } as AgentCommand<"session.catalog.contentSearch">;
+      void this.workspaceCommands.searchCatalogContent(request.context, command)
         .then((result) => origin.sendSuccess(request.requestId, request.type, result))
         .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
       return;
@@ -450,4 +448,12 @@ function connectionClosed(): HostCommandError {
     true,
     { shuttingDown: true }
   );
+}
+
+function invokeShutdown(operation: () => Promise<void>): Promise<void> {
+  try {
+    return Promise.resolve(operation());
+  } catch (error) {
+    return Promise.reject(error);
+  }
 }

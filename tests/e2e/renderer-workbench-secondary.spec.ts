@@ -103,7 +103,7 @@ test("opens Settings, update, and help from the lower-left help menu", async ({ 
   await expect(helpButton).toBeVisible();
 
   await helpButton.click();
-  await page.getByRole("menuitem", { name: /帮助/u }).click();
+  await page.getByRole("menuitem", { name: "关于", exact: true }).click();
   await expect(page.getByRole("heading", { name: "关于", exact: true })).toBeVisible();
   await expect(page.getByText("Pi-first Desktop Workbench", { exact: true })).toBeVisible();
 });

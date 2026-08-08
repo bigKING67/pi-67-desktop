@@ -60,10 +60,13 @@ completing a real session without learning terminal UI conventions first.
 
 ## Visual direction
 
-- Use fixed-commit `pi-gui` reviews as the primary product and interaction reference,
-  while preserving Peak Code's useful three-region information architecture as historical
-  lineage. Neither source contributes branding, exact pixels, assets, process architecture,
-  or automatically synchronized components.
+- Use fixed-commit `pi-gui` and `t3code` reviews as the only comprehensive
+  implementation references. Either may inform product, interaction, UI,
+  visual design, architecture, Harness, runtime lifecycle, recovery, and
+  quality; `pi-gui` is the current primary baseline but not an exclusive
+  authority, and `t3code` is not Harness-only. Neither source contributes
+  branding, exact pixels, assets, automatic roadmap expansion, or synchronized
+  components.
 - Transcript and composer form the dominant work plane. Navigation is quieter;
   files, tools, diffs, and resources appear only when they explain active work.
 - Use editorial utility composition, restrained surfaces, precise alignment,
@@ -95,7 +98,7 @@ completing a real session without learning terminal UI conventions first.
 +----------------------+--------------------------------------+----------------+
 | Workspace groups     | Conversation or Settings workbench   | Inspector      |
 | active / recent      | Transcript / tools / Composer        | Files          |
-| account          [?] | or scoped configuration              | Messages/Context |
+| account          [?] | or scoped configuration              | Changes/Messages/Context |
 +----------------------+--------------------------------------+----------------+
 ```
 
@@ -129,12 +132,41 @@ Application-level surfaces use a separate wide-window shell:
   status, notifications, command actions, and the Inspector toggle. It contains
   no horizontal task strip. The Inspector toggle is the final application action
   before the Windows caption safe area and the rightmost app action on macOS.
+- When a Workspace is selected, the title identity area includes one compact,
+  keyboard-focusable Repository status control. It distinguishes checking,
+  primary Worktree, linked Worktree, non-Git, stale, private-Git-unavailable,
+  missing, and failed states with icon plus text rather than color alone. Clicking
+  it performs only a read-only refresh. Below 760px the text becomes visually
+  hidden while the accessible label retains the complete state. This inspection
+  control exposes no create, remove, branch, Diff, or force action.
+- A provisional conversation places one `运行环境` fieldset between its intent
+  explanation and Composer. It is a native radio selection family with two
+  equal-width options: `当前工作区` and `隔离 Worktree`. Local is the default.
+  Worktree is enabled only from a fresh ready Repository observation and states
+  explicitly that creation starts on the first send; changing the selection
+  itself never implies or triggers Git work.
+- Each environment option uses one 18px semantic icon, a title, a short outcome
+  description, and a trailing Check for the selected state. Selection is not
+  communicated by hue alone. The family owns idle, hover, focus-visible,
+  selected, disabled, checking, stale/error, and creation-locked states. A
+  retryable observation failure exposes one quiet `重新检查` action; creation-
+  locked state keeps the chosen radio stable instead of offering a misleading
+  switch. Below 1040px the two options become one column without changing their
+  reading or keyboard order.
+- Environment intent is part of provisional draft recovery. A non-empty draft
+  selected for Worktree restores that selection after restart; switching back
+  to Local checkpoints the removal of Worktree intent immediately. Environment
+  intent never appears on an already materialized Pi Session.
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.
 - Navigation and Inspector share `clamp(248px, 18vw, 288px)` on the wide
   three-region layout. Neither side column gains width at the other's expense;
   long names truncate inside the shared measure.
+- The Inspector tab strip uses four equal-width compact actions: `文件`, `修改`,
+  `消息`, and `上下文`. Changes owns one bounded record list plus one independently
+  scrolling Patch detail; it does not widen the Inspector or introduce a fourth
+  permanent application region.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
 - Transcript, execution process, Composer, queue, and Composer-anchored overlays
   share one conversation measure: 860px with both side columns present, 1040px
@@ -168,9 +200,10 @@ Application-level surfaces use a separate wide-window shell:
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
 - Resizable split handles, multiple editor panes/windows, media preview, and a
-  complete Git/workspace Diff remain future capabilities. Files is the narrow
-  Workspace navigator; editable text opens in the central workbench rather than
-  replacing the file tree or pretending to be Git state.
+  complete Git/workspace Diff remain future capabilities. The Changes Inspector
+  is explicitly a Pi Session Tool projection rather than Git status. Files is the
+  narrow Workspace navigator; editable text opens in the central workbench rather
+  than replacing the file tree or pretending to be Git state.
 
 ## Typography
 
@@ -408,7 +441,7 @@ loading error where the operation can produce those states
 
 ### Inspector
 
-- The primary order is `文件 / 消息 / 上下文`; Files is the default. The Files
+- The primary order is `文件 / 修改 / 消息 / 上下文`; Files is the default. The Files
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
   Tabs, search text, file names, message summaries, tree labels, and resource
@@ -480,13 +513,26 @@ loading error where the operation can produce those states
 - No file body enters Workbench state, Pi JSONL, notifications, diagnostics,
   logs, or telemetry. The first release has no split pane, new editor window,
   system file association, media preview, or complete Git/workspace Diff.
-- Active-branch `edit` and `write` facts enrich only their matching transcript
-  Tool card through `toolCallId`; Files has no Recorded Changes drill-down.
-  `edit` facts may carry bounded Patch metadata and additions/deletions. `write`
-  facts explicitly state that no before-version exists, so no historical Diff is
+- Active-branch `edit` and `write` facts enrich their matching transcript Tool
+  card through `toolCallId` and populate the Inspector `修改` view from the same
+  authority-safe projection. The list is newest-first, reports retained files and
+  total records, and selects the newest retained record when an older selection
+  leaves the bounded window.
+- `edit` detail uses the calibrated dark code surface in both themes, distinguishes
+  Patch metadata/additions/deletions/context without hue alone, and caps rendered
+  output at 600 rows while preserving Host truncation disclosure. `write` detail
+  explicitly states that no before-version exists, so no historical Diff is
   invented.
-- Live Changes upsert by `toolCallId`; session bootstrap, Host generation change,
-  and projection resync cannot mix records from different session generations.
+- Changes owns loading, empty, stale, error, ready, and truncated states. Refresh
+  retains the previous projection until an authority-matching replacement commits;
+  a current failure remains visible beside cached content. Live Changes upsert by
+  `toolCallId`; Session bootstrap, Host generation change, delayed responses, and
+  projection resync cannot mix records from different Session generations.
+- Changes groups settled records by their originating Turn as `第 N 轮`; records
+  that do not yet belong to a settled Turn remain under the truthful `当前操作`
+  label. A row is `已查看` only after its exact authority-safe fingerprint has been
+  selected. A changed path, status, Patch, metrics, or revision for the same
+  `toolCallId` restores `未查看` without switching the user's current detail.
 - Messages shows only user-authored messages on the current active branch. The
   index is paged at 100 by default and 200 maximum, previews are capped at 120
   grapheme-scale characters, and image/attachment counts contain metadata only.
@@ -494,14 +540,21 @@ loading error where the operation can produce those states
   clicking an unloaded message installs one bounded historical window, disables
   edit/continue actions, highlights the target with Reduced Motion support, and
   offers `回到最新消息`. Sending a new turn exits historical mode.
+- `Cmd/Ctrl+F` searches visible user/Assistant text in the current Pi JSONL branch;
+  `Cmd/Ctrl+Shift+F` performs a bounded, explicit cross-conversation body search in
+  the current Workspace and opens the exact Session/message. Both are local
+  navigation features. `@file` is a Workspace file-reference action. None of these
+  controls Provider Web Search, which remains a model-decided Pi/Provider capability
+  with no user-facing enable/disable switch or persisted preference. The UI shows
+  Web Search only when a request actually runs, including its sources and citations.
 - Session tree projections are flat and renderer recursion is forbidden. They
   are no longer an Inspector tab: `/tree` and the command palette open the
   dedicated `会话分支与回退` dialog, where common technical node types are shown as
   user-facing events before a rollback is selected.
 - At most 512 nodes and 128 KiB of tree JSON cross the process boundary; the
   active node remains prioritized and truncation is visible.
-- Tree rows are virtualized. Context contains usage, Extension status, and
-  Resources without forcing conversation history to be reprojected.
+- Tree rows are virtualized. The Context tab contains usage, Extension status,
+  and Resources without forcing conversation history to be reprojected.
 - A complete Git/workspace Diff remains outside the current data contract and is
   not represented by synthetic client-side state.
 
@@ -896,6 +949,12 @@ loading error where the operation can produce those states
   selection but are read-only. Creating or editing a custom Provider writes only
   its `models.json` entry; Desktop never copies built-in definitions into that
   file merely to display them.
+- `Groland` appears as one built-in Provider and owns one credential interaction,
+  not separate Claude/GPT services. Its five Claude rows show
+  `anthropic-messages`; its two GPT rows show `openai-responses`; all seven show
+  image input and reasoning. Authentication stays protocol-native in Agent Host:
+  Claude uses `x-api-key`, GPT uses Bearer. The UI never asks the user to duplicate
+  the same credential or exposes it while explaining the mixed protocol.
 - Removing a custom Provider opens a cancel-first confirmation that names the
   `models.json` definition, states that any dirty Provider draft will be discarded,
   and explicitly preserves `auth.json`. Removing a persistent credential is a
@@ -955,11 +1014,16 @@ loading error where the operation can produce those states
   selection, and scroll position without discarding the Provider draft.
 - A Provider model Catalog uses readable rows and renders only one model detail
   editor at a time. Search matches display name and Model ID; the initial bounded
-  filters are `全部`, image input, reasoning, and custom overrides. Filtering or
-  switching models preserves the Provider draft. Adding a model clears filters,
-  selects the new row, and focuses Model ID; removing the active model selects a
-  neighboring row. Header mutations and advanced JSON remain collapsed until
-  requested or an error requires attention.
+  filters are `全部`, image input, reasoning, native search, and custom overrides.
+  Each row exposes protocol, image/text, reasoning, and search routing as restrained
+  metadata rather than a badge pile. `原生搜索 · 已声明` means the built-in
+  model/protocol route is known; it never claims a live request succeeded. Groland
+  custom or protocol-mismatched model IDs remain `搜索 · Exa 回退`, and only
+  `deepseek-v4-flash` is declared native-search capable for Pi's official DeepSeek
+  Provider. Filtering or switching models preserves the Provider draft. Adding a
+  model clears filters, selects the new row, and focuses Model ID; removing the
+  active model selects a neighboring row. Header mutations and advanced JSON
+  remain collapsed until requested or an error requires attention.
 - Model Catalog and model detail are mutually exclusive at every editor width.
   `返回模型列表` restores search, filters, selected item, and scroll position while
   the Provider draft stays live. Large Provider and model catalogs remain in the
@@ -1118,16 +1182,60 @@ loading error where the operation can produce those states
   authority disables the control. Workbench persistence and recovered Task
   placeholders always omit the value and return to `AUTO` under the current
   Desktop default.
+- Immediately after Tool mode, one compact `执行 / 计划` segmented control owns
+  interaction intent. A provisional conversation reads and writes its checkpointed
+  draft value; a materialized Session renders only the Host-authoritative Pi JSONL
+  value. Switching mode is never optimistic: pending acknowledgement, Session
+  transition, or an active Operation disables both options, and rejection leaves
+  the prior value visible with an observable notification.
+- Plan Mode keeps the normal transcript and Composer but permits only read-only
+  inspection, first-party web Tools, `plan_ask`, and `plan_complete`. Its safety
+  gate precedes YOLO and one-shot approval, so a forbidden write is blocked as
+  `PLAN_MODE_READ_ONLY` rather than presented as approvable. The control's plan
+  state uses a restrained accent border/fill and remains distinguishable by icon,
+  label, and pressed state in both themes.
+- `plan_complete` appends one complete Plan proposal card to the Timeline. The
+  Timeline card owns expanded/collapsed state, bounded Markdown scrolling, copy
+  feedback, historical status, and focus rings; it never owns an execution action.
+  It remains in the Timeline after execution with the authoritative `implemented`
+  state, and historical Plan cards may be read, expanded, and copied but never run
+  again.
+- While the current proposal is active, one compact `ActivePlanActionBar` appears
+  above the Composer with `继续完善`, `复制`, and `开始执行`. Continuing refinement
+  only prefills the Composer. Starting execution sends `planId + submissionId`,
+  never Markdown; Agent Host resolves the active Plan from the same Pi JSONL,
+  records the decision, switches that Session to execute, and emits the real Prompt
+  Operation. Busy/disabled state, focus rings, and inline implementation failure
+  belong to the action bar. The authoritative execute event removes only this action
+  bar, not the Timeline Plan.
+- At narrow widths the Timeline card retains its bounded body and the independent
+  action bar keeps every action reachable while the Composer toolbar may wrap to two
+  rows without changing keyboard order or overlapping the editor. Reduced Motion
+  removes the disclosure rotation transition.
+- Prompt Stash is a text-only, Task-scoped Composer Popover with at most 20 items,
+  256 KiB per item, and 2 MiB of total stashed text. It preserves exact whitespace;
+  drafts containing `@file` references cannot be stashed. The Composer is cleared
+  only after the stash addition and resulting empty draft have each received a
+  durable `safeStorage` acknowledgement; either persistence failure rolls back to
+  a non-lossy state. Restore is allowed only into an empty Composer, removes the
+  item through the same acknowledged two-phase flow, closes the Popover, and returns
+  focus to the Composer.
+- Context pressure is a compact status beside the Composer: below 75% is neutral,
+  75% is `上下文偏高`, and 92% is `上下文接近上限`. Manual compression calls the
+  native `session.compact` controller; automatic and manual compaction have distinct
+  progress copy, and automatic compaction never exposes a duplicate manual button.
+  Reduced Motion disables the progress rotation without hiding the state.
 - Typing `/` as the draft's first token opens a bounded, keyboard-operated
   catalog above the Composer. It always groups `Pi 内置`, `扩展命令`, `提示词`,
   and `技能` in that order. Runtime loading, failure, or disconnection is a quiet
   status below available Desktop actions rather than a replacement for the list.
-  `/new`, `/model`, `/name`, `/compact`, `/resume`, `/tree`, `/reload`, and `/settings`
-  are Renderer-owned actions using the same feature Controllers as the rest of
-  Desktop; they never become `command.invoke` calls or model Prompts. Pi-resolved
-  Extension commands, Prompt Templates, and Skills retain distinct source labels;
-  `/plan` and `/skill:<name>` remain normal Runtime entries rather than hard-coded
-  exceptions. Arrow keys move the active row without mutating the textarea. Click
+  `/new`, `/model`, `/name`, `/compact`, `/resume`, `/tree`, `/reload`, `/settings`,
+  `/plan`, and `/default` are Renderer-owned actions using the same feature
+  Controllers as the rest of Desktop; they never become `command.invoke` calls or
+  model Prompts. `/plan` selects Plan Mode and `/default` restores execute mode.
+  Pi-resolved Extension commands, Prompt Templates, and Skills such as
+  `/skill:<name>` retain distinct source labels and their normal Runtime or Prompt
+  path. Arrow keys move the active row without mutating the textarea. Click
   and Tab insert. Enter executes an exact command, but completes a partial token;
   Escape dismisses, and IME confirmation never selects, executes, or sends.
   `/name 新标题` uses the same rename Controller as the row menu; bare `/name`
@@ -1344,34 +1452,39 @@ loading error where the operation can produce those states
   side effect requires a decision. Unregistered, ambiguous, reserved-identity
   mismatch, malformed MCP routing, and other calls that authorization cannot
   repair are blocked with inline correction instead of opening a dialog.
-- Verified `pi-web-access` `web_search`, `source_check`, HTTP(S)
-  `fetch_content`, and bounded `get_search_content` calls are classified as
-  read-only web capabilities. In a trusted Workspace they run without a
-  per-call approval dialog because enabling the Package is the user's durable
-  capability choice; their exact Tool identity and query, URL, claim, or result
-  reference remain visible in the execution process. `WebSearch`, `WebFetch`,
-  and the model-common lowercase `web_fetch` are deterministic Desktop aliases
-  of the exact search/fetch Tools. Malformed input, local-file fetches, unknown
-  aliases, and same-name Tools from other Packages stay fail-closed as
-  unverified. Network writes, uploads, command execution, and other external side
-  effects retain one-shot approval.
-- A hidden Desktop interop extension handles the verified Package's successful
-  Tool Result only when the result already carries its in-memory store ID in
-  structured `details`. If the user-visible result text omits that bounded ID,
-  Desktop appends one plain-text `responseId` instruction for the next
-  `get_search_content` call. It does not inspect the store, repeat the request,
-  persist the ID separately, or modify authorization. Failed results, malformed
-  IDs, retrieval results, duplicate Tool names, and same-name Tools from another
-  Package are left untouched.
-- One automatic `web_search` call owns Package-level Provider routing. When the
-  Package exhausts configured Providers or reports missing credentials, Desktop
-  marks that Tool Result failed and tells the model not to generate a sequence of
-  Brave, Tavily, OpenAI, SearXNG, or other Provider-specific probes. A known exact
-  URL may use one `fetch_content` recovery; otherwise the answer identifies the
-  missing search configuration. This prevents redundant calls without treating
-  Package installation as Provider readiness.
+- Pi-67 registers `web_search`, `source_check`, HTTP(S) `fetch_content`, and
+  bounded `get_search_content` directly as first-party Pi SDK `customTools` with
+  the `Pi-67 原生搜索` identity. In a trusted Workspace their read-only web intent
+  runs without a duplicate approval dialog, while exact Tool identity and query,
+  URL, claim, or result reference remain visible in the execution process.
+  `WebSearch`, `WebFetch`, and lowercase `web_fetch` remain deterministic Desktop
+  aliases. Malformed input, local-file fetches, reserved-identity mismatch, and
+  same-name third-party Tools stay fail-closed; network writes, uploads, command
+  execution, and external side effects retain one-shot approval.
+- One `web_search` call owns native-first routing. Protocol-matching built-in
+  Groland Claude/GPT and Pi official Anthropic/OpenAI models use their declared
+  Anthropic Web Search or Responses `web_search` request; Pi official DeepSeek is
+  declared native only for `deepseek-v4-flash`. Missing native credentials may
+  select Exa before any provider request is sent. After a native request is sent,
+  HTTP/auth/quota/rate-limit/server errors, malformed or oversized JSON, and empty
+  results fail visibly and never silently resend the query to Exa.
+- Exa fallback uses one bounded Streamable HTTP MCP Session per Tool call:
+  `initialize -> notifications/initialized -> tools/call`. It validates the
+  negotiated protocol, session ID, JSON-RPC version/request ID, HTTP status, MCP
+  error, JSON/SSE framing, abort signal, and a 2 MiB response limit. It does not
+  retain or share an Exa Session across unrelated Tool calls.
+- `fetch_content` accepts only credential-free HTTP(S), resolves DNS before every
+  redirect, rejects local/private/link-local/reserved IPv4 and IPv6 destinations,
+  caps redirects at three, and cancels streamed bodies above 2 MiB. This is a
+  hostname/DNS validation boundary, not a claim of transport-level IP pinning
+  against every DNS-rebinding TOCTOU.
+- Every successful search or fetch stores at most one bounded in-memory result and
+  returns its `responseId` in structured Tool details. `get_search_content` reads
+  only that current bounded cache entry and performs no network request. Failed
+  results, malformed or expired IDs, duplicate Tool names, and same-name legacy
+  Package Tools never gain first-party identity or authorization.
 - New trusted Workspaces default to `AUTO` (`balanced`). Exact Workspace
-  read/write Tools, exact current-Session loaded resource reads, verified
+  read/write Tools, exact current-Session loaded resource reads, first-party
   read-only web Tools, ordinary effective configured Package/MCP operations,
   non-destructive persistent writes, and conservatively classified local
   inspection/test/build Shell commands proceed without repetitive approval. A
@@ -1468,6 +1581,11 @@ loading error where the operation can produce those states
   Package cannot be mistaken for a differently named model Tool call. Partial
   presentation coverage says `执行可用 · 展示受限`; a Tool surface without a
   dedicated Adapter says `可执行`, not that Tool execution itself is partial.
+- Package settings mark `@narumitw/pi-plan-mode`, `pi-web-access`, and
+  `pi-smart-fetch` as `原生能力替代`. Existing user configuration remains visible
+  and unchanged, but Desktop Tasks exclude those sources before Pi resource load.
+  The row offers the ordinary explicit uninstall path without claiming that
+  retirement removed unrelated third-party Packages.
 - Before every Agent turn, Desktop reinforces the bounded exact active Tool-name
   contract and advertises only verified deterministic compatibility aliases.
   `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, `WebSearch`, and `WebFetch`
@@ -1488,6 +1606,19 @@ loading error where the operation can produce those states
   hot-reload its model runtime. Fast reloads remain `applied`; a slow or failed
   reload becomes `pending` after a bounded Agent Host wait and is retried by the
   Task runtime without blocking the Settings snapshot.
+- The first Provider configuration read is also bounded before any Task exists.
+  Agent Host limits individual configuration file access to 1.5 seconds, offline
+  Pi Provider validation to 4 seconds, and Settings reload to 2 seconds; Renderer
+  allows a 12-second acknowledgement window. Manual get/reload refreshes only the
+  requested Workspace, so unrelated registered Workspaces cannot accumulate
+  Settings reload latency. Validation timeout produces an `invalid` snapshot with
+  a fixed diagnostic; file-access timeout produces a structured recoverable error
+  without exposing the affected absolute path.
+- A real Task does not reuse the diagnostic projection's partial state. Its own
+  offline `ModelRuntime.create()` is bounded to 4 seconds inside Agent Host and
+  fails with recoverable stage `session-model-runtime` before Workspace/Session
+  acknowledgement expires. Retry starts a new Pi runtime creation attempt; the
+  late result of the timed-out attempt is never installed as Task authority.
 - Credential inputs never refill. Persistent storage in Pi `auth.json` is the
   primary path; an explicitly runtime-only key states that it is cleared when the
   Agent Host exits or restarts and remains available only across Desktop-created
@@ -1511,10 +1642,15 @@ loading error where the operation can produce those states
   stable and the dialog cannot be dismissed into an ambiguous partial request.
   The scroll region is bounded on desktop and mobile; footer actions wrap without
   overlapping status content.
-- The export action uses an icon-plus-command label and sends only typed
-  `RuntimeDiagnostics` to Main. Main composes the fixed support schema with its
-  own recovery snapshot. No destructive repair, force unlock, replay, or
-  clear-all action appears in this surface.
+- The export action uses an icon-plus-command label and sends only a typed
+  Runtime-available or Runtime-unavailable request to Main. Collection uses a
+  three-second acknowledgement budget. Main always composes the fixed support
+  schema from its own recovery snapshot, Agent Host Supervisor lifecycle, and
+  fixed-file Pi configuration readability metadata; successful Host diagnostics
+  are an optional appendix rather than an export prerequisite. A fallback export
+  confirms that Runtime state was unavailable without exposing the raw transport
+  error. No destructive repair, force unlock, replay, or clear-all action appears
+  in this surface.
 - Settings and the update dialog disclose that automatic checks request only
   public GitHub Release metadata and send no Workspace, Session, model-service,
   or credential data. Packaged builds check 10 seconds after startup and at most

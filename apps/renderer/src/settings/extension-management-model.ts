@@ -4,6 +4,7 @@ import type {
   PackageResourceType,
   PackageSourceKind
 } from "@pi67/domain";
+import { nativeCapabilityReplacement } from "@pi67/domain";
 
 export type PackageFilter = "all" | "enabled" | "disabled" | "updates";
 export type ConfirmedAction =
@@ -65,11 +66,13 @@ export function packageResourceTypes(entry: ExtensionPackageEntry): PackageResou
 }
 
 export function packageRowEnabled(row: PackageRow): boolean {
+  if (nativeCapabilityReplacement(row.entry.source)) return false;
   if (!row.entry.installed || !packageContentAdmitted(row.entry)) return false;
   return packageResourceTypes(row.entry).some((type) => packageResourceEnabled(row.entry, type));
 }
 
 export type PackageRowState =
+  | "native-replaced"
   | "enabled"
   | "partial"
   | "disabled"
@@ -78,6 +81,7 @@ export type PackageRowState =
   | "changed-pending-confirmation";
 
 export function packageRowState(row: PackageRow): PackageRowState {
+  if (nativeCapabilityReplacement(row.entry.source)) return "native-replaced";
   if (!row.entry.installed || row.entry.trustReason === "install-content-missing") return "not-installed";
   if (row.entry.trustState === "drifted") return "changed-pending-confirmation";
   if (!packageContentAdmitted(row.entry)) return "pending-confirmation";

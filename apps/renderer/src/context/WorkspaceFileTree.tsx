@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import type { KeyboardEvent, ReactNode } from "react";
+import { writeWorkspaceFileDragData } from "../composer/workspace-file-drag.js";
 
 export interface WorkspaceDirectoryProjection {
   entries: WorkspaceFileEntry[];
@@ -29,6 +30,7 @@ export interface WorkspaceFileSelection {
 }
 
 export function WorkspaceFileTree({
+  workspaceId,
   entries,
   searchMode,
   rootLoaded,
@@ -47,6 +49,7 @@ export function WorkspaceFileTree({
   onTrash,
   onLoadMore
 }: {
+  workspaceId: string;
   entries: WorkspaceFileEntry[];
   searchMode: boolean;
   rootLoaded: boolean;
@@ -104,6 +107,7 @@ export function WorkspaceFileTree({
           aria-selected={isSelected}
           className={`inspector-file-row-shell ${isSelected ? "is-selected" : ""} ${resultMode ? "is-search-result" : ""}`}
           data-workspace-tree-row="true"
+          draggable={entry.kind === "file"}
           role="treeitem"
           tabIndex={isSelected || (selected === undefined && depth === 0 && entries[0]?.id === entry.id) ? 0 : -1}
           title={entry.relativePath}
@@ -115,6 +119,10 @@ export function WorkspaceFileTree({
             onShowNativeMenu(target);
           }}
           onFocus={() => onSelect(target)}
+          onDragStart={(event) => {
+            if (entry.kind !== "file") return;
+            writeWorkspaceFileDragData(event.dataTransfer, workspaceId, entry);
+          }}
           onKeyDown={(event) => handleRowKeyDown(event, target, available, directory, open)}
         >
           <div className="inspector-file-row" style={{ paddingLeft: `${8 + Math.min(depth, 10) * 14}px` }}>

@@ -1,8 +1,10 @@
 import type {
+  ActiveProposedPlan,
   SessionControlResult,
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
-  SessionSnapshot
+  SessionSnapshot,
+  SessionInteractionMode
 } from "@pi67/domain";
 import {
   activeSessionProjectionAuthorityWithoutConnection,
@@ -19,6 +21,7 @@ import {
 import {
   controlProjectionFromSnapshot,
   identityProjectionFromSnapshot,
+  interactionProjectionFromSnapshot,
   modelCatalogProjectionFromSnapshot,
   queueProjectionFromSnapshot,
   type SessionQueueProjection
@@ -58,6 +61,8 @@ export function sessionSnapshotProjectionPatch(
       patch.modelCatalog = modelCatalogProjectionFromSnapshot(snapshot);
     } else if (group === "controls") {
       patch.controls = controlProjectionFromSnapshot(snapshot);
+    } else if (group === "interaction") {
+      patch.interaction = interactionProjectionFromSnapshot(snapshot);
     } else if (group === "queue") {
       patch.queue = queueProjectionFromSnapshot(snapshot);
     } else if (group === "resources") {
@@ -159,6 +164,35 @@ export function sessionUsageProjectionPatch(
   return {
     usage: update,
     revisions: incrementSessionProjectionRevision(state.revisions, "usage")
+  };
+}
+
+export function sessionInteractionModeProjectionPatch(
+  state: SessionProjectionData,
+  authority: SessionProjectionAuthority,
+  interactionMode: SessionInteractionMode
+): Partial<SessionProjectionData> | undefined {
+  if (!matchesCurrentAuthority(state, authority)) return undefined;
+  return {
+    interaction: {
+      interactionMode,
+      ...(interactionMode === "plan" && state.interaction?.activeProposedPlan
+        ? { activeProposedPlan: state.interaction.activeProposedPlan }
+        : {})
+    },
+    revisions: incrementSessionProjectionRevision(state.revisions, "interaction")
+  };
+}
+
+export function proposedPlanProjectionPatch(
+  state: SessionProjectionData,
+  authority: SessionProjectionAuthority,
+  activeProposedPlan: ActiveProposedPlan
+): Partial<SessionProjectionData> | undefined {
+  if (!matchesCurrentAuthority(state, authority)) return undefined;
+  return {
+    interaction: { interactionMode: "plan", activeProposedPlan },
+    revisions: incrementSessionProjectionRevision(state.revisions, "interaction")
   };
 }
 

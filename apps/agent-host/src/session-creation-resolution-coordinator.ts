@@ -41,6 +41,7 @@ export class SessionCreationResolutionCoordinator {
   private readonly jobs = new Map<string, ResolutionJob>();
   private readonly queue: ResolutionJob[] = [];
   private readonly activeByWorkspace = new Map<string, number>();
+  private readonly activeJobs = new Set<Promise<void>>();
   private readonly maxActive: number;
   private readonly maxActivePerWorkspace: number;
   private readonly maxPendingJobs: number;
@@ -48,6 +49,7 @@ export class SessionCreationResolutionCoordinator {
   private active = 0;
   private waiterCount = 0;
   private shuttingDown = false;
+  private shutdownPromise: Promise<void> | undefined;
 
   constructor(
     private readonly workspaceCommands: Pick<WorkspaceCommandRouter, "resolveSessionCreation">,
@@ -105,8 +107,13 @@ export class SessionCreationResolutionCoordinator {
     return promise;
   }
 
-  shutdown(): void {
-    if (this.shuttingDown) return;
+  shutdown(deadlineMs = 1_000): Promise<void> {
+    if (this.shutdownPromise) return this.shutdownPromise;
+    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 10_000) {
+      return Promise.reject(new RangeError(
+        "Session creation resolution shutdown deadline must be between 1 and 10000 milliseconds."
+      ));
+    }
     this.shuttingDown = true;
     for (const job of this.jobs.values()) {
       job.controller.abort();
@@ -114,8 +121,11 @@ export class SessionCreationResolutionCoordinator {
     }
     this.jobs.clear();
     this.queue.splice(0);
-    this.activeByWorkspace.clear();
-    this.active = 0;
+    const activeJobs = [...this.activeJobs];
+    this.shutdownPromise = activeJobs.length === 0
+      ? Promise.resolve()
+      : waitForActiveJobs(activeJobs, deadlineMs);
+    return this.shutdownPromise;
   }
 
   private addWaiter(job: ResolutionJob, signal: AbortSignal): Promise<Resolution> {
@@ -169,7 +179,7 @@ export class SessionCreationResolutionCoordinator {
       job.context.workspaceId,
       (this.activeByWorkspace.get(job.context.workspaceId) ?? 0) + 1
     );
-    void Promise.resolve().then(() => this.workspaceCommands.resolveSessionCreation(
+    const activeJob = Promise.resolve().then(() => this.workspaceCommands.resolveSessionCreation(
       job.context,
       job.command,
       { signal: job.controller.signal }
@@ -177,6 +187,8 @@ export class SessionCreationResolutionCoordinator {
       (result) => this.settle(job, { result }),
       (error: unknown) => this.settle(job, { error })
     );
+    this.activeJobs.add(activeJob);
+    void activeJob.finally(() => this.activeJobs.delete(activeJob)).catch(() => undefined);
   }
 
   private settle(
@@ -246,4 +258,22 @@ function connectionClosed(shuttingDown: boolean): HostCommandError {
 
 function resourceLimit(message: string, details: Record<string, number>): HostCommandError {
   return new HostCommandError("RESOURCE_LIMIT_EXCEEDED", message, true, details);
+}
+
+async function waitForActiveJobs(activeJobs: Promise<void>[], deadlineMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new HostCommandError(
+      "RUNTIME_POISONED",
+      "Session creation resolution did not settle before shutdown.",
+      false,
+      { sessionCreationResolutionShutdown: false }
+    )), deadlineMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([Promise.allSettled(activeJobs), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

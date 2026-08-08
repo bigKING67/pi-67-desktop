@@ -14,6 +14,7 @@ import type {
   PackageResourceType,
   ExtensionPackageUpdatesResult,
   ModelSummary,
+  SessionInteractionMode,
   OperationKind,
   OperationView,
   ProviderSummary,
@@ -33,8 +34,10 @@ import type {
   ApprovalResponseDecision,
   ApprovalResolution,
   LocatedMessageWindow,
+  MessageSearchResult,
   UserMessageIndexPage,
   WorkspaceChangesProjection,
+  WorkspaceMessageSearchResult,
   WorkspaceTrust
 } from "@pi67/domain";
 import type {
@@ -69,6 +72,10 @@ export type {
   SessionNameMutation
 } from "./conversation-organization-messages.js";
 export interface PromptAttachmentRef { id: string; }
+export interface PromptWorkspaceFileRef {
+  id: string;
+  revision: string;
+}
 
 export const MAX_SESSION_CREATION_ID_CHARS = 128;
 
@@ -108,6 +115,7 @@ export interface PromptSubmitRequest {
   submissionId: string;
   text: string;
   attachments?: PromptAttachmentRef[];
+  workspaceFiles?: PromptWorkspaceFileRef[];
   delivery: PromptDelivery;
 }
 
@@ -242,9 +250,11 @@ export interface CommandPayloads extends
   "task.close": { mode: "stop" | "dispose" };
   "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogQuery;
+  "session.catalog.contentSearch": { query: string };
   "session.tree": Record<string, never>;
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
   "message.index": { offset?: number; limit?: number };
+  "message.search": { query: string };
   "message.locate": { id: string };
   "session.create": { creationId: string };
   "session.creation.resolve": { creationId: string };
@@ -262,6 +272,8 @@ export interface CommandPayloads extends
   "session.rollback": { entryId: string; summarize?: boolean };
   "session.compact": { submissionId: string; instructions?: string };
   "session.name": { mutation: SessionNameMutation };
+  "session.interactionMode.set": { mode: SessionInteractionMode };
+  "plan.implement": { submissionId: string; planId: string };
   "prompt.submit": PromptSubmitRequest;
   "prompt.steer": { text: string };
   "prompt.followUp": { text: string };
@@ -351,9 +363,11 @@ export interface CommandResults extends
   "task.close": TaskCloseResult;
   "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogPageResult;
+  "session.catalog.contentSearch": WorkspaceMessageSearchResult;
   "session.tree": SessionTreeProjection;
   "message.page": ConversationPage;
   "message.index": UserMessageIndexPage;
+  "message.search": MessageSearchResult;
   "message.locate": LocatedMessageWindow;
   "session.create": ProjectionMutationAcknowledgement;
   "session.creation.resolve": SessionCreationResolution;
@@ -364,6 +378,8 @@ export interface CommandResults extends
   "session.rollback": ProjectionMutationAcknowledgement;
   "session.compact": OperationSubmissionResult;
   "session.name": ProjectionMutationAcknowledgement;
+  "session.interactionMode.set": ProjectionMutationAcknowledgement;
+  "plan.implement": OperationSubmissionResult;
   "prompt.submit": OperationSubmissionResult;
   "prompt.steer": Acknowledgement;
   "prompt.followUp": Acknowledgement;

@@ -8,6 +8,8 @@ export interface ConversationOrganization {
   archivedAt?: number;
 }
 
+export const MAX_PINNED_CONVERSATION_ORDER_ITEMS = 200;
+
 export interface SessionCatalogCursor {
   revision: number;
   queryKey: string;

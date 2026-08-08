@@ -285,6 +285,7 @@ function initializationStageDetail(stage: RuntimeInitializationStage): string {
     case "resolve-session": return "正在解析 Pi Session";
     case "dispose-current": return "正在释放旧 Pi Runtime";
     case "create-session": return "正在创建 Pi Session";
+    case "load-model-runtime": return "正在读取 Pi Provider 配置";
     case "reload-configuration": return "正在加载 Pi 配置";
     case "project-snapshot": return "正在同步 Pi Session 状态";
   }

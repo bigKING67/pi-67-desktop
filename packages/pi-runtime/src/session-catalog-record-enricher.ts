@@ -61,10 +61,35 @@ export class SessionCatalogRecordEnricher {
     const organization = mutation.kind === "archive"
       ? mutation.value ? { archivedAt: now } : {}
       : mutation.value
-        ? { ...current, pinnedAt: now }
+        ? { ...current, pinnedAt: Math.max(now, this.organizationStore.highestPinnedAt() + 1) }
         : current.archivedAt === undefined ? {} : { archivedAt: current.archivedAt };
     await this.organizationStore.set(sourceKey, fileIdentity, organization);
     return organization;
+  }
+
+  async reorderPinned(
+    sourceKey: string,
+    records: readonly SessionCatalogRecord[],
+    orderedPaths: readonly string[],
+    now: number
+  ): Promise<Map<string, SessionCatalogOrganization>> {
+    const byPath = new Map(records.map((record) => [record.path, record]));
+    // Every pinned item is reassigned, so reordering does not need to grow an
+    // unbounded timestamp sequence above the previous maximum.
+    const top = Math.max(now, orderedPaths.length);
+    const updates = orderedPaths.map((path, index) => {
+      const record = byPath.get(path);
+      if (!record || record.pinnedAt === undefined || record.archivedAt !== undefined) {
+        throw new RuntimeError("INVALID_PAYLOAD", "Pinned conversation order is stale.");
+      }
+      const organization = { pinnedAt: top - index };
+      return { record, organization };
+    });
+    await this.organizationStore.setMany(sourceKey, updates.map(({ record, organization }) => ({
+      fileIdentity: record.fileIdentity,
+      value: organization
+    })));
+    return new Map(updates.map(({ record, organization }) => [record.path, organization]));
   }
 
   applyOrganization(
@@ -74,6 +99,22 @@ export class SessionCatalogRecordEnricher {
   ): SessionCatalogRecord[] {
     return sortSessionCatalogRecords(records.map((record) => {
       if (record.path !== path) return record;
+      const next = { ...record };
+      delete next.pinnedAt;
+      delete next.archivedAt;
+      if (organization.pinnedAt !== undefined) next.pinnedAt = organization.pinnedAt;
+      if (organization.archivedAt !== undefined) next.archivedAt = organization.archivedAt;
+      return next;
+    }));
+  }
+
+  applyOrganizations(
+    records: SessionCatalogRecord[],
+    organizations: ReadonlyMap<string, SessionCatalogOrganization>
+  ): SessionCatalogRecord[] {
+    return sortSessionCatalogRecords(records.map((record) => {
+      const organization = organizations.get(record.path);
+      if (!organization) return record;
       const next = { ...record };
       delete next.pinnedAt;
       delete next.archivedAt;

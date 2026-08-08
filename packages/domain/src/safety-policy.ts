@@ -88,6 +88,12 @@ export function classifyShellCommand(command: string): RiskCategory {
   return "ambiguous-command";
 }
 
+export function isPlanModeReadOnlyShellCommand(command: string): boolean {
+  const parsed = parseBoundedShellCommand(command.trim());
+  if (!parsed || parsed.commands.some(hasExternalPathToken)) return false;
+  return parsed.commands.every((tokens, index) => isPlanModeReadOnlySegment(parsed, tokens, index));
+}
+
 export function decideApproval(
   intent: ToolIntent,
   trust: WorkspaceTrust,
@@ -194,6 +200,21 @@ function isWorkspaceCommandSegment(
     return tokens[1] === "-m" && tokens[2] === "pytest";
   }
   return executable === "tsc" && tokens.includes("--noEmit");
+}
+
+function isPlanModeReadOnlySegment(
+  parsed: ParsedShellCommand,
+  originalTokens: readonly string[],
+  index: number
+): boolean {
+  const tokens = stripSafeEnvironmentAssignments(originalTokens);
+  if (!tokens) return false;
+  const executable = executableName(tokens[0] ?? "");
+  if (executable === "cd") return isSafeDirectoryChange(parsed, tokens, index);
+  if (isVersionInspection(executable, tokens.slice(1))) return true;
+  if (executable === "command") return tokens.length === 3 && tokens[1] === "-v";
+  if (READ_ONLY_COMMANDS.has(executable)) return hasSafeReadOnlyArguments(executable, tokens.slice(1));
+  return executable === "git" && hasSafeGitArguments(tokens.slice(1));
 }
 
 function hasSafeReadOnlyArguments(command: string, args: readonly string[]): boolean {

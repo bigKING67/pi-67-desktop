@@ -10,6 +10,7 @@ export interface PaletteAction {
   detail: string;
   keywords: string;
   icon: LucideIcon;
+  shortcut?: string;
   disabled?: boolean;
   disabledReason?: string;
   run: () => Promise<void> | void;
@@ -54,7 +55,7 @@ const GROUP_ORDER: ReadonlyArray<Exclude<PaletteGroupId, "recent">> = [
 const EMPTY_QUERY_LIMITS: Readonly<Record<Exclude<PaletteGroupId, "recent">, number>> = {
   sessions: 12,
   extensions: 12,
-  actions: 10,
+  actions: 20,
   settings: 10
 };
 

@@ -124,6 +124,18 @@ export function installMockCommandResponseHandler({
       || type === "conversation.pin"
       || type === "conversation.archive"
     ) return { revision: sessionCatalogPage.revision + 1 };
+    if (type === "message.search") return searchConversation(current, payload);
+    if (type === "message.locate") return locateConversationMessage(current, payload);
+    if (type === "session.catalog.contentSearch") return {
+      workspaceId: current.workspaceId,
+      query: typeof payload.query === "string" ? payload.query : "",
+      items: [],
+      sessionsVisited: sessionCatalogPage.itemCount,
+      entriesVisited: 0,
+      skippedCount: 0,
+      incomplete: false,
+      truncated: false
+    };
     if (type === "message.page") return conversationPage(current, payload);
     if (type === "session.tree") return current.snapshot.tree;
     if (type === "command.list") return fixtureExtensionCommands;
@@ -188,6 +200,7 @@ export function installMockCommandResponseHandler({
     }
     if (
       type === "prompt.submit"
+      || type === "plan.implement"
       || type === "session.compact"
       || type === "command.invoke"
       || type === "session.import"
@@ -195,7 +208,7 @@ export function installMockCommandResponseHandler({
       return acceptedOperation(
         current,
         hostEpoch,
-        type === "prompt.submit" || type === "session.compact"
+        type === "prompt.submit" || type === "plan.implement" || type === "session.compact"
       );
     }
     if (type === "prompt.steer" || type === "prompt.followUp") return { accepted: true };
@@ -368,6 +381,54 @@ export function installMockCommandResponseHandler({
     const messages = current.conversationMessages.slice(start, end);
     return {
       sessionId: String(current.snapshot.sessionId),
+      messages,
+      ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
+    };
+  }
+
+  function searchConversation(
+    current: FixtureAgentState,
+    payload: Record<string, unknown>
+  ): Record<string, unknown> {
+    const query = typeof payload.query === "string" ? payload.query : "";
+    const normalizedQuery = query.toLocaleLowerCase();
+    const items = current.conversationMessages.flatMap((message) => {
+      if (message.role !== "user" && message.role !== "assistant") return [];
+      const text = message.parts
+        .filter((part) => part.type === "text" && typeof part.text === "string")
+        .map((part) => part.text)
+        .join("\n");
+      if (!text.toLocaleLowerCase().includes(normalizedQuery)) return [];
+      return [{
+        id: message.id,
+        role: message.role,
+        snippet: text.slice(0, 240),
+        ...(message.createdAt === undefined ? {} : { createdAt: message.createdAt })
+      }];
+    });
+    return {
+      sessionId: String(current.snapshot.sessionId),
+      revision: 1,
+      query,
+      total: items.length,
+      items,
+      truncated: false
+    };
+  }
+
+  function locateConversationMessage(
+    current: FixtureAgentState,
+    payload: Record<string, unknown>
+  ): Record<string, unknown> {
+    const anchorId = typeof payload.id === "string" ? payload.id : "";
+    const anchorIndex = current.conversationMessages.findIndex((message) => message.id === anchorId);
+    const start = Math.max(0, anchorIndex - 40);
+    const end = Math.min(current.conversationMessages.length, Math.max(anchorIndex + 41, start + 1));
+    const messages = current.conversationMessages.slice(start, end);
+    return {
+      sessionId: String(current.snapshot.sessionId),
+      revision: 1,
+      anchorId,
       messages,
       ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
     };

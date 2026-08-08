@@ -2,32 +2,34 @@ import { describe, expect, it } from "vitest";
 import { createExternalReferenceAudit } from "./audit-external-reference-drift.mjs";
 
 const PI_HEAD = "1".repeat(40);
-const PEAK_HEAD = "2".repeat(40);
-const CANDIDATE_HEAD = "3".repeat(40);
+const PI_GUI_HEAD = "2".repeat(40);
+const T3CODE_HEAD = "3".repeat(40);
 const LICENSE_HASH = "4".repeat(64);
 
 describe("external reference drift audit", () => {
-  it("distinguishes contract-managed, reviewed, and unreviewed repositories", async () => {
+  it("reports Pi and both comprehensive references as current", async () => {
     const input = fixture();
     const report = await createExternalReferenceAudit({
       ...input,
       selectedRepositories: input.catalog.repositories,
-      installedPiVersion: "0.81.1",
-      now: () => new Date("2026-07-27T00:00:00.000Z"),
-      readPiLatest: async () => "0.81.1",
+      installedPiVersion: "0.83.0",
+      now: () => new Date("2026-08-08T00:00:00.000Z"),
+      readPiLatest: async () => "0.83.0",
       readLicense: async () => LICENSE_HASH,
       resolveRemote: async (url) => ({
         defaultBranch: "main",
-        head: url.endsWith("/pi") ? PI_HEAD : url.endsWith("/PeakCode") ? PEAK_HEAD : CANDIDATE_HEAD
+        head: url.endsWith("/pi")
+          ? PI_HEAD
+          : url.endsWith("/pi-gui") ? PI_GUI_HEAD : T3CODE_HEAD
       })
     });
 
-    expect(report.generatedAt).toBe("2026-07-27T00:00:00.000Z");
-    expect(report.statuses).toEqual({ current: 2, unreviewed: 1 });
+    expect(report.generatedAt).toBe("2026-08-08T00:00:00.000Z");
+    expect(report.statuses).toEqual({ current: 3 });
     expect(report.repositories.map(({ id, status }) => ({ id, status }))).toEqual([
       { id: "pi", status: "current" },
-      { id: "peakcode", status: "current" },
-      { id: "pi-app", status: "unreviewed" }
+      { id: "pi-gui", status: "current" },
+      { id: "t3code", status: "current" }
     ]);
   });
 
@@ -36,14 +38,15 @@ describe("external reference drift audit", () => {
     const nextHead = "5".repeat(40);
     const report = await createExternalReferenceAudit({
       ...input,
-      selectedRepositories: [input.catalog.repositories[1]],
-      installedPiVersion: "0.81.1",
+      selectedRepositories: [input.catalog.repositories[2]],
+      installedPiVersion: "0.83.0",
       readLicense: async () => LICENSE_HASH,
       resolveRemote: async () => ({ defaultBranch: "main", head: nextHead })
     });
     expect(report.repositories[0]).toMatchObject({
+      id: "t3code",
       status: "drifted",
-      reviewRange: `${PEAK_HEAD}..${nextHead}`
+      reviewRange: `${T3CODE_HEAD}..${nextHead}`
     });
   });
 
@@ -52,11 +55,11 @@ describe("external reference drift audit", () => {
     const report = await createExternalReferenceAudit({
       ...input,
       selectedRepositories: [input.catalog.repositories[1]],
-      installedPiVersion: "0.81.1",
+      installedPiVersion: "0.83.0",
       readLicense: async () => "6".repeat(64),
       resolveRemote: async () => ({ defaultBranch: "main", head: "5".repeat(40) })
     });
-    expect(report.repositories[0].status).toBe("license-changed");
+    expect(report.repositories[0]).toMatchObject({ id: "pi-gui", status: "license-changed" });
   });
 
   it("records bounded network failures instead of throwing away the report", async () => {
@@ -64,7 +67,7 @@ describe("external reference drift audit", () => {
     const report = await createExternalReferenceAudit({
       ...input,
       selectedRepositories: [input.catalog.repositories[2]],
-      installedPiVersion: "0.81.1",
+      installedPiVersion: "0.83.0",
       resolveRemote: async () => {
         throw new Error(`network failed\n${"x".repeat(500)}`);
       }
@@ -81,14 +84,19 @@ function fixture() {
       schemaVersion: 1,
       repositories: [
         { id: "pi", url: "https://github.com/earendil-works/pi", tier: "S0", reviewState: "contract-managed" },
-        { id: "peakcode", url: "https://github.com/PeakCode-AI/PeakCode", tier: "S1", reviewState: "reviewed" },
-        { id: "pi-app", url: "https://github.com/justhil/pi-app", tier: "S1", reviewState: "candidate" }
+        { id: "pi-gui", url: "https://github.com/minghinmatthewlam/pi-gui", tier: "S1", reviewState: "reviewed" },
+        { id: "t3code", url: "https://github.com/pingdotgg/t3code", tier: "S1", reviewState: "reviewed" }
       ]
     },
     reviewLock: {
       reviews: {
-        peakcode: {
-          reviewedCommit: PEAK_HEAD,
+        "pi-gui": {
+          reviewedCommit: PI_GUI_HEAD,
+          sourceRef: "main",
+          license: { path: "LICENSE", sha256: LICENSE_HASH }
+        },
+        t3code: {
+          reviewedCommit: T3CODE_HEAD,
           sourceRef: "main",
           license: { path: "LICENSE", sha256: LICENSE_HASH }
         }

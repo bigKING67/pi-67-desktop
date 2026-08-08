@@ -23,6 +23,8 @@ export interface ConversationRowModel {
   status?: "running" | "waiting" | "draft";
   priority: boolean;
   pinned: boolean;
+  canMovePinnedUp: boolean;
+  canMovePinnedDown: boolean;
   titleSource: SessionSummary["nameSource"];
   modifiedAt: number;
 }
@@ -86,17 +88,28 @@ export function conversationRows(
       searchText: sessionSearchText(session, session.name, meta)
     };
   }));
-  return rows
+  const ordered = rows
     .filter((row) => !normalizedQuery || row.searchText.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery))
     .sort((left, right) => Number(right.priority) - Number(left.priority)
       || taskStatusRank(left.status) - taskStatusRank(right.status)
       || Number(right.pinned) - Number(left.pinned)
       || (right.session?.pinnedAt ?? 0) - (left.session?.pinnedAt ?? 0)
       || right.modifiedAt - left.modifiedAt)
-    .map(({ searchText: _searchText, ...row }) => row);
+  const pinnedIdentities = ordered.filter((row) => row.pinned).map((row) => row.identity);
+  return ordered.map(({ searchText: _searchText, ...row }) => {
+    const pinnedIndex = pinnedIdentities.indexOf(row.identity);
+    return {
+      ...row,
+      canMovePinnedUp: pinnedIndex > 0,
+      canMovePinnedDown: pinnedIndex >= 0 && pinnedIndex < pinnedIdentities.length - 1
+    };
+  });
 }
 
-interface SearchableConversationRow extends ConversationRowModel {
+interface SearchableConversationRow extends Omit<
+  ConversationRowModel,
+  "canMovePinnedUp" | "canMovePinnedDown"
+> {
   searchText: string;
 }
 

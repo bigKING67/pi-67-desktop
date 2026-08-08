@@ -2,19 +2,25 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
+import { requestConversationFind } from "../search/conversation-find-events.js";
 import { runRuntimeDoctor, saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { executePiDesktopAction } from "../pi-actions/pi-desktop-actions.js";
-import { openRendererSession } from "../session/session-lifecycle-controller.js";
+import {
+  beginRendererSessionIntent,
+  openRendererSession
+} from "../session/session-lifecycle-controller.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionModels,
   selectSessionFileIdentity
 } from "../session/session-projection-selectors.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { toggleRendererNavigation } from "../app/global-shortcuts.js";
 import {
   buildPaletteActions,
   paletteAvailability
@@ -102,6 +108,18 @@ export function CommandPalette() {
       runDoctor: runRuntimeDoctor,
       openUpdate: () => setUpdateDialogOpen(true),
       saveDiagnostics: saveRuntimeDiagnostics
+    },
+    applicationHandlers: {
+      settings: () => rendererWorkbenchStore.getState().openSettings(),
+      "new-session": () => { beginRendererSessionIntent(); },
+      "toggle-navigation": toggleRendererNavigation,
+      "toggle-context": () => {
+        const shell = useShellStore.getState();
+        shell.setContextVisible(!shell.contextVisible);
+      },
+      "find-current-conversation": () => requestConversationFind("current"),
+      "find-workspace-conversations": () => requestConversationFind("workspace"),
+      "keyboard-shortcuts": () => useShellStore.getState().setKeyboardShortcutsDialogOpen(true)
     }
   }), [
     activeSessionFileIdentity,

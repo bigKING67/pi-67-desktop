@@ -1,4 +1,7 @@
-import { MAX_RUNNING_TASKS } from "@pi67/domain";
+import {
+  MAX_RUNNING_TASKS,
+  type ComposerWorkspaceFileRef
+} from "@pi67/domain";
 import type { OperationSubmissionResult } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useConversationStore } from "../conversation/conversation-store.js";
@@ -24,7 +27,8 @@ export async function submitRendererPrompt(
   text: string,
   behavior: "send" | "steer" | "followUp",
   submissionId: string,
-  attachments: readonly DraftAttachment[] = []
+  attachments: readonly DraftAttachment[] = [],
+  workspaceFiles: readonly ComposerWorkspaceFileRef[] = []
 ): Promise<PromptSubmissionResult> {
   if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   const delivery = behavior === "steer"
@@ -51,6 +55,9 @@ export async function submitRendererPrompt(
       ...(attachments.length === 0
         ? {}
         : { attachments: attachments.map((attachment) => ({ id: attachment.id })) }),
+      ...(workspaceFiles.length === 0
+        ? {}
+        : { workspaceFiles: workspaceFiles.map(({ id, revision }) => ({ id, revision })) }),
       delivery
     });
     const result = applyAcceptedPrompt(accepted, expectedAuthority);

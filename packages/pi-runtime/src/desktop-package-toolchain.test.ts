@@ -151,6 +151,24 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(sessionView.getPackages()).not.toContain("npm:project-drifted");
   });
 
+  it("excludes native-replaced Plan and web Packages only from the Desktop runtime projection", () => {
+    const configured = [
+      "npm:@narumitw/pi-plan-mode@0.11.0",
+      "npm:pi-web-access",
+      { source: "npm:pi-smart-fetch@0.3.12", autoload: false },
+      "npm:pi-subagents"
+    ];
+    const settingsManager = SettingsManager.inMemory({ packages: structuredClone(configured) });
+    const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
+
+    expect(sessionView.getGlobalSettings().packages).toEqual([
+      "npm:pi-subagents",
+      "/app/agent/desktop-capabilities/packages/pi67-core",
+      "/app/agent/desktop-capabilities/packages/design-craft"
+    ]);
+    expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
+  });
+
   it("keeps legacy first-party extensions when the managed Pi-67 Core Package is absent", () => {
     const settingsManager = SettingsManager.inMemory({ extensions: ["extensions/pi-hy-memory/index.ts"] });
     const sessionView = createDesktopPackageSettingsView(settingsManager, {

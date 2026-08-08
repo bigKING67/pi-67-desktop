@@ -95,6 +95,140 @@
   color: var(--text-tertiary);
 }
 
+.environmentSelector {
+  display: grid;
+  width: 100%;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  border: 0;
+}
+
+.environmentSelector legend {
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.environmentOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.environmentOption {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 72px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.environmentOption:hover:not([data-disabled="true"]):not([data-selected="true"]) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.environmentOption[data-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.environmentOption[data-disabled="true"] {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.environmentOption:has(input:focus-visible) {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.environmentOption input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.environmentOption > span {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.environmentOption strong,
+.environmentOption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.environmentOption strong {
+  color: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.environmentOption small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.environmentHelp {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.environmentHelp p {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.environmentRetry {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.environmentRetry:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.environmentRetry:focus-visible {
+  border-radius: var(--radius-control);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1040px) {
   .navigationHidden,
   .navigationHidden:global(.context-hidden) {
@@ -118,6 +252,10 @@
     width: min(320px, calc(100vw - 48px));
     border-right-color: var(--border-strong);
     box-shadow: var(--shadow-floating);
+  }
+
+  .environmentOptions {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .navigationDrawerScrim {

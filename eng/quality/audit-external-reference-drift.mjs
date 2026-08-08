@@ -203,8 +203,8 @@ function parseArguments(argumentsList) {
     else throw new Error(`Unknown argument: ${argument}`);
   }
   const selectors = Number(options.all) + Number(Boolean(options.id)) + Number(Boolean(options.tier));
-  if (selectors !== 1) throw new Error("Choose exactly one selector: --id <id>, --tier <S0-S3>, or --all");
-  if (options.tier && !/^S[0-3]$/u.test(options.tier)) throw new Error(`Unsupported tier: ${String(options.tier)}`);
+  if (selectors !== 1) throw new Error("Choose exactly one selector: --id <id>, --tier <S0-S1>, or --all");
+  if (options.tier && !/^S[01]$/u.test(options.tier)) throw new Error(`Unsupported tier: ${String(options.tier)}`);
   return options;
 }
 

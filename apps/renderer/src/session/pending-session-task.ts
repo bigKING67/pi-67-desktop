@@ -2,6 +2,7 @@ import { createMessageId } from "@pi67/protocol";
 import { messages } from "../localization/message-catalog.js";
 import {
   rendererWorkbenchStore,
+  type RendererTaskEnvironmentIntent,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 
@@ -12,6 +13,7 @@ export function beginPendingTask(
     title?: string;
     creationId?: string;
     intent?: boolean;
+    environmentIntent?: RendererTaskEnvironmentIntent;
   } = {}
 ): RendererWorkbenchTask | undefined {
   const workbench = rendererWorkbenchStore.getState();
@@ -31,6 +33,9 @@ export function beginPendingTask(
     title: options.title ?? messages.runtime.workbench.unnamedSession,
     ...(options.title ? { pendingTitle: options.title } : {}),
     ...(options.creationId ? { creationId: options.creationId } : {}),
+    ...(options.environmentIntent && options.environmentIntent !== "local"
+      ? { environmentIntent: options.environmentIntent }
+      : {}),
     ...(sessionPath ? { sessionPath } : {}),
     hasDraft: false,
     attachmentCount: 0,

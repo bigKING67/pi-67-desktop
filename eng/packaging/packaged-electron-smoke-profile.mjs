@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { writeControlledShutdownExtension } from "./controlled-shutdown-fixture.ts";
+
+const execFileAsync = promisify(execFile);
 
 export async function preparePackagedSmokeProfile({
   agentDir,
@@ -58,6 +62,13 @@ export async function preparePackagedSmokeProfile({
   await writeFile(join(agentDir, "auth.json"), `${JSON.stringify({
     anthropic: { type: "api_key", key: packagedCredential }
   }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await execFileAsync("git", ["init", "-b", "main"], { cwd: workspace, encoding: "utf8" });
+  await execFileAsync("git", ["add", "AGENTS.md"], { cwd: workspace, encoding: "utf8" });
+  await execFileAsync("git", [
+    "-c", "user.name=Pi-67",
+    "-c", "user.email=pi67@example.invalid",
+    "commit", "-m", "packaged smoke fixture"
+  ], { cwd: workspace, encoding: "utf8" });
   await writeControlledShutdownExtension({
     extensionPath: join(extensionsDirectory, "shutdown-fixture.ts"),
     childPidPath,
