@@ -1,5 +1,6 @@
 import type {
   DesktopRecoverySnapshot,
+  DesktopRuntimeHealthDiagnostics,
   PreviousRunExitStatus,
   PromptAttachmentStagingDiagnostics
 } from "@pi67/protocol";
@@ -15,6 +16,7 @@ export function createDesktopRecoverySnapshot(
   state: WorkbenchStateV5,
   previousRunExit: PreviousRunExitStatus,
   attachmentStaging: PromptAttachmentStagingDiagnostics,
+  health: DesktopRuntimeHealthDiagnostics,
   generatedAt = Date.now()
 ): DesktopRecoverySnapshot {
   const workspaces = {
@@ -45,6 +47,7 @@ export function createDesktopRecoverySnapshot(
     previousRunExitStatus: previousRunExit,
     workspaces,
     pendingSessionCreations: state.sessionCreationRecovery.length,
-    attachmentStaging: { ...attachmentStaging }
+    attachmentStaging: { ...attachmentStaging },
+    health
   };
 }

@@ -51,13 +51,19 @@ Pi-67 已有 Agent Host、Pi JSONL、operation receipts、projection recovery �
 - Timeline anchoring/read position：虚拟化对话保持阅读锚点、新消息计数和显式回到最新；
 - shortcut/action registry：Command Palette、Composer slash action 与快捷键帮助共享一份
   Desktop action identity 和调用入口；
-- Prompt Stash：exact text、两阶段 `safeStorage` acknowledgement、失败回滚和焦点恢复；
+- Prompt Stash：exact text 与加密图片、两阶段 `safeStorage` acknowledgement、失败回滚和焦点恢复；
 - Changes Turn/viewed：`第 N 轮`/`当前操作` 分组，以及基于内容 fingerprint 的
   `未查看`/`已查看` 状态；
+- Conversation Snooze：绝对到期时间、可折叠 shelf、单一 bounded timer、打开/attention 自动
+  wake 和 Undo；Snooze 只写 organization metadata，不改 Pi JSONL；
+- Composer/context/navigation：结构化 `@file` chip、可配置 action shortcuts、Command Palette
+  会话正文搜索和 authority-safe exact message locate；
 - private Git/VCS contract harness：有界 packaged private Git runner、Repository/Worktree
   transaction、rollback/reconcile、dirty protection 和特殊路径 fixture；
 - operation/overlay lifecycle fencing：Host epoch、Session generation、operation identity、
   late result fencing，以及 Approval/Extension/Command overlay 的确定性优先级。
+- Runtime Health：按需聚合 Scheduler、Operation/heartbeat、Main Supervisor、Repository service
+  和 Renderer acknowledgement；只保留 bounded counts/timestamps，不引入远端 telemetry。
 
 其中 outstanding-work drain 的直接概念性来源文件证据为：
 
@@ -76,7 +82,9 @@ deadline 重新实现；没有复制 t3code 源码，也没有引入 Effect、Tx
 
 ## 验证边界
 
-- 上述路径已具备 source、TypeScript、单元测试和 targeted hosted Chromium E2E 证据；
+- 上述路径已具备 source、TypeScript 和对应 targeted unit test 证据；已有 UI 路径中的一部分具备
+  hosted Chromium E2E，但本轮新增 Snooze、图片 Stash 与 Runtime Health 仍需完整 E2E 和 packaged
+  validation 才能升级证据；
 - packaged private Git smoke fixture 已接入，但在当前 candidate 交付前仍需 fresh packaged
   execution，不能只凭 fixture 存在宣称通过；
 - 当前文档不证明 Windows candidate、Windows 安装或用户真机生命周期；这些结论必须绑定

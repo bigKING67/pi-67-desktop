@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { persistTaskDraftStateAcknowledged } from "../workbench/task-draft-persistence.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import {
+  deleteComposerPromptStash,
   restoreComposerPromptStash,
   stashComposerPrompt
 } from "./prompt-stash-controller.js";
@@ -11,10 +12,31 @@ vi.mock("../workbench/task-draft-persistence.js", () => ({
 }));
 
 const persist = vi.mocked(persistTaskDraftStateAcknowledged);
+const storeImages = vi.fn();
+const restoreImages = vi.fn();
+const deleteImages = vi.fn();
+const releaseAttachments = vi.fn().mockResolvedValue(undefined);
 
 describe("Prompt stash controller", () => {
   beforeEach(() => {
     persist.mockReset();
+    storeImages.mockReset();
+    restoreImages.mockReset();
+    deleteImages.mockReset();
+    releaseAttachments.mockClear();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        pi67: {
+          system: {
+            storePromptStashImages: storeImages,
+            restorePromptStashImages: restoreImages,
+            deletePromptStashImages: deleteImages,
+            releasePromptAttachments: releaseAttachments
+          }
+        }
+      }
+    });
     useTaskDraftStore.getState().dispose();
   });
 
@@ -23,7 +45,7 @@ describe("Prompt stash controller", () => {
     persist.mockReturnValueOnce(acknowledgement.promise).mockResolvedValueOnce(true);
     useTaskDraftStore.getState().setText("task", "keep this prompt");
 
-    const result = stashComposerPrompt("task");
+    const result = stashComposerPrompt("task", "workspace-a");
     expect(useTaskDraftStore.getState().drafts.task?.text).toBe("keep this prompt");
     expect(useTaskDraftStore.getState().drafts.task?.promptStash).toHaveLength(1);
 
@@ -37,7 +59,7 @@ describe("Prompt stash controller", () => {
     persist.mockReturnValueOnce(acknowledgement.promise);
     useTaskDraftStore.getState().setText("task", "  keep spacing\n");
 
-    const result = stashComposerPrompt("task");
+    const result = stashComposerPrompt("task", "workspace-a");
     useTaskDraftStore.getState().setText("task", "newer edit");
     acknowledgement.resolve(true);
 
@@ -58,7 +80,7 @@ describe("Prompt stash controller", () => {
     });
     useTaskDraftStore.getState().setText("task", "same prompt");
 
-    await expect(stashComposerPrompt("task")).resolves.toEqual({ status: "stashed" });
+    await expect(stashComposerPrompt("task", "workspace-a")).resolves.toEqual({ status: "stashed" });
     expect(useTaskDraftStore.getState().drafts.task).toMatchObject({
       text: "",
       promptStash: [{ id: "existing", text: "same prompt", createdAt: 1 }]
@@ -69,7 +91,7 @@ describe("Prompt stash controller", () => {
     persist.mockResolvedValueOnce(false);
     useTaskDraftStore.getState().setText("task", "never lose this");
 
-    await expect(stashComposerPrompt("task")).resolves.toEqual({ status: "persistence-failed" });
+    await expect(stashComposerPrompt("task", "workspace-a")).resolves.toEqual({ status: "persistence-failed" });
     expect(useTaskDraftStore.getState().drafts.task?.text).toBe("never lose this");
     expect(useTaskDraftStore.getState().drafts.task?.promptStash).toEqual([]);
   });
@@ -78,7 +100,7 @@ describe("Prompt stash controller", () => {
     persist.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     useTaskDraftStore.getState().setText("task", "durable before clear");
 
-    await expect(stashComposerPrompt("task")).resolves.toEqual({ status: "persistence-failed" });
+    await expect(stashComposerPrompt("task", "workspace-a")).resolves.toEqual({ status: "persistence-failed" });
     expect(useTaskDraftStore.getState().drafts.task).toMatchObject({
       text: "durable before clear",
       promptStash: [{ text: "durable before clear" }]
@@ -117,6 +139,125 @@ describe("Prompt stash controller", () => {
       text: "restored prompt",
       promptStash: [{ id: "stash-1", text: "restored prompt", createdAt: 1 }]
     });
+  });
+
+  it("durably stashes image-only input before clearing and releasing live staging ids", async () => {
+    persist.mockResolvedValue(true);
+    storeImages.mockImplementation(async (request: { itemId: string }) => ({
+      itemId: request.itemId,
+      attachments: [{
+        blobId: "blob-a",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    }));
+    useTaskDraftStore.getState().setAttachments("task", [{
+      id: "attachment-a",
+      identity: "source-a",
+      name: "screen.png",
+      mimeType: "image/png",
+      byteLength: 8,
+      kind: "image"
+    }]);
+
+    await expect(stashComposerPrompt("task", "workspace-a")).resolves.toEqual({ status: "stashed" });
+    expect(storeImages).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: "workspace-a",
+      taskId: "task",
+      attachmentIds: ["attachment-a"]
+    }));
+    expect(useTaskDraftStore.getState().drafts.task).toMatchObject({
+      text: "",
+      attachments: [],
+      promptStash: [{ text: "", attachments: [{ blobId: "blob-a" }] }]
+    });
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(releaseAttachments).toHaveBeenCalledWith(["attachment-a"]);
+  });
+
+  it("restores encrypted image metadata to fresh staging ids and then removes the encrypted item", async () => {
+    persist.mockResolvedValue(true);
+    restoreImages.mockResolvedValue({
+      itemId: "stash-image",
+      attachments: [{
+        id: "attachment-restored",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    });
+    deleteImages.mockResolvedValue(undefined);
+    useTaskDraftStore.getState().addPromptStash("task", {
+      id: "stash-image",
+      text: "inspect image",
+      createdAt: 1,
+      attachments: [{
+        blobId: "blob-a",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    });
+
+    await expect(restoreComposerPromptStash("task", "stash-image")).resolves.toEqual({
+      status: "restored",
+      text: "inspect image"
+    });
+    expect(useTaskDraftStore.getState().drafts.task).toMatchObject({
+      text: "inspect image",
+      attachments: [{ id: "attachment-restored", identity: "stash:stash-image:attachment-restored" }],
+      promptStash: []
+    });
+    expect(deleteImages).toHaveBeenCalledWith({ taskId: "task", itemId: "stash-image" });
+  });
+
+  it("rejects non-image attachments without clearing or persisting anything", async () => {
+    useTaskDraftStore.getState().setText("task", "keep document");
+    useTaskDraftStore.getState().setAttachments("task", [{
+      id: "document-a",
+      identity: "source-document",
+      name: "notes.txt",
+      mimeType: "text/plain",
+      byteLength: 4,
+      kind: "document"
+    }]);
+
+    await expect(stashComposerPrompt("task", "workspace-a"))
+      .resolves.toEqual({ status: "unsupported-attachments" });
+    expect(useTaskDraftStore.getState().drafts.task).toMatchObject({
+      text: "keep document",
+      attachments: [{ id: "document-a" }],
+      promptStash: []
+    });
+    expect(storeImages).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("reports cleanup failure only after the stash record has been durably deleted", async () => {
+    persist.mockResolvedValue(true);
+    deleteImages.mockRejectedValue(new Error("locked"));
+    useTaskDraftStore.getState().addPromptStash("task", {
+      id: "stash-image",
+      text: "delete me",
+      createdAt: 1,
+      attachments: [{
+        blobId: "blob-a",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    });
+
+    await expect(deleteComposerPromptStash("task", "stash-image")).resolves.toEqual({
+      status: "cleanup-failed",
+      completed: "deleted"
+    });
+    expect(useTaskDraftStore.getState().drafts.task?.promptStash).toEqual([]);
   });
 });
 

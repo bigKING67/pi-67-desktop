@@ -8,6 +8,7 @@ import {
 import {
   isAgentHostRuntimePoisonedMessage,
   isAgentHostShutdownCompleteMessage,
+  type AgentHostLifecyclePhase,
   type AgentHostShutdownCompleteMessage,
   type AgentHostShutdownRequest
 } from "@pi67/protocol";
@@ -45,18 +46,14 @@ export interface AgentHostStopResult {
   extensionRequestsCancelled: number;
 }
 
-export type AgentHostSupervisorPhase =
-  | "idle"
-  | "starting"
-  | "running"
-  | "restart-scheduled"
-  | "failed"
-  | "stopping";
+export type AgentHostSupervisorPhase = AgentHostLifecyclePhase;
 
 export interface AgentHostSupervisorDiagnostics {
   phase: AgentHostSupervisorPhase;
   hostEpoch?: number;
+  processStartRequestedAt?: number;
   processStartedAt?: number;
+  lastSpawnDurationMs?: number;
   lastExit?: {
     at: number;
     code: number;
@@ -64,8 +61,10 @@ export interface AgentHostSupervisorDiagnostics {
     attempt?: number;
   };
   restartScheduledAt?: number;
+  restartCount: number;
   portHandoffCount: number;
   lastPortHandoffAt?: number;
+  poisonedRuntimeReplacementCount: number;
   poisonedRuntimeReplacementPending: boolean;
 }
 
@@ -88,11 +87,15 @@ export class AgentHostSupervisor {
   #lastHandoffKey: string | undefined;
   readonly #shutdownDeadlineMs: number;
   #phase: AgentHostSupervisorPhase = "idle";
+  #processStartRequestedAt: number | undefined;
   #processStartedAt: number | undefined;
+  #lastSpawnDurationMs: number | undefined;
   #lastExit: AgentHostSupervisorDiagnostics["lastExit"];
   #restartScheduledAt: number | undefined;
+  #restartCount = 0;
   #portHandoffCount = 0;
   #lastPortHandoffAt: number | undefined;
+  #poisonedRuntimeReplacementCount = 0;
 
   constructor(options: AgentHostSupervisorOptions) {
     this.#options = options;
@@ -103,11 +106,17 @@ export class AgentHostSupervisor {
     return {
       phase: this.#phase,
       ...(this.#identity ? { hostEpoch: this.#identity.hostEpoch } : {}),
+      ...(this.#processStartRequestedAt === undefined
+        ? {}
+        : { processStartRequestedAt: this.#processStartRequestedAt }),
       ...(this.#processStartedAt === undefined ? {} : { processStartedAt: this.#processStartedAt }),
+      ...(this.#lastSpawnDurationMs === undefined ? {} : { lastSpawnDurationMs: this.#lastSpawnDurationMs }),
       ...(this.#lastExit ? { lastExit: { ...this.#lastExit } } : {}),
       ...(this.#restartScheduledAt === undefined ? {} : { restartScheduledAt: this.#restartScheduledAt }),
+      restartCount: this.#restartCount,
       portHandoffCount: this.#portHandoffCount,
       ...(this.#lastPortHandoffAt === undefined ? {} : { lastPortHandoffAt: this.#lastPortHandoffAt }),
+      poisonedRuntimeReplacementCount: this.#poisonedRuntimeReplacementCount,
       poisonedRuntimeReplacementPending: this.#poisonedRuntimeTimer !== undefined
     };
   }
@@ -209,6 +218,7 @@ export class AgentHostSupervisor {
     if (this.#agentHost || this.#restartTimer || this.#stopping) return;
     const identity = { hostEpoch: ++this.#nextHostEpoch, hostInstanceId: randomUUID() };
     this.#phase = "starting";
+    this.#processStartRequestedAt = Date.now();
     this.#processStartedAt = undefined;
     this.#restartScheduledAt = undefined;
     let host: UtilityProcess;
@@ -232,6 +242,10 @@ export class AgentHostSupervisor {
       if (this.#agentHost !== host || this.#stopping) return;
       this.#phase = "running";
       this.#processStartedAt = Date.now();
+      this.#lastSpawnDurationMs = Math.max(
+        0,
+        this.#processStartedAt - (this.#processStartRequestedAt ?? this.#processStartedAt)
+      );
       this.attachPort();
     });
     host.on("message", (message) => this.#handleMessage(host, message));
@@ -267,10 +281,11 @@ export class AgentHostSupervisor {
       return;
     }
 
-    const restart = planAgentHostRestart(this.#restartHistory, Date.now());
+    const exitedAt = Date.now();
+    const restart = planAgentHostRestart(this.#restartHistory, exitedAt);
     this.#restartHistory = restart.history;
     this.#lastExit = {
-      at: Date.now(),
+      at: exitedAt,
       code,
       recoverable: restart.recoverable,
       ...(restart.recoverable ? { attempt: restart.attempt } : {})
@@ -282,6 +297,7 @@ export class AgentHostSupervisor {
       return;
     }
 
+    this.#restartCount += 1;
     window?.webContents.send("pi67:agent-host-failed", {
       code,
       recoverable: true,
@@ -311,6 +327,7 @@ export class AgentHostSupervisor {
       || this.#poisonedRuntimeTimer
       || !isAgentHostRuntimePoisonedMessage(message)
     ) return;
+    this.#poisonedRuntimeReplacementCount += 1;
     this.#poisonedRuntimeTimer = setTimeout(() => {
       this.#poisonedRuntimeTimer = undefined;
       if (this.#agentHost === host && !this.#stopping) host.kill();

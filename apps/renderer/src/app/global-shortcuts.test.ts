@@ -5,10 +5,12 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 import { subscribeConversationFind } from "../search/conversation-find-events.js";
 import {
+  desktopActionAllowedInContexts,
   handleGlobalShortcut,
   installGlobalShortcuts,
   toggleRendererNavigation
 } from "./global-shortcuts.js";
+import { desktopAction } from "./desktop-action-registry.js";
 
 vi.mock("../session/session-lifecycle-controller.js", () => ({
   beginRendererSessionIntent: vi.fn()
@@ -58,6 +60,26 @@ describe("global shortcuts", () => {
     expect(palette.preventDefault).toHaveBeenCalledOnce();
     expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({ kind: "settings" });
     expect(useShellStore.getState().commandPaletteOpen).toBe(true);
+  });
+
+  it("keeps global surfaces reachable while a Workspace is open", () => {
+    useAppStore.setState({ workspace: "/work/latest" });
+    const settings = shortcut(",");
+    const palette = shortcut("k");
+    const help = shortcut("/");
+
+    handleGlobalShortcut(settings.event);
+    handleGlobalShortcut(palette.event);
+    handleGlobalShortcut(help.event);
+
+    expect(settings.preventDefault).toHaveBeenCalledOnce();
+    expect(palette.preventDefault).toHaveBeenCalledOnce();
+    expect(help.preventDefault).toHaveBeenCalledOnce();
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({ kind: "settings" });
+    expect(useShellStore.getState()).toMatchObject({
+      commandPaletteOpen: true,
+      keyboardShortcutsDialogOpen: true
+    });
   });
 
   it("opens keyboard help without Workspace authority", () => {
@@ -125,16 +147,52 @@ describe("global shortcuts", () => {
     expect(owned.preventDefault).not.toHaveBeenCalled();
     expect(composing.preventDefault).not.toHaveBeenCalled();
   });
+
+  it("gates actions by the active surface and task lifecycle", () => {
+    expect(desktopActionAllowedInContexts(desktopAction("find-current-conversation"), {
+      surface: "settingsOpen",
+      lifecycle: "taskIdle"
+    })).toBe(false);
+    expect(desktopActionAllowedInContexts(desktopAction("command-palette"), {
+      surface: "settingsOpen",
+      lifecycle: "taskRunning"
+    })).toBe(true);
+    expect(desktopActionAllowedInContexts(desktopAction("new-session"), {
+      surface: "composerFocus",
+      lifecycle: "taskRunning"
+    })).toBe(true);
+    expect(desktopActionAllowedInContexts(desktopAction("new-session"), {
+      surface: "fileEditorFocus",
+      lifecycle: "taskIdle"
+    })).toBe(true);
+    expect(desktopActionAllowedInContexts(desktopAction("find-current-conversation"), {
+      surface: "composerFocus",
+      lifecycle: "taskIdle"
+    })).toBe(true);
+    expect(desktopActionAllowedInContexts(desktopAction("find-current-conversation"), {
+      surface: "fileEditorFocus",
+      lifecycle: "taskIdle"
+    })).toBe(false);
+  });
+
+  it("leaves Settings Cmd/Ctrl+F to the Settings search owner", () => {
+    rendererWorkbenchStore.setState({ selectedSurface: { kind: "settings" } });
+    useAppStore.setState({ workspace: "/work/latest" });
+    const find = shortcut("f");
+    handleGlobalShortcut(find.event);
+    expect(find.preventDefault).not.toHaveBeenCalled();
+  });
 });
 
 function shortcut(
   key: string,
-  overrides: Partial<Pick<KeyboardEvent, "ctrlKey" | "metaKey" | "shiftKey">> = {}
+  overrides: Partial<Pick<KeyboardEvent, "altKey" | "ctrlKey" | "metaKey" | "shiftKey">> = {}
 ) {
   const preventDefault = vi.fn();
   const event = {
     key,
     ctrlKey: true,
+    altKey: false,
     metaKey: false,
     shiftKey: false,
     preventDefault,

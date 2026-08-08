@@ -139,6 +139,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "session.nameByPath": strictObject({ path: PathSchema, mutation: SessionNameMutationSchema }),
   "conversation.pin": strictObject({ path: PathSchema, pinned: Type.Boolean() }),
   "conversation.archive": strictObject({ path: PathSchema, archived: Type.Boolean() }),
+  "conversation.snooze": strictObject({
+    path: PathSchema,
+    snoozedUntil: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))
+  }),
   "conversation.reorderPinned": strictObject({
     paths: Type.Array(PathSchema, { minItems: 1, maxItems: MAX_PINNED_CONVERSATION_ORDER_ITEMS })
   }),

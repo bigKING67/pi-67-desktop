@@ -82,7 +82,7 @@ describe("first-party web tools", () => {
     expect(result.urls).toEqual(["https://example.test/source"]);
   });
 
-  it("uses Bearer for Responses and refuses silent Exa resend after a sent request fails", async () => {
+  it("uses Bearer for Responses and never calls an alternate provider after a sent request fails", async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
       expect(headers.get("authorization")).toBe("Bearer fixture-key");
@@ -99,49 +99,25 @@ describe("first-party web tools", () => {
     await expect(executeNativeSearch(fetchImpl as typeof fetch, route, "gpt-5.5", "fixture-key", undefined, {
       queries: ["current answer"],
       numResults: 5
-    })).rejects.toThrow(/not resent to Exa/iu);
+    })).rejects.toThrow(/no alternate search provider was called/iu);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("runs a bounded Streamable HTTP MCP lifecycle for each Exa fallback search", async () => {
+  it("calls only the selected model's declared native route", async () => {
     const controller = new AbortController();
-    const methods: string[] = [];
-    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      expect(requestUrl).toBe("https://api.sciencetoken.ai/proxy/openai/v1/responses");
       expect(init?.signal).toBe(controller.signal);
-      const request = requestBody(init) as { id?: string; method: string; params?: Record<string, unknown> };
-      const headers = new Headers(init?.headers);
-      methods.push(request.method);
-      if (request.method === "initialize") {
-        expect(headers.get("mcp-session-id")).toBeNull();
-        expect(request.params).toMatchObject({
-          protocolVersion: "2025-06-18",
-          capabilities: {},
-          clientInfo: { name: "pi-67-desktop" }
-        });
-        return jsonResponse({
-          jsonrpc: "2.0",
-          id: request.id,
-          result: { protocolVersion: "2025-06-18", capabilities: {}, serverInfo: { name: "exa" } }
-        }, { "mcp-session-id": "exa-session-1" });
-      }
-      expect(headers.get("mcp-session-id")).toBe("exa-session-1");
-      expect(headers.get("mcp-protocol-version")).toBe("2025-06-18");
-      if (request.method === "notifications/initialized") {
-        expect(request.id).toBeUndefined();
-        return new Response(null, { status: 202 });
-      }
-      expect(request.method).toBe("tools/call");
-      expect(request.params).toMatchObject({ name: "web_search_exa" });
-      const payload = JSON.stringify({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: {
-          content: [{ type: "text", text: "Current result https://example.test/source" }]
-        }
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer fixture-key");
+      expect(requestBody(init)).toMatchObject({
+        model: "gpt-5.5",
+        input: "current result",
+        tools: [{ type: "web_search" }]
       });
-      return new Response(`event: message\ndata: ${payload}\n\n`, {
-        status: 200,
-        headers: { "content-type": "text/event-stream" }
+      return jsonResponse({
+        output_text: "Current result",
+        output: [{ type: "web_search_call", action: { sources: [{ url: "https://example.test/source" }] } }]
       });
     });
 
@@ -149,46 +125,49 @@ describe("first-party web tools", () => {
       "web_search",
       { fetch: fetchImpl as typeof fetch, resolveAddresses: async () => ["93.184.216.34"] },
       { query: "current result", numResults: 3 },
-      controller.signal
+      controller.signal,
+      {
+        model: {
+          provider: "groland",
+          id: "gpt-5.5",
+          api: "openai-responses",
+          baseUrl: "https://api.sciencetoken.ai/proxy/openai/v1"
+        },
+        auth: { ok: true, apiKey: "fixture-key" }
+      }
     );
 
-    expect(methods).toEqual(["initialize", "notifications/initialized", "tools/call"]);
+    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(result.content[0]).toMatchObject({ type: "text", text: expect.stringContaining("Current result") });
   });
 
-  it("projects explicit Exa lifecycle errors before tools/call", async () => {
-    const missingSessionFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      const request = requestBody(init) as { id?: string };
-      return jsonResponse({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: { protocolVersion: "2025-06-18", capabilities: {} }
-      });
-    });
-    await expect(executeTool(
-      "web_search",
-      { fetch: missingSessionFetch as typeof fetch, resolveAddresses: async () => ["93.184.216.34"] },
-      { query: "current result" }
-    )).rejects.toThrow(/no valid mcp-session-id/iu);
-    expect(missingSessionFetch).toHaveBeenCalledOnce();
-
-    const notificationFetch = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      const request = requestBody(init) as { id?: string; method: string };
-      if (request.method === "initialize") {
-        return jsonResponse({
-          jsonrpc: "2.0",
-          id: request.id,
-          result: { protocolVersion: "2025-06-18", capabilities: {} }
-        }, { "mcp-session-id": "exa-session-2" });
-      }
-      return new Response("rejected", { status: 409 });
-    });
-    await expect(executeTool(
-      "web_search",
-      { fetch: notificationFetch as typeof fetch, resolveAddresses: async () => ["93.184.216.34"] },
-      { query: "current result" }
-    )).rejects.toThrow(/EXA_MCP_INITIALIZED_FAILED: HTTP 409/iu);
-    expect(notificationFetch).toHaveBeenCalledTimes(2);
+  it("fails closed before network access when no native route or credential is declared", async () => {
+    const fetchImpl = vi.fn();
+    const dependencies = {
+      fetch: fetchImpl as typeof fetch,
+      resolveAddresses: async () => ["93.184.216.34"]
+    };
+    await expect(executeTool("web_search", dependencies, { query: "current result" }))
+      .rejects.toThrow(/NATIVE_WEB_SEARCH_UNAVAILABLE/iu);
+    await expect(executeTool("web_search", dependencies, { query: "current result" }, undefined, {
+      model: {
+        provider: "deepseek",
+        id: "deepseek-v4-pro",
+        api: "openai-completions",
+        baseUrl: "https://api.deepseek.com/v1"
+      },
+      auth: { ok: true, apiKey: "unused" }
+    })).rejects.toThrow(/NATIVE_WEB_SEARCH_UNAVAILABLE/iu);
+    await expect(executeTool("web_search", dependencies, { query: "current result" }, undefined, {
+      model: {
+        provider: "groland",
+        id: "claude-opus-4-6",
+        api: "anthropic-messages",
+        baseUrl: "https://api.sciencetoken.ai/proxy/anthropic"
+      },
+      auth: { ok: false }
+    })).rejects.toThrow(/NATIVE_WEB_SEARCH_CREDENTIAL_UNAVAILABLE/iu);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("re-resolves every redirect and rejects private, mapped, reserved, or empty DNS results", async () => {
@@ -271,11 +250,20 @@ async function executeTool(
   name: "web_search" | "fetch_content",
   dependencies: WebToolDependencies,
   input: Record<string, unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  context?: {
+    model: Record<string, unknown>;
+    auth: { ok: boolean; apiKey?: string };
+  }
 ) {
   const tool = createFirstPartyWebTools(dependencies).find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Missing ${name} Tool.`);
-  return tool.execute("test-tool-call", input, signal, undefined, { model: undefined } as never);
+  return tool.execute("test-tool-call", input, signal, undefined, {
+    model: context?.model,
+    modelRegistry: {
+      getApiKeyAndHeaders: vi.fn(async () => context?.auth ?? { ok: false })
+    }
+  } as never);
 }
 
 function jsonResponse(payload: unknown, headers?: Record<string, string>): Response {

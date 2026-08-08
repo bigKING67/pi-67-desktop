@@ -17,6 +17,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "session.nameByPath",
   "conversation.pin",
   "conversation.archive",
+  "conversation.snooze",
   "conversation.reorderPinned",
   "model.select",
   "model.setRuntimeKey",

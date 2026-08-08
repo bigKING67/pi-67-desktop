@@ -40,13 +40,18 @@ async function collectDiagnosticsExportRequest(): Promise<SupportDiagnosticsExpo
       [],
       { ackTimeoutMs: DIAGNOSTIC_EXPORT_ACK_TIMEOUT_MS }
     );
-    return { runtimeCollection: { status: "available" }, runtime };
+    return {
+      runtimeCollection: { status: "available" },
+      runtime,
+      renderer: agentConnectionController.diagnostics()
+    };
   } catch (error) {
     return {
       runtimeCollection: {
         status: "unavailable",
         failure: diagnosticsCollectionFailure(error)
-      }
+      },
+      renderer: agentConnectionController.diagnostics()
     };
   }
 }
@@ -66,6 +71,7 @@ export async function runRuntimeDoctor(): Promise<void> {
     collectHostDiagnostics(),
     window.pi67.system.getRecoverySnapshot()
   ]);
+  doctorStore.getState().completeRenderer(agentConnectionController.diagnostics());
 
   if (recoveryResult.status === "fulfilled") {
     doctorStore.getState().completeRecovery(recoveryResult.value);

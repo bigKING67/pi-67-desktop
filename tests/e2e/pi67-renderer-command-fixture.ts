@@ -8,9 +8,11 @@ import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
 import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import type { MockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
+import type { RuntimeDiagnostics } from "../../packages/protocol/src/index.js";
 
 interface MockCommandResponseFixture {
   fixtureExtensionCommands: unknown;
+  fixtureRuntimeDiagnostics: RuntimeDiagnostics;
   fixtureSessionCatalogStatus: FixtureSessionCatalogStatus;
 }
 
@@ -23,6 +25,7 @@ export type MockCommandResponseHandler = (
 
 export function installMockCommandResponseHandler({
   fixtureExtensionCommands,
+  fixtureRuntimeDiagnostics,
   fixtureSessionCatalogStatus
 }: MockCommandResponseFixture): void {
   const testWindow = window as FixtureWindow & {
@@ -122,6 +125,7 @@ export function installMockCommandResponseHandler({
     if (
       type === "session.nameByPath"
       || type === "conversation.pin"
+      || type === "conversation.snooze"
       || type === "conversation.archive"
     ) return { revision: sessionCatalogPage.revision + 1 };
     if (type === "message.search") return searchConversation(current, payload);
@@ -248,30 +252,9 @@ export function installMockCommandResponseHandler({
       ]
     };
     if (type === "diagnostics.collect") return {
+      ...fixtureRuntimeDiagnostics,
       generatedAt: Date.now(),
-      application: "π",
-      piSdkVersion: "0.81.1",
-      platform: "darwin",
-      architecture: "arm64",
-      node: "24.18.0",
-      workspace: {
-        pathHash: "a".repeat(64),
-        pathKind: "posix"
-      },
-      sessionConfigured: true,
-      sessionFileConfigured: true,
-      model: "openai/gpt-test",
-      extensionCount: 0,
-      extensionErrors: [],
-      host: {
-        hostEpoch,
-        taskCount: 1,
-        liveRuntimeCount: 1,
-        activeOperationCount: 0,
-        writerLeases: { activeCount: 1, pendingCount: 0, compromised: false },
-        workspaces: [],
-        workspacesTruncated: false
-      }
+      host: { ...fixtureRuntimeDiagnostics.host!, hostEpoch }
     };
     const controlCommand = applyMockSessionControlCommand(type, payload, current.snapshot);
     if (controlCommand) {

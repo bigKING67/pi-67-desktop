@@ -15,6 +15,7 @@ export async function captureGitProcess(options: {
   outputLimitBytes: number;
   signal: AbortSignal;
   platform: NodeJS.Platform;
+  acceptedExitCodes?: readonly number[];
 }): Promise<string> {
   const stdout: Buffer[] = [];
   const stderr: Buffer[] = [];
@@ -63,7 +64,8 @@ export async function captureGitProcess(options: {
 
   try {
     const result = await Promise.race([closePromise, outputLimitPromise, timeoutPromise, abortPromise]);
-    if (result.code !== 0) {
+    const acceptedExitCodes = options.acceptedExitCodes ?? [0];
+    if (result.code === null || !acceptedExitCodes.includes(result.code)) {
       const stderrText = Buffer.concat(stderr).toString("utf8");
       const code = options.stage === "repository-root" && /not a git repository/iu.test(stderrText)
         ? "not-a-repository"

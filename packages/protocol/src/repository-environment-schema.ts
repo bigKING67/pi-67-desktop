@@ -1,4 +1,6 @@
-import { MAX_REPOSITORY_WORKTREES } from "@pi67/domain";
+import {
+  MAX_REPOSITORY_WORKTREES
+} from "@pi67/domain";
 import { Type, type TProperties } from "./typebox-schema.js";
 
 const WorkspaceIdSchema = Type.String({
@@ -58,6 +60,12 @@ const WorktreesSchema = Type.Array(WorktreeObservationSchema, { maxItems: MAX_RE
 
 export const RepositoryEnvironmentInspectionRequestSchema = strictObject({
   workspaceId: WorkspaceIdSchema
+});
+
+export const RepositoryChangeDetailRequestSchema = strictObject({
+  workspaceId: WorkspaceIdSchema,
+  revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  changeId: Type.String({ pattern: "^chg_[0-9a-f]{32}$" })
 });
 
 export const RepositoryEnvironmentSnapshotSchema = Type.Union([

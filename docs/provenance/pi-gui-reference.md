@@ -91,12 +91,16 @@ Pi-67 的实现不是源码移植：
 - 真正 Workspace/Session 使用的 Task ModelRuntime 也在 Agent Host 内采用 4 秒离线创建预算；
   超时返回 `RUNTIME_NOT_READY`/`session-model-runtime`，重试重新创建，迟到结果不进入 Task 权威状态。
 - `apps/renderer/src/changes/ChangesPanel.tsx` 重新实现 `pi-gui` 的修改列表、选择和 Inline Diff
-  产品闭环，但只消费既有 `WorkspaceChangesProjection`。Pi-67 保留 Host epoch、物理 Session
-  identity、Session generation 和 projection revision 栅栏，并对 Renderer Patch DOM 另设 600 行
-  上限。`write` 没有 before-version 时只显示规模，不补造 Diff。
-- 审阅了 `apps/desktop/electron/app-store-diff.ts`，但明确没有吸收其 Renderer-facing Git status、
-  Git diff 或 Stage 路径。Pi-67 Renderer 不获得 Git/文件系统权限，完整 Git/Workspace Diff 和
-  Stage 仍不在本次数据合同内。
+  产品闭环，并明确拆为 `会话修改` 与 `工作区变更`。前者只消费既有
+  `WorkspaceChangesProjection`，保留 Host epoch、物理 Session identity、Session generation 和
+  projection revision 栅栏；`write` 没有 before-version 时只显示规模，不补造 Diff。
+- 审阅 `apps/desktop/electron/app-store-diff.ts` 后只吸收了 read-only Git status/diff 的产品闭环，
+  没有复制其进程或权限边界。Pi-67 由 Electron Main 从 Workbench 权威 Workspace 解析 cwd，使用
+  packaged private Git、预算、revision/status fingerprint 和 opaque `changeId` 重做；Renderer 不
+  获得 Git/文件系统权限，也不能提交 path/cwd。Stage、Discard、Commit、Push 和 PR 不在合同内。
+- Composer context chips、可配置快捷键、Command Palette 会话正文搜索和 Conversation Snooze
+  继续吸收 pi-gui 的清晰状态与键盘路径，但分别使用 Pi-67 的 opaque attachment、action registry、
+  physical Session identity 和 disposable Catalog 边界重做。
 
 ## 源文件证据
 

@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { MessageSquareText, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
@@ -21,6 +21,7 @@ import {
 import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { toggleRendererNavigation } from "../app/global-shortcuts.js";
+import { useDesktopShortcutRevision } from "../app/desktop-shortcut-preferences.js";
 import {
   buildPaletteActions,
   paletteAvailability
@@ -45,9 +46,13 @@ import {
 import { CommandPaletteResults, paletteOptionId } from "./CommandPaletteResults.js";
 import { usePaletteExtensionCommands } from "./use-palette-extension-commands.js";
 import { usePaletteSessions } from "./use-palette-sessions.js";
+import { usePaletteMessageSearch } from "./use-palette-message-search.js";
+import { openPaletteMessageResult } from "./palette-message-result.js";
+import { formatRelativeTime } from "../localization/date-time.js";
 import styles from "./CommandPalette.module.css";
 
 export function CommandPalette() {
+  const shortcutRevision = useDesktopShortcutRevision();
   const open = useShellStore((state) => state.commandPaletteOpen);
   const setOpen = useShellStore((state) => state.setCommandPaletteOpen);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
@@ -64,9 +69,11 @@ export function CommandPalette() {
   const [selectedKey, setSelectedKey] = useState<string>();
   const [keyboardNavigationActive, setKeyboardNavigationActive] = useState(false);
   const sessionSearch = usePaletteSessions({ open, connected, hostEpoch, query });
+  const messageSearch = usePaletteMessageSearch({ open, connected, hostEpoch, query });
   const extensionCommands = usePaletteExtensionCommands({ open, connected, hostEpoch });
 
-  const actions = useMemo(() => buildPaletteActions({
+  const actions = useMemo(() => [
+    ...buildPaletteActions({
     sessions: sessionSearch.sessions,
     extensionCommands: extensionCommands.commands,
     activeSessionFileIdentity,
@@ -121,7 +128,17 @@ export function CommandPalette() {
       "find-workspace-conversations": () => requestConversationFind("workspace"),
       "keyboard-shortcuts": () => useShellStore.getState().setKeyboardShortcutsDialogOpen(true)
     }
-  }), [
+    }),
+    ...messageSearch.items.map((item): PaletteAction => ({
+      id: `message:${item.sessionFileIdentity}:${item.messageId}`,
+      group: "messages",
+      label: item.sessionName,
+      detail: `${item.role === "user" ? "用户" : "Pi"}${item.createdAt === undefined ? "" : ` · ${formatRelativeTime(item.createdAt)}`} · ${item.snippet}`,
+      keywords: `${item.snippet} ${item.sessionName} ${item.role}`,
+      icon: MessageSquareText,
+      run: () => openPaletteMessageResult(item)
+    }))
+  ], [
     activeSessionFileIdentity,
     connected,
     extensionCommands.commands,
@@ -129,10 +146,12 @@ export function CommandPalette() {
     models,
     sessionReady,
     sessionSearch.sessions,
+    messageSearch.items,
     sessionTransitionPending,
     setCredentialDialogOpen,
     setUpdateDialogOpen,
-    workspace
+    workspace,
+    shortcutRevision
   ]);
 
   const projection = useMemo(
@@ -168,7 +187,8 @@ export function CommandPalette() {
     projection,
     query,
     sessionCount: sessionSearch.sessions.length,
-    extensionCount: extensionCommands.commands.length
+    extensionCount: extensionCommands.commands.length,
+    messageSearch
   });
 
   return (
@@ -273,7 +293,11 @@ function paletteStatus(options: {
   query: string;
   sessionCount: number;
   extensionCount: number;
+  messageSearch: ReturnType<typeof usePaletteMessageSearch>;
 }): string {
+  if (options.messageSearch.status === "failed") return options.messageSearch.error ?? "对话正文搜索失败";
+  if (options.messageSearch.status === "loading") return "正在搜索对话正文…";
+  if (options.messageSearch.incomplete) return "对话正文结果已按本地读取预算截断";
   if (options.sessionSearch.status === "failed") return options.sessionSearch.error;
   if (options.extensionStatus === "failed") return messages.commandPalette.extensionLoadFailedWithFallback;
   if (options.sessionSearch.status === "loading") return messages.commandPalette.searchingSessions;

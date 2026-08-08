@@ -2,12 +2,14 @@ import { MAX_SESSION_CATALOG_PAGE_JSON_BYTES } from "@pi67/domain";
 import { describe, expect, it, vi } from "vitest";
 import {
   createSessionCatalog,
-  type SessionCatalogContext,
   type SessionCatalogDiscoveryResult
 } from "./session-catalog.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  sessionCatalogContext as makeContext,
+  sessionCatalogDiscovery as discovery,
+  sessionCatalogRecord as record
+} from "./session-catalog-test-fixtures.js";
 import type {
-  SessionCatalogRecord,
   SqliteCatalogOpenResult,
   SqliteCatalogState,
   SqliteSessionCatalog
@@ -396,64 +398,4 @@ describe("Session Catalog orchestration", () => {
     expect(onChanged).not.toHaveBeenCalled();
   });
 
-  it("reorders the exact pinned Workspace permutation and rejects stale orders", async () => {
-    const changed = vi.fn();
-    const catalog = createSessionCatalog({ now: () => 50_000, onChanged: changed });
-    const context = makeContext("source", async () => discovery([
-      record(1, { pinnedAt: 30_000 }),
-      record(2, { pinnedAt: 20_000 }),
-      record(3, { pinnedAt: 10_000 }),
-      record(4)
-    ]));
-    await catalog.reconcile(context);
-    changed.mockClear();
-
-    const revision = await catalog.reorderPinned([
-      "/session-3.jsonl",
-      "/session-1.jsonl",
-      "/session-2.jsonl"
-    ], context);
-
-    const page = await catalog.query({ scope: "workspace", limit: 10 }, context);
-    expect(page.revision).toBe(revision);
-    expect(page.items.slice(0, 3).map((item) => item.path)).toEqual([
-      "/session-3.jsonl",
-      "/session-1.jsonl",
-      "/session-2.jsonl"
-    ]);
-    expect(changed).toHaveBeenCalledOnce();
-    expect(changed).toHaveBeenCalledWith({ revision, reason: "conversation-organized" });
-
-    await expect(catalog.reorderPinned([
-      "/session-3.jsonl",
-      "/session-1.jsonl"
-    ], context)).rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
-    await catalog.dispose();
-  });
 });
-
-function makeContext(
-  sourceKey: string,
-  discover: () => Promise<SessionCatalogDiscoveryResult>,
-  workspaceCwd = "/workspace"
-): SessionCatalogContext {
-  return { sourceKey, workspaceCwd, discover };
-}
-
-function discovery(records: SessionCatalogRecord[]): SessionCatalogDiscoveryResult {
-  return { records, incomplete: false, skippedCount: 0 };
-}
-
-function record(index: number, overrides: Partial<SessionCatalogRecord> = {}): SessionCatalogRecord {
-  return {
-    fileIdentity: `session-file-fixture-${index}`,
-    id: `id-${index}`,
-    path: `/session-${index}.jsonl`,
-    cwd: "/workspace",
-    cwdKey: normalizeSessionCatalogPathIdentity("/workspace"),
-    explicitName: `Session ${index}`,
-    modifiedAt: 10_000 - index,
-    messageCount: index,
-    ...overrides
-  };
-}

@@ -5,6 +5,9 @@ import {
   MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
   MAX_COMPOSER_WORKSPACE_FILE_REFS,
   MAX_PROMPT_STASH_ITEMS,
+  MAX_PROMPT_STASH_IMAGE_BYTES_PER_ITEM,
+  MAX_PROMPT_STASH_IMAGE_BYTES_PER_TASK,
+  MAX_PROMPT_STASH_IMAGE_BYTES_TOTAL,
   MAX_PROMPT_STASH_TEXT_BYTES_TOTAL,
   MAX_WORKSPACE_FILE_PATH_CHARS,
   type ComposerDraftPersistedState,
@@ -34,6 +37,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
   const identities = new Set<string>();
   let totalTextBytes = 0;
   let totalPromptStashBytes = 0;
+  let totalPromptStashImageBytes = 0;
   for (const candidate of value.drafts) {
     if (!isRecordWithAllowedKeys(
       candidate,
@@ -49,12 +53,19 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
     if (candidate.text.length === 0 && !promptStash?.length) return undefined;
     const textBytes = Buffer.byteLength(candidate.text, "utf8");
     const stashBytes = (promptStash ?? []).reduce((total, item) => total + Buffer.byteLength(item.text, "utf8"), 0);
+    const stashImageBytes = (promptStash ?? []).reduce(
+      (total, item) => total + (item.attachments ?? []).reduce((sum, image) => sum + image.byteLength, 0),
+      0
+    );
     totalTextBytes += textBytes + stashBytes;
     totalPromptStashBytes += stashBytes;
+    totalPromptStashImageBytes += stashImageBytes;
     if (
       textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES
       || totalTextBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL
       || totalPromptStashBytes > MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
+      || stashImageBytes > MAX_PROMPT_STASH_IMAGE_BYTES_PER_TASK
+      || totalPromptStashImageBytes > MAX_PROMPT_STASH_IMAGE_BYTES_TOTAL
       || (candidate.streamBehavior !== "steer" && candidate.streamBehavior !== "followUp")
       || (
         candidate.environmentIntent !== undefined
@@ -132,25 +143,78 @@ function parsePromptStash(value: unknown): ComposerDraftRecord["promptStash"] | 
   const items: NonNullable<ComposerDraftRecord["promptStash"]> = [];
   const ids = new Set<string>();
   let totalBytes = 0;
+  let totalImageBytes = 0;
   for (const candidate of value) {
-    if (!isRecord(candidate) || !hasExactKeys(candidate, ["id", "text", "createdAt"])) return undefined;
+    if (
+      !isRecordWithAllowedKeys(candidate, ["id", "text", "createdAt", "attachments"], ["id", "text", "createdAt"])
+    ) return undefined;
+    const attachments = parsePromptStashImages(candidate.attachments);
+    if (candidate.attachments !== undefined && !attachments) return undefined;
     if (
       !isOpaqueFileToken(candidate.id)
       || typeof candidate.text !== "string"
-      || candidate.text.trim().length === 0
+      || (candidate.text.trim().length === 0 && (attachments?.length ?? 0) === 0)
       || !Number.isSafeInteger(candidate.createdAt)
       || Number(candidate.createdAt) < 0
       || ids.has(candidate.id)
     ) return undefined;
     totalBytes += Buffer.byteLength(candidate.text, "utf8");
+    const itemImageBytes = (attachments ?? []).reduce((total, image) => total + image.byteLength, 0);
+    totalImageBytes += itemImageBytes;
     if (
       Buffer.byteLength(candidate.text, "utf8") > MAX_COMPOSER_DRAFT_TEXT_BYTES
       || totalBytes > MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
+      || itemImageBytes > MAX_PROMPT_STASH_IMAGE_BYTES_PER_ITEM
+      || totalImageBytes > MAX_PROMPT_STASH_IMAGE_BYTES_PER_TASK
     ) return undefined;
     ids.add(candidate.id);
-    items.push({ id: candidate.id, text: candidate.text, createdAt: Number(candidate.createdAt) });
+    items.push({
+      id: candidate.id,
+      text: candidate.text,
+      createdAt: Number(candidate.createdAt),
+      ...(attachments?.length ? { attachments } : {})
+    });
   }
   return items;
+}
+
+function parsePromptStashImages(
+  value: unknown
+): NonNullable<NonNullable<ComposerDraftRecord["promptStash"]>[number]["attachments"]> | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length === 0 || value.length > 20) return undefined;
+  const images: NonNullable<NonNullable<ComposerDraftRecord["promptStash"]>[number]["attachments"]> = [];
+  const ids = new Set<string>();
+  let bytes = 0;
+  for (const candidate of value) {
+    if (!isRecord(candidate) || !hasExactKeys(candidate, ["blobId", "name", "mimeType", "byteLength", "kind"])) {
+      return undefined;
+    }
+    if (
+      !isOpaqueFileToken(candidate.blobId)
+      || ids.has(candidate.blobId)
+      || typeof candidate.name !== "string"
+      || candidate.name.length === 0
+      || candidate.name.length > 1_024
+      || candidate.name.includes("/")
+      || candidate.name.includes("\\")
+      || !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(String(candidate.mimeType))
+      || !Number.isSafeInteger(candidate.byteLength)
+      || Number(candidate.byteLength) < 0
+      || candidate.kind !== "image"
+    ) return undefined;
+    bytes += Number(candidate.byteLength);
+    if (bytes > MAX_PROMPT_STASH_IMAGE_BYTES_PER_ITEM) return undefined;
+    ids.add(candidate.blobId);
+    images.push({
+      blobId: candidate.blobId,
+      name: candidate.name,
+      mimeType: candidate.mimeType as (typeof images)[number]["mimeType"],
+      byteLength: Number(candidate.byteLength),
+      kind: "image"
+    });
+  }
+  return images;
 }
 
 function parseWorkspaceFileReferences(value: unknown): ComposerDraftRecord["workspaceFiles"] | undefined {

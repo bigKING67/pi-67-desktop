@@ -21,7 +21,6 @@ import {
 
 export const DESKTOP_TOOL_ROUTING_EXTENSION_PATH = "<inline:pi67-desktop-tool-routing>";
 
-const PI_WEB_ACCESS_SOURCE_PATTERN = /^npm:pi-web-access(?:@|$)/u;
 const MAX_TOOL_NAME_CHARS = 128;
 
 type ToolInfo = ReturnType<AgentSession["getAllTools"]>[number];
@@ -113,13 +112,13 @@ export function createDesktopToolRoutingExtension(): InlineExtension {
     name: "pi67-desktop-tool-routing",
     hidden: true,
     factory: (pi: ExtensionAPI) => {
-      const webSearchCalls = new Map<string, { automaticProvider: boolean }>();
-      let searchRoutingExhausted = false;
+      const webSearchCalls = new Set<string>();
+      let nativeSearchFailed = false;
       let recoveryFetchStarted = false;
 
       pi.on("before_agent_start", (event) => {
         webSearchCalls.clear();
-        searchRoutingExhausted = false;
+        nativeSearchFailed = false;
         recoveryFetchStarted = false;
         const activeTools = getActiveToolNames(pi);
         const guidance = createToolRoutingGuidance(pi, activeTools);
@@ -127,48 +126,41 @@ export function createDesktopToolRoutingExtension(): InlineExtension {
       });
 
       pi.on("tool_call", (event) => {
-        if (searchRoutingExhausted && isCredentialConfigRead(event.toolName, event.input)) {
+        if (nativeSearchFailed && isCredentialConfigRead(event.toolName, event.input)) {
           return {
             block: true,
-            reason: "自动搜索路由已耗尽；不要读取可能包含凭据的 web-search.json。请说明需要配置搜索 Provider。"
+            reason: "当前模型的原生搜索已经失败；不要读取可能包含凭据的旧 web-search.json，也不要切换搜索 Provider。"
           };
         }
-        if (searchRoutingExhausted && isVerifiedWebFetchCall(pi, event.toolName)) {
+        if (nativeSearchFailed && isVerifiedWebFetchCall(pi, event.toolName)) {
           if (recoveryFetchStarted) {
             return {
               block: true,
-              reason: "自动搜索路由已耗尽，本轮已尝试一次已知 URL 抓取；不要继续变换 URL 或重复抓取。"
+              reason: "原生搜索失败后，本轮已尝试一次已知 URL 抓取；不要继续变换 URL 或重复抓取。"
             };
           }
           recoveryFetchStarted = true;
           return undefined;
         }
         if (!isVerifiedWebSearchCall(pi, event.toolName)) return undefined;
-        if (searchRoutingExhausted) {
+        if (nativeSearchFailed) {
           return {
             block: true,
-            reason: "自动搜索已经检查并耗尽当前可用 Provider；不要逐个试探未配置 Provider。已知准确 URL 时使用一次 fetch_content，否则请说明需要配置搜索 Provider。"
+            reason: "当前模型的原生搜索已经失败；不要切换 Provider 或重复查询。已知准确 URL 时只使用一次 fetch_content，否则请说明原生搜索错误。"
           };
         }
-        const input = recordOrEmpty(event.input);
-        const provider = optionalString(input, "provider");
-        webSearchCalls.set(event.toolCallId, {
-          automaticProvider: provider === undefined || provider.toLocaleLowerCase("en-US") === "auto"
-        });
+        webSearchCalls.add(event.toolCallId);
         return undefined;
       });
 
       pi.on("message_end", (event) => {
         const message = event.message;
         if (message.role === "toolResult") {
-          const searchCall = webSearchCalls.get(message.toolCallId);
-          webSearchCalls.delete(message.toolCallId);
+          const searchCall = webSearchCalls.delete(message.toolCallId);
           if (searchCall) {
-            const normalizedFailure = normalizeWebSearchFailure(message.content, searchCall.automaticProvider);
+            const normalizedFailure = normalizeWebSearchFailure(message.content);
             if (normalizedFailure) {
-              if (searchCall.automaticProvider && isProviderRoutingFailure(message.content)) {
-                searchRoutingExhausted = true;
-              }
+              nativeSearchFailed = true;
               return {
                 message: {
                   ...message,
@@ -200,12 +192,12 @@ export function createDesktopToolRoutingExtension(): InlineExtension {
 
       pi.on("agent_end", () => {
         webSearchCalls.clear();
-        searchRoutingExhausted = false;
+        nativeSearchFailed = false;
         recoveryFetchStarted = false;
       });
       pi.on("session_shutdown", () => {
         webSearchCalls.clear();
-        searchRoutingExhausted = false;
+        nativeSearchFailed = false;
         recoveryFetchStarted = false;
       });
     }
@@ -277,7 +269,7 @@ function createToolRoutingGuidance(
       : undefined,
     piFffGuidance,
     activeTools.has("WebSearch")
-      ? "For current web lookups, prefer `web_search`; the `WebSearch` alias is forwarded to it with `workflow: \"none\"` by default. One automatic `web_search` call already checks the configured and available providers. If it reports that routing is exhausted or a provider is unconfigured, do not probe Brave, Tavily, OpenAI, SearXNG, or other named providers one by one, and do not inspect web-search.json because it may contain credentials. Use one batched `fetch_content` call only when exact URLs are already known; otherwise explain the missing search configuration."
+      ? "For current web lookups, prefer `web_search`; the `WebSearch` alias is forwarded to it with `workflow: \"none\"` by default. The selected model decides whether to call its declared native search route. If that call fails, do not switch providers, repeat the query, or inspect legacy web-search.json because it may contain credentials. Use one batched `fetch_content` call only when exact URLs are already known; otherwise report the native search failure."
       : undefined
   ].filter((line): line is string => line !== undefined).join("\n");
 }
@@ -344,29 +336,15 @@ function isCredentialConfigRead(toolName: string, input: unknown): boolean {
   return path !== undefined && /(?:^|[/\\])\.pi[/\\]web-search\.json$/u.test(path);
 }
 
-function isProviderRoutingFailure(content: ToolResultMessage["content"]): boolean {
-  return content.some((part) => part.type === "text" && (
-    /Auto provider search failed/iu.test(part.text)
-    || /No search provider available/iu.test(part.text)
-    || /Configured search routing exhausted/iu.test(part.text)
-  ));
-}
-
 function normalizeWebSearchFailure(
-  content: ToolResultMessage["content"],
-  automaticProvider: boolean
+  content: ToolResultMessage["content"]
 ): ToolResultMessage["content"] | undefined {
   const firstTextIndex = content.findIndex((part) => part.type === "text");
   if (firstTextIndex < 0) return undefined;
   const first = content[firstTextIndex];
   const text = first?.type === "text" ? first.text : undefined;
   if (!text || !/^Error:\s/iu.test(text)) return undefined;
-  const providerFailure = /(?:provider search failed|provider available|API key not found|web search unavailable|base URL is invalid|rate limit|routing exhausted)/iu.test(text);
-  const recovery = providerFailure
-    ? automaticProvider
-      ? "Pi Desktop：自动搜索已经检查了当前可用 Provider。不要再逐个试探未配置的 Provider；已知准确 URL 时只调用一次 fetch_content，否则请说明需要配置搜索 Provider。"
-      : "Pi Desktop：指定的搜索 Provider 当前不可用。不要继续轮询其他未配置 Provider；已知准确 URL 时只调用一次 fetch_content，否则请说明需要配置搜索 Provider。"
-    : "Pi Desktop：本次网页搜索调用失败。请根据错误修正参数，不要原样重复调用。";
+  const recovery = "Pi Desktop：当前模型的原生搜索调用失败。不要切换 Provider 或重复查询；已知准确 URL 时只调用一次 fetch_content，否则请直接说明原生搜索错误。";
   return content.map((part, index) => index === firstTextIndex
     ? { ...part, text: `${text.trimEnd()}\n\n${recovery}` }
     : part);
@@ -410,15 +388,10 @@ function uniqueToolInfo(tools: readonly ToolInfo[], name: string): ToolInfo | un
 
 function isExpectedCanonicalSource(name: CanonicalToolName, tool: ToolInfo): boolean {
   if (name === "web_search" || name === "fetch_content") {
-    return (
-      tool.sourceInfo.source === "sdk"
+    return tool.sourceInfo.source === "sdk"
       && tool.sourceInfo.path === `<sdk:${name}>`
       && tool.sourceInfo.scope === "temporary"
-      && tool.sourceInfo.origin === "top-level"
-    ) || (
-      tool.sourceInfo.origin === "package"
-      && PI_WEB_ACCESS_SOURCE_PATTERN.test(tool.sourceInfo.source)
-    );
+      && tool.sourceInfo.origin === "top-level";
   }
   return tool.sourceInfo.source === "builtin"
     && tool.sourceInfo.path === `<builtin:${name}>`

@@ -3,11 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
-  selectSessionGeneration,
-  selectSessionFileIdentity,
-  selectSessionId,
-  selectInteractionMode,
-  selectSessionModels
+  selectInteractionMode, selectSessionFileIdentity, selectSessionGeneration, selectSessionId, selectSessionModels
 } from "../session/session-projection-selectors.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
 import { subscribeToComposerPrefill } from "./composer-events.js";
@@ -36,10 +32,7 @@ import {
   slashQueryFromDraft
 } from "./composer-slash-commands.js";
 import { useComposerSlashCatalog } from "./use-composer-slash-catalog.js";
-import {
-  executePiDesktopAction,
-  type PiDesktopActionContext
-} from "../pi-actions/pi-desktop-actions.js";
+import { executePiDesktopAction, type PiDesktopActionContext } from "../pi-actions/pi-desktop-actions.js";
 import { submitRendererNewSessionIntent } from "../session/new-session-intent-controller.js";
 import { setRendererSessionInteractionMode } from "../session/session-plan-controller.js";
 import {
@@ -47,10 +40,12 @@ import {
   insertComposerFileMention,
   insertComposerFileMentionAtCursor,
   mergeComposerFileReference,
+  removeComposerFileReference,
   referencesPresentInComposerText
 } from "./composer-file-mentions.js";
 import { useComposerFileMentionSearch } from "./use-composer-file-mention-search.js";
 import { ComposerSurface } from "./ComposerSurface.js";
+
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const connected = useAppStore((state) => state.connected);
@@ -377,6 +372,18 @@ export function Composer() {
       textInput.current?.setSelectionRange(inserted.cursor, inserted.cursor);
     });
   };
+  const removeWorkspaceFile = (reference: ComposerWorkspaceFileRef) => {
+    submissionIdRef.current = undefined;
+    setSubmissionError(undefined);
+    const removed = removeComposerFileReference(text, textCursor, reference);
+    setText(removed.text);
+    setWorkspaceFiles((current) => current.filter((item) => item.id !== reference.id));
+    setTextCursor(removed.cursor);
+    requestAnimationFrame(() => {
+      textInput.current?.focus();
+      textInput.current?.setSelectionRange(removed.cursor, removed.cursor);
+    });
+  };
   return <ComposerSurface
     activeOperation={activeOperation}
     activeSessionAuthority={activeSessionAuthority}
@@ -413,6 +420,7 @@ export function Composer() {
     onFileSelect={selectWorkspaceFile}
     onInteractionModeChange={(mode) => void setInteractionMode(mode)}
     onRemoveAttachment={removeAttachment}
+    onRemoveWorkspaceFile={removeWorkspaceFile}
     onSlashComplete={(command) => {
       submissionIdRef.current = undefined;
       setSubmissionError(undefined);

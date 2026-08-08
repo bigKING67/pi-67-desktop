@@ -7,9 +7,7 @@ import {
   MAX_TREE_NODES
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
-import {
-  AssetReadResultSchema
-} from "./asset-schemas.js";
+import { AssetReadResultSchema } from "./asset-schemas.js";
 import { ApprovalCancelledSchema, ApprovalRequestSchema, ApprovalResolvedSchema } from "./approval-schemas.js";
 import {
   ContextFileCatalogResultSchema,
@@ -277,6 +275,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "session.nameByPath": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.pin": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.archive": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
+  "conversation.snooze": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "conversation.reorderPinned": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),
   "prompt.submit": operationSubmissionResultSchema(Type.Literal("prompt")),
   "prompt.steer": AcknowledgementSchema,

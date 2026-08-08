@@ -102,6 +102,9 @@ function registerFixture() {
     packageNetworkSettings,
     teamMcpSettings: {},
     promptAttachments: {},
+    promptStashImages: {
+      store: vi.fn(), restore: vi.fn(), delete: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn()
+    },
     workbenchState: {},
     workspaceFileState: {},
     repositoryEnvironmentInspection: { inspect: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn() }

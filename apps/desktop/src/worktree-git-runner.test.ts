@@ -195,6 +195,43 @@ describe("BoundedPrivateGitRunner", () => {
       details: { cleanupConfirmed: true }
     });
   });
+
+  it("uses the Windows NUL device for an untracked-file diff", async () => {
+    const root = await temporaryRoot();
+    const script = join(root, "capture-arguments.mjs");
+    await writeFile(script, "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n", "utf8");
+    const runner = new BoundedPrivateGitRunner({
+      ready: true,
+      gitExecutable: process.execPath,
+      gitExecPath: root
+    } as DesktopToolchain, {
+      platform: "win32",
+      argumentPrefix: [script]
+    });
+
+    const output = await runner.diffPath(root, "new file.txt", "untracked");
+    expect(JSON.parse(output)).toEqual(expect.arrayContaining(["--no-index", "NUL", "new file.txt"]));
+    expect(output).not.toContain("/dev/null");
+  });
+
+  it("cancels active private Git processes during disposal", async () => {
+    const root = await temporaryRoot();
+    const script = join(root, "hang.mjs");
+    await writeFile(script, "setInterval(() => undefined, 1_000);\n", "utf8");
+    const runner = new BoundedPrivateGitRunner({
+      ready: true,
+      gitExecutable: process.execPath,
+      gitExecPath: root
+    } as DesktopToolchain, { argumentPrefix: [script] });
+
+    const pending = runner.resolveRepositoryRoot(root);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(runner.diagnostics()).toEqual({ activeProcessCount: 1, disposed: false });
+    runner.dispose();
+    expect(runner.diagnostics()).toEqual({ activeProcessCount: 0, disposed: true });
+    await expect(pending).rejects.toMatchObject({ code: "cancelled", details: { cleanupConfirmed: true } });
+    await expect(runner.resolveRepositoryRoot(root)).rejects.toMatchObject({ code: "cancelled" });
+  });
 });
 
 async function temporaryRoot(): Promise<string> {

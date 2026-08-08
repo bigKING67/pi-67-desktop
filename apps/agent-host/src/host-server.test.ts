@@ -102,6 +102,25 @@ describe("AgentHostServer", () => {
           taskCount: 0,
           liveRuntimeCount: 0,
           activeOperationCount: 0,
+          scheduler: {
+            taskCount: 0,
+            activeQueryCount: 0,
+            queuedControlCount: 0,
+            runningControlCount: 0,
+            queuedPromptCount: 0,
+            runningPromptCount: 0,
+            turnAdmissionCount: 0,
+            closedCount: 0
+          },
+          operations: {
+            registryCount: 0,
+            acceptingCount: 0,
+            activeCount: 0,
+            terminatingCount: 0,
+            poisonedCount: 0,
+            heartbeatTrackedCount: 0,
+            maxQuietForMs: 0
+          },
           writerLeases: { activeCount: 0, pendingCount: 0, compromised: false },
           workspaces: [],
           workspacesTruncated: false

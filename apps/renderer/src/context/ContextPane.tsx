@@ -13,7 +13,7 @@ export function ContextPane() {
   return (
     <aside aria-label="任务检查器" className="context-pane" id="task-inspector">
       <Tabs selectedKey={selectedTab} onSelectionChange={(key) => setSelectedTab(String(key) as typeof selectedTab)}>
-        <TabList aria-label="任务检查器">
+        <TabList aria-label="任务检查器" className="context-pane-tabs">
           <Tab id="files"><Files size={14} />文件</Tab>
           <Tab id="changes"><FilePenLine size={14} />修改</Tab>
           <Tab id="messages"><MessagesSquare size={14} />消息</Tab>

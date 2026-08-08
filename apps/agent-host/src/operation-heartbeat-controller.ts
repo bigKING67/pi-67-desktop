@@ -14,6 +14,12 @@ interface HeartbeatState {
   lastActivityAt: number;
 }
 
+export interface OperationHeartbeatDiagnostics {
+  active: boolean;
+  lastActivityAt?: number;
+  quietForMs?: number;
+}
+
 export class OperationHeartbeatController {
   private readonly heartbeatIntervalMs: number;
   private readonly now: () => number;
@@ -51,6 +57,18 @@ export class OperationHeartbeatController {
   observeEvent(event: AgentEvent, operationId: string | undefined): boolean {
     if (!isBusinessActivityEvent(event) || !eventBelongsToOperation(event, operationId)) return false;
     return this.touch(operationId);
+  }
+
+  diagnostics(): OperationHeartbeatDiagnostics {
+    if (!this.current) return { active: false };
+    return {
+      active: true,
+      lastActivityAt: this.current.lastActivityAt,
+      quietForMs: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.max(0, this.now() - this.current.lastActivityAt)
+      )
+    };
   }
 
   stop(operationId?: string): void {

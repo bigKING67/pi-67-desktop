@@ -7,6 +7,9 @@ export const MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL = 4 * 1024 * 1024;
 export const MAX_COMPOSER_WORKSPACE_FILE_REFS = 64;
 export const MAX_PROMPT_STASH_ITEMS = 20;
 export const MAX_PROMPT_STASH_TEXT_BYTES_TOTAL = 2 * 1024 * 1024;
+export const MAX_PROMPT_STASH_IMAGE_BYTES_PER_ITEM = 32 * 1024 * 1024;
+export const MAX_PROMPT_STASH_IMAGE_BYTES_PER_TASK = 128 * 1024 * 1024;
+export const MAX_PROMPT_STASH_IMAGE_BYTES_TOTAL = 512 * 1024 * 1024;
 
 export type ComposerDraftEnvironmentIntent = "local" | "worktree";
 
@@ -20,6 +23,15 @@ export interface PromptStashItem {
   id: string;
   text: string;
   createdAt: number;
+  attachments?: PromptStashImageRef[];
+}
+
+export interface PromptStashImageRef {
+  blobId: string;
+  name: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  byteLength: number;
+  kind: "image";
 }
 
 export interface ComposerDraftRecord {

@@ -319,11 +319,12 @@ the only Runtime and behavior specification source.
   never write or symlink escape. Pi-67 registers `web_search`, `source_check`,
   HTTP(S) `fetch_content`, and bounded `get_search_content` as first-party Pi SDK
   `customTools`; they are not Extension Packages. `web_search` and
-  `source_check` prefer the selected model's declared native protocol, otherwise
-  use a bounded per-call Exa Streamable HTTP MCP Session. Once a native request
-  has actually been sent, an authentication, quota, rate-limit, server, malformed,
-  oversized, or empty-result failure remains visible and the same query is not
-  silently resent to Exa. `fetch_content` rejects URL credentials, non-public DNS
+  `source_check` require the selected model's declared protocol-native route.
+  A model without such a route fails as unavailable before any search request is
+  sent. Authentication, quota, rate-limit, server, malformed, oversized, and
+  empty-result failures remain visible; Pi-67 never switches Provider or silently
+  resends the query through an Extension or third-party search service.
+  `fetch_content` rejects URL credentials, non-public DNS
   results, unsafe redirects, and responses over 2 MiB. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
@@ -435,7 +436,8 @@ the only Runtime and behavior specification source.
   Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
   budget preserves it when available, while timeout, disconnection, or Host
   replacement still exports Main-owned recovery, Supervisor lifecycle, and Pi
-  configuration readability metadata. Main writes `pi67-support-diagnostics.v2`;
+  configuration readability metadata. Main writes `pi67-support-diagnostics.v3`,
+  which adds bounded Main service health and Renderer acknowledgement latency;
   Renderer cannot submit arbitrary JSON or raw error text. The support file
   contains hashes, categories, counts, revisions, states, bounded timestamps,
   and bounded error classes, never raw Workspace or Agent Directory paths,
@@ -504,7 +506,8 @@ the only Runtime and behavior specification source.
   model: Groland Claude uses Anthropic Web Search, Groland GPT uses Responses
   `web_search`, Pi's official Anthropic/OpenAI Providers use their corresponding
   protocols, and Pi's official DeepSeek Provider declares native search only for
-  `deepseek-v4-flash`. Other models use Exa fallback. The Settings label
+  `deepseek-v4-flash`. Other models have no native search route and fail visibly
+  without Provider fallback. The Settings label
   `原生搜索 · 已声明` describes routing metadata, not a completed live request.
 - Web Search has no product switch and no persisted enable/disable preference. The
   model decides when the Pi SDK or protocol-native Provider search capability is
@@ -574,12 +577,17 @@ the only Runtime and behavior specification source.
   Plans may be expanded and copied but never executed again. Renderer never supplies
   Plan Markdown in the implementation request or creates a separate durable Plan
   store.
-- Prompt Stash preserves exact text in Task-scoped encrypted draft state. It accepts
-  at most 20 text-only items, 256 KiB per item, and 2 MiB total; drafts containing
-  `@file` references are rejected. Stashing clears the Composer only after both
-  persistence phases are acknowledged, and any failure preserves or rolls back to a
-  non-lossy state. Restore is allowed only into an empty Composer, is durably removed
-  from the stash, closes the Popover, and returns focus to input.
+- Prompt Stash preserves exact text plus image attachments in Task-scoped encrypted
+  draft state. It accepts at most 20 items, 256 KiB of text per item, 2 MiB of total
+  stashed text, 32 MiB of images per item, 128 MiB per Task, and 512 MiB globally;
+  non-image attachments and drafts containing `@file` references are rejected.
+  Main reads images only from authoritative attachment staging, encrypts each payload
+  with `safeStorage`, stores ownership plus hash metadata, and exposes only opaque
+  item/blob references across IPC. Stashing clears the Composer only after encrypted
+  image storage and both draft persistence phases are acknowledged; any failure
+  preserves or rolls back to a non-lossy state. Restore is allowed only into an empty
+  Composer, creates new staging identities after decrypt/hash validation, is durably
+  removed from the stash, closes the Popover, and returns focus to input.
 - Composer context pressure becomes warning state at 75% and critical state at 92%.
   Manual compression uses Pi's native `session.compact`; automatic and manual
   compaction are labeled separately, never show duplicate actions, and remain legible
@@ -811,8 +819,9 @@ the only Runtime and behavior specification source.
   plaintext and exit remains guarded. Limits are 32 tabs per Workspace, 128 per
   app, and 20 MiB of dirty draft text. File bodies never enter Workbench state,
   Pi JSONL, notifications, diagnostics, logs, or telemetry.
-- Changes presents only the current active branch's bounded Pi Session `edit` and
-  `write` facts. It summarizes retained files and total records, lists the newest
+- Changes has two explicitly separate read-only projections. `会话修改` presents
+  the current active branch's bounded Pi Session `edit` and `write` facts. It
+  summarizes retained files and total records, lists the newest
   records first, preserves cached content while a refresh is pending or fails,
   and owns explicit loading, empty, stale, error, and truncation states. Every
   projection remains fenced by Host epoch, physical Session identity, Session
@@ -826,8 +835,16 @@ the only Runtime and behavior specification source.
   changed line, Tool status, and truncated-path/Patch notices. The Renderer caps
   the rendered Patch at 600 rows independently of the 64 KiB Host Patch budget.
   A `write` record shows only bounded bytes/lines metadata because Pi does not
-  provide a before-version. Changes never reads Workspace files or Git from the
-  Renderer to manufacture missing history.
+  provide a before-version. It never reads Workspace files or Git from the Renderer
+  to manufacture missing history.
+- `工作区变更` is an independent Electron Main-owned, bounded Git observation for
+  the selected registered Workspace. Main resolves the authoritative cwd from
+  Workbench state, runs packaged private Git status/diff with time/output budgets,
+  and gives Renderer only revision-scoped opaque `changeId` values plus display
+  paths. Detail requests carry only `workspaceId + revision + changeId`; Main
+  revalidates Workspace identity and the status fingerprint before and after each
+  bounded Patch read. This surface never stages, discards, commits, pushes, opens a
+  PR, or claims to replace a full Git client.
 - Messages is a paged index of only the user's messages on the current Pi Session
   active branch. It excludes Assistant, System, Tool, Thinking, and Session
   control entries, and can locate an unloaded message through one bounded

@@ -36,8 +36,10 @@ import { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
 import { WorktreeCatalogStore } from "./worktree-catalog-store.js";
 import { WorktreeCreationService } from "./worktree-creation-service.js";
 import { WorktreeInspectionService } from "./worktree-inspection-service.js";
+import { RepositoryWorkingTreeService } from "./repository-working-tree-service.js";
 import { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
 import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-service.js";
+import { PromptStashImageStore } from "./prompt-stash-image-store.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -75,6 +77,7 @@ let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
 let promptAttachments: PromptAttachmentStagingService | undefined;
 let composerDraftState: ComposerDraftStateStore | undefined;
+let promptStashImages: PromptStashImageStore | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
 let systemBridgeRegistration: SystemBridgeRegistration | undefined;
 const appInstanceId = randomUUID();
@@ -158,6 +161,20 @@ if (hasSingleInstanceLock) {
         decrypt: (value) => safeStorage.decryptString(value)
       }
     });
+    promptStashImages = new PromptStashImageStore(app.getPath("userData"), {
+      encryption: {
+        isAvailable: () => safeStorage.isEncryptionAvailable(),
+        encrypt: (value) => safeStorage.encryptString(value),
+        decrypt: (value) => safeStorage.decryptString(value)
+      },
+      staging: promptAttachments
+    });
+    const draftSnapshot = await composerDraftState.load();
+    await promptStashImages.reconcile(new Set(
+      draftSnapshot.state.drafts.flatMap((draft) => (
+        (draft.promptStash ?? []).flatMap((item) => item.attachments?.length ? [item.id] : [])
+      ))
+    ));
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
       agentDir: desktopAgentDirectory,
@@ -202,6 +219,10 @@ if (hasSingleInstanceLock) {
       workbenchState,
       catalog: new WorktreeCatalogStore(app.getPath("userData"))
     });
+    const repositoryWorkingTree = new RepositoryWorkingTreeService({
+      runner: privateGitRunner,
+      workbenchState
+    });
     const worktreeCreation = new WorktreeCreationService({
       userData: app.getPath("userData"),
       runner: privateGitRunner,
@@ -219,11 +240,14 @@ if (hasSingleInstanceLock) {
       packageNetworkSettings,
       teamMcpSettings,
       promptAttachments,
+      promptStashImages,
       previousRunExit,
       workbenchState,
       composerDraftState,
       workspaceFileState,
       repositoryEnvironmentInspection,
+      repositoryWorkingTree,
+      repositoryGitRunner: privateGitRunner,
       worktreeCreation,
       repositoryMutationScheduler,
       agentDirectory: desktopAgentDirectory,

@@ -202,7 +202,9 @@ export const zhCNMessages = {
     running: "正在收集恢复状态…",
     results: "运行环境检查结果",
     recoveryResults: "恢复状态检查结果",
+    healthResults: "运行健康检查结果",
     environmentHeading: "运行环境",
+    healthHeading: "运行健康",
     recoveryHeading: "恢复状态",
     rerun: "重新检查",
     run: "开始检查",
@@ -220,6 +222,15 @@ export const zhCNMessages = {
       writerLease: "Writer Lease",
       hostAuthority: "Host Authority",
       attachments: "Attachment Staging"
+    },
+    healthChecks: {
+      mainLifecycle: "Agent Host 生命周期",
+      scheduler: "Command Scheduler",
+      operations: "Operation Registry",
+      operationFreshness: "Operation Freshness",
+      rendererAcknowledgement: "Renderer Acknowledgement",
+      repositoryRuntime: "Repository Runtime",
+      promptStashRuntime: "Prompt Stash Runtime"
     },
     checks: {
       platform: "系统平台",

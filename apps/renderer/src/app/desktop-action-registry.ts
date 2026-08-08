@@ -8,10 +8,20 @@ export type DesktopActionId =
   | "find-workspace-conversations"
   | "keyboard-shortcuts";
 
-interface DesktopShortcutBinding {
+export interface DesktopShortcutBinding {
   key: string;
   shift?: boolean;
+  alt?: boolean;
 }
+
+export type DesktopShortcutContext =
+  | "workspaceOpen"
+  | "composerFocus"
+  | "dialogOpen"
+  | "settingsOpen"
+  | "fileEditorFocus"
+  | "taskRunning"
+  | "taskIdle";
 
 export interface DesktopActionDescriptor {
   id: DesktopActionId;
@@ -19,6 +29,7 @@ export interface DesktopActionDescriptor {
   detail: string;
   keywords: string;
   requiresWorkspace: boolean;
+  contexts: readonly DesktopShortcutContext[];
   bindings: readonly DesktopShortcutBinding[];
 }
 
@@ -29,6 +40,15 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "管理应用、模型、Pi 与支持选项",
     keywords: "settings preferences 配置 设置",
     requiresWorkspace: false,
+    contexts: [
+      "workspaceOpen",
+      "composerFocus",
+      "dialogOpen",
+      "settingsOpen",
+      "fileEditorFocus",
+      "taskRunning",
+      "taskIdle"
+    ],
     bindings: [{ key: "," }]
   },
   {
@@ -37,6 +57,14 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "搜索会话、Pi 操作和应用命令",
     keywords: "command palette 命令 面板",
     requiresWorkspace: false,
+    contexts: [
+      "workspaceOpen",
+      "composerFocus",
+      "settingsOpen",
+      "fileEditorFocus",
+      "taskRunning",
+      "taskIdle"
+    ],
     bindings: [{ key: "k" }]
   },
   {
@@ -45,6 +73,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "在当前工作区创建一个待发送的会话",
     keywords: "new session conversation 新建 会话",
     requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "n" }, { key: "t" }]
   },
   {
@@ -53,6 +82,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "切换左侧工作区与会话列表",
     keywords: "navigation sidebar left 侧栏 导航",
     requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "b" }]
   },
   {
@@ -61,6 +91,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "切换右侧文件、Changes 与上下文面板",
     keywords: "context inspector right 任务 检查器",
     requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "b", shift: true }]
   },
   {
@@ -69,6 +100,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "只查找当前 Pi 会话的可见正文",
     keywords: "find search current message 查找 当前 对话",
     requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "f" }]
   },
   {
@@ -77,6 +109,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "跨当前工作区的 Pi JSONL 会话查找正文",
     keywords: "find search workspace messages 查找 工作区 对话",
     requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "f", shift: true }]
   },
   {
@@ -85,6 +118,15 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     detail: "打开 Pi-67 Desktop 快捷键帮助",
     keywords: "keyboard shortcuts help 键盘 快捷键 帮助",
     requiresWorkspace: false,
+    contexts: [
+      "workspaceOpen",
+      "composerFocus",
+      "dialogOpen",
+      "settingsOpen",
+      "fileEditorFocus",
+      "taskRunning",
+      "taskIdle"
+    ],
     bindings: [{ key: "/" }]
   }
 ] as const;
@@ -93,11 +135,16 @@ export function desktopAction(id: DesktopActionId): DesktopActionDescriptor {
   return DESKTOP_ACTIONS.find((action) => action.id === id)!;
 }
 
-export function matchDesktopAction(event: KeyboardEvent): DesktopActionDescriptor | undefined {
-  if (!(event.metaKey || event.ctrlKey) || event.altKey) return undefined;
+export function matchDesktopAction(
+  event: KeyboardEvent,
+  actions: readonly DesktopActionDescriptor[] = DESKTOP_ACTIONS
+): DesktopActionDescriptor | undefined {
+  if (!(event.metaKey || event.ctrlKey)) return undefined;
   const key = event.key.toLocaleLowerCase();
-  return DESKTOP_ACTIONS.find((action) => action.bindings.some((binding) => (
-    binding.key === key && Boolean(binding.shift) === event.shiftKey
+  return actions.find((action) => action.bindings.some((binding) => (
+    binding.key === key
+    && Boolean(binding.shift) === event.shiftKey
+    && Boolean(binding.alt) === event.altKey
   )));
 }
 
@@ -107,14 +154,15 @@ export function formatDesktopShortcut(
 ): string {
   return action.bindings.map((binding) => {
     const modifier = platform === "darwin" ? "⌘" : "Ctrl+";
+    const alt = binding.alt ? (platform === "darwin" ? "⌥" : "Alt+") : "";
     const shift = binding.shift ? (platform === "darwin" ? "⇧" : "Shift+") : "";
-    return `${modifier}${shift}${displayKey(binding.key)}`;
+    return `${modifier}${alt}${shift}${displayKey(binding.key)}`;
   }).join(" / ");
 }
 
 export function desktopShortcutAriaKeys(action: DesktopActionDescriptor): string {
   return action.bindings.flatMap((binding) => {
-    const suffix = `${binding.shift ? "Shift+" : ""}${ariaKey(binding.key)}`;
+    const suffix = `${binding.alt ? "Alt+" : ""}${binding.shift ? "Shift+" : ""}${ariaKey(binding.key)}`;
     return [`Control+${suffix}`, `Meta+${suffix}`];
   }).join(" ");
 }

@@ -5,6 +5,8 @@ import {
 } from "../connection/event-authority.js";
 import { messages } from "../localization/message-catalog.js";
 import { markConversationAttention } from "../navigation/conversation-attention-store.js";
+import { wakeRendererConversationForAttention } from "../navigation/conversation-organization-controller.js";
+import { selectWorkspaceSessionCatalog, useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
@@ -185,7 +187,18 @@ export function applyWorkbenchAgentEvent(
     && task.conversation.kind === "session"
     && eventSessionAuthority(envelope)?.sessionFileIdentity === task.conversation.sessionFileIdentity
   ) {
-    markConversationAttention(task.workspaceId, task.conversation.sessionFileIdentity);
+    const sessionConversation = task.conversation;
+    markConversationAttention(task.workspaceId, sessionConversation.sessionFileIdentity);
+    const catalog = selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), task.workspaceId);
+    const summary = catalog.items.find((item) => (
+      item.fileIdentity === sessionConversation.sessionFileIdentity
+    ));
+    if (summary?.snoozedUntil !== undefined && summary.snoozedUntil > Date.now()) {
+      void wakeRendererConversationForAttention(task.workspaceId, {
+        fileIdentity: sessionConversation.sessionFileIdentity,
+        path: sessionConversation.sessionPath
+      });
+    }
   }
   return true;
 }

@@ -1,11 +1,16 @@
 import type { DoctorReport } from "@pi67/domain";
-import type { DesktopRecoverySnapshot, RuntimeDiagnostics } from "@pi67/protocol";
+import type {
+  DesktopRecoverySnapshot,
+  RendererAcknowledgementDiagnostics,
+  RuntimeDiagnostics
+} from "@pi67/protocol";
 import { createStore } from "zustand/vanilla";
 
 export interface DoctorState {
   report: DoctorReport | undefined;
   diagnostics: RuntimeDiagnostics | undefined;
   recovery: DesktopRecoverySnapshot | undefined;
+  renderer: RendererAcknowledgementDiagnostics | undefined;
   running: boolean;
   recoveryLoading: boolean;
   error: string | undefined;
@@ -14,6 +19,7 @@ export interface DoctorState {
   complete: (report: DoctorReport) => void;
   completeDiagnostics: (diagnostics: RuntimeDiagnostics) => void;
   completeRecovery: (recovery: DesktopRecoverySnapshot) => void;
+  completeRenderer: (renderer: RendererAcknowledgementDiagnostics) => void;
   finish: () => void;
   fail: (error: string) => void;
   failRecovery: (error: string) => void;
@@ -23,6 +29,7 @@ export const doctorStore = createStore<DoctorState>((set) => ({
   report: undefined,
   diagnostics: undefined,
   recovery: undefined,
+  renderer: undefined,
   running: false,
   recoveryLoading: false,
   error: undefined,
@@ -32,6 +39,7 @@ export const doctorStore = createStore<DoctorState>((set) => ({
       report: undefined,
       diagnostics: undefined,
       recovery: undefined,
+      renderer: undefined,
       running: true,
       recoveryLoading: true,
       error: undefined,
@@ -46,6 +54,9 @@ export const doctorStore = createStore<DoctorState>((set) => ({
   },
   completeRecovery(recovery) {
     set({ recovery, recoveryLoading: false, recoveryError: undefined });
+  },
+  completeRenderer(renderer) {
+    set({ renderer });
   },
   finish() {
     set({ running: false, error: undefined });

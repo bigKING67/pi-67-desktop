@@ -85,7 +85,7 @@ export function registerSupportDiagnosticsBridge(options: {
       agentDirectorySource: options.agentDirectorySource
     });
     const supportDiagnostics = {
-      schema: "pi67-support-diagnostics.v2" as const,
+      schema: "pi67-support-diagnostics.v3" as const,
       generatedAt: Date.now(),
       application: {
         version: app.getVersion(),
@@ -96,6 +96,7 @@ export function registerSupportDiagnosticsBridge(options: {
       desktop: await options.recoverySnapshot(),
       agentHost: options.getAgentHostDiagnostics(),
       piConfiguration,
+      renderer: request.renderer,
       runtimeCollection: request.runtimeCollection,
       ...("runtime" in request ? { runtime: request.runtime } : {})
     };

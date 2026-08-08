@@ -6,6 +6,7 @@ export type SessionCatalogView = "active" | "archived";
 export interface ConversationOrganization {
   pinnedAt?: number;
   archivedAt?: number;
+  snoozedUntil?: number;
 }
 
 export const MAX_PINNED_CONVERSATION_ORDER_ITEMS = 200;

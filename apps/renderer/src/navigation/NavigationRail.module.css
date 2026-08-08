@@ -522,6 +522,49 @@
   padding: 0 2px 7px 22px;
 }
 
+.snoozedShelf {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.snoozedShelfButton {
+  display: grid;
+  min-height: 26px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+}
+
+.snoozedShelfButton:hover {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+}
+
+.snoozedShelfButton:focus-visible {
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.snoozedShelfButton small {
+  min-width: 17px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .conversationItem {
   display: grid;
   width: 100%;
@@ -600,6 +643,10 @@
 
 .conversationMarker[data-status="draft"] {
   color: var(--info);
+}
+
+.conversationMarker[data-status="snoozed"] {
+  color: var(--text-tertiary);
 }
 
 .conversationCopy {

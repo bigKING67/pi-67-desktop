@@ -12,6 +12,11 @@ interface StoredRecord extends ConversationOrganization {
 }
 
 interface StoredDocument {
+  version: 3;
+  records: StoredRecord[];
+}
+
+interface LegacyStoredDocument {
   version: 2;
   records: StoredRecord[];
 }
@@ -19,10 +24,14 @@ interface StoredDocument {
 export class ConversationOrganizationStore {
   private readonly records = new Map<string, ConversationOrganization>();
   private readonly path: string | undefined;
+  private readonly legacyPath: string | undefined;
   private ready: Promise<void> | undefined;
 
   constructor(storageRoot?: string) {
     this.path = storageRoot === undefined
+      ? undefined
+      : join(storageRoot, "conversation-organization", "organization-v3.json");
+    this.legacyPath = storageRoot === undefined
       ? undefined
       : join(storageRoot, "conversation-organization", "organization-v2.json");
   }
@@ -55,7 +64,11 @@ export class ConversationOrganizationStore {
     for (const update of updates) {
       const key = sessionKey(sourceKey, update.fileIdentity);
       if (!previous.has(key)) previous.set(key, this.records.get(key));
-      if (update.value.pinnedAt === undefined && update.value.archivedAt === undefined) this.records.delete(key);
+      if (
+        update.value.pinnedAt === undefined
+        && update.value.archivedAt === undefined
+        && update.value.snoozedUntil === undefined
+      ) this.records.delete(key);
       else this.records.set(key, { ...update.value });
     }
     try {
@@ -77,34 +90,40 @@ export class ConversationOrganizationStore {
     const directory = dirname(this.path);
     await mkdir(directory, { recursive: true, mode: 0o700 });
     if (process.platform !== "win32") await chmod(directory, 0o700);
-    const info = await lstat(this.path).catch((error: unknown) => (
+    const sourcePath = await firstExistingPath(this.path, this.legacyPath);
+    if (!sourcePath) return;
+    const info = await lstat(sourcePath).catch((error: unknown) => (
       isNodeError(error, "ENOENT") ? undefined : Promise.reject(error)
     ));
     if (!info) return;
     if (!info.isFile() || info.isSymbolicLink() || info.nlink > 1 || info.size > MAX_FILE_BYTES) {
-      await this.quarantine();
+      await this.quarantine(sourcePath);
       return;
     }
     try {
-      if (process.platform !== "win32") await chmod(this.path, 0o600);
-      const parsed = JSON.parse(await readFile(this.path, "utf8")) as unknown;
+      if (process.platform !== "win32") await chmod(sourcePath, 0o600);
+      const parsed = JSON.parse(await readFile(sourcePath, "utf8")) as unknown;
       if (!isStoredDocument(parsed)) throw new Error("Invalid conversation organization document.");
       for (const record of parsed.records) {
         const value: ConversationOrganization = {};
         if (record.pinnedAt !== undefined) value.pinnedAt = record.pinnedAt;
         if (record.archivedAt !== undefined) value.archivedAt = record.archivedAt;
+        if (parsed.version === 3 && record.snoozedUntil !== undefined) {
+          value.snoozedUntil = record.snoozedUntil;
+        }
         this.records.set(record.sessionKey, value);
       }
+      if (sourcePath === this.legacyPath) await this.persist().catch(() => undefined);
     } catch {
       this.records.clear();
-      await this.quarantine();
+      await this.quarantine(sourcePath);
     }
   }
 
   private async persist(): Promise<void> {
     if (!this.path) return;
     const document: StoredDocument = {
-      version: 2,
+      version: 3,
       records: [...this.records].map(([sessionKey, value]) => ({ sessionKey, ...value }))
     };
     const serialized = `${JSON.stringify(document)}\n`;
@@ -115,9 +134,8 @@ export class ConversationOrganizationStore {
     if (process.platform !== "win32") await chmod(this.path, 0o600);
   }
 
-  private async quarantine(): Promise<void> {
-    if (!this.path) return;
-    await rename(this.path, `${this.path}.corrupt-${Date.now()}`).catch(() => undefined);
+  private async quarantine(path: string): Promise<void> {
+    await rename(path, `${path}.corrupt-${Date.now()}`).catch(() => undefined);
   }
 }
 
@@ -129,15 +147,33 @@ function sessionKey(sourceKey: string, fileIdentity: string): string {
     .digest("hex");
 }
 
-function isStoredDocument(value: unknown): value is StoredDocument {
-  if (!isRecord(value) || value.version !== 2 || !Array.isArray(value.records) || value.records.length > MAX_RECORDS) {
+function isStoredDocument(value: unknown): value is StoredDocument | LegacyStoredDocument {
+  if (
+    !isRecord(value)
+    || (value.version !== 2 && value.version !== 3)
+    || !Array.isArray(value.records)
+    || value.records.length > MAX_RECORDS
+  ) {
     return false;
   }
   return value.records.every((record) => isRecord(record)
     && typeof record.sessionKey === "string"
     && /^[0-9a-f]{64}$/u.test(record.sessionKey)
     && validTimestamp(record.pinnedAt)
-    && validTimestamp(record.archivedAt));
+    && validTimestamp(record.archivedAt)
+    && (value.version === 2 ? record.snoozedUntil === undefined : validTimestamp(record.snoozedUntil)));
+}
+
+async function firstExistingPath(...paths: Array<string | undefined>): Promise<string | undefined> {
+  for (const path of paths) {
+    if (!path) continue;
+    const exists = await lstat(path).then(() => true).catch((error: unknown) => {
+      if (isNodeError(error, "ENOENT")) return false;
+      throw error;
+    });
+    if (exists) return path;
+  }
+  return undefined;
 }
 
 function validTimestamp(value: unknown): boolean {

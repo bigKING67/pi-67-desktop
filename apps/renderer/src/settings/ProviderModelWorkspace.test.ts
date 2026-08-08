@@ -27,7 +27,7 @@ describe("Provider model capability view", () => {
     });
   });
 
-  it("distinguishes DeepSeek V4 Flash native search from V4 Pro Exa fallback", () => {
+  it("distinguishes DeepSeek V4 Flash native search from V4 Pro without a declared route", () => {
     expect(modelCapabilityView("deepseek", {
       id: "deepseek-v4-flash",
       input: ["text", "image"],
@@ -37,7 +37,7 @@ describe("Provider model capability view", () => {
       id: "deepseek-v4-pro",
       input: ["text", "image"],
       reasoning: true
-    }).search).toBe("exa-fallback");
+    }).search).toBe("unavailable");
   });
 
   it("does not present declared capability as live verification", () => {
@@ -55,12 +55,12 @@ describe("Provider model capability view", () => {
       api: "openai-responses",
       input: ["text", "image"],
       reasoning: true
-    }).search).toBe("exa-fallback");
+    }).search).toBe("unavailable");
     expect(modelCapabilityView("groland", {
       id: "claude-opus-4-8",
       api: "openai-responses",
       input: ["text", "image"],
       reasoning: true
-    }).search).toBe("exa-fallback");
+    }).search).toBe("unavailable");
   });
 });

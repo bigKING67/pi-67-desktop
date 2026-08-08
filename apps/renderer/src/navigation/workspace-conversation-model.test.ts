@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
-import { conversationRows, workspaceStatus } from "./workspace-conversation-model.js";
+import {
+  conversationRows,
+  formatSnoozeTimestamp,
+  workspaceStatus
+} from "./workspace-conversation-model.js";
 
 describe("workspace conversation model", () => {
   it.each([
@@ -167,6 +171,43 @@ describe("workspace conversation model", () => {
       { title: "c", up: true, down: false },
       { title: "d", up: false, down: false }
     ]);
+  });
+
+  it("moves only future idle sessions into the Snoozed shelf and wakes them at the absolute deadline", () => {
+    const now = new Date(2026, 7, 8, 16).getTime();
+    const session = {
+      fileIdentity: "session-file-snoozed",
+      id: "session-snoozed",
+      path: "/sessions/snoozed.jsonl",
+      cwd: "/work",
+      name: "Snoozed",
+      nameSource: "explicit" as const,
+      modifiedAt: now - 1_000,
+      messageCount: 1,
+      pinnedAt: 100,
+      snoozedUntil: now + 60_000
+    };
+
+    expect(conversationRows("workspace-test", [], [session], "", now)[0]).toMatchObject({
+      snoozed: true,
+      snoozedUntil: now + 60_000,
+      pinned: false,
+      meta: expect.stringContaining(formatSnoozeTimestamp(now + 60_000))
+    });
+    expect(conversationRows("workspace-test", [], [session], "", now + 60_000)[0]).toMatchObject({
+      snoozed: false,
+      pinned: true
+    });
+
+    const activeTask = materializedTask({
+      sessionFileIdentity: session.fileIdentity,
+      sessionPath: session.path
+    });
+    activeTask.lifecycle = "running";
+    expect(conversationRows("workspace-test", [activeTask], [session], "", now)[0]).toMatchObject({
+      priority: true,
+      snoozed: false
+    });
   });
 
   it("keeps path-only recovery visibly gated on explicit confirmation", () => {

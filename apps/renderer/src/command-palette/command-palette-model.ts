@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { appLocale, messages } from "../localization/message-catalog.js";
 
-type PaletteGroupId = "recent" | "sessions" | "extensions" | "actions" | "settings";
+type PaletteGroupId = "recent" | "sessions" | "messages" | "extensions" | "actions" | "settings";
 
 export interface PaletteAction {
   id: string;
@@ -40,6 +40,7 @@ const MAX_RECENT_ITEMS = 6;
 const GROUP_LABELS: Readonly<Record<PaletteGroupId, string>> = {
   recent: messages.commandPalette.groupRecent,
   sessions: messages.commandPalette.groupSessions,
+  messages: messages.commandPalette.groupMessages,
   extensions: messages.commandPalette.groupExtensions,
   actions: messages.commandPalette.groupActions,
   settings: messages.commandPalette.groupSettings
@@ -47,6 +48,7 @@ const GROUP_LABELS: Readonly<Record<PaletteGroupId, string>> = {
 
 const GROUP_ORDER: ReadonlyArray<Exclude<PaletteGroupId, "recent">> = [
   "sessions",
+  "messages",
   "extensions",
   "actions",
   "settings"
@@ -54,6 +56,7 @@ const GROUP_ORDER: ReadonlyArray<Exclude<PaletteGroupId, "recent">> = [
 
 const EMPTY_QUERY_LIMITS: Readonly<Record<Exclude<PaletteGroupId, "recent">, number>> = {
   sessions: 12,
+  messages: 0,
   extensions: 12,
   actions: 20,
   settings: 10

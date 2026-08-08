@@ -20,7 +20,6 @@ import {
   bindLoadedResourceReadAccess,
   createLoadedResourceReadAccess
 } from "./loaded-resource-read-access.js";
-import { createDesktopPiWebAccessResultExtension } from "./pi-web-access-result-extension.js";
 import {
   bindConfiguredCapabilityCatalog,
   ConfiguredCapabilityCatalog
@@ -71,7 +70,6 @@ export async function createDesktopSessionServices(
     resourceLoaderOptions: {
       extensionFactories: [
         createDesktopToolRoutingExtension(),
-        createDesktopPiWebAccessResultExtension(),
         ...(options.promptAttachmentAccess === undefined
           ? []
           : [createDesktopPromptAttachmentExtension(options.promptAttachmentAccess)]),

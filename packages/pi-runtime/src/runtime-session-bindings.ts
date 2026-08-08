@@ -247,6 +247,7 @@ export class RuntimeSessionBindings {
       await this.options.projections.bind(session, this.activeExtensions);
       this.planMode.bind(session);
       await this.options.rebindExtensionUi(session);
+      this.activeToolAliases?.reconcile();
       this.options.emit({ type: "extension.catalog.changed", payload: this.options.projections.getCatalog() });
       await this.options.externalChangeGuard.bind(session, this.generation, this.options.emit);
     } catch (error) {

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { grolandNativeSearchApi } from "@pi67/domain";
-import { executeExaSearch } from "./first-party-web-exa.js";
 import { DEFAULT_FETCH_DEPENDENCIES, fetchPublicText, normalizeUrls } from "./first-party-web-fetch.js";
 import {
   type FetchDependencies,
@@ -79,11 +78,11 @@ export function createFirstPartyWebTools(
   const webSearch: ToolDefinition = {
     name: "web_search",
     label: "Web search",
-    description: "Search the current web. Uses the selected model's declared native search protocol when available, otherwise Pi-67's Exa fallback.",
-    promptSnippet: "Search the current web through the selected model or Pi-67 fallback.",
+    description: "Search the current web through the selected model's declared provider-native search protocol.",
+    promptSnippet: "Search the current web when the task needs current information or external evidence.",
     promptGuidelines: [
-      "Use web_search once per distinct lookup; its automatic route already selects model-native search or the Pi-67 Exa fallback.",
-      "Do not retry a model-native request through another provider after an authentication, quota, rate-limit, or server error."
+      "Decide automatically whether the task needs web search; there is no user-facing search switch.",
+      "Use web_search once per distinct lookup and do not retry through another provider after any native-search failure."
     ],
     parameters: {
       type: "object",
@@ -100,32 +99,33 @@ export function createFirstPartyWebTools(
       const request = normalizeSearchRequest(rawInput);
       const model = ctx.model;
       const route = model ? resolveNativeSearchRoute(model) : undefined;
-      onUpdate?.(toolResult("正在选择搜索路由…", {
+      if (!model || !route) {
+        throw new Error(
+          "NATIVE_WEB_SEARCH_UNAVAILABLE: the selected model does not declare a supported provider-native search route."
+        );
+      }
+      onUpdate?.(toolResult("正在调用模型原生搜索…", {
         responseId: "pending",
-        source: route ? "provider-native" : "exa",
-        sourceLabel: route?.sourceLabel ?? "Pi-67 回退 · Exa",
+        source: "provider-native",
+        sourceLabel: route.sourceLabel,
         urls: []
       }));
 
-      let result: SearchResult;
-      if (model && route) {
-        const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-        if (auth.ok && auth.apiKey) {
-          result = await executeNativeSearch(
-            dependencies.fetch,
-            route,
-            model.id,
-            auth.apiKey,
-            auth.headers,
-            request,
-            signal
-          );
-        } else {
-          result = await executeExaSearch(dependencies.fetch, request, signal);
-        }
-      } else {
-        result = await executeExaSearch(dependencies.fetch, request, signal);
+      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+      if (!auth.ok || !auth.apiKey) {
+        throw new Error(
+          "NATIVE_WEB_SEARCH_CREDENTIAL_UNAVAILABLE: the selected model's native search credential is unavailable."
+        );
       }
+      const result = await executeNativeSearch(
+        dependencies.fetch,
+        route,
+        model.id,
+        auth.apiKey,
+        auth.headers,
+        request,
+        signal
+      );
       const cached = cache.put(result);
       return toolResult(formatSearchResult(cached), searchDetails(cached));
     }
@@ -197,7 +197,7 @@ export function createFirstPartyWebTools(
   const sourceCheck: ToolDefinition = {
     name: "source_check",
     label: "Check sources",
-    description: "Search the web for evidence related to a claim using the same native-or-Exa routing as web_search.",
+    description: "Search the web for evidence related to a claim through the selected model's provider-native search.",
     parameters: {
       type: "object",
       additionalProperties: true,
@@ -266,7 +266,7 @@ export async function executeNativeSearch(
     ...(signal ? { signal } : {})
   });
   if (!response.ok) {
-    throw new Error(`NATIVE_WEB_SEARCH_FAILED: ${route.sourceLabel} returned HTTP ${response.status}; the query was not resent to Exa.`);
+    throw new Error(`NATIVE_WEB_SEARCH_FAILED: ${route.sourceLabel} returned HTTP ${response.status}; no alternate search provider was called.`);
   }
   const payload = await parseBoundedJson(
     response,
@@ -277,7 +277,7 @@ export async function executeNativeSearch(
     ? projectAnthropicSearchResponse(payload)
     : projectResponsesSearchResponse(payload);
   if (!projected.text.trim()) {
-    throw new Error(`NATIVE_WEB_SEARCH_EMPTY: ${route.sourceLabel} returned no searchable answer; the query was not resent to Exa.`);
+    throw new Error(`NATIVE_WEB_SEARCH_EMPTY: ${route.sourceLabel} returned no searchable answer; no alternate search provider was called.`);
   }
   return { ...projected, source: "provider-native", sourceLabel: route.sourceLabel };
 }

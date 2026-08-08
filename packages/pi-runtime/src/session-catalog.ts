@@ -28,7 +28,10 @@ import {
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import { upsertSessionCatalogRecordByIdentity } from "./session-catalog-record-identity.js";
 import type { CreateSessionCatalogOptions, SessionCatalog, SessionCatalogContext } from "./session-catalog-contract.js";
-import { SessionCatalogRecordEnricher } from "./session-catalog-record-enricher.js";
+import {
+  SessionCatalogRecordEnricher,
+  type SessionCatalogOrganizationMutation
+} from "./session-catalog-record-enricher.js";
 import { SessionCatalogAutomaticTitlePublisher } from "./session-catalog-automatic-title-publisher.js";
 import {
   organizeSessionCatalogRecord,
@@ -144,7 +147,7 @@ class DefaultSessionCatalog implements SessionCatalog {
   }
   organize(
     path: string,
-    mutation: { kind: "pin" | "archive"; value: boolean },
+    mutation: SessionCatalogOrganizationMutation,
     context: SessionCatalogContext
   ): Promise<number> {
     return this.withPreparedContext(context, (generation) => organizeSessionCatalogRecord(

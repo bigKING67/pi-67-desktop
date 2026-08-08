@@ -1,6 +1,8 @@
 import type { WorkspaceId } from "./workbench.js";
 
 export const MAX_REPOSITORY_WORKTREES = 100;
+export const MAX_REPOSITORY_CHANGES = 500;
+export const MAX_REPOSITORY_DIFF_CHARS = 512 * 1024;
 
 export type RepositoryEnvironmentStatus =
   | "ready"
@@ -65,6 +67,44 @@ export interface RepositoryEnvironmentSnapshot {
   repository?: RepositoryIdentityView;
   worktrees: WorktreeObservation[];
   error?: RepositoryEnvironmentError;
+}
+
+export type RepositoryChangeKind =
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "copied"
+  | "untracked"
+  | "conflict";
+
+export interface RepositoryWorkingTreeChange {
+  changeId: string;
+  displayPath: string;
+  previousDisplayPath?: string;
+  kind: RepositoryChangeKind;
+  staged: boolean;
+  unstaged: boolean;
+  conflicted: boolean;
+}
+
+export interface RepositoryWorkingTreeSnapshot {
+  workspaceId: WorkspaceId;
+  revision: number;
+  observedAt: number;
+  headSha?: string;
+  changes: RepositoryWorkingTreeChange[];
+  truncated: boolean;
+}
+
+export interface RepositoryChangeDetail {
+  workspaceId: WorkspaceId;
+  revision: number;
+  changeId: string;
+  contentFingerprint: string;
+  stagedPatch?: string;
+  unstagedPatch?: string;
+  truncated: boolean;
 }
 
 export function nextRepositoryEnvironmentRevision(

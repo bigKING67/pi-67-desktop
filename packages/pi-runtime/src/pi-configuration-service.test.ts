@@ -242,7 +242,7 @@ describe("PiConfigurationService", () => {
     const fixture = await createFixture({
       fallbackPollMs: 60_000,
       watchDebounceMs: 60_000,
-      validationRuntimeWaitMs: 10
+      validationRuntimeWaitMs: 250
     });
     const stalled = new Promise<ModelRuntime>(() => undefined);
     const createRuntime = vi.spyOn(ModelRuntime, "create").mockReturnValue(stalled);
@@ -256,7 +256,7 @@ describe("PiConfigurationService", () => {
       expect(failure).toMatchObject({
         code: "RUNTIME_NOT_READY",
         recoverable: true,
-        details: { stage: "session-model-runtime", waitMs: 10 }
+        details: { stage: "session-model-runtime", waitMs: 250 }
       });
 
       createRuntime.mockRestore();

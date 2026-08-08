@@ -21,6 +21,15 @@ import type {
   DesktopRecoverySnapshot,
   RepositoryEnvironmentInspectionRequest,
   RepositoryEnvironmentSnapshot,
+  RepositoryChangeDetail,
+  RepositoryChangeDetailRequest,
+  RepositoryWorkingTreeInspectionRequest,
+  RepositoryWorkingTreeSnapshot,
+  PromptStashImagesDeleteRequest,
+  PromptStashImagesRestoreRequest,
+  PromptStashImagesRestoreResult,
+  PromptStashImagesStoreRequest,
+  PromptStashImagesStoreResult,
   SupportDiagnosticsExportRequest,
   StagedPromptAttachment,
   WorktreeCreationAdvanceRequest,
@@ -61,10 +70,19 @@ declare global {
         connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
         stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
         releasePromptAttachments(ids: string[]): Promise<void>;
+        storePromptStashImages(request: PromptStashImagesStoreRequest): Promise<PromptStashImagesStoreResult>;
+        restorePromptStashImages(request: PromptStashImagesRestoreRequest): Promise<PromptStashImagesRestoreResult>;
+        deletePromptStashImages(request: PromptStashImagesDeleteRequest): Promise<void>;
         loadWorkbenchState(): Promise<WorkbenchStateV5>;
         inspectRepositoryEnvironment(
           request: RepositoryEnvironmentInspectionRequest
         ): Promise<RepositoryEnvironmentSnapshot>;
+        inspectRepositoryWorkingTree(
+          request: RepositoryWorkingTreeInspectionRequest
+        ): Promise<RepositoryWorkingTreeSnapshot>;
+        readRepositoryChangeDetail(
+          request: RepositoryChangeDetailRequest
+        ): Promise<RepositoryChangeDetail>;
         createWorktreeEnvironment(request: WorktreeCreationRequest): Promise<WorktreeCreationResult>;
         advanceWorktreeEnvironment(
           request: WorktreeCreationAdvanceRequest

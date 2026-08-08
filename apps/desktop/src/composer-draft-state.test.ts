@@ -245,6 +245,105 @@ describe("parseComposerDraftPersistedState", () => {
       ]
     })).toBeUndefined();
   });
+
+  it("accepts legacy text and bounded image metadata while rejecting forged image state", () => {
+    const state = draftState();
+    const image = {
+      blobId: "blob-1",
+      name: "screen.png",
+      mimeType: "image/png" as const,
+      byteLength: 4,
+      kind: "image" as const
+    };
+    const imageOnly = {
+      ...state,
+      drafts: [{
+        ...state.drafts[0],
+        text: "",
+        promptStash: [{ id: "stash-image", text: "", createdAt: 12, attachments: [image] }]
+      }]
+    };
+    expect(parseComposerDraftPersistedState(imageOnly)).toEqual(imageOnly);
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{
+        ...state.drafts[0],
+        promptStash: [{ id: "legacy", text: "legacy text", createdAt: 1 }]
+      }]
+    })).toBeDefined();
+
+    for (const attachment of [
+      { ...image, blobId: "../outside" },
+      { ...image, name: "nested/screen.png" },
+      { ...image, mimeType: "image/svg+xml" },
+      { ...image, kind: "document" },
+      { ...image, data: "iVBORw==" }
+    ]) {
+      expect(parseComposerDraftPersistedState({
+        ...imageOnly,
+        drafts: [{
+          ...imageOnly.drafts[0],
+          promptStash: [{ id: "stash-image", text: "image", createdAt: 12, attachments: [attachment] }]
+        }]
+      })).toBeUndefined();
+    }
+    expect(parseComposerDraftPersistedState({
+      ...imageOnly,
+      drafts: [{
+        ...imageOnly.drafts[0],
+        promptStash: [{ id: "stash-image", text: "image", createdAt: 12, attachments: [image, image] }]
+      }]
+    })).toBeUndefined();
+  });
+
+  it("enforces per-item, per-task, and global Prompt stash image quotas from metadata", () => {
+    const state = draftState();
+    const image = (id: string, byteLength = 32 * 1024 * 1024) => ({
+      blobId: id,
+      name: `${id}.png`,
+      mimeType: "image/png",
+      byteLength,
+      kind: "image"
+    });
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{
+        ...state.drafts[0],
+        promptStash: [{
+          id: "stash-overflow",
+          text: "overflow",
+          createdAt: 1,
+          attachments: [image("blob-overflow", 32 * 1024 * 1024 + 1)]
+        }]
+      }]
+    })).toBeUndefined();
+
+    const stashes = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => ({
+      id: `${prefix}-stash-${index}`,
+      text: "image",
+      createdAt: index,
+      attachments: [image(`${prefix}-blob-${index}`)]
+    }));
+    expect(parseComposerDraftPersistedState({
+      ...state,
+      drafts: [{ ...state.drafts[0], promptStash: stashes("task", 5) }]
+    })).toBeUndefined();
+
+    expect(parseComposerDraftPersistedState({
+      version: 1,
+      drafts: Array.from({ length: 5 }, (_, index) => ({
+        conversation: {
+          kind: "provisional",
+          workspaceId: "workspace-a",
+          draftId: `draft-${index}`
+        },
+        text: "",
+        streamBehavior: "followUp",
+        updatedAt: index,
+        promptStash: stashes(`global-${index}`, 4)
+      }))
+    })).toBeUndefined();
+  });
 });
 
 function draftState() {

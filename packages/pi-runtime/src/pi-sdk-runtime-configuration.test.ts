@@ -25,7 +25,7 @@ describe("PiSdkRuntime configuration reload", () => {
     const configurationService = new PiConfigurationService(agentDir, {
       fallbackPollMs: 60_000,
       watchDebounceMs: 60_000,
-      validationRuntimeWaitMs: 10
+      validationRuntimeWaitMs: 250
     });
     const workspaceServices = createPiWorkspaceRuntimeServices({
       cwd,
@@ -50,7 +50,7 @@ describe("PiSdkRuntime configuration reload", () => {
       expect(failure).toMatchObject({
         code: "RUNTIME_NOT_READY",
         recoverable: true,
-        details: { stage: "session-model-runtime", waitMs: 10 }
+        details: { stage: "session-model-runtime", waitMs: 250 }
       });
       expect(observations).toEqual(expect.arrayContaining([
         { stage: "load-model-runtime", outcome: "started", durationMs: 0 },

@@ -8,7 +8,7 @@ import { fingerprintSchemaSql, SchemaSqlFingerprintError } from "./sqlite-schema
 import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
 import type { SessionCatalogRecord, SqliteCatalogState } from "./sqlite-session-catalog.js";
 
-export const SESSION_CATALOG_SCHEMA_VERSION = 3;
+export const SESSION_CATALOG_SCHEMA_VERSION = 4;
 const SQLITE_BUSY_TIMEOUT_MS = 100;
 const CATALOG_STATE_TABLE_SQL = `CREATE TABLE catalog_state (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -33,7 +33,8 @@ const SESSIONS_TABLE_SQL = `CREATE TABLE sessions (
   message_count INTEGER NOT NULL CHECK (message_count >= 0),
   parent_session_path TEXT CHECK (parent_session_path IS NULL OR length(trim(parent_session_path)) BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS}),
   pinned_at_ms INTEGER CHECK (pinned_at_ms IS NULL OR pinned_at_ms >= 0),
-  archived_at_ms INTEGER CHECK (archived_at_ms IS NULL OR archived_at_ms >= 0)
+  archived_at_ms INTEGER CHECK (archived_at_ms IS NULL OR archived_at_ms >= 0),
+  snoozed_until_ms INTEGER CHECK (snoozed_until_ms IS NULL OR snoozed_until_ms >= 0)
 ) STRICT`;
 const REQUIRED_SESSION_INDEXES = [
   {
@@ -91,7 +92,8 @@ const SESSION_COLUMNS = [
   { name: "message_count", type: "INTEGER", notNull: 1, primaryKey: 0 },
   { name: "parent_session_path", type: "TEXT", notNull: 0, primaryKey: 0 },
   { name: "pinned_at_ms", type: "INTEGER", notNull: 0, primaryKey: 0 },
-  { name: "archived_at_ms", type: "INTEGER", notNull: 0, primaryKey: 0 }
+  { name: "archived_at_ms", type: "INTEGER", notNull: 0, primaryKey: 0 },
+  { name: "snoozed_until_ms", type: "INTEGER", notNull: 0, primaryKey: 0 }
 ] as const;
 
 interface StatementLike {
@@ -163,7 +165,8 @@ export function recordValues(record: SessionCatalogRecord): SqlValue[] {
     record.messageCount,
     record.parentSessionPath ?? null,
     record.pinnedAt ?? null,
-    record.archivedAt ?? null
+    record.archivedAt ?? null,
+    record.snoozedUntil ?? null
   ];
 }
 
@@ -180,6 +183,9 @@ export function recordFromRow(row: Record<string, unknown>): SessionCatalogRecor
   const archivedAt = row.archived_at_ms === null
     ? undefined
     : readNonNegativeInteger(row.archived_at_ms, "archived_at_ms");
+  const snoozedUntil = row.snoozed_until_ms === null
+    ? undefined
+    : readNonNegativeInteger(row.snoozed_until_ms, "snoozed_until_ms");
   return {
     fileIdentity: readText(
       row.file_identity,
@@ -195,7 +201,8 @@ export function recordFromRow(row: Record<string, unknown>): SessionCatalogRecor
     messageCount: readNonNegativeInteger(row.message_count, "message_count"),
     ...(parentSessionPath === undefined ? {} : { parentSessionPath }),
     ...(pinnedAt === undefined ? {} : { pinnedAt }),
-    ...(archivedAt === undefined ? {} : { archivedAt })
+    ...(archivedAt === undefined ? {} : { archivedAt }),
+    ...(snoozedUntil === undefined ? {} : { snoozedUntil })
   };
 }
 
@@ -244,6 +251,7 @@ function validateLogicalState(database: DatabaseLike): void {
        OR modified_at_ms < 0 OR message_count < 0
        OR (pinned_at_ms IS NOT NULL AND pinned_at_ms < 0)
        OR (archived_at_ms IS NOT NULL AND archived_at_ms < 0)
+       OR (snoozed_until_ms IS NOT NULL AND snoozed_until_ms < 0)
        OR (parent_session_path IS NOT NULL AND length(trim(parent_session_path)) NOT BETWEEN 1 AND ${MAX_SESSION_CATALOG_PATH_CHARS})
   `).get()?.total, "invalid rows");
   if (invalid > 0) throw new SchemaMismatchError("Catalog contains invalid session metadata.");
@@ -267,7 +275,8 @@ function isConsistentCatalogState(state: SqliteCatalogState, total: number): boo
 function validateDerivedSessionMetadata(database: DatabaseLike): void {
   const rows = database.prepare(`
     SELECT file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-           modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
+           modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms,
+           snoozed_until_ms
     FROM sessions
   `).all();
   for (const row of rows) {

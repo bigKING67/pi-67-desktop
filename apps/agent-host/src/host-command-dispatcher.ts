@@ -62,6 +62,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "session.nameByPath"
       | "conversation.pin"
       | "conversation.archive"
+      | "conversation.snooze"
       | "conversation.reorderPinned"
   }
 >;

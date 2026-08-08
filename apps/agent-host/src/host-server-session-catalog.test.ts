@@ -112,7 +112,7 @@ describe("AgentHostServer Session Catalog", () => {
     }
   });
 
-  it("renames, pins, archives, restores, and replays cold conversation mutations without loading a Task Runtime", async () => {
+  it("renames, pins, snoozes, archives, restores, and replays cold conversation mutations without loading a Task Runtime", async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), "pi67-host-conversation-organization-")));
     const cwd = join(root, "workspace");
     const agentDir = join(root, "agent");
@@ -254,7 +254,7 @@ describe("AgentHostServer Session Catalog", () => {
       expect(archivedItems[0]).not.toHaveProperty("pinnedAt");
 
       const organizationRaw = await readFile(
-        join(root, "conversation-organization", "organization-v2.json"),
+        join(root, "conversation-organization", "organization-v3.json"),
         "utf8"
       );
       expect(organizationRaw).not.toContain(sessionPath);
@@ -266,6 +266,24 @@ describe("AgentHostServer Session Catalog", () => {
       }, context, 9, "restore-cold-conversation");
       port.emit(restored);
       expect(await responseFor(port, restored.requestId)).toMatchObject({ ok: true });
+
+      const snoozedUntil = Date.now() + 60 * 60 * 1_000;
+      const snoozed = commandEnvelopeForContext("conversation.snooze", {
+        path: sessionPath,
+        snoozedUntil
+      }, context, 9, "snooze-cold-conversation");
+      port.emit(snoozed);
+      expect(await responseFor(port, snoozed.requestId)).toMatchObject({ ok: true });
+      expect((await queryCatalog(port, context, { view: "active" })).items.find((item) => item.path === sessionPath))
+        .toEqual(expect.objectContaining({ snoozedUntil }));
+
+      const wake = commandEnvelopeForContext("conversation.snooze", {
+        path: sessionPath
+      }, context, 9, "wake-cold-conversation");
+      port.emit(wake);
+      expect(await responseFor(port, wake.requestId)).toMatchObject({ ok: true });
+      expect((await queryCatalog(port, context, { view: "active" })).items.find((item) => item.path === sessionPath))
+        .not.toHaveProperty("snoozedUntil");
 
       const clearName = commandEnvelopeForContext("session.nameByPath", {
         path: sessionPath,

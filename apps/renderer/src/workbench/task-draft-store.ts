@@ -74,7 +74,12 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
 
   addPromptStash(taskId, item) {
     const current = draftFor(get(), taskId);
-    if (current.promptStash.some((candidate) => candidate.text === item.text)) return "duplicate";
+    if (
+      (item.attachments?.length ?? 0) === 0
+      && current.promptStash.some((candidate) => (
+        (candidate.attachments?.length ?? 0) === 0 && candidate.text === item.text
+      ))
+    ) return "duplicate";
     if (current.promptStash.length >= MAX_PROMPT_STASH_ITEMS) return "full";
     const itemBytes = encoder.encode(item.text).byteLength;
     const totalBytes = current.promptStash.reduce(
@@ -90,7 +95,7 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
         ...state.drafts,
         [taskId]: {
           ...draftFor(state, taskId),
-          promptStash: [...draftFor(state, taskId).promptStash, { ...item }]
+          promptStash: [...draftFor(state, taskId).promptStash, cloneStashItem(item)]
         }
       }
     }));
@@ -133,7 +138,7 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
           text: draft.text,
           attachments: [],
           workspaceFiles: draft.workspaceFiles?.map((reference) => ({ ...reference })) ?? [],
-          promptStash: draft.promptStash?.map((item) => ({ ...item })) ?? [],
+          promptStash: draft.promptStash?.map(cloneStashItem) ?? [],
           streamBehavior: draft.streamBehavior,
           interactionMode: draft.interactionMode ?? "execute"
         }
@@ -183,4 +188,11 @@ function hasDraftContent(draft: TaskDraft): boolean {
     || draft.attachments.length > 0
     || draft.workspaceFiles.length > 0
     || draft.promptStash.length > 0;
+}
+
+function cloneStashItem(item: PromptStashItem): PromptStashItem {
+  return {
+    ...item,
+    ...(item.attachments ? { attachments: item.attachments.map((attachment) => ({ ...attachment })) } : {})
+  };
 }

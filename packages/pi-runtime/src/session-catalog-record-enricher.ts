@@ -7,7 +7,12 @@ import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 export interface SessionCatalogOrganization {
   pinnedAt?: number;
   archivedAt?: number;
+  snoozedUntil?: number;
 }
+
+export type SessionCatalogOrganizationMutation =
+  | { kind: "pin" | "archive"; value: boolean }
+  | { kind: "snooze"; value: number | undefined };
 
 export class SessionCatalogRecordEnricher {
   private readonly automaticTitles = new SessionAutomaticTitleReader();
@@ -51,18 +56,28 @@ export class SessionCatalogRecordEnricher {
   async organize(
     sourceKey: string,
     fileIdentity: string,
-    mutation: { kind: "pin" | "archive"; value: boolean },
+    mutation: SessionCatalogOrganizationMutation,
     now: number
   ): Promise<SessionCatalogOrganization> {
     const current = this.organizationStore.get(sourceKey, fileIdentity);
     if (mutation.kind === "pin" && mutation.value && current.archivedAt !== undefined) {
       throw new RuntimeError("INVALID_PAYLOAD", "Archived conversations must be restored before pinning.");
     }
-    const organization = mutation.kind === "archive"
+    if (mutation.kind === "snooze" && current.archivedAt !== undefined) {
+      throw new RuntimeError("INVALID_PAYLOAD", "Archived conversations must be restored before snoozing.");
+    }
+    const organization: SessionCatalogOrganization = mutation.kind === "archive"
       ? mutation.value ? { archivedAt: now } : {}
+      : mutation.kind === "snooze"
+        ? mutation.value === undefined
+          ? organizationWithout(current, "snoozedUntil")
+          : { snoozedUntil: mutation.value }
       : mutation.value
-        ? { ...current, pinnedAt: Math.max(now, this.organizationStore.highestPinnedAt() + 1) }
-        : current.archivedAt === undefined ? {} : { archivedAt: current.archivedAt };
+        ? {
+            ...organizationWithout(current, "snoozedUntil"),
+            pinnedAt: Math.max(now, this.organizationStore.highestPinnedAt() + 1)
+          }
+        : organizationWithout(current, "pinnedAt");
     await this.organizationStore.set(sourceKey, fileIdentity, organization);
     return organization;
   }
@@ -102,8 +117,10 @@ export class SessionCatalogRecordEnricher {
       const next = { ...record };
       delete next.pinnedAt;
       delete next.archivedAt;
+      delete next.snoozedUntil;
       if (organization.pinnedAt !== undefined) next.pinnedAt = organization.pinnedAt;
       if (organization.archivedAt !== undefined) next.archivedAt = organization.archivedAt;
+      if (organization.snoozedUntil !== undefined) next.snoozedUntil = organization.snoozedUntil;
       return next;
     }));
   }
@@ -118,9 +135,20 @@ export class SessionCatalogRecordEnricher {
       const next = { ...record };
       delete next.pinnedAt;
       delete next.archivedAt;
+      delete next.snoozedUntil;
       if (organization.pinnedAt !== undefined) next.pinnedAt = organization.pinnedAt;
       if (organization.archivedAt !== undefined) next.archivedAt = organization.archivedAt;
+      if (organization.snoozedUntil !== undefined) next.snoozedUntil = organization.snoozedUntil;
       return next;
     }));
   }
+}
+
+function organizationWithout(
+  organization: SessionCatalogOrganization,
+  key: keyof SessionCatalogOrganization
+): SessionCatalogOrganization {
+  const next = { ...organization };
+  delete next[key];
+  return next;
 }

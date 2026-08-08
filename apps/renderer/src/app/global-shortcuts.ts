@@ -3,7 +3,13 @@ import { useShellStore } from "../shell/shell-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 import { requestConversationFind } from "../search/conversation-find-events.js";
-import { matchDesktopAction } from "./desktop-action-registry.js";
+import {
+  matchDesktopAction,
+  type DesktopActionDescriptor,
+  type DesktopShortcutContext
+} from "./desktop-action-registry.js";
+import { effectiveDesktopActions } from "./desktop-shortcut-preferences.js";
+import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
 
 interface GlobalShortcutTarget {
   addEventListener(type: "keydown", listener: (event: KeyboardEvent) => void): void;
@@ -18,8 +24,9 @@ export function installGlobalShortcuts(target: GlobalShortcutTarget = window) {
 export function handleGlobalShortcut(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return;
   if (shortcutOwnedByFocusedOverlay(event.target)) return;
-  const action = matchDesktopAction(event);
+  const action = matchDesktopAction(event, effectiveDesktopActions());
   if (!action) return;
+  if (!desktopActionAllowedInContexts(action, activeShortcutContexts(event.target))) return;
 
   if (action.id === "settings") {
     event.preventDefault();
@@ -61,6 +68,37 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
     return;
   }
   if (action.id === "toggle-navigation") toggleRendererNavigation();
+}
+
+export function desktopActionAllowedInContexts(
+  action: DesktopActionDescriptor,
+  contexts: {
+    surface?: Extract<DesktopShortcutContext, "workspaceOpen" | "composerFocus" | "settingsOpen" | "fileEditorFocus">;
+    lifecycle: Extract<DesktopShortcutContext, "taskRunning" | "taskIdle">;
+  }
+): boolean {
+  if (!action.contexts.includes(contexts.lifecycle)) return false;
+  return contexts.surface === undefined || action.contexts.includes(contexts.surface);
+}
+
+function activeShortcutContexts(target: EventTarget | null): {
+  surface?: Extract<DesktopShortcutContext, "workspaceOpen" | "composerFocus" | "settingsOpen" | "fileEditorFocus">;
+  lifecycle: Extract<DesktopShortcutContext, "taskRunning" | "taskIdle">;
+} {
+  const operation = useAppStore.getState().operation;
+  const lifecycle = operation && isActiveOperationLifecycle(operation.lifecycle)
+    ? "taskRunning"
+    : "taskIdle";
+  if (rendererWorkbenchStore.getState().selectedSurface?.kind === "settings") {
+    return { surface: "settingsOpen", lifecycle };
+  }
+  if (typeof Element !== "undefined" && target instanceof Element) {
+    if (target.closest(".workspace-file-editor")) return { surface: "fileEditorFocus", lifecycle };
+    if (target.closest('[data-testid="composer-region"]')) return { surface: "composerFocus", lifecycle };
+  }
+  return useAppStore.getState().workspace
+    ? { surface: "workspaceOpen", lifecycle }
+    : { lifecycle };
 }
 
 export function toggleRendererNavigation() {

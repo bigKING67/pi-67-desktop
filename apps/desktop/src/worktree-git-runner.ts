@@ -28,6 +28,8 @@ const FILTER_INSPECTION_TIMEOUT_MS = 5_000;
 const FILTER_INSPECTION_OUTPUT_BYTES = 256 * 1024;
 const STATUS_TIMEOUT_MS = 10_000;
 const STATUS_OUTPUT_BYTES = 1024 * 1024;
+const DIFF_TIMEOUT_MS = 15_000;
+const DIFF_OUTPUT_BYTES = 2 * 1024 * 1024;
 const WORKTREE_ADD_TIMEOUT_MS = 60_000;
 const WORKTREE_REMOVE_TIMEOUT_MS = 30_000;
 const MUTATION_OUTPUT_BYTES = 1024 * 1024;
@@ -37,6 +39,7 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
   readonly #argumentPrefix: string[];
   readonly #budgets: Required<NonNullable<BoundedPrivateGitRunnerOptions["budgets"]>>;
   readonly #controllers = new Set<AbortController>();
+  #disposed = false;
 
   constructor(toolchain: DesktopToolchain, options: BoundedPrivateGitRunnerOptions = {}) {
     this.#toolchain = toolchain;
@@ -51,6 +54,8 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
       filterInspectionOutputBytes: options.budgets?.filterInspectionOutputBytes ?? FILTER_INSPECTION_OUTPUT_BYTES,
       statusTimeoutMs: options.budgets?.statusTimeoutMs ?? STATUS_TIMEOUT_MS,
       statusOutputBytes: options.budgets?.statusOutputBytes ?? STATUS_OUTPUT_BYTES,
+      diffTimeoutMs: options.budgets?.diffTimeoutMs ?? DIFF_TIMEOUT_MS,
+      diffOutputBytes: options.budgets?.diffOutputBytes ?? DIFF_OUTPUT_BYTES,
       worktreeAddTimeoutMs: options.budgets?.worktreeAddTimeoutMs ?? WORKTREE_ADD_TIMEOUT_MS,
       worktreeRemoveTimeoutMs: options.budgets?.worktreeRemoveTimeoutMs ?? WORKTREE_REMOVE_TIMEOUT_MS,
       mutationOutputBytes: options.budgets?.mutationOutputBytes ?? MUTATION_OUTPUT_BYTES
@@ -129,11 +134,41 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
     return this.#execute(
       "status",
       cwd,
-      ["--no-optional-locks", "-c", "core.longpaths=true", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      ["--no-optional-locks", "-c", "core.longpaths=true", "status", "--porcelain=v2", "-z", "--untracked-files=all"],
       this.#budgets.statusTimeoutMs,
       this.#budgets.statusOutputBytes,
       signal
     );
+  }
+
+  diffPath(
+    cwd: string,
+    relativePath: string,
+    mode: "staged" | "unstaged" | "untracked" | "conflict",
+    signal?: AbortSignal
+  ): Promise<string> {
+    assertRelativeGitPath(relativePath);
+    const common = ["--no-optional-locks", "-c", "core.longpaths=true", "diff", "--no-ext-diff", "--no-textconv", "--unified=3"];
+    const arguments_ = mode === "staged"
+      ? [...common, "--cached", "--", relativePath]
+      : mode === "conflict"
+        ? [...common, "--cc", "--", relativePath]
+        : mode === "untracked"
+          ? [...common, "--no-index", "--no-prefix", "--", this.#platform === "win32" ? "NUL" : "/dev/null", relativePath]
+          : [...common, "--", relativePath];
+    return this.#execute(
+      "diff",
+      cwd,
+      arguments_,
+      this.#budgets.diffTimeoutMs,
+      this.#budgets.diffOutputBytes,
+      signal,
+      mode === "untracked" ? [0, 1] : undefined
+    );
+  }
+
+  diagnostics(): { activeProcessCount: number; disposed: boolean } {
+    return { activeProcessCount: this.#controllers.size, disposed: this.#disposed };
   }
 
   async resolveBranchHead(cwd: string, branchName: string, signal?: AbortSignal): Promise<string | undefined> {
@@ -211,6 +246,7 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
   }
 
   dispose(): void {
+    this.#disposed = true;
     for (const controller of this.#controllers) controller.abort();
     this.#controllers.clear();
   }
@@ -221,10 +257,12 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
     arguments_: string[],
     timeoutMs: number,
     outputLimitBytes: number,
-    callerSignal?: AbortSignal
+    callerSignal?: AbortSignal,
+    acceptedExitCodes?: readonly number[]
   ): Promise<string> {
     const executable = this.#toolchain.gitExecutable;
     const gitExecPath = this.#toolchain.gitExecPath;
+    if (this.#disposed) throw new GitInspectionError(stage, "cancelled", { cleanupConfirmed: true });
     if (!this.#toolchain.ready || !executable || !gitExecPath) {
       throw new GitInspectionError(stage, "toolchain-unavailable");
     }
@@ -251,13 +289,25 @@ export class BoundedPrivateGitRunner implements RepositoryMutationGitRunner {
         timeoutMs,
         outputLimitBytes,
         signal: controller.signal,
-        platform: this.#platform
+        platform: this.#platform,
+        ...(acceptedExitCodes ? { acceptedExitCodes } : {})
       });
     } finally {
       callerSignal?.removeEventListener("abort", abortFromCaller);
       this.#controllers.delete(controller);
     }
   }
+}
+
+function assertRelativeGitPath(path: string): void {
+  if (
+    path.length === 0
+    || path.length > 32_768
+    || path.includes("\0")
+    || path.startsWith("/")
+    || /^[A-Za-z]:[\\/]/u.test(path)
+    || path.split(/[\\/]/u).some((segment) => segment === "..")
+  ) throw new Error("Git diff path is invalid.");
 }
 
 export function parseGitWorktreePorcelain(

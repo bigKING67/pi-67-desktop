@@ -6,21 +6,15 @@ describe("CommandScheduler", () => {
   it("classifies control, recovery, turn, queue, interrupt and query commands", () => {
     expect(commandClassFor(command("session.open", { path: "/tmp/s.jsonl" }))).toBe("exclusive-control");
     expect(commandClassFor(command("session.fork", { entryId: "entry-1" }))).toBe("exclusive-control");
-    expect(commandClassFor(command("prompt.submit", {
-      submissionId: "s", text: "go", delivery: "new-turn"
-    }))).toBe("turn");
-    expect(commandClassFor(command("prompt.submit", {
-      submissionId: "s", text: "adjust", delivery: "steer"
-    }))).toBe("queue");
+    expect(commandClassFor(command("prompt.submit", { submissionId: "s", text: "go", delivery: "new-turn" })))
+      .toBe("turn");
+    expect(commandClassFor(command("prompt.submit", { submissionId: "s", text: "adjust", delivery: "steer" })))
+      .toBe("queue");
     expect(commandClassFor(command("operation.abort", {}))).toBe("interrupt");
     expect(commandClassFor(command("queue.clear", {}))).toBe("interrupt");
     expect(commandClassFor(command("approval.respond", {
-      requestId: "approval-1",
-      toolCallId: "tool-call-1",
-      sessionId: "session-1",
-      sessionGeneration: 1,
-      operationId: "operation-1",
-      decision: "deny"
+      requestId: "approval-1", toolCallId: "tool-call-1", sessionId: "session-1",
+      sessionGeneration: 1, operationId: "operation-1", decision: "deny"
     }))).toBe("interrupt");
     expect(commandClassFor(command("task.toolMode.set", { mode: "yolo" }))).toBe("interrupt");
     expect(commandClassFor(command("runtime.getStatus", {}))).toBe("query");
@@ -29,10 +23,7 @@ describe("CommandScheduler", () => {
     expect(commandClassFor(command("workspace.changes", {}))).toBe("query");
     expect(commandClassFor(command("session.tree", {}))).toBe("query");
     expect(commandClassFor(command("asset.read", {
-      assetId: "asset-1",
-      sessionGeneration: 1,
-      offset: 0,
-      length: 1_024
+      assetId: "asset-1", sessionGeneration: 1, offset: 0, length: 1_024
     }))).toBe("query");
   });
 
@@ -433,7 +424,18 @@ describe("CommandScheduler", () => {
     });
     await Promise.resolve();
 
+    expect(scheduler.diagnostics()).toEqual({
+      queryActive: 0,
+      controlQueued: 1,
+      controlRunning: true,
+      promptQueued: 1,
+      promptRunning: true,
+      turnAdmission: false,
+      closed: false
+    });
+
     expect(scheduler.shutdown()).toEqual({ queuedCommandsDropped: 2 });
+    expect(scheduler.diagnostics()).toMatchObject({ closed: true, controlQueued: 1, promptQueued: 1 });
     expect(scheduler.shutdown()).toEqual({ queuedCommandsDropped: 2 });
     await expect(scheduler.run(command("runtime.getStatus", {}), async () => "late"))
       .rejects.toMatchObject({ code: "CONNECTION_CLOSED", details: { shuttingDown: true } });

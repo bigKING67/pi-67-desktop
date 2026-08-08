@@ -33,6 +33,27 @@ describe("desktop recovery snapshot", () => {
       claimedCount: 1,
       invalidEntryCount: 0,
       truncated: false
+    }, {
+      agentHost: {
+        phase: "running",
+        hostEpoch: 2,
+        restartCount: 1,
+        portHandoffCount: 3,
+        poisonedRuntimeReplacementCount: 0,
+        poisonedRuntimeReplacementPending: false
+      },
+      repository: {
+        mutationScheduler: {
+          queuedCount: 1,
+          runningCount: 0,
+          activeRepositoryCount: 0,
+          fencedRepositoryCount: 0,
+          disposed: false
+        },
+        gitRunner: { activeProcessCount: 0, disposed: false },
+        workingTree: { cachedSnapshotCount: 2, disposed: false }
+      },
+      promptStashImages: { disposed: false }
     }, 42);
 
     expect(snapshot).toEqual({
@@ -55,6 +76,28 @@ describe("desktop recovery snapshot", () => {
         claimedCount: 1,
         invalidEntryCount: 0,
         truncated: false
+      },
+      health: {
+        agentHost: {
+          phase: "running",
+          hostEpoch: 2,
+          restartCount: 1,
+          portHandoffCount: 3,
+          poisonedRuntimeReplacementCount: 0,
+          poisonedRuntimeReplacementPending: false
+        },
+        repository: {
+          mutationScheduler: {
+            queuedCount: 1,
+            runningCount: 0,
+            activeRepositoryCount: 0,
+            fencedRepositoryCount: 0,
+            disposed: false
+          },
+          gitRunner: { activeProcessCount: 0, disposed: false },
+          workingTree: { cachedSnapshotCount: 2, disposed: false }
+        },
+        promptStashImages: { disposed: false }
       }
     });
     expect(JSON.stringify(snapshot)).not.toContain("/private/work");

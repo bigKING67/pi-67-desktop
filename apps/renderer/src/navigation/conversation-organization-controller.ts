@@ -91,6 +91,118 @@ export async function setRendererConversationPinned(
   }
 }
 
+export type ConversationSnoozePreset = "later" | "tomorrow" | "next-week";
+
+export function conversationSnoozeUntil(preset: ConversationSnoozePreset, now = Date.now()): number {
+  if (preset === "later") return now + 60 * 60 * 1_000;
+  const current = new Date(now);
+  if (preset === "tomorrow") {
+    return new Date(
+      current.getFullYear(),
+      current.getMonth(),
+      current.getDate() + 1,
+      9
+    ).getTime();
+  }
+  const daysUntilNextMonday = current.getDay() === 0 ? 1 : 8 - current.getDay();
+  return new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate() + daysUntilNextMonday,
+    9
+  ).getTime();
+}
+
+export async function snoozeRendererConversation(
+  workspaceId: WorkspaceId,
+  session: RendererSessionLocator,
+  preset: ConversationSnoozePreset
+): Promise<boolean> {
+  const task = taskForSession(workspaceId, session);
+  const blocker = conversationArchiveBlocker({
+    kind: "session",
+    ...(task ? { lifecycle: task.lifecycle, hasDraft: hasTaskDraft(task) } : {})
+  });
+  if (blocker) {
+    publishNotification({
+      level: "warning",
+      title: "暂时无法稍后处理对话",
+      message: snoozeBlockerMessage(blocker)
+    });
+    return false;
+  }
+  if (task && task.runtime.phase !== "stopped") {
+    try {
+      await agentConnectionController.request(
+        "task.close",
+        { mode: "dispose" },
+        [],
+        { context: workbenchProtocolContextForTask(task) }
+      );
+      rendererWorkbenchStore.getState().removeRuntimeTask(task.id);
+    } catch (error) {
+      publishNotification({ level: "error", title: "无法释放对话运行资源", message: errorMessage(error) });
+      return false;
+    }
+  }
+  const snoozedUntil = conversationSnoozeUntil(preset);
+  try {
+    await setSnoozedUntil(workspaceId, session.path, snoozedUntil);
+    const workbench = rendererWorkbenchStore.getState();
+    if (workbench.selectedSurface?.kind === "conversation"
+      && rendererConversationIdentity(workbench.selectedSurface.conversation)
+        === rendererConversationIdentity({
+          kind: "session",
+          workspaceId,
+          sessionFileIdentity: session.fileIdentity,
+          sessionPath: session.path
+        })) {
+      workbench.selectWorkspace(workspaceId);
+    }
+    await queryFirstSessionCatalog(workspaceId);
+    publishNotification({
+      level: "success",
+      title: `对话将在${formatSnoozeUntil(snoozedUntil)}回到最近列表`,
+      action: {
+        label: "撤销",
+        run: async () => { await wakeRendererConversation(workspaceId, session); }
+      }
+    });
+    return true;
+  } catch (error) {
+    publishNotification({ level: "error", title: "无法稍后处理对话", message: errorMessage(error) });
+    return false;
+  }
+}
+
+export async function wakeRendererConversation(
+  workspaceId: WorkspaceId,
+  session: RendererSessionLocator,
+  notify = true
+): Promise<boolean> {
+  try {
+    await setSnoozedUntil(workspaceId, session.path, undefined);
+    await queryFirstSessionCatalog(workspaceId);
+    if (notify) publishNotification({ level: "success", title: "对话已回到最近列表" });
+    return true;
+  } catch (error) {
+    if (notify) publishNotification({ level: "error", title: "无法唤醒对话", message: errorMessage(error) });
+    return false;
+  }
+}
+
+export async function wakeRendererConversationForAttention(
+  workspaceId: WorkspaceId,
+  session: RendererSessionLocator
+): Promise<void> {
+  if (await wakeRendererConversation(workspaceId, session, false)) return;
+  publishNotification({
+    level: "warning",
+    title: "对话已有新动态",
+    message: "稍后状态未能自动清除，请从对话菜单手动唤醒。"
+  });
+}
+
 export async function moveRendererPinnedConversation(
   workspaceId: WorkspaceId,
   fileIdentity: string,
@@ -278,6 +390,19 @@ async function setArchived(workspaceId: WorkspaceId, path: string, archived: boo
   );
 }
 
+async function setSnoozedUntil(
+  workspaceId: WorkspaceId,
+  path: string,
+  snoozedUntil: number | undefined
+): Promise<void> {
+  await agentConnectionController.request(
+    "conversation.snooze",
+    { path, ...(snoozedUntil === undefined ? {} : { snoozedUntil }) },
+    [],
+    { context: { scope: "workspace", workspaceId } }
+  );
+}
+
 function taskForSession(
   workspaceId: WorkspaceId,
   session: RendererSessionLocator
@@ -311,6 +436,22 @@ function archiveBlockerMessage(blocker: NonNullable<ReturnType<typeof conversati
   if (blocker === "initializing") return "对话仍在初始化，请稍后再试。";
   if (blocker === "draft") return "输入框中仍有未发送内容，请发送或清空草稿。";
   return "尚未保存的新对话不能归档。";
+}
+
+function snoozeBlockerMessage(blocker: NonNullable<ReturnType<typeof conversationArchiveBlocker>>): string {
+  if (blocker === "active-task") return "任务仍在运行、等待批准或等待扩展输入，请先处理或停止任务。";
+  if (blocker === "initializing") return "对话仍在初始化，请稍后再试。";
+  if (blocker === "draft") return "输入框中仍有未发送内容，请先发送、暂存或清空草稿。";
+  return "尚未保存的新对话不能稍后处理。";
+}
+
+function formatSnoozeUntil(value: number): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(value);
 }
 
 function errorMessage(error: unknown): string {

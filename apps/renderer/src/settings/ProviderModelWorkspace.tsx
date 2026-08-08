@@ -207,7 +207,7 @@ export function ProviderModelWorkspace({
                 `协议 ${capability.protocol}`,
                 capability.image ? "图片" : "仅文本",
                 capability.reasoning ? "推理" : "无推理",
-                capability.search === "native-declared" ? "原生搜索 · 已声明" : "搜索 · Exa 回退",
+                capability.search === "native-declared" ? "原生搜索 · 已声明" : "原生搜索 · 不可用",
                 hasCustomOverrides(row) ? "覆盖" : undefined
               ].filter((item): item is string => item !== undefined);
               return (

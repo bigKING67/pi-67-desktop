@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,15 +17,15 @@ describe("ConversationOrganizationStore", () => {
     roots.push(root);
     const fileIdentity = "session-file-v1\0private-identity";
     const first = new ConversationOrganizationStore(root);
-    await first.set("source-a", fileIdentity, { pinnedAt: 123 });
+    await first.set("source-a", fileIdentity, { pinnedAt: 123, snoozedUntil: 456 });
 
-    const serialized = await readFile(join(root, "conversation-organization", "organization-v2.json"), "utf8");
+    const serialized = await readFile(join(root, "conversation-organization", "organization-v3.json"), "utf8");
     expect(serialized).not.toContain(fileIdentity);
     expect(serialized).not.toContain("private-title");
 
     const restored = new ConversationOrganizationStore(root);
     await restored.initialize();
-    expect(restored.get("source-a", fileIdentity)).toEqual({ pinnedAt: 123 });
+    expect(restored.get("source-a", fileIdentity)).toEqual({ pinnedAt: 123, snoozedUntil: 456 });
   });
 
   it("removes empty organization records", async () => {
@@ -59,5 +60,31 @@ describe("ConversationOrganizationStore", () => {
     expect(restored.get("source", "session-file-v1\0one")).toEqual({ pinnedAt: 300 });
     expect(restored.get("source", "session-file-v1\0two")).toEqual({ pinnedAt: 200 });
     expect(restored.get("source", "session-file-v1\0three")).toEqual({ pinnedAt: 100 });
+  });
+
+  it("loads the v2 organization document and migrates it without exposing Session identity", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-conversation-organization-v2-"));
+    roots.push(root);
+    const directory = join(root, "conversation-organization");
+    const sourceKey = "source-a";
+    const fileIdentity = "session-file-v1\0legacy";
+    const hashedKey = createHash("sha256")
+      .update(sourceKey)
+      .update("\0")
+      .update(fileIdentity)
+      .digest("hex");
+    await mkdir(directory);
+    await writeFile(join(directory, "organization-v2.json"), `${JSON.stringify({
+      version: 2,
+      records: [{ sessionKey: hashedKey, archivedAt: 789 }]
+    })}\n`, "utf8");
+
+    const store = new ConversationOrganizationStore(root);
+    await store.initialize();
+
+    expect(store.get(sourceKey, fileIdentity)).toEqual({ archivedAt: 789 });
+    const migrated = await readFile(join(directory, "organization-v3.json"), "utf8");
+    expect(migrated).toContain('"version":3');
+    expect(migrated).not.toContain(fileIdentity);
   });
 });

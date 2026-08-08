@@ -11,6 +11,7 @@ import {
   type EventEnvelope,
   type ProtocolContext,
   type ProjectionResyncInstaller,
+  type RendererAcknowledgementDiagnostics,
   type SequenceGap
 } from "@pi67/protocol";
 import { currentWorkbenchProtocolContext } from "../workbench/workbench-protocol-context.js";
@@ -44,6 +45,13 @@ export interface AgentConnectionRequestOptions {
   ackTimeoutMs?: number;
 }
 
+export interface AgentConnectionControllerOptions {
+  now?: () => number;
+  slowAcknowledgementThresholdMs?: number;
+}
+
+const DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS = 2_000;
+
 export class AgentConnectionController {
   private readonly subscribers = new Set<ConnectionSubscriber>();
   private client: AgentPortClient | undefined;
@@ -51,8 +59,24 @@ export class AgentConnectionController {
   private generation = 0;
   private receivedPort = false;
   private disposed = false;
+  private readonly now: () => number;
+  private readonly slowAcknowledgementThresholdMs: number;
+  private activeRequestCount = 0;
+  private sampleCount = 0;
+  private slowAcknowledgementCount = 0;
+  private lastAcknowledgementLatencyMs: number | undefined;
+  private maxAcknowledgementLatencyMs: number | undefined;
 
-  constructor(private readonly handoffTarget = createBrowserHandoffTarget()) {
+  constructor(
+    private readonly handoffTarget = createBrowserHandoffTarget(),
+    options: AgentConnectionControllerOptions = {}
+  ) {
+    this.now = options.now ?? Date.now;
+    this.slowAcknowledgementThresholdMs = positiveInteger(
+      options.slowAcknowledgementThresholdMs,
+      DEFAULT_SLOW_ACKNOWLEDGEMENT_THRESHOLD_MS,
+      "slowAcknowledgementThresholdMs"
+    );
     this.handoffTarget?.addMessageListener(this.onWindowMessage);
   }
 
@@ -66,6 +90,21 @@ export class AgentConnectionController {
 
   get hasReceivedPort(): boolean {
     return this.receivedPort;
+  }
+
+  diagnostics(): RendererAcknowledgementDiagnostics {
+    return {
+      activeRequestCount: this.activeRequestCount,
+      sampleCount: this.sampleCount,
+      slowAcknowledgementCount: this.slowAcknowledgementCount,
+      slowThresholdMs: this.slowAcknowledgementThresholdMs,
+      ...(this.lastAcknowledgementLatencyMs === undefined
+        ? {}
+        : { lastAcknowledgementLatencyMs: this.lastAcknowledgementLatencyMs }),
+      ...(this.maxAcknowledgementLatencyMs === undefined
+        ? {}
+        : { maxAcknowledgementLatencyMs: this.maxAcknowledgementLatencyMs })
+    };
   }
 
   subscribe(subscriber: ConnectionSubscriber): () => void {
@@ -155,27 +194,48 @@ export class AgentConnectionController {
     const client = this.client;
     const generation = this.generation;
     if (!client || client.isClosed) throw connectionError("Pi 运行服务尚未连接。");
-    let result: CommandResults[T];
+    const startedAt = this.now();
+    this.activeRequestCount += 1;
     try {
-      result = await client.request(type, payload, transfer, {
-        context,
-        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-        ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs })
-      });
-    } catch (error) {
-      if (client.isClosed) {
-        this.handleTeardown(generation, client, error instanceof Error ? error : connectionError("Agent request failed."));
+      let result: CommandResults[T];
+      try {
+        result = await client.request(type, payload, transfer, {
+          context,
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+          ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs })
+        });
+      } catch (error) {
+        if (client.isClosed) {
+          this.handleTeardown(
+            generation,
+            client,
+            error instanceof Error ? error : connectionError("Agent request failed.")
+          );
+        }
+        throw error;
       }
-      throw error;
+      if (generation !== this.generation || client !== this.client) {
+        throw new ProtocolRequestError({
+          code: "STALE_HOST_EPOCH",
+          message: "旧 Pi 运行服务的响应已被丢弃。",
+          recoverable: true
+        });
+      }
+      this.recordAcknowledgement(this.now() - startedAt);
+      return result;
+    } finally {
+      this.activeRequestCount = Math.max(0, this.activeRequestCount - 1);
     }
-    if (generation !== this.generation || client !== this.client) {
-      throw new ProtocolRequestError({
-        code: "STALE_HOST_EPOCH",
-        message: "旧 Pi 运行服务的响应已被丢弃。",
-        recoverable: true
-      });
+  }
+
+  private recordAcknowledgement(durationMs: number): void {
+    const latency = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(durationMs)));
+    this.sampleCount = Math.min(Number.MAX_SAFE_INTEGER, this.sampleCount + 1);
+    this.lastAcknowledgementLatencyMs = latency;
+    this.maxAcknowledgementLatencyMs = Math.max(this.maxAcknowledgementLatencyMs ?? 0, latency);
+    if (latency >= this.slowAcknowledgementThresholdMs) {
+      this.slowAcknowledgementCount = Math.min(Number.MAX_SAFE_INTEGER, this.slowAcknowledgementCount + 1);
     }
-    return result;
   }
 
   async resyncProjection(
@@ -328,6 +388,14 @@ function connectionError(message: string): ProtocolRequestError {
 
 function disposedError(): ProtocolRequestError {
   return connectionError("Agent connection controller has been disposed.");
+}
+
+function positiveInteger(value: number | undefined, fallback: number, name: string): number {
+  const resolved = value ?? fallback;
+  if (!Number.isSafeInteger(resolved) || resolved < 1) {
+    throw new RangeError(`${name} must be a positive integer.`);
+  }
+  return resolved;
 }
 
 function createBrowserHandoffTarget(): AgentPortHandoffTarget | undefined {

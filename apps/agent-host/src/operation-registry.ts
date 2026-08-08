@@ -17,25 +17,17 @@ import { AbortWatchdogExpiredError, withAbortWatchdog } from "./operation-abort-
 import { OperationActivityController } from "./operation-activity-controller.js";
 import {
   OperationHeartbeatController,
-  type OperationHeartbeatControllerOptions
+  type OperationHeartbeatControllerOptions,
+  type OperationHeartbeatDiagnostics
 } from "./operation-heartbeat-controller.js";
 import { assertOperationAuthority } from "./operation-authority.js";
 import { OperationExecutionRunner } from "./operation-execution-runner.js";
 import { isOperationReceiptIntegrityError } from "./operation-receipt-contract.js";
 import type { OperationReceiptStore } from "./operation-receipt-store.js";
-import {
-  acceptedOperation,
-  createOperationView,
-  requireOperationSessionIdentity
-} from "./operation-registry-authority.js";
+import { acceptedOperation, createOperationView, requireOperationSessionIdentity } from "./operation-registry-authority.js";
 import { OperationResultLedger } from "./operation-result-ledger.js";
-import {
-  type ActiveOperation,
-  OperationTerminalCoordinator
-} from "./operation-terminal-coordinator.js";
-import {
-  authorityFromIdentity
-} from "./operation-submission-ledger.js";
+import { type ActiveOperation, OperationTerminalCoordinator } from "./operation-terminal-coordinator.js";
+import { authorityFromIdentity } from "./operation-submission-ledger.js";
 import { HostCommandError } from "./protocol-error.js";
 
 export type OperationShutdownResult = "none" | "cancelled" | "lost";
@@ -54,6 +46,14 @@ export interface OperationRegistryOptions extends OperationHeartbeatControllerOp
   abortWatchdogMs?: number;
   receiptStore?: OperationReceiptStore;
   onRuntimePoisoned?: (message: AgentHostRuntimePoisonedMessage) => void;
+}
+
+export interface OperationRegistryDiagnostics {
+  accepting: boolean;
+  active: boolean;
+  terminating: boolean;
+  poisoned: boolean;
+  heartbeat: OperationHeartbeatDiagnostics;
 }
 const DEFAULT_ABORT_WATCHDOG_MS = 10_000;
 
@@ -114,6 +114,15 @@ export class OperationRegistry {
 
   hasActive(): boolean { return this.poisoned || this.accepting || this.active !== undefined || this.terminating !== undefined; }
   isPoisoned(): boolean { return this.poisoned; }
+  diagnostics(): OperationRegistryDiagnostics {
+    return {
+      accepting: this.accepting,
+      active: this.active !== undefined,
+      terminating: this.terminating !== undefined,
+      poisoned: this.poisoned,
+      heartbeat: this.heartbeat.diagnostics()
+    };
+  }
   canAcceptQueue(): boolean {
     return this.active !== undefined
       && this.active.terminalLifecycle === undefined

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Archive,
+  Clock3,
   Ellipsis,
   FileInput,
   FolderSearch,
@@ -33,6 +34,7 @@ import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-se
 import { ConversationRow } from "./ConversationRow.js";
 import styles from "./NavigationRail.module.css";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
+import { useConversationSnoozeClock } from "./conversation-snooze-clock.js";
 import {
   loadMoreSessionCatalog,
   queryFirstSessionCatalog
@@ -67,12 +69,31 @@ export function WorkspaceConversationList({
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const workspaceOpenPending = useAppStore((state) => state.workspaceOpenPending);
   const catalogs = useSessionCatalogStore((state) => state.byWorkspace);
+  const snoozeClock = useConversationSnoozeClock();
   const [showAllWorkspaceIds, setShowAllWorkspaceIds] = useState<Set<string>>(() => new Set());
   const selectedRow = useRef<HTMLElement | null>(null);
   const selectedConversation = selectedSurface?.kind === "conversation"
     ? selectedSurface.conversation
     : undefined;
   const selectedIdentity = selectedConversation ? rendererConversationIdentity(selectedConversation) : undefined;
+
+  const nextSnoozeExpiry = useMemo(() => {
+    let next: number | undefined;
+    for (const catalog of Object.values(catalogs)) {
+      for (const item of catalog.items) {
+        if (item.snoozedUntil === undefined || item.snoozedUntil <= snoozeClock.now) continue;
+        next = next === undefined ? item.snoozedUntil : Math.min(next, item.snoozedUntil);
+      }
+    }
+    return next;
+  }, [catalogs, snoozeClock.now]);
+
+  useEffect(() => {
+    if (nextSnoozeExpiry === undefined) return;
+    const delay = Math.min(2_147_000_000, Math.max(1, nextSnoozeExpiry - snoozeClock.now + 25));
+    const timer = window.setTimeout(() => snoozeClock.refresh(), delay);
+    return () => window.clearTimeout(timer);
+  }, [nextSnoozeExpiry, snoozeClock]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -117,6 +138,7 @@ export function WorkspaceConversationList({
             selectedRow={selectedRow}
             showAll={showAllWorkspaceIds.has(workspaceId)}
             tasks={workspaceTasks}
+            now={snoozeClock.now}
             workspace={workspace}
             workspaceCount={workspaceOrder.length}
             onShowAll={() => setShowAllWorkspaceIds((current) => {
@@ -146,6 +168,7 @@ function WorkspaceConversationGroup({
   selectedRow,
   index,
   workspaceCount,
+  now,
   onShowAll,
   onRequestRemoval
 }: {
@@ -164,14 +187,18 @@ function WorkspaceConversationGroup({
   workspaceCount: number;
   onShowAll: () => void;
   onRequestRemoval: (workspaceId: string) => void;
+  now: number;
 }) {
+  const [showSnoozed, setShowSnoozed] = useState(false);
   const backgroundCount = tasks.filter((task) => taskConsumesRunSlot(task.lifecycle)).length;
   const rows = useMemo(
-    () => conversationRows(workspace.id, tasks, catalog.items, query),
-    [catalog.items, query, tasks, workspace.id]
+    () => conversationRows(workspace.id, tasks, catalog.items, query, now),
+    [catalog.items, now, query, tasks, workspace.id]
   );
   const priority = rows.filter((row) => row.priority);
-  const recent = rows.filter((row) => !row.priority);
+  const snoozed = rows.filter((row) => !row.priority && row.snoozed);
+  const recent = rows.filter((row) => !row.priority && !row.snoozed);
+  const snoozedOpen = Boolean(query) || showSnoozed;
   const visibleRecent = showAll ? recent : boundedRecent(recent, selectedIdentity, RECENT_SESSION_LIMIT);
   const canShowMore = recent.length > RECENT_SESSION_LIMIT || catalog.hasMore;
   const catalogUnavailable = catalog.catalogState === "unavailable";
@@ -236,7 +263,35 @@ function WorkspaceConversationGroup({
               selectedRow={selectedRow}
             />
           ))}
-          {priority.length > 0 && visibleRecent.length > 0 ? <div className={styles.conversationDivider} /> : null}
+          {snoozed.length > 0 ? (
+            <div className={styles.snoozedShelf}>
+              <button
+                aria-expanded={snoozedOpen}
+                className={styles.snoozedShelfButton}
+                onClick={() => setShowSnoozed((current) => !current)}
+                type="button"
+              >
+                {snoozedOpen
+                  ? <ChevronDown aria-hidden="true" size={12} />
+                  : <ChevronRight aria-hidden="true" size={12} />}
+                <Clock3 aria-hidden="true" size={12} />
+                <span>稍后</span>
+                <small>{snoozed.length}</small>
+              </button>
+              {snoozedOpen ? snoozed.map((row) => (
+                <ConversationRow
+                  disabled={sessionTransitionPending || workspaceOpenPending}
+                  key={row.identity}
+                  row={row}
+                  selected={row.identity === selectedIdentity}
+                  selectedRow={selectedRow}
+                />
+              )) : null}
+            </div>
+          ) : null}
+          {(priority.length > 0 || snoozed.length > 0) && visibleRecent.length > 0
+            ? <div className={styles.conversationDivider} />
+            : null}
           {visibleRecent.map((row) => (
             <ConversationRow
               disabled={sessionTransitionPending || workspaceOpenPending}

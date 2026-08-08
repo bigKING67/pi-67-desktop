@@ -21,6 +21,13 @@ describe("OperationRegistry heartbeat", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     await vi.advanceTimersByTimeAsync(5_000);
+    expect(registry.diagnostics()).toEqual({
+      accepting: false,
+      active: true,
+      terminating: false,
+      poisoned: false,
+      heartbeat: { active: true, lastActivityAt: 1_000, quietForMs: 5_000 }
+    });
     expect(heartbeats(events)).toEqual([{
       type: "operation.heartbeat",
       payload: {
@@ -41,6 +48,7 @@ describe("OperationRegistry heartbeat", () => {
       payload: { observedAt: 11_000, lastActivityAt: 7_000 }
     });
     await registry.loseActive("test cleanup");
+    expect(registry.diagnostics()).toMatchObject({ active: false, heartbeat: { active: false } });
   });
 
   it("keeps heartbeats active while waiting for input and stops them after terminal settlement", async () => {

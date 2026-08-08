@@ -16,6 +16,16 @@ export interface CommandSchedulerShutdownResult {
   queuedCommandsDropped: number;
 }
 
+export interface CommandSchedulerDiagnostics {
+  queryActive: number;
+  controlQueued: number;
+  controlRunning: boolean;
+  promptQueued: number;
+  promptRunning: boolean;
+  turnAdmission: boolean;
+  closed: boolean;
+}
+
 const EXCLUSIVE_COMMANDS = new Set<AgentCommandType>([
   ...REPLAY_SAFE_CONTROL_MUTATION_TYPES,
   "session.import",
@@ -178,6 +188,20 @@ export class CommandScheduler {
       && this.queueBarriersAdmitted === 0
       && !this.turnAdmission
       && this.activeQueries === 0;
+  }
+
+  diagnostics(): CommandSchedulerDiagnostics {
+    return {
+      queryActive: this.activeQueries,
+      controlQueued: this.exclusiveQueued,
+      controlRunning: this.exclusiveRunning,
+      promptQueued:
+        Math.max(0, this.queueAdmitted - (this.queueRunning ? 1 : 0))
+        + Math.max(0, this.queueBarriersAdmitted - (this.queueBarrierRunning ? 1 : 0)),
+      promptRunning: this.queueRunning || this.queueBarrierRunning,
+      turnAdmission: this.turnAdmission,
+      closed: this.closed
+    };
   }
 
   shutdown(): CommandSchedulerShutdownResult {

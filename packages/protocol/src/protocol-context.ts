@@ -72,6 +72,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "session.nameByPath": "workspace",
   "conversation.pin": "workspace",
   "conversation.archive": "workspace",
+  "conversation.snooze": "workspace",
   "conversation.reorderPinned": "workspace",
   "session.forkFromTask": "task",
   "provider.list": "workspace",

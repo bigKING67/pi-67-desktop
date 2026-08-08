@@ -10,6 +10,7 @@ import { installMockInspectorCommandHandler } from "./pi67-renderer-inspector-co
 import { installMockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
 import { installMockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
 import { installMockOperationFactories } from "./pi67-renderer-operation-fixture.js";
+import { MOCK_RUNTIME_DIAGNOSTICS } from "./pi67-runtime-diagnostics-fixture.js";
 
 export async function installMockAgentHandlers(page: Page): Promise<void> {
   await page.evaluate(installMockSessionControlCommandHandler);
@@ -22,6 +23,7 @@ export async function installMockAgentHandlers(page: Page): Promise<void> {
   await page.evaluate(installMockProviderConfigurationCommandHandler);
   await page.evaluate<void, Parameters<typeof installMockCommandResponseHandler>[0]>(installMockCommandResponseHandler, {
     fixtureExtensionCommands: MOCK_EXTENSION_COMMANDS,
+    fixtureRuntimeDiagnostics: MOCK_RUNTIME_DIAGNOSTICS,
     fixtureSessionCatalogStatus: MOCK_SESSION_CATALOG_STATUS
   });
 }

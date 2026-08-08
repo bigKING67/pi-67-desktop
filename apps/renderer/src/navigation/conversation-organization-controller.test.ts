@@ -10,10 +10,13 @@ import {
 import { queryFirstSessionCatalog, querySessionCatalogPage } from "./session-catalog-controller.js";
 import {
   archiveRendererConversation,
+  conversationSnoozeUntil,
   moveRendererPinnedConversation,
   placeRendererPinnedConversationBefore,
   renameRendererConversation,
-  setRendererConversationPinned
+  setRendererConversationPinned,
+  snoozeRendererConversation,
+  wakeRendererConversation
 } from "./conversation-organization-controller.js";
 
 vi.mock("./session-catalog-controller.js", () => ({
@@ -116,6 +119,84 @@ describe("conversation organization controller", () => {
       title: "无法释放对话运行资源",
       message: "busy"
     });
+  });
+
+  it("computes absolute local snooze presets with stable calendar semantics", () => {
+    const now = new Date(2026, 7, 8, 16, 30).getTime();
+    expect(conversationSnoozeUntil("later", now)).toBe(now + 60 * 60 * 1_000);
+    const tomorrow = new Date(conversationSnoozeUntil("tomorrow", now));
+    expect([
+      tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), tomorrow.getHours(), tomorrow.getMinutes()
+    ]).toEqual([2026, 7, 9, 9, 0]);
+    const nextWeek = new Date(conversationSnoozeUntil("next-week", now));
+    expect([
+      nextWeek.getDay(), nextWeek.getHours(), nextWeek.getMinutes()
+    ]).toEqual([1, 9, 0]);
+    expect(nextWeek.getTime()).toBeGreaterThan(now);
+  });
+
+  it("blocks snooze while waiting for approval or when a draft is present", async () => {
+    installTask("waiting-approval", { phase: "busy", detail: "approval", recoverable: true });
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await expect(snoozeRendererConversation("workspace-a", session("a"), "later")).resolves.toBe(false);
+    expect(request).not.toHaveBeenCalled();
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "暂时无法稍后处理对话",
+      message: expect.stringContaining("等待批准")
+    });
+
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "ready", recoverable: true }
+    });
+    useTaskDraftStore.getState().setText("task-a", "unsent");
+    await expect(snoozeRendererConversation("workspace-a", session("a"), "tomorrow")).resolves.toBe(false);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("disposes an idle Runtime, snoozes with an absolute timestamp, and provides undo", async () => {
+    installTask("completed", { phase: "ready", detail: "ready", recoverable: true });
+    vi.spyOn(Date, "now").mockReturnValue(new Date(2026, 7, 8, 16, 30).getTime());
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => (
+      type === "task.close" ? { closed: true, stopped: false } : { revision: 8 }
+    ) as never);
+
+    await expect(snoozeRendererConversation("workspace-a", session("a"), "tomorrow")).resolves.toBe(true);
+    const expectedUntil = new Date(2026, 7, 9, 9).getTime();
+    expect(request.mock.calls.map(([type]) => type)).toEqual(["task.close", "conversation.snooze"]);
+    expect(request.mock.calls[1]).toEqual([
+      "conversation.snooze",
+      { path: "/sessions/a.jsonl", snoozedUntil: expectedUntil },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    ]);
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeUndefined();
+    const notification = useNotificationStore.getState().items.at(-1);
+    expect(notification).toMatchObject({ level: "success", action: { label: "撤销" } });
+
+    await notification?.action?.run();
+    expect(request.mock.calls.at(-1)).toEqual([
+      "conversation.snooze",
+      { path: "/sessions/a.jsonl" },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    ]);
+  });
+
+  it("wakes a cold snoozed conversation without loading or closing a Runtime", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({ revision: 9 } as never);
+
+    await expect(wakeRendererConversation("workspace-a", session("cold"))).resolves.toBe(true);
+
+    expect(request).toHaveBeenCalledWith(
+      "conversation.snooze",
+      { path: "/sessions/cold.jsonl" },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+    );
+    expect(refreshCatalog).toHaveBeenCalledWith("workspace-a");
   });
 
   it("uses Task authority for live renames and restores the immediate automatic title", async () => {

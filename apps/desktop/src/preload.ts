@@ -8,8 +8,17 @@ import type {
   NativeNotificationRequest,
   PackageNetworkSettings,
   PackageNetworkSnapshot,
+  PromptStashImagesDeleteRequest,
+  PromptStashImagesRestoreRequest,
+  PromptStashImagesRestoreResult,
+  PromptStashImagesStoreRequest,
+  PromptStashImagesStoreResult,
+  RepositoryChangeDetail,
+  RepositoryChangeDetailRequest,
   RepositoryEnvironmentInspectionRequest,
   RepositoryEnvironmentSnapshot,
+  RepositoryWorkingTreeInspectionRequest,
+  RepositoryWorkingTreeSnapshot,
   SupportDiagnosticsExportRequest,
   WorktreeCreationRequest,
   WorktreeCreationAdvanceRequest,
@@ -22,7 +31,15 @@ import type {
   WorkspaceFilePersistedState,
   WorkspaceFileStateSnapshot
 } from "@pi67/protocol";
-import { isRepositoryEnvironmentSnapshot } from "@pi67/protocol/repository-environment-snapshot-validation";
+import {
+  isRepositoryChangeDetail,
+  isRepositoryEnvironmentSnapshot,
+  isRepositoryWorkingTreeSnapshot
+} from "@pi67/protocol/repository-environment-snapshot-validation";
+import {
+  isPromptStashImagesRestoreResult,
+  isPromptStashImagesStoreResult
+} from "@pi67/protocol/prompt-stash-images";
 import {
   isWorktreeCreationAdvanceResult,
   isWorktreeCreationResult,
@@ -65,6 +82,23 @@ const systemBridge = {
   releasePromptAttachments: (ids: string[]): Promise<void> => (
     ipcRenderer.invoke("pi67:prompt-attachments-release", ids)
   ),
+  storePromptStashImages: async (
+    request: PromptStashImagesStoreRequest
+  ): Promise<PromptStashImagesStoreResult> => {
+    const value = await ipcRenderer.invoke("pi67:prompt-stash-images-store", request) as unknown;
+    if (!isPromptStashImagesStoreResult(value)) throw new Error("Prompt Stash image store response is invalid.");
+    return value;
+  },
+  restorePromptStashImages: async (
+    request: PromptStashImagesRestoreRequest
+  ): Promise<PromptStashImagesRestoreResult> => {
+    const value = await ipcRenderer.invoke("pi67:prompt-stash-images-restore", request) as unknown;
+    if (!isPromptStashImagesRestoreResult(value)) throw new Error("Prompt Stash image restore response is invalid.");
+    return value;
+  },
+  deletePromptStashImages: (request: PromptStashImagesDeleteRequest): Promise<void> => (
+    ipcRenderer.invoke("pi67:prompt-stash-images-delete", request)
+  ),
   loadWorkbenchState: (): Promise<WorkbenchStateV5> => ipcRenderer.invoke("pi67:workbench-load"),
   inspectRepositoryEnvironment: async (
     request: RepositoryEnvironmentInspectionRequest
@@ -73,6 +107,20 @@ const systemBridge = {
     if (!isRepositoryEnvironmentSnapshot(value)) {
       throw new Error("Repository environment response is invalid.");
     }
+    return value;
+  },
+  inspectRepositoryWorkingTree: async (
+    request: RepositoryWorkingTreeInspectionRequest
+  ): Promise<RepositoryWorkingTreeSnapshot> => {
+    const value = await ipcRenderer.invoke("pi67:repository-working-tree-inspect", request) as unknown;
+    if (!isRepositoryWorkingTreeSnapshot(value)) throw new Error("Invalid repository working tree response.");
+    return value;
+  },
+  readRepositoryChangeDetail: async (
+    request: RepositoryChangeDetailRequest
+  ): Promise<RepositoryChangeDetail> => {
+    const value = await ipcRenderer.invoke("pi67:repository-change-detail", request) as unknown;
+    if (!isRepositoryChangeDetail(value)) throw new Error("Invalid repository change detail response.");
     return value;
   },
   createWorktreeEnvironment: async (

@@ -25,10 +25,38 @@ const diagnostics = {
     taskCount: 1,
     liveRuntimeCount: 1,
     activeOperationCount: 0,
+    scheduler: {
+      taskCount: 1,
+      activeQueryCount: 0,
+      queuedControlCount: 0,
+      runningControlCount: 0,
+      queuedPromptCount: 0,
+      runningPromptCount: 0,
+      turnAdmissionCount: 0,
+      closedCount: 0
+    },
+    operations: {
+      registryCount: 1,
+      acceptingCount: 0,
+      activeCount: 0,
+      terminatingCount: 0,
+      poisonedCount: 0,
+      heartbeatTrackedCount: 0,
+      maxQuietForMs: 0
+    },
     writerLeases: { activeCount: 1, pendingCount: 0, compromised: false },
     workspaces: [],
     workspacesTruncated: false
   }
+} as const;
+
+const renderer = {
+  activeRequestCount: 0,
+  sampleCount: 3,
+  slowAcknowledgementCount: 0,
+  slowThresholdMs: 2_000,
+  lastAcknowledgementLatencyMs: 12,
+  maxAcknowledgementLatencyMs: 18
 } as const;
 
 describe("runtime diagnostics boundary", () => {
@@ -51,13 +79,15 @@ describe("runtime diagnostics boundary", () => {
   it("accepts only correlated available or unavailable export requests", () => {
     expect(isSupportDiagnosticsExportRequest({
       runtimeCollection: { status: "available" },
-      runtime: diagnostics
+      runtime: diagnostics,
+      renderer
     })).toBe(true);
     expect(isSupportDiagnosticsExportRequest({
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
-      }
+      },
+      renderer
     })).toBe(true);
 
     expect(isSupportDiagnosticsExportRequest({
@@ -68,13 +98,15 @@ describe("runtime diagnostics boundary", () => {
         status: "unavailable",
         failure: "acknowledgement-timeout"
       },
-      runtime: diagnostics
+      runtime: diagnostics,
+      renderer
     })).toBe(false);
     expect(isSupportDiagnosticsExportRequest({
       runtimeCollection: {
         status: "unavailable",
         failure: "raw-message-must-not-cross"
-      }
+      },
+      renderer
     })).toBe(false);
   });
 });

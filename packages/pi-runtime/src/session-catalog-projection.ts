@@ -94,6 +94,10 @@ export function sanitizeSessionCatalogRecord(record: SessionCatalogRecord): Sess
     || (record.parentSessionPath !== undefined && !validText(record.parentSessionPath, MAX_SESSION_CATALOG_PATH_CHARS))
     || !Number.isSafeInteger(record.modifiedAt)
     || !Number.isSafeInteger(record.messageCount)
+    || (record.pinnedAt !== undefined && (!Number.isSafeInteger(record.pinnedAt) || record.pinnedAt < 0))
+    || (record.archivedAt !== undefined && (!Number.isSafeInteger(record.archivedAt) || record.archivedAt < 0))
+    || (record.snoozedUntil !== undefined
+      && (!Number.isSafeInteger(record.snoozedUntil) || record.snoozedUntil < 0))
     || record.modifiedAt < 0
     || record.messageCount < 0) return undefined;
   const safe = { ...record };
@@ -221,6 +225,7 @@ function toSummary(record: SessionCatalogRecord): SessionSummary {
     messageCount: record.messageCount,
     ...(record.pinnedAt === undefined ? {} : { pinnedAt: record.pinnedAt }),
     ...(record.archivedAt === undefined ? {} : { archivedAt: record.archivedAt }),
+    ...(record.snoozedUntil === undefined ? {} : { snoozedUntil: record.snoozedUntil }),
     ...(record.parentSessionPath === undefined ? {} : { parentSessionPath: record.parentSessionPath })
   };
 }

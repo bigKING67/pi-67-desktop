@@ -11,6 +11,7 @@ export type WorkspaceConversationCommandType =
   | "session.nameByPath"
   | "conversation.pin"
   | "conversation.archive"
+  | "conversation.snooze"
   | "conversation.reorderPinned";
 export type WorkspaceConversationCommand = AgentCommand<WorkspaceConversationCommandType>;
 export type WorkspaceConversationResult = CommandResults[WorkspaceConversationCommandType];
@@ -69,7 +70,9 @@ export class WorkspaceConversationCommandRouter {
       path,
       command.type === "conversation.pin"
         ? { kind: "pin", value: command.payload.pinned }
-        : { kind: "archive", value: command.payload.archived }
+        : command.type === "conversation.archive"
+          ? { kind: "archive", value: command.payload.archived }
+          : { kind: "snooze", value: command.payload.snoozedUntil }
     );
     return { revision };
   }
@@ -81,5 +84,6 @@ export function isWorkspaceConversationCommand(
   return type === "session.nameByPath"
     || type === "conversation.pin"
     || type === "conversation.archive"
+    || type === "conversation.snooze"
     || type === "conversation.reorderPinned";
 }

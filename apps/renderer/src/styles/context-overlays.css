@@ -8,7 +8,7 @@
   display: none;
 }
 
-.context-pane [role="tablist"] {
+.context-pane-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   height: 43px;
@@ -16,7 +16,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.context-pane [role="tab"] {
+.context-pane-tabs [role="tab"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -28,7 +28,7 @@
   font-size: 12px;
 }
 
-.context-pane [role="tab"][data-selected] { background: var(--surface); color: var(--text-primary); }
+.context-pane-tabs [role="tab"][data-selected] { background: var(--surface); color: var(--text-primary); }
 .context-pane [role="tabpanel"] { height: calc(100vh - var(--titlebar-height) - 43px); overflow: auto; }
 .context-panel { padding: 13px; }
 .context-heading { margin-bottom: 12px; }

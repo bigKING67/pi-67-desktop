@@ -15,10 +15,10 @@ import {
   SquarePlus
 } from "lucide-react";
 import {
-  DESKTOP_ACTIONS,
   formatDesktopShortcut,
   type DesktopActionId
 } from "../app/desktop-action-registry.js";
+import { effectiveDesktopActions } from "../app/desktop-shortcut-preferences.js";
 import { formatRelativeTime } from "../localization/date-time.js";
 import { messages } from "../localization/message-catalog.js";
 import {
@@ -130,7 +130,7 @@ export function buildPaletteActions(options: BuildPaletteActionsOptions): Palett
     });
   });
   const applicationActions = options.applicationHandlers
-    ? DESKTOP_ACTIONS.filter((descriptor) => descriptor.id !== "command-palette").map((descriptor): PaletteAction => {
+    ? effectiveDesktopActions().filter((descriptor) => descriptor.id !== "command-palette").map((descriptor): PaletteAction => {
         const run = options.applicationHandlers?.[descriptor.id];
         const disabledReason = descriptor.requiresWorkspace && !options.desktopActionContext.workspaceAvailable
           ? "请先打开一个工作区"

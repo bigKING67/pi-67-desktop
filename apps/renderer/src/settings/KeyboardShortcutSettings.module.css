@@ -1,0 +1,20 @@
+.search { display: flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-tertiary); }
+.search:focus-within { border-color: var(--focus); box-shadow: var(--shadow-focus); }
+.search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text-primary); font-size: 12px; }
+.list { display: grid; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(128px, auto) auto; align-items: center; gap: 10px; min-height: 62px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.row:last-child { border-bottom: 0; }
+.icon { display: inline-flex; color: var(--text-tertiary); }
+.copy { display: grid; min-width: 0; gap: 2px; }
+.copy strong { color: var(--text-primary); font-size: 12px; }
+.copy small { color: var(--text-secondary); font-size: 11px; }
+.copy em { overflow: hidden; color: var(--text-tertiary); font-size: 9px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.recorder { min-height: 30px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-raised); color: var(--text-secondary); font-size: 10px; }
+.recorder[data-recording] { border-color: var(--focus); color: var(--accent-strong); box-shadow: var(--shadow-focus); }
+.recorder:focus-visible, .reset:focus-visible, .resetAll:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.recorder kbd { font-family: var(--font-code); font-size: 10px; }
+.reset, .resetAll { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text-secondary); font-size: 10px; }
+.reset { width: 30px; padding: 0; }
+.reset[data-disabled] { opacity: 0.35; }
+.empty { margin: 0; padding: 18px; color: var(--text-tertiary); font-size: 11px; text-align: center; }
+@media (max-width: 780px) { .row { grid-template-columns: auto minmax(0, 1fr) auto; } .recorder { grid-column: 2 / 3; justify-self: start; } }

@@ -1,13 +1,17 @@
 import { Keyboard, X } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import {
-  DESKTOP_ACTIONS,
   formatDesktopShortcut
 } from "../app/desktop-action-registry.js";
+import {
+  effectiveDesktopActions,
+  useDesktopShortcutRevision
+} from "../app/desktop-shortcut-preferences.js";
 import { useShellStore } from "../shell/shell-store.js";
 import styles from "./KeyboardShortcutsDialog.module.css";
 
 export function KeyboardShortcutsDialog() {
+  useDesktopShortcutRevision();
   const open = useShellStore((state) => state.keyboardShortcutsDialogOpen);
   const setOpen = useShellStore((state) => state.setKeyboardShortcutsDialogOpen);
   if (!open) return null;
@@ -32,7 +36,7 @@ export function KeyboardShortcutsDialog() {
             </Button>
           </header>
           <div className={styles.list}>
-            {DESKTOP_ACTIONS.map((action) => (
+            {effectiveDesktopActions().map((action) => (
               <div className={styles.row} key={action.id}>
                 <span>
                   <strong>{action.label}</strong>

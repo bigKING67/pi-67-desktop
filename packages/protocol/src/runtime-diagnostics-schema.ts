@@ -25,6 +25,25 @@ export const RuntimeDiagnosticsSchema = strictObject({
     taskCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
     liveRuntimeCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
     activeOperationCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+    scheduler: strictObject({
+      taskCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      activeQueryCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      queuedControlCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      runningControlCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      queuedPromptCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      runningPromptCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      turnAdmissionCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      closedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+    }),
+    operations: strictObject({
+      registryCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      acceptingCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      activeCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      terminatingCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      poisonedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      heartbeatTrackedCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+      maxQuietForMs: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
+    }),
     writerLeases: strictObject({
       activeCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
       pendingCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
@@ -60,16 +79,27 @@ const RuntimeDiagnosticsCollectionFailureSchema = Type.Union([
   Type.Literal("unknown")
 ]);
 
+const RendererAcknowledgementDiagnosticsSchema = strictObject({
+  activeRequestCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  sampleCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  slowAcknowledgementCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  slowThresholdMs: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+  lastAcknowledgementLatencyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  maxAcknowledgementLatencyMs: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }))
+});
+
 export const SupportDiagnosticsExportRequestSchema = Type.Union([
   strictObject({
     runtimeCollection: strictObject({ status: Type.Literal("available") }),
-    runtime: RuntimeDiagnosticsSchema
+    runtime: RuntimeDiagnosticsSchema,
+    renderer: RendererAcknowledgementDiagnosticsSchema
   }),
   strictObject({
     runtimeCollection: strictObject({
       status: Type.Literal("unavailable"),
       failure: RuntimeDiagnosticsCollectionFailureSchema
-    })
+    }),
+    renderer: RendererAcknowledgementDiagnosticsSchema
   })
 ]);
 

@@ -23,16 +23,27 @@ export type RuntimeDiagnosticsCollectionFailure =
   | "protocol-error"
   | "unknown";
 
+export interface RendererAcknowledgementDiagnostics {
+  activeRequestCount: number;
+  sampleCount: number;
+  slowAcknowledgementCount: number;
+  slowThresholdMs: number;
+  lastAcknowledgementLatencyMs?: number;
+  maxAcknowledgementLatencyMs?: number;
+}
+
 export type SupportDiagnosticsExportRequest =
   | {
       runtimeCollection: { status: "available" };
       runtime: RuntimeDiagnostics;
+      renderer: RendererAcknowledgementDiagnostics;
     }
   | {
       runtimeCollection: {
         status: "unavailable";
         failure: RuntimeDiagnosticsCollectionFailure;
       };
+      renderer: RendererAcknowledgementDiagnostics;
     };
 
 export interface SessionCreationJournalDiagnostics {
@@ -50,6 +61,25 @@ export interface RuntimeHostDiagnostics {
   taskCount: number;
   liveRuntimeCount: number;
   activeOperationCount: number;
+  scheduler: {
+    taskCount: number;
+    activeQueryCount: number;
+    queuedControlCount: number;
+    runningControlCount: number;
+    queuedPromptCount: number;
+    runningPromptCount: number;
+    turnAdmissionCount: number;
+    closedCount: number;
+  };
+  operations: {
+    registryCount: number;
+    acceptingCount: number;
+    activeCount: number;
+    terminatingCount: number;
+    poisonedCount: number;
+    heartbeatTrackedCount: number;
+    maxQuietForMs: number;
+  };
   writerLeases: { activeCount: number; pendingCount: number; compromised: boolean };
   workspaces: Array<{
     workspaceIdHash: string;

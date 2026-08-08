@@ -9,6 +9,12 @@ export async function verifyPackagedMainOnlyDiagnostics(options) {
     runtimeCollection: {
       status: "unavailable",
       failure: "connection-unavailable"
+    },
+    renderer: {
+      activeRequestCount: 0,
+      sampleCount: 0,
+      slowAcknowledgementCount: 0,
+      slowThresholdMs: 2_000
     }
   }));
   if (savedPath !== diagnosticsPath) {
@@ -17,9 +23,11 @@ export async function verifyPackagedMainOnlyDiagnostics(options) {
   const text = await readFile(diagnosticsPath, "utf8");
   const diagnostics = JSON.parse(text);
   if (
-    diagnostics.schema !== "pi67-support-diagnostics.v2"
+    diagnostics.schema !== "pi67-support-diagnostics.v3"
     || diagnostics.runtime !== undefined
     || diagnostics.runtimeCollection?.failure !== "connection-unavailable"
+    || diagnostics.renderer?.activeRequestCount !== 0
+    || diagnostics.renderer?.slowThresholdMs !== 2_000
     || diagnostics.agentHost?.phase !== "idle"
     || diagnostics.piConfiguration?.agentDirectory?.state !== "available"
     || diagnostics.piConfiguration?.files?.find((entry) => entry.file === "auth.json")?.state !== "valid-json"

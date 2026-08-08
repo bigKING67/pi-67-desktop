@@ -239,7 +239,10 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
         ? { workspaceFiles: draft.workspaceFiles.map((reference) => ({ ...reference })) }
         : {}),
       ...(draft.promptStash.length > 0
-        ? { promptStash: draft.promptStash.map((item) => ({ ...item })) }
+        ? { promptStash: draft.promptStash.map((item) => ({
+            ...item,
+            ...(item.attachments ? { attachments: item.attachments.map((attachment) => ({ ...attachment })) } : {})
+          })) }
         : {}),
       ...(task.conversation.kind === "provisional" && task.environmentIntent === "worktree"
         ? { environmentIntent: "worktree" as const }
@@ -312,8 +315,17 @@ function draftContentFingerprint(record: ComposerDraftRecord): string {
   return `${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
 }
 
-function promptStashFingerprint(items: readonly { id: string; text: string; createdAt: number }[]): string {
-  return items.map((item) => `${item.id}\0${item.createdAt}\0${item.text}`).join("\0");
+function promptStashFingerprint(items: readonly {
+  id: string;
+  text: string;
+  createdAt: number;
+  attachments?: readonly { blobId: string; name: string; mimeType: string; byteLength: number }[];
+}[]): string {
+  return items.map((item) => (
+    `${item.id}\0${item.createdAt}\0${item.text}\0${(item.attachments ?? []).map((attachment) => (
+      `${attachment.blobId}:${attachment.mimeType}:${attachment.byteLength}:${attachment.name}`
+    )).join("|")}`
+  )).join("\0");
 }
 
 function workspaceFileFingerprint(

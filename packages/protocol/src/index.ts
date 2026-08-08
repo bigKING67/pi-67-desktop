@@ -10,6 +10,7 @@ export * from "./protocol-revision.js";
 export * from "./protocol-revision-contract.js";
 export * from "./repository-environment-contract.js";
 export * from "./repository-environment.js";
+export * from "./prompt-stash-images.js";
 export * from "./runtime-diagnostics-contract.js";
 export * from "./runtime-diagnostics.js";
 export * from "./supervisor-messages.js";

@@ -3,6 +3,7 @@ import {
   composerFileMentionQuery,
   insertComposerFileMention,
   mergeComposerFileReference,
+  removeComposerFileReference,
   referencesPresentInComposerText
 } from "./composer-file-mentions.js";
 
@@ -39,5 +40,21 @@ describe("composer file mentions", () => {
     }], renewed)).toEqual([renewed]);
     expect(referencesPresentInComposerText("no file token", [renewed])).toEqual([]);
     expect(referencesPresentInComposerText("use @[src/main.ts]", [renewed])).toEqual([renewed]);
+  });
+
+  it("removes only the exact reference tokens and keeps a legal cursor", () => {
+    expect(removeComposerFileReference(
+      "compare @[src/main.ts] with @[src/other.ts] and @[src/main.ts]",
+      64,
+      { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
+    )).toEqual({
+      text: "compare with @[src/other.ts] and",
+      cursor: 32
+    });
+    expect(removeComposerFileReference(
+      "@[src/main.ts] next",
+      4,
+      { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
+    )).toEqual({ text: "next", cursor: 0 });
   });
 });

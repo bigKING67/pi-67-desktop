@@ -5,7 +5,7 @@ export interface ModelCapabilityView {
   protocol: string;
   image: boolean;
   reasoning: boolean;
-  search: "native-declared" | "exa-fallback";
+  search: "native-declared" | "unavailable";
 }
 
 export function modelCapabilityView(
@@ -28,7 +28,7 @@ export function modelCapabilityView(
     protocol,
     image: model.input?.includes("image") ?? existingView?.input.includes("image") ?? false,
     reasoning: model.reasoning ?? existingView?.reasoning ?? false,
-    search: nativeSearch ? "native-declared" : "exa-fallback"
+    search: nativeSearch ? "native-declared" : "unavailable"
   };
 }
 

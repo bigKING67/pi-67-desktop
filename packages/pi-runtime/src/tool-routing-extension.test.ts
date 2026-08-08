@@ -56,7 +56,8 @@ describe("createDesktopToolRoutingExtension", () => {
     expect(result?.systemPrompt).toContain("`web_fetch`→`fetch_content`");
     expect(result?.systemPrompt).toContain("Prefer native Pi tool names and schemas");
     expect(result?.systemPrompt).toContain('workflow: "none"');
-    expect(result?.systemPrompt).toContain("do not probe");
+    expect(result?.systemPrompt).toContain("do not switch providers");
+    expect(result?.systemPrompt).toContain("selected model decides whether to call its declared native search route");
     expect(result?.systemPrompt).not.toContain("Current registered tool names");
 
     expect(routingHandlers(["subagent"]).beforeAgentStart({ systemPrompt: "base" })).toBeUndefined();
@@ -176,7 +177,7 @@ describe("createDesktopToolRoutingExtension", () => {
     })).toBeUndefined();
   });
 
-  it("marks package-level web search error text failed and prevents provider probing", () => {
+  it("marks native web search failures and prevents provider switching", () => {
     const handlers = routingHandlers(["WebSearch", "web_search", "WebFetch", "fetch_content", "read"]);
     handlers.toolCall({
       toolCallId: "search-auto",
@@ -188,15 +189,15 @@ describe("createDesktopToolRoutingExtension", () => {
         role: "toolResult",
         toolCallId: "search-auto",
         toolName: "web_search",
-        content: [{ type: "text", text: "Error: Auto provider search failed: Exa rate limit" }],
+        content: [{ type: "text", text: "Error: NATIVE_WEB_SEARCH_UNAVAILABLE: rate limit" }],
         isError: false,
         timestamp: 1
       }
     });
 
     expect(result?.message?.isError).toBe(true);
-    expect(result?.message?.content?.[0]?.text).toContain("自动搜索已经检查了当前可用 Provider");
-    expect(result?.message?.content?.[0]?.text).toContain("不要再逐个试探");
+    expect(result?.message?.content?.[0]?.text).toContain("当前模型的原生搜索调用失败");
+    expect(result?.message?.content?.[0]?.text).toContain("不要切换 Provider");
 
     expect(handlers.toolCall({
       toolCallId: "search-brave",
@@ -204,7 +205,7 @@ describe("createDesktopToolRoutingExtension", () => {
       input: { query: "杭州天气", provider: "brave" }
     })).toMatchObject({
       block: true,
-      reason: expect.stringContaining("不要逐个试探")
+      reason: expect.stringContaining("不要切换 Provider")
     });
     expect(handlers.toolCall({
       toolCallId: "read-search-config",
@@ -314,7 +315,7 @@ function missingToolMessage(toolName: string): Parameters<MessageEndHandler>[0] 
 
 function routingHandlers(
   activeTools: string[],
-  webSearchSource = "npm:pi-web-access@0.17.0",
+  webSearchSource = "sdk",
   piFffTools: readonly string[] = []
 ): {
   beforeAgentStart: BeforeAgentStartHandler;
@@ -335,10 +336,10 @@ function routingHandlers(
             scope: "user",
             origin: "package"
           }
-        : name === "web_search"
-        ? { source: webSearchSource, path: "/package/index.ts", scope: "user", origin: "package" }
-        : name === "fetch_content"
-          ? { source: webSearchSource, path: "/package/index.ts", scope: "user", origin: "package" }
+        : name === "web_search" || name === "fetch_content"
+          ? webSearchSource === "sdk"
+            ? { source: "sdk", path: `<sdk:${name}>`, scope: "temporary", origin: "top-level" }
+            : { source: webSearchSource, path: "/package/index.ts", scope: "user", origin: "package" }
         : name === "WebSearch"
           ? { source: "sdk", path: "<sdk:WebSearch>", scope: "temporary", origin: "top-level" }
         : name === "WebFetch"

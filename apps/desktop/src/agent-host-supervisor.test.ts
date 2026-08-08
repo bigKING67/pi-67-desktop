@@ -155,7 +155,9 @@ describe("AgentHostSupervisor", () => {
 
     expect(supervisor.diagnostics()).toEqual({
       phase: "idle",
+      restartCount: 0,
       portHandoffCount: 0,
+      poisonedRuntimeReplacementCount: 0,
       poisonedRuntimeReplacementPending: false
     });
 
@@ -166,9 +168,13 @@ describe("AgentHostSupervisor", () => {
     expect(supervisor.diagnostics()).toEqual({
       phase: "running",
       hostEpoch: 1,
+      processStartRequestedAt: 10_000,
       processStartedAt: 10_000,
+      lastSpawnDurationMs: 0,
+      restartCount: 0,
       portHandoffCount: 1,
       lastPortHandoffAt: 10_000,
+      poisonedRuntimeReplacementCount: 0,
       poisonedRuntimeReplacementPending: false
     });
 
@@ -176,6 +182,8 @@ describe("AgentHostSupervisor", () => {
     firstHost.emit("exit", 17);
     expect(supervisor.diagnostics()).toEqual({
       phase: "restart-scheduled",
+      processStartRequestedAt: 10_000,
+      lastSpawnDurationMs: 0,
       lastExit: {
         at: 11_000,
         code: 17,
@@ -183,8 +191,10 @@ describe("AgentHostSupervisor", () => {
         attempt: 1
       },
       restartScheduledAt: 11_500,
+      restartCount: 1,
       portHandoffCount: 1,
       lastPortHandoffAt: 10_000,
+      poisonedRuntimeReplacementCount: 0,
       poisonedRuntimeReplacementPending: false
     });
 
@@ -229,6 +239,10 @@ describe("AgentHostSupervisor", () => {
       abortTimeoutMs: 10_000,
       rawRuntime: "must be rejected"
     });
+    expect(supervisor.diagnostics()).toMatchObject({
+      poisonedRuntimeReplacementCount: 0,
+      poisonedRuntimeReplacementPending: false
+    });
     await vi.advanceTimersByTimeAsync(50);
     expect(firstHost.kill).not.toHaveBeenCalled();
 
@@ -237,6 +251,10 @@ describe("AgentHostSupervisor", () => {
       code: "ABORT_WATCHDOG_EXPIRED",
       operationId: "operation-1",
       abortTimeoutMs: 10_000
+    });
+    expect(supervisor.diagnostics()).toMatchObject({
+      poisonedRuntimeReplacementCount: 1,
+      poisonedRuntimeReplacementPending: true
     });
     await vi.advanceTimersByTimeAsync(49);
     expect(firstHost.kill).not.toHaveBeenCalled();

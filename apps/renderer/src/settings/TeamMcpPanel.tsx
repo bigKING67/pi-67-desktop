@@ -163,7 +163,7 @@ export function TeamMcpPanel() {
       actions={<Button className="secondary-button" isDisabled={busy} onPress={() => void refresh()}>
         <RefreshCw aria-hidden="true" size={14} />刷新
       </Button>}
-      description="团队搜索 MCP · 通过自建中转连接。这里配置的是 Client Token，不是 Tavily 官方 tvly-… Key，也不会写入 pi-web-access。"
+      description="团队搜索 MCP · 通过自建中转连接。这里配置的是 Client Token，不是 Tavily 官方 tvly-… Key，也不会进入模型 Provider。"
       title="Tavily Bridge"
     >
       {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
@@ -262,8 +262,8 @@ export function TeamMcpPanel() {
         />
         <SettingsRow
           leading={<EyeOff aria-hidden="true" size={17} />}
-          title="与 pi-web-access 的关系"
-          description="web_search / fetch_content 走 pi-web-access 自己的 provider 配置；本 Token 只给 tavily-bridge MCP 使用。"
+          title="与原生搜索的关系"
+          description="web_search / source_check 只走所选模型声明的原生 Provider 协议；本 Token 只给显式 tavily_bridge_* MCP Tool 使用。"
           value="分离"
         />
       </SettingsRows>

@@ -35,9 +35,17 @@ describe("RepositoryMutationScheduler", () => {
     let release: (() => void) | undefined;
     const active = scheduler.run("repo-a", () => new Promise<void>((resolve) => { release = resolve; }));
     const queued = scheduler.run("repo-b", async () => undefined);
+    expect(scheduler.diagnostics()).toEqual({
+      queuedCount: 1,
+      runningCount: 1,
+      activeRepositoryCount: 1,
+      fencedRepositoryCount: 0,
+      disposed: false
+    });
     await expect(scheduler.run("repo-c", async () => undefined)).rejects.toMatchObject({ code: "queue-full" });
 
     scheduler.fence("repo-b");
+    expect(scheduler.diagnostics()).toMatchObject({ queuedCount: 0, fencedRepositoryCount: 1 });
     await expect(queued).rejects.toMatchObject({ code: "repository-indeterminate" });
     await expect(scheduler.run("repo-b", async () => undefined)).rejects.toBeInstanceOf(
       RepositoryMutationAdmissionError
@@ -56,6 +64,12 @@ describe("RepositoryMutationScheduler", () => {
     }));
     const queued = scheduler.run("repo-b", async () => "never");
     scheduler.dispose();
+    expect(scheduler.diagnostics()).toMatchObject({
+      queuedCount: 0,
+      runningCount: 1,
+      activeRepositoryCount: 1,
+      disposed: true
+    });
     await expect(queued).rejects.toMatchObject({ code: "disposed" });
     await expect(scheduler.run("repo-c", async () => "never")).rejects.toMatchObject({ code: "disposed" });
     release?.();

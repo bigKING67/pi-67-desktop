@@ -77,7 +77,7 @@ describe("SQLite Session Catalog", () => {
     const root = await temporaryRoot();
     const catalog = await openReady(root);
     catalog.replaceAll("source", [
-      record(1, { modifiedAt: 900 }),
+      record(1, { modifiedAt: 900, snoozedUntil: 8_000 }),
       record(2, { modifiedAt: 700, pinnedAt: 2_000 }),
       record(3, { modifiedAt: 800, pinnedAt: 1_000 }),
       record(4, { modifiedAt: 950, archivedAt: 3_000 })
@@ -85,6 +85,8 @@ describe("SQLite Session Catalog", () => {
 
     expect(catalog.query({ scope: "all", view: "active", cwdKey: WORKSPACE, limit: 50 }).records
       .map((item) => item.id)).toEqual(["id-2", "id-3", "id-1"]);
+    expect(catalog.query({ scope: "all", view: "active", cwdKey: WORKSPACE, limit: 50 }).records
+      .find((item) => item.id === "id-1")?.snoozedUntil).toBe(8_000);
     expect(catalog.query({ scope: "all", view: "archived", cwdKey: WORKSPACE, limit: 50 }).records
       .map((item) => item.id)).toEqual(["id-4"]);
 

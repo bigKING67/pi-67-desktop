@@ -23,6 +23,8 @@ export interface ConversationRowModel {
   status?: "running" | "waiting" | "draft";
   priority: boolean;
   pinned: boolean;
+  snoozed: boolean;
+  snoozedUntil?: number;
   canMovePinnedUp: boolean;
   canMovePinnedDown: boolean;
   titleSource: SessionSummary["nameSource"];
@@ -33,7 +35,8 @@ export function conversationRows(
   workspaceId: string,
   tasks: RendererWorkbenchTask[],
   sessions: SessionSummary[],
-  query: string
+  query: string,
+  now = Date.now()
 ): ConversationRowModel[] {
   const normalizedQuery = query.normalize("NFKC").trim().toLocaleLowerCase();
   const sessionByIdentity = new Map(sessions.map((session) => [session.fileIdentity, session]));
@@ -43,12 +46,15 @@ export function conversationRows(
       : undefined;
     if (task.sessionFileIdentity) sessionByIdentity.delete(task.sessionFileIdentity);
     const status = taskStatus(task);
+    const snoozed = status === undefined
+      && session?.snoozedUntil !== undefined
+      && session.snoozedUntil > now;
     const stableTitle = conversationStableTitle(task, session);
     const title = conversationPrimaryTitle(task, session);
     const meta = session
       ? task.recentUserMessagePreview
-        ? `${stableTitle} · ${sessionMeta(session)}`
-        : sessionMeta(session)
+        ? `${stableTitle} · ${sessionMeta(session, snoozed)}`
+        : sessionMeta(session, snoozed)
       : task.conversation.kind === "provisional" ? "尚未保存 · 当前草稿" : stableTitle;
     return {
       identity: rendererConversationIdentity(task.conversation),
@@ -59,7 +65,9 @@ export function conversationRows(
       meta,
       ...(status ? { status } : {}),
       priority: status !== undefined,
-      pinned: session?.pinnedAt !== undefined,
+      pinned: !snoozed && session?.pinnedAt !== undefined,
+      snoozed,
+      ...(snoozed ? { snoozedUntil: session.snoozedUntil } : {}),
       titleSource: task.titleSource === "explicit" ? "explicit" : session?.nameSource ?? "fallback",
       modifiedAt: session?.modifiedAt ?? 0,
       searchText: session
@@ -74,7 +82,8 @@ export function conversationRows(
       sessionFileIdentity: session.fileIdentity,
       sessionPath: session.path
     };
-    const meta = sessionMeta(session);
+    const snoozed = session.snoozedUntil !== undefined && session.snoozedUntil > now;
+    const meta = sessionMeta(session, snoozed);
     return {
       identity: rendererConversationIdentity(conversation),
       conversation,
@@ -82,7 +91,9 @@ export function conversationRows(
       title: session.name,
       meta,
       priority: false,
-      pinned: session.pinnedAt !== undefined,
+      pinned: !snoozed && session.pinnedAt !== undefined,
+      snoozed,
+      ...(snoozed ? { snoozedUntil: session.snoozedUntil } : {}),
       titleSource: session.nameSource,
       modifiedAt: session.modifiedAt,
       searchText: sessionSearchText(session, session.name, meta)
@@ -149,8 +160,19 @@ function taskStatusRank(status: ConversationRowModel["status"]): number {
   return status === "waiting" ? 0 : status === "running" ? 1 : status === "draft" ? 2 : 3;
 }
 
-function sessionMeta(session: SessionSummary): string {
-  return `${session.messageCount} 条消息 · ${formatSessionRelativeTime(session.modifiedAt)}`;
+function sessionMeta(session: SessionSummary, snoozed: boolean): string {
+  return snoozed
+    ? `${session.messageCount} 条消息 · ${formatSnoozeTimestamp(session.snoozedUntil!)}唤醒`
+    : `${session.messageCount} 条消息 · ${formatSessionRelativeTime(session.modifiedAt)}`;
+}
+
+export function formatSnoozeTimestamp(value: number): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(value);
 }
 
 function sessionSearchText(session: SessionSummary, title: string, meta: string): string {

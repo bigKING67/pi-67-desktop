@@ -71,7 +71,7 @@ test("navigates bounded results while the accessible combobox keeps focus", asyn
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+k");
 
-  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
+  const search = page.getByLabel("搜索会话、对话正文、扩展命令和应用操作");
   await expect(search).toBeFocused();
   await search.press("ArrowDown");
   await expect(search).toBeFocused();
@@ -79,6 +79,10 @@ test("navigates bounded results while the accessible combobox keeps focus", asyn
   expect(firstActiveId).toBeTruthy();
   const firstOption = page.locator(`[id="${firstActiveId}"]`);
   await expect(firstOption).toHaveAttribute("aria-selected", "true");
+  await page.screenshot({
+    path: "artifacts/visual-review/command-palette.png",
+    animations: "disabled"
+  });
 
   await page.keyboard.press("ArrowDown");
   await expect(search).toBeFocused();
@@ -115,7 +119,7 @@ test("keeps visible keyboard focus on the Composer and command palette search", 
   expect(focusedComposer.boxShadow).not.toBe("none");
 
   await page.keyboard.press("Control+k");
-  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
+  const search = page.getByLabel("搜索会话、对话正文、扩展命令和应用操作");
   await expect(search).toBeFocused();
   const searchFocus = await search.locator("..").evaluate((element) => {
     const style = getComputedStyle(element);
@@ -129,7 +133,7 @@ test("does not execute a selected action while Windows IME confirmation is activ
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+k");
-  const search = page.getByLabel("搜索会话、扩展命令和应用操作");
+  const search = page.getByLabel("搜索会话、对话正文、扩展命令和应用操作");
   await search.fill("inspect");
   await expect(page.getByRole("option", { name: /\/inspect/u })).toBeVisible();
   await expect(search).toHaveValue("inspect");
@@ -167,7 +171,7 @@ test("keeps Session search failures observable instead of presenting an authorit
   });
   await page.keyboard.press("Control+k");
 
-  await page.getByLabel("搜索会话、扩展命令和应用操作").fill("definitely-missing-session");
+  await page.getByLabel("搜索会话、对话正文、扩展命令和应用操作").fill("definitely-missing-session");
   await expect(page.getByRole("status").filter({ hasText: "会话目录查询失败" })).toBeVisible();
   await expect(page.getByText("会话目录暂时不可用", { exact: true })).toBeVisible();
 });

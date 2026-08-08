@@ -75,8 +75,8 @@ spacing, component states, and motion as `DESIGN.md`.
   configured state may use the semantic success role, but custom source and model
   counts remain secondary text rather than additional glowing badges.
 - Groland's mixed-protocol model rows use the same restrained metadata grammar as
-  every other Provider. Protocol, image/reasoning, and `原生搜索 · 已声明` or Exa
-  fallback remain legible secondary text; they never become a glowing capability
+  every other Provider. Protocol, image/reasoning, and `原生搜索 · 已声明` or
+  `原生搜索 · 不可用` remain legible secondary text; they never become a glowing capability
   badge pile, and `已声明` never changes color to imply live verification.
 - Provider file status, revision conflict, invalid-file, pending reload, and
   model-reselection states use the same semantic success, warning, and danger
@@ -96,7 +96,7 @@ spacing, component states, and motion as `DESIGN.md`.
   `accent-soft` plus border, Check, icon, and text contrast; disabled, checking,
   stale/error, and creation-locked states use semantic text and explicit copy,
   never opacity alone or a green glow.
-- The Changes Inspector keeps its list on neutral dark surfaces and its bounded
+- The Changes Inspector keeps both `会话修改` and `工作区变更` lists on neutral dark surfaces and their bounded
   Patch on `codeSurface`; selected rows, metadata, additions, deletions, focus,
   stale/error notices, and truncation disclosure remain distinct without glow or
   theme-specific information architecture. `第 N 轮`/`当前操作` grouping and
@@ -112,10 +112,13 @@ spacing, component states, and motion as `DESIGN.md`.
   may wrap to two rows, but both Timeline card and action bar remain reachable
   without overlap.
 - Prompt Stash uses one raised neutral Popover above the Composer. Exact text preview,
-  count, disabled restore, persistence failure, focus return, and 20-item limit stay
+  image count/size, disabled restore, persistence failure, focus return, and 20-item limit stay
   legible without a green success surface. Current/Workspace conversation search uses
   the same neutral overlay grammar; match selection, incomplete results, and focused
   navigation never resemble a Web Search on/off state.
+- Doctor's `运行健康` group uses the same neutral compact rows as environment and
+  recovery. Queue/latency/heartbeat counts remain secondary text; warning and fail
+  states use semantic icon, border, and text without animated gauges or glow.
 - Warning and critical context pressure use semantic text, icon, and border roles in
   addition to color. Automatic/manual compression copy remains visible, and Reduced
   Motion removes rotation rather than suppressing the progress state.

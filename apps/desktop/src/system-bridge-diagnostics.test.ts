@@ -65,13 +65,14 @@ describe("system bridge recovery diagnostics", () => {
     });
     await expect(invoke("pi67:save-diagnostics", {
       runtimeCollection: { status: "available" },
-      runtime: runtimeDiagnostics
+      runtime: runtimeDiagnostics,
+      renderer: rendererDiagnostics
     })).resolves.toBe("/tmp/pi67-diagnostics.json");
 
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     expect(typeof serialized).toBe("string");
     expect(JSON.parse(serialized as string)).toEqual(expect.objectContaining({
-      schema: "pi67-support-diagnostics.v2",
+      schema: "pi67-support-diagnostics.v3",
       application: expect.objectContaining({ version: "0.1.0-alpha.10" }),
       desktop: expect.objectContaining({ previousRunExitStatus: "unclean" }),
       agentHost: expect.objectContaining({ phase: "running", hostEpoch: 4 }),
@@ -84,7 +85,8 @@ describe("system bridge recovery diagnostics", () => {
         ]
       }),
       runtimeCollection: { status: "available" },
-      runtime: runtimeDiagnostics
+      runtime: runtimeDiagnostics,
+      renderer: rendererDiagnostics
     }));
   });
 
@@ -95,17 +97,19 @@ describe("system bridge recovery diagnostics", () => {
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
-      }
+      },
+      renderer: rendererDiagnostics
     })).resolves.toBe("/tmp/pi67-diagnostics.json");
 
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     const document = JSON.parse(String(serialized)) as Record<string, unknown>;
     expect(document).toMatchObject({
-      schema: "pi67-support-diagnostics.v2",
+      schema: "pi67-support-diagnostics.v3",
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
       },
+      renderer: rendererDiagnostics,
       agentHost: { phase: "running", hostEpoch: 4 },
       piConfiguration: expect.any(Object)
     });
@@ -120,7 +124,8 @@ describe("system bridge recovery diagnostics", () => {
       runtime: {
         ...runtimeDiagnostics,
         cwd: "/private/workspace"
-      }
+      },
+      renderer: rendererDiagnostics
     })).rejects.toThrow("Invalid diagnostic payload.");
 
     expect(mocks.showSaveDialog).not.toHaveBeenCalled();
@@ -141,6 +146,15 @@ const runtimeDiagnostics = {
   extensionErrors: []
 };
 
+const rendererDiagnostics = {
+  activeRequestCount: 0,
+  sampleCount: 2,
+  slowAcknowledgementCount: 0,
+  slowThresholdMs: 2_000,
+  lastAcknowledgementLatencyMs: 12,
+  maxAcknowledgementLatencyMs: 18
+};
+
 function registerFixture(): void {
   const state = createEmptyWorkbenchState();
   registerSystemBridge({
@@ -159,18 +173,46 @@ function registerFixture(): void {
         truncated: false
       }))
     },
+    promptStashImages: {
+      store: vi.fn(),
+      restore: vi.fn(),
+      delete: vi.fn(),
+      removeWorkspace: vi.fn(),
+      diagnostics: vi.fn(() => ({ disposed: false })),
+      dispose: vi.fn()
+    },
     previousRunExit: "unclean",
     agentDirectory: join(tmpdir(), `pi67-missing-agent-${randomUUID()}`),
     agentDirectorySource: "default",
     getAgentHostDiagnostics: vi.fn(() => ({
       phase: "running",
       hostEpoch: 4,
+      restartCount: 0,
       portHandoffCount: 1,
+      poisonedRuntimeReplacementCount: 0,
       poisonedRuntimeReplacementPending: false
     })),
     workbenchState: { load: vi.fn(async () => ({ state })) },
     workspaceFileState: {},
-    repositoryEnvironmentInspection: { inspect: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn() }
+    repositoryEnvironmentInspection: { inspect: vi.fn(), removeWorkspace: vi.fn(), dispose: vi.fn() },
+    repositoryWorkingTree: {
+      inspect: vi.fn(),
+      detail: vi.fn(),
+      removeWorkspace: vi.fn(),
+      diagnostics: vi.fn(() => ({ cachedSnapshotCount: 0, disposed: false })),
+      dispose: vi.fn()
+    },
+    repositoryGitRunner: { diagnostics: vi.fn(() => ({ activeProcessCount: 0, disposed: false })) },
+    repositoryMutationScheduler: {
+      diagnostics: vi.fn(() => ({
+        queuedCount: 0,
+        runningCount: 0,
+        activeRepositoryCount: 0,
+        fencedRepositoryCount: 0,
+        disposed: false
+      })),
+      dispose: vi.fn()
+    }
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
 }
 

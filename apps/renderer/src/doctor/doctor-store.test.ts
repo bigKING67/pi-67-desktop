@@ -19,6 +19,7 @@ describe("doctor store", () => {
       report: undefined,
       diagnostics: undefined,
       recovery: undefined,
+      renderer: undefined,
       running: true,
       recoveryLoading: true,
       error: undefined
@@ -76,7 +77,28 @@ const recoverySnapshot: DesktopRecoverySnapshot = {
     pathOnlyIdentity: 0
   },
   pendingSessionCreations: 0,
-  attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
+  attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false },
+  health: {
+    agentHost: {
+      phase: "running",
+      restartCount: 0,
+      portHandoffCount: 1,
+      poisonedRuntimeReplacementCount: 0,
+      poisonedRuntimeReplacementPending: false
+    },
+    repository: {
+      mutationScheduler: {
+        queuedCount: 0,
+        runningCount: 0,
+        activeRepositoryCount: 0,
+        fencedRepositoryCount: 0,
+        disposed: false
+      },
+      gitRunner: { activeProcessCount: 0, disposed: false },
+      workingTree: { cachedSnapshotCount: 0, disposed: false }
+    },
+    promptStashImages: { disposed: false }
+  }
 };
 
 const runtimeDiagnostics: RuntimeDiagnostics = {

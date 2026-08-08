@@ -40,7 +40,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "general",
         ...messages.settings.sections.general,
-        searchTerms: ["通用", "外观", "主题", "深色", "浅色", "跟随系统", "appearance", "theme"],
+        searchTerms: ["通用", "外观", "主题", "深色", "浅色", "跟随系统", "快捷键", "键盘", "shortcut", "keyboard", "appearance", "theme"],
         icon: SlidersHorizontal
       }
     ]

@@ -189,9 +189,9 @@ describe("createDesktopSafetyExtension", () => {
       requestApproval,
       () => [
         sdkTool("WebSearch"),
-        packageTool("web_search", "npm:pi-web-access@0.17.0"),
+        sdkTool("web_search"),
         sdkTool("web_fetch"),
-        packageTool("fetch_content", "npm:pi-web-access@0.17.0")
+        sdkTool("fetch_content")
       ],
       () => ["WebSearch", "web_search", "web_fetch", "fetch_content"]
     );

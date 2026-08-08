@@ -48,6 +48,9 @@ test("reviews bounded Session changes and inline Patch without claiming Git stat
 
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await inspector.getByRole("tab", { name: "修改", exact: true }).click();
+  expect(await inspector.getByRole("tablist", { name: "修改来源" }).evaluate((element) => (
+    getComputedStyle(element).gridTemplateColumns.split(" ").length
+  ))).toBe(2);
   await expect(inspector.getByText("2 个文件 · 4 条记录", { exact: true })).toBeVisible();
   await expect(inspector.getByText("仅显示预算内最近记录；更早的修改仍保留在 Pi JSONL 中。", { exact: true })).toBeVisible();
   await expect(inspector.getByRole("list", { name: "当前会话修改记录" })).toBeVisible();
@@ -59,15 +62,19 @@ test("reviews bounded Session changes and inline Patch without claiming Git stat
   const patch = inspector.getByLabel("本会话修改 Patch");
   await expect(patch).toContainText("-old");
   await expect(patch).toContainText("+new");
+  const lightScreenshotPath = "artifacts/visual-review/session-changes-light.png";
+  await inspector.screenshot({ path: lightScreenshotPath, animations: "disabled" });
   await testInfo.attach("session-changes-light", {
-    body: await inspector.screenshot(),
+    path: lightScreenshotPath,
     contentType: "image/png"
   });
 
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const darkScreenshotPath = "artifacts/visual-review/session-changes-dark.png";
+  await inspector.screenshot({ path: darkScreenshotPath, animations: "disabled" });
   await testInfo.attach("session-changes-dark", {
-    body: await inspector.screenshot(),
+    path: darkScreenshotPath,
     contentType: "image/png"
   });
 

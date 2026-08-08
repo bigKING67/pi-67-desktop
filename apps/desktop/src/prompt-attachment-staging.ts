@@ -15,20 +15,30 @@ import {
   rm,
   writeFile
 } from "node:fs/promises";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Transform } from "node:stream";
 import {
+  ALLOWED_IMAGE_MIME_TYPES,
   MAX_PROMPT_ATTACHMENT_BYTES,
   MAX_PROMPT_ATTACHMENT_COUNT,
   MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
-  MAX_PROMPT_ATTACHMENT_NAME_CHARS,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES,
   type PromptAttachmentStagingDiagnostics,
-  type PromptAttachmentKind,
   type StagedPromptAttachment
 } from "@pi67/protocol";
+import {
+  asRecord,
+  assertByteLength,
+  assertFileName,
+  assertOpaqueId,
+  attachmentKind,
+  detectMimeType,
+  parsePromptAttachmentManifest,
+  publicManifest,
+  type PromptAttachmentManifest
+} from "./prompt-attachment-metadata.js";
 
 export interface PromptAttachmentStageCandidate {
   name: string;
@@ -39,17 +49,23 @@ export interface PromptAttachmentStageCandidate {
   data?: ArrayBuffer;
 }
 
+export interface PromptStoredImageCandidate {
+  name: string;
+  mimeType: string;
+  bytes: Buffer;
+}
+
+export interface PromptStagedImagePayload extends StagedPromptAttachment {
+  kind: "image";
+  bytes: Buffer;
+}
+
 export {
   cleanupStalePromptAttachmentRuns
 } from "./prompt-attachment-stale-run-cleanup.js";
 
-interface PromptAttachmentManifest extends StagedPromptAttachment {
-  version: 1;
-  sha256: string;
-  stagedAt: number;
-}
-
 const MAX_DIAGNOSTIC_STAGING_ENTRIES = 256;
+const MAX_PROMPT_ATTACHMENT_MANIFEST_BYTES = 64 * 1024;
 
 export class PromptAttachmentStagingService {
   readonly root: string;
@@ -90,6 +106,78 @@ export class PromptAttachmentStagingService {
     }
     const ids = value.map(assertOpaqueId);
     await Promise.all(ids.map((id) => this.releaseOne(id)));
+  }
+
+  async readDraftImages(ids: readonly string[]): Promise<PromptStagedImagePayload[]> {
+    if (ids.length === 0 || ids.length > MAX_PROMPT_ATTACHMENT_COUNT) {
+      throw new Error("Invalid prompt stash image source request.");
+    }
+    const uniqueIds = ids.map(assertOpaqueId);
+    if (new Set(uniqueIds).size !== uniqueIds.length) throw new Error("Prompt stash image sources are duplicated.");
+    return Promise.all(uniqueIds.map(async (id) => {
+      const directory = join(this.draftRoot, id);
+      const directoryMetadata = await lstat(directory);
+      if (directoryMetadata.isSymbolicLink() || !directoryMetadata.isDirectory()) {
+        throw new Error("Prompt stash image source is not a real staging directory.");
+      }
+      const manifestBytes = await readBoundedRegularFile(
+        join(directory, "manifest.json"),
+        MAX_PROMPT_ATTACHMENT_MANIFEST_BYTES
+      );
+      const manifest = parsePromptAttachmentManifest(JSON.parse(manifestBytes.toString("utf8")) as unknown);
+      if (!manifest || manifest.id !== id || manifest.kind !== "image") {
+        throw new Error("Only staged images can be placed in Prompt Stash.");
+      }
+      const handle = await open(join(directory, "payload.bin"), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      try {
+        const metadata = await handle.stat();
+        if (!metadata.isFile() || metadata.size !== manifest.byteLength) {
+          throw new Error("Prompt stash image source changed after staging.");
+        }
+        const bytes = await handle.readFile();
+        if (createHash("sha256").update(bytes).digest("hex") !== manifest.sha256) {
+          throw new Error("Prompt stash image source failed integrity validation.");
+        }
+        return { ...publicManifest(manifest), kind: "image", bytes };
+      } finally {
+        await handle.close();
+      }
+    }));
+  }
+
+  async stageStoredImages(images: readonly PromptStoredImageCandidate[]): Promise<StagedPromptAttachment[]> {
+    if (images.length === 0 || images.length > MAX_PROMPT_ATTACHMENT_COUNT) {
+      throw new Error("Invalid Prompt Stash image restore request.");
+    }
+    await this.ensureRoots();
+    const staged: StagedPromptAttachment[] = [];
+    let totalBytes = 0;
+    try {
+      for (const image of images) {
+        const name = assertFileName(image.name);
+        const mimeType = image.mimeType.trim().toLowerCase();
+        if (!ALLOWED_IMAGE_MIME_TYPES.includes(mimeType as typeof ALLOWED_IMAGE_MIME_TYPES[number])) {
+          throw new Error("Prompt Stash contains an unsupported image type.");
+        }
+        totalBytes += image.bytes.byteLength;
+        if (image.bytes.byteLength > MAX_PROMPT_ATTACHMENT_BYTES || totalBytes > MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES) {
+          throw new Error("Prompt Stash images exceed the restore limit.");
+        }
+        const attachment = await this.stageOne({
+          name,
+          mimeType,
+          byteLength: image.bytes.byteLength,
+          lastModified: 0,
+          data: Uint8Array.from(image.bytes).buffer
+        });
+        if (attachment.kind !== "image") throw new Error("Prompt Stash restored a non-image payload.");
+        staged.push(attachment);
+      }
+      return staged;
+    } catch (error) {
+      await Promise.all(staged.map((attachment) => this.releaseOne(attachment.id)));
+      throw error;
+    }
   }
 
   async cleanup(): Promise<void> {
@@ -176,6 +264,21 @@ async function inspectStagingDirectory(path: string): Promise<{
     invalidEntryCount,
     truncated: entries.length > MAX_DIAGNOSTIC_STAGING_ENTRIES
   };
+}
+
+async function readBoundedRegularFile(path: string, maximumBytes: number): Promise<Buffer> {
+  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > maximumBytes) {
+      throw new Error("Prompt attachment manifest exceeds its boundary.");
+    }
+    const bytes = await handle.readFile();
+    if (bytes.byteLength > maximumBytes) throw new Error("Prompt attachment manifest exceeds its boundary.");
+    return bytes;
+  } finally {
+    await handle.close();
+  }
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
@@ -323,91 +426,4 @@ async function readHeader(path: string): Promise<Uint8Array> {
   } finally {
     await handle.close();
   }
-}
-
-function detectMimeType(header: Uint8Array, declared: string, name: string): string {
-  if (startsWith(header, [0x89, 0x50, 0x4e, 0x47])) return "image/png";
-  if (startsWith(header, [0xff, 0xd8, 0xff])) return "image/jpeg";
-  if (ascii(header, 0, 4) === "GIF8") return "image/gif";
-  if (ascii(header, 0, 4) === "RIFF" && ascii(header, 8, 4) === "WEBP") return "image/webp";
-  if (ascii(header, 0, 5) === "%PDF-") return "application/pdf";
-  if (startsWith(header, [0x50, 0x4b, 0x03, 0x04])) return officeOrZipMime(name);
-  if (startsWith(header, [0x1f, 0x8b])) return "application/gzip";
-  return declared || mimeFromExtension(name) || "application/octet-stream";
-}
-
-function attachmentKind(mimeType: string, name: string): PromptAttachmentKind {
-  if (mimeType === "image/png" || mimeType === "image/jpeg"
-    || mimeType === "image/gif" || mimeType === "image/webp") return "image";
-  if (mimeType.startsWith("audio/")) return "audio";
-  if (mimeType.startsWith("video/")) return "video";
-  if (/zip|gzip|tar|7z|rar/iu.test(mimeType) || /\.(?:zip|tar|tgz|gz)$/iu.test(name)) return "archive";
-  if (mimeType.startsWith("text/") || /pdf|word|excel|spreadsheet|presentation|opendocument|rtf|epub/iu.test(mimeType)) {
-    return "document";
-  }
-  return "file";
-}
-
-function officeOrZipMime(name: string): string {
-  const lower = name.toLowerCase();
-  if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-  if (lower.endsWith(".epub")) return "application/epub+zip";
-  return "application/zip";
-}
-
-function mimeFromExtension(name: string): string | undefined {
-  const lower = name.toLowerCase();
-  if (/\.(?:txt|md|markdown|csv|tsv|log|json|jsonl|ya?ml|toml|xml|html?|css|[cm]?[jt]sx?|py|rs|go|java|kt|swift|sql|sh|ps1)$/u.test(lower)) return "text/plain";
-  if (lower.endsWith(".rtf")) return "application/rtf";
-  if (lower.endsWith(".tar")) return "application/x-tar";
-  if (lower.endsWith(".gz") || lower.endsWith(".tgz")) return "application/gzip";
-  return undefined;
-}
-
-function assertFileName(value: unknown): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > MAX_PROMPT_ATTACHMENT_NAME_CHARS) {
-    throw new Error("Attachment file name is invalid.");
-  }
-  if (value.includes("\0") || value.includes("/") || value.includes("\\") || basename(value) !== value) {
-    throw new Error("Attachment file name must not contain a path.");
-  }
-  return value;
-}
-
-function assertByteLength(value: unknown, maximum: number, name: string): number {
-  if (!Number.isSafeInteger(value) || Number(value) < 0 || Number(value) > maximum) {
-    throw new Error(`${name} exceeds the 100 MiB per-file limit.`);
-  }
-  return Number(value);
-}
-
-function assertOpaqueId(value: unknown): string {
-  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,128}$/u.test(value)) {
-    throw new Error("Prompt attachment id is invalid.");
-  }
-  return value;
-}
-
-function publicManifest(manifest: PromptAttachmentManifest): StagedPromptAttachment {
-  return {
-    id: manifest.id,
-    name: manifest.name,
-    mimeType: manifest.mimeType,
-    byteLength: manifest.byteLength,
-    kind: manifest.kind
-  };
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-}
-
-function startsWith(bytes: Uint8Array, expected: readonly number[]): boolean {
-  return expected.every((value, index) => bytes[index] === value);
-}
-
-function ascii(bytes: Uint8Array, offset: number, length: number): string {
-  return String.fromCharCode(...bytes.subarray(offset, offset + length));
 }

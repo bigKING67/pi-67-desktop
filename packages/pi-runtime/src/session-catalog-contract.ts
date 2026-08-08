@@ -6,6 +6,7 @@ import type {
   SessionCatalogStatus
 } from "@pi67/domain";
 import type { SessionCatalogDiscoveryResult } from "./session-catalog-projection.js";
+import type { SessionCatalogOrganizationMutation } from "./session-catalog-record-enricher.js";
 import type {
   OpenSqliteSessionCatalog,
   SessionCatalogRecord
@@ -28,7 +29,7 @@ export interface SessionCatalog {
   ): Promise<void>;
   organize(
     path: string,
-    mutation: { kind: "pin" | "archive"; value: boolean },
+    mutation: SessionCatalogOrganizationMutation,
     context: SessionCatalogContext
   ): Promise<number>;
   reorderPinned(paths: readonly string[], context: SessionCatalogContext): Promise<number>;

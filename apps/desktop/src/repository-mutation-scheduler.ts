@@ -22,6 +22,14 @@ export interface RepositoryMutationSchedulerOptions {
   queueLimit?: number;
 }
 
+export interface RepositoryMutationSchedulerDiagnostics {
+  queuedCount: number;
+  runningCount: number;
+  activeRepositoryCount: number;
+  fencedRepositoryCount: number;
+  disposed: boolean;
+}
+
 export class RepositoryMutationScheduler {
   readonly #globalConcurrency: number;
   readonly #queueLimit: number;
@@ -68,6 +76,16 @@ export class RepositoryMutationScheduler {
 
   isFenced(repositoryGroupId: string): boolean {
     return this.#fencedRepositories.has(repositoryGroupId);
+  }
+
+  diagnostics(): RepositoryMutationSchedulerDiagnostics {
+    return {
+      queuedCount: this.#queue.length,
+      runningCount: this.#activeCount,
+      activeRepositoryCount: this.#activeRepositories.size,
+      fencedRepositoryCount: this.#fencedRepositories.size,
+      disposed: this.#disposed
+    };
   }
 
   dispose(): void {

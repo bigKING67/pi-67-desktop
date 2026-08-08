@@ -5,6 +5,7 @@ export type GitInspectionStage =
   | "head"
   | "filters"
   | "status"
+  | "diff"
   | "branch-head"
   | "worktree-add"
   | "worktree-remove"
@@ -50,15 +51,25 @@ export interface RepositoryReadOnlyGitRunner {
   dispose(): void;
 }
 
+export interface RepositoryWorkingTreeGitRunner extends RepositoryReadOnlyGitRunner {
+  resolveHeadSha(cwd: string, signal?: AbortSignal): Promise<string>;
+  statusPorcelain(cwd: string, signal?: AbortSignal): Promise<string>;
+  diffPath(
+    cwd: string,
+    relativePath: string,
+    mode: "staged" | "unstaged" | "untracked" | "conflict",
+    signal?: AbortSignal
+  ): Promise<string>;
+  diagnostics(): { activeProcessCount: number; disposed: boolean };
+}
+
 export interface GitFilterInspection {
   lfsConfigured: boolean;
   unknownFilterNames: string[];
 }
 
-export interface RepositoryMutationGitRunner extends RepositoryReadOnlyGitRunner {
-  resolveHeadSha(cwd: string, signal?: AbortSignal): Promise<string>;
+export interface RepositoryMutationGitRunner extends RepositoryWorkingTreeGitRunner {
   inspectFilters(cwd: string, signal?: AbortSignal): Promise<GitFilterInspection>;
-  statusPorcelain(cwd: string, signal?: AbortSignal): Promise<string>;
   resolveBranchHead(cwd: string, branchName: string, signal?: AbortSignal): Promise<string | undefined>;
   addWorktree(input: {
     cwd: string;
@@ -83,6 +94,8 @@ export interface BoundedPrivateGitRunnerOptions {
     filterInspectionOutputBytes: number;
     statusTimeoutMs: number;
     statusOutputBytes: number;
+    diffTimeoutMs: number;
+    diffOutputBytes: number;
     worktreeAddTimeoutMs: number;
     worktreeRemoveTimeoutMs: number;
     mutationOutputBytes: number;

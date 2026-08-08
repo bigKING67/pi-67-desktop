@@ -21,6 +21,7 @@ import { applyRendererAgentEvent } from "./renderer-agent-event-controller.js";
 import styles from "./App.module.css";
 import { initializeUpdateProjection } from "../updates/update-store.js";
 import { dismissConversationFind } from "../search/conversation-find-events.js";
+import { refreshConversationSnoozeClock } from "../navigation/conversation-snooze-clock.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -108,6 +109,7 @@ export function App() {
 
   useEffect(() => window.pi67.system.onPowerResume(() => {
     freshnessInstallationRef.current?.handlePowerResume();
+    refreshConversationSnoozeClock();
     useAppStore.getState().handlePowerResume();
   }), []);
 

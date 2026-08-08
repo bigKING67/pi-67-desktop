@@ -31,9 +31,15 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(doctorDialog.getByRole("button", { name: "导出诊断" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("doctor-dialog.png"), animations: "disabled" });
   await page.setViewportSize({ width: 390, height: 700 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(doctorDialog.getByRole("button", { name: "导出诊断" })).toBeInViewport();
   await expect(doctorDialog.getByRole("button", { name: "重新检查" })).toBeInViewport();
   await expectNoHorizontalPageOverflow(page);
+  await page.screenshot({
+    path: "artifacts/visual-review/doctor-dialog-dark-narrow.png",
+    animations: "disabled"
+  });
   await doctorDialog.locator(".doctor-results-scroll").evaluate((element) => { element.scrollTop = element.scrollHeight; });
   await expect(page.getByLabel("恢复状态检查结果").getByText("Attachment Staging")).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 920 });

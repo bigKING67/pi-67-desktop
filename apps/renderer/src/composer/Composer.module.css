@@ -45,6 +45,75 @@
   color: var(--text-tertiary);
 }
 
+.workspaceContextRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.workspaceContextLabel {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.workspaceContextChip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 220px;
+  height: 26px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 3px 0 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-family: var(--font-code);
+  font-size: 10px;
+}
+
+.workspaceContextChip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceContextRemove {
+  display: inline-grid;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+.workspaceContextRemove[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.workspaceContextRemove[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.workspaceContextRemove[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .dropActive {
   border-color: var(--accent);
   box-shadow: var(--shadow-focus);
@@ -586,160 +655,6 @@
 
 .contextPressureSpin {
   animation: context-pressure-spin 900ms linear infinite;
-}
-
-.promptStashButton {
-  position: relative;
-  display: inline-grid;
-  width: 29px;
-  height: 29px;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: var(--surface-muted);
-  color: var(--text-secondary);
-}
-
-.promptStashButton[data-hovered] {
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.promptStashButton[data-focus-visible] {
-  border-color: var(--focus);
-  box-shadow: var(--shadow-focus);
-  outline: none;
-}
-
-.promptStashButton > span {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 14px;
-  height: 14px;
-  padding-inline: 3px;
-  border: 1px solid var(--surface);
-  border-radius: 999px;
-  background: var(--accent-strong);
-  color: var(--canvas);
-  font-size: 8px;
-  font-weight: 720;
-  line-height: 12px;
-}
-
-.promptStashPopover {
-  z-index: 92;
-  width: min(420px, calc(100vw - 24px));
-  max-height: min(440px, calc(100vh - 120px));
-  overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-floating);
-}
-
-.promptStashDialog {
-  display: grid;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  outline: none;
-}
-
-.promptStashDialog > header {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.promptStashDialog > header > span {
-  display: grid;
-  gap: 1px;
-  padding-left: 3px;
-}
-
-.promptStashDialog > header strong,
-.promptStashItem strong {
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.promptStashDialog > header small,
-.promptStashItem small {
-  color: var(--text-tertiary);
-  font-size: 9px;
-}
-
-.promptStashSave {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  background: var(--surface-muted);
-  color: var(--text-primary);
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.promptStashList {
-  min-height: 0;
-  padding: 5px;
-  overflow: auto;
-}
-
-.promptStashList > p,
-.promptStashDialog > footer {
-  margin: 0;
-  padding: 12px;
-  color: var(--text-tertiary);
-  font-size: 10px;
-  text-align: center;
-}
-
-.promptStashItem {
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-tertiary);
-  text-align: left;
-}
-
-.promptStashItem[data-hovered] {
-  border-color: var(--border);
-  background: var(--surface-hover);
-}
-
-.promptStashItem > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.promptStashItem strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.promptStashDialog > footer {
-  border-top: 1px solid var(--border);
 }
 
 @keyframes context-pressure-spin {

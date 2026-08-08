@@ -12,6 +12,7 @@ export interface FixtureSessionSummary {
   name: string;
   nameSource?: "explicit" | "latest-user" | "fallback";
   pinnedAt?: number;
+  snoozedUntil?: number;
   archivedAt?: number;
   modifiedAt: number;
   messageCount: number;

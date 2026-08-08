@@ -58,7 +58,8 @@ describe("runtime diagnostics controller", () => {
       error: undefined,
       report: doctorReport(),
       recovery: recoverySnapshot(),
-      diagnostics: runtimeDiagnostics()
+      diagnostics: runtimeDiagnostics(),
+      renderer: rendererDiagnostics()
     });
   });
 
@@ -92,7 +93,8 @@ describe("runtime diagnostics controller", () => {
     );
     expect(saveDiagnostics).toHaveBeenCalledWith({
       runtimeCollection: { status: "available" },
-      runtime: { safe: true }
+      runtime: { safe: true },
+      renderer: rendererDiagnostics()
     });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "info",
@@ -143,7 +145,8 @@ describe("runtime diagnostics controller", () => {
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
-      }
+      },
+      renderer: rendererDiagnostics()
     });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "info",
@@ -162,7 +165,8 @@ describe("runtime diagnostics controller", () => {
       runtimeCollection: {
         status: "unavailable",
         failure: "unknown"
-      }
+      },
+      renderer: rendererDiagnostics()
     });
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
@@ -195,7 +199,37 @@ function recoverySnapshot() {
       pathOnlyIdentity: 0
     },
     pendingSessionCreations: 0,
-    attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
+    attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false },
+    health: {
+      agentHost: {
+        phase: "running",
+        restartCount: 0,
+        portHandoffCount: 1,
+        poisonedRuntimeReplacementCount: 0,
+        poisonedRuntimeReplacementPending: false
+      },
+      repository: {
+        mutationScheduler: {
+          queuedCount: 0,
+          runningCount: 0,
+          activeRepositoryCount: 0,
+          fencedRepositoryCount: 0,
+          disposed: false
+        },
+        gitRunner: { activeProcessCount: 0, disposed: false },
+        workingTree: { cachedSnapshotCount: 0, disposed: false }
+      },
+      promptStashImages: { disposed: false }
+    }
+  };
+}
+
+function rendererDiagnostics() {
+  return {
+    activeRequestCount: 0,
+    sampleCount: 0,
+    slowAcknowledgementCount: 0,
+    slowThresholdMs: 2_000
   };
 }
 

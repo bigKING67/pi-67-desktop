@@ -12,6 +12,7 @@ import {
   type MockWorkspaceDescriptor
 } from "./pi67-renderer-desktop-bridge-contract.js";
 import { installMockDesktopCapabilityBridge } from "./pi67-renderer-desktop-capability-bridge.js";
+import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.js";
 
 export {
   DEFAULT_MOCK_WORKSPACE,
@@ -42,6 +43,7 @@ export async function installMockDesktopBridge(
     settings: options.settings ?? { section: "general" as const, scope: "global" as const },
     deferInitialUpdateState: options.deferInitialUpdateState ?? false,
     repositoryEnvironmentSnapshot: options.repositoryEnvironmentSnapshot,
+    runtimeHealth: MOCK_DESKTOP_RUNTIME_HEALTH
   };
   await installMockDesktopCapabilityBridge(
     page,
@@ -315,7 +317,8 @@ export async function installMockDesktopBridge(
               pathOnlyIdentity: workbenchState.workspaces.filter((workspace) => workspace.identity.assurance === "path-only").length
             },
             pendingSessionCreations: workbenchState.sessionCreationRecovery.length,
-            attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false }
+            attachmentStaging: { draftCount: 0, claimedCount: 0, invalidEntryCount: 0, truncated: false },
+            health: bridgeFixture.runtimeHealth
           }),
           saveDiagnostics: async () => "/tmp/pi67-diagnostics.json",
           showNativeNotification: async (request: NativeNotificationRequest) => {

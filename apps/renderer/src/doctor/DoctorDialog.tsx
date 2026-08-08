@@ -1,8 +1,13 @@
 import { CircleCheck, CircleX, Download, LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
-import type { DoctorCheck } from "@pi67/domain";
-import type { DesktopRecoverySnapshot, RuntimeDiagnostics } from "@pi67/protocol";
+import type { DoctorCheck, OperationFreshness } from "@pi67/domain";
+import type {
+  DesktopRecoverySnapshot,
+  RendererAcknowledgementDiagnostics,
+  RuntimeDiagnostics
+} from "@pi67/protocol";
 import { messages } from "../localization/message-catalog.js";
+import { useOperationFreshnessStore } from "../operation/operation-freshness-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { runRuntimeDoctor, saveRuntimeDiagnostics } from "./runtime-diagnostics-controller.js";
 import { useDoctorStore } from "./use-doctor-store.js";
@@ -29,6 +34,8 @@ export function DoctorDialog() {
   const report = useDoctorStore((state) => state.report);
   const diagnostics = useDoctorStore((state) => state.diagnostics);
   const recovery = useDoctorStore((state) => state.recovery);
+  const renderer = useDoctorStore((state) => state.renderer);
+  const operationFreshness = useOperationFreshnessStore((state) => state.freshness);
   const running = useDoctorStore((state) => state.running);
   const recoveryLoading = useDoctorStore((state) => state.recoveryLoading);
   const error = useDoctorStore((state) => state.error);
@@ -36,11 +43,12 @@ export function DoctorDialog() {
 
   if (!open) return null;
   const recoveryRows = buildRecoveryChecks(recovery, diagnostics);
-  const hasResults = Boolean(report || recovery || diagnostics);
+  const healthRows = buildRuntimeHealthChecks(recovery, diagnostics, renderer, operationFreshness);
+  const hasResults = Boolean(report || recovery || diagnostics || renderer);
   const failing = (report?.checks.filter((check) => check.status === "fail").length ?? 0)
-    + (hasResults ? recoveryRows.filter((check) => check.status === "fail").length : 0);
+    + (hasResults ? [...recoveryRows, ...healthRows].filter((check) => check.status === "fail").length : 0);
   const warnings = (report?.checks.filter((check) => check.status === "warning").length ?? 0)
-    + (hasResults ? recoveryRows.filter((check) => check.status === "warning").length : 0);
+    + (hasResults ? [...recoveryRows, ...healthRows].filter((check) => check.status === "warning").length : 0);
   const busy = running || recoveryLoading;
 
   return (
@@ -90,9 +98,18 @@ export function DoctorDialog() {
 
               {hasResults ? (
                 <div className="doctor-section">
+                  <h3>{messages.doctor.healthHeading}</h3>
+                  <div className="doctor-checks" aria-label={messages.doctor.healthResults}>
+                    {healthRows.map((check) => <StatusCheckRow check={check} key={check.id} />)}
+                  </div>
+                </div>
+              ) : null}
+
+              {hasResults ? (
+                <div className="doctor-section">
                   <h3>{messages.doctor.recoveryHeading}</h3>
                   <div className="doctor-checks" aria-label={messages.doctor.recoveryResults}>
-                    {recoveryRows.map((check) => <RecoveryCheckRow check={check} key={check.id} />)}
+                    {recoveryRows.map((check) => <StatusCheckRow check={check} key={check.id} />)}
                   </div>
                 </div>
               ) : null}
@@ -130,14 +147,14 @@ function DoctorCheckRow({ check }: { check: DoctorCheck }) {
   );
 }
 
-interface RecoveryCheck {
-  id: "workspace" | "journal" | "catalog" | "writerLease" | "hostAuthority" | "attachments";
+interface StatusCheck {
+  id: string;
   label: string;
   status: DoctorCheck["status"];
   detail: string;
 }
 
-function RecoveryCheckRow({ check }: { check: RecoveryCheck }) {
+function StatusCheckRow({ check }: { check: StatusCheck }) {
   const StatusIcon = check.status === "pass" ? CircleCheck : check.status === "warning" ? TriangleAlert : CircleX;
   return (
     <div className={`doctor-check status-${check.status}`}>
@@ -154,7 +171,7 @@ function RecoveryCheckRow({ check }: { check: RecoveryCheck }) {
 function buildRecoveryChecks(
   desktop: DesktopRecoverySnapshot | undefined,
   diagnostics: RuntimeDiagnostics | undefined
-): RecoveryCheck[] {
+): StatusCheck[] {
   const host = diagnostics?.host;
   const workspaceIssues = desktop
     ? desktop.workspaces.missing
@@ -251,6 +268,123 @@ function buildRecoveryChecks(
       detail: desktop
         ? `草稿 ${desktop.attachmentStaging.draftCount}；已认领 ${desktop.attachmentStaging.claimedCount}；无效 ${desktop.attachmentStaging.invalidEntryCount}${desktop.attachmentStaging.truncated ? "；扫描已截断" : ""}`
         : "Desktop 状态不可用"
+    }
+  ];
+}
+
+export function buildRuntimeHealthChecks(
+  desktop: DesktopRecoverySnapshot | undefined,
+  diagnostics: RuntimeDiagnostics | undefined,
+  renderer: RendererAcknowledgementDiagnostics | undefined,
+  freshness: OperationFreshness | undefined
+): StatusCheck[] {
+  const host = diagnostics?.host;
+  const scheduler = host?.scheduler;
+  const operations = host?.operations;
+  const main = desktop?.health;
+  const repository = main?.repository;
+  const queuedCommands = scheduler
+    ? scheduler.queuedControlCount + scheduler.queuedPromptCount
+    : 0;
+  const repositoryDisposed = repository
+    ? repository.mutationScheduler.disposed
+      || repository.gitRunner.disposed
+      || repository.workingTree.disposed
+    : false;
+
+  return [
+    {
+      id: "mainLifecycle",
+      label: messages.doctor.healthChecks.mainLifecycle,
+      status: !main
+        ? "warning"
+        : main.agentHost.phase === "failed"
+          ? "fail"
+          : main.agentHost.phase === "running"
+            ? "pass"
+            : "warning",
+      detail: main
+        ? `阶段 ${main.agentHost.phase}；重启 ${main.agentHost.restartCount}；Port ${main.agentHost.portHandoffCount}；Runtime 替换 ${main.agentHost.poisonedRuntimeReplacementCount}${main.agentHost.lastSpawnDurationMs === undefined ? "" : `；最近启动 ${main.agentHost.lastSpawnDurationMs} ms`}`
+        : "Main 生命周期状态不可用"
+    },
+    {
+      id: "scheduler",
+      label: messages.doctor.healthChecks.scheduler,
+      status: !scheduler
+        ? "warning"
+        : scheduler.closedCount > 0
+          ? "fail"
+          : queuedCommands >= 16
+            ? "warning"
+            : "pass",
+      detail: scheduler
+        ? `Task ${scheduler.taskCount}；查询 ${scheduler.activeQueryCount}；控制 排队 ${scheduler.queuedControlCount}/运行 ${scheduler.runningControlCount}；Prompt 排队 ${scheduler.queuedPromptCount}/运行 ${scheduler.runningPromptCount}；Turn 准入 ${scheduler.turnAdmissionCount}`
+        : "Scheduler 状态不可用"
+    },
+    {
+      id: "operations",
+      label: messages.doctor.healthChecks.operations,
+      status: !operations
+        ? "warning"
+        : operations.poisonedCount > 0
+          ? "fail"
+          : operations.terminatingCount > 0 || (
+            operations.heartbeatTrackedCount > 0 && operations.maxQuietForMs >= 60_000
+          )
+            ? "warning"
+            : "pass",
+      detail: operations
+        ? `Registry ${operations.registryCount}；接受中 ${operations.acceptingCount}；活动 ${operations.activeCount}；终止中 ${operations.terminatingCount}；Poisoned ${operations.poisonedCount}；Heartbeat ${operations.heartbeatTrackedCount}；最长静默 ${operations.maxQuietForMs} ms`
+        : "Operation 状态不可用"
+    },
+    {
+      id: "operationFreshness",
+      label: messages.doctor.healthChecks.operationFreshness,
+      status: freshness?.phase === "stalled"
+        ? "fail"
+        : freshness && freshness.phase !== "fresh"
+          ? "warning"
+          : host && host.activeOperationCount > 0 && !freshness
+            ? "warning"
+            : "pass",
+      detail: freshness
+        ? `阶段 ${freshness.phase}；观测 ${freshness.observedAt}${freshness.reason ? `；原因 ${freshness.reason}` : ""}`
+        : host && host.activeOperationCount > 0 ? "活动 Operation 尚无 Renderer freshness 投影" : "当前无活动 Operation"
+    },
+    {
+      id: "rendererAcknowledgement",
+      label: messages.doctor.healthChecks.rendererAcknowledgement,
+      status: !renderer
+        ? "warning"
+        : (renderer.lastAcknowledgementLatencyMs ?? 0) >= renderer.slowThresholdMs
+          || renderer.activeRequestCount > 0
+          ? "warning"
+          : "pass",
+      detail: renderer
+        ? `样本 ${renderer.sampleCount}；活动 ${renderer.activeRequestCount}；最近 ${renderer.lastAcknowledgementLatencyMs ?? 0} ms；最大 ${renderer.maxAcknowledgementLatencyMs ?? 0} ms；慢响应 ${renderer.slowAcknowledgementCount}`
+        : "Renderer acknowledgement 状态不可用"
+    },
+    {
+      id: "repositoryRuntime",
+      label: messages.doctor.healthChecks.repositoryRuntime,
+      status: !repository
+        ? "warning"
+        : repositoryDisposed
+          ? "fail"
+          : repository.mutationScheduler.fencedRepositoryCount > 0
+            ? "warning"
+            : "pass",
+      detail: repository
+        ? `Git 进程 ${repository.gitRunner.activeProcessCount}；变更快照 ${repository.workingTree.cachedSnapshotCount}；Mutation 排队 ${repository.mutationScheduler.queuedCount}/运行 ${repository.mutationScheduler.runningCount}；Fence ${repository.mutationScheduler.fencedRepositoryCount}`
+        : "Repository runtime 状态不可用"
+    },
+    {
+      id: "promptStashRuntime",
+      label: messages.doctor.healthChecks.promptStashRuntime,
+      status: !main ? "warning" : main.promptStashImages.disposed ? "fail" : "pass",
+      detail: !main
+        ? "Prompt Stash image store 状态不可用"
+        : main.promptStashImages.disposed ? "图片加密存储已停止" : "图片加密存储可用"
     }
   ];
 }

@@ -72,9 +72,109 @@ describe("system bridge repository environment inspection", () => {
     await expect(invoke("pi67:repository-environment-inspect", { workspaceId: "workspace-a" }))
       .rejects.toThrow("Repository environment inspection response is invalid.");
   });
+
+  it("forwards only opaque working-tree identities and validates Main projections", async () => {
+    const changeId = `chg_${"a".repeat(32)}`;
+    const inspectWorkingTree = vi.fn(async () => ({
+      workspaceId: "workspace-a",
+      revision: 1,
+      observedAt: 1,
+      changes: [{
+        changeId,
+        displayPath: "src/current.ts",
+        kind: "modified",
+        staged: false,
+        unstaged: true,
+        conflicted: false
+      }],
+      truncated: false
+    }));
+    const detail = vi.fn(async () => ({
+      workspaceId: "workspace-a",
+      revision: 1,
+      changeId,
+      contentFingerprint: "b".repeat(64),
+      unstagedPatch: "patch",
+      truncated: false
+    }));
+    registerFixture(vi.fn(), { inspect: inspectWorkingTree, detail });
+
+    await expect(invoke("pi67:repository-working-tree-inspect", { workspaceId: "workspace-a" }))
+      .resolves.toMatchObject({ revision: 1 });
+    await expect(invoke("pi67:repository-change-detail", {
+      workspaceId: "workspace-a",
+      revision: 1,
+      changeId
+    })).resolves.toMatchObject({ contentFingerprint: "b".repeat(64) });
+    expect(detail).toHaveBeenCalledWith({ workspaceId: "workspace-a", revision: 1, changeId });
+
+    await expect(invoke("pi67:repository-change-detail", {
+      workspaceId: "workspace-a",
+      revision: 1,
+      changeId,
+      path: "/private/repository/src/current.ts"
+    })).rejects.toThrow("Invalid repository change detail request.");
+    expect(detail).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Prompt Stash image IPC opaque and validates Main metadata", async () => {
+    const store = vi.fn(async (request: { itemId: string }) => ({
+      itemId: request.itemId,
+      attachments: [{
+        blobId: "blob-a",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    }));
+    const restore = vi.fn(async (request: { itemId: string }) => ({
+      itemId: request.itemId,
+      attachments: [{
+        id: "attachment-restored",
+        name: "screen.png",
+        mimeType: "image/png",
+        byteLength: 8,
+        kind: "image"
+      }]
+    }));
+    const remove = vi.fn(async () => undefined);
+    registerFixture(vi.fn(), undefined, { store, restore, delete: remove });
+
+    const opaqueStore = {
+      workspaceId: "workspace-a",
+      taskId: "task-a",
+      itemId: "stash-a",
+      attachmentIds: ["attachment-a"]
+    };
+    await expect(invoke("pi67:prompt-stash-images-store", opaqueStore))
+      .resolves.toMatchObject({ itemId: "stash-a" });
+    expect(store).toHaveBeenCalledWith(opaqueStore);
+    await expect(invoke("pi67:prompt-stash-images-store", { ...opaqueStore, path: "/private/image.png" }))
+      .rejects.toThrow("store request is invalid");
+
+    await expect(invoke("pi67:prompt-stash-images-restore", { taskId: "task-a", itemId: "stash-a" }))
+      .resolves.toMatchObject({ itemId: "stash-a" });
+    await expect(invoke("pi67:prompt-stash-images-delete", { taskId: "task-a", itemId: "stash-a" }))
+      .resolves.toBeUndefined();
+    expect(restore).toHaveBeenCalledWith({ taskId: "task-a", itemId: "stash-a" });
+    expect(remove).toHaveBeenCalledWith({ taskId: "task-a", itemId: "stash-a" });
+  });
 });
 
-function registerFixture(inspect: ReturnType<typeof vi.fn>) {
+function registerFixture(
+  inspect: ReturnType<typeof vi.fn>,
+  workingTree: { inspect: ReturnType<typeof vi.fn>; detail: ReturnType<typeof vi.fn> } | undefined = {
+    inspect: vi.fn(),
+    detail: vi.fn()
+  },
+  promptStashImages: {
+    store: ReturnType<typeof vi.fn>;
+    restore: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  } = { store: vi.fn(), restore: vi.fn(), delete: vi.fn() }
+) {
+  const activeWorkingTree = workingTree ?? { inspect: vi.fn(), detail: vi.fn() };
   registerSystemBridge({
     connectAgentHost: vi.fn(),
     getMainWindow: () => undefined,
@@ -84,9 +184,13 @@ function registerFixture(inspect: ReturnType<typeof vi.fn>) {
     packageNetworkSettings: {},
     teamMcpSettings: {},
     promptAttachments: {},
+    promptStashImages: {
+      ...promptStashImages, removeWorkspace: vi.fn(), dispose: vi.fn()
+    },
     workbenchState: {},
     workspaceFileState: {},
-    repositoryEnvironmentInspection: { inspect, removeWorkspace: vi.fn(), dispose: vi.fn() }
+    repositoryEnvironmentInspection: { inspect, removeWorkspace: vi.fn(), dispose: vi.fn() },
+    repositoryWorkingTree: { ...activeWorkingTree, removeWorkspace: vi.fn(), dispose: vi.fn() }
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
 }
 

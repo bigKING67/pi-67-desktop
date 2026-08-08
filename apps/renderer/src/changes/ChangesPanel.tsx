@@ -18,26 +18,48 @@ import {
 } from "./workspace-changes-store.js";
 import styles from "./ChangesPanel.module.css";
 import { selectedWorkbenchTask, useWorkbenchStore } from "../workbench/workbench-store.js";
+import { RepositoryWorkingTreePanel } from "./RepositoryWorkingTreePanel.js";
+import { PatchView } from "./PatchView.js";
 import {
   changesReadSessionKey,
   useChangesReadStore,
   workspaceChangeViewed
 } from "./changes-read-store.js";
 
-const MAX_RENDERED_PATCH_LINES = 600;
-
 export interface ChangesPanelProps {
   active: boolean;
 }
 
-export type PatchLineKind = "meta" | "added" | "removed" | "context";
-
-export interface RenderedPatch {
-  lines: Array<{ content: string; kind: PatchLineKind }>;
-  omittedLines: number;
-}
+export { classifyPatchLine, projectPatchLines } from "./PatchView.js";
 
 export function ChangesPanel({ active }: ChangesPanelProps) {
+  const [view, setView] = useState<"session" | "worktree">("session");
+  return (
+    <div className={styles.inspector}>
+      <div aria-label="修改来源" className={styles.viewTabs} role="tablist">
+        <button
+          aria-selected={view === "session"}
+          onClick={() => setView("session")}
+          role="tab"
+          type="button"
+        >会话修改</button>
+        <button
+          aria-selected={view === "worktree"}
+          onClick={() => setView("worktree")}
+          role="tab"
+          type="button"
+        >工作区变更</button>
+      </div>
+      <div className={styles.viewContent} role="tabpanel">
+        {view === "session"
+          ? <SessionChangesPanel active={active} />
+          : <RepositoryWorkingTreePanel active={active} />}
+      </div>
+    </div>
+  );
+}
+
+function SessionChangesPanel({ active }: ChangesPanelProps) {
   const canonicalAuthority = useSessionProjectionStore((state) => state.authority);
   const sessionName = useSessionProjectionStore(selectSessionName);
   const view = useWorkspaceChangesStore((state) => (
@@ -216,31 +238,13 @@ function ChangeDetail({ change }: { change: WorkspaceChangeView }) {
       {change.kind === "write" ? (
         <p className={styles.explanation}>write Tool Result 不包含写入前版本，因此这里只显示写入规模，不伪造历史 Diff。</p>
       ) : change.patch ? (
-        <PatchView patch={change.patch} sourceTruncated={change.patchTruncated} />
+        <PatchView ariaLabel="本会话修改 Patch" patch={change.patch} sourceTruncated={change.patchTruncated} />
       ) : (
         <p className={styles.explanation}>{change.status === "pending" || change.status === "running"
           ? "Pi 尚未返回可展示的 Patch。"
           : "本条 edit 记录没有可用 Patch；不会从 Renderer 读取文件来补造 Diff。"}</p>
       )}
     </section>
-  );
-}
-
-function PatchView({ patch, sourceTruncated }: { patch: string; sourceTruncated: boolean }) {
-  const rendered = useMemo(() => projectPatchLines(patch), [patch]);
-  return (
-    <pre aria-label="本会话修改 Patch" className={styles.patch}>
-      {rendered.lines.map((line, index) => (
-        <span className={styles[patchLineClass(line.kind)]} key={`${index}:${line.content}`}>{line.content || " "}</span>
-      ))}
-      {sourceTruncated || rendered.omittedLines > 0 ? (
-        <span className={styles.patchNotice}>
-          {sourceTruncated ? "Host 已截断 Patch。" : ""}
-          {sourceTruncated && rendered.omittedLines > 0 ? " " : ""}
-          {rendered.omittedLines > 0 ? `界面另省略 ${rendered.omittedLines} 行以保持流畅。` : ""}
-        </span>
-      ) : null}
-    </pre>
   );
 }
 
@@ -257,34 +261,6 @@ function ChangeDetailMetric({ change }: { change: WorkspaceChangeView }) {
     return <span className={styles.stats}><b>+{change.additions ?? 0}</b><i>-{change.deletions ?? 0}</i></span>;
   }
   return <span className={styles.meta}>{writeMetric(change)}</span>;
-}
-
-export function projectPatchLines(patch: string, limit = MAX_RENDERED_PATCH_LINES): RenderedPatch {
-  const allLines = patch.split(/\r?\n/u);
-  const visibleLines = allLines.slice(0, Math.max(0, limit));
-  return {
-    lines: visibleLines.map((content) => ({ content, kind: classifyPatchLine(content) })),
-    omittedLines: Math.max(0, allLines.length - visibleLines.length)
-  };
-}
-
-export function classifyPatchLine(line: string): PatchLineKind {
-  if (
-    line.startsWith("@@ ")
-    || line.startsWith("diff --git ")
-    || line.startsWith("index ")
-    || line.startsWith("--- ")
-    || line.startsWith("+++ ")
-    || line.startsWith("new file mode ")
-    || line.startsWith("deleted file mode ")
-    || line.startsWith("similarity index ")
-    || line.startsWith("rename from ")
-    || line.startsWith("rename to ")
-    || line.startsWith("\\ No newline at end of file")
-  ) return "meta";
-  if (line.startsWith("+")) return "added";
-  if (line.startsWith("-")) return "removed";
-  return "context";
 }
 
 export function selectWorkspaceChange(
@@ -321,11 +297,6 @@ export function groupWorkspaceChangesByTurn(
     group.items.push(change);
   }
   return groups;
-}
-
-function patchLineClass(kind: PatchLineKind): "patchMeta" | "added" | "removed" | "context" {
-  if (kind === "meta") return "patchMeta";
-  return kind;
 }
 
 function statusIcon(status: WorkspaceChangeView["status"]): ReactNode {

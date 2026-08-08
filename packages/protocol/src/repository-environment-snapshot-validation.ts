@@ -1,7 +1,12 @@
 import {
+  MAX_REPOSITORY_CHANGES,
+  MAX_REPOSITORY_DIFF_CHARS,
   MAX_REPOSITORY_WORKTREES,
+  type RepositoryChangeDetail,
   type RepositoryEnvironmentError,
   type RepositoryEnvironmentSnapshot,
+  type RepositoryWorkingTreeChange,
+  type RepositoryWorkingTreeSnapshot,
   type WorktreeObservation
 } from "@pi67/domain";
 
@@ -9,6 +14,11 @@ const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/u;
 const REPOSITORY_ID_PATTERN = /^repo_[0-9a-f]{32}$/u;
 const WORKTREE_ID_PATTERN = /^wt_[0-9a-f]{32}$/u;
 const HEAD_SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const CHANGE_ID_PATTERN = /^chg_[0-9a-f]{32}$/u;
+const CONTENT_FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/u;
+const CHANGE_KINDS = new Set<RepositoryWorkingTreeChange["kind"]>([
+  "added", "modified", "deleted", "renamed", "copied", "untracked", "conflict"
+]);
 
 const FAILURE_STAGES = new Set<RepositoryEnvironmentError["stage"]>([
   "workspace",
@@ -51,6 +61,69 @@ export function isRepositoryEnvironmentSnapshot(
     return isFailureSnapshot(value);
   }
   return false;
+}
+
+export function isRepositoryWorkingTreeSnapshot(
+  value: unknown
+): value is RepositoryWorkingTreeSnapshot {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "workspaceId", "revision", "observedAt", "changes", "truncated"
+  ], ["headSha"])) return false;
+  if (
+    typeof value.workspaceId !== "string"
+    || !WORKSPACE_ID_PATTERN.test(value.workspaceId)
+    || !isPositiveSafeInteger(value.revision)
+    || !isNonNegativeSafeInteger(value.observedAt)
+    || (value.headSha !== undefined && (
+      typeof value.headSha !== "string" || !HEAD_SHA_PATTERN.test(value.headSha)
+    ))
+    || !Array.isArray(value.changes)
+    || value.changes.length > MAX_REPOSITORY_CHANGES
+    || !value.changes.every(isRepositoryWorkingTreeChange)
+    || typeof value.truncated !== "boolean"
+  ) return false;
+  return new Set(value.changes.map((change) => change.changeId)).size === value.changes.length;
+}
+
+export function isRepositoryChangeDetail(value: unknown): value is RepositoryChangeDetail {
+  return isRecord(value)
+    && hasExactKeys(value, [
+      "workspaceId", "revision", "changeId", "contentFingerprint", "truncated"
+    ], ["stagedPatch", "unstagedPatch"])
+    && typeof value.workspaceId === "string"
+    && WORKSPACE_ID_PATTERN.test(value.workspaceId)
+    && isPositiveSafeInteger(value.revision)
+    && typeof value.changeId === "string"
+    && CHANGE_ID_PATTERN.test(value.changeId)
+    && typeof value.contentFingerprint === "string"
+    && CONTENT_FINGERPRINT_PATTERN.test(value.contentFingerprint)
+    && boundedPatch(value.stagedPatch)
+    && boundedPatch(value.unstagedPatch)
+    && typeof value.truncated === "boolean";
+}
+
+function isRepositoryWorkingTreeChange(value: unknown): value is RepositoryWorkingTreeChange {
+  return isRecord(value)
+    && hasExactKeys(value, [
+      "changeId", "displayPath", "kind", "staged", "unstaged", "conflicted"
+    ], ["previousDisplayPath"])
+    && typeof value.changeId === "string"
+    && CHANGE_ID_PATTERN.test(value.changeId)
+    && isDisplayPath(value.displayPath)
+    && (value.previousDisplayPath === undefined || isDisplayPath(value.previousDisplayPath))
+    && typeof value.kind === "string"
+    && CHANGE_KINDS.has(value.kind as RepositoryWorkingTreeChange["kind"])
+    && typeof value.staged === "boolean"
+    && typeof value.unstaged === "boolean"
+    && typeof value.conflicted === "boolean";
+}
+
+function isDisplayPath(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !value.includes("\0");
+}
+
+function boundedPatch(value: unknown): boolean {
+  return value === undefined || (typeof value === "string" && value.length <= MAX_REPOSITORY_DIFF_CHARS);
 }
 
 function isReadySnapshot(value: Record<string, unknown>): boolean {
@@ -169,6 +242,10 @@ function isEnvironmentError(value: unknown): value is RepositoryEnvironmentError
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

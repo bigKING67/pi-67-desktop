@@ -51,6 +51,7 @@ const SessionSummarySchema = strictObject({
   messageCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   pinnedAt: Type.Optional(TimestampSchema),
   archivedAt: Type.Optional(TimestampSchema),
+  snoozedUntil: Type.Optional(TimestampSchema),
   parentSessionPath: Type.Optional(CatalogPathSchema)
 });
 

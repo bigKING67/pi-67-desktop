@@ -7,7 +7,10 @@ import {
 } from "@pi67/domain";
 import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import type { SessionCatalogContext } from "./session-catalog-contract.js";
-import type { SessionCatalogRecordEnricher } from "./session-catalog-record-enricher.js";
+import type {
+  SessionCatalogOrganizationMutation,
+  SessionCatalogRecordEnricher
+} from "./session-catalog-record-enricher.js";
 import type { ValidatedSessionCatalogQuery } from "./session-catalog-projection.js";
 import type { SessionCatalogRecord, SqliteSessionCatalog } from "./sqlite-session-catalog.js";
 
@@ -31,7 +34,7 @@ export interface SessionCatalogOrganizationHost {
 export async function organizeSessionCatalogRecord(
   host: SessionCatalogOrganizationHost,
   path: string,
-  mutation: { kind: "pin" | "archive"; value: boolean },
+  mutation: SessionCatalogOrganizationMutation,
   context: SessionCatalogContext,
   contextGeneration: number
 ): Promise<number> {

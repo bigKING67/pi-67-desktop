@@ -14,6 +14,7 @@ describe("conversation organization protocol", () => {
       "session.nameByPath",
       "conversation.pin",
       "conversation.archive",
+      "conversation.snooze",
       "conversation.reorderPinned"
     ] as const) {
       expect(isReplaySafeControlMutation(type)).toBe(true);
@@ -40,5 +41,16 @@ describe("conversation organization protocol", () => {
       paths: ["/sessions/two.jsonl", "/sessions/one.jsonl"]
     })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["conversation.reorderPinned"], { paths: [] })).toBe(false);
+    expect(Value.Check(CommandPayloadSchemas["conversation.snooze"], {
+      path: "/sessions/one.jsonl",
+      snoozedUntil: 2_000
+    })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["conversation.snooze"], {
+      path: "/sessions/one.jsonl"
+    })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["conversation.snooze"], {
+      path: "/sessions/one.jsonl",
+      snoozedUntil: -1
+    })).toBe(false);
   });
 });

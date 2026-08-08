@@ -46,6 +46,7 @@ import {
   type SettingsDraftRegistrar
 } from "./SettingsDraftGuard.js";
 import { AboutSettings, RuntimeSettings } from "./SettingsSystemPanels.js";
+import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -284,7 +285,7 @@ function AccountSettings() {
 
 function GeneralSettings() {
   const theme = useThemeSnapshot();
-  return (
+  return (<>
     <SettingsSectionBlock title="外观" description="默认跟随操作系统；选择只影响 Desktop，不会启动 Pi 运行服务。">
       <SettingsRows>
         <SettingsRow
@@ -310,7 +311,8 @@ function GeneralSettings() {
       </SettingsRows>
       {theme.persistence === "memory" ? <SettingsNotice tone="warning">主题存储不可用，选择仅在本次运行有效。</SettingsNotice> : null}
     </SettingsSectionBlock>
-  );
+    <KeyboardShortcutSettings />
+  </>);
 }
 
 function ProviderSettings() {

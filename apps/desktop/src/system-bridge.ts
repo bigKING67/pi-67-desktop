@@ -1,14 +1,4 @@
-import {
-  app,
-  clipboard,
-  dialog,
-  ipcMain,
-  Menu,
-  net,
-  Notification,
-  shell,
-  type BrowserWindow
-} from "electron";
+import { app, clipboard, dialog, ipcMain, Menu, net, Notification, shell, type BrowserWindow } from "electron";
 import { ManualUpdateController } from "./manual-update-controller.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { DesktopCapabilityService } from "./desktop-capability-service.js";
@@ -52,13 +42,17 @@ import type { AgentHostSupervisorDiagnostics } from "./agent-host-supervisor.js"
 import { registerSupportDiagnosticsBridge } from "./support-diagnostics.js";
 import {
   registerRepositoryEnvironmentBridge,
-  type RepositoryEnvironmentInspectionBridge
+  type RepositoryEnvironmentInspectionBridge,
+  type RepositoryWorkingTreeBridge
 } from "./repository-environment-bridge.js";
 import {
   registerWorktreeCreationBridge,
   type WorktreeCreationBridge
 } from "./worktree-creation-bridge.js";
 import type { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
+import type { PromptStashImageStore } from "./prompt-stash-image-store.js";
+import { registerPromptInputBridge } from "./prompt-input-bridge.js";
+import type { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
 
 export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
@@ -70,13 +64,16 @@ export interface SystemBridgeOptions {
   packageNetworkSettings: PackageNetworkSettingsStore;
   teamMcpSettings: TeamMcpSettingsStore;
   promptAttachments: PromptAttachmentStagingService;
+  promptStashImages: PromptStashImageStore;
   previousRunExit: PreviousRunExitStatus;
   workbenchState: WorkbenchStateStore;
   composerDraftState: ComposerDraftStateStore;
   workspaceFileState: WorkspaceFileStateStore;
   repositoryEnvironmentInspection: RepositoryEnvironmentInspectionBridge;
+  repositoryWorkingTree: RepositoryWorkingTreeBridge;
+  repositoryGitRunner: Pick<BoundedPrivateGitRunner, "diagnostics">;
   worktreeCreation: WorktreeCreationBridge;
-  repositoryMutationScheduler: Pick<RepositoryMutationScheduler, "dispose">;
+  repositoryMutationScheduler: Pick<RepositoryMutationScheduler, "diagnostics" | "dispose">;
   agentDirectory: string;
   agentDirectorySource: "default" | "environment";
   getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
@@ -129,7 +126,16 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   const recoverySnapshot = async (): Promise<DesktopRecoverySnapshot> => createDesktopRecoverySnapshot(
     (await workbenchState.load()).state,
     options.previousRunExit,
-    await options.promptAttachments.diagnostics()
+    await options.promptAttachments.diagnostics(),
+    {
+      agentHost: options.getAgentHostDiagnostics(),
+      repository: {
+        mutationScheduler: options.repositoryMutationScheduler.diagnostics(),
+        gitRunner: options.repositoryGitRunner.diagnostics(),
+        workingTree: options.repositoryWorkingTree.diagnostics()
+      },
+      promptStashImages: options.promptStashImages.diagnostics()
+    }
   );
   registerSupportDiagnosticsBridge({
     agentDirectory: options.agentDirectory,
@@ -146,14 +152,9 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   ipcMain.handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
     options.connectAgentHost(replaceCurrent === true)
   ));
-  ipcMain.handle("pi67:prompt-attachments-stage", (_event, value: unknown) => (
-    options.promptAttachments.stage(value)
-  ));
-  ipcMain.handle("pi67:prompt-attachments-release", (_event, value: unknown) => (
-    options.promptAttachments.release(value)
-  ));
+  registerPromptInputBridge(options.promptAttachments, options.promptStashImages);
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
-  registerRepositoryEnvironmentBridge(options.repositoryEnvironmentInspection);
+  registerRepositoryEnvironmentBridge(options.repositoryEnvironmentInspection, options.repositoryWorkingTree);
   registerWorktreeCreationBridge(options.worktreeCreation);
   ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
   ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
@@ -192,10 +193,12 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     const id = assertWorkspaceId(workspaceId);
     const state = await workbenchState.update((current) => removeWorkspaceRegistration(current, id));
     await options.composerDraftState.removeWorkspace(id);
+    await options.promptStashImages.removeWorkspace(id);
     await options.workspaceFileState.removeWorkspace(id);
     await options.repositoryEnvironmentInspection.removeWorkspace(id).catch(() => {
       console.warn("Worktree Catalog cleanup failed after Workspace removal.");
     });
+    await options.repositoryWorkingTree.removeWorkspace(id);
     return state;
   });
   ipcMain.handle("pi67:workspace-reorder", (_event, workspaceIds: unknown) => (
@@ -439,6 +442,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       updateController.dispose();
       options.repositoryMutationScheduler.dispose();
       options.repositoryEnvironmentInspection.dispose();
+      options.repositoryWorkingTree.dispose();
+      options.promptStashImages.dispose();
     }
   };
 }

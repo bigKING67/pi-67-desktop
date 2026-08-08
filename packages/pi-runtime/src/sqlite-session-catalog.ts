@@ -37,8 +37,8 @@ import {
 
 export type { SqliteCatalogQueryResult } from "./sqlite-session-catalog-query.js";
 
-export const SESSION_CATALOG_DATABASE_FILENAME = "session-catalog-v2.sqlite3";
-export const SESSION_CATALOG_RECOVERY_FILENAME = "session-catalog-v2.recovery.sqlite3";
+export const SESSION_CATALOG_DATABASE_FILENAME = "session-catalog-v3.sqlite3";
+export const SESSION_CATALOG_RECOVERY_FILENAME = "session-catalog-v3.recovery.sqlite3";
 const CATALOG_DATABASE_VERSION_SQL = `
   SELECT data.data_version, schema_version.schema_version
   FROM pragma_data_version() AS data
@@ -55,6 +55,7 @@ export interface SessionCatalogRecord {
   automaticName?: string;
   pinnedAt?: number;
   archivedAt?: number;
+  snoozedUntil?: number;
   modifiedAt: number;
   messageCount: number;
   parentSessionPath?: string;
@@ -245,8 +246,8 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     const insert = this.database.prepare(`
       INSERT INTO sessions (
         file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-        modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms, snoozed_until_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.database.exec("BEGIN IMMEDIATE");
     try {
@@ -290,8 +291,8 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
       this.database.prepare(`
         INSERT INTO sessions (
           file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
-          modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms, snoozed_until_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_identity) DO UPDATE SET
           path = excluded.path,
           cwd = excluded.cwd,
@@ -304,7 +305,8 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
           message_count = excluded.message_count,
           parent_session_path = excluded.parent_session_path,
           pinned_at_ms = excluded.pinned_at_ms,
-          archived_at_ms = excluded.archived_at_ms
+          archived_at_ms = excluded.archived_at_ms,
+          snoozed_until_ms = excluded.snoozed_until_ms
       `).run(...recordValues(record));
       this.database.prepare(`
         UPDATE catalog_state

@@ -5,7 +5,7 @@ export const MAX_RESULT_CHARS = 60_000;
 
 export interface SearchToolDetails {
   responseId: string;
-  source: "provider-native" | "exa" | "direct-fetch" | "cache";
+  source: "provider-native" | "direct-fetch" | "cache";
   sourceLabel: string;
   urls: string[];
 }

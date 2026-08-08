@@ -21,6 +21,7 @@ import { ComposerQueuePanel } from "./ComposerQueuePanel.js";
 import { ComposerRuntimeControls } from "./ComposerRuntimeControls.js";
 import { ComposerStreamModeControl } from "./ComposerStreamModeControl.js";
 import { ComposerTextarea } from "./ComposerTextarea.js";
+import { ComposerWorkspaceContextChips } from "./ComposerWorkspaceContextChips.js";
 import { ExtensionWidgets } from "./ExtensionWidgets.js";
 import { PromptStashControl } from "./PromptStashControl.js";
 import { ToolModeSelector } from "./ToolModeSelector.js";
@@ -81,6 +82,7 @@ interface ComposerSurfaceProps {
   onFileSelect: (entry: WorkspaceFileEntry) => void;
   onInteractionModeChange: (mode: "execute" | "plan") => void;
   onRemoveAttachment: (id: string) => void;
+  onRemoveWorkspaceFile: (reference: ComposerWorkspaceFileRef) => void;
   onSlashComplete: (command: ComposerSlashItem) => void;
   onStreamBehaviorChange: (mode: "steer" | "followUp") => void;
   onSubmit: () => void;
@@ -179,6 +181,11 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
             </Suspense>
           </div>
         ) : null}
+        <ComposerWorkspaceContextChips
+          disabled={disabled}
+          references={props.draft.workspaceFiles}
+          onRemove={props.onRemoveWorkspaceFile}
+        />
         <ComposerTextarea
           disabled={props.submitting}
           inputRef={props.textInput}
@@ -211,10 +218,13 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
             />
             {props.activeTaskId ? (
               <PromptStashControl
+                attachments={props.draft.attachments}
                 disabled={disabled}
                 items={props.draft.promptStash}
                 taskId={props.activeTaskId}
                 text={props.draft.text}
+                workspaceFileCount={props.draft.workspaceFiles.length}
+                workspaceId={props.activeWorkspaceId}
                 onRestored={(restoredText) => {
                   props.setTextCursor(restoredText.length);
                   requestAnimationFrame(() => {

@@ -220,7 +220,7 @@ test("keeps Command Palette server search independent from navigation search", a
 
   await page.getByRole("button", { name: "打开命令面板" }).click();
   const palette = page.getByRole("dialog", { name: "命令面板" });
-  await palette.getByRole("combobox", { name: "搜索会话、扩展命令和应用操作" }).fill("palette-only");
+  await palette.getByRole("combobox", { name: "搜索会话、对话正文、扩展命令和应用操作" }).fill("palette-only");
   await expect.poll(async () => (await sessionCatalogRequests(page)).some((request) => (
     request.payload.search === "palette-only"
   ))).toBe(true);

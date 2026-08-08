@@ -200,10 +200,11 @@ Application-level surfaces use a separate wide-window shell:
 - Windows keeps native caption buttons through `titleBarOverlay`.
 - macOS keeps traffic lights through `hiddenInset`.
 - Resizable split handles, multiple editor panes/windows, media preview, and a
-  complete Git/workspace Diff remain future capabilities. The Changes Inspector
-  is explicitly a Pi Session Tool projection rather than Git status. Files is the
-  narrow Workspace navigator; editable text opens in the central workbench rather
-  than replacing the file tree or pretending to be Git state.
+  mutation-capable Git client remain future capabilities. The Changes Inspector
+  explicitly separates the Pi Session Tool projection (`会话修改`) from Electron
+  Main's bounded read-only Git observation (`工作区变更`). Files is the narrow
+  Workspace navigator; editable text opens in the central workbench rather than
+  replacing the file tree or pretending to offer stage/discard/commit actions.
 
 ## Typography
 
@@ -533,6 +534,14 @@ loading error where the operation can produce those states
   label. A row is `已查看` only after its exact authority-safe fingerprint has been
   selected. A changed path, status, Patch, metrics, or revision for the same
   `toolCallId` restores `未查看` without switching the user's current detail.
+- `工作区变更` uses the same compact list/Patch grammar but a separate state and
+  authority label. Main resolves cwd from the selected registered Workspace,
+  executes packaged private Git under bounded time/output budgets, and returns
+  revision-scoped opaque `changeId` values. Renderer never supplies a path or cwd;
+  Patch requests contain only `workspaceId + revision + changeId`, and Main
+  revalidates Workspace identity plus the status fingerprint before and after the
+  read. Loading, empty, unsupported-repository, stale, error, and truncated states
+  remain distinct. No row exposes stage, discard, commit, push, or PR actions.
 - Messages shows only user-authored messages on the current active branch. The
   index is paged at 100 by default and 200 maximum, previews are capped at 120
   grapheme-scale characters, and image/attachment counts contain metadata only.
@@ -1018,7 +1027,7 @@ loading error where the operation can produce those states
   Each row exposes protocol, image/text, reasoning, and search routing as restrained
   metadata rather than a badge pile. `原生搜索 · 已声明` means the built-in
   model/protocol route is known; it never claims a live request succeeded. Groland
-  custom or protocol-mismatched model IDs remain `搜索 · Exa 回退`, and only
+  custom or protocol-mismatched model IDs remain `原生搜索 · 不可用`, and only
   `deepseek-v4-flash` is declared native-search capable for Pi's official DeepSeek
   Provider. Filtering or switching models preserves the Provider draft. Adding a
   model clears filters, selects the new row, and focuses Model ID; removing the
@@ -1212,14 +1221,18 @@ loading error where the operation can produce those states
   action bar keeps every action reachable while the Composer toolbar may wrap to two
   rows without changing keyboard order or overlapping the editor. Reduced Motion
   removes the disclosure rotation transition.
-- Prompt Stash is a text-only, Task-scoped Composer Popover with at most 20 items,
-  256 KiB per item, and 2 MiB of total stashed text. It preserves exact whitespace;
-  drafts containing `@file` references cannot be stashed. The Composer is cleared
-  only after the stash addition and resulting empty draft have each received a
-  durable `safeStorage` acknowledgement; either persistence failure rolls back to
-  a non-lossy state. Restore is allowed only into an empty Composer, removes the
-  item through the same acknowledged two-phase flow, closes the Popover, and returns
-  focus to the Composer.
+- Prompt Stash is a Task-scoped Composer Popover for exact text and images, with at
+  most 20 items, 256 KiB of text per item, 2 MiB of total stashed text, 32 MiB of
+  images per item, 128 MiB per Task, and 512 MiB globally. Image-only items are
+  allowed; non-image attachments and drafts containing `@file` references are not.
+  The row shows bounded preview, image count, aggregate size, and time, never image
+  bytes or a filesystem path. Main encrypts staged image payloads with `safeStorage`
+  and verifies ownership, length, canonical base64, and SHA-256 before restore.
+  The Composer is cleared only after image storage plus the stash addition and
+  resulting empty draft have each received a durable acknowledgement; any failure
+  rolls back to a non-lossy state. Restore is allowed only into an empty Composer,
+  creates new staging identities, removes the item through the acknowledged flow,
+  closes the Popover, and returns focus to the Composer.
 - Context pressure is a compact status beside the Composer: below 75% is neutral,
   75% is `上下文偏高`, and 92% is `上下文接近上限`. Manual compression calls the
   native `session.compact` controller; automatic and manual compaction have distinct
@@ -1461,18 +1474,13 @@ loading error where the operation can produce those states
   aliases. Malformed input, local-file fetches, reserved-identity mismatch, and
   same-name third-party Tools stay fail-closed; network writes, uploads, command
   execution, and external side effects retain one-shot approval.
-- One `web_search` call owns native-first routing. Protocol-matching built-in
+- One `web_search` call owns strict native routing. Protocol-matching built-in
   Groland Claude/GPT and Pi official Anthropic/OpenAI models use their declared
   Anthropic Web Search or Responses `web_search` request; Pi official DeepSeek is
-  declared native only for `deepseek-v4-flash`. Missing native credentials may
-  select Exa before any provider request is sent. After a native request is sent,
-  HTTP/auth/quota/rate-limit/server errors, malformed or oversized JSON, and empty
-  results fail visibly and never silently resend the query to Exa.
-- Exa fallback uses one bounded Streamable HTTP MCP Session per Tool call:
-  `initialize -> notifications/initialized -> tools/call`. It validates the
-  negotiated protocol, session ID, JSON-RPC version/request ID, HTTP status, MCP
-  error, JSON/SSE framing, abort signal, and a 2 MiB response limit. It does not
-  retain or share an Exa Session across unrelated Tool calls.
+  declared native only for `deepseek-v4-flash`. A missing native route or credential
+  fails before sending a search request. HTTP/auth/quota/rate-limit/server errors,
+  malformed or oversized JSON, and empty results fail visibly. Pi-67 never switches
+  Provider, invokes a search Extension, or silently resends the same query.
 - `fetch_content` accepts only credential-free HTTP(S), resolves DNS before every
   redirect, rejects local/private/link-local/reserved IPv4 and IPv6 destinations,
   caps redirects at three, and cancels streamed bodies above 2 MiB. This is a
@@ -1624,15 +1632,22 @@ loading error where the operation can produce those states
   Agent Host exits or restarts and remains available only across Desktop-created
   session transitions within that Agent Host lifetime.
 - `恢复与诊断` is a compact advanced-user control plane, not a dashboard or
-  onboarding surface. It retains the existing environment rows and adds one
-  equally dense recovery group for Workspace identity, Session Creation Journal,
-  Session Catalog, Writer Lease, Host authority, and Attachment Staging. Every
-  row uses an icon, text status, and bounded detail; color is never the only cue.
+  onboarding surface. It retains environment and recovery rows and adds one equally
+  dense `运行健康` group. Health combines Main-owned Agent Host lifecycle/restart/
+  port-handoff facts, Repository scheduler/private-Git/working-tree services,
+  Prompt Stash storage state, Host scheduler/Operation/heartbeat aggregates,
+  Renderer acknowledgement latency, and the existing Operation Freshness projection.
+  Every row uses an icon, text status, and bounded detail; color is never the only cue.
 - Runtime Doctor, Host diagnostics, and Desktop recovery are independent
   projections. Loading or failure in one region cannot erase a completed result
   from another region, and a late `doctor.completed` event cannot clear the
   recovery snapshot. Recheck and diagnostic export remain available without
   changing the active Pi Session.
+- Health observations are local, on-demand, bounded counts/timestamps only. They do
+  not contain Task/Operation IDs, Prompt or Tool payloads, paths, credentials, or
+  stdout/stderr, and they do not create OTLP, Grafana, remote telemetry, or a
+  continuously updating dashboard. Diagnostic export uses
+  `pi67-support-diagnostics.v3` for the same redacted projection.
 - The Host authority row renders previous-run exit as one of first launch,
   clean, unclean, or unknown. First launch is neutral; unclean and unknown are
   warnings. The persisted `cleanExit=false` launch marker remains unchanged so a

@@ -65,6 +65,7 @@ export interface SessionSummary {
   messageCount: number;
   pinnedAt?: number;
   archivedAt?: number;
+  snoozedUntil?: number;
   parentSessionPath?: string;
 }
 

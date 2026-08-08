@@ -14,6 +14,7 @@ import {
   resolveExistingSessionFileIdentity
 } from "./session-path-identity.js";
 import type { SessionProjectionMetadata } from "./session-projection-index.js";
+import type { SessionCatalogOrganizationMutation } from "./session-catalog-record-enricher.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 
 type UpsertReason = Extract<
@@ -35,7 +36,7 @@ export interface RuntimeSessionCatalog {
   status(): SessionCatalogStatus;
   upsertCurrent(reason: UpsertReason): Promise<void>;
   upsertRecord(record: SessionCatalogRecord, reason: UpsertReason): Promise<void>;
-  organize(path: string, mutation: { kind: "pin" | "archive"; value: boolean }): Promise<number>;
+  organize(path: string, mutation: SessionCatalogOrganizationMutation): Promise<number>;
   reorderPinned(paths: readonly string[]): Promise<number>;
   dispose(): Promise<void>;
 }

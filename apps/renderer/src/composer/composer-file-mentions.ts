@@ -82,6 +82,40 @@ function composerFileMentionToken(relativePath: string): string {
   return `@[${relativePath}]`;
 }
 
+export function removeComposerFileReference(
+  text: string,
+  cursor: number,
+  reference: ComposerWorkspaceFileRef
+): { text: string; cursor: number } {
+  const token = composerFileMentionToken(reference.relativePath);
+  let nextText = text;
+  let nextCursor = Math.max(0, Math.min(text.length, cursor));
+  let offset = 0;
+  while ((offset = nextText.indexOf(token, offset)) >= 0) {
+    let start = offset;
+    let end = offset + token.length;
+    const before = nextText[start - 1];
+    const after = nextText[end];
+    if (isHorizontalSpace(before) && isHorizontalSpace(after)) end += 1;
+    else if ((start === 0 || before === "\n") && isHorizontalSpace(after)) end += 1;
+    else if (isHorizontalSpace(before) && (end === nextText.length || after === "\n")) start -= 1;
+    nextCursor = cursorAfterRemoval(nextCursor, start, end);
+    nextText = `${nextText.slice(0, start)}${nextText.slice(end)}`;
+    offset = start;
+  }
+  return { text: nextText, cursor: Math.min(nextCursor, nextText.length) };
+}
+
+function isHorizontalSpace(value: string | undefined): boolean {
+  return value === " " || value === "\t";
+}
+
+function cursorAfterRemoval(cursor: number, start: number, end: number): number {
+  if (cursor <= start) return cursor;
+  if (cursor >= end) return cursor - (end - start);
+  return start;
+}
+
 export function composerFileMentionOptionId(index: number): string {
   return `composer-file-mention-${index}`;
 }

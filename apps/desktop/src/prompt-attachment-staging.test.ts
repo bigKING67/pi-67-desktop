@@ -25,6 +25,12 @@ import {
   cleanupStalePromptAttachmentRuns,
   PromptAttachmentStagingService
 } from "./prompt-attachment-staging.js";
+import {
+  attachmentCandidate as candidate,
+  bufferCandidate,
+  draftDirectories,
+  pngBuffer
+} from "./prompt-attachment-staging-test-fixture.js";
 
 const roots: string[] = [];
 
@@ -101,6 +107,75 @@ describe("PromptAttachmentStagingService", () => {
     await fixture.service.release([attachment.id]);
     await expect(access(join(fixture.service.draftRoot, attachment.id))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(fixture.service.release(["../outside"])).rejects.toThrow("Prompt attachment id is invalid.");
+  });
+
+  it("reads only authoritative staged images and restores them under fresh opaque ids", async () => {
+    const fixture = await createFixture();
+    const [source] = await fixture.service.stage([bufferCandidate(
+      "stash.png",
+      [0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]
+    )]);
+    if (!source) throw new Error("Expected a staged source image.");
+
+    const [payload] = await fixture.service.readDraftImages([source.id]);
+    expect(payload).toMatchObject({
+      id: source.id,
+      name: "stash.png",
+      mimeType: "image/png",
+      byteLength: 8,
+      kind: "image"
+    });
+    expect(payload?.bytes).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]));
+
+    const [restored] = await fixture.service.stageStoredImages([{
+      name: payload!.name,
+      mimeType: payload!.mimeType,
+      bytes: payload!.bytes
+    }]);
+    expect(restored).toMatchObject({ name: "stash.png", mimeType: "image/png", kind: "image" });
+    expect(restored?.id).not.toBe(source.id);
+    expect(await readFile(join(fixture.service.draftRoot, restored!.id, "payload.bin")))
+      .toEqual(payload!.bytes);
+  });
+
+  it("rejects non-images, duplicate ids, manifest links, and payload drift during stash reads", async () => {
+    const fixture = await createFixture();
+    const [document] = await fixture.service.stage([candidate({
+      name: "notes.txt",
+      mimeType: "text/plain",
+      byteLength: 4,
+      data: new TextEncoder().encode("text").buffer
+    })]);
+    if (!document) throw new Error("Expected a staged document.");
+    await expect(fixture.service.readDraftImages([document.id])).rejects.toThrow("Only staged images");
+    await expect(fixture.service.readDraftImages([document.id, document.id])).rejects.toThrow("duplicated");
+
+    const [image] = await fixture.service.stage([bufferCandidate(
+      "drift.png",
+      [0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]
+    )]);
+    if (!image) throw new Error("Expected a staged image.");
+    await writeFile(join(fixture.service.draftRoot, image.id, "payload.bin"), Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 9, 9, 9, 9
+    ]));
+    await expect(fixture.service.readDraftImages([image.id])).rejects.toThrow("integrity validation");
+
+    const manifestPath = join(fixture.service.draftRoot, image.id, "manifest.json");
+    const outsideManifest = join(fixture.parent, "outside-manifest.json");
+    await writeFile(outsideManifest, "{}", "utf8");
+    await rm(manifestPath);
+    await symlink(outsideManifest, manifestPath);
+    await expect(fixture.service.readDraftImages([image.id])).rejects.toThrow();
+  });
+
+  it("bounds restored Prompt Stash images by the inline-image budget", async () => {
+    const fixture = await createFixture();
+    await expect(fixture.service.stageStoredImages([{
+      name: "overflow.png",
+      mimeType: "image/png",
+      bytes: Buffer.alloc(MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES + 1, 1)
+    }])).rejects.toThrow("restore limit");
+    expect(await draftDirectories(fixture.service.draftRoot)).toEqual([]);
   });
 
   it("rejects links, non-regular inputs, changed sizes, and pathless overflows", async () => {
@@ -369,35 +444,6 @@ describe("PromptAttachmentStagingService", () => {
   });
 });
 
-function candidate(overrides: {
-  name: string;
-  byteLength: number;
-  path?: string;
-  data?: ArrayBuffer;
-  mimeType?: string;
-  lastModified?: number;
-}) {
-  return {
-    name: overrides.name,
-    mimeType: overrides.mimeType ?? "application/octet-stream",
-    byteLength: overrides.byteLength,
-    lastModified: overrides.lastModified ?? 0,
-    ...(overrides.path === undefined ? {} : { path: overrides.path }),
-    ...(overrides.data === undefined ? {} : { data: overrides.data })
-  };
-}
-
-function pngBuffer(byteLength: number): ArrayBuffer {
-  const bytes = new Uint8Array(byteLength);
-  bytes.set([0x89, 0x50, 0x4e, 0x47]);
-  return bytes.buffer;
-}
-
-function bufferCandidate(name: string, bytes: number[], mimeType = "") {
-  const data = Uint8Array.from(bytes).buffer;
-  return candidate({ name, mimeType, byteLength: data.byteLength, data });
-}
-
 async function createFixture(): Promise<{
   parent: string;
   service: PromptAttachmentStagingService;
@@ -408,14 +454,4 @@ async function createFixture(): Promise<{
     parent,
     service: new PromptAttachmentStagingService(join(parent, "run"))
   };
-}
-
-async function draftDirectories(root: string): Promise<string[]> {
-  try {
-    const { readdir } = await import("node:fs/promises");
-    return await readdir(root);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    throw error;
-  }
 }

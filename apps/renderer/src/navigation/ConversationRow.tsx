@@ -1,6 +1,8 @@
 import { conversationArchiveBlocker, taskCanBeStopped } from "@pi67/domain";
 import {
   Archive,
+  Calendar1,
+  CalendarDays,
   Circle,
   Clock3,
   ArrowDown,
@@ -29,7 +31,9 @@ import {
   moveRendererPinnedConversation,
   placeRendererPinnedConversationBefore,
   renameRendererConversation,
-  setRendererConversationPinned
+  setRendererConversationPinned,
+  snoozeRendererConversation,
+  wakeRendererConversation
 } from "./conversation-organization-controller.js";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { statusLabel, type ConversationRowModel } from "./workspace-conversation-model.js";
@@ -47,7 +51,9 @@ export function ConversationRow({
   selectedRow: MutableRefObject<HTMLElement | null>;
   disabled: boolean;
 }) {
-  const StatusIcon = row.status === "running" ? LoaderCircle : row.status === "waiting" ? Clock3 : Circle;
+  const StatusIcon = row.status === "running"
+    ? LoaderCircle
+    : row.status === "waiting" || row.snoozed ? Clock3 : Circle;
   const task = row.task;
   const sessionConversation = row.conversation.kind === "session" ? row.conversation : undefined;
   const needsAttention = useConversationAttentionStore((state) => (
@@ -59,6 +65,10 @@ export function ConversationRow({
         )
       : false
   ));
+  const organizationBlocked = Boolean(conversationArchiveBlocker({
+    kind: "session",
+    ...(task ? { lifecycle: task.lifecycle, hasDraft: task.hasDraft || task.attachmentCount > 0 } : {})
+  }));
   return (
     <div
       className={styles.conversationRow}
@@ -100,7 +110,7 @@ export function ConversationRow({
         }}
         type="button"
       >
-        <span className={styles.conversationMarker} data-status={row.status ?? "idle"}>
+        <span className={styles.conversationMarker} data-status={row.snoozed ? "snoozed" : row.status ?? "idle"}>
           <StatusIcon aria-hidden="true" className={row.status === "running" ? styles.spinning : undefined} size={11} />
         </span>
         <span className={styles.conversationCopy}>
@@ -109,6 +119,7 @@ export function ConversationRow({
         </span>
         <span className={styles.conversationIndicators}>
           {row.pinned ? <Pin aria-label="已置顶" className={styles.pinnedIcon} size={11} /> : null}
+          {row.snoozed ? <span className={styles.conversationState}>稍后</span> : null}
           {needsAttention ? <span className={styles.conversationAttention}>待查看</span> : null}
           {row.status ? <span className={styles.conversationState}>{statusLabel(row.status)}</span> : null}
         </span>
@@ -180,12 +191,54 @@ export function ConversationRow({
                   <RotateCcw aria-hidden="true" size={13} />恢复自动标题
                 </MenuItem>
               ) : null}
+              <Separator className={styles.menuSeparator!} />
+              {row.snoozed ? (
+                <MenuItem className={styles.menuItem!} onAction={() => void wakeRendererConversation(
+                  sessionConversation.workspaceId,
+                  {
+                    fileIdentity: sessionConversation.sessionFileIdentity,
+                    path: sessionConversation.sessionPath
+                  }
+                )} textValue="立即唤醒">
+                  <Clock3 aria-hidden="true" size={13} />立即唤醒
+                </MenuItem>
+              ) : (
+                <>
+                  <MenuItem
+                    className={styles.menuItem!}
+                    isDisabled={organizationBlocked}
+                    onAction={() => void snoozeRendererConversation(
+                      sessionConversation.workspaceId,
+                      { fileIdentity: sessionConversation.sessionFileIdentity, path: sessionConversation.sessionPath },
+                      "later"
+                    )}
+                    textValue="稍后"
+                  ><Clock3 aria-hidden="true" size={13} />稍后（1 小时）</MenuItem>
+                  <MenuItem
+                    className={styles.menuItem!}
+                    isDisabled={organizationBlocked}
+                    onAction={() => void snoozeRendererConversation(
+                      sessionConversation.workspaceId,
+                      { fileIdentity: sessionConversation.sessionFileIdentity, path: sessionConversation.sessionPath },
+                      "tomorrow"
+                    )}
+                    textValue="明天"
+                  ><Calendar1 aria-hidden="true" size={13} />明天 09:00</MenuItem>
+                  <MenuItem
+                    className={styles.menuItem!}
+                    isDisabled={organizationBlocked}
+                    onAction={() => void snoozeRendererConversation(
+                      sessionConversation.workspaceId,
+                      { fileIdentity: sessionConversation.sessionFileIdentity, path: sessionConversation.sessionPath },
+                      "next-week"
+                    )}
+                    textValue="下周"
+                  ><CalendarDays aria-hidden="true" size={13} />下周一 09:00</MenuItem>
+                </>
+              )}
               <MenuItem
                 className={styles.menuItem!}
-                isDisabled={Boolean(conversationArchiveBlocker({
-                  kind: "session",
-                  ...(task ? { lifecycle: task.lifecycle, hasDraft: task.hasDraft || task.attachmentCount > 0 } : {})
-                }))}
+                isDisabled={organizationBlocked}
                 onAction={() => void archiveRendererConversation(sessionConversation.workspaceId, {
                   fileIdentity: sessionConversation.sessionFileIdentity,
                   path: sessionConversation.sessionPath
@@ -226,6 +279,12 @@ function parsePinnedDrag(value: string): { workspaceId: string; fileIdentity: st
 }
 
 async function openConversation(row: ConversationRowModel): Promise<void> {
+  if (row.snoozed && row.conversation.kind === "session") {
+    await wakeRendererConversation(row.conversation.workspaceId, {
+      fileIdentity: row.conversation.sessionFileIdentity,
+      path: row.conversation.sessionPath
+    }, false);
+  }
   if (row.task) {
     await activateRendererTask(row.task.id);
     return;

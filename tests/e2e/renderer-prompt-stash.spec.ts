@@ -26,8 +26,12 @@ test("clears and restores exact Prompt text only after secure persistence acknow
   await page.setViewportSize({ width: 720, height: 520 });
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  const item = stash.getByRole("button", { name: /Preserve exact whitespace/u });
+  const item = stash.getByRole("button", { name: /^Preserve exact whitespace/u });
   await expect(item).toBeEnabled();
+  await page.screenshot({
+    path: "artifacts/visual-review/prompt-stash-dark-narrow.png",
+    animations: "disabled"
+  });
   await item.click();
   await expect.poll(() => composer.inputValue()).toBe(exactText);
   await expect(page.getByRole("button", { name: "Prompt 暂存，0 条" })).toBeVisible();

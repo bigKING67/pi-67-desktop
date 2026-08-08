@@ -42,6 +42,24 @@ describe("command palette model", () => {
     expect(projection.groups[0]?.items.map((item) => item.id)).toEqual(["settings:provider"]);
   });
 
+  it("places local message-body results directly after matching Sessions", () => {
+    const projection = buildPaletteProjection([
+      action("settings:search", "settings", "Search settings"),
+      action("message:search", "messages", "Search message"),
+      action("session:search", "sessions", "Search session"),
+      action("action:search", "actions", "Search action")
+    ], "search");
+    expect(projection.groups.map((group) => group.id)).toEqual([
+      "sessions",
+      "messages",
+      "actions",
+      "settings"
+    ]);
+    expect(buildPaletteProjection([
+      action("message:search", "messages", "Search message")
+    ], "").groups).toEqual([]);
+  });
+
   it("reports exact search truncation instead of inferring it from all actions", () => {
     const exactlyVisible = buildPaletteProjection(
       Array.from({ length: MAX_VISIBLE_SEARCH_RESULTS }, (_, index) => (
