@@ -8,7 +8,7 @@ describe("Windows installed Provider configuration", () => {
   it("requires the seeded Provider and persisted Pi credential before returning to the workbench", async () => {
     const actions = [];
     const unavailable = { isVisible: async () => false };
-    const credentialDialog = dialogLocator(actions, ["false", "true"]);
+    const credentialDialog = dialogLocator(actions);
     const configuredProvider = providerLocator(actions);
     const panel = {
       getByRole: (role, options) => role === "textbox"
@@ -35,7 +35,7 @@ describe("Windows installed Provider configuration", () => {
     const result = await verifyProviderConfiguration(window);
     expect(result).toMatchObject({
       configuredProvider: "openai",
-      credentialProviderSelection: "openai",
+      credentialDialogTarget: "openai",
       credentialPersistence: "pi-auth-json",
       outcome: "ready"
     });
@@ -49,11 +49,9 @@ describe("Windows installed Provider configuration", () => {
       "configured-provider:visible",
       "configured-state:visible",
       "click:configured-provider",
-      "click:settings:管理凭据",
+      "click:settings:更新 API Key",
       "credential-dialog:visible",
-      "credential-provider:visible",
-      "credential-provider:selected:false",
-      "credential-provider:selected:true",
+      "credential-provider-list:count:0",
       "credential-persistence:visible",
       "click:credential-close",
       "credential-dialog:hidden",
@@ -78,18 +76,13 @@ function providerLocator(actions) {
   };
 }
 
-function dialogLocator(actions, selectedStates) {
+function dialogLocator(actions) {
   return {
-    getByRole: (_role, options) => String(options.name).includes("OpenAI")
-      ? {
-          getAttribute: async () => {
-            const selected = selectedStates.shift() ?? "true";
-            actions.push(`credential-provider:selected:${selected}`);
-            return selected;
-          },
-          waitFor: async ({ state }) => actions.push(`credential-provider:${state}`)
-        }
-      : clickLocator(actions, "credential-close"),
+    getByLabel: () => ({ count: async () => {
+      actions.push("credential-provider-list:count:0");
+      return 0;
+    } }),
+    getByRole: () => clickLocator(actions, "credential-close"),
     getByText: () => waitLocator(actions, "credential-persistence"),
     waitFor: async ({ state }) => actions.push(`credential-dialog:${state}`)
   };

@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { grolandNativeSearchApi } from "@pi67/domain";
+import {
+  type DeepSeekWebSearchState,
+  readDeepSeekResponsesStream
+} from "./deepseek-responses-stream.js";
 import { DEFAULT_FETCH_DEPENDENCIES, fetchPublicText, normalizeUrls } from "./first-party-web-fetch.js";
 import {
   type FetchDependencies,
@@ -124,7 +128,13 @@ export function createFirstPartyWebTools(
         auth.apiKey,
         auth.headers,
         request,
-        signal
+        signal,
+        (state) => onUpdate?.(toolResult(deepSeekSearchStatus(state), {
+          responseId: "pending",
+          source: "provider-native",
+          sourceLabel: route.sourceLabel,
+          urls: []
+        }))
       );
       const cached = cache.put(result);
       return toolResult(formatSearchResult(cached), searchDetails(cached));
@@ -231,7 +241,8 @@ export async function executeNativeSearch(
   apiKey: string,
   inheritedHeaders: Record<string, string> | undefined,
   request: SearchRequest,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onDeepSeekSearchState?: (state: DeepSeekWebSearchState) => void
 ): Promise<SearchResult> {
   const headers = new Headers(inheritedHeaders);
   headers.set("content-type", "application/json");
@@ -255,7 +266,8 @@ export async function executeNativeSearch(
     body = {
       model: modelId,
       input: request.queries.join("\n\n"),
-      tools: [{ type: "web_search" }]
+      tools: [{ type: "web_search" }],
+      ...(route.protocol === "deepseek-web-search" ? { stream: true } : {})
     };
   }
 
@@ -268,11 +280,14 @@ export async function executeNativeSearch(
   if (!response.ok) {
     throw new Error(`NATIVE_WEB_SEARCH_FAILED: ${route.sourceLabel} returned HTTP ${response.status}; no alternate search provider was called.`);
   }
-  const payload = await parseBoundedJson(
-    response,
-    "NATIVE_WEB_SEARCH_RESPONSE_TOO_LARGE: provider response exceeds the 2 MiB limit.",
-    "NATIVE_WEB_SEARCH_INVALID: provider returned malformed JSON."
-  );
+  const payload = route.protocol === "deepseek-web-search"
+    && response.headers.get("content-type")?.toLocaleLowerCase().includes("text/event-stream")
+    ? await readDeepSeekResponsesStream(response, onDeepSeekSearchState)
+    : await parseBoundedJson(
+        response,
+        "NATIVE_WEB_SEARCH_RESPONSE_TOO_LARGE: provider response exceeds the 2 MiB limit.",
+        "NATIVE_WEB_SEARCH_INVALID: provider returned malformed JSON."
+      );
   const projected = route.protocol === "anthropic-web-search"
     ? projectAnthropicSearchResponse(payload)
     : projectResponsesSearchResponse(payload);
@@ -351,6 +366,12 @@ function anthropicMessagesEndpoint(baseUrl: string): string {
 function responsesEndpoint(baseUrl: string): string {
   const normalized = baseUrl.replace(/\/+$/u, "").replace(/\/responses$/u, "");
   return `${normalized}/responses`;
+}
+
+function deepSeekSearchStatus(state: DeepSeekWebSearchState): string {
+  if (state === "searching") return "DeepSeek 正在使用官方 Responses API 联网搜索…";
+  if (state === "completed") return "DeepSeek 已完成联网搜索，正在整理结果…";
+  return "DeepSeek 原生搜索已开始…";
 }
 
 function normalizeSearchRequest(input: unknown): SearchRequest {

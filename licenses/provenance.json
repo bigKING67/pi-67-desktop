@@ -167,6 +167,36 @@
       "modifications": "Reimplemented a bounded unified-Patch presentation with Pi-67 theme tokens, metadata classification, reduced-motion behavior, and a separate 600-row DOM budget. No pi-gui source code was copied."
     },
     {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/settings-providers-section.tsx",
+      "sourceSha256": "e7f8147ccbb981eac43439379f5c3e7b41ea3d4881a005767b3a8b7916383485",
+      "targetPath": "apps/renderer/src/settings/ProviderConfigurationPanel.tsx",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented the built-in Provider connection flow as a dedicated Pi-67 surface with effective read-only endpoints and protocols, a direct API-key action, and a separate custom Provider form. Pi auth.json, revision fencing, Agent Host isolation, and Pi model catalogs remain authoritative. No pi-gui source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/minghinmatthewlam/pi-gui",
+      "sourceCommit": "eb9a7380705dffad36db3efa771ee825aafbef6f",
+      "sourcePath": "apps/desktop/src/settings-providers-section.tsx",
+      "sourceSha256": "e7f8147ccbb981eac43439379f5c3e7b41ea3d4881a005767b3a8b7916383485",
+      "targetPath": "apps/renderer/src/settings/CredentialDialog.tsx",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c"
+      },
+      "copyrightNotice": "Copyright (c) 2026 Matthew Lam",
+      "modifications": "Reimplemented contextual Provider API-key setup as a focused single-Provider dialog while retaining a separate searchable generic credential catalog. Credential values remain write-only by default and are handled through Pi-67 Protocol and Agent Host boundaries. No pi-gui source code was copied."
+    },
+    {
       "sourceRepository": "https://github.com/pingdotgg/t3code",
       "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
       "sourcePath": "packages/shared/src/DrainableWorker.ts",

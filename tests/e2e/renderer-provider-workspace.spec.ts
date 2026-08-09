@@ -8,6 +8,7 @@ import {
   recordedCommandDetails
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
+import { createMockDeepSeekProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page, {
@@ -223,8 +224,12 @@ test("uses a list-to-detail model flow in a narrow Settings workspace", async ({
 });
 
 test("persists a Provider credential from a registered Workspace without starting a Task", async ({ page }) => {
+  const providerConfigurationSnapshot = createMockDeepSeekProviderConfigurationSnapshot();
   await page.goto("/");
-  await attachMockAgent(page);
+  await attachMockAgent(page, [], {}, {
+    providerCatalogProviders: [{ id: "deepseek", label: "DeepSeek", configured: false, modelCount: 1 }],
+    providerConfigurationSnapshot
+  });
   await page.keyboard.press("Control+,");
 
   const settings = page.getByLabel("π 设置");
@@ -234,14 +239,24 @@ test("persists a Provider credential from a registered Workspace without startin
     .getByRole("tab", { name: "可配置 1" })
     .click();
   await settings.getByTestId("provider-configuration-list")
-    .getByRole("button", { name: /Anthropic/u })
+    .getByRole("button", { name: /DeepSeek/u })
     .click();
-  await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
+  const providerPanel = settings.getByTestId("provider-configuration-panel");
+  const connection = providerPanel.getByTestId("builtin-provider-connection");
+  await expect(providerPanel.getByRole("tab", { name: "连接" })).toHaveAttribute("aria-selected", "true");
+  await expect(connection.getByText("需要 API Key", { exact: true })).toBeVisible();
+  await expect(connection.getByText("https://api.deepseek.com", { exact: true })).toBeVisible();
+  await expect(connection.getByText("openai-completions", { exact: true })).toBeVisible();
+  await expect(connection.getByText(/DeepSeek V4 Flash 通过官方 Responses \/responses 自动联网搜索/u)).toBeVisible();
+  await expect(providerPanel.getByLabel("Base URL")).toHaveCount(0);
+  await providerPanel.getByRole("button", { name: "配置 API Key", exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
-  await expect(dialog.getByText("OpenAI", { exact: true }).first()).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /Anthropic/u })).toHaveAttribute("aria-pressed", "true");
+  const dialog = page.getByRole("dialog", { name: "配置 DeepSeek API Key" });
+  await expect(dialog.getByLabel("Pi Provider 列表")).toHaveCount(0);
+  await expect(dialog.getByText("DeepSeek", { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText("尚未配置", { exact: true })).toBeVisible();
   const apiKeyInput = page.getByLabel("Provider API 密钥", { exact: true });
+  await expect(apiKeyInput).toBeFocused();
   await expect(apiKeyInput).toHaveAttribute("type", "password");
   await apiKeyInput.fill("workspace-secret-1234");
   await dialog.getByRole("button", { name: "显示 API Key" }).click();
@@ -255,7 +270,7 @@ test("persists a Provider credential from a registered Workspace without startin
   await expect(page.locator("body")).not.toContainText("workspace-secret-1234");
   expect(await recordedCommandDetails(page)).toContainEqual(expect.objectContaining({
     type: "provider.credential.store",
-    payload: expect.objectContaining({ provider: "anthropic", apiKey: "[redacted]" }),
+    payload: expect.objectContaining({ provider: "deepseek", apiKey: "[redacted]" }),
     context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   }));
   await clearRecordedCommands(page);
@@ -270,12 +285,12 @@ test("persists a Provider credential from a registered Workspace without startin
     .toHaveLength(0);
   await dialog.getByRole("button", { name: "移除持久凭据" }).click();
   await removal.getByRole("button", { name: "移除持久凭据", exact: true }).click();
-  await expect(dialog.getByText("尚未配置")).toBeVisible();
+  await expect(dialog.getByText("尚未配置", { exact: true })).toBeVisible();
   const commands = await recordedCommandDetails(page);
   expect(commands.filter((command) => command.type === "runtime.initialize")).toHaveLength(0);
   expect(commands).toContainEqual(expect.objectContaining({
     type: "provider.credential.remove",
-    payload: expect.objectContaining({ provider: "anthropic" }),
+    payload: expect.objectContaining({ provider: "deepseek" }),
     context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
   }));
 });

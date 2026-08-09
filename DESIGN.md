@@ -1009,6 +1009,12 @@ loading error where the operation can produce those states
   selection but are read-only. Creating or editing a custom Provider writes only
   its `models.json` entry; Desktop never copies built-in definitions into that
   file merely to display them.
+- An unconfigured built-in Provider opens on a dedicated `连接` section. It shows
+  the effective Endpoint and API protocol from the Pi model catalog as compact
+  read-only facts and makes `配置 API Key` the primary action. It never renders
+  the custom Provider form as a page of disabled Base URL, protocol, Header, or
+  advanced-JSON controls. Those editable controls appear only for a custom
+  Provider; proxy or compatibility endpoints use a distinct custom definition.
 - `Groland` appears as one built-in Provider and owns one credential interaction,
   not separate Claude/GPT services. Its five Claude rows show
   `anthropic-messages`; its two GPT rows show `openai-responses`; all seven show
@@ -1028,11 +1034,19 @@ loading error where the operation can produce those states
   replacing, or removing a Header is an explicit write-only mutation; after a
   save the value field clears and only the safe name remains visible.
 - `保存到 Pi` is the primary credential action and persists to `auth.json`.
-  `仅本次运行` is secondary and clearly states that the value disappears with
+  `仅本次使用` is secondary and clearly states that the value disappears with
   the runtime. If a persistent credential exists while a runtime override is
   active, the UI names both facts rather than implying the stored value is active.
-- `管理凭据` opened from a Provider editor preserves that exact Provider as the
+- The focused built-in DeepSeek connection states that `deepseek-v4-flash`
+  reuses the same credential for official Responses `/responses` Web Search.
+  Streaming `response.web_search_call.in_progress`, `.searching`, and
+  `.completed` events update the in-place Tool state without introducing a
+  search switch or implying support for `deepseek-v4-pro`.
+- `配置 API Key` / `更新 API Key` opened from a Provider editor preserves that exact Provider as the
   credential-dialog selection, even when the active Session uses another model.
+  This targeted entry opens a focused `配置 <Provider> API Key` dialog without a
+  second Provider picker; generic Composer and Command Palette entries retain the
+  searchable multi-Provider catalog.
   Generic credential entry points may prefer the active model Provider and then
   fall back to the first available Provider.
 - The API-key input is masked by default and provides an accessible eye control

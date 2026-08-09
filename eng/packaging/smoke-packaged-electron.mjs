@@ -189,15 +189,15 @@ try {
   await capturePackagedScreenshot(window, "03-model-detail.png");
   await providerPanel.getByRole("button", { name: "返回模型列表" }).click();
   await providerModelList.waitFor({ state: "visible", timeout: 15_000 });
-  await workspaceSettings.getByRole("button", { name: "管理凭据", exact: true }).click();
-  const credentialDialog = window.getByRole("dialog", { name: "Provider 与凭据" });
+  await workspaceSettings.getByRole("button", { name: "更新 API Key", exact: true }).click();
+  const credentialDialog = window.getByRole("dialog", { name: "配置 Anthropic API Key" });
   await credentialDialog.waitFor({ state: "visible", timeout: 15_000 });
-  const credentialProviderSearch = credentialDialog.getByRole("textbox", { name: "搜索 Provider" });
-  await credentialProviderSearch.fill("anthropic");
-  await credentialDialog.getByRole("button", { name: /^Anthropic\b/u }).click();
+  if (await credentialDialog.getByLabel("Pi Provider 列表").count()) {
+    throw new Error("Packaged targeted credential dialog rendered a second Provider picker.");
+  }
   await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await credentialDialog.getByRole("button", { name: "临时显示已保存 API Key" }).click();
+  await credentialDialog.getByRole("button", { name: "显示已保存 API Key（15 秒）" }).click();
   await credentialDialog.getByText(packagedCredential, { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await credentialDialog.getByRole("button", { name: "隐藏已保存 API Key" }).click();

@@ -137,8 +137,8 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
     await expect(openAi).toBeVisible();
     await expect(openAi).toContainText("已配置");
     await openAi.click();
-    await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
-    await expect(window.getByRole("dialog", { name: "Provider 与凭据" })
+    await settings.getByRole("button", { name: "更新 API Key", exact: true }).click();
+    await expect(window.getByRole("dialog", { name: "配置 OpenAI API Key" })
       .getByText("已持久化到 Pi auth.json", { exact: true })).toBeVisible();
   } finally {
     await application?.close();

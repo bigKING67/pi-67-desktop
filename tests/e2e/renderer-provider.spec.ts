@@ -57,11 +57,11 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await credentialDialog.getByRole("button", { name: /^OpenAI\b/u }).click();
   await expect(credentialDialog.getByText("已持久化到 Pi auth.json")).toBeVisible();
   await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
-  await credentialDialog.getByRole("button", { name: "临时显示已保存 API Key" }).click();
+  await credentialDialog.getByRole("button", { name: "显示已保存 API Key（15 秒）" }).click();
   await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toBeVisible();
   await credentialDialog.getByRole("button", { name: "隐藏已保存 API Key" }).click();
   await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toHaveCount(0);
-  await credentialDialog.getByRole("button", { name: "临时显示已保存 API Key" }).click();
+  await credentialDialog.getByRole("button", { name: "显示已保存 API Key（15 秒）" }).click();
   await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toBeVisible();
   await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
   await expect(credentialDialog.getByText("fixture-persisted-openai-key", { exact: true })).toHaveCount(0);
@@ -69,12 +69,12 @@ test("shows Provider status while keeping runtime API keys ephemeral", async ({ 
   await expect(credentialDialog.getByText("••••••••••••")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("credential-dialog-saved.png"), animations: "disabled" });
   await credentialDialog.getByRole("button", { name: /Anthropic/u }).click();
-  await expect(credentialDialog.getByText("尚未配置")).toBeVisible();
+  await expect(credentialDialog.getByText("尚未配置", { exact: true })).toBeVisible();
   const keyInput = page.getByLabel("Provider API 密钥", { exact: true });
   await keyInput.fill("test-secret-1234");
   await page.screenshot({ path: testInfo.outputPath("credential-dialog.png"), animations: "disabled" });
-  await credentialDialog.getByRole("button", { name: "仅本次运行" }).click();
-  await expect(credentialDialog.getByText("来源：本次运行内存")).toBeVisible();
+  await credentialDialog.getByRole("button", { name: "仅本次使用" }).click();
+  await expect(credentialDialog.getByText("来源：当前运行内存（完全退出后失效）", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("test-secret-1234");
   await expect(keyInput).toHaveValue("");
 
@@ -188,19 +188,17 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
     getComputedStyle(element).gridTemplateColumns
   ));
   expect(layoutColumns.split(" ")).toHaveLength(1);
-  await expect(dialog.getByRole("button", { name: "仅本次运行" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "仅本次使用" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(680);
   await page.screenshot({ path: testInfo.outputPath("credential-dialog-narrow-dark.png"), animations: "disabled" });
 });
 
 async function openProviderDialog(page: Page): Promise<void> {
-  const settings = await openSettingsSection(page, /^模型$/u);
-  const editor = settings.getByTestId("provider-configuration-editor");
-  if (!(await editor.isVisible())) {
-    await settings.getByRole("button", { name: /^OpenAI\b/u }).click();
-  }
-  await expect(editor).toBeVisible();
-  await settings.getByRole("button", { name: "管理凭据", exact: true }).click();
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog", { name: "命令面板" });
+  const search = palette.getByLabel("搜索会话、对话正文、扩展命令和应用操作");
+  await search.fill("模型服务与凭据");
+  await palette.getByRole("option", { name: /模型服务与凭据/u }).click();
 }
 
 async function expectNoHorizontalPageOverflow(page: Page): Promise<void> {

@@ -67,3 +67,24 @@ export function createMockProviderConfigurationSnapshot(): PiProviderConfigurati
     diagnostics: []
   };
 }
+
+export function createMockDeepSeekProviderConfigurationSnapshot(): PiProviderConfigurationSnapshot {
+  const snapshot = createMockProviderConfigurationSnapshot();
+  const openai = snapshot.providers.find((provider) => provider.id === "openai")!;
+  const template = snapshot.providers.find((provider) => provider.id === "anthropic")!;
+  return {
+    ...snapshot,
+    providers: [openai, {
+      ...template,
+      id: "deepseek",
+      name: "DeepSeek",
+      models: [{
+        ...template.models[0]!,
+        id: "deepseek-v4-flash",
+        name: "DeepSeek V4 Flash",
+        api: "openai-completions",
+        baseUrl: "https://api.deepseek.com"
+      }]
+    }]
+  };
+}

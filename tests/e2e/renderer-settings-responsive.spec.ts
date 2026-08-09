@@ -188,7 +188,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   const scope = page.getByRole("group", { name: "设置作用域" });
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
-  const manageCredentials = page.getByRole("button", { name: "管理凭据" });
+  const manageCredentials = page.getByRole("button", { name: /API Key/u });
   await expect(scope).toHaveCount(0);
   await expect(providerList).toBeVisible();
   await expect(providerEditor).toBeHidden();

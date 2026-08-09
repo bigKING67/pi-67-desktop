@@ -87,6 +87,14 @@
   border-radius: 10px;
   background: var(--surface);
 }
+.provider-credential-layout.is-focused {
+  height: auto;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.provider-credential-layout.is-focused .provider-credential-editor {
+  overflow-y: visible;
+}
 .provider-sidebar {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -240,6 +248,7 @@
 
 @media (max-width: 680px) {
   .provider-credential-layout { height: min(520px, 62vh); grid-template-columns: 1fr; grid-template-rows: minmax(170px, 0.8fr) minmax(240px, 1.2fr); }
+  .provider-credential-layout.is-focused { height: auto; grid-template-rows: auto; }
   .provider-sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
 }
 

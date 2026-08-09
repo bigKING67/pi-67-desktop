@@ -3,20 +3,13 @@ import type {
   PiProviderConfigurationSnapshot,
   PiProviderConfigurationView
 } from "@pi67/protocol";
-import {
-  AlertTriangle,
-  Check,
-  FileJson2,
-  KeyRound,
-  RefreshCw,
-  Save,
-  Trash2
-} from "lucide-react";
+import { AlertTriangle, Check, FileJson2, KeyRound, RefreshCw, Save, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, TextArea } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
+import { BuiltInProviderConnection } from "./BuiltInProviderConnection.js";
 import {
   defaultProviderCatalogView,
   ProviderCatalog,
@@ -138,9 +131,14 @@ export function ProviderConfigurationPanel() {
         useProviderConfigurationStore.getState().startProvider();
       }
       setSection("configuration");
-    } else if (providerId !== selectedProviderId) {
-      useProviderConfigurationStore.getState().selectProvider(providerId);
-      setSection("models");
+    } else {
+      const target = snapshot.providers.find((provider) => provider.id === providerId);
+      if (providerId !== selectedProviderId) {
+        useProviderConfigurationStore.getState().selectProvider(providerId);
+        setSection(target?.origin === "builtin" && !target.configured ? "configuration" : "models");
+      } else if (target?.origin === "builtin" && !target.configured) {
+        setSection("configuration");
+      }
     }
     setProviderDetailOpen(true);
   };
@@ -221,15 +219,22 @@ export function ProviderConfigurationPanel() {
                   <SettingsBackAction label="返回模型服务列表" onPress={closeProvider}>模型服务</SettingsBackAction>
                   <span>
                     <strong>{selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}</strong>
-                    <small>{editable ? "保存会原子更新 Pi models.json" : "Pi 内置 Provider 只能管理凭据与默认模型"}</small>
+                    <small>{editable
+                      ? "Endpoint 与模型写入 Pi models.json；API Key 单独保存"
+                      : selectedView?.configured
+                        ? "Pi 内置服务已连接；Endpoint 与协议由 Pi 管理"
+                        : "先配置 API Key；Endpoint 与协议由 Pi 管理"}</small>
                   </span>
                   <div>
-                    <Button
-                      className="secondary-button"
-                      onPress={() => setCredentialDialogOpen(true, selectedProviderId)}
-                    >
-                      <KeyRound aria-hidden="true" size={14} />管理凭据
-                    </Button>
+                    {selectedProviderId && (editable || section !== "configuration") ? (
+                      <Button
+                        className={selectedView?.configured ? "secondary-button" : "primary-button"}
+                        onPress={() => setCredentialDialogOpen(true, selectedProviderId)}
+                      >
+                        <KeyRound aria-hidden="true" size={14} />
+                        {selectedView?.configured ? "更新 API Key" : "配置 API Key"}
+                      </Button>
+                    ) : null}
                     {selectedProviderId && editable ? (
                       <Button className={styles.dangerButton!} onPress={() => setRemovalTarget(selectedProviderId)}>
                         <Trash2 aria-hidden="true" size={14} />移除
@@ -244,12 +249,20 @@ export function ProviderConfigurationPanel() {
                 </div>
                 <ProviderSectionTabs
                   activeSection={section}
+                  builtIn={!editable}
                   modelCount={draft.models.length}
                   onChange={setSection}
                 />
                 <div className={styles.editorBody} data-section={section}>
                   {section === "configuration" ? (
-                    <ProviderConfigurationEditor draft={draft} editable={editable} selectedView={selectedView} />
+                    editable ? (
+                      <ProviderConfigurationEditor draft={draft} selectedView={selectedView} />
+                    ) : selectedView ? (
+                      <BuiltInProviderConnection
+                        provider={selectedView}
+                        onConfigureCredential={() => setCredentialDialogOpen(true, selectedView.id)}
+                      />
+                    ) : null
                   ) : null}
                   {section === "models" ? (
                     <ProviderModelWorkspace
@@ -298,15 +311,17 @@ export function ProviderConfigurationPanel() {
 
 function ProviderSectionTabs({
   activeSection,
+  builtIn,
   modelCount,
   onChange
 }: {
   activeSection: ProviderSection;
+  builtIn: boolean;
   modelCount: number;
   onChange: (section: ProviderSection) => void;
 }) {
   const items: Array<{ id: ProviderSection; label: string }> = [
-    { id: "configuration", label: "基本配置" },
+    { id: "configuration", label: builtIn ? "连接" : "基本配置" },
     { id: "models", label: `模型 ${modelCount}` },
     { id: "defaults", label: "默认模型" },
     { id: "diagnostics", label: "文件与诊断" }
@@ -331,11 +346,9 @@ function ProviderSectionTabs({
 
 function ProviderConfigurationEditor({
   draft,
-  editable,
   selectedView
 }: {
   draft: PiProviderConfigurationInput;
-  editable: boolean;
   selectedView: PiProviderConfigurationView | undefined;
 }) {
   const update = (mutation: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput) => (
@@ -345,25 +358,25 @@ function ProviderConfigurationEditor({
     <section className={styles.formSection}>
       <header className={styles.sectionIntro}>
         <strong>基本配置</strong>
-        <small>{editable ? "Provider ID、Endpoint 与协议直接对应 Pi models.json。" : "Pi 内置 Provider 由运行时提供，Desktop 不创建私有副本。"}</small>
+        <small>Provider ID、Endpoint 与协议直接对应 Pi models.json。新服务保存后再单独配置 API Key。</small>
       </header>
       <div className={styles.fieldGrid}>
-        <Field label="Provider ID" {...(editable ? { detail: "写入 providers.<id>" } : {})}>
-          <Input disabled={!editable || selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
+        <Field label="Provider ID" detail="写入 providers.<id>">
+          <Input disabled={selectedView !== undefined} value={draft.id} onChange={(event) => update((current) => ({ ...current, id: event.target.value }))} />
         </Field>
         <Field label="显示名称">
-          <Input disabled={!editable} value={draft.name ?? ""} onChange={(event) => updateOptionalProvider("name", event.target.value)} />
+          <Input value={draft.name ?? ""} onChange={(event) => updateOptionalProvider("name", event.target.value)} />
         </Field>
         <Field label="Base URL">
-          <Input disabled={!editable} value={draft.baseUrl ?? ""} onChange={(event) => updateOptionalProvider("baseUrl", event.target.value)} />
+          <Input value={draft.baseUrl ?? ""} onChange={(event) => updateOptionalProvider("baseUrl", event.target.value)} />
         </Field>
         <Field label="API 协议" detail="如 openai-responses / anthropic-messages">
-          <Input disabled={!editable} value={draft.api ?? ""} onChange={(event) => updateOptionalProvider("api", event.target.value)} />
+          <Input value={draft.api ?? ""} onChange={(event) => updateOptionalProvider("api", event.target.value)} />
         </Field>
       </div>
       <div className={styles.checkRow}>
-        <label><input checked={draft.authHeader ?? false} disabled={!editable} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />使用 Authorization header</label>
-        <label><input checked={draft.oauth === "radius"} disabled={!editable} onChange={(event) => update((current) => {
+        <label><input checked={draft.authHeader ?? false} onChange={(event) => update((current) => ({ ...current, authHeader: event.target.checked }))} type="checkbox" />使用 Authorization header</label>
+        <label><input checked={draft.oauth === "radius"} onChange={(event) => update((current) => {
           const next = { ...current };
           if (event.target.checked) next.oauth = "radius";
           else delete next.oauth;
@@ -372,7 +385,7 @@ function ProviderConfigurationEditor({
       </div>
       <details className={styles.advancedDetails}>
         <summary>自定义 Headers{selectedView?.headerNames.length ? ` · ${selectedView.headerNames.length} 项` : ""}</summary>
-        <ProviderHeaderMutationEditor existingNames={selectedView?.headerNames ?? []} readOnly={!editable} showTitle={false} />
+        <ProviderHeaderMutationEditor existingNames={selectedView?.headerNames ?? []} readOnly={false} showTitle={false} />
       </details>
       <details className={styles.advancedDetails}>
         <summary>Provider 高级 JSON{hasAdvancedJson(draft.advancedJson) ? " · 已配置" : ""}</summary>
@@ -380,13 +393,11 @@ function ProviderConfigurationEditor({
         <TextArea
           aria-label="Provider 高级 JSON"
           className={styles.codeArea!}
-          readOnly={!editable}
           spellCheck={false}
           value={draft.advancedJson ?? "{}"}
           onChange={(event) => update((current) => ({ ...current, advancedJson: event.target.value }))}
         />
       </details>
-      {!editable ? <div className={styles.readOnlyNotice}>可通过“管理凭据”写入认证信息；模型和 Provider 定义保持只读。</div> : null}
     </section>
   );
 }

@@ -23,6 +23,23 @@ Command Palette、Diff Panel、Thread Terminal、Agent/Thread 状态、右侧面
 这些实现可以作为信息架构、状态表达、键盘路径、工作流组织和细节交互的候选参考，不形成
 像素、品牌、组件或 roadmap 的自动继承。
 
+Provider 设置专项又检查了 `AddProviderInstanceDialog`、Wizard steps 和
+`ProviderSettingsForm`。可吸收原则是按当前 Provider 能力只呈现真实可用字段、让新增流程先完成
+身份再进入专项配置、对敏感值使用明确的 replace/hidden 状态；不应拿一张通用表单展示大量禁用项。
+Pi-67 的模型 Provider 语义与 t3code 的 CLI Provider instance 不同，因此本轮只用它校验交互原则，
+不伪造一条源码复用映射，也不引入 t3code 的 Provider runtime。
+
+```text
+apps/web/src/components/settings/AddProviderInstanceDialog.tsx
+SHA-256 4ac19b8b6a9c1daf1e06efb6fc63df15fce38ed7fc0d599b6c4c00d0d313f221
+
+apps/web/src/components/settings/AddProviderInstanceWizardSteps.tsx
+SHA-256 cdb178e5d294f1828f5d4edffb7199cc1765eeba5ad9cbbdda30555b803be0ba
+
+apps/web/src/components/settings/ProviderSettingsForm.tsx
+SHA-256 711279ea2670013642d2f356b6648a0d6dca52d7cde95966f276f5a993021b43
+```
+
 架构与 Harness 侧检查了 `OrchestrationEngine`、`ProviderRuntimeIngestion`、
 `RuntimeReceiptBus`、`CheckpointReactor`、`ThreadBackgroundLiveness`、Provider Adapter/
 Session Reaper、VCS contract harness、connection supervisor、`safeLog`、`DrainableWorker`

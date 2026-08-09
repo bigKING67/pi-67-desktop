@@ -101,6 +101,12 @@ Pi-67 的实现不是源码移植：
 - Composer context chips、可配置快捷键、Command Palette 会话正文搜索和 Conversation Snooze
   继续吸收 pi-gui 的清晰状态与键盘路径，但分别使用 Pi-67 的 opaque attachment、action registry、
   physical Session identity 和 disposable Catalog 边界重做。
+- Provider 配置吸收 `settings-providers-section.tsx` 将内置 Provider 认证与
+  `settings-custom-endpoints-section.tsx` 自定义 Endpoint 编辑分开的产品边界：Pi-67 的未配置
+  内置 Provider 现在先进入 `连接`，直接显示真实只读 Endpoint/协议和 API Key 主操作；不再把
+  自定义表单整页禁用后展示。Provider 精确入口打开单服务凭据对话框，通用入口仍保留可搜索目录。
+  Pi-67 继续通过 Agent Host、Pi `auth.json` 和 revisioned configuration snapshot 实现，没有复制
+  pi-gui 组件、状态或存储代码。
 
 ## 源文件证据
 
@@ -191,6 +197,15 @@ SHA-256 2d6ccee502b29c6aa4efcea30769870bbb18dfe3dfca32144bb2db4ee11339f3
 
 apps/desktop/tests/core/worktrees.spec.ts
 SHA-256 49e66c3dd5e2947cf63b6ed6d4516559d4d8c75941764843623ca8ad00cb7fe7
+
+apps/desktop/src/settings-providers-section.tsx
+SHA-256 e7f8147ccbb981eac43439379f5c3e7b41ea3d4881a005767b3a8b7916383485
+
+apps/desktop/src/settings-custom-endpoints-section.tsx
+SHA-256 7ada72d186f8402ddf3b81696e4f1e051ee0aa1d00c37f0b11de656a133eeacb
+
+apps/desktop/src/model-onboarding.ts
+SHA-256 5b9ee8b37f559d9fd7fd4a9a5b1097dc8a18a6bc2ba8704c88dcad9ec36229e0
 ```
 
 ## 保留的 Pi-67 边界

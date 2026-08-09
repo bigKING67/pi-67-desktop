@@ -36,19 +36,16 @@ export async function verifyProviderConfiguration(window) {
     timeout: remainingTimeout(startedAt)
   });
   await configuredProvider.click({ timeout: remainingTimeout(startedAt) });
-  await settings.getByRole("button", { name: "管理凭据", exact: true })
+  await settings.getByRole("button", { name: "更新 API Key", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
-  const credentialDialog = window.getByRole("dialog", { name: "Provider 与凭据" });
+  const credentialDialog = window.getByRole("dialog", { name: "配置 OpenAI API Key" });
   await credentialDialog.waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
   });
-  const credentialProvider = credentialDialog.getByRole("button", { name: /^OpenAI\s+openai\b/u });
-  await credentialProvider.waitFor({
-    state: "visible",
-    timeout: remainingTimeout(startedAt)
-  });
-  await waitForSelectedProvider(credentialProvider, startedAt);
+  if (await credentialDialog.getByLabel("Pi Provider 列表").count()) {
+    throw new Error("Windows real-user targeted credential dialog rendered a second Provider picker.");
+  }
   await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true }).waitFor({
     state: "visible",
     timeout: remainingTimeout(startedAt)
@@ -68,7 +65,7 @@ export async function verifyProviderConfiguration(window) {
   const durationMs = performance.now() - startedAt;
   return {
     configuredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
-    credentialProviderSelection: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
+    credentialDialogTarget: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
     credentialPersistence: "pi-auth-json",
     durationMs: round(durationMs),
     outcome: "ready"
@@ -81,14 +78,6 @@ function remainingTimeout(startedAt) {
     throw new Error(`Windows real-user Provider configuration exceeded ${REAL_USER_PROVIDER_TIMEOUT_MS}ms.`);
   }
   return remaining;
-}
-
-async function waitForSelectedProvider(provider, startedAt) {
-  while (performance.now() - startedAt < REAL_USER_PROVIDER_TIMEOUT_MS) {
-    if (await provider.getAttribute("aria-pressed") === "true") return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  throw new Error("Windows real-user Provider credential dialog did not preserve the selected Provider.");
 }
 
 function round(value) {

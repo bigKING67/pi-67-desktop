@@ -49,9 +49,92 @@ describe("first-party web tools", () => {
     expect(resolveNativeSearchRoute({
       provider: "deepseek",
       id: "deepseek-v4-flash",
-      api: "openai-responses",
-      baseUrl: "https://api.deepseek.com/v1"
-    })?.endpoint).toBe("https://api.deepseek.com/v1/responses");
+      api: "openai-completions",
+      baseUrl: "https://api.deepseek.com"
+    })?.endpoint).toBe("https://api.deepseek.com/responses");
+  });
+
+  it("streams official DeepSeek Responses search states and projects the terminal response", async () => {
+    const states: string[] = [];
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const requestUrl = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      expect(requestUrl).toBe("https://api.deepseek.com/responses");
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer fixture-key");
+      expect(requestBody(init)).toMatchObject({
+        model: "deepseek-v4-flash",
+        input: "current DeepSeek result",
+        stream: true,
+        tools: [{ type: "web_search" }]
+      });
+      return eventStreamResponse([
+        { event: "response.web_search_call.in_progress" },
+        { event: "response.web_search_call.searching" },
+        { event: "response.web_search_call.completed" },
+        {
+          event: "response.completed",
+          response: {
+            output_text: "Current DeepSeek result",
+            output: [{
+              type: "web_search_call",
+              action: { sources: [{ url: "https://example.test/deepseek-source" }] }
+            }]
+          }
+        }
+      ]);
+    });
+    const route = resolveNativeSearchRoute({
+      provider: "deepseek",
+      id: "deepseek-v4-flash",
+      api: "openai-completions",
+      baseUrl: "https://api.deepseek.com"
+    });
+    if (!route) throw new Error("missing DeepSeek route");
+
+    const result = await executeNativeSearch(
+      fetchImpl as typeof fetch,
+      route,
+      "deepseek-v4-flash",
+      "fixture-key",
+      undefined,
+      { queries: ["current DeepSeek result"], numResults: 5 },
+      undefined,
+      (state) => states.push(state)
+    );
+
+    expect(states).toEqual(["in_progress", "searching", "completed"]);
+    expect(result).toMatchObject({
+      text: "Current DeepSeek result",
+      urls: ["https://example.test/deepseek-source"],
+      source: "provider-native"
+    });
+  });
+
+  it("rejects failed or unterminated DeepSeek Responses streams without fallback", async () => {
+    const route = resolveNativeSearchRoute({
+      provider: "deepseek",
+      id: "deepseek-v4-flash",
+      api: "openai-completions",
+      baseUrl: "https://api.deepseek.com"
+    });
+    if (!route) throw new Error("missing DeepSeek route");
+    const request = { queries: ["current DeepSeek result"], numResults: 5 };
+
+    await expect(executeNativeSearch(
+      vi.fn(async () => eventStreamResponse([{ event: "response.failed" }])) as typeof fetch,
+      route,
+      "deepseek-v4-flash",
+      "fixture-key",
+      undefined,
+      request
+    )).rejects.toThrow(/reported a failed Responses stream/iu);
+    await expect(executeNativeSearch(
+      vi.fn(async () => eventStreamResponse([{ event: "response.web_search_call.searching" }])) as typeof fetch,
+      route,
+      "deepseek-v4-flash",
+      "fixture-key",
+      undefined,
+      request
+    )).rejects.toThrow(/malformed or unterminated Responses stream/iu);
   });
 
   it("uses x-api-key for Anthropic and extracts citations", async () => {
@@ -271,6 +354,19 @@ function jsonResponse(payload: unknown, headers?: Record<string, string>): Respo
     status: 200,
     headers: { "content-type": "application/json", ...headers }
   });
+}
+
+function eventStreamResponse(events: unknown[]): Response {
+  const encoder = new TextEncoder();
+  const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+  const midpoint = Math.floor(body.length / 2);
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(body.slice(0, midpoint)));
+      controller.enqueue(encoder.encode(body.slice(midpoint)));
+      controller.close();
+    }
+  }), { status: 200, headers: { "content-type": "text/event-stream" } });
 }
 
 function requestBody(init: RequestInit | undefined): Record<string, unknown> {

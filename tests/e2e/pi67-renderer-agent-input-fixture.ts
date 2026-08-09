@@ -17,6 +17,8 @@ export function createMockAgentFixtureInput(
   responseDelays: Record<string, number>,
   options: MockAgentOptions
 ) {
+  const fixtureSnapshot = createMockSessionSnapshot(messages);
+  if (options.providerCatalogProviders) fixtureSnapshot.providers = options.providerCatalogProviders;
   return {
     fixtureMessages: messages,
     fixtureResponseDelays: responseDelays,
@@ -32,7 +34,7 @@ export function createMockAgentFixtureInput(
         [workspaceId, mockSessionCatalogPage(items)]
       ))
     ),
-    fixtureSnapshot: createMockSessionSnapshot(messages),
+    fixtureSnapshot,
     fixtureProtocolVersion: PROTOCOL_VERSION,
     fixtureProtocolRevision: PROTOCOL_REVISION
   };

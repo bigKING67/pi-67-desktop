@@ -104,6 +104,10 @@ export function CredentialDialog() {
   if (!open) return null;
   const selectedProvider = providerList.find((provider) => provider.id === providerId);
   const removalProvider = providerList.find((provider) => provider.id === removeTargetProviderId);
+  const focusedProvider = targetProviderId !== undefined && selectedProvider?.id === targetProviderId;
+  const dialogTitle = focusedProvider
+    ? `配置 ${selectedProvider.label} API Key`
+    : messages.credentials.title;
   const canSubmit = selectedProvider !== undefined && apiKey.trim().length >= 8 && !submitting;
 
   return (
@@ -114,8 +118,8 @@ export function CredentialDialog() {
       isDismissable={!submitting && removeTargetProviderId === undefined}
       onOpenChange={(next) => { if (removeTargetProviderId === undefined) setOpen(next); }}
     >
-      <Modal className="modal-surface credential-dialog">
-        <Dialog aria-label={messages.credentials.title}>
+      <Modal className="modal-surface credential-dialog" data-mode={focusedProvider ? "focused" : "catalog"}>
+        <Dialog aria-label={dialogTitle}>
           <form onSubmit={(event) => {
             event.preventDefault();
             if (!canSubmit || !workspaceId) return;
@@ -134,8 +138,8 @@ export function CredentialDialog() {
               }
             })();
           }}>
-            <span className="dialog-eyebrow">{messages.credentials.eyebrow}</span>
-            <Heading slot="title">{messages.credentials.title}</Heading>
+            <span className="dialog-eyebrow">{focusedProvider ? "Pi 模型服务认证" : messages.credentials.eyebrow}</span>
+            <Heading slot="title">{dialogTitle}</Heading>
             <div className="credential-notice">
               <LockKeyhole size={17} aria-hidden="true" />
               <p>
@@ -146,8 +150,8 @@ export function CredentialDialog() {
             {providers === undefined ? (
               <p className="credential-empty" role="status">{messages.credentials.loading}</p>
             ) : providerList.length > 0 ? (
-              <div className="provider-credential-layout">
-                <div className="provider-sidebar">
+              <div className={`provider-credential-layout${focusedProvider ? " is-focused" : ""}`}>
+                {!focusedProvider ? <div className="provider-sidebar">
                   <div className="provider-search">
                     <Search aria-hidden="true" size={15} />
                     <Input
@@ -190,10 +194,11 @@ export function CredentialDialog() {
                       <p className="provider-list-empty">{messages.credentials.noProviderMatches}</p>
                     ) : null}
                   </div>
-                </div>
+                </div> : null}
                 {selectedProvider ? (
                   <ProviderCredentialEditor
                     apiKey={apiKey}
+                    focusInput={focusedProvider}
                     key={selectedProvider.id}
                     persistentCredential={configuration?.credentials.find((credential) => credential.provider === providerId)}
                     provider={selectedProvider}
@@ -233,7 +238,7 @@ export function CredentialDialog() {
                     setSubmitting(false);
                   });
                 }}
-              >仅本次运行</Button> : null}
+              >仅本次使用</Button> : null}
               {selectedProvider && workspaceId && configuration?.credentials.some((credential) => credential.provider === providerId) ? <Button
                 className="secondary-button"
                 isDisabled={submitting}
@@ -289,6 +294,7 @@ export function CredentialDialog() {
 
 interface ProviderCredentialEditorProps {
   apiKey: string;
+  focusInput: boolean;
   provider: ProviderSummary;
   persistentCredential: PiCredentialSummary | undefined;
   submitting: boolean;
@@ -298,6 +304,7 @@ interface ProviderCredentialEditorProps {
 
 function ProviderCredentialEditor({
   apiKey,
+  focusInput,
   provider,
   persistentCredential,
   submitting,
@@ -393,12 +400,13 @@ function ProviderCredentialEditor({
       </div>
       <div className="dialog-field">
         <label htmlFor="provider-api-key-input">{provider.configured
-          ? messages.credentials.replaceKeyLabel
-          : messages.credentials.addKeyLabel}</label>
+          ? `输入新的 ${provider.label} API Key`
+          : `输入 ${provider.label} API Key`}</label>
         <div className="credential-secret-input">
           <Input
             aria-label={messages.credentials.apiKeyLabel}
             autoComplete="new-password"
+            autoFocus={focusInput}
             id="provider-api-key-input"
             type={apiKeyVisible ? "text" : "password"}
             value={apiKey}
@@ -419,7 +427,7 @@ function ProviderCredentialEditor({
               : <Eye aria-hidden="true" size={16} />}
           </Button>
         </div>
-        <small>默认保存到 Pi auth.json；新输入和已保存值都只会在你主动操作时临时显示。也可选择“仅本次运行”。</small>
+        <small>推荐“保存到 Pi”：写入 auth.json，完全退出或重启后仍可用。“仅本次使用”不会写文件，完全退出后失效。</small>
       </div>
     </section>
   );
@@ -445,7 +453,7 @@ function credentialSourceLabel(provider: ProviderSummary): string {
 
 function credentialStatusLabel(provider: ProviderSummary, persistent: boolean): string {
   if (persistent && provider.credentialSource === "runtime") {
-    return "持久凭据已存在；当前运行使用临时覆盖";
+    return "auth.json 中已有凭据；当前使用本次运行内存中的覆盖值（退出后失效）";
   }
   return persistent ? "已持久化到 Pi auth.json" : credentialSourceLabel(provider);
 }

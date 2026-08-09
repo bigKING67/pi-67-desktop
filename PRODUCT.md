@@ -519,6 +519,11 @@ the only Runtime and behavior specification source.
   `deepseek-v4-flash`. Other models have no native search route and fail visibly
   without Provider fallback. The Settings label
   `原生搜索 · 已声明` describes routing metadata, not a completed live request.
+- DeepSeek native search calls the official Responses `/responses` endpoint with
+  `stream: true`, reuses the selected Provider credential, and maps the official
+  `response.web_search_call.in_progress`, `.searching`, and `.completed` events
+  to bounded Tool progress. The credential remains a Pi `auth.json` credential;
+  search does not create a second key, Provider, or persisted preference.
 - Web Search has no product switch and no persisted enable/disable preference. The
   model decides when the Pi SDK or protocol-native Provider search capability is
   needed for the task. Pi-67 only presents search execution, sources, and citations

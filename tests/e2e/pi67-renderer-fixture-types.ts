@@ -1,4 +1,5 @@
 import type { PiProviderConfigurationSnapshot } from "@pi67/protocol";
+import type { ProviderSummary } from "../../packages/domain/src/index.js";
 import type {
   ContextFileCatalogResult,
   ExtensionCatalogResult
@@ -51,6 +52,7 @@ export interface MockAgentOptions {
   autoStartOperation?: boolean;
   rotateSessionOnCreate?: boolean;
   isolateTaskSnapshots?: boolean;
+  providerCatalogProviders?: ProviderSummary[];
   providerConfigurationSnapshot?: PiProviderConfigurationSnapshot;
   extensionCatalog?: ExtensionCatalogResult;
   contextFiles?: FixtureContextFiles;

@@ -172,7 +172,7 @@ async function configureRuntimeProvider(page, config) {
   await dialog.getByRole("button", {
     name: /启用本次运行密钥|替换本次运行密钥/u
   }).click();
-  await dialog.getByText("来源：本次运行内存", { exact: true }).waitFor({
+  await dialog.getByText("来源：当前运行内存（完全退出后失效）", { exact: true }).waitFor({
     state: "visible",
     timeout: 30_000
   });

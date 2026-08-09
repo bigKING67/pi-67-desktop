@@ -1,6 +1,6 @@
 export const MAX_SEARCH_QUERIES = 5;
 export const MAX_FETCH_URLS = 5;
-const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+export const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 export const MAX_RESULT_CHARS = 60_000;
 
 export interface SearchToolDetails {
