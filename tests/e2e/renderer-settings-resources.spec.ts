@@ -11,7 +11,36 @@ import {
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 
+test("keeps Pi resource reload unavailable for a provisional task without a Session", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.getByRole("button", { name: `在 ${DEFAULT_MOCK_WORKSPACE.displayName} 新建会话` }).click();
+  await expect(page.getByTestId("new-session-intent")).toBeVisible();
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("π 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: "提示词模板", exact: true }).click();
+  const reload = settings.getByRole("button", {
+    name: "重新加载不可用：当前 Pi 会话尚未就绪。"
+  });
+  await expect(reload).toBeDisabled();
+  await expect(reload).toHaveAttribute(
+    "aria-label",
+    "重新加载不可用：当前 Pi 会话尚未就绪。"
+  );
+  await expect(settings.getByText(
+    "当前 Pi 会话尚未就绪；请返回工作台打开会话后再查看或重新加载资源。",
+    { exact: true }
+  )).toBeVisible();
+  expect(await recordedCommands(page)).not.toContain("resource.reload");
+});
+
 test("separates extension packages, extensions, skills, prompt templates, and context rules", async ({ page }) => {
+  const visualArtifactDirectory = process.env.PI67_VISUAL_ARTIFACT_DIR;
+  if (visualArtifactDirectory) await mkdir(visualArtifactDirectory, { recursive: true });
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
@@ -123,53 +152,48 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(skillWorkspace.getByRole("tabpanel").getByText("design-craft", { exact: true })).toHaveCount(0);
   await expect(skillWorkspace.getByRole("tabpanel").getByText("package-skill", { exact: true })).toHaveCount(0);
 
-  await navigation.getByRole("button", { name: "指令模板", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "指令模板", exact: true })).toBeVisible();
+  await navigation.getByRole("button", { name: "提示词模板", exact: true }).click();
+  await expect(settings.getByRole("heading", { name: "提示词模板", exact: true })).toBeVisible();
   await expect(settings.getByText("/review", { exact: true })).toBeVisible();
   await expect(settings.getByText("Pi-67 Core", { exact: true })).toHaveCount(0);
 
-  await navigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "规则与上下文", exact: true })).toBeVisible();
+  await navigation.getByRole("button", { name: "工作规则", exact: true }).click();
+  await expect(settings.getByRole("heading", { name: "工作规则", exact: true })).toBeVisible();
   const ruleWorkspace = settings.getByTestId("rule-settings-workspace");
-  const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "规则与上下文可用范围" });
-  await expect(ruleTabs.getByRole("tab", { name: "全局可用", exact: true }))
+  const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "工作规则范围" });
+  await expect(ruleTabs.getByRole("tab", { name: "全局", exact: true }))
     .toHaveAttribute("aria-selected", "true");
-  const globalRuleCategories = ruleWorkspace.getByRole("group", { name: "全局规则与上下文分类" });
-  const globalRulesCategory = globalRuleCategories.getByRole("button", { name: "全局规则", exact: true });
-  const managedRulesCategory = globalRuleCategories.getByRole("button", { name: "桌面托管", exact: true });
-  const globalSystemCategory = globalRuleCategories.getByRole("button", { name: "系统提示词", exact: true });
-  await expect(globalRulesCategory).toHaveAttribute("aria-pressed", "true");
-  await expect(globalRulesCategory).toContainText("1");
-  await expect(managedRulesCategory).toContainText("11");
-  await expect(globalSystemCategory).toContainText("2");
-  await expect(ruleWorkspace.getByRole("heading", { name: "全局规则与上下文", exact: true })).toBeVisible();
-  await expect(ruleWorkspace.getByRole("heading", { name: "桌面托管规则", exact: true })).toHaveCount(0);
-  await globalRuleCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
-  await expect(ruleWorkspace.getByRole("list", { name: "桌面托管规则" }).getByRole("listitem"))
+  await expect(ruleWorkspace.getByText("工作规则由 Pi 自动加载，并在会话中持续生效。", { exact: false })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("heading", { name: "全局工作规则", exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("heading", { name: "Pi-67 内置规则", exact: true })).toHaveCount(0);
+  await expect(ruleWorkspace.getByText("Pi-67 内置规则 · 11 项", { exact: true })).toBeVisible();
+  await expect(ruleWorkspace.locator("summary").getByText("系统提示词覆盖 · 未配置", { exact: true })).toBeVisible();
+  if (visualArtifactDirectory) {
+    await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-work-rules-global.png") });
+  }
+  await ruleWorkspace.getByText("高级", { exact: true }).click();
+  await expect(ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" }).getByRole("listitem"))
     .toHaveCount(11);
-  await expect(ruleWorkspace.getByRole("heading", { name: "全局规则与上下文", exact: true })).toHaveCount(0);
-  await globalRuleCategories.getByRole("button", { name: "系统提示词", exact: true }).click();
-  await expect(ruleWorkspace.getByRole("heading", { name: "全局系统提示词", exact: true })).toBeVisible();
-  await ruleTabs.getByRole("tab", { name: "项目专属", exact: true }).click();
-  const projectRuleCategories = ruleWorkspace.getByRole("group", { name: "项目规则与上下文分类" });
-  const projectRulesCategory = projectRuleCategories.getByRole("button", { name: "项目规则", exact: true });
-  const inheritedRulesCategory = projectRuleCategories.getByRole("button", { name: "继承规则", exact: true });
-  await expect(projectRulesCategory).toHaveAttribute("aria-pressed", "true");
-  await expect(projectRulesCategory).toContainText("1");
-  await expect(inheritedRulesCategory).toContainText("2");
-  await expect(ruleWorkspace.getByRole("heading", { name: "项目规则与上下文", exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" }).getByRole("listitem"))
+    .toHaveCount(2);
+  await expect(ruleWorkspace.getByText("尚未创建", { exact: true })).toHaveCount(2);
+  if (visualArtifactDirectory) {
+    await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-work-rules-global-advanced.png") });
+  }
+  await ruleTabs.getByRole("tab", { name: "项目", exact: true }).click();
+  await expect(ruleWorkspace.getByRole("heading", { name: "项目工作规则", exact: true })).toBeVisible();
   await expect(ruleWorkspace.getByText("/Users/test/Projects/pi-demo/AGENTS.md", { exact: true })).toBeVisible();
-  await expect(ruleWorkspace.getByRole("heading", { name: "继承的规则与上下文", exact: true })).toHaveCount(0);
-  await projectRuleCategories.getByRole("button", { name: "继承规则", exact: true }).click();
-  await expect(ruleWorkspace.getByRole("heading", { name: "继承的规则与上下文", exact: true })).toBeVisible();
+  await expect(ruleWorkspace.getByRole("heading", { name: "继承的工作规则", exact: true })).toBeVisible();
   await expect(ruleWorkspace.getByText("/Users/test/Projects/AGENTS.md", { exact: true })).toBeVisible();
-  await projectRuleCategories.getByRole("button", { name: "系统提示词", exact: true }).click();
-  await expect(ruleWorkspace.getByRole("heading", { name: "项目系统提示词", exact: true })).toBeVisible();
-  await ruleTabs.getByRole("tab", { name: "全局可用", exact: true }).click();
-  await expect(globalSystemCategory).toHaveAttribute("aria-pressed", "true");
-  await ruleTabs.getByRole("tab", { name: "项目专属", exact: true }).click();
-  await expect(projectRuleCategories.getByRole("button", { name: "系统提示词", exact: true }))
-    .toHaveAttribute("aria-pressed", "true");
+  await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" })).toHaveCount(0);
+  await ruleWorkspace.getByText("高级", { exact: true }).click();
+  await expect(ruleWorkspace.getByRole("list", { name: "系统提示词覆盖 · 未配置" }).getByRole("listitem"))
+    .toHaveCount(2);
+  if (visualArtifactDirectory) {
+    await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-work-rules-project-advanced.png") });
+  }
+  await ruleTabs.getByRole("tab", { name: "全局", exact: true }).click();
+  await expect(ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" })).toBeVisible();
 
   await navigation.getByRole("button", { name: "下载源与网络", exact: true }).click();
   for (const version of ["24.18.0", "12.0.1", "2.53.0"]) {
@@ -239,13 +263,12 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: "规则与上下文", exact: true }).click();
+    .getByRole("button", { name: "工作规则", exact: true }).click();
   const workspace = settings.getByTestId("rule-settings-workspace");
-  const tabs = workspace.getByRole("tablist", { name: "规则与上下文可用范围" });
-  const globalCategories = workspace.getByRole("group", { name: "全局规则与上下文分类" });
+  const tabs = workspace.getByRole("tablist", { name: "工作规则范围" });
   await expect.poll(() => recordedCommands(page)).toContain("context.file.list");
-  await globalCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
-  const managedCatalog = workspace.getByRole("list", { name: "桌面托管规则" });
+  await workspace.getByText("高级", { exact: true }).click();
+  const managedCatalog = workspace.getByRole("list", { name: "Pi-67 内置规则" });
   await expect(managedCatalog.getByRole("listitem")).toHaveCount(11);
 
   await managedCatalog.getByRole("button", { name: /00-product\.md/u }).click();
@@ -257,26 +280,19 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
   await expect(detail.getByTestId("context-file-preview").getByRole("img", { name: "远程示例" }))
     .toContainText("图片：远程示例");
   expect(remoteImageRequests).toEqual([]);
-  await detail.getByRole("button", { name: "返回规则目录" }).click();
-  await expect(globalCategories.getByRole("button", { name: "桌面托管", exact: true }))
-    .toHaveAttribute("aria-pressed", "true");
+  await detail.getByRole("button", { name: "返回工作规则" }).click();
+  await expect(managedCatalog).toBeVisible();
 
-  await globalCategories.getByRole("button", { name: "全局规则", exact: true }).click();
-  const globalCatalog = workspace.getByRole("list", { name: "全局规则与上下文" });
+  const globalCatalog = workspace.getByRole("list", { name: "全局工作规则" });
   await globalCatalog.getByRole("button", { name: /AGENTS\.md/u }).click();
   const globalSource = detail.getByRole("textbox", { name: "AGENTS.md Markdown 源码" });
   const privateMarker = "context-private-e2e-marker";
   await globalSource.fill(`# Global rules\n\n${privateMarker}\n`);
-  await globalCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
   const discard = page.getByRole("dialog", { name: "放弃未保存的修改" });
+  await tabs.getByRole("tab", { name: "项目", exact: true }).click();
   await expect(discard).toBeVisible();
   await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
-  await expect(globalCategories.getByRole("button", { name: "全局规则", exact: true }))
-    .toHaveAttribute("aria-pressed", "true");
-  await tabs.getByRole("tab", { name: "项目专属", exact: true }).click();
-  await expect(discard).toBeVisible();
-  await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
-  await expect(tabs.getByRole("tab", { name: "全局可用", exact: true }))
+  await expect(tabs.getByRole("tab", { name: "全局", exact: true }))
     .toHaveAttribute("aria-selected", "true");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "浏览器集成", exact: true }).click();
@@ -303,9 +319,8 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
   expect(saveCommand?.payload).not.toHaveProperty("path");
   expect(JSON.stringify(saveCommand)).not.toContain(privateMarker);
 
-  await detail.getByRole("button", { name: "返回规则目录" }).click();
-  await globalCategories.getByRole("button", { name: "系统提示词", exact: true }).click();
-  const systemCatalog = workspace.getByRole("list", { name: "全局系统提示词" });
+  await detail.getByRole("button", { name: "返回工作规则" }).click();
+  const systemCatalog = workspace.getByRole("list", { name: /^系统提示词覆盖/u });
   await systemCatalog.getByRole("button", { name: /SYSTEM\.md/u }).first().click();
   const systemSource = detail.getByRole("textbox", { name: "SYSTEM.md Markdown 源码" });
   await expect(systemSource).toHaveValue("");
@@ -313,9 +328,9 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
   await detail.getByRole("button", { name: "保存并重新加载", exact: true }).click();
   await expect(detail.getByText("可编辑", { exact: true })).toBeVisible();
 
-  await detail.getByRole("button", { name: "返回规则目录" }).click();
-  await tabs.getByRole("tab", { name: "项目专属", exact: true }).click();
-  await workspace.getByRole("list", { name: "项目规则与上下文" })
+  await detail.getByRole("button", { name: "返回工作规则" }).click();
+  await tabs.getByRole("tab", { name: "项目", exact: true }).click();
+  await workspace.getByRole("list", { name: "项目工作规则" })
     .getByRole("button", { name: /AGENTS\.md/u }).click();
   const projectSource = detail.getByRole("textbox", { name: "AGENTS.md Markdown 源码" });
   await projectSource.fill("# Project conflict draft\n");

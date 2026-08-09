@@ -27,12 +27,10 @@ import { ContextFileDiscardDialog } from "./ContextFileDiscardDialog.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import {
   contextFileAccessLabel,
-  contextFileRuntimeStateLabel,
+  contextFileStatusLabel,
   contextFileScopeLabel,
   GlobalRuleCatalog,
-  ProjectRuleCatalog,
-  type GlobalRuleCategory,
-  type ProjectRuleCategory
+  ProjectRuleCatalog
 } from "./RuleSettingsCatalog.js";
 import {
   SettingsBackAction,
@@ -54,21 +52,19 @@ export function RuleSettingsWorkspace() {
   const workspace = useWorkbenchStore((state) => workspaceId ? state.workspaces[workspaceId] : undefined);
   const state = useContextFileStore();
   const [scope, setScope] = useState<RuleScope>("global");
-  const [globalCategory, setGlobalCategory] = useState<GlobalRuleCategory>("rules");
-  const [projectCategory, setProjectCategory] = useState<ProjectRuleCategory>("rules");
+  const [globalAdvancedOpen, setGlobalAdvancedOpen] = useState(false);
+  const [projectAdvancedOpen, setProjectAdvancedOpen] = useState(false);
   const [mode, setMode] = useState<DetailMode>("source");
   const [discardOpen, setDiscardOpen] = useState(false);
   const pendingAction = useRef<(() => void) | undefined>(undefined);
   const listScrollTop = useRef<Record<string, number>>({});
   const previousWorkspaceId = useRef(workspaceId);
-  const activeCatalogKey = scope === "global"
-    ? `${workspaceId}:global:${globalCategory}`
-    : `${workspaceId}:project:${projectCategory}`;
+  const activeCatalogKey = `${workspaceId}:${scope}`;
 
   useSettingsDraftRegistration({
     dirty: state.dirty,
     busy: state.phase === "saving",
-    subject: state.selectedItem?.name ?? "规则与上下文",
+    subject: state.selectedItem?.name ?? "工作规则",
     discard: () => useContextFileStore.getState().discardDraft()
   });
 
@@ -77,8 +73,8 @@ export function RuleSettingsWorkspace() {
       previousWorkspaceId.current = workspaceId;
       listScrollTop.current = {};
       setScope("global");
-      setGlobalCategory("rules");
-      setProjectCategory("rules");
+      setGlobalAdvancedOpen(false);
+      setProjectAdvancedOpen(false);
       setMode("source");
     }
     if (!workspaceId) {
@@ -120,10 +116,10 @@ export function RuleSettingsWorkspace() {
   if (!workspaceId || !workspace) {
     return (
       <SettingsSectionBlock
-        title="规则与上下文"
-        description="按来源管理 Pi 加载的 Markdown 规则、上下文和系统提示词。"
+        title="工作规则"
+        description="查看并管理 Pi 自动加载、在会话中持续生效的 Markdown 工作规则。"
       >
-        <SettingsNotice>请先选择一个项目，再查看全局与项目规则。</SettingsNotice>
+        <SettingsNotice>请先选择一个项目，再查看全局与项目工作规则。</SettingsNotice>
       </SettingsSectionBlock>
     );
   }
@@ -142,18 +138,18 @@ export function RuleSettingsWorkspace() {
           setScope(key === "project" ? "project" : "global");
         })}
       >
-        <TabList aria-label="规则与上下文可用范围" className={styles.tabList!}>
+        <TabList aria-label="工作规则范围" className={styles.tabList!}>
           <Tab className={styles.tab!} id="global">
-            <Globe2 aria-hidden="true" size={15} />全局可用
+            <Globe2 aria-hidden="true" size={15} />全局
           </Tab>
           <Tab className={styles.tab!} id="project">
-            <FolderOpen aria-hidden="true" size={15} />项目专属
+            <FolderOpen aria-hidden="true" size={15} />项目
           </Tab>
         </TabList>
         <TabPanel className={styles.tabPanel!} id="global">
           <GlobalRuleCatalog
+            advancedOpen={globalAdvancedOpen}
             busy={state.phase === "loading-catalog"}
-            category={globalCategory}
             detail={state.selectedItem ? <ContextFileDetail
               mode={mode}
               onBack={() => requestNavigation(() => useContextFileStore.getState().clearSelection())}
@@ -165,20 +161,15 @@ export function RuleSettingsWorkspace() {
             /> : undefined}
             error={state.error}
             items={catalog}
-            onCategoryChange={(category) => requestNavigation(() => {
-              rememberCatalogScroll();
-              useContextFileStore.getState().clearSelection();
-              setMode("source");
-              setGlobalCategory(category);
-            })}
+            onAdvancedOpenChange={setGlobalAdvancedOpen}
             onRefresh={() => void loadContextFileCatalog(workspaceId)}
             onSelect={selectItem}
           />
         </TabPanel>
         <TabPanel className={styles.tabPanel!} id="project">
           <ProjectRuleCatalog
+            advancedOpen={projectAdvancedOpen}
             busy={state.phase === "loading-catalog"}
-            category={projectCategory}
             detail={state.selectedItem ? <ContextFileDetail
               mode={mode}
               onBack={() => requestNavigation(() => useContextFileStore.getState().clearSelection())}
@@ -190,12 +181,7 @@ export function RuleSettingsWorkspace() {
             /> : undefined}
             error={state.error}
             items={catalog}
-            onCategoryChange={(category) => requestNavigation(() => {
-              rememberCatalogScroll();
-              useContextFileStore.getState().clearSelection();
-              setMode("source");
-              setProjectCategory(category);
-            })}
+            onAdvancedOpenChange={setProjectAdvancedOpen}
             onRefresh={() => void loadContextFileCatalog(workspaceId)}
             onSelect={selectItem}
             trusted={state.catalog?.workspaceTrusted ?? workspace.trust === "trusted"}
@@ -243,7 +229,7 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
     || tooLarge;
   return (
     <div className={styles.detail} data-testid="context-file-detail">
-      <SettingsBackAction label="返回规则目录" onPress={onBack}>返回规则目录</SettingsBackAction>
+      <SettingsBackAction label="返回工作规则" onPress={onBack}>返回工作规则</SettingsBackAction>
       <div className={styles.detailHeading}>
         <span>
           <span className="dialog-eyebrow">{contextFileScopeLabel(item.scope)} · {originLabel(item)}</span>
@@ -255,7 +241,7 @@ function ContextFileDetail({ mode, onBack, onModeChange, onReload }: {
       <SettingsRows>
         <SettingsRow title="来源" value={originLabel(item)} />
         <SettingsRow title="作用域" value={contextFileScopeLabel(item.scope)} />
-        <SettingsRow title="当前状态" value={contextFileRuntimeStateLabel(item.runtimeState)} />
+        <SettingsRow title="当前状态" value={contextFileStatusLabel(item)} />
         {item.detail ? <SettingsRow title="说明" value={item.detail} /> : null}
       </SettingsRows>
       {state.error && !state.externalConflict ? <SettingsNotice tone="danger">{state.error}</SettingsNotice> : null}

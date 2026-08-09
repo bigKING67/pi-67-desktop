@@ -1,14 +1,16 @@
 import type { ContextFileSummary } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
-  globalRuleCategoryDefinitions,
-  projectRuleCategoryDefinitions
+  contextFileStatusLabel,
+  globalRuleGroups,
+  presentItemCount,
+  projectRuleGroups
 } from "./RuleSettingsCatalog.js";
 
-describe("rule settings catalog categories", () => {
-  it("separates global and project resources into counted flat catalogs", () => {
+describe("rule settings catalog groups", () => {
+  it("keeps creation candidates visible without counting them as configured files", () => {
     const items = [
-      contextItem("managed", "managed-rule", "managed", "present"),
+      contextItem("managed-rule", "managed-rule", "managed", "present"),
       contextItem("global-rules", "rules-context", "global", "present"),
       contextItem("global-system", "system-prompt", "global", "missing"),
       contextItem("global-append", "append-system-prompt", "global", "missing"),
@@ -18,24 +20,28 @@ describe("rule settings catalog categories", () => {
       contextItem("project-append", "append-system-prompt", "project", "missing")
     ];
 
-    expect(globalRuleCategoryDefinitions(items).map((category) => ({
-      id: category.id,
-      label: category.label,
-      count: category.items.length
-    }))).toEqual([
-      { id: "rules", label: "全局规则", count: 1 },
-      { id: "managed", label: "桌面托管", count: 1 },
-      { id: "system", label: "系统提示词", count: 2 }
-    ]);
-    expect(projectRuleCategoryDefinitions(items, "demo").map((category) => ({
-      id: category.id,
-      label: category.label,
-      count: category.items.length
-    }))).toEqual([
-      { id: "rules", label: "项目规则", count: 1 },
-      { id: "inherited", label: "继承规则", count: 2 },
-      { id: "system", label: "系统提示词", count: 2 }
-    ]);
+    const global = globalRuleGroups(items);
+    expect(global.rules).toHaveLength(1);
+    expect(global.managed).toHaveLength(1);
+    expect(global.system).toHaveLength(2);
+    expect(presentItemCount(global.system)).toBe(0);
+
+    const project = projectRuleGroups(items);
+    expect(project.rules).toHaveLength(1);
+    expect(project.inherited).toHaveLength(2);
+    expect(project.system).toHaveLength(2);
+    expect(presentItemCount(project.system)).toBe(0);
+  });
+
+  it("distinguishes missing, active, and overridden files in user-facing status", () => {
+    expect(contextFileStatusLabel(contextItem("missing", "system-prompt", "global", "missing")))
+      .toBe("尚未创建");
+    expect(contextFileStatusLabel(contextItem("active", "rules-context", "global", "present")))
+      .toBe("当前生效");
+    expect(contextFileStatusLabel({
+      ...contextItem("overridden", "system-prompt", "global", "present"),
+      runtimeState: "overridden"
+    })).toBe("已配置 · 当前未生效");
   });
 });
 

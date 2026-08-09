@@ -80,6 +80,30 @@ describe("AgentConnectionController", () => {
     expect(controller.hasOpenPort).toBe(false);
   });
 
+  it("forwards per-request cancellation without tearing down the Host connection", async () => {
+    const target = new FakeHandoffTarget();
+    const controller = createController(target);
+    const host = createHost(3);
+    host.handoff(target);
+    await controller.waitForConnection();
+    const abort = new AbortController();
+
+    const pending = controller.request("workspace.usage.report", { window: "30d" }, [], {
+      context: { scope: "workspace", workspaceId: "workspace-1" },
+      signal: abort.signal
+    });
+    const request = await host.nextRequest("workspace.usage.report");
+    abort.abort();
+
+    await expect(pending).rejects.toMatchObject({ code: "CONNECTION_CLOSED" });
+    await vi.waitFor(() => expect(host.cancellations).toContainEqual(expect.objectContaining({
+      requestId: request.requestId,
+      hostEpoch: 3
+    })));
+    expect(controller.hasOpenPort).toBe(true);
+    expect(controller.identity?.hostEpoch).toBe(3);
+  });
+
   it("records bounded acknowledgement latency without command payloads", async () => {
     let now = 100;
     const target = new FakeHandoffTarget();

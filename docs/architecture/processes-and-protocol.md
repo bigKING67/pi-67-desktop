@@ -161,6 +161,8 @@ revision，写同目录私有临时文件并 flush，在 rename 前重新读取�
   capability、`idempotentControlMutations` 和 envelope byte budget；
 - request：`requestId`、`hostEpoch`、typed command/payload；replay-safe control mutation 还必须携带
   caller-stable `idempotencyKey`；
+- request-cancel：只携带同一 MessagePort 上已有的 `requestId + hostEpoch`，用于释放单个 caller，
+  不关闭共享 Port，也不授予新的 command authority；
 - response：复用 `requestId` 和 command type，返回 typed result 或 redacted structured error；
 - event：单调递增 sequence，并按需携带 `sessionId`、`sessionFileIdentity`、
   `sessionGeneration` 与 `operationId`。
@@ -214,6 +216,13 @@ coordinator 管理。同一 `workspaceId + creationId` 共享一次 single-fligh
 退化成无界目录/文件读取或伪装成 storage error。exact marker 与 matching header/canonical path 是
 创建事实；Renderer 不再等待 SQLite Catalog 二次确认。Catalog upsert 在 authoritative bootstrap 之后
 异步执行，失败只触发 metadata refresh/rebuild，不能把已创建结果改写为 `REQUEST_OUTCOME_UNKNOWN`。
+
+Workspace-scoped `workspace.usage.report` 同样不创建 Task 或加载 Pi Task Runtime。Agent Host 按
+`workspaceId + window` single-flight，同一 Workspace 最多运行一个冷扫描、全 Host 最多并行四个扫描，
+最多保留 32 个 job 和 128 个 waiter；新窗口替换旧窗口，最后一个 waiter 取消、Renderer 单请求取消、
+Port 关闭或 Host shutdown 都会向 JSONL scanner 传播 `AbortSignal`。扫描仍受 500 个 Session、128 MiB
+总读取量和五秒 deadline 约束。Renderer 在窗口、Workspace、连接状态或 Host epoch 变化时撤销旧请求，
+同 Host 重连也必须重新构建，不得保留旧报告或永久 loading。
 
 Pi Runtime 在 `session-creation-journal-v1` 中维护私有 Durable Creation Journal，并通过 per-creation
 跨进程文件锁串行化状态推进。事务顺序是 `reserved -> materializing -> materialized -> published`：

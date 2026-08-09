@@ -119,22 +119,21 @@ export async function runSessionResourceCatalogTransition(
   options: SessionResourceCatalogTransitionOptions
 ): Promise<void> {
   if (get().sessionTransitionPending) return;
-  prepareRendererSessionTransaction("session-control");
-  set({
-    ...clearedTransientState(),
-    sessionTransitionPending: true,
-    runtime: transitionRuntime(options.detail)
-  });
   const transitionTarget = captureRendererSessionTransition(get());
   const authority = currentRendererSessionAuthority(get());
   const projectionTarget = authority
     ? useSessionProjectionStore.getState().capture(authority)
     : undefined;
   if (!transitionTarget || !authority || !projectionTarget) {
-    set({ sessionTransitionPending: false });
-    options.onError(new Error("Renderer Session projection is not current."));
+    options.onError(new Error("当前 Pi 会话尚未就绪。"));
     return;
   }
+  prepareRendererSessionTransaction("session-control");
+  set({
+    ...clearedTransientState(),
+    sessionTransitionPending: true,
+    runtime: transitionRuntime(options.detail)
+  });
 
   try {
     const result = await options.request();

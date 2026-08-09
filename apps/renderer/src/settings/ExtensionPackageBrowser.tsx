@@ -227,7 +227,7 @@ export function PackageDetails({ row, workspaceName, updatesChecked, updateDisab
       </div>
       {!row.inherited ? (
         <div className={styles.dangerZone} data-testid="extension-danger-zone">
-          <span><strong>移除扩展包</strong><small>将同时移除这个扩展包提供的扩展、技能、指令模板和主题；本地目录只移除配置引用。</small></span>
+          <span><strong>移除扩展包</strong><small>将同时移除这个扩展包提供的扩展、技能、提示词模板和主题；本地目录只移除配置引用。</small></span>
           <Button
             aria-label={`卸载 ${row.entry.source}`}
             className={styles.dangerButton!}
@@ -301,7 +301,7 @@ function CapabilitySummary({ resourceTypes }: { resourceTypes: readonly string[]
 function resourceTypeLabel(type: string): string {
   if (type === "extension") return "扩展";
   if (type === "skill") return "技能";
-  if (type === "prompt") return "指令模板";
+  if (type === "prompt") return "提示词模板";
   if (type === "theme") return "主题";
   if (type === "rule") return "规则";
   if (type === "integration") return "集成";

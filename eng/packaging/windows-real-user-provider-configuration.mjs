@@ -11,7 +11,7 @@ export async function verifyProviderConfiguration(window) {
     timeout: remainingTimeout(startedAt)
   });
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u })
+    .getByRole("button", { name: "模型", exact: true })
     .click({ timeout: remainingTimeout(startedAt) });
   const panel = settings.getByTestId("provider-configuration-panel");
   const unavailable = settings.getByText("Pi 配置尚不可用", { exact: true });

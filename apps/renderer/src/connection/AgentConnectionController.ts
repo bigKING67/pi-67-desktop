@@ -43,6 +43,7 @@ export interface AgentConnectionRequestOptions {
   context?: ProtocolContext;
   onAcknowledgementDelayed?: () => void;
   ackTimeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface AgentConnectionControllerOptions {
@@ -161,7 +162,8 @@ export class AgentConnectionController {
           transfer,
           context,
           idempotencyKey,
-          type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined
+          type === "session.create" ? (attempt === 0 ? 5_000 : 10_000) : undefined,
+          options.signal
         ),
         () => this.prepareSameHostRetry(expectedHostEpoch),
         options.onAcknowledgementDelayed
@@ -169,11 +171,19 @@ export class AgentConnectionController {
     }
     if (isReplaySafeOperationAck(type)) {
       return requestWithBoundedTransportRetry(
-        () => this.requestOnce(type, payload, transfer, context),
+        () => this.requestOnce(type, payload, transfer, context, undefined, undefined, options.signal),
         () => this.prepareSameHostRetry(expectedHostEpoch)
       ) as Promise<CommandResults[T]>;
     }
-    return this.requestOnce(type, payload, transfer, context, undefined, options.ackTimeoutMs);
+    return this.requestOnce(
+      type,
+      payload,
+      transfer,
+      context,
+      undefined,
+      options.ackTimeoutMs,
+      options.signal
+    );
   }
 
   private async prepareSameHostRetry(expectedHostEpoch: number | undefined): Promise<boolean> {
@@ -189,7 +199,8 @@ export class AgentConnectionController {
     transfer: Transferable[],
     context: ProtocolContext,
     idempotencyKey?: string,
-    ackTimeoutMs?: number
+    ackTimeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<CommandResults[T]> {
     const client = this.client;
     const generation = this.generation;
@@ -202,7 +213,8 @@ export class AgentConnectionController {
         result = await client.request(type, payload, transfer, {
           context,
           ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-          ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs })
+          ...(ackTimeoutMs === undefined ? {} : { ackTimeoutMs }),
+          ...(signal === undefined ? {} : { signal })
         });
       } catch (error) {
         if (client.isClosed) {

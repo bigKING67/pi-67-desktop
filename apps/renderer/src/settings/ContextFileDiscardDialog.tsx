@@ -11,7 +11,7 @@ export function ContextFileDiscardDialog({ open, busy, fileName, onCancel, onDis
     <SettingsDiscardDialog
       busy={busy}
       open={open}
-      subject={fileName ?? "当前规则与上下文文件"}
+      subject={fileName ?? "当前工作规则文件"}
       onCancel={onCancel}
       onDiscard={onDiscard}
     />

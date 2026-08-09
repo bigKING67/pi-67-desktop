@@ -137,6 +137,100 @@ describe("AgentHostServer Workspace catalog", () => {
     await server.shutdown();
   });
 
+  it("rebuilds Workspace usage without creating or loading a Task Runtime", async () => {
+    const fixture = await workspaceFixture("usage");
+    const runtimeLoader = vi.fn(async () => { throw new Error("Usage reports must not load a Task Runtime."); });
+    const server = new AgentHostServer(runtimeLoader, { sdkVersionLoader: async () => "0.81.1" });
+    const port = new FakePort();
+
+    try {
+      await attach(server, port);
+      expect((await hostCommand(port, WORKSPACE, "workspace.register", {
+        cwd: fixture.cwd,
+        trust: "trusted",
+        approvalMode: "guided"
+      }, "register-usage-workspace")).response).toMatchObject({ ok: true });
+
+      expect((await hostCommand(port, WORKSPACE, "workspace.usage.report", {
+        window: "30d"
+      })).response).toMatchObject({
+        ok: true,
+        type: "workspace.usage.report",
+        context: WORKSPACE,
+        result: {
+          workspaceId: WORKSPACE.workspaceId,
+          window: "30d",
+          buckets: [],
+          models: [],
+          totals: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            total: 0
+          },
+          coverage: {
+            discoveredSessions: 0,
+            scannedSessions: 0
+          }
+        }
+      });
+      expect(runtimeLoader).not.toHaveBeenCalled();
+      expect(hostTaskRuntimeCount(server)).toBe(0);
+
+      const missingWorkspace: WorkspaceProtocolContext = {
+        scope: "workspace",
+        workspaceId: "workspace-missing"
+      };
+      expect((await hostCommand(port, missingWorkspace, "workspace.usage.report", {
+        window: "90d"
+      })).response).toMatchObject({
+        ok: false,
+        error: { code: "RUNTIME_NOT_READY" }
+      });
+      expect(runtimeLoader).not.toHaveBeenCalled();
+      expect(hostTaskRuntimeCount(server)).toBe(0);
+    } finally {
+      await server.shutdown();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves Session creation from Workspace authority without a Task Runtime", async () => {
+    const fixture = await workspaceFixture("creation-resolution");
+    const runtimeLoader = vi.fn(async () => {
+      throw new Error("Session creation resolution must not load a Task Runtime.");
+    });
+    const server = new AgentHostServer(runtimeLoader, { sdkVersionLoader: async () => "0.81.1" });
+    const port = new FakePort();
+
+    try {
+      await attach(server, port);
+      expect((await hostCommand(port, WORKSPACE, "workspace.register", {
+        cwd: fixture.cwd,
+        trust: "trusted",
+        approvalMode: "guided"
+      }, "register-creation-resolution-workspace")).response).toMatchObject({ ok: true });
+
+      expect((await hostCommand(port, WORKSPACE, "session.creation.resolve", {
+        creationId: "creation-authority-regression"
+      })).response).toMatchObject({
+        ok: true,
+        type: "session.creation.resolve",
+        context: WORKSPACE,
+        result: {
+          status: "missing",
+          creationId: "creation-authority-regression"
+        }
+      });
+      expect(runtimeLoader).not.toHaveBeenCalled();
+      expect(hostTaskRuntimeCount(server)).toBe(0);
+    } finally {
+      await server.shutdown();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
   it("keeps lifecycle mutations idempotent and blocks unregister while a Task is open", async () => {
     const fixture = await workspaceFixture("lifecycle");
     const runtimeLoader = vi.fn(async () => { throw new Error("Task Runtime must not load."); });
@@ -294,6 +388,12 @@ function hostWorkspaceSettings(server: AgentHostServer, workspaceId: string) {
       };
     };
   }).workspaces.require(workspaceId).workspaceServices.settingsManager;
+}
+
+function hostTaskRuntimeCount(server: AgentHostServer): number {
+  return (server as unknown as {
+    taskRuntimes: { values(): unknown[] };
+  }).taskRuntimes.values().length;
 }
 
 async function hostCommand<T extends AgentCommandType>(

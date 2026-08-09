@@ -331,9 +331,9 @@ function PromptSettings() {
   return (
     <SessionResourcePanel
       kind="prompt"
-      title="当前会话已加载的指令模板"
-      description="这些 Markdown 模板通过 /name 调用；它们与持续生效的 AGENTS.md 规则不是同一类资源。"
-      empty="当前作用域没有加载可显示的指令模板。"
+      title="当前会话可用的提示词模板"
+      description="通过 /名称 手动调用；不会自动成为会话规则。"
+      empty="当前作用域没有可用的提示词模板。"
     />
   );
 }

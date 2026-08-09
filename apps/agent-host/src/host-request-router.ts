@@ -22,11 +22,10 @@ import {
   isWorkspaceProviderCommand,
   type WorkspaceCommandRouter
 } from "./workspace-command-router.js";
-import {
-  isWorkspaceFileCommand,
-  type WorkspaceFileCommandRouter
-} from "./workspace-file-command-router.js";
+import { isWorkspaceFileCommand, type WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
 import { handleWorkspaceReadRequest } from "./workspace-read-request-handler.js";
+import { WorkspaceUsageReportCoordinator } from "./workspace-usage-report-coordinator.js";
+
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
   runtimeStatus(): CommandResults["runtime.getStatus"];
@@ -47,6 +46,7 @@ export interface HostRequestRouterOptions {
 }
 export class HostRequestRouter {
   private readonly sessionCreationResolutions: SessionCreationResolutionCoordinator;
+  private readonly usageReports: WorkspaceUsageReportCoordinator;
   constructor(
     private readonly tasks: HostTaskStateCoordinator,
     private readonly contextFiles: ContextFileCommandRouter,
@@ -57,10 +57,12 @@ export class HostRequestRouter {
     private readonly options: HostRequestRouterOptions
   ) {
     this.sessionCreationResolutions = new SessionCreationResolutionCoordinator(workspaceCommands);
+    this.usageReports = new WorkspaceUsageReportCoordinator(workspaceCommands);
   }
   async shutdown(deadlineMs?: number): Promise<void> {
     const results = await Promise.allSettled([
       invokeShutdown(() => this.sessionCreationResolutions.shutdown(deadlineMs)),
+      invokeShutdown(() => this.usageReports.shutdown(deadlineMs)),
       invokeShutdown(() => this.options.shutdownResources(deadlineMs)),
       invokeShutdown(() => this.workspaceCommands.shutdown())
     ]);
@@ -97,7 +99,12 @@ export class HostRequestRouter {
       this.handleWorkspaceConversationCommand(origin, request);
       return;
     }
-    if (handleWorkspaceReadRequest(origin, request, this.workspaceCommands)) return;
+    if (handleWorkspaceReadRequest(
+      origin,
+      request,
+      this.workspaceCommands,
+      this.usageReports
+    )) return;
     if (request.type === "session.creation.resolve" && request.context.scope === "workspace") {
       const command = {
         type: request.type,

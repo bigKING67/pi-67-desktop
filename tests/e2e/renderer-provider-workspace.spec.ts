@@ -81,7 +81,7 @@ test("organizes Provider task views while search and drill-down preserve the act
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   const search = panel.getByRole("textbox", { name: "搜索 Pi Provider" });
   const providerList = panel.getByTestId("provider-configuration-list");
@@ -177,7 +177,7 @@ test("defaults to configurable Providers when no service is currently configured
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
 
   await expect(panel.getByRole("tab", { name: "可配置 2" })).toHaveAttribute("aria-selected", "true");
@@ -194,7 +194,7 @@ test("uses a list-to-detail model flow in a narrow Settings workspace", async ({
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("button", { name: "选择设置分类", exact: true }).click();
   await page.getByRole("menu", { name: "选择设置分类" })
-    .getByRole("menuitem", { name: "模型服务", exact: true }).click();
+    .getByRole("menuitem", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   const providerList = panel.getByTestId("provider-configuration-list");
   const editor = panel.getByTestId("provider-configuration-editor");
@@ -229,7 +229,7 @@ test("persists a Provider credential from a registered Workspace without startin
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   await settings.getByTestId("provider-configuration-panel")
     .getByRole("tab", { name: "可配置 1" })
     .click();
@@ -293,7 +293,7 @@ test("protects Provider drafts and confirms models.json definition removal", asy
 
   const settings = page.getByLabel("π 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  await navigation.getByRole("button", { name: "模型服务", exact: true }).click();
+  await navigation.getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   await panel.getByTestId("provider-configuration-list")
     .getByRole("button", { name: /Anthropic/u }).click();
@@ -310,7 +310,7 @@ test("protects Provider drafts and confirms models.json definition removal", asy
   await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
 
-  await navigation.getByRole("button", { name: "模型服务", exact: true }).click();
+  await navigation.getByRole("button", { name: "模型", exact: true }).click();
   await panel.getByTestId("provider-configuration-list")
     .getByRole("button", { name: /Anthropic/u }).click();
   await clearRecordedCommands(page);
@@ -339,7 +339,7 @@ test("edits Pi Provider files, selects built-in defaults, and preserves a stale 
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   await panel.getByTestId("provider-configuration-list").getByRole("button").first().click();
   await panel.getByRole("tab", { name: "默认模型" }).click();

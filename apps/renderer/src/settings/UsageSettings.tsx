@@ -25,15 +25,70 @@ export function UsageSettings() {
   const [report, setReport] = useState<UsageReport>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
+  const [refreshRevision, setRefreshRevision] = useState(0);
   const requestRevision = useRef(0);
 
   useEffect(() => {
-    requestRevision.current += 1;
+    const revision = ++requestRevision.current;
     setReport(undefined);
     setError(undefined);
     setLoading(false);
-    if (workspace && connected && hostEpoch !== undefined) void loadReport();
-  }, [workspace?.id, hostEpoch, window]);
+    if (!workspace || !connected || hostEpoch === undefined) return;
+
+    const controller = new AbortController();
+    const expectedWorkspaceId = workspace.id;
+    const expectedHostEpoch = hostEpoch;
+    const requestedWindow = window;
+    const isCurrentRequest = () => {
+      const workbench = rendererWorkbenchStore.getState();
+      const app = useAppStore.getState();
+      return isUsageReportRequestCurrent({
+        revision,
+        hostEpoch: expectedHostEpoch,
+        workspaceId: expectedWorkspaceId
+      }, {
+        revision: requestRevision.current,
+        connected: app.connected,
+        hostEpoch: app.hostEpoch,
+        workspaceId: workbench.settingsWorkspaceId ?? workbench.currentWorkspaceId
+      });
+    };
+
+    setLoading(true);
+    void (async () => {
+      try {
+        await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+        if (controller.signal.aborted || !isCurrentRequest()) return;
+        const next = await agentConnectionController.request(
+          "workspace.usage.report",
+          { window: requestedWindow },
+          [],
+          {
+            context: { scope: "workspace", workspaceId: expectedWorkspaceId },
+            ackTimeoutMs: 8_000,
+            signal: controller.signal
+          }
+        );
+        if (
+          controller.signal.aborted
+          || !isCurrentRequest()
+          || next.workspaceId !== expectedWorkspaceId
+        ) return;
+        setReport(next);
+      } catch (cause) {
+        if (!controller.signal.aborted && isCurrentRequest()) {
+          setError(cause instanceof Error ? cause.message : "无法重建 Pi JSONL 用量统计。");
+        }
+      } finally {
+        if (!controller.signal.aborted && isCurrentRequest()) setLoading(false);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (requestRevision.current === revision) requestRevision.current += 1;
+    };
+  }, [workspace, connected, hostEpoch, window, refreshRevision]);
 
   const daily = useMemo(() => aggregateDaily(report?.buckets ?? []), [report]);
   const modelRows = report?.models ?? [];
@@ -54,7 +109,11 @@ export function UsageSettings() {
             >{item.label}</Button>
           ))}
         </div>
-        <Button className="secondary-button" isDisabled={loading || !workspace || !connected} onPress={() => void loadReport()}>
+        <Button
+          className="secondary-button"
+          isDisabled={loading || !workspace || !connected}
+          onPress={() => setRefreshRevision((current) => current + 1)}
+        >
           {loading ? <LoaderCircle aria-hidden="true" className={styles.spin} size={13} /> : <RefreshCw aria-hidden="true" size={13} />}
           重建
         </Button>
@@ -123,46 +182,6 @@ export function UsageSettings() {
     </SettingsSectionBlock>
   );
 
-  async function loadReport(): Promise<void> {
-    const expectedHostEpoch = useAppStore.getState().hostEpoch;
-    if (!workspace || !useAppStore.getState().connected || expectedHostEpoch === undefined || loading) return;
-    const revision = ++requestRevision.current;
-    setLoading(true);
-    setError(undefined);
-    try {
-      await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
-      if (!isCurrentRequest(revision, expectedHostEpoch, workspace.id)) return;
-      const next = await agentConnectionController.request(
-        "workspace.usage.report",
-        { window },
-        [],
-        { context: { scope: "workspace", workspaceId: workspace.id }, ackTimeoutMs: 8_000 }
-      );
-      if (!isCurrentRequest(revision, expectedHostEpoch, workspace.id) || next.workspaceId !== workspace.id) return;
-      setReport(next);
-    } catch (cause) {
-      if (isCurrentRequest(revision, expectedHostEpoch, workspace.id)) {
-        setError(cause instanceof Error ? cause.message : "无法重建 Pi JSONL 用量统计。");
-      }
-    } finally {
-      if (isCurrentRequest(revision, expectedHostEpoch, workspace.id)) setLoading(false);
-    }
-  }
-
-  function isCurrentRequest(revision: number, expectedHostEpoch: number, expectedWorkspaceId: string): boolean {
-    const workbench = rendererWorkbenchStore.getState();
-    const app = useAppStore.getState();
-    return isUsageReportRequestCurrent({
-      revision,
-      hostEpoch: expectedHostEpoch,
-      workspaceId: expectedWorkspaceId
-    }, {
-      revision: requestRevision.current,
-      connected: app.connected,
-      hostEpoch: app.hostEpoch,
-      workspaceId: workbench.settingsWorkspaceId ?? workbench.currentWorkspaceId
-    });
-  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

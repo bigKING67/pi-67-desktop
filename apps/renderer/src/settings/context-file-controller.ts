@@ -32,7 +32,7 @@ async function performCatalogLoad(workspaceId: string): Promise<boolean> {
     useContextFileStore.getState().installCatalog(workspaceId, catalog);
     return true;
   } catch (error) {
-    return reportFailure(workspaceId, "无法读取规则与上下文文件", error);
+    return reportFailure(workspaceId, "无法读取工作规则文件", error);
   }
 }
 
@@ -125,8 +125,8 @@ function reportFailure(workspaceId: string, title: string, error: unknown): fals
 }
 
 function scopeLabel(scope: "managed" | "global" | "project" | "inherited"): string {
-  if (scope === "global") return "全局可用";
-  if (scope === "project") return "项目专属";
+  if (scope === "global") return "全局";
+  if (scope === "project") return "项目";
   if (scope === "managed") return "Desktop 托管";
   return "继承上下文";
 }

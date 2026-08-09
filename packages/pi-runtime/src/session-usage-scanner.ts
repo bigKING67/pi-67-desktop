@@ -90,17 +90,25 @@ export async function scanSessionUsage(options: SessionUsageScanOptions): Promis
       break;
     }
     bytesReadTotal += loaded.bytes;
-    scannedSessions += 1;
-    let sessionFuture = false;
+    const entries: unknown[] = [];
+    let invalidJson = false;
     for (const line of loaded.lines) {
       if (line.length === 0) continue;
-      let entry: unknown;
       try {
-        entry = JSON.parse(line);
+        entries.push(JSON.parse(line));
       } catch {
-        invalidSessions += 1;
+        invalidJson = true;
         break;
       }
+    }
+    if (invalidJson) {
+      invalidSessions += 1;
+      continue;
+    }
+
+    scannedSessions += 1;
+    let sessionFuture = false;
+    for (const entry of entries) {
       if (!isRecord(entry)) continue;
       if (entry.type === "session") {
         const version = finiteInteger(entry.version) ?? 1;
@@ -169,6 +177,7 @@ export async function scanSessionUsage(options: SessionUsageScanOptions): Promis
     && !modelOverflow
     && unavailableSessions === 0
     && invalidSessions === 0
+    && futureVersionSessions === 0
     && skippedSessions === 0;
   return {
     workspaceId: options.workspaceId,

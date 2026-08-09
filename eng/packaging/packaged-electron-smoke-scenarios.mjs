@@ -76,7 +76,7 @@ export async function ensurePackagedNewSessionIntent(window, timeoutMs = 30_000)
 }
 
 export async function verifyColdProviderRestoration(window) {
-  const settings = await openSettingsSection(window, /^模型服务/u);
+  const settings = await openSettingsSection(window, "模型");
   const providerPanel = settings.getByTestId("provider-configuration-panel");
   const providerList = providerPanel.getByTestId("provider-configuration-list");
   await providerPanel.getByRole("textbox", { name: "搜索 Pi Provider" }).waitFor({ state: "visible", timeout: 30_000 });

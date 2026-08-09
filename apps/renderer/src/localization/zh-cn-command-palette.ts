@@ -31,7 +31,7 @@ export const zhCNCommandPaletteMessages = {
   currentSessionDetail: (count: number) => `当前会话 · ${count} 条消息`,
   sessionDetail: (count: number, relativeTime: string) => `${count} 条消息 · ${relativeTime}`,
   reloadResources: "重新加载 Pi 资源",
-  reloadResourcesDetail: "技能、指令模板、扩展和上下文文件",
+  reloadResourcesDetail: "技能、提示词模板、扩展和工作规则",
   compactSession: "压缩当前会话",
   compactSessionDetail: "使用 Pi compaction 释放上下文空间",
   credentials: "模型服务与凭据",

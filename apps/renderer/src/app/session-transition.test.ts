@@ -174,6 +174,33 @@ describe("renderer session transition authority", () => {
     });
   });
 
+  it("rejects a resource reload before mutating runtime when no Session projection is current", async () => {
+    useSessionProjectionStore.getState().reset();
+    const runtime = useAppStore.getState().runtime;
+    const request = vi.fn(async () => resourceCatalogResult());
+    const onError = vi.fn();
+
+    await runSessionResourceCatalogTransition(
+      useAppStore.getState,
+      useAppStore.setState,
+      {
+        detail: "Reloading",
+        readyDetail: "Ready",
+        request,
+        onError
+      }
+    );
+
+    expect(request).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      message: "当前 Pi 会话尚未就绪。"
+    }));
+    expect(useAppStore.getState()).toMatchObject({
+      runtime,
+      sessionTransitionPending: false
+    });
+  });
+
   it("does not publish ready after a projection subscriber starts a newer recovery transaction", async () => {
     const deferred = deferredResourceCatalogResult();
     const onError = vi.fn();

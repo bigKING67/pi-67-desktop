@@ -34,7 +34,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "account",
         ...messages.settings.sections.account,
-        searchTerms: ["账户", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
+        searchTerms: ["账户与本地数据", "登录", "未登录", "本地数据", "本地模式", "account", "sign in"],
         icon: UserRound
       },
       {
@@ -51,7 +51,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "providers",
         ...messages.settings.sections.providers,
-        searchTerms: ["提供商", "服务商", "认证", "密钥", "思考级别", "provider", "model", "api key"],
+        searchTerms: ["模型服务", "提供商", "服务商", "认证", "密钥", "思考级别", "provider", "model", "api key"],
         icon: Bot
       },
       {
@@ -106,7 +106,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
       {
         id: "rules",
         ...messages.settings.sections.rules,
-        searchTerms: ["规则", "上下文", "agents", "claude", "system", "rule", "rules", "行为约束"],
+        searchTerms: ["规则与上下文", "规则", "上下文", "agents", "claude", "system", "rule", "rules", "行为约束"],
         icon: Scale
       }
     ]

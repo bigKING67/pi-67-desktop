@@ -21,15 +21,15 @@ export const zhCNMessages = {
     },
     sections: {
       account: {
-        label: "账户与本地数据",
-        summary: "查看本地模式、账户服务状态与数据保留边界。"
+        label: "账户",
+        summary: "查看登录状态、账户同步与本地数据边界。"
       },
       general: {
         label: "外观",
         summary: "选择跟随系统、浅色或深色应用外观。"
       },
       providers: {
-        label: "模型服务",
+        label: "模型",
         summary: "配置模型服务、认证、可用模型与默认模型。"
       },
       packages: {
@@ -45,12 +45,12 @@ export const zhCNMessages = {
         summary: "按可用范围查看技能；全局页统一汇总内置、受管和本地技能，项目页只显示当前项目专属技能。"
       },
       prompts: {
-        label: "指令模板",
-        summary: "查看可通过 /name 调用的指令模板及其来源。"
+        label: "提示词模板",
+        summary: "查看可通过 /名称 手动调用的提示词模板及其来源。"
       },
       rules: {
-        label: "规则与上下文",
-        summary: "查看全局与项目 AGENTS.md、CLAUDE.md 以及桌面托管规则。"
+        label: "工作规则",
+        summary: "管理 Pi 自动加载并持续生效的全局与项目工作规则。"
       },
       integrations: {
         label: "浏览器集成",

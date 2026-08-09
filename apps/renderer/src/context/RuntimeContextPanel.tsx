@@ -1,12 +1,16 @@
 import type { ExtensionCompatibility } from "@pi67/domain";
 import { PackageOpen } from "lucide-react";
-import { Button } from "react-aria-components";
+import { useAppStore } from "../app/app-store.js";
 import { ExtensionCatalog } from "../extension-ui/ExtensionCatalog.js";
 import {
   useCommittedExtensionCatalog,
   useExtensionUiStore
 } from "../extension-ui/extension-ui-store.js";
-import { reloadSessionResources } from "../session/session-control-controller.js";
+import { SessionResourceReloadButton } from "../session/SessionResourceReloadButton.js";
+import {
+  currentSessionResourceTask,
+  sessionResourceProjectionMatchesTask
+} from "../session/session-control-controller.js";
 import {
   selectSessionId,
   selectSessionName,
@@ -14,12 +18,26 @@ import {
   selectSessionStats
 } from "../session/session-projection-selectors.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
 
 export function RuntimeContextPanel() {
-  const sessionId = useSessionProjectionStore(selectSessionId);
-  const sessionName = useSessionProjectionStore(selectSessionName);
-  const stats = useSessionProjectionStore(selectSessionStats);
-  const resources = useSessionProjectionStore(selectSessionResources);
+  const projectedSessionId = useSessionProjectionStore(selectSessionId);
+  const projectedSessionName = useSessionProjectionStore(selectSessionName);
+  const projectedStats = useSessionProjectionStore(selectSessionStats);
+  const projectedResources = useSessionProjectionStore(selectSessionResources);
+  const projectionAuthority = useSessionProjectionStore((state) => state.authority);
+  const connected = useAppStore((state) => state.connected);
+  const hostEpoch = useAppStore((state) => state.hostEpoch);
+  const task = useWorkbenchStore(currentSessionResourceTask);
+  const projectionCurrent = sessionResourceProjectionMatchesTask(
+    task,
+    projectionAuthority,
+    connected ? hostEpoch : undefined
+  );
+  const sessionId = projectionCurrent ? projectedSessionId : undefined;
+  const sessionName = projectionCurrent ? projectedSessionName : undefined;
+  const stats = projectionCurrent ? projectedStats : undefined;
+  const resources = projectionCurrent ? projectedResources : undefined;
   const statuses = useExtensionUiStore((state) => state.statuses);
   const compatibility = useExtensionUiStore((state) => state.compatibility);
   const extensionCatalog = useCommittedExtensionCatalog();
@@ -54,7 +72,7 @@ export function RuntimeContextPanel() {
       <ExtensionCatalog catalog={extensionCatalog} />
       <div className="context-heading">
         <div><span className="section-label"><PackageOpen size={13} /> Pi 资源</span><strong>{resources?.length ?? 0} 项</strong></div>
-        <Button className="small-button" onPress={() => void reloadSessionResources()}>重新加载</Button>
+        <SessionResourceReloadButton compact />
       </div>
       <div className="resource-list">
         {resources?.length ? resources.map((resource) => (
@@ -62,7 +80,9 @@ export function RuntimeContextPanel() {
             <span className={`resource-status status-${resource.status}`} aria-label={resource.status} />
             <div><strong>{resource.label}</strong><small>{resource.kind}{resource.detail ? ` · ${resource.detail}` : ""}</small></div>
           </div>
-        )) : <ContextEmpty text="尚未发现 Skills、Prompts、Extensions 或上下文文件。" />}
+        )) : <ContextEmpty text={projectionCurrent
+          ? "尚未发现 Skills、Prompts、Extensions 或上下文文件。"
+          : "当前 Pi 会话尚未就绪。"} />}
       </div>
     </>
   );

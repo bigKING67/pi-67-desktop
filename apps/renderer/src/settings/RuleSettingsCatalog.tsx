@@ -1,5 +1,5 @@
 import type { ContextFileScope, ContextFileSummary } from "@pi67/domain";
-import { ChevronRight, FilePlus2, FileText, LockKeyhole, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus2, FileText, LockKeyhole, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "react-aria-components";
 import {
@@ -10,9 +10,6 @@ import {
 } from "./SettingsPrimitives.js";
 import styles from "./RuleSettingsWorkspace.module.css";
 
-export type GlobalRuleCategory = "rules" | "managed" | "system";
-export type ProjectRuleCategory = "rules" | "inherited" | "system";
-
 interface CatalogProps {
   items: ContextFileSummary[];
   busy: boolean;
@@ -22,169 +19,191 @@ interface CatalogProps {
   onSelect: (item: ContextFileSummary) => void;
 }
 
-export interface CategoryDefinition<Key extends string> {
-  id: Key;
-  label: string;
-  title: string;
-  description: string;
-  items: ContextFileSummary[];
+export interface GlobalRuleGroups {
+  rules: ContextFileSummary[];
+  managed: ContextFileSummary[];
+  system: ContextFileSummary[];
+}
+
+export interface ProjectRuleGroups {
+  rules: ContextFileSummary[];
+  inherited: ContextFileSummary[];
+  system: ContextFileSummary[];
 }
 
 export function GlobalRuleCatalog({
-  category,
-  onCategoryChange,
+  advancedOpen,
+  onAdvancedOpenChange,
   ...props
 }: CatalogProps & {
-  category: GlobalRuleCategory;
-  onCategoryChange: (category: GlobalRuleCategory) => void;
+  advancedOpen: boolean;
+  onAdvancedOpenChange: (open: boolean) => void;
 }) {
-  const definitions = globalRuleCategoryDefinitions(props.items);
-  return <CategorizedCatalog
-    {...props}
-    ariaLabel="全局规则与上下文分类"
-    category={category}
-    definitions={definitions}
-    onCategoryChange={onCategoryChange}
-  />;
+  if (props.detail !== undefined) return <div className={styles.catalogSurface}>{props.detail}</div>;
+  const groups = globalRuleGroups(props.items);
+  const managedCount = presentItemCount(groups.managed);
+  const systemCount = presentItemCount(groups.system);
+  return (
+    <div className={styles.catalogSurface}>
+      <div className={styles.sections}>
+        <RuleBehaviorNotice />
+        {props.error ? <SettingsNotice tone="danger">{props.error}</SettingsNotice> : null}
+        <CatalogSection
+          actions={<RefreshButton busy={props.busy} onPress={props.onRefresh} />}
+          description="适用于所有项目；AGENTS.md 优先于同目录的 CLAUDE.md。"
+          items={groups.rules}
+          onSelect={props.onSelect}
+          title="全局工作规则"
+        />
+        <AdvancedDisclosure
+          description="Pi-67 内置规则与系统提示词覆盖"
+          open={advancedOpen}
+          statuses={[
+            `Pi-67 内置规则 · ${managedCount} 项`,
+            `系统提示词覆盖 · ${configuredCountLabel(systemCount)}`
+          ]}
+          onOpenChange={onAdvancedOpenChange}
+        >
+          <CatalogSection
+            description="随 Pi-67 Desktop 提供的只读内部规则；可查看源码和预览。"
+            items={groups.managed}
+            onSelect={props.onSelect}
+            title="Pi-67 内置规则"
+          />
+          <CatalogSection
+            description="高级设置。通常使用 AGENTS.md 即可；SYSTEM.md 替换默认系统提示词，APPEND_SYSTEM.md 追加默认系统提示词。"
+            items={groups.system}
+            onSelect={props.onSelect}
+            title={`系统提示词覆盖 · ${configuredCountLabel(systemCount)}`}
+          />
+        </AdvancedDisclosure>
+      </div>
+    </div>
+  );
 }
 
-export function globalRuleCategoryDefinitions(
-  items: ContextFileSummary[]
-): Array<CategoryDefinition<GlobalRuleCategory>> {
-  return [
-    {
-      id: "rules",
-      label: "全局规则",
-      title: "全局规则与上下文",
-      description: "由用户维护并对所有项目可用；AGENTS.md 优先于同目录的 CLAUDE.md。",
-      items: items.filter((item) => item.scope === "global" && item.category === "rules-context")
-    },
-    {
-      id: "managed",
-      label: "桌面托管",
-      title: "桌面托管规则",
-      description: "随 Desktop 提供并按文件展示；可以查看源码和预览，但不能直接修改。",
-      items: items.filter((item) => item.scope === "managed")
-    },
-    {
-      id: "system",
-      label: "系统提示词",
-      title: "全局系统提示词",
-      description: "SYSTEM.md 替换默认系统提示词；APPEND_SYSTEM.md 追加系统提示词。",
-      items: items.filter((item) => item.scope === "global" && item.category !== "rules-context")
-    }
-  ];
+export function globalRuleGroups(items: ContextFileSummary[]): GlobalRuleGroups {
+  return {
+    rules: items.filter((item) => item.scope === "global" && item.category === "rules-context"),
+    managed: items.filter((item) => item.scope === "managed"),
+    system: items.filter((item) => item.scope === "global" && item.category !== "rules-context")
+  };
 }
 
 export function ProjectRuleCatalog({
-  category,
-  onCategoryChange,
+  advancedOpen,
+  onAdvancedOpenChange,
   trusted,
   workspaceName,
   ...props
 }: CatalogProps & {
-  category: ProjectRuleCategory;
-  onCategoryChange: (category: ProjectRuleCategory) => void;
+  advancedOpen: boolean;
+  onAdvancedOpenChange: (open: boolean) => void;
   trusted: boolean;
   workspaceName: string;
 }) {
-  const definitions = projectRuleCategoryDefinitions(props.items, workspaceName);
-  const notice = trusted ? undefined : (
-    <SettingsNotice tone="warning">
-      当前项目尚未受信任。项目文件可以查看，但创建、编辑和加载保持禁用。
-    </SettingsNotice>
-  );
-  return <CategorizedCatalog
-    {...props}
-    ariaLabel="项目规则与上下文分类"
-    category={category}
-    definitions={definitions}
-    notice={notice}
-    onCategoryChange={onCategoryChange}
-  />;
-}
-
-export function projectRuleCategoryDefinitions(
-  items: ContextFileSummary[],
-  workspaceName: string
-): Array<CategoryDefinition<ProjectRuleCategory>> {
-  const inherited = items.filter((item) => (
-    item.scope === "inherited"
-    || (item.scope === "global" && item.category === "rules-context" && item.presence === "present")
-  ));
-  return [
-    {
-      id: "rules",
-      label: "项目规则",
-      title: "项目规则与上下文",
-      description: `由 ${workspaceName} 维护；仅受信任 Workspace 内的普通 Markdown 文件可编辑。`,
-      items: items.filter((item) => item.scope === "project" && item.category === "rules-context")
-    },
-    {
-      id: "inherited",
-      label: "继承规则",
-      title: "继承的规则与上下文",
-      description: "展示全局规则和 Pi 从 Workspace 外父目录继承的有效上下文；父目录条目只读。",
-      items: inherited
-    },
-    {
-      id: "system",
-      label: "系统提示词",
-      title: "项目系统提示词",
-      description: "项目 .pi 目录中的 SYSTEM.md 或 APPEND_SYSTEM.md 存在时覆盖对应全局文件。",
-      items: items.filter((item) => item.scope === "project" && item.category !== "rules-context")
-    }
-  ];
-}
-
-function CategorizedCatalog<Key extends string>({
-  ariaLabel,
-  busy,
-  category,
-  definitions,
-  detail,
-  error,
-  notice,
-  onCategoryChange,
-  onRefresh,
-  onSelect
-}: CatalogProps & {
-  ariaLabel: string;
-  category: Key;
-  definitions: Array<CategoryDefinition<Key>>;
-  notice?: ReactNode;
-  onCategoryChange: (category: Key) => void;
-}) {
-  const selected = definitions.find((definition) => definition.id === category) ?? definitions[0]!;
+  if (props.detail !== undefined) return <div className={styles.catalogSurface}>{props.detail}</div>;
+  const groups = projectRuleGroups(props.items);
+  const systemCount = presentItemCount(groups.system);
   return (
     <div className={styles.catalogSurface}>
-      <div aria-label={ariaLabel} className={styles.categoryTabs} role="group">
-        {definitions.map((definition) => (
-          <Button
-            aria-label={definition.label}
-            aria-pressed={definition.id === selected.id}
-            className={styles.categoryButton!}
-            key={definition.id}
-            onPress={() => onCategoryChange(definition.id)}
-          >
-            {definition.label}<span aria-hidden="true">{definition.items.length}</span>
-          </Button>
-        ))}
-      </div>
-      {detail !== undefined ? detail : (
-        <div className={styles.sections}>
-          {notice}
-          {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
+      <div className={styles.sections}>
+        <RuleBehaviorNotice />
+        {!trusted ? (
+          <SettingsNotice tone="warning">
+            当前项目尚未受信任。项目文件可以查看，但创建、编辑和加载保持禁用。
+          </SettingsNotice>
+        ) : null}
+        {props.error ? <SettingsNotice tone="danger">{props.error}</SettingsNotice> : null}
+        <CatalogSection
+          actions={<RefreshButton busy={props.busy} onPress={props.onRefresh} />}
+          description={`仅适用于 ${workspaceName}；受信任项目中的普通 Markdown 文件可编辑。`}
+          items={groups.rules}
+          onSelect={props.onSelect}
+          title="项目工作规则"
+        />
+        <CatalogSection
+          description="Pi 自动继承全局工作规则和项目父目录中的工作规则；项目目录之外的文件只读。"
+          items={groups.inherited}
+          onSelect={props.onSelect}
+          title="继承的工作规则"
+        />
+        <AdvancedDisclosure
+          description="项目级系统提示词覆盖"
+          open={advancedOpen}
+          statuses={[`系统提示词覆盖 · ${configuredCountLabel(systemCount)}`]}
+          onOpenChange={onAdvancedOpenChange}
+        >
           <CatalogSection
-            actions={<RefreshButton busy={busy} onPress={onRefresh} />}
-            description={selected.description}
-            items={selected.items}
-            onSelect={onSelect}
-            title={selected.title}
+            description="高级设置。通常使用 AGENTS.md 即可；项目 .pi 目录中的文件存在时覆盖对应全局系统提示词文件。"
+            items={groups.system}
+            onSelect={props.onSelect}
+            title={`系统提示词覆盖 · ${configuredCountLabel(systemCount)}`}
           />
-        </div>
-      )}
+        </AdvancedDisclosure>
+      </div>
     </div>
+  );
+}
+
+export function projectRuleGroups(items: ContextFileSummary[]): ProjectRuleGroups {
+  return {
+    rules: items.filter((item) => item.scope === "project" && item.category === "rules-context"),
+    inherited: items.filter((item) => (
+      item.scope === "inherited"
+      || (item.scope === "global" && item.category === "rules-context" && item.presence === "present")
+    )),
+    system: items.filter((item) => item.scope === "project" && item.category !== "rules-context")
+  };
+}
+
+export function presentItemCount(items: ContextFileSummary[]): number {
+  return items.filter((item) => item.presence === "present").length;
+}
+
+function configuredCountLabel(count: number): string {
+  return count === 0 ? "未配置" : `${count} 项`;
+}
+
+function RuleBehaviorNotice() {
+  return (
+    <SettingsNotice className={styles.behaviorNotice!}>
+      工作规则由 Pi 自动加载，并在会话中持续生效。提示词模板只有通过 <code>/名称</code> 调用时才会加入当前消息。
+    </SettingsNotice>
+  );
+}
+
+function AdvancedDisclosure({
+  children,
+  description,
+  open,
+  statuses,
+  onOpenChange
+}: {
+  children: ReactNode;
+  description: string;
+  open: boolean;
+  statuses: string[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <details
+      className={styles.advancedDetails}
+      open={open}
+      onToggle={(event) => onOpenChange(event.currentTarget.open)}
+    >
+      <summary>
+        <span className={styles.advancedIdentity}>
+          <strong>高级</strong>
+          <small>{description}</small>
+        </span>
+        <span className={styles.advancedStatuses}>
+          {statuses.map((status) => <span key={status}>{status}</span>)}
+        </span>
+        <ChevronDown aria-hidden="true" className={styles.advancedChevron} size={16} />
+      </summary>
+      <div className={styles.advancedSections}>{children}</div>
+    </details>
   );
 }
 
@@ -211,7 +230,7 @@ function CatalogSection({ title, description, items, actions, onSelect }: {
               meta={<span className={styles.meta}>
                 <span>{contextFileScopeLabel(item.scope)}</span>
                 <span>{contextFileAccessLabel(item)}</span>
-                <span>{contextFileRuntimeStateLabel(item.runtimeState)}</span>
+                <span>{contextFileStatusLabel(item)}</span>
               </span>}
               onSelect={() => onSelect(item)}
               testId={`context-file-${item.id}`}
@@ -234,7 +253,7 @@ function RefreshButton({ busy, onPress }: { busy: boolean; onPress: () => void }
 }
 
 export function contextFileScopeLabel(scope: ContextFileScope): string {
-  if (scope === "managed") return "桌面托管";
+  if (scope === "managed") return "Pi-67 内置";
   if (scope === "global") return "全局";
   if (scope === "project") return "当前项目";
   return "父目录继承";
@@ -242,13 +261,14 @@ export function contextFileScopeLabel(scope: ContextFileScope): string {
 
 export function contextFileAccessLabel(item: ContextFileSummary): string {
   if (item.access === "editable") return "可编辑";
-  if (item.access === "creatable") return "可新建";
+  if (item.access === "creatable") return "可创建";
   return item.presence === "missing" ? "不可创建" : "只读";
 }
 
-export function contextFileRuntimeStateLabel(state: ContextFileSummary["runtimeState"]): string {
-  if (state === "active") return "当前生效";
-  if (state === "overridden") return "已被覆盖";
-  if (state === "not-loaded") return "尚未加载";
+export function contextFileStatusLabel(item: ContextFileSummary): string {
+  if (item.presence === "missing") return "尚未创建";
+  if (item.runtimeState === "active") return "当前生效";
+  if (item.runtimeState === "overridden") return "已配置 · 当前未生效";
+  if (item.runtimeState === "not-loaded") return "已配置 · 尚未加载";
   return "当前不可用";
 }

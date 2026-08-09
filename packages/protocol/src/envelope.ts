@@ -71,6 +71,13 @@ export interface RequestEnvelope<T extends AgentCommandType = AgentCommandType> 
   payload: CommandPayloads[T];
 }
 
+export interface RequestCancellationEnvelope {
+  protocolVersion: typeof PROTOCOL_VERSION;
+  kind: "request-cancel";
+  requestId: string;
+  hostEpoch: number;
+}
+
 export interface SuccessResponseEnvelope<T extends AgentCommandType = AgentCommandType> {
   protocolVersion: typeof PROTOCOL_VERSION;
   kind: "response";
@@ -118,7 +125,14 @@ export type EventEnvelope<T extends AgentEventType = AgentEventType> =
 
 // Kept as an exported name while call sites migrate from v1 terminology.
 export type CommandEnvelope = RequestEnvelope;
-export type ProtocolEnvelope = RendererHello | HostWelcome | HandshakeRejected | RequestEnvelope | ResponseEnvelope | EventEnvelope;
+export type ProtocolEnvelope =
+  | RendererHello
+  | HostWelcome
+  | HandshakeRejected
+  | RequestEnvelope
+  | RequestCancellationEnvelope
+  | ResponseEnvelope
+  | EventEnvelope;
 
 export const RequestEnvelopeSchema = strictObject({
   protocolVersion: Type.Literal(PROTOCOL_VERSION),
@@ -129,6 +143,13 @@ export const RequestEnvelopeSchema = strictObject({
   idempotencyKey: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   type: Type.String({ minLength: 1, maxLength: 128 }),
   payload: Type.Any()
+});
+
+export const RequestCancellationEnvelopeSchema = strictObject({
+  protocolVersion: Type.Literal(PROTOCOL_VERSION),
+  kind: Type.Literal("request-cancel"),
+  requestId: Type.String({ minLength: 1, maxLength: 512 }),
+  hostEpoch: Type.Integer({ minimum: 0 })
 });
 
 const SuccessResponseEnvelopeSchema = strictObject({
@@ -177,6 +198,7 @@ export const EventEnvelopeSchema = Type.Union([
 ]);
 
 export type RequestEnvelopeShape = Static<typeof RequestEnvelopeSchema>;
+export type RequestCancellationEnvelopeShape = Static<typeof RequestCancellationEnvelopeSchema>;
 export type ResponseEnvelopeShape = Static<typeof ResponseEnvelopeSchema>;
 export type EventEnvelopeShape = Static<typeof EventEnvelopeSchema>;
 
@@ -189,6 +211,12 @@ export function isRequestEnvelope(value: unknown): value is RequestEnvelope {
   if (isReplaySafeControlMutation(type) !== (typeof envelope.idempotencyKey === "string")) return false;
   if (!hasValidCommandContext(type, envelope.context as ProtocolContext)) return false;
   return true;
+}
+
+export function isRequestCancellationEnvelope(
+  value: unknown
+): value is RequestCancellationEnvelope {
+  return Value.Check(RequestCancellationEnvelopeSchema, value);
 }
 
 export function correlateInvalidRequest(value: unknown): {
@@ -286,6 +314,18 @@ export function commandEnvelope<T extends AgentCommandType>(
     ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
     type,
     payload
+  };
+}
+
+export function requestCancellationEnvelope(
+  requestId: string,
+  hostEpoch: number
+): RequestCancellationEnvelope {
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    kind: "request-cancel",
+    requestId,
+    hostEpoch
   };
 }
 

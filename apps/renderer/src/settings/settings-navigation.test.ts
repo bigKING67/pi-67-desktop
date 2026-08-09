@@ -15,18 +15,18 @@ describe("settings navigation", () => {
       {
         label: "应用",
         items: [
-          { id: "account", label: "账户与本地数据" },
+          { id: "account", label: "账户" },
           { id: "general", label: "外观" }
         ]
       },
       {
         label: "Pi",
         items: [
-          { id: "providers", label: "模型服务" },
+          { id: "providers", label: "模型" },
           { id: "extensions", label: "扩展" },
           { id: "skills", label: "技能" },
-          { id: "prompts", label: "指令模板" },
-          { id: "rules", label: "规则与上下文" }
+          { id: "prompts", label: "提示词模板" },
+          { id: "rules", label: "工作规则" }
         ]
       },
       {
@@ -64,6 +64,7 @@ describe("settings navigation", () => {
     const usage = items.find((item) => item.id === "usage");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
+    expect(provider && matchesSettingsQuery(provider, "模型服务")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "extension")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "扩展包")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "本地扩展")).toBe(true);
@@ -74,7 +75,9 @@ describe("settings navigation", () => {
     expect(skill && matchesSettingsQuery(skill, ".agents/skills")).toBe(true);
     expect(sectionSupportsProjectScope("skills")).toBe(false);
     expect(prompt && matchesSettingsQuery(prompt, "prompts")).toBe(true);
+    expect(prompt && matchesSettingsQuery(prompt, "指令模板")).toBe(true);
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
+    expect(rule && matchesSettingsQuery(rule, "规则与上下文")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "browser67")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "doctor")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "tavily")).toBe(false);

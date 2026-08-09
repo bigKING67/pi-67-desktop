@@ -194,7 +194,7 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
 });
 
 async function openProviderDialog(page: Page): Promise<void> {
-  const settings = await openSettingsSection(page, /^模型服务/u);
+  const settings = await openSettingsSection(page, /^模型$/u);
   const editor = settings.getByTestId("provider-configuration-editor");
   if (!(await editor.isVisible())) {
     await settings.getByRole("button", { name: /^OpenAI\b/u }).click();

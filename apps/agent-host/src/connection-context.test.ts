@@ -3,6 +3,7 @@ import {
   PROTOCOL_REVISION,
   PROTOCOL_VERSION,
   isResponseEnvelope,
+  requestCancellationEnvelope,
   type ProtocolError,
   type ProtocolPort,
   type RendererHello
@@ -46,6 +47,40 @@ class FakePort implements ProtocolPort {
 }
 
 describe("HostConnectionContext", () => {
+  it("aborts only the correlated request when the Renderer sends a cancellation frame", async () => {
+    const port = new FakePort();
+    let requestSignal: AbortSignal | undefined;
+    new HostConnectionContext(
+      port,
+      { appInstanceId: "app-cancel", hostInstanceId: "host-cancel", hostEpoch: 6 },
+      async () => ({ sdkVersion: "0.81.1", eventSequence: 0 }),
+      (origin, request) => {
+        requestSignal = origin.signalForRequest(request.requestId);
+      }
+    );
+    port.emit({
+      protocolVersion: PROTOCOL_VERSION,
+      protocolRevision: PROTOCOL_REVISION,
+      kind: "hello",
+      rendererInstanceId: "renderer-cancel",
+      appInstanceId: "app-cancel",
+      maxEnvelopeBytes: 2 * 1024 * 1024
+    } satisfies RendererHello);
+    await vi.waitFor(() => expect(port.sent).toHaveLength(1));
+    const request = commandEnvelopeForContext(
+      "workspace.usage.report",
+      { window: "30d" },
+      TEST_WORKSPACE_CONTEXT,
+      6
+    );
+    port.emit(request);
+    expect(requestSignal?.aborted).toBe(false);
+
+    port.emit(requestCancellationEnvelope(request.requestId, 6));
+    expect(requestSignal?.aborted).toBe(true);
+    expect(port.closed).toBe(false);
+  });
+
   it("transfers asset chunks without copying the response through structured clone", () => {
     const port = new FakePort();
     const connection = new HostConnectionContext(

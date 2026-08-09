@@ -1,9 +1,11 @@
 import {
   isRendererHello,
+  isRequestCancellationEnvelope,
   isRequestEnvelope,
   welcomeEnvelope,
   type AgentCommandType,
   type RendererHello,
+  type RequestCancellationEnvelope,
   type RequestEnvelope
 } from "@pi67/protocol";
 import {
@@ -53,6 +55,7 @@ export class FakeHandoffTarget implements AgentPortHandoffTarget {
 export class HostConnection {
   readonly channel = new MessageChannel();
   readonly requests: RequestEnvelope[] = [];
+  readonly cancellations: RequestCancellationEnvelope[] = [];
   hello: RendererHello | undefined;
   private readonly requestWaiters: Array<(request: RequestEnvelope) => void> = [];
 
@@ -123,6 +126,10 @@ export class HostConnection {
         },
         maxEnvelopeBytes: 2 * 1024 * 1024
       }));
+      return;
+    }
+    if (isRequestCancellationEnvelope(event.data)) {
+      this.cancellations.push(event.data);
       return;
     }
     if (!isRequestEnvelope(event.data)) return;

@@ -11,7 +11,8 @@ import {
   type RendererSessionAuthority
 } from "./session-authority.js";
 import {
-  useSessionProjectionStore
+  useSessionProjectionStore,
+  type SessionProjectionAuthorityState
 } from "./session-projection-store.js";
 import type { SessionProjectionTarget } from "./session-projection-revisions.js";
 import {
@@ -26,6 +27,12 @@ import {
   type ModelSelectionToken
 } from "./model-selection-store.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
+import {
+  rendererWorkbenchStore,
+  taskForConversation,
+  type RendererWorkbenchState,
+  type RendererWorkbenchTask
+} from "../workbench/workbench-store.js";
 
 interface ModelSelectionFlight {
   key: string;
@@ -143,12 +150,68 @@ export async function setSessionThinkingLevel(
 export async function reloadSessionResources(): Promise<void> {
   const get = useAppStore.getState;
   const set = useAppStore.setState;
+  const unavailable = sessionResourceReloadUnavailableReason(
+    get(),
+    useSessionProjectionStore.getState().authority,
+    currentSessionResourceTask(rendererWorkbenchStore.getState())
+  );
+  if (unavailable) {
+    publishNotification({
+      level: "info",
+      title: "暂时无法重新加载 Pi 资源",
+      message: unavailable
+    });
+    return;
+  }
   await runSessionResourceCatalogTransition(get, set, {
     detail: "正在重新加载 Pi 资源",
     readyDetail: "Pi 资源已重新加载",
     onError: (error) => publishRuntimeError(error, "无法重新加载 Pi 资源"),
     request: () => agentConnectionController.request("resource.reload", {})
   });
+}
+
+export function sessionResourceReloadUnavailableReason(
+  state: Pick<AppState, "connected" | "hostEpoch" | "sessionTransitionPending">,
+  projectionAuthority: SessionProjectionAuthorityState,
+  task: RendererWorkbenchTask | undefined
+): string | undefined {
+  if (state.sessionTransitionPending) return messages.composer.piActionUnavailable.transition;
+  if (!state.connected || state.hostEpoch === undefined) {
+    return messages.composer.piActionUnavailable.disconnected;
+  }
+  if (!sessionResourceProjectionMatchesTask(task, projectionAuthority, state.hostEpoch)) {
+    return messages.composer.piActionUnavailable.session;
+  }
+  return undefined;
+}
+
+export function currentSessionResourceTask(
+  state: Pick<RendererWorkbenchState, "selectedSurface" | "settingsReturnSurface" | "tasks">
+): RendererWorkbenchTask | undefined {
+  const surface = state.selectedSurface?.kind === "settings"
+    ? state.settingsReturnSurface
+    : state.selectedSurface;
+  return surface?.kind === "conversation"
+    ? taskForConversation(state.tasks, surface.conversation)
+    : undefined;
+}
+
+export function sessionResourceProjectionMatchesTask(
+  task: RendererWorkbenchTask | undefined,
+  projectionAuthority: SessionProjectionAuthorityState,
+  hostEpoch: number | undefined
+): boolean {
+  return task?.conversation.kind === "session"
+    && task.conversation.sessionFileIdentity === task.sessionFileIdentity
+    && task.sessionFileIdentity !== undefined
+    && task.sessionGeneration !== undefined
+    && hostEpoch !== undefined
+    && projectionAuthority.phase === "active"
+    && projectionAuthority.hostEpoch === hostEpoch
+    && projectionAuthority.sessionId === task.sessionId
+    && projectionAuthority.sessionFileIdentity === task.sessionFileIdentity
+    && projectionAuthority.sessionGeneration === task.sessionGeneration;
 }
 
 function requireSessionAuthority(state: AppState): RendererSessionAuthority {

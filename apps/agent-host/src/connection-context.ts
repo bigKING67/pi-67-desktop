@@ -4,6 +4,7 @@ import {
   isEnvelopeWithinByteLimit,
   isEventEnvelope,
   isHandshakeCandidate,
+  isRequestCancellationEnvelope,
   isRendererHello,
   isRequestEnvelope,
   isResponseEnvelope,
@@ -213,6 +214,12 @@ export class HostConnectionContext {
       if (this.handshakePending) return;
       this.handshakePending = true;
       void this.completeHandshake(data.appInstanceId, data.maxEnvelopeBytes);
+      return;
+    }
+    if (isRequestCancellationEnvelope(data)) {
+      if (data.hostEpoch === this.identity.hostEpoch) {
+        this.requestAbortControllers.get(data.requestId)?.abort();
+      }
       return;
     }
     if (!isRequestEnvelope(data)) {

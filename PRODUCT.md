@@ -145,13 +145,15 @@ the only Runtime and behavior specification source.
   not interrupted, decline is persisted, and no network request occurs before
   confirmation. `pi-hy-memory`, `@ff-labs/pi-fff`, and
   `@victor-software-house/pi-curated-themes` are retired from the default catalog.
-- Settings manages rules and context as Markdown files in two availability scopes.
-  Each scope uses a counted secondary category selector and renders only the selected
-  category as a flat Catalog. `全局可用` separates user-owned global context,
-  Desktop-managed rules, and global system-prompt inputs; `项目专属` separates
-  Workspace context, inherited context, and project system-prompt inputs. User-owned
-  global or project rules are the default category in their scope. Every file opens
-  into a source/preview detail. Desktop-managed files and files inherited from outside the Workspace are
+- Settings presents Pi's automatically loaded Markdown instructions as `工作规则`
+  in explicit `全局` and `项目` scopes. Global and project `AGENTS.md` rules remain
+  primary; inherited rules are visible directly in the project scope. Pi-67 built-in
+  rules and `SYSTEM.md` / `APPEND_SYSTEM.md` overrides are advanced configuration and
+  stay collapsed by default. Only files whose `presence` is `present` count as
+  configured; missing canonical files remain explicit creation candidates rather
+  than inflating status counts. `提示词模板` is a separate user concept: it joins a
+  message only when the user invokes `/名称` and never masquerades as a persistent
+  work rule. Every work-rule file opens into a source/preview detail. Pi-67 built-in files and files inherited from outside the Workspace are
   read-only; regular files in the controlled global root or a trusted Workspace are
   editable. Creation is limited to the canonical `AGENTS.md`, `SYSTEM.md`, and
   `APPEND_SYSTEM.md` locations. Existing `CLAUDE.md` variants remain editable where
@@ -422,7 +424,7 @@ the only Runtime and behavior specification source.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
-- Settings navigation groups `账户与本地数据` and `外观` under Application; Pi
+- Settings navigation groups `账户` and `外观` under Application; Pi
   resources under Pi; MCP and browser work under Connections & Integrations; and
   runtime, network, updates, and About under System & Support. Category search
   searches these navigation targets rather than arbitrary page content. Narrow

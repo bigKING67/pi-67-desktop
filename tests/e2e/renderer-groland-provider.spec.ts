@@ -49,7 +49,7 @@ test("presents Groland vision and native-search capability without a per-turn se
 
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   const panel = settings.getByTestId("provider-configuration-panel");
   await panel.getByTestId("provider-configuration-list")
     .getByRole("button", { name: /Groland/u }).click();

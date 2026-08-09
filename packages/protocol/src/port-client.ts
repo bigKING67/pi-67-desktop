@@ -29,9 +29,16 @@ import {
 } from "./envelope.js";
 import { correlateInvalidEvent } from "./event-context.js";
 import {
-  EXTENSION_PACKAGE_REQUEST_TIMEOUT_MS,
-  isWorkerBackedExtensionPackageCommand
-} from "./extension-package-operation.js";
+  bindRequestAbort,
+  postRequestCancellation,
+  releaseRequestAbort,
+  requestCancelled,
+  waitForRequestConnection,
+  type RequestAbortBinding
+} from "./port-request-cancellation.js";
+import { acknowledgementTimeout } from "./port-request-timeout.js";
+
+export { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "./port-request-timeout.js";
 
 interface PortMessageEvent {
   data: unknown;
@@ -56,6 +63,8 @@ interface PendingRequest {
   resolve: (value: never) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
+  abort?: RequestAbortBinding;
+  sent: boolean;
 }
 
 export interface AgentConnectionIdentity {
@@ -86,11 +95,10 @@ export interface AgentRequestOptions {
   idempotencyKey?: string;
   context?: ProtocolContext;
   ackTimeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export type ProjectionResyncInstaller = (result: ProjectionResyncResult) => boolean;
-
-export const CONTROL_MUTATION_ACK_TIMEOUT_MS = 60_000;
 
 export class AgentPortClient {
   private readonly pending = new Map<string, PendingRequest>();
@@ -207,8 +215,9 @@ export class AgentPortClient {
     transfer: Transferable[] = [],
     options: AgentRequestOptions = {}
   ): Promise<TResult> {
-    const identity = await this.readyPromise;
+    const identity = await waitForRequestConnection(this.readyPromise, options.signal, type);
     if (this.closed) throw connectionError("Agent connection closed.");
+    if (options.signal?.aborted) throw requestCancelled(type);
     if (options.idempotencyKey !== undefined && !isReplaySafeControlMutation(type)) {
       throw new ProtocolRequestError({
         code: "INVALID_PAYLOAD",
@@ -240,22 +249,38 @@ export class AgentPortClient {
     const ackTimeoutMs = acknowledgementTimeout(options.ackTimeoutMs, type, this.requestTimeoutMs);
     const response = new Promise<TResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.pending.delete(envelope.requestId);
+        const pending = this.takePending(envelope.requestId);
+        if (!pending) return;
+        if (pending.sent) this.cancelHostRequest(envelope.requestId, identity.hostEpoch);
         reject(new ProtocolRequestError({
           code: "REQUEST_TIMEOUT",
           message: `Agent request acknowledgement timed out: ${type}`,
           recoverable: true
         }));
       }, ackTimeoutMs);
-      this.pending.set(envelope.requestId, {
+      const pending: PendingRequest = {
         type,
         context: envelope.context,
         resolve: resolve as (value: never) => void,
         reject,
-        timeout
-      });
+        timeout,
+        sent: false
+      };
+      if (options.signal) {
+        const onAbort = () => {
+          const cancelled = this.takePending(envelope.requestId);
+          if (!cancelled) return;
+          if (cancelled.sent) this.cancelHostRequest(envelope.requestId, identity.hostEpoch);
+          reject(requestCancelled(type));
+        };
+        pending.abort = bindRequestAbort(options.signal, onAbort);
+      }
+      this.pending.set(envelope.requestId, pending);
     });
+    const pending = this.pending.get(envelope.requestId);
+    if (!pending) return response;
     try {
+      pending.sent = true;
       this.port.postMessage(envelope, transfer);
     } catch {
       this.teardown(connectionError(`Agent request could not be sent: ${type}`));
@@ -330,8 +355,7 @@ export class AgentPortClient {
       }));
       return;
     }
-    this.pending.delete(data.requestId);
-    clearTimeout(pending.timeout);
+    this.takePending(data.requestId);
     if (data.ok) pending.resolve(data.result as never);
     else pending.reject(new ProtocolRequestError(data.error));
   }
@@ -372,7 +396,7 @@ export class AgentPortClient {
     if (closePort) this.port.close?.();
     if (!this.welcome) this.rejectReady(error);
     for (const pending of this.pending.values()) {
-      clearTimeout(pending.timeout);
+      releasePending(pending);
       pending.reject(error);
     }
     this.pending.clear();
@@ -388,6 +412,21 @@ export class AgentPortClient {
   private removePortListener(type: PortEventType, listener: PortListener): void {
     if (this.port.removeEventListener) this.port.removeEventListener(type, listener);
     else this.port.off?.(type, listener);
+  }
+
+  private takePending(requestId: string): PendingRequest | undefined {
+    const pending = this.pending.get(requestId);
+    if (!pending) return undefined;
+    this.pending.delete(requestId);
+    releasePending(pending);
+    return pending;
+  }
+
+  private cancelHostRequest(requestId: string, hostEpoch: number): void {
+    if (this.closed) return;
+    postRequestCancellation(this.port, requestId, hostEpoch, () => this.teardown(
+      connectionError("Agent request cancellation could not be sent.")
+    ));
   }
 }
 
@@ -412,26 +451,7 @@ function connectionError(message: string): ProtocolRequestError {
   return new ProtocolRequestError(error);
 }
 
-function timeoutFor(type: AgentCommandType, fallback: number): number {
-  if (isWorkerBackedExtensionPackageCommand(type)) return EXTENSION_PACKAGE_REQUEST_TIMEOUT_MS;
-  if (isReplaySafeControlMutation(type)) return CONTROL_MUTATION_ACK_TIMEOUT_MS;
-  if (type === "prompt.submit" || type === "command.invoke" || type === "session.compact" || type === "session.import") return 5_000;
-  if (type === "runtime.getStatus") return 5_000;
-  return fallback;
-}
-
-function acknowledgementTimeout(
-  override: number | undefined,
-  type: AgentCommandType,
-  fallback: number
-): number {
-  if (override === undefined) return timeoutFor(type, fallback);
-  if (!Number.isSafeInteger(override) || override < 1_000 || override > CONTROL_MUTATION_ACK_TIMEOUT_MS) {
-    throw new ProtocolRequestError({
-      code: "INVALID_PAYLOAD",
-      message: "Agent acknowledgement timeout is outside the supported range.",
-      recoverable: false
-    });
-  }
-  return override;
+function releasePending(pending: PendingRequest): void {
+  clearTimeout(pending.timeout);
+  releaseRequestAbort(pending.abort);
 }

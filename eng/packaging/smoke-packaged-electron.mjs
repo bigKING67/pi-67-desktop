@@ -110,7 +110,7 @@ try {
   await sessionCatalogCheck.getByText(/schema v4; ready/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   const providerPanel = workspaceSettings.getByTestId("provider-configuration-panel");
   const configurationProviderSearch = providerPanel.getByRole("textbox", { name: "搜索 Pi Provider" });
   const configurationProviderList = providerPanel.getByTestId("provider-configuration-list");
@@ -261,18 +261,17 @@ try {
     skillSettingsWorkspace,
     (fileName) => capturePackagedScreenshot(window, fileName)
   );
-  await settingsNavigation.getByRole("button", { name: "指令模板", exact: true }).click();
+  await settingsNavigation.getByRole("button", { name: "提示词模板", exact: true }).click();
   await workspaceSettings.getByText("/packaged-review", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
     throw new Error("Packaged Prompt Template page repeated an Extension-only Package.");
   }
   await capturePackagedScreenshot(window, "08-prompt-template-resources.png");
-  await settingsNavigation.getByRole("button", { name: "规则与上下文", exact: true }).click();
+  await settingsNavigation.getByRole("button", { name: "工作规则", exact: true }).click();
   const ruleSettingsWorkspace = workspaceSettings.getByTestId("rule-settings-workspace");
-  const globalRuleCategories = ruleSettingsWorkspace.getByRole("group", { name: "全局规则与上下文分类" });
-  await globalRuleCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
-  const managedRuleCatalog = ruleSettingsWorkspace.getByRole("list", { name: "桌面托管规则", exact: true });
+  await ruleSettingsWorkspace.locator("details").first().locator("summary").click();
+  const managedRuleCatalog = ruleSettingsWorkspace.getByRole("list", { name: "Pi-67 内置规则", exact: true });
   const managedRuleRows = managedRuleCatalog.getByRole("listitem");
   await managedRuleRows.first().waitFor({ state: "visible", timeout: 15_000 });
   if (await managedRuleRows.count() !== 11) {
@@ -289,16 +288,14 @@ try {
   await managedRuleDetail.getByTestId("context-file-preview")
     .waitFor({ state: "visible", timeout: 15_000 });
   await capturePackagedScreenshot(window, "09-rule-context-managed-preview.png");
-  await managedRuleDetail.getByRole("button", { name: "返回规则目录", exact: true }).click();
-  await ruleSettingsWorkspace.getByRole("tab", { name: "项目专属", exact: true }).click();
-  await ruleSettingsWorkspace.getByRole("heading", { name: "项目规则与上下文", exact: true })
+  await managedRuleDetail.getByRole("button", { name: "返回工作规则", exact: true }).click();
+  await ruleSettingsWorkspace.getByRole("tab", { name: "项目", exact: true }).click();
+  await ruleSettingsWorkspace.getByRole("heading", { name: "项目工作规则", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await workspaceSettings.getByText(/(?:\/|\\)workspace(?:\/|\\)AGENTS\.md$/u)
     .waitFor({ state: "visible", timeout: 15_000 });
   await capturePackagedScreenshot(window, "09-rule-context-project-catalog.png");
-  const projectRuleCategories = ruleSettingsWorkspace.getByRole("group", { name: "项目规则与上下文分类" });
-  await projectRuleCategories.getByRole("button", { name: "继承规则", exact: true }).click();
-  await ruleSettingsWorkspace.getByRole("heading", { name: "继承的规则与上下文", exact: true })
+  await ruleSettingsWorkspace.getByRole("heading", { name: "继承的工作规则", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({

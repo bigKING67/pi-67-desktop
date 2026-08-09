@@ -106,7 +106,7 @@ describe("context file controller", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "success",
       title: "AGENTS.md 已保存",
-      message: "项目专属 · Pi 资源已重新加载。"
+      message: "项目 · Pi 资源已重新加载。"
     });
   });
 

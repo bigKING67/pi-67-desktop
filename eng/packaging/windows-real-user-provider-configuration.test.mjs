@@ -43,7 +43,7 @@ describe("Windows installed Provider configuration", () => {
     expect(actions).toEqual([
       "key:Control+,",
       "settings:visible",
-      "click:section:/^模型服务/u",
+      "click:section:模型",
       "provider-or-error:visible",
       "provider:搜索 Pi Provider:visible",
       "configured-provider:visible",

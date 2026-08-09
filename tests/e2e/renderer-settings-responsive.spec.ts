@@ -75,9 +75,9 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(bundledPanel.getByRole("button", { name: "返回全局可用技能" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
-  await selectMobileSettingsSection(settings, page, "规则与上下文");
+  await selectMobileSettingsSection(settings, page, "工作规则");
   const ruleWorkspace = settings.getByTestId("rule-settings-workspace");
-  const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "规则与上下文可用范围" });
+  const ruleTabs = ruleWorkspace.getByRole("tablist", { name: "工作规则范围" });
   await expect(ruleTabs).toBeVisible();
   const ruleTabBounds = await ruleTabs.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -85,15 +85,16 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   });
   expect(ruleTabBounds.left).toBeGreaterThanOrEqual(0);
   expect(ruleTabBounds.right).toBeLessThanOrEqual(520);
-  const ruleCategories = ruleWorkspace.getByRole("group", { name: "全局规则与上下文分类" });
-  const ruleCategoryBounds = await ruleCategories.evaluate((element) => {
+  const ruleAdvanced = ruleWorkspace.locator("details").first();
+  const ruleAdvancedSummary = ruleAdvanced.locator("summary");
+  const ruleCategoryBounds = await ruleAdvancedSummary.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return { left: rect.left, right: rect.right };
   });
   expect(ruleCategoryBounds.left).toBeGreaterThanOrEqual(0);
   expect(ruleCategoryBounds.right).toBeLessThanOrEqual(520);
-  await ruleCategories.getByRole("button", { name: "桌面托管", exact: true }).click();
-  await ruleWorkspace.getByRole("list", { name: "桌面托管规则" })
+  await ruleAdvancedSummary.click();
+  await ruleWorkspace.getByRole("list", { name: "Pi-67 内置规则" })
     .getByRole("button", { name: /00-product\.md/u }).click();
   const contextDetail = ruleWorkspace.getByTestId("context-file-detail");
   await expect(contextDetail.getByRole("textbox", { name: "00-product.md Markdown 源码" })).toBeVisible();
@@ -183,7 +184,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
 
   const settings = page.getByLabel("π 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  await navigation.getByRole("button", { name: /^模型服务/u }).click();
+  await navigation.getByRole("button", { name: "模型", exact: true }).click();
   const scope = page.getByRole("group", { name: "设置作用域" });
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
@@ -267,7 +268,7 @@ test("keeps every Settings category on one centered document measure without sid
   expect(Math.abs(documentMetrics.leftInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
 
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  for (const category of ["指令模板", "用量分析", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
+  for (const category of ["提示词模板", "用量分析", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
     await navigation.getByRole("button", { name: category, exact: true }).click();
     await expect(settings.getByRole("heading", { name: category, exact: true }).first()).toBeVisible();
     const next = await measureDocument();
@@ -276,7 +277,7 @@ test("keeps every Settings category on one centered document measure without sid
     expect(Math.abs(next.rightInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
   }
 
-  await navigation.getByRole("button", { name: /^模型服务/u }).click();
+  await navigation.getByRole("button", { name: "模型", exact: true }).click();
   const standardWidth = (await measureDocument()).bodyWidth;
   expect(Math.abs(standardWidth - documentMetrics.bodyWidth)).toBeLessThanOrEqual(1);
   const providerList = settings.getByTestId("provider-configuration-list");

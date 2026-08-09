@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { PROTOCOL_VERSION } from "../../packages/protocol/src/index.js";
 import type {
   FixtureMessage,
   FixtureResyncOperations,
@@ -38,6 +39,27 @@ export async function replaceMockAgentHost(page: Page, hostEpoch?: number): Prom
     }).__pi67TestAgent;
     state.attachHost(nextHostEpoch ?? state.hostEpoch + 1);
   }, hostEpoch);
+}
+
+export async function disconnectMockAgentHost(page: Page): Promise<void> {
+  await page.evaluate((protocolVersion) => {
+    const state = (window as unknown as {
+      __pi67TestAgent: {
+        activePort?: MessagePort;
+        hostEpoch: number;
+        sequence: number;
+      };
+    }).__pi67TestAgent;
+    state.activePort?.postMessage({
+      protocolVersion,
+      kind: "event",
+      hostEpoch: state.hostEpoch,
+      sequence: ++state.sequence,
+      context: { scope: "app" },
+      type: "runtime.statusChanged",
+      payload: { phase: "invalid-test-disconnect" }
+    });
+  }, PROTOCOL_VERSION);
 }
 
 export async function setMockConversationMessages(page: Page, messages: FixtureMessage[]): Promise<void> {

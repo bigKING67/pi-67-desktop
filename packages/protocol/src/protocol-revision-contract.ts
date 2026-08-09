@@ -3,6 +3,7 @@ import {
   HandshakeRejectedSchema,
   HostWelcomeSchema,
   RendererHelloSchema,
+  RequestCancellationEnvelopeSchema,
   RequestEnvelopeSchema,
   ResponseEnvelopeSchema
 } from "./envelope.js";
@@ -30,6 +31,7 @@ export function canonicalProtocolRevisionMaterial(): string {
       hostWelcome: HostWelcomeSchema,
       handshakeRejected: HandshakeRejectedSchema,
       request: RequestEnvelopeSchema,
+      requestCancellation: RequestCancellationEnvelopeSchema,
       response: ResponseEnvelopeSchema,
       event: EventEnvelopeSchema
     },

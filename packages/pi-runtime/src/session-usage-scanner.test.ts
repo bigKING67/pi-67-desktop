@@ -120,15 +120,14 @@ describe("scanSessionUsage", () => {
     })]);
   });
 
-  it("marks future-format and unreadable Sessions as partial coverage", async () => {
+  it("marks a future-format Session as partial coverage", async () => {
     const future = await writeSession("future", [
       { type: "session", version: 4, id: "future", cwd: "/workspace", timestamp: "2026-08-09T00:00:00.000Z" }
     ]);
-    const missing: SessionSummary = { ...future, fileIdentity: "missing", path: `${future.path}.missing` };
     const report = await scanSessionUsage({
       workspaceId: "workspace-1",
-      sessions: [future, missing],
-      discoveredSessions: 2,
+      sessions: [future],
+      discoveredSessions: 1,
       catalogIncomplete: false,
       catalogSkippedCount: 0,
       window: "30d",
@@ -136,8 +135,59 @@ describe("scanSessionUsage", () => {
     });
     expect(report.coverage).toMatchObject({
       scannedSessions: 1,
-      unavailableSessions: 1,
+      unavailableSessions: 0,
       futureVersionSessions: 1,
+      complete: false
+    });
+  });
+
+  it("keeps malformed Sessions out of the successful count and totals", async () => {
+    const malformed = await writeRawSession("malformed", [
+      JSON.stringify({ type: "session", version: 3, id: "malformed", cwd: "/workspace" }),
+      JSON.stringify(assistantUsage("2026-08-09T01:00:00.000Z", 42)),
+      "{not-json"
+    ]);
+    const report = await scanSessionUsage({
+      workspaceId: "workspace-1",
+      sessions: [malformed],
+      discoveredSessions: 1,
+      catalogIncomplete: false,
+      catalogSkippedCount: 0,
+      window: "30d",
+      now: Date.UTC(2026, 7, 9, 12)
+    });
+
+    expect(report.coverage).toMatchObject({
+      scannedSessions: 0,
+      invalidSessions: 1,
+      skippedSessions: 0,
+      complete: false
+    });
+    expect(report.totals.total).toBe(0);
+    expect(report.models).toEqual([]);
+  });
+
+  it("marks an unavailable Session as partial coverage", async () => {
+    const existing = await writeSession("existing", []);
+    const missing: SessionSummary = {
+      ...existing,
+      fileIdentity: "missing",
+      path: `${existing.path}.missing`
+    };
+    const report = await scanSessionUsage({
+      workspaceId: "workspace-1",
+      sessions: [missing],
+      discoveredSessions: 1,
+      catalogIncomplete: false,
+      catalogSkippedCount: 0,
+      window: "30d",
+      now: Date.UTC(2026, 7, 9, 12)
+    });
+
+    expect(report.coverage).toMatchObject({
+      scannedSessions: 0,
+      unavailableSessions: 1,
+      skippedSessions: 0,
       complete: false
     });
   });
@@ -157,6 +207,23 @@ async function writeSession(id: string, entries: unknown[]): Promise<SessionSumm
     nameSource: "fallback",
     modifiedAt: Date.UTC(2026, 7, 9),
     messageCount: entries.length
+  };
+}
+
+async function writeRawSession(id: string, lines: string[]): Promise<SessionSummary> {
+  const root = await mkdtemp(join(tmpdir(), "pi67-usage-"));
+  roots.push(root);
+  const path = join(root, `${id}.jsonl`);
+  await writeFile(path, `${lines.join("\n")}\n`, "utf8");
+  return {
+    fileIdentity: `identity-${id}`,
+    id,
+    path,
+    cwd: "/workspace",
+    name: id,
+    nameSource: "fallback",
+    modifiedAt: Date.UTC(2026, 7, 9),
+    messageCount: lines.length
   };
 }
 

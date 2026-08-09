@@ -1,7 +1,10 @@
 import type { ResourceSummary } from "@pi67/domain";
-import { RefreshCw } from "lucide-react";
-import { Button } from "react-aria-components";
-import { reloadSessionResources } from "../session/session-control-controller.js";
+import { useAppStore } from "../app/app-store.js";
+import { SessionResourceReloadButton } from "../session/SessionResourceReloadButton.js";
+import {
+  currentSessionResourceTask,
+  sessionResourceProjectionMatchesTask
+} from "../session/session-control-controller.js";
 import { selectSessionResources } from "../session/session-projection-selectors.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -34,14 +37,23 @@ export function SessionResourcePanel({
 }) {
   const settingsScope = useWorkbenchStore((state) => state.settingsScope);
   const scope = requestedScope ?? settingsScope;
-  const resources = useSessionProjectionStore(selectSessionResources);
+  const projectedResources = useSessionProjectionStore(selectSessionResources);
+  const projectionAuthority = useSessionProjectionStore((state) => state.authority);
+  const connected = useAppStore((state) => state.connected);
+  const hostEpoch = useAppStore((state) => state.hostEpoch);
+  const task = useWorkbenchStore(currentSessionResourceTask);
+  const resources = sessionResourceProjectionMatchesTask(
+    task,
+    projectionAuthority,
+    connected ? hostEpoch : undefined
+  )
+    ? projectedResources
+    : undefined;
   const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope)
     .filter((resource) => !excludeIds?.has(resource.id));
   return (
     <SettingsSectionBlock
-      actions={<Button className="secondary-button" onPress={() => void reloadSessionResources()}>
-        <RefreshCw aria-hidden="true" size={14} />重新加载
-      </Button>}
+      actions={<SessionResourceReloadButton />}
       title={title}
       description={description}
     >
@@ -56,7 +68,9 @@ export function SessionResourcePanel({
           {resource.path ? <code className={styles.resourcePath} title={resource.path}>{resource.path}</code> : null}
         </SettingsRow>
       ))}</SettingsRows> : (
-        <SettingsNotice>{resources === undefined ? "当前任务尚未同步可显示的 Pi 资源。" : empty}</SettingsNotice>
+        <SettingsNotice>{resources === undefined
+          ? "当前 Pi 会话尚未就绪；请返回工作台打开会话后再查看或重新加载资源。"
+          : empty}</SettingsNotice>
       )}
     </SettingsSectionBlock>
   );

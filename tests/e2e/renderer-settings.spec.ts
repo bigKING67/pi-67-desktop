@@ -305,7 +305,7 @@ test("uses one extension package workbench for third-party installed and discove
   await workspace.getByRole("button", { name: /pi-subagents，npm:pi-subagents · 全局/u }).click();
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("技能");
-  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("指令模板");
+  await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("提示词模板");
   await expect(workspace.getByRole("button", { name: "启用 技能 npm:pi-subagents" })).toBeVisible();
   await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
 
@@ -386,7 +386,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(search).toBeFocused();
   await search.fill("主题");
   await expect(navigation.getByRole("button", { name: "外观", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("button", { name: "账户与本地数据", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("button", { name: "扩展", exact: true })).toHaveCount(0);
 
   await search.fill("卸载");
@@ -394,7 +394,7 @@ test("uses compact grouped navigation and real Settings search", async ({ page }
   await expect(settings.getByRole("heading", { name: "扩展", exact: true })).toBeVisible();
 
   await settings.getByRole("button", { name: "清除设置分类搜索" }).click();
-  await expect(navigation.getByRole("button", { name: "账户与本地数据", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "账户", exact: true })).toBeVisible();
   await search.fill("不存在的设置");
   await expect(navigation.getByText("没有匹配的设置", { exact: true })).toBeVisible();
   await navigation.getByRole("button", { name: "清除搜索", exact: true }).click();

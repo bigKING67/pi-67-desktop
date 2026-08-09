@@ -2,6 +2,7 @@ import type { RuntimeStatus } from "@pi67/domain";
 import type { AgentRuntime } from "@pi67/pi-runtime";
 import {
   APP_PROTOCOL_CONTEXT,
+  COMMAND_CONTEXT_SCOPE_REQUIREMENTS,
   hasValidCommandContext,
   type AgentHostRuntimePoisonedMessage,
   type CommandResults,
@@ -11,21 +12,13 @@ import {
 import { CommandScheduler } from "./command-scheduler.js";
 import { ControlMutationLedger } from "./control-mutation-ledger.js";
 import type { ExtensionPackageTaskView } from "./extension-package-command-router.js";
-import { isExtensionPackageCommand } from "./extension-package-command-router.js";
 import { GlobalRunAdmission, type RunAdmissionLease } from "./global-run-admission.js";
 import type { HostEventChannel } from "./host-event-channel.js";
-import { isContextFileCommand } from "./context-file-command-router.js";
 import { OperationRegistry } from "./operation-registry.js";
 import { OperationReceiptStore } from "./operation-receipt-store.js";
 import { HostCommandError } from "./protocol-error.js";
-import { isSkillPackCommand } from "./skill-pack-command-router.js";
 import type { TaskRuntimeRecord, TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
-import {
-  isWorkspaceConversationCommand,
-  isWorkspaceProviderCommand
-} from "./workspace-command-router.js";
-import { isWorkspaceFileCommand } from "./workspace-file-command-router.js";
 
 export interface TaskHostState {
   readonly record: TaskRuntimeRecord;
@@ -99,25 +92,10 @@ export class HostTaskStateCoordinator {
       if (
         request.type === "workspace.register"
         || request.type === "workspace.unregister"
-        || isWorkspaceProviderCommand(request.type)
-        || isWorkspaceConversationCommand(request.type)
       ) {
-        if (
-          isWorkspaceProviderCommand(request.type)
-          || isWorkspaceConversationCommand(request.type)
-        ) this.workspaces.require(context.workspaceId);
         return undefined;
       }
-      if (
-        isContextFileCommand(request.type)
-        || isWorkspaceFileCommand(request.type)
-        || isExtensionPackageCommand(request.type)
-        || isSkillPackCommand(request.type)
-      ) {
-        this.workspaces.require(context.workspaceId);
-        return undefined;
-      }
-      if (request.type !== "session.catalog.query" && request.type !== "session.catalog.contentSearch") {
+      if (COMMAND_CONTEXT_SCOPE_REQUIREMENTS[request.type] !== "workspace") {
         throw new HostCommandError(
           "INVALID_PAYLOAD",
           `Command requires Task authority: ${request.type}`,

@@ -209,5 +209,11 @@ describe("Inspector protocol", () => {
       "workspace.usage.report",
       { scope: "workspace", workspaceId: "workspace-1" }
     )).toBe(true);
+    expect(hasValidCommandContext("workspace.usage.report", {
+      scope: "task",
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      taskGeneration: 1
+    })).toBe(false);
   });
 });

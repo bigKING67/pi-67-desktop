@@ -43,7 +43,7 @@ export async function openModelServiceSettings(window: Page) {
   const settings = window.getByLabel("π 设置");
   await expect(settings).toBeVisible();
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: /^模型服务/u }).click();
+    .getByRole("button", { name: "模型", exact: true }).click();
   return settings;
 }
 

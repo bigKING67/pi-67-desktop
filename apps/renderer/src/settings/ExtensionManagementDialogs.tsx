@@ -58,7 +58,7 @@ export function InstallExtensionDialog({
           </dl>
           <div className={styles.permissionNotice}>
             <ShieldCheck aria-hidden="true" size={17} />
-            <span>Pi 扩展包可能提供可执行扩展、技能或指令模板。可执行扩展拥有与 Agent 相同的运行权限，安装也可能访问网络。</span>
+            <span>Pi 扩展包可能提供可执行扩展、技能或提示词模板。可执行扩展拥有与 Agent 相同的运行权限，安装也可能访问网络。</span>
           </div>
           {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
           <div className="dialog-actions">

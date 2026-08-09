@@ -696,8 +696,8 @@ loading error where the operation can produce those states
   Settings document. The document begins with one category title and one bounded
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
-- Settings owns `账户与本地数据`, `外观`, `模型服务`, `扩展`, `技能`,
-  `指令模板`, `规则与上下文`, `浏览器集成`, `运行服务`, `用量分析`,
+- Settings owns `账户`, `外观`, `模型`, `扩展`, `技能`,
+  `提示词模板`, `工作规则`, `浏览器集成`, `运行服务`, `用量分析`,
   `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
   `应用`, `Pi`, `连接与集成`, and `系统与支持`. Account, Appearance, Model
   Services, managed Rules, Browser Integration, Runtime, Usage, Download
@@ -741,19 +741,20 @@ loading error where the operation can produce those states
   view consumes only top-level Skills owned by the current project. Package-
   attributed Skills never repeat in either view. Verified updater-owned members
   may be summarized once at Pack level, while all remaining user-scope Skills stay
-  in `本地全局技能`. `指令模板` lists `/name`
-  Prompt Templates.
-  `规则与上下文` owns its own `全局可用` / `项目专属` tabs instead of the generic
-  Settings scope control. Each scope adds a quieter counted category selector and
-  renders only that category as a flat Catalog. The global selector offers `全局规则`,
-  `桌面托管`, and `系统提示词`; the project selector offers `项目规则`, `继承规则`,
-  and `系统提示词`. The user-owned global or project rules category is the default,
-  and switching scope preserves the last category chosen within each scope. Desktop-managed Markdown remains
+  in `本地全局技能`. `提示词模板` lists Prompt Templates invoked manually through
+  `/名称`; they do not become persistent Session rules.
+  `工作规则` owns concise `全局` / `项目` tabs instead of the generic Settings
+  scope control. The global scope shows `全局工作规则` directly. The project scope
+  shows `项目工作规则` followed by `继承的工作规则`. A default-collapsed `高级`
+  disclosure contains `Pi-67 内置规则` and `系统提示词覆盖` globally, and only
+  project system-prompt overrides in project scope. Pi-67 built-in Markdown remains
   visible per file but read-only. Controlled user-global files and regular files in
   a trusted Workspace are editable; Workspace-external inherited files are read-only.
   Missing canonical `AGENTS.md`, `SYSTEM.md`, and `APPEND_SYSTEM.md` entries appear as
   explicit creation candidates, while arbitrary names, paths, rename, and delete are
-  absent. Existing `CLAUDE.md` variants may be edited but never gain a create action.
+  absent. Counts and configured labels include only `presence = present`; an absent
+  system-prompt pair reads `未配置`, and an overridden file reads
+  `已配置 · 当前未生效`. Existing `CLAUDE.md` variants may be edited but never gain a create action.
   Selecting a row opens one full-width drill-down with a labeled return action,
   path/source/scope/load state, bounded UTF-8 byte count, and `源码` / `预览` modes.
   Read-only source uses the same editor geometry without mutation controls. Preview
@@ -1000,7 +1001,7 @@ loading error where the operation can produce those states
 
 ### Provider and model configuration
 
-- `模型服务` is the graphical editor for Pi's native Provider and model
+- `模型` is the Settings entry for Pi's native Provider and model
   configuration, not a parallel Desktop registry. Its file-status region names
   `~/.pi/agent/models.json`, `auth.json`, `settings.json`, and the trusted
   Workspace `.pi/settings.json` as the current source of truth.

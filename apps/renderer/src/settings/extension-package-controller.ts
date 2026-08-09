@@ -141,7 +141,7 @@ export async function setExtensionPackageEnabled(
   const label = resourceType === "skill"
     ? "技能"
     : resourceType === "prompt"
-      ? "指令模板"
+      ? "提示词模板"
       : resourceType === "theme"
         ? "主题"
         : "扩展";
