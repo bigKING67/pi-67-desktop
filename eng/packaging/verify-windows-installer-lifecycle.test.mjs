@@ -232,7 +232,19 @@ describe("Windows installer lifecycle contract", () => {
     expect(builder).toMatch(/nsis:[\s\S]*?oneClick:\s*false/u);
     expect(builder).toMatch(/nsis:[\s\S]*?perMachine:\s*false/u);
     expect(builder).toMatch(/nsis:[\s\S]*?allowToChangeInstallationDirectory:\s*true/u);
+    expect(builder).toMatch(/nsis:[\s\S]*?include:\s*eng\/packaging\/installer\.nsh/u);
     expect(builder).toMatch(/nsis:[\s\S]*?deleteAppDataOnUninstall:\s*false/u);
+  });
+
+  it("guards assisted current-user destinations before extracting application files", async () => {
+    const guard = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
+
+    expect(guard).toMatch(/!macro customPageAfterChangeDir[\s\S]*?Page custom Pi67InstallDirectoryGuardPre Pi67InstallDirectoryGuardLeave/u);
+    expect(guard).toMatch(/Function Pi67InstallDirectoryGuardPre[\s\S]*?Call instFilesPre[\s\S]*?Call Pi67CheckInstallDirectory/u);
+    expect(guard).toMatch(/\$installMode == "CurrentUser"[\s\S]*?PathIsPrefixW\(w "\$PROGRAMFILES"/u);
+    expect(guard).toMatch(/PathIsPrefixW\(w "\$WINDIR"/u);
+    expect(guard).toMatch(/GetTempFileNameW\(w "\$INSTDIR"/u);
+    expect(guard).toMatch(/Function Pi67InstallDirectoryGuardLeave\s+Abort\s+FunctionEnd/u);
   });
 
   it("selects the current light theme through Appearance Settings and returns to the workbench", async () => {

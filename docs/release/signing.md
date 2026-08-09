@@ -90,8 +90,9 @@ executable 必须匹配同一个预期 Publisher thumbprint；macOS App 必须�
 11. `verify_release_gate` 必须重新计算 Provider/native 两条证据链的 candidate identity、receipt、
     screenshot 和 summary SHA-256，生成 `provider-long-turn-release-gate.json` 与
     `windows-native-release-gate.json`；`publish` 只能依赖该 gate，不能直接依赖 build；
-12. 在干净 Windows 机器上补充 assisted installer、默认用户目录、SmartScreen、首次启动、
-    “添加或删除程序”和系统级残留进程人工认证；
+12. 在干净 Windows 机器上补充 assisted installer、默认用户目录、当前用户选择
+    `Program Files` 时的受保护目录拦截与返回重选、SmartScreen、首次启动、“添加或删除程序”
+    和系统级残留进程人工认证；
 13. 明确授权后才创建 GitHub Release。当前 stable release 只发布三个 product artifact、manifest、
     candidate identity、Provider gate/summary、native gate/summary、三档 receipt 和三张脱敏截图；在
     updater metadata 建立独立签名与校验合同前，不发布 `latest*.yml` 或 blockmap。
@@ -123,6 +124,12 @@ executable，验证生产 `app://pi67`、Agent Host 和受控子进程关闭；�
 same-version reinstall，确认隔离 user data 中的主题仍可恢复，再运行 silent uninstall
 并确认安装目录删除、已知进程退出且隔离 user data 仍存在。验证报告写入
 `artifacts/validation/windows-installer-lifecycle/summary.json`，只作为 CI artifact 保留。
+
+Assisted installer 在应用文件解压之前还会运行目标目录预检：当前用户模式下拒绝
+`Program Files`、Windows 目录和 `ProgramData` 等机器级受保护路径，并通过在选定目录中创建、
+删除唯一临时文件来证明实际可写性。预检失败只展示可返回的说明页，不得开始解压、覆盖旧安装或
+写入卸载器。上述 silent lifecycle 使用已知可写的受控目录，不等于已验证交互页的文案、返回按钮或受保护路径拦截；
+后者仍需 Windows 真机人工验收。
 
 Signed Release workflow 不接受人工 `previous_tag` 选择器。Provenance job 会读取有界 GitHub
 Release catalog，排除 draft、GitHub prerelease、SemVer prerelease、未发布记录和 malformed tag，
