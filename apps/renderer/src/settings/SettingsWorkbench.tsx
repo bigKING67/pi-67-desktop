@@ -33,7 +33,6 @@ import styles from "./SettingsWorkbench.module.css";
 import { ExtensionSettingsWorkspace } from "./ExtensionSettingsWorkspace.js";
 import { Browser67IntegrationPanel } from "./DesktopCapabilityPanels.js";
 import { PackageNetworkPanel } from "./PackageNetworkPanel.js";
-import { TeamMcpPanel } from "./TeamMcpPanel.js";
 import { ProviderConfigurationPanel } from "./ProviderConfigurationPanel.js";
 import { RuleSettingsWorkspace } from "./RuleSettingsWorkspace.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
@@ -47,6 +46,7 @@ import {
 } from "./SettingsDraftGuard.js";
 import { AboutSettings, RuntimeSettings } from "./SettingsSystemPanels.js";
 import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
+import { UsageSettings } from "./UsageSettings.js";
 import {
   SettingsNotice,
   SettingsPageHeader,
@@ -258,9 +258,9 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
   if (section === "rules") return <RuleSettingsWorkspace />;
-  if (section === "mcp") return <TeamMcpPanel />;
   if (section === "integrations") return <Browser67IntegrationPanel />;
   if (section === "runtime") return <RuntimeSettings />;
+  if (section === "usage") return <UsageSettings />;
   if (section === "network") return <PackageNetworkPanel />;
   if (section === "updates") return <UpdateSettings />;
   return <AboutSettings />;

@@ -23,6 +23,11 @@ export function installGlobalShortcuts(target: GlobalShortcutTarget = window) {
 
 export function handleGlobalShortcut(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return;
+  if (event.key === "Escape" && useShellStore.getState().keyboardShortcutsDialogOpen) {
+    event.preventDefault();
+    useShellStore.getState().setKeyboardShortcutsDialogOpen(false);
+    return;
+  }
   if (shortcutOwnedByFocusedOverlay(event.target)) return;
   const action = matchDesktopAction(event, effectiveDesktopActions());
   if (!action) return;
@@ -49,9 +54,14 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
   if (
     action.id === "find-current-conversation"
     || action.id === "find-workspace-conversations"
+    || action.id === "find-workspace-content"
   ) {
     event.preventDefault();
-    requestConversationFind(action.id === "find-workspace-conversations" ? "workspace" : "current");
+    if (action.id === "find-workspace-content") {
+      useShellStore.getState().setWorkspaceContentSearchDialogOpen(true);
+    } else {
+      requestConversationFind(action.id === "find-workspace-conversations" ? "workspace" : "current");
+    }
     return;
   }
   if (action.id === "new-session") {

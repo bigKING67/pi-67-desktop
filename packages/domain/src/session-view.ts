@@ -131,6 +131,15 @@ export interface SessionResourceCatalogResult extends SessionModelCatalogResult 
   resources: ResourceSummary[];
 }
 
+export interface SessionCompatibilityView {
+  status: "compatible" | "partial" | "future-format";
+  currentSupportedVersion: number;
+  sessionFormatVersion: number;
+  unknownEntryCount: number;
+  unrenderableMessageCount: number;
+  mutationSafe: boolean;
+}
+
 export interface SessionSnapshot {
   sessionId: string;
   sessionFileIdentity?: string;
@@ -151,6 +160,7 @@ export interface SessionSnapshot {
   resources: ResourceSummary[];
   interactionMode?: SessionInteractionMode;
   activeProposedPlan?: ActiveProposedPlan;
+  compatibility?: SessionCompatibilityView;
   stats?: {
     tokens: number;
     cost: number;

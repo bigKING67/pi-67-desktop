@@ -301,14 +301,14 @@ test("protects Provider drafts and confirms models.json definition removal", asy
   const name = panel.getByLabel("显示名称");
   await name.fill("Unsaved Provider Draft");
 
-  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
   const discard = page.getByRole("dialog", { name: "放弃未保存的修改" });
   await expect(discard).toContainText("Anthropic");
   await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
   await expect(name).toHaveValue("Unsaved Provider Draft");
-  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
+  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
   await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "MCP 服务", exact: true })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
 
   await navigation.getByRole("button", { name: "模型服务", exact: true }).click();
   await panel.getByTestId("provider-configuration-list")

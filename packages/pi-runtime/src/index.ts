@@ -32,6 +32,7 @@ export * from "./session-tree-projection.js";
 export * from "./workspace-runtime-services.js";
 export * from "./workspace-provider-catalog.js";
 export { normalizeSessionCatalogPathIdentity as normalizeSessionCatalogCwd } from "./session-path-identity.js";
+export { scanSessionUsage, type SessionUsageScanOptions } from "./session-usage-scanner.js";
 export {
   createSessionCatalogContext,
   createSessionCatalogSourceKey,

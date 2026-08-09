@@ -35,6 +35,9 @@ export const extensionToolPresenter: ToolPresenter = {
         ...(change === undefined && adapter.presentation === "change"
           ? ["当前 Pi Session 投影没有可验证的文件变更记录。"]
           : []),
+        ...(adapter.presentation === "delegated"
+          ? ["当前只确认这是已验证 Adapter 声明的委派工具；不推断子代理身份、模型、Token、层级或并行数量。"]
+          : []),
         "当前投影未记录完整 Tool Output。"
       ],
       ...(summary ? { summary } : {})

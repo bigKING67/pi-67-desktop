@@ -19,6 +19,7 @@ import { ComposerInteractionModeControl } from "./ComposerInteractionModeControl
 import styles from "./Composer.module.css";
 import { ComposerQueuePanel } from "./ComposerQueuePanel.js";
 import { ComposerRuntimeControls } from "./ComposerRuntimeControls.js";
+import { ComposerReviewContextChips } from "./ComposerReviewContextChips.js";
 import { ComposerStreamModeControl } from "./ComposerStreamModeControl.js";
 import { ComposerTextarea } from "./ComposerTextarea.js";
 import { ComposerWorkspaceContextChips } from "./ComposerWorkspaceContextChips.js";
@@ -185,6 +186,11 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
           disabled={disabled}
           references={props.draft.workspaceFiles}
           onRemove={props.onRemoveWorkspaceFile}
+        />
+        <ComposerReviewContextChips
+          comments={props.draft.reviewComments}
+          disabled={disabled}
+          taskId={props.activeTaskId}
         />
         <ComposerTextarea
           disabled={props.submitting}

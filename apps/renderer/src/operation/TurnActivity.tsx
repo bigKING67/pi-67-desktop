@@ -131,9 +131,11 @@ export function operationPresentation(
   if (activity?.kind === "tool") {
     return {
       icon: <Wrench aria-hidden="true" size={14} />,
-      label: activity.status === "running"
-        ? messages.operation.callingNamedTool(activity.toolName)
-        : messages.operation.calledNamedTool(activity.toolName)
+      label: activity.toolKind === "subagent"
+        ? delegatedToolStatusLabel(activity.status)
+        : activity.status === "running"
+          ? messages.operation.callingNamedTool(activity.toolName)
+          : messages.operation.calledNamedTool(activity.toolName)
     };
   }
   if (activity?.kind === "responding") return { icon: <CircleDashed aria-hidden="true" className={styles.spinning} size={14} />, label: messages.operation.responding };
@@ -294,6 +296,7 @@ function timelineStepLabel(
   }
   if (step.activity === null) return active ? messages.operation.running : "继续处理";
   if (step.activity.kind === "tool") {
+    if (step.activity.toolKind === "subagent") return delegatedToolStatusLabel(step.activity.status);
     return active
       ? messages.operation.callingNamedTool(step.activity.toolName)
       : messages.operation.calledNamedTool(step.activity.toolName);
@@ -306,6 +309,12 @@ function timelineStepLabel(
     case "approval": return "等待确认";
     case "extension-input": return "等待扩展输入";
   }
+}
+
+function delegatedToolStatusLabel(status: Extract<OperationActivity, { kind: "tool" }>["status"]): string {
+  if (status === "running") return messages.operation.delegatedToolRunning;
+  if (status === "failed") return messages.operation.delegatedToolFailed;
+  return messages.operation.delegatedToolCompleted;
 }
 
 function timelineStepIcon(status: OperationTimelineStep["status"]): ReactNode {

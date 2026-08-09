@@ -15,11 +15,12 @@ describe("desktop action registry", () => {
     expect(desktopShortcutAriaKeys(action)).toBe("Control+Shift+F Meta+Shift+F");
   });
 
-  it("matches exact primary-modifier and Shift ownership", () => {
+  it("matches exact primary-modifier search variants", () => {
     expect(matchDesktopAction(shortcut("f"))?.id).toBe("find-current-conversation");
     expect(matchDesktopAction(shortcut("f", { shiftKey: true }))?.id)
       .toBe("find-workspace-conversations");
-    expect(matchDesktopAction(shortcut("f", { altKey: true }))).toBeUndefined();
+    expect(matchDesktopAction(shortcut("f", { altKey: true }))?.id)
+      .toBe("find-workspace-content");
   });
 
   it("keeps both new-Session aliases in one action", () => {

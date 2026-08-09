@@ -5,7 +5,6 @@ import type { DesktopCapabilityService } from "./desktop-capability-service.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 import { probePackageSources, unprobedPackageNetworkSnapshot } from "./package-source-probe.js";
 import { redact } from "./redaction.js";
-import type { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import type { PromptAttachmentStagingService } from "./prompt-attachment-staging.js";
 import {
   parsePackageNetworkSettings,
@@ -62,7 +61,6 @@ export interface SystemBridgeOptions {
   desktopToolchain: DesktopToolchain;
   desktopCapabilities: DesktopCapabilityService;
   packageNetworkSettings: PackageNetworkSettingsStore;
-  teamMcpSettings: TeamMcpSettingsStore;
   promptAttachments: PromptAttachmentStagingService;
   promptStashImages: PromptStashImageStore;
   previousRunExit: PreviousRunExitStatus;
@@ -419,19 +417,6 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     return result.response === 0
       ? options.desktopCapabilities.verifyBrowser67Extension({ startHub: true })
       : options.desktopCapabilities.snapshot();
-  });
-  ipcMain.handle("pi67:team-mcp-status", () => options.teamMcpSettings.status());
-  ipcMain.handle("pi67:team-mcp-reveal", () => options.teamMcpSettings.revealToken());
-  ipcMain.handle("pi67:team-mcp-save", async (_event, value: unknown) => {
-    const status = await options.teamMcpSettings.saveToken(value);
-    // Restart Agent Host so TAVILY_BRIDGE_MCP_TOKEN is re-read from userData.
-    (options.restartAgentHost ?? (() => options.connectAgentHost(true)))();
-    return status;
-  });
-  ipcMain.handle("pi67:team-mcp-clear", async () => {
-    const status = await options.teamMcpSettings.clearToken();
-    (options.restartAgentHost ?? (() => options.connectAgentHost(true)))();
-    return status;
   });
   ipcMain.handle("pi67:update-check", () => updateController.checkNow());
   updateController.startAutomaticChecks();

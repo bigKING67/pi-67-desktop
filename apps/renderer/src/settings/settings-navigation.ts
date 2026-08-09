@@ -1,6 +1,7 @@
 import type { SettingsSection } from "@pi67/domain";
 import {
   Activity,
+  ChartNoAxesCombined,
   Blocks,
   Bot,
   FileText,
@@ -9,7 +10,6 @@ import {
   Network,
   RefreshCw,
   Scale,
-  Server,
   SlidersHorizontal,
   Sparkles,
   UserRound
@@ -115,20 +115,6 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
     label: messages.settings.groups.connections,
     items: [
       {
-        id: "mcp",
-        ...messages.settings.sections.mcp,
-        searchTerms: [
-          "mcp",
-          "tavily",
-          "client token",
-          "认证",
-          "端点",
-          "中转",
-          "搜索服务"
-        ],
-        icon: Server
-      },
-      {
         id: "integrations",
         ...messages.settings.sections.integrations,
         searchTerms: [
@@ -153,6 +139,12 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ...messages.settings.sections.runtime,
         searchTerms: ["运行", "会话", "并发", "恢复", "诊断", "runtime", "session"],
         icon: Activity
+      },
+      {
+        id: "usage",
+        ...messages.settings.sections.usage,
+        searchTerms: ["用量", "token", "cost", "usage", "模型", "provider", "jsonl", "成本"],
+        icon: ChartNoAxesCombined
       },
       {
         id: "network",
@@ -181,7 +173,8 @@ export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.items)
 export function sectionSupportsProjectScope(section: SettingsSection): boolean {
   return section === "packages"
     || section === "extensions"
-    || section === "prompts";
+    || section === "prompts"
+    || section === "usage";
 }
 
 export function matchesSettingsQuery(item: SettingsNavigationItem, query: string): boolean {

@@ -187,6 +187,43 @@ describe("parseComposerDraftPersistedState", () => {
     })).toBeUndefined();
   });
 
+  it("accepts bounded review-only drafts and rejects forged anchors or raw Patch fields", () => {
+    const state = draftState();
+    const comment = {
+      id: "review-a",
+      authority: {
+        source: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-a",
+        toolCallId: "tool-a",
+        contentFingerprint: "24:abcd"
+      },
+      anchor: { section: "session", side: "new", startLine: 8, endLine: 8 },
+      body: "Keep this error observable.",
+      createdAt: 12,
+      file: { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
+    };
+    const reviewOnly = {
+      ...state,
+      drafts: [{ ...state.drafts[0], text: "", reviewComments: [comment] }]
+    };
+    expect(parseComposerDraftPersistedState(reviewOnly)).toEqual(reviewOnly);
+    expect(parseComposerDraftPersistedState({
+      ...reviewOnly,
+      drafts: [{
+        ...reviewOnly.drafts[0],
+        reviewComments: [{ ...comment, anchor: { ...comment.anchor, startLine: 0 } }]
+      }]
+    })).toBeUndefined();
+    expect(parseComposerDraftPersistedState({
+      ...reviewOnly,
+      drafts: [{
+        ...reviewOnly.drafts[0],
+        reviewComments: [{ ...comment, patch: "@@ -1 +1 @@" }]
+      }]
+    })).toBeUndefined();
+  });
+
   it("validates Prompt stash count, identity, timestamps and global text budget", () => {
     const state = draftState();
     const stashItem = { id: "stash-1", text: "later prompt", createdAt: 10 };

@@ -21,9 +21,9 @@ import {
 } from "./workspace-file-controller.js";
 import {
   useWorkspaceFileStore,
-  workspaceFileStore,
-  type WorkspaceFileTab
+  workspaceFileStore
 } from "./workspace-file-store.js";
+import type { WorkspaceFileTab } from "./workspace-file-state.js";
 import { WorkspaceFileNameDialog } from "./WorkspaceFileNameDialog.js";
 
 const FileEditor = lazy(() => import("./FileEditor.js").then((module) => ({ default: module.FileEditor })));
@@ -44,6 +44,7 @@ export function WorkspaceFileSurface({
   const tabs = fileWorkspace?.tabs ?? [];
   const activeRelativePath = fileWorkspace?.activeRelativePath;
   const activeTab = activeRelativePath ? fileWorkspace?.byPath[activeRelativePath] : undefined;
+  const navigation = fileWorkspace?.navigation;
 
   useEffect(() => {
     if (activeTab?.phase === "restoring") {
@@ -121,6 +122,7 @@ export function WorkspaceFileSurface({
           <FileDocumentSurface
             draftPersistence={draftPersistence}
             persistenceError={persistenceError}
+            navigation={navigation?.relativePath === activeTab.relativePath ? navigation : undefined}
             tab={activeTab}
             workspace={workspace}
             onReload={() => activeTab.dirty
@@ -165,6 +167,7 @@ function FileDocumentSurface({
   tab,
   draftPersistence,
   persistenceError,
+  navigation,
   onReload,
   onSaveAs
 }: {
@@ -172,6 +175,7 @@ function FileDocumentSurface({
   tab: WorkspaceFileTab;
   draftPersistence: "available" | "unavailable";
   persistenceError?: string | undefined;
+  navigation?: import("./workspace-file-state.js").WorkspaceFileNavigationIntent | undefined;
   onReload: () => void;
   onSaveAs: () => void;
 }) {
@@ -224,6 +228,7 @@ function FileDocumentSurface({
             content={tab.content}
             fileName={tab.name}
             key={`${tab.relativePath}:${tab.documentVersion}`}
+            navigation={navigation}
             onChange={(content) => workspaceFileStore.getState().updateContent(workspace.id, tab.relativePath, content)}
             onSave={save}
           />

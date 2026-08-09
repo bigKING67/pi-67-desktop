@@ -181,7 +181,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
 });
 
-test("separates MCP services from browser integrations", async ({ page }, testInfo) => {
+test("keeps browser integration as the only first-party connection surface", async ({ page }, testInfo) => {
   const visualArtifactDirectory = process.env.PI67_VISUAL_ARTIFACT_DIR;
   if (visualArtifactDirectory) await mkdir(visualArtifactDirectory, { recursive: true });
   await installMockDesktopBridge(page);
@@ -192,49 +192,14 @@ test("separates MCP services from browser integrations", async ({ page }, testIn
 
   const settings = page.getByLabel("π 设置");
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "MCP 服务", exact: true })).toBeVisible();
-  await expect(settings.getByRole("heading", { name: "Tavily Bridge", exact: true })).toBeVisible();
-  await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toBeVisible();
-  await expect(settings.getByText("凭据状态", { exact: true })).toBeVisible();
-  await expect(settings.getByText("设置页未验证连接", { exact: true })).toBeVisible();
-  await expect(settings.getByText("已连接", { exact: true })).toHaveCount(0);
-  await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toHaveCount(0);
-  await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toHaveCount(0);
-  const mcpScreenshotPath = visualArtifactDirectory
-    ? resolve(visualArtifactDirectory, "settings-mcp-services.png")
-    : testInfo.outputPath("settings-mcp-services.png");
-  await page.screenshot({ path: mcpScreenshotPath, animations: "disabled" });
-  await testInfo.attach("settings-mcp-services", { path: mcpScreenshotPath, contentType: "image/png" });
-
-  const clientToken = "mcp_testbridge.0123456789abcdef0123456789abcdef";
-  await settings.getByRole("textbox", { name: "Tavily Bridge Client Token" }).fill(clientToken);
-  await settings.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(settings.getByText("已保存 Client Token，并重启了 Pi 运行服务以加载新凭据。", { exact: true }))
-    .toBeVisible();
-  await settings.getByRole("button", { name: "显示完整 Token" }).click();
-  await expect(settings.getByText(clientToken, { exact: true })).toBeVisible();
-  await settings.getByRole("button", { name: "隐藏完整 Token" }).click();
-  await settings.getByRole("button", { name: "清除", exact: true }).click();
-  const clearDialog = page.getByRole("dialog", { name: "清除 MCP Client Token？" });
-  await expect(clearDialog).toContainText("Pi-67 userData");
-  expect(await settingsActionCount(page, "mcpClears")).toBe(0);
-  await clearDialog.getByRole("button", { name: "取消", exact: true }).click();
-  expect(await settingsActionCount(page, "mcpClears")).toBe(0);
-  await settings.getByRole("button", { name: "清除", exact: true }).click();
-  await clearDialog.getByRole("button", { name: "清除 Client Token", exact: true }).click();
-  expect(await settingsActionCount(page, "mcpClears")).toBe(1);
-  await expect(settings.getByText("已清除本机 Token，并重启了 Pi 运行服务。在重新配置前，自建 Tavily 中转搜索将不可用。", { exact: true }))
-    .toBeVisible();
-
+  await expect(navigation.getByRole("button", { name: "MCP 服务", exact: true })).toHaveCount(0);
+  await expect(settings.getByText("Tavily Bridge", { exact: true })).toHaveCount(0);
   await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
   await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
   await expect(settings.getByText("内置第一方", { exact: true })).toBeVisible();
   await expect(settings.getByText("尚未检查", { exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
-  await expect(settings.getByRole("heading", { name: "Tavily Bridge", exact: true })).toHaveCount(0);
-  await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toHaveCount(0);
   await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
   const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
   await expect(installer).toBeVisible();
@@ -314,7 +279,7 @@ test("opens, previews, edits, creates, and conflict-checks Context Markdown file
   await expect(tabs.getByRole("tab", { name: "全局可用", exact: true }))
     .toHaveAttribute("aria-selected", "true");
   await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: "MCP 服务", exact: true }).click();
+    .getByRole("button", { name: "浏览器集成", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "放弃未保存的修改" })).toHaveCount(1);
   await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
   await settings.getByRole("button", { name: "返回工作台", exact: true }).click();
@@ -382,15 +347,6 @@ test("refreshes an initializing capability snapshot without requiring a manual r
   await expect(coreExtensionRow).toContainText("已提供");
   await expect(coreExtensionRow).not.toContainText("准备中");
 });
-
-async function settingsActionCount(page: import("@playwright/test").Page, key: "mcpClears" | "packageResets") {
-  return page.evaluate((actionKey) => {
-    const state = (window as typeof window & {
-      __pi67SettingsTest: Record<string, number>;
-    }).__pi67SettingsTest;
-    return state[actionKey] ?? 0;
-  }, key);
-}
 
 test("explains why project skills are unavailable for an untrusted workspace", async ({ page }) => {
   await installMockDesktopBridge(page, {

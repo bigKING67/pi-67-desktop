@@ -24,6 +24,26 @@ describe("ChangesPanel projection helpers", () => {
     expect(projected.omittedLines).toBe(2);
   });
 
+  it("maps exact old/new line anchors only inside complete unified diff hunks", () => {
+    const projected = projectPatchLines([
+      "# UNSTAGED",
+      "@@ -10,2 +10,3 @@",
+      " context",
+      "-before",
+      "+after",
+      "+extra"
+    ].join("\n"));
+    expect(projected.lines.map((line) => line.anchor)).toEqual([
+      undefined,
+      undefined,
+      { section: "unstaged", side: "new", startLine: 10, endLine: 10 },
+      { section: "unstaged", side: "old", startLine: 11, endLine: 11 },
+      { section: "unstaged", side: "new", startLine: 11, endLine: 11 },
+      { section: "unstaged", side: "new", startLine: 12, endLine: 12 }
+    ]);
+    expect(projectPatchLines("+not-a-hunk").lines[0]?.anchor).toBeUndefined();
+  });
+
   it("keeps selection current and falls back to the newest retained record", () => {
     const items = [edit("first"), edit("latest")];
     expect(selectWorkspaceChange(items, "first")?.toolCallId).toBe("first");

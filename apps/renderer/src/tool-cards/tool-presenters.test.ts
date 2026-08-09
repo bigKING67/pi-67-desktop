@@ -48,6 +48,25 @@ describe("tool presenter registry", () => {
     });
   });
 
+  it("keeps delegated Adapter presentation conservative", () => {
+    const presentation = presentToolCall(tool({
+      name: "delegate_task",
+      adapter: {
+        adapterId: "verified-delegation",
+        package: "@verified/delegation",
+        presentation: "delegated",
+        label: "Delegate task"
+      }
+    }));
+
+    expect(presentation).toMatchObject({
+      presenterId: "extension-adapter",
+      kind: "delegated",
+      title: "Delegate task"
+    });
+    expect(presentation.limitations.join(" ")).toContain("不推断子代理身份、模型、Token、层级或并行数量");
+  });
+
   it("projects command and cwd only when the summary contains them", () => {
     const presentation = presentToolCall(tool({
       name: "bash",

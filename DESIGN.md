@@ -401,8 +401,8 @@ loading error where the operation can produce those states
   focus ring, and supports keyboard scrolling. Copy reports `复制`, `已复制`, or
   `复制失败` through the same bounded feedback contract used by message and Tool
   copy actions. Code never widens the Transcript or application document. Tool summaries and
-  recorded Edit Patch facts remain bounded; complete Tool Output and Git/workspace
-  Diff require future explicit data and expansion contracts.
+  recorded Edit Patch facts remain bounded; complete Tool Output and an unbounded
+  whole-repository Diff require future explicit data and expansion contracts.
 - Editorial Markdown uses visible heading, paragraph, nested-list, quote,
   separator, and GFM task-list hierarchy. GFM tables retain semantic table
   structure, a quiet header surface, cell spacing and row boundaries; a wide
@@ -431,14 +431,26 @@ loading error where the operation can produce those states
   replacement revokes cached URLs so an old connection cannot remain visually
   authoritative.
 - A stopped, aborted, or crashed turn never appears completed.
+- A Session compatibility banner appears above known transcript content only for
+  `partial` or `future-format`. It names supported and observed format versions plus
+  bounded unknown/unrenderable counts without transporting raw unknown entries.
+  Known messages remain readable. `重新同步` requests an authority-bound projection
+  resync; `查看诊断` opens Doctor. Compatible Sessions render no banner, and theme,
+  resync, or dismissal cannot invent support for unknown content. The banner is
+  informational; existing Session identity, branch, external-change, Task-generation,
+  and Host-epoch guards continue to own mutation safety.
 - Tool presentation is registry-driven. Bash, read/search, edit/write, and
   unknown tools render bounded, copyable summaries; the UI states explicitly
   when cwd, duration, output, Diff, or file preview is absent from the projection.
 - Verified declarative Extension Adapter metadata takes precedence over tool-name
-  heuristics and may choose only the existing `generic`, `command`, `read`, or
-  `change` presentation grammar. It never loads Extension HTML, JavaScript, CSS,
-  React components, or renderer modules. Historical tools without a current
-  generation `toolCallId` binding remain on the built-in or generic presenter.
+  heuristics and may choose only `generic`, `command`, `read`, `change`, or
+  `delegated` presentation grammar. `delegated` is reserved for a package/version/
+  source/runtime-surface verified Adapter and uses the same bounded running,
+  completed, and failed states as other Tool rows. It is not a child-agent roster:
+  no child identity, model, token/cost, tree, parallel count, or result is inferred.
+  It never loads Extension HTML, JavaScript, CSS, React components, or renderer
+  modules. Historical tools without a current-generation `toolCallId` binding and
+  generic same-name Tools remain on the built-in or generic presenter.
 
 ### Inspector
 
@@ -458,6 +470,17 @@ loading error where the operation can produce those states
   losing expansion, selection, or scroll; stale responses cannot replace the
   latest result. A failed child directory exposes an inline `重试` without forcing
   a whole-tree reset.
+- `Cmd/Ctrl+Alt+F` and the Command Palette open one neutral, focus-trapped Workspace
+  file-body search dialog. It owns query, case sensitivity, optional generated/
+  dependency inclusion, loading, empty, error, incomplete, and opening states. It
+  never resembles or controls Provider Web Search. Agent Host bounds each search to
+  256 query characters, 200 matches, 2,000 files, 1 MiB per file, 64 MiB total,
+  4,096 characters per line, 320-character snippets, and three seconds; `.git` and
+  symlinks are always excluded. Each row shows relative path, original-text line/
+  UTF-16 column, and a bounded snippet. Selection opens the central file tab only
+  after exact opaque-reference/revision revalidation and positions the editor at
+  that line; dirty or stale bytes fail closed. `添加到上下文` reuses the existing
+  opaque Workspace file reference instead of copying a source body into Workbench.
 - Directory rows expand or collapse. Clicking an ordinary file opens or focuses
   its central Pi-67 file tab; source never gets squeezed into the Inspector.
   The row menu presents `在 Pi-67 中打开`, system-default open, relative-path
@@ -513,7 +536,7 @@ loading error where the operation can produce those states
   32 tabs per Workspace, 128 per app, and 20 MiB of dirty drafts.
 - No file body enters Workbench state, Pi JSONL, notifications, diagnostics,
   logs, or telemetry. The first release has no split pane, new editor window,
-  system file association, media preview, or complete Git/workspace Diff.
+  system file association, media preview, or unbounded whole-repository Diff.
 - Active-branch `edit` and `write` facts enrich their matching transcript Tool
   card through `toolCallId` and populate the Inspector `修改` view from the same
   authority-safe projection. The list is newest-first, reports retained files and
@@ -542,6 +565,22 @@ loading error where the operation can produce those states
   revalidates Workspace identity plus the status fingerprint before and after the
   read. Loading, empty, unsupported-repository, stale, error, and truncated states
   remain distinct. No row exposes stage, discard, commit, push, or PR actions.
+- A complete, line-mappable Session or staged/unstaged Git Patch adds a review layer
+  without turning Changes into a mutation-capable Git client. `Viewed` is bound to
+  the exact content fingerprint; `Reviewed` requires an explicit user action;
+  `Pending` is represented by one or more line comments in the encrypted Task draft;
+  `Stale` appears when revision/fingerprint authority changes. Reviewable rows show
+  old/new line numbers and a visible selected state with keyboard focus. Truncated,
+  Renderer-omitted, binary, metadata-only, or otherwise non-mappable Diff remains
+  readable but disables exact comments and Reviewed confirmation with explicit copy.
+- A line comment binds section (`session`, `staged`, or `unstaged`), old/new side,
+  line range, exact Diff fingerprint, opaque file reference, and file revision. The
+  Composer shows pending comments as removable context chips; stale chips use warning
+  semantics and block submission until removed or rebound. Patch text is never stored
+  in the draft or appended wholesale to the Prompt. `prompt.submit` remains the only
+  Agent side effect. Accepted exact submission snapshots clear only their captured
+  comment IDs; rejected/terminal failures preserve them, and newer in-flight comments
+  survive an older acceptance.
 - Messages shows only user-authored messages on the current active branch. The
   index is paged at 100 by default and 200 maximum, previews are capped at 120
   grapheme-scale characters, and image/attachment counts contain metadata only.
@@ -564,8 +603,9 @@ loading error where the operation can produce those states
   active node remains prioritized and truncation is visible.
 - Tree rows are virtualized. The Context tab contains usage, Extension status,
   and Resources without forcing conversation history to be reprojected.
-- A complete Git/workspace Diff remains outside the current data contract and is
-  not represented by synthetic client-side state.
+- The product still does not offer a whole-repository unbounded Diff, staging,
+  discard, commit, push, or PR workflow; only the current bounded per-change Patch
+  authorities participate in review.
 
 ### Appearance
 
@@ -657,10 +697,10 @@ loading error where the operation can produce those states
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
 - Settings owns `账户与本地数据`, `外观`, `模型服务`, `扩展`, `技能`,
-  `指令模板`, `规则与上下文`, `MCP 服务`, `浏览器集成`, `运行服务`,
+  `指令模板`, `规则与上下文`, `浏览器集成`, `运行服务`, `用量分析`,
   `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
   `应用`, `Pi`, `连接与集成`, and `系统与支持`. Account, Appearance, Model
-  Services, managed Rules, MCP Services, Browser Integration, Runtime, Download
+  Services, managed Rules, Browser Integration, Runtime, Usage, Download
   Sources/Network, Updates, and About are global-only and do not show a meaningless
   page-level scope control. Only the Extension workspace and Prompt Templates use
   the generic global/current-project switch; Skills and Rules own their explicit
@@ -728,7 +768,7 @@ loading error where the operation can produce those states
   catalog, and Pi reload status without placing Markdown content in notifications,
   Session projection, or persisted Workbench state. Returning to a catalog restores
   its prior scroll position.
-- Provider, Download Sources/Network, MCP, and Rules/Context register at most one
+- Provider, Download Sources/Network, and Rules/Context register at most one
   active Settings draft with the shell. Category changes, applicable page-scope
   changes, and `返回工作台` open one discard dialog while dirty. `继续编辑` is the
   default focus; the destructive choice discards the current in-memory draft before
@@ -882,17 +922,27 @@ loading error where the operation can produce those states
   draft without saving or clearing dirty state, labels results based on unsaved
   settings, and marks them stale after any subsequent edit. `恢复默认` remains
   reachable but opens a cancel-first confirmation before it overwrites persistence.
-- `MCP 服务` and `浏览器集成` are separate first-level Settings categories rather
-  than tabs or vertically stacked sections in one generic Integration document.
-  The MCP page owns external service endpoints and local credential configuration.
-  It labels configured state as `凭据状态`, never as a live connection, and states
-  `设置页未验证连接`; real MCP connection identity belongs to the active Pi Task and
-  Agent Host projection. Its current single `Tavily Bridge` service remains a flat
-  Settings section until another independently manageable MCP service exists.
-  If Team MCP bootstrap detects that `mcp.json` changed between read and atomic
-  commit, the external file wins. The UI/recovery surface must call this a revision
-  conflict rather than connection failure or invalid credentials, and must not offer
-  a blind retry that overwrites the external edit.
+- Desktop has no first-party `MCP 服务` Settings category. User-owned Pi MCP servers
+  remain Runtime resources and follow the normal capability/safety projection, but
+  Desktop does not offer a generic endpoint or credential editor. The retired Team
+  MCP/Tavily Bridge surface, token reveal/save/clear flow, packaged resource, and Host
+  environment injection must not reappear under another category.
+- Startup retirement cleanup recognizes only the former Desktop-owned
+  `tavily-bridge` URL/auth/token-env identity. It atomically removes that one entry
+  under exact-revision authority while preserving same-name customized entries,
+  unrelated servers, settings, and unknown fields. A revision conflict fences Agent
+  Host startup instead of loading an ambiguous retired route. The orphan userData
+  token cleanup never follows symlinks; failure is reported only as a bounded class
+  and does not block Main because no token is injected.
+- `用量分析` uses a grouped summary, restrained daily bars, and one responsive
+  Provider/model table for `7 天`, `30 天`, or `90 天`. It rebuilds from the selected
+  Workspace's Pi JSONL through `workspace.usage.report`; switching window, Workspace,
+  or Host epoch invalidates the prior request. Metrics distinguish Pi-recorded token,
+  input/output, cache read/write, and `Pi 记录成本（非账单）`. UTC date and coverage
+  are explicit. Incomplete coverage owns a warning with discovered/scanned/skipped
+  counts; empty, loading, disconnected, no-Workspace, and error states remain distinct.
+  The view does not invent reasoning/subagent token attribution, billing truth, public
+  pricing estimates, or an incremental cache that the Host has not implemented.
 - Browser integrations do not equate copied source with readiness. The browser67
   section reports separate rows for bundled source, runtime dependencies, browser
   extension files, and the managed connection. Its three-step dialog prepares the
@@ -1561,6 +1611,14 @@ loading error where the operation can produce those states
   Host, Session generation, Operation, request, or Tool call cannot enable the
   mode. The mode never changes OS permission, Electron sandbox/preload,
   credential, update/signing, or Workspace trust boundaries.
+- Blocking Approval and Extension input add a visually separated danger action only
+  when exact modal authority maps to one Task in `waiting-approval` or
+  `waiting-extension-input`. `拒绝` or `取消当前输入` resolves only the current
+  interaction. `停止整个任务` sends `task.close { mode: "stop" }`; it is not an
+  `operation.abort` alias and removes the Renderer Task only after Runtime stop
+  succeeds. Host epoch, Session ID/generation, Operation ID, lifecycle, loading,
+  disabled, failure, and focus states remain explicit. Missing, stale, or ambiguous
+  authority hides the task-level action and leaves the current request fail-closed.
 - Approval is displayed and answered only while Host epoch, session generation,
   Operation, request, and Pi `toolCallId` remain authoritative. Terminal
   resolved/cancelled events may clear the exact stored request after the
@@ -1604,6 +1662,10 @@ loading error where the operation can produce those states
 - A verified Adapter row shows package, installed version, and matched command/tool
   counts. `adapter` is shown only when every discovered executable surface is
   covered and no known TUI custom surface remains; partial coverage stays `partial`.
+- A verified `delegated` Tool row may visually distinguish delegated running,
+  completed, and failed work, but its detail explicitly states the evidence limit.
+  It never synthesizes child names, models, token/cost, hierarchy, parallelism, or
+  child output from a package label or Tool summary.
 - TUI-only custom components show an actionable compatibility message.
 - The Provider dialog lists configured state, non-secret credential source, and
   model count. A configured credential remains hidden by default. Only an

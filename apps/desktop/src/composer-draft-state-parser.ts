@@ -3,6 +3,9 @@ import {
   MAX_COMPOSER_DRAFTS,
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
   MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
+  MAX_COMPOSER_REVIEW_COMMENTS,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL,
   MAX_COMPOSER_WORKSPACE_FILE_REFS,
   MAX_PROMPT_STASH_ITEMS,
   MAX_PROMPT_STASH_IMAGE_BYTES_PER_ITEM,
@@ -41,23 +44,29 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
   for (const candidate of value.drafts) {
     if (!isRecordWithAllowedKeys(
       candidate,
-      ["conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "promptStash", "environmentIntent", "interactionMode"],
+      ["conversation", "text", "streamBehavior", "updatedAt", "workspaceFiles", "reviewComments", "promptStash", "environmentIntent", "interactionMode"],
       ["conversation", "text", "streamBehavior", "updatedAt"]
     )) return undefined;
     const conversation = parseConversation(candidate.conversation);
     if (!conversation || typeof candidate.text !== "string") return undefined;
     const workspaceFiles = parseWorkspaceFileReferences(candidate.workspaceFiles);
     if (candidate.workspaceFiles !== undefined && !workspaceFiles) return undefined;
+    const reviewComments = parseReviewComments(candidate.reviewComments);
+    if (candidate.reviewComments !== undefined && !reviewComments) return undefined;
     const promptStash = parsePromptStash(candidate.promptStash);
     if (candidate.promptStash !== undefined && !promptStash) return undefined;
-    if (candidate.text.length === 0 && !promptStash?.length) return undefined;
+    if (candidate.text.length === 0 && !reviewComments?.length && !promptStash?.length) return undefined;
     const textBytes = Buffer.byteLength(candidate.text, "utf8");
+    const reviewBytes = (reviewComments ?? []).reduce(
+      (total, comment) => total + Buffer.byteLength(comment.body, "utf8"),
+      0
+    );
     const stashBytes = (promptStash ?? []).reduce((total, item) => total + Buffer.byteLength(item.text, "utf8"), 0);
     const stashImageBytes = (promptStash ?? []).reduce(
       (total, item) => total + (item.attachments ?? []).reduce((sum, image) => sum + image.byteLength, 0),
       0
     );
-    totalTextBytes += textBytes + stashBytes;
+    totalTextBytes += textBytes + reviewBytes + stashBytes;
     totalPromptStashBytes += stashBytes;
     totalPromptStashImageBytes += stashImageBytes;
     if (
@@ -91,6 +100,7 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
       streamBehavior: candidate.streamBehavior,
       updatedAt: Number(candidate.updatedAt),
       ...(workspaceFiles?.length ? { workspaceFiles } : {}),
+      ...(reviewComments?.length ? { reviewComments } : {}),
       ...(promptStash?.length ? { promptStash } : {}),
       ...(candidate.environmentIntent ? { environmentIntent: candidate.environmentIntent } : {}),
       ...(candidate.interactionMode ? { interactionMode: candidate.interactionMode } : {})
@@ -135,6 +145,111 @@ export function encodeStoredComposerDraftState(
 
 export function emptyComposerDraftState(): ComposerDraftPersistedState {
   return { version: 1, drafts: [] };
+}
+
+function parseReviewComments(value: unknown): ComposerDraftRecord["reviewComments"] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_COMPOSER_REVIEW_COMMENTS) return undefined;
+  const comments: NonNullable<ComposerDraftRecord["reviewComments"]> = [];
+  const ids = new Set<string>();
+  let totalBodyBytes = 0;
+  for (const candidate of value) {
+    if (!isRecord(candidate) || !hasExactKeys(
+      candidate,
+      ["id", "authority", "anchor", "body", "createdAt", "file"]
+    )) return undefined;
+    const authority = parseReviewAuthority(candidate.authority);
+    const anchor = parseReviewAnchor(candidate.anchor);
+    const file = parseWorkspaceFileReferences([candidate.file])?.[0];
+    const bodyBytes = typeof candidate.body === "string"
+      ? Buffer.byteLength(candidate.body, "utf8")
+      : Number.POSITIVE_INFINITY;
+    totalBodyBytes += bodyBytes;
+    if (
+      !isOpaqueFileToken(candidate.id)
+      || ids.has(candidate.id)
+      || !authority
+      || !anchor
+      || !file
+      || typeof candidate.body !== "string"
+      || candidate.body.trim().length === 0
+      || bodyBytes > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES
+      || totalBodyBytes > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL
+      || !Number.isSafeInteger(candidate.createdAt)
+      || Number(candidate.createdAt) < 0
+    ) return undefined;
+    ids.add(candidate.id);
+    comments.push({
+      id: candidate.id,
+      authority,
+      anchor,
+      body: candidate.body,
+      createdAt: Number(candidate.createdAt),
+      file
+    });
+  }
+  return comments;
+}
+
+function parseReviewAuthority(
+  value: unknown
+): NonNullable<ComposerDraftRecord["reviewComments"]>[number]["authority"] | undefined {
+  if (!isRecord(value) || !isBoundedString(value.workspaceId, MAX_ID_CHARS)) return undefined;
+  if (
+    value.source === "session"
+    && hasExactKeys(
+      value,
+      ["source", "workspaceId", "sessionFileIdentity", "toolCallId", "contentFingerprint"]
+    )
+    && isBoundedString(value.sessionFileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
+    && isBoundedString(value.toolCallId, 512)
+    && isBoundedString(value.contentFingerprint, 512)
+  ) return {
+    source: "session",
+    workspaceId: value.workspaceId,
+    sessionFileIdentity: value.sessionFileIdentity,
+    toolCallId: value.toolCallId,
+    contentFingerprint: value.contentFingerprint
+  };
+  if (
+    value.source === "worktree"
+    && hasExactKeys(value, ["source", "workspaceId", "revision", "changeId", "contentFingerprint"])
+    && Number.isSafeInteger(value.revision)
+    && Number(value.revision) >= 0
+    && isBoundedString(value.changeId, 512)
+    && isBoundedString(value.contentFingerprint, 512)
+  ) return {
+    source: "worktree",
+    workspaceId: value.workspaceId,
+    revision: Number(value.revision),
+    changeId: value.changeId,
+    contentFingerprint: value.contentFingerprint
+  };
+  return undefined;
+}
+
+function parseReviewAnchor(
+  value: unknown
+): NonNullable<ComposerDraftRecord["reviewComments"]>[number]["anchor"] | undefined {
+  if (!isRecord(value) || !hasExactKeys(value, ["section", "side", "startLine", "endLine"])) {
+    return undefined;
+  }
+  if (
+    value.section !== "session" && value.section !== "staged" && value.section !== "unstaged"
+  ) return undefined;
+  if (value.side !== "old" && value.side !== "new") return undefined;
+  if (
+    !Number.isSafeInteger(value.startLine)
+    || !Number.isSafeInteger(value.endLine)
+    || Number(value.startLine) < 1
+    || Number(value.endLine) < Number(value.startLine)
+  ) return undefined;
+  return {
+    section: value.section,
+    side: value.side,
+    startLine: Number(value.startLine),
+    endLine: Number(value.endLine)
+  };
 }
 
 function parsePromptStash(value: unknown): ComposerDraftRecord["promptStash"] | undefined {

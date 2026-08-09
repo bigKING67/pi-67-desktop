@@ -3,8 +3,7 @@ import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
   MAX_SLASH_COMMAND_ITEMS,
   MAX_SLASH_COMMAND_NAME_CHARS,
-  MAX_SESSION_FILE_IDENTITY_CHARS,
-  MAX_TREE_NODES
+  MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
 import { AssetReadResultSchema } from "./asset-schemas.js";
@@ -36,7 +35,9 @@ import {
   SessionCatalogStatusSchema
 } from "./session-catalog-schemas.js";
 import { SessionCreationResolutionSchema } from "./session-creation-schemas.js";
+import { SessionCompatibilityViewSchema } from "./session-compatibility-schemas.js";
 import { SessionExternalChangeSchema } from "./session-external-change-schema.js";
+import { SessionTreeProjectionSchema } from "./session-tree-schemas.js";
 import {
   WorkspaceChangeEventSchema,
   WorkspaceChangesProjectionSchema
@@ -57,6 +58,7 @@ import {
   WorkspaceMessageSearchResultSchema
 } from "./message-schemas.js";
 import {
+  WorkspaceFileContentSearchResultSchema,
   WorkspaceFileEntryResultSchema,
   WorkspaceFileOpenResultSchema,
   WorkspaceFilePageSchema,
@@ -87,23 +89,10 @@ import {
   WorkspaceRegisterResultSchema, WorkspaceUnregisterResultSchema
 } from "./workspace-registration-schemas.js";
 import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
+import { WorkspaceUsageReportSchema } from "./usage-schemas.js";
 import { ActiveProposedPlanSchema, SessionInteractionModeSchema } from "./session-plan-schemas.js";
 export { ProtocolErrorSchema } from "./protocol-error-schema.js";
 export { CommandPayloadSchemas } from "./command-payload-schemas.js";
-const SessionTreeNodeSchema = strictObject({
-  id: Type.String({ minLength: 1, maxLength: 512 }),
-  parentId: Type.Union([Type.String({ minLength: 1, maxLength: 512 }), Type.Null()]),
-  type: Type.String({ minLength: 1, maxLength: 64 }),
-  label: Type.Optional(Type.String({ maxLength: 256 })),
-  preview: Type.String({ maxLength: 512 }),
-  active: Type.Boolean(),
-  depth: Type.Integer({ minimum: 0 })
-});
-const SessionTreeProjectionSchema = strictObject({
-  nodes: Type.Array(SessionTreeNodeSchema, { maxItems: MAX_TREE_NODES }),
-  truncated: Type.Boolean(),
-  total: Type.Integer({ minimum: 0 })
-});
 const SessionSnapshotSchema = strictObject({
   sessionId: Type.String(),
   sessionFileIdentity: Type.Optional(Type.String({
@@ -127,6 +116,7 @@ const SessionSnapshotSchema = strictObject({
   resources: Type.Array(ResourceSummarySchema),
   interactionMode: Type.Optional(SessionInteractionModeSchema),
   activeProposedPlan: Type.Optional(ActiveProposedPlanSchema),
+  compatibility: Type.Optional(SessionCompatibilityViewSchema),
   stats: Type.Optional(strictObject({
     tokens: Type.Number(),
     cost: Type.Number(),
@@ -247,6 +237,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.changes": WorkspaceChangesProjectionSchema,
   "workspace.file.list": WorkspaceFilePageSchema,
   "workspace.file.search": WorkspaceFileSearchResultSchema,
+  "workspace.file.contentSearch": WorkspaceFileContentSearchResultSchema,
   "workspace.file.resolve": WorkspaceFileEntryResultSchema,
   "workspace.file.open": WorkspaceFileOpenResultSchema,
   "workspace.file.save": WorkspaceFileEntryResultSchema,
@@ -256,6 +247,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
   "session.catalog.query": SessionCatalogPageSchema,
   "session.catalog.contentSearch": WorkspaceMessageSearchResultSchema,
+  "workspace.usage.report": WorkspaceUsageReportSchema,
   "session.tree": SessionTreeProjectionSchema,
   "message.page": ConversationPageSchema,
   "message.index": UserMessageIndexPageSchema,

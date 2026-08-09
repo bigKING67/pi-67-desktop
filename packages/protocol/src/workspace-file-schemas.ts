@@ -1,4 +1,6 @@
 import {
+  MAX_WORKSPACE_CONTENT_SEARCH_RESULTS,
+  MAX_WORKSPACE_CONTENT_SEARCH_SNIPPET_CHARS,
   MAX_WORKSPACE_FILE_CONTENT_BYTES,
   MAX_WORKSPACE_FILE_NAME_CHARS,
   MAX_WORKSPACE_FILE_PAGE_ITEMS,
@@ -42,6 +44,12 @@ export const WorkspaceFileSearchPayloadSchema = strictObject({
   includeGenerated: Type.Optional(Type.Boolean())
 });
 
+export const WorkspaceFileContentSearchPayloadSchema = strictObject({
+  query: Type.String({ minLength: 1, maxLength: MAX_WORKSPACE_FILE_QUERY_CHARS }),
+  includeGenerated: Type.Optional(Type.Boolean()),
+  caseSensitive: Type.Optional(Type.Boolean())
+});
+
 export const WorkspaceFileResolvePayloadSchema = strictObject({
   relativePath: Type.String({ minLength: 1, maxLength: MAX_WORKSPACE_FILE_PATH_CHARS })
 });
@@ -79,6 +87,23 @@ export const WorkspaceFileSearchResultSchema = strictObject({
   entries: Type.Array(WorkspaceFileEntrySchema, { maxItems: MAX_WORKSPACE_FILE_SEARCH_RESULTS }),
   truncated: Type.Boolean(),
   visited: Type.Integer({ minimum: 0 })
+});
+
+export const WorkspaceFileContentSearchResultSchema = strictObject({
+  workspaceId: Type.String({ minLength: 1, maxLength: 512 }),
+  query: Type.String({ minLength: 1, maxLength: MAX_WORKSPACE_FILE_QUERY_CHARS }),
+  matches: Type.Array(strictObject({
+    entry: WorkspaceFileEntrySchema,
+    line: Type.Integer({ minimum: 1 }),
+    column: Type.Integer({ minimum: 1 }),
+    snippet: Type.String({ maxLength: MAX_WORKSPACE_CONTENT_SEARCH_SNIPPET_CHARS }),
+    snippetTruncated: Type.Boolean()
+  }), { maxItems: MAX_WORKSPACE_CONTENT_SEARCH_RESULTS }),
+  filesVisited: Type.Integer({ minimum: 0 }),
+  bytesVisited: Type.Integer({ minimum: 0 }),
+  skippedCount: Type.Integer({ minimum: 0 }),
+  truncated: Type.Boolean(),
+  incomplete: Type.Boolean()
 });
 
 export const WorkspaceFileEntryResultSchema = strictObject({ entry: WorkspaceFileEntrySchema });

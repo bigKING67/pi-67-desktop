@@ -4,7 +4,7 @@ import {
   installMockDesktopBridge
 } from "./pi67-renderer-fixture.js";
 
-test("keeps Network and MCP drafts in memory until the user saves or discards them", async ({ page }) => {
+test("keeps Network drafts in memory until the user saves or discards them", async ({ page }) => {
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
@@ -57,18 +57,6 @@ test("keeps Network and MCP drafts in memory until the user saves or discards th
   await settings.getByRole("button", { name: "恢复默认", exact: true }).click();
   await reset.getByRole("button", { name: "恢复默认下载源", exact: true }).click();
   expect((await settingsActionState(page)).packageResets).toBe(1);
-
-  await navigation.getByRole("button", { name: "MCP 服务", exact: true }).click();
-  const token = settings.getByRole("textbox", { name: "Tavily Bridge Client Token" });
-  await token.fill("mcp_unsaved.0123456789abcdef");
-  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
-  await expect(discard).toContainText("Tavily Bridge Client Token");
-  await discard.getByRole("button", { name: "继续编辑", exact: true }).click();
-  await expect(token).toHaveValue("mcp_unsaved.0123456789abcdef");
-  await navigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
-  await discard.getByRole("button", { name: "放弃修改并离开", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "浏览器集成", exact: true })).toBeVisible();
-  expect((await settingsActionState(page)).mcpSaves).toBe(0);
 });
 
 test("keeps update actions disabled until the Main update state is ready", async ({ page }) => {
@@ -118,8 +106,6 @@ async function settingsActionState(page: import("@playwright/test").Page) {
         packageSaves: unknown[];
         packageResets: number;
         packageProbes: unknown[];
-        mcpSaves: number;
-        mcpClears: number;
         platformInfoCalls: number;
       };
     }).__pi67SettingsTest;
@@ -127,8 +113,6 @@ async function settingsActionState(page: import("@playwright/test").Page) {
       packageSaves: state.packageSaves.length,
       packageResets: state.packageResets,
       packageProbes: state.packageProbes.length,
-      mcpSaves: state.mcpSaves,
-      mcpClears: state.mcpClears,
       platformInfoCalls: state.platformInfoCalls
     };
   });

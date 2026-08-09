@@ -6,12 +6,17 @@ import type {
   SessionStats,
   SessionTreeNode
 } from "@earendil-works/pi-coding-agent";
-import type { MessageSearchItem, UserMessageIndexItem } from "@pi67/domain";
+import type {
+  MessageSearchItem,
+  SessionCompatibilityView,
+  UserMessageIndexItem
+} from "@pi67/domain";
 import {
   appendProjectedUserMessage,
   projectUserMessageIndex,
   searchProjectedMessages
 } from "./session-message-projection.js";
+import { projectSessionCompatibility } from "./session-compatibility-projection.js";
 
 export interface SessionProjectionMetadata {
   sessionId: string;
@@ -42,6 +47,7 @@ interface ProjectionState {
   messageStats: Pick<SessionStats, "userMessages" | "assistantMessages" | "toolCalls" | "toolResults" | "totalMessages">;
   tree: SessionTreeNode[];
   treeNodesById: Map<string, SessionTreeNode>;
+  compatibility: SessionCompatibilityView;
 }
 
 /**
@@ -123,6 +129,10 @@ export class SessionProjectionIndex {
     };
   }
 
+  getCompatibility(): SessionCompatibilityView {
+    return this.synchronizeState().compatibility;
+  }
+
   private requireState(manager: SessionManager): ProjectionState {
     const state = this.requireBoundState();
     if (state.manager !== manager || state.sessionId !== manager.getSessionId()) {
@@ -169,6 +179,7 @@ function buildState(manager: SessionManager, entries: SessionEntry[]): Projectio
     },
     usage: emptyUsage(),
     messageStats: emptyMessageStats(),
+    compatibility: projectSessionCompatibility(manager, entries),
     ...buildTree(entries)
   };
   for (const entry of entries) accumulateEntry(state, entry);
@@ -186,6 +197,7 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
   const previousLeafId = state.leafId;
   state.entries.push(entry);
   state.entriesById.set(entry.id, entry);
+  state.compatibility = projectSessionCompatibility(state.manager, state.entries);
   appendTreeEntry(state, entry);
   accumulateEntry(state, entry);
   state.leafId = nextLeafId;

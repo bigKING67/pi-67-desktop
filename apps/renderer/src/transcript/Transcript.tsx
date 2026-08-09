@@ -43,6 +43,7 @@ import {
 } from "./transcript-rows.js";
 import styles from "./Transcript.module.css";
 import { ConversationFindBar } from "../search/ConversationFindBar.js";
+import { SessionCompatibilityBanner } from "./SessionCompatibilityBanner.js";
 import {
   conversationReadPositionKey,
   useConversationReadPositionStore
@@ -263,6 +264,7 @@ export function Transcript() {
       ref={transcriptRegionRef}
     >
       {selectedTask ? <ConversationFindBar task={selectedTask} /> : null}
+      <SessionCompatibilityBanner />
       {historicalWindow ? (
         <div className={styles.historicalBanner} role="status">
           <span>正在查看较早消息</span>

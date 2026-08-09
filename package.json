@@ -47,7 +47,6 @@
     "prepare:capabilities": "node eng/capabilities/prepare-capabilities.mjs",
     "verify:capability-source-lock": "node eng/capabilities/verify-capability-source-lock.mjs",
     "prepare:runtime-resources": "node eng/packaging/ensure-prepared-runtime-resources.mjs",
-    "prepare:team-mcp": "node eng/packaging/prepare-team-mcp.mjs",
     "check:capability-freshness": "node eng/capabilities/check-capability-freshness.mjs",
     "package:win": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --mac dmg zip --arm64",

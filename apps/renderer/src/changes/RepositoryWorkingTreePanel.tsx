@@ -14,16 +14,16 @@ import {
   refreshRepositoryWorkingTree
 } from "./repository-working-tree-controller.js";
 import {
+  repositoryChangeReviewed,
   repositoryChangeViewed,
   useRepositoryWorkingTreeStore
 } from "./repository-working-tree-store.js";
-import { PatchView } from "./PatchView.js";
 import styles from "./ChangesPanel.module.css";
+import { ChangeReviewPanel } from "./ChangeReviewPanel.js";
 
 export function RepositoryWorkingTreePanel({ active }: { active: boolean }) {
-  const workspaceId = useWorkbenchStore((state) => (
-    selectedWorkbenchTask(state)?.workspaceId ?? state.currentWorkspaceId
-  ));
+  const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
+  const workspaceId = useWorkbenchStore((state) => selectedTask?.workspaceId ?? state.currentWorkspaceId);
   const state = useRepositoryWorkingTreeStore();
   const [selectedChangeId, setSelectedChangeId] = useState<string>();
   const refreshedWorkspace = useRef<string | undefined>(undefined);
@@ -32,6 +32,7 @@ export function RepositoryWorkingTreePanel({ active }: { active: boolean }) {
   const selected = changes.find((change) => change.changeId === selectedChangeId) ?? changes[0];
   const detail = selected ? state.detailByChangeId[selected.changeId] : undefined;
   const viewed = workspaceId ? state.viewedByWorkspace[workspaceId] : undefined;
+  const reviewed = workspaceId ? state.reviewedByWorkspace[workspaceId] : undefined;
   const stagedCount = useMemo(() => changes.filter((change) => change.staged).length, [changes]);
   const unstagedCount = useMemo(() => changes.filter((change) => change.unstaged).length, [changes]);
 
@@ -104,17 +105,23 @@ export function RepositoryWorkingTreePanel({ active }: { active: boolean }) {
                 detail={detail}
                 error={state.detailLoadingId === undefined ? state.detailError : undefined}
                 loading={state.detailLoadingId === selected.changeId}
+                reviewed={repositoryChangeReviewed(workspaceId, detail, reviewed)}
+                taskId={selectedTask?.id}
+                workspaceId={workspaceId}
               /> : null}
             </div>}
     </div>
   );
 }
 
-function RepositoryDetail({ change, detail, error, loading }: {
+function RepositoryDetail({ change, detail, error, loading, reviewed, taskId, workspaceId }: {
   change: RepositoryWorkingTreeChange;
   detail: RepositoryChangeDetail | undefined;
   error: string | undefined;
   loading: boolean;
+  reviewed: boolean;
+  taskId: string | undefined;
+  workspaceId: string;
 }) {
   const patch = [
     detail?.stagedPatch ? `# STAGED\n${detail.stagedPatch}` : undefined,
@@ -124,7 +131,23 @@ function RepositoryDetail({ change, detail, error, loading }: {
     <div className={styles.detailHeading}><div><span>{changeLabel(change)}</span><code>{change.displayPath}</code></div></div>
     {loading ? <WorkingTreeState loading text="正在读取 bounded Diff。" />
       : error ? <p className={styles.error} role="alert">{error}</p>
-        : patch ? <PatchView ariaLabel="工作区 Git Diff" patch={patch} sourceTruncated={detail?.truncated === true} />
+        : patch && detail ? (
+          <ChangeReviewPanel
+            authority={{
+              source: "worktree",
+              workspaceId,
+              revision: detail.revision,
+              changeId: detail.changeId,
+              contentFingerprint: detail.contentFingerprint
+            }}
+            onMarkReviewed={() => useRepositoryWorkingTreeStore.getState().markReviewed(workspaceId, detail)}
+            patch={patch}
+            path={change.displayPath}
+            reviewed={reviewed}
+            sourceTruncated={detail.truncated}
+            taskId={taskId}
+          />
+        )
           : <p className={styles.explanation}>该状态没有可展示的文本 Diff，可能是二进制文件或纯元数据变化。</p>}
   </section>;
 }

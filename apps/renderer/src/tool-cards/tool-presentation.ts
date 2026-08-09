@@ -4,7 +4,7 @@ import { boundToolText, compactToolText } from "./tool-presentation-boundaries.j
 const COPY_TEXT_LIMIT = 4_000;
 const TOOL_NAME_LIMIT = 120;
 
-export type ToolPresentationKind = "command" | "read" | "change" | "generic";
+export type ToolPresentationKind = "command" | "read" | "change" | "delegated" | "generic";
 
 interface ToolPresentationDetail {
   label: string;

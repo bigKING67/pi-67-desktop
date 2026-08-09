@@ -114,6 +114,29 @@ describe("Extension Adapter runtime projection", () => {
     expect(projection.effectiveTools.size).toBe(0);
   });
 
+  it("projects delegated semantics only from a matched package Adapter", async () => {
+    const packaged = await packageExtension("@verified/delegation", "1.0.0");
+    const registry = createExtensionAdapterRegistry([
+      manifest("verified-delegation", "@verified/delegation", "1.0.0", {
+        commands: {},
+        tools: { delegate_task: { presentation: "delegated", label: "Delegate task" } }
+      })
+    ]);
+
+    const projection = await projectExtensionAdapterProjection(
+      projectionSource([packaged.extension], []),
+      sessionSource([{ name: "delegate_task", sourceInfo: cloneSourceInfo(packaged.sourceInfo) }]),
+      registry
+    );
+
+    expect(projection.effectiveTools.get("delegate_task")).toEqual({
+      adapterId: "verified-delegation",
+      package: "@verified/delegation",
+      presentation: "delegated",
+      label: "Delegate task"
+    });
+  });
+
   it("keeps the production empty built-in registry at zero without reading runtime surfaces", async () => {
     const packaged = await packageExtension("@verified/example", "1.0.0");
     let commandReads = 0;
@@ -205,7 +228,10 @@ function manifest(
   versionRange: string,
   surfaces: {
     commands: Record<string, { label: string }>;
-    tools: Record<string, { presentation: "generic" | "command" | "read" | "change"; label?: string }>;
+    tools: Record<string, {
+      presentation: "generic" | "command" | "read" | "change" | "delegated";
+      label?: string;
+    }>;
   }
 ): unknown {
   return {

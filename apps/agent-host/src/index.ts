@@ -9,8 +9,8 @@ import { isAttachPortMessage } from "./connection-context.js";
 import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
-import { bootstrapTeamMcpConfig } from "./team-mcp-bootstrap.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
+import { removeRetiredTeamMcpConfig } from "./retired-team-mcp-cleanup.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -30,9 +30,12 @@ process.env.PI67_AGENT_PROFILE_FRESH = existsSync(agentDir) ? "0" : "1";
 await bootstrapDesktopCapabilities({
   agentDir
 });
-await bootstrapTeamMcpConfig({
+const retiredTeamMcpCleanup = await removeRetiredTeamMcpConfig({
   agentDir
 });
+if (retiredTeamMcpCleanup.status === "revision-conflict") {
+  throw new Error("Agent Host cannot start while retired Team MCP configuration cleanup conflicts with an external edit.");
+}
 
 const promptAttachments = createPromptAttachmentAccessOwner(process.env.PI67_PROMPT_ATTACHMENT_ROOT);
 const server = new AgentHostServer(undefined, {

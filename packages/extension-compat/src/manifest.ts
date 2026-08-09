@@ -16,7 +16,7 @@ export const EXTENSION_ADAPTER_LIMITS = Object.freeze({
   validationIssues: 32
 });
 
-export type ExtensionAdapterToolPresentation = "generic" | "command" | "read" | "change";
+export type ExtensionAdapterToolPresentation = "generic" | "command" | "read" | "change" | "delegated";
 
 export interface ExtensionAdapterCommandManifest {
   readonly label: string;

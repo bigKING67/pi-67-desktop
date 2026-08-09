@@ -15,7 +15,13 @@ import {
 const ADAPTER_ID_PATTERN = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/u;
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9](?:[a-z0-9._~-]*[a-z0-9])?\/)?[a-z0-9](?:[a-z0-9._~-]*[a-z0-9])?$/u;
 const SURFACE_NAME_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:/-]*[A-Za-z0-9])?$/u;
-const TOOL_PRESENTATIONS = new Set<ExtensionAdapterToolPresentation>(["generic", "command", "read", "change"]);
+const TOOL_PRESENTATIONS = new Set<ExtensionAdapterToolPresentation>([
+  "generic",
+  "command",
+  "read",
+  "change",
+  "delegated"
+]);
 const DANGEROUS_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const EXECUTABLE_FIELDS = new Set([
   "html",
@@ -196,7 +202,11 @@ function projectTools(value: unknown, issues: IssueCollector): Record<string, Ex
     requireExactKeys(definition, path, ["presentation", "label"], issues, ["presentation"]);
     const presentation = definition.presentation;
     if (typeof presentation !== "string" || !TOOL_PRESENTATIONS.has(presentation as ExtensionAdapterToolPresentation)) {
-      issues.add("invalid_value", `${path}.presentation`, "presentation must be generic, command, read, or change");
+      issues.add(
+        "invalid_value",
+        `${path}.presentation`,
+        "presentation must be generic, command, read, change, or delegated"
+      );
       continue;
     }
     const label = readOptionalString(definition.label, `${path}.label`, EXTENSION_ADAPTER_LIMITS.labelCharacters, issues);

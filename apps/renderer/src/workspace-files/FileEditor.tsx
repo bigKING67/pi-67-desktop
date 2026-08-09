@@ -1,21 +1,26 @@
 import { basicSetup, EditorView } from "codemirror";
 import { languages } from "@codemirror/language-data";
 import { useEffect, useRef } from "react";
+import type { WorkspaceFileNavigationIntent } from "./workspace-file-state.js";
 
 export interface FileEditorProps {
   content: string;
   fileName: string;
   onChange: (content: string) => void;
   onSave: () => void;
+  navigation?: WorkspaceFileNavigationIntent | undefined;
 }
 
-export function FileEditor({ content, fileName, onChange, onSave }: FileEditorProps) {
+export function FileEditor({ content, fileName, onChange, onSave, navigation }: FileEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | undefined>(undefined);
+  const navigationRef = useRef(navigation);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const initialContent = useRef(content).current;
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
+  navigationRef.current = navigation;
 
   useEffect(() => {
     let disposed = false;
@@ -23,16 +28,25 @@ export function FileEditor({ content, fileName, onChange, onSave }: FileEditorPr
     void loadLanguage(fileName).then((language) => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName, language);
+      viewRef.current = view;
+      applyNavigation(view, navigationRef.current);
       view.focus();
     }).catch(() => {
       if (disposed || !containerRef.current) return;
       view = createEditor(containerRef.current, initialContent, fileName);
+      viewRef.current = view;
+      applyNavigation(view, navigationRef.current);
     });
     return () => {
       disposed = true;
+      viewRef.current = undefined;
       view?.destroy();
     };
   }, [fileName, initialContent]);
+
+  useEffect(() => {
+    if (viewRef.current) applyNavigation(viewRef.current, navigation);
+  }, [navigation?.nonce]);
 
   return (
     <div
@@ -97,6 +111,19 @@ export function FileEditor({ content, fileName, onChange, onSave }: FileEditorPr
       ]
     });
   }
+}
+
+function applyNavigation(
+  view: EditorView,
+  navigation: WorkspaceFileNavigationIntent | undefined
+): void {
+  if (!navigation || navigation.line > view.state.doc.lines) return;
+  const line = view.state.doc.line(Math.max(1, navigation.line));
+  const position = Math.min(line.to, line.from + Math.max(0, navigation.column - 1));
+  view.dispatch({
+    selection: { anchor: position },
+    effects: EditorView.scrollIntoView(position, { y: "center" })
+  });
 }
 
 async function loadLanguage(fileName: string) {

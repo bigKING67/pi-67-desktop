@@ -123,6 +123,43 @@ describe("operation activity timeline", () => {
     expect(afterClear).toBe(timeline);
   });
 
+  it("updates a delegated Tool in place without inventing child-agent fields", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "delegated-1",
+      toolName: "delegate_task",
+      toolKind: "subagent",
+      status: "running"
+    }, 20);
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "delegated-1",
+      toolName: "delegate_task",
+      toolKind: "subagent",
+      status: "failed"
+    }, 45);
+
+    expect(timeline.steps).toHaveLength(2);
+    expect(timeline.steps.at(-1)).toMatchObject({
+      status: "failed",
+      startedAt: 20,
+      settledAt: 45,
+      activity: {
+        toolCallId: "delegated-1",
+        toolKind: "subagent",
+        status: "failed"
+      }
+    });
+    expect(Object.keys(timeline.steps.at(-1)?.activity ?? {}).sort()).toEqual([
+      "kind",
+      "status",
+      "toolCallId",
+      "toolKind",
+      "toolName"
+    ]);
+  });
+
   it("projects only the bounded Runtime-authored AUTO reason into Tool detail", () => {
     let timeline = createOperationActivityTimeline(operation());
     timeline = recordOperationTimelineActivity(timeline, {

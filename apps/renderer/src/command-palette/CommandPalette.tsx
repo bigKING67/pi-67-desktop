@@ -126,6 +126,7 @@ export function CommandPalette() {
       },
       "find-current-conversation": () => requestConversationFind("current"),
       "find-workspace-conversations": () => requestConversationFind("workspace"),
+      "find-workspace-content": () => useShellStore.getState().setWorkspaceContentSearchDialogOpen(true),
       "keyboard-shortcuts": () => useShellStore.getState().setKeyboardShortcutsDialogOpen(true)
     }
     }),

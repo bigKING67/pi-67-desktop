@@ -49,6 +49,37 @@ describe("TurnActivity projection", () => {
     }, undefined, undefined).label).toBe("正在调用 web_search");
   });
 
+  it("uses conservative delegated Tool copy for every real terminal status", () => {
+    const activity = {
+      kind: "tool" as const,
+      toolCallId: "delegated-1",
+      toolName: "delegate_task",
+      toolKind: "subagent" as const
+    };
+
+    expect(operationPresentation(
+      "prompt",
+      "running",
+      { ...activity, status: "running" },
+      undefined,
+      undefined
+    ).label).toBe("正在执行委派工具");
+    expect(operationPresentation(
+      "prompt",
+      "running",
+      { ...activity, status: "completed" },
+      undefined,
+      undefined
+    ).label).toBe("委派工具已完成");
+    expect(operationPresentation(
+      "prompt",
+      "running",
+      { ...activity, status: "failed" },
+      undefined,
+      undefined
+    ).label).toBe("委派工具执行失败");
+  });
+
   it("hides completed activity but keeps terminal failures and recovery visible", () => {
     const completed = {
       operationId: "operation-completed",

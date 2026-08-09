@@ -53,6 +53,7 @@ export interface SessionProjectionData {
   queue: SessionQueueProjection | undefined;
   resources: ResourceSummary[] | undefined;
   usage: SessionSnapshot["stats"];
+  compatibility: SessionSnapshot["compatibility"];
   recoverySessionFileIdentity: string | undefined;
   recoverySessionPath: string | undefined;
   revisions: SessionProjectionRevisions;

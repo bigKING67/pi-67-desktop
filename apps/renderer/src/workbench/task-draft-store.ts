@@ -1,7 +1,10 @@
 import { create } from "zustand";
-import type { ComposerWorkspaceFileRef, PromptStashItem } from "@pi67/domain";
+import type { ComposerReviewComment, ComposerWorkspaceFileRef, PromptStashItem } from "@pi67/domain";
 import {
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
+  MAX_COMPOSER_REVIEW_COMMENTS,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL,
   MAX_PROMPT_STASH_ITEMS,
   MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
 } from "@pi67/domain";
@@ -16,6 +19,7 @@ export interface TaskDraft {
   text: string;
   attachments: DraftAttachment[];
   workspaceFiles: ComposerWorkspaceFileRef[];
+  reviewComments: ComposerReviewComment[];
   promptStash: PromptStashItem[];
   streamBehavior: "steer" | "followUp";
   interactionMode: "execute" | "plan";
@@ -25,6 +29,7 @@ export const EMPTY_TASK_DRAFT: TaskDraft = {
   text: "",
   attachments: [],
   workspaceFiles: [],
+  reviewComments: [],
   promptStash: [],
   streamBehavior: "followUp",
   interactionMode: "execute"
@@ -35,6 +40,11 @@ interface TaskDraftState {
   setText: (taskId: string, text: string) => void;
   setAttachments: (taskId: string, attachments: DraftAttachment[]) => void;
   setWorkspaceFiles: (taskId: string, workspaceFiles: ComposerWorkspaceFileRef[]) => void;
+  addReviewComment: (
+    taskId: string,
+    comment: ComposerReviewComment
+  ) => "added" | "duplicate" | "full" | "too-large";
+  removeReviewComments: (taskId: string, commentIds: readonly string[]) => void;
   addPromptStash: (
     taskId: string,
     item: PromptStashItem
@@ -44,7 +54,7 @@ interface TaskDraftState {
   setInteractionMode: (taskId: string, interactionMode: TaskDraft["interactionMode"]) => void;
   restore: (
     taskId: string,
-    draft: Pick<TaskDraft, "text" | "streamBehavior"> & Partial<Pick<TaskDraft, "interactionMode" | "workspaceFiles" | "promptStash">>
+    draft: Pick<TaskDraft, "text" | "streamBehavior"> & Partial<Pick<TaskDraft, "interactionMode" | "workspaceFiles" | "reviewComments" | "promptStash">>
   ) => "restored" | "conflict";
   transfer: (sourceTaskId: string, targetTaskId: string) => "empty" | "moved" | "conflict";
   discard: (taskId: string) => void;
@@ -69,6 +79,46 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
   setWorkspaceFiles(taskId, workspaceFiles) {
     set((state) => ({
       drafts: { ...state.drafts, [taskId]: { ...draftFor(state, taskId), workspaceFiles } }
+    }));
+  },
+
+  addReviewComment(taskId, comment) {
+    const current = draftFor(get(), taskId);
+    if (current.reviewComments.some((candidate) => candidate.id === comment.id)) return "duplicate";
+    if (current.reviewComments.length >= MAX_COMPOSER_REVIEW_COMMENTS) return "full";
+    const bodyBytes = encoder.encode(comment.body).byteLength;
+    const totalBytes = current.reviewComments.reduce(
+      (total, candidate) => total + encoder.encode(candidate.body).byteLength,
+      bodyBytes
+    );
+    if (
+      comment.body.trim().length === 0
+      || bodyBytes > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES
+      || totalBytes > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL
+    ) return "too-large";
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [taskId]: {
+          ...draftFor(state, taskId),
+          reviewComments: [...draftFor(state, taskId).reviewComments, cloneReviewComment(comment)]
+        }
+      }
+    }));
+    return "added";
+  },
+
+  removeReviewComments(taskId, commentIds) {
+    if (commentIds.length === 0) return;
+    const ids = new Set(commentIds);
+    set((state) => ({
+      drafts: {
+        ...state.drafts,
+        [taskId]: {
+          ...draftFor(state, taskId),
+          reviewComments: draftFor(state, taskId).reviewComments.filter((comment) => !ids.has(comment.id))
+        }
+      }
     }));
   },
 
@@ -138,6 +188,7 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
           text: draft.text,
           attachments: [],
           workspaceFiles: draft.workspaceFiles?.map((reference) => ({ ...reference })) ?? [],
+          reviewComments: draft.reviewComments?.map(cloneReviewComment) ?? [],
           promptStash: draft.promptStash?.map(cloneStashItem) ?? [],
           streamBehavior: draft.streamBehavior,
           interactionMode: draft.interactionMode ?? "execute"
@@ -176,7 +227,7 @@ export const useTaskDraftStore = create<TaskDraftState>((set, get) => ({
 }));
 
 function emptyTaskDraft(): TaskDraft {
-  return { ...EMPTY_TASK_DRAFT, attachments: [], workspaceFiles: [], promptStash: [] };
+  return { ...EMPTY_TASK_DRAFT, attachments: [], workspaceFiles: [], reviewComments: [], promptStash: [] };
 }
 
 function draftFor(state: TaskDraftState, taskId: string): TaskDraft {
@@ -187,7 +238,17 @@ function hasDraftContent(draft: TaskDraft): boolean {
   return draft.text.trim().length > 0
     || draft.attachments.length > 0
     || draft.workspaceFiles.length > 0
+    || draft.reviewComments.length > 0
     || draft.promptStash.length > 0;
+}
+
+function cloneReviewComment(comment: ComposerReviewComment): ComposerReviewComment {
+  return {
+    ...comment,
+    authority: { ...comment.authority },
+    anchor: { ...comment.anchor },
+    file: { ...comment.file }
+  };
 }
 
 function cloneStashItem(item: PromptStashItem): PromptStashItem {

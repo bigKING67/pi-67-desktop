@@ -11,6 +11,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
+  await installUsageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await page.keyboard.press("Control+,");
 
@@ -107,11 +108,10 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(contextDetail.getByTestId("context-file-preview")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
-  await selectMobileSettingsSection(settings, page, "MCP 服务");
-  await expect(settings.getByRole("textbox", { name: "Tavily Bridge Client Token" })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "显示输入内容" })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "保存", exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "清除", exact: true })).toBeVisible();
+  await selectMobileSettingsSection(settings, page, "用量分析");
+  await expect(settings.getByRole("heading", { name: "Pi JSONL 用量分析", exact: true })).toBeVisible();
+  await expect(settings.getByRole("group", { name: "统计窗口" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "重建", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(520);
 
   await selectMobileSettingsSection(settings, page, "浏览器集成");
@@ -176,6 +176,7 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   await page.goto("/");
   await attachMockAgent(page);
   await installPackageFixture(page);
+  await installUsageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
@@ -243,6 +244,7 @@ test("keeps every Settings category on one centered document measure without sid
   await page.goto("/");
   await attachMockAgent(page);
   await installPackageFixture(page);
+  await installUsageFixture(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
   await expect(page.getByRole("button", { name: "帮助与设置" })).toBeVisible();
   await page.keyboard.press("Control+,");
@@ -265,7 +267,7 @@ test("keeps every Settings category on one centered document measure without sid
   expect(Math.abs(documentMetrics.leftInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
 
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  for (const category of ["指令模板", "MCP 服务", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
+  for (const category of ["指令模板", "用量分析", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
     await navigation.getByRole("button", { name: category, exact: true }).click();
     await expect(settings.getByRole("heading", { name: category, exact: true }).first()).toBeVisible();
     const next = await measureDocument();
@@ -321,6 +323,27 @@ async function installPackageFixture(page: Page): Promise<void> {
       resourceTypes: ["extension"]
     }],
     total: 1
+  });
+}
+
+async function installUsageFixture(page: Page): Promise<void> {
+  await setMockAgentResponseResult(page, "workspace.usage.report", {
+    workspaceId: DEFAULT_MOCK_WORKSPACE.id,
+    generatedAt: 1_786_220_000_000,
+    window: "30d",
+    buckets: [],
+    models: [],
+    totals: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    coverage: {
+      discoveredSessions: 0,
+      scannedSessions: 0,
+      skippedSessions: 0,
+      unavailableSessions: 0,
+      invalidSessions: 0,
+      futureVersionSessions: 0,
+      undatedUsageEntries: 0,
+      complete: true
+    }
   });
 }
 

@@ -20,7 +20,7 @@ import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/work
 import type { DraftAttachment } from "./composer-attachments.js";
 
 export type PromptSubmissionResult =
-  | { accepted: true; operationId: string; retainsAttachmentPreviews: boolean }
+  | { accepted: true; operationId: string; retainsAttachmentPreviews: boolean; terminalError?: string }
   | { accepted: false; error: string };
 
 export async function submitRendererPrompt(
@@ -105,7 +105,11 @@ export async function submitRendererPrompt(
       });
     }
     return result.accepted
-      ? { ...result, retainsAttachmentPreviews }
+      ? {
+          ...result,
+          retainsAttachmentPreviews,
+          ...(terminalError === undefined ? {} : { terminalError })
+        }
       : result;
   } catch (error) {
     const detail = errorMessage(error);

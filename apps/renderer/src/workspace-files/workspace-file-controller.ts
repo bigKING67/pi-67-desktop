@@ -2,6 +2,7 @@ import type {
   WorkspaceDescriptor,
   WorkspaceEntryContextAction,
   WorkspaceEntryRequest,
+  WorkspaceFileContentSearchMatch,
   WorkspaceFileEntry
 } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
@@ -102,6 +103,42 @@ export async function openWorkspaceFileEntry(
     return true;
   }
   return openWorkspaceFile(workspace, entry, { notifyFailure: true });
+}
+
+export async function openWorkspaceContentSearchMatch(
+  workspace: WorkspaceDescriptor,
+  match: WorkspaceFileContentSearchMatch
+): Promise<boolean> {
+  const current = workspaceFileStore.getState().workspaces[workspace.id]?.byPath[match.entry.relativePath];
+  if (current?.dirty && current.revision !== match.entry.revision) {
+    publishNotification({
+      level: "warning",
+      title: "搜索结果已过期",
+      message: "文件已有未保存草稿，无法安全定位到这条旧搜索结果。"
+    });
+    return false;
+  }
+  let opened: boolean;
+  if (current?.phase === "ready" && current.revision === match.entry.revision) {
+    workspaceFileStore.getState().activateTab(workspace.id, match.entry.relativePath);
+    opened = true;
+  } else {
+    opened = await openWorkspaceFile(workspace, match.entry, {
+      discardDraft: !current?.dirty,
+      notifyFailure: true,
+      preserveDraftOnFailure: Boolean(current?.dirty)
+    });
+  }
+  const tab = workspaceFileStore.getState().workspaces[workspace.id]?.byPath[match.entry.relativePath];
+  if (!opened || tab?.phase !== "ready" || tab.revision !== match.entry.revision) return false;
+  workspaceFileStore.getState().requestNavigation(workspace.id, {
+    relativePath: match.entry.relativePath,
+    revision: match.entry.revision,
+    line: match.line,
+    column: match.column,
+    query: match.snippet
+  });
+  return true;
 }
 
 export async function activateWorkspaceFileTab(

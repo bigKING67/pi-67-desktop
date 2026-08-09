@@ -53,7 +53,11 @@ export const ExtensionToolAdapterSchema = strictObject({
   adapterId: AdapterIdSchema,
   package: AdapterPackageSchema,
   presentation: Type.Union([
-    Type.Literal("generic"), Type.Literal("command"), Type.Literal("read"), Type.Literal("change")
+    Type.Literal("generic"),
+    Type.Literal("command"),
+    Type.Literal("read"),
+    Type.Literal("change"),
+    Type.Literal("delegated")
   ]),
   label: Type.Optional(Type.String({ minLength: 1, maxLength: MAX_EXTENSION_ADAPTER_LABEL_CHARS }))
 });

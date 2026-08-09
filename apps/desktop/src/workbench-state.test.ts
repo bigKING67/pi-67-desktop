@@ -238,12 +238,12 @@ describe("WorkbenchStateV5 persistence", () => {
     })).toThrow(/invalid/u);
     expect(replaceWorkbenchLayout(state, {
       ...layout,
-      settings: { section: "mcp", scope: "global" }
-    }).settings).toEqual({ section: "mcp", scope: "global" });
-    expect(() => replaceWorkbenchLayout(state, {
+      settings: { section: "mcp" as never, scope: "global" }
+    }).settings).toEqual({ section: "integrations", scope: "global" });
+    expect(replaceWorkbenchLayout(state, {
       ...layout,
-      settings: { section: "mcp", scope: "project", workspaceId: workspace.id }
-    })).toThrow(/invalid/u);
+      settings: { section: "usage", scope: "project", workspaceId: workspace.id }
+    }).settings).toEqual({ section: "usage", scope: "project", workspaceId: workspace.id });
     expect(replaceWorkbenchLayout(state, {
       ...layout,
       settings: { section: "integrations", scope: "global" }

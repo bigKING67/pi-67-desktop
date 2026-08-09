@@ -13,6 +13,7 @@ interface ShellState {
   sessionTreeDialogOpen: boolean;
   commandPaletteOpen: boolean;
   keyboardShortcutsDialogOpen: boolean;
+  workspaceContentSearchDialogOpen: boolean;
   doctorDialogOpen: boolean;
   credentialDialogOpen: boolean;
   credentialDialogProviderId: string | undefined;
@@ -27,6 +28,7 @@ interface ShellState {
   setSessionTreeDialogOpen: (open: boolean) => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setKeyboardShortcutsDialogOpen: (open: boolean) => void;
+  setWorkspaceContentSearchDialogOpen: (open: boolean) => void;
   setDoctorDialogOpen: (open: boolean) => void;
   setCredentialDialogOpen: (open: boolean, providerId?: string) => void;
   setUpdateDialogOpen: (open: boolean) => void;
@@ -45,6 +47,7 @@ export const useShellStore = create<ShellState>((set) => ({
   sessionTreeDialogOpen: false,
   commandPaletteOpen: false,
   keyboardShortcutsDialogOpen: false,
+  workspaceContentSearchDialogOpen: false,
   doctorDialogOpen: false,
   credentialDialogOpen: false,
   credentialDialogProviderId: undefined,
@@ -74,6 +77,9 @@ export const useShellStore = create<ShellState>((set) => ({
   setSessionTreeDialogOpen(sessionTreeDialogOpen) { set({ sessionTreeDialogOpen }); },
   setCommandPaletteOpen(commandPaletteOpen) { set({ commandPaletteOpen }); },
   setKeyboardShortcutsDialogOpen(keyboardShortcutsDialogOpen) { set({ keyboardShortcutsDialogOpen }); },
+  setWorkspaceContentSearchDialogOpen(workspaceContentSearchDialogOpen) {
+    set({ workspaceContentSearchDialogOpen });
+  },
   setDoctorDialogOpen(doctorDialogOpen) { set({ doctorDialogOpen }); },
   setCredentialDialogOpen(credentialDialogOpen, credentialDialogProviderId) {
     set({
@@ -86,6 +92,7 @@ export const useShellStore = create<ShellState>((set) => ({
     set({
       commandPaletteOpen: false,
       keyboardShortcutsDialogOpen: false,
+      workspaceContentSearchDialogOpen: false,
       doctorDialogOpen: false,
       credentialDialogOpen: false,
       credentialDialogProviderId: undefined,

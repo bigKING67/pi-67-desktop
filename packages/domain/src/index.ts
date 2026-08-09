@@ -27,3 +27,4 @@ export * from "./workbench.js";
 export * from "./worktree-environment.js";
 export * from "./workspace-file.js";
 export * from "./user-message-index.js";
+export * from "./usage.js";

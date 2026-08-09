@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
-import { stopRendererTask } from "./task-stop-controller.js";
+import {
+  stopRendererTask,
+  taskIdForInteractiveStop
+} from "./task-stop-controller.js";
 
 describe("task stop controller", () => {
   beforeEach(() => {
@@ -103,5 +106,38 @@ describe("task stop controller", () => {
     await expect(stopRendererTask("task-a")).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeDefined();
+  });
+
+  it("resolves only one exact waiting modal authority on the current Host", () => {
+    vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
+      appInstanceId: "app",
+      hostInstanceId: "host",
+      hostEpoch: 9,
+      sdkVersion: "fixture",
+      eventSequence: 0
+    });
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      lifecycle: "waiting-approval",
+      operationId: "operation-a"
+    });
+    const authority = {
+      hostEpoch: 9,
+      sessionId: "session-a",
+      sessionGeneration: 3,
+      operationId: "operation-a"
+    };
+
+    expect(taskIdForInteractiveStop(authority)).toBe("task-a");
+    expect(taskIdForInteractiveStop({ ...authority, hostEpoch: 8 })).toBeUndefined();
+    expect(taskIdForInteractiveStop({ ...authority, operationId: "operation-old" })).toBeUndefined();
+
+    const task = rendererWorkbenchStore.getState().tasks["task-a"]!;
+    rendererWorkbenchStore.setState((state) => ({
+      tasks: {
+        ...state.tasks,
+        "task-duplicate": { ...task, id: "task-duplicate" }
+      }
+    }));
+    expect(taskIdForInteractiveStop(authority)).toBeUndefined();
   });
 });

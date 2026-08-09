@@ -26,6 +26,7 @@ import {
   isWorkspaceFileCommand,
   type WorkspaceFileCommandRouter
 } from "./workspace-file-command-router.js";
+import { handleWorkspaceReadRequest } from "./workspace-read-request-handler.js";
 export interface HostRequestRouterOptions {
   isShuttingDown(): boolean;
   runtimeStatus(): CommandResults["runtime.getStatus"];
@@ -96,20 +97,7 @@ export class HostRequestRouter {
       this.handleWorkspaceConversationCommand(origin, request);
       return;
     }
-    if (request.type === "session.catalog.query" && request.context.scope === "workspace") {
-      const command = { type: request.type, payload: request.payload } as AgentCommand<"session.catalog.query">;
-      void this.workspaceCommands.queryCatalog(request.context, command)
-        .then((result) => origin.sendSuccess(request.requestId, request.type, result))
-        .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
-      return;
-    }
-    if (request.type === "session.catalog.contentSearch" && request.context.scope === "workspace") {
-      const command = { type: request.type, payload: request.payload } as AgentCommand<"session.catalog.contentSearch">;
-      void this.workspaceCommands.searchCatalogContent(request.context, command)
-        .then((result) => origin.sendSuccess(request.requestId, request.type, result))
-        .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
-      return;
-    }
+    if (handleWorkspaceReadRequest(origin, request, this.workspaceCommands)) return;
     if (request.type === "session.creation.resolve" && request.context.scope === "workspace") {
       const command = {
         type: request.type,
@@ -212,7 +200,12 @@ export class HostRequestRouter {
       return;
     }
     const command = { type: request.type, payload: request.payload } as AgentCommand<typeof request.type>;
-    void this.workspaceFiles.dispatch(request.context, command, request.idempotencyKey)
+    void this.workspaceFiles.dispatch(
+      request.context,
+      command,
+      request.idempotencyKey,
+      { signal: origin.signalForRequest(request.requestId) }
+    )
       .then((result) => sendSuccess(origin, request, result))
       .catch((error: unknown) => origin.sendError(request.requestId, request.type, toProtocolError(error)));
   }

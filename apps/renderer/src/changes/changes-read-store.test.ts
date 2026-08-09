@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   changesReadSessionKey,
   useChangesReadStore,
+  workspaceChangeReviewed,
   workspaceChangeViewed
 } from "./changes-read-store.js";
 
@@ -17,6 +18,20 @@ describe("Changes read state", () => {
     expect(workspaceChangeViewed(fingerprints, change)).toBe(true);
     expect(workspaceChangeViewed(fingerprints, { ...change, status: "completed" })).toBe(false);
     expect(workspaceChangeViewed(fingerprints, { ...change, patch: "@@\n+changed" })).toBe(false);
+  });
+
+  it("does not infer Reviewed from Viewed and binds explicit review to the exact fingerprint", () => {
+    const change = edit("completed");
+    const store = useChangesReadStore.getState();
+    store.markViewed("session", change);
+    expect(workspaceChangeReviewed(
+      useChangesReadStore.getState().sessions.session?.reviewedFingerprints,
+      change
+    )).toBe(false);
+    store.markReviewed("session", change);
+    const reviewed = useChangesReadStore.getState().sessions.session?.reviewedFingerprints;
+    expect(workspaceChangeReviewed(reviewed, change)).toBe(true);
+    expect(workspaceChangeReviewed(reviewed, { ...change, patch: "@@ -1 +1 @@\n+new" })).toBe(false);
   });
 
   it("isolates physical Sessions", () => {

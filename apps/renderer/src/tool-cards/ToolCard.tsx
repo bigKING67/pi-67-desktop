@@ -14,6 +14,7 @@ import {
   LoaderCircle,
   Maximize2,
   Minimize2,
+  Network,
   Terminal,
   Wrench
 } from "lucide-react";
@@ -37,6 +38,7 @@ const KIND_ICONS = {
   command: Terminal,
   read: FileSearch,
   change: FilePenLine,
+  delegated: Network,
   generic: Wrench
 } satisfies Record<ToolPresentationKind, typeof Wrench>;
 

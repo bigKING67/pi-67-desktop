@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { RepositoryChangeDetail, RepositoryWorkingTreeSnapshot } from "@pi67/domain";
 import {
+  repositoryChangeReviewed,
   repositoryChangeViewed,
   useRepositoryWorkingTreeStore
 } from "./repository-working-tree-store.js";
@@ -39,6 +40,17 @@ describe("repository working tree store", () => {
       { ...current, contentFingerprint: "d".repeat(64) },
       state.viewedByWorkspace["workspace-a"]
     )).toBe(false);
+    expect(repositoryChangeReviewed(
+      "workspace-a",
+      current,
+      state.reviewedByWorkspace["workspace-a"]
+    )).toBe(false);
+    expect(store.markReviewed("workspace-a", current)).toBe(true);
+    expect(repositoryChangeReviewed(
+      "workspace-a",
+      current,
+      useRepositoryWorkingTreeStore.getState().reviewedByWorkspace["workspace-a"]
+    )).toBe(true);
   });
 });
 

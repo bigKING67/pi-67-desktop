@@ -202,6 +202,7 @@ const APPLICATION_ACTION_ICONS = {
   "toggle-context": PanelRight,
   "find-current-conversation": Search,
   "find-workspace-conversations": Search,
+  "find-workspace-content": Search,
   "keyboard-shortcuts": BookOpenText
 } satisfies Record<DesktopActionId, typeof Command>;
 

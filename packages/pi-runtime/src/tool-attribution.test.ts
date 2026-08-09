@@ -76,6 +76,29 @@ describe("ToolAttributionRegistry", () => {
     expect(registry.bindToolExecutionStart(1, "bad\ncall", "adapted", [adapted])).toBeUndefined();
   });
 
+  it("classifies only a provenance-matched delegated Adapter as delegated work", () => {
+    const registry = new ToolAttributionRegistry();
+    const verified = extensionTool("delegate_task", "delegation");
+    registry.replaceEffectiveTools(8, [verified], new Map([
+      ["delegate_task", adapter("verified-delegation", "delegated")]
+    ]));
+
+    expect(registry.bindToolExecutionStart(8, "verified-call", "delegate_task", [verified])).toMatchObject({
+      toolName: "delegate_task",
+      toolKind: "subagent",
+      adapter: { presentation: "delegated" }
+    });
+    expect(registry.bindToolExecutionStart(
+      8,
+      "same-name-unverified",
+      "subagent",
+      [extensionTool("subagent", "unverified")]
+    )).toEqual({
+      toolName: "subagent",
+      toolKind: "generic"
+    });
+  });
+
   it("classifies only provenance-confirmed Pi built-ins by their reserved names", () => {
     const registry = new ToolAttributionRegistry();
     registry.replaceEffectiveTools(5, [], new Map());
@@ -201,11 +224,14 @@ function tools(name: string): ReadonlyMap<string, ToolAdapterView> {
   return new Map([[name, adapter("verified")]]);
 }
 
-function adapter(adapterId: string): ToolAdapterView {
+function adapter(
+  adapterId: string,
+  presentation: ToolAdapterView["presentation"] = "read"
+): ToolAdapterView {
   return {
     adapterId,
     package: "@verified/example",
-    presentation: "read",
+    presentation,
     label: "Verified tool"
   };
 }

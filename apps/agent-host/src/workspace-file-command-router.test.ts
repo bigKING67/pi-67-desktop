@@ -103,6 +103,65 @@ describe("WorkspaceFileCommandRouter", () => {
     expect(JSON.stringify(included)).not.toContain(".git/feature");
   });
 
+  it("searches bounded UTF-8 file content without exposing generated or Git metadata", async () => {
+    const root = await workspaceRoot();
+    await mkdir(join(root, "src"));
+    await mkdir(join(root, "node_modules", "dependency"), { recursive: true });
+    await mkdir(join(root, ".git"));
+    await writeFile(join(root, "src", "feature.ts"), [
+      "export function feature() {",
+      "  return 'Needle';",
+      "}",
+      ""
+    ].join("\n"), "utf8");
+    await writeFile(join(root, "node_modules", "dependency", "feature.js"), "needle", "utf8");
+    await writeFile(join(root, ".git", "config"), "needle", "utf8");
+    await writeFile(join(root, "binary.dat"), Buffer.from([0, 1, 2, 3]));
+    const router = routerFor(root);
+    const context = { scope: "workspace" as const, workspaceId: "workspace-1" };
+
+    const result = await router.dispatch(context, {
+      type: "workspace.file.contentSearch",
+      payload: { query: "needle" }
+    });
+    if (!("matches" in result)) throw new Error("Expected Workspace content search results.");
+    expect(result.matches).toEqual([expect.objectContaining({
+      entry: expect.objectContaining({ relativePath: "src/feature.ts" }),
+      line: 2,
+      column: 11,
+      snippet: "  return 'Needle';"
+    })]);
+    expect(result.skippedCount).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(result)).not.toContain("node_modules");
+    expect(JSON.stringify(result)).not.toContain(".git/config");
+
+    const generated = await router.dispatch(context, {
+      type: "workspace.file.contentSearch",
+      payload: { query: "needle", includeGenerated: true, caseSensitive: true }
+    });
+    if (!("matches" in generated)) throw new Error("Expected generated content search results.");
+    expect(generated.matches.map((match) => match.entry.relativePath)).toEqual([
+      "node_modules/dependency/feature.js"
+    ]);
+    expect(JSON.stringify(generated)).not.toContain(".git/config");
+  });
+
+  it("keeps original UTF-16 columns when case folding expands a character", async () => {
+    const root = await workspaceRoot();
+    await writeFile(join(root, "unicode.txt"), "A\u0130B needle\n", "utf8");
+    const result = await routerFor(root).dispatch(
+      { scope: "workspace", workspaceId: "workspace-1" },
+      { type: "workspace.file.contentSearch", payload: { query: "b NEEDLE" } }
+    );
+
+    if (!("matches" in result)) throw new Error("Expected Workspace content search results.");
+    expect(result.matches).toEqual([expect.objectContaining({
+      line: 1,
+      column: 3,
+      snippet: "A\u0130B needle"
+    })]);
+  });
+
   it("keeps ordinary root files visible while hiding and rejecting .git metadata", async () => {
     const root = await workspaceRoot();
     await mkdir(join(root, ".git"));

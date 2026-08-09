@@ -164,7 +164,6 @@ function registerFixture(): void {
     desktopToolchain: {},
     desktopCapabilities: {},
     packageNetworkSettings: {},
-    teamMcpSettings: {},
     promptAttachments: {
       diagnostics: vi.fn(async () => ({
         draftCount: 2,

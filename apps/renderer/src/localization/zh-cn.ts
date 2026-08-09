@@ -52,10 +52,6 @@ export const zhCNMessages = {
         label: "规则与上下文",
         summary: "查看全局与项目 AGENTS.md、CLAUDE.md 以及桌面托管规则。"
       },
-      mcp: {
-        label: "MCP 服务",
-        summary: "管理 Tavily Bridge Client Token 与本机凭据状态。"
-      },
       integrations: {
         label: "浏览器集成",
         summary: "准备并诊断 browser67 的依赖、扩展和真实受管浏览器连接。"
@@ -63,6 +59,10 @@ export const zhCNMessages = {
       runtime: {
         label: "运行服务",
         summary: "查看运行名额、会话写入边界与恢复诊断状态。"
+      },
+      usage: {
+        label: "用量分析",
+        summary: "从 Pi JSONL 重建本地 token 与记录成本统计。"
       },
       network: {
         label: "下载源与网络",

@@ -39,4 +39,12 @@ describe("composer queue projection", () => {
     expect(item?.preview.length).toBeLessThanOrEqual(500);
     expect(item?.truncated).toBe(true);
   });
+
+  it("projects sparse queue slots as empty bounded previews", () => {
+    const sparseQueue: string[] = [];
+    sparseQueue.length = 1;
+    expect(projectQueue(sparseQueue, []).items).toEqual([
+      { id: "steer-0", kind: "steer", preview: "", truncated: false }
+    ]);
+  });
 });

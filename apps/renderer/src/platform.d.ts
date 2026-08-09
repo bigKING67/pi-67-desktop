@@ -40,19 +40,6 @@ import type {
   WorktreeCreationRollbackResult
 } from "@pi67/protocol";
 
-export type TeamMcpStatus = {
-  serverName: string;
-  url: string;
-  tokenEnv: string;
-  configured: boolean;
-  tokenPrefix?: string;
-  tokenPath: string;
-};
-
-export type TeamMcpRevealResult =
-  | { status: "revealed"; token: string }
-  | { status: "missing" };
-
 export type WorkbenchLayoutV5 = {
   expandedWorkspaceIds: string[];
   currentWorkspaceId?: string;
@@ -126,10 +113,6 @@ declare global {
         revealBrowser67Extension(): Promise<boolean>;
         copyBrowser67ExtensionPath(): Promise<boolean>;
         verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot>;
-        getTeamMcpStatus(): Promise<TeamMcpStatus>;
-        revealTeamMcpToken(): Promise<TeamMcpRevealResult>;
-        saveTeamMcpToken(token: string): Promise<TeamMcpStatus>;
-        clearTeamMcpToken(): Promise<TeamMcpStatus>;
         getUpdateState(): Promise<unknown>;
         checkForUpdates(): Promise<unknown>;
         onUpdateStateChanged(listener: (state: unknown) => void): () => void;

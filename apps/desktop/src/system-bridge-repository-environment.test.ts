@@ -182,7 +182,6 @@ function registerFixture(
     desktopToolchain: {},
     desktopCapabilities: {},
     packageNetworkSettings: {},
-    teamMcpSettings: {},
     promptAttachments: {},
     promptStashImages: {
       ...promptStashImages, removeWorkspace: vi.fn(), dispose: vi.fn()

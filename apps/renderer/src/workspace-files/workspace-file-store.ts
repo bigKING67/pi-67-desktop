@@ -8,25 +8,9 @@ import {
 } from "@pi67/domain";
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
-type WorkspaceFileTabPhase = "restoring" | "loading" | "ready" | "unavailable" | "missing";
-export interface WorkspaceFileTab {
-  id?: string | undefined;
-  name: string;
-  relativePath: string;
-  phase: WorkspaceFileTabPhase;
-  revision?: string | undefined;
-  content?: string | undefined;
-  savedContent?: string | undefined;
-  dirty: boolean;
-  conflict: boolean;
-  reason?: string | undefined;
-  documentVersion: number;
-}
-interface WorkspaceFileWorkspaceState {
-  tabs: string[];
-  activeRelativePath?: string | undefined;
-  byPath: Record<string, WorkspaceFileTab>;
-}
+import type {
+  WorkspaceFileNavigationIntent, WorkspaceFileTab, WorkspaceFileWorkspaceState
+} from "./workspace-file-state.js";
 interface WorkspaceFileStoreState {
   workspaces: Record<string, WorkspaceFileWorkspaceState>;
   draftPersistence: "available" | "unavailable";
@@ -46,6 +30,10 @@ interface WorkspaceFileStoreState {
   closeTab: (workspaceId: string, relativePath: string) => void;
   renamePath: (workspaceId: string, previousPath: string, nextPath: string, entry: WorkspaceFileEntry) => void;
   removePath: (workspaceId: string, relativePath: string, directory: boolean) => void;
+  requestNavigation: (
+    workspaceId: string,
+    intent: Omit<WorkspaceFileNavigationIntent, "nonce">
+  ) => void;
 }
 
 export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => ({
@@ -366,6 +354,16 @@ export const workspaceFileStore = createStore<WorkspaceFileStoreState>((set) => 
         : undefined;
       return { tabs, byPath, ...(activeRelativePath === undefined ? {} : { activeRelativePath }) };
     }));
+  },
+
+  requestNavigation(workspaceId, intent) {
+    set((state) => updateWorkspace(state, workspaceId, (workspace) => ({
+      ...workspace,
+      navigation: {
+        ...intent,
+        nonce: (workspace.navigation?.nonce ?? 0) + 1
+      }
+    })));
   }
 }));
 

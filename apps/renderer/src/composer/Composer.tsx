@@ -7,14 +7,11 @@ import {
 } from "../session/session-projection-selectors.js";
 import { useCommittedConversationStreaming } from "../conversation/conversation-store.js";
 import { subscribeToComposerPrefill } from "./composer-events.js";
-import { submitRendererPrompt } from "./prompt-submission-controller.js";
 import { useExtensionUiStore } from "../extension-ui/extension-ui-store.js";
 import { messages } from "../localization/message-catalog.js";
 import {
   removeDraftAttachment,
-  revokeDraftAttachments,
-  stageDraftAttachments,
-  type DraftAttachment
+  stageDraftAttachments
 } from "./composer-attachments.js";
 import {
   rendererWorkbenchStore,
@@ -33,7 +30,6 @@ import {
 } from "./composer-slash-commands.js";
 import { useComposerSlashCatalog } from "./use-composer-slash-catalog.js";
 import { executePiDesktopAction, type PiDesktopActionContext } from "../pi-actions/pi-desktop-actions.js";
-import { submitRendererNewSessionIntent } from "../session/new-session-intent-controller.js";
 import { setRendererSessionInteractionMode } from "../session/session-plan-controller.js";
 import {
   composerFileMentionQuery,
@@ -45,6 +41,9 @@ import {
 } from "./composer-file-mentions.js";
 import { useComposerFileMentionSearch } from "./use-composer-file-mention-search.js";
 import { ComposerSurface } from "./ComposerSurface.js";
+import { prepareComposerReviewSubmission } from "../changes/change-review-controller.js";
+import { clearAcceptedComposerDraft, submitComposerDraft } from "./composer-submission-controller.js";
+import { composerDraftActions } from "./composer-draft-actions.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
@@ -72,6 +71,7 @@ export function Composer() {
   const text = draft.text;
   const attachments = draft.attachments;
   const workspaceFiles = draft.workspaceFiles;
+  const reviewComments = draft.reviewComments;
   const streamBehavior = draft.streamBehavior;
   const [attachmentError, setAttachmentError] = useState<string>();
   const [submissionError, setSubmissionError] = useState<string>();
@@ -100,7 +100,10 @@ export function Composer() {
     ? authoritativeInteractionMode
     : draft.interactionMode;
   const activeStreaming = activeSessionAuthority && streaming;
-  const hasDraft = text.trim().length > 0 || attachments.length > 0 || workspaceFiles.length > 0;
+  const hasDraft = text.trim().length > 0
+    || attachments.length > 0
+    || workspaceFiles.length > 0
+    || reviewComments.length > 0;
   const canSend = !submitting && !stagingAttachments && hasDraft;
   const activeOperation = Boolean(
     activeSessionAuthority
@@ -149,30 +152,10 @@ export function Composer() {
     activeOperation,
     configuredModels: models
   };
-  const setText = (value: string) => {
-    if (activeTaskId) useTaskDraftStore.getState().setText(activeTaskId, value);
-  };
-  const setAttachments = (value: DraftAttachment[] | ((current: DraftAttachment[]) => DraftAttachment[])) => {
-    if (!activeTaskId) return;
-    const current = useTaskDraftStore.getState().drafts[activeTaskId]?.attachments ?? [];
-    useTaskDraftStore.getState().setAttachments(
-      activeTaskId,
-      typeof value === "function" ? value(current) : value
-    );
-  };
-  const setWorkspaceFiles = (
-    value: ComposerWorkspaceFileRef[] | ((current: ComposerWorkspaceFileRef[]) => ComposerWorkspaceFileRef[])
-  ) => {
-    if (!activeTaskId) return;
-    const current = useTaskDraftStore.getState().drafts[activeTaskId]?.workspaceFiles ?? [];
-    useTaskDraftStore.getState().setWorkspaceFiles(
-      activeTaskId,
-      typeof value === "function" ? value(current) : value
-    );
-  };
-  const setStreamBehavior = (value: "steer" | "followUp") => {
-    if (activeTaskId) useTaskDraftStore.getState().setStreamBehavior(activeTaskId, value);
-  };
+  const { setText, setAttachments, setWorkspaceFiles, setStreamBehavior } = useMemo(
+    () => composerDraftActions(activeTaskId),
+    [activeTaskId]
+  );
   const setInteractionMode = async (mode: "execute" | "plan") => {
     if (!activeTaskId || mode === interactionMode || changingInteractionMode) return;
     submissionIdRef.current = undefined;
@@ -213,6 +196,10 @@ export function Composer() {
   useEffect(() => {
     setFileActiveIndex(0);
   }, [fileMentionQuery?.query, fileMentionSearch.status]);
+  useEffect(() => {
+    submissionIdRef.current = undefined;
+    setSubmissionError(undefined);
+  }, [reviewComments]);
 
   useEffect(() => {
     if (!activeTaskId) return;
@@ -220,15 +207,27 @@ export function Composer() {
       hasDraft: text.trim().length > 0
         || attachments.length > 0
         || workspaceFiles.length > 0
+        || reviewComments.length > 0
         || draft.promptStash.length > 0,
       attachmentCount: attachments.length
     });
-  }, [activeTaskId, attachments.length, draft.promptStash.length, text, workspaceFiles.length]);
+  }, [activeTaskId, attachments.length, draft.promptStash.length, reviewComments.length, text, workspaceFiles.length]);
   const submit = async () => {
     if (!canSend || !activeTask || !activeTaskId) return;
-    const nextText = text.trim();
+    const baseText = text.trim();
     const nextAttachments = attachments;
-    const nextWorkspaceFiles = referencesPresentInComposerText(nextText, workspaceFiles);
+    const mentionedWorkspaceFiles = referencesPresentInComposerText(baseText, workspaceFiles);
+    if (reviewComments.length > 0 && isSlashInvocation(baseText)) {
+      setSubmissionError("修改意见不能与 Slash command 同时发送；请改为普通任务说明。");
+      return;
+    }
+    const preparedReview = prepareComposerReviewSubmission(activeTaskId, baseText, mentionedWorkspaceFiles);
+    if (!preparedReview.ok) {
+      setSubmissionError(preparedReview.message);
+      return;
+    }
+    const nextText = preparedReview.text;
+    const nextWorkspaceFiles = preparedReview.workspaceFiles;
     if (isSlashInvocation(nextText)) {
       if (nextWorkspaceFiles.length > 0) {
         setSubmissionError(messages.composer.commandAttachmentsUnsupported);
@@ -293,31 +292,28 @@ export function Composer() {
     try {
       const submissionId = submissionIdRef.current ?? crypto.randomUUID();
       submissionIdRef.current = submissionId;
-      const result = activeTask.conversation.kind === "provisional"
-        && activeTask.creationStatus === undefined
-        ? await submitRendererNewSessionIntent(
-            activeTask.id,
-            nextText,
-            submissionId,
-            nextAttachments,
-            nextWorkspaceFiles
-          )
-        : await submitRendererPrompt(
-            nextText,
-            activeStreaming ? streamBehavior : "send",
-            submissionId,
-            nextAttachments,
-            nextWorkspaceFiles
-          );
+      const result = await submitComposerDraft({
+        taskId: activeTask.id,
+        provisional: activeTask.conversation.kind === "provisional"
+          && activeTask.creationStatus === undefined,
+        text: nextText,
+        submissionId,
+        attachments: nextAttachments,
+        workspaceFiles: nextWorkspaceFiles,
+        activeStreaming,
+        streamBehavior
+      });
       if (!result.accepted) {
         setSubmissionError(result.error);
         return;
       }
-      setText("");
-      setWorkspaceFiles([]);
+      clearAcceptedComposerDraft({
+        taskId: activeTaskId,
+        result,
+        attachments: nextAttachments,
+        reviewCommentIds: preparedReview.commentIds
+      });
       submissionIdRef.current = undefined;
-      if (!result.retainsAttachmentPreviews) revokeDraftAttachments(nextAttachments);
-      useTaskDraftStore.getState().setAttachments(activeTaskId, []);
     } catch (error) {
       setSubmissionError(error instanceof Error ? error.message : messages.composer.attachmentReadFailed);
     } finally {

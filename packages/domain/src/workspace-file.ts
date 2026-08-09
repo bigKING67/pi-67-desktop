@@ -26,6 +26,25 @@ export interface WorkspaceFileSearchResult {
   visited: number;
 }
 
+export interface WorkspaceFileContentSearchMatch {
+  entry: WorkspaceFileEntry;
+  line: number;
+  column: number;
+  snippet: string;
+  snippetTruncated: boolean;
+}
+
+export interface WorkspaceFileContentSearchResult {
+  workspaceId: string;
+  query: string;
+  matches: WorkspaceFileContentSearchMatch[];
+  filesVisited: number;
+  bytesVisited: number;
+  skippedCount: number;
+  truncated: boolean;
+  incomplete: boolean;
+}
+
 export type WorkspaceFileOpenKind = "text" | "binary" | "oversized" | "unsupported";
 
 export interface WorkspaceFileOpenResult {

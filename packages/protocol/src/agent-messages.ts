@@ -38,6 +38,8 @@ import type {
   UserMessageIndexPage,
   WorkspaceChangesProjection,
   WorkspaceMessageSearchResult,
+  UsageReport,
+  UsageWindow,
   WorkspaceTrust
 } from "@pi67/domain";
 import type {
@@ -52,6 +54,7 @@ import type {
 } from "./provider-configuration-schemas.js";
 import type { ProtocolError } from "./protocol-error.js";
 import type { RuntimeDiagnostics } from "./runtime-diagnostics-contract.js";
+import type { SessionCreationResolution } from "./session-creation-resolution-contract.js";
 import type {
   WorkspaceFileCommandPayloads,
   WorkspaceFileCommandResults
@@ -71,31 +74,15 @@ export type {
   SessionCatalogMutationResult,
   SessionNameMutation
 } from "./conversation-organization-messages.js";
+export {
+  MAX_SESSION_CREATION_ID_CHARS,
+  type SessionCreationResolution
+} from "./session-creation-resolution-contract.js";
 export interface PromptAttachmentRef { id: string; }
 export interface PromptWorkspaceFileRef {
   id: string;
   revision: string;
 }
-
-export const MAX_SESSION_CREATION_ID_CHARS = 128;
-
-export type SessionCreationResolution =
-  | {
-      status: "materialized";
-      creationId: string;
-      sessionId: string;
-      sessionFileIdentity: string;
-      sessionPath: string;
-    }
-  | {
-      status: "missing" | "ambiguous";
-      creationId: string;
-    }
-  | {
-      status: "unavailable";
-      creationId: string;
-      reason: "scan-limit" | "storage-error";
-    };
 
 export const ALLOWED_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 
@@ -251,6 +238,7 @@ export interface CommandPayloads extends
   "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogQuery;
   "session.catalog.contentSearch": { query: string };
+  "workspace.usage.report": { window: UsageWindow };
   "session.tree": Record<string, never>;
   "message.page": { direction: "older" | "newer"; cursor?: string; limit?: number };
   "message.index": { offset?: number; limit?: number };
@@ -364,6 +352,7 @@ export interface CommandResults extends
   "task.toolMode.set": { mode: TaskToolMode };
   "session.catalog.query": SessionCatalogPageResult;
   "session.catalog.contentSearch": WorkspaceMessageSearchResult;
+  "workspace.usage.report": UsageReport;
   "session.tree": SessionTreeProjection;
   "message.page": ConversationPage;
   "message.index": UserMessageIndexPage;

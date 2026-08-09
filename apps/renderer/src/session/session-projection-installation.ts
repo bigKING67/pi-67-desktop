@@ -75,6 +75,7 @@ export function beginSessionSnapshotReplacement(
       queue: undefined,
       resources: undefined,
       usage: undefined,
+      compatibility: undefined,
       revisions: incrementAllSessionProjectionRevisions(state.revisions)
     }
   };
@@ -109,6 +110,7 @@ export function commitSessionSnapshotReplacement(
       queue: queueProjectionFromSnapshot(snapshot),
       resources: snapshot.resources,
       usage: snapshot.stats,
+      compatibility: snapshot.compatibility,
       recoverySessionFileIdentity: snapshot.sessionFileIdentity,
       recoverySessionPath: snapshot.sessionPath,
       revisions: incrementAllSessionProjectionRevisions(state.revisions)
@@ -132,6 +134,7 @@ export function resetSessionProjection(
     queue: undefined,
     resources: undefined,
     usage: undefined,
+    compatibility: undefined,
     recoverySessionFileIdentity: options?.preserveRecoverySessionIdentity
       ? state.recoverySessionFileIdentity
       : undefined,

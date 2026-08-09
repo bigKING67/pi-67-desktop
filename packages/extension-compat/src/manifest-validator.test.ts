@@ -49,6 +49,18 @@ describe("Extension Adapter manifest v1", () => {
     }).toThrow();
   });
 
+  it("accepts delegated as declarative presentation metadata", () => {
+    const input = validManifest();
+    input.tools = {
+      delegate_task: { presentation: "delegated", label: "Delegate task" }
+    };
+
+    expect(parseExtensionAdapterManifest(input).tools.delegate_task).toEqual({
+      presentation: "delegated",
+      label: "Delegate task"
+    });
+  });
+
   it("requires the exact v1 root shape and at least one declared surface", () => {
     const missing = validManifest();
     delete missing.versionRange;

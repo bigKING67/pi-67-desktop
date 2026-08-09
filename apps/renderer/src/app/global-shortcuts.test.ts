@@ -91,6 +91,16 @@ describe("global shortcuts", () => {
     expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(true);
   });
 
+  it("closes keyboard help on Escape even before the lazy dialog takes focus", () => {
+    useShellStore.setState({ keyboardShortcutsDialogOpen: true });
+    const escape = shortcut("Escape", { ctrlKey: false });
+
+    handleGlobalShortcut(escape.event);
+
+    expect(escape.preventDefault).toHaveBeenCalledOnce();
+    expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(false);
+  });
+
   it("creates Sessions only when the latest state has Workspace authority", () => {
     const blocked = shortcut("n");
     handleGlobalShortcut(blocked.event);

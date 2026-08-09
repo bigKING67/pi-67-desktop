@@ -15,12 +15,22 @@ import {
   analyzeSecurityLiteral,
   type SecurityLiteralCategory
 } from "./security-literal.js";
+import {
+  stopInteractiveRendererTask,
+  taskIdForInteractiveStop
+} from "../workbench/task-stop-controller.js";
+import { useWorkbenchStore } from "../workbench/workbench-store.js";
 
 export function ApprovalDialog() {
   const request = useApprovalStore((state) => state.requests[0]);
+  useWorkbenchStore((state) => state.tasks);
   const [submittingDecision, setSubmittingDecision] = useState<ApprovalResponseDecision>();
+  const [stoppingTask, setStoppingTask] = useState(false);
 
-  useEffect(() => setSubmittingDecision(undefined), [request?.requestId]);
+  useEffect(() => {
+    setSubmittingDecision(undefined);
+    setStoppingTask(false);
+  }, [request?.requestId]);
   if (!request) return null;
 
   const toolName = analyzeSecurityLiteral(request.toolName);
@@ -37,9 +47,10 @@ export function ApprovalDialog() {
     ...target.categories,
     ...cwd.categories
   ]);
+  const stoppableTaskId = taskIdForInteractiveStop(request);
 
   const submit = async (decision: ApprovalResponseDecision) => {
-    if (submittingDecision) return;
+    if (submittingDecision || stoppingTask) return;
     setSubmittingDecision(decision);
     const resolved = await respondToSafetyApproval(
       () => useAppStore.getState(),
@@ -49,6 +60,15 @@ export function ApprovalDialog() {
     if (!resolved && useApprovalStore.getState().requests.some(
       (candidate) => candidate.requestId === request.requestId
     )) setSubmittingDecision(undefined);
+  };
+  const stopTask = async () => {
+    if (submittingDecision || stoppingTask) return;
+    setStoppingTask(true);
+    if (await stopInteractiveRendererTask(request)) {
+      useApprovalStore.getState().removeRequestIfCurrent(request);
+      return;
+    }
+    if (useApprovalStore.getState().requests.includes(request)) setStoppingTask(false);
   };
 
   return (
@@ -115,21 +135,30 @@ export function ApprovalDialog() {
               <p className={styles.yoloNotice}>{messages.approval.yoloNotice}</p>
             </div>
             <div className={`dialog-actions ${styles.actions}`}>
-              <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined} onPress={() => void submit("deny")}>
+              <Button autoFocus className="secondary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("deny")}>
                 {submittingDecision === "deny" ? messages.approval.submitting : messages.approval.deny}
               </Button>
-              <Button className="primary-button" isDisabled={submittingDecision !== undefined} onPress={() => void submit("allow-once")}>
+              <Button className="primary-button" isDisabled={submittingDecision !== undefined || stoppingTask} onPress={() => void submit("allow-once")}>
                 {submittingDecision === "allow-once" ? messages.approval.submitting : messages.approval.allowOnce}
               </Button>
               <Button
                 className={styles.yoloButton!}
-                isDisabled={submittingDecision !== undefined}
+                isDisabled={submittingDecision !== undefined || stoppingTask}
                 onPress={() => void submit("enable-task-yolo-and-allow")}
               >
                 {submittingDecision === "enable-task-yolo-and-allow"
                   ? messages.approval.submitting
                   : messages.approval.enableTaskYolo}
               </Button>
+              {stoppableTaskId ? (
+                <Button
+                  className="danger-button"
+                  isDisabled={submittingDecision !== undefined || stoppingTask}
+                  onPress={() => void stopTask()}
+                >
+                  {stoppingTask ? "正在停止任务" : "停止整个任务"}
+                </Button>
+              ) : null}
             </div>
           </div>
         </Dialog>

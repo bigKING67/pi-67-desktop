@@ -301,9 +301,9 @@ function isSettingsSection(value: unknown): value is SettingsSection {
     "skills",
     "prompts",
     "rules",
-    "mcp",
     "integrations",
     "runtime",
+    "usage",
     "network",
     "updates",
     "about"
@@ -334,7 +334,9 @@ export function parseWorkbenchSettings(
       ? "prompts"
       : value.section === "packages"
         ? "extensions"
-        : value.section;
+        : value.section === "mcp"
+          ? "integrations"
+          : value.section;
   if (!isSettingsSection(section)) return undefined;
   if (value.scope === "global") {
     if (value.workspaceId !== undefined) return undefined;
@@ -429,7 +431,6 @@ function taskLifecycleWasLive(lifecycle: TaskLifecycle): boolean {
 function settingsSectionIsGlobalOnly(section: SettingsSection): boolean {
   return section === "account"
     || section === "general"
-    || section === "mcp"
     || section === "integrations"
     || section === "network"
     || section === "updates"

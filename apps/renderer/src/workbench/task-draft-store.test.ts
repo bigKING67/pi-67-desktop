@@ -43,6 +43,7 @@ describe("task draft store", () => {
       text: "preserve this draft",
       attachments: [attachment],
       workspaceFiles: [],
+      reviewComments: [],
       promptStash: [],
       streamBehavior: "steer",
       interactionMode: "execute"
@@ -77,6 +78,7 @@ describe("task draft store", () => {
       text: "restored",
       attachments: [],
       workspaceFiles: [],
+      reviewComments: [],
       promptStash: [],
       streamBehavior: "steer",
       interactionMode: "execute"
@@ -102,6 +104,7 @@ describe("task draft store", () => {
       text: "",
       attachments: [],
       workspaceFiles: [],
+      reviewComments: [],
       promptStash: [],
       streamBehavior: "steer",
       interactionMode: "execute"
@@ -154,6 +157,20 @@ describe("task draft store", () => {
     })).toBe("too-large");
     expect(useTaskDraftStore.getState().drafts.task?.promptStash).toHaveLength(8);
   });
+
+  it("keeps bounded review comments as draft content and clears only acknowledged ids", () => {
+    const comment = reviewComment("review-a", "Please keep the error observable.");
+    const store = useTaskDraftStore.getState();
+    expect(store.addReviewComment("task", comment)).toBe("added");
+    expect(store.addReviewComment("task", comment)).toBe("duplicate");
+    expect(store.transfer("task", "target")).toBe("moved");
+    expect(useTaskDraftStore.getState().drafts.target?.reviewComments).toEqual([comment]);
+
+    store.addReviewComment("target", reviewComment("review-b", "Keep this newer note."));
+    store.removeReviewComments("target", ["review-a"]);
+    expect(useTaskDraftStore.getState().drafts.target?.reviewComments.map((item) => item.id))
+      .toEqual(["review-b"]);
+  });
 });
 
 function draftAttachment(): DraftAttachment {
@@ -165,5 +182,22 @@ function draftAttachment(): DraftAttachment {
     kind: "image",
     identity: ["draft.png", "image/png", "1", "1"].join("\0"),
     previewUrl: "blob:draft"
+  };
+}
+
+function reviewComment(id: string, body: string) {
+  return {
+    id,
+    authority: {
+      source: "session" as const,
+      workspaceId: "workspace-a",
+      sessionFileIdentity: "session-file-a",
+      toolCallId: "tool-a",
+      contentFingerprint: "12:abcd"
+    },
+    anchor: { section: "session" as const, side: "new" as const, startLine: 4, endLine: 4 },
+    body,
+    createdAt: 1,
+    file: { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
   };
 }

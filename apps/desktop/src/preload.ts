@@ -47,7 +47,6 @@ import {
 } from "@pi67/protocol/worktree-creation-result-validation";
 import { isTrustedRendererOrigin } from "./renderer-security.js";
 import { stagePromptAttachmentsFromPreload } from "./prompt-attachment-preload.js";
-import type { TeamMcpRevealResult, TeamMcpStatus } from "./team-mcp-settings.js";
 import type {
   WorkbenchLayoutV5,
   WorkbenchStateV5
@@ -236,12 +235,6 @@ const systemBridge = {
   verifyBrowser67Extension: (options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot> => (
     ipcRenderer.invoke("pi67:browser67-extension-verify", options)
   ),
-  getTeamMcpStatus: (): Promise<TeamMcpStatus> => ipcRenderer.invoke("pi67:team-mcp-status"),
-  revealTeamMcpToken: (): Promise<TeamMcpRevealResult> => ipcRenderer.invoke("pi67:team-mcp-reveal"),
-  saveTeamMcpToken: (token: string): Promise<TeamMcpStatus> => (
-    ipcRenderer.invoke("pi67:team-mcp-save", token)
-  ),
-  clearTeamMcpToken: (): Promise<TeamMcpStatus> => ipcRenderer.invoke("pi67:team-mcp-clear"),
   getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
   onUpdateStateChanged: (listener: (state: unknown) => void): (() => void) => {

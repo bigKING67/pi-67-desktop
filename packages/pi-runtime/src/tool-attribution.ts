@@ -176,6 +176,7 @@ function toolPresentationKind(
   if (adapter.presentation === "command") return "shell";
   if (adapter.presentation === "read") return "read";
   if (adapter.presentation === "change") return "edit";
+  if (adapter.presentation === "delegated") return "subagent";
   return "generic";
 }
 
@@ -256,7 +257,11 @@ function projectAdapter(toolName: string, adapter: ToolAdapterView): ToolAdapter
 }
 
 function isPresentation(value: string): value is ToolAdapterView["presentation"] {
-  return value === "generic" || value === "command" || value === "read" || value === "change";
+  return value === "generic"
+    || value === "command"
+    || value === "read"
+    || value === "change"
+    || value === "delegated";
 }
 
 function isSessionGeneration(value: number): boolean {

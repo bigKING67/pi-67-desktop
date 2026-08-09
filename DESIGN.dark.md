@@ -102,6 +102,11 @@ spacing, component states, and motion as `DESIGN.md`.
   theme-specific information architecture. `第 N 轮`/`当前操作` grouping and
   `未查看`/`已查看` state remain readable by text and luminance rather than hue; a
   revision returning to unread never becomes a glowing attention badge.
+- A reviewable Diff line uses one quiet selected-row luminance plus the existing
+  focus ring; added/removed foreground contrast remains readable underneath it.
+  `Reviewed`, pending comments, stale comment chips, disabled non-mappable review,
+  destructive removal, loading, and error states use text/icon/border semantics in
+  both themes rather than success/warning hue alone.
 - The Timeline Plan proposal card uses a neutral raised surface with a restrained
   accent border, not a luminous green panel. Markdown owns a bounded scroll region;
   disclosure, copy, focus, and historical status remain visible, but execution
@@ -116,6 +121,17 @@ spacing, component states, and motion as `DESIGN.md`.
   legible without a green success surface. Current/Workspace conversation search uses
   the same neutral overlay grammar; match selection, incomplete results, and focused
   navigation never resemble a Web Search on/off state.
+- Session compatibility and Usage incomplete-coverage warnings use the same quiet
+  warning surface, visible focus, and bounded actions as light mode. Usage bars keep
+  sufficient contrast without neon accent, tables remain horizontally contained at
+  narrow widths, and loading/empty/disconnected/error states preserve the same layout.
+- Verified `delegated` Tool rows retain ordinary Tool-card geometry. Running,
+  completed, and failed states remain distinguishable by icon, copy, and contrast;
+  dark styling never implies a child-agent roster or extra model/token evidence.
+- Blocking Approval and Extension dialogs keep current-interaction actions separate
+  from `停止整个任务`; danger, pending, disabled, focus, and failure remain legible
+  at constrained height. The retired Team MCP/Tavily Settings surface has no
+  dark-theme-only replacement.
 - Doctor's `运行健康` group uses the same neutral compact rows as environment and
   recovery. Queue/latency/heartbeat counts remain secondary text; warning and fail
   states use semantic icon, border, and text without animated gauges or glow.

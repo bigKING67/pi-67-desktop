@@ -81,6 +81,26 @@ describe("session projection store", () => {
     expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
   });
 
+  it("installs compatibility only with the exact Session snapshot authority", () => {
+    const compatibility = {
+      status: "future-format" as const,
+      currentSupportedVersion: 3,
+      sessionFormatVersion: 4,
+      unknownEntryCount: 2,
+      unrenderableMessageCount: 1,
+      mutationSafe: false
+    };
+
+    installSessionProjectionFixture(CONNECTION, {
+      ...snapshot("session-1"),
+      compatibility
+    }, 3);
+
+    expect(useSessionProjectionStore.getState().compatibility).toEqual(compatibility);
+    useSessionProjectionStore.getState().reset();
+    expect(useSessionProjectionStore.getState().compatibility).toBeUndefined();
+  });
+
   it("rejects proposed plans from stale Session authority", () => {
     installSessionProjectionFixture(CONNECTION, snapshot("session-1"), 3);
     const plan = {

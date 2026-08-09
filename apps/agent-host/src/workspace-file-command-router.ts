@@ -26,15 +26,18 @@ import {
   WorkspaceFileAccess,
   workspaceFileChanged
 } from "./workspace-file-access.js";
+import { searchWorkspaceFileContent } from "./workspace-file-content-search.js";
 import {
   isWorkspaceFileMutation,
   WorkspaceFileMutations
 } from "./workspace-file-mutations.js";
+import { WORKSPACE_GENERATED_DIRECTORIES } from "./workspace-file-search-policy.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 
 export type WorkspaceFileCommandType =
   | "workspace.file.list"
   | "workspace.file.search"
+  | "workspace.file.contentSearch"
   | "workspace.file.resolve"
   | "workspace.file.open"
   | "workspace.file.save"
@@ -43,20 +46,6 @@ export type WorkspaceFileCommandType =
 
 type WorkspaceFileCommand = AgentCommand<WorkspaceFileCommandType>;
 type WorkspaceFileResult = CommandResults[WorkspaceFileCommandType];
-
-const GENERATED_DIRECTORIES = new Set([
-  ".cache",
-  ".next",
-  ".pnpm",
-  ".turbo",
-  "artifacts",
-  "build",
-  "coverage",
-  "dist",
-  "node_modules",
-  "out",
-  "release"
-]);
 
 export class WorkspaceFileCommandRouter {
   private readonly access: WorkspaceFileAccess;
@@ -101,7 +90,8 @@ export class WorkspaceFileCommandRouter {
   dispatch(
     context: WorkspaceProtocolContext,
     command: WorkspaceFileCommand,
-    idempotencyKey?: string
+    idempotencyKey?: string,
+    options: { signal?: AbortSignal } = {}
   ): Promise<WorkspaceFileResult> {
     if (isWorkspaceFileMutation(command)) {
       if (!idempotencyKey) {
@@ -115,6 +105,9 @@ export class WorkspaceFileCommandRouter {
     }
     if (command.type === "workspace.file.list") return this.list(context, command.payload);
     if (command.type === "workspace.file.search") return this.search(context, command.payload);
+    if (command.type === "workspace.file.contentSearch") {
+      return searchWorkspaceFileContent(this.access, context, command.payload, options.signal);
+    }
     if (command.type === "workspace.file.resolve") return this.resolveEntry(context, command.payload.relativePath);
     return this.openFile(context, command.payload.id);
   }
@@ -144,7 +137,7 @@ export class WorkspaceFileCommandRouter {
     )))).filter((entry) => (
       payload.includeGenerated
       || entry.kind !== "directory"
-      || !GENERATED_DIRECTORIES.has(entry.name)
+      || !WORKSPACE_GENERATED_DIRECTORIES.has(entry.name)
     )).sort(compareWorkspaceFileEntries);
     const offset = parseCursor(payload.cursor);
     const limit = Math.min(MAX_WORKSPACE_FILE_PAGE_ITEMS, payload.limit ?? MAX_WORKSPACE_FILE_PAGE_ITEMS);
@@ -205,7 +198,7 @@ export class WorkspaceFileCommandRouter {
           continue;
         }
         const skipDirectory = entry.kind === "directory" && (
-          name === ".git" || (!payload.includeGenerated && GENERATED_DIRECTORIES.has(name))
+          name === ".git" || (!payload.includeGenerated && WORKSPACE_GENERATED_DIRECTORIES.has(name))
         );
         if (!skipDirectory && relativePath.toLocaleLowerCase().includes(needle)) entries.push(entry);
         if (entries.length >= MAX_WORKSPACE_FILE_SEARCH_RESULTS) break;
@@ -340,6 +333,7 @@ export class WorkspaceFileCommandRouter {
 export function isWorkspaceFileCommand(type: AgentCommandType): type is WorkspaceFileCommandType {
   return type === "workspace.file.list"
     || type === "workspace.file.search"
+    || type === "workspace.file.contentSearch"
     || type === "workspace.file.resolve"
     || type === "workspace.file.open"
     || type === "workspace.file.save"

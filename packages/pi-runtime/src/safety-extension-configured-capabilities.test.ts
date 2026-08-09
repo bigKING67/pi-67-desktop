@@ -104,20 +104,20 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
     }), expect.any(Object));
   });
 
-  it("auto-allows task-scoped JS-Reverse instrumentation and configured Tavily reads", async () => {
+  it("auto-allows task-scoped JS-Reverse instrumentation and configured MCP reads", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>();
     const tools = [
       packageTool("js_reverse_remove_hook", "npm:pi-mcp-adapter@2.11.0"),
-      packageTool("tavily_bridge_tavily_search", "npm:pi-mcp-adapter@2.11.0")
+      packageTool("docs_source_search", "npm:pi-mcp-adapter@2.11.0")
     ];
     const handler = await safetyHandler(autoPolicy(), requestApproval, tools, ["pi-mcp-adapter"], {
       mcpServers: {
         "js-reverse": { command: "redacted", directTools: true },
-        "tavily-bridge": { url: "https://redacted.invalid", directTools: ["tavily_search"] }
+        "docs-source": { url: "https://redacted.invalid", directTools: ["search"] }
       },
       cache: {
         "js-reverse": ["remove_hook"],
-        "tavily-bridge": ["tavily_search"]
+        "docs-source": ["search"]
       }
     });
 
@@ -127,8 +127,8 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
       input: { hook_id: "hook-1" }
     }, { hasUI: true })).resolves.toBeUndefined();
     await expect(handler({
-      toolCallId: "tavily-search",
-      toolName: "tavily_bridge_tavily_search",
+      toolCallId: "docs-search",
+      toolName: "docs_source_search",
       input: { query: "fixture" }
     }, { hasUI: true })).resolves.toBeUndefined();
     expect(requestApproval).not.toHaveBeenCalled();

@@ -32,7 +32,6 @@ describe("settings navigation", () => {
       {
         label: "连接与集成",
         items: [
-          { id: "mcp", label: "MCP 服务" },
           { id: "integrations", label: "浏览器集成" }
         ]
       },
@@ -40,6 +39,7 @@ describe("settings navigation", () => {
         label: "系统与支持",
         items: [
           { id: "runtime", label: "运行服务" },
+          { id: "usage", label: "用量分析" },
           { id: "network", label: "下载源与网络" },
           { id: "updates", label: "更新与诊断" },
           { id: "about", label: "关于" }
@@ -59,9 +59,9 @@ describe("settings navigation", () => {
     const extension = items.find((item) => item.id === "extensions");
     const prompt = items.find((item) => item.id === "prompts");
     const rule = items.find((item) => item.id === "rules");
-    const mcp = items.find((item) => item.id === "mcp");
     const browserIntegration = items.find((item) => item.id === "integrations");
     const runtime = items.find((item) => item.id === "runtime");
+    const usage = items.find((item) => item.id === "usage");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
     expect(extension && matchesSettingsQuery(extension, "extension")).toBe(true);
@@ -75,16 +75,15 @@ describe("settings navigation", () => {
     expect(sectionSupportsProjectScope("skills")).toBe(false);
     expect(prompt && matchesSettingsQuery(prompt, "prompts")).toBe(true);
     expect(rule && matchesSettingsQuery(rule, "rules")).toBe(true);
-    expect(mcp && matchesSettingsQuery(mcp, "tavily")).toBe(true);
-    expect(mcp && matchesSettingsQuery(mcp, "client token")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "browser67")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "doctor")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "tavily")).toBe(false);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
+    expect(usage && matchesSettingsQuery(usage, "usage")).toBe(true);
+    expect(usage && matchesSettingsQuery(usage, "token")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
     expect(sectionSupportsProjectScope("providers")).toBe(false);
     expect(sectionSupportsProjectScope("rules")).toBe(false);
-    expect(sectionSupportsProjectScope("mcp")).toBe(false);
     expect(sectionSupportsProjectScope("integrations")).toBe(false);
     expect(sectionSupportsProjectScope("runtime")).toBe(false);
     expect(items.every((item) => !("measure" in item))).toBe(true);

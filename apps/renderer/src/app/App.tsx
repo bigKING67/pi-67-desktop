@@ -32,6 +32,7 @@ const CredentialDialog = lazy(() => import("../settings/CredentialDialog.js").th
 const UpdateDialog = lazy(() => import("../updates/UpdateDialog.js").then((module) => ({ default: module.UpdateDialog })));
 const SessionTreeDialog = lazy(() => import("../session-tree/SessionTreeDialog.js").then((module) => ({ default: module.SessionTreeDialog })));
 const WorkspaceConversationSearchDialog = lazy(() => import("../search/WorkspaceConversationSearchDialog.js").then((module) => ({ default: module.WorkspaceConversationSearchDialog })));
+const WorkspaceContentSearchDialog = lazy(() => import("../search/WorkspaceContentSearchDialog.js").then((module) => ({ default: module.WorkspaceContentSearchDialog })));
 const KeyboardShortcutsDialog = lazy(() => import("../help/KeyboardShortcutsDialog.js").then((module) => ({ default: module.KeyboardShortcutsDialog })));
 
 export function App() {
@@ -190,6 +191,7 @@ export function App() {
       )}
       <NotificationToasts />
       <Suspense fallback={null}><WorkspaceConversationSearchDialog /></Suspense>
+      <Suspense fallback={null}><WorkspaceContentSearchDialog /></Suspense>
       {keyboardShortcutsDialogOpen && !blockingOverlayOpen ? (
         <LazySurfaceBoundary
           description="关闭后可通过 Cmd/Ctrl+/ 或帮助菜单重新打开。"

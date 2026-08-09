@@ -6,6 +6,7 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 import {
   createWorkspaceEntry,
+  openWorkspaceContentSearchMatch,
   openWorkspaceFileByRelativePath,
   reloadWorkspaceFile,
   renameWorkspaceEntry,
@@ -83,6 +84,70 @@ describe("workspace file controller Markdown links", () => {
       level: "error",
       title: "无法打开工作区链接",
       message: "工作区当前不可用。"
+    });
+  });
+
+  it("opens an exact content-search revision and records line navigation without persisting the snippet", async () => {
+    const entry = fileEntry();
+    const store = workspaceFileStore.getState();
+    store.beginOpen("workspace-a", entry);
+    store.installOpenResult("workspace-a", {
+      id: entry.id,
+      relativePath: entry.relativePath,
+      kind: "text",
+      totalBytes: 18,
+      revision: entry.revision,
+      content: "export const pi = 67;"
+    });
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await expect(openWorkspaceContentSearchMatch(workspace(), {
+      entry,
+      line: 1,
+      column: 14,
+      snippet: "secret search snippet",
+      snippetTruncated: false
+    })).resolves.toBe(true);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(workspaceFileStore.getState().workspaces["workspace-a"]?.navigation).toMatchObject({
+      relativePath: "src/main.ts",
+      revision: "revision-1",
+      line: 1,
+      column: 14
+    });
+    expect(JSON.stringify(workspaceFileStore.getState().workspaces["workspace-a"]?.byPath)).not.toContain(
+      "secret search snippet"
+    );
+  });
+
+  it("fails closed when an old content-search hit conflicts with a dirty editor", async () => {
+    const entry = fileEntry();
+    const store = workspaceFileStore.getState();
+    store.beginOpen("workspace-a", entry);
+    store.installOpenResult("workspace-a", {
+      id: entry.id,
+      relativePath: entry.relativePath,
+      kind: "text",
+      totalBytes: 18,
+      revision: entry.revision,
+      content: "export const pi = 67;"
+    });
+    store.updateContent("workspace-a", entry.relativePath, "unsaved draft");
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await expect(openWorkspaceContentSearchMatch(workspace(), {
+      entry: { ...entry, revision: "revision-old" },
+      line: 1,
+      column: 1,
+      snippet: "old",
+      snippetTruncated: false
+    })).resolves.toBe(false);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "搜索结果已过期"
     });
   });
 });

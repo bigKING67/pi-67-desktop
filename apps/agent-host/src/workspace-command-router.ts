@@ -17,6 +17,7 @@ import {
 } from "./workspace-conversation-command-router.js";
 import type { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { mutationFingerprint } from "./workspace-mutation-fingerprint.js";
+import { createWorkspaceUsageReport } from "./workspace-usage-report.js";
 
 export { isWorkspaceConversationCommand };
 
@@ -90,6 +91,14 @@ export class WorkspaceCommandRouter {
         context: { scope: "workspace", workspaceId }
       });
     });
+  }
+
+  async usageReport(
+    context: WorkspaceProtocolContext,
+    command: AgentCommand<"workspace.usage.report">,
+    signal?: AbortSignal
+  ): Promise<CommandResults["workspace.usage.report"]> {
+    return createWorkspaceUsageReport(this.workspaces, context, command, signal);
   }
 
   async shutdown(): Promise<void> {

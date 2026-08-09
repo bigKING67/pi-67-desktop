@@ -9,9 +9,26 @@ import {
 } from "@pi67/domain";
 import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
-import { ExtensionCatalogSchema } from "./extension-catalog-schemas.js";
+import {
+  ExtensionCatalogSchema,
+  ExtensionToolAdapterSchema
+} from "./extension-catalog-schemas.js";
 
 describe("ExtensionCatalogSchema", () => {
+  it("accepts delegated presentation only as bounded Adapter metadata", () => {
+    expect(Value.Check(ExtensionToolAdapterSchema, {
+      adapterId: "verified-delegation",
+      package: "@verified/delegation",
+      presentation: "delegated",
+      label: "Delegate task"
+    })).toBe(true);
+    expect(Value.Check(ExtensionToolAdapterSchema, {
+      adapterId: "verified-delegation",
+      package: "@verified/delegation",
+      presentation: "subagent"
+    })).toBe(false);
+  });
+
   it("accepts a bounded per-surface catalog", () => {
     expect(Value.Check(ExtensionCatalogSchema, catalog())).toBe(true);
   });

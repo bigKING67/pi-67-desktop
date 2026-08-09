@@ -14,12 +14,14 @@ interface RepositoryWorkingTreeState {
   detailLoadingId: string | undefined;
   detailError: string | undefined;
   viewedByWorkspace: Record<string, Record<string, string>>;
+  reviewedByWorkspace: Record<string, Record<string, string>>;
   begin(workspaceId: string): number;
   finish(workspaceId: string, requestRevision: number, snapshot: RepositoryWorkingTreeSnapshot): boolean;
   fail(workspaceId: string, requestRevision: number, error: string): boolean;
   beginDetail(workspaceId: string, revision: number, changeId: string): boolean;
   finishDetail(detail: RepositoryChangeDetail): boolean;
   failDetail(workspaceId: string, revision: number, changeId: string, error: string): boolean;
+  markReviewed(workspaceId: string, detail: RepositoryChangeDetail): boolean;
   reset(): void;
 }
 
@@ -32,7 +34,8 @@ const INITIAL = {
   detailByChangeId: {},
   detailLoadingId: undefined,
   detailError: undefined,
-  viewedByWorkspace: {}
+  viewedByWorkspace: {},
+  reviewedByWorkspace: {}
 };
 
 export const useRepositoryWorkingTreeStore = create<RepositoryWorkingTreeState>((set, get) => ({
@@ -113,6 +116,27 @@ export const useRepositoryWorkingTreeStore = create<RepositoryWorkingTreeState>(
     set({ detailLoadingId: undefined, detailError });
     return true;
   },
+  markReviewed(workspaceId, detail) {
+    const state = get();
+    const snapshot = state.snapshot;
+    if (
+      !snapshot
+      || snapshot.workspaceId !== workspaceId
+      || snapshot.revision !== detail.revision
+      || detail.workspaceId !== workspaceId
+      || state.detailByChangeId[detail.changeId]?.contentFingerprint !== detail.contentFingerprint
+    ) return false;
+    set({
+      reviewedByWorkspace: {
+        ...state.reviewedByWorkspace,
+        [workspaceId]: {
+          ...state.reviewedByWorkspace[workspaceId],
+          [detail.changeId]: detail.contentFingerprint
+        }
+      }
+    });
+    return true;
+  },
   reset() { set({ ...INITIAL, requestRevision: get().requestRevision + 1 }); }
 }));
 
@@ -125,5 +149,17 @@ export function repositoryChangeViewed(
     detail
     && detail.workspaceId === workspaceId
     && viewed?.[detail.changeId] === detail.contentFingerprint
+  );
+}
+
+export function repositoryChangeReviewed(
+  workspaceId: string,
+  detail: RepositoryChangeDetail | undefined,
+  reviewed: Readonly<Record<string, string>> | undefined
+): boolean {
+  return Boolean(
+    detail
+    && detail.workspaceId === workspaceId
+    && reviewed?.[detail.changeId] === detail.contentFingerprint
   );
 }

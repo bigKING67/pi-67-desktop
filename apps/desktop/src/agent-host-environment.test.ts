@@ -1,14 +1,6 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { agentHostEnvironment } from "./agent-host-environment.js";
-
-const tempDirs: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
 
 describe("Agent Host environment", () => {
   it("overrides externally supplied storage and telemetry paths with Main-owned values", () => {
@@ -76,7 +68,6 @@ describe("Agent Host environment", () => {
         gitExecPath
       },
       capabilitiesRoot: "/app/resources/capabilities",
-      teamMcpResourcesRoot: "/app/resources/team-mcp",
       promptAttachmentRoot: "/app/user-data/transient/prompt-attachments/run-a",
       packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
       packaged: true,
@@ -86,7 +77,6 @@ describe("Agent Host environment", () => {
     expect(environment).toMatchObject({
       PI_CODING_AGENT_DIR: "/Users/test/.pi/agent",
       PI67_PACKAGED: "1",
-      PI67_TEAM_MCP_RESOURCES: "/app/resources/team-mcp",
       PI67_NODE_EXECUTABLE: nodeExecutable,
       PI67_NPM_CLI: npmCli,
       PI67_GIT_EXECUTABLE: gitExecutable,
@@ -104,79 +94,18 @@ describe("Agent Host environment", () => {
     ]);
   });
 
-  it("injects the team MCP token from the userData path without requiring an existing env value", async () => {
-    const { mkdir } = await import("node:fs/promises");
-    const userData = await mkdtemp(join(tmpdir(), "pi67-team-mcp-env-"));
-    tempDirs.push(userData);
-    const tokenDir = join(userData, "team-mcp");
-    await mkdir(tokenDir, { recursive: true });
-    const tokenPath = join(tokenDir, "tavily-bridge.token");
-    const token = "mcp_envtestprefix.0123456789abcdef0123456789abcdef";
-    await writeFile(tokenPath, `${token}\n`, "utf8");
-
-    const environment = agentHostEnvironment({}, {
-      storageRoot: "/app/user-data",
-      capabilityProbeDirectory: "/app/user-data",
-      sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
-    }, {
-      agentDir: "/Users/test/.pi/agent",
-      toolchain: {
-        root: "/app/resources/toolchain",
-        ready: false,
-        packaged: true,
-        platform: "darwin",
-        architecture: "arm64",
-        nodeVersion: "24.18.0",
-        npmVersion: "12.0.1",
-        gitVersion: "2.53.0"
-      },
-      capabilitiesRoot: "/app/resources/capabilities",
-      teamMcpResourcesRoot: "/app/resources/team-mcp",
-      promptAttachmentRoot: "/app/user-data/transient/prompt-attachments/run-b",
-      teamMcpTokenPath: tokenPath,
-      packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
-      packaged: true,
-      electronExecutable: "/app/Pi-67 Desktop"
-    });
-
-    expect(environment.TAVILY_BRIDGE_MCP_TOKEN).toBe(token);
-    expect(environment.PI67_TEAM_MCP_TOKEN_PATH).toBe(tokenPath);
-    expect(JSON.stringify(environment)).toContain("TAVILY_BRIDGE_MCP_TOKEN");
-  });
-
-  it("does not override an already-provided team MCP token", async () => {
-    const resourcesRoot = await mkdtemp(join(tmpdir(), "pi67-team-mcp-env-keep-"));
-    tempDirs.push(resourcesRoot);
-    await writeFile(
-      join(resourcesRoot, "tavily-bridge.token"),
-      "mcp_resources.shouldnotwin0123456789abcdef\n",
-      "utf8"
-    );
+  it("strips retired Team MCP credentials and resource hints from the Host environment", () => {
     const environment = agentHostEnvironment({
-      TAVILY_BRIDGE_MCP_TOKEN: "mcp_already.set0123456789abcdef0123456789"
+      TAVILY_BRIDGE_MCP_TOKEN: "legacy-secret",
+      PI67_TEAM_MCP_RESOURCES: "/legacy/resources",
+      PI67_TEAM_MCP_TOKEN_PATH: "/legacy/token"
     }, {
       storageRoot: "/app/user-data",
       capabilityProbeDirectory: "/app/user-data",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
-    }, {
-      agentDir: "/Users/test/.pi/agent",
-      toolchain: {
-        root: "/app/resources/toolchain",
-        ready: false,
-        packaged: false,
-        platform: "darwin",
-        architecture: "arm64",
-        nodeVersion: "24.18.0",
-        npmVersion: "12.0.1",
-        gitVersion: "2.53.0"
-      },
-      capabilitiesRoot: "/app/resources/capabilities",
-      teamMcpResourcesRoot: resourcesRoot,
-      promptAttachmentRoot: "/app/user-data/transient/prompt-attachments/run-c",
-      packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
-      packaged: false,
-      electronExecutable: "/app/Pi-67 Desktop"
     });
-    expect(environment.TAVILY_BRIDGE_MCP_TOKEN).toBe("mcp_already.set0123456789abcdef0123456789");
+    expect(environment).not.toHaveProperty("TAVILY_BRIDGE_MCP_TOKEN");
+    expect(environment).not.toHaveProperty("PI67_TEAM_MCP_RESOURCES");
+    expect(environment).not.toHaveProperty("PI67_TEAM_MCP_TOKEN_PATH");
   });
 });

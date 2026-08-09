@@ -15,15 +15,7 @@ export async function installMockDesktopCapabilityBridge(
   const fixture = {
     capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0,
     capabilitySnapshot: createMockDesktopCapabilitySnapshot(),
-    packageNetworkSnapshot: createMockPackageNetworkSnapshot(),
-    teamMcpStatus: {
-      serverName: "tavily-bridge",
-      url: "https://tavily.example.test/mcp",
-      tokenEnv: "TAVILY_BRIDGE_MCP_TOKEN",
-      tokenPath: "/Users/test/Library/Application Support/Pi-67 Desktop/team-mcp/tavily-bridge.token",
-      configured: false,
-      tokenPrefix: undefined as string | undefined
-    }
+    packageNetworkSnapshot: createMockPackageNetworkSnapshot()
   };
 
   await page.addInitScript((bridgeFixture) => {
@@ -33,14 +25,10 @@ export async function installMockDesktopCapabilityBridge(
     };
     const systemFixture = fixtureWindow.__pi67SystemFixture ??= { methods: {} };
     let capabilitySnapshotCalls = 0;
-    let teamMcpToken: string | undefined;
-    let teamMcpStatus = structuredClone(bridgeFixture.teamMcpStatus);
     const settingsActionsTest = {
       packageSaves: [] as Array<Record<string, unknown>>,
       packageResets: 0,
       packageProbes: [] as Array<Record<string, unknown>>,
-      mcpSaves: 0,
-      mcpClears: 0,
       platformInfoCalls: 0
     };
 
@@ -149,34 +137,7 @@ export async function installMockDesktopCapabilityBridge(
           extensionCheckedAt: 1_784_800_000_100,
           registry: "https://registry.npmmirror.com"
         }]
-      }),
-      getTeamMcpStatus: async () => structuredClone(teamMcpStatus),
-      revealTeamMcpToken: async () => teamMcpToken
-        ? { status: "revealed", token: teamMcpToken }
-        : { status: "missing" },
-      saveTeamMcpToken: async (token: string) => {
-        settingsActionsTest.mcpSaves += 1;
-        teamMcpToken = token;
-        teamMcpStatus = {
-          ...teamMcpStatus,
-          configured: true,
-          tokenPrefix: `${token.split(".")[0] ?? "mcp"}…`
-        };
-        return structuredClone(teamMcpStatus);
-      },
-      clearTeamMcpToken: async () => {
-        settingsActionsTest.mcpClears += 1;
-        teamMcpToken = undefined;
-        teamMcpStatus = {
-          serverName: bridgeFixture.teamMcpStatus.serverName,
-          url: bridgeFixture.teamMcpStatus.url,
-          tokenEnv: bridgeFixture.teamMcpStatus.tokenEnv,
-          tokenPath: bridgeFixture.teamMcpStatus.tokenPath,
-          configured: false,
-          tokenPrefix: undefined
-        };
-        return structuredClone(teamMcpStatus);
-      }
+      })
     });
 
     Object.defineProperty(window, "__pi67SettingsTest", {

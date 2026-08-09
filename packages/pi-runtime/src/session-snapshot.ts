@@ -57,6 +57,7 @@ export function projectSessionSnapshot(
     followUpQueue: [...session.getFollowUpMessages()],
     tree: projectSessionTree(projection),
     resources: projectSessionResources(services, extensionsResult),
+    compatibility: projection.getCompatibility(),
     stats: {
       tokens: stats.tokens.total,
       cost: stats.cost,

@@ -21,7 +21,9 @@ import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
+import { WorkspaceUsageReportPayloadSchema } from "./usage-schemas.js";
 import {
+  WorkspaceFileContentSearchPayloadSchema,
   WorkspaceFileCreatePayloadSchema,
   WorkspaceFileListPayloadSchema,
   WorkspaceFileOpenPayloadSchema,
@@ -85,6 +87,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.changes": EmptyPayloadSchema,
   "workspace.file.list": WorkspaceFileListPayloadSchema,
   "workspace.file.search": WorkspaceFileSearchPayloadSchema,
+  "workspace.file.contentSearch": WorkspaceFileContentSearchPayloadSchema,
   "workspace.file.resolve": WorkspaceFileResolvePayloadSchema,
   "workspace.file.open": WorkspaceFileOpenPayloadSchema,
   "workspace.file.save": WorkspaceFileSavePayloadSchema,
@@ -96,6 +99,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "session.catalog.contentSearch": strictObject({
     query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
   }),
+  "workspace.usage.report": WorkspaceUsageReportPayloadSchema,
   "session.tree": EmptyPayloadSchema,
   "message.page": strictObject({
     direction: Type.Union([Type.Literal("older"), Type.Literal("newer")]),

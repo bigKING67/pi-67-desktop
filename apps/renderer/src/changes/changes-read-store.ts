@@ -6,12 +6,14 @@ const MAX_READ_CHANGES_PER_SESSION = 400;
 
 interface SessionChangesReadState {
   fingerprints: Record<string, string>;
+  reviewedFingerprints: Record<string, string>;
   touchedAt: number;
 }
 
 interface ChangesReadState {
   sessions: Record<string, SessionChangesReadState>;
   markViewed: (sessionKey: string, change: WorkspaceChangeView) => void;
+  markReviewed: (sessionKey: string, change: WorkspaceChangeView) => void;
   reset: () => void;
 }
 
@@ -33,7 +35,43 @@ export const useChangesReadStore = create<ChangesReadState>((set) => ({
       }
       const sessions = {
         ...state.sessions,
-        [sessionKey]: { fingerprints, touchedAt: Date.now() }
+        [sessionKey]: {
+          fingerprints,
+          reviewedFingerprints: current?.reviewedFingerprints ?? {},
+          touchedAt: Date.now()
+        }
+      };
+      const sessionKeys = Object.keys(sessions);
+      if (sessionKeys.length > MAX_READ_SESSIONS) {
+        sessionKeys.sort((left, right) => sessions[left]!.touchedAt - sessions[right]!.touchedAt);
+        for (const staleKey of sessionKeys.slice(0, sessionKeys.length - MAX_READ_SESSIONS)) {
+          delete sessions[staleKey];
+        }
+      }
+      return { sessions };
+    });
+  },
+  markReviewed(sessionKey, change) {
+    if (!sessionKey) return;
+    const fingerprint = workspaceChangeFingerprint(change);
+    set((state) => {
+      const current = state.sessions[sessionKey];
+      if (current?.reviewedFingerprints[change.toolCallId] === fingerprint) return state;
+      const reviewedFingerprints = {
+        ...current?.reviewedFingerprints,
+        [change.toolCallId]: fingerprint
+      };
+      const changeIds = Object.keys(reviewedFingerprints);
+      for (const staleId of changeIds.slice(0, Math.max(0, changeIds.length - MAX_READ_CHANGES_PER_SESSION))) {
+        delete reviewedFingerprints[staleId];
+      }
+      const sessions = {
+        ...state.sessions,
+        [sessionKey]: {
+          fingerprints: current?.fingerprints ?? {},
+          reviewedFingerprints,
+          touchedAt: Date.now()
+        }
       };
       const sessionKeys = Object.keys(sessions);
       if (sessionKeys.length > MAX_READ_SESSIONS) {
@@ -64,7 +102,14 @@ export function workspaceChangeViewed(
   return fingerprints?.[change.toolCallId] === workspaceChangeFingerprint(change);
 }
 
-function workspaceChangeFingerprint(change: WorkspaceChangeView): string {
+export function workspaceChangeReviewed(
+  fingerprints: Readonly<Record<string, string>> | undefined,
+  change: WorkspaceChangeView
+): boolean {
+  return fingerprints?.[change.toolCallId] === workspaceChangeFingerprint(change);
+}
+
+export function workspaceChangeFingerprint(change: WorkspaceChangeView): string {
   const details = change.kind === "edit"
     ? `${change.patchTruncated}:${change.additions ?? ""}:${change.deletions ?? ""}:${change.firstChangedLine ?? ""}:${hashText(change.patch ?? "")}`
     : `${change.metricsTruncated}:${change.writtenBytes ?? ""}:${change.writtenLines ?? ""}`;

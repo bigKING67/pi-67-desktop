@@ -19,8 +19,8 @@ import {
   cleanupStalePromptAttachmentRuns,
   PromptAttachmentStagingService
 } from "./prompt-attachment-staging.js";
-import { TeamMcpSettingsStore } from "./team-mcp-settings.js";
 import { redact } from "./redaction.js";
+import { removeRetiredTeamMcpToken } from "./retired-team-mcp-token.js";
 import { rendererOrigin, resolveRendererUrl } from "./renderer-security.js";
 import { registerSystemBridge, type SystemBridgeRegistration } from "./system-bridge.js";
 import {
@@ -50,9 +50,6 @@ const toolchainRoot = app.isPackaged
 const capabilitiesRoot = app.isPackaged
   ? join(process.resourcesPath, "capabilities")
   : normalize(join(currentDirectory, "../../../artifacts/capabilities/current"));
-const teamMcpResourcesRoot = app.isPackaged
-  ? join(process.resourcesPath, "team-mcp")
-  : normalize(join(currentDirectory, "../resources/team-mcp"));
 const desktopToolchain = resolveDesktopToolchain(toolchainRoot, app.isPackaged);
 const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER_DEV_URL);
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
@@ -73,7 +70,6 @@ let mainWindow: BrowserWindow | undefined;
 let unregisterPowerResumeRecovery: (() => void) | undefined;
 let workbenchState: WorkbenchStateStore | undefined;
 let packageNetworkSettings: PackageNetworkSettingsStore | undefined;
-let teamMcpSettings: TeamMcpSettingsStore | undefined;
 let desktopCapabilities: DesktopCapabilityService | undefined;
 let promptAttachments: PromptAttachmentStagingService | undefined;
 let composerDraftState: ComposerDraftStateStore | undefined;
@@ -88,14 +84,11 @@ const agentHostSupervisor = new AgentHostSupervisor({
   getStoragePaths: () => createAgentHostStoragePaths(app.getPath("userData")),
   getRuntimeEnvironment: () => {
     if (!packageNetworkSettings) throw new Error("Package network settings are not initialized.");
-    if (!teamMcpSettings) throw new Error("Team MCP settings are not initialized.");
     if (!promptAttachments) throw new Error("Prompt attachment staging is not initialized.");
     return {
       agentDir: desktopAgentDirectory,
       toolchain: desktopToolchain,
       capabilitiesRoot,
-      teamMcpResourcesRoot,
-      teamMcpTokenPath: teamMcpSettings.tokenPath,
       packageNetworkSettingsPath: packageNetworkSettings.requestedSettingsPath,
       promptAttachmentRoot: promptAttachments.root,
       packaged: app.isPackaged,
@@ -131,7 +124,10 @@ if (hasSingleInstanceLock) {
     registerApplicationProtocol(rendererDirectory);
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
-    teamMcpSettings = new TeamMcpSettingsStore(app.getPath("userData"));
+    const retiredTokenCleanup = await removeRetiredTeamMcpToken(app.getPath("userData"));
+    if (retiredTokenCleanup === "failed") {
+      console.info("Retired Team MCP token cleanup failed; the token is not injected into Agent Host.");
+    }
     const promptAttachmentParent = join(
       app.getPath("userData"),
       "runtime",
@@ -238,7 +234,6 @@ if (hasSingleInstanceLock) {
       desktopToolchain,
       desktopCapabilities,
       packageNetworkSettings,
-      teamMcpSettings,
       promptAttachments,
       promptStashImages,
       previousRunExit,

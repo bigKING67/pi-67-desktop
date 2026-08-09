@@ -25,6 +25,15 @@ describe("Inspector protocol", () => {
     expect(Value.Check(CommandPayloadSchemas["workspace.file.list"], { limit: 201 })).toBe(false);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.search"], { query: "main", includeGenerated: true })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.search"], { query: "x".repeat(257) })).toBe(false);
+    expect(Value.Check(CommandPayloadSchemas["workspace.file.contentSearch"], {
+      query: "answer",
+      includeGenerated: false,
+      caseSensitive: true
+    })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["workspace.file.contentSearch"], {
+      query: "answer",
+      absolutePath: "/tmp/escape"
+    })).toBe(false);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.resolve"], { relativePath: file.relativePath })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.open"], { id: file.id })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["workspace.file.save"], {
@@ -46,6 +55,22 @@ describe("Inspector protocol", () => {
       totalBytes: 12,
       content: "export {};\n",
       revision: file.revision
+    })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["workspace.file.contentSearch"], {
+      workspaceId: "workspace-1",
+      query: "answer",
+      matches: [{
+        entry: file,
+        line: 3,
+        column: 8,
+        snippet: "const answer = 42;",
+        snippetTruncated: false
+      }],
+      filesVisited: 1,
+      bytesVisited: 19,
+      skippedCount: 0,
+      truncated: false,
+      incomplete: false
     })).toBe(true);
   });
 
@@ -138,5 +163,51 @@ describe("Inspector protocol", () => {
       startCursor: "message-1",
       endCursor: "message-1"
     })).toBe(true);
+  });
+
+  it("validates exact Workspace usage aggregates without billing or reasoning fields", () => {
+    const report = {
+      workspaceId: "workspace-1",
+      generatedAt: 1,
+      window: "30d",
+      buckets: [{
+        date: "2026-08-09",
+        provider: "groland",
+        model: "gpt-5.5",
+        source: "assistant-message",
+        sessions: 1,
+        turns: 2,
+        totals: { input: 10, output: 2, cacheRead: 3, cacheWrite: 0, total: 15, recordedCost: 0.1 }
+      }],
+      models: [{
+        provider: "groland",
+        model: "gpt-5.5",
+        sessions: 1,
+        turns: 2,
+        totals: { input: 10, output: 2, cacheRead: 3, cacheWrite: 0, total: 15, recordedCost: 0.1 }
+      }],
+      totals: { input: 10, output: 2, cacheRead: 3, cacheWrite: 0, total: 15, recordedCost: 0.1 },
+      coverage: {
+        discoveredSessions: 1,
+        scannedSessions: 1,
+        skippedSessions: 0,
+        unavailableSessions: 0,
+        invalidSessions: 0,
+        futureVersionSessions: 0,
+        undatedUsageEntries: 0,
+        complete: true
+      }
+    };
+
+    expect(Value.Check(CommandPayloadSchemas["workspace.usage.report"], { window: "30d" })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["workspace.usage.report"], report)).toBe(true);
+    expect(Value.Check(CommandResultSchemas["workspace.usage.report"], {
+      ...report,
+      reasoningTokens: 10
+    })).toBe(false);
+    expect(hasValidCommandContext(
+      "workspace.usage.report",
+      { scope: "workspace", workspaceId: "workspace-1" }
+    )).toBe(true);
   });
 });

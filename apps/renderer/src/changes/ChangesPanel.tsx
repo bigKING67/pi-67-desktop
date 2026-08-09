@@ -23,8 +23,11 @@ import { PatchView } from "./PatchView.js";
 import {
   changesReadSessionKey,
   useChangesReadStore,
+  workspaceChangeFingerprint,
+  workspaceChangeReviewed,
   workspaceChangeViewed
 } from "./changes-read-store.js";
+import { ChangeReviewPanel } from "./ChangeReviewPanel.js";
 
 export interface ChangesPanelProps {
   active: boolean;
@@ -77,6 +80,9 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
   );
   const viewedFingerprints = useChangesReadStore((state) => (
     readSessionKey ? state.sessions[readSessionKey]?.fingerprints : undefined
+  ));
+  const reviewedFingerprints = useChangesReadStore((state) => (
+    readSessionKey ? state.sessions[readSessionKey]?.reviewedFingerprints : undefined
   ));
   const summary = summarizeWorkspaceChanges(items, view.projection?.total ?? 0);
   const authorityKey = view.authority
@@ -183,7 +189,16 @@ function SessionChangesPanel({ active }: ChangesPanelProps) {
               );
             })}
           </div>
-          {selected ? <ChangeDetail change={selected} /> : null}
+          {selected ? (
+            <ChangeDetail
+              change={selected}
+              readSessionKey={readSessionKey}
+              reviewed={workspaceChangeReviewed(reviewedFingerprints, selected)}
+              taskId={selectedTask?.id}
+              workspaceId={selectedTask?.workspaceId}
+              sessionFileIdentity={selectedTask?.sessionFileIdentity}
+            />
+          ) : null}
         </div>
       )}
     </div>
@@ -225,7 +240,21 @@ function ChangesPanelState({ actionLabel, icon, text }: {
   );
 }
 
-function ChangeDetail({ change }: { change: WorkspaceChangeView }) {
+function ChangeDetail({
+  change,
+  readSessionKey,
+  reviewed,
+  taskId,
+  workspaceId,
+  sessionFileIdentity
+}: {
+  change: WorkspaceChangeView;
+  readSessionKey: string | undefined;
+  reviewed: boolean;
+  taskId: string | undefined;
+  workspaceId: string | undefined;
+  sessionFileIdentity: string | undefined;
+}) {
   return (
     <section aria-label={`修改详情 ${change.path}`} className={styles.detail}>
       <div className={styles.detailHeading}>
@@ -237,6 +266,24 @@ function ChangeDetail({ change }: { change: WorkspaceChangeView }) {
       </div>
       {change.kind === "write" ? (
         <p className={styles.explanation}>write Tool Result 不包含写入前版本，因此这里只显示写入规模，不伪造历史 Diff。</p>
+      ) : change.patch && change.status === "completed" && workspaceId && sessionFileIdentity ? (
+        <ChangeReviewPanel
+          authority={{
+            source: "session",
+            workspaceId,
+            sessionFileIdentity,
+            toolCallId: change.toolCallId,
+            contentFingerprint: workspaceChangeFingerprint(change)
+          }}
+          onMarkReviewed={() => {
+            if (readSessionKey) useChangesReadStore.getState().markReviewed(readSessionKey, change);
+          }}
+          patch={change.patch}
+          path={change.path}
+          reviewed={reviewed}
+          sourceTruncated={change.patchTruncated || change.pathTruncated}
+          taskId={taskId}
+        />
       ) : change.patch ? (
         <PatchView ariaLabel="本会话修改 Patch" patch={change.patch} sourceTruncated={change.patchTruncated} />
       ) : (

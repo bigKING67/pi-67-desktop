@@ -55,6 +55,7 @@ export function sessionSnapshotProjectionPatch(
     revisions[group] += 1;
     if (group === "identity") {
       patch.identity = identityProjectionFromSnapshot(snapshot);
+      patch.compatibility = snapshot.compatibility;
       patch.recoverySessionFileIdentity = snapshot.sessionFileIdentity;
       patch.recoverySessionPath = snapshot.sessionPath;
     } else if (group === "modelCatalog") {

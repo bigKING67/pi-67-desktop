@@ -54,7 +54,7 @@ export interface ExtensionCommandAdapterView {
 export interface ExtensionToolAdapterView {
   adapterId: string;
   package: string;
-  presentation: "generic" | "command" | "read" | "change";
+  presentation: "generic" | "command" | "read" | "change" | "delegated";
   label?: string;
 }
 

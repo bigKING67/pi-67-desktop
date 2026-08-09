@@ -55,6 +55,36 @@ describe("task draft persistence", () => {
     });
   });
 
+  it("persists review-only drafts without persisting Patch source bodies", () => {
+    const task = sessionTask("task-session-review", "session-file-review");
+    expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);
+    useTaskDraftStore.getState().addReviewComment(task.id, {
+      id: "review-a",
+      authority: {
+        source: "session",
+        workspaceId: "workspace-a",
+        sessionFileIdentity: "session-file-review",
+        toolCallId: "tool-a",
+        contentFingerprint: "24:abcd"
+      },
+      anchor: { section: "session", side: "new", startLine: 12, endLine: 12 },
+      body: "Keep the failure observable.",
+      createdAt: 125,
+      file: { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
+    });
+
+    const serialized = serializeTaskDraftState(126);
+    expect(serialized.drafts[0]).toMatchObject({
+      text: "",
+      reviewComments: [{
+        id: "review-a",
+        body: "Keep the failure observable.",
+        file: { id: "file-a", revision: "revision-a", relativePath: "src/main.ts" }
+      }]
+    });
+    expect(JSON.stringify(serialized)).not.toContain("@@ -");
+  });
+
   it("serializes text-only Prompt stash without attachment metadata or bytes", () => {
     const task = sessionTask("task-session-stash", "session-file-stash");
     expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);

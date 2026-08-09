@@ -2,6 +2,9 @@ import {
   MAX_COMPOSER_DRAFTS,
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
   MAX_COMPOSER_DRAFT_TEXT_BYTES_TOTAL,
+  MAX_COMPOSER_REVIEW_COMMENTS,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES,
+  MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL,
   MAX_PROMPT_STASH_ITEMS,
   MAX_PROMPT_STASH_TEXT_BYTES_TOTAL,
   conversationKeyIdentity,
@@ -105,7 +108,12 @@ function restorePersistedDrafts(state: ComposerDraftPersistedState): void {
     if (restored === "conflict") continue;
     const draft = useTaskDraftStore.getState().drafts[taskId];
     rendererWorkbenchStore.getState().updateTask(taskId, {
-      hasDraft: Boolean(draft && (draft.text.trim() || draft.promptStash.length > 0)),
+      hasDraft: Boolean(draft && (
+        draft.text.trim()
+        || draft.workspaceFiles.length > 0
+        || draft.reviewComments.length > 0
+        || draft.promptStash.length > 0
+      )),
       attachmentCount: draft?.attachments.length ?? 0,
       ...(record.environmentIntent ? { environmentIntent: record.environmentIntent } : {})
     });
@@ -159,6 +167,7 @@ function synchronizeTaskDraftFlags(drafts: Record<string, TaskDraft>): void {
       draft.text.trim().length > 0
       || draft.attachments.length > 0
       || draft.workspaceFiles.length > 0
+      || draft.reviewComments.length > 0
       || draft.promptStash.length > 0
     ));
     const attachmentCount = draft?.attachments.length ?? 0;
@@ -213,11 +222,24 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
   const candidates: ComposerDraftRecord[] = [];
   for (const [taskId, draft] of Object.entries(drafts)) {
     const task = workbench.tasks[taskId];
-    if (!task || (draft.text.length === 0 && draft.promptStash.length === 0)) continue;
+    if (!task || (
+      draft.text.length === 0
+      && draft.reviewComments.length === 0
+      && draft.promptStash.length === 0
+    )) continue;
     const textBytes = encoder.encode(draft.text).byteLength;
+    const reviewBytes = draft.reviewComments.reduce(
+      (total, comment) => total + encoder.encode(comment.body).byteLength,
+      0
+    );
     const stashBytes = draft.promptStash.reduce((total, item) => total + encoder.encode(item.text).byteLength, 0);
     if (
       textBytes > MAX_COMPOSER_DRAFT_TEXT_BYTES
+      || draft.reviewComments.length > MAX_COMPOSER_REVIEW_COMMENTS
+      || draft.reviewComments.some((comment) => (
+        encoder.encode(comment.body).byteLength > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES
+      ))
+      || reviewBytes > MAX_COMPOSER_REVIEW_COMMENT_BODY_BYTES_TOTAL
       || draft.promptStash.length > MAX_PROMPT_STASH_ITEMS
       || stashBytes > MAX_PROMPT_STASH_TEXT_BYTES_TOTAL
     ) {
@@ -237,6 +259,9 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       updatedAt: updatedAtByConversation.get(identity) ?? now,
       ...(draft.workspaceFiles.length > 0
         ? { workspaceFiles: draft.workspaceFiles.map((reference) => ({ ...reference })) }
+        : {}),
+      ...(draft.reviewComments.length > 0
+        ? { reviewComments: draft.reviewComments.map(cloneReviewComment) }
         : {}),
       ...(draft.promptStash.length > 0
         ? { promptStash: draft.promptStash.map((item) => ({
@@ -259,6 +284,10 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
   let totalPromptStashBytes = 0;
   for (const candidate of candidates) {
     const textBytes = encoder.encode(candidate.text).byteLength
+      + (candidate.reviewComments ?? []).reduce(
+        (total, comment) => total + encoder.encode(comment.body).byteLength,
+        0
+      )
       + (candidate.promptStash ?? []).reduce((total, item) => total + encoder.encode(item.text).byteLength, 0);
     const promptStashBytes = (candidate.promptStash ?? []).reduce(
       (total, item) => total + encoder.encode(item.text).byteLength,
@@ -308,11 +337,26 @@ function taskDraftFingerprint(
   draft: TaskDraft,
   environmentIntent: RendererWorkbenchTask["environmentIntent"]
 ): string {
-  return `${draft.streamBehavior}\0${draft.interactionMode}\0${environmentIntent ?? "local"}\0${draft.text}\0${workspaceFileFingerprint(draft.workspaceFiles)}\0${promptStashFingerprint(draft.promptStash)}`;
+  return `${draft.streamBehavior}\0${draft.interactionMode}\0${environmentIntent ?? "local"}\0${draft.text}\0${workspaceFileFingerprint(draft.workspaceFiles)}\0${reviewCommentFingerprint(draft.reviewComments)}\0${promptStashFingerprint(draft.promptStash)}`;
 }
 
 function draftContentFingerprint(record: ComposerDraftRecord): string {
-  return `${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
+  return `${record.streamBehavior}\0${record.interactionMode ?? "execute"}\0${record.environmentIntent ?? "local"}\0${record.text}\0${workspaceFileFingerprint(record.workspaceFiles ?? [])}\0${reviewCommentFingerprint(record.reviewComments ?? [])}\0${promptStashFingerprint(record.promptStash ?? [])}`;
+}
+
+function reviewCommentFingerprint(
+  comments: readonly NonNullable<ComposerDraftRecord["reviewComments"]>[number][]
+): string {
+  return comments.map((comment) => JSON.stringify(comment)).join("\0");
+}
+
+function cloneReviewComment(comment: NonNullable<ComposerDraftRecord["reviewComments"]>[number]) {
+  return {
+    ...comment,
+    authority: { ...comment.authority },
+    anchor: { ...comment.anchor },
+    file: { ...comment.file }
+  };
 }
 
 function promptStashFingerprint(items: readonly {

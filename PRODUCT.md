@@ -203,16 +203,19 @@ the only Runtime and behavior specification source.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
-- MCP credentials and browser capability readiness are independent Settings tasks.
-  `MCP 服务` owns external service endpoints and local credential status;
-  live connection identity comes only from the Task/Agent Host projection after
-  Pi establishes the MCP transport. `浏览器集成` owns browser-specific dependency
-  preparation and runtime diagnostics. They never share one mixed Settings document.
-- Desktop Team MCP bootstrap preserves the exact bytes it read from `mcp.json` and
-  rechecks that revision immediately before an atomic same-directory replacement.
-  External edits, creation, or deletion win with `revision-conflict`; Desktop never
-  overwrites that newer file, and the configuration stores only `bearerTokenEnv`,
-  never the bearer token.
+- Browser capability readiness is the only first-party connection task in Settings.
+  `浏览器集成` owns browser-specific dependency preparation and runtime diagnostics.
+  Pi user-owned MCP configuration remains visible through normal Runtime capability
+  projections, but Desktop does not provide a generic MCP endpoint or credential editor.
+- The former Desktop-owned Team MCP/Tavily Bridge product is retired. Desktop no
+  longer bundles its resource definition, stores or reveals its token, injects its
+  environment, or bootstraps it into Pi. On Desktop startup, Agent Host removes only
+  the exact former `tavily-bridge` URL/auth/token-env identity from `mcp.json` through
+  an exact-revision atomic replacement. Same-name user-customized entries and every
+  unrelated field/server are preserved; a concurrent external edit wins and fences
+  Agent Host startup rather than loading an ambiguous retired route. Main attempts to
+  remove only the former userData token file without following symlinks. Token cleanup
+  failure does not block the application because the token is no longer injected.
 - Download-source probing validates and checks the current in-memory draft without
   persisting it. Probe results identify whether they belong to unsaved settings and
   become stale as soon as the draft changes; only the explicit Save action writes
@@ -445,11 +448,11 @@ the only Runtime and behavior specification source.
   stdout/stderr, or Tool payloads.
   Alpha exposes only recheck and export actions here; it has no clear-all,
   force-unlock, automatic replay, or unverified repair action.
-- Provider, Download Sources/Network, MCP credential, and Rules/Context drafts stay
+- Provider, Download Sources/Network, and Rules/Context drafts stay
   in Renderer memory. Leaving the category, changing an applicable page scope, or
   returning to the Workbench requires an explicit discard decision while dirty.
   Removing a custom Provider definition, restoring default download sources,
-  clearing an MCP token, or removing a persistent Provider credential requires a
+  or removing a persistent Provider credential requires a
   separate confirmation whose default action is Cancel.
 - The conversation workbench is the only three-region application surface.
   Settings and other application-level surfaces replace the Workspace rail with
@@ -475,6 +478,11 @@ the only Runtime and behavior specification source.
   compatibility requires Pi-resolved package manifest evidence, canonical installed
   SemVer, Registry version matching, and final runtime surface ownership; it never
   implies shared `ctx.ui` caller attribution.
+- A verified Adapter may additionally declare the `delegated` presentation for a
+  Tool whose package, version, source, and runtime surface all match. This is a
+  presentation fact, not a typed child-agent roster: Pi-67 does not infer or display
+  child identity, model, token/cost, tree position, parallel count, or child result.
+  Generic same-name Tools never receive that upgrade.
 - `npm:@narumitw/pi-plan-mode`, `npm:pi-web-access`, and `npm:pi-smart-fetch`
   are replaced by first-party Plan/Search capabilities. Existing Pi user settings
   are not deleted or rewritten, but Desktop Tasks do not load those Packages and
@@ -516,6 +524,16 @@ the only Runtime and behavior specification source.
   `Cmd/Ctrl+Shift+F` bounded Workspace conversation search, and `@file` Workspace
   references are separate local navigation/input capabilities and never toggle Web
   Search.
+- Settings `用量分析` rebuilds a `7d`, `30d`, or `90d` report only from the current
+  Workspace's Pi JSONL. It aggregates assistant-message, tool-result, compaction, and
+  branch-summary usage by UTC date and Provider/model, including input, output,
+  cache-read, cache-write, total token, and Pi-recorded cost when present. Unique
+  Session counts are calculated by the bounded Host scanner. Pi-recorded cost is not
+  a Provider bill or public-pricing estimate, and Pi-67 does not invent reasoning or
+  subagent token attribution. Catalog gaps, unreadable/invalid/future-format Sessions,
+  undated entries, scan limits, and deadline exhaustion remain visible as coverage
+  facts. The current implementation is a bounded cold rebuild; no incremental or
+  persisted Usage cache is claimed.
 - Removing a custom Provider deletes only its `models.json` definition and does not
   silently remove a same-named `auth.json` credential. Persistent credential removal
   is an independent confirmed operation against `auth.json`.
@@ -744,6 +762,16 @@ the only Runtime and behavior specification source.
 - Conversation and session-tree projections remain bounded and rebuildable;
   opening a long JSONL session does not require mounting or transferring its
   complete history.
+- Every Session snapshot carries a bounded compatibility view: `compatible`,
+  `partial`, or `future-format`, plus the supported/current format versions and
+  counts of unknown or unrenderable entries. Known messages continue to render;
+  unknown raw entry bodies never cross the protocol or enter diagnostics. A visible
+  warning offers exact projection resynchronization and Doctor navigation. Pi JSONL
+  remains authoritative. The compatibility view is currently informational and does
+  not independently gate every Session mutation; existing physical-identity, active-
+  branch, external-change, Task-generation, and Host-epoch guards continue to own
+  mutation safety. A future format is never treated as proof of compatibility merely
+  because its known messages can be rendered.
 - Session image data does not travel in Snapshot or Message Page JSON. Visible
   images load through bounded generation-bound transferable asset chunks, while
   unsupported, stale, or unavailable images fail explicitly without exposing
@@ -788,6 +816,18 @@ the only Runtime and behavior specification source.
   directories are hidden from both the tree and search by default; changing
   `显示依赖/生成目录` refreshes both while retaining expansion, selection, and
   scroll state. A failed child-directory read owns a local retry action.
+- `Cmd/Ctrl+Alt+F` and the Command Palette open Workspace file-body search. It is
+  separate from filename/path search, conversation search, and Provider Web Search.
+  Agent Host accepts only a trusted registered Workspace, never follows symlinks,
+  always excludes `.git`, reads only strict UTF-8 regular files, and excludes common
+  dependency/generated/cache directories unless explicitly included. One request is
+  bounded to 256 query characters, 200 matches, 2,000 files, 1 MiB per file,
+  64 MiB total, 4,096 characters per line, 320-character snippets, and three seconds.
+  Results carry opaque file identity, exact revision, original-text line/UTF-16 column,
+  and a bounded snippet. Case-folded matching maps positions back to the original
+  text. Skips, deadline/limit exhaustion, or unsafe reads are reported as incomplete.
+  Opening a result revalidates the exact revision and line target; a dirty or stale
+  editor draft fails closed instead of navigating against different bytes.
 - Create-file, create-directory, rename, and draft-save-as use one stable naming
   dialog with a visible name label, destination summary, inline validation, and
   recoverable request errors. Create-file additionally offers `自动识别`,
@@ -845,6 +885,17 @@ the only Runtime and behavior specification source.
   revalidates Workspace identity and the status fingerprint before and after each
   bounded Patch read. This surface never stages, discards, commits, pushes, opens a
   PR, or claims to replace a full Git client.
+- Complete, line-mappable Session and staged/unstaged Git patches support an explicit
+  review lifecycle: `Viewed` is exact-fingerprint inspection, `Reviewed` is a separate
+  user confirmation, `Pending` means one or more line comments are waiting in the
+  Composer draft, and `Stale` means the bound Diff authority changed. Each comment is
+  anchored to old/new line, section, content fingerprint, opaque file reference, and
+  exact file revision. Truncated or non-mappable patches cannot accept precise comments.
+  Comments persist only inside the encrypted Task draft; Patch bodies do not. On send,
+  comments become bounded Prompt text plus existing opaque Workspace file references,
+  never a second Agent side effect. Only acceptance of the exact submission snapshot
+  clears its comment IDs; rejection or terminal failure retains them, and comments
+  added while that submission is in flight are not removed by the older acceptance.
 - Messages is a paged index of only the user's messages on the current Pi Session
   active branch. It excludes Assistant, System, Tool, Thinking, and Session
   control entries, and can locate an unloaded message through one bounded
@@ -874,6 +925,13 @@ the only Runtime and behavior specification source.
   current and other pending Safety Approval requests in the same Runtime, but it
   never resolves ordinary Extension `ctx.ui` requests. Composer-initiated YOLO
   selection requires a second confirmation in the same upward menu.
+- A blocking Safety Approval or Extension input distinguishes resolving only the
+  current interaction from stopping the entire Task. `拒绝`/`取消当前输入` answers
+  that one request; `停止整个任务` is available only when exactly one current Task
+  matches Host epoch, Session ID/generation, Operation ID, and waiting lifecycle.
+  Task stop sends `task.close { mode: "stop" }`, not `operation.abort`, and removes
+  the Task only after the Runtime stop succeeds. Missing, stale, or ambiguous
+  authority fails closed and leaves the dialog and draft recoverable.
 - Tool mode never weakens Workspace trust, Extension UI separation, operating
   system permissions, Electron sandbox and preload boundaries, credential
   isolation, update/signing rules, or any capability outside the current Pi

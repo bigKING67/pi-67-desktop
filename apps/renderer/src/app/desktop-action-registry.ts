@@ -6,6 +6,7 @@ export type DesktopActionId =
   | "toggle-context"
   | "find-current-conversation"
   | "find-workspace-conversations"
+  | "find-workspace-content"
   | "keyboard-shortcuts";
 
 export interface DesktopShortcutBinding {
@@ -111,6 +112,15 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "f", shift: true }]
+  },
+  {
+    id: "find-workspace-content",
+    label: "在工作区文件中查找",
+    detail: "在可信工作区内有界搜索文本内容并定位到行",
+    keywords: "find search workspace files content 查找 工作区 文件 内容",
+    requiresWorkspace: true,
+    contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
+    bindings: [{ key: "f", alt: true }]
   },
   {
     id: "keyboard-shortcuts",
