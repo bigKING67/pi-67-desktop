@@ -194,7 +194,6 @@
 .toolbar,
 .tools,
 .actions,
-.streamMode,
 .interactionMode,
 .runtimeControls,
 .runtimeField {
@@ -260,8 +259,7 @@
   min-height: 43px;
   gap: 6px;
   padding: 5px 7px 7px;
-  flex-wrap: wrap;
-  row-gap: 5px;
+  flex-wrap: nowrap;
 }
 
 .tools {
@@ -274,6 +272,7 @@
   min-width: 0;
   flex: 0 1 auto;
   gap: 7px;
+  margin-left: auto;
 }
 
 .runtimeControls {
@@ -311,11 +310,11 @@
 }
 
 .runtimeSelectButton[data-runtime-select="model"] {
-  width: min(190px, 26vw);
+  width: min(170px, 22vw);
 }
 
 .runtimeSelectButton[data-runtime-select="thinking"] {
-  max-width: min(144px, 24vw);
+  max-width: min(128px, 18vw);
 }
 
 .runtimeSelectButton[data-hovered] {
@@ -872,34 +871,9 @@
   outline: none;
 }
 
-.streamMode {
-  flex: 0 1 auto;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 7px;
-  background: var(--surface-muted);
-}
-
-.streamMode button {
-  display: inline-flex;
-  align-items: center;
-  height: 25px;
-  gap: var(--space-1);
-  padding: 0 7px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.streamMode button.streamModeActive {
-  background: var(--surface-raised);
-  color: var(--text-primary);
-}
-
 .sendButton {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   min-height: 31px;
@@ -911,6 +885,7 @@
   color: var(--canvas);
   font-size: 12px;
   font-weight: 650;
+  white-space: nowrap;
 }
 
 .sendButton:hover {
@@ -930,6 +905,7 @@
 
 .stopButton {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   min-height: 31px;
@@ -941,6 +917,7 @@
   color: var(--canvas);
   font-size: 12px;
   font-weight: 650;
+  white-space: nowrap;
 }
 
 .stopButton:hover {

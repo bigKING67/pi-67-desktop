@@ -1,0 +1,86 @@
+.streamModeButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 29px;
+  gap: var(--space-1);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.streamModeButton[data-hovered] {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.streamModeButton[data-focus-visible] {
+  border-color: var(--focus);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.streamModeButton[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.streamModePopover {
+  z-index: 82;
+  width: min(270px, calc(100vw - 24px));
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-popover);
+}
+
+.streamModeMenu {
+  display: grid;
+  gap: 3px;
+  outline: none;
+}
+
+.streamModeOption {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
+  align-items: center;
+  min-height: 48px;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  outline: none;
+}
+
+.streamModeOption > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.streamModeOption strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.streamModeOption small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.streamModeOption[data-hovered],
+.streamModeOption[data-focused] {
+  background: var(--surface-hover);
+}
+
+.streamModeOption[data-focus-visible] {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}

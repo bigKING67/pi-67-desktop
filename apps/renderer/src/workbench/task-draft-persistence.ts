@@ -22,6 +22,8 @@ import {
 import { useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
 
 const PERSISTENCE_DELAY_MS = 500;
+const PERSISTENCE_RETRY_DELAY_MS = 1_500;
+const BACKGROUND_FAILURE_HISTORY_THRESHOLD = 3;
 const encoder = new TextEncoder();
 
 let initialization: Promise<void> | undefined;
@@ -31,6 +33,7 @@ let persistenceBound = false;
 let suppressPersistence = false;
 let shuttingDown = false;
 let lastError: string | undefined;
+let consecutiveBackgroundFailures = 0;
 let limitWarningPublished = false;
 const updatedAtByConversation = new Map<string, number>();
 const contentFingerprintByConversation = new Map<string, string>();
@@ -73,7 +76,7 @@ async function initialize(): Promise<void> {
       });
     }
   } catch (error) {
-    reportPersistenceError(error);
+    publishPersistenceWarning(error);
   } finally {
     suppressPersistence = false;
   }
@@ -185,7 +188,12 @@ function schedulePersistence(): void {
   }, PERSISTENCE_DELAY_MS);
 }
 
-function persistTaskDraftState(requiredTaskId?: string): Promise<boolean> {
+type PersistenceFeedback = "background" | "checkpoint" | "caller-owned";
+
+function persistTaskDraftState(
+  requiredTaskId?: string,
+  feedback: PersistenceFeedback = "background"
+): Promise<boolean> {
   if (persistenceTimer !== undefined) {
     window.clearTimeout(persistenceTimer);
     persistenceTimer = undefined;
@@ -199,9 +207,15 @@ function persistTaskDraftState(requiredTaskId?: string): Promise<boolean> {
     try {
       await window.pi67.system.updateComposerDraftState(state);
       lastError = undefined;
+      consecutiveBackgroundFailures = 0;
       succeeded = true;
     } catch (error) {
-      reportPersistenceError(error);
+      if (feedback === "background") {
+        reportBackgroundPersistenceError(error);
+        schedulePersistenceRetry();
+      } else if (feedback === "checkpoint") {
+        publishPersistenceWarning(error);
+      }
     }
   });
   persistencePromise = operation;
@@ -209,17 +223,17 @@ function persistTaskDraftState(requiredTaskId?: string): Promise<boolean> {
 }
 
 export async function persistTaskDraftStateCheckpoint(): Promise<void> {
-  await persistTaskDraftState();
+  await persistTaskDraftState(undefined, "checkpoint");
 }
 
 export function persistTaskDraftStateAcknowledged(taskId?: string): Promise<boolean> {
-  return persistTaskDraftState(taskId);
+  return persistTaskDraftState(taskId, "caller-owned");
 }
 
 export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersistedState {
   const workbench = rendererWorkbenchStore.getState();
   const drafts = useTaskDraftStore.getState().drafts;
-  const candidates: ComposerDraftRecord[] = [];
+  const candidateByConversation = new Map<string, ComposerDraftRecord>();
   for (const [taskId, draft] of Object.entries(drafts)) {
     const task = workbench.tasks[taskId];
     if (!task || (
@@ -252,7 +266,7 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
       contentFingerprintByConversation.set(identity, fingerprint);
       updatedAtByConversation.set(identity, now);
     }
-    candidates.push({
+    candidateByConversation.set(identity, {
       conversation: task.conversation,
       text: draft.text,
       streamBehavior: draft.streamBehavior,
@@ -278,7 +292,8 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
     });
   }
 
-  candidates.sort((left, right) => right.updatedAt - left.updatedAt);
+  const candidates = [...candidateByConversation.values()]
+    .sort((left, right) => right.updatedAt - left.updatedAt);
   const bounded: ComposerDraftRecord[] = [];
   let totalTextBytes = 0;
   let totalPromptStashBytes = 0;
@@ -390,7 +405,28 @@ function publishLimitWarning(): void {
   });
 }
 
-function reportPersistenceError(error: unknown): void {
+function schedulePersistenceRetry(): void {
+  if (!shouldScheduleDraftPersistenceRetry(shuttingDown, persistenceTimer !== undefined)) return;
+  persistenceTimer = window.setTimeout(() => {
+    persistenceTimer = undefined;
+    void persistTaskDraftState();
+  }, PERSISTENCE_RETRY_DELAY_MS);
+}
+
+function reportBackgroundPersistenceError(error: unknown): void {
+  const detail = error instanceof Error ? error.message : "对话草稿无法保存。";
+  consecutiveBackgroundFailures += 1;
+  if (!shouldPublishBackgroundPersistenceFailure(consecutiveBackgroundFailures, detail, lastError)) return;
+  lastError = detail;
+  publishNotification({
+    level: "warning",
+    title: "对话草稿未保存",
+    message: `${detail} 草稿仍保留在当前窗口中，Desktop 将继续自动重试。`,
+    toast: false
+  });
+}
+
+function publishPersistenceWarning(error: unknown): void {
   const detail = error instanceof Error ? error.message : "对话草稿无法保存。";
   if (lastError === detail) return;
   lastError = detail;
@@ -399,4 +435,19 @@ function reportPersistenceError(error: unknown): void {
     title: "对话草稿未保存",
     message: `${detail} 草稿仍保留在当前窗口中。`
   });
+}
+
+export function shouldScheduleDraftPersistenceRetry(
+  isShuttingDown: boolean,
+  timerScheduled: boolean
+): boolean {
+  return !isShuttingDown && !timerScheduled;
+}
+
+export function shouldPublishBackgroundPersistenceFailure(
+  failureCount: number,
+  detail: string,
+  previousDetail: string | undefined
+): boolean {
+  return failureCount >= BACKGROUND_FAILURE_HISTORY_THRESHOLD && previousDetail !== detail;
 }

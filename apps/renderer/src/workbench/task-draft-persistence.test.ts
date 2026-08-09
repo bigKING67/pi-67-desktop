@@ -2,7 +2,12 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { rendererWorkbenchStore, type RendererWorkbenchTask } from "./workbench-store.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
-import { serializeTaskDraftState } from "./task-draft-persistence.js";
+import {
+  serializeTaskDraftState,
+  shouldPublishBackgroundPersistenceFailure,
+  shouldScheduleDraftPersistenceRetry
+} from "./task-draft-persistence.js";
+import { parseComposerDraftPersistedState } from "../../../desktop/src/composer-draft-state.js";
 
 describe("task draft persistence", () => {
   beforeEach(() => {
@@ -23,7 +28,8 @@ describe("task draft persistence", () => {
     useTaskDraftStore.getState().setText(task.id, "继续完成当前对话");
     useTaskDraftStore.getState().setStreamBehavior(task.id, "steer");
 
-    expect(serializeTaskDraftState(123)).toEqual({
+    const serialized = serializeTaskDraftState(123);
+    expect(serialized).toEqual({
       version: 1,
       drafts: [{
         conversation: task.conversation,
@@ -33,6 +39,37 @@ describe("task draft persistence", () => {
       }],
       selectedConversation: task.conversation
     });
+    expect(parseComposerDraftPersistedState(serialized)).toEqual(serialized);
+  });
+
+  it("keeps a transient duplicate conversation from invalidating every draft", () => {
+    const authoritative = sessionTask("task-authoritative", "session-file-shared");
+    const transient = provisionalTask("task-transient");
+    expect(rendererWorkbenchStore.getState().restoreTask(authoritative)).toBe(authoritative.id);
+    expect(rendererWorkbenchStore.getState().restoreTask(transient)).toBe(transient.id);
+    useTaskDraftStore.getState().setText(authoritative.id, "旧的瞬态草稿");
+    useTaskDraftStore.getState().setText(transient.id, "当前输入不应触发整包拒绝");
+    if (authoritative.conversation.kind !== "session") throw new Error("Expected a Session conversation.");
+    rendererWorkbenchStore.getState().updateTask(transient.id, {
+      conversation: authoritative.conversation,
+      sessionFileIdentity: authoritative.conversation.sessionFileIdentity,
+      sessionPath: authoritative.conversation.sessionPath
+    });
+
+    const serialized = serializeTaskDraftState(124);
+    expect(serialized.drafts).toHaveLength(1);
+    expect(serialized.drafts[0]?.text).toBe("当前输入不应触发整包拒绝");
+    expect(parseComposerDraftPersistedState(serialized)).toEqual(serialized);
+  });
+
+  it("retries background writes quietly and records only sustained distinct failures", () => {
+    expect(shouldScheduleDraftPersistenceRetry(false, false)).toBe(true);
+    expect(shouldScheduleDraftPersistenceRetry(true, false)).toBe(false);
+    expect(shouldScheduleDraftPersistenceRetry(false, true)).toBe(false);
+    expect(shouldPublishBackgroundPersistenceFailure(2, "invalid", undefined)).toBe(false);
+    expect(shouldPublishBackgroundPersistenceFailure(3, "invalid", undefined)).toBe(true);
+    expect(shouldPublishBackgroundPersistenceFailure(4, "invalid", "invalid")).toBe(false);
+    expect(shouldPublishBackgroundPersistenceFailure(4, "changed", "invalid")).toBe(true);
   });
 
   it("persists Workspace file refs separately from the durable text token", () => {

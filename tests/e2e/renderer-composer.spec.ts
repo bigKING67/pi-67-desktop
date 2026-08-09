@@ -13,6 +13,7 @@ import {
   scenarioCommands,
   scenarioCommandTypes
 } from "./pi67-renderer-scenario-commands.js";
+import { composerToolbarGeometry } from "./renderer-composer-geometry.js";
 
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
@@ -67,12 +68,14 @@ test("switches ASK/AUTO directly and confirms current-Task YOLO in the upward Co
 });
 
 test("shows the accepted user message without waiting for the first Pi token", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
   await attachMockAgent(page, [], {}, { terminalDelayMs: 90_000 });
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
 
   const composer = page.getByLabel("给 Pi 发送消息");
+  const idleGeometry = await composerToolbarGeometry(page);
   await composer.fill("执行一个耗时九十秒的任务");
   await page.getByRole("button", { name: "发送", exact: true }).click();
 
@@ -91,6 +94,20 @@ test("shows the accepted user message without waiting for the first Pi token", a
   const composerRegion = page.getByTestId("composer-region");
   await expect(composerRegion.getByRole("button", { name: "停止" })).toBeVisible();
   await expect(composerRegion.getByRole("button", { name: "发送", exact: true })).toHaveCount(0);
+  await expect(composerRegion.getByRole("group", { name: "任务交互模式" })).toHaveCount(0);
+  const streamMode = composerRegion.getByRole("button", { name: /运行中消息处理方式/u });
+  await expect(streamMode).toContainText("完成后执行");
+  await composer.fill("补充一条完成后执行的要求");
+  await expect(composerRegion.getByRole("button", { name: "发送", exact: true })).toBeVisible();
+  const activeGeometry = await composerToolbarGeometry(page);
+  expect(activeGeometry.toolbarRows).toBe(1);
+  expect(activeGeometry.stopRight).toBeGreaterThan(activeGeometry.sendRight);
+  expect(activeGeometry.toolbarHeight).toBeLessThanOrEqual(idleGeometry.toolbarHeight + 2);
+  await streamMode.click();
+  const deliveryMenu = page.getByRole("menu", { name: "运行中消息处理方式" });
+  await expect(deliveryMenu.getByRole("menuitemradio", { name: /立即纠偏/u })).toBeVisible();
+  await expect(deliveryMenu.getByRole("menuitemradio", { name: /完成后执行/u })).toBeVisible();
+  await page.keyboard.press("Escape");
   const geometry = await page.evaluate(() => {
     const user = document.querySelector<HTMLElement>('[data-message-id="pending-user:operation-1"]');
     const turnActivity = document.querySelector<HTMLElement>("[data-turn-activity]");
@@ -116,7 +133,7 @@ test("shows the accepted user message without waiting for the first Pi token", a
     text: "执行一个耗时九十秒的任务"
   });
   await page.screenshot({
-    path: "artifacts/visual-review/turn-activity-inline.png",
+    path: "artifacts/visual-review/composer-active-stable.png",
     animations: "disabled"
   });
 });

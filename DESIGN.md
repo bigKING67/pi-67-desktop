@@ -1154,6 +1154,12 @@ loading error where the operation can produce those states
   rightmost main-action position and is visible only when the accepted Operation
   declares a real Host-owned abort path; Session import stays visibly running
   until it completes or fails.
+- While a Prompt Operation is streaming, the compact delivery selector replaces
+  the idle `执行 | 计划` control instead of being appended beside it. Its resting
+  trigger shows the current `立即纠偏` or `完成后执行` behavior and opens an upward
+  single-choice menu. Model, thinking, Send, and Stop retain their positions; a
+  normal desktop Composer must not gain an incidental wrapped row merely because
+  the Operation started, and Stop remains the rightmost action.
 - Turn activity is Host-owned and evidence-based: Pi `thinking_*` renders as
   `正在分析问题`, `text_*` as `正在组织回复`, Tool execution uses its verified
   name, presentation kind, and terminal success/failure event, and compaction renders

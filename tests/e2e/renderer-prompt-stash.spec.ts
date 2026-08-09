@@ -63,3 +63,21 @@ test("keeps the Composer text when the first Prompt Stash persistence write fail
     window as unknown as { __pi67ComposerDraftTest: { state(): { drafts: unknown[] } } }
   ).__pi67ComposerDraftTest.state().drafts)).toEqual([]);
 });
+
+test("retries a routine autosave failure without interrupting Composer input", async ({ page }) => {
+  await installMockDesktopBridge(page, { composerDraftFailureCalls: [1] });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("输入过程中不要弹出草稿保存警告");
+  await expect.poll(() => page.evaluate(() => (
+    window as unknown as { __pi67ComposerDraftTest: { updates: number } }
+  ).__pi67ComposerDraftTest.updates)).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText("对话草稿未保存", { exact: true })).toHaveCount(0);
+  await expect(composer).toHaveValue("输入过程中不要弹出草稿保存警告");
+  expect(await page.evaluate(() => (
+    window as unknown as { __pi67ComposerDraftTest: { state(): { drafts: Array<{ text: string }> } } }
+  ).__pi67ComposerDraftTest.state().drafts[0]?.text)).toBe("输入过程中不要弹出草稿保存警告");
+});

@@ -241,19 +241,20 @@ export function ComposerSurface(props: ComposerSurfaceProps) {
               />
             ) : null}
             <ToolModeSelector />
-            <ComposerInteractionModeControl
-              disabled={props.submitting || props.changingInteractionMode
-                || props.sessionTransitionPending || props.activeOperation}
-              mode={props.interactionMode}
-              onChange={props.onInteractionModeChange}
-            />
             {props.activeStreaming ? (
               <ComposerStreamModeControl
                 disabled={props.submitting}
                 mode={props.draft.streamBehavior}
                 onChange={props.onStreamBehaviorChange}
               />
-            ) : null}
+            ) : (
+              <ComposerInteractionModeControl
+                disabled={props.submitting || props.changingInteractionMode
+                  || props.sessionTransitionPending || props.activeOperation}
+                mode={props.interactionMode}
+                onChange={props.onInteractionModeChange}
+              />
+            )}
           </div>
           <div className={styles.actions}>
             {props.activeSessionAuthority ? <ComposerContextPressure /> : null}
