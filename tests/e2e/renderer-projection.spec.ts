@@ -250,6 +250,10 @@ test("applies narrow conversation, queue, metadata, tree and usage projections",
   await page.getByRole("tab", { name: "上下文" }).click();
   await expect(page.getByText("1,234", { exact: true })).toBeVisible();
   await expect(page.getByText("25.0%", { exact: true })).toBeVisible();
+  const metricList = page.locator(".metric-list");
+  await expect(metricList.locator("dt").first()).toHaveCSS("font-size", "12px");
+  await expect(metricList.locator("dt").first()).toHaveCSS("font-weight", "500");
+  await expect(metricList.locator("dd").first()).toHaveCSS("font-size", "12px");
 
   await emitMockAgentEvent(page, { type: "tree.changed", payload: { reason: "session-entry" } });
   await expect.poll(async () => (await recordedCommands(page)).filter((command) => command === "session.tree")).toEqual(["session.tree"]);
