@@ -17,7 +17,7 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
   query: string;
   busy: boolean;
   onBack: () => void;
-  onMutation: (action: "update" | "restore", pack: SkillPackEntry) => void;
+  onMutation: (action: "install" | "update" | "restore", pack: SkillPackEntry) => void;
   onQueryChange: (query: string) => void;
 }) {
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
@@ -38,6 +38,11 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
       <SettingsSectionBlock
         actions={<span className={styles.detailActions}>
           <span className={styles.detailStatus} data-status={status.id}>{status.label}</span>
+          {pack?.canInstall ? (
+            <Button className="primary-button" isDisabled={busy} onPress={() => onMutation("install", pack)}>
+              安装 Lark CLI
+            </Button>
+          ) : null}
           {pack?.updateStatus === "update-available" && pack.canUpdate ? (
             <Button className="primary-button" isDisabled={busy} onPress={() => onMutation("update", pack)}>
               更新套件
@@ -61,8 +66,8 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
           {pack?.manager === "lark-cli" ? <>
             <SettingsRow
               title="当前 CLI"
-              description="本次检查固定使用的用户全局 lark-cli，不使用 Desktop 私有工具链中的副本。"
-              value={pack.installedVersion ?? "待检查"}
+              description="优先使用 Desktop 在当前用户共享工具目录管理的原生程序，也兼容经过验证的用户现有安装。"
+              value={pack.managerStatus === "missing" ? "未安装" : pack.installedVersion ?? "待检查"}
             />
             <SettingsRow
               title="官方 Skills"
@@ -139,6 +144,7 @@ export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: Skill
   id: "ready" | "partial" | "unavailable";
   label: string;
 } {
+  if (pack?.updateStatus === "not-installed") return { id: "unavailable", label: "CLI 未安装" };
   if (pack?.updateStatus === "update-available") return { id: "partial", label: pack.canUpdate ? "可更新" : "需手动更新" };
   if (pack?.updateStatus === "modified") {
     return { id: "unavailable", label: pack.manager === "lark-cli" ? "技能不同步" : "Overlay 异常" };
@@ -159,6 +165,7 @@ export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: Skill
 }
 
 export function suiteVersionSummary(suite: DesktopBundledSkillSuiteSummary, pack?: SkillPackEntry): string {
+  if (pack?.manager === "lark-cli" && pack.managerStatus === "missing") return "CLI 未安装";
   if (pack?.manager === "lark-cli" && pack.installedVersion) return `当前 CLI ${pack.installedVersion}`;
   if (pack?.manager === "pi67-desktop") {
     const effectiveVersion = pack.installedVersion ?? pack.baselineVersion;
@@ -222,7 +229,7 @@ function suiteUpdateLabel(suite: DesktopBundledSkillSuiteSummary): string {
 
 function suiteUpdateDescription(suite: DesktopBundledSkillSuiteSummary): string {
   if (suite.updateManager === "lark-cli") {
-    return "内置基线随 Desktop 发布；同一“全局可用”页面中的受管套件由 Lark CLI 检查和更新。";
+    return "内置基线随 Desktop 发布；官方 Skills 安装到 ~/.agents/skills，Pi-67 与其他兼容 Agent 可共享。";
   }
   if (suite.updateManager === "pi67-skill-pack-registry") {
     return suite.independentUpdateState === "planned"

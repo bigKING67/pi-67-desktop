@@ -13,6 +13,7 @@ import type { SkillPackManagementPort } from "./skill-pack-management.js";
 export type SkillPackCommandType =
   | "skill.pack.list"
   | "skill.pack.checkUpdates"
+  | "skill.pack.install"
   | "skill.pack.update"
   | "skill.pack.restore";
 
@@ -44,7 +45,11 @@ export class SkillPackCommandRouter {
     command: SkillPackCommand,
     idempotencyKey?: string
   ): Promise<SkillPackResult> {
-    if (command.type !== "skill.pack.update" && command.type !== "skill.pack.restore") {
+    if (
+      command.type !== "skill.pack.install"
+      && command.type !== "skill.pack.update"
+      && command.type !== "skill.pack.restore"
+    ) {
       return this.options.coordinator.runQuery(
         context.workspaceId,
         () => this.dispatchQuery(context.workspaceId, command)
@@ -61,9 +66,11 @@ export class SkillPackCommandRouter {
       this.options.coordinator.runTransactionalMutation(
         context.workspaceId,
         "global",
-        () => command.type === "skill.pack.update"
-          ? this.management(context.workspaceId).beginUpdate(command.payload.id)
-          : this.management(context.workspaceId).beginRestore(command.payload.id)
+        () => command.type === "skill.pack.install"
+          ? this.management(context.workspaceId).beginInstall(command.payload.id)
+          : command.type === "skill.pack.update"
+            ? this.management(context.workspaceId).beginUpdate(command.payload.id)
+            : this.management(context.workspaceId).beginRestore(command.payload.id)
       )
     ));
   }
@@ -123,6 +130,7 @@ export class SkillPackCommandRouter {
 export function isSkillPackCommand(type: AgentCommandType): type is SkillPackCommandType {
   return type === "skill.pack.list"
     || type === "skill.pack.checkUpdates"
+    || type === "skill.pack.install"
     || type === "skill.pack.update"
     || type === "skill.pack.restore";
 }
@@ -134,7 +142,9 @@ function mutationFingerprint(context: WorkspaceProtocolContext, command: SkillPa
     .update(command.type, "utf8")
     .update("\0")
     .update(
-      command.type === "skill.pack.update" || command.type === "skill.pack.restore"
+      command.type === "skill.pack.install"
+        || command.type === "skill.pack.update"
+        || command.type === "skill.pack.restore"
         ? command.payload.id
         : "",
       "utf8"

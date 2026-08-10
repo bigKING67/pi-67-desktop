@@ -28,6 +28,7 @@ const PACK: SkillPackEntry = {
   displayName: "飞书 Lark CLI",
   description: "飞书文档、消息和开放平台能力。",
   manager: "lark-cli",
+  managerStatus: "ready",
   updateOwner: "managed-pack",
   updateStatus: "update-available",
   localState: "clean",
@@ -35,6 +36,7 @@ const PACK: SkillPackEntry = {
   installed: true,
   installedSkillCount: 27,
   skillIds: ["lark-doc", "lark-calendar"],
+  canInstall: false,
   canUpdate: true,
   effectiveSource: "managed",
   canRestore: false,
@@ -49,7 +51,17 @@ describe("Skill Pack management protocol", () => {
     expect(hasValidCommandContext("skill.pack.list", APP_PROTOCOL_CONTEXT)).toBe(false);
     expect(hasValidCommandContext("skill.pack.list", TASK_CONTEXT)).toBe(false);
     expect(isReplaySafeControlMutation("skill.pack.update")).toBe(true);
+    expect(isReplaySafeControlMutation("skill.pack.install")).toBe(true);
     expect(isReplaySafeControlMutation("skill.pack.restore")).toBe(true);
+
+    const install = commandEnvelope(
+      "skill.pack.install",
+      { id: "lark-cli-global" },
+      WORKSPACE_CONTEXT,
+      2,
+      "install-lark"
+    );
+    expect(isRequestEnvelope(install)).toBe(true);
 
     const update = commandEnvelope(
       "skill.pack.update",

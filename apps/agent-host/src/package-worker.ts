@@ -294,7 +294,7 @@ function send(response: PackageWorkerResponse): void {
           recoverable: false
         }
       };
-  process.send?.(boundedResponse, undefined, undefined, () => process.disconnect());
+  process.send?.(boundedResponse);
 }
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {

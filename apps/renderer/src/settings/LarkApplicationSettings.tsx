@@ -13,11 +13,21 @@ import {
   SettingsRows,
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
+import { LarkCliRequiredNotice } from "./LarkCliRequiredNotice.js";
 import { saveLarkApplicationConfiguration } from "./lark-auth-controller.js";
 import styles from "./LarkApplicationSettings.module.css";
 
-export function LarkApplicationSettings({ snapshot, onSnapshotChange }: {
+export function LarkApplicationSettings({
+  snapshot,
+  canInstallLarkCli,
+  installingLarkCli,
+  onInstallLarkCli,
+  onSnapshotChange
+}: {
   snapshot: LarkAuthSnapshot | undefined;
+  canInstallLarkCli: boolean;
+  installingLarkCli: boolean;
+  onInstallLarkCli: () => void;
   onSnapshotChange: (snapshot: LarkAuthSnapshot) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -77,6 +87,11 @@ export function LarkApplicationSettings({ snapshot, onSnapshotChange }: {
     title="飞书应用"
     description="配置当前设备使用的飞书开放平台应用；Bot 身份和用户授权都会基于该应用工作。"
   >
+    {cliMissing ? <LarkCliRequiredNotice
+      canInstall={canInstallLarkCli}
+      installing={installingLarkCli}
+      onInstall={onInstallLarkCli}
+    /> : null}
     <SettingsRows>
       <SettingsRow
         leading={<Bot aria-hidden="true" size={17} />}
@@ -193,11 +208,9 @@ export function LarkApplicationSettings({ snapshot, onSnapshotChange }: {
       </footer>
     </form> : null}
 
-    {cliMissing ? <SettingsNotice tone="warning">
-      未找到 lark-cli。请先在“技能”中安装或修复飞书 Lark CLI，再配置应用。
-    </SettingsNotice> : <SettingsNotice>
+    {!cliMissing ? <SettingsNotice>
       App ID 可以在此查看；App Secret 保存后只显示安全状态，如需更换请重新输入。
-    </SettingsNotice>}
+    </SettingsNotice> : null}
   </SettingsSectionBlock>;
 }
 
@@ -217,7 +230,7 @@ function applicationStatusLabel(snapshot: LarkAuthSnapshot | undefined): string 
 function applicationDescription(snapshot: LarkAuthSnapshot | undefined): string {
   if (!snapshot) return "正在读取应用配置。";
   if (snapshot.appStatus === "ready") return "应用身份已验证，可用于 Bot 身份及后续用户授权。";
-  if (snapshot.cliStatus === "missing") return "安装或修复 lark-cli 后即可配置应用。";
+  if (snapshot.cliStatus === "missing") return "安装 Lark CLI 后即可配置应用。";
   return snapshot.appId
     ? "已检测到 App ID，但应用身份尚未通过验证。"
     : "配置自己的 App ID 与 App Secret 后即可使用飞书能力。";

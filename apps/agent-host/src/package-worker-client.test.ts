@@ -121,6 +121,37 @@ describe("Isolated Package Worker client", () => {
     await services.dispose();
   });
 
+  it("keeps the Windows IPC root alive until process-tree termination starts", async () => {
+    const services = createServices();
+    const child = new FakePackageWorker(151);
+    const terminateProcessTree = vi.fn<PackageWorkerProcessTreeTerminator>(async (worker) => {
+      expect(worker.connected).toBe(true);
+      child.exit(0);
+      return true;
+    });
+    const client = new PackageWorkerClient({
+      environment: desktopEnvironment(),
+      platform: "win32",
+      spawnWorker: () => child.asChildProcess(),
+      terminateProcessTree,
+      inspectProcessTree: async (worker) => fakeTreeAlive(worker)
+    });
+
+    const result = client.run("check-updates", services);
+    const request = await child.request();
+    child.emit("message", {
+      type: "package-worker-response",
+      requestId: request.requestId,
+      ok: true,
+      result: { items: [], total: 0 }
+    });
+
+    await expect(result).resolves.toEqual({ items: [], total: 0 });
+    expect(terminateProcessTree).toHaveBeenCalledOnce();
+    expect(child.disconnect).toHaveBeenCalledOnce();
+    await services.dispose();
+  });
+
   it("uses two-phase process-tree termination and fences new work during shutdown", async () => {
     const services = createServices();
     const children = [new FakePackageWorker(201), new FakePackageWorker(202)];

@@ -316,6 +316,7 @@ export interface CommandPayloads extends
   "extension.package.uninstall": { source: string; scope: ExtensionPackageScope };
   "skill.pack.list": Record<string, never>;
   "skill.pack.checkUpdates": Record<string, never>;
+  "skill.pack.install": { id: string };
   "skill.pack.update": { id: string };
   "skill.pack.restore": { id: string };
   "extension.ui.respond": {
@@ -411,6 +412,7 @@ export interface CommandResults extends
   "extension.package.uninstall": ExtensionPackageMutationResult;
   "skill.pack.list": SkillPackListResult;
   "skill.pack.checkUpdates": SkillPackListResult;
+  "skill.pack.install": SkillPackMutationResult;
   "skill.pack.update": SkillPackMutationResult;
   "skill.pack.restore": SkillPackMutationResult;
   "extension.ui.respond": { resolved: boolean };

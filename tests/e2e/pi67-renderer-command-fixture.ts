@@ -110,6 +110,12 @@ export function installMockCommandResponseHandler({
       total: 2,
       checkedAt: Date.now()
     };
+    if (type === "skill.pack.install") return {
+      items: mockSkillPacks("current", "bundled"),
+      total: 2,
+      checkedAt: Date.now(),
+      changed: true
+    };
     if (type === "skill.pack.update") return {
       items: mockSkillPacks("current", payload.id === "ai-berkshire-investment-suite" ? "managed" : "bundled"),
       total: 2,
@@ -296,6 +302,7 @@ export function installMockCommandResponseHandler({
       displayName: "飞书 Lark CLI",
       description: "飞书文档、消息、日历、任务、会议和开放平台能力。",
       manager: "lark-cli",
+      managerStatus: "ready",
       updateOwner: "managed-pack",
       updateStatus: status,
       localState: status === "not-checked" ? "unknown" : "clean",
@@ -303,6 +310,7 @@ export function installMockCommandResponseHandler({
       installed: true,
       installedSkillCount: 2,
       skillIds: ["lark-doc", "lark-calendar"],
+      canInstall: false,
       canUpdate: status === "update-available",
       effectiveSource: "managed",
       canRestore: false,
@@ -324,6 +332,7 @@ export function installMockCommandResponseHandler({
       displayName: "AI Berkshire 投资研究",
       description: "公司研究、财务分析和组合管理能力。",
       manager: "pi67-desktop",
+      managerStatus: "ready",
       updateOwner: "managed-pack",
       updateStatus: status,
       localState: "clean",
@@ -331,6 +340,7 @@ export function installMockCommandResponseHandler({
       installed: true,
       installedSkillCount: 1,
       skillIds: ["investment-research"],
+      canInstall: false,
       canUpdate: status === "update-available",
       effectiveSource: aiSource,
       canRestore: aiSource === "managed",

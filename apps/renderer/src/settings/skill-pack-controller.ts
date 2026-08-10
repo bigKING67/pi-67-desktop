@@ -38,14 +38,19 @@ export async function checkSkillPackUpdates(workspaceId?: string): Promise<boole
     );
     useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
     const updates = result.items.filter((entry) => entry.updateStatus === "update-available").length;
+    const missing = result.items.filter((entry) => entry.updateStatus === "not-installed").length;
     const attention = result.items.filter((entry) => (
-      entry.updateStatus === "modified" || entry.updateStatus === "unavailable"
+      entry.updateStatus === "modified"
+      || entry.updateStatus === "unavailable"
+      || entry.updateStatus === "not-installed"
     ));
     publishNotification({
       level: attention.length > 0 ? "warning" : "info",
       title: "技能更新检查完成",
       message: updates > 0
         ? `发现 ${updates} 个可更新的技能套件。`
+        : missing > 0
+          ? `有 ${missing} 个技能套件依赖尚未安装。`
         : attention.length > 0
           ? "没有可直接更新的套件；部分来源需要处理。"
           : "当前受管技能套件均已是最新。"
@@ -53,6 +58,32 @@ export async function checkSkillPackUpdates(workspaceId?: string): Promise<boole
     return true;
   } catch (error) {
     return reportFailure(target.id, "无法检查技能更新", error);
+  }
+}
+
+export async function installSkillPack(id: string, workspaceId?: string): Promise<boolean> {
+  const target = resolveWorkspace(workspaceId, true);
+  if (!target || !preflightGlobalMutation()) return false;
+  useSkillPackStore.getState().begin(target.id, "installing");
+  try {
+    await ensureAgentConnection();
+    const result = await agentConnectionController.request(
+      "skill.pack.install",
+      { id },
+      [],
+      { context: workspaceContext(target.id) }
+    );
+    useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
+    publishNotification({
+      level: "success",
+      title: "Lark CLI 已安装",
+      message: result.changed
+        ? "官方 Lark CLI 与全局办公 Skills 已安装；Pi-67 和其他兼容 Agent 可复用 ~/.agents/skills。"
+        : "当前已经存在可用的 Lark CLI。"
+    });
+    return true;
+  } catch (error) {
+    return reportMutationFailure(target.id, id, "Lark CLI 安装失败", error);
   }
 }
 
@@ -112,7 +143,7 @@ function preflightGlobalMutation(): boolean {
   if (!busy) return true;
   publishNotification({
     level: "warning",
-    title: "技能套件暂不可更新",
+    title: "技能套件暂不可更改",
     message: "请先完成或停止所有正在运行或等待输入的任务。"
   });
   return false;

@@ -235,6 +235,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "extension.package.uninstall": ExtensionPackageTargetSchema,
   "skill.pack.list": EmptyPayloadSchema,
   "skill.pack.checkUpdates": EmptyPayloadSchema,
+  "skill.pack.install": SkillPackTargetSchema,
   "skill.pack.update": SkillPackTargetSchema,
   "skill.pack.restore": SkillPackTargetSchema,
   "lark.auth.status": EmptyPayloadSchema,

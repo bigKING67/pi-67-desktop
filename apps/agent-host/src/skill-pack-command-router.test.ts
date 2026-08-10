@@ -7,6 +7,7 @@ import {
   SkillPackCommandRouter,
   type SkillPackCommandType
 } from "./skill-pack-command-router.js";
+import type { SkillPackManagementPort } from "./skill-pack-management.js";
 
 const WORKSPACE: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-skills" };
 const EMPTY: SkillPackListResult = { items: [], total: 0 };
@@ -24,6 +25,8 @@ describe("SkillPackCommandRouter", () => {
 
     await expect(router.dispatch(WORKSPACE, command("skill.pack.list", {}))).resolves.toEqual(EMPTY);
     await expect(router.dispatch(WORKSPACE, command("skill.pack.checkUpdates", {}))).resolves.toEqual(EMPTY);
+    await expect(router.dispatch(WORKSPACE, command("skill.pack.install", { id: "lark-cli-global" })))
+      .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
     await expect(router.dispatch(WORKSPACE, command("skill.pack.update", { id: "lark-cli-global" })))
       .rejects.toMatchObject({ code: "INVALID_PAYLOAD" });
   });
@@ -56,6 +59,33 @@ describe("SkillPackCommandRouter", () => {
     expect(update).toHaveBeenCalledOnce();
     expect(runtimeA.reloadResources).toHaveBeenCalledOnce();
     expect(runtimeB.reloadResources).toHaveBeenCalledOnce();
+  });
+
+  it("blocks a global Lark CLI install while any Pi Task is active", async () => {
+    const install = vi.fn(async () => transaction(UPDATED));
+    const coordinator = new ResourceManagementCoordinator({
+      listTasks: () => [{
+        taskKey: "workspace-a:active-task",
+        workspaceId: "workspace-a",
+        runtime: undefined,
+        initialized: false,
+        isIdle: () => false
+      }]
+    });
+    const router = createRouter({
+      list: async () => EMPTY,
+      checkForUpdates: async () => EMPTY,
+      beginInstall: install,
+      beginUpdate: async () => transaction(UPDATED),
+      beginRestore: async () => transaction(UPDATED)
+    }, coordinator);
+
+    await expect(router.dispatch(
+      WORKSPACE,
+      command("skill.pack.install", { id: "lark-cli-global" }),
+      "install-lark-while-busy"
+    )).rejects.toMatchObject({ code: "BUSY", details: { scope: "global" } });
+    expect(install).not.toHaveBeenCalled();
   });
 
   it("shares the resource coordinator with package queries", async () => {
@@ -203,17 +233,16 @@ describe("SkillPackCommandRouter", () => {
 });
 
 function createRouter(
-  management: {
-    list(): Promise<SkillPackListResult>;
-    checkForUpdates(): Promise<SkillPackListResult>;
-    beginUpdate(id: string): Promise<ReturnType<typeof transaction>>;
-    beginRestore(id: string): Promise<ReturnType<typeof transaction>>;
-  },
+  management: Omit<SkillPackManagementPort, "beginInstall"> & Partial<Pick<SkillPackManagementPort, "beginInstall">>,
   coordinator = new ResourceManagementCoordinator({ listTasks: () => [] })
 ): SkillPackCommandRouter {
+  const complete: SkillPackManagementPort = {
+    beginInstall: async () => transaction(UPDATED),
+    ...management
+  };
   return new SkillPackCommandRouter({
     getWorkspaceServices: () => ({}) as PiWorkspaceRuntimeServices,
-    createManagement: () => management,
+    createManagement: () => complete,
     coordinator
   });
 }

@@ -8,6 +8,7 @@ import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import {
   checkSkillPackUpdates,
+  installSkillPack,
   loadSkillPacks,
   restoreSkillPack,
   updateSkillPack
@@ -22,7 +23,7 @@ import {
 } from "./SettingsPrimitives.js";
 import styles from "./SkillSettingsWorkspace.module.css";
 
-type SkillPackMutationAction = "update" | "restore";
+export type SkillPackMutationAction = "install" | "update" | "restore";
 
 export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSelectPack, onBack }: {
   selectedPackId?: string;
@@ -50,7 +51,11 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
     () => new Set(allManagedPacks.flatMap((entry) => entry.skillIds)),
     [allManagedPacks]
   );
-  const busy = phase === "loading" || phase === "checking" || phase === "updating" || phase === "restoring";
+  const busy = phase === "loading"
+    || phase === "checking"
+    || phase === "installing"
+    || phase === "updating"
+    || phase === "restoring";
   const updateCount = managedPacks.filter((entry) => entry.updateStatus === "update-available").length;
 
   useEffect(() => {
@@ -77,14 +82,16 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
         {pending ? (
           <SkillPackMutationDialog
             action={pending.action}
-            busy={phase === "updating" || phase === "restoring"}
+            busy={phase === "installing" || phase === "updating" || phase === "restoring"}
             error={phase === "failed" ? error : undefined}
             pack={pending.pack}
             onCancel={() => setPending(undefined)}
             onConfirm={async () => {
-              const completed = pending.action === "update"
-                ? await updateSkillPack(pending.pack.id, workspaceId)
-                : await restoreSkillPack(pending.pack.id, workspaceId);
+              const completed = pending.action === "install"
+                ? await installSkillPack(pending.pack.id, workspaceId)
+                : pending.action === "update"
+                  ? await updateSkillPack(pending.pack.id, workspaceId)
+                  : await restoreSkillPack(pending.pack.id, workspaceId);
               if (completed) setPending(undefined);
             }}
           />
@@ -147,14 +154,16 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
       {pending ? (
         <SkillPackMutationDialog
           action={pending.action}
-          busy={phase === "updating" || phase === "restoring"}
+          busy={phase === "installing" || phase === "updating" || phase === "restoring"}
           error={phase === "failed" ? error : undefined}
           pack={pending.pack}
           onCancel={() => setPending(undefined)}
           onConfirm={async () => {
-            const completed = pending.action === "update"
-              ? await updateSkillPack(pending.pack.id, workspaceId)
-              : await restoreSkillPack(pending.pack.id, workspaceId);
+            const completed = pending.action === "install"
+              ? await installSkillPack(pending.pack.id, workspaceId)
+              : pending.action === "update"
+                ? await updateSkillPack(pending.pack.id, workspaceId)
+                : await restoreSkillPack(pending.pack.id, workspaceId);
             if (completed) setPending(undefined);
           }}
         />
@@ -281,19 +290,27 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
   return (
     <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Modal className={`modal-surface ${styles.modal}`}>
-        <Dialog aria-label={action === "update" ? "更新技能套件" : "恢复内置技能套件"} className={styles.dialog!}>
-          <h2>{action === "update" ? "更新技能套件？" : "恢复内置版本？"}</h2>
-          <p>{action === "update"
-            ? "更新会修改所有项目可用的受管技能，并在完成后重新加载所有 Workspace 中的 Pi 资源。"
-            : "恢复会移除受管 Overlay，重新启用随 Desktop 发布的不可变内置基线，并重新加载所有 Workspace 中的 Pi 资源。"}</p>
+        <Dialog
+          aria-label={action === "install" ? "安装 Lark CLI" : action === "update" ? "更新技能套件" : "恢复内置技能套件"}
+          className={styles.dialog!}
+        >
+          <h2>{action === "install" ? "安装 Lark CLI？" : action === "update" ? "更新技能套件？" : "恢复内置版本？"}</h2>
+          <p>{action === "install"
+            ? <>Desktop 将验证并启用官方 @larksuite/cli，把办公 Skills 安装到 <code>~/.agents/skills</code>。这是当前用户全局安装，Pi-67 与其他兼容 Agent 都可复用；已有非受管同名 Skill 不会被覆盖。</>
+            : action === "update"
+              ? "更新会原子替换已验证归属于该套件的当前用户全局组件，并在完成后重新加载所有 Workspace 中的 Pi 资源。"
+              : "恢复会移除受管 Overlay，重新启用随 Desktop 发布的不可变内置基线，并重新加载所有 Workspace 中的 Pi 资源。"}</p>
           <dl className={styles.updateSummary}>
             <div><dt>套件</dt><dd>{pack.displayName}</dd></div>
             <div><dt>来源</dt><dd>{pack.source ?? "受管来源"}</dd></div>
-            <div><dt>当前版本</dt><dd>{pack.installedVersion ?? "未知"}</dd></div>
-            <div><dt>目标版本</dt><dd>{action === "update"
-              ? pack.latestVersion ?? "最新稳定版"
-              : pack.baselineVersion ?? "内置基线"}</dd></div>
+            <div><dt>当前版本</dt><dd>{action === "install" ? "未安装" : pack.installedVersion ?? "未知"}</dd></div>
+            <div><dt>目标版本</dt><dd>{action === "install"
+              ? "官方最新稳定版"
+              : action === "update"
+                ? pack.latestVersion ?? "最新稳定版"
+                : pack.baselineVersion ?? "内置基线"}</dd></div>
             <div><dt>影响技能</dt><dd>{pack.skillIds.length} 个</dd></div>
+            <div><dt>作用域</dt><dd>当前用户全局</dd></div>
             <div><dt>本地状态</dt><dd>{pack.localState === "clean" ? "未发现修改" : "需要检查"}</dd></div>
           </dl>
           {error ? <p className={styles.dialogError} role="alert">{error}</p> : null}
@@ -301,10 +318,12 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
             <Button className="secondary-button" isDisabled={busy} onPress={onCancel}>取消</Button>
             <Button
               className="primary-button"
-              isDisabled={busy || (action === "update" ? !pack.canUpdate : !pack.canRestore)}
+              isDisabled={busy || (action === "install" ? !pack.canInstall : action === "update" ? !pack.canUpdate : !pack.canRestore)}
               onPress={() => void onConfirm()}
             >
-              {busy ? (action === "update" ? "更新中…" : "恢复中…") : (action === "update" ? "确认更新" : "确认恢复")}
+              {busy
+                ? action === "install" ? "安装中…" : action === "update" ? "更新中…" : "恢复中…"
+                : action === "install" ? "确认安装" : action === "update" ? "确认更新" : "确认恢复"}
             </Button>
           </div>
         </Dialog>
@@ -317,6 +336,7 @@ function skillPackStatus(pack: SkillPackEntry): {
   tone: "ready" | "partial" | "unavailable";
   label: string;
 } {
+  if (pack.updateStatus === "not-installed") return { tone: "unavailable", label: "CLI 未安装" };
   if (pack.updateStatus === "current") return { tone: "ready", label: "已是最新" };
   if (pack.updateStatus === "update-available") {
     return { tone: "partial", label: pack.canUpdate ? "可更新" : "需手动更新" };
@@ -328,7 +348,11 @@ function skillPackStatus(pack: SkillPackEntry): {
 }
 
 function skillPackMeta(pack: SkillPackEntry): string {
-  const installed = pack.installedVersion ? `已安装 ${pack.installedVersion}` : `${pack.installedSkillCount} 个已安装`;
+  const installed = pack.managerStatus === "missing"
+    ? "CLI 未安装"
+    : pack.installedVersion
+      ? `已安装 ${pack.installedVersion}`
+      : `${pack.installedSkillCount} 个已安装`;
   const latest = pack.latestVersion && pack.latestVersion !== pack.installedVersion
     ? `最新 ${pack.latestVersion}`
     : undefined;

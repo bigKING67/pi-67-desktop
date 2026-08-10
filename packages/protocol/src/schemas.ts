@@ -313,6 +313,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "extension.package.uninstall": ExtensionPackageMutationResultSchema,
   "skill.pack.list": SkillPackListResultSchema,
   "skill.pack.checkUpdates": SkillPackListResultSchema,
+  "skill.pack.install": SkillPackMutationResultSchema,
   "skill.pack.update": SkillPackMutationResultSchema,
   "skill.pack.restore": SkillPackMutationResultSchema,
   ...LarkCommandResultSchemas,

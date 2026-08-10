@@ -8,32 +8,49 @@ export async function resolveLarkCli(options: {
   homeDirectory: string;
   shellPath: string | undefined;
   runProcess: SkillPackProcessRunner;
+  platform?: NodeJS.Platform;
 }): Promise<string | undefined> {
+  const platform = options.platform ?? process.platform;
   const privateToolchainRoot = resolveOptionalPath(options.environment.PI67_TOOLCHAIN_ROOT);
   const isUserManagedExecutable = (candidate: string): boolean => (
     !privateToolchainRoot || !isContainedAbsolutePath(candidate, privateToolchainRoot)
   );
+  const managed = await executablePath(
+    desktopManagedLarkCliExecutable(options.homeDirectory, platform),
+    platform
+  );
+  if (managed) return managed;
+  const sharedLauncher = await executablePath(
+    userGlobalLarkCliLauncher(options.homeDirectory, options.environment, platform),
+    platform
+  );
+  if (sharedLauncher) return sharedLauncher;
+  const agentDir = resolveOptionalPath(options.environment.PI_CODING_AGENT_DIR);
+  if (agentDir) {
+    const legacyManaged = await executablePath(legacyDesktopManagedLarkCliExecutable(agentDir, platform), platform);
+    if (legacyManaged) return legacyManaged;
+  }
   const configured = options.environment.PI67_LARK_CLI_PATH;
   if (configured) {
-    const verified = await executablePath(configured);
+    const verified = await executablePath(configured, platform);
     if (verified && isUserManagedExecutable(verified)) return verified;
   }
-  const names = process.platform === "win32"
+  const names = platform === "win32"
     ? ["lark-cli.cmd", "lark-cli.exe", "lark-cli"]
     : ["lark-cli"];
   for (const directory of (options.environment.PATH ?? "").split(delimiter).filter(Boolean)) {
     for (const name of names) {
-      const verified = await executablePath(join(directory, name));
+      const verified = await executablePath(join(directory, name), platform);
       if (verified && isUserManagedExecutable(verified)) return verified;
     }
   }
-  if (process.platform === "win32" && options.environment.APPDATA) {
+  if (platform === "win32" && options.environment.APPDATA) {
     for (const name of names) {
-      const verified = await executablePath(join(options.environment.APPDATA, "npm", name));
+      const verified = await executablePath(join(options.environment.APPDATA, "npm", name), platform);
       if (verified && isUserManagedExecutable(verified)) return verified;
     }
   }
-  if (process.platform !== "win32" && options.shellPath) {
+  if (platform !== "win32" && options.shellPath) {
     try {
       const result = await options.runProcess(options.shellPath, ["-lic", "command -v lark-cli"], {
         cwd: options.homeDirectory,
@@ -42,7 +59,7 @@ export async function resolveLarkCli(options: {
       });
       const candidates = result.stdout.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean).reverse();
       for (const candidate of candidates) {
-        const verified = await executablePath(candidate);
+        const verified = await executablePath(candidate, platform);
         if (verified && isUserManagedExecutable(verified)) return verified;
       }
     } catch {
@@ -50,6 +67,65 @@ export async function resolveLarkCli(options: {
     }
   }
   return undefined;
+}
+
+export function desktopManagedLarkCliRoot(homeDirectory: string): string {
+  return join(resolve(homeDirectory), ".agents", "tools", "lark-cli");
+}
+
+export function desktopManagedLarkCliExecutable(
+  homeDirectory: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  return join(
+    desktopManagedLarkCliRoot(homeDirectory),
+    "node_modules",
+    "@larksuite",
+    "cli",
+    "bin",
+    platform === "win32" ? "lark-cli.exe" : "lark-cli"
+  );
+}
+
+export function globalAgentSkillsRoot(homeDirectory: string): string {
+  return join(resolve(homeDirectory), ".agents", "skills");
+}
+
+export function userGlobalLarkCliLauncher(
+  homeDirectory: string,
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform
+): string {
+  if (platform === "win32") {
+    const appData = resolveOptionalPath(environment.APPDATA)
+      ?? join(resolve(homeDirectory), "AppData", "Roaming");
+    return join(appData, "npm", "lark-cli.exe");
+  }
+  return join(resolve(homeDirectory), ".local", "bin", "lark-cli");
+}
+
+export function isDesktopManagedLarkCliExecutable(
+  executable: string,
+  homeDirectory: string
+): boolean {
+  return isContainedAbsolutePath(executable, desktopManagedLarkCliRoot(homeDirectory));
+}
+
+function legacyDesktopManagedLarkCliExecutable(
+  agentDir: string,
+  platform: NodeJS.Platform
+): string {
+  return join(
+    resolve(agentDir),
+    "desktop-capabilities",
+    "tools",
+    "lark-cli",
+    "node_modules",
+    "@larksuite",
+    "cli",
+    "bin",
+    platform === "win32" ? "lark-cli.exe" : "lark-cli"
+  );
 }
 
 export function larkCliProcessEnvironment(
@@ -78,12 +154,12 @@ export function resolveOptionalPath(value: string | undefined): string | undefin
   return resolve(value);
 }
 
-async function executablePath(candidate: string): Promise<string | undefined> {
+async function executablePath(candidate: string, platform: NodeJS.Platform): Promise<string | undefined> {
   if (!isAbsolute(candidate) || candidate.includes("\0") || candidate.includes("\"")) return undefined;
   try {
     const metadata = await stat(candidate);
     if (!metadata.isFile()) return undefined;
-    if (process.platform !== "win32") await access(candidate, constants.X_OK);
+    if (platform !== "win32") await access(candidate, constants.X_OK);
     return resolve(candidate);
   } catch {
     return undefined;

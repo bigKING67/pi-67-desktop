@@ -235,13 +235,6 @@ export class PackageWorkerClient implements PackageWorkerPort {
         if (finalizing) return;
         finalizing = true;
         if (timer) clearTimeout(timer);
-        if (child.connected) {
-          try {
-            child.disconnect();
-          } catch {
-            // Continue with process-tree termination.
-          }
-        }
         void terminateAndWaitForPackageWorkerProcessTree(
           child,
           exited,

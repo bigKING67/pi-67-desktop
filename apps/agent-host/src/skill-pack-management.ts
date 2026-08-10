@@ -9,9 +9,18 @@ import type {
   SkillPackListResult,
   SkillPackMutationResult
 } from "@pi67/domain";
+import { LARK_CLI_SKILL_PACK_ID } from "@pi67/domain";
 import { HostCommandError } from "./protocol-error.js";
 import type { ResourceMutationTransaction } from "./resource-management-coordinator.js";
 import {
+  beginDesktopLarkCliInstallation
+} from "./lark-cli-installation.js";
+import {
+  beginDesktopManagedLarkSkillPackUpdate,
+  beginLarkSkillPackInstallation
+} from "./lark-skill-pack-installation.js";
+import {
+  isDesktopManagedLarkCliExecutable,
   larkCliProcessEnvironment,
   resolveLarkCli,
   resolveOptionalPath
@@ -43,7 +52,6 @@ import {
 } from "./skill-pack-update-state.js";
 import { boundedError } from "./skill-pack-validation.js";
 
-const LARK_PACK_ID = "lark-cli-global";
 const AI_BERKSHIRE_PACK_ID = "ai-berkshire-investment-suite";
 const CHECK_TIMEOUT_MS = 60_000;
 const UPDATE_TIMEOUT_MS = 5 * 60_000;
@@ -51,6 +59,7 @@ const UPDATE_TIMEOUT_MS = 5 * 60_000;
 export interface SkillPackManagementPort {
   list(): Promise<SkillPackListResult>;
   checkForUpdates(): Promise<SkillPackListResult>;
+  beginInstall(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>>;
   beginUpdate(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>>;
   beginRestore(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>>;
 }
@@ -62,6 +71,7 @@ export interface SkillPackManagementOptions {
   now?: () => number;
   resolveLarkCli?: () => Promise<string | undefined>;
   runProcess?: SkillPackProcessRunner;
+  installLarkCli?: typeof beginDesktopLarkCliInstallation;
   pi67Channel?: Pi67SkillPackChannelPort;
 }
 
@@ -79,6 +89,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
   readonly #now: () => number;
   readonly #runProcess: NonNullable<SkillPackManagementOptions["runProcess"]>;
   readonly #resolveLarkCli: () => Promise<string | undefined>;
+  readonly #installLarkCli: NonNullable<SkillPackManagementOptions["installLarkCli"]>;
   readonly #pi67Channel: Pi67SkillPackChannelPort;
 
   constructor(
@@ -92,6 +103,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
     );
     this.#now = options.now ?? Date.now;
     this.#runProcess = options.runProcess ?? runBoundedSkillPackProcess;
+    this.#installLarkCli = options.installLarkCli ?? beginDesktopLarkCliInstallation;
     this.#pi67Channel = options.pi67Channel ?? createPi67SkillPackChannel({
       environment: this.#environment,
       runProcess: this.#runProcess,
@@ -107,7 +119,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
 
   async list(): Promise<SkillPackListResult> {
     const [lark, aiBerkshire] = await Promise.all([this.#larkEntry(), this.#aiBerkshireEntry()]);
-    const items = [...(lark.installed ? [lark] : []), aiBerkshire];
+    const items = [lark, aiBerkshire];
     return { items, total: items.length };
   }
 
@@ -117,12 +129,30 @@ export class SkillPackManagement implements SkillPackManagementPort {
       this.#checkLarkEntry(),
       this.#checkAiBerkshireEntry()
     ]);
-    const items = [...(lark.installed ? [lark] : []), aiBerkshire];
+    const items = [lark, aiBerkshire];
     return { items, total: items.length, checkedAt };
   }
 
+  async beginInstall(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
+    if (id !== LARK_CLI_SKILL_PACK_ID) {
+      throw new HostCommandError("INVALID_PAYLOAD", "This Skill Pack cannot be installed independently.", false);
+    }
+    const suite = await readLarkSuite(this.#capabilitiesRoot);
+    return beginLarkSkillPackInstallation({
+      id,
+      homeDirectory: this.#homeDirectory,
+      skillIds: suite.skillIds,
+      environment: this.#environment,
+      runProcess: this.#runProcess,
+      resolveLarkCli: this.#resolveLarkCli,
+      installLarkCli: this.#installLarkCli,
+      checkEntry: (executable) => this.#checkLarkEntry(executable),
+      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
+    });
+  }
+
   async beginUpdate(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
-    if (id === LARK_PACK_ID) return this.#beginLarkUpdate();
+    if (id === LARK_CLI_SKILL_PACK_ID) return this.#beginLarkUpdate();
     if (id === AI_BERKSHIRE_PACK_ID) return this.#beginAiBerkshireUpdate();
     throw new HostCommandError("INVALID_PAYLOAD", "The managed Skill Pack is not supported.", false);
   }
@@ -154,11 +184,11 @@ export class SkillPackManagement implements SkillPackManagementPort {
   }
 
   async #beginLarkUpdate(): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
-    const installed = await this.#larkEntry();
+    const executable = await this.#requireLarkCli();
+    const installed = await this.#larkEntryForExecutable(executable);
     if (!installed.installed) {
       throw new HostCommandError("RUNTIME_NOT_READY", "The Lark CLI Skill Pack is not installed.", true);
     }
-    const executable = await this.#requireLarkCli();
     const current = await this.#checkLarkEntry(executable);
     if (current.localState === "modified") {
       throw new HostCommandError(
@@ -183,6 +213,18 @@ export class SkillPackManagement implements SkillPackManagementPort {
         "The current Lark CLI installation requires a manual update.",
         false
       );
+    }
+    if (isDesktopManagedLarkCliExecutable(executable, this.#homeDirectory)) {
+      const suite = await readLarkSuite(this.#capabilitiesRoot);
+      return beginDesktopManagedLarkSkillPackUpdate({
+        homeDirectory: this.#homeDirectory,
+        skillIds: suite.skillIds,
+        environment: this.#environment,
+        runProcess: this.#runProcess,
+        installLarkCli: this.#installLarkCli,
+        checkEntry: (updatedExecutable) => this.#checkLarkEntry(updatedExecutable),
+        mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
+      });
     }
     await this.#runProcess(executable, ["update", "--json"], {
       cwd: this.#homeDirectory,
@@ -263,30 +305,44 @@ export class SkillPackManagement implements SkillPackManagementPort {
   }
 
   async #larkEntry(): Promise<SkillPackEntry> {
+    return this.#larkEntryForExecutable(await this.#resolveLarkCli());
+  }
+
+  async #larkEntryForExecutable(executable: string | undefined): Promise<SkillPackEntry> {
     const suite = await readLarkSuite(this.#capabilitiesRoot);
     const roots = [
       join(this.#homeDirectory, ".agents", "skills"),
       join(this.services.agentDir, "skills")
     ];
-    const installedSkillCount = await countInstalledSkills(suite.skillIds, roots);
+    const [installedSkillCount, globallyInstalledSkillCount] = await Promise.all([
+      countInstalledSkills(suite.skillIds, roots),
+      countInstalledSkills(suite.skillIds, [roots[0]!])
+    ]);
+    const canInstall = executable === undefined || globallyInstalledSkillCount < suite.skillIds.length;
     return {
-      id: LARK_PACK_ID,
+      id: LARK_CLI_SKILL_PACK_ID,
       suiteId: suite.id,
       displayName: suite.displayName,
       description: suite.description,
       manager: "lark-cli",
+      managerStatus: executable ? "ready" : "missing",
       updateOwner: "managed-pack",
-      updateStatus: "not-checked",
+      updateStatus: executable ? "not-checked" : "not-installed",
       localState: "unknown",
       provenance: "verified",
       installed: installedSkillCount > 0,
       installedSkillCount,
       skillIds: suite.skillIds,
+      canInstall,
       canUpdate: false,
       effectiveSource: "managed",
       canRestore: false,
       source: "@larksuite/cli",
-      detail: "点击检查更新后，由 Lark CLI 验证版本和官方技能同步状态。"
+      detail: executable
+        ? canInstall
+          ? "官方办公 Skills 尚未完整安装到 ~/.agents/skills；确认安装后可供 Pi-67 与其他兼容 Agent 共享。"
+          : "点击检查更新后，由 Lark CLI 验证版本和官方技能同步状态。"
+        : "需要先安装官方 Lark CLI，才能检查技能更新、配置飞书应用和进行用户授权。"
     };
   }
 
@@ -304,6 +360,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
       displayName: suite.displayName,
       description: suite.description,
       manager: "pi67-desktop",
+      managerStatus: "ready",
       updateOwner: "managed-pack",
       updateStatus: "not-checked",
       localState: managed.status === "invalid" ? "modified" : "clean",
@@ -311,6 +368,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
       installed: true,
       installedSkillCount: skillIds.length,
       skillIds,
+      canInstall: false,
       canUpdate: false,
       effectiveSource: valid ? "managed" : "bundled",
       canRestore: managed.status !== "absent",
@@ -327,16 +385,23 @@ export class SkillPackManagement implements SkillPackManagementPort {
   }
 
   async #checkLarkEntry(executableOverride?: string): Promise<SkillPackEntry> {
-    const entry = await this.#larkEntry();
-    if (!entry.installed) return entry;
+    const executable = executableOverride ?? await this.#resolveLarkCli();
+    const entry = await this.#larkEntryForExecutable(executable);
+    if (!executable) return entry;
     try {
-      const executable = executableOverride ?? await this.#requireLarkCli();
       const result = await this.#runProcess(executable, ["update", "--check", "--json"], {
         cwd: this.#homeDirectory,
         timeoutMs: CHECK_TIMEOUT_MS,
         environment: larkCliProcessEnvironment(this.#environment, executable)
       });
-      return applyLarkUpdateCheck(entry, parseLarkUpdateResult(result.stdout));
+      const checked = applyLarkUpdateCheck(entry, parseLarkUpdateResult(result.stdout));
+      return entry.canInstall
+        ? {
+            ...checked,
+            canUpdate: false,
+            detail: "请先将官方办公 Skills 安装到 ~/.agents/skills，再检查整套更新状态。"
+          }
+        : checked;
     } catch (error) {
       return { ...entry, updateStatus: "unavailable", canUpdate: false, detail: boundedError(error) };
     }
@@ -365,7 +430,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
     if (!executable) {
       throw new HostCommandError(
         "RUNTIME_NOT_READY",
-        "未找到 lark-cli。请先安装或修复 Lark CLI，再检查官方技能更新。",
+        "未找到 lark-cli。请先安装 Lark CLI，再检查官方技能更新。",
         true
       );
     }

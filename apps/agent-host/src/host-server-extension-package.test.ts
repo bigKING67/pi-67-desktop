@@ -172,6 +172,11 @@ describe("AgentHostServer Extension package commands", () => {
       skillPackManagementFactory: () => ({
         list,
         checkForUpdates: vi.fn(async () => ({ items: [], total: 0 })),
+        beginInstall: vi.fn(async () => ({
+          result: { items: [], total: 0, changed: false },
+          commit: async () => undefined,
+          rollback: async () => undefined
+        })),
         beginUpdate: update,
         beginRestore: vi.fn(async () => ({
           result: { items: [], total: 0, changed: false },

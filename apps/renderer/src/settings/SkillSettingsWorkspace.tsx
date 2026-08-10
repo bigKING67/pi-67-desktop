@@ -21,10 +21,15 @@ import {
   suiteVersionSummary
 } from "./BundledSkillSuiteDetail.js";
 import { useDesktopCapabilitySnapshot } from "./DesktopCapabilityPanels.js";
-import { ManagedGlobalSkillPanel, SkillPackMutationDialog } from "./ManagedGlobalSkillPanel.js";
+import {
+  ManagedGlobalSkillPanel,
+  SkillPackMutationDialog,
+  type SkillPackMutationAction
+} from "./ManagedGlobalSkillPanel.js";
 import { SessionResourcePanel } from "./SessionResourcePanel.js";
 import {
   checkSkillPackUpdates,
+  installSkillPack,
   loadSkillPacks,
   restoreSkillPack,
   updateSkillPack
@@ -163,7 +168,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
   onSelectSuite: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [pending, setPending] = useState<{ action: "update" | "restore"; pack: SkillPackEntry }>();
+  const [pending, setPending] = useState<{ action: SkillPackMutationAction; pack: SkillPackEntry }>();
   const settingsWorkspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
   const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
   const workspaceId = settingsWorkspaceId ?? currentWorkspaceId;
@@ -171,9 +176,13 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
   const suites = capability.snapshot?.bundledSkillSuites ?? [];
   const selectedSuite = suites.find((suite) => suite.id === selectedSuiteId);
   const managedBySuiteId = useMemo(() => new Map(
-    managedPacks.filter((pack) => pack.installed).map((pack) => [pack.suiteId, pack])
+    managedPacks.map((pack) => [pack.suiteId, pack])
   ), [managedPacks]);
-  const busy = phase === "loading" || phase === "checking" || phase === "updating" || phase === "restoring";
+  const busy = phase === "loading"
+    || phase === "checking"
+    || phase === "installing"
+    || phase === "updating"
+    || phase === "restoring";
   const updateCount = suites.filter((suite) => (
     managedBySuiteId.get(suite.id)?.updateStatus === "update-available"
   )).length;
@@ -201,14 +210,16 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
         />
         {pending ? <SkillPackMutationDialog
           action={pending.action}
-          busy={phase === "updating" || phase === "restoring"}
+          busy={phase === "installing" || phase === "updating" || phase === "restoring"}
           error={phase === "failed" ? error : undefined}
           pack={pending.pack}
           onCancel={() => setPending(undefined)}
           onConfirm={async () => {
-            const completed = pending.action === "update"
-              ? await updateSkillPack(pending.pack.id, workspaceId)
-              : await restoreSkillPack(pending.pack.id, workspaceId);
+            const completed = pending.action === "install"
+              ? await installSkillPack(pending.pack.id, workspaceId)
+              : pending.action === "update"
+                ? await updateSkillPack(pending.pack.id, workspaceId)
+                : await restoreSkillPack(pending.pack.id, workspaceId);
             if (completed) setPending(undefined);
           }}
         /> : null}

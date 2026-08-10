@@ -19,8 +19,10 @@ const SkillPackEntrySchema = strictObject({
   displayName: SkillPackTextSchema(200),
   description: SkillPackTextSchema(500),
   manager: Type.Union([Type.Literal("lark-cli"), Type.Literal("pi67-desktop")]),
+  managerStatus: Type.Union([Type.Literal("ready"), Type.Literal("missing")]),
   updateOwner: Type.Union([Type.Literal("managed-pack"), Type.Literal("desktop")]),
   updateStatus: Type.Union([
+    Type.Literal("not-installed"),
     Type.Literal("not-checked"),
     Type.Literal("current"),
     Type.Literal("update-available"),
@@ -35,6 +37,7 @@ const SkillPackEntrySchema = strictObject({
   installed: Type.Boolean(),
   installedSkillCount: Type.Integer({ minimum: 0, maximum: 256 }),
   skillIds: Type.Array(SkillPackIdSchema, { maxItems: 256 }),
+  canInstall: Type.Boolean(),
   canUpdate: Type.Boolean(),
   effectiveSource: Type.Union([Type.Literal("bundled"), Type.Literal("managed")]),
   canRestore: Type.Boolean(),

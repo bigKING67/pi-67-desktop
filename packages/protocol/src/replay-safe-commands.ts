@@ -41,6 +41,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "extension.package.restoreInheritance",
   "extension.package.uninstall",
   "skill.pack.update",
+  "skill.pack.install",
   "skill.pack.restore"
 ] as const satisfies readonly AgentCommandType[];
 

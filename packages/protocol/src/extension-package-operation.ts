@@ -10,6 +10,7 @@ export function isWorkerBackedExtensionPackageCommand(type: AgentCommandType): b
     || type === "extension.package.update"
     || type === "extension.package.uninstall"
     || type === "skill.pack.checkUpdates"
+    || type === "skill.pack.install"
     || type === "skill.pack.update"
     || type === "skill.pack.restore";
 }

@@ -724,8 +724,12 @@ loading error where the operation can produce those states
 - `飞书` uses the same page-level Tab language as other Settings workspaces instead
   of stacking both identity workflows into one long page. `用户授权` is the first and
   default tab; `应用配置` is second. Each panel contains its own explicit Grouped
-  Settings section rather than one ambiguous connection card. Both Bot identity and
-  the user Device Flow still depend on the active App, so an unconfigured user panel
+  Settings section rather than one ambiguous connection card. When Lark CLI is
+  missing, both panels place one warning prerequisite before their disabled rows:
+  `需要先安装 Lark CLI`, a primary `安装 Lark CLI`, and a secondary `前往技能`.
+  Installation opens a one-shot confirmation that names the official source, latest
+  stable target, current-user scope, and global resource reload; success refreshes
+  identity state in place. Both Bot identity and the user Device Flow still depend on the active App, so an unconfigured user panel
   explains the dependency and provides a direct `前往应用配置` action. User-managed
   configuration shows the complete App ID after save and presents App ID, region,
   and a masked App Secret editor with a draft-only reveal control. Saving requires a
@@ -853,7 +857,18 @@ loading error where the operation can produce those states
   one-shot Pack-wide confirmation naming source, current and target versions,
   affected Skills, and local state; it never mutates silently. A detected local
   modification or unverifiable updater disables automatic overwrite and remains
-  visibly actionable as a recovery state. Before a check, an updater-owned suite says
+  visibly actionable as a recovery state. A missing owning CLI says `CLI 未安装`
+  rather than `检查失败`; its detail leads with `安装 Lark CLI`, and the confirmed
+  operation remains globally fenced while any Pi Task is active. Desktop stages the
+  official npm package outside the active directory with npm lifecycle scripts
+  disabled, verifies its identity and bounded install entry before executing that one
+  entry, verifies native/update identity, atomically swaps the current-user shared
+  tool installation, and installs the exact official suite into
+  `~/.agents/skills`. The confirmation names that current-user global scope and says
+  other compatible Agents can reuse the standard directory. It also states that
+  non-managed same-name Skills are preserved. CLI, launcher, Skill directories, and
+  the global Skill lock roll back together if Pi resources cannot reload. Before a
+  check, an installed updater-owned suite says
   `尚未检查`; after a successful check it says `已是最新` or `可更新`. A newer legacy
   registry record that is not independently installable says `暂无可安装更新`, while an
   older record is labeled `Registry 记录版本` rather than `最新兼容版本`. Lark official Skills update through the
@@ -862,8 +877,12 @@ loading error where the operation can produce those states
   drift; unproven drift remains `技能不同步` and blocks overwrite. Lark detail labels
   `当前 CLI`, `官方 Skills`, and `最新稳定版本` separately and attributes member rows
   to `Lark CLI 官方 Skills`, never to the capability Package carrying the immutable
-  baseline. A mutation pins one external CLI installation across check/update/check;
-  failure rechecks that same source or invalidates the stale success state. Extension Package
+  baseline. Runtime prefers the Desktop-managed current-user native CLI, remains
+  compatible with a verified existing user CLI, and updates the Desktop-managed path
+  through a staged atomic replacement. Only global Skills already owned by the
+  verified `larksuite/cli` lock source may be replaced; external user installations
+  retain their owning CLI update path. A failed update rechecks that same source or
+  invalidates the stale success state. Extension Package
   Skills remain in Package detail,
   bundled Skill suites retain an immutable Desktop baseline, and Desktop never
   performs a live `git pull` of an arbitrary Skill repository. AI Berkshire records

@@ -1,7 +1,7 @@
 import type { SkillPackEntry } from "@pi67/domain";
 import { create } from "zustand";
 
-type SkillPackPhase = "idle" | "loading" | "checking" | "updating" | "restoring" | "failed";
+type SkillPackPhase = "idle" | "loading" | "checking" | "installing" | "updating" | "restoring" | "failed";
 
 interface SkillPackState {
   workspaceId: string | undefined;

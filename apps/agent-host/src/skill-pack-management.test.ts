@@ -231,7 +231,7 @@ describe("SkillPackManagement", () => {
     });
     expect(JSON.stringify(transaction.result)).not.toContain("/mock/lark-cli");
     expect(runProcess).toHaveBeenCalledTimes(3);
-    expect(resolveLarkCli).toHaveBeenCalledTimes(1);
+    expect(resolveLarkCli).toHaveBeenCalledTimes(2);
     expect(runProcess.mock.calls.every(([calledExecutable]) => calledExecutable === executable)).toBe(true);
     expect(runProcess.mock.calls.every(([, , options]) => (
       options.environment.PATH?.split(delimiter)[0] === dirname(executable)
@@ -312,23 +312,6 @@ describe("SkillPackManagement", () => {
       expect.any(Array),
       expect.any(Object)
     );
-  });
-
-  it("returns an observable unavailable state when the updater cannot be resolved", async () => {
-    const fixture = await createFixture();
-    const management = new SkillPackManagement(fixture.services, {
-      capabilitiesRoot: fixture.capabilitiesRoot,
-      homeDirectory: fixture.homeDirectory,
-      now: () => 1_722_400_000_000,
-      resolveLarkCli: async () => undefined
-    });
-
-    const checked = await management.checkForUpdates();
-    expect(checked.items.find((item) => item.id === "lark-cli-global")).toMatchObject({
-        updateStatus: "unavailable",
-        canUpdate: false,
-        detail: expect.stringContaining("未找到 lark-cli")
-    });
   });
 
   it("activates AI Berkshire as a rollback-safe Overlay and restores the bundled baseline", async () => {

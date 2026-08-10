@@ -5,6 +5,7 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   checkSkillPackUpdates,
+  installSkillPack,
   loadSkillPacks,
   restoreSkillPack,
   updateSkillPack
@@ -17,6 +18,7 @@ const PACK: SkillPackEntry = {
   displayName: "飞书 Lark CLI",
   description: "飞书文档、消息、日历和开放平台能力。",
   manager: "lark-cli",
+  managerStatus: "ready",
   updateOwner: "managed-pack",
   updateStatus: "update-available",
   localState: "clean",
@@ -24,6 +26,7 @@ const PACK: SkillPackEntry = {
   installed: true,
   installedSkillCount: 27,
   skillIds: ["lark-doc", "lark-calendar"],
+  canInstall: false,
   canUpdate: true,
   effectiveSource: "managed",
   canRestore: false,
@@ -104,7 +107,38 @@ describe("Skill Pack controller", () => {
     await expect(updateSkillPack(PACK.id, "workspace-skills")).resolves.toBe(false);
     expect(request).not.toHaveBeenCalled();
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
-      title: "技能套件暂不可更新"
+      title: "技能套件暂不可更改"
+    });
+  });
+
+  it("installs a missing Lark CLI through the replay-safe Workspace command", async () => {
+    const current = {
+      ...PACK,
+      managerStatus: "ready" as const,
+      updateStatus: "current" as const,
+      canInstall: false,
+      canUpdate: false,
+      installedVersion: "1.0.85",
+      latestVersion: "1.0.85"
+    };
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [current],
+      total: 1,
+      changed: true,
+      checkedAt: 1_722_400_000_050
+    } as never);
+
+    await expect(installSkillPack(PACK.id, "workspace-skills")).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith(
+      "skill.pack.install",
+      { id: PACK.id },
+      [],
+      { context: { scope: "workspace", workspaceId: "workspace-skills" } }
+    );
+    expect(useSkillPackStore.getState().items).toEqual([current]);
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      title: "Lark CLI 已安装",
+      message: expect.stringContaining("~/.agents/skills")
     });
   });
 

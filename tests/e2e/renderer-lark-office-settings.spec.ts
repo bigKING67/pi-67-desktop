@@ -41,6 +41,37 @@ const UNCONFIGURED = {
   detail: "尚未配置飞书开放平台应用。"
 } as const;
 
+const MISSING_CLI = {
+  cliStatus: "missing",
+  phase: "disconnected",
+  verified: false,
+  checkedAt: 1_754_731_200_000,
+  appStatus: "unknown",
+  detail: "未找到 lark-cli。"
+} as const;
+
+const MISSING_LARK_PACK = {
+  id: "lark-cli-global",
+  suiteId: "lark-cli",
+  displayName: "飞书 Lark CLI",
+  description: "飞书文档、消息、日历、任务、会议和开放平台能力。",
+  manager: "lark-cli",
+  managerStatus: "missing",
+  updateOwner: "managed-pack",
+  updateStatus: "not-installed",
+  localState: "unknown",
+  provenance: "verified",
+  installed: true,
+  installedSkillCount: 27,
+  skillIds: ["lark-doc", "lark-calendar"],
+  canInstall: true,
+  canUpdate: false,
+  effectiveSource: "managed",
+  canRestore: false,
+  source: "@larksuite/cli",
+  detail: "需要先安装官方 Lark CLI，才能检查技能更新、配置飞书应用和进行用户授权。"
+} as const;
+
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
@@ -201,6 +232,78 @@ test("routes an unconfigured user authorization to application configuration", a
   await expect(applicationTab).toHaveAttribute("aria-selected", "true");
   await expect(settings.getByRole("heading", { name: "飞书应用", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "配置应用", exact: true })).toBeVisible();
+});
+
+test("offers a verified Lark CLI install before application or user authorization", async ({ page }, testInfo) => {
+  const visualArtifactDirectory = process.env.PI67_VISUAL_ARTIFACT_DIR;
+  if (visualArtifactDirectory) await mkdir(visualArtifactDirectory, { recursive: true });
+  const installedPack = {
+    ...MISSING_LARK_PACK,
+    managerStatus: "ready",
+    updateStatus: "current",
+    localState: "clean",
+    canInstall: false,
+    installedVersion: "1.0.85",
+    installedSkillVersion: "1.0.85",
+    latestVersion: "1.0.85",
+    detail: "当前 CLI 与官方 Skills 均为 1.0.85。"
+  } as const;
+  await page.goto("/");
+  await attachMockAgent(page, [], {}, {
+    responseResults: {
+      "lark.auth.status": MISSING_CLI,
+      "skill.pack.list": { items: [MISSING_LARK_PACK], total: 1 },
+      "skill.pack.install": {
+        items: [installedPack],
+        total: 1,
+        changed: true,
+        checkedAt: 1_754_731_201_000
+      }
+    }
+  });
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  const settings = await openLarkSettings(page);
+
+  await expect(settings.getByText("需要先安装 Lark CLI", { exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "登录飞书", exact: true })).toBeDisabled();
+  const missingCliScreenshot = visualArtifactDirectory
+    ? resolve(visualArtifactDirectory, "lark-office-settings-missing-cli.png")
+    : testInfo.outputPath("lark-office-settings-missing-cli.png");
+  await page.screenshot({ path: missingCliScreenshot, animations: "disabled" });
+  await testInfo.attach("lark-office-settings-missing-cli", {
+    path: missingCliScreenshot,
+    contentType: "image/png"
+  });
+  await settings.getByRole("tab", { name: "应用配置", exact: true }).click();
+  await expect(settings.getByText("需要先安装 Lark CLI", { exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "配置应用", exact: true })).toBeDisabled();
+  await settings.getByRole("tab", { name: "用户授权", exact: true }).click();
+  await settings.getByRole("button", { name: "安装 Lark CLI", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "安装 Lark CLI" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("~/.agents/skills");
+  await expect(dialog).toContainText("其他兼容 Agent");
+  await expect(dialog).toContainText("当前用户全局");
+  const installConfirmationScreenshot = visualArtifactDirectory
+    ? resolve(visualArtifactDirectory, "lark-cli-install-confirmation.png")
+    : testInfo.outputPath("lark-cli-install-confirmation.png");
+  await page.screenshot({ path: installConfirmationScreenshot, animations: "disabled" });
+  await testInfo.attach("lark-cli-install-confirmation", {
+    path: installConfirmationScreenshot,
+    contentType: "image/png"
+  });
+  await setMockAgentResponseResult(page, "lark.auth.status", UNCONFIGURED);
+  await dialog.getByRole("button", { name: "确认安装", exact: true }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(settings.getByText("需要先安装 Lark CLI", { exact: true })).toHaveCount(0);
+  await expect(settings.getByText("请先配置并验证飞书应用，再登录个人飞书账号。")).toBeVisible();
+  const installCommands = (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "skill.pack.install"
+  ));
+  expect(installCommands).toHaveLength(1);
+  expect(installCommands[0]?.context?.scope).toBe("workspace");
+  expect(installCommands[0]?.payload).toEqual({ id: "lark-cli-global" });
 });
 
 async function openLarkSettings(page: Page) {

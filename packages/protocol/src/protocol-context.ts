@@ -116,6 +116,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "extension.package.uninstall": "workspace",
   "skill.pack.list": "workspace",
   "skill.pack.checkUpdates": "workspace",
+  "skill.pack.install": "workspace",
   "skill.pack.update": "workspace",
   "skill.pack.restore": "workspace",
   "lark.auth.status": "app",

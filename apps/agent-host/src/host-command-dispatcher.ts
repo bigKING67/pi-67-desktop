@@ -56,6 +56,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "extension.package.uninstall"
       | "skill.pack.list"
       | "skill.pack.checkUpdates"
+      | "skill.pack.install"
       | "skill.pack.update"
       | "skill.pack.restore"
       | "lark.auth.status"

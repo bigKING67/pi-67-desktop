@@ -3,6 +3,7 @@ import type {
   LarkAuthSnapshot,
   LarkTokenStatus
 } from "@pi67/domain";
+import { LARK_CLI_SKILL_PACK_ID } from "@pi67/domain";
 import { Bot, ExternalLink, RefreshCw, UserRound } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Tab, TabList, TabPanel, Tabs } from "react-aria-components";
@@ -13,7 +14,11 @@ import {
   SettingsSectionBlock
 } from "./SettingsPrimitives.js";
 import { LarkApplicationSettings } from "./LarkApplicationSettings.js";
+import { LarkCliRequiredNotice } from "./LarkCliRequiredNotice.js";
+import { SkillPackMutationDialog } from "./ManagedGlobalSkillPanel.js";
 import { beginLarkUserLogin, loadLarkAuthStatus } from "./lark-auth-controller.js";
+import { installSkillPack, loadSkillPacks } from "./skill-pack-controller.js";
+import { useSkillPackStore } from "./skill-pack-store.js";
 import styles from "./LarkOfficeSettings.module.css";
 
 const AUTH_POLL_INTERVAL_MS = 1_500;
@@ -26,6 +31,12 @@ export function LarkOfficeSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [selectedTab, setSelectedTab] = useState<LarkSettingsTab>("user");
+  const [installConfirmationOpen, setInstallConfirmationOpen] = useState(false);
+  const skillPackLoadRequested = useRef(false);
+  const larkPack = useSkillPackStore((state) => (
+    state.items.find((entry) => entry.id === LARK_CLI_SKILL_PACK_ID)
+  ));
+  const skillPackPhase = useSkillPackStore((state) => state.phase);
 
   useEffect(() => {
     mounted.current = true;
@@ -49,6 +60,12 @@ export function LarkOfficeSettings() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (snapshot?.cliStatus !== "missing" || skillPackLoadRequested.current) return;
+    skillPackLoadRequested.current = true;
+    void loadSkillPacks();
+  }, [snapshot?.cliStatus]);
 
   useEffect(() => {
     if (snapshot?.phase !== "authorizing") return;
@@ -101,8 +118,16 @@ export function LarkOfficeSettings() {
   const userConnected = snapshot?.verified === true;
   const needsRefresh = snapshot?.tokenStatus === "needs-refresh";
   const appReady = snapshot?.appStatus === "ready";
+  const installingCli = skillPackPhase === "installing";
 
-  return <Tabs
+  const installLarkCli = async (): Promise<void> => {
+    const installed = await installSkillPack(LARK_CLI_SKILL_PACK_ID);
+    if (!installed || !mounted.current) return;
+    setInstallConfirmationOpen(false);
+    await refresh();
+  };
+
+  return <><Tabs
     className={styles.workspace!}
     data-testid="lark-office-settings"
     selectedKey={selectedTab}
@@ -122,6 +147,11 @@ export function LarkOfficeSettings() {
         title="用户授权"
         description="使用你的飞书身份访问个人云空间、日历、消息、任务和邮箱；这是办公能力的主要授权入口。"
       >
+        {cliMissing ? <LarkCliRequiredNotice
+          canInstall={larkPack?.canInstall === true}
+          installing={installingCli}
+          onInstall={() => setInstallConfirmationOpen(true)}
+        /> : null}
         <SettingsRows>
           <SettingsRow
             leading={<UserRound aria-hidden="true" size={17} />}
@@ -181,17 +211,28 @@ export function LarkOfficeSettings() {
         >
           请先配置并验证飞书应用，再登录个人飞书账号。
         </SettingsNotice> : null}
-        {cliMissing ? <SettingsNotice tone="warning">
-          未找到 lark-cli。请先在“技能”中安装或修复飞书 Lark CLI，再返回此处登录。
-        </SettingsNotice> : null}
         {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       </SettingsSectionBlock>
     </TabPanel>
 
     <TabPanel className={styles.tabPanel!} id="application">
-      <LarkApplicationSettings snapshot={snapshot} onSnapshotChange={setSnapshot} />
+      <LarkApplicationSettings
+        canInstallLarkCli={larkPack?.canInstall === true}
+        installingLarkCli={installingCli}
+        snapshot={snapshot}
+        onInstallLarkCli={() => setInstallConfirmationOpen(true)}
+        onSnapshotChange={setSnapshot}
+      />
     </TabPanel>
-  </Tabs>;
+  </Tabs>
+  {installConfirmationOpen && larkPack ? <SkillPackMutationDialog
+    action="install"
+    busy={installingCli}
+    error={skillPackPhase === "failed" ? useSkillPackStore.getState().error : undefined}
+    pack={larkPack}
+    onCancel={() => setInstallConfirmationOpen(false)}
+    onConfirm={installLarkCli}
+  /> : null}</>;
 }
 
 function userStatusLabel(snapshot: LarkAuthSnapshot | undefined, busy: boolean): string {

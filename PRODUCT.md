@@ -165,14 +165,31 @@ the only Runtime and behavior specification source.
   it. Markdown bodies and drafts remain renderer-memory-only and never enter Session
   projection, Workbench persistence, notifications, diagnostics, or default logs.
 - Global Skills with an explicit owning updater and verified suite manifest may be
-  checked and updated once per Skill Pack. Lark delegates the version check and
-  update to the installed `lark-cli`. A complete official Skill set already at the
-  latest reported Skill version remains updateable when only the CLI version is
-  behind; incomplete or otherwise unverified Skill drift blocks overwrite. Pi
-  resources reload only after the updater verifies convergence. One update pins the
-  same user-managed CLI executable for its pre-check, mutation, and post-check;
-  Desktop's private packaged toolchain is never an installation target. Settings
-  reports the current CLI, official Skills, and latest stable version separately.
+  checked and updated once per Skill Pack. A missing Lark CLI remains a visible
+  `not-installed` dependency instead of a generic failed check. After one explicit
+  confirmation, Desktop uses its private Node/npm only as the installer, downloads
+  `@larksuite/cli@latest` with npm lifecycle scripts disabled, validates the exact
+  package identity and bounded official install entry before executing that one entry,
+  validates the native executable, reported version, and official update-check JSON,
+  then atomically activates it under the current user's shared Agent tools root and
+  creates a native user launcher. The same confirmed transaction stages the exact
+  catalogued official suite through the pinned `skills` installer, validates its
+  bounded trees and source lock, and installs missing members into
+  `~/.agents/skills`. Existing same-name Skills are preserved. A later
+  Desktop-managed update may replace only members whose lock source is already
+  `larksuite/cli`; any unowned or unverifiable member blocks overwrite. This makes
+  the official Skills reusable by Pi-67 and other compatible Agents that read the
+  standard shared directory. The packaged toolchain and application resources are
+  never installation targets; CLI, launcher, global Skill lock, Skill activation,
+  and Workspace reload failures restore the previous user state. Runtime resolution
+  prefers this Desktop-managed native executable and remains compatible with a
+  verified existing user installation. External user installations continue to use
+  their owning CLI update path, while Desktop-managed installations update through
+  a newly staged and validated atomic replacement. A complete official Skill set
+  already at the latest reported Skill version remains updateable when only the CLI
+  version is behind; incomplete or otherwise unverified Skill drift blocks overwrite.
+  Pi resources reload only after the updater verifies convergence. Settings reports
+  the current CLI, official Skills, and latest stable version separately.
   AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one
   exact Pi-67 `main` commit, validates the bounded registry/lock and every declared
   Skill hash, installs only those Skills as a separate Pi Package Overlay, activates
@@ -207,12 +224,16 @@ the only Runtime and behavior specification source.
   verifiable suite version.
 - Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用配置`
   page-level tabs. `用户授权` is first and selected by default because the user's
-  personal identity is the primary office task. The Device Flow still depends on a
-  verified App identity; when one is missing, the user tab explains that dependency
-  and links directly to `应用配置` instead of exposing both workflows in one long
-  page. App ID remains visible, while a newly entered App Secret may be revealed only
+  personal identity is the primary office task. Both tabs first expose a missing
+  Lark CLI as an explicit prerequisite with `安装 Lark CLI` and `前往技能` actions;
+  the confirmation explicitly identifies a current-user global installation and
+  `~/.agents/skills` sharing scope. Application editing and user login stay disabled
+  until that installation verifies.
+  The Device Flow still depends on a verified App identity; when one is missing, the
+  user tab explains that dependency and links directly to `应用配置` instead of
+  exposing both workflows in one long page. App ID remains visible, while a newly entered App Secret may be revealed only
   in the active editor and crosses a dedicated one-shot credential command to Agent
-  Host. Agent Host passes it to the user-managed `lark-cli` through stdin, never argv,
+  Host. Agent Host passes it to the resolved user-owned `lark-cli` through stdin, never argv,
   and clears its mutable input buffer after the bounded configuration attempt. Saved
   App Secrets are not read back or duplicated by Desktop; organization-managed
   application sources remain read-only when such provenance becomes available.
