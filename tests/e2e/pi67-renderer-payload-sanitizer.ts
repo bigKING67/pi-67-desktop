@@ -22,6 +22,9 @@ export function installMockPayloadSanitizer(): void {
       || type === "provider.setRuntimeKey"
       || type === "provider.credential.store"
     ) return { ...payload, apiKey: "[redacted]" };
+    if (type === "lark.app.configuration.save") {
+      return { ...payload, appSecret: "[redacted]" };
+    }
     if (type === "provider.configuration.save") {
       const provider = payload.provider as Record<string, unknown> | undefined;
       const redactHeaders = (value: unknown) => Array.isArray(value)

@@ -1,12 +1,21 @@
-import type { AgentConnectionIdentity, SequenceGap } from "@pi67/protocol";
+import type {
+  AgentConnectionIdentity,
+  SequenceGap,
+  TaskProtocolContext
+} from "@pi67/protocol";
 import type { AppState } from "../app/app-store.types.js";
 import { clearedTransientState, INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
+import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-identity.js";
-import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
+import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
+import {
+  rendererWorkbenchStore,
+  type RendererWorkbenchTask
+} from "../workbench/workbench-store.js";
 import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
 import {
   beginRendererConnectionLoss,
@@ -94,8 +103,11 @@ export function handlePowerResume(get: StoreGet, set: StoreSet): void {
   const state = get();
   if (!state.workspace) return;
   if (state.connected && state.hostEpoch !== undefined) {
+    const context = activeProjectionTaskContext(state);
+    if (!context) return;
     void resynchronizeRendererProjection(get, set, {
       hostEpoch: state.hostEpoch,
+      context,
       recoveringDetail: messages.runtime.connection.resyncPower,
       readyDetail: messages.runtime.connection.resyncPowerReady,
       failureTitle: messages.runtime.connection.resyncPowerFailed
@@ -103,6 +115,32 @@ export function handlePowerResume(get: StoreGet, set: StoreSet): void {
     return;
   }
   recoverAgentConnectionAfterPowerResume(get, set, state.workspace);
+}
+
+function activeProjectionTaskContext(state: AppState): TaskProtocolContext | undefined {
+  const projection = useSessionProjectionStore.getState();
+  const authority = projection.currentAuthority(state);
+  const task = Object.values(rendererWorkbenchStore.getState().tasks).find((candidate) => (
+    authority
+      ? matchesProjectionAuthority(candidate, authority)
+      : projection.recoverySessionFileIdentity !== undefined
+        && candidate.sessionFileIdentity === projection.recoverySessionFileIdentity
+        && candidate.sessionGeneration !== undefined
+  ));
+  return task ? workbenchProtocolContextForTask(task) : undefined;
+}
+
+function matchesProjectionAuthority(
+  task: RendererWorkbenchTask,
+  authority: {
+    sessionId: string;
+    sessionFileIdentity: string;
+    sessionGeneration: number;
+  }
+): boolean {
+  return task.sessionId === authority.sessionId
+    && task.sessionFileIdentity === authority.sessionFileIdentity
+    && task.sessionGeneration === authority.sessionGeneration;
 }
 
 export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailure): void {

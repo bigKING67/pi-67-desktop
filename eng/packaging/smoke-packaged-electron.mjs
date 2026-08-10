@@ -22,6 +22,7 @@ import {
 } from "./packaged-electron-smoke-scenarios.mjs";
 import { verifyPackagedMainOnlyDiagnostics } from "./packaged-diagnostics-smoke.mjs";
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
+import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 const artifact = resolvePackagedArtifact();
@@ -297,6 +298,7 @@ try {
   await capturePackagedScreenshot(window, "09-rule-context-project-catalog.png");
   await ruleSettingsWorkspace.getByRole("heading", { name: "继承的工作规则", exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
+  await verifyPackagedLarkSettings({ capturePackagedScreenshot, settingsNavigation, window, workspaceSettings });
   if (window.url() !== "app://pi67/index.html") throw new Error(`Unexpected packaged renderer URL: ${window.url()}`);
   const security = await window.evaluate(() => ({
     hasNodeProcess: "process" in globalThis,
@@ -421,7 +423,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

@@ -11,9 +11,11 @@ color:
   surface-raised: "#252b26"
   surface-hover: "#2a302b"
   surface-active: "#30433a"
+  surface-disabled: "#202521"
   text-primary: "#f0f3ef"
   text-secondary: "#a9b1aa"
   text-tertiary: "#7f8981"
+  text-disabled: "#7f8981"
   border: "#343b35"
   border-strong: "#465047"
   accent: "#7bc5ad"
@@ -60,7 +62,7 @@ spacing, component states, and motion as `DESIGN.md`.
   low-contrast luminance fill rather than the green runtime accent, and the
   removed Settings brand/description hero must not reappear as dark-theme-only
   chrome. At narrow widths the grouped Popover uses the same raised neutral surface,
-  retains all four group labels, and remains bounded inside the viewport.
+  retains all five group labels, and remains bounded inside the viewport.
 - The right column uses the same centered `840px` compact and `1120px` standard
   measures as light mode with a single vertical scroll owner. Grouped Settings use
   one quiet surface and row dividers;
@@ -83,6 +85,16 @@ spacing, component states, and motion as `DESIGN.md`.
   roles as light mode. The API-key eye control may reveal only the current user
   input; persisted credentials and Header values never gain a theme-specific
   value preview, and focus rings remain visible on every raised surface.
+- Lark uses the same two page-level Tabs in both themes: `用户授权` is first and
+  selected by default, while `应用配置` is second. The selected, hover, and
+  focus-visible states reuse the neutral Settings Tab family without glow or a green
+  identity treatment. Each panel keeps its own neutral Grouped Settings section.
+  Connected, needs-refresh, authorizing, missing-CLI, unconfigured-App, editing,
+  saving, and error states use semantic text and notices rather than glowing identity
+  cards. The application editor uses the normal Settings field and focus tokens; App
+  ID remains readable, while App Secret reveal exists only for the current draft and
+  never for the saved credential. The user login remains a distinct OAuth action
+  rather than a second App-login button.
 - Disabled controls use explicit tokens rather than blanket opacity.
 - Readable Settings metadata at 10-12px uses the secondary text role in both themes;
   the tertiary role remains limited to decorative status dots and nonessential marks.

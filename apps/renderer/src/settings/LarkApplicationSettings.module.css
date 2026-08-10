@@ -1,0 +1,138 @@
+.appId {
+  max-width: min(420px, 44vw);
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 560;
+}
+
+.editor {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.editorHeader {
+  display: grid;
+  gap: 3px;
+}
+
+.editorHeader strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.editorHeader small,
+.field small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.5fr);
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.field > span:first-child {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 630;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  height: 38px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 24%, transparent);
+}
+
+.field input:disabled,
+.field select:disabled {
+  border-color: var(--border);
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
+}
+
+.secretControl {
+  position: relative;
+  display: block;
+}
+
+.secretControl input {
+  padding-right: 44px;
+}
+
+.secretToggle {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.secretToggle[data-hovered] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.secretToggle[data-focus-visible] {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appId {
+    max-width: 52vw;
+  }
+}

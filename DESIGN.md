@@ -11,9 +11,11 @@ color:
   surface-raised: "#ffffff"
   surface-hover: "#e8ebe7"
   surface-active: "#e0e9e4"
+  surface-disabled: "#eef0ed"
   text-primary: "#171a18"
   text-secondary: "#626862"
   text-tertiary: "#858c86"
+  text-disabled: "#858c86"
   border: "#d9ddd8"
   border-strong: "#c8cec8"
   accent: "#2f6757"
@@ -228,8 +230,8 @@ Application-level surfaces use a separate wide-window shell:
 CSS consumes only semantic roles:
 
 ```text
-canvas surface surfaceMuted surfaceRaised surfaceHover surfaceActive
-textPrimary textSecondary textTertiary textOnDanger
+canvas surface surfaceMuted surfaceRaised surfaceHover surfaceActive surfaceDisabled
+textPrimary textSecondary textTertiary textDisabled textOnDanger
 border borderStrong accent accentStrong accentSoft focus
 info warning danger success diffAdded diffRemoved codeDiffAddedText codeDiffRemovedText
 codeSurface codeBorder codeText codeMuted overlayBackdrop
@@ -697,14 +699,14 @@ loading error where the operation can produce those states
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
 - Settings owns `账户`, `外观`, `模型`, `扩展`, `技能`,
-  `提示词模板`, `工作规则`, `浏览器集成`, `运行服务`, `用量分析`,
+  `提示词模板`, `工作规则`, `飞书`, `浏览器集成`, `运行服务`, `用量分析`,
   `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
-  `应用`, `Pi`, `连接与集成`, and `系统与支持`. Account, Appearance, Model
-  Services, managed Rules, Browser Integration, Runtime, Usage, Download
-  Sources/Network, Updates, and About are global-only and do not show a meaningless
-  page-level scope control. Only the Extension workspace and Prompt Templates use
-  the generic global/current-project switch; Skills and Rules own their explicit
-  availability tabs instead.
+  `应用`, `Pi`, `办公`, `连接与集成`, and `系统与支持`. Account, Appearance,
+  Model Services, managed Rules, Lark, Browser Integration, Runtime, Usage,
+  Download Sources/Network, Updates, and About are global-only and do not show a
+  meaningless page-level scope control. Only the Extension workspace and Prompt
+  Templates use the generic global/current-project switch; Skills and Rules own
+  their explicit availability tabs instead.
 - Every Settings category uses one centered `min(1120px, 100%)` document flow and
   the content region is its only vertical scroll owner. Page title, summary,
   scope, section headings, and content share the same cross-category alignment;
@@ -719,6 +721,27 @@ loading error where the operation can produce those states
   giant outline or floating cards. **Editor / Notice** lets a textarea, long
   editor, or semantic notice be the surface and forbids another ordinary card
   around it. Section headings remain outside all three surfaces.
+- `飞书` uses the same page-level Tab language as other Settings workspaces instead
+  of stacking both identity workflows into one long page. `用户授权` is the first and
+  default tab; `应用配置` is second. Each panel contains its own explicit Grouped
+  Settings section rather than one ambiguous connection card. Both Bot identity and
+  the user Device Flow still depend on the active App, so an unconfigured user panel
+  explains the dependency and provides a direct `前往应用配置` action. User-managed
+  configuration shows the complete App ID after save and presents App ID, region,
+  and a masked App Secret editor with a draft-only reveal control. Saving requires a
+  fresh App Secret, uses a dedicated one-shot credential command, and never offers
+  saved-secret reveal; success clears the draft and shows `已安全保存`. An organization-
+  managed source remains read-only when provenance proves that policy. `用户授权`
+  owns `登录飞书` / `重新授权`, refresh,
+  verified user name, token validity/expiry, and the Device Flow waiting state. The
+  validated HTTPS verification destination opens through Main's existing external-
+  link boundary; an optional user code may be shown, but Device Code and tokens
+  never cross Protocol. `needs_refresh` is neutral `待自动续期`, not a reauthorization
+  warning; only invalid or expired refresh credentials request user action. Identity
+  readiness does not imply that a specific Drive, Calendar, message, task, or mail
+  request has passed. Missing CLI, editing, saving, connected, needs-refresh,
+  disconnected, expired, and error states keep the same row geometry and explicit
+  text; polling is bounded to the active Device Flow.
 - Provider, model, and Package catalogs always use explicit drill-down rather
   than automatic master-detail expansion: `Provider 目录 -> Provider 编辑 ->
   模型目录 -> 模型详情` and `Package Catalog -> Package 详情`. No viewport or
@@ -966,7 +989,7 @@ loading error where the operation can produce those states
 - At high zoom or an equivalently narrow effective viewport, Settings moves its
   category navigation from a fixed left column to one grouped Popover trigger above
   the content. The trigger names the current group and category; the Popover repeats
-  all visible search results under `应用`, `Pi`, `连接与集成`, and `系统与支持`, is at
+  all visible search results under `应用`, `Pi`, `办公`, `连接与集成`, and `系统与支持`, is at
   most `320px` wide and bounded by the viewport height. The scope switch and current
   section remain at the top of the same document, while the content owns vertical
   scrolling without introducing document-level or two-dimensional overflow.

@@ -117,7 +117,10 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "skill.pack.list": "workspace",
   "skill.pack.checkUpdates": "workspace",
   "skill.pack.update": "workspace",
-  "skill.pack.restore": "workspace"
+  "skill.pack.restore": "workspace",
+  "lark.auth.status": "app",
+  "lark.auth.login.begin": "app",
+  "lark.app.configuration.save": "app"
 };
 
 export function hasValidCommandContext(

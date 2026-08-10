@@ -65,7 +65,12 @@ export function larkCliProcessEnvironment(
       !privateNodeDirectory || !sameAbsolutePath(entry, privateNodeDirectory)
     ))
     .filter((entry, index, entries) => entries.findIndex((candidate) => sameAbsolutePath(candidate, entry)) === index);
-  return { ...environment, PATH: pathEntries.join(delimiter) };
+  return {
+    ...environment,
+    PATH: pathEntries.join(delimiter),
+    LARKSUITE_CLI_NO_UPDATE_NOTIFIER: "1",
+    LARKSUITE_CLI_NO_SKILLS_NOTIFIER: "1"
+  };
 }
 
 export function resolveOptionalPath(value: string | undefined): string | undefined {

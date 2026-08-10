@@ -1,4 +1,4 @@
-import { MAX_RUNNING_TASKS } from "@pi67/protocol";
+import { MAX_RUNNING_TASKS, isWorkbenchSettingsSection } from "@pi67/protocol";
 import { MAX_WORKSPACE_ID_LENGTH, parseWorkspaceDescriptor,
   workspaceDescriptorsReferToSameDirectory, type WorkspaceDescriptor } from "./workspace-identity.js";
 import type { TaskLifecycle } from "./workbench-state-lifecycle.js";
@@ -291,25 +291,6 @@ function parseConversationKey(
   return undefined;
 }
 
-function isSettingsSection(value: unknown): value is SettingsSection {
-  return typeof value === "string" && [
-    "account",
-    "general",
-    "providers",
-    "packages",
-    "extensions",
-    "skills",
-    "prompts",
-    "rules",
-    "integrations",
-    "runtime",
-    "usage",
-    "network",
-    "updates",
-    "about"
-  ].includes(value);
-}
-
 export function parseWorkspaces(value: unknown): WorkspaceDescriptor[] | undefined {
   if (!Array.isArray(value) || value.length > MAX_WORKSPACES) return undefined;
   const workspaces: WorkspaceDescriptor[] = [];
@@ -337,7 +318,7 @@ export function parseWorkbenchSettings(
         : value.section === "mcp"
           ? "integrations"
           : value.section;
-  if (!isSettingsSection(section)) return undefined;
+  if (!isWorkbenchSettingsSection(section)) return undefined;
   if (value.scope === "global") {
     if (value.workspaceId !== undefined) return undefined;
   } else if (value.scope === "project") {
@@ -431,6 +412,7 @@ function taskLifecycleWasLive(lifecycle: TaskLifecycle): boolean {
 function settingsSectionIsGlobalOnly(section: SettingsSection): boolean {
   return section === "account"
     || section === "general"
+    || section === "lark"
     || section === "integrations"
     || section === "network"
     || section === "updates"

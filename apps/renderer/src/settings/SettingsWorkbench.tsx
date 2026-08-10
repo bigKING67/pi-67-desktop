@@ -46,6 +46,7 @@ import {
 } from "./SettingsDraftGuard.js";
 import { AboutSettings, RuntimeSettings } from "./SettingsSystemPanels.js";
 import { KeyboardShortcutSettings } from "./KeyboardShortcutSettings.js";
+import { LarkOfficeSettings } from "./LarkOfficeSettings.js";
 import { UsageSettings } from "./UsageSettings.js";
 import {
   SettingsNotice,
@@ -258,6 +259,7 @@ function SettingsSectionContent({ section }: { section: SettingsSection }) {
   if (section === "skills") return <SkillSettings />;
   if (section === "prompts") return <PromptSettings />;
   if (section === "rules") return <RuleSettingsWorkspace />;
+  if (section === "lark") return <LarkOfficeSettings />;
   if (section === "integrations") return <Browser67IntegrationPanel />;
   if (section === "runtime") return <RuntimeSettings />;
   if (section === "usage") return <UsageSettings />;

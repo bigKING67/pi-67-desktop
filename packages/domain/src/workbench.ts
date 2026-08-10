@@ -72,21 +72,30 @@ export type WorkbenchSurface =
   | { kind: "settings" }
   | { kind: "workspace"; workspaceId: WorkspaceId };
 
-export type SettingsSection =
-  | "account"
-  | "general"
-  | "providers"
-  | "packages"
-  | "extensions"
-  | "skills"
-  | "prompts"
-  | "rules"
-  | "integrations"
-  | "runtime"
-  | "usage"
-  | "network"
-  | "updates"
-  | "about";
+export const WORKBENCH_SETTINGS_SECTIONS = [
+  "account",
+  "general",
+  "providers",
+  "packages",
+  "extensions",
+  "skills",
+  "prompts",
+  "rules",
+  "lark",
+  "integrations",
+  "runtime",
+  "usage",
+  "network",
+  "updates",
+  "about"
+] as const;
+
+export type SettingsSection = (typeof WORKBENCH_SETTINGS_SECTIONS)[number];
+
+export function isWorkbenchSettingsSection(value: unknown): value is SettingsSection {
+  return typeof value === "string"
+    && WORKBENCH_SETTINGS_SECTIONS.some((section) => section === value);
+}
 
 export interface RuntimeRecoveryRecordV2 {
   taskId: TaskId;

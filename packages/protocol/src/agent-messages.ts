@@ -47,6 +47,7 @@ import type {
   ConversationOrganizationCommandResults,
   SessionNameMutation
 } from "./conversation-organization-messages.js";
+import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
 import type {
   PiCredentialRevealResult,
   PiProviderConfigurationInput,
@@ -218,7 +219,8 @@ export type SessionCatalogPageResult = Omit<SessionCatalogPage, "items"> & {
 
 export interface CommandPayloads extends
   WorkspaceFileCommandPayloads,
-  ConversationOrganizationCommandPayloads {
+  ConversationOrganizationCommandPayloads,
+  LarkCommandPayloads {
   "runtime.initialize": {
     cwd: string;
     agentDir?: string;
@@ -338,7 +340,8 @@ export interface CommandPayloads extends
 
 export interface CommandResults extends
   WorkspaceFileCommandResults,
-  ConversationOrganizationCommandResults {
+  ConversationOrganizationCommandResults,
+  LarkCommandResults {
   "runtime.initialize": ProjectionMutationAcknowledgement;
   "runtime.getStatus": RuntimeStatusResult;
   "projection.resync": ProjectionResyncResult;

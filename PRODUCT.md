@@ -73,9 +73,9 @@ the only Runtime and behavior specification source.
 5. Diagnose shell, configuration, extension, update, and runtime failures
    without exposing credentials or private content.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
-7. Open the singleton Settings surface across Application, Pi, Connections &
-   Integrations, and System & Support categories without losing drafts or
-   background work.
+7. Open the singleton Settings surface across Application, Pi, Office,
+   Connections & Integrations, and System & Support categories without losing
+   drafts or background work.
 8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
    external MCP services; and prepare supported browser integrations without
    requiring a system Node, npm, Git, pnpm, or Pi CLI.
@@ -205,7 +205,32 @@ the only Runtime and behavior specification source.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
-- Browser capability readiness is the only first-party connection task in Settings.
+- Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用配置`
+  page-level tabs. `用户授权` is first and selected by default because the user's
+  personal identity is the primary office task. The Device Flow still depends on a
+  verified App identity; when one is missing, the user tab explains that dependency
+  and links directly to `应用配置` instead of exposing both workflows in one long
+  page. App ID remains visible, while a newly entered App Secret may be revealed only
+  in the active editor and crosses a dedicated one-shot credential command to Agent
+  Host. Agent Host passes it to the user-managed `lark-cli` through stdin, never argv,
+  and clears its mutable input buffer after the bounded configuration attempt. Saved
+  App Secrets are not read back or duplicated by Desktop; organization-managed
+  application sources remain read-only when such provenance becomes available.
+  `用户授权` invokes the `lark-cli` Device Flow, Renderer opens only the validated HTTPS verification URL,
+  and the resulting user OAuth identity is used for personal Drive, Calendar, IM,
+  Task, Mail, and other user-authorized resources. Bot identity never uses the user
+  OAuth login action and cannot stand in for the user's personal identity. User
+  tokens remain owned by `lark-cli`; Device Code remains Agent-Host-memory-only.
+  Tokens, Device Code, saved App Secret, open_id, and full scope lists never enter
+  Pi JSONL, Desktop persistence, diagnostics, default logs, or model context. A
+  ready identity status proves only the bounded CLI verification, not that a
+  particular Feishu business API operation has succeeded. User access-token expiry
+  is not authorization expiry: `needs_refresh` remains usable and is described as
+  automatic renewal on the next user API call; only an invalid or expired refresh
+  grant requires a new browser authorization.
+- Browser capability readiness is the only first-party task under Settings'
+  Connections & Integrations group. The separate Office group owns Lark identity;
+  it is not a generic MCP endpoint or credential editor.
   `浏览器集成` owns browser-specific dependency preparation and runtime diagnostics.
   Pi user-owned MCP configuration remains visible through normal Runtime capability
   projections, but Desktop does not provide a generic MCP endpoint or credential editor.
@@ -424,11 +449,12 @@ the only Runtime and behavior specification source.
 - Settings opens or focuses one application-level selected surface. Global and project
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
-- Settings navigation groups `账户` and `外观` under Application; Pi
-  resources under Pi; MCP and browser work under Connections & Integrations; and
-  runtime, network, updates, and About under System & Support. Category search
-  searches these navigation targets rather than arbitrary page content. Narrow
-  windows use the same grouped information architecture in a bounded popover.
+- Settings navigation groups `账户` and `外观` under Application; Pi resources
+  under Pi; `飞书` under Office; browser work under Connections & Integrations;
+  and runtime, network, updates, and About under System & Support. Category
+  search searches these navigation targets rather than arbitrary page content.
+  Narrow windows use the same grouped information architecture in a bounded
+  popover.
 - `恢复与诊断` combines three read-only authorities without creating another
   business source of truth: Pi runtime checks from `doctor.run`, bounded Agent
   Host recovery facts from `diagnostics.collect`, and Electron Main Workspace,

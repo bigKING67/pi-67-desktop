@@ -1,8 +1,9 @@
-import type { WorkspaceDescriptor } from "./workspace-identity.js";
 import type {
   EnvironmentMutationRecoveryRecord,
+  SettingsSection as ProtocolSettingsSection,
   WorkspaceEnvironmentBinding
 } from "@pi67/protocol";
+import type { WorkspaceDescriptor } from "./workspace-identity.js";
 import type { TaskLifecycle } from "./workbench-state-lifecycle.js";
 import type { SessionCreationRecoveryRecord } from "./workbench-state-session-creation.js";
 
@@ -18,21 +19,7 @@ export type LegacyConversationKey =
 
 export type SessionConversationKey = Extract<ConversationKey, { kind: "session" }>;
 
-export type SettingsSection =
-  | "account"
-  | "general"
-  | "providers"
-  | "packages"
-  | "extensions"
-  | "skills"
-  | "prompts"
-  | "rules"
-  | "integrations"
-  | "runtime"
-  | "usage"
-  | "network"
-  | "updates"
-  | "about";
+export type SettingsSection = ProtocolSettingsSection;
 
 export type WorkbenchSurface =
   | { kind: "conversation"; conversation: ConversationKey }

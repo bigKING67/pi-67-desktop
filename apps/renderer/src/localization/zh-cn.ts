@@ -16,6 +16,7 @@ export const zhCNMessages = {
     groups: {
       application: "应用",
       pi: "Pi",
+      office: "办公",
       connections: "连接与集成",
       systemSupport: "系统与支持"
     },
@@ -51,6 +52,10 @@ export const zhCNMessages = {
       rules: {
         label: "工作规则",
         summary: "管理 Pi 自动加载并持续生效的全局与项目工作规则。"
+      },
+      lark: {
+        label: "飞书",
+        summary: "配置飞书应用，并管理个人飞书用户授权。"
       },
       integrations: {
         label: "浏览器集成",

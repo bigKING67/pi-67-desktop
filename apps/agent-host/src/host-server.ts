@@ -15,6 +15,7 @@ import { HostConnectionContext, type HostConnectionIdentity } from "./connection
 import { forkSessionFromTask } from "./cross-task-session-fork.js";
 import { commandRequiresRunAdmission, isSettledRunAdmissionResult } from "./global-run-admission.js";
 import { dispatchHostCommand, type RuntimeLoadedCommand } from "./host-command-dispatcher.js";
+import { dispatchHostAppCommand } from "./host-app-command-dispatcher.js";
 import { HostEventChannel } from "./host-event-channel.js";
 import { HostRequestRouter } from "./host-request-router.js";
 import { collectHostRuntimeDiagnostics } from "./host-runtime-diagnostics.js";
@@ -26,7 +27,10 @@ import { boundedMetadataCount, shutdownDeadline } from "./host-shutdown-contract
 import { HostTaskStateCoordinator, type TaskHostState } from "./host-task-state-coordinator.js";
 import { HostTaskRuntimeLifecycle } from "./host-task-runtime-lifecycle.js";
 import { captureProjectionMutationAcknowledgement, captureProjectionResync } from "./host-projection.js";
-import { HostCommandError } from "./protocol-error.js";
+import {
+  createLarkAuthManagement,
+  type LarkAuthManagementPort
+} from "./lark-auth-management.js";
 import { createResourceManagementRouters, type ResourceManagementRouters } from "./resource-management-routers.js";
 import type { SessionWriterLeaseRegistry, SessionWriterLeaseReservation } from "./session-writer-lease-registry.js";
 import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
@@ -50,6 +54,7 @@ export class AgentHostServer {
   private readonly contextFiles: ResourceManagementRouters["contextFiles"];
   private readonly extensionPackages: ResourceManagementRouters["extensionPackages"];
   private readonly skillPacks: ResourceManagementRouters["skillPacks"];
+  private readonly larkAuth: LarkAuthManagementPort;
   private readonly tasks: HostTaskStateCoordinator;
   private readonly taskLifecycle: HostTaskRuntimeLifecycle;
   private readonly requests: HostRequestRouter;
@@ -116,6 +121,7 @@ export class AgentHostServer {
     this.contextFiles = resourceManagement.contextFiles;
     this.extensionPackages = resourceManagement.extensionPackages;
     this.skillPacks = resourceManagement.skillPacks;
+    this.larkAuth = this.options.larkAuthManagement ?? createLarkAuthManagement();
     this.events = new HostEventChannel({
       getConnection: () => this.currentConnection,
       getHostEpoch: () => this.hostIdentity?.hostEpoch ?? 1,
@@ -157,12 +163,31 @@ export class AgentHostServer {
       {
         isShuttingDown: () => this.shuttingDown,
         runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),
-        dispatchAppCommand: (command) => this.dispatchAppCommand(command),
+        dispatchAppCommand: (command) => dispatchHostAppCommand(command, {
+          larkAuth: this.larkAuth,
+          loadRuntime: async () => this.tasks.activeState()?.record.runtime ?? this.loadCompatibilityRuntime(),
+          collectDiagnostics: (runtime) => collectHostRuntimeDiagnostics({
+            runtime,
+            hostEpoch: this.hostIdentity?.hostEpoch ?? 0,
+            taskStates: this.tasks.values(),
+            workspaceRecords: this.workspaces.values(),
+            writerLeases: this.sessionWriterLeases
+          })
+        }),
         handleProjectionResync: (origin, request, state) => this.handleProjectionResync(origin, request, state),
         loadRuntime: (state) => this.taskLifecycle.loadRuntime(state),
         closeTask: (state, mode) => this.taskLifecycle.closeTask(state, mode),
         dispatchTask: (command, state, fingerprint) => this.dispatch(command, state, fingerprint),
-        shutdownResources: (deadlineMs) => resourceManagement.shutdown(deadlineMs)
+        shutdownResources: async (deadlineMs) => {
+          const results = await Promise.allSettled([
+            resourceManagement.shutdown(deadlineMs),
+            this.larkAuth.shutdown()
+          ]);
+          const rejected = results.find(
+            (result): result is PromiseRejectedResult => result.status === "rejected"
+          );
+          if (rejected) throw rejected.reason;
+        }
       }
     );
   }
@@ -417,32 +442,6 @@ export class AgentHostServer {
       this.hostIdentity?.hostEpoch ?? 1,
       state.operations
     );
-  }
-
-  private async dispatchAppCommand(
-    command: AgentCommand
-  ): Promise<CommandResults[AgentCommandType]> {
-    const runtime = this.tasks.activeState()?.record.runtime ?? await this.loadCompatibilityRuntime();
-    switch (command.type) {
-      case "diagnostics.collect":
-        return collectHostRuntimeDiagnostics({
-          runtime,
-          hostEpoch: this.hostIdentity?.hostEpoch ?? 0,
-          taskStates: this.tasks.values(),
-          workspaceRecords: this.workspaces.values(),
-          writerLeases: this.sessionWriterLeases
-        });
-      case "doctor.run":
-        return runtime.runDoctor();
-      case "session.catalog.query":
-        return runtime.querySessionCatalog(command.payload);
-      default:
-        throw new HostCommandError(
-          "INVALID_PAYLOAD",
-          `Command does not support App authority: ${command.type}`,
-          false
-        );
-    }
   }
 
   private resolveHostIdentity(options: AttachPortOptions): HostConnectionIdentity {

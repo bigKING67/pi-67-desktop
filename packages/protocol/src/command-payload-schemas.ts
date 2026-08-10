@@ -17,6 +17,7 @@ import {
   PiConfigurationProviderIdSchema,
   PiProviderConfigurationInputSchema
 } from "./provider-configuration-schemas.js";
+import { LarkAppConfigurationInputSchema } from "./lark-auth-schemas.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
@@ -236,6 +237,9 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "skill.pack.checkUpdates": EmptyPayloadSchema,
   "skill.pack.update": SkillPackTargetSchema,
   "skill.pack.restore": SkillPackTargetSchema,
+  "lark.auth.status": EmptyPayloadSchema,
+  "lark.auth.login.begin": EmptyPayloadSchema,
+  "lark.app.configuration.save": LarkAppConfigurationInputSchema,
   "extension.ui.respond": strictObject({
     requestId: Type.String({ minLength: 1, maxLength: 512 }),
     sessionId: Type.String({ minLength: 1, maxLength: 512 }),

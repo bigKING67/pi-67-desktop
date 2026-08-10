@@ -92,6 +92,7 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - Desktop 已退休 Team MCP/Tavily Bridge：不再打包资源、提供设置页、保存/显示 Token 或向 Agent Host 注入环境。启动时只移除完全匹配旧 Desktop-owned identity 的 `mcp.json` entry 与旧 userData token；用户自定义或其他 MCP 配置保持不变
 - 内置 `Groland` 是一个 Provider、一个 Credential、七个图片+推理模型：五个 Claude 走 Anthropic Messages/x-api-key，两个 GPT 走 OpenAI Responses/Bearer。DeepSeek 继续走 Pi 官方 Provider，目前仅 `deepseek-v4-flash` 声明原生搜索；它复用同一个 Pi API Key 调用官方 Responses `/responses`，并接收 `in_progress` / `searching` / `completed` 流式搜索状态
 - `@narumitw/pi-plan-mode`、`pi-web-access`、`pi-smart-fetch` 的既有用户配置不会被自动删除或改写，但 Desktop Task 不再加载；Settings 会显示原生替代并保留显式卸载入口
+- Settings 的 `办公 -> 飞书` 用两个页内 Tab 分开身份流程：`用户授权` 在前并默认选中，负责通过 `lark-cli` Device Flow 登录/重新授权，以访问云空间、日历、消息、任务、邮箱等用户资源；缺少有效应用时会明确引导到第二个 `应用配置` Tab。应用配置支持查看和编辑 App ID，并在当前草稿中显隐核对 App Secret；Agent Host 只通过 stdin 将一次性密钥交给本机 `lark-cli`，保存后 Desktop 不回读或复制明文。`needs_refresh` 表示下一次用户 API 调用会自动续期，不等于必须重新授权。用户 Token 由 `lark-cli` 保存，Device Code 只留在 Agent Host 内存，已保存 App Secret、Token、Device Code、open_id 和完整 scope 不进入 Pi JSONL、持久化、诊断、默认日志或模型上下文。身份显示已连接不代表某个具体飞书 API 已完成实测
 - `known-baseline-observed`、`user-approved-observed` 与 `user-installed-observed` 都不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
 - 后续只跟踪 `pi-gui` 与 `t3code` 两个综合参考源。两者的产品、功能、交互、UI、设计、
   架构、Harness、runtime lifecycle、恢复、测试与工程质量都可选择性吸收；`pi-gui` 是

@@ -356,7 +356,12 @@ export class AgentConnectionController {
 }
 
 function requestContext<T extends AgentCommandType>(type: T, payload: CommandPayloads[T]): ProtocolContext {
-  if (type === "diagnostics.collect" || type === "doctor.run") return { scope: "app" };
+  if (
+    type === "diagnostics.collect"
+    || type === "doctor.run"
+    || type === "lark.auth.status"
+    || type === "lark.auth.login.begin"
+  ) return { scope: "app" };
   const current = currentWorkbenchProtocolContext();
   if (type === "session.catalog.query") {
     const scope = (payload as CommandPayloads["session.catalog.query"]).scope;

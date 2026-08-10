@@ -284,6 +284,9 @@ function allowsAppContext(request: RequestEnvelope): boolean {
   return request.type === "runtime.getStatus"
     || request.type === "diagnostics.collect"
     || request.type === "doctor.run"
+    || request.type === "lark.auth.status"
+    || request.type === "lark.auth.login.begin"
+    || request.type === "lark.app.configuration.save"
     || (
       request.type === "session.catalog.query"
       && (request as RequestEnvelope<"session.catalog.query">).payload.scope === "all"

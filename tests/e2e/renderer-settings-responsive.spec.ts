@@ -40,7 +40,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await categoryTrigger.click();
   const categoryMenu = page.getByRole("menu", { name: "选择设置分类" });
   await expect(categoryMenu).toBeVisible();
-  for (const group of ["应用", "Pi", "连接与集成", "系统与支持"]) {
+  for (const group of ["应用", "Pi", "办公", "连接与集成", "系统与支持"]) {
     await expect(categoryMenu.getByText(group, { exact: true })).toBeVisible();
   }
   const categoryPopover = page.getByRole("dialog", { name: "选择设置分类" });
@@ -268,7 +268,7 @@ test("keeps every Settings category on one centered document measure without sid
   expect(Math.abs(documentMetrics.leftInset - documentMetrics.rightInset)).toBeLessThanOrEqual(1);
 
   const navigation = settings.getByRole("navigation", { name: "设置分类" });
-  for (const category of ["提示词模板", "用量分析", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
+  for (const category of ["提示词模板", "飞书", "用量分析", "浏览器集成", "运行服务", "更新与诊断", "关于"]) {
     await navigation.getByRole("button", { name: category, exact: true }).click();
     await expect(settings.getByRole("heading", { name: category, exact: true }).first()).toBeVisible();
     const next = await measureDocument();

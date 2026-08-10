@@ -248,6 +248,14 @@ describe("WorkbenchStateV5 persistence", () => {
       ...layout,
       settings: { section: "integrations", scope: "global" }
     }).settings).toEqual({ section: "integrations", scope: "global" });
+    expect(replaceWorkbenchLayout(state, {
+      ...layout,
+      settings: { section: "lark", scope: "global" }
+    }).settings).toEqual({ section: "lark", scope: "global" });
+    expect(() => replaceWorkbenchLayout(state, {
+      ...layout,
+      settings: { section: "lark", scope: "project", workspaceId: workspace.id }
+    })).toThrow(/invalid/u);
 
     const boundedRecovery = Array.from({ length: MAX_RUNTIME_RECOVERY_RECORDS }, (_, index) => recoveryRecord(
       `task-${index}`,

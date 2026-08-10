@@ -15,6 +15,7 @@ import type { TaskRuntimeLoader } from "./task-runtime-registry.js";
 import type { PromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
 import type { PackageWorkerPort } from "./package-worker-client.js";
 import type { SessionWriterLeaseRegistry } from "./session-writer-lease-registry.js";
+import type { LarkAuthManagementPort } from "./lark-auth-management.js";
 
 export interface AttachPortOptions {
   expectedOrigin?: string;
@@ -34,6 +35,7 @@ export interface AgentHostServerOptions {
   packageWorker?: PackageWorkerPort;
   contextFileManagementFactory?: ContextFileManagementFactory;
   skillPackManagementFactory?: SkillPackManagementFactory;
+  larkAuthManagement?: LarkAuthManagementPort;
   onRuntimePoisoned?: (message: AgentHostRuntimePoisonedMessage) => void;
   runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
   sdkVersionLoader?: () => Promise<string>;

@@ -1,6 +1,7 @@
 import type { SettingsSection } from "@pi67/domain";
 import {
   Activity,
+  Building2,
   ChartNoAxesCombined,
   Blocks,
   Bot,
@@ -108,6 +109,32 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
         ...messages.settings.sections.rules,
         searchTerms: ["规则与上下文", "规则", "上下文", "agents", "claude", "system", "rule", "rules", "行为约束"],
         icon: Scale
+      }
+    ]
+  },
+  {
+    label: messages.settings.groups.office,
+    items: [
+      {
+        id: "lark",
+        ...messages.settings.sections.lark,
+        searchTerms: [
+          "飞书",
+          "Lark",
+          "Lark CLI",
+          "用户授权",
+          "飞书应用",
+          "App ID",
+          "App Secret",
+          "OAuth",
+          "云盘",
+          "云空间",
+          "日历",
+          "消息",
+          "任务",
+          "邮箱"
+        ],
+        icon: Building2
       }
     ]
   },

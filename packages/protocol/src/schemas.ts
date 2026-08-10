@@ -75,6 +75,7 @@ import {
   ResourceSummarySchema,
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
+import { LarkCommandResultSchemas } from "./lark-auth-schemas.js";
 import {
   SkillPackListResultSchema,
   SkillPackMutationResultSchema
@@ -314,6 +315,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "skill.pack.checkUpdates": SkillPackListResultSchema,
   "skill.pack.update": SkillPackMutationResultSchema,
   "skill.pack.restore": SkillPackMutationResultSchema,
+  ...LarkCommandResultSchemas,
   "extension.ui.respond": strictObject({ resolved: Type.Boolean() }),
   "approval.respond": strictObject({
     resolved: Type.Boolean(),

@@ -13,11 +13,14 @@ import { useOperationActivityTimelineStore } from "../operation/operation-activi
 import { installSessionProjectionFixture } from "../session/session-projection-test-support.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useSessionTreeStore } from "../session-tree/session-tree-store.js";
+import { seedAuthoritativeRecoveryTask } from "../connection/projection-recovery-test-support.js";
+import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { useAppStore } from "./app-store.js";
 
 describe("renderer interactive projection resync", () => {
   beforeEach(() => {
     resetStores();
+    seedAuthoritativeRecoveryTask({ sessionFileIdentity: "session-file-1" });
     const authority = installSessionProjectionFixture(useAppStore.getState(), snapshot(), 3);
     if (!authority) throw new Error("Expected Session projection fixture authority.");
     useWorkspaceChangesStore.getState().beginSession(authority);
@@ -167,6 +170,7 @@ function resetStores(): void {
   useOperationActivityTimelineStore.setState(useOperationActivityTimelineStore.getInitialState(), true);
   useSessionProjectionStore.setState(useSessionProjectionStore.getInitialState(), true);
   useSessionTreeStore.setState(useSessionTreeStore.getInitialState(), true);
+  rendererWorkbenchStore.getState().reset();
 }
 
 function runningToolOperation(): OperationView {

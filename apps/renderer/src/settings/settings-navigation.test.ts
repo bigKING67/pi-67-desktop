@@ -30,6 +30,12 @@ describe("settings navigation", () => {
         ]
       },
       {
+        label: "办公",
+        items: [
+          { id: "lark", label: "飞书" }
+        ]
+      },
+      {
         label: "连接与集成",
         items: [
           { id: "integrations", label: "浏览器集成" }
@@ -49,7 +55,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(13);
+    expect(SETTINGS_SECTIONS).toHaveLength(14);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -62,6 +68,7 @@ describe("settings navigation", () => {
     const browserIntegration = items.find((item) => item.id === "integrations");
     const runtime = items.find((item) => item.id === "runtime");
     const usage = items.find((item) => item.id === "usage");
+    const lark = items.find((item) => item.id === "lark");
 
     expect(provider && matchesSettingsQuery(provider, "provider")).toBe(true);
     expect(provider && matchesSettingsQuery(provider, "模型服务")).toBe(true);
@@ -87,6 +94,10 @@ describe("settings navigation", () => {
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
     expect(sectionSupportsProjectScope("providers")).toBe(false);
     expect(sectionSupportsProjectScope("rules")).toBe(false);
+    expect(lark && matchesSettingsQuery(lark, "用户授权")).toBe(true);
+    expect(lark && matchesSettingsQuery(lark, "oauth")).toBe(true);
+    expect(lark && matchesSettingsQuery(lark, "日历")).toBe(true);
+    expect(sectionSupportsProjectScope("lark")).toBe(false);
     expect(sectionSupportsProjectScope("integrations")).toBe(false);
     expect(sectionSupportsProjectScope("runtime")).toBe(false);
     expect(items.every((item) => !("measure" in item))).toBe(true);

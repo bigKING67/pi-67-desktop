@@ -40,9 +40,11 @@
   --surface-raised: #ffffff;
   --surface-hover: #e8ebe7;
   --surface-active: #e0e9e4;
+  --surface-disabled: #eef0ed;
   --text-primary: #171a18;
   --text-secondary: #626862;
   --text-tertiary: #858c86;
+  --text-disabled: #858c86;
   --border: #d9ddd8;
   --border-strong: #c8cec8;
   --accent: #2f6757;
@@ -92,9 +94,11 @@
     --surface-raised: #252b26;
     --surface-hover: #2a302b;
     --surface-active: #30433a;
+    --surface-disabled: #202521;
     --text-primary: #f0f3ef;
     --text-secondary: #a9b1aa;
     --text-tertiary: #7f8981;
+    --text-disabled: #7f8981;
     --border: #343b35;
     --border-strong: #465047;
     --accent: #7bc5ad;

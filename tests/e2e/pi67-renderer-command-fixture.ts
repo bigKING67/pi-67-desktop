@@ -8,6 +8,7 @@ import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
 import type { MockContextFileCommandHandler } from "./pi67-context-file-fixture.js";
 import type { MockProviderConfigurationCommandHandler } from "./pi67-provider-configuration-command-fixture.js";
+import type { MockLarkCommandHandler } from "./pi67-lark-command-fixture.js";
 import type { RuntimeDiagnostics } from "../../packages/protocol/src/index.js";
 
 interface MockCommandResponseFixture {
@@ -32,18 +33,22 @@ export function installMockCommandResponseHandler({
     __pi67ApplyMockSessionControlCommand: MockSessionControlCommandHandler;
     __pi67ResolveMockContextFileCommand: MockContextFileCommandHandler;
     __pi67ResolveMockInspectorCommand: MockInspectorCommandHandler;
+    __pi67ResolveMockLarkCommand: MockLarkCommandHandler;
     __pi67ResolveMockProviderConfigurationCommand: MockProviderConfigurationCommandHandler;
     __pi67ResolveMockCommand?: MockCommandResponseHandler;
   };
   const applyMockSessionControlCommand = testWindow.__pi67ApplyMockSessionControlCommand;
   const resolveMockContextFileCommand = testWindow.__pi67ResolveMockContextFileCommand;
   const resolveMockInspectorCommand = testWindow.__pi67ResolveMockInspectorCommand;
+  const resolveMockLarkCommand = testWindow.__pi67ResolveMockLarkCommand;
   const resolveMockProviderConfigurationCommand = testWindow.__pi67ResolveMockProviderConfigurationCommand;
 
   const resolveMockCommand: MockCommandResponseHandler = (type, payload, current, hostEpoch) => {
     const sessionCatalogPage = current.sessionCatalogPagesByWorkspace[current.workspaceId]
       ?? current.sessionCatalogPage;
     if (type === "runtime.getStatus") return { initialized: true, loaded: true };
+    const larkResult = resolveMockLarkCommand(type, payload);
+    if (larkResult !== undefined) return larkResult;
     if (type === "runtime.initialize" || type === "workspace.open") return {};
     if (
       type === "session.create"

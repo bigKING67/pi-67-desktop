@@ -1,3 +1,8 @@
+export {
+  WORKBENCH_SETTINGS_SECTIONS,
+  isWorkbenchSettingsSection,
+  type SettingsSection
+} from "@pi67/domain";
 export * from "./agent-messages.js";
 export * from "./context-file-schemas.js";
 export * from "./desktop-system-contract.js";
@@ -6,6 +11,7 @@ export * from "./extension-package-operation.js";
 export * from "./port-client.js";
 export * from "./protocol-error.js";
 export * from "./provider-configuration-schemas.js";
+export * from "./lark-auth-schemas.js";
 export * from "./protocol-revision.js";
 export * from "./protocol-revision-contract.js";
 export * from "./repository-environment-contract.js";
