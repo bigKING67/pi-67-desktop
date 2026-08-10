@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   AgentSession,
-  InlineExtension,
+  AgentSessionEvent,
   SessionEntry,
   ToolDefinition
 } from "@earendil-works/pi-coding-agent";
@@ -10,17 +9,23 @@ import {
   MAX_PLAN_MARKDOWN_CHARS,
   RuntimeError,
   parseActiveProposedPlan,
+  parsePlanImplementation,
   type ActiveProposedPlan,
   type PlanDecision,
+  type PlanImplementationRequestLineage,
+  type PlanImplementationView,
+  type PlanLifecycleChange,
   type SessionInteractionMode,
   type SessionInteractionState
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
+import { createPlanModeTools } from "./plan-mode-tools.js";
+export { createDesktopPlanModeExtension } from "./plan-mode-tools.js";
 
 export const INTERACTION_MODE_ENTRY_TYPE = "pi67.interaction-mode.v1";
 export const PROPOSED_PLAN_ENTRY_TYPE = "pi67.proposed-plan.v1";
 export const PLAN_DECISION_ENTRY_TYPE = "pi67.plan-decision.v1";
-const PLAN_MODE_CONTEXT_TYPE = "pi67.plan-mode-context.v1";
+export const PLAN_IMPLEMENTATION_ENTRY_TYPE = "pi67.plan-implementation.v1";
 export const PLAN_IMPLEMENTATION_MESSAGE_TYPE = "pi67.plan-implementation.v1";
 
 type PlanModeSession = Pick<
@@ -39,9 +44,15 @@ interface PlanDecisionEntryData {
   decidedAt: number;
 }
 
+interface ActivePlanImplementationAttempt {
+  implementation: PlanImplementationView;
+  started: boolean;
+}
+
 export class PlanModeController {
   private session: PlanModeSession | undefined;
   private state: SessionInteractionState = { interactionMode: "execute" };
+  private activeAttempt: ActivePlanImplementationAttempt | undefined;
 
   constructor(private readonly emit: (event: AgentEvent) => void) {}
 
@@ -54,17 +65,20 @@ export class PlanModeController {
       interactionMode: this.state.interactionMode,
       ...(this.state.activeProposedPlan
         ? { activeProposedPlan: { ...this.state.activeProposedPlan } }
-        : {})
+        : {}),
+      ...(this.state.planLifecycle ? { planLifecycle: { ...this.state.planLifecycle } } : {})
     };
   }
 
   bind(session: PlanModeSession): void {
     this.session = session;
+    this.activeAttempt = undefined;
     this.state = restorePlanModeState(session.sessionManager.getBranch());
   }
 
   unbind(): void {
     this.session = undefined;
+    this.activeAttempt = undefined;
     this.state = { interactionMode: "execute" };
   }
 
@@ -75,12 +89,16 @@ export class PlanModeController {
     )) return;
 
     if (interactionMode === "execute" && this.state.activeProposedPlan) {
-      appendPlanDecision(session, this.state.activeProposedPlan.planId, "dismissed");
-      this.state = { interactionMode: "execute" };
+      const planId = this.state.activeProposedPlan.planId;
+      const decidedAt = appendPlanDecision(session, planId, "dismissed");
+      const planLifecycle: PlanLifecycleChange = { phase: "dismissed", planId, timestamp: decidedAt };
+      this.state = { interactionMode: "execute", planLifecycle };
+      this.emit({ type: "plan.lifecycleChanged", payload: planLifecycle });
     } else {
       this.state = {
         interactionMode,
-        ...(this.state.activeProposedPlan ? { activeProposedPlan: this.state.activeProposedPlan } : {})
+        ...(this.state.activeProposedPlan ? { activeProposedPlan: this.state.activeProposedPlan } : {}),
+        ...(this.state.planLifecycle ? { planLifecycle: this.state.planLifecycle } : {})
       };
     }
     appendInteractionMode(session, interactionMode);
@@ -93,13 +111,14 @@ export class PlanModeController {
       throw new RuntimeError("INVALID_PAYLOAD", "plan_complete is available only while Plan Mode is active.");
     }
     const normalized = normalizePlanMarkdown(markdown);
-    const planId = stablePlanId(session.sessionId, normalized);
+    const boundedSourceOperationId = boundedIdentifier(sourceOperationId, "sourceOperationId");
+    const planId = stablePlanId(session.sessionId, boundedSourceOperationId, normalized);
     const active = this.state.activeProposedPlan;
     if (active?.planId === planId && active.markdown === normalized) return { ...active };
 
     const plan: ActiveProposedPlan = {
       planId,
-      sourceOperationId: boundedIdentifier(sourceOperationId, "sourceOperationId"),
+      sourceOperationId: boundedSourceOperationId,
       markdown: normalized,
       createdAt: Date.now()
     };
@@ -109,30 +128,78 @@ export class PlanModeController {
     return { ...plan };
   }
 
-  async implementPlan(planId: string): Promise<void> {
+  async implementPlan(
+    planId: string,
+    lineage: PlanImplementationRequestLineage
+  ): Promise<void> {
     const session = this.requireIdleSession();
     const plan = this.state.activeProposedPlan;
     if (!plan || plan.planId !== planId) {
       throw new RuntimeError("INVALID_PAYLOAD", "The proposed Plan is no longer active for this Pi Session.");
     }
+    const implementation = requirePlanImplementation({
+      ...lineage,
+      planId,
+      sourceOperationId: plan.sourceOperationId,
+      phase: "requested",
+      timestamp: Date.now()
+    });
+    if (implementation.sessionId !== session.sessionId) {
+      throw new RuntimeError("SESSION_CHANGED_EXTERNALLY", "The Plan implementation belongs to a stale Pi Session.");
+    }
 
-    appendPlanDecision(session, planId, "implement");
+    appendPlanImplementation(session, implementation);
     appendInteractionMode(session, "execute");
-    this.state = { interactionMode: "execute" };
+    const requested = lifecycleChange(implementation);
+    const attempt: ActivePlanImplementationAttempt = { implementation, started: false };
+    this.activeAttempt = attempt;
+    this.state = {
+      interactionMode: "execute",
+      activeProposedPlan: plan,
+      planLifecycle: requested
+    };
+    this.emit({ type: "plan.lifecycleChanged", payload: requested });
     this.emit({
       type: "session.interactionModeChanged",
       payload: { interactionMode: "execute" }
     });
-    await session.sendCustomMessage({
-      customType: PLAN_IMPLEMENTATION_MESSAGE_TYPE,
-      content: implementationPrompt(plan.markdown),
-      display: false,
-      details: { planId: plan.planId, sourceOperationId: plan.sourceOperationId }
-    }, { triggerTurn: true });
+    try {
+      await session.sendCustomMessage({
+        customType: PLAN_IMPLEMENTATION_MESSAGE_TYPE,
+        content: implementationPrompt(plan.markdown),
+        display: false,
+        details: { planId: plan.planId, sourceOperationId: plan.sourceOperationId }
+      }, { triggerTurn: true });
+      if (!attempt.started) {
+        throw new RuntimeError("INTERNAL", "Pi returned before the Plan implementation Turn started.");
+      }
+    } catch (error) {
+      if (!attempt.started && this.activeAttempt === attempt && this.session === session) {
+        this.failImplementationStart(session, plan, implementation);
+      }
+      throw error;
+    } finally {
+      if (this.activeAttempt === attempt) this.activeAttempt = undefined;
+    }
+  }
+
+  observeSessionEvent(session: PlanModeSession, event: AgentSessionEvent): void {
+    if (session !== this.session || event.type !== "agent_start") return;
+    const attempt = this.activeAttempt;
+    if (!attempt || attempt.started) return;
+    const started = { ...attempt.implementation, phase: "started" as const, timestamp: Date.now() };
+    appendPlanImplementation(session, started);
+    attempt.started = true;
+    this.state = {
+      interactionMode: "execute",
+      planLifecycle: lifecycleChange(started)
+    };
+    appendPlanDecision(session, started.planId, "implement");
+    this.emit({ type: "plan.lifecycleChanged", payload: lifecycleChange(started) });
   }
 
   createTools(): ToolDefinition[] {
-    return [createPlanAskTool(this), createPlanCompleteTool(this)];
+    return createPlanModeTools(this);
   }
 
   private requireSession(): PlanModeSession {
@@ -149,40 +216,29 @@ export class PlanModeController {
     }
     return session;
   }
-}
 
-export function createDesktopPlanModeExtension(
-  getInteractionMode: () => SessionInteractionMode
-): InlineExtension {
-  return {
-    name: "pi67-native-plan-mode",
-    hidden: true,
-    factory: (pi) => {
-      pi.on("before_agent_start", () => {
-        if (getInteractionMode() !== "plan") return undefined;
-        return {
-          message: {
-            customType: PLAN_MODE_CONTEXT_TYPE,
-            content: `[PI-67 PLAN MODE ACTIVE]\nYou are preparing a plan, not implementing it.\n\nRules:\n- Inspect and reason with read-only tools only.\n- Do not edit files, install dependencies, run builds/tests, publish, upload, or cause external side effects.\n- Use plan_ask when a missing decision materially changes the plan.\n- When the plan is complete, call plan_complete with the full Markdown plan.\n- Never begin implementation until the user explicitly chooses Start implementation in Pi-67 Desktop.`,
-            display: false
-          }
-        };
-      });
-      pi.on("context", (event) => {
-        if (getInteractionMode() === "plan") return undefined;
-        return {
-          messages: event.messages.filter((message) => (
-            (message as AgentMessage & { customType?: string }).customType !== PLAN_MODE_CONTEXT_TYPE
-          ))
-        };
-      });
-    }
-  };
+  private failImplementationStart(
+    session: PlanModeSession,
+    plan: ActiveProposedPlan,
+    implementation: PlanImplementationView
+  ): void {
+    const failed = { ...implementation, phase: "start-failed" as const, timestamp: Date.now() };
+    appendPlanImplementation(session, failed);
+    appendInteractionMode(session, "plan");
+    const planLifecycle = lifecycleChange(failed);
+    this.state = { interactionMode: "plan", activeProposedPlan: plan, planLifecycle };
+    this.emit({ type: "plan.lifecycleChanged", payload: planLifecycle });
+    this.emit({
+      type: "session.interactionModeChanged",
+      payload: { interactionMode: "plan" }
+    });
+  }
 }
 
 function restorePlanModeState(entries: readonly SessionEntry[]): SessionInteractionState {
   let interactionMode: SessionInteractionMode = "execute";
   let activeProposedPlan: ActiveProposedPlan | undefined;
+  let planLifecycle: PlanLifecycleChange | undefined;
   for (const entry of entries) {
     if (entry.type !== "custom") continue;
     if (entry.customType === INTERACTION_MODE_ENTRY_TYPE) {
@@ -194,7 +250,22 @@ function restorePlanModeState(entries: readonly SessionEntry[]): SessionInteract
     }
     if (entry.customType === PROPOSED_PLAN_ENTRY_TYPE) {
       const plan = parseActiveProposedPlan(entry.data);
-      if (plan) activeProposedPlan = plan;
+      if (plan) {
+        activeProposedPlan = plan;
+        planLifecycle = undefined;
+      }
+      continue;
+    }
+    if (entry.customType === PLAN_IMPLEMENTATION_ENTRY_TYPE) {
+      const implementation = parsePlanImplementation(entry.data);
+      if (!implementation || implementation.planId !== activeProposedPlan?.planId) continue;
+      planLifecycle = lifecycleChange(implementation);
+      if (implementation.phase === "started") {
+        activeProposedPlan = undefined;
+        interactionMode = "execute";
+      } else if (implementation.phase === "start-failed") {
+        interactionMode = "plan";
+      }
       continue;
     }
     if (entry.customType === PLAN_DECISION_ENTRY_TYPE) {
@@ -203,71 +274,26 @@ function restorePlanModeState(entries: readonly SessionEntry[]): SessionInteract
         activeProposedPlan
         && data.planId === activeProposedPlan.planId
         && (data.decision === "dismissed" || data.decision === "implement")
-      ) activeProposedPlan = undefined;
+      ) {
+        if (data.decision === "dismissed") {
+          planLifecycle = {
+            phase: "dismissed",
+            planId: activeProposedPlan.planId,
+            timestamp: typeof data.decidedAt === "number" ? data.decidedAt : 0
+          };
+        }
+        activeProposedPlan = undefined;
+      }
     }
+  }
+  if (planLifecycle?.phase === "implementation-requested" && activeProposedPlan) {
+    interactionMode = "plan";
+    planLifecycle = undefined;
   }
   return {
     interactionMode,
-    ...(activeProposedPlan ? { activeProposedPlan } : {})
-  };
-}
-
-function createPlanAskTool(controller: PlanModeController): ToolDefinition {
-  return {
-    name: "plan_ask",
-    label: "Ask a planning question",
-    description: "Ask the user one blocking planning question through the native Pi-67 dialog. Use only in Plan Mode.",
-    promptSnippet: "Ask one blocking question while preparing a Plan.",
-    promptGuidelines: ["Use plan_ask only when the answer materially changes the proposed Plan."],
-    parameters: {
-      type: "object",
-      additionalProperties: false,
-      required: ["question"],
-      properties: {
-        question: { type: "string", minLength: 1, maxLength: 2_000 },
-        options: { type: "array", items: { type: "string", minLength: 1, maxLength: 500 }, maxItems: 20 },
-        placeholder: { type: "string", maxLength: 500 }
-      }
-    } as ToolDefinition["parameters"],
-    executionMode: "sequential",
-    async execute(_toolCallId, rawInput, _signal, _onUpdate, ctx) {
-      if (controller.interactionMode !== "plan") {
-        throw new Error("PLAN_MODE_REQUIRED: plan_ask is available only in Plan Mode.");
-      }
-      if (!ctx.hasUI) throw new Error("PLAN_QUESTION_UI_UNAVAILABLE: Pi-67 cannot show the planning question.");
-      const input = asRecord(rawInput);
-      const question = requiredString(input.question, "question");
-      const options = stringArray(input.options, 20);
-      const answer = options.length > 0
-        ? await ctx.ui.select(question, options)
-        : await ctx.ui.input(question, optionalString(input.placeholder));
-      return textToolResult(answer === undefined
-        ? "The user cancelled the planning question. Do not infer an answer."
-        : `User answer: ${answer}`);
-    }
-  };
-}
-
-function createPlanCompleteTool(controller: PlanModeController): ToolDefinition {
-  return {
-    name: "plan_complete",
-    label: "Propose Plan",
-    description: "Submit the completed Markdown Plan to the native Pi-67 Plan card. This never starts implementation.",
-    promptSnippet: "Finish Plan Mode by proposing a Markdown Plan for explicit user review.",
-    promptGuidelines: ["Call plan_complete once with the complete implementation Plan; do not implement it yourself."],
-    parameters: {
-      type: "object",
-      additionalProperties: false,
-      required: ["markdown"],
-      properties: {
-        markdown: { type: "string", minLength: 1, maxLength: MAX_PLAN_MARKDOWN_CHARS }
-      }
-    } as ToolDefinition["parameters"],
-    executionMode: "sequential",
-    async execute(toolCallId, rawInput) {
-      const plan = controller.proposePlan(toolCallId, requiredString(asRecord(rawInput).markdown, "markdown"));
-      return textToolResult(`Plan proposed as ${plan.planId}. Wait for the user's explicit decision in Pi-67 Desktop; do not begin implementation.`);
-    }
+    ...(activeProposedPlan ? { activeProposedPlan } : {}),
+    ...(planLifecycle ? { planLifecycle } : {})
   };
 }
 
@@ -280,17 +306,50 @@ function appendPlanDecision(
   session: PlanModeSession,
   planId: string,
   decision: PlanDecisionEntryData["decision"]
-): void {
-  const data: PlanDecisionEntryData = { planId, decision, decidedAt: Date.now() };
+): number {
+  const decidedAt = Date.now();
+  const data: PlanDecisionEntryData = { planId, decision, decidedAt };
   session.sessionManager.appendCustomEntry(PLAN_DECISION_ENTRY_TYPE, data);
+  return decidedAt;
+}
+
+function appendPlanImplementation(
+  session: PlanModeSession,
+  implementation: PlanImplementationView
+): void {
+  session.sessionManager.appendCustomEntry(PLAN_IMPLEMENTATION_ENTRY_TYPE, implementation);
 }
 
 function implementationPrompt(markdown: string): string {
-  return `[PI-67 APPROVED PLAN]\nThe user explicitly chose to start implementation of the stored Plan below. Implement it in this same Pi Session. Re-check live repository state before editing, preserve unrelated work, and validate the completed change.\n\n${markdown}`;
+  return `[PI-67 APPROVED PLAN]\nThe user explicitly chose to implement the stored Plan below in this same Pi Session. Re-check the live repository and runtime state before editing, preserve unrelated work in progress, implement the approved scope, and validate the result. If material drift makes the approved Plan unsafe or no longer decision-complete, report the drift instead of silently rewriting the Plan or broadening scope.\n\n${markdown}`;
 }
 
-function stablePlanId(sessionId: string, markdown: string): string {
-  return `plan_${createHash("sha256").update(sessionId).update("\0").update(markdown).digest("hex").slice(0, 32)}`;
+function stablePlanId(sessionId: string, sourceOperationId: string, markdown: string): string {
+  return `plan_${createHash("sha256")
+    .update(sessionId)
+    .update("\0")
+    .update(sourceOperationId)
+    .update("\0")
+    .update(markdown)
+    .digest("hex")
+    .slice(0, 32)}`;
+}
+
+function requirePlanImplementation(value: PlanImplementationView): PlanImplementationView {
+  const implementation = parsePlanImplementation(value);
+  if (!implementation) {
+    throw new RuntimeError("INVALID_PAYLOAD", "The Plan implementation lineage is invalid.");
+  }
+  return implementation;
+}
+
+function lifecycleChange(implementation: PlanImplementationView): PlanLifecycleChange {
+  const phase = implementation.phase === "requested"
+    ? "implementation-requested"
+    : implementation.phase === "started"
+      ? "implementation-started"
+      : "implementation-start-failed";
+  return { ...implementation, phase };
 }
 
 function normalizePlanMarkdown(value: string): string {
@@ -312,26 +371,4 @@ function boundedIdentifier(value: string, label: string): string {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function requiredString(value: unknown, label: string): string {
-  const result = optionalString(value);
-  if (!result) throw new Error(`${label} must be a non-empty string.`);
-  return result;
-}
-
-function stringArray(value: unknown, maxItems: number): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    .slice(0, maxItems)
-    .map((item) => item.trim());
-}
-
-function textToolResult(text: string) {
-  return { content: [{ type: "text" as const, text }], details: {} };
 }

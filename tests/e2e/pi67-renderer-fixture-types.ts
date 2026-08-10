@@ -49,6 +49,7 @@ export interface FixtureMessage {
 export interface MockAgentOptions {
   hostEpoch?: number;
   terminalDelayMs?: number;
+  planImplementationStartDelayMs?: number;
   autoStartOperation?: boolean;
   rotateSessionOnCreate?: boolean;
   isolateTaskSnapshots?: boolean;

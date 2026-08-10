@@ -21,7 +21,7 @@ import {
   type OperationHeartbeatDiagnostics
 } from "./operation-heartbeat-controller.js";
 import { assertOperationAuthority } from "./operation-authority.js";
-import { OperationExecutionRunner } from "./operation-execution-runner.js";
+import { OperationExecutionRunner, type OperationExecutionContext } from "./operation-execution-runner.js";
 import { isOperationReceiptIntegrityError } from "./operation-receipt-contract.js";
 import type { OperationReceiptStore } from "./operation-receipt-store.js";
 import { acceptedOperation, createOperationView, requireOperationSessionIdentity } from "./operation-registry-authority.js";
@@ -36,7 +36,7 @@ export interface AcceptOperationOptions {
   submissionId: string;
   fingerprint: string;
   kind: OperationKind;
-  execute: () => Promise<void>;
+  execute: (context: OperationExecutionContext) => Promise<void>;
   abort?: () => Promise<void>;
   beforeTerminal?: () => void;
 }
@@ -160,10 +160,8 @@ export class OperationRegistry {
     await this.withDurability(() => this.results.reconcile());
   }
 
-  submissionFor(
-    submissionId: string,
-    fingerprint: string
-  ): OperationSubmissionResult | Promise<OperationSubmissionResult> | undefined {
+  submissionFor(submissionId: string, fingerprint: string):
+    OperationSubmissionResult | Promise<OperationSubmissionResult> | undefined {
     this.assertHealthy();
     return this.results.get(submissionId, fingerprint);
   }
@@ -204,7 +202,8 @@ export class OperationRegistry {
         operation,
         options.submissionId,
         options.fingerprint,
-        options.execute
+        options.execute,
+        { operation: operation.view, hostEpoch: this.hostEpoch }
       ).catch(() => undefined), 0);
       return remembered.result;
     } finally {

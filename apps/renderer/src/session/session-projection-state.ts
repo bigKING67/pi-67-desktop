@@ -1,5 +1,6 @@
 import type {
   ActiveProposedPlan,
+  PlanLifecycleChange,
   ResourceSummary,
   SessionControlResult,
   SessionModelCatalogResult,
@@ -132,6 +133,10 @@ export interface SessionProjectionState extends SessionProjectionData {
   applyProposedPlan: (
     authority: SessionProjectionAuthority,
     plan: ActiveProposedPlan
+  ) => boolean;
+  applyPlanLifecycle: (
+    authority: SessionProjectionAuthority,
+    change: PlanLifecycleChange
   ) => boolean;
   clearQueue: (target: SessionProjectionTarget) => boolean;
 }

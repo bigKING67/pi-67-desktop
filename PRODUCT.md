@@ -638,17 +638,29 @@ the only Runtime and behavior specification source.
   Session creation, only an authority-matching Host acknowledgement changes the
   visible mode. Plan Mode admits only read-only inspection, first-party search,
   and Plan interaction, with `PLAN_MODE_READ_ONLY` enforced before YOLO or any
-  one-shot approval decision. `plan_complete` stores the complete Markdown Plan
+  one-shot approval decision. Pi must ground discoverable facts in live evidence,
+  ask only for materially blocking intent, and audit that every material requirement
+  maps to a concrete change and observable acceptance evidence before `plan_complete`.
+  The Plan covers non-goals, concrete locations where discoverable, dependency order,
+  failure/recovery, compatibility, risks, tests, and explicit assumptions without a
+  mandatory heading template. `plan_complete` stores the complete Markdown Plan
   in the current Pi JSONL and publishes a persistent Timeline review card; it never
   starts work. Only the active proposal owns a compact action bar above the Composer
-  with `继续完善`, `复制`, and `开始执行`. `继续完善` prefills the Composer, while
-  `开始执行` sends only `planId` and a fresh `submissionId`. Agent Host reads the
-  active stored Plan, records the decision, returns the same Session to execute mode,
-  and starts one Prompt Operation in that same Pi Session. The action bar then
-  disappears, while the Timeline entry remains with `implemented` status. Historical
-  Plans may be expanded and copied but never executed again. Renderer never supplies
-  Plan Markdown in the implementation request or creates a separate durable Plan
-  store.
+  with `复制` plus one contextual primary action: a non-empty Composer shows
+  `继续完善` and submits the user's exact text, attachments, Workspace files, and
+  review comments through the normal Composer path; an empty Composer shows
+  `开始执行`. Pi-67 never inserts a generic refinement Prompt. `开始执行` sends only
+  `planId` and a fresh `submissionId`. Agent Host binds that request to the accepted
+  Operation and writes a durable requested marker in the same Pi JSONL, but the Plan
+  remains active until that exact Runtime observes Pi `agent_start`. Only then does
+  Pi-67 write the started marker and compatibility decision, consume the active Plan,
+  remove the action bar, and show the Timeline entry as `implemented`. Failure,
+  Runtime rebind, or Host loss before `agent_start` restores Plan Mode and the same
+  proposal for a retry with a new `submissionId`; failure, cancellation, or Host loss
+  after `agent_start` never restores it because the implementation Turn may already
+  have changed files or external state. Historical Plans may be expanded and copied
+  but never executed again. Renderer never supplies Plan Markdown in the implementation
+  request or creates a separate durable Plan store.
 - Prompt Stash preserves exact text plus image attachments in Task-scoped encrypted
   draft state. It accepts at most 20 items, 256 KiB of text per item, 2 MiB of total
   stashed text, 32 MiB of images per item, 128 MiB per Task, and 512 MiB globally;

@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import type { MockAssetReadHandler } from "./pi67-renderer-asset-fixture.js";
 import type { MockCommandResponseHandler } from "./pi67-renderer-command-fixture.js";
 import type { MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js";
-import type { MockOperationViewFactory, MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
+import type { MockOperationViewFactory, MockPlanImplementationLifecycleScheduler, MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
 import { createMockAgentFixtureInput } from "./pi67-renderer-agent-input-fixture.js";
 import { installMockAgentHandlers } from "./pi67-renderer-agent-installation.js";
 import type {
@@ -49,6 +49,7 @@ export async function attachMockAgent(
     }).__pi67SanitizeMockPayload;
     const operationView = (testWindow as FixtureWindow & { __pi67MockOperationView: MockOperationViewFactory }).__pi67MockOperationView;
     const projectionMutationAcknowledgement = (testWindow as FixtureWindow & { __pi67MockProjectionAcknowledgement: MockProjectionAcknowledgementFactory }).__pi67MockProjectionAcknowledgement;
+    const schedulePlanImplementationLifecycle = (testWindow as FixtureWindow & { __pi67ScheduleMockPlanImplementationLifecycle: MockPlanImplementationLifecycleScheduler }).__pi67ScheduleMockPlanImplementationLifecycle;
     const sessionBootstrapCommands = new Set(["session.create", "session.open", "session.fork", "session.forkFromTask"]);
     const sessionForkCommands = new Set(["session.fork", "session.forkFromTask"]);
     const sessionBootstrapReasons: Record<string, string> = { "session.create": "session-create", "session.open": "session-open", "session.fork": "session-fork", "session.forkFromTask": "session-fork" };
@@ -304,16 +305,14 @@ export async function attachMockAgent(
                 }
               }, accepted.operationId), 0);
               if (envelope.type === "plan.implement") setTimeout(() => {
-                const snapshot: Record<string, unknown> = {
-                  ...state.snapshot,
-                  interactionMode: "execute"
-                };
-                delete snapshot.activeProposedPlan;
-                state.snapshot = snapshot;
-                emitThrough(hostPort, hostEpoch, {
-                  type: "session.interactionModeChanged",
-                  payload: { interactionMode: "execute" }
-                });
+                schedulePlanImplementationLifecycle(
+                  state,
+                  hostEpoch,
+                  envelope.payload,
+                  accepted.operationId,
+                  fixtureOptions.planImplementationStartDelayMs ?? 0,
+                  (event, operationId) => emitThrough(hostPort, hostEpoch, event, operationId)
+                );
               }, 0);
               if (state.terminalDelayMs !== undefined) setTimeout(() => {
                 state.snapshot = { ...state.snapshot, streaming: false };

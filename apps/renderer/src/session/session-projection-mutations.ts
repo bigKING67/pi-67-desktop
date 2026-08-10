@@ -1,5 +1,6 @@
 import type {
   ActiveProposedPlan,
+  PlanLifecycleChange,
   SessionControlResult,
   SessionModelCatalogResult,
   SessionResourceCatalogResult,
@@ -174,12 +175,17 @@ export function sessionInteractionModeProjectionPatch(
   interactionMode: SessionInteractionMode
 ): Partial<SessionProjectionData> | undefined {
   if (!matchesCurrentAuthority(state, authority)) return undefined;
+  const interaction = state.interaction;
+  const preserveActivePlan = interaction?.activeProposedPlan !== undefined
+    && (
+      interactionMode === "plan"
+      || interaction.planLifecycle?.phase === "implementation-requested"
+    );
   return {
     interaction: {
       interactionMode,
-      ...(interactionMode === "plan" && state.interaction?.activeProposedPlan
-        ? { activeProposedPlan: state.interaction.activeProposedPlan }
-        : {})
+      ...(preserveActivePlan ? { activeProposedPlan: interaction.activeProposedPlan } : {}),
+      ...(interaction?.planLifecycle ? { planLifecycle: interaction.planLifecycle } : {})
     },
     revisions: incrementSessionProjectionRevision(state.revisions, "interaction")
   };
@@ -193,6 +199,36 @@ export function proposedPlanProjectionPatch(
   if (!matchesCurrentAuthority(state, authority)) return undefined;
   return {
     interaction: { interactionMode: "plan", activeProposedPlan },
+    revisions: incrementSessionProjectionRevision(state.revisions, "interaction")
+  };
+}
+
+export function planLifecycleProjectionPatch(
+  state: SessionProjectionData,
+  authority: SessionProjectionAuthority,
+  change: PlanLifecycleChange
+): Partial<SessionProjectionData> | undefined {
+  if (!matchesCurrentAuthority(state, authority)) return undefined;
+  const current = state.interaction;
+  const activeProposedPlan = current?.activeProposedPlan;
+  const relatedPlanId = activeProposedPlan?.planId ?? current?.planLifecycle?.planId;
+  if (relatedPlanId !== change.planId) return undefined;
+
+  const preservePlan = change.phase === "implementation-requested"
+    || change.phase === "implementation-start-failed";
+  if (preservePlan && activeProposedPlan?.planId !== change.planId) return undefined;
+  const interaction = preservePlan && activeProposedPlan
+    ? {
+        interactionMode: change.phase === "implementation-start-failed" ? "plan" as const : "execute" as const,
+        activeProposedPlan,
+        planLifecycle: change
+      }
+    : {
+        interactionMode: "execute" as const,
+        planLifecycle: change
+      };
+  return {
+    interaction,
     revisions: incrementSessionProjectionRevision(state.revisions, "interaction")
   };
 }

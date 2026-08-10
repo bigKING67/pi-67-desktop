@@ -44,6 +44,7 @@ import { ComposerSurface } from "./ComposerSurface.js";
 import { prepareComposerReviewSubmission } from "../changes/change-review-controller.js";
 import { clearAcceptedComposerDraft, submitComposerDraft } from "./composer-submission-controller.js";
 import { composerDraftActions } from "./composer-draft-actions.js";
+import { ActivePlanActionBar } from "../transcript/PlanProposalCard.js";
 
 export function Composer() {
   const sessionId = useSessionProjectionStore(selectSessionId);
@@ -380,7 +381,9 @@ export function Composer() {
       textInput.current?.setSelectionRange(removed.cursor, removed.cursor);
     });
   };
-  return <ComposerSurface
+  return <>
+    <ActivePlanActionBar hasDraft={hasDraft} refineBusy={submitting} onRefine={() => void submit()} />
+    <ComposerSurface
     activeOperation={activeOperation}
     activeSessionAuthority={activeSessionAuthority}
     activeStreaming={activeStreaming}
@@ -450,5 +453,6 @@ export function Composer() {
     setFileActiveIndex={setFileActiveIndex}
     setSlashActiveIndex={setSlashActiveIndex}
     setTextCursor={setTextCursor}
-  />;
+    />
+  </>;
 }

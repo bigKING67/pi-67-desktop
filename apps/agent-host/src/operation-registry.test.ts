@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentEvent } from "@pi67/protocol";
 import { OperationRegistry } from "./operation-registry.js";
+import type { OperationExecutionContext } from "./operation-execution-runner.js";
 
 describe("OperationRegistry", () => {
   afterEach(() => {
@@ -10,13 +11,17 @@ describe("OperationRegistry", () => {
   it("accepts immediately, deduplicates submission IDs and completes asynchronously", async () => {
     const events: AgentEvent[] = [];
     let complete!: () => void;
+    let executionContext: OperationExecutionContext | undefined;
     const registry = createRegistry(events);
     const accepted = await registry.accept({
       submissionId: "submission-1",
       fingerprint: "same",
       kind: "prompt",
       abort: async () => undefined,
-      execute: () => new Promise<void>((resolve) => { complete = resolve; })
+      execute: (context) => {
+        executionContext = context;
+        return new Promise<void>((resolve) => { complete = resolve; });
+      }
     });
     expect(accepted).toMatchObject({ kind: "accepted", cancellable: true });
     await expect(registry.accept({
@@ -34,6 +39,15 @@ describe("OperationRegistry", () => {
       execute: vi.fn(async () => undefined)
     })).rejects.toThrow("cannot be reused");
     await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
+    expect(executionContext).toMatchObject({
+      hostEpoch: 3,
+      operation: {
+        operationId: accepted.operationId,
+        sessionId: "session-1",
+        sessionFileIdentity: "session-file-session-1",
+        sessionGeneration: 2
+      }
+    });
     complete();
     await vi.waitFor(() => expect(events.some((event) => event.type === "operation.completed")).toBe(true));
     expect(events.map((event) => event.type)).toEqual(["operation.started", "operation.completed"]);

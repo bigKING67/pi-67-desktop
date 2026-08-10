@@ -301,6 +301,9 @@ function withInteractiveEventContext(
 
 function operationIdFor(event: AgentEvent): string | undefined {
   const payload = recordOf(event.payload);
+  if (event.type === "plan.lifecycleChanged" && event.payload.phase !== "dismissed") {
+    return event.payload.operationId;
+  }
   if (event.type === "operation.started") {
     const operation = recordOf(payload?.operation);
     return typeof operation?.operationId === "string" ? operation.operationId : undefined;

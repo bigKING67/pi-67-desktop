@@ -55,6 +55,56 @@ Session Reaper、VCS contract harness、connection supervisor、`safeLog`、`Dra
 Pi-67 已有 Agent Host、Pi JSONL、operation receipts、projection recovery 和 scheduler。不会
 因为相似模式再引入第二套 orchestration engine、第二套 Session 真源或多 Provider runtime。
 
+## Plan 专项审阅与重实现
+
+Plan 专项固定在同一 commit `5661c6116c9d6e9e93e59cf067fc02dd3303ceef`，重点审阅了
+proposal identity、Composer follow-up、持久化投影、来源 lineage，以及 Provider Turn 启动后才
+消费 proposal 的边界。决定性源码证据为：
+
+```text
+apps/web/src/proposedPlan.ts
+SHA-256 8a7969787c95d3b8802ac088e7a9c092c8cc735375018bf7f3973558d6766fea
+
+apps/web/src/components/chat/ProposedPlanCard.tsx
+SHA-256 deed8d256cceaf5330c801a784395f2fbf9f671e9d9607f97d5c77dd7e8d63e0
+
+apps/web/src/components/chat/ComposerPlanFollowUpBanner.tsx
+SHA-256 3f9b5bd26a0cc2023555d5df556f7339ebd0c4365966c4dadc102035f1e6d087
+
+apps/web/src/components/chat/ComposerPrimaryActions.tsx
+SHA-256 d3e3c1e5eab043584ea5d9791aeb1e82ab554386e1b6f189f6e5d881ecc2e103
+
+apps/server/src/orchestration/ThreadPlanProgress.ts
+SHA-256 0647a46e345aed49ffa939603775b89586d98bdbc6271ea6ccecb2d20e45f741
+
+apps/server/src/persistence/Services/ProjectionThreadProposedPlans.ts
+SHA-256 6065ee483a6844968361fc39ff3ade744673e8723aad9f4fd33bf23964d378ff
+
+apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
+SHA-256 5282b5b35e74c10578300deb3966f2c191506c49ff850e1e6c93e47c2e782d20
+
+apps/server/src/orchestration/Layers/ProjectionPipeline.ts
+SHA-256 5714821b20718654d3925ce1a85e347916ab06ae20a4e4b62f16162e70837a86
+```
+
+Pi-67 吸收的是以下机制，而不是 t3code 的技术栈：
+
+- Composer 有用户草稿时呈现 Refine，空草稿时呈现 Implement；
+- Plan proposal 与实现 Turn 保留可核对的来源 lineage；
+- accepted request 不是 implemented，只有真实 Provider/Pi Turn started 才消费 proposal；
+- stale/replay Turn 不得消费当前 Plan，启动前失败可恢复，启动后失败不重复实施。
+
+这些机制按 Pi-67 边界重新实现：Pi JSONL 中的 `requested | started | start-failed` durable entry
+是 lifecycle 真源；Agent Host 从 accepted Operation 绑定 `submissionId`、`operationId`、Host epoch、
+Session physical identity 和 generation；Pi Runtime 只在同一绑定 Session 的真实 `agent_start` 后
+写 started 并消费 Plan；Renderer 仍只发送 `planId + submissionId`，Refine 直接提交现有 Composer
+内容。没有复制 t3code 的 client-side Markdown implementation Prompt、SQLite projection、Effect
+orchestration、多 Provider adapter、新 Thread 实施、保存、下载或导出功能。
+
+t3code 后续产品版本把部分手动 Plan Mode 入口归到 Legacy/default-off，只表示其后续入口与默认值
+选择，不否定上述 durable proposal/Turn lineage 机制，也不代表 Pi-67 弃用第一方 Plan。该后续
+分类不推进本文件的固定审阅 commit。
+
 ## 已重新实现的模式
 
 当前固定审阅批次不再局限于 `DrainableWorker`。Pi-67 已按自身 Domain、Protocol、进程和
@@ -79,6 +129,8 @@ Pi-67 已有 Agent Host、Pi JSONL、operation receipts、projection recovery �
   transaction、rollback/reconcile、dirty protection 和特殊路径 fixture；
 - operation/overlay lifecycle fencing：Host epoch、Session generation、operation identity、
   late result fencing，以及 Approval/Extension/Command overlay 的确定性优先级。
+- Plan proposal/Turn lineage：同一 Pi JSONL 的 requested/started/start-failed marker、accepted
+  Operation authority、真实 Pi `agent_start` 消费门、启动前恢复和 contextual Refine/Implement；
 - Runtime Health：按需聚合 Scheduler、Operation/heartbeat、Main Supervisor、Repository service
   和 Renderer acknowledgement；只保留 bounded counts/timestamps，不引入远端 telemetry。
 
@@ -89,9 +141,10 @@ packages/shared/src/DrainableWorker.ts
 SHA-256 c0632786c0985a7b899646a053c2b00b9f8b28675ed4ebbf03034e4c29f7e229
 ```
 
-主要目标文件：`apps/agent-host/src/session-creation-resolution-coordinator.ts`。只有这一条存在
-可精确对应的 source path/hash 映射，因此 `licenses/provenance.json` 不为其他概念性参考伪造
-源码 provenance。
+主要目标文件：`apps/agent-host/src/session-creation-resolution-coordinator.ts`。此外，Plan 专项对
+`ProviderRuntimeIngestion.ts` 的 started-after-authority 语义和 `ComposerPrimaryActions.tsx` 的
+contextual Refine/Implement 语义建立了两条精确 source path/hash 重实现映射。其余概念性参考仍
+不伪造源码 provenance。
 
 Pi-67 使用现有 Promise、AbortController、HostCommandError、Workspace fairness 和 shutdown
 deadline 重新实现；没有复制 t3code 源码，也没有引入 Effect、TxQueue、TxRef 或共享 Worker
@@ -99,8 +152,9 @@ deadline 重新实现；没有复制 t3code 源码，也没有引入 Effect、Tx
 
 ## 验证边界
 
-- 上述路径已具备 source、TypeScript 和对应 targeted unit test 证据；已有 UI 路径中的一部分具备
-  hosted Chromium E2E，但本轮新增 Snooze、图片 Stash 与 Runtime Health 仍需完整 E2E 和 packaged
+- 上述路径已具备 source、TypeScript 和对应 targeted unit test 证据；Plan 的 contextual action、
+  requested/started UI 和启动前失败重试具备 hosted Chromium E2E。本轮仍未用该 browser 证据外推
+  packaged Electron，而 Snooze、图片 Stash 与 Runtime Health 仍需各自完整 E2E 和 packaged
   validation 才能升级证据；
 - packaged private Git smoke fixture 已接入，但在当前 candidate 交付前仍需 fresh packaged
   execution，不能只凭 fixture 存在宣称通过；

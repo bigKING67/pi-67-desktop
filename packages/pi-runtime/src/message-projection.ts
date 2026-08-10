@@ -7,6 +7,7 @@ import {
   MAX_CONVERSATION_PAGE_JSON_BYTES,
   parseActiveProposedPlan,
   parsePlanDecision,
+  parsePlanImplementation,
   type ConversationPage,
   type ExtensionToolAdapterView,
   type PlanProposalStatus,
@@ -19,6 +20,7 @@ import {
 } from "./message-normalizer.js";
 import {
   PLAN_DECISION_ENTRY_TYPE,
+  PLAN_IMPLEMENTATION_ENTRY_TYPE,
   PROPOSED_PLAN_ENTRY_TYPE
 } from "./plan-mode-controller.js";
 
@@ -252,6 +254,18 @@ function projectPlanProposalStatuses(entries: readonly SessionEntry[]): Readonly
       if (active) statuses.set(active.entryIndex, "dismissed");
       statuses.set(entryIndex, "proposed");
       active = { entryIndex, planId: plan.planId };
+      continue;
+    }
+    if (entry.customType === PLAN_IMPLEMENTATION_ENTRY_TYPE) {
+      const implementation = parsePlanImplementation(entry.data);
+      if (
+        implementation?.phase === "started"
+        && active
+        && implementation.planId === active.planId
+      ) {
+        statuses.set(active.entryIndex, "implemented");
+        active = undefined;
+      }
       continue;
     }
     if (entry.customType !== PLAN_DECISION_ENTRY_TYPE) continue;

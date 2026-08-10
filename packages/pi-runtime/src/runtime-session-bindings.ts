@@ -10,7 +10,11 @@ import {
   type SettingsManager
 } from "@earendil-works/pi-coding-agent";
 import { realpath, stat, writeFile } from "node:fs/promises";
-import { RuntimeError, type ExtensionUiCancellationReason } from "@pi67/domain";
+import {
+  RuntimeError,
+  type ExtensionUiCancellationReason,
+  type PlanImplementationRequestLineage
+} from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
@@ -78,7 +82,21 @@ export class RuntimeSessionBindings {
   get interactionState(): SessionInteractionState { return this.planMode.snapshot(); }
 
   setInteractionMode(mode: SessionInteractionMode): void { this.planMode.setInteractionMode(mode); }
-  implementPlan(planId: string): Promise<void> { return this.planMode.implementPlan(planId); }
+  implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void> {
+    const session = this.session;
+    if (
+      !session
+      || lineage.sessionId !== session.sessionId
+      || lineage.sessionFileIdentity !== this.activeSessionFileIdentity
+      || lineage.sessionGeneration !== this.generation
+    ) {
+      throw new RuntimeError(
+        "SESSION_CHANGED_EXTERNALLY",
+        "The Plan implementation no longer belongs to the active Pi Session."
+      );
+    }
+    return this.planMode.implementPlan(planId, lineage);
+  }
 
   refreshExtensions(): LoadExtensionsResult | undefined {
     this.activeExtensions = this.activeServices?.resourceLoader.getExtensions();
@@ -238,6 +256,7 @@ export class RuntimeSessionBindings {
     this.activeExtensions = this.activeServices.resourceLoader.getExtensions();
     this.options.setSessionCwd(session.sessionManager.getCwd());
     const unsubscribe = session.subscribe((event) => {
+      this.planMode.observeSessionEvent(session, event);
       this.options.projections.observe(session, event);
     });
     this.sessionUnsubscribe = unsubscribe;

@@ -123,11 +123,14 @@ spacing, component states, and motion as `DESIGN.md`.
   accent border, not a luminous green panel. Markdown owns a bounded scroll region;
   disclosure, copy, focus, and historical status remain visible, but execution
   controls never move into the card. The independent compact action bar above the
-  Composer owns busy, disabled, inline-error, `继续完善`, `复制`, and `开始执行`
-  states. `继续完善` stays neutral, while `开始执行` uses `accent` with `canvas`
-  text for the same primary-action contrast as light mode. At 720x480 the Composer
-  may wrap to two rows, but both Timeline card and action bar remain reachable
-  without overlap.
+  Composer always shows `复制` plus one contextual primary action: `继续完善` when
+  the Composer has user context, otherwise `开始执行`. `继续完善` stays neutral,
+  while `开始执行` uses `accent` with `canvas` text for the same primary-action
+  contrast as light mode. Accepted-but-not-started implementation uses the same
+  geometry with disabled `正在启动计划 / 正在启动`; a matching pre-start failure
+  restores the primary action and renders the bounded inline error without relying
+  on hue alone. At 720x480 the Composer may wrap to two rows, but both Timeline card
+  and action bar remain reachable without overlap.
 - Prompt Stash uses one raised neutral Popover above the Composer. Exact text preview,
   image count/size, disabled restore, persistence failure, focus return, and 20-item limit stay
   legible without a green success surface. Current/Workspace conversation search uses

@@ -91,7 +91,11 @@ import {
 } from "./workspace-registration-schemas.js";
 import { RuntimeDiagnosticsSchema } from "./runtime-diagnostics-schema.js";
 import { WorkspaceUsageReportSchema } from "./usage-schemas.js";
-import { ActiveProposedPlanSchema, SessionInteractionModeSchema } from "./session-plan-schemas.js";
+import {
+  ActiveProposedPlanSchema,
+  PlanLifecycleChangeSchema,
+  SessionInteractionModeSchema
+} from "./session-plan-schemas.js";
 export { ProtocolErrorSchema } from "./protocol-error-schema.js";
 export { CommandPayloadSchemas } from "./command-payload-schemas.js";
 const SessionSnapshotSchema = strictObject({
@@ -117,6 +121,7 @@ const SessionSnapshotSchema = strictObject({
   resources: Type.Array(ResourceSummarySchema),
   interactionMode: Type.Optional(SessionInteractionModeSchema),
   activeProposedPlan: Type.Optional(ActiveProposedPlanSchema),
+  planLifecycle: Type.Optional(PlanLifecycleChangeSchema),
   compatibility: Type.Optional(SessionCompatibilityViewSchema),
   stats: Type.Optional(strictObject({
     tokens: Type.Number(),
@@ -373,6 +378,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
     interactionMode: SessionInteractionModeSchema
   }),
   "plan.proposed": strictObject({ plan: ActiveProposedPlanSchema }),
+  "plan.lifecycleChanged": PlanLifecycleChangeSchema,
   "model.catalog.changed": SessionModelCatalogResultSchema,
   "tree.changed": strictObject({
     reason: Type.Union([Type.Literal("session-entry"), Type.Literal("compacted"), Type.Literal("rollback")])

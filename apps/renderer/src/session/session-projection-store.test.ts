@@ -11,6 +11,7 @@ import {
   selectSessionModels,
   selectActiveProposedPlan,
   selectInteractionMode,
+  selectPlanLifecycle,
   selectSessionResources,
   selectSessionStats
 } from "./session-projection-selectors.js";
@@ -79,6 +80,63 @@ describe("session projection store", () => {
     expect(useSessionProjectionStore.getState().applyInteractionMode(AUTHORITY, "execute")).toBe(true);
     expect(selectInteractionMode(useSessionProjectionStore.getState())).toBe("execute");
     expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
+  });
+
+  it("keeps a requested Plan until started and applies lifecycle replays idempotently", () => {
+    const proposedPlan = {
+      planId: "plan-lifecycle",
+      sourceOperationId: "operation-plan-source",
+      markdown: "# Plan\n\n1. Inspect",
+      createdAt: 67
+    };
+    installSessionProjectionFixture(CONNECTION, {
+      ...snapshot("session-1"),
+      interactionMode: "plan",
+      activeProposedPlan: proposedPlan
+    }, 3);
+    const requested = planLifecycle("implementation-requested");
+
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
+    expect(selectInteractionMode(useSessionProjectionStore.getState())).toBe("execute");
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toEqual(proposedPlan);
+    expect(selectPlanLifecycle(useSessionProjectionStore.getState())).toEqual(requested);
+
+    const started = planLifecycle("implementation-started");
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, started)).toBe(true);
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, started)).toBe(true);
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
+    expect(selectPlanLifecycle(useSessionProjectionStore.getState())).toEqual(started);
+  });
+
+  it("restores a Plan after start failure and rejects stale or unrelated lifecycle changes", () => {
+    const proposedPlan = {
+      planId: "plan-lifecycle",
+      sourceOperationId: "operation-plan-source",
+      markdown: "# Plan\n\n1. Inspect",
+      createdAt: 67
+    };
+    installSessionProjectionFixture(CONNECTION, {
+      ...snapshot("session-1"),
+      interactionMode: "plan",
+      activeProposedPlan: proposedPlan
+    }, 3);
+    const requested = planLifecycle("implementation-requested");
+    const failed = planLifecycle("implementation-start-failed");
+
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle({
+      ...AUTHORITY,
+      sessionGeneration: 4
+    }, failed)).toBe(false);
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, {
+      ...failed,
+      planId: "plan-unrelated"
+    })).toBe(false);
+    expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, failed)).toBe(true);
+    expect(selectInteractionMode(useSessionProjectionStore.getState())).toBe("plan");
+    expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toEqual(proposedPlan);
+    expect(selectPlanLifecycle(useSessionProjectionStore.getState())).toEqual(failed);
   });
 
   it("installs compatibility only with the exact Session snapshot authority", () => {
@@ -378,5 +436,22 @@ function snapshot(sessionId: string): SessionSnapshot {
     tree: { nodes: [], truncated: false, total: 0 },
     resources: [{ kind: "skill", id: "testing", label: "Testing", status: "ready" }],
     stats: { tokens: 10, cost: 0.1, contextPercent: 5 }
+  };
+}
+
+function planLifecycle(
+  phase: "implementation-requested" | "implementation-started" | "implementation-start-failed"
+) {
+  return {
+    phase,
+    planId: "plan-lifecycle",
+    sourceOperationId: "operation-plan-source",
+    submissionId: "submission-plan",
+    operationId: "operation-plan",
+    hostEpoch: AUTHORITY.hostEpoch,
+    sessionId: AUTHORITY.sessionId,
+    sessionFileIdentity: AUTHORITY.sessionFileIdentity,
+    sessionGeneration: AUTHORITY.sessionGeneration,
+    timestamp: 68
   };
 }

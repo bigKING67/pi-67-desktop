@@ -1316,6 +1316,13 @@ loading error where the operation can produce those states
   `PLAN_MODE_READ_ONLY` rather than presented as approvable. The control's plan
   state uses a restrained accent border/fill and remains distinguishable by icon,
   label, and pressed state in both themes.
+- The hidden Plan context requires evidence-grounded, decision-complete output:
+  discoverable facts come from applicable instructions, real files, configuration,
+  Git, and runtime evidence; `plan_ask` is reserved for materially blocking intent
+  with two or three mutually exclusive choices. Before `plan_complete`, every
+  material requirement must trace to a concrete change and observable acceptance
+  evidence, with non-goals, concrete locations, dependency order, failure/recovery,
+  compatibility, risks, tests, and assumptions covered without fixed headings.
 - `plan_complete` appends one complete Plan proposal card to the Timeline. The
   Timeline card owns expanded/collapsed state, bounded Markdown scrolling, copy
   feedback, historical status, and focus rings; it never owns an execution action.
@@ -1323,13 +1330,19 @@ loading error where the operation can produce those states
   state, and historical Plan cards may be read, expanded, and copied but never run
   again.
 - While the current proposal is active, one compact `ActivePlanActionBar` appears
-  above the Composer with `继续完善`, `复制`, and `开始执行`. Continuing refinement
-  only prefills the Composer. Starting execution sends `planId + submissionId`,
-  never Markdown; Agent Host resolves the active Plan from the same Pi JSONL,
-  records the decision, switches that Session to execute, and emits the real Prompt
-  Operation. Busy/disabled state, focus rings, and inline implementation failure
-  belong to the action bar. The authoritative execute event removes only this action
-  bar, not the Timeline Plan.
+  above the Composer with `复制` plus one contextual primary action. A Composer with
+  text, attachments, Workspace files, or review comments shows `继续完善` and calls
+  the existing Composer submit path without replacing or prefilling its draft. An
+  empty Composer shows `开始执行`, which sends `planId + submissionId`, never
+  Markdown. After Agent Host accepts the request, the action bar remains visible as
+  disabled `正在启动计划 / 正在启动`; the Timeline still reads `待确认` because a Host
+  receipt is not proof that Pi began the Turn. Only the exact authority-matching Pi
+  `agent_start` removes the action bar and changes the Timeline to `implemented`.
+  A matching failure before `agent_start` restores Plan Mode in place, retains the
+  proposal, and shows that Operation's error below the bar so a new one-click retry
+  can use a fresh `submissionId`. Failure, cancellation, or loss after `agent_start`
+  never restores the Plan. Focus rings and copy feedback remain available while the
+  pending implementation action is disabled.
 - At narrow widths the Timeline card retains its bounded body and the independent
   action bar keeps every action reachable while the Composer toolbar may wrap to two
   rows without changing keyboard order or overlapping the editor. Reduced Motion

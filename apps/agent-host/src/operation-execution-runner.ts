@@ -1,4 +1,4 @@
-import type { RuntimeIdentity } from "@pi67/domain";
+import type { OperationView, RuntimeIdentity } from "@pi67/domain";
 import type { AgentEvent, OperationSubmissionResult } from "@pi67/protocol";
 import { assertCurrentOperationAuthority } from "./operation-authority.js";
 import { acceptedOperation } from "./operation-registry-authority.js";
@@ -18,6 +18,11 @@ interface OperationExecutionRunnerOptions {
   withDurability<T>(operation: () => Promise<T>): Promise<T>;
 }
 
+export interface OperationExecutionContext {
+  operation: OperationView;
+  hostEpoch: number;
+}
+
 export class OperationExecutionRunner {
   constructor(private readonly options: OperationExecutionRunnerOptions) {}
 
@@ -25,13 +30,14 @@ export class OperationExecutionRunner {
     operation: ActiveOperation,
     submissionId: string,
     fingerprint: string,
-    execute: () => Promise<void>
+    execute: (context: OperationExecutionContext) => Promise<void>,
+    context: OperationExecutionContext
   ): Promise<void> {
     await this.options.withDurability(() => this.options.results.markRunning(submissionId, fingerprint));
     if (!this.options.isActive(operation.view.operationId)) return;
     this.options.emit({ type: "operation.started", payload: { operation: operation.view } });
     try {
-      await execute();
+      await execute(context);
     } catch (error) {
       await this.options.finishFailed(operation.view.operationId, toProtocolError(error));
       return;

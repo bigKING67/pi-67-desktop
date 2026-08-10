@@ -8,6 +8,7 @@ import type {
   ExtensionUiRequestView,
   OperationActivity,
   OperationView,
+  PlanLifecycleChange,
   RuntimeCapabilities,
   RuntimeStatus,
   SessionCatalogChangedEvent,
@@ -53,6 +54,7 @@ export interface EventPayloads {
   };
   "session.interactionModeChanged": { interactionMode: SessionInteractionMode };
   "plan.proposed": { plan: ActiveProposedPlan };
+  "plan.lifecycleChanged": PlanLifecycleChange;
   "model.catalog.changed": SessionModelCatalogResult;
   "tree.changed": { reason: "session-entry" | "compacted" | "rollback" };
   "usage.changed": { tokens: number; cost: number; contextPercent?: number };

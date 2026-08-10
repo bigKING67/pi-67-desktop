@@ -128,6 +128,46 @@ describe("app events renderer session authority", () => {
     expect(committedCatalog()).toEqual(catalog);
   });
 
+  it("applies Plan lifecycle only when payload and envelope share exact Session lineage", () => {
+    setActiveSession("session-1", 3);
+    const authority = currentAuthority();
+    const plan = {
+      planId: "plan-authority",
+      sourceOperationId: "operation-plan-source",
+      markdown: "# Plan authority",
+      createdAt: 67
+    };
+    useSessionProjectionStore.getState().applyProposedPlan(authority, plan);
+    const requested = planLifecycle("implementation-requested");
+
+    emitPlanLifecycle(requested, "operation-plan", 1);
+    expect(useSessionProjectionStore.getState().interaction).toMatchObject({
+      activeProposedPlan: plan,
+      planLifecycle: requested
+    });
+
+    for (const stale of [
+      { ...requested, phase: "implementation-start-failed" as const, hostEpoch: 10 },
+      { ...requested, phase: "implementation-start-failed" as const, sessionId: "session-old" },
+      { ...requested, phase: "implementation-start-failed" as const, sessionFileIdentity: "session-file-old" },
+      { ...requested, phase: "implementation-start-failed" as const, sessionGeneration: 2 }
+    ]) {
+      emitPlanLifecycle(stale, "operation-plan", 2);
+    }
+    emitPlanLifecycle({
+      ...requested,
+      phase: "implementation-start-failed"
+    }, "operation-other", 3);
+    expect(useSessionProjectionStore.getState().interaction?.planLifecycle).toEqual(requested);
+
+    const started = planLifecycle("implementation-started");
+    emitPlanLifecycle(started, "operation-plan", 4);
+    expect(useSessionProjectionStore.getState().interaction).toEqual({
+      interactionMode: "execute",
+      planLifecycle: started
+    });
+  });
+
   it("stages the next Session catalog during an active import and binds the operation to bootstrap authority", () => {
     setActiveSession("session-1", 3);
     const previousCatalog = { items: [], total: 1, truncated: false };
@@ -220,6 +260,38 @@ function emitOperationStarted(value: OperationView): void {
     sessionId: value.sessionId,
     sessionGeneration: value.sessionGeneration,
     operationId: value.operationId
+  })));
+}
+
+function planLifecycle(
+  phase: "implementation-requested" | "implementation-started" | "implementation-start-failed"
+) {
+  return {
+    phase,
+    planId: "plan-authority",
+    sourceOperationId: "operation-plan-source",
+    submissionId: "submission-plan",
+    operationId: "operation-plan",
+    hostEpoch: 9,
+    sessionId: "session-1",
+    sessionFileIdentity: "session-file-session-1",
+    sessionGeneration: 3,
+    timestamp: 68
+  };
+}
+
+function emitPlanLifecycle(
+  payload: ReturnType<typeof planLifecycle>,
+  envelopeOperationId: string,
+  sequence: number
+): void {
+  const event = { type: "plan.lifecycleChanged", payload } as const;
+  useAppStore.getState().receiveAgentEvent(event, eventEnvelope(event.type, event.payload, taskEventFixture({
+    hostEpoch: 9,
+    sequence,
+    sessionId: "session-1",
+    sessionGeneration: 3,
+    operationId: envelopeOperationId
   })));
 }
 

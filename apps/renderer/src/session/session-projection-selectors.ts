@@ -28,3 +28,6 @@ export const selectInteractionMode = (state: SessionProjectionState) => (
 export const selectActiveProposedPlan = (state: SessionProjectionState) => (
   state.interaction?.activeProposedPlan
 );
+export const selectPlanLifecycle = (state: SessionProjectionState) => (
+  state.interaction?.planLifecycle
+);

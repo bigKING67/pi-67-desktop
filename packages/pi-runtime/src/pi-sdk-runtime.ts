@@ -8,6 +8,7 @@ import {
   type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
   type SessionSnapshot, type SessionTreeProjection,
   type SessionInteractionMode,
+  type PlanImplementationRequestLineage,
   type WorkspaceTrust, type TaskToolMode
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
@@ -297,11 +298,11 @@ export class PiSdkRuntime implements AgentRuntime {
     await this.sessionCatalog.upsertCurrent("session-updated");
   }
 
-  async implementPlan(planId: string): Promise<void> {
+  async implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void> {
     await this.assertSessionWritable();
     await this.configurationReload.assertReady();
     try {
-      await this.sessionBindings.implementPlan(planId);
+      await this.sessionBindings.implementPlan(planId, lineage);
     } finally {
       await this.sessionCatalog.upsertCurrent("session-updated");
       await this.configurationReload.apply();

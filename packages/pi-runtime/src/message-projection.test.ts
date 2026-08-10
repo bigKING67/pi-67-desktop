@@ -7,6 +7,7 @@ import {
 } from "./message-projection.js";
 import {
   PLAN_DECISION_ENTRY_TYPE,
+  PLAN_IMPLEMENTATION_ENTRY_TYPE,
   PROPOSED_PLAN_ENTRY_TYPE
 } from "./plan-mode-controller.js";
 
@@ -71,6 +72,26 @@ describe("projectMessagePage", () => {
     expect(newer.messages.map((message) => message.parts[0])).toEqual([
       { type: "text", text: "After" }
     ]);
+  });
+
+  it("marks a Plan implemented from the durable started marker without a compatibility decision", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "plan-started-session" });
+    manager.appendCustomEntry(PROPOSED_PLAN_ENTRY_TYPE, proposedPlan("plan-started", 1));
+    manager.appendCustomEntry(PLAN_IMPLEMENTATION_ENTRY_TYPE, planImplementation(
+      "plan-started",
+      "requested",
+      2
+    ));
+
+    expect(projectedPlanStatus(manager, "plan-started")).toBe("proposed");
+
+    manager.appendCustomEntry(PLAN_IMPLEMENTATION_ENTRY_TYPE, planImplementation(
+      "plan-started",
+      "started",
+      3
+    ));
+
+    expect(projectedPlanStatus(manager, "plan-started")).toBe("implemented");
   });
 
   it("bootstraps only the newest 100 messages and pages older history without overlap", () => {
@@ -206,6 +227,37 @@ function proposedPlan(planId: string, createdAt: number) {
     markdown: `# ${planId}`,
     createdAt
   };
+}
+
+function planImplementation(
+  planId: string,
+  phase: "requested" | "started",
+  timestamp: number
+) {
+  return {
+    planId,
+    sourceOperationId: `source-${planId}`,
+    submissionId: `submission-${planId}`,
+    operationId: `operation-${planId}`,
+    hostEpoch: 1,
+    sessionId: "plan-started-session",
+    sessionFileIdentity: "session-file-plan-started-session",
+    sessionGeneration: 1,
+    phase,
+    timestamp
+  };
+}
+
+function projectedPlanStatus(
+  manager: SessionManager,
+  planId: string
+): "proposed" | "implemented" | "dismissed" | undefined {
+  for (const message of projectMessagePage(manager).messages) {
+    for (const part of message.parts) {
+      if (part.type === "plan-proposal" && part.plan.planId === planId) return part.plan.status;
+    }
+  }
+  return undefined;
 }
 
 function assistantText(text: string, timestamp: number) {

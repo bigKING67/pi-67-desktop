@@ -17,6 +17,7 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "session.metaChanged": { session: true, operation: false },
   "session.interactionModeChanged": { session: true, operation: false },
   "plan.proposed": { session: true, operation: false },
+  "plan.lifecycleChanged": { session: true, operation: false },
   "model.catalog.changed": { session: true, operation: false },
   "tree.changed": { session: true, operation: false },
   "usage.changed": { session: true, operation: false },
@@ -90,6 +91,13 @@ export function hasValidEventContext(envelope: EventContextEnvelope): boolean {
     case "operation.cancelled":
     case "operation.lost":
       return event.payload.operationId === taskContext?.operationId;
+    case "plan.lifecycleChanged":
+      if (event.payload.phase === "dismissed") return true;
+      return event.payload.hostEpoch === event.hostEpoch
+        && event.payload.sessionId === taskContext?.sessionId
+        && event.payload.sessionFileIdentity === taskContext.sessionFileIdentity
+        && event.payload.sessionGeneration === taskContext.sessionGeneration
+        && event.payload.operationId === taskContext.operationId;
     case "approval.requested":
     case "extension.ui.requested":
     case "extension.ui.updated":

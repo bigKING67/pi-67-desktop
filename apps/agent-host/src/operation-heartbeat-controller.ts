@@ -94,6 +94,7 @@ function isBusinessActivityEvent(event: AgentEvent): boolean {
     case "operation.started":
     case "operation.activityChanged":
     case "operation.progress":
+    case "plan.lifecycleChanged":
     case "workspace.changeChanged":
     case "approval.requested":
     case "approval.resolved":
@@ -110,6 +111,9 @@ function isBusinessActivityEvent(event: AgentEvent): boolean {
 
 function eventBelongsToOperation(event: AgentEvent, operationId: string | undefined): boolean {
   if (operationId === undefined) return false;
+  if (event.type === "plan.lifecycleChanged") {
+    return event.payload.phase !== "dismissed" && event.payload.operationId === operationId;
+  }
   if (event.type === "operation.started") return event.payload.operation.operationId === operationId;
   if (event.type.startsWith("operation.")) {
     return (event.payload as { operationId: string }).operationId === operationId;

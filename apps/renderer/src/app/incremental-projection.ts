@@ -29,6 +29,7 @@ type ProjectionAgentEventType =
   | "session.metaChanged"
   | "session.interactionModeChanged"
   | "plan.proposed"
+  | "plan.lifecycleChanged"
   | "model.catalog.changed"
   | "tree.changed"
   | "usage.changed";
@@ -122,6 +123,13 @@ export function handleProjectionEvent(
       return applyScopedSessionProjection(envelope, get, (authority) => {
         useSessionProjectionStore.getState().applyProposedPlan(authority, event.payload.plan);
       });
+    case "plan.lifecycleChanged": {
+      const authority = acceptScopedEvent(envelope, get);
+      if (!authority || !matchesPlanLifecycleAuthority(event, envelope, authority)) return "ignored";
+      return useSessionProjectionStore.getState().applyPlanLifecycle(authority, event.payload)
+        ? "applied"
+        : "ignored";
+    }
     case "model.catalog.changed": {
       const authority = acceptScopedEvent(envelope, get, event.payload.sessionId);
       if (!authority) return "ignored";
@@ -160,6 +168,7 @@ export function isProjectionAgentEvent(event: AgentEvent): event is ProjectionAg
     case "session.metaChanged":
     case "session.interactionModeChanged":
     case "plan.proposed":
+    case "plan.lifecycleChanged":
     case "model.catalog.changed":
     case "tree.changed":
     case "usage.changed":
@@ -167,6 +176,20 @@ export function isProjectionAgentEvent(event: AgentEvent): event is ProjectionAg
     default:
       return false;
   }
+}
+
+function matchesPlanLifecycleAuthority(
+  event: Extract<AgentEvent, { type: "plan.lifecycleChanged" }>,
+  envelope: EventEnvelope,
+  authority: RendererSessionAuthority
+): boolean {
+  const change = event.payload;
+  if (change.phase === "dismissed") return true;
+  return change.hostEpoch === authority.hostEpoch
+    && change.sessionId === authority.sessionId
+    && change.sessionFileIdentity === authority.sessionFileIdentity
+    && change.sessionGeneration === authority.sessionGeneration
+    && eventSessionAuthority(envelope)?.operationId === change.operationId;
 }
 
 function applyScopedSessionProjection(

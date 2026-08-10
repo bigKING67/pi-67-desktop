@@ -5,6 +5,7 @@ import {
   dispatchHostCommand,
   operationSubmissionIdentity
 } from "./host-command-dispatcher.js";
+import type { AcceptOperationOptions } from "./operation-registry.js";
 
 describe("operationSubmissionIdentity", () => {
   it("keeps caller identity separate from the canonical import fingerprint", () => {
@@ -337,6 +338,50 @@ describe("operationSubmissionIdentity", () => {
     }, context as never)).rejects.toBe(failure);
 
     expect(accept).not.toHaveBeenCalled();
+  });
+
+  it("binds Plan implementation to the accepted Operation and Host authority", async () => {
+    const implementPlan = vi.fn().mockResolvedValue(undefined);
+    const operation = {
+      operationId: "operation-plan",
+      kind: "prompt" as const,
+      lifecycle: "accepted" as const,
+      cancellable: true,
+      sessionId: "session-plan",
+      sessionFileIdentity: "session-file-plan",
+      sessionGeneration: 4,
+      startedAt: 67
+    };
+    const accept = vi.fn(async (options: AcceptOperationOptions) => {
+      await options.execute({ operation, hostEpoch: 9 });
+      return {
+        kind: "accepted" as const,
+        operationId: operation.operationId,
+        cancellable: true,
+        hostEpoch: 9,
+        sessionId: operation.sessionId,
+        sessionFileIdentity: operation.sessionFileIdentity,
+        sessionGeneration: operation.sessionGeneration
+      };
+    });
+
+    await dispatchHostCommand(
+      { implementPlan } as unknown as AgentRuntime,
+      {
+        type: "plan.implement",
+        payload: { planId: "plan-1", submissionId: "submission-plan" }
+      },
+      { operations: () => ({ accept }) } as never
+    );
+
+    expect(implementPlan).toHaveBeenCalledWith("plan-1", {
+      submissionId: "submission-plan",
+      operationId: operation.operationId,
+      hostEpoch: 9,
+      sessionId: operation.sessionId,
+      sessionFileIdentity: operation.sessionFileIdentity,
+      sessionGeneration: operation.sessionGeneration
+    });
   });
 });
 

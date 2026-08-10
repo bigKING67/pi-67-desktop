@@ -3,6 +3,7 @@ import type { ExtensionCompatibility } from "./runtime-state.js";
 import type { AssetReference } from "./asset.js";
 import type {
   ActiveProposedPlan,
+  PlanLifecycleChange,
   PlanProposalPart,
   SessionInteractionMode
 } from "./plan-mode.js";
@@ -160,6 +161,7 @@ export interface SessionSnapshot {
   resources: ResourceSummary[];
   interactionMode?: SessionInteractionMode;
   activeProposedPlan?: ActiveProposedPlan;
+  planLifecycle?: PlanLifecycleChange;
   compatibility?: SessionCompatibilityView;
   stats?: {
     tokens: number;

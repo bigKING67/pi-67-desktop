@@ -1,5 +1,6 @@
 import type {
   ActiveProposedPlan,
+  PlanLifecycleChange,
   SessionControlsView,
   SessionInteractionMode,
   SessionModelCatalogView,
@@ -24,6 +25,7 @@ export interface SessionQueueProjection {
 export interface SessionInteractionProjection {
   interactionMode: SessionInteractionMode;
   activeProposedPlan?: ActiveProposedPlan;
+  planLifecycle?: PlanLifecycleChange;
 }
 
 export function identityProjectionFromSnapshot(
@@ -72,6 +74,9 @@ export function interactionProjectionFromSnapshot(
     interactionMode: snapshot.interactionMode ?? "execute",
     ...(snapshot.activeProposedPlan === undefined
       ? {}
-      : { activeProposedPlan: snapshot.activeProposedPlan })
+      : { activeProposedPlan: snapshot.activeProposedPlan }),
+    ...(snapshot.planLifecycle === undefined
+      ? {}
+      : { planLifecycle: snapshot.planLifecycle })
   };
 }

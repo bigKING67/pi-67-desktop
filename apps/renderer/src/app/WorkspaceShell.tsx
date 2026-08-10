@@ -24,7 +24,6 @@ import {
   selectSessionId
 } from "../session/session-projection-selectors.js";
 import { Transcript } from "../transcript/Transcript.js";
-import { ActivePlanActionBar } from "../transcript/PlanProposalCard.js";
 import { TrustBanner } from "../workspace/TrustBanner.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import {
@@ -100,7 +99,6 @@ export function WorkspaceShell({
       <TrustBanner />
       <StreamingAnnouncer />
       <Transcript />
-      <ActivePlanActionBar />
       <Composer />
     </section>
   ) : selectedWorkspace && selectedWorkspace.availability !== "available" ? (

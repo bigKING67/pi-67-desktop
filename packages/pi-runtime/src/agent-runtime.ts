@@ -17,6 +17,7 @@ import type {
   SessionResourceCatalogResult,
   SessionSnapshot,
   SessionInteractionMode,
+  PlanImplementationRequestLineage,
   SessionTreeProjection,
   WorkspaceChangesProjection,
   WorkspaceTrust,
@@ -96,7 +97,7 @@ export interface AgentRuntime {
   compact(instructions?: string): Promise<void>;
   setSessionName(name?: string): Promise<void>;
   setInteractionMode(mode: SessionInteractionMode): Promise<void>;
-  implementPlan(planId: string): Promise<void>;
+  implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void>;
   preparePromptAttachments(
     submissionId: string,
     refs: readonly PromptAttachmentRef[]

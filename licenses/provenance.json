@@ -210,6 +210,36 @@
       },
       "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
       "modifications": "Reimplemented the outstanding-work drain invariant with bounded Promise-native Agent Host shutdown semantics. Effect, TxQueue, TxRef, and t3code source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts",
+      "sourceSha256": "5282b5b35e74c10578300deb3966f2c191506c49ff850e1e6c93e47c2e782d20",
+      "targetPath": "packages/pi-runtime/src/plan-mode-controller.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented the consume-only-after-authoritative-Turn-start invariant with Pi agent_start, Pi JSONL lifecycle entries, and Agent Host operation lineage. SQLite, Effect orchestration, and t3code source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "apps/web/src/components/chat/ComposerPrimaryActions.tsx",
+      "sourceSha256": "d3e3c1e5eab043584ea5d9791aeb1e82ab554386e1b6f189f6e5d881ecc2e103",
+      "targetPath": "apps/renderer/src/transcript/PlanProposalCard.tsx",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented contextual Refine versus Implement actions through Pi-67 Composer and Session authority. Renderer sends identifiers only for implementation; no t3code source code was copied."
     }
   ]
 }

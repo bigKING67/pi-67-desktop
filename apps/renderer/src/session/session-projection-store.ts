@@ -21,6 +21,7 @@ import {
   sessionQueueProjectionPatch,
   sessionResourceCatalogResultPatch,
   proposedPlanProjectionPatch,
+  planLifecycleProjectionPatch,
   sessionSnapshotProjectionPatch,
   sessionUsageProjectionPatch
 } from "./session-projection-mutations.js";
@@ -182,6 +183,10 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
 
   applyProposedPlan(authority, plan) {
     return applyPatch(proposedPlanProjectionPatch(get(), authority, plan), set);
+  },
+
+  applyPlanLifecycle(authority, change) {
+    return applyPatch(planLifecycleProjectionPatch(get(), authority, change), set);
   },
 
   clearQueue(target) {

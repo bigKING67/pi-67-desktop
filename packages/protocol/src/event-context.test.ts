@@ -162,6 +162,41 @@ describe("event context validation", () => {
     })).toBe(false);
   });
 
+  it("rejects stale Plan lifecycle lineage while allowing Session-scoped dismissal", () => {
+    const requested = eventEnvelope("plan.lifecycleChanged", {
+      phase: "implementation-requested",
+      planId: "plan-1",
+      sourceOperationId: "tool-call-1",
+      submissionId: "submission-1",
+      operationId: "operation-1",
+      hostEpoch: 3,
+      sessionId: "session-1",
+      sessionFileIdentity: "session-file-1",
+      sessionGeneration: 2,
+      timestamp: 100
+    }, operationContext());
+
+    expect(isEventEnvelope(requested)).toBe(true);
+    expect(isEventEnvelope({
+      ...requested,
+      payload: { ...requested.payload, hostEpoch: 4 }
+    })).toBe(false);
+    expect(isEventEnvelope({
+      ...requested,
+      payload: { ...requested.payload, operationId: "operation-other" }
+    })).toBe(false);
+    expect(isEventEnvelope({
+      ...requested,
+      payload: { ...requested.payload, sessionFileIdentity: "session-file-other" }
+    })).toBe(false);
+
+    expect(isEventEnvelope(eventEnvelope("plan.lifecycleChanged", {
+      phase: "dismissed",
+      planId: "plan-1",
+      timestamp: 101
+    }, sessionContext()))).toBe(true);
+  });
+
   it("only correlates structurally event-shaped frames to a Host epoch", () => {
     expect(correlateInvalidEvent({ kind: "event", hostEpoch: 7 })).toEqual({ hostEpoch: 7 });
     expect(correlateInvalidEvent({ kind: "response", hostEpoch: 7 })).toBeUndefined();

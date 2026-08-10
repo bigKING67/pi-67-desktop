@@ -1,4 +1,4 @@
-import { RuntimeError } from "@pi67/domain";
+import { RuntimeError, type PlanImplementationRequestLineage } from "@pi67/domain";
 import { describe, expect, it, vi } from "vitest";
 import type { RuntimeProjectionController } from "./runtime-projection-controller.js";
 import { createRuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
@@ -58,6 +58,41 @@ describe("RuntimeSessionBindings", () => {
       details: { stage: "session-model-runtime", waitMs: 10 }
     });
     expect(createModelRuntime).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when Plan lineage no longer matches the bound Session identity", async () => {
+    const bindings = createBindings();
+    const internals = bindings as unknown as {
+      activeRuntime: { session: { sessionId: string } };
+      activeSessionFileIdentity: string;
+      generation: number;
+      planMode: { implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void> };
+    };
+    internals.activeRuntime = { session: { sessionId: "session-plan" } };
+    internals.activeSessionFileIdentity = "session-file-plan";
+    internals.generation = 4;
+    const implementPlan = vi.spyOn(internals.planMode, "implementPlan").mockResolvedValue(undefined);
+    const lineage: PlanImplementationRequestLineage = {
+      submissionId: "submission-plan",
+      operationId: "operation-plan",
+      hostEpoch: 9,
+      sessionId: "session-plan",
+      sessionFileIdentity: "session-file-plan",
+      sessionGeneration: 4
+    };
+
+    await expect(bindings.implementPlan("plan-1", lineage)).resolves.toBeUndefined();
+    expect(implementPlan).toHaveBeenCalledWith("plan-1", lineage);
+
+    expect(() => bindings.implementPlan("plan-1", {
+      ...lineage,
+      sessionFileIdentity: "session-file-stale"
+    })).toThrow("no longer belongs to the active Pi Session");
+    expect(() => bindings.implementPlan("plan-1", {
+      ...lineage,
+      sessionGeneration: 5
+    })).toThrow("no longer belongs to the active Pi Session");
+    expect(implementPlan).toHaveBeenCalledOnce();
   });
 });
 

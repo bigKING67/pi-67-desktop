@@ -273,7 +273,14 @@ export async function dispatchHostCommand(
         submissionId: submission.submissionId,
         fingerprint: submissionFingerprint ?? submission.fingerprint,
         kind: "prompt",
-        execute: () => runtime.implementPlan(command.payload.planId),
+        execute: ({ operation, hostEpoch }) => runtime.implementPlan(command.payload.planId, {
+          submissionId: command.payload.submissionId,
+          operationId: operation.operationId,
+          hostEpoch,
+          sessionId: operation.sessionId,
+          sessionFileIdentity: operation.sessionFileIdentity,
+          sessionGeneration: operation.sessionGeneration
+        }),
         abort: () => runtime.abort(),
         beforeTerminal: () => runtime.flushStream()
       });
