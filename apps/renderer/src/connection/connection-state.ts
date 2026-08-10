@@ -14,6 +14,7 @@ import { workspaceIdForCanonicalPath } from "../workbench/renderer-workspace-ide
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import {
   rendererWorkbenchStore,
+  selectedWorkbenchTask,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import { registerAvailableRendererWorkspaces } from "../workbench/workspace-host-registration-controller.js";
@@ -43,13 +44,17 @@ export function handleConnected(
     && (!state.connected || state.connectionIdentity !== undefined || previousHostEpoch !== identity.hostEpoch)
   );
   const sameHost = shouldRecover && previousHostEpoch === identity.hostEpoch;
+  const restoredRuntime = shouldRestoreFirstConnectionRuntime(state, previousHostEpoch)
+    ? inactiveWorkbenchRuntime()
+    : undefined;
   set({
     connectionIdentity: identity,
     hostEpoch: identity.hostEpoch,
     connected: true,
     trustUpdating: false,
     sessionTransitionPending: shouldRecover,
-    sessionBootstrapTransitionPending: false
+    sessionBootstrapTransitionPending: false,
+    ...(restoredRuntime === undefined ? {} : { runtime: restoredRuntime })
   });
   if (!shouldRecover || !state.workspace) {
     synchronizeWorkspaceScopedStateAfterConnection();
@@ -63,6 +68,28 @@ export function handleConnected(
     approvalMode: state.approvalMode,
     sameHost
   });
+}
+
+function shouldRestoreFirstConnectionRuntime(
+  state: AppState,
+  previousHostEpoch: number | undefined
+): boolean {
+  return Boolean(
+    state.workspace
+    && !state.connected
+    && previousHostEpoch === undefined
+    && state.runtime.phase === "recovering"
+    && state.runtime.detail === messages.runtime.connection.runtimeConnectionRecovering
+  );
+}
+
+function inactiveWorkbenchRuntime(): AppState["runtime"] {
+  const workbench = rendererWorkbenchStore.getState();
+  const selectedTask = selectedWorkbenchTask(workbench);
+  if (selectedTask) return selectedTask.runtime;
+  return workbench.selectedSurface?.kind === "conversation"
+    ? { phase: "stopped", detail: messages.runtime.workbench.sessionPendingOpen, recoverable: true }
+    : { phase: "stopped", detail: messages.runtime.workbench.workspaceRestored, recoverable: true };
 }
 
 function synchronizeWorkspaceScopedStateAfterConnection(): void {
