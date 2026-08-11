@@ -151,7 +151,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(sessionView.getPackages()).not.toContain("npm:project-drifted");
   });
 
-  it("excludes native-replaced Plan and web Packages only from the Desktop runtime projection", () => {
+  it("excludes native-replaced Plan, web, and subagent Packages only from the Desktop runtime projection", () => {
     const configured = [
       "npm:@narumitw/pi-plan-mode@0.11.0",
       "npm:pi-web-access",
@@ -162,9 +162,37 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     const sessionView = createDesktopPackageSettingsView(settingsManager, environment);
 
     expect(sessionView.getGlobalSettings().packages).toEqual([
-      "npm:pi-subagents",
       "/app/agent/desktop-capabilities/packages/pi67-core",
       "/app/agent/desktop-capabilities/packages/design-craft"
+    ]);
+    expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
+  });
+
+  it("uses verified managed adapter and memory Packages without rewriting user npm sources", () => {
+    const managedRoot = "/app/agent/desktop-capabilities/managed-packages/active";
+    const adapter = `${managedRoot}/packages/pi-mcp-adapter`;
+    const memory = `${managedRoot}/packages/pi-observational-memory`;
+    const configured = [
+      "npm:pi-mcp-adapter@2.11.0",
+      "npm:pi-observational-memory@3.0.3",
+      "npm:user-package"
+    ];
+    const settingsManager = SettingsManager.inMemory({ packages: structuredClone(configured) });
+    const sessionView = createDesktopPackageSettingsView(settingsManager, {
+      ...environment,
+      PI67_MANAGED_NPM_ROOT: managedRoot,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([
+        "/app/agent/desktop-capabilities/packages/pi67-core",
+        adapter,
+        memory
+      ])
+    });
+
+    expect(sessionView.getGlobalSettings().packages).toEqual([
+      "npm:user-package",
+      "/app/agent/desktop-capabilities/packages/pi67-core",
+      adapter,
+      memory
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(configured);
   });

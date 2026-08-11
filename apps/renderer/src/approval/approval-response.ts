@@ -2,6 +2,7 @@ import type { ApprovalRequestView, ApprovalResponseDecision } from "@pi67/domain
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import {
   hasCurrentInteractiveAuthority,
+  hasCurrentInteractiveSessionAuthority,
   type InteractiveAuthorityState
 } from "../connection/interactive-authority.js";
 import { recoverInteractiveResponseTimeout } from "../connection/interactive-response-timeout-recovery.js";
@@ -60,9 +61,10 @@ export function approvalResponsePayload(
   if (
     request.sessionId === undefined
     || request.sessionGeneration === undefined
-    || request.operationId === undefined
     || request.hostEpoch === undefined
-    || !hasCurrentInteractiveAuthority(state, request)
+    || (request.subagent === undefined
+      ? request.operationId === undefined || !hasCurrentInteractiveAuthority(state, request)
+      : !hasCurrentInteractiveSessionAuthority(state, request))
   ) return undefined;
 
   return {
@@ -70,7 +72,9 @@ export function approvalResponsePayload(
     toolCallId: request.toolCallId,
     sessionId: request.sessionId,
     sessionGeneration: request.sessionGeneration,
-    operationId: request.operationId,
+    ...(request.subagent !== undefined || request.operationId === undefined
+      ? {}
+      : { operationId: request.operationId }),
     decision
   };
 }

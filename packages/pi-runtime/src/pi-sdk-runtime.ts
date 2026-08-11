@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getAgentDir, VERSION } from "@earendil-works/pi-coding-agent";
 import {
   type ApprovalMode, type ApprovalResolution, type ApprovalResponseDecision,
@@ -9,7 +10,12 @@ import {
   type SessionSnapshot, type SessionTreeProjection,
   type SessionInteractionMode,
   type PlanImplementationRequestLineage,
-  type TaskToolMode, type ToolExecutionView, type WorkspaceTrust
+  type TaskToolMode,
+  type ToolExecutionView,
+  type WorkspaceTrust,
+  type NativeSubagentMode,
+  type NativeSubagentView,
+  type NativeSubagentWaitResult
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
   PromptAttachmentRef, RuntimeDiagnostics, StreamDelta } from "@pi67/protocol";
@@ -35,11 +41,15 @@ import { RuntimePromptAttachments } from "./runtime-prompt-attachments.js";
 import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js";
 import { ToolAuthorizationTracker } from "./tool-authorization-tracker.js";
 import { PiSdkRuntimeSessionLifecycle } from "./pi-sdk-runtime-session-lifecycle.js";
+import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
+import { NativeSubagentAdmission } from "./native-subagent-admission.js";
 
 export interface PiSdkRuntimeOptions {
   workspaceServices?: PiWorkspaceRuntimeServices;
   runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
   promptAttachmentAccess?: PromptAttachmentAccess;
+  subagentAdmission?: NativeSubagentAdmission;
+  subagentParentKey?: string;
 }
 
 export class PiSdkRuntime implements AgentRuntime {
@@ -64,6 +74,7 @@ export class PiSdkRuntime implements AgentRuntime {
   private readonly sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
   private readonly sessionTransitions: RuntimeSessionTransitions;
   private readonly sessionLifecycle: PiSdkRuntimeSessionLifecycle;
+  private readonly subagents: NativeSubagentCoordinator;
   private uiBridge: ReturnType<typeof createSessionExtensionUiBridge>;
 
   constructor(options: PiSdkRuntimeOptions = {}) {
@@ -93,6 +104,16 @@ export class PiSdkRuntime implements AgentRuntime {
       pushStream: (delta) => this.streamBatcher.push(delta),
       flushStream: () => this.streamBatcher.flush()
     });
+    this.subagents = new NativeSubagentCoordinator({
+      admission: options.subagentAdmission ?? new NativeSubagentAdmission(),
+      parentKey: options.subagentParentKey ?? `runtime-${randomUUID()}`,
+      getAgentDir: () => this.agentDir,
+      createSession: (input) => this.sessionBindings.createSubagentSession(input),
+      emit: (item, reason) => this.emit({
+        type: "subagent.changed",
+        payload: { item, reason }
+      })
+    });
     this.sessionBindings = new RuntimeSessionBindings({
       cancelInteractiveRequests: (reason) => { this.uiBridge.cancelAll(reason); },
       emit: (event) => this.emit(event),
@@ -111,13 +132,17 @@ export class PiSdkRuntime implements AgentRuntime {
         );
         await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
       },
+      bindChildExtensionUi: async (session) => {
+        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
+      },
       requestApproval: (request, options) => this.uiBridge.requestApproval(request, options),
       recordToolAuthorization: (toolCallId, reason) => {
         this.toolAuthorizations.record(toolCallId, reason);
         const authorization = this.toolAuthorizations.get(toolCallId);
         if (authorization) this.projections.recordToolAuthorization(toolCallId, authorization);
       },
-      setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd)
+      setSessionCwd: (cwd) => this.toolSafety.setCwd(cwd),
+      subagents: this.subagents
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,
@@ -203,6 +228,7 @@ export class PiSdkRuntime implements AgentRuntime {
   async dispose(): Promise<void> {
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
+    await this.subagents.dispose();
     await this.configurationReload.dispose();
     await this.sessionBindings.settleAndDispose();
     await this.sessionCatalog.dispose();
@@ -225,6 +251,21 @@ export class PiSdkRuntime implements AgentRuntime {
   setTaskToolMode(mode: TaskToolMode): TaskToolMode { return this.toolSafety.setTaskToolMode(mode); }
   async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
     return this.configurationReload.request(revision);
+  }
+
+  listSubagents(): NativeSubagentView[] { return this.subagents.list(); }
+  getSubagentStatus(id: string): NativeSubagentView { return this.subagents.status(id); }
+  waitForSubagents(
+    ids: readonly string[],
+    mode: "first" | "all",
+    timeoutMs: number
+  ): Promise<NativeSubagentWaitResult> { return this.subagents.wait(ids, mode, timeoutMs); }
+  steerSubagent(id: string, text: string): Promise<NativeSubagentView> {
+    return this.subagents.steer(id, text);
+  }
+  stopSubagent(id: string): Promise<NativeSubagentView> { return this.subagents.stop(id); }
+  resumeSubagent(id: string, mode?: NativeSubagentMode): Promise<NativeSubagentView> {
+    return this.subagents.resume(id, mode);
   }
 
   querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage> { return this.sessionCatalog.query(query); }
@@ -403,6 +444,9 @@ export class PiSdkRuntime implements AgentRuntime {
     decision: ApprovalResponseDecision
   ): ApprovalResolution {
     return this.toolSafety.resolveApproval(this.uiBridge, requestId, toolCallId, decision);
+  }
+  hasPendingSubagentApproval(requestId: string, toolCallId: string): boolean {
+    return this.uiBridge.hasPendingSubagentApproval(requestId, toolCallId);
   }
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[] { return this.uiBridge.cancelAll(reason); }
 

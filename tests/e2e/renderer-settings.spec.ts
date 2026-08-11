@@ -11,32 +11,23 @@ import {
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
 import { openPackageSettings, packageEntry } from "./pi67-renderer-package-settings-fixture.js";
 
-test("asks once before installing observational memory on a fresh profile", async ({ page }) => {
+test("does not prompt-install Desktop-managed observational memory", async ({ page }) => {
   await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await setMockAgentResponseResult(page, "extension.package.onboarding.get", {
-    source: "npm:pi-observational-memory",
-    scope: "global",
-    state: "unseen"
-  });
+  await clearRecordedCommands(page);
   await page.getByRole("button", { name: "帮助与设置" }).click();
   await page.getByRole("menuitem", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "扩展", exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: "安装会话观察记忆扩展" });
-  await expect(dialog.getByRole("heading", { name: "安装 pi-observational-memory？" })).toBeVisible();
-  await expect(dialog.getByText("不会静默下载", { exact: false })).toBeVisible();
-  await clearRecordedCommands(page);
-  await dialog.getByRole("button", { name: "暂不安装" }).click();
-
-  await expect.poll(async () => (await recordedCommandDetails(page)).map((command) => command.type))
-    .toContain("extension.package.onboarding.decline");
+  await expect(page.getByTestId("extension-management-workspace")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "安装会话观察记忆扩展" })).toHaveCount(0);
   expect((await recordedCommandDetails(page)).some((command) => (
-    command.type === "extension.package.install"
+    command.type === "extension.package.onboarding.get"
+    || command.type === "extension.package.onboarding.decline"
+    || command.type === "extension.package.install"
   ))).toBe(false);
-  await expect(dialog).toHaveCount(0);
 });
 
 test("lists package sources and keeps update eligibility bounded to npm and git", async ({ page }) => {
@@ -301,17 +292,24 @@ test("uses one extension package workbench for third-party installed and discove
   await expect(workspace.getByRole("list", { name: "已安装扩展包" }).getByText("第三方扩展包", { exact: true })).toBeVisible();
   await expect(workspace.getByText("随应用提供", { exact: true })).toHaveCount(0);
   await expect(workspace.getByText("已停用", { exact: true }).first()).toBeVisible();
-  await expect(workspace.getByText("部分启用", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("原生替代", { exact: true })).toBeVisible();
   await workspace.getByRole("button", { name: /pi-subagents，npm:pi-subagents · 全局/u }).click();
+  await expect(workspace.getByText("原生能力替代", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。", { exact: true }))
+    .toBeVisible();
+  await expect(workspace.getByText("由 Pi-67 原生子代理替代", { exact: true })).toBeVisible();
+  await expect(workspace.getByText(/现有用户配置保持不变，但 Desktop Task 不再加载该扩展/u)).toBeVisible();
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("技能");
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("提示词模板");
-  await expect(workspace.getByRole("button", { name: "启用 技能 npm:pi-subagents" })).toBeVisible();
+  await expect(workspace.getByRole("button", { name: "启用 技能 npm:pi-subagents" })).toBeDisabled();
   await workspace.getByRole("button", { name: "返回扩展包列表" }).click();
 
   await tabs.getByRole("tab", { name: /发现/u }).click();
   await expect(workspace.getByRole("heading", { name: "推荐扩展包" })).toBeVisible();
-  await expect(workspace.getByText("npm:pi-subagents", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("pi-rewind", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("https://github.com/arpagon/pi-rewind.git", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("npm:pi-subagents", { exact: true })).toHaveCount(0);
 
   await expect(tabs.getByRole("tab", { name: /当前会话/u })).toHaveCount(0);
 });
@@ -352,8 +350,10 @@ test("keeps a dense resource-package catalog in the shared document scroll and e
   await workspace.getByRole("button", { name: "pi-subagents，npm:pi-subagents · 全局" }).click();
   await expect(list).toBeHidden();
   await expect(detail).toBeVisible();
-  await expect(workspace.getByText("将任务委派给子代理，支持任务链、并行执行和交互式澄清。"))
+  await expect(workspace.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。"))
     .toBeVisible();
+  await expect(workspace.getByText("原生能力替代", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("由 Pi-67 原生子代理替代", { exact: true })).toBeVisible();
   await expect(workspace.getByText("Pi extension for delegating tasks", { exact: false })).toHaveCount(0);
   await expect(workspace.getByText("1.0.0", { exact: true })).toBeVisible();
   await expect(workspace.getByLabel("扩展包提供的资源类型")).toContainText("扩展");

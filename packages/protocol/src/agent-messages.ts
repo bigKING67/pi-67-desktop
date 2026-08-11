@@ -40,7 +40,10 @@ import type {
   WorkspaceMessageSearchResult,
   UsageReport,
   UsageWindow,
-  WorkspaceTrust
+  WorkspaceTrust,
+  NativeSubagentMode,
+  NativeSubagentView,
+  NativeSubagentWaitResult
 } from "@pi67/domain";
 import type {
   ConversationOrganizationCommandPayloads,
@@ -238,6 +241,12 @@ export interface CommandPayloads extends
   "workspace.changes": Record<string, never>;
   "task.close": { mode: "stop" | "dispose" };
   "task.toolMode.set": { mode: TaskToolMode };
+  "subagent.list": Record<string, never>;
+  "subagent.status": { id: string };
+  "subagent.wait": { ids: string[]; mode?: "first" | "all"; timeoutMs?: number };
+  "subagent.steer": { id: string; text: string };
+  "subagent.stop": { id: string };
+  "subagent.resume": { id: string; mode?: NativeSubagentMode };
   "session.catalog.query": SessionCatalogQuery;
   "session.catalog.contentSearch": { query: string };
   "workspace.usage.report": { window: UsageWindow };
@@ -332,7 +341,7 @@ export interface CommandPayloads extends
     toolCallId: string;
     sessionId: string;
     sessionGeneration: number;
-    operationId: string;
+    operationId?: string;
     decision: ApprovalResponseDecision;
   };
   "diagnostics.collect": Record<string, never>;
@@ -354,6 +363,12 @@ export interface CommandResults extends
   "workspace.changes": WorkspaceChangesProjection;
   "task.close": TaskCloseResult;
   "task.toolMode.set": { mode: TaskToolMode };
+  "subagent.list": { items: NativeSubagentView[] };
+  "subagent.status": NativeSubagentView;
+  "subagent.wait": NativeSubagentWaitResult;
+  "subagent.steer": NativeSubagentView;
+  "subagent.stop": NativeSubagentView;
+  "subagent.resume": NativeSubagentView;
   "session.catalog.query": SessionCatalogPageResult;
   "session.catalog.contentSearch": WorkspaceMessageSearchResult;
   "workspace.usage.report": UsageReport;

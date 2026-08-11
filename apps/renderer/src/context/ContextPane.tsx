@@ -1,10 +1,11 @@
-import { FilePenLine, Files, Gauge, MessagesSquare } from "lucide-react";
+import { Bot, FilePenLine, Files, Gauge, MessagesSquare } from "lucide-react";
 import { Tab, TabList, TabPanel, Tabs } from "react-aria-components";
 import { ChangesPanel } from "../changes/ChangesPanel.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { FilesPanel } from "./FilesPanel.js";
 import { MessagesPanel } from "./MessagesPanel.js";
 import { RuntimeContextPanel } from "./RuntimeContextPanel.js";
+import { SubagentsPanel } from "../subagents/SubagentsPanel.js";
 
 export function ContextPane() {
   const selectedTab = useShellStore((state) => state.contextTab);
@@ -17,6 +18,7 @@ export function ContextPane() {
           <Tab id="files"><Files size={14} />文件</Tab>
           <Tab id="changes"><FilePenLine size={14} />修改</Tab>
           <Tab id="messages"><MessagesSquare size={14} />消息</Tab>
+          <Tab id="agents"><Bot size={14} />代理</Tab>
           <Tab id="context"><Gauge size={14} />上下文</Tab>
         </TabList>
         <TabPanel id="files" className="context-panel inspector-files-panel">
@@ -27,6 +29,9 @@ export function ContextPane() {
         </TabPanel>
         <TabPanel id="messages" className="context-panel inspector-messages-panel">
           <MessagesPanel />
+        </TabPanel>
+        <TabPanel id="agents" className="context-panel inspector-agents-panel">
+          <SubagentsPanel />
         </TabPanel>
         <TabPanel id="context" className="context-panel">
           <RuntimeContextPanel />

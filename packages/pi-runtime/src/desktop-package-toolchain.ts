@@ -22,6 +22,11 @@ const PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS = [
   "-extensions/xtalpi-pi-tools/index.ts"
 ] as const;
 
+const DESKTOP_MANAGED_NPM_SOURCES = new Set([
+  "npm:pi-mcp-adapter",
+  "npm:pi-observational-memory"
+]);
+
 export interface DesktopPackageToolchain {
   readonly desktop: boolean;
   readonly packaged: boolean;
@@ -84,9 +89,9 @@ export function applyDesktopPackageToolchain(
       { recoverable: false, details: { packaged: toolchain.packaged } }
     );
   }
-  const packages = withoutNativeReplacedPackages(
+  const packages = withoutManagedNpmPackageSources(withoutNativeReplacedPackages(
     desktopCapabilityPackages(settingsManager.getPackages(), environment)
-  );
+  ), environment);
   settingsManager.applyOverrides({
     npmCommand: [toolchain.nodeExecutable, toolchain.npmCli],
     ...(packages.length === 0 ? {} : { packages })
@@ -158,7 +163,7 @@ export function createDesktopPackageSettingsView(
           return {
             ...settings,
             packages: runtimeAdmittedPackages(
-              withoutNativeReplacedPackages(settings.packages ?? []),
+              withoutManagedNpmPackageSources(withoutNativeReplacedPackages(settings.packages ?? []), environment),
               "project",
               trustRegistry
             )
@@ -166,7 +171,10 @@ export function createDesktopPackageSettingsView(
         };
       }
       if (property === "getPackages") {
-        return () => withoutNativeReplacedPackages(target.getPackages()).filter((entry) => {
+        return () => withoutManagedNpmPackageSources(
+          withoutNativeReplacedPackages(target.getPackages()),
+          environment
+        ).filter((entry) => {
           const source = typeof entry === "string" ? entry : entry.source;
           return trustRegistry === undefined
             || trustRegistry.runtimePackageAllowed(source, "global")
@@ -189,6 +197,60 @@ function withoutNativeReplacedPackages(configured: PackageSource[]): PackageSour
     const source = typeof entry === "string" ? entry : entry.source;
     return nativeCapabilityReplacement(source) === undefined;
   });
+}
+
+function withoutManagedNpmPackageSources(
+  configured: PackageSource[],
+  environment: NodeJS.ProcessEnv
+): PackageSource[] {
+  const active = activeManagedNpmPackageIds(environment);
+  if (active.size === 0) return configured;
+  return configured.filter((entry) => {
+    const source = typeof entry === "string" ? entry : entry.source;
+    const normalized = source.trim().replace(/@(?:\^|~)?\d[^/]*$/u, "");
+    return !DESKTOP_MANAGED_NPM_SOURCES.has(normalized) || !active.has(normalized.slice("npm:".length));
+  });
+}
+
+export function managedDesktopExtensionPaths(
+  environment: NodeJS.ProcessEnv = process.env
+): string[] {
+  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
+  const serialized = nonEmpty(environment.PI67_MANAGED_EXTENSION_PATHS);
+  if (!serialized) return [];
+  if (!managedRoot || !isAbsolute(managedRoot)) {
+    throw new RuntimeError(
+      "TOOLCHAIN_INTEGRITY_FAILED",
+      "Pi-67 Desktop managed Extension root is unavailable.",
+      { recoverable: false }
+    );
+  }
+  let candidates: unknown;
+  try {
+    candidates = JSON.parse(serialized) as unknown;
+  } catch {
+    throw new RuntimeError(
+      "TOOLCHAIN_INTEGRITY_FAILED",
+      "Pi-67 Desktop managed Extension paths are malformed.",
+      { recoverable: false }
+    );
+  }
+  if (
+    !Array.isArray(candidates)
+    || candidates.length > 16
+    || candidates.some((path) => (
+      typeof path !== "string"
+      || path.length > 4_096
+      || !isContainedAbsolutePath(path, managedRoot)
+    ))
+  ) {
+    throw new RuntimeError(
+      "TOOLCHAIN_INTEGRITY_FAILED",
+      "Pi-67 Desktop managed Extension paths escaped their verified root.",
+      { recoverable: false }
+    );
+  }
+  return [...new Set(candidates)];
 }
 
 function runtimeAdmittedPackages(
@@ -238,7 +300,10 @@ function desktopCapabilityPackages(
   const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
   const serialized = nonEmpty(environment.PI67_CAPABILITY_PACKAGE_PATHS);
   if (!managedRoot || !isAbsolute(managedRoot)) return configured;
-  const userConfigured = withoutDesktopCapabilityPackages(configured, environment);
+  const userConfigured = withoutManagedNpmPackageSources(
+    withoutDesktopCapabilityPackages(configured, environment),
+    environment
+  );
   if (!serialized) return userConfigured;
   let candidates: unknown;
   try {
@@ -267,6 +332,25 @@ function desktopCapabilityPackages(
     if (!configuredSources.has(path)) result.push(path);
   }
   return result;
+}
+
+function activeManagedNpmPackageIds(environment: NodeJS.ProcessEnv): Set<string> {
+  const root = nonEmpty(environment.PI67_MANAGED_NPM_ROOT);
+  const serialized = nonEmpty(environment.PI67_CAPABILITY_PACKAGE_PATHS);
+  if (!root || !serialized || !isAbsolute(root)) return new Set();
+  let candidates: unknown;
+  try {
+    candidates = JSON.parse(serialized) as unknown;
+  } catch {
+    return new Set();
+  }
+  if (!Array.isArray(candidates)) return new Set();
+  const packageRoot = join(root, "packages");
+  return new Set(candidates.flatMap((candidate) => {
+    if (typeof candidate !== "string" || !isContainedAbsolutePath(candidate, packageRoot)) return [];
+    const fromRoot = relative(resolve(packageRoot), resolve(candidate));
+    return fromRoot !== "" && !fromRoot.includes(sep) ? [fromRoot] : [];
+  }));
 }
 
 function withoutDesktopCapabilityPackages(

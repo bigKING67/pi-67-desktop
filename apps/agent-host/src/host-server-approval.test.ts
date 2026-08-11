@@ -52,6 +52,7 @@ describe("AgentHostServer safety approval", () => {
       },
       getIdentity: () => ({ sessionId: "session-approval", sessionFileIdentity: "session-file-session-approval", sessionGeneration: 7 }),
       getTaskToolMode: () => "auto",
+      getModels: () => [],
       submitPrompt: () => new Promise<void>((resolve) => {
         finishPrompt = resolve;
         emit?.({
@@ -205,6 +206,96 @@ describe("AgentHostServer safety approval", () => {
 
     expect(resolveApproval).toHaveBeenCalledWith("approval-without-operation", "tool-call-idle", "deny");
     expect(port.sent.some((value) => isEventEnvelope(value) && value.type === "approval.requested")).toBe(false);
+    await server.shutdown();
+  });
+
+  it("routes a background child approval with Session authority and no parent operation", async () => {
+    let emit: ((event: AgentEvent) => void) | undefined;
+    const resolveApproval = vi.fn(() => ({ resolved: true, taskToolMode: "auto" as const }));
+    const runtime = {
+      getSdkVersion: () => "0.81.1",
+      subscribe: (listener: (event: AgentEvent) => void) => {
+        emit = listener;
+        return () => undefined;
+      },
+      getIdentity: () => ({
+        sessionId: "session-child-approval",
+        sessionFileIdentity: "session-file-child-approval",
+        sessionGeneration: 4
+      }),
+      getTaskToolMode: () => "auto",
+      getModels: () => [],
+      hasPendingSubagentApproval: (requestId: string, toolCallId: string) => (
+        requestId === "approval-child-1" && toolCallId === "tool-child-1"
+      ),
+      resolveApproval,
+      cancelInteractiveRequests: () => [],
+      dispose: async () => undefined
+    } as unknown as AgentRuntime;
+    const server = new AgentHostServer(async () => runtime);
+    const port = new FakePort();
+    server.attachPort(port, { appInstanceId: "app-child", hostInstanceId: "host-child", hostEpoch: 6 });
+    handshake(port, "app-child");
+    await vi.waitFor(() => expect(port.sent.some(isHostWelcome)).toBe(true));
+
+    const loadTask = commandEnvelope("model.list", {}, 6);
+    port.emitMessage(loadTask);
+    await expectResponse(port, loadTask.requestId, { ok: true, result: [] });
+
+    emit?.({
+      type: "approval.requested",
+      payload: {
+        requestId: "approval-child-1",
+        toolCallId: "tool-child-1",
+        toolName: "bash",
+        toolSource: "Pi 内置",
+        category: "ambiguous-command",
+        reason: "执行无法安全分类的命令",
+        targetKind: "command",
+        target: "pwd",
+        targetTruncated: false,
+        cwd: "/workspace",
+        cwdTruncated: false,
+        scope: "single-tool-call",
+        subagent: {
+          runId: "run-child-1",
+          childId: "child-1",
+          activationId: "activation-1",
+          depth: 1,
+          role: "worker"
+        }
+      }
+    });
+
+    expect(resolveApproval).not.toHaveBeenCalled();
+    const approval = await waitForEvent(port, "approval.requested");
+    expect(approval).toMatchObject({
+      context: {
+        scope: "task",
+        sessionId: "session-child-approval",
+        sessionGeneration: 4
+      },
+      payload: {
+        requestId: "approval-child-1",
+        sessionId: "session-child-approval",
+        sessionGeneration: 4,
+        subagent: { runId: "run-child-1", childId: "child-1" }
+      }
+    });
+    if (approval.context.scope !== "task") throw new Error("Expected Task authority.");
+    expect(approval.context.operationId).toBeUndefined();
+    expect(approval.payload.operationId).toBeUndefined();
+
+    const response = commandEnvelope("approval.respond", {
+      requestId: "approval-child-1",
+      toolCallId: "tool-child-1",
+      sessionId: "session-child-approval",
+      sessionGeneration: 4,
+      decision: "allow-once"
+    }, 6);
+    port.emitMessage(response);
+    await expectResponse(port, response.requestId, { ok: true, result: { resolved: true } });
+    expect(resolveApproval).toHaveBeenCalledWith("approval-child-1", "tool-child-1", "allow-once");
     await server.shutdown();
   });
 

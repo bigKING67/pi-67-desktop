@@ -114,6 +114,11 @@ spacing, component states, and motion as `DESIGN.md`.
   theme-specific information architecture. `第 N 轮`/`当前操作` grouping and
   `未查看`/`已查看` state remain readable by text and luminance rather than hue; a
   revision returning to unread never becomes a glowing attention badge.
+- The Agents Inspector uses the same neutral list/card hierarchy and semantic state
+  roles as light mode. Running, completed, failed, interrupted, and stopped children
+  remain distinguishable by text as well as the small state mark; nested lineage,
+  model/usage metadata, result, error, and steer controls never become glowing badges
+  or a second Transcript surface.
 - A reviewable Diff line uses one quiet selected-row luminance plus the existing
   focus ring; added/removed foreground contrast remains readable underneath it.
   `Reviewed`, pending comments, stale comment chips, disabled non-mappable review,

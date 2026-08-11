@@ -7,6 +7,7 @@ const MAX_CAPABILITY_PACKAGES = 32;
 interface CapabilityManifestPackage {
   id: string;
   treeSha256: string;
+  includeNodeModules: boolean;
 }
 
 export interface CapabilityManifest {
@@ -44,8 +45,17 @@ export function parseCapabilityManifest(value: unknown): CapabilityManifest | un
   if (!Array.isArray(value.packages) || value.packages.length > MAX_CAPABILITY_PACKAGES) return undefined;
   const packages: CapabilityManifestPackage[] = [];
   for (const item of value.packages) {
-    if (!isRecord(item) || !isId(item.id) || !isSha256(item.treeSha256)) return undefined;
-    packages.push({ id: item.id, treeSha256: item.treeSha256 });
+    if (
+      !isRecord(item)
+      || !isId(item.id)
+      || !isSha256(item.treeSha256)
+      || (item.includeNodeModules !== undefined && typeof item.includeNodeModules !== "boolean")
+    ) return undefined;
+    packages.push({
+      id: item.id,
+      treeSha256: item.treeSha256,
+      includeNodeModules: item.includeNodeModules === true
+    });
   }
   if (new Set(packages.map((entry) => entry.id)).size !== packages.length) return undefined;
   return { schema: MANIFEST_SCHEMA, catalogVersion: value.catalogVersion, packages };

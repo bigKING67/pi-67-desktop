@@ -80,6 +80,7 @@ export function handleAgentEvent<TState extends AppEventState>(
       publishNotification({ level: "info", title: "Pi 资源已重新加载", toast: false });
       return true;
     case "task.toolMode.changed":
+    case "subagent.changed":
       return true;
     default:
       assertNever(event);
@@ -118,6 +119,7 @@ function requiresSessionAuthority(type: RoutedAgentEvent["type"]): boolean {
     case "extension.compatibilityChanged":
     case "session.externalChangeDetected":
     case "resource.changed":
+    case "subagent.changed":
       return true;
     default:
       return false;

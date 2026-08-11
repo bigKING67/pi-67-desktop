@@ -76,6 +76,30 @@ describe("approvalResponsePayload", () => {
     expect(approvalResponsePayload({ ...state, operation: { ...operation, operationId: "operation-2" } }, request, "allow-once")).toBeUndefined();
     expect(approvalResponsePayload(state, requestWithoutOperation, "allow-once")).toBeUndefined();
   });
+
+  it("binds a child approval to Session authority without borrowing a parent operation", () => {
+    const childRequest: ApprovalRequestView = {
+      ...request,
+      operationId: "unrelated-parent-operation",
+      subagent: {
+        runId: "run-1",
+        childId: "child-1",
+        activationId: "activation-1",
+        depth: 1,
+        role: "worker"
+      }
+    };
+
+    expect(approvalResponsePayload(state, childRequest, "allow-once")).toEqual({
+      requestId: "approval-1",
+      toolCallId: "tool-1",
+      sessionId: "session-1",
+      sessionGeneration: 3,
+      decision: "allow-once"
+    });
+    expect(approvalResponsePayload({ ...state, hostEpoch: 10 }, childRequest, "allow-once"))
+      .toBeUndefined();
+  });
 });
 
 function installSession(sessionGeneration: number): void {

@@ -1,4 +1,4 @@
-import type { RuntimeStatus } from "@pi67/domain";
+import type { NativeSubagentView, RuntimeStatus } from "@pi67/domain";
 import {
   eventEnvelope
 } from "@pi67/protocol";
@@ -8,6 +8,7 @@ import {
   conversationNeedsAttention,
   useConversationAttentionStore
 } from "../navigation/conversation-attention-store.js";
+import { useSubagentStore } from "../subagents/subagent-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 import {
   openActiveProvisionalTask,
@@ -24,6 +25,7 @@ describe("workbench event routing", () => {
   beforeEach(() => {
     rendererWorkbenchStore.getState().reset();
     useConversationAttentionStore.getState().reset();
+    useSubagentStore.setState(useSubagentStore.getInitialState(), true);
   });
 
   it("updates a background task without making its projection active", () => {
@@ -172,6 +174,67 @@ describe("workbench event routing", () => {
     expect(rendererWorkbenchStore.getState().selectedSurface).toMatchObject({
       conversation: { sessionPath: "/sessions/active.jsonl" }
     });
+  });
+
+  it("routes child lifecycle events to the exact background Task roster", () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.registerWorkspace({
+      id: "workspace-a",
+      displayName: "A",
+      identity: { canonicalPath: "/work/a", assurance: "filesystem" },
+      trust: "trusted",
+      trustProvenance: "native-picker",
+      availability: "available"
+    });
+    workbench.openTask(task("active"));
+    workbench.openTask(task("background"));
+    workbench.selectTask("active");
+    const item = subagentView("completed");
+    const payload = { item, reason: "completed" as const };
+
+    expect(routeWorkbenchAgentEvent(
+      { type: "subagent.changed", payload },
+      eventEnvelope("subagent.changed", payload, taskEventFixture({
+        hostEpoch: 9,
+        sequence: 4,
+        workspaceId: "workspace-a",
+        taskId: "background",
+        taskGeneration: 1,
+        sessionId: "session-background",
+        sessionGeneration: 2
+      }))
+    )).toBe("background");
+
+    expect(useSubagentStore.getState().byTaskId.background).toEqual({
+      sessionId: "session-background",
+      sessionGeneration: 2,
+      items: [item]
+    });
+    expect(conversationNeedsAttention(
+      useConversationAttentionStore.getState(),
+      "workspace-a",
+      "session-file-session-background"
+    )).toBe(true);
+    expect(useSubagentStore.getState().byTaskId.active).toBeUndefined();
+  });
+
+  it("rejects a child lifecycle event from an old Session identity", () => {
+    openActiveTask();
+    const payload = { item: subagentView("running"), reason: "started" as const };
+
+    expect(routeWorkbenchAgentEvent(
+      { type: "subagent.changed", payload },
+      eventEnvelope("subagent.changed", payload, taskEventFixture({
+        hostEpoch: 9,
+        sequence: 4,
+        workspaceId: "workspace-a",
+        taskId: "active",
+        taskGeneration: 1,
+        sessionId: "session-old",
+        sessionGeneration: 1
+      }))
+    )).toBe("stale");
+    expect(useSubagentStore.getState().byTaskId.active).toBeUndefined();
   });
 
   it("rejects a stale task generation", () => {
@@ -333,3 +396,19 @@ describe("workbench event routing", () => {
     });
   });
 });
+
+function subagentView(state: NativeSubagentView["state"]): NativeSubagentView {
+  return {
+    runId: "run-child-1",
+    childId: "child-1",
+    activationId: "activation-1",
+    depth: 1,
+    role: "worker",
+    state,
+    mode: "background",
+    context: "fresh",
+    isolation: "shared",
+    cwd: "/work/a",
+    updatedAt: 10
+  };
+}

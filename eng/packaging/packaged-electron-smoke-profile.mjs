@@ -15,19 +15,33 @@ export async function preparePackagedSmokeProfile({
   const childPidPath = join(userDataDirectory, "child.pid");
   const lifecyclePath = join(userDataDirectory, "lifecycle.txt");
   const packagedCredential = "pi67-packaged-reveal-fixture";
-  const localizedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
+  const packagedExtensionDirectory = join(agentDir, "npm/node_modules/pi67-smoke-extension");
+  const nativeReplacedExtensionDirectory = join(agentDir, "npm/node_modules/pi-subagents");
   const packagedSkillDirectory = join(agentDir, "skills/packaged-skill");
   const packagedPromptDirectory = join(agentDir, "prompts");
   await Promise.all([
-    mkdir(localizedExtensionDirectory, { recursive: true }),
+    mkdir(packagedExtensionDirectory, { recursive: true }),
+    mkdir(nativeReplacedExtensionDirectory, { recursive: true }),
     mkdir(packagedSkillDirectory, { recursive: true }),
     mkdir(packagedPromptDirectory, { recursive: true })
   ]);
   await Promise.all([
     writeFile(join(agentDir, "settings.json"), `${JSON.stringify({
-      packages: ["npm:pi-subagents"]
+      packages: ["npm:pi67-smoke-extension", "npm:pi-subagents"]
     }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
-    writeFile(join(localizedExtensionDirectory, "package.json"), `${JSON.stringify({
+    writeFile(join(packagedExtensionDirectory, "package.json"), `${JSON.stringify({
+      name: "pi67-smoke-extension",
+      version: "0.35.1",
+      description: "Packaged fixture for Desktop extension and resource projection checks.",
+      type: "module",
+      pi: { extensions: ["index.js"] }
+    }, null, 2)}\n`, "utf8"),
+    writeFile(
+      join(packagedExtensionDirectory, "index.js"),
+      "export default function packagedLocalizationFixture() {}\n",
+      "utf8"
+    ),
+    writeFile(join(nativeReplacedExtensionDirectory, "package.json"), `${JSON.stringify({
       name: "pi-subagents",
       version: "0.35.1",
       description: "Pi extension for delegating tasks to subagents with chains, parallel execution, and TUI clarification",
@@ -35,8 +49,8 @@ export async function preparePackagedSmokeProfile({
       pi: { extensions: ["index.js"] }
     }, null, 2)}\n`, "utf8"),
     writeFile(
-      join(localizedExtensionDirectory, "index.js"),
-      "export default function packagedLocalizationFixture() {}\n",
+      join(nativeReplacedExtensionDirectory, "index.js"),
+      "throw new Error('pi-subagents must not load in a Pi-67 Desktop Task');\n",
       "utf8"
     ),
     writeFile(join(packagedSkillDirectory, "SKILL.md"), [

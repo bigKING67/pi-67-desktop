@@ -138,13 +138,24 @@ the only Runtime and behavior specification source.
   as pinned first-party capability snapshots. Desktop materializes verified
   copies under the Pi agent directory, preserves existing Package object filters,
   namespaces managed Rules, and never overwrites an existing global `AGENTS.md`.
-- The default Pi Package set stays minimal: only Pi-67 first-party capability
-  Packages are materialized automatically. Recommended third-party Packages remain
-  user-initiated. `pi-observational-memory@3.0.3` is the sole `prompt-once` option:
-  a truly fresh Agent profile gets one explicit install choice, existing profiles are
-  not interrupted, decline is persisted, and no network request occurs before
-  confirmation. `pi-hy-memory`, `@ff-labs/pi-fff`, and
-  `@victor-software-house/pi-curated-themes` are retired from the default catalog.
+- The default Pi Package set stays bounded. In addition to Pi-67 first-party
+  capability Packages, Desktop ships the complete locked runtime closures for
+  `pi-mcp-adapter@2.11.0` and `pi-observational-memory@3.0.3`; the client never runs
+  npm to activate them. Both are enabled by default from a verified
+  `bundled -> staging -> active` Desktop projection. Observational Memory has a
+  Desktop-owned durable opt-out state, does not rewrite shared Pi settings, and keeps
+  upstream `debugLog=false`; an explicit opt-out UI is not yet a completed surface.
+  Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
+  `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
+  the default catalog.
+- Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
+  in the Pi Agent Profile with the private packaged Node executable. It updates only
+  entries carrying a matching Desktop receipt, fails closed on same-name user-owned
+  entries, invalid JSON, or compare-and-swap conflict, and never runs npm in the
+  packaged client. When the managed browser67 revision or server specification
+  changes, Desktop removes only those two entries from valid `mcp-cache.json`, keeps
+  unrelated cached servers, and records cache invalidation completion before startup
+  proceeds.
 - Settings presents Pi's automatically loaded Markdown instructions as `工作规则`
   in explicit `全局` and `项目` scopes. Global and project `AGENTS.md` rules remain
   primary; inherited rules are visible directly in the project scope. Pi-67 built-in
@@ -866,7 +877,7 @@ the only Runtime and behavior specification source.
   latches the Session read-only, interrupts an active turn, and requires reopen or
   repair before another mutation. The renderer receives only a typed reason and
   recoverability flag, never the Session path.
-- The Inspector has four primary views: `文件`, `修改`, `消息`, and `上下文`. Files is a
+- The Inspector has five primary views: `文件`, `修改`, `消息`, `代理`, and `上下文`. Files is a
   lazy, bounded navigator for the registered trusted Workspace and remains
   available without initializing a Task Runtime. Directory clicks expand in
   place; ordinary file clicks open or focus the file in Pi-67. A compact
@@ -967,6 +978,14 @@ the only Runtime and behavior specification source.
   control entries, and can locate an unloaded message through one bounded
   historical conversation window without transferring the complete JSONL.
   Historical mode is visibly read-only and offers `回到最新消息`.
+- Agents projects the native child roster owned by the current Task and exact
+  Session generation. Each child is an independent Pi JSONL Session, not a Browser
+  Profile and not a top-level Task slot. The bounded roster shows lineage, lifecycle,
+  foreground/background mode, model, reasoning, duration, usage, result, and error,
+  and exposes steer, stop, and resume through the parent Task authority. A Host restart
+  changes any previously live child to `interrupted`; it never claims detached work is
+  still running. Worktree isolation remains explicit and fail-closed until Electron
+  Main authority creates and retains a reviewable Worktree.
 - Active-branch `edit` and `write` facts enrich their matching Tool cards by
   `toolCallId` and feed the Changes view from the same authority-safe projection.
   These facts never claim to be a complete Git or Workspace diff. Session
@@ -974,7 +993,9 @@ the only Runtime and behavior specification source.
   the dedicated `会话分支与回退` dialog opened by `/tree` or the command palette
   rather than appearing as an Inspector tab.
 - Safety approval is a dedicated, fail-closed single-Tool-Call flow bound to
-  Host epoch, session generation, operation, request, and Pi `toolCallId`;
+  Host epoch, session generation, request, and Pi `toolCallId`. Ordinary parent
+  execution also binds the active Operation; a background native child instead
+  binds its explicit child lineage and does not borrow a later parent Operation;
   ordinary Extension confirmation cannot impersonate it. Skill selection and
   model routing do not create a separate authorization step: each actual Tool
   Call is classified at execution time against the current trusted Workspace,

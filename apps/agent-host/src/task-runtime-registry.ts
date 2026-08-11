@@ -1,8 +1,9 @@
-import type {
-  AgentRuntime,
-  PiSdkRuntimeOptions,
-  PiWorkspaceRuntimeServices,
-  RuntimeCredentialOverrideStore
+import {
+  NativeSubagentAdmission,
+  type AgentRuntime,
+  type PiSdkRuntimeOptions,
+  type PiWorkspaceRuntimeServices,
+  type RuntimeCredentialOverrideStore
 } from "@pi67/pi-runtime";
 import type { TaskProtocolContext } from "@pi67/protocol";
 import { HostCommandError } from "./protocol-error.js";
@@ -29,6 +30,7 @@ export interface TaskRuntimeRegistryOptions {
 export class TaskRuntimeRegistry {
   private readonly records = new Map<string, TaskRuntimeRecord>();
   private readonly runtimeOwners = new Map<AgentRuntime, string>();
+  private readonly subagentAdmission = new NativeSubagentAdmission();
 
   constructor(
     private readonly runtimeLoader: TaskRuntimeLoader,
@@ -112,6 +114,8 @@ export class TaskRuntimeRegistry {
     record.workspaceServices = workspaceServices;
     const runtimeOptions: PiSdkRuntimeOptions = {
       runtimeCredentialOverrides: this.runtimeCredentialOverrides,
+      subagentAdmission: this.subagentAdmission,
+      subagentParentKey: record.taskKey,
       ...(this.promptAttachments === undefined
         ? {}
         : { promptAttachmentAccess: this.promptAttachments.forTask(record.taskKey) }),

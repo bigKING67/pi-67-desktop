@@ -132,6 +132,22 @@ export async function dispatchHostCommand(
       });
       return { mode };
     }
+    case "subagent.list":
+      return { items: runtime.listSubagents() };
+    case "subagent.status":
+      return runtime.getSubagentStatus(command.payload.id);
+    case "subagent.wait":
+      return runtime.waitForSubagents(
+        command.payload.ids,
+        command.payload.mode ?? "all",
+        command.payload.timeoutMs ?? 30_000
+      );
+    case "subagent.steer":
+      return runtime.steerSubagent(command.payload.id, command.payload.text);
+    case "subagent.stop":
+      return runtime.stopSubagent(command.payload.id);
+    case "subagent.resume":
+      return runtime.resumeSubagent(command.payload.id, command.payload.mode);
     case "session.catalog.query":
       return runtime.querySessionCatalog(command.payload);
     case "session.tree":
@@ -424,6 +440,12 @@ function assertInteractiveResponseContext(
       }
     );
   }
+
+  if (
+    payload.operationId === undefined
+    && "toolCallId" in payload
+    && runtime.hasPendingSubagentApproval(payload.requestId, payload.toolCallId)
+  ) return;
 
   const activeOperation = operations.activeView();
   if (activeOperation?.operationId !== payload.operationId) {

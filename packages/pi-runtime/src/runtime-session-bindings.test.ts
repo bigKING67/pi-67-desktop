@@ -5,6 +5,8 @@ import { createRuntimeCredentialOverrideStore } from "./runtime-credential-overr
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
+import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
+import { NativeSubagentAdmission } from "./native-subagent-admission.js";
 
 describe("RuntimeSessionBindings", () => {
   it("owns the structured not-ready boundary", () => {
@@ -115,9 +117,17 @@ function createBindings(
     getPromptAttachmentAccess: () => undefined,
     projections: { reset: vi.fn() } as unknown as RuntimeProjectionController,
     rebindExtensionUi: vi.fn(async () => undefined),
+    bindChildExtensionUi: vi.fn(async () => undefined),
     requestApproval: vi.fn(async () => ({ status: "denied" as const })),
     recordToolAuthorization: vi.fn(),
-    setSessionCwd: vi.fn()
+    setSessionCwd: vi.fn(),
+    subagents: new NativeSubagentCoordinator({
+      admission: new NativeSubagentAdmission(),
+      parentKey: "test-parent",
+      getAgentDir: () => "/tmp/pi67-agent",
+      createSession: async () => { throw new Error("unexpected child session"); },
+      emit: vi.fn()
+    })
   });
 }
 

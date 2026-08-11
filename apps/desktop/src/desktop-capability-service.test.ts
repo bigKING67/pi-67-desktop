@@ -57,6 +57,35 @@ describe("Desktop capability service", () => {
     expect(JSON.stringify(prepared)).not.toContain(fixture.agentDir);
   });
 
+  it("uses bundled browser67 dependencies without invoking npm or requiring network settings", async () => {
+    const fixture = await createFixture();
+    await prepareBrowserDependencies(fixture.packageRoot);
+    await fixture.packageNetworkSettings.save({
+      npmMode: "offline",
+      gitMode: "offline",
+      gitMirrors: []
+    });
+    const runNpm = vi.fn(async () => undefined);
+    const runBrowserEntrypointCheck = vi.fn(async () => undefined);
+    const service = new DesktopCapabilityService({
+      ...fixture,
+      runNpm,
+      runBrowserEntrypointCheck,
+      now: () => 124,
+      createToken: () => "bundled"
+    });
+
+    await expect(service.setupBrowser67()).resolves.toMatchObject({
+      integrations: [{
+        dependencyState: "prepared",
+        preparedAt: 124,
+        detail: "内置运行依赖与命令入口已验证；浏览器扩展尚未完成连接。"
+      }]
+    });
+    expect(runNpm).not.toHaveBeenCalled();
+    expect(runBrowserEntrypointCheck).toHaveBeenCalledOnce();
+  });
+
   it("reports missing, malformed, and stale capability metadata without false readiness", async () => {
     const missingState = await createFixture();
     await unlink(join(missingState.agentDir, "desktop-capabilities", "state.json"));

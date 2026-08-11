@@ -199,19 +199,11 @@ export function createMockDesktopCapabilitySnapshot() {
       skills: bundledSkills.slice(6, 8)
     }],
     recommendedExternal: [{
-      id: "pi-subagents",
-      source: "npm:pi-subagents",
-      recommendedVersion: "0.34.0",
+      id: "pi-rewind",
+      source: "https://github.com/arpagon/pi-rewind.git",
+      minimumCommit: "91611ad87992fb7b635a41ba68f67916ff6e6ae3",
       installPolicy: "user-initiated",
-      admissionPolicy: "known-baseline-or-user-approval",
-      baselineContentSha256: "a".repeat(64)
-    }, {
-      id: "pi-observational-memory",
-      source: "npm:pi-observational-memory",
-      recommendedVersion: "3.0.3",
-      installPolicy: "prompt-once",
-      admissionPolicy: "known-baseline-or-user-approval",
-      baselineContentSha256: "b".repeat(64)
+      admissionPolicy: "user-approval"
     }],
     managedContext: { rules: "installed", agents: "user-owned" },
     integrations: [{

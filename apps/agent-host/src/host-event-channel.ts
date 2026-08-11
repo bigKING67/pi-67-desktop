@@ -76,9 +76,11 @@ export class HostEventChannel {
     const runtime = authority.runtime;
     const identity = runtime?.getIdentity() ?? { sessionGeneration: 0 };
     const operations = authority.operations;
+    const subagentApproval = event.type === "approval.requested"
+      && event.payload.subagent !== undefined;
     const operationId = operationIdFor(event)
       ?? this.interactiveOperationIdFor(event, authority.context)
-      ?? operations?.activeAccepted()?.operationId;
+      ?? (subagentApproval ? undefined : operations?.activeAccepted()?.operationId);
     const hostEpoch = this.dependencies.getHostEpoch();
     const protocolContext = enrichTaskContext(
       authority.context,
@@ -90,7 +92,7 @@ export class HostEventChannel {
       && (
         identity.sessionId === undefined
         || identity.sessionFileIdentity === undefined
-        || operationId === undefined
+        || (operationId === undefined && !subagentApproval)
       )
     ) {
       rejectInteractiveRequest(runtime, event);
@@ -217,6 +219,7 @@ function enrichTaskContext(
 
 function updateInteractiveActivity(operations: OperationRegistry | undefined, event: AgentEvent): void {
   if (event.type === "approval.requested") {
+    if (event.payload.subagent !== undefined) return;
     operations?.beginInteractiveWait({ kind: "approval", requestId: event.payload.requestId });
     return;
   }

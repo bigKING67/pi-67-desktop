@@ -24,3 +24,4 @@ export * from "./workspace-file-schemas.js";
 export * from "./worktree-environment.js";
 export * from "./worktree-creation-contract.js";
 export * from "./worktree-creation.js";
+export * from "./native-subagent-schemas.js";

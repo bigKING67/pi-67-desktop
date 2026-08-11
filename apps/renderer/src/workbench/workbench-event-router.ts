@@ -12,6 +12,7 @@ import {
   selectedWorkbenchTask,
   taskForConversation
 } from "./workbench-store.js";
+import { useSubagentStore } from "../subagents/subagent-store.js";
 
 export type WorkbenchEventRoute = "active" | "background" | "stale" | "unscoped";
 
@@ -97,6 +98,7 @@ export function applyWorkbenchAgentEvent(
   switch (event.type) {
     case "runtime.ready":
     case "session.bootstrap": {
+      useSubagentStore.getState().clear(task.id);
       const snapshot = event.payload.snapshot;
       const sessionName = snapshot.sessionName?.trim();
       const sessionAuthority = eventSessionAuthority(envelope);
@@ -134,6 +136,18 @@ export function applyWorkbenchAgentEvent(
     case "task.toolMode.changed":
       workbench.updateTask(task.id, { toolMode: event.payload.mode });
       break;
+    case "subagent.changed": {
+      const authority = eventSessionAuthority(envelope);
+      if (authority) {
+        useSubagentStore.getState().upsert(
+          task.id,
+          authority.sessionId,
+          authority.sessionGeneration,
+          event.payload.item
+        );
+      }
+      break;
+    }
     case "runtime.statusChanged":
       workbench.updateTask(task.id, { runtime: event.payload });
       break;
@@ -213,6 +227,10 @@ function eventRequiresConversationAttention(event: AgentEvent): boolean {
     case "operation.activityChanged":
       return event.payload.activity?.kind === "approval"
         || event.payload.activity?.kind === "extension-input";
+    case "subagent.changed":
+      return event.payload.reason === "completed"
+        || event.payload.reason === "failed"
+        || event.payload.reason === "interrupted";
     default:
       return false;
   }
@@ -254,6 +272,7 @@ function isLiveOperationEvent(type: AgentEvent["type"]): boolean {
 function eventUpdatesWorkbenchTaskSummary(type: AgentEvent["type"]): boolean {
   switch (type) {
     case "task.toolMode.changed":
+    case "subagent.changed":
     case "runtime.statusChanged":
     case "runtime.crashed":
     case "operation.started":

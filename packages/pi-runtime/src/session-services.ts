@@ -4,7 +4,10 @@ import {
   type ModelRuntime,
   type SettingsManager
 } from "@earendil-works/pi-coding-agent";
-import { createDesktopPackageSettingsView } from "./desktop-package-toolchain.js";
+import {
+  createDesktopPackageSettingsView,
+  managedDesktopExtensionPaths
+} from "./desktop-package-toolchain.js";
 import { restoreRuntimeApiKeys } from "./model-control.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import {
@@ -43,6 +46,7 @@ interface DesktopSessionServicesOptions {
   promptAttachmentAccess?: PromptAttachmentAccess;
   packageTrustRegistry?: Pick<PackageTrustRegistry, "refresh" | "runtimePackageAllowed">;
   getInteractionMode?: () => SessionInteractionMode;
+  noThirdPartyExtensions?: boolean;
 }
 
 export async function createDesktopSessionServices(
@@ -68,6 +72,12 @@ export async function createDesktopSessionServices(
     ...(settingsManager === undefined ? {} : { settingsManager }),
     ...(options.modelRuntime === undefined ? {} : { modelRuntime: options.modelRuntime }),
     resourceLoaderOptions: {
+      ...(options.noThirdPartyExtensions
+        ? {
+            noExtensions: true,
+            additionalExtensionPaths: managedDesktopExtensionPaths()
+          }
+        : {}),
       extensionFactories: [
         createDesktopToolRoutingExtension(),
         ...(options.promptAttachmentAccess === undefined

@@ -23,7 +23,11 @@ interface PendingUiRequestBase {
 
 type PendingUiRequest =
   | (PendingUiRequestBase & { purpose: "extension" })
-  | (PendingUiRequestBase & { purpose: "approval"; toolCallId: string });
+  | (PendingUiRequestBase & {
+      purpose: "approval";
+      toolCallId: string;
+      details: ApprovalRequestDetails;
+    });
 
 type EditorFactory = ReturnType<ExtensionUIContext["getEditorComponent"]>;
 
@@ -163,6 +167,13 @@ export class DesktopExtensionUiBridge {
     return pending?.purpose === "approval" && pending.toolCallId === toolCallId;
   }
 
+  hasPendingSubagentApproval(requestId: string, toolCallId: string): boolean {
+    const pending = this.pending.get(requestId);
+    return pending?.purpose === "approval"
+      && pending.toolCallId === toolCallId
+      && pending.details.subagent !== undefined;
+  }
+
   allowAllPendingApprovals(): string[] {
     const resolved: string[] = [];
     for (const [requestId, pending] of this.pending) {
@@ -264,7 +275,12 @@ export class DesktopExtensionUiBridge {
         ...(opts?.signal ? { abort: () => opts.signal?.removeEventListener("abort", abortListener) } : {})
       };
       this.pending.set(requestId, purpose === "approval"
-        ? { ...pendingBase, purpose, toolCallId: (details as ApprovalRequestDetails).toolCallId }
+        ? {
+            ...pendingBase,
+            purpose,
+            toolCallId: (details as ApprovalRequestDetails).toolCallId,
+            details: details as ApprovalRequestDetails
+          }
         : { ...pendingBase, purpose });
       if (purpose === "approval") {
         this.emit({

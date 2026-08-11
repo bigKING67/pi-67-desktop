@@ -1,0 +1,14 @@
+{
+  "name": "@pi67/managed-npm-bundle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build-only dependency closure for Pi-67 Desktop managed Pi extensions.",
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "open": "10.2.0",
+    "recheck": "4.5.0",
+    "typebox": "1.3.7",
+    "zod": "4.4.3"
+  }
+}

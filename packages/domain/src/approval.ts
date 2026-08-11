@@ -1,5 +1,6 @@
 import type { RiskCategory } from "./safety-policy.js";
 import type { TaskToolMode } from "./runtime-state.js";
+import type { NativeSubagentLineage } from "./native-subagent.js";
 
 export type ApprovalTargetKind = "command" | "path" | "tool";
 export type ApprovalResponseDecision = "deny" | "allow-once" | "enable-task-yolo-and-allow";
@@ -21,6 +22,7 @@ export interface ApprovalRequestDetails {
   cwd: string;
   cwdTruncated: boolean;
   scope: "single-tool-call";
+  subagent?: NativeSubagentLineage;
 }
 
 export interface ApprovalRequestView extends ApprovalRequestDetails {

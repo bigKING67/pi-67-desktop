@@ -16,6 +16,7 @@ import {
   assertCapabilitySourceLock,
   treeSha256
 } from "./prepared-capabilities-validation.mjs";
+import { prepareManagedNpmBundles } from "./managed-npm-bundles.mjs";
 import { preparePi67SkillPackOverlay } from "./pi67-skill-pack-overlay.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -23,6 +24,8 @@ const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lo
 const skillSuitesPath = resolve(repositoryRoot, "eng/capabilities/bundled-skill-suites.json");
 const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
 const sourceCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/sources");
+const managedNpmCacheRoot = resolve(repositoryRoot, "artifacts/capabilities/npm-cache");
+const managedNpmProjectRoot = resolve(repositoryRoot, "eng/capabilities/managed-npm");
 const generatedSkillPackRoot = resolve(repositoryRoot, "artifacts/capabilities/generated/skill-packs");
 const toolchainManifestPath = resolve(repositoryRoot, "artifacts/toolchain/current/manifest.json");
 const execFileAsync = promisify(execFile);
@@ -93,6 +96,12 @@ export async function prepareDesktopCapabilities() {
     ...skillPackOverlays.map(({ sourceRoot: _sourceRoot, skills: _skills, ...pack }) => pack)
   ].sort((left, right) => left.name.localeCompare(right.name));
   const bundledSkillSuites = compileBundledSkillSuites(skillSuiteDefinition, entries, { skillPacks });
+  const managedNpmBundle = await prepareManagedNpmBundles({
+    lock,
+    outputRoot,
+    projectRoot: managedNpmProjectRoot,
+    cacheRoot: managedNpmCacheRoot
+  });
 
   const catalog = {
     schema: "pi67.capability-catalog.v1",
@@ -100,6 +109,7 @@ export async function prepareDesktopCapabilities() {
     generatedFrom: entries.map(({ packagePath: _packagePath, resourceTypes: _resourceTypes, ...entry }) => entry),
     entries,
     bundledSkillSuites,
+    managedNpmBundles: managedNpmBundle.packages,
     recommendedExternal: lock.recommendedExternal
   };
   const manifest = {
@@ -107,8 +117,14 @@ export async function prepareDesktopCapabilities() {
     catalogVersion: lock.catalogVersion,
     packages: await Promise.all(entries.map(async (entry) => ({
       id: entry.id,
-      treeSha256: await treeSha256(join(outputRoot, entry.packagePath))
-    })))
+      treeSha256: await treeSha256(join(outputRoot, entry.packagePath)),
+      ...(entry.id === "browser67" ? { includeNodeModules: true } : {})
+    }))),
+    managedNpmBundle: {
+      treeSha256: managedNpmBundle.treeSha256,
+      platform: managedNpmBundle.platform,
+      architecture: managedNpmBundle.architecture
+    }
   };
   assertCapabilitiesMetadata(lock, catalog, manifest);
   await writeFile(join(outputRoot, "catalog.json"), `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
@@ -211,6 +227,19 @@ async function prepareBrowser67(sourceRoot, source) {
     ...packageManifest,
     gitHead: source.commit
   }, null, 2)}\n`, "utf8");
+  await execFileAsync(process.platform === "win32" ? "npm.cmd" : "npm", [
+    "ci",
+    "--omit=dev",
+    "--omit=peer",
+    "--ignore-scripts",
+    "--no-audit",
+    "--no-fund",
+    "--no-bin-links"
+  ], {
+    cwd: destination,
+    maxBuffer: 2_000_000,
+    timeout: 5 * 60_000
+  });
   await assertBrowser67PackageEntrypoints(destination);
   const skillPaths = (await readdir(join(destination, "skills"), { withFileTypes: true }))
     .filter((entry) => entry.isDirectory())

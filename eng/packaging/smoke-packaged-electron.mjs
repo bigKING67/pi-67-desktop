@@ -215,15 +215,46 @@ try {
   if (await extensionDetail.isVisible()) {
     throw new Error("Packaged resource detail must not share the Package Catalog surface.");
   }
-  const packagedExtensionRow = extensionList.getByRole("button", { name: /^pi-subagents，/u });
+  const nativeReplacedExtensionRow = extensionList.getByRole("button", { name: /^pi-subagents，/u });
+  const packagedExtensionRow = extensionList.getByRole("button", { name: /^pi67-smoke-extension，/u });
+  await nativeReplacedExtensionRow.waitFor({ state: "visible", timeout: 30_000 });
   await packagedExtensionRow.waitFor({ state: "visible", timeout: 30_000 });
   await capturePackagedScreenshot(window, "04-resource-package-catalog.png");
+  await nativeReplacedExtensionRow.click();
+  await extensionDetail.waitFor({ state: "visible", timeout: 15_000 });
+  await extensionList.waitFor({ state: "hidden", timeout: 15_000 });
+  await extensionDetail.getByText("旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await extensionDetail.getByText("原生能力替代", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await extensionDetail.getByText("由 Pi-67 原生子代理替代", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await extensionDetail.getByText(/现有用户配置保持不变，但 Desktop Task 不再加载该扩展/u)
+    .waitFor({ state: "visible", timeout: 15_000 });
+  if (await extensionDetail.getByText("Pi extension for delegating tasks", { exact: false }).count()) {
+    throw new Error("Packaged native-replaced Extension exposed raw English manifest copy in the Chinese locale.");
+  }
+  const nativeReplacementResourceActions = extensionDetail
+    .getByLabel("资源启用状态")
+    .getByRole("button");
+  const nativeReplacementResourceActionCount = await nativeReplacementResourceActions.count();
+  if (nativeReplacementResourceActionCount === 0) {
+    throw new Error("Packaged native-replaced Extension did not expose its disabled resource state.");
+  }
+  for (let index = 0; index < nativeReplacementResourceActionCount; index += 1) {
+    if (await nativeReplacementResourceActions.nth(index).isEnabled()) {
+      throw new Error("Packaged native-replaced Extension exposed an enabled resource toggle.");
+    }
+  }
+  await capturePackagedScreenshot(window, "05-native-replaced-extension-detail.png");
+  await extensionWorkspace.getByRole("button", { name: "返回扩展包列表" }).click();
+  await extensionList.waitFor({ state: "visible", timeout: 15_000 });
   await packagedExtensionRow.click();
   await extensionDetail.waitFor({ state: "visible", timeout: 15_000 });
   await extensionList.waitFor({ state: "hidden", timeout: 15_000 });
-  await extensionDetail.getByText("将任务委派给子代理，支持任务链、并行执行和交互式澄清。", { exact: true })
+  await extensionDetail.getByText("该扩展的本地包清单提供了功能说明，但暂未收录对应中文文案。可在“当前会话”中查看 Pi Runtime 实际加载的能力。", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await extensionDetail.getByText("Pi extension for delegating tasks", { exact: false }).count()) {
+  if (await extensionDetail.getByText("Packaged fixture for Desktop extension", { exact: false }).count()) {
     throw new Error("Packaged resource detail exposed raw English manifest copy in the Chinese locale.");
   }
   await assertNoWorkspaceChangesAuthorityWarning(window);
@@ -242,8 +273,11 @@ try {
   const localExtensionPanel = extensionSettingsWorkspace.getByRole("tabpanel", { name: "本地扩展", exact: true });
   await localExtensionPanel.getByText("shutdown-fixture.ts", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await localExtensionPanel.getByText("pi-subagents · index.js", { exact: true }).count()) {
+  if (await localExtensionPanel.getByText("pi67-smoke-extension · index.js", { exact: true }).count()) {
     throw new Error("Packaged third-party Extension was duplicated in the local Extension view.");
+  }
+  if (await localExtensionPanel.getByText("pi-subagents · index.js", { exact: true }).count()) {
+    throw new Error("Packaged native-replaced Extension was duplicated in the local Extension view.");
   }
   if (await localExtensionPanel.getByRole("button", { name: /卸载/u }).count()) {
     throw new Error("Packaged local Extension view repeated Package uninstall controls.");
@@ -254,8 +288,11 @@ try {
   const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await globalSkillPanel.getByText("pi-subagents", { exact: true }).count()) {
+  if (await globalSkillPanel.getByText("pi67-smoke-extension", { exact: true }).count()) {
     throw new Error("Packaged global Skill view repeated an Extension-only Package.");
+  }
+  if (await globalSkillPanel.getByText("pi-subagents", { exact: true }).count()) {
+    throw new Error("Packaged global Skill view repeated a native-replaced Extension-only Package.");
   }
   await capturePackagedScreenshot(window, "07-global-skills.png");
   await assertPackagedSkillSuites(
@@ -265,8 +302,11 @@ try {
   await settingsNavigation.getByRole("button", { name: "提示词模板", exact: true }).click();
   await workspaceSettings.getByText("/packaged-review", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
+  if (await workspaceSettings.getByText("pi67-smoke-extension", { exact: true }).count()) {
     throw new Error("Packaged Prompt Template page repeated an Extension-only Package.");
+  }
+  if (await workspaceSettings.getByText("pi-subagents", { exact: true }).count()) {
+    throw new Error("Packaged Prompt Template page repeated a native-replaced Extension-only Package.");
   }
   await capturePackagedScreenshot(window, "08-prompt-template-resources.png");
   await settingsNavigation.getByRole("button", { name: "工作规则", exact: true }).click();

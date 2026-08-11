@@ -18,7 +18,9 @@ import type {
   TaskToolMode,
   ToolExecutionView,
   ApprovalResponseDecision,
-  WorkspaceChangeView
+  WorkspaceChangeView,
+  NativeSubagentChangeReason,
+  NativeSubagentView
 } from "@pi67/domain";
 import type { ProtocolError } from "./protocol-error.js";
 import type { PiProviderConfigurationChanged } from "./provider-configuration-schemas.js";
@@ -90,6 +92,7 @@ export interface EventPayloads {
     mode: TaskToolMode;
     reason: "user-selected" | "approval-enabled-yolo" | "trust-revoked" | "runtime-reset";
   };
+  "subagent.changed": { item: NativeSubagentView; reason: NativeSubagentChangeReason };
   "extension.ui.requested": ExtensionUiRequestView;
   "extension.ui.updated": ExtensionUiRequestView;
   "extension.ui.resolved": { requestId: string; cancelled: boolean };

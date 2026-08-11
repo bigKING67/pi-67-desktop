@@ -52,8 +52,18 @@ const QUERY_COMMANDS = new Set<AgentCommandType>([
   "resource.list",
   "command.list",
   "extension.catalog.list",
+  "subagent.list",
+  "subagent.status",
+  "subagent.wait",
   "diagnostics.collect",
   "doctor.run"
+]);
+
+const NON_BLOCKING_QUERY_COMMANDS = new Set<AgentCommandType>([
+  "runtime.getStatus",
+  "subagent.list",
+  "subagent.status",
+  "subagent.wait"
 ]);
 
 // These queries also refresh authoritative projections. If a refresh arrives
@@ -80,6 +90,9 @@ export function commandClassFor(command: AgentCommand): CommandClass {
     command.type === "operation.abort"
     || command.type === "queue.clear"
     || command.type === "task.toolMode.set"
+    || command.type === "subagent.steer"
+    || command.type === "subagent.stop"
+    || command.type === "subagent.resume"
     || command.type === "approval.respond"
     || command.type === "extension.ui.respond"
   ) return "interrupt";
@@ -129,7 +142,7 @@ export class CommandScheduler {
         }
         return Promise.reject(busy("A session transition is in progress."));
       }
-      return this.runQuery(task, command.type !== "runtime.getStatus");
+      return this.runQuery(task, !NON_BLOCKING_QUERY_COMMANDS.has(command.type));
     }
     if (commandClass === "queue") {
       if (!this.canAcceptQueue()) return Promise.reject(busy("There is no active operation to receive a queued prompt."));

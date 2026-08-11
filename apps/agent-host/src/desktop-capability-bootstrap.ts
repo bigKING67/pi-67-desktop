@@ -82,11 +82,18 @@ export async function bootstrapDesktopCapabilities(
     const integrity = manifestById.get(entry.id)!;
     const source = containedPath(capabilitiesRoot, entry.packagePath, "Capability package path");
     const destination = join(managedRoot, "packages", entry.id);
-    const sourceHash = await capabilityTreeSha256(source);
+    const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
     if (sourceHash !== integrity.treeSha256) {
       throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
     }
-    await replaceDirectoryIfChanged(source, destination, integrity.treeSha256, managedRoot, createToken);
+    await replaceDirectoryIfChanged(
+      source,
+      destination,
+      integrity.treeSha256,
+      managedRoot,
+      createToken,
+      integrity.includeNodeModules
+    );
     bundledPackagePaths.push(destination);
   }
 
@@ -185,9 +192,10 @@ async function replaceDirectoryIfChanged(
   destination: string,
   expectedHash: string,
   containmentRoot: string,
-  createToken: () => string
+  createToken: () => string,
+  includeNodeModules = false
 ): Promise<void> {
-  if (await directoryHashMatches(destination, expectedHash)) return;
+  if (await directoryHashMatches(destination, expectedHash, includeNodeModules)) return;
   await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
   const token = createToken();
   const staging = join(dirname(destination), `.${basename(destination)}.${process.pid}.${token}.staging`);
@@ -198,9 +206,9 @@ async function replaceDirectoryIfChanged(
   let staged = false;
   let backedUp = false;
   try {
-    await copyDirectory(source, staging, source);
+    await copyDirectory(source, staging, source, includeNodeModules);
     staged = true;
-    if (await capabilityTreeSha256(staging) !== expectedHash) {
+    if (await capabilityTreeSha256(staging, includeNodeModules) !== expectedHash) {
       throw new Error("Desktop capability copy failed integrity verification.");
     }
     try {
@@ -227,13 +235,18 @@ async function replaceDirectoryIfChanged(
   }
 }
 
-async function copyDirectory(source: string, destination: string, sourceRoot: string): Promise<void> {
+async function copyDirectory(
+  source: string,
+  destination: string,
+  sourceRoot: string,
+  includeNodeModules: boolean
+): Promise<void> {
   const metadata = await lstat(source);
   if (metadata.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${source}`);
   if (!metadata.isDirectory()) throw new Error(`Desktop capability package must be a directory: ${source}`);
   await mkdir(destination, { recursive: true, mode: 0o700 });
   const entries = (await readdir(source, { withFileTypes: true }))
-    .filter((entry) => entry.name !== ".DS_Store" && entry.name !== "node_modules")
+    .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
     .sort((left, right) => left.name.localeCompare(right.name));
   for (const entry of entries) {
     const input = join(source, entry.name);
@@ -242,7 +255,7 @@ async function copyDirectory(source: string, destination: string, sourceRoot: st
     const child = await lstat(input);
     if (child.isSymbolicLink()) throw new Error(`Desktop capabilities cannot contain symlinks: ${input}`);
     if (child.isDirectory()) {
-      await copyDirectory(input, output, sourceRoot);
+      await copyDirectory(input, output, sourceRoot, includeNodeModules);
     } else if (child.isFile()) {
       await writeFile(output, await readFile(input), { mode: child.mode & 0o111 ? 0o755 : 0o600 });
     } else {
@@ -251,11 +264,11 @@ async function copyDirectory(source: string, destination: string, sourceRoot: st
   }
 }
 
-export async function capabilityTreeSha256(root: string): Promise<string> {
+export async function capabilityTreeSha256(root: string, includeNodeModules = false): Promise<string> {
   const hash = createHash("sha256");
   const visit = async (directory: string): Promise<void> => {
     const entries = (await readdir(directory, { withFileTypes: true }))
-      .filter((entry) => entry.name !== ".DS_Store" && entry.name !== "node_modules")
+      .filter((entry) => entry.name !== ".DS_Store" && (includeNodeModules || entry.name !== "node_modules"))
       .sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const path = join(directory, entry.name);
@@ -277,11 +290,15 @@ export async function capabilityTreeSha256(root: string): Promise<string> {
   return hash.digest("hex");
 }
 
-async function directoryHashMatches(path: string, expected: string): Promise<boolean> {
+async function directoryHashMatches(
+  path: string,
+  expected: string,
+  includeNodeModules: boolean
+): Promise<boolean> {
   try {
     const metadata = await lstat(path);
     return metadata.isDirectory() && !metadata.isSymbolicLink()
-      && await capabilityTreeSha256(path) === expected;
+      && await capabilityTreeSha256(path, includeNodeModules) === expected;
   } catch (error) {
     if (isNodeError(error, "ENOENT")) return false;
     throw error;

@@ -64,7 +64,7 @@ describe("Extension management view model", () => {
 
   it("keeps a multi-resource package in one row with type-scoped states", () => {
     const mixed: ExtensionPackageEntry = {
-      ...packageEntry("npm:pi-subagents", "global", true),
+      ...packageEntry("npm:pi-mixed-resources", "global", true),
       resourceTypes: ["extension", "skill", "prompt"],
       resourceStates: [
         { type: "extension" as const, enabled: true },
@@ -79,6 +79,16 @@ describe("Extension management view model", () => {
     expect(packageRowState(rows[0]!)).toBe("partial");
     expect(packageResourceEnabled(mixed, "extension")).toBe(true);
     expect(packageResourceEnabled(mixed, "skill")).toBe(false);
+  });
+
+  it("keeps native-replaced packages visible without presenting them as enabled", () => {
+    const rows = buildPackageRows([
+      packageEntry("npm:pi-subagents@0.46.0", "global", true)
+    ], [], "global");
+
+    expect(rows).toHaveLength(1);
+    expect(packageRowState(rows[0]!)).toBe("native-replaced");
+    expect(packageRowEnabled(rows[0]!)).toBe(false);
   });
 
   it("does not present unverified or drifted packages as enabled", () => {

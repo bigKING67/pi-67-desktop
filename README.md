@@ -86,12 +86,13 @@ xattr -dr com.apple.quarantine "/Applications/Pi-67 Desktop.app"
 - Composer 非空文本和 `streamBehavior` 由 Electron Main 使用 `safeStorage` 加密持久化；附件 staging handle 不跨重启，安全存储不可用时不写明文
 - 后台/隐藏会话完成、失败或等待交互时可发原生系统通知；Main 使用固定隐私文案，点击按 opaque Workspace/Session identity 返回精确会话，不显示 Prompt、源码、Tool 结果、错误详情或绝对路径
 - 第三方 Pi Package 只有在匹配 Pi-67 已知内容基线，或 Desktop durable 安装/用户确认 receipt 与当前 bounded directory/manifest/content observation 一致时才进入 Runtime；待确认、内容变更、结果不明或检查超限都不会加载，也不会触发 Pi 的隐式安装。确认操作只绑定当前已安装 bytes，不下载、不重装
-- 默认 Package 保持精简：只自动物化第一方 capability；`pi-observational-memory@3.0.3` 仅对 fresh profile 做一次明确安装确认，其余推荐 Package 由用户主动安装。`pi-hy-memory`、`@ff-labs/pi-fff` 和 `@victor-software-house/pi-curated-themes` 已退出默认目录
+- 默认 Package 保持有界：除第一方 capability 外，内置并离线激活完整锁定闭包的 `pi-mcp-adapter@2.11.0` 与 `pi-observational-memory@3.0.3`，客户端不运行 npm；两者默认启用，Observational Memory 预留 Desktop-owned durable opt-out（当前没有完成显式开关 UI），不改共享 Pi settings，也不删除既有 memory 数据
+- `tmwd_browser` 与 `js-reverse` 由 Desktop 使用私有 Node 注册到当前 Pi Agent Profile 的 `mcp.json`；同名用户自定义项不覆盖，browser67 revision/spec 更新时只定向失效这两项 `mcp-cache.json` metadata，不影响其他 MCP server cache
 - Plan Mode 与 Search 已改为 Pi SDK 第一方能力，不依赖 Extension Package。`/plan` 与 `/default` 是 Desktop-owned action；Plan Markdown 以 Pi JSONL 为真源，点击开始执行时 Renderer 只提交 `planId + submissionId`
 - `web_search`、`source_check`、`fetch_content`、`get_search_content` 由 Pi-67 原生注册：Web Search 没有用户开关或持久化偏好，由模型按任务自行决定是否调用；`web_search` 只按所选模型声明的协议原生路由执行。无路由、无凭据或 Provider 请求失败都会显式失败，不切换 Provider，也不回退 Exa、Tavily、MCP 或 Search Extension。UI 的“原生搜索 · 已声明”不是 live verification
 - Desktop 已退休 Team MCP/Tavily Bridge：不再打包资源、提供设置页、保存/显示 Token 或向 Agent Host 注入环境。启动时只移除完全匹配旧 Desktop-owned identity 的 `mcp.json` entry 与旧 userData token；用户自定义或其他 MCP 配置保持不变
 - 内置 `Groland` 是一个 Provider、一个 Credential、七个图片+推理模型：五个 Claude 走 Anthropic Messages/x-api-key，两个 GPT 走 OpenAI Responses/Bearer。DeepSeek 继续走 Pi 官方 Provider，目前仅 `deepseek-v4-flash` 声明原生搜索；它复用同一个 Pi API Key 调用官方 Responses `/responses`，并接收 `in_progress` / `searching` / `completed` 流式搜索状态
-- `@narumitw/pi-plan-mode`、`pi-web-access`、`pi-smart-fetch` 的既有用户配置不会被自动删除或改写，但 Desktop Task 不再加载；Settings 会显示原生替代并保留显式卸载入口
+- `@narumitw/pi-plan-mode`、`pi-web-access`、`pi-smart-fetch`、`pi-subagents` 的既有用户配置不会被自动删除或改写，但 Desktop Task 不再加载；Settings 会显示原生替代并保留显式卸载入口
 - Settings 的 `办公 -> 飞书` 用两个页内 Tab 分开身份流程：`用户授权` 在前并默认选中，负责通过 `lark-cli` Device Flow 登录/重新授权，以访问云空间、日历、消息、任务、邮箱等用户资源；缺少有效应用时会明确引导到第二个 `应用配置` Tab。应用配置支持查看和编辑 App ID，并在当前草稿中显隐核对 App Secret；Agent Host 只通过 stdin 将一次性密钥交给本机 `lark-cli`，保存后 Desktop 不回读或复制明文。`needs_refresh` 表示下一次用户 API 调用会自动续期，不等于必须重新授权。用户 Token 由 `lark-cli` 保存，Device Code 只留在 Agent Host 内存，已保存 App Secret、Token、Device Code、open_id 和完整 scope 不进入 Pi JSONL、持久化、诊断、默认日志或模型上下文。身份显示已连接不代表某个具体飞书 API 已完成实测
 - `known-baseline-observed`、`user-approved-observed` 与 `user-installed-observed` 都不是签名或供应链 provenance；当前内容 hash 排除 `.git`/`node_modules`。Package Worker 只隔离安装/update/uninstall，不隔离第三方 Extension import、hook、Tool、UI 或 MCP child
 - 后续只跟踪 `pi-gui` 与 `t3code` 两个综合参考源。两者的产品、功能、交互、UI、设计、

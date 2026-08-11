@@ -165,8 +165,8 @@ Application-level surfaces use a separate wide-window shell:
 - Navigation and Inspector share `clamp(248px, 18vw, 288px)` on the wide
   three-region layout. Neither side column gains width at the other's expense;
   long names truncate inside the shared measure.
-- The Inspector tab strip uses four equal-width compact actions: `文件`, `修改`,
-  `消息`, and `上下文`. Changes owns one bounded record list plus one independently
+- The Inspector tab strip uses five equal-width compact actions: `文件`, `修改`,
+  `消息`, `代理`, and `上下文`. Changes owns one bounded record list plus one independently
   scrolling Patch detail; it does not widen the Inspector or introduce a fourth
   permanent application region.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
@@ -476,7 +476,7 @@ loading error where the operation can produce those states
 
 ### Inspector
 
-- The primary order is `文件 / 修改 / 消息 / 上下文`; Files is the default. The Files
+- The primary order is `文件 / 修改 / 消息 / 代理 / 上下文`; Files is the default. The Files
   root preserves expansion, search, selection, and scroll state while the
   Inspector stays mounted. Directories load in pages of at most 200 entries.
   Tabs, search text, file names, message summaries, tree labels, and resource
@@ -610,6 +610,16 @@ loading error where the operation can produce those states
   clicking an unloaded message installs one bounded historical window, disables
   edit/continue actions, highlights the target with Reduced Motion support, and
   offers `回到最新消息`. Sending a new turn exits historical mode.
+- Agents is a bounded roster, not another Transcript. Cards use compact semantic
+  state dots plus text and show role, child identity, depth, foreground/background
+  mode, model, reasoning, elapsed time, usage, parent-child lineage, bounded result,
+  and bounded error. The list scrolls independently; refresh, empty, loading, stale,
+  and error states remain inside the Inspector. Live children expose `引导` and
+  `停止`; non-completed terminal children expose `继续`. Every action carries the
+  exact parent Task and Session authority. The empty state states that a child is an
+  independent Pi JSONL Session, not a Browser Profile and not a top-level Task slot.
+  A retained Worktree path may be shown only after Main created it; unsupported
+  Worktree isolation must fail visibly rather than rendering invented success.
 - `Cmd/Ctrl+F` searches visible user/Assistant text in the current Pi JSONL branch;
   `Cmd/Ctrl+Shift+F` performs a bounded, explicit cross-conversation body search in
   the current Workspace and opens the exact Session/message. Both are local
@@ -954,17 +964,21 @@ loading error where the operation can produce those states
   Extension, global/project Skill, Prompt Template, and Context views consume the
   current Session resource projection and never repeat Package update or uninstall
   controls.
-- Installing a Pi Package starts from one page-level action and opens a focused
+- The Desktop-managed runtime bundle contains the complete locked closures for
+  `pi-mcp-adapter@2.11.0` and `pi-observational-memory@3.0.3`. Startup verifies the
+  packaged bundle, atomically promotes `staging` to `active`, retains one `previous`
+  rollback, and exposes only `active` to Pi ResourceLoader. Both Packages default to
+  enabled without a client-side npm call. Observational Memory may be disabled through
+  Desktop-owned durable state without changing shared Pi settings or deleting memory;
+  its explicit opt-out UI remains unimplemented and must not be implied by Settings.
+- Installing another Pi Package starts from one page-level action and opens a focused
   confirmation dialog that identifies npm, Git, or local-directory sources, the
   target scope, and the fact that a Package may load executable Extension code.
   Recommended Packages prefill the same dialog and never bypass the one-shot
   installation confirmation. Loaded-resource evidence remains separate because
   installed configuration and the current Session projection are different states.
-  `pi-observational-memory@3.0.3` is the only `prompt-once` recommendation. A fresh
-  Agent profile gets one non-dismissible choice between explicit global installation
-  and `暂不安装`; the decision is persisted by Agent Host, existing profiles are
-  suppressed, a failed installation exposes explicit retry, and no download starts
-  before confirmation. All other recommended Packages remain `user-initiated`.
+  Recommended Packages remain `user-initiated` and do not include a second npm source
+  for either Desktop-managed Package.
 - Package network mutations remain one logical Settings action while an isolated
   Agent Host worker owns the subprocess. A Host shutdown or worker-tree cleanup
   failure produces one explicit failed result and never a success toast; the UI does
@@ -997,6 +1011,15 @@ loading error where the operation can produce those states
   Host startup instead of loading an ambiguous retired route. The orphan userData
   token cleanup never follows symlinks; failure is reported only as a bounded class
   and does not block Main because no token is injected.
+- Capability bootstrap provisions `tmwd_browser` and `js-reverse` into `mcp.json`
+  with Desktop private Node and browser67 entrypoints under the active Pi Agent
+  Profile. Same-name entries without an exact Desktop receipt are user-owned conflicts
+  and are never overwritten. Revision-checked atomic replacement prevents lost updates.
+  A changed browser67 commit or server spec invalidates only those two entries in a
+  structurally valid `mcp-cache.json`; unrelated server metadata is preserved. Cache
+  invalid JSON and cache compare-and-swap races remain distinct startup blockers, and
+  an unacknowledged invalidation is retried rather than silently accepting stale Tool
+  schemas.
 - `用量分析` uses a grouped summary, restrained daily bars, and one responsive
   Provider/model table for `7 天`, `30 天`, or `90 天`. It rebuilds from the selected
   Workspace's Pi JSONL through `workspace.usage.report`; switching window, Workspace,

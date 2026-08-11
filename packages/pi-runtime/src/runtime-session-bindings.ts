@@ -13,6 +13,7 @@ import { realpath, stat, writeFile } from "node:fs/promises";
 import {
   RuntimeError,
   type ExtensionUiCancellationReason,
+  type NativeSubagentLineage,
   type PlanImplementationRequestLineage
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
@@ -37,6 +38,12 @@ import { resolveExistingSessionFileIdentity } from "./session-path-identity.js";
 import { createFirstPartyWebTools } from "./first-party-web-tools.js";
 import { PlanModeController } from "./plan-mode-controller.js";
 import type { SessionInteractionMode, SessionInteractionState } from "@pi67/domain";
+import {
+  NativeSubagentCoordinator,
+  type NativeSubagentSessionFactoryInput,
+  type NativeSubagentSessionHandle
+} from "./native-subagent-coordinator.js";
+import { createNativeSubagentTools } from "./native-subagent-tools.js";
 
 interface RuntimeSessionBindingsOptions {
   cancelInteractiveRequests: (reason: ExtensionUiCancellationReason) => void;
@@ -49,9 +56,11 @@ interface RuntimeSessionBindingsOptions {
   getPromptAttachmentAccess: () => PromptAttachmentAccess | undefined;
   projections: RuntimeProjectionController;
   rebindExtensionUi: (session: AgentSession) => Promise<void>;
+  bindChildExtensionUi: (session: AgentSession, lineage: NativeSubagentLineage) => Promise<void>;
   requestApproval: DesktopApprovalRequester;
   recordToolAuthorization: DesktopToolAuthorizationRecorder;
   setSessionCwd: (cwd: string) => void;
+  subagents: NativeSubagentCoordinator;
 }
 
 /** Owns the mutable Pi SDK session runtime and all bindings tied to its current session. */
@@ -114,6 +123,7 @@ export class RuntimeSessionBindings {
     const customTools = [
       ...createFirstPartyWebTools(),
       ...this.planMode.createTools(),
+      ...createNativeSubagentTools(this.options.subagents),
       ...toolAliases.tools
     ];
     const result = sessionManager
@@ -198,6 +208,7 @@ export class RuntimeSessionBindings {
       const customTools = [
         ...createFirstPartyWebTools(),
         ...this.planMode.createTools(),
+        ...createNativeSubagentTools(this.options.subagents),
         ...toolAliases.tools
       ];
       const result = await createAgentSessionFromServices({
@@ -214,7 +225,8 @@ export class RuntimeSessionBindings {
 
   private async createServices(
     cwd: string,
-    observeStage?: RuntimeInitializationObserver
+    observeStage?: RuntimeInitializationObserver,
+    subagent?: NativeSubagentLineage
   ): Promise<AgentSessionServices> {
     const workspaceServices = this.options.getWorkspaceServices();
     const promptAttachmentAccess = this.options.getPromptAttachmentAccess();
@@ -239,11 +251,65 @@ export class RuntimeSessionBindings {
           }),
       ...(modelRuntime === undefined ? {} : { modelRuntime }),
       getSafety: this.options.getSafety,
-      requestApproval: this.options.requestApproval,
+      requestApproval: subagent === undefined
+        ? this.options.requestApproval
+        : (request, approvalOptions) => this.options.requestApproval(
+            { ...request, subagent },
+            approvalOptions
+          ),
       recordToolAuthorization: this.options.recordToolAuthorization,
       getInteractionMode: () => this.planMode.interactionMode,
-      ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess })
+      ...(promptAttachmentAccess === undefined ? {} : { promptAttachmentAccess }),
+      ...(subagent === undefined ? {} : { noThirdPartyExtensions: true })
     });
+  }
+
+  async createSubagentSession(
+    input: NativeSubagentSessionFactoryInput
+  ): Promise<NativeSubagentSessionHandle> {
+    const cwd = input.sessionManager.getCwd();
+    const services = await this.createServices(cwd, undefined, input.lineage);
+    const requestedModel = input.requestedModel === undefined
+      ? undefined
+      : services.modelRuntime.getModel(input.requestedModel.provider, input.requestedModel.id);
+    if (input.requestedModel !== undefined && requestedModel === undefined) {
+      throw new RuntimeError(
+        "INVALID_PAYLOAD",
+        "The requested native subagent model is not available in this Pi Agent Profile."
+      );
+    }
+    const toolAliases = createDesktopToolAliasBinding();
+    const customTools = [
+      ...createFirstPartyWebTools(),
+      ...createNativeSubagentTools(this.options.subagents, {
+        parentChildId: input.lineage.childId,
+        depth: input.lineage.depth
+      }),
+      ...toolAliases.tools
+    ];
+    const selectedModel = requestedModel ?? input.parentModel;
+    const result = await createAgentSessionFromServices({
+      services,
+      sessionManager: input.sessionManager,
+      customTools,
+      ...(selectedModel === undefined ? {} : { model: selectedModel }),
+      thinkingLevel: input.thinkingLevel
+    });
+    toolAliases.bind(result.session);
+    await this.options.bindChildExtensionUi(result.session, input.lineage);
+    const runtime = new AgentSessionRuntime(
+      result.session,
+      services,
+      async () => {
+        throw new RuntimeError("UNSUPPORTED", "Child Pi Session replacement is not exposed by native subagents.");
+      },
+      services.diagnostics,
+      result.modelFallbackMessage
+    );
+    return {
+      session: result.session,
+      dispose: () => runtime.dispose()
+    };
   }
 
   private async bindSession(session: AgentSession): Promise<void> {
@@ -265,6 +331,7 @@ export class RuntimeSessionBindings {
       // land between the initial projection snapshot and event observation.
       await this.options.projections.bind(session, this.activeExtensions);
       this.planMode.bind(session);
+      await this.options.subagents.bindParent(session);
       await this.options.rebindExtensionUi(session);
       this.activeToolAliases?.reconcile();
       this.options.emit({ type: "extension.catalog.changed", payload: this.options.projections.getCatalog() });
@@ -277,6 +344,7 @@ export class RuntimeSessionBindings {
       this.options.externalChangeGuard.detach();
       this.options.projections.reset();
       this.planMode.unbind();
+      this.options.subagents.detachParent();
       this.activeSessionFileIdentity = undefined;
       throw error;
     }
@@ -320,6 +388,7 @@ export class RuntimeSessionBindings {
     this.options.projections.reset();
     this.options.cancelInteractiveRequests("session-transition");
     this.planMode.unbind();
+    this.options.subagents.detachParent();
   }
 }
 

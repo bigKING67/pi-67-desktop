@@ -21,6 +21,14 @@ import { LarkAppConfigurationInputSchema } from "./lark-auth-schemas.js";
 import { SessionCatalogQuerySchema } from "./session-catalog-schemas.js";
 import { SessionCreationIdSchema } from "./session-creation-schemas.js";
 import { SkillPackTargetSchema } from "./skill-pack-schemas.js";
+import {
+  NativeSubagentListPayloadSchema,
+  NativeSubagentResumePayloadSchema,
+  NativeSubagentStatusPayloadSchema,
+  NativeSubagentSteerPayloadSchema,
+  NativeSubagentStopPayloadSchema,
+  NativeSubagentWaitPayloadSchema
+} from "./native-subagent-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
 import { WorkspaceUsageReportPayloadSchema } from "./usage-schemas.js";
 import {
@@ -96,6 +104,12 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.file.rename": WorkspaceFileRenamePayloadSchema,
   "task.close": strictObject({ mode: Type.Union([Type.Literal("stop"), Type.Literal("dispose")]) }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
+  "subagent.list": NativeSubagentListPayloadSchema,
+  "subagent.status": NativeSubagentStatusPayloadSchema,
+  "subagent.wait": NativeSubagentWaitPayloadSchema,
+  "subagent.steer": NativeSubagentSteerPayloadSchema,
+  "subagent.stop": NativeSubagentStopPayloadSchema,
+  "subagent.resume": NativeSubagentResumePayloadSchema,
   "session.catalog.query": SessionCatalogQuerySchema,
   "session.catalog.contentSearch": strictObject({
     query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })

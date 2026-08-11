@@ -27,7 +27,10 @@ import type {
   ApprovalResolution,
   UserMessageIndexPage,
   LocatedMessageWindow,
-  MessageSearchResult
+  MessageSearchResult,
+  NativeSubagentMode,
+  NativeSubagentView,
+  NativeSubagentWaitResult
 } from "@pi67/domain";
 import type {
   AgentEvent,
@@ -127,7 +130,18 @@ export interface AgentRuntime {
     toolCallId: string,
     decision: ApprovalResponseDecision
   ): ApprovalResolution;
+  hasPendingSubagentApproval(requestId: string, toolCallId: string): boolean;
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[];
+  listSubagents(): NativeSubagentView[];
+  getSubagentStatus(id: string): NativeSubagentView;
+  waitForSubagents(
+    ids: readonly string[],
+    mode: "first" | "all",
+    timeoutMs: number
+  ): Promise<NativeSubagentWaitResult>;
+  steerSubagent(id: string, text: string): Promise<NativeSubagentView>;
+  stopSubagent(id: string): Promise<NativeSubagentView>;
+  resumeSubagent(id: string, mode?: NativeSubagentMode): Promise<NativeSubagentView>;
   collectDiagnostics(): Promise<RuntimeDiagnostics>;
   runDoctor(): Promise<DoctorReport>;
 }

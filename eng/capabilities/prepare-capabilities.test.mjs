@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.07.2");
+    expect(lock.catalogVersion).toBe("2026.08.11.3");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -31,7 +31,7 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.4.0",
-      commit: "eb857d335660380a383490f549c4d40227dbf3dc"
+      commit: "e531a83a0f86614699703f193c822763f9a9ec67"
     });
     expect(lock.skillPacks).toEqual([{
       name: "ai-berkshire-investment-suite",
@@ -46,19 +46,19 @@ describe("Desktop first-party capability source lock", () => {
       bundleSha256: "7438834d7e26b0043332c886503cfdf45ac3dab5d1e46def95ce2b899f08d018"
     }]);
     expect(() => assertPi67SkillPackSource(lock.skillPacks[0])).not.toThrow();
-    expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual([
-      "pi-subagents",
-      "pi-observational-memory",
-      "pi-rewind",
-      "pi-mcp-adapter"
-    ]);
-    expect(lock.recommendedExternal.find((entry) => entry.id === "pi-observational-memory"))
-      .toMatchObject({
-        recommendedVersion: "3.0.3",
-        installPolicy: "prompt-once",
-        admissionPolicy: "known-baseline-or-user-approval",
-        baselineContentSha256: "bf6636a84e3ddb58ba54423cad9541ba954b43a35c5daab282e5144870be00cd"
-      });
+    expect(lock.managedNpmBundles).toMatchObject([{
+      id: "pi-mcp-adapter",
+      version: "2.11.0",
+      extensionPaths: ["index.ts"],
+      defaultEnabled: true
+    }, {
+      id: "pi-observational-memory",
+      version: "3.0.3",
+      extensionPaths: ["src/index.ts"],
+      defaultEnabled: true
+    }]);
+    expect(lock.managedNpmBundles.every((entry) => entry.packageIntegrity.startsWith("sha512-"))).toBe(true);
+    expect(lock.recommendedExternal.map((entry) => entry.id)).toEqual(["pi-rewind"]);
     expect(lock.recommendedExternal.every((entry) => (
       entry.installPolicy === "prompt-once" || entry.installPolicy === "user-initiated"
     ))).toBe(true);
@@ -108,12 +108,27 @@ describe("Desktop first-party capability source lock", () => {
       catalogVersion: lock.catalogVersion,
       generatedFrom,
       entries,
+      managedNpmBundles: lock.managedNpmBundles.map((entry) => ({
+        id: entry.id,
+        packageName: entry.packageName,
+        source: entry.source,
+        version: entry.version,
+        packageIntegrity: entry.packageIntegrity,
+        packagePath: `packages/${entry.id}`,
+        extensionPaths: entry.extensionPaths,
+        defaultEnabled: entry.defaultEnabled
+      })),
       recommendedExternal: lock.recommendedExternal
     };
     const manifest = {
       schema: "pi67.desktop-capabilities.v1",
       catalogVersion: lock.catalogVersion,
-      packages
+      packages,
+      managedNpmBundle: {
+        treeSha256: "b".repeat(64),
+        platform: process.platform,
+        architecture: process.arch
+      }
     };
 
     expect(() => assertCapabilitiesMetadata(lock, catalog, manifest)).not.toThrow();

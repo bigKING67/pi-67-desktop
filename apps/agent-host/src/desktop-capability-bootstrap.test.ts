@@ -14,6 +14,10 @@ describe("Desktop first-party capability bootstrap", () => {
     const before = await capabilityTreeSha256(root);
     await mkdir(join(root, "empty", "nested"), { recursive: true });
     await expect(capabilityTreeSha256(root)).resolves.toBe(before);
+    await mkdir(join(root, "node_modules", "fixture"), { recursive: true });
+    await writeFile(join(root, "node_modules", "fixture", "index.js"), "export {};\n", "utf8");
+    await expect(capabilityTreeSha256(root)).resolves.toBe(before);
+    await expect(capabilityTreeSha256(root, true)).resolves.not.toBe(before);
   });
 
   it("materializes verified packages and preserves a user-owned AGENTS.md", async () => {

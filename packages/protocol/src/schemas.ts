@@ -81,6 +81,12 @@ import {
 } from "./skill-pack-schemas.js";
 import { ProtocolErrorSchema } from "./protocol-error-schema.js";
 import {
+  NativeSubagentChangedEventSchema,
+  NativeSubagentListResultSchema,
+  NativeSubagentViewSchema,
+  NativeSubagentWaitResultSchema
+} from "./native-subagent-schemas.js";
+import {
   PiCredentialRevealResultSchema,
   PiProviderConfigurationChangedSchema,
   PiProviderConfigurationSnapshotSchema
@@ -250,6 +256,12 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "workspace.file.rename": WorkspaceFileRenameResultSchema,
   "task.close": strictObject({ closed: Type.Literal(true), stopped: Type.Boolean() }),
   "task.toolMode.set": strictObject({ mode: TaskToolModeSchema }),
+  "subagent.list": NativeSubagentListResultSchema,
+  "subagent.status": NativeSubagentViewSchema,
+  "subagent.wait": NativeSubagentWaitResultSchema,
+  "subagent.steer": NativeSubagentViewSchema,
+  "subagent.stop": NativeSubagentViewSchema,
+  "subagent.resume": NativeSubagentViewSchema,
   "session.catalog.query": SessionCatalogPageSchema,
   "session.catalog.contentSearch": WorkspaceMessageSearchResultSchema,
   "workspace.usage.report": WorkspaceUsageReportSchema,
@@ -422,6 +434,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
       Type.Literal("runtime-reset")
     ])
   }),
+  "subagent.changed": NativeSubagentChangedEventSchema,
   "extension.ui.requested": ExtensionUiRequestSchema,
   "extension.ui.updated": ExtensionUiRequestSchema,
   "extension.ui.resolved": ExtensionUiResolvedSchema,

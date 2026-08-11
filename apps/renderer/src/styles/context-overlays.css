@@ -10,7 +10,7 @@
 
 .context-pane-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: 43px;
   padding: 5px 7px;
   border-bottom: 1px solid var(--border);
@@ -36,6 +36,10 @@
 .inspector-files-panel,
 .inspector-changes-panel,
 .inspector-messages-panel {
+  overflow: hidden !important;
+}
+
+.inspector-agents-panel {
   overflow: hidden !important;
 }
 
@@ -367,6 +371,114 @@
 .inspector-message-pagination { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; padding-top: 8px; }
 .inspector-message-pagination button:last-child { justify-self: end; }
 .inspector-message-pagination span { color: var(--text-tertiary); font-family: var(--font-code); font-size: 10px; }
+
+.inspector-agents {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  align-content: start;
+  height: 100%;
+  min-height: 0;
+}
+.inspector-agents-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inspector-agents-header > div { display: grid; }
+.inspector-agents-header strong { margin-top: 2px; font-size: 13px; }
+.inspector-agents-header button,
+.inspector-agent-actions button,
+.inspector-agent-steer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.inspector-agents-header button { padding: 0 7px; border-color: transparent; background: transparent; }
+.inspector-agents-header button:hover,
+.inspector-agent-actions button:hover,
+.inspector-agent-steer button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.inspector-agents-header button:disabled,
+.inspector-agent-actions button:disabled,
+.inspector-agent-steer button:disabled { cursor: not-allowed; opacity: 0.45; }
+.inspector-agents-help { margin: 8px 0 10px; color: var(--text-tertiary); font-size: 10px; line-height: 1.45; }
+.inspector-agent-list {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
+  gap: 7px;
+  padding-bottom: 12px;
+}
+.inspector-agent-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.inspector-agent-title-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 7px;
+}
+.inspector-agent-title-row > div { display: grid; min-width: 0; gap: 2px; }
+.inspector-agent-title-row strong { font-size: 12px; }
+.inspector-agent-title-row small { color: var(--text-tertiary); font-size: 10px; }
+.inspector-agent-title-row code { color: var(--text-tertiary); font-family: var(--font-code); font-size: 9px; }
+.inspector-agent-state {
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+.inspector-agent-state.is-running,
+.inspector-agent-state.is-waiting { background: var(--accent); }
+.inspector-agent-state.is-pending,
+.inspector-agent-state.is-idle { background: var(--warning); }
+.inspector-agent-state.is-completed { background: var(--success); }
+.inspector-agent-state.is-failed,
+.inspector-agent-state.is-interrupted { background: var(--danger); }
+.inspector-agent-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 9px; margin: 0; }
+.inspector-agent-meta > div { display: grid; min-width: 0; gap: 1px; }
+.inspector-agent-meta dt { color: var(--text-tertiary); font-size: 9px; }
+.inspector-agent-meta dd { overflow: hidden; margin: 0; font-family: var(--font-code); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-agent-lineage,
+.inspector-agent-path,
+.inspector-agent-result,
+.inspector-agent-error { margin: 0; font-size: 10px; line-height: 1.45; }
+.inspector-agent-lineage { display: inline-flex; align-items: center; gap: 4px; color: var(--text-tertiary); }
+.inspector-agent-path { overflow: hidden; color: var(--text-tertiary); font-family: var(--font-code); text-overflow: ellipsis; white-space: nowrap; }
+.inspector-agent-result,
+.inspector-agent-error { max-height: 108px; overflow: auto; padding: 7px; border-radius: 6px; background: var(--surface-muted); white-space: pre-wrap; }
+.inspector-agent-error { color: var(--danger); }
+.inspector-agent-actions { display: flex; justify-content: flex-end; gap: 5px; }
+.inspector-agent-actions button,
+.inspector-agent-steer button { padding: 0 8px; }
+.inspector-agent-actions button.is-danger { color: var(--danger); }
+.inspector-agent-steer { display: grid; gap: 6px; padding-top: 2px; }
+.inspector-agent-steer label { color: var(--text-secondary); font-size: 10px; }
+.inspector-agent-steer textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 7px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font: 11px/1.45 var(--font-ui);
+}
+.inspector-agent-steer textarea:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.inspector-agent-steer > div { display: flex; justify-content: flex-end; gap: 5px; }
 
 .session-tree,
 .resource-list,

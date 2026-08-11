@@ -3,6 +3,10 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertPi67SkillPackSource } from "./pi67-skill-pack-overlay.mjs";
+import {
+  assertManagedNpmBundleLock,
+  assertPreparedManagedNpmBundles
+} from "./managed-npm-bundles.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
@@ -21,6 +25,7 @@ export async function assertPreparedDesktopCapabilities() {
       throw new Error(`Prepared capability package failed integrity validation: ${entry.id}`);
     }
   }
+  await assertPreparedManagedNpmBundles({ lock, outputRoot });
   return { catalog, manifest };
 }
 
@@ -32,8 +37,10 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
     || manifest.catalogVersion !== lock.catalogVersion
     || !Array.isArray(catalog.entries)
     || !Array.isArray(catalog.generatedFrom)
+    || !Array.isArray(catalog.managedNpmBundles)
     || !Array.isArray(catalog.recommendedExternal)
     || !Array.isArray(manifest.packages)
+    || !manifest.managedNpmBundle
   ) throw new Error("Prepared capability metadata does not match the locked catalog.");
 
   const expectedSources = new Map(lock.sources.map((source) => [source.id, source]));
@@ -48,6 +55,21 @@ export function assertCapabilitiesMetadata(lock, catalog, manifest) {
   if (JSON.stringify(catalog.recommendedExternal) !== JSON.stringify(lock.recommendedExternal)) {
     throw new Error("Prepared recommended Extension catalog does not match the source lock.");
   }
+  if (JSON.stringify(catalog.managedNpmBundles) !== JSON.stringify(lock.managedNpmBundles.map((entry) => ({
+    id: entry.id,
+    packageName: entry.packageName,
+    source: entry.source,
+    version: entry.version,
+    packageIntegrity: entry.packageIntegrity,
+    packagePath: `packages/${entry.id}`,
+    extensionPaths: entry.extensionPaths,
+    defaultEnabled: entry.defaultEnabled
+  })))) throw new Error("Prepared managed npm catalog does not match the source lock.");
+  if (
+    !/^[a-f0-9]{64}$/u.test(manifest.managedNpmBundle.treeSha256 ?? "")
+    || typeof manifest.managedNpmBundle.platform !== "string"
+    || typeof manifest.managedNpmBundle.architecture !== "string"
+  ) throw new Error("Prepared managed npm integrity metadata is invalid.");
 
   for (const [id, source] of expectedSources) {
     const generatedSource = generated.get(id);
@@ -96,6 +118,7 @@ export function assertCapabilitySourceLock(lock) {
     lock.schema !== "pi67.capability-sources-lock.v1"
     || !Array.isArray(lock.sources)
     || !Array.isArray(lock.skillPacks)
+    || !Array.isArray(lock.managedNpmBundles)
     || !Array.isArray(lock.recommendedExternal)
   ) throw new Error("Capability source lock is invalid.");
 
@@ -119,6 +142,7 @@ export function assertCapabilitySourceLock(lock) {
     assertPi67SkillPackSource(pack);
     assertLocalSibling(pack.localSibling, "Skill Pack local sibling");
   }
+  assertManagedNpmBundleLock(lock);
   const recommendedIds = lock.recommendedExternal.map((entry) => entry?.id);
   if (new Set(recommendedIds).size !== recommendedIds.length || recommendedIds.length > 64) {
     throw new Error("Recommended Extension package ids are invalid.");

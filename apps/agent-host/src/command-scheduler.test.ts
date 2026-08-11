@@ -19,6 +19,11 @@ describe("CommandScheduler", () => {
     expect(commandClassFor(command("task.toolMode.set", { mode: "yolo" }))).toBe("interrupt");
     expect(commandClassFor(command("runtime.getStatus", {}))).toBe("query");
     expect(commandClassFor(command("extension.catalog.list", {}))).toBe("query");
+    expect(commandClassFor(command("subagent.list", {}))).toBe("query");
+    expect(commandClassFor(command("subagent.wait", { ids: ["run-1"] }))).toBe("query");
+    expect(commandClassFor(command("subagent.steer", { id: "run-1", text: "adjust" }))).toBe("interrupt");
+    expect(commandClassFor(command("subagent.stop", { id: "run-1" }))).toBe("interrupt");
+    expect(commandClassFor(command("subagent.resume", { id: "run-1" }))).toBe("interrupt");
     expect(commandClassFor(command("projection.resync", {}))).toBe("recovery");
     expect(commandClassFor(command("workspace.changes", {}))).toBe("query");
     expect(commandClassFor(command("session.tree", {}))).toBe("query");
@@ -112,6 +117,20 @@ describe("CommandScheduler", () => {
     const scheduler = new CommandScheduler(() => true);
     await expect(scheduler.run(command("extension.catalog.list", {}), async () => "catalog"))
       .resolves.toBe("catalog");
+  });
+
+  it("keeps child wait and control lanes available while a parent turn is active", async () => {
+    const scheduler = new CommandScheduler(() => true);
+    let releaseWait!: () => void;
+    const waiting = scheduler.run(command("subagent.wait", { ids: ["run-1"] }), () => (
+      new Promise<string>((resolve) => { releaseWait = () => resolve("settled"); })
+    ));
+    await Promise.resolve();
+
+    await expect(scheduler.run(command("subagent.stop", { id: "run-1" }), async () => "stopped"))
+      .resolves.toBe("stopped");
+    releaseWait();
+    await expect(waiting).resolves.toBe("settled");
   });
 
   it("serializes exclusive commands", async () => {

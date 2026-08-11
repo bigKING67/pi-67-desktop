@@ -4,6 +4,7 @@ import {
   ExtensionUiCancellationReasonSchema,
   MAX_EXTENSION_UI_CANCELLED_REQUESTS
 } from "./extension-schemas.js";
+import { NativeSubagentLineageSchema } from "./native-subagent-schemas.js";
 
 const ApprovalIdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
 
@@ -35,7 +36,7 @@ export const ApprovalRequestSchema = strictObject({
   requestId: Type.String({ minLength: 1, maxLength: 512 }),
   sessionId: Type.String({ minLength: 1, maxLength: 512 }),
   sessionGeneration: Type.Integer({ minimum: 0 }),
-  operationId: Type.String({ minLength: 1, maxLength: 512 }),
+  operationId: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   hostEpoch: Type.Integer({ minimum: 0 }),
   toolCallId: Type.String({ minLength: 1, maxLength: 512 }),
   toolName: Type.String({ minLength: 1, maxLength: 256 }),
@@ -47,7 +48,8 @@ export const ApprovalRequestSchema = strictObject({
   targetTruncated: Type.Boolean(),
   cwd: Type.String({ maxLength: MAX_APPROVAL_CWD_BYTES }),
   cwdTruncated: Type.Boolean(),
-  scope: Type.Literal("single-tool-call")
+  scope: Type.Literal("single-tool-call"),
+  subagent: Type.Optional(NativeSubagentLineageSchema)
 });
 
 export const ApprovalRespondSchema = strictObject({
@@ -55,7 +57,7 @@ export const ApprovalRespondSchema = strictObject({
   toolCallId: ApprovalIdentifierSchema,
   sessionId: ApprovalIdentifierSchema,
   sessionGeneration: Type.Integer({ minimum: 0 }),
-  operationId: ApprovalIdentifierSchema,
+  operationId: Type.Optional(ApprovalIdentifierSchema),
   decision: Type.Union([
     Type.Literal("deny"),
     Type.Literal("allow-once"),

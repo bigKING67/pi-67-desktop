@@ -12,7 +12,7 @@ const KNOWN_PACKAGE_PURPOSES: Readonly<Record<string, string>> = Object.freeze({
   "pi-rewind": "为 Pi 提供检查点与回退能力，支持逐工具快照、安全恢复和重做。",
   "pi-simplify": "审查近期修改的代码，帮助提升清晰度、一致性和可维护性。",
   "pi-smart-fetch": "提供智能网页抓取，使用桌面浏览器 TLS 特征并提取干净正文。",
-  "pi-subagents": "将任务委派给子代理，支持任务链、并行执行和交互式澄清。",
+  "pi-subagents": "旧的第三方子代理扩展；Pi-67 Desktop 使用原生子代理并不加载此包。",
   "pi-until-done": "为 Pi 提供证据驱动的目标循环，结合 TDD 规划、验证与强制评审。",
   "pi-web-access": "为 Pi 提供网页搜索、URL 抓取、GitHub 仓库克隆、PDF 提取以及视频理解与分析。"
 });

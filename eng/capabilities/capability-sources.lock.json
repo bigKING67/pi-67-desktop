@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.07.2",
+  "catalogVersion": "2026.08.11.3",
   "sources": [
     {
       "id": "pi67-core",
@@ -21,7 +21,7 @@
       "displayName": "browser67",
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/browser67.git",
-      "commit": "eb857d335660380a383490f549c4d40227dbf3dc",
+      "commit": "e531a83a0f86614699703f193c822763f9a9ec67",
       "localSibling": "../browser67",
       "version": "0.4.0"
     },
@@ -58,37 +58,37 @@
       "bundleSha256": "7438834d7e26b0043332c886503cfdf45ac3dab5d1e46def95ce2b899f08d018"
     }
   ],
-  "recommendedExternal": [
+  "managedNpmBundles": [
     {
-      "id": "pi-subagents",
-      "source": "npm:pi-subagents",
-      "recommendedVersion": "0.34.0",
-      "installPolicy": "user-initiated",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "e67fee1fe14a38413ae44d895ed11f58762aa22a7a7bee7b077c9f517ba176af"
+      "id": "pi-mcp-adapter",
+      "packageName": "pi-mcp-adapter",
+      "source": "npm:pi-mcp-adapter",
+      "version": "2.11.0",
+      "packageIntegrity": "sha512-4Y/eLbhbxnRih519dJUxMyQ5QASvPcdWyBlS8+dDXteAzaMuLnd4nMTWgoZw3JRIW+0r93KAQcz1Rbli4xCwEQ==",
+      "extensionPaths": [
+        "index.ts"
+      ],
+      "defaultEnabled": true
     },
     {
       "id": "pi-observational-memory",
+      "packageName": "pi-observational-memory",
       "source": "npm:pi-observational-memory",
-      "recommendedVersion": "3.0.3",
-      "installPolicy": "prompt-once",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "bf6636a84e3ddb58ba54423cad9541ba954b43a35c5daab282e5144870be00cd"
-    },
+      "version": "3.0.3",
+      "packageIntegrity": "sha512-YVbGRKQFRqBnj4K8TUYmRAaP+zpUptkdag3/GlzvmuVYEVi8aCHroPb8cKA8edYaUD2v291mJfojYl1TtTII7g==",
+      "extensionPaths": [
+        "src/index.ts"
+      ],
+      "defaultEnabled": true
+    }
+  ],
+  "recommendedExternal": [
     {
       "id": "pi-rewind",
       "source": "https://github.com/arpagon/pi-rewind.git",
       "minimumCommit": "91611ad87992fb7b635a41ba68f67916ff6e6ae3",
       "installPolicy": "user-initiated",
       "admissionPolicy": "user-approval"
-    },
-    {
-      "id": "pi-mcp-adapter",
-      "source": "npm:pi-mcp-adapter",
-      "recommendedVersion": "2.11.0",
-      "installPolicy": "user-initiated",
-      "admissionPolicy": "known-baseline-or-user-approval",
-      "baselineContentSha256": "23a0a09e64b5f197deaa28ff7373092f3487bee5e471a923a07f7ab7ecae87f8"
     }
   ]
 }

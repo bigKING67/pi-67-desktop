@@ -7,6 +7,8 @@ import {
 import { existsSync } from "node:fs";
 import { isAttachPortMessage } from "./connection-context.js";
 import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
+import { provisionManagedBrowser67Mcp } from "./managed-browser67-mcp-provision.js";
+import { activateDesktopManagedPackages } from "./managed-package-bundle.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
@@ -27,14 +29,26 @@ if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utili
 
 const agentDir = resolveAgentDirectory(undefined);
 process.env.PI67_AGENT_PROFILE_FRESH = existsSync(agentDir) ? "0" : "1";
-await bootstrapDesktopCapabilities({
+const capabilityBootstrap = await bootstrapDesktopCapabilities({
   agentDir
 });
+if (capabilityBootstrap.enabled) {
+  await activateDesktopManagedPackages({ agentDir });
+}
 const retiredTeamMcpCleanup = await removeRetiredTeamMcpConfig({
   agentDir
 });
 if (retiredTeamMcpCleanup.status === "revision-conflict") {
   throw new Error("Agent Host cannot start while retired Team MCP configuration cleanup conflicts with an external edit.");
+}
+if (capabilityBootstrap.enabled) {
+  const managedBrowser67Mcp = await provisionManagedBrowser67Mcp({ agentDir });
+  if (["invalid-json", "revision-conflict", "user-owned-conflict"].includes(managedBrowser67Mcp.status)) {
+    throw new Error(`Agent Host cannot provision managed browser67 MCP servers: ${managedBrowser67Mcp.status}.`);
+  }
+  if (["invalid-json", "revision-conflict"].includes(managedBrowser67Mcp.cacheStatus)) {
+    throw new Error(`Agent Host cannot invalidate managed browser67 MCP cache entries: ${managedBrowser67Mcp.cacheStatus}.`);
+  }
 }
 
 const promptAttachments = createPromptAttachmentAccessOwner(process.env.PI67_PROMPT_ATTACHMENT_ROOT);

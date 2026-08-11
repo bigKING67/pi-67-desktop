@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ShellContextTab = "files" | "changes" | "messages" | "context";
+type ShellContextTab = "files" | "changes" | "messages" | "agents" | "context";
 
 interface ShellState {
   navigationVisible: boolean;

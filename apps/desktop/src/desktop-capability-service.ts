@@ -195,6 +195,25 @@ export class DesktopCapabilityService {
   async #setupBrowser67Unlocked(): Promise<DesktopCapabilitySnapshot> {
     const packageRoot = await this.#requireBrowser67Package();
     if (!this.#toolchain.ready) throw new Error("Desktop private Node/npm/Git toolchain is unavailable.");
+    if (browser67DependenciesPrepared(packageRoot)) {
+      await this.#runBrowserEntrypointCheck(packageRoot, this.#toolchain);
+      const previous = await this.#readBrowserState();
+      const now = this.#now();
+      await this.#writeBrowserState({
+        schema: INTEGRATION_STATE_SCHEMA,
+        dependencyState: "prepared",
+        extensionState: previous?.extensionState ?? "not-prepared",
+        doctorState: previous?.doctorState ?? "not-checked",
+        detail: previous?.extensionState === "connected"
+          ? "内置运行依赖与扩展连接均已准备。"
+          : "内置运行依赖与命令入口已验证；浏览器扩展尚未完成连接。",
+        preparedAt: now,
+        ...(previous?.checkedAt === undefined ? {} : { checkedAt: previous.checkedAt }),
+        ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
+        ...(previous?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: previous.extensionCheckedAt })
+      });
+      return this.#snapshotUnlocked();
+    }
     const candidates = npmRegistryCandidates(await this.#packageNetworkSettings.load());
     if (candidates.length === 0) throw new Error("Package downloads are offline; browser67 dependencies cannot be prepared.");
     const previous = await this.#readBrowserState();
