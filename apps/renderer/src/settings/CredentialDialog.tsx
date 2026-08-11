@@ -42,7 +42,6 @@ export function CredentialDialog() {
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [loadRevision, setLoadRevision] = useState(0);
   const [removeTargetProviderId, setRemoveTargetProviderId] = useState<string>();
-
   useEffect(() => {
     if (!open) return;
     setApiKey("");
@@ -71,20 +70,23 @@ export function CredentialDialog() {
     );
     return () => { current = false; };
   }, [loadRevision, open, workspaceId]);
-
   useEffect(() => {
     if (!open) return;
+    if (targetProviderId) {
+      const targetExists = providerList.some((provider) => provider.id === targetProviderId);
+      setProviderId(targetExists ? targetProviderId : "");
+      if (providers !== undefined && !targetExists) {
+        setLoadError((current) => current ?? `当前 Pi Provider 目录中找不到 ${targetProviderId}。请重新加载后重试。`);
+      }
+      return;
+    }
     setProviderId((current) => {
       if (providerList.some((provider) => provider.id === current)) return current;
-      if (targetProviderId && providerList.some((provider) => provider.id === targetProviderId)) {
-        return targetProviderId;
-      }
       return providerList.some((provider) => provider.id === selectedModel?.provider)
         ? selectedModel?.provider ?? ""
         : providerList[0]?.id ?? "";
     });
-  }, [open, providerList, selectedModel?.provider, targetProviderId]);
-
+  }, [open, providerList, providers, selectedModel?.provider, targetProviderId]);
   const filteredProviderList = useMemo(() => {
     const query = providerQuery.trim().toLocaleLowerCase();
     if (query.length === 0) return providerList;
@@ -93,7 +95,6 @@ export function CredentialDialog() {
       || provider.id.toLocaleLowerCase().includes(query)
     ));
   }, [providerList, providerQuery]);
-
   useEffect(() => {
     if (providerQuery.trim().length === 0 || filteredProviderList.length === 0) return;
     if (!filteredProviderList.some((provider) => provider.id === providerId)) {
@@ -105,9 +106,8 @@ export function CredentialDialog() {
   const selectedProvider = providerList.find((provider) => provider.id === providerId);
   const removalProvider = providerList.find((provider) => provider.id === removeTargetProviderId);
   const focusedProvider = targetProviderId !== undefined && selectedProvider?.id === targetProviderId;
-  const dialogTitle = focusedProvider
-    ? `配置 ${selectedProvider.label} API Key`
-    : messages.credentials.title;
+  const targetProviderLabel = configuration?.providers.find((provider) => provider.id === targetProviderId)?.name ?? targetProviderId;
+  const dialogTitle = targetProviderId ? `配置 ${targetProviderLabel} API Key` : messages.credentials.title;
   const canSubmit = selectedProvider !== undefined && apiKey.trim().length >= 8 && !submitting;
 
   return (
@@ -149,6 +149,13 @@ export function CredentialDialog() {
             </div>
             {providers === undefined ? (
               <p className="credential-empty" role="status">{messages.credentials.loading}</p>
+            ) : loadError ? (
+              <div className="credential-empty credential-load-error" role="alert">
+                <span>{messages.credentials.loadFailed}: {loadError}</span>
+                <Button className="secondary-button" onPress={() => setLoadRevision((value) => value + 1)}>
+                  {messages.credentials.retry}
+                </Button>
+              </div>
             ) : providerList.length > 0 ? (
               <div className={`provider-credential-layout${focusedProvider ? " is-focused" : ""}`}>
                 {!focusedProvider ? <div className="provider-sidebar">
@@ -210,13 +217,6 @@ export function CredentialDialog() {
                     }}
                   />
                 ) : null}
-              </div>
-            ) : loadError ? (
-              <div className="credential-empty credential-load-error" role="alert">
-                <span>{messages.credentials.loadFailed}: {loadError}</span>
-                <Button className="secondary-button" onPress={() => setLoadRevision((value) => value + 1)}>
-                  {messages.credentials.retry}
-                </Button>
               </div>
             ) : (
               <p className="credential-empty">

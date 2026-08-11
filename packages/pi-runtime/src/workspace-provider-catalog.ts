@@ -8,6 +8,7 @@ import {
   createRuntimeCredentialOverrideStore,
   type RuntimeCredentialOverrideStore
 } from "./runtime-credential-overrides.js";
+import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { projectRuntimeProviders } from "./session-snapshot.js";
 
 export interface CreatePiWorkspaceProviderCatalogOptions {
@@ -43,6 +44,7 @@ export function createPiWorkspaceProviderCatalog(
       settingsManager: options.settingsManager
     }).then(async (services) => {
       if (disposed) throw disposedError();
+      await installFirstPartyModelProviders(services.modelRuntime);
       unsubscribe = runtimeCredentialOverrides.subscribe((provider, apiKey) => (
         services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false })
       ));
