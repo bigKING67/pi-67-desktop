@@ -128,8 +128,6 @@ export function Transcript() {
   ) ? operationTimeline : undefined;
   const currentProcessRunning = operationMatchesSession
     && isActiveOperationLifecycle(operation.lifecycle);
-  const currentProcessInterrupted = operationMatchesSession
-    && (operation.lifecycle === "failed" || operation.lifecycle === "cancelled" || operation.lifecycle === "lost");
   const hasTurnActivity = !hasCurrentProcessGroup && (
     hasVisibleTurnActivity(runtime.phase, operation, sessionId, sessionGeneration)
     || (
@@ -140,12 +138,10 @@ export function Transcript() {
     && operationMatchesSession
     && (operation.kind === "prompt" || operation.kind === "command")
     ? {
-      row: createLiveProcessRow(operation, currentProcessInterrupted, Boolean(liveText)),
+      row: createLiveProcessRow(operation, Boolean(liveText)),
       operation,
       timeline: matchingOperationTimeline,
-      running: currentProcessRunning,
-      interrupted: currentProcessInterrupted,
-      completed: operation.lifecycle === "completed"
+      running: currentProcessRunning
     }
     : undefined;
   const messageActionDisabledReason = currentEdit
@@ -327,8 +323,6 @@ export function Transcript() {
             const currentOperation = current && operationMatchesSession ? operation : undefined;
             return (
               <DeferredTranscriptProcessGroup
-                completed={currentOperation ? currentOperation.lifecycle === "completed" : true}
-                interrupted={current && currentProcessInterrupted}
                 liveThinking={current ? liveThinking : ""}
                 row={row}
                 running={current && currentProcessRunning}

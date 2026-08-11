@@ -45,8 +45,7 @@ import {
 import {
   OperationAcceptedSchema,
   OperationActivitySchema,
-  OperationKindSchema,
-  OperationViewSchema
+  OperationKindSchema, OperationViewSchema, ToolExecutionSchema
 } from "./operation-schemas.js";
 import {
   ConversationPageSchema,
@@ -399,6 +398,7 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
     lastActivityAt: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })
   }),
   "operation.activityChanged": strictObject({ operationId: Type.String(), activity: Type.Union([OperationActivitySchema, Type.Null()]) }),
+  "operation.toolExecutionChanged": strictObject({ operationId: Type.String({ minLength: 1, maxLength: 512 }), execution: ToolExecutionSchema }),
   "operation.progress": strictObject({
     operationId: Type.String(),
     message: Type.String(),

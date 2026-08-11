@@ -7,6 +7,7 @@ import type {
   PlanProposalPart,
   SessionInteractionMode
 } from "./plan-mode.js";
+import type { ToolExecutionStatus, ToolExecutionView } from "./tool-execution.js";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 
@@ -19,8 +20,9 @@ export interface ToolCallPart {
   type: "tool-call";
   id: string;
   name: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: ToolExecutionStatus;
   summary?: string;
+  execution?: ToolExecutionView;
   adapter?: ExtensionToolAdapterView;
 }
 

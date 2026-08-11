@@ -369,7 +369,8 @@ describe("PiSdkRuntime", () => {
       expect(diagnostics).toMatchObject({
         application: "π",
         piSdkVersion: "0.83.0",
-        sessionConfigured: true
+        sessionConfigured: true,
+        toolExecutionReceiptFailureCount: 0
       });
       expect(JSON.stringify(diagnostics)).not.toMatch(/api.?key|token|prompt/iu);
       expect(JSON.stringify(diagnostics)).not.toContain(runtimeKey);

@@ -186,6 +186,7 @@ export class HostTaskStateCoordinator {
     const state = this.stateForRecord(record);
     runtime.subscribe((event) => this.sendEvent(state, event));
     runtime.subscribeOperationActivity?.((activity) => state.operations?.updateActivity(activity));
+    runtime.subscribeToolExecution?.((execution) => state.operations?.updateToolExecution(execution));
   }
 
   sendStatus(state: TaskHostState, status: RuntimeStatus): void {

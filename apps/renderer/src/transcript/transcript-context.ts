@@ -17,8 +17,6 @@ export interface TranscriptContext {
     operation: OperationView;
     timeline: OperationActivityTimeline | undefined;
     running: boolean;
-    interrupted: boolean;
-    completed: boolean;
   } | undefined;
   loadOlderMessages: () => Promise<void>;
 }

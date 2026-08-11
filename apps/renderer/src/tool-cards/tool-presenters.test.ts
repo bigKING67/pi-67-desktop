@@ -79,8 +79,7 @@ describe("tool presenter registry", () => {
       { label: "命令", value: "pnpm test" },
       { label: "工作目录", value: "D:/code/pi-67-desktop" }
     ]);
-    expect(presentation.limitations).not.toContain("当前投影未记录工作目录。");
-    expect(presentation.limitations.join(" ")).toContain("未记录执行耗时");
+    expect(presentation.limitations).toEqual([]);
   });
 
   it("keeps unavailable command metadata explicit instead of inventing values", () => {
@@ -88,8 +87,33 @@ describe("tool presenter registry", () => {
 
     expect(presentation.compact).toBe("pnpm test");
     expect(presentation.details).toEqual([]);
-    expect(presentation.limitations).toContain("当前投影未记录工作目录。");
+    expect(presentation.limitations).toEqual([]);
     expect(JSON.stringify(presentation)).not.toContain("0ms");
+  });
+
+  it("prefers the lifecycle projection for command, cwd, and duration", () => {
+    const presentation = presentToolCall(tool({
+      name: "bash",
+      summary: JSON.stringify({ command: "stale command", cwd: "stale cwd" }),
+      execution: {
+        toolCallId: "tool-1",
+        toolName: "bash",
+        toolKind: "shell",
+        status: "completed",
+        projectionSource: "durable",
+        resultState: "present",
+        command: { text: "pnpm test", truncated: false },
+        cwd: "D:/code/pi-67-desktop",
+        durationMs: 1_250
+      }
+    }));
+
+    expect(presentation.compact).toBe("pnpm test");
+    expect(presentation.details).toEqual([
+      { label: "命令", value: "pnpm test" },
+      { label: "工作目录", value: "D:/code/pi-67-desktop" },
+      { label: "耗时", value: "1.3 s" }
+    ]);
   });
 
   it("projects read, search, and edit summaries through dedicated presenters", () => {

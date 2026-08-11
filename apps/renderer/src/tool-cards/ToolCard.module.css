@@ -122,6 +122,27 @@
   color: var(--danger);
 }
 
+.status-interrupted .header,
+.status-lost .header,
+.status-unreconciled .header {
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border));
+}
+
+.status-interrupted .status,
+.status-interrupted .kindIcon,
+.status-lost .status,
+.status-lost .kindIcon,
+.status-unreconciled .status,
+.status-unreconciled .kindIcon,
+.warningDetail {
+  color: var(--warning);
+}
+
+.status-cancelled .status,
+.status-cancelled .kindIcon {
+  color: var(--text-tertiary);
+}
+
 .status-running .status,
 .status-running .kindIcon {
   color: var(--accent);
@@ -162,6 +183,7 @@
 
 .detailList dt,
 .rawSummary > span,
+.progress > span,
 .result > span {
   color: var(--text-tertiary);
   font-size: 10px;
@@ -175,6 +197,7 @@
 
 .detailList code,
 .rawSummary pre,
+.progress pre,
 .result pre {
   color: var(--text-secondary);
   font-family: var(--font-code);
@@ -185,6 +208,7 @@
 }
 
 .rawSummary,
+.progress,
 .result {
   display: grid;
   min-width: 0;
@@ -192,6 +216,7 @@
 }
 
 .rawSummary pre,
+.progress pre,
 .result pre {
   max-height: 220px;
   margin: 0;
@@ -209,6 +234,7 @@
 }
 
 .failureDetail,
+.warningDetail,
 .emptyResult,
 .pendingResult {
   margin: 0;

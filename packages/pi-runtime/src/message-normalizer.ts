@@ -5,8 +5,10 @@ import {
   type AssetReference,
   type ExtensionToolAdapterView,
   type MessagePart,
-  type SessionMessageView
+  type SessionMessageView,
+  type ToolExecutionView
 } from "@pi67/domain";
+import { projectToolFailure } from "./tool-execution-projection.js";
 
 export interface ImageAssetSource {
   stableKey: string;
@@ -24,7 +26,8 @@ export function normalizeMessagesWithAdapters(
   messages: readonly unknown[],
   stableIds: readonly string[] = [],
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
-  projectImageAsset?: ImageAssetProjector
+  projectImageAsset?: ImageAssetProjector,
+  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined
 ): SessionMessageView[] {
   const toolResultStatuses = collectToolResultStatuses(messages);
   const normalized: SessionMessageView[] = [];
@@ -44,6 +47,7 @@ export function normalizeMessagesWithAdapters(
       stableIds[index],
       resolveToolAdapter,
       projectImageAsset,
+      resolveToolExecution,
       (toolCallId) => toolResultStatuses.get(toolCallId)
     );
     if (projected.role === "user" && promptAttachments.length > 0) {
@@ -74,6 +78,7 @@ function normalizeMessage(
   stableId: string | undefined,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
   resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): SessionMessageView {
   const message = asRecord(value);
@@ -85,12 +90,15 @@ function normalizeMessage(
     id,
     resolveToolAdapter,
     projectImageAsset,
+    resolveToolExecution,
     resolveToolStatus
   );
   const createdAt = numberValue(message.timestamp) ?? numberValue(message.createdAt);
   const model = stringValue(message.model);
   const toolName = role === "tool" ? stringValue(message.toolName)?.slice(0, 128) : undefined;
+  const projectedFailure = message.isError === true ? projectToolFailure(message, "pi-result") : undefined;
   const error = stringValue(message.errorMessage)
+    ?? projectedFailure?.message?.text
     ?? (message.isError === true ? "Tool execution failed." : emptyAssistantResponseError(message, role, parts));
   return {
     id,
@@ -110,6 +118,7 @@ function normalizeContent(
   messageId: string,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
   resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): MessagePart[] {
   if (typeof content === "string") return [{ type: "text", text: boundedText(content) }];
@@ -132,6 +141,7 @@ function normalizeContent(
       partIndex,
       resolveToolAdapter,
       projectImageAsset,
+      resolveToolExecution,
       resolveToolStatus
     ));
 }
@@ -142,6 +152,7 @@ function normalizePart(
   partIndex: number,
   resolveToolAdapter: ((toolCallId: string) => ExtensionToolAdapterView | undefined) | undefined,
   projectImageAsset: ImageAssetProjector | undefined,
+  resolveToolExecution: ((toolCallId: string) => ToolExecutionView | undefined) | undefined,
   resolveToolStatus: (toolCallId: string) => ToolCallStatus | undefined
 ): MessagePart[] {
   const part = asRecord(value);
@@ -156,12 +167,14 @@ function normalizePart(
     const summary = part.arguments === undefined ? undefined : summarizeToolArguments(name, part.arguments);
     const toolCallId = stringValue(part.id) ?? `${messageId}:tool:${stableDigest(`${name}:${summary ?? ""}`)}`;
     const adapter = resolveToolAdapter?.(toolCallId);
+    const execution = resolveToolExecution?.(toolCallId);
     return [{
       type: "tool-call",
       id: toolCallId,
       name,
-      status: resolveToolStatus(toolCallId) ?? "completed",
+      status: execution?.status ?? resolveToolStatus(toolCallId) ?? "unreconciled",
       ...(summary === undefined ? {} : { summary }),
+      ...(execution === undefined ? {} : { execution }),
       ...(adapter === undefined ? {} : { adapter })
     }];
   }

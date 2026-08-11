@@ -21,7 +21,8 @@ export function projectRuntimeIdentity(
 export function projectRuntimeDiagnostics(
   runtime: AgentSessionRuntime | undefined,
   extensions: LoadExtensionsResult | undefined,
-  sdkVersion: string
+  sdkVersion: string,
+  toolExecutionReceiptFailureCount: number
 ): RuntimeDiagnostics {
   const session = runtime?.session;
   const cwd = session?.sessionManager.getCwd();
@@ -46,7 +47,8 @@ export function projectRuntimeDiagnostics(
     extensionErrors: extensions?.errors.map((error) => ({
       sourceHash: hashDiagnosticValue(error.path),
       errorClass: diagnosticErrorClass(sanitizeRuntimeText(error.error))
-    })) ?? []
+    })) ?? [],
+    toolExecutionReceiptFailureCount
   };
 }
 

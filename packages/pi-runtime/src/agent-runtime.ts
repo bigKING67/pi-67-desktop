@@ -9,6 +9,7 @@ import type {
   RuntimeCapabilities,
   RuntimeIdentity,
   RuntimeOperationActivity,
+  ToolExecutionView,
   SessionCatalogPage,
   SessionCatalogQuery,
   SessionCatalogStatus,
@@ -75,6 +76,7 @@ export interface AgentRuntime {
   dispose(): Promise<void>;
   subscribe(listener: (event: AgentEvent) => void): () => void;
   subscribeOperationActivity?(listener: (activity: RuntimeOperationActivity) => void): () => void;
+  subscribeToolExecution?(listener: (execution: ToolExecutionView) => void): () => void;
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode;
   getTaskToolMode(): TaskToolMode;
   setTaskToolMode(mode: TaskToolMode): TaskToolMode;

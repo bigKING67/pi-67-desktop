@@ -3,7 +3,7 @@ import type {
   OperationKind,
   OperationView,
   RuntimeIdentity,
-  RuntimeOperationActivity
+  RuntimeOperationActivity, ToolExecutionView
 } from "@pi67/domain";
 import {
   type AgentHostRuntimePoisonedMessage,
@@ -27,6 +27,7 @@ import type { OperationReceiptStore } from "./operation-receipt-store.js";
 import { acceptedOperation, createOperationView, requireOperationSessionIdentity } from "./operation-registry-authority.js";
 import { OperationResultLedger } from "./operation-result-ledger.js";
 import { type ActiveOperation, OperationTerminalCoordinator } from "./operation-terminal-coordinator.js";
+import { OperationToolExecutionController } from "./operation-tool-execution-controller.js";
 import { authorityFromIdentity } from "./operation-submission-ledger.js";
 import { HostCommandError } from "./protocol-error.js";
 
@@ -62,6 +63,7 @@ export class OperationRegistry {
   private terminating: ActiveOperation | undefined;
   private readonly results: OperationResultLedger;
   private readonly activity: OperationActivityController;
+  private readonly toolExecutions: OperationToolExecutionController;
   private readonly heartbeat: OperationHeartbeatController;
   private readonly terminals: OperationTerminalCoordinator;
   private readonly executions: OperationExecutionRunner;
@@ -81,6 +83,7 @@ export class OperationRegistry {
   ) {
     this.maxSubmissions = positiveInteger(options.maxSubmissions, 512, "maxSubmissions");
     this.activity = new OperationActivityController(emit);
+    this.toolExecutions = new OperationToolExecutionController(emit);
     this.abortWatchdogMs = positiveInteger(options.abortWatchdogMs, DEFAULT_ABORT_WATCHDOG_MS, "abortWatchdogMs");
     this.now = options.now ?? Date.now;
     this.results = new OperationResultLedger(
@@ -97,6 +100,7 @@ export class OperationRegistry {
       getIdentity,
       heartbeat: this.heartbeat,
       results: this.results,
+      toolExecutions: this.toolExecutions,
       withDurability: (operation) => this.withDurability(operation)
     });
     this.executions = new OperationExecutionRunner({
@@ -137,7 +141,10 @@ export class OperationRegistry {
     this.heartbeat.touch(this.active?.view.operationId);
     return this.activity.updateBase(this.active, activity);
   }
-
+  updateToolExecution(execution: ToolExecutionView): boolean {
+    this.heartbeat.touch(this.active?.view.operationId);
+    return this.toolExecutions.update(this.active, execution);
+  }
   observeEventActivity(event: AgentEvent): boolean {
     const operation = this.active ?? this.terminating;
     return this.heartbeat.observeEvent(event, operation?.view.operationId);
@@ -148,13 +155,11 @@ export class OperationRegistry {
     return this.activity.beginInteractive(this.active, activity)
       && this.heartbeat.touch(this.active?.view.operationId);
   }
-
   completeInteractiveWait(requestId: string): boolean {
     return this.activity.completeInteractive(this.active, requestId)
       && this.heartbeat.touch(this.active?.view.operationId);
   }
   latestTerminal(): OperationSettled | undefined { return this.results.latestTerminal(); }
-
   async reconcile(): Promise<void> {
     this.assertHealthy();
     await this.withDurability(() => this.results.reconcile());
@@ -188,6 +193,7 @@ export class OperationRegistry {
       }));
       if (!remembered.created) return remembered.result;
       this.activity.reset();
+      this.toolExecutions.reset();
       const operation: ActiveOperation = {
         view,
         submissionId: options.submissionId,
@@ -439,17 +445,13 @@ export class OperationRegistry {
       this.terminals.prepare(operation);
     }
     this.activity.reset();
+    this.toolExecutions.reset();
   }
 }
-
 function shutdownResultFor(lifecycle: ActiveOperation["terminalLifecycle"]): OperationShutdownResult {
   return lifecycle === "cancelled" ? "cancelled" : lifecycle === "lost" ? "lost" : "none";
 }
-
-function acceptsPiQueue(kind: OperationKind): boolean {
-  return kind === "prompt" || kind === "command";
-}
-
+function acceptsPiQueue(kind: OperationKind): boolean { return kind === "prompt" || kind === "command"; }
 function positiveInteger(value: number | undefined, fallback: number, name: string): number {
   const resolved = value ?? fallback;
   if (!Number.isSafeInteger(resolved) || resolved < 1) throw new RangeError(`${name} must be a positive integer.`);

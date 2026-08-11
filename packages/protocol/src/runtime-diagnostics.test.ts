@@ -20,6 +20,7 @@ const diagnostics = {
   model: "openai/gpt-test",
   extensionCount: 0,
   extensionErrors: [],
+  toolExecutionReceiptFailureCount: 0,
   host: {
     hostEpoch: 4,
     taskCount: 1,

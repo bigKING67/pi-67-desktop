@@ -13,6 +13,7 @@ export interface RuntimeDiagnostics {
   model?: string;
   extensionCount: number;
   extensionErrors: Array<{ sourceHash: string; errorClass: string }>;
+  toolExecutionReceiptFailureCount: number;
   host?: RuntimeHostDiagnostics;
 }
 

@@ -17,6 +17,7 @@ import {
   type ExtensionCatalogResult,
   type RuntimeCapabilities,
   type RuntimeOperationActivity,
+  type ToolExecutionView,
   type SessionSnapshot,
   type SessionTreeProjection,
   type ToolAuthorizationProjection,
@@ -46,6 +47,7 @@ interface RuntimeProjectionTarget {
   getSessionGeneration: () => number;
   emit: (event: AgentEvent) => void;
   emitActivity: (activity: RuntimeOperationActivity) => void;
+  emitToolExecution: (execution: ToolExecutionView) => void;
   getToolAuthorization: (toolCallId: string) => ToolAuthorizationProjection | undefined;
   completeToolAuthorization: (toolCallId: string) => void;
   resetToolAuthorizations: () => void;
@@ -59,6 +61,7 @@ export class RuntimeProjectionController {
   private readonly adapters = new ExtensionAdapterRuntime();
   private readonly assets = new RuntimeAssetRegistry();
   private readonly events: SessionEventProjector;
+  private toolExecutionReceiptFailureCount = 0;
 
   constructor(private readonly target: RuntimeProjectionTarget) {
     this.events = new SessionEventProjector({
@@ -66,6 +69,8 @@ export class RuntimeProjectionController {
       getStats: () => this.getStats(target.getSession()),
       emit: target.emit,
       emitActivity: target.emitActivity,
+      emitToolExecution: target.emitToolExecution,
+      reportToolExecutionReceiptFailure: () => { this.toolExecutionReceiptFailureCount += 1; },
       pushStream: target.pushStream,
       flushStream: target.flushStream,
       bindToolExecutionStart: (toolCallId, toolName) => {
@@ -123,6 +128,14 @@ export class RuntimeProjectionController {
     this.events.recordToolAuthorization(toolCallId, authorization);
   }
 
+  requestToolCancellation(): void {
+    this.events.requestToolCancellation();
+  }
+
+  getToolExecutionReceiptFailureCount(): number {
+    return this.toolExecutionReceiptFailureCount;
+  }
+
   getMetadata(manager: SessionManager): SessionProjectionMetadata { return this.session.getMetadata(manager); }
   getStats(session: AgentSession): SessionStats { return this.session.getStats(session); }
   getTree(): SessionTreeProjection { return projectSessionTree(this.session); }
@@ -135,7 +148,8 @@ export class RuntimeProjectionController {
       this.session,
       options,
       (toolCallId) => this.resolveToolAdapter(toolCallId),
-      (source) => this.projectImageAsset(source)
+      (source) => this.projectImageAsset(source),
+      (toolCallId) => this.session.getToolExecution(toolCallId)
     );
   }
 
@@ -186,7 +200,8 @@ export class RuntimeProjectionController {
       this.session,
       { direction: "newer", ...(cursor === undefined ? {} : { cursor }), limit: 100 },
       (toolCallId) => this.resolveToolAdapter(toolCallId),
-      (source) => this.projectImageAsset(source)
+      (source) => this.projectImageAsset(source),
+      (toolCallId) => this.session.getToolExecution(toolCallId)
     );
     if (!page.messages.some((message) => message.id === id)) throw missingMessage();
     return { ...page, anchorId: id, revision: this.session.getRevision() };

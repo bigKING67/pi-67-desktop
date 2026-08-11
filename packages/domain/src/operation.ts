@@ -1,3 +1,5 @@
+import type { ToolExecutionStatus, ToolExecutionView } from "./tool-execution.js";
+
 export type OperationKind = "prompt" | "command" | "compaction" | "session-import";
 
 export type OperationLifecycle =
@@ -41,7 +43,7 @@ export type OperationActivity =
       toolCallId: string;
       toolName: string;
       toolKind: ToolPresentationKind;
-      status: "running" | "completed" | "failed";
+      status: ToolExecutionStatus;
       aliasTarget?: string;
       authorization?: ToolAuthorizationProjection;
     }
@@ -77,6 +79,8 @@ export interface OperationView {
   sessionGeneration: number;
   startedAt: number;
   activity?: OperationActivity;
+  toolExecutions?: ToolExecutionView[];
+  toolExecutionsTruncated?: boolean;
 }
 
 export interface RuntimeIdentity {

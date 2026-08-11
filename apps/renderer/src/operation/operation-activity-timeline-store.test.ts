@@ -5,6 +5,7 @@ import {
   createResynchronizedOperationActivityTimeline,
   finishOperationActivityTimeline,
   recordOperationTimelineActivity,
+  recordOperationTimelineToolExecution,
   timelineMatchesOperation,
   updateOperationTimelineProgress,
   useOperationActivityTimelineStore
@@ -232,6 +233,78 @@ describe("operation activity timeline", () => {
       detail: "AUTO · 只读 · 执行中",
       activity: { authorization: { mode: "auto", reason: "read-only" } }
     });
+  });
+
+  it("uses Runtime timing and progress for a Tool instead of renderer observation time", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineToolExecution(timeline, {
+      toolCallId: "tool-timed",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running",
+      projectionSource: "live",
+      resultState: "pending",
+      startedAt: 1_000,
+      command: { text: "pnpm test", truncated: false },
+      progress: { text: "running", truncated: false }
+    });
+    timeline = recordOperationTimelineToolExecution(timeline, {
+      toolCallId: "tool-timed",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "completed",
+      projectionSource: "live",
+      resultState: "present",
+      startedAt: 1_000,
+      completedAt: 1_250,
+      durationMs: 250,
+      command: { text: "pnpm test", truncated: false },
+      progress: { text: "done", truncated: false }
+    });
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      status: "completed",
+      startedAt: 1_000,
+      settledAt: 1_250,
+      toolExecution: {
+        toolCallId: "tool-timed",
+        durationMs: 250,
+        progress: { text: "done" }
+      }
+    });
+  });
+
+  it("updates any parallel Tool step by id without duplicating it", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    for (const toolCallId of ["a", "b"]) {
+      timeline = recordOperationTimelineToolExecution(timeline, {
+        toolCallId,
+        toolName: "read",
+        toolKind: "read",
+        status: "running",
+        projectionSource: "live",
+        resultState: "pending",
+        startedAt: toolCallId === "a" ? 20 : 30
+      });
+    }
+    timeline = recordOperationTimelineToolExecution(timeline, {
+      toolCallId: "a",
+      toolName: "read",
+      toolKind: "read",
+      status: "failed",
+      projectionSource: "live",
+      resultState: "present",
+      startedAt: 20,
+      completedAt: 40,
+      failure: { detailState: "available", source: "runtime-event", message: { text: "missing", truncated: false } }
+    });
+
+    const toolSteps = timeline.steps.filter((step) => step.activity?.kind === "tool");
+    expect(toolSteps).toHaveLength(2);
+    expect(toolSteps.find((step) => step.activity?.kind === "tool" && step.activity.toolCallId === "a"))
+      .toMatchObject({ status: "failed", settledAt: 40 });
+    expect(toolSteps.find((step) => step.activity?.kind === "tool" && step.activity.toolCallId === "b"))
+      .toMatchObject({ status: "running", settledAt: undefined });
   });
 
   it("matches only the current operation authority", () => {

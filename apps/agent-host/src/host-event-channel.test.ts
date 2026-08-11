@@ -270,6 +270,34 @@ describe("HostEventChannel", () => {
       }
     ]);
   });
+
+  it("keeps a Tool execution event bound after the active Operation is cleared", () => {
+    const fixture = createFixture();
+    fixture.setActiveOperationId(undefined);
+
+    fixture.channel.send({
+      type: "operation.toolExecutionChanged",
+      payload: {
+        operationId: "operation-settling",
+        execution: {
+          toolCallId: "tool-settling",
+          toolName: "bash",
+          toolKind: "shell",
+          status: "interrupted",
+          projectionSource: "live",
+          resultState: "unreconciled",
+          completedAt: 25
+        }
+      }
+    });
+
+    expect(fixture.postEvent).toHaveBeenCalledOnce();
+    expect(fixture.postEvent.mock.calls[0]?.[0]).toMatchObject({
+      type: "operation.toolExecutionChanged",
+      context: { operationId: "operation-settling" },
+      payload: { operationId: "operation-settling" }
+    });
+  });
 });
 
 function createFixture(

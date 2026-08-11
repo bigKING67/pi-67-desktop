@@ -1,8 +1,10 @@
+import { MAX_OPERATION_TOOL_EXECUTIONS } from "@pi67/domain";
 import type {
   ApprovalRequestView,
   ExtensionUiRequestView,
   OperationActivity,
-  OperationLifecycle
+  OperationLifecycle,
+  ToolExecutionView
 } from "@pi67/domain";
 import type { AgentEvent, EventEnvelope, OperationSettled } from "@pi67/protocol";
 import { useApprovalStore } from "../approval/approval-store.js";
@@ -48,6 +50,14 @@ export function reduceOperationEvent<TState extends AppEventState>(
         event.payload.activity
       );
       updateOperation(set, event.payload.operationId, event.payload.activity);
+      return true;
+    case "operation.toolExecutionChanged":
+      if (!acceptsLiveOperationEvent(get(), event.payload.operationId)) return false;
+      useOperationActivityTimelineStore.getState().recordToolExecution(
+        event.payload.operationId,
+        event.payload.execution
+      );
+      updateOperationToolExecution(set, event.payload.operationId, event.payload.execution);
       return true;
     case "operation.progress":
       if (!acceptsLiveOperationEvent(get(), event.payload.operationId)) return false;
@@ -170,6 +180,30 @@ function updateOperation<TState extends AppEventState>(
     }
     return {
       operation: { ...state.operation, lifecycle: activityLifecycle(activity), activity }
+    } as Partial<TState>;
+  });
+}
+
+function updateOperationToolExecution<TState extends AppEventState>(
+  set: EventStoreSet<TState>,
+  operationId: string,
+  execution: ToolExecutionView
+): void {
+  set((state) => {
+    if (state.operation?.operationId !== operationId) return {} as Partial<TState>;
+    const previous = state.operation.toolExecutions ?? [];
+    const next = [
+      ...previous.filter((candidate) => candidate.toolCallId !== execution.toolCallId),
+      execution
+    ];
+    const truncated = state.operation.toolExecutionsTruncated === true
+      || next.length > MAX_OPERATION_TOOL_EXECUTIONS;
+    return {
+      operation: {
+        ...state.operation,
+        toolExecutions: next.slice(-MAX_OPERATION_TOOL_EXECUTIONS),
+        ...(truncated ? { toolExecutionsTruncated: true } : {})
+      }
     } as Partial<TState>;
   });
 }

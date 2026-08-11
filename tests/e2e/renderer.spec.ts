@@ -341,7 +341,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
       error: { code: "INTERNAL", message: "测试失败", recoverable: true }
     }
   }, { operationId });
-  const failedTimeline = page.locator("[data-turn-activity]").filter({ hasText: "执行过程有失败" });
+  const failedTimeline = page.locator("[data-turn-activity]").filter({ hasText: "执行失败" });
   await expect(failedTimeline).toBeVisible();
   await expect(failedTimeline).toHaveAttribute("open", "");
   await expect(failedTimeline).toContainText("测试失败");
@@ -404,7 +404,7 @@ test("projects operation activities and sends an operation-scoped abort", async 
   const completedTimeline = page.locator(
     "[data-turn-activity][data-operation-lifecycle='completed']"
   );
-  await expect(completedTimeline).toContainText("执行过程 · 1 次工具调用 · 3 秒");
+  await expect(completedTimeline).toContainText("执行未完整收口 · 1 次工具调用 · 3 秒");
   await expect(completedTimeline).toHaveAttribute("open", "");
   await expect(completedTimeline).toContainText("分析问题");
   await expect(completedTimeline).toContainText("读取文件");

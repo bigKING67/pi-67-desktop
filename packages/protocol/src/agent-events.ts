@@ -16,6 +16,7 @@ import type {
   SessionSnapshot,
   SessionInteractionMode,
   TaskToolMode,
+  ToolExecutionView,
   ApprovalResponseDecision,
   WorkspaceChangeView
 } from "@pi67/domain";
@@ -68,6 +69,7 @@ export interface EventPayloads {
   "operation.started": { operation: OperationView };
   "operation.heartbeat": { operationId: string; observedAt: number; lastActivityAt: number };
   "operation.activityChanged": { operationId: string; activity: OperationActivity | null };
+  "operation.toolExecutionChanged": { operationId: string; execution: ToolExecutionView };
   "operation.progress": { operationId: string; message: string; current?: number; total?: number };
   "operation.completed": { operationId: string; completedAt: number };
   "operation.failed": { operationId: string; failedAt: number; error: ProtocolError };

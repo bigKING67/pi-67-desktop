@@ -15,6 +15,7 @@ import {
 } from "@pi67/domain";
 import { AssetReferenceSchema } from "./asset-schemas.js";
 import { ExtensionToolAdapterSchema } from "./extension-catalog-schemas.js";
+import { ToolExecutionSchema, ToolExecutionStatusSchema } from "./operation-schemas.js";
 
 const TextPartSchema = messageObject({
   type: Type.Union([Type.Literal("text"), Type.Literal("thinking")]),
@@ -24,13 +25,9 @@ const ToolCallPartSchema = messageObject({
   type: Type.Literal("tool-call"),
   id: Type.String(),
   name: Type.String(),
-  status: Type.Union([
-    Type.Literal("pending"),
-    Type.Literal("running"),
-    Type.Literal("completed"),
-    Type.Literal("failed")
-  ]),
+  status: ToolExecutionStatusSchema,
   summary: Type.Optional(Type.String()),
+  execution: Type.Optional(ToolExecutionSchema),
   adapter: Type.Optional(ExtensionToolAdapterSchema)
 });
 const ImagePartSchema = messageObject({

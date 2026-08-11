@@ -224,6 +224,7 @@ function operationIdForEvent(event: AgentEvent): string | undefined {
       return event.payload.operation.operationId;
     case "operation.heartbeat":
     case "operation.activityChanged":
+    case "operation.toolExecutionChanged":
     case "operation.progress":
     case "operation.completed":
     case "operation.failed":
@@ -246,6 +247,7 @@ function isLiveOperationEvent(type: AgentEvent["type"]): boolean {
   return type === "operation.started"
     || type === "operation.heartbeat"
     || type === "operation.activityChanged"
+    || type === "operation.toolExecutionChanged"
     || type === "operation.progress";
 }
 

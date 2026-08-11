@@ -2,13 +2,15 @@ import type {
   OperationActivity,
   OperationKind,
   OperationLifecycle,
-  OperationView
+  OperationView,
+  ToolExecutionStatus,
+  ToolExecutionView
 } from "@pi67/domain";
 import { create } from "zustand";
 
 const MAX_TIMELINE_STEPS = 64;
 
-type OperationTimelineStepStatus = "running" | "completed" | "failed" | "cancelled" | "lost";
+type OperationTimelineStepStatus = ToolExecutionStatus;
 
 export interface OperationTimelineStep {
   id: string;
@@ -17,6 +19,7 @@ export interface OperationTimelineStep {
   startedAt: number;
   settledAt?: number | undefined;
   detail?: string | undefined;
+  toolExecution?: ToolExecutionView | undefined;
 }
 
 export interface OperationActivityTimeline {
@@ -36,6 +39,7 @@ interface OperationActivityTimelineState {
   begin: (operation: OperationView) => void;
   restoreFromProjection: (operation: OperationView, observedAt?: number) => void;
   recordActivity: (operationId: string, activity: OperationActivity | null, observedAt?: number) => void;
+  recordToolExecution: (operationId: string, execution: ToolExecutionView) => void;
   updateProgress: (operationId: string, detail: string) => void;
   finish: (
     operationId: string,
@@ -61,6 +65,14 @@ export const useOperationActivityTimelineStore = create<OperationActivityTimelin
     set((state) => ({
       timeline: state.timeline?.operationId === operationId
         ? recordOperationTimelineActivity(state.timeline, activity, observedAt)
+        : state.timeline
+    }));
+  },
+
+  recordToolExecution(operationId, execution) {
+    set((state) => ({
+      timeline: state.timeline?.operationId === operationId
+        ? recordOperationTimelineToolExecution(state.timeline, execution)
         : state.timeline
     }));
   },
@@ -102,16 +114,20 @@ export function createOperationActivityTimeline(operation: OperationView): Opera
       startedAt: operation.startedAt
     }]
   };
-  return operation.activity
+  const activityTimeline = operation.activity
     ? recordOperationTimelineActivity(base, operation.activity, operation.startedAt)
     : base;
+  return (operation.toolExecutions ?? []).reduce(
+    recordOperationTimelineToolExecution,
+    activityTimeline
+  );
 }
 
 export function createResynchronizedOperationActivityTimeline(
   operation: OperationView,
   observedAt: number
 ): OperationActivityTimeline {
-  return {
+  const base: OperationActivityTimeline = {
     operationId: operation.operationId,
     operationKind: operation.kind,
     sessionId: operation.sessionId,
@@ -125,6 +141,41 @@ export function createResynchronizedOperationActivityTimeline(
       status: "running",
       startedAt: observedAt
     }]
+  };
+  return (operation.toolExecutions ?? []).reduce(
+    recordOperationTimelineToolExecution,
+    base
+  );
+}
+
+export function recordOperationTimelineToolExecution(
+  timeline: OperationActivityTimeline,
+  execution: ToolExecutionView
+): OperationActivityTimeline {
+  const activity = toolExecutionActivity(execution);
+  const index = timeline.steps.findIndex((step) => (
+    step.activity?.kind === "tool" && step.activity.toolCallId === execution.toolCallId
+  ));
+  const current = index < 0 ? undefined : timeline.steps[index];
+  const step: OperationTimelineStep = {
+    id: current?.id ?? `${timeline.operationId}:${timeline.nextStepSequence}`,
+    activity,
+    toolExecution: execution,
+    status: execution.status,
+    startedAt: execution.startedAt ?? current?.startedAt ?? timeline.startedAt,
+    settledAt: execution.completedAt,
+    detail: toolExecutionDetail(execution)
+  };
+  if (index >= 0) {
+    return {
+      ...timeline,
+      steps: timeline.steps.map((candidate, stepIndex) => stepIndex === index ? step : candidate)
+    };
+  }
+  return {
+    ...timeline,
+    nextStepSequence: timeline.nextStepSequence + 1,
+    steps: [...timeline.steps, step].slice(-MAX_TIMELINE_STEPS)
   };
 }
 
@@ -216,9 +267,7 @@ function settleToolTimelineStep(
 }
 
 function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" }>): string {
-  const result = activity.status === "running"
-    ? "执行中"
-    : activity.status === "completed" ? "执行成功" : "执行失败";
+  const result = toolStatusDetail(activity.status);
   return [
     activity.authorization === undefined
       ? undefined
@@ -232,6 +281,35 @@ function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" 
     activity.aliasTarget === undefined ? undefined : `已兼容转发到 ${activity.aliasTarget}`,
     result
   ].filter((value): value is string => value !== undefined).join(" · ");
+}
+
+function toolExecutionActivity(execution: ToolExecutionView): Extract<OperationActivity, { kind: "tool" }> {
+  return {
+    kind: "tool",
+    toolCallId: execution.toolCallId,
+    toolName: execution.toolName,
+    toolKind: execution.toolKind,
+    status: execution.status,
+    ...(execution.aliasTarget === undefined ? {} : { aliasTarget: execution.aliasTarget }),
+    ...(execution.authorization === undefined ? {} : { authorization: execution.authorization })
+  };
+}
+
+function toolExecutionDetail(execution: ToolExecutionView): string {
+  return toolActivityDetail(toolExecutionActivity(execution));
+}
+
+function toolStatusDetail(status: ToolExecutionStatus): string {
+  switch (status) {
+    case "pending": return "等待执行";
+    case "running": return "执行中";
+    case "completed": return "执行成功";
+    case "failed": return "执行失败";
+    case "interrupted": return "执行被中断";
+    case "cancelled": return "执行已取消";
+    case "lost": return "执行状态丢失";
+    case "unreconciled": return "结果未核对";
+  }
 }
 
 export function updateOperationTimelineProgress(

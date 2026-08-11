@@ -4,7 +4,8 @@ import type {
   ToolAuthorizationProjection,
   ToolCallPart
 } from "@pi67/domain";
-import { Check, ChevronRight, CircleX, LoaderCircle } from "lucide-react";
+import { isUnsuccessfulToolStatus } from "@pi67/domain";
+import { Check, ChevronRight, CircleAlert, CircleX, LoaderCircle, Square } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   OperationActivityTimeline,
@@ -14,7 +15,11 @@ import { operationPresentation } from "../operation/TurnActivity.js";
 import { ToolCard } from "../tool-cards/index.js";
 import { AssetImage } from "./AssetImage.js";
 import { TranscriptMarkdownView } from "./TranscriptMarkdownView.js";
-import type { TranscriptProcessItem, TranscriptRow } from "./transcript-rows.js";
+import type {
+  ProcessGroupOutcome,
+  TranscriptProcessItem,
+  TranscriptRow
+} from "./transcript-rows.js";
 import styles from "./TranscriptProcessGroup.module.css";
 
 type ProcessGroupRow = Extract<TranscriptRow, { kind: "process-group" }>;
@@ -22,26 +27,16 @@ type ProcessGroupRow = Extract<TranscriptRow, { kind: "process-group" }>;
 export function TranscriptProcessGroup({
   row,
   running = false,
-  interrupted = false,
-  completed = true,
   operation,
   timeline,
   liveThinking = ""
 }: {
   row: ProcessGroupRow;
   running?: boolean;
-  interrupted?: boolean;
-  completed?: boolean;
   operation?: OperationView;
   timeline?: OperationActivityTimeline;
   liveThinking?: string;
 }) {
-  const failed = row.failed || interrupted;
-  const completionReady = completed && row.hasFinalAnswer;
-  const [open, setOpen] = useState(running || interrupted || (completed && !row.hasFinalAnswer));
-  const previousRunning = useRef(running);
-  const previousInterrupted = useRef(interrupted);
-  const previousCompletionReady = useRef(completionReady);
   const supplementalThinking = uncommittedLiveThinking(row.items, liveThinking);
   const supplementalTimeline = useMemo(
     () => projectSupplementalTimeline(row.items, timeline, Boolean(liveThinking)),
@@ -51,17 +46,17 @@ export function TranscriptProcessGroup({
   const supplementalTools = supplementalTimeline.filter((item) => item.kind === "tool");
   const stepCount = row.stepCount + supplementalTimeline.length + (supplementalThinking ? 1 : 0);
   const toolCount = row.toolCount + supplementalTools.length;
-  const failedToolCount = row.failedToolCount
-    + supplementalTools.filter((item) => item.tool.status === "failed").length;
+  const unsuccessfulToolCount = row.unsuccessfulToolCount
+    + supplementalTools.filter((item) => isUnsuccessfulToolStatus(item.tool.status)).length;
+  const outcome = resolveProcessGroupOutcome(row, operation, running, unsuccessfulToolCount);
+  const autoExpanded = processOutcomeAutoExpanded(outcome);
+  const [open, setOpen] = useState(autoExpanded);
+  const previousOutcome = useRef(outcome);
 
   useEffect(() => {
-    if (!previousRunning.current && running) setOpen(true);
-    if (!previousInterrupted.current && interrupted) setOpen(true);
-    if (!previousCompletionReady.current && completionReady) setOpen(false);
-    previousRunning.current = running;
-    previousInterrupted.current = interrupted;
-    previousCompletionReady.current = completionReady;
-  }, [completionReady, interrupted, running]);
+    if (previousOutcome.current !== outcome) setOpen(autoExpanded);
+    previousOutcome.current = outcome;
+  }, [autoExpanded, outcome]);
 
   const label = running && operation
     ? operationPresentation(
@@ -73,23 +68,22 @@ export function TranscriptProcessGroup({
     ).label
     : running
       ? "正在执行"
-      : failed
-        ? "执行过程有失败"
-        : "执行过程";
+      : processOutcomeLabel(outcome);
   const duration = !running && timeline
     ? formatTimelineDuration(timeline.startedAt, timeline.settledAt)
     : undefined;
   const statusDetail = currentBlockingDetail(operation);
   const hasBody = row.items.length > 0 || supplementalThinking !== "" || supplementalTimeline.length > 0 || statusDetail;
   const countSummary = toolCount > 0
-    ? `${toolCount} 次工具调用${failedToolCount > 0 ? ` · ${failedToolCount} 次失败` : ""}`
+    ? `${toolCount} 次工具调用${unsuccessfulToolCount > 0 ? ` · ${unsuccessfulToolCount} 个步骤未成功` : ""}`
     : `${Math.max(1, stepCount)} 个步骤`;
 
   return (
     <details
-      className={`${styles.group} ${failed ? styles.failed : ""}`}
+      className={`${styles.group} ${outcome === "failed" ? styles.failed : ""} ${isWarningOutcome(outcome) ? styles.warning : ""}`}
       data-operation-lifecycle={operation?.lifecycle}
-      data-process-failed={failed ? "true" : "false"}
+      data-process-failed={outcome === "failed" ? "true" : "false"}
+      data-process-outcome={outcome}
       data-process-running={running ? "true" : "false"}
       data-testid="transcript-process-group"
       data-turn-activity={operation ? "true" : undefined}
@@ -98,9 +92,7 @@ export function TranscriptProcessGroup({
     >
       <summary>
         <span className={styles.statusIcon} aria-hidden="true">
-          {running && !row.failed
-            ? <LoaderCircle className={styles.spinning} size={14} />
-            : failed ? <CircleX size={14} /> : <Check size={14} />}
+          {processOutcomeIcon(outcome)}
         </span>
         <span className={styles.summaryCopy} aria-live={running ? "polite" : undefined}>
           <strong>{label}</strong>
@@ -193,7 +185,9 @@ function ProcessItem({
     return (
       <li className={styles.step} data-process-step="tool">
         <ToolCard
-          {...(authorization === undefined ? {} : { authorization })}
+          {...((item.call.execution?.authorization ?? authorization) === undefined
+            ? {}
+            : { authorization: item.call.execution?.authorization ?? authorization! })}
           {...(item.result === undefined ? {} : { result: item.result })}
           tool={item.call}
         />
@@ -268,11 +262,12 @@ function projectSupplementalTimeline(
           type: "tool-call" as const,
           id: step.activity.toolCallId,
           name: step.activity.toolName,
-          status: step.activity.status
+          status: step.toolExecution?.status ?? step.activity.status,
+          ...(step.toolExecution === undefined ? {} : { execution: step.toolExecution })
         },
-        ...(step.activity.authorization === undefined
+        ...((step.toolExecution?.authorization ?? step.activity.authorization) === undefined
           ? {}
-          : { authorization: step.activity.authorization })
+          : { authorization: step.toolExecution?.authorization ?? step.activity.authorization! })
       }];
     }
     if (hasPersistedContent) return [];
@@ -293,15 +288,62 @@ function projectToolAuthorizations(
 ): ReadonlyMap<string, ToolAuthorizationProjection> {
   const result = new Map<string, ToolAuthorizationProjection>();
   for (const step of timeline?.steps ?? []) {
-    if (step.activity?.kind === "tool" && step.activity.authorization) {
-      result.set(step.activity.toolCallId, step.activity.authorization);
+    if (step.activity?.kind === "tool") {
+      const authorization = step.toolExecution?.authorization ?? step.activity.authorization;
+      if (authorization) result.set(step.activity.toolCallId, authorization);
     }
   }
   return result;
 }
 
+export function resolveProcessGroupOutcome(
+  row: ProcessGroupRow,
+  operation: OperationView | undefined,
+  running: boolean,
+  unsuccessfulToolCount: number
+): ProcessGroupOutcome {
+  if (running) return "running";
+  if (operation?.lifecycle === "failed") return "failed";
+  if (operation?.lifecycle === "cancelled") return "cancelled";
+  if (operation?.lifecycle === "lost") return "lost";
+  if (!row.hasFinalAnswer) return "incomplete";
+  return unsuccessfulToolCount > 0 ? "completed-with-warnings" : "completed";
+}
+
+function processOutcomeAutoExpanded(outcome: ProcessGroupOutcome): boolean {
+  return outcome !== "completed" && outcome !== "completed-with-warnings";
+}
+
+function processOutcomeLabel(outcome: ProcessGroupOutcome): string {
+  switch (outcome) {
+    case "running": return "正在执行";
+    case "completed":
+    case "completed-with-warnings": return "执行完成";
+    case "failed": return "执行失败";
+    case "cancelled": return "执行已取消";
+    case "lost": return "执行连接中断";
+    case "incomplete": return "执行未完整收口";
+  }
+}
+
+function processOutcomeIcon(outcome: ProcessGroupOutcome) {
+  switch (outcome) {
+    case "running": return <LoaderCircle className={styles.spinning} size={14} />;
+    case "completed": return <Check size={14} />;
+    case "failed": return <CircleX size={14} />;
+    case "cancelled": return <Square size={12} />;
+    case "completed-with-warnings":
+    case "lost":
+    case "incomplete": return <CircleAlert size={14} />;
+  }
+}
+
+function isWarningOutcome(outcome: ProcessGroupOutcome): boolean {
+  return outcome === "completed-with-warnings" || outcome === "lost" || outcome === "incomplete";
+}
+
 function timelineStepLabel(operationKind: OperationKind, step: OperationTimelineStep): string {
-  const active = step.status === "running";
+  const active = step.status === "running" || step.status === "pending";
   if (step.activity === undefined) {
     if (operationKind === "command") return active ? "正在准备命令" : "准备命令";
     return active ? "正在准备任务" : "准备任务";

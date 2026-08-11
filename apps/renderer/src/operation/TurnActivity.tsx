@@ -259,10 +259,12 @@ function TimelineSteps({
   return (
     <ol className={styles.timelineSteps}>
       {steps.map((step, index) => {
-        const active = step.status === "running";
+        const active = step.status === "running" || step.status === "pending";
         const stepDetail = active && index === steps.length - 1 ? progress ?? step.detail : step.detail;
-        const duration = !active && step.settledAt !== undefined
-          ? formatStepDuration(step.startedAt, step.settledAt)
+        const duration = !active
+          ? step.toolExecution
+            ? formatDurationMs(step.toolExecution.durationMs)
+            : step.settledAt === undefined ? undefined : formatStepDuration(step.startedAt, step.settledAt)
           : undefined;
         return (
           <li className={styles.timelineStep} data-step-status={step.status} key={step.id}>
@@ -312,19 +314,36 @@ function timelineStepLabel(
 }
 
 function delegatedToolStatusLabel(status: Extract<OperationActivity, { kind: "tool" }>["status"]): string {
-  if (status === "running") return messages.operation.delegatedToolRunning;
-  if (status === "failed") return messages.operation.delegatedToolFailed;
-  return messages.operation.delegatedToolCompleted;
+  switch (status) {
+    case "pending": return messages.operation.delegatedToolPending;
+    case "running": return messages.operation.delegatedToolRunning;
+    case "completed": return messages.operation.delegatedToolCompleted;
+    case "failed": return messages.operation.delegatedToolFailed;
+    case "interrupted": return messages.operation.delegatedToolInterrupted;
+    case "cancelled": return messages.operation.delegatedToolCancelled;
+    case "lost": return messages.operation.delegatedToolLost;
+    case "unreconciled": return messages.operation.delegatedToolUnreconciled;
+  }
 }
 
 function timelineStepIcon(status: OperationTimelineStep["status"]): ReactNode {
   switch (status) {
+    case "pending": return <CircleDashed aria-hidden="true" size={14} />;
     case "running": return <CircleDashed aria-hidden="true" className={styles.spinning} size={14} />;
     case "completed": return <Check aria-hidden="true" size={14} />;
     case "failed": return <CircleX aria-hidden="true" size={14} />;
+    case "interrupted":
+    case "unreconciled": return <CircleAlert aria-hidden="true" size={14} />;
     case "cancelled": return <Square aria-hidden="true" size={11} />;
     case "lost": return <CircleAlert aria-hidden="true" size={14} />;
   }
+}
+
+function formatDurationMs(elapsed: number | undefined): string | undefined {
+  if (elapsed === undefined) return undefined;
+  if (elapsed < 1_000) return elapsed === 0 ? undefined : `${elapsed}ms`;
+  if (elapsed < 10_000) return `${(elapsed / 1_000).toFixed(1)}s`;
+  return `${Math.round(elapsed / 1_000)}s`;
 }
 
 function formatStepDuration(startedAt: number, settledAt: number): string | undefined {

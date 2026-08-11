@@ -120,6 +120,7 @@ function isBusinessActivityEvent(event: AgentEvent): boolean {
     case "turn.streamBatch":
     case "operation.started":
     case "operation.activityChanged":
+    case "operation.toolExecutionChanged":
     case "operation.progress":
     case "workspace.changeChanged":
     case "approval.requested":

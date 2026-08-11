@@ -37,6 +37,7 @@ export const MOCK_RUNTIME_DIAGNOSTICS = {
   model: "openai/gpt-test",
   extensionCount: 0,
   extensionErrors: [],
+  toolExecutionReceiptFailureCount: 0,
   host: {
     hostEpoch: 0,
     taskCount: 1,

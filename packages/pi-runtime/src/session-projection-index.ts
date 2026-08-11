@@ -9,6 +9,7 @@ import type {
 import type {
   MessageSearchItem,
   SessionCompatibilityView,
+  ToolExecutionView,
   UserMessageIndexItem
 } from "@pi67/domain";
 import {
@@ -17,6 +18,7 @@ import {
   searchProjectedMessages
 } from "./session-message-projection.js";
 import { projectSessionCompatibility } from "./session-compatibility-projection.js";
+import { DurableToolExecutionIndex } from "./durable-tool-execution-index.js";
 
 export interface SessionProjectionMetadata {
   sessionId: string;
@@ -48,6 +50,7 @@ interface ProjectionState {
   tree: SessionTreeNode[];
   treeNodesById: Map<string, SessionTreeNode>;
   compatibility: SessionCompatibilityView;
+  toolExecutions: DurableToolExecutionIndex;
 }
 
 /**
@@ -133,6 +136,10 @@ export class SessionProjectionIndex {
     return this.synchronizeState().compatibility;
   }
 
+  getToolExecution(toolCallId: string): ToolExecutionView | undefined {
+    return this.synchronizeState().toolExecutions.get(toolCallId);
+  }
+
   private requireState(manager: SessionManager): ProjectionState {
     const state = this.requireBoundState();
     if (state.manager !== manager || state.sessionId !== manager.getSessionId()) {
@@ -180,6 +187,7 @@ function buildState(manager: SessionManager, entries: SessionEntry[]): Projectio
     usage: emptyUsage(),
     messageStats: emptyMessageStats(),
     compatibility: projectSessionCompatibility(manager, entries),
+    toolExecutions: new DurableToolExecutionIndex(manager.getCwd()),
     ...buildTree(entries)
   };
   for (const entry of entries) accumulateEntry(state, entry);
@@ -204,6 +212,7 @@ function appendEntry(state: ProjectionState, entry: SessionEntry, nextLeafId: st
   if (nextLeafId === entry.id && entry.parentId === previousLeafId) {
     state.branchIndex.set(entry.id, state.branch.length);
     state.branch.push(entry);
+    state.toolExecutions.observe(entry);
     appendProjectedUserMessage(state.userMessages, entry, state.branch.at(-2));
   } else {
     rebuildBranch(state);
@@ -230,6 +239,7 @@ function rebuildBranch(state: ProjectionState): void {
   state.branch = reverse.reverse();
   state.branchIndex = new Map(state.branch.map((entry, index) => [entry.id, index]));
   state.userMessages = projectUserMessageIndex(state.branch);
+  state.toolExecutions.rebuild(state.branch, state.manager.getCwd());
 }
 
 function buildTree(entries: SessionEntry[]): Pick<ProjectionState, "tree" | "treeNodesById"> {

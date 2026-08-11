@@ -240,6 +240,32 @@ describe("normalizeMessages tool outcome correlation", () => {
 
     expect(messages[0]?.parts[0]).toMatchObject({ status: "completed" });
   });
+
+  it("prefers the full-branch Tool execution projection over page-local inference", () => {
+    const execution = {
+      toolCallId: "search-call",
+      toolName: "web_search",
+      toolKind: "search" as const,
+      status: "failed" as const,
+      projectionSource: "durable" as const,
+      resultState: "present" as const,
+      failure: {
+        detailState: "available" as const,
+        source: "pi-result" as const,
+        message: { text: "provider unavailable", truncated: false }
+      }
+    };
+    const messages = normalizeMessagesWithAdapters([{
+      role: "assistant",
+      content: [{ type: "toolCall", id: "search-call", name: "web_search", arguments: {} }]
+    }], [], undefined, undefined, (toolCallId) => toolCallId === "search-call" ? execution : undefined);
+
+    expect(messages[0]?.parts[0]).toMatchObject({
+      type: "tool-call",
+      status: "failed",
+      execution
+    });
+  });
 });
 
 describe("normalizeMessages Desktop prompt attachments", () => {

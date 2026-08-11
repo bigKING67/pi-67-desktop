@@ -1,6 +1,7 @@
 import type { AgentSession, AgentSessionEvent, SessionStats } from "@earendil-works/pi-coding-agent";
 import type {
   RuntimeOperationActivity,
+  ToolExecutionView,
   ToolAuthorizationProjection,
   ToolPresentationKind,
   WorkspaceChangeView
@@ -18,12 +19,16 @@ import {
   projectLiveWorkspaceChangeStart
 } from "./workspace-change-projection.js";
 import { OperationActivityProjector } from "./operation-activity-projector.js";
+import { ToolExecutionProjector } from "./tool-execution-projector.js";
+import { TOOL_EXECUTION_RECEIPT_TYPE } from "./tool-execution-receipt.js";
 
 interface SessionEventProjectionTarget {
   getSession: () => AgentSession;
   getStats: () => SessionStats;
   emit: (event: AgentEvent) => void;
   emitActivity: (activity: RuntimeOperationActivity) => void;
+  emitToolExecution: (execution: ToolExecutionView) => void;
+  reportToolExecutionReceiptFailure: () => void;
   pushStream: (delta: StreamDelta) => void;
   flushStream: () => void;
   bindToolExecutionStart: (toolCallId: string, toolName: string) => ToolPresentationKind;
@@ -35,14 +40,28 @@ interface SessionEventProjectionTarget {
 export class SessionEventProjector {
   private readonly liveChanges = new Map<string, WorkspaceChangeView>();
   private readonly activity: OperationActivityProjector;
+  private readonly toolExecutions: ToolExecutionProjector;
 
   constructor(private readonly target: SessionEventProjectionTarget) {
     this.activity = new OperationActivityProjector(target.emitActivity);
+    this.toolExecutions = new ToolExecutionProjector({
+      emit: target.emitToolExecution,
+      getCwd: () => target.getSession().sessionManager.getCwd(),
+      persistReceipt: (data) => {
+        target.getSession().sessionManager.appendCustomEntry(TOOL_EXECUTION_RECEIPT_TYPE, data);
+      },
+      reportReceiptFailure: target.reportToolExecutionReceiptFailure
+    });
   }
 
   reset(): void {
     this.liveChanges.clear();
     this.activity.reset();
+    this.toolExecutions.reset();
+  }
+
+  requestToolCancellation(): void {
+    this.toolExecutions.requestCancellation();
   }
 
   recordToolAuthorization(
@@ -50,6 +69,7 @@ export class SessionEventProjector {
     authorization: ToolAuthorizationProjection
   ): void {
     this.activity.recordToolAuthorization(toolCallId, authorization);
+    this.toolExecutions.recordAuthorization(toolCallId, authorization);
   }
 
   handle(event: AgentSessionEvent): void {
@@ -60,6 +80,7 @@ export class SessionEventProjector {
       ? this.target.getToolAuthorization(event.toolCallId)
       : undefined;
     this.activity.handle(event, toolKind, authorization);
+    this.toolExecutions.handle(event, toolKind, authorization);
     if (event.type === "tool_execution_start") {
       const change = projectLiveWorkspaceChangeStart(event);
       if (change) {

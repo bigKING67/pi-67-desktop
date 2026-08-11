@@ -68,8 +68,6 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
       ) : null}
       {context.liveProcess ? (
         <DeferredTranscriptProcessGroup
-          completed={context.liveProcess.completed}
-          interrupted={context.liveProcess.interrupted}
           liveThinking={context.liveThinking}
           operation={context.liveProcess.operation}
           row={context.liveProcess.row}

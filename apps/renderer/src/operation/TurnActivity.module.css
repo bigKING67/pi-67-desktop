@@ -115,6 +115,7 @@
   color: var(--text-tertiary);
 }
 
+.timelineStep[data-step-status="pending"] .stepIcon,
 .timelineStep[data-step-status="running"] .stepIcon {
   color: var(--accent);
 }
@@ -123,7 +124,8 @@
   color: var(--danger);
 }
 
-.timelineStep[data-step-status="cancelled"] .stepIcon,
+.timelineStep[data-step-status="interrupted"] .stepIcon,
+.timelineStep[data-step-status="unreconciled"] .stepIcon,
 .timelineStep[data-step-status="lost"] .stepIcon {
   color: var(--warning);
 }
@@ -144,6 +146,7 @@
   white-space: nowrap;
 }
 
+.timelineStep[data-step-status="pending"] .stepCopy strong,
 .timelineStep[data-step-status="running"] .stepCopy strong {
   color: var(--text-secondary);
   font-weight: 620;

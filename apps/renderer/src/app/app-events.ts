@@ -38,6 +38,7 @@ export function handleAgentEvent<TState extends AppEventState>(
     case "operation.started":
     case "operation.heartbeat":
     case "operation.activityChanged":
+    case "operation.toolExecutionChanged":
     case "operation.progress":
     case "operation.completed":
     case "operation.failed":
@@ -101,6 +102,7 @@ function requiresSessionAuthority(type: RoutedAgentEvent["type"]): boolean {
     case "operation.started":
     case "operation.heartbeat":
     case "operation.activityChanged":
+    case "operation.toolExecutionChanged":
     case "operation.progress":
     case "operation.completed":
     case "operation.failed":

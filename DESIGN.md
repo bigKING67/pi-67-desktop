@@ -321,9 +321,9 @@ loading error where the operation can produce those states
   their distinct stopped state.
 - Consecutive reasoning Assistant parts, progress narration, Tool Calls, and Tool
   Results form one execution disclosure in the Transcript. A process with Tools
-  summarizes as `执行过程 · N 次工具调用 · duration`; a process without Tools falls
-  back to `执行过程 · N 个步骤 · duration`, and a failed Tool count is appended when
-  present. Within it, reasoning uses the low-emphasis `分析` label, narration uses
+  summarizes by outcome and then appends `N 次工具调用 · duration`; a process without
+  Tools falls back to `N 个步骤 · duration`. Within it, reasoning uses the
+  low-emphasis `分析` label, narration uses
   the parallel `进度` label, and each Tool Call is paired with its correlated Tool
   Result as one compact logical step; the call and result are never rendered as
   duplicate peer cards. An unmatched legacy Tool Result remains one explicitly inspectable
@@ -337,6 +337,22 @@ loading error where the operation can produce those states
   process data. The final Assistant answer remains an ordinary editorial Markdown
   message outside that process surface. Pi JSONL remains the conversation source of
   truth; this hierarchy is a disposable Renderer projection.
+- Process outcome is independent from individual Tool outcome. `running` reads
+  `正在执行` and remains expanded; a clean final answer reads `执行完成` and folds;
+  a final answer with failed, interrupted, cancelled, lost, or unreconciled Tools
+  reads `执行完成 · N 次工具调用 · M 个步骤未成功`, uses the quiet warning role, and
+  folds while preserving every Tool detail. Only an Operation whose authoritative
+  lifecycle is `failed` reads `执行失败`, uses danger, and stays expanded. Cancelled,
+  lost, and no-final-answer states read `执行已取消`, `执行连接中断`, and
+  `执行未完整收口`; they stay expanded and never masquerade as a Tool failure.
+- Tool lifecycle is keyed by Pi `toolCallId` and distinguishes `pending`, `running`,
+  `completed`, `failed`, `interrupted`, `cancelled`, `lost`, and `unreconciled`.
+  Live events may add bounded redacted input, recognized command, Session working
+  directory, recent progress, real failure detail, and runtime timing. A compact
+  Pi JSONL receipt persists only Tool identity, terminal status, and timing; on
+  reopen the durable Tool Result remains authoritative, the receipt only restores
+  timing, and a missing result becomes `unreconciled` rather than a fabricated
+  success or failure. Renderer time never substitutes for Runtime/receipt time.
 - A recognized Tool row leads with a human semantic action and one bounded target
   summary. Its exact Tool identifier, response identity, and bounded redacted
   argument projection belong inside the expanded detail rather than competing on
@@ -346,6 +362,10 @@ loading error where the operation can produce those states
   Tool titles use 12px, semantic summaries 11px, and process metadata no smaller
   than 10px. Desktop widths keep one truncated row; narrow widths use one deliberate
   second metadata row rather than arbitrary wrapping or document overflow.
+  Failed or integrity-uncertain rows open by default and show the projected real
+  error or a specific missing-result explanation; successful rows remain compact.
+  `复制详情` copies only the bounded redacted projection, progress, and failure text,
+  never the entire raw Tool payload.
 - An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
   `AUTO · 已配置来源`, `AUTO · 只读`, `AUTO · 工作区命令`, or
   `AUTO · Workspace 内写入`. The reason

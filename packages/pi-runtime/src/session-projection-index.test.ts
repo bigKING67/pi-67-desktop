@@ -151,6 +151,42 @@ describe("SessionProjectionIndex", () => {
     expect(branchSearch.items.map((item) => item.id)).toEqual([rootId, branchId]);
     expect(branchSearch.items.every((item) => Array.from(item.snippet).length <= 240)).toBe(true);
   });
+
+  it("correlates a Tool Result outside the requested message page", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "projection-tool-pagination" });
+    const callEntryId = manager.appendMessage(toolCallAssistant("tool-1", "web_search", 1));
+    const resultEntryId = manager.appendMessage({
+      role: "toolResult",
+      toolCallId: "tool-1",
+      toolName: "web_search",
+      content: [{ type: "text", text: "provider unavailable" }],
+      isError: true,
+      timestamp: 2
+    });
+    const projection = new SessionProjectionIndex();
+    projection.bind(manager);
+
+    const page = projectMessagePage(
+      projection,
+      { direction: "older", cursor: resultEntryId, limit: 1 },
+      undefined,
+      undefined,
+      (toolCallId) => projection.getToolExecution(toolCallId)
+    );
+
+    expect(page.messages).toHaveLength(1);
+    expect(page.messages[0]?.id).toBe(callEntryId);
+    expect(page.messages[0]?.parts[0]).toMatchObject({
+      type: "tool-call",
+      id: "tool-1",
+      status: "failed",
+      execution: {
+        status: "failed",
+        resultState: "present",
+        failure: { message: { text: "provider unavailable" } }
+      }
+    });
+  });
 });
 
 function appended(manager: SessionManager, id: string): AgentSessionEvent {
@@ -183,6 +219,26 @@ function assistantMessage(text: string, timestamp: number) {
       cost: { input: 0.1, output: 0.1, cacheRead: 0.03, cacheWrite: 0.02, total: 0.25 }
     },
     stopReason: "stop" as const,
+    timestamp
+  };
+}
+
+function toolCallAssistant(toolCallId: string, toolName: string, timestamp: number) {
+  return {
+    role: "assistant" as const,
+    content: [{ type: "toolCall" as const, id: toolCallId, name: toolName, arguments: { query: "fixture" } }],
+    api: "openai-responses" as const,
+    provider: "pi67-test",
+    model: "fixture",
+    usage: {
+      input: 1,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 2,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+    },
+    stopReason: "toolUse" as const,
     timestamp
   };
 }

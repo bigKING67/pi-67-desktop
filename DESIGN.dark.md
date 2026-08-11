@@ -143,6 +143,14 @@ spacing, component states, and motion as `DESIGN.md`.
 - Verified `delegated` Tool rows retain ordinary Tool-card geometry. Running,
   completed, and failed states remain distinguishable by icon, copy, and contrast;
   dark styling never implies a child-agent roster or extra model/token evidence.
+- Transcript Process disclosures and Tool rows preserve the light-theme outcome
+  matrix without glow. A recovered final answer with unsuccessful Tool steps uses
+  the quiet warning role and folds by default; only an authoritative Operation
+  failure uses danger and stays open. Cancelled remains neutral, while lost,
+  incomplete, interrupted, and unreconciled states remain legible through icon,
+  label, luminance, and semantic border rather than hue alone. Open/closed,
+  hover, focus-visible, running, completed, warning, and danger states keep the
+  same geometry and reading order in both themes.
 - Blocking Approval and Extension dialogs keep current-interaction actions separate
   from `停止整个任务`; danger, pending, disabled, focus, and failure remain legible
   at constrained height. The retired Team MCP/Tavily Settings surface has no

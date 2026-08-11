@@ -28,6 +28,7 @@ export const EVENT_CONTEXT_REQUIREMENTS = {
   "operation.started": { session: true, operation: true },
   "operation.heartbeat": { session: true, operation: true },
   "operation.activityChanged": { session: true, operation: true },
+  "operation.toolExecutionChanged": { session: true, operation: true },
   "operation.progress": { session: true, operation: true },
   "operation.completed": { session: true, operation: true },
   "operation.failed": { session: true, operation: true },
@@ -85,6 +86,7 @@ export function hasValidEventContext(envelope: EventContextEnvelope): boolean {
       return event.payload.operationId === taskContext?.operationId
         && event.payload.lastActivityAt <= event.payload.observedAt;
     case "operation.activityChanged":
+    case "operation.toolExecutionChanged":
     case "operation.progress":
     case "operation.completed":
     case "operation.failed":

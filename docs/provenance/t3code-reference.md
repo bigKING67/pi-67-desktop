@@ -9,7 +9,9 @@
 5661c6116c9d6e9e93e59cf067fc02dd3303ceef
 ```
 
-审阅时该 commit 同时是 `main` 的 remote HEAD。上游使用 MIT License：
+2026-08-10 初次审阅时该 commit 同时是 `main` 的 remote HEAD。2026-08-11 扩展 Tool Harness
+审阅路径时，现场 remote HEAD 为 `e5c82d79a09e010d1a87c715f405635f8c45f1f7`；来源权威仍固定
+在上述 reviewed commit，不追随漂移的远端。上游使用 MIT License：
 
 ```text
 LICENSE SHA-256 935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43
@@ -105,6 +107,41 @@ t3code 后续产品版本把部分手动 Plan Mode 入口归到 Legacy/default-o
 选择，不否定上述 durable proposal/Turn lineage 机制，也不代表 Pi-67 弃用第一方 Plan。该后续
 分类不推进本文件的固定审阅 commit。
 
+## Tool 执行生命周期专项审阅与重实现
+
+本次继续固定在同一 commit，审阅 Provider runtime event、ingestion/projection、Web Session
+folding、Timeline process item 和 orchestration timing。决定性源码证据为：
+
+```text
+packages/contracts/src/providerRuntime.ts
+SHA-256 466b86d5f90d41743660fa3e4849941610d152fcf9794bc6d426d9ddf492e737
+
+apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
+SHA-256 5282b5b35e74c10578300deb3966f2c191506c49ff850e1e6c93e47c2e782d20
+
+apps/web/src/session-logic.ts
+SHA-256 7bdf795d576702c3d83fd1642e65e3f8b84ecda97a4c213871e0c964f22d72c6
+
+apps/web/src/components/chat/MessagesTimeline.tsx
+SHA-256 3b5c1b2f3f11d40585341f7e81d6167fd704fe2cf740bf7d671f94f30e7bab79
+
+apps/web/src/components/chat/MessagesTimeline.logic.ts
+SHA-256 3d116d6f2986d76ce57be4711480476655145333b3259867c214938be935fa9c
+
+packages/shared/src/orchestrationTiming.ts
+SHA-256 5e80de85f459d22eeb1759e7bc7c8db292c18a4034d97f22ae16b11150b39912
+```
+
+Pi-67 重新实现 keyed Tool lifecycle、event/projection separation、live/durable merge、process
+item folding、durable timing receipt 和 bounded error projection。Pi Runtime 在 Agent Host 内
+投影真实 Tool start/update/end；Pi JSONL receipt 仅保存 Tool identity、terminal status 与 timing，
+重开时 Tool Result 仍决定成功或失败，receipt 只补 timing。Renderer 将“中间 Tool 未成功但已有
+最终答案”表达为可折叠 warning，只有权威 Operation failure 才表达为红色 `执行失败`。
+
+没有复制 t3code 源码，也没有引入它的 Provider runtime、Effect orchestration、SQLite projection、
+RPC/WebSocket server 或第二套 Session 真源。精确 source/target 映射记录在
+`licenses/provenance.json`。
+
 ## 已重新实现的模式
 
 当前固定审阅批次不再局限于 `DrainableWorker`。Pi-67 已按自身 Domain、Protocol、进程和
@@ -129,6 +166,9 @@ t3code 后续产品版本把部分手动 Plan Mode 入口归到 Legacy/default-o
   transaction、rollback/reconcile、dirty protection 和特殊路径 fixture；
 - operation/overlay lifecycle fencing：Host epoch、Session generation、operation identity、
   late result fencing，以及 Approval/Extension/Command overlay 的确定性优先级。
+- Tool execution lifecycle：按 `toolCallId` 合并并行 start/update/end、100ms progress 节流、
+  bounded/redacted input 与 error、真实 Runtime timing、终态收口、Pi JSONL timing receipt、
+  durable Tool Result 核对和 Renderer process outcome 分层；
 - Plan proposal/Turn lineage：同一 Pi JSONL 的 requested/started/start-failed marker、accepted
   Operation authority、真实 Pi `agent_start` 消费门、启动前恢复和 contextual Refine/Implement；
 - Runtime Health：按需聚合 Scheduler、Operation/heartbeat、Main Supervisor、Repository service

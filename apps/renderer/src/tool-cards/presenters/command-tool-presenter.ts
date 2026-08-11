@@ -15,13 +15,15 @@ export const commandToolPresenter: ToolPresenter = {
     ["bash", "shell", "exec", "exec-command", "run-command"]
   ),
   present(tool) {
-    const summary = normalizeToolSummary(tool.summary);
+    const summary = normalizeToolSummary(tool.execution?.inputSummary?.text ?? tool.summary);
     const fields = parseToolSummaryFields(tool.summary);
-    const command = readToolSummaryTextField(fields, ["command", "cmd", "script"]);
-    const cwd = readToolSummaryTextField(
+    const command = tool.execution?.command?.text
+      ?? readToolSummaryTextField(fields, ["command", "cmd", "script"]);
+    const cwd = tool.execution?.cwd ?? readToolSummaryTextField(
       fields,
       ["cwd", "workingDirectory", "working_directory"]
     );
+    const duration = formatDuration(tool.execution?.durationMs);
 
     return {
       presenterId: "bash",
@@ -30,13 +32,18 @@ export const commandToolPresenter: ToolPresenter = {
       compact: compactToolText(command ?? summary, "命令详情未提供"),
       details: compactToolDetails([
         command ? { label: "命令", value: command } : undefined,
-        cwd ? { label: "工作目录", value: cwd } : undefined
+        cwd ? { label: "工作目录", value: cwd } : undefined,
+        duration ? { label: "耗时", value: duration } : undefined
       ]),
-      limitations: [
-        ...(!cwd ? ["当前投影未记录工作目录。"] : []),
-        "当前投影未记录执行耗时或实时输出。"
-      ],
+      limitations: [],
       ...(summary ? { summary } : {})
     };
   }
 };
+
+function formatDuration(durationMs: number | undefined): string | undefined {
+  if (durationMs === undefined) return undefined;
+  if (durationMs < 1_000) return `${durationMs} ms`;
+  if (durationMs < 10_000) return `${(durationMs / 1_000).toFixed(1)} s`;
+  return `${Math.round(durationMs / 1_000)} s`;
+}

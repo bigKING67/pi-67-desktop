@@ -64,6 +64,41 @@ describe("OperationRegistry", () => {
     expect(registry.latestTerminal()).toEqual(registry.submissionFor("submission-1", "same"));
   });
 
+  it("settles unfinished Tool executions before the Operation terminal event", async () => {
+    const events: AgentEvent[] = [];
+    let complete!: () => void;
+    const registry = createRegistry(events);
+    await registry.accept({
+      submissionId: "tool-lifecycle",
+      fingerprint: "tool-lifecycle",
+      kind: "prompt",
+      execute: () => new Promise<void>((resolve) => { complete = resolve; })
+    });
+    await vi.waitFor(() => expect(events[0]?.type).toBe("operation.started"));
+    registry.updateToolExecution({
+      toolCallId: "tool-1",
+      toolName: "bash",
+      toolKind: "shell",
+      status: "running",
+      projectionSource: "live",
+      resultState: "pending",
+      startedAt: 10
+    });
+
+    complete();
+    await vi.waitFor(() => expect(events.some((event) => event.type === "operation.completed")).toBe(true));
+
+    expect(events.map((event) => event.type)).toEqual([
+      "operation.started",
+      "operation.toolExecutionChanged",
+      "operation.toolExecutionChanged",
+      "operation.completed"
+    ]);
+    expect(events[2]).toMatchObject({
+      payload: { execution: { toolCallId: "tool-1", status: "interrupted", resultState: "unreconciled" } }
+    });
+  });
+
   it("rejects a pending queued submission when its Session generation changes", async () => {
     let identity = runtimeIdentity("session-1", 2);
     let finishQueue!: () => void;

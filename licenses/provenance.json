@@ -240,6 +240,81 @@
       },
       "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
       "modifications": "Reimplemented contextual Refine versus Implement actions through Pi-67 Composer and Session authority. Renderer sends identifiers only for implementation; no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "packages/contracts/src/providerRuntime.ts",
+      "sourceSha256": "466b86d5f90d41743660fa3e4849941610d152fcf9794bc6d426d9ddf492e737",
+      "targetPath": "packages/pi-runtime/src/tool-execution-projector.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented keyed Tool start, update, end, cancellation, settlement, throttled progress, and bounded failure projection over Pi SDK events. Pi remains the only runtime and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts",
+      "sourceSha256": "5282b5b35e74c10578300deb3966f2c191506c49ff850e1e6c93e47c2e782d20",
+      "targetPath": "packages/pi-runtime/src/durable-tool-execution-index.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented event versus projection separation as a disposable full-branch Pi JSONL Tool index. Tool Results remain authoritative and timing receipts cannot manufacture successful results. No t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "apps/web/src/session-logic.ts",
+      "sourceSha256": "7bdf795d576702c3d83fd1642e65e3f8b84ecda97a4c213871e0c964f22d72c6",
+      "targetPath": "apps/renderer/src/operation/operation-activity-timeline-store.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented live and durable Tool projection merging in the Renderer timeline with Pi Operation, Session, and toolCallId authority. Renderer does not own runtime timing or Session truth, and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "apps/web/src/components/chat/MessagesTimeline.logic.ts",
+      "sourceSha256": "3d116d6f2986d76ce57be4711480476655145333b3259867c214938be935fa9c",
+      "targetPath": "apps/renderer/src/transcript/transcript-rows.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented process-item folding so reasoning, narration, Tool Calls, and correlated Tool Results form one disposable Pi JSONL-derived process group. Operation failure remains distinct from unsuccessful Tool steps. No t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "5661c6116c9d6e9e93e59cf067fc02dd3303ceef",
+      "sourcePath": "packages/shared/src/orchestrationTiming.ts",
+      "sourceSha256": "5e80de85f459d22eeb1759e7bc7c8db292c18a4034d97f22ae16b11150b39912",
+      "targetPath": "packages/pi-runtime/src/tool-execution-receipt.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented durable timing receipts as a strict bounded Pi JSONL custom entry containing only Tool identity, terminal status, and timestamps. Raw Tool payloads and t3code source code were not copied."
     }
   ]
 }

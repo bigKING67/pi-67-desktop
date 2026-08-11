@@ -9,7 +9,7 @@ import {
   type SessionSnapshot, type SessionTreeProjection,
   type SessionInteractionMode,
   type PlanImplementationRequestLineage,
-  type WorkspaceTrust, type TaskToolMode
+  type TaskToolMode, type ToolExecutionView, type WorkspaceTrust
 } from "@pi67/domain";
 import type { AgentEvent, AssetReadResult, PiConfigurationReloadState, SlashCommandCatalogResult,
   PromptAttachmentRef, RuntimeDiagnostics, StreamDelta } from "@pi67/protocol";
@@ -45,6 +45,7 @@ export interface PiSdkRuntimeOptions {
 export class PiSdkRuntime implements AgentRuntime {
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly activityListeners = new Set<(activity: RuntimeOperationActivity) => void>();
+  private readonly toolExecutionListeners = new Set<(execution: ToolExecutionView) => void>();
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
   private readonly ownsRuntimeCredentialOverrides: boolean;
   private readonly workspaceServices: PiWorkspaceRuntimeServices | undefined;
@@ -85,6 +86,7 @@ export class PiSdkRuntime implements AgentRuntime {
       getSessionGeneration: () => this.sessionBindings.sessionGeneration,
       emit: (event) => this.emit(event),
       emitActivity: (activity) => this.emitOperationActivity(activity),
+      emitToolExecution: (execution) => this.toolExecutionListeners.forEach((listener) => listener(execution)),
       getToolAuthorization: (toolCallId) => this.toolAuthorizations.get(toolCallId),
       completeToolAuthorization: (toolCallId) => this.toolAuthorizations.complete(toolCallId),
       resetToolAuthorizations: () => this.toolAuthorizations.reset(),
@@ -184,7 +186,6 @@ export class PiSdkRuntime implements AgentRuntime {
       this
     );
   }
-
   getSdkVersion(): string { return VERSION; }
   getExtensionUiCapabilities(): RuntimeCapabilities["extensionUi"] { return this.projections.getCapabilities(); }
   subscribe(listener: (event: AgentEvent) => void): () => void {
@@ -193,10 +194,12 @@ export class PiSdkRuntime implements AgentRuntime {
   subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void {
     this.activityListeners.add(listener); return () => this.activityListeners.delete(listener);
   }
+  subscribeToolExecution(listener: (execution: ToolExecutionView) => void): () => void {
+    this.toolExecutionListeners.add(listener); return () => this.toolExecutionListeners.delete(listener);
+  }
   async initialize(options: RuntimeInitializeOptions, observeStage?: RuntimeInitializationObserver): Promise<SessionSnapshot> {
     return this.sessionLifecycle.initialize(options, observeStage);
   }
-
   async dispose(): Promise<void> {
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
@@ -211,6 +214,7 @@ export class PiSdkRuntime implements AgentRuntime {
     if (this.ownsRuntimeCredentialOverrides) await this.runtimeCredentialOverrides.clear();
     this.listeners.clear();
     this.activityListeners.clear();
+    this.toolExecutionListeners.clear();
   }
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
     const mode = this.toolSafety.setWorkspacePolicy(trust, approvalMode);
@@ -343,6 +347,7 @@ export class PiSdkRuntime implements AgentRuntime {
 
   async abort(): Promise<void> {
     this.uiBridge.cancelAll("abort");
+    this.projections.requestToolCancellation();
     await this.sessionBindings.requireSession().abort();
   }
 
@@ -402,7 +407,12 @@ export class PiSdkRuntime implements AgentRuntime {
   cancelInteractiveRequests(reason: ExtensionUiCancellationReason): string[] { return this.uiBridge.cancelAll(reason); }
 
   async collectDiagnostics(): Promise<RuntimeDiagnostics> {
-    return projectRuntimeDiagnostics(this.sessionBindings.runtime, this.sessionBindings.extensions, VERSION);
+    return projectRuntimeDiagnostics(
+      this.sessionBindings.runtime,
+      this.sessionBindings.extensions,
+      VERSION,
+      this.projections.getToolExecutionReceiptFailureCount()
+    );
   }
 
   async runDoctor(): Promise<DoctorReport> {

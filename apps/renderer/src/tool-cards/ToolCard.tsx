@@ -7,6 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  CircleAlert,
   Clock3,
   Copy,
   FilePenLine,
@@ -15,6 +16,7 @@ import {
   Maximize2,
   Minimize2,
   Network,
+  Square,
   Terminal,
   Wrench
 } from "lucide-react";
@@ -26,6 +28,7 @@ import { messages } from "../localization/message-catalog.js";
 import { AssetImage } from "../transcript/AssetImage.js";
 import { messageTextForCopy } from "../transcript/message-actions.js";
 import styles from "./ToolCard.module.css";
+import { boundToolText } from "./tool-presentation-boundaries.js";
 import {
   createToolCopyText,
   getToolDisplayName,
@@ -46,7 +49,11 @@ const STATUS_ICONS = {
   pending: Clock3,
   running: LoaderCircle,
   completed: CheckCircle2,
-  failed: AlertCircle
+  failed: AlertCircle,
+  interrupted: CircleAlert,
+  cancelled: Square,
+  lost: CircleAlert,
+  unreconciled: CircleAlert
 } satisfies Record<ToolCallPart["status"], typeof Wrench>;
 
 export function ToolCard({
@@ -59,34 +66,50 @@ export function ToolCard({
   authorization?: ToolAuthorizationProjection;
 }) {
   const change = useCommittedWorkspaceChange(tool.id);
-  const presentation = presentToolCall(tool, change);
+  const execution = tool.execution;
+  const projectedTool: ToolCallPart = execution?.inputSummary === undefined
+    ? tool
+    : { ...tool, summary: execution.inputSummary.text };
+  const presentation = presentToolCall(projectedTool, change);
   const KindIcon = KIND_ICONS[presentation.kind];
-  const failed = tool.status === "failed" || Boolean(result?.error);
-  const effectiveStatus = failed ? "failed" : tool.status;
+  const projectedStatus = execution?.status ?? tool.status;
+  const failed = projectedStatus === "failed" || Boolean(result?.error);
+  const effectiveStatus = failed ? "failed" : projectedStatus;
   const StatusIcon = STATUS_ICONS[effectiveStatus];
   const statusLabel = TOOL_STATUS_LABELS[effectiveStatus];
   const toolName = getToolDisplayName(tool.name);
+  const effectiveAuthorization = execution?.authorization ?? authorization;
   const { copyState, copyText } = useCopyFeedback({ failureTitle: "工具详情复制失败" });
-  const [open, setOpen] = useState(failed);
+  const unsuccessful = effectiveStatus === "failed"
+    || effectiveStatus === "interrupted"
+    || effectiveStatus === "cancelled"
+    || effectiveStatus === "lost"
+    || effectiveStatus === "unreconciled";
+  const [open, setOpen] = useState(unsuccessful);
   const [expanded, setExpanded] = useState(false);
-  const previousFailed = useRef(failed);
+  const previousUnsuccessful = useRef(unsuccessful);
   const resultText = result === undefined ? undefined : messageTextForCopy(result);
   const hasLongResult = (resultText?.length ?? 0) > 800;
+  const failureMessage = toolFailureMessage(execution?.failure?.message?.text, result?.error, resultText);
 
   useEffect(() => {
-    if (!previousFailed.current && failed) setOpen(true);
-    previousFailed.current = failed;
-  }, [failed]);
+    if (!previousUnsuccessful.current && unsuccessful) setOpen(true);
+    previousUnsuccessful.current = unsuccessful;
+  }, [unsuccessful]);
 
   async function copyDetails() {
-    const callText = createToolCopyText(tool, presentation);
-    await copyText(resultText ? `${callText}\n\n工具结果\n${resultText}` : callText);
+    const callText = createToolCopyText({ ...projectedTool, status: effectiveStatus }, presentation);
+    const projectedDetails = [
+      execution?.progress ? `实时输出\n${execution.progress.text}` : undefined,
+      failureMessage ? `失败详情\n${failureMessage}` : undefined
+    ].filter((value): value is string => value !== undefined);
+    await copyText(boundToolText([callText, ...projectedDetails].join("\n\n"), 8_000));
   }
 
   return (
     <details
       className={`${styles.card} ${styles[`status-${effectiveStatus}`]}`}
-      aria-label={`${presentation.title}，${statusLabel}${authorization ? `，${authorizationLabel(authorization)}` : ""}`}
+      aria-label={`${presentation.title}，${statusLabel}${effectiveAuthorization ? `，${authorizationLabel(effectiveAuthorization)}` : ""}`}
       data-presenter={presentation.presenterId}
       data-tool-status={effectiveStatus}
       open={open}
@@ -103,13 +126,13 @@ export function ToolCard({
             <strong>{presentation.title}</strong>
           </span>
           <span className={styles.compact}>{presentation.compact}</span>
-          {authorization ? (
+          {effectiveAuthorization ? (
             <span
               className={styles.authorization}
               data-tool-authorization="auto"
-              data-tool-authorization-reason={authorization.reason}
+              data-tool-authorization-reason={effectiveAuthorization.reason}
             >
-              {authorizationLabel(authorization)}
+              {authorizationLabel(effectiveAuthorization)}
             </span>
           ) : null}
         </div>
@@ -140,8 +163,27 @@ export function ToolCard({
               <span>调用参数</span>
               <pre>{presentation.summary}</pre>
             </div>
-          ) : tool.status === "failed" ? (
-            <p className={styles.failureDetail}>工具报告执行失败，但当前投影没有失败详情。</p>
+          ) : null}
+
+          {execution?.progress ? (
+            <div className={styles.progress}>
+              <span>实时输出</span>
+              <pre>{execution.progress.text}{execution.progress.truncated ? "\n…仅显示最近片段" : ""}</pre>
+            </div>
+          ) : null}
+
+          {effectiveStatus === "failed" ? (
+            <p className={styles.failureDetail}>
+              {failureMessage ?? "该步骤失败，但 Pi 结果中没有可显示的错误详情。"}
+            </p>
+          ) : effectiveStatus === "unreconciled" ? (
+            <p className={styles.warningDetail}>该步骤未找到可核对的 Tool Result，结果未能确认。</p>
+          ) : effectiveStatus === "interrupted" ? (
+            <p className={styles.warningDetail}>该步骤在执行完成前被中断，结果未能确认。</p>
+          ) : effectiveStatus === "lost" ? (
+            <p className={styles.warningDetail}>该步骤的运行状态已丢失，结果未能确认。</p>
+          ) : effectiveStatus === "cancelled" ? (
+            <p className={styles.emptyResult}>该步骤已取消。</p>
           ) : null}
 
           {result ? (
@@ -169,9 +211,11 @@ export function ToolCard({
             <p className={styles.emptyResult}>当前会话记录中尚未找到对应的工具结果。</p>
           )}
 
-          <ul className={styles.limitations} aria-label="当前可用信息说明">
-            {presentation.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}
-          </ul>
+          {presentation.limitations.length > 0 ? (
+            <ul className={styles.limitations} aria-label="当前可用信息说明">
+              {presentation.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}
+            </ul>
+          ) : null}
 
           <div className={styles.actions}>
             {hasLongResult ? (
@@ -201,4 +245,16 @@ export function ToolCard({
 
 function authorizationLabel(authorization: ToolAuthorizationProjection): string {
   return messages.operation.autoAuthorizationReasons[authorization.reason];
+}
+
+function toolFailureMessage(
+  projected: string | undefined,
+  resultError: string | undefined,
+  resultText: string | undefined
+): string | undefined {
+  if (projected?.trim()) return projected;
+  if (resultError?.trim() && resultError !== "Tool execution failed.") {
+    return boundToolText(resultError, 4_096);
+  }
+  return resultText?.trim() ? boundToolText(resultText, 4_096) : undefined;
 }

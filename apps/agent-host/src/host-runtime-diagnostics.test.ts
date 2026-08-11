@@ -15,7 +15,8 @@ describe("Host runtime diagnostics", () => {
         sessionConfigured: false,
         sessionFileConfigured: false,
         extensionCount: 0,
-        extensionErrors: []
+        extensionErrors: [],
+        toolExecutionReceiptFailureCount: 0
       }))
     } as unknown as AgentRuntime;
     const taskStates = [{

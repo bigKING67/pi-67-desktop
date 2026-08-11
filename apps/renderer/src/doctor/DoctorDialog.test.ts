@@ -116,6 +116,7 @@ function runtimeDiagnostics(): RuntimeDiagnostics {
     sessionFileConfigured: false,
     extensionCount: 0,
     extensionErrors: [],
+    toolExecutionReceiptFailureCount: 0,
     host: {
       hostEpoch: 4,
       taskCount: 0,

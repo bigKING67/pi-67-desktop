@@ -31,7 +31,11 @@ export const TOOL_STATUS_LABELS: Readonly<Record<ToolCallPart["status"], string>
   pending: "等待执行",
   running: "执行中",
   completed: "已完成",
-  failed: "执行失败"
+  failed: "执行失败",
+  interrupted: "已中断",
+  cancelled: "已取消",
+  lost: "状态丢失",
+  unreconciled: "结果未确认"
 };
 
 export function createToolCopyText(

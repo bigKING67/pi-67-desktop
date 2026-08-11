@@ -13,12 +13,14 @@ describe("SessionEventProjector", () => {
   it("refreshes Conversation projection when a user entry is appended, but not for assistant entries", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "session-event-projector" });
     const emitted: AgentEvent[] = [];
-    const session = { sessionId: manager.getSessionId() } as AgentSession;
+    const session = { sessionId: manager.getSessionId(), sessionManager: manager } as AgentSession;
     const projector = new SessionEventProjector({
       getSession: () => session,
       getStats: () => ({}) as SessionStats,
       emit: (event) => emitted.push(event),
       emitActivity: vi.fn(),
+      emitToolExecution: vi.fn(),
+      reportToolExecutionReceiptFailure: vi.fn(),
       pushStream: vi.fn(),
       flushStream: vi.fn(),
       bindToolExecutionStart: vi.fn(() => "generic" as const),
@@ -44,7 +46,7 @@ describe("SessionEventProjector", () => {
 
   it("projects a late AUTO reason before clearing it at Tool completion", () => {
     const manager = SessionManager.inMemory("/tmp", { id: "session-event-projector-tool" });
-    const session = { sessionId: manager.getSessionId() } as AgentSession;
+    const session = { sessionId: manager.getSessionId(), sessionManager: manager } as AgentSession;
     const activities = vi.fn();
     const authorization = { mode: "auto", reason: "read-only" } as const;
     const getToolAuthorization = vi.fn()
@@ -56,6 +58,8 @@ describe("SessionEventProjector", () => {
       getStats: () => ({}) as SessionStats,
       emit: vi.fn(),
       emitActivity: activities,
+      emitToolExecution: vi.fn(),
+      reportToolExecutionReceiptFailure: vi.fn(),
       pushStream: vi.fn(),
       flushStream: vi.fn(),
       bindToolExecutionStart: vi.fn(() => "search" as const),

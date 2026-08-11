@@ -85,12 +85,13 @@ test("collapses a recovered Tool failure after a final answer", async ({ page })
 
   const process = page.getByTestId("transcript-process-group");
   await expect(process).toBeVisible();
-  await expect(process.locator(":scope > summary")).toContainText("执行过程有失败 · 1 次工具调用 · 1 次失败");
+  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用 · 1 个步骤未成功");
   await expect(process).not.toHaveAttribute("open", "");
   await expect(page.getByText("已通过其他只读来源完成回答。", { exact: true })).toBeVisible();
   await expect(page.getByText("结果引用已过期。", { exact: true })).not.toBeVisible();
 
   await process.locator(":scope > summary").click();
+  await expect(page.getByText("Stored result was unavailable.", { exact: true })).toBeVisible();
   await expect(page.getByText("结果引用已过期。", { exact: true })).toBeVisible();
 });
 
@@ -183,7 +184,7 @@ test("keeps the settled process collapsed and renders Tool output as a bounded l
 
   const process = page.getByTestId("transcript-process-group");
   await expect(process).toBeVisible();
-  await expect(process).toContainText("执行过程");
+  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用");
   await expect(page.getByText("杭州今天有雷阵雨。", { exact: true })).toBeVisible();
   await expect(page.getByText(rawResult, { exact: true })).not.toBeVisible();
 
@@ -281,7 +282,7 @@ test("expands the current execution process and collapses it when the operation 
   }, { operationId });
 
   await expect(process).not.toHaveAttribute("open", "");
-  await expect(process.locator(":scope > summary")).toContainText("执行过程 · 1 次工具调用");
+  await expect(process.locator(":scope > summary")).toContainText("执行完成 · 1 次工具调用");
   await expect(page.getByText("export const ready = true;", { exact: true })).not.toBeVisible();
 });
 

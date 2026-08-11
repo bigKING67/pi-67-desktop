@@ -11,7 +11,8 @@ import {
   type ConversationPage,
   type ExtensionToolAdapterView,
   type PlanProposalStatus,
-  type SessionMessageView
+  type SessionMessageView,
+  type ToolExecutionView
 } from "@pi67/domain";
 import { ProtocolRequestError } from "@pi67/protocol";
 import {
@@ -41,7 +42,8 @@ export function projectMessagePage(
   sessionManager: MessageSessionManager,
   options: MessagePageOptions = {},
   resolveToolAdapter?: (toolCallId: string) => ExtensionToolAdapterView | undefined,
-  projectImageAsset?: ImageAssetProjector
+  projectImageAsset?: ImageAssetProjector,
+  resolveToolExecution?: (toolCallId: string) => ToolExecutionView | undefined
 ): ConversationPage {
   const entries = sessionManager.getBranch();
   const planStatuses = projectPlanProposalStatuses(entries);
@@ -74,7 +76,8 @@ export function projectMessagePage(
     collectedPage.filter(isContextMessageRecord).map((record) => record.message),
     collectedPage.filter(isContextMessageRecord).map((record) => record.id),
     resolveToolAdapter,
-    projectImageAsset
+    projectImageAsset,
+    resolveToolExecution
   );
   let normalizedIndex = 0;
   const normalized = collectedPage.map((record) => (

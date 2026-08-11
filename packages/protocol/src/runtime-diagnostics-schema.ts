@@ -20,6 +20,7 @@ export const RuntimeDiagnosticsSchema = strictObject({
     sourceHash: Type.String({ minLength: 64, maxLength: 64, pattern: "^[0-9a-f]+$" }),
     errorClass: Type.String({ minLength: 1, maxLength: 64, pattern: "^[A-Z0-9_]+$" })
   }), { maxItems: 64 }),
+  toolExecutionReceiptFailureCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
   host: Type.Optional(strictObject({
     hostEpoch: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
     taskCount: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),

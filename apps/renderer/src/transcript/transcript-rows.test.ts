@@ -58,8 +58,8 @@ describe("projectTranscriptRows", () => {
       key: "assistant-tool:group",
       stepCount: 1,
       toolCount: 1,
-      failedToolCount: 0,
-      failed: false,
+      unsuccessfulToolCount: 0,
+      outcome: "completed",
       hasFinalAnswer: true,
       items: [{
         kind: "tool",
@@ -87,7 +87,7 @@ describe("projectTranscriptRows", () => {
     expect(hasProcessGroupAfterLatestUser(rows)).toBe(false);
   });
 
-  it("marks a process group failed when its correlated Tool Call failed", () => {
+  it("keeps a recovered Tool failure as a completed warning when a final answer exists", () => {
     const rows = projectTranscriptRows([
       message("assistant-tool", "assistant", [{
         type: "tool-call",
@@ -99,13 +99,15 @@ describe("projectTranscriptRows", () => {
         ...message("search-1", "tool", [{ type: "text", text: "provider unavailable" }]),
         toolName: "web_search",
         error: "Tool execution failed."
-      }
+      },
+      message("assistant-final", "assistant", [{ type: "text", text: "已换用备用步骤完成。" }])
     ]);
 
-    expect(rows.at(-1)).toMatchObject({
+    expect(rows.at(-2)).toMatchObject({
       kind: "process-group",
-      failed: true,
-      failedToolCount: 1,
+      outcome: "completed-with-warnings",
+      unsuccessfulToolCount: 1,
+      hasFinalAnswer: true,
       stepCount: 1,
       toolCount: 1
     });
@@ -166,7 +168,8 @@ describe("projectTranscriptRows", () => {
       kind: "process-group",
       stepCount: 3,
       toolCount: 1,
-      failedToolCount: 0,
+      unsuccessfulToolCount: 0,
+      outcome: "completed",
       items: [
         { kind: "reasoning", text: "先读取入口。" },
         {
@@ -191,7 +194,8 @@ describe("projectTranscriptRows", () => {
       kind: "process-group",
       stepCount: 1,
       toolCount: 1,
-      failedToolCount: 0,
+      unsuccessfulToolCount: 0,
+      outcome: "incomplete",
       hasFinalAnswer: false,
       items: [expect.objectContaining({
         kind: "orphan-tool-result",
@@ -218,7 +222,8 @@ describe("projectTranscriptRows", () => {
       kind: "process-group",
       stepCount: 3,
       toolCount: 1,
-      failedToolCount: 0,
+      unsuccessfulToolCount: 0,
+      outcome: "incomplete",
       items: [
         { kind: "reasoning", text: "先搜索资料。" },
         { kind: "narration", content: "已经找到线索，正在获取内容。" },

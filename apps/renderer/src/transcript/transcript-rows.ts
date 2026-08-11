@@ -5,6 +5,16 @@ import type {
   SessionMessageView,
   ToolCallPart
 } from "@pi67/domain";
+import { isUnsuccessfulToolStatus } from "@pi67/domain";
+
+export type ProcessGroupOutcome =
+  | "running"
+  | "completed"
+  | "completed-with-warnings"
+  | "failed"
+  | "cancelled"
+  | "lost"
+  | "incomplete";
 
 export type TranscriptProcessItem =
   | {
@@ -41,8 +51,8 @@ export type TranscriptRow =
     items: TranscriptProcessItem[];
     stepCount: number;
     toolCount: number;
-    failedToolCount: number;
-    failed: boolean;
+    unsuccessfulToolCount: number;
+    outcome: ProcessGroupOutcome;
     hasFinalAnswer: boolean;
   };
 
@@ -53,15 +63,19 @@ export function projectTranscriptRows(messages: readonly SessionMessageView[]): 
   const flushProcess = (followedBy?: SessionMessageView) => {
     if (processMessages.length === 0) return;
     const items = projectProcessItems(processMessages);
+    const unsuccessfulToolCount = items.filter(processItemUnsuccessful).length;
+    const hasFinalAnswer = followedBy?.role === "assistant" && hasVisibleAnswer(followedBy);
     rows.push({
       kind: "process-group",
       key: `${processMessages[0]!.id}:group`,
       items,
       stepCount: Math.max(1, items.length),
       toolCount: items.filter((item) => item.kind === "tool" || item.kind === "orphan-tool-result").length,
-      failedToolCount: items.filter(processItemFailed).length,
-      failed: items.some(processItemFailed),
-      hasFinalAnswer: followedBy?.role === "assistant" && hasVisibleAnswer(followedBy)
+      unsuccessfulToolCount,
+      outcome: hasFinalAnswer
+        ? unsuccessfulToolCount > 0 ? "completed-with-warnings" : "completed"
+        : "incomplete",
+      hasFinalAnswer
     });
     processMessages = [];
   };
@@ -153,8 +167,8 @@ function projectProcessItems(messages: readonly SessionMessageView[]): Transcrip
   return items;
 }
 
-function processItemFailed(item: TranscriptProcessItem): boolean {
-  if (item.kind === "tool") return item.call.status === "failed" || Boolean(item.result?.error);
+function processItemUnsuccessful(item: TranscriptProcessItem): boolean {
+  if (item.kind === "tool") return isUnsuccessfulToolStatus(item.call.status) || Boolean(item.result?.error);
   if (item.kind === "orphan-tool-result") return Boolean(item.result.error);
   return false;
 }
@@ -179,17 +193,28 @@ export function hasProcessGroupAfterLatestUser(rows: readonly TranscriptRow[]): 
 
 export function createLiveProcessRow(
   operation: OperationView,
-  interrupted: boolean,
   hasFinalAnswer: boolean
 ): Extract<TranscriptRow, { kind: "process-group" }> {
+  const unsuccessfulToolCount = (operation.toolExecutions ?? [])
+    .filter((execution) => isUnsuccessfulToolStatus(execution.status)).length;
   return {
     kind: "process-group",
     key: `${operation.operationId}:live-process`,
     items: [],
     stepCount: 1,
     toolCount: 0,
-    failedToolCount: 0,
-    failed: interrupted,
+    unsuccessfulToolCount,
+    outcome: operation.lifecycle === "failed"
+      ? "failed"
+      : operation.lifecycle === "cancelled"
+        ? "cancelled"
+        : operation.lifecycle === "lost"
+          ? "lost"
+          : operation.lifecycle === "completed"
+            ? hasFinalAnswer
+              ? unsuccessfulToolCount > 0 ? "completed-with-warnings" : "completed"
+              : "incomplete"
+            : "running",
     hasFinalAnswer
   };
 }

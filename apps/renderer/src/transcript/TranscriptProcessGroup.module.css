@@ -42,6 +42,11 @@
   color: var(--danger);
 }
 
+.warning .statusIcon,
+.warning .summaryCopy strong {
+  color: var(--warning);
+}
+
 .summaryCopy {
   display: flex;
   min-width: 0;
@@ -195,9 +200,14 @@
   background: var(--danger);
 }
 
-.step[data-step-status="cancelled"]::before,
+.step[data-step-status="interrupted"]::before,
+.step[data-step-status="unreconciled"]::before,
 .step[data-step-status="lost"]::before {
   background: var(--warning);
+}
+
+.step[data-step-status="cancelled"]::before {
+  background: var(--border-strong);
 }
 
 .failed .step[data-process-step="status"]::before {

@@ -4,6 +4,7 @@ import type { OperationActivityController } from "./operation-activity-controlle
 import type { OperationHeartbeatController } from "./operation-heartbeat-controller.js";
 import type { OperationResultLedger } from "./operation-result-ledger.js";
 import type { OperationTerminalDetails } from "./operation-terminal-ledger.js";
+import type { OperationToolExecutionController } from "./operation-tool-execution-controller.js";
 
 export interface ActiveOperation {
   view: OperationView;
@@ -23,6 +24,7 @@ interface OperationTerminalCoordinatorOptions {
   getIdentity(): RuntimeIdentity;
   heartbeat: OperationHeartbeatController;
   results: OperationResultLedger;
+  toolExecutions: OperationToolExecutionController;
   withDurability<T>(operation: () => Promise<T>): Promise<T>;
 }
 
@@ -54,6 +56,7 @@ export class OperationTerminalCoordinator {
     await Promise.allSettled(operation.pendingQueues);
     this.options.heartbeat.stop(operation.view.operationId);
     this.prepare(operation);
+    this.options.toolExecutions.settle(operation, details.lifecycle, details.settledAt);
     const terminal = await this.options.withDurability(() => this.options.results.settle(
       operation.view,
       this.options.getIdentity(),
