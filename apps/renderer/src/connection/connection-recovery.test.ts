@@ -41,11 +41,12 @@ describe("connection recovery", () => {
 
     const first = ensureAgentConnection();
     const second = ensureAgentConnection();
-    await Promise.resolve();
+    await vi.waitFor(() => {
+      expect(waitForConnection).toHaveBeenCalledOnce();
+    });
 
     expect(first).toBe(second);
     expect(connectAgentHost).toHaveBeenCalledOnce();
-    expect(waitForConnection).toHaveBeenCalledOnce();
     resolveConnection(identity);
     await expect(first).resolves.toEqual(identity);
   });
@@ -75,6 +76,30 @@ describe("connection recovery", () => {
     expect(connectAgentHost).toHaveBeenCalledTimes(2);
     expect(connectAgentHost).toHaveBeenNthCalledWith(1, { replaceCurrent: false });
     expect(connectAgentHost).toHaveBeenNthCalledWith(2, { replaceCurrent: false });
+    expect(waitForConnection).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a Port handed off during the retry delay without replacing it", async () => {
+    vi.useFakeTimers();
+    let hasOpenPort = false;
+    vi.spyOn(agentConnectionController, "hasOpenPort", "get").mockImplementation(() => hasOpenPort);
+    const waitForConnection = vi.spyOn(agentConnectionController, "waitForConnection")
+      .mockRejectedValueOnce(new Error("initial handoff timed out"))
+      .mockResolvedValueOnce(identity);
+
+    const connection = ensureAgentConnection();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(connectAgentHost).toHaveBeenCalledOnce();
+    expect(waitForConnection).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(1);
+
+    hasOpenPort = true;
+    await vi.runAllTimersAsync();
+
+    await expect(connection).resolves.toEqual(identity);
+    expect(connectAgentHost).toHaveBeenCalledOnce();
+    expect(connectAgentHost).toHaveBeenCalledWith({ replaceCurrent: false });
     expect(waitForConnection).toHaveBeenCalledTimes(2);
   });
 

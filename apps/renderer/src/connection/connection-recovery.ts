@@ -61,17 +61,26 @@ export async function resynchronizeProjection(
 
 async function connectWithBoundedRetry(): Promise<AgentConnectionIdentity> {
   let lastError: unknown;
-  for (const delayMs of CONNECTION_ATTEMPT_DELAYS_MS) {
+  const waitForCurrentPort = async (): Promise<AgentConnectionIdentity | undefined> => {
     const current = agentConnectionController.identity;
     if (current) return current;
-    if (agentConnectionController.hasOpenPort) {
-      try {
-        return await agentConnectionController.waitForConnection(CONNECTION_ATTEMPT_TIMEOUT_MS);
-      } catch (error) {
-        lastError = error;
-      }
+    if (!agentConnectionController.hasOpenPort) return undefined;
+    try {
+      return await agentConnectionController.waitForConnection(CONNECTION_ATTEMPT_TIMEOUT_MS);
+    } catch (error) {
+      lastError = error;
+      return undefined;
     }
-    if (delayMs > 0) await delay(delayMs);
+  };
+
+  for (const delayMs of CONNECTION_ATTEMPT_DELAYS_MS) {
+    const current = await waitForCurrentPort();
+    if (current) return current;
+    if (delayMs > 0) {
+      await delay(delayMs);
+      const afterDelay = await waitForCurrentPort();
+      if (afterDelay) return afterDelay;
+    }
     try {
       await window.pi67.system.connectAgentHost({
         replaceCurrent: agentConnectionController.hasReceivedPort

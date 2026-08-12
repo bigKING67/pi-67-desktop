@@ -43,8 +43,10 @@ export function handleConnected(
     && previousHostEpoch !== undefined
     && (!state.connected || state.connectionIdentity !== undefined || previousHostEpoch !== identity.hostEpoch)
   );
-  const sameHost = shouldRecover && previousHostEpoch === identity.hostEpoch;
+  const shouldRecoverProjection = shouldRecover && hasProjectionRecoveryIntent(state.workspace);
+  const sameHost = shouldRecoverProjection && previousHostEpoch === identity.hostEpoch;
   const restoredRuntime = shouldRestoreFirstConnectionRuntime(state, previousHostEpoch)
+    || (shouldRecover && !shouldRecoverProjection)
     ? inactiveWorkbenchRuntime()
     : undefined;
   set({
@@ -52,11 +54,11 @@ export function handleConnected(
     hostEpoch: identity.hostEpoch,
     connected: true,
     trustUpdating: false,
-    sessionTransitionPending: shouldRecover,
+    sessionTransitionPending: shouldRecoverProjection,
     sessionBootstrapTransitionPending: false,
     ...(restoredRuntime === undefined ? {} : { runtime: restoredRuntime })
   });
-  if (!shouldRecover || !state.workspace) {
+  if (!shouldRecoverProjection || !state.workspace) {
     synchronizeWorkspaceScopedStateAfterConnection();
     return;
   }
@@ -68,6 +70,29 @@ export function handleConnected(
     approvalMode: state.approvalMode,
     sameHost
   });
+}
+
+function hasProjectionRecoveryIntent(workspace: string | undefined): boolean {
+  const projection = useSessionProjectionStore.getState();
+  const workbench = rendererWorkbenchStore.getState();
+  if (
+    projection.recoverySessionFileIdentity !== undefined
+    || projection.recoverySessionPath !== undefined
+  ) return true;
+  if (workspace === undefined) return false;
+  const workspaceId = workspaceIdForCanonicalPath(workbench, workspace);
+  if (workspaceId === undefined) return false;
+  const selectedTask = selectedWorkbenchTask(workbench);
+  return Boolean(
+    selectedTask?.workspaceId === workspaceId
+    && selectedTask.conversation.kind === "session"
+    && selectedTask.creationStatus === undefined
+  ) || Object.values(workbench.tasks).some((task) => (
+    task.workspaceId === workspaceId
+    && task.conversation.kind === "provisional"
+    && task.creationId !== undefined
+    && task.creationStatus !== undefined
+  ));
 }
 
 function shouldRestoreFirstConnectionRuntime(

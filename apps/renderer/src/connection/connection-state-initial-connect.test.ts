@@ -64,11 +64,113 @@ describe("initial Agent Host connection state", () => {
       detail: "正在恢复 Pi 会话"
     });
   });
+
+  it("restores a Workspace-only surface without inventing Session recovery authority", () => {
+    registerWorkspaceOnly();
+    useAppStore.setState({
+      workspace: "/workspace",
+      connected: false,
+      hostEpoch: 1,
+      runtime: {
+        phase: "recovering",
+        detail: "Pi 运行服务连接已中断，正在等待恢复",
+        recoverable: true
+      }
+    });
+
+    useAppStore.getState().handleAgentConnected({ ...CONNECTION, hostEpoch: 2 });
+
+    expect(useAppStore.getState()).toMatchObject({
+      connected: true,
+      hostEpoch: 2,
+      sessionTransitionPending: false,
+      runtime: { phase: "stopped", detail: "工作区已恢复" }
+    });
+    expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("keeps a repeated same-Host handshake inert for a Workspace-only surface", () => {
+    registerWorkspaceOnly();
+    useAppStore.setState({
+      workspace: "/workspace",
+      connected: true,
+      connectionIdentity: CONNECTION,
+      hostEpoch: CONNECTION.hostEpoch,
+      runtime: { phase: "stopped", detail: "工作区已恢复", recoverable: true }
+    });
+
+    useAppStore.getState().handleAgentConnected(CONNECTION);
+
+    expect(useAppStore.getState()).toMatchObject({
+      connected: true,
+      hostEpoch: CONNECTION.hostEpoch,
+      sessionTransitionPending: false,
+      runtime: { phase: "stopped", detail: "工作区已恢复" }
+    });
+    expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("does not recover a Workspace-only surface because another Workspace has a Session Task", () => {
+    registerWorkspaceOnly();
+    registerBackgroundSessionTask();
+    rendererWorkbenchStore.getState().selectWorkspace("workspace-1");
+    useAppStore.setState({
+      workspace: "/workspace",
+      connected: false,
+      hostEpoch: 1,
+      runtime: {
+        phase: "recovering",
+        detail: "Pi 运行服务连接已中断，正在等待恢复",
+        recoverable: true
+      }
+    });
+
+    useAppStore.getState().handleAgentConnected({ ...CONNECTION, hostEpoch: 2 });
+
+    expect(useAppStore.getState()).toMatchObject({
+      connected: true,
+      hostEpoch: 2,
+      sessionTransitionPending: false,
+      runtime: { phase: "stopped", detail: "工作区已恢复" }
+    });
+    expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("fails closed when a Session recovery identity has no authoritative Task", () => {
+    registerWorkspaceOnly();
+    useSessionProjectionStore.setState({
+      recoverySessionFileIdentity: "session-file-orphaned",
+      recoverySessionPath: "/sessions/orphaned.jsonl"
+    });
+    useAppStore.setState({
+      workspace: "/workspace",
+      connected: false,
+      hostEpoch: 1,
+      runtime: {
+        phase: "recovering",
+        detail: "Pi 运行服务连接已中断，正在等待恢复",
+        recoverable: true
+      }
+    });
+
+    useAppStore.getState().handleAgentConnected({ ...CONNECTION, hostEpoch: 2 });
+
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      runtime: {
+        phase: "failed",
+        detail: expect.stringContaining("No authoritative Workbench Task")
+      }
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "error",
+      title: "无法恢复 Pi 会话"
+    });
+  });
 });
 
-function registerWorkspaceAndSelectColdSession(): void {
-  const workbench = rendererWorkbenchStore.getState();
-  workbench.registerWorkspace({
+function registerWorkspaceOnly(): void {
+  rendererWorkbenchStore.getState().registerWorkspace({
     id: "workspace-1",
     displayName: "Workspace",
     identity: { canonicalPath: "/workspace", assurance: "filesystem" },
@@ -76,11 +178,48 @@ function registerWorkspaceAndSelectColdSession(): void {
     trustProvenance: "native-picker",
     availability: "available"
   });
+}
+
+function registerWorkspaceAndSelectColdSession(): void {
+  registerWorkspaceOnly();
+  const workbench = rendererWorkbenchStore.getState();
   workbench.selectConversation({
     kind: "session",
     workspaceId: "workspace-1",
     sessionFileIdentity: "session-file-1",
     sessionPath: "/sessions/session-1.jsonl"
+  });
+}
+
+function registerBackgroundSessionTask(): void {
+  const workbench = rendererWorkbenchStore.getState();
+  workbench.registerWorkspace({
+    id: "workspace-2",
+    displayName: "Background Workspace",
+    identity: { canonicalPath: "/background", assurance: "filesystem" },
+    trust: "trusted",
+    trustProvenance: "native-picker",
+    availability: "available"
+  });
+  workbench.restoreTask({
+    id: "task-background",
+    conversation: {
+      kind: "session",
+      workspaceId: "workspace-2",
+      sessionFileIdentity: "session-file-background",
+      sessionPath: "/sessions/background.jsonl"
+    },
+    workspaceId: "workspace-2",
+    sessionId: "session-background",
+    taskGeneration: 1,
+    lifecycle: "idle",
+    runtime: { phase: "stopped", detail: "会话待打开", recoverable: true },
+    title: "Background Session",
+    hasDraft: false,
+    attachmentCount: 0,
+    toolMode: "auto",
+    sessionFileIdentity: "session-file-background",
+    sessionPath: "/sessions/background.jsonl"
   });
 }
 
