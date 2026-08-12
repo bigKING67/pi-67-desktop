@@ -2,7 +2,10 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node
 import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { INSTALLED_SHUTDOWN_BUDGET_MS } from "./windows-installed-application-lifecycle.mjs";
+import {
+  INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
+  INSTALLED_SHUTDOWN_BUDGET_MS
+} from "./windows-installed-application-lifecycle.mjs";
 import { assertSessionPathContained } from "./windows-installer-identity.mjs";
 import {
   activateCatalogSession,
@@ -67,10 +70,12 @@ describe("Windows installed real-user lifecycle", () => {
     const launchFlow = source.slice(source.indexOf("async function runRealUserLaunch"), source.indexOf(
       "export async function waitForCatalogState"
     ));
-    const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(window);");
+    const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
     const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir)");
     expect(creationAuthorityReady).toBeGreaterThan(-1);
     expect(controlledCreate).toBeGreaterThan(creationAuthorityReady);
+    expect(launchFlow.slice(creationAuthorityReady, controlledCreate))
+      .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {
@@ -325,7 +330,8 @@ describe("Windows installed real-user lifecycle", () => {
       { runtimePhase: "ready", selectionMatches: false },
       { runtimePhase: "ready", selectionMatches: true }
     ];
-    const readyOrFailed = { waitFor: async () => undefined };
+    const waitFor = vi.fn(async () => undefined);
+    const readyOrFailed = { waitFor };
     const ready = { or: () => readyOrFailed };
     const failed = { isVisible: async () => false };
     const conversation = { waitFor: async () => undefined };
@@ -337,6 +343,7 @@ describe("Windows installed real-user lifecycle", () => {
     };
 
     await expect(waitForRealUserRuntimeReady(window, sessionIdentity)).resolves.toBeGreaterThanOrEqual(0);
+    expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 15_000 });
     expect(evaluate).toHaveBeenCalledTimes(2);
   });
 
@@ -345,7 +352,8 @@ describe("Windows installed real-user lifecycle", () => {
       { runtimePhase: "starting", selectionMatches: true },
       { runtimePhase: "ready", selectionMatches: true }
     ];
-    const readyOrFailed = { waitFor: async () => undefined };
+    const waitFor = vi.fn(async () => undefined);
+    const readyOrFailed = { waitFor };
     const ready = { or: () => readyOrFailed };
     const failed = { isVisible: async () => false };
     const evaluate = vi.fn(async () => runtimeState.shift());
@@ -355,7 +363,15 @@ describe("Windows installed real-user lifecycle", () => {
       locator: (selector) => selector.includes('="ready"') ? ready : failed
     };
 
-    await expect(waitForRealUserRuntimeReady(window, undefined)).resolves.toBeGreaterThanOrEqual(0);
+    await expect(waitForRealUserRuntimeReady(
+      window,
+      undefined,
+      INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+    )).resolves.toBeGreaterThanOrEqual(0);
+    expect(waitFor).toHaveBeenCalledWith({
+      state: "visible",
+      timeout: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+    });
     expect(evaluate).toHaveBeenCalledTimes(2);
   });
 

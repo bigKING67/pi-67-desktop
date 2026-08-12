@@ -23,6 +23,7 @@ import {
   verifyGitMetadataIsHidden
 } from "./windows-real-user-health.mjs";
 import {
+  INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
   readSelectedConversationIdentity,
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
@@ -148,7 +149,11 @@ async function runRealUserLaunch({
     let create;
     let sessionIdentity = expectedSessionIdentity;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
-      await waitForRealUserRuntimeReady(window);
+      await waitForRealUserRuntimeReady(
+        window,
+        undefined,
+        INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+      );
       await assertHealthyWorkbench(window);
       const created = await createControlledConversation(window, agentDir);
       create = created.report;
@@ -322,15 +327,19 @@ export async function activateCatalogSession(
   );
 }
 
-export async function waitForRealUserRuntimeReady(window, expectedSessionIdentity) {
+export async function waitForRealUserRuntimeReady(
+  window,
+  expectedSessionIdentity,
+  timeoutMs = REAL_USER_RUNTIME_TIMEOUT_MS
+) {
   const startedAt = performance.now();
   const ready = window.locator('[data-runtime-phase="ready"]');
   const failed = window.locator('[data-runtime-phase="failed"]');
-  await ready.or(failed).waitFor({ state: "visible", timeout: REAL_USER_RUNTIME_TIMEOUT_MS });
+  await ready.or(failed).waitFor({ state: "visible", timeout: timeoutMs });
   if (await failed.isVisible()) {
     throw new Error("Windows real-user Pi Runtime entered a failed phase.");
   }
-  const remaining = remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS);
+  const remaining = remainingTimeout(startedAt, timeoutMs);
   await window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: remaining });
   await waitForCondition(async () => {
     const observation = await window.evaluate((expectedIdentity) => {
@@ -348,7 +357,7 @@ export async function waitForRealUserRuntimeReady(window, expectedSessionIdentit
     return observation.runtimePhase === "ready" && observation.selectionMatches
       ? observation
       : undefined;
-  }, remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS),
+  }, remainingTimeout(startedAt, timeoutMs),
   "Windows real-user Pi Runtime did not become ready for the activated Catalog Session");
   return performance.now() - startedAt;
 }
