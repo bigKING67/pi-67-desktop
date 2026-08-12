@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { INSTALLED_SHUTDOWN_BUDGET_MS } from "./windows-installed-application-lifecycle.mjs";
 import { assertSessionPathContained } from "./windows-installer-identity.mjs";
 import {
@@ -9,6 +9,7 @@ import {
   assertModelRuntimeInitialization,
   canonicalContainedSessionPath,
   shouldCreateInitialRealUserSession,
+  waitForHealthyWorkbenchConvergence,
   waitForCatalogState
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
@@ -165,6 +166,33 @@ describe("Windows installed real-user lifecycle", () => {
     })).toBe(false);
   });
 
+  it("waits for the Session row view to converge after runtime.ready", async () => {
+    const running = workbenchStatusObservation({ runningCount: 1, selectedRunningCount: 1 });
+    const idle = workbenchStatusObservation();
+    const evaluate = vi.fn()
+      .mockResolvedValueOnce(running)
+      .mockResolvedValueOnce(idle)
+      .mockResolvedValueOnce({
+        ghostCount: 0,
+        rawAcknowledgementTimeout: false,
+        rawEnoent: false,
+        runningCount: 0
+      });
+
+    await expect(waitForHealthyWorkbenchConvergence({ evaluate }, 100)).resolves.toEqual(idle);
+    expect(evaluate).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails closed with bounded diagnostics when a Session status stays running", async () => {
+    const observation = workbenchStatusObservation({ runningCount: 1, selectedRunningCount: 1 });
+
+    await expect(waitForHealthyWorkbenchConvergence({
+      evaluate: async () => observation
+    }, 1)).rejects.toThrow(
+      'false running Session after 1ms: {"rowCount":1,"runningCount":1,"selectedRunningCount":1}'
+    );
+  });
+
   it("waits for a Catalog Session row that is transiently absent during reconciliation", async () => {
     const clicks = [];
     let observationCount = 0;
@@ -219,3 +247,12 @@ describe("Windows installed real-user lifecycle", () => {
   });
 
 });
+
+function workbenchStatusObservation(overrides = {}) {
+  return {
+    rowCount: 1,
+    runningCount: 0,
+    selectedRunningCount: 0,
+    ...overrides
+  };
+}

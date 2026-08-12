@@ -49,6 +49,7 @@ export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
 export const REAL_USER_MODEL_HYDRATION_TIMEOUT_MS = 30_000;
+export const REAL_USER_WORKBENCH_CONVERGENCE_TIMEOUT_MS = 10_000;
 const REAL_USER_RUNTIME_TIMEOUT_MS = 15_000;
 const REAL_USER_SHUTDOWN_BUDGET_MS = 5_000;
 export const REAL_USER_RESTART_COUNT = 3;
@@ -156,7 +157,7 @@ async function runRealUserLaunch({
     }
     const runtimeReadyMs = await waitForRealUserRuntimeReady(window);
     const launchToReadyMs = performance.now() - launchStartedAt;
-    await assertHealthyWorkbench(window);
+    await waitForHealthyWorkbenchConvergence(window);
     const providerConfiguration = await verifyProviderConfiguration(window);
     const fileProjection = await verifyGitMetadataIsHidden(window);
 
@@ -321,6 +322,40 @@ async function waitForRealUserRuntimeReady(window) {
   const remaining = remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS);
   await window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: remaining });
   return performance.now() - startedAt;
+}
+
+export async function waitForHealthyWorkbenchConvergence(
+  window,
+  timeoutMs = REAL_USER_WORKBENCH_CONVERGENCE_TIMEOUT_MS
+) {
+  const deadline = performance.now() + timeoutMs;
+  let observation;
+  do {
+    observation = await window.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-testid="conversation-row"]')];
+      const runningRows = rows.filter((row) => row.querySelector('[data-status="running"]'));
+      return {
+        rowCount: rows.length,
+        runningCount: runningRows.length,
+        selectedRunningCount: runningRows.filter((row) => row.getAttribute("aria-current") === "page").length
+      };
+    });
+    if (observation.runningCount === 0) {
+      await assertHealthyWorkbench(window);
+      return observation;
+    }
+    const remainingMs = deadline - performance.now();
+    if (remainingMs <= 0) break;
+    await new Promise((resolvePromise) => setTimeout(
+      resolvePromise,
+      Math.max(1, Math.min(POLL_INTERVAL_MS, remainingMs))
+    ));
+  } while (performance.now() <= deadline);
+
+  throw new Error(
+    `Windows real-user lifecycle exposed a false running Session after ${timeoutMs}ms: `
+    + JSON.stringify(observation)
+  );
 }
 
 async function createControlledConversation(window, agentDir) {
