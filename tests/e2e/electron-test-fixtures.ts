@@ -21,9 +21,18 @@ export async function utilityProcessIds(
 export function forwardElectronDebugOutput(
   application: Awaited<ReturnType<typeof electron.launch>>
 ): void {
-  if (process.env.PI67_DEBUG_AGENT_STDERR !== "1") return;
+  if (
+    process.env.PI67_DEBUG_AGENT_STDERR !== "1"
+    && process.env.PI67_TEST_CAPTURE_AGENT_INIT !== "1"
+  ) return;
   application.process().stdout?.on("data", (chunk) => process.stdout.write(chunk));
   application.process().stderr?.on("data", (chunk) => process.stderr.write(chunk));
+}
+
+export function nativeElectronAgentDirectory(fallback: string): string {
+  // CI reuses capability activation only; every test keeps separate Desktop userData and Workspaces.
+  const sharedRoot = process.env.PI67_E2E_SHARED_AGENT_ROOT;
+  return sharedRoot ? resolve(sharedRoot, "agent profile") : fallback;
 }
 
 export async function openRuntimeSettings(window: Page) {

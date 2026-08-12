@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   forwardElectronDebugOutput,
+  nativeElectronAgentDirectory,
   openModelServiceSettings,
   openRuntimeSettings,
   utilityProcessCount
@@ -19,8 +20,8 @@ test("boots the real sandboxed Electron shell over app://", async () => {
   test.setTimeout(90_000);
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-shell-"));
-  const agentDir = join(temporaryRoot, "agent");
-  await mkdir(agentDir);
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
+  await mkdir(agentDir, { recursive: true });
 
   let application: Awaited<ReturnType<typeof electron.launch>> | undefined;
   try {
@@ -86,11 +87,11 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-provider-profile-"));
   const workspace = join(temporaryRoot, "workspace");
-  const agentDir = join(temporaryRoot, "agent with spaces");
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent with spaces"));
   const wrongAgentDir = join(temporaryRoot, "wrong-agent");
   await Promise.all([
     mkdir(workspace),
-    mkdir(agentDir),
+    mkdir(agentDir, { recursive: true }),
     mkdir(wrongAgentDir)
   ]);
   await Promise.all([
@@ -142,6 +143,10 @@ test("keeps the Main-resolved Pi profile authoritative when the launch environme
       .getByText("已持久化到 Pi auth.json", { exact: true })).toBeVisible();
   } finally {
     await application?.close();
+    await Promise.all([
+      rm(join(agentDir, "auth.json"), { force: true }),
+      rm(join(agentDir, "settings.json"), { force: true })
+    ]);
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });

@@ -11,6 +11,7 @@ import {
 } from "../../eng/packaging/controlled-shutdown-fixture.js";
 import {
   forwardElectronDebugOutput,
+  nativeElectronAgentDirectory,
   openRuntimeSettings,
   piDefaultSessionDirectory,
   utilityProcessCount,
@@ -29,8 +30,8 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-workspace-"));
   const workspace = join(temporaryRoot, "workspace");
-  const agentDir = join(temporaryRoot, "agent");
-  await Promise.all([mkdir(workspace), mkdir(agentDir)]);
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
+  await Promise.all([mkdir(workspace), mkdir(agentDir, { recursive: true })]);
 
   let application: Awaited<ReturnType<typeof electron.launch>> | undefined;
   try {
@@ -140,7 +141,7 @@ test("opens, switches, creates, and restores exact Sessions across a real Electr
 
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "pi67-electron-session-story-")));
   const workspace = join(temporaryRoot, "workspace");
-  const agentDir = join(temporaryRoot, "agent");
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
   const profile = join(temporaryRoot, "profile");
   const sessionDirectory = piDefaultSessionDirectory(workspace, agentDir);
   await Promise.all([
@@ -262,7 +263,7 @@ test("refreshes the session tree after rollback without a transition BUSY warnin
 
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "pi67-electron-tree-refresh-")));
   const workspace = join(temporaryRoot, "workspace");
-  const agentDir = join(temporaryRoot, "agent");
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
   const sessionDirectory = piDefaultSessionDirectory(workspace, agentDir);
   await Promise.all([
     mkdir(workspace),
@@ -342,7 +343,7 @@ test("closes an active Extension command and its child process within the shutdo
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "pi67-electron-shutdown-"));
   const workspace = join(temporaryRoot, "workspace");
-  const agentDir = join(temporaryRoot, "agent");
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
   const extensionsDirectory = join(agentDir, "extensions");
   const childPidPath = join(temporaryRoot, "child.pid");
   const lifecyclePath = join(temporaryRoot, "lifecycle.txt");
@@ -406,6 +407,7 @@ test("closes an active Extension command and its child process within the shutdo
   } finally {
     if (application) await application.close();
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
+    await rm(join(extensionsDirectory, "shutdown-fixture.ts"), { force: true });
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });

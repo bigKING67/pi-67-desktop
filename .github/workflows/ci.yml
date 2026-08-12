@@ -188,6 +188,9 @@ jobs:
           pnpm run build
           pnpm run prepare:runtime-resources
       - name: Native Electron E2E
+        env:
+          PI67_E2E_SHARED_AGENT_ROOT: ${{ runner.temp }}/pi67-native-electron
+          PI67_TEST_CAPTURE_AGENT_INIT: "1"
         run: pnpm exec playwright test --project=electron --workers=1
       - name: Build fast unsigned Windows smoke package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources --ci-fast
@@ -296,6 +299,9 @@ jobs:
           pnpm run build
           pnpm run prepare:runtime-resources
       - name: Native Electron E2E
+        env:
+          PI67_E2E_SHARED_AGENT_ROOT: ${{ runner.temp }}/pi67-native-electron
+          PI67_TEST_CAPTURE_AGENT_INIT: "1"
         run: pnpm exec playwright test --project=electron --workers=1
       - name: Build unsigned macOS smoke package
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources

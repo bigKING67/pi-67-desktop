@@ -8,6 +8,7 @@ import {
   CONTROLLED_PROMPT_TEXT,
   writeControlledShutdownExtension
 } from "../../eng/packaging/controlled-shutdown-fixture.js";
+import { nativeElectronAgentDirectory } from "./electron-test-fixtures.js";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const inheritedEnvironment = Object.fromEntries(
@@ -20,7 +21,7 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), "pi67-electron-multi-workspace-")));
   const primaryWorkspace = join(temporaryRoot, "workspace-primary");
   const secondaryWorkspace = join(temporaryRoot, "workspace-secondary");
-  const agentDir = join(temporaryRoot, "agent");
+  const agentDir = nativeElectronAgentDirectory(join(temporaryRoot, "agent"));
   const extensionsDirectory = join(agentDir, "extensions");
   await Promise.all([
     mkdir(primaryWorkspace),
@@ -92,6 +93,7 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
     await expect(window.getByText("无法加载本会话修改记录", { exact: true })).toHaveCount(0);
   } finally {
     if (application) await application.close();
+    await rm(join(extensionsDirectory, "multi-workspace-runtime.ts"), { force: true });
     await rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
