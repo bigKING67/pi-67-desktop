@@ -102,7 +102,11 @@ describe("approval protocol schemas", () => {
       decision: "allow-once"
     }, taskContext(), 4);
     const { operationId: _responseOperationId, ...withoutResponseOperation } = request.payload;
-    expect(isRequestEnvelope({ ...request, payload: withoutResponseOperation })).toBe(false);
+    expect(isRequestEnvelope({ ...request, payload: withoutResponseOperation })).toBe(true);
+    expect(isRequestEnvelope({
+      ...request,
+      payload: { ...request.payload, operationId: "" }
+    })).toBe(false);
     expect(isRequestEnvelope({
       ...request,
       payload: { ...request.payload, toolCallId: "" }

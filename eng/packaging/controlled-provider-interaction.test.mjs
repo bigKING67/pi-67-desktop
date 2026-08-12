@@ -30,12 +30,21 @@ describe("controlled Provider interaction", () => {
     const composer = {
       fill: vi.fn(async (text) => actions.push(`fill:${text}`))
     };
+    const composerShell = {
+      getByRole: vi.fn((_role, options) => {
+        expect(options).toEqual({ name: "停止", exact: true });
+        return stopButton;
+      })
+    };
     const page = {
       getByLabel: vi.fn(() => composer),
+      getByTestId: vi.fn((testId) => {
+        expect(testId).toBe("composer-shell");
+        return composerShell;
+      }),
       getByRole: vi.fn((_role, options) => {
         if (options.name === "Pi 模型") return modelButton;
         if (options.name === "发送") return sendButton;
-        if (options.name === "停止") return stopButton;
         throw new Error(`Unexpected role: ${String(options.name)}`);
       })
     };

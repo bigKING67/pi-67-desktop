@@ -24,10 +24,18 @@ describe("TaskRuntimeRegistry", () => {
     const second = await registry.load(context("task-b"), workspaceServices);
     expect(first).not.toBe(second);
     expect(loader).toHaveBeenCalledTimes(2);
-    expect(loadedOptions).toEqual([
-      { runtimeCredentialOverrides: credentials, workspaceServices },
-      { runtimeCredentialOverrides: credentials, workspaceServices }
-    ]);
+    expect(loadedOptions[0]).toMatchObject({
+      runtimeCredentialOverrides: credentials,
+      subagentParentKey: JSON.stringify(["workspace-1", "task-a"]),
+      workspaceServices
+    });
+    expect(loadedOptions[1]).toMatchObject({
+      runtimeCredentialOverrides: credentials,
+      subagentParentKey: JSON.stringify(["workspace-1", "task-b"]),
+      workspaceServices
+    });
+    expect(loadedOptions[0]!.subagentAdmission).toBeDefined();
+    expect(loadedOptions[1]!.subagentAdmission).toBe(loadedOptions[0]!.subagentAdmission);
     await registry.disposeAll();
     expect(runtimes[0]!.disposeSpy).toHaveBeenCalledOnce();
     expect(runtimes[1]!.disposeSpy).toHaveBeenCalledOnce();
