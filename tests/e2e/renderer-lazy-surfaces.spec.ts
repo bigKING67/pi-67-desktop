@@ -7,6 +7,12 @@ import {
   waitForMockWorkspaceReady
 } from "./pi67-renderer-fixture.js";
 
+const SETTINGS_MODULE = /\/(?:src\/settings\/SettingsWorkbench\.tsx|assets\/SettingsWorkbench-[^/?]+\.js)(?:\?|$)/u;
+const WORKSPACE_MODULE = /\/(?:src\/app\/WorkspaceShell\.tsx|assets\/WorkspaceShell-[^/?]+\.js)(?:\?|$)/u;
+const FRESHNESS_MODULE = /\/(?:src\/operation\/operation-freshness-controller\.ts|assets\/operation-freshness-controller-[^/?]+\.js)(?:\?|$)/u;
+const APPROVAL_MODULE = /\/(?:src\/approval\/ApprovalDialog\.tsx|assets\/ApprovalDialog-[^/?]+\.js)(?:\?|$)/u;
+const COMMAND_PALETTE_MODULE = /\/(?:src\/command-palette\/CommandPalette\.tsx|assets\/CommandPalette-[^/?]+\.js)(?:\?|$)/u;
+
 test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
@@ -14,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 test("loads Settings only on first open and restores the workbench", async ({ page }) => {
   let settingsModuleRequests = 0;
   page.on("request", (request) => {
-    if (/\/src\/settings\/SettingsWorkbench\.tsx(?:\?|$)/u.test(request.url())) {
+    if (SETTINGS_MODULE.test(request.url())) {
       settingsModuleRequests += 1;
     }
   });
@@ -35,7 +41,7 @@ test("loads Settings only on first open and restores the workbench", async ({ pa
 });
 
 test("keeps Settings load failure recoverable without stopping the workspace", async ({ page }) => {
-  await page.route(/\/src\/settings\/SettingsWorkbench\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.route(SETTINGS_MODULE, (route) => route.abort("failed"));
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -50,7 +56,7 @@ test("keeps Settings load failure recoverable without stopping the workspace", a
 });
 
 test("keeps a failed lazy WorkspaceShell observable without tearing down the Agent connection", async ({ page }) => {
-  await page.route(/\/src\/app\/WorkspaceShell\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.route(WORKSPACE_MODULE, (route) => route.abort("failed"));
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -65,7 +71,7 @@ test("keeps a failed lazy WorkspaceShell observable without tearing down the Age
 });
 
 test("keeps the workspace usable when the operation freshness monitor cannot load", async ({ page }) => {
-  await page.route(/\/src\/operation\/operation-freshness-controller\.ts(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.route(FRESHNESS_MODULE, (route) => route.abort("failed"));
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -77,7 +83,7 @@ test("keeps the workspace usable when the operation freshness monitor cannot loa
 });
 
 test("fails closed when the lazy approval surface cannot load", async ({ page }) => {
-  await page.route(/\/src\/approval\/ApprovalDialog\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.route(APPROVAL_MODULE, (route) => route.abort("failed"));
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -131,7 +137,7 @@ test("fails closed when the lazy approval surface cannot load", async ({ page })
 });
 
 test("lets non-blocking lazy overlay failures close without blanking the workspace", async ({ page }) => {
-  await page.route(/\/src\/command-palette\/CommandPalette\.tsx(?:\?|$)/u, (route) => route.abort("failed"));
+  await page.route(COMMAND_PALETTE_MODULE, (route) => route.abort("failed"));
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();

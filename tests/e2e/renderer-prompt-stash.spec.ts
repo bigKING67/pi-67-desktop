@@ -5,7 +5,7 @@ import {
 } from "./pi67-renderer-fixture.js";
 
 test("clears and restores exact Prompt text only after secure persistence acknowledgement", async ({ page }) => {
-  await installMockDesktopBridge(page, { composerDraftUpdateDelayMs: 220 });
+  await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -13,13 +13,27 @@ test("clears and restores exact Prompt text only after secure persistence acknow
   const composer = page.getByLabel("给 Pi 发送消息");
   const exactText = "  Preserve exact whitespace\n第二行  ";
   await composer.fill(exactText);
+  await page.evaluate(() => (
+    window as unknown as {
+      __pi67ComposerDraftTest: { holdNextUpdate(): void };
+    }
+  ).__pi67ComposerDraftTest.holdNextUpdate());
   await page.getByRole("button", { name: "Prompt 暂存，0 条" }).click();
   const stash = page.getByRole("dialog", { name: "Prompt 暂存" });
   await stash.getByRole("button", { name: "暂存当前输入" }).click();
 
-  await page.waitForTimeout(100);
+  await expect.poll(() => page.evaluate(() => (
+    window as unknown as {
+      __pi67ComposerDraftTest: { pendingUpdates: number };
+    }
+  ).__pi67ComposerDraftTest.pendingUpdates)).toBe(1);
   await expect(composer).toHaveValue(exactText);
   await expect(stash.getByRole("button", { name: "暂存当前输入" })).toBeDisabled();
+  await page.evaluate(() => (
+    window as unknown as {
+      __pi67ComposerDraftTest: { releaseHeldUpdate(): void };
+    }
+  ).__pi67ComposerDraftTest.releaseHeldUpdate());
   await expect.poll(() => composer.inputValue()).toBe("");
   await expect(page.getByRole("button", { name: "Prompt 暂存，1 条" })).toBeVisible();
 
@@ -69,16 +83,23 @@ test("keeps the Composer text when the first Prompt Stash persistence write fail
 });
 
 test("retries a routine autosave failure without interrupting Composer input", async ({ page }) => {
-  await installMockDesktopBridge(page, { composerDraftFailureCalls: [1] });
+  await installMockDesktopBridge(page);
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
   const composer = page.getByLabel("给 Pi 发送消息");
+  const updatesBeforeInput = await page.evaluate(() => {
+    const fixture = (window as unknown as {
+      __pi67ComposerDraftTest: { failNextUpdate(): void; updates: number };
+    }).__pi67ComposerDraftTest;
+    fixture.failNextUpdate();
+    return fixture.updates;
+  });
   await composer.fill("输入过程中不要弹出草稿保存警告");
   await expect.poll(() => page.evaluate(() => (
     window as unknown as { __pi67ComposerDraftTest: { updates: number } }
-  ).__pi67ComposerDraftTest.updates)).toBeGreaterThanOrEqual(2);
+  ).__pi67ComposerDraftTest.updates)).toBeGreaterThanOrEqual(updatesBeforeInput + 2);
   await expect(page.getByText("对话草稿未保存", { exact: true })).toHaveCount(0);
   await expect(composer).toHaveValue("输入过程中不要弹出草稿保存警告");
   expect(await page.evaluate(() => (

@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { rendererWorkbenchStore, type RendererWorkbenchTask } from "./workbench-store.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import {
+  restorePersistedDrafts,
   serializeTaskDraftState,
   shouldPublishBackgroundPersistenceFailure,
   shouldScheduleDraftPersistenceRetry
 } from "./task-draft-persistence.js";
+import { captureDraftRestoreSelectionGuard } from "./task-draft-restore-selection.js";
 import { parseComposerDraftPersistedState } from "../../../desktop/src/composer-draft-state.js";
 
 describe("task draft persistence", () => {
@@ -175,6 +177,62 @@ describe("task draft persistence", () => {
       streamBehavior: "followUp",
       updatedAt: 456
     }]);
+  });
+
+  it("does not let delayed draft restoration replace a Session selected after startup", () => {
+    const previous = sessionTask("task-session-previous", "session-file-previous");
+    expect(rendererWorkbenchStore.getState().restoreTask(previous)).toBe(previous.id);
+    rendererWorkbenchStore.getState().selectTask(previous.id);
+    const selectionGuard = captureDraftRestoreSelectionGuard();
+
+    const current = provisionalTask("task-session-current");
+    rendererWorkbenchStore.getState().openTask(current);
+    const currentConversation = sessionTask(current.id, "session-file-current").conversation;
+    if (currentConversation.kind !== "session") throw new Error("Expected a Session conversation.");
+    rendererWorkbenchStore.getState().updateTask(current.id, {
+      conversation: currentConversation,
+      sessionId: "session-current",
+      sessionFileIdentity: currentConversation.sessionFileIdentity,
+      sessionPath: currentConversation.sessionPath
+    });
+
+    restorePersistedDrafts({
+      version: 1,
+      drafts: [{
+        conversation: previous.conversation,
+        text: "previous draft",
+        streamBehavior: "followUp",
+        updatedAt: 900
+      }],
+      selectedConversation: previous.conversation
+    }, { restoreSelection: selectionGuard.release() });
+
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+      kind: "conversation",
+      conversation: currentConversation
+    });
+  });
+
+  it("allows draft restoration to select its saved conversation when startup selection stayed unchanged", () => {
+    rendererWorkbenchStore.getState().selectWorkspace("workspace-a");
+    const selectionGuard = captureDraftRestoreSelectionGuard();
+    const restored = provisionalTask("task-restored-at-startup");
+
+    restorePersistedDrafts({
+      version: 1,
+      drafts: [{
+        conversation: restored.conversation,
+        text: "restored draft",
+        streamBehavior: "followUp",
+        updatedAt: 901
+      }],
+      selectedConversation: restored.conversation
+    }, { restoreSelection: selectionGuard.release() });
+
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+      kind: "conversation",
+      conversation: restored.conversation
+    });
   });
 
   it("does not persist empty text as a durable attachment promise", () => {

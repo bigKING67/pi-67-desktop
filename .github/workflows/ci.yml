@@ -120,11 +120,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
-      - name: Build renderer workspace dependencies
-        run: pnpm --filter @pi67/protocol... run build
+      - name: Build renderer E2E assets
+        run: |
+          pnpm --filter @pi67/protocol... run build
+          pnpm --filter @pi67/renderer run build
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --no-shell chromium
       - name: Renderer browser E2E
+        env:
+          PI67_E2E_RENDERER_MODE: preview
         run: pnpm exec playwright test --project=renderer-chromium --workers=2 --retries=0
       - uses: actions/upload-artifact@v7
         if: failure()

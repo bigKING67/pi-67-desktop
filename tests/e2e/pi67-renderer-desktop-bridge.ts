@@ -12,6 +12,7 @@ import {
   type MockWorkspaceDescriptor
 } from "./pi67-renderer-desktop-bridge-contract.js";
 import { installMockDesktopCapabilityBridge } from "./pi67-renderer-desktop-capability-bridge.js";
+import { installComposerDraftTestControl } from "./pi67-composer-draft-test-control.js";
 import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.js";
 
 export {
@@ -52,6 +53,7 @@ export async function installMockDesktopBridge(
       ? {}
       : { capabilityInitializingCalls: options.capabilityInitializingCalls }
   );
+  await installComposerDraftTestControl(page);
   await page.addInitScript((bridgeFixture) => {
     // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.
     performance.setResourceTimingBufferSize(2_048);
@@ -104,10 +106,14 @@ export async function installMockDesktopBridge(
       bridgeFixture.initialComposerDraftState
     );
     let nativeNotificationActivationListener: ((activation: NativeNotificationActivation) => void) | undefined;
-    const composerDraftTest = {
-      updates: 0,
-      state: () => structuredClone(composerDraftState)
-    };
+    const composerDraftTest = (window as unknown as {
+      __pi67ComposerDraftTest: {
+        beforeUpdate(): Promise<void>;
+        setStateReader(reader: () => ComposerDraftPersistedState): void;
+        updates: number;
+      };
+    }).__pi67ComposerDraftTest;
+    composerDraftTest.setStateReader(() => structuredClone(composerDraftState));
     let composerDraftPromptStashFailureConsumed = false;
     const worktreeTest = {
       createCalls: 0,
@@ -206,7 +212,7 @@ export async function installMockDesktopBridge(
             persistence: bridgeFixture.composerDraftPersistence
           }),
           updateComposerDraftState: async (state: ComposerDraftPersistedState) => {
-            composerDraftTest.updates += 1;
+            await composerDraftTest.beforeUpdate();
             if (bridgeFixture.composerDraftUpdateDelayMs > 0) {
               await new Promise((resolve) => setTimeout(resolve, bridgeFixture.composerDraftUpdateDelayMs));
             }
@@ -420,10 +426,6 @@ export async function installMockDesktopBridge(
     Object.defineProperty(window, "__pi67WorkspaceEntryTest", {
       configurable: false,
       value: workspaceEntryTest
-    });
-    Object.defineProperty(window, "__pi67ComposerDraftTest", {
-      configurable: false,
-      value: composerDraftTest
     });
     Object.defineProperty(window, "__pi67WorktreeTest", {
       configurable: false,

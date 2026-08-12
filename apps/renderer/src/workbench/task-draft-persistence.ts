@@ -20,12 +20,12 @@ import {
   type RendererWorkbenchTask
 } from "./workbench-store.js";
 import { useTaskDraftStore, type TaskDraft } from "./task-draft-store.js";
+import { captureDraftRestoreSelectionGuard } from "./task-draft-restore-selection.js";
 
 const PERSISTENCE_DELAY_MS = 500;
 const PERSISTENCE_RETRY_DELAY_MS = 1_500;
 const BACKGROUND_FAILURE_HISTORY_THRESHOLD = 3;
 const encoder = new TextEncoder();
-
 let initialization: Promise<void> | undefined;
 let persistenceTimer: number | undefined;
 let persistencePromise: Promise<void> = Promise.resolve();
@@ -44,11 +44,13 @@ export function initializeTaskDraftPersistence(): Promise<void> {
 }
 
 async function initialize(): Promise<void> {
+  const restoreSelectionGuard = captureDraftRestoreSelectionGuard();
   try {
     const snapshot = await window.pi67.system.loadComposerDraftState();
     suppressPersistence = true;
-    restorePersistedDrafts(snapshot.state);
-    suppressPersistence = false;
+    restorePersistedDrafts(snapshot.state, {
+      restoreSelection: restoreSelectionGuard.release()
+    });
     if (snapshot.recovery === "backup-restored") {
       publishNotification({
         level: "warning",
@@ -78,6 +80,7 @@ async function initialize(): Promise<void> {
   } catch (error) {
     publishPersistenceWarning(error);
   } finally {
+    restoreSelectionGuard.release();
     suppressPersistence = false;
   }
 
@@ -96,7 +99,10 @@ async function initialize(): Promise<void> {
   });
 }
 
-function restorePersistedDrafts(state: ComposerDraftPersistedState): void {
+export function restorePersistedDrafts(
+  state: ComposerDraftPersistedState,
+  options: { restoreSelection: boolean } = { restoreSelection: true }
+): void {
   const restoredTaskByConversation = new Map<string, string>();
   for (const record of state.drafts) {
     const workbench = rendererWorkbenchStore.getState();
@@ -126,7 +132,7 @@ function restorePersistedDrafts(state: ComposerDraftPersistedState): void {
   const selected = state.selectedConversation
     ? restoredTaskByConversation.get(conversationKeyIdentity(state.selectedConversation))
     : undefined;
-  if (selected) rendererWorkbenchStore.getState().selectTask(selected);
+  if (selected && options.restoreSelection) rendererWorkbenchStore.getState().selectTask(selected);
 }
 
 function restoredTask(record: ComposerDraftRecord): RendererWorkbenchTask {
