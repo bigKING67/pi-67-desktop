@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
 import { createInterface } from "node:readline";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogWorkspaceIdentity } from "./session-path-identity.js";
 
 export const SESSION_CREATION_MARKER_TYPE = "pi67.session-creation";
 export const SESSION_CREATION_MARKER_SCHEMA_VERSION = 1;
@@ -140,8 +140,8 @@ export async function inspectSessionCreationMarker(
   if (
     matches !== 1
     || !header
-    || normalizeSessionCatalogPathIdentity(header.cwd)
-      !== normalizeSessionCatalogPathIdentity(expectedCwd)
+    || normalizeSessionCatalogWorkspaceIdentity(header.cwd)
+      !== normalizeSessionCatalogWorkspaceIdentity(expectedCwd)
   ) return { status: "missing" };
   return {
     status: "match",

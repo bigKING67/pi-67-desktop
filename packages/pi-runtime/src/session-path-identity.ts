@@ -10,6 +10,14 @@ export function normalizeSessionCatalogPathIdentity(path: string): string {
   return resolve(path);
 }
 
+export function normalizeSessionCatalogWorkspaceIdentity(
+  path: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  const resolved = normalizeSessionCatalogPathIdentity(path);
+  return platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 export function versionSessionCatalogSourceIdentity(identity: string): string {
   return `${SESSION_CATALOG_SOURCE_KEY_VERSION}\0${identity}`;
 }

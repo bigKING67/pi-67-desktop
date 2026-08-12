@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { resolveExistingSessionFileIdentity } from "../../packages/pi-runtime/src/session-path-identity.ts";
 import {
+  inspectRealUserSessionFile,
   sanitizeSessionCreationObservation,
   prepareRealUserSessionCreation,
   waitForSelectedProvisionalSessionIntent,
@@ -17,6 +18,26 @@ describe("Windows installed real-user Session creation", () => {
     }, "C:\\private-root")).toEqual({
       errorNotificationMessages: ["Failed at <temporary-root>\\agent\\sessions"]
     });
+  });
+  it("inspects an expected JSONL without returning its path or physical identity", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-session-diagnostic-"));
+    const sessionPath = join(root, "private-session.jsonl");
+    const payload = "{\"type\":\"session\"}\n";
+    await writeFile(sessionPath, payload, "utf8");
+    try {
+      const diagnostic = await inspectRealUserSessionFile(sessionPath);
+      expect(diagnostic).toMatchObject({
+        expected: true, exists: true, isFile: true,
+        byteLength: Buffer.byteLength(payload, "utf8"),
+        fileIdentityFingerprint: expect.stringMatching(/^[0-9a-f]{12}$/u)
+      });
+      expect(JSON.stringify(diagnostic)).not.toContain(sessionPath);
+      await expect(inspectRealUserSessionFile(join(root, "missing.jsonl"))).resolves.toEqual({
+        expected: true, exists: false, isFile: false
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("captures the create baseline only after the action becomes admissible", async () => {

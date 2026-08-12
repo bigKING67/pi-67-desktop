@@ -44,7 +44,7 @@ import {
   type PiConfigurationServiceOptions,
   type ResolvedPiConfigurationServiceOptions
 } from "./pi-configuration-service-options.js";
-import { normalizeSessionCatalogPathIdentity as workspaceIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogWorkspaceIdentity as workspaceIdentity } from "./session-path-identity.js";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";

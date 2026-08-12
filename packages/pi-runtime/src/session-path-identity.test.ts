@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   normalizeSessionCatalogPathIdentity,
+  normalizeSessionCatalogWorkspaceIdentity,
   resolveExistingSessionFileIdentity,
   versionSessionCatalogSourceIdentity
 } from "./session-path-identity.js";
@@ -15,7 +16,7 @@ afterEach(async () => {
 });
 
 describe("session path identity", () => {
-  it("preserves exact canonical spelling instead of lowercasing Windows paths", () => {
+  it("preserves exact canonical spelling for physical paths and versions source identity", () => {
     const path = join("CaseSensitive", "Session.JSONL");
 
     expect(normalizeSessionCatalogPathIdentity(path)).toBe(resolve(path));
@@ -23,6 +24,18 @@ describe("session path identity", () => {
       normalizeSessionCatalogPathIdentity(join("casesensitive", "session.jsonl"))
     );
     expect(versionSessionCatalogSourceIdentity("source")).toBe("session-catalog-source-v3\0source");
+  });
+
+  it("matches Workspace cwd keys using Windows case-insensitive path semantics", () => {
+    const upper = join("CaseSensitive", "Workspace 中文");
+    const lower = join("casesensitive", "workspace 中文");
+
+    expect(normalizeSessionCatalogWorkspaceIdentity(upper, "win32")).toBe(
+      normalizeSessionCatalogWorkspaceIdentity(lower, "win32")
+    );
+    expect(normalizeSessionCatalogWorkspaceIdentity(upper, "darwin")).not.toBe(
+      normalizeSessionCatalogWorkspaceIdentity(lower, "darwin")
+    );
   });
 
   it("deduplicates hard-linked JSONL aliases by physical file identity", async () => {

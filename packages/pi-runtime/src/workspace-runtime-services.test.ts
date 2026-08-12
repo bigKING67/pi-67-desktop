@@ -152,6 +152,28 @@ describe("Pi Workspace runtime services", () => {
     }
   });
 
+  it("accepts Windows Workspace path casing changes without relaxing Agent directory identity", async () => {
+    const windowsPlatform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const workspaceServices = createPiWorkspaceRuntimeServices({
+      cwd: String.raw`C:\Users\Runner\Workspace`,
+      agentDir: String.raw`C:\Pi Agent`,
+      settingsManager: SettingsManager.inMemory()
+    });
+    try {
+      expect(() => workspaceServices.assertCompatible(
+        String.raw`c:\users\runner\workspace`,
+        String.raw`C:\Pi Agent`
+      )).not.toThrow();
+      expect(() => workspaceServices.assertCompatible(
+        String.raw`c:\users\runner\workspace`,
+        String.raw`c:\pi agent`
+      )).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
+    } finally {
+      await workspaceServices.dispose();
+      windowsPlatform.mockRestore();
+    }
+  });
+
   it("leaves an injected Agent Host Session Catalog owner alive when Workspace services dispose", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-shared-catalog-owner-"));
     temporaryDirectories.push(root);

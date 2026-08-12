@@ -5,6 +5,7 @@ import { SessionManager, type SessionInfo } from "@earendil-works/pi-coding-agen
 import type { SessionCatalogContext, SessionCatalogDiscoveryResult } from "./session-catalog.js";
 import {
   normalizeSessionCatalogPathIdentity,
+  normalizeSessionCatalogWorkspaceIdentity,
   resolveExistingSessionFileIdentity,
   versionSessionCatalogSourceIdentity
 } from "./session-path-identity.js";
@@ -90,7 +91,7 @@ function toCatalogRecord(session: SessionInfo, fileIdentity: string): SessionCat
     id: session.id,
     path: session.path,
     cwd: session.cwd,
-    cwdKey: normalizeSessionCatalogPathIdentity(session.cwd),
+    cwdKey: normalizeSessionCatalogWorkspaceIdentity(session.cwd),
     ...(session.name?.trim() ? { explicitName: session.name.trim() } : {}),
     modifiedAt: session.modified.getTime(),
     messageCount: session.messageCount,

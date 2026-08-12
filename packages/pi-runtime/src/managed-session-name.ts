@@ -4,7 +4,7 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { SessionNameMutation } from "@pi67/protocol";
 import { resolveManagedSessionPath } from "./session-import.js";
 import {
-  normalizeSessionCatalogPathIdentity,
+  normalizeSessionCatalogWorkspaceIdentity,
   resolveExistingSessionFileIdentity
 } from "./session-path-identity.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
@@ -26,7 +26,7 @@ export async function mutateManagedSessionName(options: {
     id: manager.getSessionId(),
     path,
     cwd: manager.getCwd(),
-    cwdKey: normalizeSessionCatalogPathIdentity(manager.getCwd()),
+    cwdKey: normalizeSessionCatalogWorkspaceIdentity(manager.getCwd()),
     ...(explicitName === undefined ? {} : { explicitName }),
     modifiedAt: Math.max(0, Math.trunc(file.mtimeMs)),
     messageCount: manager.getEntries().filter((entry) => entry.type === "message").length,

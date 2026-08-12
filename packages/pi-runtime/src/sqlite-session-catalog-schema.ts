@@ -5,7 +5,7 @@ import {
   MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import { fingerprintSchemaSql, SchemaSqlFingerprintError } from "./sqlite-schema-fingerprint.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogWorkspaceIdentity } from "./session-path-identity.js";
 import type { SessionCatalogRecord, SqliteCatalogState } from "./sqlite-session-catalog.js";
 
 export const SESSION_CATALOG_SCHEMA_VERSION = 4;
@@ -282,7 +282,7 @@ function validateDerivedSessionMetadata(database: DatabaseLike): void {
   for (const row of rows) {
     const record = recordFromRow(row);
     const expected = recordValues(record);
-    if (row.cwd_key !== normalizeSessionCatalogPathIdentity(record.cwd)
+    if (row.cwd_key !== normalizeSessionCatalogWorkspaceIdentity(record.cwd)
       || row.search_name !== expected[6]
       || row.search_path !== expected[7]
       || row.search_id !== expected[8]) {

@@ -45,7 +45,7 @@ export async function createControlledConversation(window, agentDir, contract) {
   if (materializationDurationMs > contract.createHardTimeoutMs) {
     throw new Error("Windows real-user session.create succeeded after its 15s hard gate.");
   }
-  await canonicalContainedSessionPath(createdSession.sessionPath, agentDir);
+  const sessionPath = await canonicalContainedSessionPath(createdSession.sessionPath, agentDir);
 
   await waitForControlledModel(window, contract.modelHydrationTimeoutMs);
   await waitForControlledPromptRunning(window);
@@ -77,7 +77,8 @@ export async function createControlledConversation(window, agentDir, contract) {
       targetMet: materializationDurationMs <= contract.createTargetMs,
       targetMs: contract.createTargetMs
     },
-    sessionIdentity: createdSession.sessionIdentity
+    sessionIdentity: createdSession.sessionIdentity,
+    sessionPath
   };
 }
 

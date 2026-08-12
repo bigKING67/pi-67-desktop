@@ -10,7 +10,7 @@ import type { AgentEvent } from "@pi67/protocol";
 import { createSessionCatalog, type SessionCatalog } from "./session-catalog.js";
 import { createSessionCatalogContext } from "./session-discovery.js";
 import {
-  normalizeSessionCatalogPathIdentity,
+  normalizeSessionCatalogWorkspaceIdentity,
   resolveExistingSessionFileIdentity
 } from "./session-path-identity.js";
 import type { SessionProjectionMetadata } from "./session-projection-index.js";
@@ -166,7 +166,7 @@ async function projectCurrentSession(
     id: manager.getSessionId(),
     path,
     cwd: manager.getCwd(),
-    cwdKey: normalizeSessionCatalogPathIdentity(manager.getCwd()),
+    cwdKey: normalizeSessionCatalogWorkspaceIdentity(manager.getCwd()),
     ...(explicitName === undefined ? {} : { explicitName }),
     modifiedAt: live.modifiedAt || Math.max(0, Math.trunc(file.mtimeMs)),
     messageCount: live.messageCount,

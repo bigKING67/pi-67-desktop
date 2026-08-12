@@ -194,6 +194,49 @@ describe("Pi SDK Session Catalog discovery contract", () => {
       "session-file-path-v1\0"
     ].some((prefix) => discovered.records[0]?.fileIdentity.startsWith(prefix))).toBe(true);
   });
+
+  it("reopens and refreshes a Windows Workspace whose path casing changed", async () => {
+    const fixture = await createFixture();
+    const session = SessionManager.create(fixture.cwd, fixture.sessionDirectory);
+    session.appendMessage({ role: "user", content: "restart fixture", timestamp: Date.now() });
+    session.appendMessage(assistantMessage("restart reply", Date.now() + 1));
+    const sessionPath = await realpath(requirePersistedPath(session));
+    const catalogDirectory = join(fixture.root, "restart-catalog");
+    const windowsPlatform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+
+    try {
+      const initialContext = createSessionCatalogContext({
+        agentDir: fixture.agentDir,
+        configuredSessionDir: fixture.sessionDirectory,
+        workspaceCwd: fixture.cwd
+      });
+      const initialCatalog = createSessionCatalog({ directory: catalogDirectory });
+      await initialCatalog.reconcile(initialContext);
+      expect((await initialCatalog.query({ scope: "workspace" }, initialContext)).items)
+        .toEqual([expect.objectContaining({ id: session.getSessionId(), path: sessionPath })]);
+      await initialCatalog.dispose();
+
+      const restartedCwd = fixture.cwd.toUpperCase();
+      expect(restartedCwd).not.toBe(fixture.cwd);
+      const restartedContext = createSessionCatalogContext({
+        agentDir: fixture.agentDir,
+        configuredSessionDir: fixture.sessionDirectory,
+        workspaceCwd: restartedCwd
+      });
+      const restartedCatalog = createSessionCatalog({ directory: catalogDirectory });
+      await restartedCatalog.reconcile(restartedContext);
+
+      expect(await restartedCatalog.query({ scope: "workspace" }, restartedContext)).toMatchObject({
+        source: "sqlite",
+        state: "ready",
+        total: 1,
+        items: [expect.objectContaining({ id: session.getSessionId(), path: sessionPath })]
+      });
+      await restartedCatalog.dispose();
+    } finally {
+      windowsPlatform.mockRestore();
+    }
+  });
 });
 
 async function createFixture(): Promise<{

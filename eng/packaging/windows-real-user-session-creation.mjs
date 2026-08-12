@@ -1,7 +1,10 @@
-import { readdir } from "node:fs/promises";
+import { lstat, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { resolveExistingSessionFileIdentity } from "../../packages/pi-runtime/src/session-path-identity.ts";
-import { createSessionCreationDiagnostic } from "./windows-installer-identity.mjs";
+import {
+  createSessionCreationDiagnostic,
+  fingerprintSessionIdentity
+} from "./windows-installer-identity.mjs";
 
 const SESSION_CREATION_POLL_INTERVAL_MS = 50;
 
@@ -119,6 +122,29 @@ export async function waitForRealUserCreatedSession(
   throw new Error(
     `Windows real-user session.create exceeded its 15s hard gate: ${JSON.stringify(diagnostic)}`
   );
+}
+
+export async function inspectRealUserSessionFile(sessionPath) {
+  if (!sessionPath) return { expected: false };
+  const metadata = await lstat(sessionPath).catch((error) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!metadata) {
+    return { expected: true, exists: false, isFile: false };
+  }
+  const isFile = metadata.isFile() && !metadata.isSymbolicLink();
+  if (!isFile) {
+    return { expected: true, exists: true, isFile: false };
+  }
+  const fileIdentity = await resolveExistingSessionFileIdentity(sessionPath).catch(() => undefined);
+  return {
+    expected: true,
+    exists: true,
+    isFile: true,
+    byteLength: metadata.size,
+    fileIdentityFingerprint: fingerprintSessionIdentity(fileIdentity)
+  };
 }
 
 function observeSessionCreation(window, existingIdentities) {

@@ -8,7 +8,10 @@ import type { PiConfigurationService } from "./pi-configuration-service.js";
 import type { RuntimeCredentialOverrideStore } from "./runtime-credential-overrides.js";
 import { installDesktopPackageToolchainReloadHook } from "./desktop-package-toolchain.js";
 import { createRuntimeSessionCatalogOwner, type RuntimeSessionCatalogOwner } from "./runtime-session-catalog.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import {
+  normalizeSessionCatalogPathIdentity,
+  normalizeSessionCatalogWorkspaceIdentity
+} from "./session-path-identity.js";
 import { SessionCreationReceiptStore } from "./session-creation-receipt-store.js";
 import { PackageMutationReceiptStore } from "./package-mutation-receipt-store.js";
 import { PackageTrustRegistry } from "./package-trust-registry.js";
@@ -53,7 +56,7 @@ export function createPiWorkspaceRuntimeServices(
 ): PiWorkspaceRuntimeServices {
   const cwd = resolve(options.cwd);
   const agentDir = resolve(options.agentDir);
-  const cwdIdentity = normalizeSessionCatalogPathIdentity(cwd);
+  const cwdIdentity = normalizeSessionCatalogWorkspaceIdentity(cwd);
   const agentDirIdentity = normalizeSessionCatalogPathIdentity(agentDir);
   const settingsManager = options.settingsManager ?? SettingsManager.create(cwd, agentDir, {
     projectTrusted: options.projectTrusted ?? false
@@ -118,7 +121,7 @@ export function createPiWorkspaceRuntimeServices(
     packageOnboarding,
     assertCompatible(candidateCwd, candidateAgentDir) {
       if (
-        normalizeSessionCatalogPathIdentity(candidateCwd) !== cwdIdentity
+        normalizeSessionCatalogWorkspaceIdentity(candidateCwd) !== cwdIdentity
         || normalizeSessionCatalogPathIdentity(candidateAgentDir) !== agentDirIdentity
       ) {
         throw new RuntimeError(

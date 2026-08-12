@@ -1,3 +1,5 @@
+import { fingerprintSessionIdentity } from "./windows-installer-identity.mjs";
+
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 
 const POLL_INTERVAL_MS = 50;
@@ -15,7 +17,8 @@ function catalogStateFromText(text, itemCount) {
 export async function waitForCatalogState(
   window,
   expectedSessionIdentity,
-  timeoutMs = REAL_USER_CATALOG_TIMEOUT_MS
+  timeoutMs = REAL_USER_CATALOG_TIMEOUT_MS,
+  diagnostics = {}
 ) {
   const startedAt = performance.now();
   const workspaceGroup = window.getByTestId("workspace-group").first();
@@ -33,10 +36,18 @@ export async function waitForCatalogState(
         itemCount: sessionIdentities.length,
         provisionalItemCount: conversationIdentities
           .filter((identity) => identity?.startsWith("provisional:")).length,
+        sessionIdentities,
         text
       };
     }, expectedSessionIdentity);
-    latestObservation = current;
+    latestObservation = {
+      hasExpectedSession: current.hasExpectedSession,
+      itemCount: current.itemCount,
+      provisionalItemCount: current.provisionalItemCount,
+      state: catalogStateFromText(current.text, current.itemCount) ?? null,
+      text: current.text,
+      visibleSessionIdentityFingerprints: (current.sessionIdentities ?? []).map(fingerprintSessionIdentity)
+    };
     if (current.text.includes("Session 目录暂不可用")) {
       throw new Error("Windows real-user Session Catalog became unavailable.");
     }
@@ -49,10 +60,18 @@ export async function waitForCatalogState(
     }
     const explicitState = catalogStateFromText(current.text, current.itemCount);
     return explicitState ? { itemCount: current.itemCount, state: explicitState } : undefined;
-  }, timeoutMs, () => (
-    "Windows real-user Session Catalog did not return an explicit state. "
-    + `Diagnostics: ${JSON.stringify(latestObservation)}`
-  ));
+  }, timeoutMs, async () => {
+    const expectedSessionFile = diagnostics.inspectExpectedSessionFile
+      ? await diagnostics.inspectExpectedSessionFile()
+      : undefined;
+    return "Windows real-user Session Catalog did not return an explicit state. "
+      + `Diagnostics: ${JSON.stringify({
+        ...latestObservation,
+        launchIndex: diagnostics.launchIndex ?? null,
+        expectedSessionIdentityFingerprint: fingerprintSessionIdentity(expectedSessionIdentity),
+        ...(expectedSessionFile === undefined ? {} : { expectedSessionFile })
+      })}`;
+  });
   const durationMs = performance.now() - startedAt;
   if (durationMs > timeoutMs) throw new Error(`Windows real-user Session Catalog exceeded ${timeoutMs}ms.`);
   return { ...observation, durationMs: Math.round(durationMs * 10) / 10 };
@@ -72,5 +91,5 @@ async function waitForCatalogCondition(action, timeoutMs, failureMessage) {
     if (result !== undefined && result !== false) return result;
     await new Promise((resolvePromise) => setTimeout(resolvePromise, POLL_INTERVAL_MS));
   }
-  throw new Error(`${failureMessage()} after ${timeoutMs}ms.`);
+  throw new Error(`${await failureMessage()} after ${timeoutMs}ms.`);
 }

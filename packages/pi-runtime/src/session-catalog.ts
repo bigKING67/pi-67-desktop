@@ -25,7 +25,7 @@ import {
   type SessionCatalogDiscoveryResult,
   type ValidatedSessionCatalogQuery
 } from "./session-catalog-projection.js";
-import { normalizeSessionCatalogPathIdentity } from "./session-path-identity.js";
+import { normalizeSessionCatalogWorkspaceIdentity } from "./session-path-identity.js";
 import { upsertSessionCatalogRecordByIdentity } from "./session-catalog-record-identity.js";
 import type { CreateSessionCatalogOptions, SessionCatalog, SessionCatalogContext } from "./session-catalog-contract.js";
 import {
@@ -247,7 +247,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.assertNotDisposed();
     this.activeContext = context;
     if (this.activeSourceKey === context.sourceKey) {
-      this.activeWorkspaceKey = normalizeSessionCatalogPathIdentity(context.workspaceCwd);
+      this.activeWorkspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
       return this.contextGeneration;
     }
     const changed = this.activeSourceKey !== undefined;
@@ -257,7 +257,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     }
     this.activeSourceKey = context.sourceKey;
     this.contextGeneration += 1;
-    this.activeWorkspaceKey = normalizeSessionCatalogPathIdentity(context.workspaceCwd);
+    this.activeWorkspaceKey = normalizeSessionCatalogWorkspaceIdentity(context.workspaceCwd);
     this.fallbackRecords = [];
     this.fallbackReady = false;
     this.autoReconciledSource = undefined;

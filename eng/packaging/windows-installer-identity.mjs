@@ -69,7 +69,7 @@ function fingerprintSessionIdentities(identities) {
   return identities.slice(0, 8).map(fingerprintSessionIdentity);
 }
 
-function fingerprintSessionIdentity(identity) {
+export function fingerprintSessionIdentity(identity) {
   if (typeof identity !== "string" || identity.length === 0) return null;
   return createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 12);
 }

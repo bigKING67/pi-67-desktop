@@ -1,3 +1,4 @@
+import * as systemPath from "node:path";
 import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
@@ -21,10 +22,8 @@ import {
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
-import {
-  shouldCreateInitialRealUserSession,
-  waitForCatalogState
-} from "./windows-real-user-catalog-state.mjs";
+import { shouldCreateInitialRealUserSession, waitForCatalogState } from "./windows-real-user-catalog-state.mjs";
+import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
 export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
 import {
@@ -66,6 +65,7 @@ export async function verifyInstalledRealUserLifecycle({
   }
   const launches = [];
   let expectedSessionIdentity;
+  let expectedSessionPath;
   let create;
 
   for (let launchIndex = 0; launchIndex <= REAL_USER_RESTART_COUNT; launchIndex += 1) {
@@ -74,11 +74,13 @@ export async function verifyInstalledRealUserLifecycle({
       artifact,
       environmentDriftAgentDir,
       expectedSessionIdentity,
+      expectedSessionPath,
       launchIndex,
       userDataDirectory,
       workspace
     });
     expectedSessionIdentity = result.sessionIdentity;
+    expectedSessionPath = result.sessionPath;
     create ??= result.create;
     launches.push(result.report);
   }
@@ -100,6 +102,7 @@ async function runRealUserLaunch({
   artifact,
   environmentDriftAgentDir,
   expectedSessionIdentity,
+  expectedSessionPath,
   launchIndex,
   userDataDirectory,
   workspace
@@ -141,9 +144,13 @@ async function runRealUserLaunch({
       await window.getByRole("button", { name: "选择工作区" }).click();
     }
 
-    const catalog = await waitForCatalogState(window, expectedSessionIdentity);
+    const catalog = await waitForCatalogState(window, expectedSessionIdentity, undefined, {
+      launchIndex,
+      inspectExpectedSessionFile: () => inspectRealUserSessionFile(expectedSessionPath)
+    });
     let create;
     let sessionIdentity = expectedSessionIdentity;
+    let sessionPath = expectedSessionPath;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
       try {
         await waitForRealUserRuntimeReady(
@@ -166,6 +173,7 @@ async function runRealUserLaunch({
       const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
+      sessionPath = created.sessionPath;
     } else {
       sessionIdentity = await activateCatalogSession(window, expectedSessionIdentity);
     }
@@ -179,6 +187,7 @@ async function runRealUserLaunch({
       const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
+      sessionPath = created.sessionPath;
     }
     if (!sessionIdentity) {
       throw new Error("Windows real-user launch did not expose a materialized Session identity.");
@@ -232,7 +241,8 @@ async function runRealUserLaunch({
         runtimeReadyMs: round(runtimeReadyMs),
         startupSurface
       },
-      sessionIdentity
+      sessionIdentity,
+      sessionPath
     };
   } finally {
     if (application) await application.close();
