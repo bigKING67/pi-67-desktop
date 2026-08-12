@@ -153,9 +153,9 @@ async function runRealUserLaunch({
       create = created.report;
       sessionIdentity = created.sessionIdentity;
     } else {
-      await activateCatalogSession(window, expectedSessionIdentity);
+      sessionIdentity = await activateCatalogSession(window, expectedSessionIdentity);
     }
-    const runtimeReadyMs = await waitForRealUserRuntimeReady(window);
+    const runtimeReadyMs = await waitForRealUserRuntimeReady(window, sessionIdentity);
     const launchToReadyMs = performance.now() - launchStartedAt;
     await waitForHealthyWorkbenchConvergence(window);
     const providerConfiguration = await verifyProviderConfiguration(window);
@@ -274,13 +274,19 @@ export async function activateCatalogSession(
   const deadline = performance.now() + timeoutMs;
   const conversation = window.getByLabel("Pi conversation");
   const rows = window.locator('[data-testid="conversation-row"]');
+  let targetSessionIdentity = expectedSessionIdentity;
+  let activationRequested = false;
   let observation = { provisionalRowCount: 0, rowCount: 0, sessionRowCount: 0 };
 
   while (performance.now() <= deadline) {
     if (await conversation.isVisible()) {
-      if (!expectedSessionIdentity) return;
       const selectedIdentity = await readSelectedConversationIdentity(window);
-      if (selectedIdentity === expectedSessionIdentity) return;
+      if (targetSessionIdentity && selectedIdentity === targetSessionIdentity) {
+        return targetSessionIdentity;
+      }
+      if (!targetSessionIdentity && selectedIdentity?.startsWith("session:")) {
+        return selectedIdentity;
+      }
     }
 
     const rowCount = await rows.count();
@@ -288,11 +294,15 @@ export async function activateCatalogSession(
       const row = rows.nth(index);
       const identity = await row.getAttribute("data-conversation-id");
       if (
-        (expectedSessionIdentity && identity === expectedSessionIdentity)
-        || (!expectedSessionIdentity && identity?.startsWith("session:"))
+        (targetSessionIdentity && identity === targetSessionIdentity)
+        || (!targetSessionIdentity && identity?.startsWith("session:"))
       ) {
-        await row.click({ timeout: Math.max(1, Math.ceil(deadline - performance.now())) });
-        return;
+        targetSessionIdentity = identity;
+        if (!activationRequested) {
+          await row.click({ timeout: Math.max(1, Math.ceil(deadline - performance.now())) });
+          activationRequested = true;
+        }
+        break;
       }
     }
 
@@ -311,7 +321,7 @@ export async function activateCatalogSession(
   );
 }
 
-async function waitForRealUserRuntimeReady(window) {
+export async function waitForRealUserRuntimeReady(window, expectedSessionIdentity) {
   const startedAt = performance.now();
   const ready = window.locator('[data-runtime-phase="ready"]');
   const failed = window.locator('[data-runtime-phase="failed"]');
@@ -321,6 +331,24 @@ async function waitForRealUserRuntimeReady(window) {
   }
   const remaining = remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS);
   await window.getByLabel("Pi conversation").waitFor({ state: "visible", timeout: remaining });
+  await waitForCondition(async () => {
+    const observation = await window.evaluate((expectedIdentity) => {
+      const selectedIdentity = document.querySelector(
+        '[data-testid="conversation-row"][aria-current="page"]'
+      )?.getAttribute("data-conversation-id");
+      return {
+        runtimePhase: document.querySelector("[data-runtime-phase]")?.getAttribute("data-runtime-phase") ?? null,
+        selectionMatches: selectedIdentity === expectedIdentity
+      };
+    }, expectedSessionIdentity);
+    if (observation.runtimePhase === "failed") {
+      throw new Error("Windows real-user Pi Runtime entered a failed phase.");
+    }
+    return observation.runtimePhase === "ready" && observation.selectionMatches
+      ? observation
+      : undefined;
+  }, remainingTimeout(startedAt, REAL_USER_RUNTIME_TIMEOUT_MS),
+  "Windows real-user Pi Runtime did not become ready for the activated Catalog Session");
   return performance.now() - startedAt;
 }
 

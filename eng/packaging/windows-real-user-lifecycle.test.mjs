@@ -10,7 +10,8 @@ import {
   canonicalContainedSessionPath,
   shouldCreateInitialRealUserSession,
   waitForHealthyWorkbenchConvergence,
-  waitForCatalogState
+  waitForCatalogState,
+  waitForRealUserRuntimeReady
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
   it("keeps the installed product shutdown budget fixed", () => {
@@ -196,8 +197,12 @@ describe("Windows installed real-user lifecycle", () => {
   it("waits for a Catalog Session row that is transiently absent during reconciliation", async () => {
     const clicks = [];
     let observationCount = 0;
+    let selectedIdentity;
     const sessionRow = {
-      click: async () => clicks.push("session:workspace-1:session.jsonl"),
+      click: async () => {
+        selectedIdentity = "session:workspace-1:session.jsonl";
+        clicks.push(selectedIdentity);
+      },
       getAttribute: async () => "session:workspace-1:session.jsonl"
     };
     const rows = {
@@ -209,13 +214,123 @@ describe("Windows installed real-user lifecycle", () => {
       }),
       nth: () => sessionRow
     };
+    const selectedRows = {
+      evaluateAll: async () => selectedIdentity
+    };
     const window = {
-      getByLabel: () => ({ isVisible: async () => false }),
-      locator: () => rows
+      getByLabel: () => ({ isVisible: async () => selectedIdentity !== undefined }),
+      locator: (selector) => selector.includes('[aria-current="page"]') ? selectedRows : rows
     };
 
-    await expect(activateCatalogSession(window, undefined, 200)).resolves.toBeUndefined();
+    await expect(activateCatalogSession(window, undefined, 200))
+      .resolves.toBe("session:workspace-1:session.jsonl");
     expect(clicks).toEqual(["session:workspace-1:session.jsonl"]);
+  });
+
+  it("activates a materialized Catalog Session when a provisional conversation is already visible", async () => {
+    const sessionIdentity = "session:workspace-1:session.jsonl";
+    let selectedIdentity = "provisional:workspace-1:draft-1";
+    const clicks = [];
+    const sessionRow = {
+      click: async () => {
+        clicks.push(sessionIdentity);
+        selectedIdentity = sessionIdentity;
+      },
+      getAttribute: async () => sessionIdentity
+    };
+    const rows = {
+      count: async () => 1,
+      evaluateAll: async () => ({
+        provisionalRowCount: 1,
+        rowCount: 2,
+        sessionRowCount: 1
+      }),
+      nth: () => sessionRow
+    };
+    const selectedRows = {
+      evaluateAll: async () => selectedIdentity
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => true }),
+      locator: (selector) => selector.includes('[aria-current="page"]') ? selectedRows : rows
+    };
+
+    await expect(activateCatalogSession(window, undefined, 200)).resolves.toBe(sessionIdentity);
+    expect(clicks).toEqual([sessionIdentity]);
+  });
+
+  it("reuses an already selected materialized Catalog Session", async () => {
+    const sessionIdentity = "session:workspace-1:session.jsonl";
+    const selectedRows = {
+      evaluateAll: async () => sessionIdentity
+    };
+    const rows = {
+      count: async () => {
+        throw new Error("Catalog rows should not be scanned when the selected Session is materialized.");
+      }
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => true }),
+      locator: (selector) => {
+        if (selector.includes('[aria-current="page"]')) return selectedRows;
+        return rows;
+      }
+    };
+
+    await expect(activateCatalogSession(window, undefined, 200)).resolves.toBe(sessionIdentity);
+  });
+
+  it("waits for the exact persisted Catalog Session to become selected", async () => {
+    const expectedIdentity = "session:workspace-1:expected.jsonl";
+    let selectedIdentity = "session:workspace-1:other.jsonl";
+    const clicks = [];
+    const identities = [selectedIdentity, expectedIdentity];
+    const rows = {
+      count: async () => identities.length,
+      evaluateAll: async () => ({
+        provisionalRowCount: 0,
+        rowCount: identities.length,
+        sessionRowCount: identities.length
+      }),
+      nth: (index) => ({
+        click: async () => {
+          selectedIdentity = identities[index];
+          clicks.push(selectedIdentity);
+        },
+        getAttribute: async () => identities[index]
+      })
+    };
+    const selectedRows = {
+      evaluateAll: async () => selectedIdentity
+    };
+    const window = {
+      getByLabel: () => ({ isVisible: async () => true }),
+      locator: (selector) => selector.includes('[aria-current="page"]') ? selectedRows : rows
+    };
+
+    await expect(activateCatalogSession(window, expectedIdentity, 200)).resolves.toBe(expectedIdentity);
+    expect(clicks).toEqual([expectedIdentity]);
+  });
+
+  it("binds runtime readiness to the activated materialized Session", async () => {
+    const sessionIdentity = "session:workspace-1:session.jsonl";
+    const runtimeState = [
+      { runtimePhase: "ready", selectionMatches: false },
+      { runtimePhase: "ready", selectionMatches: true }
+    ];
+    const readyOrFailed = { waitFor: async () => undefined };
+    const ready = { or: () => readyOrFailed };
+    const failed = { isVisible: async () => false };
+    const conversation = { waitFor: async () => undefined };
+    const evaluate = vi.fn(async () => runtimeState.shift());
+    const window = {
+      evaluate,
+      getByLabel: () => conversation,
+      locator: (selector) => selector.includes('="ready"') ? ready : failed
+    };
+
+    await expect(waitForRealUserRuntimeReady(window, sessionIdentity)).resolves.toBeGreaterThanOrEqual(0);
+    expect(evaluate).toHaveBeenCalledTimes(2);
   });
 
   it("does not substitute another Catalog Session when the persisted identity is absent", async () => {
