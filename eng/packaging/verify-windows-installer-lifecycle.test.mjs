@@ -24,6 +24,9 @@ import {
   REAL_USER_RESTART_COUNT
 } from "./windows-real-user-lifecycle.mjs";
 import {
+  createSessionCreationDiagnostic
+} from "./windows-installer-identity.mjs";
+import {
   assertPreservedUserData,
   buildNsisInstallArguments,
   parseWindowsInstallerLifecycleArguments,
@@ -37,6 +40,18 @@ import {
 
 const temporaryDirectories = [];
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+it("retains redacted Session creation notification details", () => {
+  expect(createSessionCreationDiagnostic({
+    errorNotificationCount: 1,
+    errorNotificationMessages: ["无法创建 Pi 会话：safe detail"],
+    errorNotificationTitles: ["无法创建 Pi 会话"]
+  })).toMatchObject({
+    errorNotificationCount: 1,
+    errorNotificationMessages: ["无法创建 Pi 会话：safe detail"],
+    errorNotificationTitles: ["无法创建 Pi 会话"]
+  });
+});
 
 afterEach(async () => {
   vi.restoreAllMocks();

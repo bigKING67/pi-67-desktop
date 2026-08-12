@@ -21,6 +21,7 @@ export function createSessionCreationDiagnostic(
   return {
     distinctNewSessionFileNameCount: new Set(newSessionFileNames).size,
     errorNotificationCount: observation?.errorNotificationCount ?? 0,
+    errorNotificationMessages: observation?.errorNotificationMessages ?? [],
     errorNotificationTitles: observation?.errorNotificationTitles ?? [],
     knownIdentityFingerprints: fingerprintSessionIdentities(existingIdentities),
     knownSessionFileNameCount: existingSessionFileNames.length,
