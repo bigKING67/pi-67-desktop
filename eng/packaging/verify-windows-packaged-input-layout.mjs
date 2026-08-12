@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { release, version } from "node:os";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { release, tmpdir, version } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -55,10 +55,12 @@ export async function verifyWindowsPackagedInputLayout() {
     scenarios: []
   };
   await writeReport(report);
+  const sharedAgentDirectory = await mkdtemp(join(tmpdir(), "pi67-windows-ui-agent-"));
+  await mkdir(join(sharedAgentDirectory, "extensions"), { recursive: true });
 
   try {
     for (const scaleFactor of WINDOWS_SYNTHETIC_SCALE_FACTORS) {
-      report.scenarios.push(await verifyScaleScenario(artifact, scaleFactor));
+      report.scenarios.push(await verifyScaleScenario(artifact, scaleFactor, sharedAgentDirectory));
       await writeReport(report);
     }
     report.status = "passed";
@@ -72,10 +74,12 @@ export async function verifyWindowsPackagedInputLayout() {
     report.error = error instanceof Error ? error.message : String(error);
     await writeReport(report);
     throw error;
+  } finally {
+    await rm(sharedAgentDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 
-async function verifyScaleScenario(artifact, scaleFactor) {
+async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
   const scaleLabel = String(Math.round(scaleFactor * 100));
   const directories = await createPackagedTestDirectories(
     `pi67-windows-ui-${scaleLabel}-`,
@@ -84,7 +88,7 @@ async function verifyScaleScenario(artifact, scaleFactor) {
   const childPidPath = join(directories.userDataDirectory, "child.pid");
   const lifecyclePath = join(directories.userDataDirectory, "lifecycle.txt");
   await writeControlledShutdownExtension({
-    extensionPath: join(directories.extensionsDirectory, "windows-ui-fixture.ts"),
+    extensionPath: join(agentDirectory, "extensions", "windows-ui-fixture.ts"),
     childPidPath,
     lifecyclePath
   });
@@ -93,7 +97,7 @@ async function verifyScaleScenario(artifact, scaleFactor) {
   let childPid;
   try {
     application = await launchPackagedApplication({
-      agentDir: directories.agentDir,
+      agentDir: agentDirectory,
       applicationArguments: [`--force-device-scale-factor=${scaleFactor}`],
       artifact,
       userDataDirectory: directories.userDataDirectory
@@ -114,6 +118,9 @@ async function verifyScaleScenario(artifact, scaleFactor) {
     }));
     await startControlledPrompt(window);
     childPid = await readPositiveProcessId(childPidPath);
+    const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
+      .filter((metric) => metric.type === "Utility")
+      .map((metric) => metric.pid));
 
     const { contextViewport, navigationViewport } = await verifyPackagedResponsiveLayout(
       window,
@@ -127,6 +134,7 @@ async function verifyScaleScenario(artifact, scaleFactor) {
     await application.close();
     application = undefined;
     await waitForProcessExit(childPid);
+    for (const pid of utilityPids) await waitForProcessExit(pid);
     await assertSingleShutdownQuitLifecycle(
       lifecyclePath,
       `Scale ${scaleFactor}: controlled Runtime`
