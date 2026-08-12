@@ -149,11 +149,23 @@ async function runRealUserLaunch({
     let create;
     let sessionIdentity = expectedSessionIdentity;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
-      await waitForRealUserRuntimeReady(
-        window,
-        undefined,
-        INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
-      );
+      try {
+        await waitForRealUserRuntimeReady(
+          window,
+          undefined,
+          INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+        );
+      } catch (error) {
+        const diagnostic = {
+          initialization: parseInitializationObservations(processOutput()),
+          surface: await inspectRealUserRuntimeSurface(window, systemPath.dirname(agentDir))
+            .catch(() => ({ available: false }))
+        };
+        throw new Error(
+          `Windows real-user initial Pi Runtime authority did not become ready. Diagnostics: ${JSON.stringify(diagnostic)}`,
+          { cause: error }
+        );
+      }
       await assertHealthyWorkbench(window);
       const created = await createControlledConversation(window, agentDir);
       create = created.report;
@@ -360,6 +372,36 @@ export async function waitForRealUserRuntimeReady(
   }, remainingTimeout(startedAt, timeoutMs),
   "Windows real-user Pi Runtime did not become ready for the activated Catalog Session");
   return performance.now() - startedAt;
+}
+
+export async function inspectRealUserRuntimeSurface(window, privateRoot) {
+  const observation = await window.evaluate(() => {
+    const bodyText = document.body.innerText;
+    const runtimeStatus = document.querySelector('[aria-label^="当前状态："]');
+    const errorNotifications = [...document.querySelectorAll('[aria-label="通知"] [role="alert"]')];
+    return {
+      acknowledgementTimedOut: bodyText.includes("Agent request acknowledgement timed out"),
+      errorNotificationCount: errorNotifications.length,
+      errorNotificationMessages: errorNotifications.slice(0, 3).map((notification) => (
+        notification.textContent?.trim().slice(0, 500) ?? ""
+      )),
+      errorNotificationTitles: errorNotifications.slice(0, 3).map((notification) => (
+        notification.querySelector("strong")?.textContent?.trim().slice(0, 160) ?? null
+      )),
+      providerConfigurationFailed: bodyText.includes("无法读取 Pi Provider 配置"),
+      runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
+      runtimeStatus: runtimeStatus?.getAttribute("aria-label")?.slice(0, 160) ?? null,
+      workspaceOpenFailed: bodyText.includes("无法打开工作区")
+    };
+  });
+  const sanitize = (value) => typeof value === "string"
+    ? value.replaceAll(privateRoot, "<temporary-root>")
+    : value;
+  return {
+    ...observation,
+    errorNotificationMessages: observation.errorNotificationMessages.map(sanitize),
+    runtimeStatus: sanitize(observation.runtimeStatus)
+  };
 }
 
 export async function waitForHealthyWorkbenchConvergence(

@@ -11,6 +11,7 @@ import {
   activateCatalogSession,
   assertModelRuntimeInitialization,
   canonicalContainedSessionPath,
+  inspectRealUserRuntimeSurface,
   shouldCreateInitialRealUserSession,
   waitForHealthyWorkbenchConvergence,
   waitForCatalogState,
@@ -373,6 +374,26 @@ describe("Windows installed real-user lifecycle", () => {
       timeout: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
     });
     expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports bounded and redacted initial runtime failure diagnostics", async () => {
+    const observation = {
+      acknowledgementTimedOut: false,
+      errorNotificationCount: 1,
+      errorNotificationMessages: ["无法启动 C:\\private-root\\agent-host"],
+      errorNotificationTitles: ["Pi 运行服务启动失败"],
+      providerConfigurationFailed: false,
+      runtimePhase: "failed",
+      runtimeStatus: "当前状态：C:\\private-root\\runtime failed",
+      workspaceOpenFailed: false
+    };
+    const window = { evaluate: vi.fn(async () => observation) };
+
+    await expect(inspectRealUserRuntimeSurface(window, "C:\\private-root")).resolves.toEqual({
+      ...observation,
+      errorNotificationMessages: ["无法启动 <temporary-root>\\agent-host"],
+      runtimeStatus: "当前状态：<temporary-root>\\runtime failed"
+    });
   });
 
   it("does not substitute another Catalog Session when the persisted identity is absent", async () => {
