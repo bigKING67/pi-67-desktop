@@ -37,6 +37,7 @@ export async function installMockDesktopBridge(
     composerDraftPersistence: options.composerDraftPersistence ?? "available" as const,
     composerDraftUpdateDelayMs: options.composerDraftUpdateDelayMs ?? 0,
     composerDraftFailureCalls: options.composerDraftFailureCalls ?? [],
+    composerDraftFailFirstPromptStashWrite: options.composerDraftFailFirstPromptStashWrite ?? false,
     expandedWorkspaceIds: options.expandedWorkspaceIds ?? [],
     currentWorkspaceId: options.currentWorkspaceId,
     selectedSurface: options.selectedSurface,
@@ -107,6 +108,7 @@ export async function installMockDesktopBridge(
       updates: 0,
       state: () => structuredClone(composerDraftState)
     };
+    let composerDraftPromptStashFailureConsumed = false;
     const worktreeTest = {
       createCalls: 0,
       advanceCalls: 0,
@@ -210,6 +212,12 @@ export async function installMockDesktopBridge(
             }
             if (bridgeFixture.composerDraftFailureCalls.includes(composerDraftTest.updates)) {
               throw new Error(`Mock Composer draft update ${composerDraftTest.updates} failed.`);
+            }
+            if (bridgeFixture.composerDraftFailFirstPromptStashWrite
+              && !composerDraftPromptStashFailureConsumed
+              && state.drafts.some((draft) => (draft.promptStash?.length ?? 0) > 0)) {
+              composerDraftPromptStashFailureConsumed = true;
+              throw new Error("Mock Prompt Stash draft update failed.");
             }
             composerDraftState = structuredClone(state);
             return {

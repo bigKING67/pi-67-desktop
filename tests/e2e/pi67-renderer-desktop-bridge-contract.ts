@@ -34,6 +34,7 @@ export interface MockDesktopBridgeOptions {
   composerDraftPersistence?: "available" | "unavailable";
   composerDraftUpdateDelayMs?: number;
   composerDraftFailureCalls?: number[];
+  composerDraftFailFirstPromptStashWrite?: boolean;
   expandedWorkspaceIds?: string[];
   currentWorkspaceId?: string;
   selectedSurface?: WorkbenchSurface;

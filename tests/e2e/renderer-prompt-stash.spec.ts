@@ -42,7 +42,7 @@ test("clears and restores exact Prompt text only after secure persistence acknow
 });
 
 test("keeps the Composer text when the first Prompt Stash persistence write fails", async ({ page }) => {
-  await installMockDesktopBridge(page, { composerDraftFailureCalls: [1] });
+  await installMockDesktopBridge(page, { composerDraftFailFirstPromptStashWrite: true });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -60,8 +60,12 @@ test("keeps the Composer text when the first Prompt Stash persistence write fail
     exact: true
   })).toBeVisible();
   expect(await page.evaluate(() => (
-    window as unknown as { __pi67ComposerDraftTest: { state(): { drafts: unknown[] } } }
-  ).__pi67ComposerDraftTest.state().drafts)).toEqual([]);
+    window as unknown as {
+      __pi67ComposerDraftTest: {
+        state(): { drafts: Array<{ text: string; promptStash?: unknown[] }> };
+      };
+    }
+  ).__pi67ComposerDraftTest.state().drafts.flatMap((draft) => draft.promptStash ?? []))).toEqual([]);
 });
 
 test("retries a routine autosave failure without interrupting Composer input", async ({ page }) => {
