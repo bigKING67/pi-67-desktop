@@ -51,6 +51,7 @@
     "package:win": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --win nsis --x64",
     "package:mac": "corepack pnpm run build && corepack pnpm run prepare:toolchain && corepack pnpm run prepare:capabilities && electron-builder --mac dmg zip --arm64",
     "package:smoke": "node eng/packaging/smoke-packaged-electron.mjs",
+    "package:smoke:browser67-live": "node eng/packaging/smoke-packaged-browser67-live.mjs",
     "package:smoke:windows-ui": "node eng/packaging/verify-windows-packaged-input-layout.mjs",
     "package:smoke:windows-installer": "node eng/packaging/verify-windows-installer-lifecycle.mjs",
     "certify:windows-native": "node eng/packaging/certify-windows-native-runtime.mjs",

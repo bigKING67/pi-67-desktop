@@ -181,7 +181,7 @@ export async function managedNpmBundleTreeSha256(root) {
   return { sha256: hash.digest("hex"), fileCount, totalBytes };
 }
 
-export async function extractNpmTarball(tarballPath, destination) {
+async function extractNpmTarball(tarballPath, destination) {
   const archive = gunzipSync(await readFile(tarballPath));
   let offset = 0;
   let fileCount = 0;
@@ -228,7 +228,7 @@ export async function extractNpmTarball(tarballPath, destination) {
   }
 }
 
-export function parseManagedNpmBundleManifest(value, catalogVersion) {
+function parseManagedNpmBundleManifest(value, catalogVersion) {
   if (
     !value
     || value.schema !== MANIFEST_SCHEMA

@@ -92,7 +92,7 @@ export const NativeSubagentSteerPayloadSchema = strictObject({
   id: IdentifierSchema,
   text: Type.String({ minLength: 1, maxLength: MAX_NATIVE_SUBAGENT_STEER_CHARS })
 });
-export const NativeSubagentStopPayloadSchema = NativeSubagentStatusPayloadSchema;
+export const NativeSubagentStopPayloadSchema = strictObject({ id: IdentifierSchema });
 export const NativeSubagentResumePayloadSchema = strictObject({
   id: IdentifierSchema,
   mode: Type.Optional(ModeSchema)

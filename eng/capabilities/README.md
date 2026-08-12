@@ -60,7 +60,10 @@ and reproducible builds remain valid.
 4. Run `prepare:capabilities`; every bundled Skill must still have exactly one
    suite membership.
 5. Run the freshness audit, targeted tests, typecheck, lint, build, and packaged
-   Electron smoke before shipping the next Desktop release.
+   Electron smoke before shipping the next Desktop release. For browser67,
+   also run `package:smoke:browser67-live` against a connected local Hub and
+   extension; it proves the exact packaged private Node can initialize, list,
+   and call both managed MCP servers from an isolated Pi Agent Profile.
 
 `verify:capability-source-lock` shallow-fetches every exact locked commit from
 its canonical repository. Candidate and release provenance run this check before

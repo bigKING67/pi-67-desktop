@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.11.3");
+    expect(lock.catalogVersion).toBe("2026.08.12.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -31,7 +31,7 @@ describe("Desktop first-party capability source lock", () => {
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.4.0",
-      commit: "e531a83a0f86614699703f193c822763f9a9ec67"
+      commit: "c2394ca7810e01fed73dbba34a29bac8e1be5196"
     });
     expect(lock.skillPacks).toEqual([{
       name: "ai-berkshire-investment-suite",

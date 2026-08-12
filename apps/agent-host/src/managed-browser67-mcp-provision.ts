@@ -23,7 +23,7 @@ interface ManagedMetadata {
   servers: Partial<Record<ManagedServerName, ManagedServerReceipt>>;
 }
 
-export type ManagedBrowser67McpStatus =
+type ManagedBrowser67McpStatus =
   | "skipped"
   | "created"
   | "updated"
@@ -32,7 +32,7 @@ export type ManagedBrowser67McpStatus =
   | "invalid-json"
   | "revision-conflict";
 
-export type ManagedBrowser67McpCacheStatus =
+type ManagedBrowser67McpCacheStatus =
   | "skipped"
   | "missing"
   | "updated"
