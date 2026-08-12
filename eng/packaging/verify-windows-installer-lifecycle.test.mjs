@@ -104,7 +104,7 @@ describe("Windows installer lifecycle contract", () => {
   });
 
   it("keeps enough process-timeout margin for variable GitHub Windows installer performance", () => {
-    expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(180_000);
+    expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(240_000);
   });
 
   it("aligns installed runtime readiness with the replay-safe control mutation timeout", () => {
