@@ -29,8 +29,10 @@ describe("Windows installed profile authority wiring", () => {
     );
 
     expect(verifier).toContain("mkdir(lifecycleUserDataDirectory, { recursive: true })");
-    expect(verifier).toContain("environmentDriftAgentDir,");
+    expect(verifier).toContain("agentDir: lifecycleAgentDir");
+    expect(verifier).toContain("environmentDriftAgentDir: lifecycleEnvironmentDriftAgentDir");
     expect(verifier).toContain("userDataDirectory: lifecycleUserDataDirectory");
     expect(verifier).toContain("assertPreservedUserData(lifecycleUserDataDirectory)");
+    expect(verifier).toContain("extensionPath: lifecycleExtensionPath");
   });
 });

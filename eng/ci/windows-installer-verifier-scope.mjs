@@ -11,8 +11,11 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-artifact-identity.test.mjs",
   "windows-installed-application-lifecycle.mjs",
   "windows-installer-identity.mjs",
+  "windows-installer-profile-authority.test.mjs",
   "windows-real-user-lifecycle.mjs",
-  "windows-real-user-lifecycle.test.mjs"
+  "windows-real-user-lifecycle.test.mjs",
+  "windows-real-user-profile.mjs",
+  "windows-real-user-profile.test.mjs"
 ]);
 
 const ALLOWED_CI_BASENAMES = new Set([

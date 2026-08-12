@@ -17,11 +17,19 @@ describe("Windows installed real-user Pi profile", () => {
 
       expect(profile.agentDir).toContain("Pi 配置 含空格");
       expect(profile.environmentDriftAgentDir).toContain("错误 Pi 配置 空目录");
+      expect(profile.lifecycleAgentDir).toContain("生命周期 Pi 配置 含空格");
+      expect(profile.lifecycleAgentDir).not.toBe(profile.agentDir);
+      expect(profile.lifecycleEnvironmentDriftAgentDir).toContain("生命周期错误 Pi 配置 空目录");
       expect(profile.lifecycleUserDataDirectory).toContain("生命周期用户数据 含空格");
       expect(await readdir(profile.environmentDriftAgentDir)).toEqual([]);
+      expect(await readdir(profile.lifecycleEnvironmentDriftAgentDir)).toEqual([]);
       expect(JSON.parse(await readFile(join(profile.agentDir, "auth.json"), "utf8")))
         .toMatchObject({ openai: { type: "api_key" } });
+      expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "auth.json"), "utf8")))
+        .toMatchObject({ openai: { type: "api_key" } });
       expect(JSON.parse(await readFile(join(profile.agentDir, "settings.json"), "utf8")))
+        .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
+      expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "settings.json"), "utf8")))
         .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
       expect(WINDOWS_REAL_USER_CONFIGURED_PROVIDER).toBe("openai");
     } finally {

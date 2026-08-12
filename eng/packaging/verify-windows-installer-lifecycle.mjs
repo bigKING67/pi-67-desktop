@@ -100,6 +100,9 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     agentDir,
     environmentDriftAgentDir,
     extensionsDirectory,
+    lifecycleAgentDir,
+    lifecycleEnvironmentDriftAgentDir,
+    lifecycleExtensionsDirectory,
     lifecycleUserDataDirectory
   } = resolveWindowsRealUserProfilePaths(root);
   const workspace = join(root, "中文工作区 包含空格");
@@ -134,7 +137,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     configurationProfile: {
       agentDirectoryClass: "localized-space",
       environmentDriftProbe: true,
-      expectedConfiguredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER
+      expectedConfiguredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
+      isolatedLifecycleAgentProfile: true
     },
     phases: [],
     notVerified: [
@@ -153,7 +157,10 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       prepareWindowsRealUserProfile({
         agentDir,
         environmentDriftAgentDir,
-        extensionsDirectory
+        extensionsDirectory,
+        lifecycleAgentDir,
+        lifecycleEnvironmentDriftAgentDir,
+        lifecycleExtensionsDirectory
       }),
       mkdir(userDataDirectory, { recursive: true }),
       mkdir(lifecycleUserDataDirectory, { recursive: true }),
@@ -165,6 +172,12 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       writeFile(join(workspace, ".git", "config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n", "utf8")
     ]);
     const extensionPath = join(extensionsDirectory, "installer-lifecycle-fixture.ts");
+    const lifecycleExtensionPath = join(lifecycleExtensionsDirectory, "installer-lifecycle-fixture.ts");
+    await writeControlledShutdownExtension({
+      extensionPath: lifecycleExtensionPath,
+      childPidPath,
+      lifecyclePath
+    });
     if (baseline) {
       await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
     } else {
@@ -266,9 +279,9 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     }
 
     const realUserLifecycle = await verifyInstalledRealUserLifecycle({
-      agentDir,
+      agentDir: lifecycleAgentDir,
       artifact: finalInstalledArtifact,
-      environmentDriftAgentDir,
+      environmentDriftAgentDir: lifecycleEnvironmentDriftAgentDir,
       userDataDirectory: lifecycleUserDataDirectory,
       workspace
     });
