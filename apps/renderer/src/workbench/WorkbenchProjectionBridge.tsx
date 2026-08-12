@@ -13,6 +13,7 @@ import {
 } from "../session/session-projection-selectors.js";
 import {
   rendererWorkbenchStore,
+  rendererConversationIdentity,
   selectedWorkbenchTask,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
@@ -81,14 +82,12 @@ export function WorkbenchProjectionBridge() {
     const workbench = rendererWorkbenchStore.getState();
     if (!shouldProjectSession(workbench.tasks, workspaceId, sessionId, sessionFileIdentity, sessionPath)) return;
     const selected = selectedWorkbenchTask(workbench);
-    const matchingSession = Object.values(workbench.tasks).find((task) => (
-      task.workspaceId === workspaceId && task.sessionFileIdentity === sessionFileIdentity
-    ));
-    const provisional = selected?.workspaceId === workspaceId
-      && selected.sessionId.startsWith("pending:")
-      ? selected
-      : undefined;
-    const existing = matchingSession ?? provisional;
+    const existing = existingWorkbenchProjectionOwner(
+      workbench.tasks,
+      selected,
+      workspaceId,
+      sessionFileIdentity
+    );
     const task = workbenchTaskFromProjection({
       ...(existing ? { existing } : {}),
       workspaceId,
@@ -105,7 +104,7 @@ export function WorkbenchProjectionBridge() {
     if (existing) {
       workbench.updateTask(taskId, task);
     } else if (lastProjectedTaskId.current !== taskId) {
-      workbench.openTask(task);
+      installNewWorkbenchProjection(workbench, task);
     }
     lastProjectedTaskId.current = taskId;
   }, [
@@ -122,6 +121,43 @@ export function WorkbenchProjectionBridge() {
   ]);
 
   return null;
+}
+
+export function existingWorkbenchProjectionOwner(
+  tasks: Record<string, RendererWorkbenchTask>,
+  selected: RendererWorkbenchTask | undefined,
+  workspaceId: string,
+  sessionFileIdentity: string
+): RendererWorkbenchTask | undefined {
+  const matchingSession = Object.values(tasks).find((task) => (
+    task.workspaceId === workspaceId && task.sessionFileIdentity === sessionFileIdentity
+  ));
+  if (matchingSession) return matchingSession;
+  return selected?.workspaceId === workspaceId
+    && selected.conversation.kind === "provisional"
+    && selected.sessionId.startsWith("pending:")
+    && selected.lifecycle === "initializing"
+    && selected.creationId === undefined
+    ? selected
+    : undefined;
+}
+
+export function installNewWorkbenchProjection(
+  workbench: ReturnType<typeof rendererWorkbenchStore.getState>,
+  task: RendererWorkbenchTask
+): void {
+  const selectedConversation = workbench.selectedSurface?.kind === "conversation"
+    ? workbench.selectedSurface.conversation
+    : undefined;
+  if (
+    selectedConversation
+    && rendererConversationIdentity(selectedConversation) !== rendererConversationIdentity(task.conversation)
+  ) {
+    // A late projection may populate the background Task, but it must not undo a newer user selection.
+    workbench.restoreTask(task);
+    return;
+  }
+  workbench.openTask(task);
 }
 
 interface WorkbenchTaskProjectionInput {
