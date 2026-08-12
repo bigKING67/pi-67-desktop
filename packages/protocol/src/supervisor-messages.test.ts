@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
   isAgentHostShutdownCompleteMessage,
   isAgentHostShutdownRequest
 } from "./supervisor-messages.js";
 
 describe("Agent Host supervisor messages", () => {
+  it("accepts only the exact Agent Host readiness signal", () => {
+    expect(isAgentHostReadyMessage({ type: "agent-host-ready" })).toBe(true);
+    expect(isAgentHostReadyMessage({ type: "agent-host-ready", phase: "running" })).toBe(false);
+    expect(isAgentHostReadyMessage({ type: "agent-host-starting" })).toBe(false);
+    expect(isAgentHostReadyMessage(undefined)).toBe(false);
+  });
+
   it("accepts only bounded structured abort watchdog failures", () => {
     const message = {
       type: "agent-host-runtime-poisoned",

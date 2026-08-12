@@ -3,6 +3,12 @@ import { strictObject } from "./schemas.js";
 
 const OperationIdSchema = Type.String({ minLength: 1, maxLength: 512 });
 
+export const AgentHostReadyMessageSchema = strictObject({
+  type: Type.Literal("agent-host-ready")
+});
+
+export type AgentHostReadyMessage = Static<typeof AgentHostReadyMessageSchema>;
+
 export const AgentHostRuntimePoisonedMessageSchema = Type.Union([
   strictObject({
     type: Type.Literal("agent-host-runtime-poisoned"),
@@ -54,6 +60,10 @@ export const AgentHostShutdownCompleteMessageSchema = strictObject({
   queuedCommandsDropped: Type.Integer({ minimum: 0, maximum: 10_000 }),
   extensionRequestsCancelled: Type.Integer({ minimum: 0, maximum: 10_000 })
 });
+
+export function isAgentHostReadyMessage(value: unknown): value is AgentHostReadyMessage {
+  return Value.Check(AgentHostReadyMessageSchema, value);
+}
 
 export function isAgentHostRuntimePoisonedMessage(
   value: unknown

@@ -1,5 +1,6 @@
 import {
   isAgentHostShutdownRequest,
+  type AgentHostReadyMessage,
   type AgentHostRuntimePoisonedMessage,
   type AgentHostShutdownCompleteMessage,
   type ProtocolPort
@@ -21,7 +22,9 @@ interface ParentMessageEvent {
 
 interface UtilityParentPort {
   on(type: "message", listener: (event: ParentMessageEvent) => void): void;
-  postMessage(message: AgentHostRuntimePoisonedMessage | AgentHostShutdownCompleteMessage): void;
+  postMessage(
+    message: AgentHostReadyMessage | AgentHostRuntimePoisonedMessage | AgentHostShutdownCompleteMessage
+  ): void;
 }
 
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
@@ -77,6 +80,7 @@ parentPort.on("message", (event) => {
   }
   server.attachPort(port, event.data);
 });
+parentPort.postMessage({ type: "agent-host-ready" });
 
 function shutdown(deadlineMs = 1_000, notifyParent = false): Promise<void> {
   if (shutdownPromise) return shutdownPromise;

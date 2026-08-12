@@ -58,7 +58,7 @@ describe("AgentHostSupervisor", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
     const firstHandoff = window.postMessage.mock.calls[0]?.[1] as { hostEpoch?: number } | undefined;
     supervisor.connect();
 
@@ -75,7 +75,7 @@ describe("AgentHostSupervisor", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
     window.setRoutingId(23);
     supervisor.connect();
 
@@ -91,7 +91,7 @@ describe("AgentHostSupervisor", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
     supervisor.connect(true);
 
     expect(electronMocks.fork).toHaveBeenCalledOnce();
@@ -131,10 +131,10 @@ describe("AgentHostSupervisor", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    firstHost.emit("spawn");
+    makeHostReady(firstHost);
     firstHost.emit("exit", 1);
     await vi.advanceTimersByTimeAsync(500);
-    secondHost.emit("spawn");
+    makeHostReady(secondHost);
 
     expect(window.postMessage).toHaveBeenCalledTimes(2);
     expect(window.postMessage.mock.calls.map((call) => (
@@ -165,6 +165,19 @@ describe("AgentHostSupervisor", () => {
     expect(supervisor.diagnostics()).toMatchObject({ phase: "starting", hostEpoch: 1 });
 
     firstHost.emit("spawn");
+    expect(supervisor.diagnostics()).toEqual({
+      phase: "starting",
+      hostEpoch: 1,
+      processStartRequestedAt: 10_000,
+      processStartedAt: 10_000,
+      lastSpawnDurationMs: 0,
+      restartCount: 0,
+      portHandoffCount: 0,
+      poisonedRuntimeReplacementCount: 0,
+      poisonedRuntimeReplacementPending: false
+    });
+
+    firstHost.emit("message", { type: "agent-host-ready" });
     expect(supervisor.diagnostics()).toEqual({
       phase: "running",
       hostEpoch: 1,
@@ -214,7 +227,7 @@ describe("AgentHostSupervisor", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
     supervisor.connect();
 
     expect(host.postMessage).not.toHaveBeenCalled();
@@ -277,7 +290,7 @@ describe("AgentHostSupervisor", () => {
     electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
     const supervisor = createSupervisor(window.value);
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
 
     const firstStop = supervisor.stop();
     const secondStop = supervisor.stop();
@@ -317,7 +330,7 @@ describe("AgentHostSupervisor", () => {
     electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
     const supervisor = createSupervisor(window.value, 100);
     supervisor.connect();
-    host.emit("spawn");
+    makeHostReady(host);
 
     const stopping = supervisor.stop();
     supervisor.connect();
@@ -335,6 +348,7 @@ describe("AgentHostSupervisor", () => {
     });
     expect(host.kill).toHaveBeenCalledOnce();
   });
+
 });
 
 function createSupervisor(window: BrowserWindow, shutdownDeadlineMs?: number): AgentHostSupervisor {
@@ -399,6 +413,11 @@ function fakeUtilityProcess() {
       stderr.emit("data", chunk);
     }
   };
+}
+
+function makeHostReady(host: ReturnType<typeof fakeUtilityProcess>): void {
+  host.emit("spawn");
+  host.emit("message", { type: "agent-host-ready" });
 }
 
 function fakeStream() {

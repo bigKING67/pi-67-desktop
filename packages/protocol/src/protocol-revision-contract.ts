@@ -13,6 +13,7 @@ import {
   RepositoryEnvironmentSnapshotSchema
 } from "./repository-environment-schema.js";
 import {
+  AgentHostReadyMessageSchema,
   AgentHostRuntimePoisonedMessageSchema,
   AgentHostShutdownCompleteMessageSchema,
   AgentHostShutdownRequestSchema
@@ -53,6 +54,7 @@ export function canonicalProtocolRevisionMaterial(): string {
       }
     },
     supervisor: {
+      ready: AgentHostReadyMessageSchema,
       runtimePoisoned: AgentHostRuntimePoisonedMessageSchema,
       shutdownRequest: AgentHostShutdownRequestSchema,
       shutdownComplete: AgentHostShutdownCompleteMessageSchema

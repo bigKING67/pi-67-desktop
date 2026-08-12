@@ -6,6 +6,7 @@ import {
   type UtilityProcess
 } from "electron";
 import {
+  isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
   isAgentHostShutdownCompleteMessage,
   type AgentHostLifecyclePhase,
@@ -84,6 +85,7 @@ export class AgentHostSupervisor {
   #stopTimer: ReturnType<typeof setTimeout> | undefined;
   #stopHost: UtilityProcess | undefined;
   #shutdownComplete: AgentHostShutdownCompleteMessage | undefined;
+  #hostReadyReceived = false;
   #lastHandoffKey: string | undefined;
   readonly #shutdownDeadlineMs: number;
   #phase: AgentHostSupervisorPhase = "idle";
@@ -188,7 +190,14 @@ export class AgentHostSupervisor {
   }
 
   attachPort(window = this.#options.getMainWindow(), replaceCurrent = false): void {
-    if (this.#stopping || !this.#agentHost || !this.#identity || !window || window.isDestroyed()) return;
+    if (
+      this.#stopping
+      || this.#phase !== "running"
+      || !this.#agentHost
+      || !this.#identity
+      || !window
+      || window.isDestroyed()
+    ) return;
     if (!isExpectedRendererLocation(window.webContents.getURL(), this.#options.rendererUrl)) return;
     const handoffKey = rendererDocumentHandoffKey(window, this.#identity.hostEpoch);
     if (!handoffKey || (!replaceCurrent && handoffKey === this.#lastHandoffKey)) return;
@@ -220,6 +229,7 @@ export class AgentHostSupervisor {
     this.#phase = "starting";
     this.#processStartRequestedAt = Date.now();
     this.#processStartedAt = undefined;
+    this.#hostReadyReceived = false;
     this.#restartScheduledAt = undefined;
     let host: UtilityProcess;
     try {
@@ -240,13 +250,12 @@ export class AgentHostSupervisor {
     this.#agentHost = host;
     host.on("spawn", () => {
       if (this.#agentHost !== host || this.#stopping) return;
-      this.#phase = "running";
       this.#processStartedAt = Date.now();
       this.#lastSpawnDurationMs = Math.max(
         0,
         this.#processStartedAt - (this.#processStartRequestedAt ?? this.#processStartedAt)
       );
-      this.attachPort();
+      this.#promoteReadyHost(host);
     });
     host.on("message", (message) => this.#handleMessage(host, message));
     host.on("exit", (code) => this.#handleExit(host, code));
@@ -272,6 +281,7 @@ export class AgentHostSupervisor {
     }
     this.#agentHost = undefined;
     this.#identity = undefined;
+    this.#hostReadyReceived = false;
     this.#processStartedAt = undefined;
     this.#lastHandoffKey = undefined;
     if (this.#stopping) {
@@ -322,6 +332,16 @@ export class AgentHostSupervisor {
       return;
     }
     if (
+      this.#agentHost === host
+      && !this.#stopping
+      && this.#phase === "starting"
+      && isAgentHostReadyMessage(message)
+    ) {
+      this.#hostReadyReceived = true;
+      this.#promoteReadyHost(host);
+      return;
+    }
+    if (
       this.#agentHost !== host
       || this.#stopping
       || this.#poisonedRuntimeTimer
@@ -332,6 +352,18 @@ export class AgentHostSupervisor {
       this.#poisonedRuntimeTimer = undefined;
       if (this.#agentHost === host && !this.#stopping) host.kill();
     }, 50);
+  }
+
+  #promoteReadyHost(host: UtilityProcess): void {
+    if (
+      this.#agentHost !== host
+      || this.#stopping
+      || this.#phase !== "starting"
+      || this.#processStartedAt === undefined
+      || !this.#hostReadyReceived
+    ) return;
+    this.#phase = "running";
+    this.attachPort();
   }
 
   #forceStop(host: UtilityProcess): void {
