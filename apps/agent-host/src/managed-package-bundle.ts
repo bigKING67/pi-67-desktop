@@ -1,14 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   chmod,
+  copyFile,
   lstat,
   mkdir,
   readFile,
   readdir,
   rename,
   rm,
-  stat,
-  writeFile
+  stat
 } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { safeAtomicReplaceFile } from "@pi67/pi-runtime";
@@ -79,7 +79,7 @@ export async function activateDesktopManagedPackages(options: {
   const createToken = options.createToken ?? randomUUID;
   const bundledManifest = await verifyManagedPackageTree(bundled, platform, architecture);
   let activated = false;
-  const activeManifest = await verifyManagedPackageTreeIfPresent(active, platform, architecture);
+  let activeManifest = await verifyManagedPackageTreeIfPresent(active, platform, architecture);
   if (
     !activeManifest
     || activeManifest.catalogVersion !== bundledManifest.catalogVersion
@@ -107,6 +107,9 @@ export async function activateDesktopManagedPackages(options: {
       await rename(staging, active);
       staged = false;
       activated = true;
+      // Rename preserves the verified staging tree, so do not hash thousands of
+      // dependency files a third time during the same activation.
+      activeManifest = stagedManifest;
     } catch (error) {
       if (backedUp) {
         await rm(active, { recursive: true, force: true }).catch(() => undefined);
@@ -119,7 +122,8 @@ export async function activateDesktopManagedPackages(options: {
     }
   }
 
-  const manifest = await verifyManagedPackageTree(active, platform, architecture);
+  if (!activeManifest) throw new Error("Managed package activation did not produce a verified tree.");
+  const manifest = activeManifest;
   const state = await readOrCreateState(root, manifest.packages, createToken);
   const packagePaths: string[] = [];
   const extensionPaths: string[] = [];
@@ -317,7 +321,7 @@ async function copyDirectory(source: string, destination: string, sourceRoot: st
     if (child.isDirectory()) {
       await copyDirectory(input, output, sourceRoot);
     } else if (child.isFile()) {
-      await writeFile(output, await readFile(input), { mode: child.mode & 0o111 ? 0o755 : 0o600 });
+      await copyFile(input, output);
     } else {
       throw new Error(`Managed packages contain an unsupported entry: ${input}`);
     }

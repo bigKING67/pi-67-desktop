@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -37,6 +37,10 @@ describe("Desktop managed npm package activation", () => {
     expect(JSON.parse(environment.PI67_MANAGED_EXTENSION_PATHS ?? "[]")).toEqual(first.extensionPaths);
     expect(await readFile(join(first.activeRoot!, "node_modules", "fixture", "index.js"), "utf8"))
       .toBe("export {};\n");
+    if (process.platform !== "win32") {
+      expect((await stat(join(first.activeRoot!, "node_modules", "fixture", "cli"))).mode & 0o111)
+        .not.toBe(0);
+    }
 
     const second = await activateDesktopManagedPackages({
       agentDir: fixture.agentDir,
@@ -44,6 +48,16 @@ describe("Desktop managed npm package activation", () => {
       createToken: () => "second"
     });
     expect(second).toMatchObject({ enabled: true, activated: false });
+
+    await writeFile(join(first.activeRoot!, "node_modules", "fixture", "index.js"), "tampered\n", "utf8");
+    const repaired = await activateDesktopManagedPackages({
+      agentDir: fixture.agentDir,
+      environment,
+      createToken: () => "repair"
+    });
+    expect(repaired).toMatchObject({ enabled: true, activated: true });
+    expect(await readFile(join(repaired.activeRoot!, "node_modules", "fixture", "index.js"), "utf8"))
+      .toBe("export {};\n");
   });
 
   it("preserves the Desktop-owned observational-memory opt-out without changing the adapter", async () => {
@@ -102,8 +116,10 @@ async function createFixture() {
       "export default () => {};\n",
       "utf8"
     ),
-    writeFile(join(bundled, "node_modules", "fixture", "index.js"), "export {};\n", "utf8")
+    writeFile(join(bundled, "node_modules", "fixture", "index.js"), "export {};\n", "utf8"),
+    writeFile(join(bundled, "node_modules", "fixture", "cli"), "#!/usr/bin/env node\n", "utf8")
   ]);
+  await chmod(join(bundled, "node_modules", "fixture", "cli"), 0o755);
   const tree = await managedPackageTreeSha256(bundled);
   const lockfile = await readFile(join(bundled, "package-lock.json"));
   const { createHash } = await import("node:crypto");
