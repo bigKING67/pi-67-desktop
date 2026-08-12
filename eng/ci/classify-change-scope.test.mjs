@@ -48,6 +48,8 @@ describe("CI change scope classifier", () => {
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
+      "eng/packaging/windows-real-user-catalog-discovery.mjs",
+      "eng/packaging/windows-real-user-catalog-discovery.test.mjs",
       "eng/packaging/windows-real-user-catalog-state.mjs",
       "eng/packaging/windows-real-user-conversation.mjs",
       "eng/packaging/windows-real-user-profile.mjs",

@@ -23,6 +23,7 @@ import {
 } from "./windows-installed-application-lifecycle.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
 import { shouldCreateInitialRealUserSession, waitForCatalogState } from "./windows-real-user-catalog-state.mjs";
+import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
 import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
 export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
@@ -146,7 +147,13 @@ async function runRealUserLaunch({
 
     const catalog = await waitForCatalogState(window, expectedSessionIdentity, undefined, {
       launchIndex,
-      inspectExpectedSessionFile: () => inspectRealUserSessionFile(expectedSessionPath)
+      inspectExpectedSessionFile: () => inspectRealUserSessionFile(expectedSessionPath),
+      inspectSessionCatalogDiscovery: () => inspectRealUserSessionCatalogDiscovery({
+        agentDir,
+        expectedSessionIdentity,
+        sessionPath: expectedSessionPath,
+        workspace
+      })
     });
     let create;
     let sessionIdentity = expectedSessionIdentity;

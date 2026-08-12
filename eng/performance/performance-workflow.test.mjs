@@ -165,7 +165,8 @@ describe("release performance workflow gates", () => {
     expect(certification).toContain("timeout-minutes: 180");
     expect(certification).toContain("schedule:");
     expect(release).toContain("timeout-minutes: 180");
-    expect(release).toContain("run: corepack pnpm run package:smoke:windows-installer");
+    expect(release).toContain("corepack pnpm run build:packages");
+    expect(release).toContain("corepack pnpm run package:smoke:windows-installer");
     expect(release).not.toContain("package:smoke:windows-installer -- --quick");
   });
 });

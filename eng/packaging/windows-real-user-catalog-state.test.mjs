@@ -50,6 +50,17 @@ describe("Windows real-user Catalog state", () => {
         isFile: true,
         byteLength: 321,
         fileIdentityFingerprint: "0123456789ab"
+      }),
+      inspectSessionCatalogDiscovery: async () => ({
+        currentFileIdentityFingerprint: "0123456789ab",
+        discoveryState: "complete",
+        expectedIdentityFileFingerprint: "0123456789ab",
+        expectedPhysicalRecordPresent: true,
+        expectedRecordWorkspaceMatch: false,
+        incomplete: false,
+        recordCount: 1,
+        skippedCount: 0,
+        workspaceMatchedRecordCount: 0
       })
     }).catch((error) => { failure = String(error); });
 
@@ -57,6 +68,8 @@ describe("Windows real-user Catalog state", () => {
     expect(failure).toContain('"launchIndex":1');
     expect(failure).toContain('"byteLength":321');
     expect(failure).toContain('"fileIdentityFingerprint":"0123456789ab"');
+    expect(failure).toContain('"expectedPhysicalRecordPresent":true');
+    expect(failure).toContain('"expectedRecordWorkspaceMatch":false');
     expect(failure).not.toContain(expectedIdentity);
     expect(failure).not.toContain("private-device");
   });

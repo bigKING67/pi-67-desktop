@@ -168,7 +168,7 @@ jobs:
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       - name: Build verifier workspace dependencies
-        run: corepack pnpm --filter @pi67/protocol... run build
+        run: corepack pnpm run build:packages
       - name: Download exact candidate build
         uses: actions/download-artifact@v8
         with:

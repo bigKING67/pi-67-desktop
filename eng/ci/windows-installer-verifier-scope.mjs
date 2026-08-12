@@ -17,6 +17,8 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-installer-profile-authority.test.mjs",
   "windows-real-user-lifecycle.mjs",
   "windows-real-user-lifecycle.test.mjs",
+  "windows-real-user-catalog-discovery.mjs",
+  "windows-real-user-catalog-discovery.test.mjs",
   "windows-real-user-catalog-state.mjs",
   "windows-real-user-conversation.mjs",
   "windows-real-user-profile.mjs",
@@ -47,6 +49,9 @@ export function isWindowsInstallerVerifierProductPath(path) {
 function isAllowedWindowsInstallerVerifierChange(path) {
   return path.startsWith("docs/")
     || path.endsWith(".md")
+    || path === ".github/workflows/windows-installer-debug.yml"
+    || path === ".github/workflows/windows-candidate.yml"
+    || path === ".github/workflows/release.yml"
     || isWindowsInstallerVerifierProductPath(path);
 }
 

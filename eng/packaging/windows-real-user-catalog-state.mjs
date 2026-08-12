@@ -61,15 +61,17 @@ export async function waitForCatalogState(
     const explicitState = catalogStateFromText(current.text, current.itemCount);
     return explicitState ? { itemCount: current.itemCount, state: explicitState } : undefined;
   }, timeoutMs, async () => {
-    const expectedSessionFile = diagnostics.inspectExpectedSessionFile
-      ? await diagnostics.inspectExpectedSessionFile()
-      : undefined;
+    const [expectedSessionFile, sessionCatalogDiscovery] = await Promise.all([
+      diagnostics.inspectExpectedSessionFile?.(),
+      diagnostics.inspectSessionCatalogDiscovery?.()
+    ]);
     return "Windows real-user Session Catalog did not return an explicit state. "
       + `Diagnostics: ${JSON.stringify({
         ...latestObservation,
         launchIndex: diagnostics.launchIndex ?? null,
         expectedSessionIdentityFingerprint: fingerprintSessionIdentity(expectedSessionIdentity),
-        ...(expectedSessionFile === undefined ? {} : { expectedSessionFile })
+        ...(expectedSessionFile === undefined ? {} : { expectedSessionFile }),
+        ...(sessionCatalogDiscovery === undefined ? {} : { sessionCatalogDiscovery })
       })}`;
   });
   const durationMs = performance.now() - startedAt;

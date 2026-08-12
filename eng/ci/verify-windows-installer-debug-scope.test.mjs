@@ -12,7 +12,7 @@ import {
 } from "./windows-installer-source-run.mjs";
 
 describe("Windows installer debug artifact reuse", () => {
-  it("accepts only verifier, lifecycle fixture, and documentation changes", () => {
+  it("accepts only verifier, verifier workflows, lifecycle fixtures, and documentation changes", () => {
     expect(() => verifyWindowsInstallerDebugScope([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.mjs",
@@ -21,6 +21,8 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
+      "eng/packaging/windows-real-user-catalog-discovery.mjs",
+      "eng/packaging/windows-real-user-catalog-discovery.test.mjs",
       "eng/packaging/windows-real-user-catalog-state.mjs",
       "eng/packaging/windows-real-user-conversation.mjs",
       "eng/packaging/windows-real-user-profile.mjs",
@@ -37,6 +39,9 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/ci/verify-windows-installer-debug-scope.mjs",
       "eng/ci/verify-windows-installer-debug-scope.test.mjs",
       "eng/ci/windows-installer-verifier-scope.mjs",
+      ".github/workflows/windows-installer-debug.yml",
+      ".github/workflows/windows-candidate.yml",
+      ".github/workflows/release.yml",
       "docs/testing/windows-installer.md"
     ])).not.toThrow();
   });
@@ -46,7 +51,7 @@ describe("Windows installer debug artifact reuse", () => {
     "packages/pi-runtime/src/pi-sdk-runtime.ts",
     "package.json",
     "electron-builder.yml",
-    ".github/workflows/windows-installer-debug.yml"
+    ".github/workflows/ci.yml"
   ])("rejects product or workflow changes: %s", (path) => {
     expect(() => verifyWindowsInstallerDebugScope([path])).toThrow(/artifact reuse rejected/u);
   });
@@ -105,7 +110,7 @@ describe("Windows installer debug artifact reuse", () => {
     expect(buildStep).toBeGreaterThan(-1);
     expect(lifecycleStep).toBeGreaterThan(buildStep);
     expect(workflow.slice(buildStep, lifecycleStep))
-      .toContain("pnpm --filter @pi67/protocol... run build");
+      .toContain("pnpm run build:packages");
     expect(workflow).toContain("run: pnpm run package:smoke:windows-installer");
     expect(workflow).not.toContain("package:smoke:windows-installer -- --quick");
   });

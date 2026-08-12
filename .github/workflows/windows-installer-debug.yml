@@ -84,7 +84,7 @@ jobs:
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Build verifier workspace dependencies
-        run: pnpm --filter @pi67/protocol... run build
+        run: pnpm run build:packages
       - name: Download source Windows installer candidate
         uses: actions/download-artifact@v8
         with:
