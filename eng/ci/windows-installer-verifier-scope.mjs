@@ -16,6 +16,7 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
 ]);
 
 const ALLOWED_CI_BASENAMES = new Set([
+  "classify-change-scope.test.mjs",
   "verify-windows-installer-debug-scope.mjs",
   "verify-windows-installer-debug-scope.test.mjs",
   "windows-installer-source-run.mjs",

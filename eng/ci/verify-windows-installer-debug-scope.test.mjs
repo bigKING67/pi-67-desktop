@@ -22,6 +22,7 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/verify-windows-packaged-input-layout.test.mjs",
       "eng/packaging/controlled-shutdown-fixture.ts",
       "eng/ci/windows-installer-source-run.mjs",
+      "eng/ci/classify-change-scope.test.mjs",
       "eng/ci/verify-windows-installer-debug-scope.mjs",
       "eng/ci/verify-windows-installer-debug-scope.test.mjs",
       "eng/ci/windows-installer-verifier-scope.mjs",
