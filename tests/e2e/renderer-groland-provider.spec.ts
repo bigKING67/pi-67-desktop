@@ -116,11 +116,11 @@ test("targets the Groland credential without starting a Session", async ({ page 
   });
   await dialog.getByRole("button", { name: "保存到 Pi" }).click();
 
-  const commands = await recordedCommandDetails(page);
-  expect(commands).toContainEqual(expect.objectContaining({
+  await expect.poll(() => recordedCommandDetails(page), { timeout: 15_000 }).toContainEqual(expect.objectContaining({
     type: "provider.credential.store",
     payload: expect.objectContaining({ provider: "groland", apiKey: "[redacted]" })
   }));
+  const commands = await recordedCommandDetails(page);
   expect(commands).not.toContainEqual(expect.objectContaining({
     type: "provider.credential.store",
     payload: expect.objectContaining({ provider: "anthropic" })

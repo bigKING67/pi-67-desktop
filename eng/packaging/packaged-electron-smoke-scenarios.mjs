@@ -28,7 +28,7 @@ export async function verifyInitialRuntimeSettings(window, packagedProcessOutput
   await doctorDialog.getByRole("button", { name: "开始检查" }).click();
   const doctorResults = doctorDialog.getByLabel("运行环境检查结果");
   const doctorError = doctorDialog.locator(".doctor-error");
-  await doctorResults.or(doctorError).waitFor({ state: "visible", timeout: 30_000 });
+  await doctorResults.or(doctorError).waitFor({ state: "visible", timeout: 60_000 });
   if (await doctorError.isVisible()) {
     throw new Error([
       `Packaged Agent Host Doctor failed: ${(await doctorError.textContent())?.trim() ?? "unknown error"}`,

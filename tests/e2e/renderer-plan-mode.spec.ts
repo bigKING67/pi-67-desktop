@@ -147,6 +147,7 @@ async function openPlanScenario(page: Page, planImplementationStartDelayMs = 0):
       }
     }
   });
+  await expect(page.getByTestId("active-plan-action-bar")).toBeVisible({ timeout: 15_000 });
 }
 
 function planMessage(status: "proposed" | "implemented"): FixtureMessage {

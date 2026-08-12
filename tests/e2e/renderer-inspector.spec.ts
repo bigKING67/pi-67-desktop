@@ -294,6 +294,7 @@ test("confirms before replacing a dirty draft with the disk version", async ({ p
     recoverable: true
   });
   await reloadDialog.getByRole("button", { name: "放弃修改并重新读取" }).click();
+  await expect(page.getByText("磁盘文件暂时不可读。", { exact: true })).toBeVisible();
   await expect(reloadDialog).toBeVisible();
   await expect(editor).toContainText("Keep this draft");
   await expect(fileSurface.getByLabel("未保存")).toBeVisible();

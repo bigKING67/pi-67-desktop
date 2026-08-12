@@ -25,5 +25,6 @@ export async function waitForControlledModel(page, timeoutMs = 30_000) {
 }
 
 export async function waitForControlledPromptRunning(page, timeoutMs = 10_000) {
-  await page.getByRole("button", { name: "停止" }).waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByTestId("composer-shell").getByRole("button", { name: "停止", exact: true })
+    .waitFor({ state: "visible", timeout: timeoutMs });
 }
