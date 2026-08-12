@@ -15,7 +15,6 @@ import type {
   ExtensionPackageUpdatesResult,
   ModelSummary,
   SessionInteractionMode,
-  OperationKind,
   OperationView,
   ProviderSummary,
   ResourceSummary,
@@ -57,6 +56,10 @@ import type {
   PiProviderConfigurationSnapshot
 } from "./provider-configuration-schemas.js";
 import type { ProtocolError } from "./protocol-error.js";
+import type {
+  OperationSettled,
+  OperationSubmissionResult
+} from "./operation-messages.js";
 import type { RuntimeDiagnostics } from "./runtime-diagnostics-contract.js";
 import type { SessionCreationResolution } from "./session-creation-resolution-contract.js";
 import type {
@@ -66,6 +69,12 @@ import type {
 
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
+export { isOperationSettled } from "./operation-messages.js";
+export type {
+  OperationAccepted,
+  OperationSettled,
+  OperationSubmissionResult
+} from "./operation-messages.js";
 export {
   MAX_PROMPT_ATTACHMENT_BYTES,
   MAX_PROMPT_ATTACHMENT_COUNT,
@@ -108,41 +117,6 @@ export interface PromptSubmitRequest {
   attachments?: PromptAttachmentRef[];
   workspaceFiles?: PromptWorkspaceFileRef[];
   delivery: PromptDelivery;
-}
-
-export interface OperationAccepted {
-  kind: "accepted";
-  operationId: string;
-  cancellable: boolean;
-  hostEpoch: number;
-  sessionId: string;
-  sessionFileIdentity: string;
-  sessionGeneration: number;
-}
-
-interface OperationSettledBase {
-  kind: "settled";
-  operationId: string;
-  operationKind: OperationKind;
-  cancellable: false;
-  hostEpoch: number;
-  sessionId: string;
-  sessionFileIdentity: string;
-  sessionGeneration: number;
-  startedAt: number;
-  settledAt: number;
-}
-
-export type OperationSettled = OperationSettledBase & (
-  | { lifecycle: "completed" }
-  | { lifecycle: "failed"; error: ProtocolError }
-  | { lifecycle: "cancelled" | "lost"; reason: string }
-);
-
-export type OperationSubmissionResult = OperationAccepted | OperationSettled;
-
-export function isOperationSettled(result: OperationSubmissionResult): result is OperationSettled {
-  return result.kind === "settled";
 }
 
 export interface Acknowledgement {

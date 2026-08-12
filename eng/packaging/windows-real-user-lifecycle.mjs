@@ -1,13 +1,6 @@
-import { realpath, stat } from "node:fs/promises";
-import * as systemPath from "node:path";
 import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
-import {
-  submitControlledPromptInput,
-  waitForControlledModel,
-  waitForControlledPromptRunning
-} from "./controlled-provider-interaction.mjs";
 import {
   measureElectronApplicationShutdown,
   productShutdownWithinBudget
@@ -27,12 +20,9 @@ import {
   readSelectedConversationIdentity,
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
-import { assertSessionPathContained } from "./windows-installer-identity.mjs";
-import {
-  prepareRealUserSessionCreation,
-  waitForSelectedProvisionalSessionIntent,
-  waitForRealUserCreatedSession
-} from "./windows-real-user-session-creation.mjs";
+import { createControlledConversation } from "./windows-real-user-conversation.mjs";
+import { catalogStateFromText } from "./windows-real-user-catalog-state.mjs";
+export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
 import {
   assertModelRuntimeInitialization,
@@ -56,7 +46,6 @@ const REAL_USER_SHUTDOWN_BUDGET_MS = 5_000;
 export const REAL_USER_RESTART_COUNT = 3;
 
 const POLL_INTERVAL_MS = 50;
-const SESSION_JSONL_TIMEOUT_MS = 10_000;
 
 export async function verifyInstalledRealUserLifecycle({
   agentDir,
@@ -167,7 +156,7 @@ async function runRealUserLaunch({
         );
       }
       await assertHealthyWorkbench(window);
-      const created = await createControlledConversation(window, agentDir);
+      const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
     } else {
@@ -180,7 +169,7 @@ async function runRealUserLaunch({
     const fileProjection = await verifyGitMetadataIsHidden(window);
 
     if (launchIndex === 0 && !create) {
-      const created = await createControlledConversation(window, agentDir);
+      const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
     }
@@ -438,102 +427,6 @@ export async function waitForHealthyWorkbenchConvergence(
   );
 }
 
-async function createControlledConversation(window, agentDir) {
-  const { createAction, existingIdentities, existingSessionFileNames } = await prepareRealUserSessionCreation(
-    window,
-    agentDir,
-    REAL_USER_CREATE_HARD_TIMEOUT_MS
-  );
-  const intentStartedAt = performance.now();
-  await createAction.click({ timeout: REAL_USER_CREATE_HARD_TIMEOUT_MS });
-  await waitForSelectedProvisionalSessionIntent(
-    window,
-    agentDir,
-    existingIdentities,
-    existingSessionFileNames,
-    intentStartedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
-  );
-  const intentDurationMs = performance.now() - intentStartedAt;
-
-  const materializationStartedAt = performance.now();
-  await submitControlledPromptInput(window);
-  const createdSession = await waitForRealUserCreatedSession(
-    window,
-    existingIdentities,
-    existingSessionFileNames,
-    agentDir,
-    materializationStartedAt + REAL_USER_CREATE_HARD_TIMEOUT_MS
-  );
-  const materializationDurationMs = performance.now() - materializationStartedAt;
-  if (materializationDurationMs > REAL_USER_CREATE_HARD_TIMEOUT_MS) {
-    throw new Error("Windows real-user session.create succeeded after its 15s hard gate.");
-  }
-  await canonicalContainedSessionPath(createdSession.sessionPath, agentDir);
-
-  await waitForControlledModel(window, REAL_USER_MODEL_HYDRATION_TIMEOUT_MS);
-  await waitForControlledPromptRunning(window);
-  await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
-  await window.getByRole("button", { name: "停止", exact: true })
-    .waitFor({ state: "hidden", timeout: 10_000 });
-  await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 10_000 });
-  await waitForCondition(async () => (
-    (await window.locator('[data-testid="conversation-row"][aria-current="page"]')
-      .getByText("运行中", { exact: true }).count()) === 0
-  ), 10_000, "Windows real-user controlled operation remained marked as running");
-
-  return {
-    report: {
-      candidateSessionRowCount: createdSession.diagnostic.candidateSessionRowCount,
-      durationMs: round(materializationDurationMs),
-      hardGateMs: REAL_USER_CREATE_HARD_TIMEOUT_MS,
-      intentDurationMs: round(intentDurationMs),
-      jsonlMaterialized: true,
-      materializationTrigger: "first-prompt",
-      newPhysicalSessionFileCount: createdSession.diagnostic.newPhysicalSessionFileCount,
-      newPhysicalSessionFileNames: createdSession.diagnostic.newPhysicalSessionFileNames,
-      newSessionRowCount: createdSession.diagnostic.newSessionRowCount,
-      operationOutcome: "user-stopped",
-      provisionalIntentObserved: true,
-      selectedIdentityFingerprint: createdSession.diagnostic.selectedIdentityFingerprint,
-      selectedNewSession: createdSession.diagnostic.selectedNewSession,
-      selectedProvisional: createdSession.diagnostic.selectedProvisional,
-      targetMet: materializationDurationMs <= REAL_USER_CREATE_TARGET_MS,
-      targetMs: REAL_USER_CREATE_TARGET_MS
-    },
-    sessionIdentity: createdSession.sessionIdentity
-  };
-}
-
-function catalogStateFromText(text, itemCount) {
-  if (text.includes("Session 索引正在恢复")) return "fallback-recovering";
-  if (text.includes("Session 索引暂时不可用")) return "fallback";
-  if (text.includes("正在建立 Session 目录")) return "rebuilding";
-  if (text.includes("未能读取全部 Session")) return "incomplete-empty";
-  if (text.includes("这个工作区还没有会话")) return "ready-empty";
-  if (itemCount > 0) return "ready";
-  return undefined;
-}
-
-export async function canonicalContainedSessionPath(sessionPath, agentDir) {
-  const canonicalAgentDir = await realpath(systemPath.resolve(agentDir)).catch(() => {
-    throw new Error("Windows real-user isolated Agent directory could not be canonicalized.");
-  });
-  const resolvedSessionPath = systemPath.resolve(sessionPath);
-  await waitForSessionJsonl(resolvedSessionPath);
-  const canonicalSessionPath = await realpath(resolvedSessionPath).catch(() => {
-    throw new Error("Windows real-user Pi Session JSONL could not be canonicalized.");
-  });
-  assertSessionPathContained(canonicalAgentDir, canonicalSessionPath);
-  return canonicalSessionPath;
-}
-
-async function waitForSessionJsonl(sessionPath) {
-  await waitForCondition(async () => {
-    const metadata = await stat(sessionPath).catch(() => undefined);
-    return metadata?.isFile() && metadata.size > 0 ? true : undefined;
-  }, SESSION_JSONL_TIMEOUT_MS, "Windows real-user Pi Session JSONL did not materialize");
-}
-
 async function waitForCondition(action, timeoutMs, failureMessage) {
   const deadline = performance.now() + timeoutMs;
   while (performance.now() <= deadline) {
@@ -552,4 +445,12 @@ function remainingTimeout(startedAt, timeoutMs) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+function conversationContract() {
+  return {
+    createHardTimeoutMs: REAL_USER_CREATE_HARD_TIMEOUT_MS,
+    createTargetMs: REAL_USER_CREATE_TARGET_MS,
+    modelHydrationTimeoutMs: REAL_USER_MODEL_HYDRATION_TIMEOUT_MS
+  };
 }

@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "./typebox-schema.js";
+import { Type, type TProperties, type TSchema } from "./typebox-schema.js";
 import {
   MAX_OPERATION_TOOL_EXECUTIONS,
   MAX_TOOL_CALL_ID_CHARS,
@@ -7,10 +7,12 @@ import {
   MAX_TOOL_FAILURE_CHARS,
   MAX_TOOL_INPUT_SUMMARY_CHARS,
   MAX_TOOL_NAME_CHARS,
-  MAX_TOOL_PROGRESS_CHARS
+  MAX_TOOL_PROGRESS_CHARS,
+  MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
+import { ProtocolErrorSchema } from "./protocol-error-schema.js";
 
-export const OperationKindSchema = Type.Union([
+const OperationKindSchema = Type.Union([
   Type.Literal("prompt"),
   Type.Literal("command"),
   Type.Literal("compaction"),
@@ -115,7 +117,7 @@ export const OperationViewSchema = strictObject({
   toolExecutionsTruncated: Type.Optional(Type.Boolean())
 });
 
-export const OperationAcceptedSchema = strictObject({
+const OperationAcceptedSchema = strictObject({
   kind: Type.Literal("accepted"),
   operationId: Type.String(),
   cancellable: Type.Boolean(),
@@ -124,6 +126,36 @@ export const OperationAcceptedSchema = strictObject({
   sessionFileIdentity: Type.String({ minLength: 1, maxLength: 512 }),
   sessionGeneration: Type.Integer({ minimum: 0 })
 });
+
+export function operationSubmissionResultSchema(operationKind: TSchema): TSchema {
+  return Type.Union([OperationAcceptedSchema, operationSettledSchema(operationKind)]);
+}
+
+export const OperationSettledSchema = operationSettledSchema(OperationKindSchema);
+
+function operationSettledSchema(operationKind: TSchema): TSchema {
+  const base = {
+    kind: Type.Literal("settled"),
+    operationId: Type.String(),
+    operationKind,
+    cancellable: Type.Literal(false),
+    hostEpoch: Type.Integer({ minimum: 0 }),
+    sessionId: Type.String(),
+    sessionFileIdentity: Type.String({
+      minLength: 1,
+      maxLength: MAX_SESSION_FILE_IDENTITY_CHARS
+    }),
+    sessionGeneration: Type.Integer({ minimum: 0 }),
+    startedAt: Type.Number(),
+    settledAt: Type.Number()
+  };
+  return Type.Union([
+    strictObject({ ...base, lifecycle: Type.Literal("completed") }),
+    strictObject({ ...base, lifecycle: Type.Literal("failed"), error: ProtocolErrorSchema }),
+    strictObject({ ...base, lifecycle: Type.Literal("cancelled"), reason: Type.String() }),
+    strictObject({ ...base, lifecycle: Type.Literal("lost"), reason: Type.String() })
+  ]);
+}
 
 function strictObject<T extends TProperties>(properties: T) {
   return Type.Object(properties, { additionalProperties: false });

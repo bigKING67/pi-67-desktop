@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import type { Model } from "@earendil-works/pi-ai";
+import { join } from "node:path";
 import {
-  SessionManager,
   type AgentSession,
   type SessionEntry
 } from "@earendil-works/pi-coding-agent";
@@ -12,81 +9,45 @@ import {
   MAX_NATIVE_SUBAGENT_ERROR_CHARS,
   MAX_NATIVE_SUBAGENT_NESTING_DEPTH,
   MAX_NATIVE_SUBAGENT_RESULT_CHARS,
-  MAX_NATIVE_SUBAGENT_WAIT_MS,
   RuntimeError,
   isNativeSubagentTerminalState,
-  type NativeSubagentLineage,
   type NativeSubagentChangeReason,
   type NativeSubagentMode,
   type NativeSubagentSpawnRequest,
-  type NativeSubagentUsage,
   type NativeSubagentView,
   type NativeSubagentWaitResult
 } from "@pi67/domain";
 import type { NativeSubagentOperations } from "./native-subagent-tools.js";
+import { NativeSubagentCleanup } from "./native-subagent-cleanup.js";
 import {
-  NativeSubagentAdmission,
-  type NativeSubagentAdmissionLease
-} from "./native-subagent-admission.js";
-import { sanitizeRuntimeText } from "./runtime-redaction.js";
+  cloneView,
+  collectUsage,
+  createNativeSubagentRecord,
+  errorText,
+  lastAssistantText,
+  parsePersistedView,
+  prepareNativeSubagentResume,
+  safePathSegment,
+  type BoundParent,
+  type ChildActivation,
+  type ChildRecord,
+  type NativeSubagentCoordinatorOptions,
+} from "./native-subagent-support.js";
+import { NativeSubagentWaiters } from "./native-subagent-waiters.js";
+
+export type {
+  NativeSubagentSessionFactoryInput,
+  NativeSubagentSessionHandle
+} from "./native-subagent-support.js";
 
 export const SUBAGENT_SESSION_ENTRY_TYPE = "pi67.subagent-session.v1";
 export const SUBAGENT_LIFECYCLE_ENTRY_TYPE = "pi67.subagent-lifecycle.v1";
 
-export interface NativeSubagentSessionHandle {
-  session: AgentSession;
-  dispose(): Promise<void>;
-}
-
-export interface NativeSubagentSessionFactoryInput {
-  sessionManager: SessionManager;
-  lineage: NativeSubagentLineage;
-  parentModel: Model<any> | undefined;
-  requestedModel?: { provider: string; id: string };
-  thinkingLevel: ThinkingLevel;
-}
-
-interface NativeSubagentCoordinatorOptions {
-  admission: NativeSubagentAdmission;
-  parentKey: string;
-  getAgentDir: () => string;
-  createSession: (input: NativeSubagentSessionFactoryInput) => Promise<NativeSubagentSessionHandle>;
-  emit: (item: NativeSubagentView, reason: NativeSubagentChangeReason) => void;
-  now?: () => number;
-  createId?: () => string;
-}
-
-interface ChildRecord {
-  view: NativeSubagentView;
-  sessionManager: SessionManager | undefined;
-  active: ChildActivation | undefined;
-  lease: NativeSubagentAdmissionLease | undefined;
-}
-
-interface ChildActivation {
-  activationId: string;
-  handle: NativeSubagentSessionHandle;
-  unsubscribe: () => void;
-  cleanup: Promise<void> | undefined;
-}
-
-interface BoundParent {
-  session: AgentSession;
-  directory: string;
-}
-
-interface Waiter {
-  ids: readonly string[];
-  mode: "first" | "all";
-  resolve: (result: NativeSubagentWaitResult) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
-
 /** Owns child Pi Sessions beneath one top-level Pi Runtime. */
 export class NativeSubagentCoordinator implements NativeSubagentOperations {
   private readonly records = new Map<string, ChildRecord>();
-  private readonly waiters = new Set<Waiter>();
-  private readonly pendingCleanups = new Set<Promise<void>>();
+  private readonly waiters = new NativeSubagentWaiters();
+  private readonly cleanup = new NativeSubagentCleanup();
   private readonly now: () => number;
   private readonly createId: () => string;
   private parent: BoundParent | undefined;
@@ -101,7 +62,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     const generation = ++this.parentGeneration;
     this.interruptLive("The parent Pi Session changed before the child settled.");
     this.parent = undefined;
-    await this.awaitPendingCleanups();
+    await this.cleanup.settle();
     this.records.clear();
     const directory = join(
       this.options.getAgentDir(),
@@ -125,12 +86,8 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
   async dispose(): Promise<void> {
     this.parentGeneration += 1;
     this.interruptLive("The Pi Runtime stopped before the child settled.");
-    await this.awaitPendingCleanups();
-    for (const waiter of this.waiters) {
-      clearTimeout(waiter.timer);
-      waiter.resolve({ items: this.views(waiter.ids), timedOut: true });
-    }
-    this.waiters.clear();
+    await this.cleanup.settle();
+    this.waiters.dispose((id) => this.requireRecord(id));
     this.records.clear();
     this.parent = undefined;
   }
@@ -166,57 +123,25 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
       activationId
     });
     try {
-      const childDirectory = join(parent.directory, safePathSegment(childId));
-      await mkdir(childDirectory, { recursive: true, mode: 0o700 });
-      const sessionManager = createChildSessionManager(
-        request.context ?? "fresh",
-        parent.session,
-        childDirectory,
-        childId
-      );
       const timestamp = this.now();
-      const sessionPath = sessionManager.getSessionFile();
-      const inheritedModel = request.model ?? (parent.session.model
-        ? { provider: parent.session.model.provider, id: parent.session.model.id }
-        : undefined);
-      const lineage: NativeSubagentLineage = {
+      const prepared = await createNativeSubagentRecord({
+        request,
+        parent,
+        ...(parentChildId === undefined ? {} : { parentChildId }),
+        depth,
         runId,
         childId,
         activationId,
-        ...(parentChildId === undefined ? {} : { parentChildId }),
-        depth,
-        role: request.role ?? "general"
-      };
-      const view: NativeSubagentView = {
-        ...lineage,
-        state: "pending",
-        mode: request.mode ?? "foreground",
-        context: request.context ?? "fresh",
-        isolation: "shared",
-        ...(inheritedModel === undefined ? {} : { model: inheritedModel }),
-        reasoning: request.reasoning ?? parent.session.thinkingLevel,
-        cwd: sessionManager.getCwd(),
-        ...(sessionPath === undefined ? {} : { sessionPath }),
-        updatedAt: timestamp
-      };
-      sessionManager.appendCustomEntry(SUBAGENT_SESSION_ENTRY_TYPE, view);
-      const record: ChildRecord = {
-        view,
-        sessionManager,
-        active: undefined,
-        lease
-      };
+        lease,
+        timestamp
+      });
+      const { record } = prepared;
+      record.sessionManager!.appendCustomEntry(SUBAGENT_SESSION_ENTRY_TYPE, record.view);
       this.records.set(runId, record);
-      this.appendParentEntry(SUBAGENT_SESSION_ENTRY_TYPE, view);
+      this.appendParentEntry(SUBAGENT_SESSION_ENTRY_TYPE, record.view);
       this.publish(record, "spawned");
 
-      const handle = await this.options.createSession({
-        sessionManager,
-        lineage,
-        parentModel: parent.session.model,
-        ...(request.model === undefined ? {} : { requestedModel: request.model }),
-        thinkingLevel: (request.reasoning ?? parent.session.thinkingLevel) as ThinkingLevel
-      });
+      const handle = await this.options.createSession(prepared.sessionInput);
       if (!this.isCurrentActivation(record, activationId, parent, parentGeneration)) {
         await handle.dispose().catch(() => undefined);
         throw new RuntimeError(
@@ -239,7 +164,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
         };
       });
       record.active = activation;
-      void this.execute(record, activation, rolePrompt(record.view.role, request.task), "started");
+      void this.execute(record, activation, prepared.prompt, "started");
       return cloneView(record.view);
     } catch (error) {
       this.options.admission.release(lease);
@@ -285,7 +210,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     const activationId = record.view.activationId;
     const activation = record.active;
     this.settle(record, activationId, "cancelled", "stopped", undefined, "Stopped by the parent Task.");
-    if (activation) await this.cleanupActivation(record, activation, true);
+    if (activation) await this.cleanup.cleanup(record, activation, true);
     return cloneView(record.view);
   }
 
@@ -299,8 +224,6 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     if (record.view.state === "completed") {
       throw new RuntimeError("INVALID_PAYLOAD", "A completed native subagent does not need to be resumed.");
     }
-    const sessionPath = record.view.sessionPath;
-    if (!sessionPath) throw new RuntimeError("RUNTIME_NOT_READY", "The child Pi Session file is unavailable.");
     const activationId = this.createId();
     const lease = this.options.admission.acquire({
       parentKey: this.options.parentKey,
@@ -308,45 +231,25 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
       activationId
     });
     try {
-      if (record.active) await this.cleanupActivation(record, record.active, true);
+      if (record.active) await this.cleanup.cleanup(record, record.active, true);
       if (this.parent !== parent || this.parentGeneration !== parentGeneration) {
         throw new RuntimeError(
           "SESSION_CHANGED_EXTERNALLY",
           "The parent Pi Session changed before the native subagent could resume."
         );
       }
-      const sessionManager = SessionManager.open(sessionPath, dirname(sessionPath));
-      const lineage: NativeSubagentLineage = {
-        runId: record.view.runId,
-        childId: record.view.childId,
+      const sessionInput = prepareNativeSubagentResume({
+        record,
+        parentModel: parent.session.model,
+        parentThinkingLevel: parent.session.thinkingLevel,
         activationId,
-        ...(record.view.parentChildId === undefined ? {} : { parentChildId: record.view.parentChildId }),
-        depth: record.view.depth,
-        role: record.view.role
-      };
-      const previousView = { ...record.view };
-      delete previousView.settledAt;
-      delete previousView.result;
-      delete previousView.error;
-      record.view = {
-        ...previousView,
-        ...lineage,
-        state: "pending",
-        mode: mode ?? record.view.mode,
-        updatedAt: this.nextTimestamp(record)
-      };
-      record.sessionManager = sessionManager;
+        ...(mode === undefined ? {} : { mode }),
+        timestamp: this.nextTimestamp(record)
+      });
       record.lease = lease;
       this.persist(record);
       this.publish(record, "resumed");
-      const requestedModel = record.view.model;
-      const handle = await this.options.createSession({
-        sessionManager,
-        lineage,
-        parentModel: parent.session.model,
-        ...(requestedModel === undefined ? {} : { requestedModel }),
-        thinkingLevel: (record.view.reasoning ?? parent.session.thinkingLevel) as ThinkingLevel
-      });
+      const handle = await this.options.createSession(sessionInput);
       if (!this.isCurrentActivation(record, activationId, parent, parentGeneration)) {
         await handle.dispose().catch(() => undefined);
         throw new RuntimeError(
@@ -384,23 +287,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     mode: "first" | "all" = "all",
     timeoutMs = 30_000
   ): Promise<NativeSubagentWaitResult> {
-    const boundedTimeout = Math.max(1_000, Math.min(timeoutMs, MAX_NATIVE_SUBAGENT_WAIT_MS));
-    for (const id of ids) this.requireRecord(id);
-    if (this.waitSatisfied(ids, mode)) {
-      return Promise.resolve({ items: this.views(ids), timedOut: false });
-    }
-    return new Promise((resolve) => {
-      const waiter: Waiter = {
-        ids: [...ids],
-        mode,
-        resolve,
-        timer: setTimeout(() => {
-          this.waiters.delete(waiter);
-          resolve({ items: this.views(ids), timedOut: true });
-        }, boundedTimeout)
-      };
-      this.waiters.add(waiter);
-    });
+    return this.waiters.wait(ids, mode, timeoutMs, (id) => this.requireRecord(id));
   }
 
   private async execute(
@@ -432,7 +319,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     } catch (error) {
       this.settle(record, activation.activationId, "failed", "failed", undefined, errorText(error));
     } finally {
-      await this.cleanupActivation(record, activation, false);
+      await this.cleanup.cleanup(record, activation, false);
     }
   }
 
@@ -502,43 +389,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
       if (!isNativeSubagentTerminalState(record.view.state)) {
         this.settle(record, record.view.activationId, "interrupted", "interrupted", undefined, message);
       }
-      if (record.active) void this.cleanupActivation(record, record.active, true);
-    }
-  }
-
-  private cleanupActivation(
-    record: ChildRecord,
-    activation: ChildActivation,
-    abort: boolean
-  ): Promise<void> {
-    if (!activation.cleanup) {
-      activation.cleanup = (async () => {
-        if (abort && activation.handle.session.isStreaming) {
-          await activation.handle.session.abort().catch(() => undefined);
-        }
-        try {
-          activation.unsubscribe();
-        } catch {
-          // Pi subscriptions are best-effort during teardown; handle disposal remains authoritative.
-        }
-        await activation.handle.dispose().catch(() => undefined);
-      })().finally(() => {
-        if (record.active === activation) record.active = undefined;
-      });
-      this.pendingCleanups.add(activation.cleanup);
-      void activation.cleanup.then(
-        () => this.pendingCleanups.delete(activation.cleanup!),
-        () => this.pendingCleanups.delete(activation.cleanup!)
-      );
-    } else if (abort && activation.handle.session.isStreaming) {
-      void activation.handle.session.abort().catch(() => undefined);
-    }
-    return activation.cleanup;
-  }
-
-  private async awaitPendingCleanups(): Promise<void> {
-    while (this.pendingCleanups.size > 0) {
-      await Promise.all(this.pendingCleanups);
+      if (record.active) void this.cleanup.cleanup(record, record.active, true);
     }
   }
 
@@ -573,23 +424,7 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
   }
 
   private notifyWaiters(): void {
-    for (const waiter of this.waiters) {
-      if (!this.waitSatisfied(waiter.ids, waiter.mode)) continue;
-      this.waiters.delete(waiter);
-      clearTimeout(waiter.timer);
-      waiter.resolve({ items: this.views(waiter.ids), timedOut: false });
-    }
-  }
-
-  private waitSatisfied(ids: readonly string[], mode: "first" | "all"): boolean {
-    const states = ids.map((id) => this.requireRecord(id).view.state);
-    return mode === "first"
-      ? states.some(isNativeSubagentTerminalState)
-      : states.every(isNativeSubagentTerminalState);
-  }
-
-  private views(ids: readonly string[]): NativeSubagentView[] {
-    return ids.map((id) => cloneView(this.requireRecord(id).view));
+    this.waiters.notify((id) => this.requireRecord(id));
   }
 
   private requireParent(): BoundParent {
@@ -612,123 +447,4 @@ export class NativeSubagentCoordinator implements NativeSubagentOperations {
     }
     return record;
   }
-}
-
-function createChildSessionManager(
-  context: NativeSubagentSpawnRequest["context"],
-  parent: AgentSession,
-  childDirectory: string,
-  childId: string
-): SessionManager {
-  const parentSession = parent.sessionFile ?? parent.sessionId;
-  if (context === "fork") {
-    if (!parent.sessionFile) {
-      throw new RuntimeError("RUNTIME_NOT_READY", "The parent Pi JSONL must be persisted before a child can fork it.");
-    }
-    return SessionManager.forkFrom(parent.sessionFile, parent.sessionManager.getCwd(), childDirectory, {
-      id: childId,
-      parentSession
-    });
-  }
-  return SessionManager.create(parent.sessionManager.getCwd(), childDirectory, {
-    id: childId,
-    parentSession
-  });
-}
-
-function rolePrompt(role: NativeSubagentView["role"], task: string): string {
-  const roleInstruction = {
-    explorer: "Work read-only. Map the narrow requested scope and return concrete path-and-line evidence.",
-    worker: "Implement only the bounded requested scope. Preserve unrelated worktree changes and report exact validation.",
-    reviewer: "Review read-only for correctness, security, regressions, and missing tests. Lead with actionable findings.",
-    general: "Complete the bounded task directly and report the result with decisive evidence."
-  }[role];
-  return [
-    `You are a Pi-67 native ${role} child agent.`,
-    roleInstruction,
-    "You are not a top-level Desktop Task. Do not reinterpret Browser Profile, Pi Agent Profile, or Worktree as the same concept.",
-    "Return a concise final result to the parent agent when done.",
-    "",
-    "Task:",
-    task
-  ].join("\n");
-}
-
-function lastAssistantText(session: AgentSession): string {
-  for (let index = session.messages.length - 1; index >= 0; index -= 1) {
-    const message = session.messages[index];
-    if (message?.role !== "assistant" || !Array.isArray(message.content)) continue;
-    return message.content
-      .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-      .trim()
-      .slice(0, MAX_NATIVE_SUBAGENT_RESULT_CHARS);
-  }
-  return "";
-}
-
-function collectUsage(session: AgentSession): NativeSubagentUsage {
-  const usage: NativeSubagentUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
-  for (const message of session.messages) {
-    if (message.role !== "assistant") continue;
-    usage.input += message.usage.input;
-    usage.output += message.usage.output;
-    usage.cacheRead += message.usage.cacheRead;
-    usage.cacheWrite += message.usage.cacheWrite;
-    usage.cost += message.usage.cost.total;
-  }
-  return usage;
-}
-
-function parsePersistedView(value: unknown): NativeSubagentView | undefined {
-  if (!isRecord(value)) return undefined;
-  const role = value.role;
-  const state = value.state;
-  const mode = value.mode;
-  const context = value.context;
-  const isolation = value.isolation;
-  if (
-    !isString(value.runId)
-    || !isString(value.childId)
-    || !isString(value.activationId)
-    || !Number.isInteger(value.depth)
-    || (value.depth as number) < 1
-    || (value.depth as number) > MAX_NATIVE_SUBAGENT_NESTING_DEPTH
-    || !["explorer", "worker", "reviewer", "general"].includes(String(role))
-    || !["pending", "running", "waiting", "idle", "completed", "failed", "cancelled", "interrupted"].includes(String(state))
-    || !["foreground", "background"].includes(String(mode))
-    || !["fresh", "fork"].includes(String(context))
-    || !["shared", "worktree"].includes(String(isolation))
-    || typeof value.updatedAt !== "number"
-    || !Number.isFinite(value.updatedAt)
-  ) return undefined;
-  return value as unknown as NativeSubagentView;
-}
-
-function cloneView(view: NativeSubagentView): NativeSubagentView {
-  return {
-    ...view,
-    ...(view.model === undefined ? {} : { model: { ...view.model } }),
-    ...(view.usage === undefined ? {} : { usage: { ...view.usage } })
-  };
-}
-
-function errorText(error: unknown): string {
-  return sanitizeRuntimeText(error instanceof Error ? error.message : String(error))
-    .slice(0, MAX_NATIVE_SUBAGENT_ERROR_CHARS);
-}
-
-function safePathSegment(value: string): string {
-  const safe = value.replaceAll(/[^a-zA-Z0-9_-]/gu, "_").slice(0, 128);
-  if (!safe) throw new RuntimeError("INVALID_PAYLOAD", "The native subagent identity cannot form a safe path.");
-  return safe;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 512;
 }

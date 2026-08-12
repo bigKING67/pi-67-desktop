@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { chmod, lstat, mkdir, open, rename } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { lstat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import {
   npmRegistryCandidates,
   type DesktopCapabilitySnapshot,
@@ -11,7 +11,6 @@ import {
   boundedError,
   emptyCapabilitySnapshot,
   isNodeError,
-  parseBrowserState,
   parseBundledCatalog,
   parseManagedState,
   readBoundedJson,
@@ -20,6 +19,8 @@ import {
   type BundledCapabilityCatalog,
   type ManagedCapabilityState
 } from "./desktop-capability-contract.js";
+import { Browser67IntegrationStateStore } from "./browser67-integration-state-store.js";
+import { isContainedManagedCapabilityPath } from "./managed-capability-path.js";
 import {
   assertSafeBrowser67ExtensionTarget,
   detectBrowser67Browsers,
@@ -67,6 +68,7 @@ export class DesktopCapabilityService {
   readonly #availableBrowsers: () => Browser67BrowserId[];
   readonly #now: () => number;
   readonly #createToken: () => string;
+  readonly #browserState: Browser67IntegrationStateStore;
   #pending: Promise<void> = Promise.resolve();
   #liveIdentityVerified = false;
 
@@ -88,6 +90,7 @@ export class DesktopCapabilityService {
     this.#availableBrowsers = options.availableBrowsers ?? (() => detectBrowser67Browsers());
     this.#now = options.now ?? Date.now;
     this.#createToken = options.createToken ?? randomUUID;
+    this.#browserState = new Browser67IntegrationStateStore(this.#managedRoot, this.#createToken);
   }
 
   snapshot(): Promise<DesktopCapabilitySnapshot> {
@@ -379,7 +382,7 @@ export class DesktopCapabilityService {
   async #browserStatus(): Promise<DesktopIntegrationStatus> {
     let state: Browser67IntegrationState | undefined;
     try {
-      state = parseBrowserState(await readBoundedJson(this.#browserStatePath()));
+      state = await this.#browserState.read();
     } catch (error) {
       if (!isNodeError(error, "ENOENT")) {
         return {
@@ -423,7 +426,7 @@ export class DesktopCapabilityService {
 
   async #readBrowserState(): Promise<Browser67IntegrationState | undefined> {
     try {
-      return parseBrowserState(await readBoundedJson(this.#browserStatePath()));
+      return await this.#browserState.read();
     } catch (error) {
       if (isNodeError(error, "ENOENT")) return undefined;
       throw error;
@@ -432,7 +435,9 @@ export class DesktopCapabilityService {
 
   async #requireBrowser67Package(): Promise<string> {
     const packageRoot = this.#browserPackageRoot();
-    if (!isContained(packageRoot, this.#managedRoot)) throw new Error("browser67 package escaped the managed capability root.");
+    if (!isContainedManagedCapabilityPath(packageRoot, this.#managedRoot)) {
+      throw new Error("browser67 package escaped the managed capability root.");
+    }
     const metadata = await lstat(packageRoot);
     if (metadata.isSymbolicLink() || !metadata.isDirectory()) throw new Error("browser67 managed package is unavailable.");
     return packageRoot;
@@ -442,35 +447,7 @@ export class DesktopCapabilityService {
     return join(this.#managedRoot, "packages", "browser67");
   }
 
-  #browserStatePath(): string {
-    return join(this.#managedRoot, ".state", "integrations", "browser67.json");
-  }
-
   async #writeBrowserState(state: Browser67IntegrationState): Promise<void> {
-    const path = this.#browserStatePath();
-    const directory = dirname(path);
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const temporary = join(directory, `.browser67.${process.pid}.${this.#createToken()}.tmp`);
-    const handle = await open(temporary, "wx", 0o600);
-    try {
-      await handle.writeFile(`${JSON.stringify(state, null, 2)}\n`, "utf8");
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    await rename(temporary, path);
-    if (process.platform !== "win32") await chmod(path, 0o600);
+    await this.#browserState.write(state);
   }
-}
-
-function isContained(candidate: string, root: string): boolean {
-  if (!isAbsolute(candidate)) return false;
-  const normalize = process.platform === "win32"
-    ? (value: string) => resolve(value).toLowerCase()
-    : (value: string) => resolve(value);
-  const fromRoot = relative(normalize(root), normalize(candidate));
-  return fromRoot !== ""
-    && fromRoot !== ".."
-    && !fromRoot.startsWith(`..${sep}`)
-    && !isAbsolute(fromRoot);
 }

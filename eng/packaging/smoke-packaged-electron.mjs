@@ -6,25 +6,30 @@ import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
   createPackagedTestDirectories,
-  installWorkspaceDialogResult,
   launchPackagedApplication,
   resolvePackagedArtifact
 } from "./packaged-electron-fixture.mjs";
 import {
   captureProcessOutput,
+  captureWelcomeAndConnectAgentHost,
   inspectRendererSurface,
-  openSettingsSection,
+  openPackagedSmokeWorkspace,
   runControlledShutdownScenario,
   waitForPersistedRuntimeRecovery,
   verifyColdProviderRestoration,
-  verifyInitialRuntimeSettings,
-  verifyPackagedPrivateGitWorktreeContract
+  verifyPackagedWelcome,
+  verifyPackagedPrivateGitWorktreeContract,
+  verifyReadySessionCatalog
 } from "./packaged-electron-smoke-scenarios.mjs";
 import { verifyPackagedMainOnlyDiagnostics } from "./packaged-diagnostics-smoke.mjs";
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
 import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
+import {
+  assertNoWorkspaceChangesAuthorityWarning,
+  verifyPackagedChangesInspector
+} from "./packaged-changes-inspector-smoke.mjs";
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
@@ -62,31 +67,17 @@ try {
   packagedProcessOutput = captureProcessOutput(application.process());
   let window = await application.firstWindow();
   await window.waitForLoadState("domcontentloaded");
-  await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
-  if (!(await window.getByRole("button", { name: "选择工作区" }).isEnabled())) {
-    throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
-  }
-  await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
-  await verifyPackagedMainOnlyDiagnostics({
+  await verifyPackagedWelcome({
     agentDir,
     application,
     packagedCredential,
     userDataDirectory,
     window,
-    workspace
+    workspace,
+    verifyMainOnlyDiagnostics: verifyPackagedMainOnlyDiagnostics
   });
-  await capturePackagedScreenshot(window, "00-welcome-system.png");
-  await window.evaluate(() => window.pi67.system.connectAgentHost());
-  await verifyInitialRuntimeSettings(window, packagedProcessOutput);
-  await installWorkspaceDialogResult(application, workspace);
-  await window.getByRole("button", { name: "选择工作区" }).click();
-  await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
-  await window.getByRole("list", { name: "工作区与会话" }).waitFor({ state: "visible", timeout: 30_000 });
-  const initialConversationRows = window.locator('[data-testid="conversation-row"]');
-  await initialConversationRows.first().waitFor({ state: "visible", timeout: 30_000 });
-  if ((await initialConversationRows.count()) !== 1) {
-    throw new Error(`Expected one initial packaged conversation row, received ${await initialConversationRows.count()}.`);
-  }
+  await captureWelcomeAndConnectAgentHost(window, capturePackagedScreenshot, packagedProcessOutput);
+  await openPackagedSmokeWorkspace({ application, window, workspace });
   await verifyPackagedPrivateGitWorktreeContract(window);
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
     throw new Error(`Packaged workspace open reported a failure: ${JSON.stringify(await inspectRendererSurface(window))}`);
@@ -100,16 +91,8 @@ try {
       { cause: error }
     );
   }
-  await verifyPackagedChangesInspector(window);
-  const workspaceSettings = await openSettingsSection(window, /^运行服务/u);
-  await workspaceSettings.getByRole("button", { name: /恢复与诊断/u }).click();
-  const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
-  const sessionCatalogCheck = doctorDialog.getByLabel("运行环境检查结果")
-    .locator(".doctor-check").filter({ hasText: "Session 目录" });
-  await doctorDialog.getByRole("button", { name: /重新检查/u }).click();
-  await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v4; ready/u).waitFor({ state: "visible", timeout: 30_000 });
-  await doctorDialog.getByRole("button", { name: "关闭" }).click();
+  await verifyPackagedChangesInspector(window, capturePackagedScreenshot);
+  const workspaceSettings = await verifyReadySessionCatalog(window);
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
   const providerPanel = workspaceSettings.getByTestId("provider-configuration-panel");
@@ -472,27 +455,4 @@ try {
   } finally {
     await cleanupPackagedTestDirectories(userDataDirectory);
   }
-}
-
-async function assertNoWorkspaceChangesAuthorityWarning(window) {
-  if (await window.getByText("无法加载本会话修改记录", { exact: true }).count()) {
-    throw new Error("Packaged workspace-only Settings requested Task-scoped workspace changes.");
-  }
-}
-
-async function verifyPackagedChangesInspector(window) {
-  let inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
-  if (!(await inspector.isVisible())) {
-    await window.getByRole("button", { name: "显示任务检查器", exact: true }).click();
-    inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
-  }
-  await inspector.waitFor({ state: "visible", timeout: 15_000 });
-  await inspector.getByRole("tab", { name: "修改", exact: true }).click();
-  await inspector.getByText("0 个文件 · 0 条记录", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await inspector.getByText("Pi Session 修改投影，不等于当前 Git 或完整 Workspace Diff。", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await inspector.getByText("当前活动分支还没有 edit 或 write 修改记录。", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await capturePackagedScreenshot(window, "01-changes-empty.png");
 }

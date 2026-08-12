@@ -180,6 +180,7 @@ jobs:
           eng/release/windows-preview-candidate.test.mjs
           eng/packaging/controlled-shutdown-fixture.test.mjs
           eng/packaging/verify-windows-installer-lifecycle.test.mjs
+          eng/packaging/windows-installed-application-lifecycle.test.mjs
           eng/packaging/windows-artifact-identity.test.mjs
       - name: Reverify exact Windows candidate bytes
         shell: pwsh

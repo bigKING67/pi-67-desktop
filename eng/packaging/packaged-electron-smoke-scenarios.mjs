@@ -16,7 +16,65 @@ import {
 
 const PACKAGED_SHUTDOWN_BUDGET_MS = 5_000;
 
-export async function verifyInitialRuntimeSettings(window, packagedProcessOutput) {
+export async function verifyPackagedWelcome({
+  agentDir,
+  application,
+  packagedCredential,
+  userDataDirectory,
+  window,
+  workspace,
+  verifyMainOnlyDiagnostics
+}) {
+  await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
+  if (!(await window.getByRole("button", { name: "选择工作区" }).isEnabled())) {
+    throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
+  }
+  await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
+  await verifyMainOnlyDiagnostics({
+    agentDir,
+    application,
+    packagedCredential,
+    userDataDirectory,
+    window,
+    workspace
+  });
+}
+
+export async function captureWelcomeAndConnectAgentHost(window, captureScreenshot, packagedProcessOutput) {
+  await captureScreenshot(window, "00-welcome-system.png");
+  await window.evaluate(() => window.pi67.system.connectAgentHost());
+  await verifyInitialRuntimeSettings(window, packagedProcessOutput);
+}
+
+export async function openPackagedSmokeWorkspace({ application, window, workspace }) {
+  await application.evaluate(({ dialog }, selectedWorkspace) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedWorkspace] });
+  }, workspace);
+  await window.getByRole("button", { name: "选择工作区" }).click();
+  await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByRole("list", { name: "工作区与会话" }).waitFor({ state: "visible", timeout: 30_000 });
+  const rows = window.locator('[data-testid="conversation-row"]');
+  await rows.first().waitFor({ state: "visible", timeout: 30_000 });
+  const rowCount = await rows.count();
+  if (rowCount !== 1) {
+    throw new Error(`Expected one initial packaged conversation row, received ${rowCount}.`);
+  }
+}
+
+export async function verifyReadySessionCatalog(window) {
+  const settings = await openSettingsSection(window, /^运行服务/u);
+  await settings.getByRole("button", { name: /恢复与诊断/u }).click();
+  const doctorDialog = window.getByRole("dialog", { name: "恢复与诊断" });
+  const sessionCatalogCheck = doctorDialog.getByLabel("运行环境检查结果")
+    .locator(".doctor-check").filter({ hasText: "Session 目录" });
+  await doctorDialog.getByRole("button", { name: /重新检查/u }).click();
+  await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v4; ready/u).waitFor({ state: "visible", timeout: 30_000 });
+  await doctorDialog.getByRole("button", { name: "关闭" }).click();
+  return settings;
+}
+
+async function verifyInitialRuntimeSettings(window, packagedProcessOutput) {
   const settings = await openSettingsSection(window, /^运行服务/u);
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: /^下载源与网络/u }).click();

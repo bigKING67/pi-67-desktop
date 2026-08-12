@@ -43,9 +43,11 @@ import {
   WorkspaceChangesProjectionSchema
 } from "./workspace-change-schemas.js";
 import {
-  OperationAcceptedSchema,
+  operationSubmissionResultSchema,
   OperationActivitySchema,
-  OperationKindSchema, OperationViewSchema, ToolExecutionSchema
+  OperationSettledSchema,
+  OperationViewSchema,
+  ToolExecutionSchema
 } from "./operation-schemas.js";
 import {
   ConversationPageSchema,
@@ -199,8 +201,6 @@ const DoctorCheckSchema = strictObject({
   detail: Type.String()
 });
 const DoctorReportSchema = strictObject({ generatedAt: Type.Number(), checks: Type.Array(DoctorCheckSchema) });
-
-const OperationSettledSchema = operationSettledSchema(OperationKindSchema);
 
 const AcknowledgementSchema = strictObject({ accepted: Type.Literal(true) });
 const ProjectionMutationAcknowledgementSchema = strictObject({
@@ -445,28 +445,4 @@ export const EventPayloadSchemas: Record<AgentEventType, TSchema> = {
   "diagnostics.progress": strictObject({ step: Type.String(), completed: Type.Boolean() }),
   "doctor.completed": DoctorReportSchema
 };
-function operationSubmissionResultSchema(operationKind: TSchema): TSchema {
-  return Type.Union([OperationAcceptedSchema, operationSettledSchema(operationKind)]);
-}
-
-function operationSettledSchema(operationKind: TSchema): TSchema {
-  const base = {
-    kind: Type.Literal("settled"),
-    operationId: Type.String(),
-    operationKind,
-    cancellable: Type.Literal(false),
-    hostEpoch: Type.Integer({ minimum: 0 }),
-    sessionId: Type.String(),
-    sessionFileIdentity: Type.String({ minLength: 1, maxLength: MAX_SESSION_FILE_IDENTITY_CHARS }),
-    sessionGeneration: Type.Integer({ minimum: 0 }),
-    startedAt: Type.Number(),
-    settledAt: Type.Number()
-  };
-  return Type.Union([
-    strictObject({ ...base, lifecycle: Type.Literal("completed") }),
-    strictObject({ ...base, lifecycle: Type.Literal("failed"), error: ProtocolErrorSchema }),
-    strictObject({ ...base, lifecycle: Type.Literal("cancelled"), reason: Type.String() }),
-    strictObject({ ...base, lifecycle: Type.Literal("lost"), reason: Type.String() })
-  ]);
-}
 export function strictObject<T extends TProperties>(properties: T) { return Type.Object(properties, { additionalProperties: false }); }

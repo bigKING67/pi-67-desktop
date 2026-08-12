@@ -43,9 +43,13 @@ describe("CI change scope classifier", () => {
     expect(classifyChangedPaths([
       "eng/packaging/verify-windows-installer-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.mjs",
+      "eng/packaging/windows-installed-application-lifecycle.test.mjs",
+      "eng/packaging/windows-installer-process.mjs",
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
+      "eng/packaging/windows-real-user-catalog-state.mjs",
+      "eng/packaging/windows-real-user-conversation.mjs",
       "eng/packaging/windows-real-user-profile.mjs",
       "eng/packaging/windows-real-user-profile.test.mjs",
       "eng/packaging/windows-real-user-session-creation.mjs",
@@ -53,6 +57,7 @@ describe("CI change scope classifier", () => {
       "eng/packaging/windows-installer-profile-authority.test.mjs",
       "eng/packaging/controlled-shutdown-fixture.test.mjs",
       "eng/packaging/verify-windows-packaged-input-layout.mjs",
+      "eng/packaging/windows-layout-observation.mjs",
       "eng/ci/windows-installer-source-run.mjs",
       "eng/ci/verify-windows-installer-debug-scope.mjs",
       "eng/ci/windows-installer-verifier-scope.mjs"

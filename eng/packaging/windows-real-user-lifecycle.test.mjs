@@ -38,11 +38,14 @@ describe("Windows installed real-user lifecycle", () => {
   });
 
   it("materializes a New Session only after the controlled first Prompt", async () => {
-    const source = await readFile(
+    const lifecycleSource = await readFile(
       new URL("./windows-real-user-lifecycle.mjs", import.meta.url),
       "utf8"
     );
-    const createFlow = source.slice(source.indexOf("async function createControlledConversation"));
+    const createFlow = await readFile(
+      new URL("./windows-real-user-conversation.mjs", import.meta.url),
+      "utf8"
+    );
     const clickIntent = createFlow.indexOf("await createAction.click");
     const provisionalObserved = createFlow.indexOf("await waitForSelectedProvisionalSessionIntent");
     const promptSubmitted = createFlow.indexOf("await submitControlledPromptInput");
@@ -68,11 +71,14 @@ describe("Windows installed real-user lifecycle", () => {
     ]) {
       expect(createFlow).toContain(`${field}: createdSession.diagnostic.${field}`);
     }
-    const launchFlow = source.slice(source.indexOf("async function runRealUserLaunch"), source.indexOf(
+    const launchFlow = lifecycleSource.slice(
+      lifecycleSource.indexOf("async function runRealUserLaunch"),
+      lifecycleSource.indexOf(
       "export async function waitForCatalogState"
-    ));
+      )
+    );
     const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
-    const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir)");
+    const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir,");
     expect(creationAuthorityReady).toBeGreaterThan(-1);
     expect(controlledCreate).toBeGreaterThan(creationAuthorityReady);
     expect(launchFlow.slice(creationAuthorityReady, controlledCreate))
