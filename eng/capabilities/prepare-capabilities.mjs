@@ -10,7 +10,11 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep 
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileBundledSkillSuites, parseSkillMetadata, readPi67SkillPackMetadata } from "./bundled-skill-suites.mjs";
-import { resolveBundledGitToolchain, resolveExactCapabilitySource } from "./capability-source-resolver.mjs";
+import {
+  resolveBundledGitToolchain,
+  resolveBundledNpmToolchain,
+  resolveExactCapabilitySource
+} from "./capability-source-resolver.mjs";
 import {
   assertCapabilitiesMetadata,
   assertCapabilitySourceLock,
@@ -44,7 +48,10 @@ export async function prepareDesktopCapabilities() {
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   const skillSuiteDefinition = JSON.parse(await readFile(skillSuitesPath, "utf8"));
   assertCapabilitySourceLock(lock);
-  const git = await resolveBundledGitToolchain(toolchainManifestPath);
+  const [git, npmCommand] = await Promise.all([
+    resolveBundledGitToolchain(toolchainManifestPath),
+    resolveBundledNpmToolchain(toolchainManifestPath)
+  ]);
   await rm(outputRoot, { recursive: true, force: true });
   await mkdir(join(outputRoot, "packages"), { recursive: true });
 
@@ -83,7 +90,11 @@ export async function prepareDesktopCapabilities() {
     lock.sources.find((item) => item.id === "pi67-core"),
     skillPackOverlays
   ));
-  entries.push(await prepareBrowser67(sources.get("browser67"), lock.sources.find((item) => item.id === "browser67")));
+  entries.push(await prepareBrowser67(
+    sources.get("browser67"),
+    lock.sources.find((item) => item.id === "browser67"),
+    npmCommand
+  ));
   entries.push(await prepareDesignCraft(sources.get("design-craft"), lock.sources.find((item) => item.id === "design-craft")));
   entries.push(await prepareCommerceGrowthOs(
     sources.get("commerce-growth-os"),
@@ -100,7 +111,8 @@ export async function prepareDesktopCapabilities() {
     lock,
     outputRoot,
     projectRoot: managedNpmProjectRoot,
-    cacheRoot: managedNpmCacheRoot
+    cacheRoot: managedNpmCacheRoot,
+    npmCommand
   });
 
   const catalog = {
@@ -198,7 +210,7 @@ async function preparePi67Core(sourceRoot, source, skillPackOverlays) {
   );
 }
 
-async function prepareBrowser67(sourceRoot, source) {
+async function prepareBrowser67(sourceRoot, source, npmCommand) {
   const destination = join(outputRoot, "packages", source.id);
   await copyAllowed(sourceRoot, destination, [
     "package.json",
@@ -227,7 +239,8 @@ async function prepareBrowser67(sourceRoot, source) {
     ...packageManifest,
     gitHead: source.commit
   }, null, 2)}\n`, "utf8");
-  await execFileAsync(process.platform === "win32" ? "npm.cmd" : "npm", [
+  await execFileAsync(npmCommand.executable, [
+    ...npmCommand.argumentsPrefix,
     "ci",
     "--omit=dev",
     "--omit=peer",

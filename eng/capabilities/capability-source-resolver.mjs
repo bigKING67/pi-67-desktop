@@ -56,6 +56,18 @@ export async function resolveBundledGitToolchain(toolchainManifestPath) {
   return { executable, execPath };
 }
 
+export async function resolveBundledNpmToolchain(toolchainManifestPath) {
+  const manifest = JSON.parse(await readFile(toolchainManifestPath, "utf8"));
+  const root = dirname(toolchainManifestPath);
+  const executable = resolve(root, manifest.paths?.node ?? "");
+  const npmCli = resolve(root, manifest.paths?.npmCli ?? "");
+  if (![executable, npmCli].every((path) => isContained(path, root))) {
+    throw new Error("Bundled Node/npm escaped the Desktop toolchain root.");
+  }
+  await Promise.all([stat(executable), stat(npmCli)]);
+  return { executable, argumentsPrefix: [npmCli] };
+}
+
 async function repositoryContainsCommit(path, commit, git) {
   try {
     if (!lstatSync(path).isDirectory()) return false;

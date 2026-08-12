@@ -57,7 +57,7 @@ export async function prepareManagedNpmBundles(options) {
     outputRoot,
     projectRoot,
     cacheRoot,
-    npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm"
+    npmCommand
   } = options;
   assertManagedNpmBundleLock(lock);
   const bundledRoot = join(outputRoot, "managed-packages", "bundled");
@@ -67,7 +67,8 @@ export async function prepareManagedNpmBundles(options) {
   await copyFile(join(projectRoot, "package.json"), join(bundledRoot, "package.json"));
   await copyFile(join(projectRoot, "package-lock.json"), join(bundledRoot, "package-lock.json"));
 
-  await execFileAsync(npmExecutable, [
+  await execFileAsync(npmCommand.executable, [
+    ...npmCommand.argumentsPrefix,
     "ci",
     "--omit=dev",
     "--omit=peer",
@@ -83,7 +84,7 @@ export async function prepareManagedNpmBundles(options) {
 
   const packages = [];
   for (const entry of lock.managedNpmBundles) {
-    const tarball = await resolvePackageTarball(entry, cacheRoot, npmExecutable);
+    const tarball = await resolvePackageTarball(entry, cacheRoot, npmCommand);
     const packageRoot = join(bundledRoot, "packages", entry.id);
     await extractNpmTarball(tarball, packageRoot);
     const packageJson = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
@@ -249,12 +250,13 @@ function parseManagedNpmBundleManifest(value, catalogVersion) {
   return value;
 }
 
-async function resolvePackageTarball(entry, cacheRoot, npmExecutable) {
+async function resolvePackageTarball(entry, cacheRoot, npmCommand) {
   const fileName = `${entry.packageName}-${entry.version}.tgz`;
   const cachedPath = join(cacheRoot, fileName);
   if (await matchesIntegrity(cachedPath, entry.packageIntegrity)) return cachedPath;
   await rm(cachedPath, { force: true });
-  const { stdout } = await execFileAsync(npmExecutable, [
+  const { stdout } = await execFileAsync(npmCommand.executable, [
+    ...npmCommand.argumentsPrefix,
     "pack",
     `${entry.packageName}@${entry.version}`,
     "--ignore-scripts",

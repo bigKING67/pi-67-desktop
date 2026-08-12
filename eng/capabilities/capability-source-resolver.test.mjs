@@ -1,10 +1,11 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   capabilityGitTransportCandidates,
+  resolveBundledNpmToolchain,
   runCapabilityGitCommand
 } from "./capability-source-resolver.mjs";
 
@@ -27,6 +28,37 @@ describe("Desktop capability source resolver", () => {
       "https://gitclone.com/github.com/bigKING67/pi-67.git",
       `https://ghproxy.net/${canonical}`
     ]);
+  });
+
+  it("resolves npm through the immutable Desktop Node toolchain", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-capability-npm-"));
+    temporaryRoots.push(root);
+    const nodeExecutable = join(root, "node", "node.exe");
+    const npmCli = join(root, "npm", "bin", "npm-cli.js");
+    await mkdir(join(root, "node"), { recursive: true });
+    await mkdir(join(root, "npm", "bin"), { recursive: true });
+    await writeFile(nodeExecutable, "node fixture\n", "utf8");
+    await writeFile(npmCli, "npm fixture\n", "utf8");
+    const manifestPath = join(root, "manifest.json");
+    await writeFile(manifestPath, `${JSON.stringify({
+      paths: {
+        node: "node/node.exe",
+        npmCli: "npm/bin/npm-cli.js"
+      }
+    })}\n`, "utf8");
+
+    await expect(resolveBundledNpmToolchain(manifestPath)).resolves.toEqual({
+      executable: nodeExecutable,
+      argumentsPrefix: [npmCli]
+    });
+
+    await writeFile(manifestPath, `${JSON.stringify({
+      paths: {
+        node: "../outside-node",
+        npmCli: "npm/bin/npm-cli.js"
+      }
+    })}\n`, "utf8");
+    await expect(resolveBundledNpmToolchain(manifestPath)).rejects.toThrow(/escaped/u);
   });
 
   it("terminates a timed-out Git process tree before returning control", async () => {
