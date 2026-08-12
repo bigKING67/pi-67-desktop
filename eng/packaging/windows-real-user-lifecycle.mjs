@@ -368,13 +368,20 @@ async function createControlledConversation(window, agentDir) {
 
   return {
     report: {
+      candidateSessionRowCount: createdSession.diagnostic.candidateSessionRowCount,
       durationMs: round(materializationDurationMs),
       hardGateMs: REAL_USER_CREATE_HARD_TIMEOUT_MS,
       intentDurationMs: round(intentDurationMs),
       jsonlMaterialized: true,
       materializationTrigger: "first-prompt",
+      newPhysicalSessionFileCount: createdSession.diagnostic.newPhysicalSessionFileCount,
+      newPhysicalSessionFileNames: createdSession.diagnostic.newPhysicalSessionFileNames,
+      newSessionRowCount: createdSession.diagnostic.newSessionRowCount,
       operationOutcome: "user-stopped",
       provisionalIntentObserved: true,
+      selectedIdentityFingerprint: createdSession.diagnostic.selectedIdentityFingerprint,
+      selectedNewSession: createdSession.diagnostic.selectedNewSession,
+      selectedProvisional: createdSession.diagnostic.selectedProvisional,
       targetMet: materializationDurationMs <= REAL_USER_CREATE_TARGET_MS,
       targetMs: REAL_USER_CREATE_TARGET_MS
     },

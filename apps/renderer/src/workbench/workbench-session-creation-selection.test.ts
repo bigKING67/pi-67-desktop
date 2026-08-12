@@ -36,7 +36,7 @@ describe("workbench Session creation selection", () => {
         sessionId: bootstrapSnapshot.sessionId,
         sessionGeneration: 4
       }))
-    )).toBe("background");
+    )).toBe("active");
     expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
       kind: "conversation",
       conversation: {

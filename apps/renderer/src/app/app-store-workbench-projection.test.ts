@@ -73,6 +73,64 @@ describe("Workbench-selected App projection", () => {
     expect(useConversationStore.getState().authority?.sessionId).toBe("session-2");
   });
 
+  it("commits a pending creation bootstrap even after a late projection changed selection", () => {
+    const workbench = rendererWorkbenchStore.getState();
+    workbench.openTask({
+      id: "task-create",
+      conversation: { kind: "provisional", workspaceId: "workspace-1", draftId: "create" },
+      workspaceId: "workspace-1",
+      sessionId: "pending:session-create",
+      taskGeneration: 1,
+      lifecycle: "initializing",
+      runtime: { phase: "starting", detail: "正在创建 Pi Session", recoverable: true },
+      title: "新会话",
+      hasDraft: false,
+      attachmentCount: 0,
+      toolMode: "auto",
+      creationId: "session-creation-active",
+      creationStatus: "confirming"
+    });
+    openWorkbenchTask("task-previous", "session-1", 3);
+    const createdSnapshot = snapshot("session-created");
+    const event = {
+      type: "session.bootstrap",
+      payload: { snapshot: createdSnapshot, reason: "session-create" as const }
+    } as const;
+    const envelope = eventEnvelope(event.type, event.payload, taskEventFixture({
+      hostEpoch: 9,
+      sequence: 2,
+      workspaceId: "workspace-1",
+      taskId: "task-create",
+      taskGeneration: 1,
+      sessionId: createdSnapshot.sessionId,
+      sessionGeneration: 4
+    }));
+
+    expect(applyRendererAgentEvent(event, envelope)).toBe("active");
+    expect(useSessionProjectionStore.getState().authority).toMatchObject({
+      phase: "active",
+      sessionId: "session-created",
+      sessionFileIdentity: "session-file-session-created",
+      sessionGeneration: 4
+    });
+    expect(rendererWorkbenchStore.getState().selectedSurface).toEqual({
+      kind: "conversation",
+      conversation: {
+        kind: "session",
+        workspaceId: "workspace-1",
+        sessionFileIdentity: "session-file-session-created",
+        sessionPath: "/sessions/session-created.jsonl"
+      }
+    });
+    expect(rendererWorkbenchStore.getState().tasks["task-create"]).toMatchObject({
+      sessionId: "session-created",
+      sessionFileIdentity: "session-file-session-created",
+      sessionGeneration: 4,
+      creationId: undefined,
+      creationStatus: undefined
+    });
+  });
+
   it("does not commit a bootstrap from an unregistered Workbench Task", () => {
     emitChange(runningChange);
     const before = useWorkspaceChangesStore.getState();

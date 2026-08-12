@@ -10,7 +10,8 @@ import { selectWorkspaceSessionCatalog, useSessionCatalogStore } from "../naviga
 import {
   rendererWorkbenchStore,
   selectedWorkbenchTask,
-  taskForConversation
+  taskForConversation,
+  type RendererWorkbenchTask
 } from "./workbench-store.js";
 import { useSubagentStore } from "../subagents/subagent-store.js";
 
@@ -72,6 +73,10 @@ export function classifyWorkbenchAgentEvent(
     && task.creationId
   ) return "stale";
 
+  // A pending create owns navigation until its authoritative bootstrap arrives.
+  // Treat it as projection-active even if a late projection temporarily changed the selected surface.
+  if (isPendingSessionCreationBootstrap(event, task)) return "active";
+
   const activeTask = selectedWorkbenchTask(workbench) ?? (
     workbench.selectedSurface?.kind === "settings"
     && workbench.settingsReturnSurface?.kind === "conversation"
@@ -103,10 +108,7 @@ export function applyWorkbenchAgentEvent(
       const sessionName = snapshot.sessionName?.trim();
       const sessionAuthority = eventSessionAuthority(envelope);
       // Navigation is locked while creation is pending, so a background selection cannot supersede this intent.
-      const reselectPendingCreation = event.type === "session.bootstrap"
-        && event.payload.reason === "session-create"
-        && task.conversation.kind === "provisional"
-        && (task.creationStatus === "pending" || task.creationStatus === "confirming");
+      const reselectPendingCreation = isPendingSessionCreationBootstrap(event, task);
       workbench.updateTask(task.id, {
         ...(snapshot.sessionPath === undefined || snapshot.sessionFileIdentity === undefined
           ? {}
@@ -221,6 +223,16 @@ export function applyWorkbenchAgentEvent(
     }
   }
   return true;
+}
+
+function isPendingSessionCreationBootstrap(
+  event: AgentEvent,
+  task: RendererWorkbenchTask
+): boolean {
+  return event.type === "session.bootstrap"
+    && event.payload.reason === "session-create"
+    && task.conversation.kind === "provisional"
+    && (task.creationStatus === "pending" || task.creationStatus === "confirming");
 }
 
 function eventRequiresConversationAttention(event: AgentEvent): boolean {

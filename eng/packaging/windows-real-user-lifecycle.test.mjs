@@ -51,6 +51,17 @@ describe("Windows installed real-user lifecycle", () => {
     expect(controlledModelSelected).toBeGreaterThan(sessionMaterialized);
     expect(operationRunning).toBeGreaterThan(controlledModelSelected);
     expect(createFlow).not.toContain("await startControlledPrompt(window)");
+    for (const field of [
+      "candidateSessionRowCount",
+      "newPhysicalSessionFileCount",
+      "newPhysicalSessionFileNames",
+      "newSessionRowCount",
+      "selectedIdentityFingerprint",
+      "selectedNewSession",
+      "selectedProvisional"
+    ]) {
+      expect(createFlow).toContain(`${field}: createdSession.diagnostic.${field}`);
+    }
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {

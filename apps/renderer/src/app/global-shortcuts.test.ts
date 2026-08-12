@@ -101,6 +101,27 @@ describe("global shortcuts", () => {
     expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(false);
   });
 
+  it("leaves a focused keyboard dialog Escape to React Aria focus restoration", () => {
+    class OverlayElement {
+      closest(selector: string) {
+        return selector === '[role="dialog"]' ? this : null;
+      }
+    }
+    vi.stubGlobal("Element", OverlayElement);
+    useShellStore.setState({ keyboardShortcutsDialogOpen: true });
+    const escape = shortcut("Escape", { ctrlKey: false });
+    Object.assign(escape.event, { target: new OverlayElement() });
+
+    try {
+      handleGlobalShortcut(escape.event);
+
+      expect(escape.preventDefault).not.toHaveBeenCalled();
+      expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("creates Sessions only when the latest state has Workspace authority", () => {
     const blocked = shortcut("n");
     handleGlobalShortcut(blocked.event);

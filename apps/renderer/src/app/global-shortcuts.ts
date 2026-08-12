@@ -23,12 +23,17 @@ export function installGlobalShortcuts(target: GlobalShortcutTarget = window) {
 
 export function handleGlobalShortcut(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return;
-  if (event.key === "Escape" && useShellStore.getState().keyboardShortcutsDialogOpen) {
+  const ownedByOverlay = shortcutOwnedByFocusedOverlay(event.target);
+  if (
+    event.key === "Escape"
+    && useShellStore.getState().keyboardShortcutsDialogOpen
+    && !ownedByOverlay
+  ) {
     event.preventDefault();
     useShellStore.getState().setKeyboardShortcutsDialogOpen(false);
     return;
   }
-  if (shortcutOwnedByFocusedOverlay(event.target)) return;
+  if (ownedByOverlay) return;
   const action = matchDesktopAction(event, effectiveDesktopActions());
   if (!action) return;
   if (!desktopActionAllowedInContexts(action, activeShortcutContexts(event.target))) return;

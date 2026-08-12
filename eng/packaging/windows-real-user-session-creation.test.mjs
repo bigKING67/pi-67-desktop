@@ -218,7 +218,18 @@ describe("Windows installed real-user Session creation", () => {
         performance.now() + 1_000
       );
 
-      await expect(pending).resolves.toEqual({ sessionIdentity, sessionPath });
+      await expect(pending).resolves.toEqual({
+        diagnostic: expect.objectContaining({
+          candidateSessionRowCount: 1,
+          newPhysicalSessionFileCount: 1,
+          newPhysicalSessionFileNames: ["created.jsonl"],
+          newSessionRowCount: 1,
+          selectedNewSession: true,
+          selectedProvisional: false
+        }),
+        sessionIdentity,
+        sessionPath
+      });
       expect(window.evaluate).toHaveBeenCalledTimes(2);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -259,7 +270,17 @@ describe("Windows installed real-user Session creation", () => {
         new Set(["prior.jsonl"]),
         agentDir,
         performance.now() + 1_000
-      )).resolves.toEqual({ sessionIdentity: createdIdentity, sessionPath: createdPath });
+      )).resolves.toEqual({
+        diagnostic: expect.objectContaining({
+          candidateSessionRowCount: 2,
+          newPhysicalSessionFileCount: 1,
+          newPhysicalSessionFileNames: ["created.jsonl"],
+          newSessionRowCount: 1,
+          selectedNewSession: true
+        }),
+        sessionIdentity: createdIdentity,
+        sessionPath: createdPath
+      });
       expect(window.evaluate).toHaveBeenCalledOnce();
     } finally {
       vi.unstubAllGlobals();

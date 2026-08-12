@@ -106,7 +106,7 @@ export async function waitForRealUserCreatedSession(
     const sessionIdentity = matchingSessionIdentities[0] ?? null;
     const sessionPath = newPhysicalSessionFiles[0]?.path;
     if (sessionIdentity && sessionPath && correlatedObservation.selectedNewSession) {
-      return { sessionIdentity, sessionPath };
+      return { diagnostic, sessionIdentity, sessionPath };
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, SESSION_CREATION_POLL_INTERVAL_MS));
   }
