@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { resolveExistingSessionFileIdentity } from "../../packages/pi-runtime/src/session-path-identity.ts";
 import { createSessionCreationDiagnostic } from "./windows-installer-identity.mjs";
 
@@ -26,7 +26,10 @@ export async function waitForSelectedProvisionalSessionIntent(
   const existingFiles = [...existingSessionFileNames];
   let diagnostic = createSessionCreationDiagnostic(undefined, existing, existingFiles);
   while (performance.now() <= deadline) {
-    const observation = await observeSessionCreation(window, existing);
+    const observation = sanitizeSessionCreationObservation(
+      await observeSessionCreation(window, existing),
+      dirname(agentDir)
+    );
     const newPhysicalSessionFiles = await readNewPhysicalSessionFiles(
       agentDir,
       existingSessionFileNames
@@ -79,7 +82,10 @@ export async function waitForRealUserCreatedSession(
   const existingFiles = [...existingSessionFileNames];
   let diagnostic = createSessionCreationDiagnostic(undefined, existing, existingFiles);
   while (performance.now() <= deadline) {
-    const observation = await observeSessionCreation(window, existing);
+    const observation = sanitizeSessionCreationObservation(
+      await observeSessionCreation(window, existing),
+      dirname(agentDir)
+    );
     const newPhysicalSessionFiles = await readNewPhysicalSessionFiles(
       agentDir,
       existingSessionFileNames
@@ -134,6 +140,9 @@ function observeSessionCreation(window, existingIdentities) {
     const errorNotifications = [...document.querySelectorAll('[aria-label="通知"] [role="alert"]')];
     return {
       errorNotificationCount: errorNotifications.length,
+      errorNotificationMessages: errorNotifications.slice(0, 3).map((notification) => (
+        notification.textContent?.trim().slice(0, 500) ?? ""
+      )),
       errorNotificationTitles: errorNotifications.slice(0, 3).map((notification) => (
         notification.querySelector("strong")?.textContent?.trim().slice(0, 160) ?? null
       )),
@@ -152,6 +161,15 @@ function observeSessionCreation(window, existingIdentities) {
       sessionRowCount: sessionRows.length
     };
   }, { identities: existingIdentities });
+}
+
+export function sanitizeSessionCreationObservation(observation, privateRoot) {
+  return {
+    ...observation,
+    errorNotificationMessages: (observation.errorNotificationMessages ?? []).map((message) => (
+      message.replaceAll(privateRoot, "<temporary-root>")
+    ))
+  };
 }
 
 async function readRealUserSessionFileNames(agentDir) {

@@ -4,12 +4,21 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { resolveExistingSessionFileIdentity } from "../../packages/pi-runtime/src/session-path-identity.ts";
 import {
+  sanitizeSessionCreationObservation,
   prepareRealUserSessionCreation,
   waitForSelectedProvisionalSessionIntent,
   waitForRealUserCreatedSession
 } from "./windows-real-user-session-creation.mjs";
 
 describe("Windows installed real-user Session creation", () => {
+  it("redacts the private temporary root from Session creation errors", () => {
+    expect(sanitizeSessionCreationObservation({
+      errorNotificationMessages: ["Failed at C:\\private-root\\agent\\sessions"]
+    }, "C:\\private-root")).toEqual({
+      errorNotificationMessages: ["Failed at <temporary-root>\\agent\\sessions"]
+    });
+  });
+
   it("captures the create baseline only after the action becomes admissible", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-real-user-baseline-"));
     const agentDir = join(root, "agent");

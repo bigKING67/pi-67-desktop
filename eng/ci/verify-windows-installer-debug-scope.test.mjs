@@ -20,6 +20,8 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
       "eng/packaging/windows-real-user-profile.mjs",
       "eng/packaging/windows-real-user-profile.test.mjs",
+      "eng/packaging/windows-real-user-session-creation.mjs",
+      "eng/packaging/windows-real-user-session-creation.test.mjs",
       "eng/packaging/windows-installer-profile-authority.test.mjs",
       "eng/packaging/verify-windows-packaged-input-layout.mjs",
       "eng/packaging/verify-windows-packaged-input-layout.test.mjs",

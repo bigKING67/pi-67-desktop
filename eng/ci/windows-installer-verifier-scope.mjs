@@ -15,7 +15,9 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-real-user-lifecycle.mjs",
   "windows-real-user-lifecycle.test.mjs",
   "windows-real-user-profile.mjs",
-  "windows-real-user-profile.test.mjs"
+  "windows-real-user-profile.test.mjs",
+  "windows-real-user-session-creation.mjs",
+  "windows-real-user-session-creation.test.mjs"
 ]);
 
 const ALLOWED_CI_BASENAMES = new Set([
