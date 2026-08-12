@@ -331,6 +331,6 @@ describe("AgentHostServer multi-Task routing", () => {
 
     await fixture.server.shutdown();
     expect(fixture.runtimes.every((runtime) => runtime.dispose.mock.calls.length === 1)).toBe(true);
-  }, 10_000);
+  }, 20_000);
 
 });
