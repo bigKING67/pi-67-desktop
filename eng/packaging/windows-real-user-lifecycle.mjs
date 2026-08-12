@@ -48,6 +48,7 @@ export {
 export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
+export const REAL_USER_MODEL_HYDRATION_TIMEOUT_MS = 30_000;
 const REAL_USER_RUNTIME_TIMEOUT_MS = 15_000;
 const REAL_USER_SHUTDOWN_BUDGET_MS = 5_000;
 export const REAL_USER_RESTART_COUNT = 3;
@@ -354,7 +355,7 @@ async function createControlledConversation(window, agentDir) {
   }
   await canonicalContainedSessionPath(createdSession.sessionPath, agentDir);
 
-  await waitForControlledModel(window, REAL_USER_CREATE_HARD_TIMEOUT_MS);
+  await waitForControlledModel(window, REAL_USER_MODEL_HYDRATION_TIMEOUT_MS);
   await waitForControlledPromptRunning(window);
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });
   await window.getByRole("button", { name: "停止", exact: true })

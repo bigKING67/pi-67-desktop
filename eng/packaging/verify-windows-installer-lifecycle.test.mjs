@@ -18,6 +18,7 @@ import {
   REAL_USER_CATALOG_TIMEOUT_MS,
   REAL_USER_CREATE_HARD_TIMEOUT_MS,
   REAL_USER_CREATE_TARGET_MS,
+  REAL_USER_MODEL_HYDRATION_TIMEOUT_MS,
   REAL_USER_MODEL_RUNTIME_TIMEOUT_MS,
   REAL_USER_PROVIDER_TIMEOUT_MS,
   REAL_USER_RESTART_COUNT
@@ -101,6 +102,7 @@ describe("Windows installer lifecycle contract", () => {
       catalog: REAL_USER_CATALOG_TIMEOUT_MS,
       createHard: REAL_USER_CREATE_HARD_TIMEOUT_MS,
       createTarget: REAL_USER_CREATE_TARGET_MS,
+      modelHydration: REAL_USER_MODEL_HYDRATION_TIMEOUT_MS,
       modelRuntime: REAL_USER_MODEL_RUNTIME_TIMEOUT_MS,
       provider: REAL_USER_PROVIDER_TIMEOUT_MS,
       restarts: REAL_USER_RESTART_COUNT
@@ -108,6 +110,7 @@ describe("Windows installer lifecycle contract", () => {
       catalog: 5_000,
       createHard: 15_000,
       createTarget: 5_000,
+      modelHydration: 30_000,
       modelRuntime: 5_000,
       provider: 10_000,
       restarts: 3
