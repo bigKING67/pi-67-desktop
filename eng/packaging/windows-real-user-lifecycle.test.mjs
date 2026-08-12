@@ -12,9 +12,7 @@ import {
   assertModelRuntimeInitialization,
   canonicalContainedSessionPath,
   inspectRealUserRuntimeSurface,
-  shouldCreateInitialRealUserSession,
   waitForHealthyWorkbenchConvergence,
-  waitForCatalogState,
   waitForRealUserRuntimeReady
 } from "./windows-real-user-lifecycle.mjs";
 describe("Windows installed real-user lifecycle", () => {
@@ -73,9 +71,7 @@ describe("Windows installed real-user lifecycle", () => {
     }
     const launchFlow = lifecycleSource.slice(
       lifecycleSource.indexOf("async function runRealUserLaunch"),
-      lifecycleSource.indexOf(
-      "export async function waitForCatalogState"
-      )
+      lifecycleSource.indexOf("export async function activateCatalogSession")
     );
     const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
     const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir,");
@@ -124,68 +120,6 @@ describe("Windows installed real-user lifecycle", () => {
       "Windows real-user Session JSONL resolved outside the isolated Agent directory."
     );
   });
-  it("accepts a Catalog state only after the expected materialized Session is present", async () => {
-    const workspaceGroup = {
-      evaluate: async (_callback, expectedIdentity) => ({
-        hasExpectedSession: expectedIdentity === "session:workspace-1:session.jsonl",
-        itemCount: 1,
-        text: "Workspace Session"
-      }),
-      waitFor: async () => undefined
-    };
-    const window = {
-      getByTestId: () => ({ first: () => workspaceGroup })
-    };
-
-    await expect(waitForCatalogState(
-      window,
-      "session:workspace-1:session.jsonl",
-      100
-    )).resolves.toMatchObject({ itemCount: 1, state: "ready" });
-  });
-
-  it("fails closed when the installed Catalog reports unavailable", async () => {
-    const workspaceGroup = {
-      evaluate: async () => ({
-        hasExpectedSession: true,
-        itemCount: 0,
-        text: "Session 目录暂不可用，可稍后刷新重试。"
-      }),
-      waitFor: async () => undefined
-    };
-    const window = {
-      getByTestId: () => ({ first: () => workspaceGroup })
-    };
-
-    await expect(waitForCatalogState(window, undefined, 100)).rejects.toThrow(
-      "Session Catalog became unavailable"
-    );
-  });
-
-  it.each([
-    ["ready empty", { itemCount: 0, state: "ready-empty" }, true],
-    ["rebuilding empty", { itemCount: 0, state: "rebuilding" }, true],
-    ["materialized", { itemCount: 1, state: "ready" }, false]
-  ])("creates the first real-user Session before activation for %s Catalog state", (
-    _label,
-    catalog,
-    expected
-  ) => {
-    expect(shouldCreateInitialRealUserSession({
-      catalog,
-      expectedSessionIdentity: undefined,
-      launchIndex: 0
-    })).toBe(expected);
-  });
-
-  it("requires the exact persisted Session on real-user restarts", () => {
-    expect(shouldCreateInitialRealUserSession({
-      catalog: { itemCount: 0, state: "ready-empty" },
-      expectedSessionIdentity: "session:workspace-1:session.jsonl",
-      launchIndex: 1
-    })).toBe(false);
-  });
-
   it("waits for the Session row view to converge after runtime.ready", async () => {
     const running = workbenchStatusObservation({ runningCount: 1, selectedRunningCount: 1 });
     const idle = workbenchStatusObservation();

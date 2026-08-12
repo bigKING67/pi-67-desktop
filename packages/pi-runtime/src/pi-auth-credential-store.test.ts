@@ -90,6 +90,23 @@ describe("PiAuthCredentialStore", () => {
     ]);
   });
 
+  it("loads revision-pinned content without disk access and preserves the last-known-good data", async () => {
+    const store = new PiAuthCredentialStore("/unused/auth.json");
+    const content = JSON.stringify({
+      direct: { type: "api_key", key: "direct-key" }
+    });
+
+    expect(store.loadContent(content)).toBeUndefined();
+    await expect(store.list()).resolves.toEqual([
+      { providerId: "direct", type: "api_key" }
+    ]);
+
+    expect(store.loadContent("{ invalid JSON")).toEqual(expect.any(String));
+    await expect(store.list()).resolves.toEqual([
+      { providerId: "direct", type: "api_key" }
+    ]);
+  });
+
   it("reveals only literal persisted API keys without expanding commands or environment references", () => {
     const content = JSON.stringify({
       literal: { type: "api_key", key: "literal-secret" },

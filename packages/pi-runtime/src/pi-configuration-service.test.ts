@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiConfigurationReloadState, PiProviderConfigurationChanged } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import { PiConfigurationService } from "./pi-configuration-service.js";
 
 const temporaryDirectories: string[] = [];
@@ -79,6 +80,38 @@ describe("PiConfigurationService", () => {
         defaultModel: builtin!.models[0]!.id
       });
     } finally {
+      await fixture.dispose();
+    }
+  }, 20_000);
+
+  it("projects a credential mutation from the revision-pinned bundle without reloading auth.json", async () => {
+    const fixture = await createFixture();
+    const reload = vi.spyOn(PiAuthCredentialStore.prototype, "reload")
+      .mockResolvedValue("redundant auth.json reload");
+    try {
+      const initial = await fixture.service.get(fixture.cwd);
+      const saved = await fixture.service.saveProvider(
+        fixture.cwd,
+        initial.revision,
+        providerInput()
+      );
+
+      const credentialSnapshot = await fixture.service.storeCredential(
+        fixture.cwd,
+        saved.revision,
+        "pi67-test",
+        "revision-pinned-credential"
+      );
+
+      expect(credentialSnapshot).toMatchObject({ syncState: "current" });
+      expect(credentialSnapshot.credentials).toContainEqual({
+        provider: "pi67-test",
+        type: "api_key"
+      });
+      expect(reload).not.toHaveBeenCalled();
+      expect(JSON.stringify(credentialSnapshot)).not.toContain("revision-pinned-credential");
+    } finally {
+      reload.mockRestore();
       await fixture.dispose();
     }
   }, 20_000);

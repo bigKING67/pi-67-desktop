@@ -33,10 +33,19 @@ export class PiAuthCredentialStore implements CredentialStore {
     this.readWaitMs = options.readWaitMs ?? 2_000;
   }
 
+  loadContent(content: string | undefined): string | undefined {
+    try {
+      const next = parseCredentialData(content);
+      this.data = next;
+      return undefined;
+    } catch (error) {
+      return errorMessage(error);
+    }
+  }
+
   async reload(): Promise<string | undefined> {
     try {
-      this.data = parseCredentialData(await readOptionalFile(this.path, this.readWaitMs));
-      return undefined;
+      return this.loadContent(await readOptionalFile(this.path, this.readWaitMs));
     } catch (error) {
       return errorMessage(error);
     }

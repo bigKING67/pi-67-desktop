@@ -31,7 +31,7 @@ export function resolvePiConfigurationServiceOptions(
     fallbackPollMs: boundedWaitMilliseconds(options.fallbackPollMs, 2_000),
     watchDebounceMs: boundedWaitMilliseconds(options.watchDebounceMs, 200),
     runtimeReloadWaitMs: boundedWaitMilliseconds(options.runtimeReloadWaitMs, 1_000),
-    fileAccessWaitMs: boundedWaitMilliseconds(options.fileAccessWaitMs, 1_500),
+    fileAccessWaitMs: boundedWaitMilliseconds(options.fileAccessWaitMs, 4_000),
     validationRuntimeWaitMs: boundedWaitMilliseconds(options.validationRuntimeWaitMs, 4_000),
     settingsReloadWaitMs: boundedWaitMilliseconds(options.settingsReloadWaitMs, 2_000)
   };

@@ -21,7 +21,10 @@ import {
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
-import { catalogStateFromText } from "./windows-real-user-catalog-state.mjs";
+import {
+  shouldCreateInitialRealUserSession,
+  waitForCatalogState
+} from "./windows-real-user-catalog-state.mjs";
 export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
 import {
@@ -35,8 +38,12 @@ export {
   parseInitializationObservations,
   REAL_USER_MODEL_RUNTIME_TIMEOUT_MS
 } from "./windows-real-user-initialization.mjs";
+export {
+  REAL_USER_CATALOG_TIMEOUT_MS,
+  shouldCreateInitialRealUserSession,
+  waitForCatalogState
+} from "./windows-real-user-catalog-state.mjs";
 
-export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
 export const REAL_USER_MODEL_HYDRATION_TIMEOUT_MS = 30_000;
@@ -230,47 +237,6 @@ async function runRealUserLaunch({
   } finally {
     if (application) await application.close();
   }
-}
-
-export async function waitForCatalogState(
-  window,
-  expectedSessionIdentity,
-  timeoutMs = REAL_USER_CATALOG_TIMEOUT_MS
-) {
-  const startedAt = performance.now();
-  const workspaceGroup = window.getByTestId("workspace-group").first();
-  await workspaceGroup.waitFor({ state: "visible", timeout: timeoutMs });
-  const observation = await waitForCondition(async () => {
-    const current = await workspaceGroup.evaluate((element, expectedIdentity) => {
-      const text = element.textContent ?? "";
-      const sessionIdentities = [...element.querySelectorAll('[data-testid="conversation-row"]')]
-        .map((row) => row.getAttribute("data-conversation-id"))
-        .filter((identity) => identity?.startsWith("session:"));
-      return {
-        hasExpectedSession: expectedIdentity ? sessionIdentities.includes(expectedIdentity) : true,
-        itemCount: sessionIdentities.length,
-        text
-      };
-    }, expectedSessionIdentity);
-    if (current.text.includes("Session 目录暂不可用")) {
-      throw new Error("Windows real-user Session Catalog became unavailable.");
-    }
-    if (current.text.includes("Agent request acknowledgement timed out")) {
-      throw new Error("Windows real-user Session Catalog exposed an acknowledgement timeout.");
-    }
-    if (!current.hasExpectedSession || current.text.includes("正在加载 Session")) return undefined;
-    const explicitState = catalogStateFromText(current.text, current.itemCount);
-    return explicitState ? { itemCount: current.itemCount, state: explicitState } : undefined;
-  }, timeoutMs, "Windows real-user Session Catalog did not return an explicit state");
-  const durationMs = performance.now() - startedAt;
-  if (durationMs > timeoutMs) throw new Error(`Windows real-user Session Catalog exceeded ${timeoutMs}ms.`);
-  return { ...observation, durationMs: round(durationMs) };
-}
-
-export function shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex }) {
-  return launchIndex === 0
-    && expectedSessionIdentity === undefined
-    && catalog.itemCount === 0;
 }
 
 export async function activateCatalogSession(

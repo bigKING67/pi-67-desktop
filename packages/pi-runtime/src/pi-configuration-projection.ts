@@ -59,7 +59,7 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
   } catch (error) {
     globalDiagnostics.push({ file: "models", message: configurationErrorMessage(error) });
   }
-  const authError = await options.credentials.reload();
+  const authError = options.credentials.loadContent(global.byKind.auth.content);
   if (authError) globalDiagnostics.push({ file: "auth", message: authError });
   try {
     globalSettings = parseSettingsDocument(global.byKind["global-settings"].content);

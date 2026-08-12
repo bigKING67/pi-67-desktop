@@ -14,11 +14,17 @@ vi.mock("node:fs/promises", async (importOriginal) => ({
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import { readWorkspaceConfigurationBundle } from "./pi-configuration-file-state.js";
+import { resolvePiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 
 describe("Pi configuration read budgets", () => {
   beforeEach(() => {
     fileSystem.readFile.mockReset();
     fileSystem.stat.mockReset();
+  });
+
+  it("keeps the default configuration file access budget bounded at four seconds", () => {
+    expect(resolvePiConfigurationServiceOptions({}).fileAccessWaitMs).toBe(4_000);
+    expect(resolvePiConfigurationServiceOptions({ fileAccessWaitMs: 5 }).fileAccessWaitMs).toBe(5);
   });
 
   it("fails a stalled configuration bundle read with a structured bounded error", async () => {
