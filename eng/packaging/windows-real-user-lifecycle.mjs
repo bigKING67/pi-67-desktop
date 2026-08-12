@@ -148,6 +148,7 @@ async function runRealUserLaunch({
     let create;
     let sessionIdentity = expectedSessionIdentity;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
+      await waitForRealUserRuntimeReady(window);
       await assertHealthyWorkbench(window);
       const created = await createControlledConversation(window, agentDir);
       create = created.report;
@@ -338,7 +339,7 @@ export async function waitForRealUserRuntimeReady(window, expectedSessionIdentit
       )?.getAttribute("data-conversation-id");
       return {
         runtimePhase: document.querySelector("[data-runtime-phase]")?.getAttribute("data-runtime-phase") ?? null,
-        selectionMatches: selectedIdentity === expectedIdentity
+        selectionMatches: expectedIdentity === undefined || selectedIdentity === expectedIdentity
       };
     }, expectedSessionIdentity);
     if (observation.runtimePhase === "failed") {

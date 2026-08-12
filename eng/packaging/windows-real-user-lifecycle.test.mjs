@@ -64,6 +64,13 @@ describe("Windows installed real-user lifecycle", () => {
     ]) {
       expect(createFlow).toContain(`${field}: createdSession.diagnostic.${field}`);
     }
+    const launchFlow = source.slice(source.indexOf("async function runRealUserLaunch"), source.indexOf(
+      "export async function waitForCatalogState"
+    ));
+    const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(window);");
+    const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir)");
+    expect(creationAuthorityReady).toBeGreaterThan(-1);
+    expect(controlledCreate).toBeGreaterThan(creationAuthorityReady);
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {
@@ -330,6 +337,25 @@ describe("Windows installed real-user lifecycle", () => {
     };
 
     await expect(waitForRealUserRuntimeReady(window, sessionIdentity)).resolves.toBeGreaterThanOrEqual(0);
+    expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it("admits initial Session creation only after the Workspace runtime is ready", async () => {
+    const runtimeState = [
+      { runtimePhase: "starting", selectionMatches: true },
+      { runtimePhase: "ready", selectionMatches: true }
+    ];
+    const readyOrFailed = { waitFor: async () => undefined };
+    const ready = { or: () => readyOrFailed };
+    const failed = { isVisible: async () => false };
+    const evaluate = vi.fn(async () => runtimeState.shift());
+    const window = {
+      evaluate,
+      getByLabel: () => ({ waitFor: async () => undefined }),
+      locator: (selector) => selector.includes('="ready"') ? ready : failed
+    };
+
+    await expect(waitForRealUserRuntimeReady(window, undefined)).resolves.toBeGreaterThanOrEqual(0);
     expect(evaluate).toHaveBeenCalledTimes(2);
   });
 
