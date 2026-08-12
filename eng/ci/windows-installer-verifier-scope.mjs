@@ -3,6 +3,8 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "controlled-shutdown-fixture.test.mjs",
   "packaged-electron-fixture.mjs",
   "packaged-electron-smoke-scenarios.mjs",
+  "verify-windows-packaged-input-layout.mjs",
+  "verify-windows-packaged-input-layout.test.mjs",
   "verify-windows-installer-lifecycle.mjs",
   "verify-windows-installer-lifecycle.test.mjs",
   "windows-artifact-identity.mjs",
@@ -13,9 +15,21 @@ const ALLOWED_PACKAGING_BASENAMES = new Set([
   "windows-real-user-lifecycle.test.mjs"
 ]);
 
+const ALLOWED_CI_BASENAMES = new Set([
+  "verify-windows-installer-debug-scope.mjs",
+  "verify-windows-installer-debug-scope.test.mjs",
+  "windows-installer-source-run.mjs",
+  "windows-installer-verifier-scope.mjs"
+]);
+
 export function isWindowsInstallerVerifierProductPath(path) {
-  if (!path.startsWith("eng/packaging/")) return false;
-  return ALLOWED_PACKAGING_BASENAMES.has(path.slice("eng/packaging/".length));
+  if (path.startsWith("eng/packaging/")) {
+    return ALLOWED_PACKAGING_BASENAMES.has(path.slice("eng/packaging/".length));
+  }
+  if (path.startsWith("eng/ci/")) {
+    return ALLOWED_CI_BASENAMES.has(path.slice("eng/ci/".length));
+  }
+  return false;
 }
 
 function isAllowedWindowsInstallerVerifierChange(path) {

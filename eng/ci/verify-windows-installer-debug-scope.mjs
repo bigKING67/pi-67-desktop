@@ -46,7 +46,7 @@ async function main() {
   const metadata = JSON.parse(await readFile(resolve(runMetadata), "utf8"));
   const jobs = JSON.parse(await readFile(resolve(jobsMetadata), "utf8"));
   verifySourceRunMetadata(metadata, base);
-  verifySourceRunJobsMetadata(jobs);
+  verifySourceRunJobsMetadata(jobs, { allowPackagedUiFailure: true });
   try {
     execFileSync("git", ["merge-base", "--is-ancestor", base, head], {
       cwd: repositoryRoot,

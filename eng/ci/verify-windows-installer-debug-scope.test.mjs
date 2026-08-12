@@ -7,7 +7,8 @@ import {
 } from "./verify-windows-installer-debug-scope.mjs";
 import {
   WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME,
-  WINDOWS_NATIVE_JOB_NAME
+  WINDOWS_NATIVE_JOB_NAME,
+  WINDOWS_PACKAGED_UI_STEP_NAME
 } from "./windows-installer-source-run.mjs";
 
 describe("Windows installer debug artifact reuse", () => {
@@ -17,7 +18,13 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-installed-application-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
+      "eng/packaging/verify-windows-packaged-input-layout.mjs",
+      "eng/packaging/verify-windows-packaged-input-layout.test.mjs",
       "eng/packaging/controlled-shutdown-fixture.ts",
+      "eng/ci/windows-installer-source-run.mjs",
+      "eng/ci/verify-windows-installer-debug-scope.mjs",
+      "eng/ci/verify-windows-installer-debug-scope.test.mjs",
+      "eng/ci/windows-installer-verifier-scope.mjs",
       "docs/testing/windows-installer.md"
     ])).not.toThrow();
   });
@@ -57,21 +64,25 @@ describe("Windows installer debug artifact reuse", () => {
         status: "completed",
         conclusion: "failure",
         steps: [
-          { number: 12, name: "Verify Windows packaged synthetic scale and IME contracts", conclusion: "success" },
+          { number: 12, name: WINDOWS_PACKAGED_UI_STEP_NAME, conclusion: "success" },
           { number: 13, name: WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME, conclusion: "failure" }
         ]
       }]
     };
     expect(() => verifySourceRunJobsMetadata(metadata)).not.toThrow();
-    expect(() => verifySourceRunJobsMetadata({
+    const packagedUiFailure = {
       jobs: [{
         ...metadata.jobs[0],
         steps: [
-          { number: 12, name: "Verify Windows packaged synthetic scale and IME contracts", conclusion: "failure" },
+          { number: 12, name: WINDOWS_PACKAGED_UI_STEP_NAME, conclusion: "failure" },
           { number: 13, name: WINDOWS_INSTALLER_LIFECYCLE_STEP_NAME, conclusion: "skipped" }
         ]
       }]
-    })).toThrow(/did not fail at the installer lifecycle step/u);
+    };
+    expect(() => verifySourceRunJobsMetadata(packagedUiFailure))
+      .toThrow(/did not fail at the installer lifecycle step/u);
+    expect(() => verifySourceRunJobsMetadata(packagedUiFailure, { allowPackagedUiFailure: true }))
+      .not.toThrow();
   });
 
   it("builds workspace dependencies before running the direct Node verifier", async () => {

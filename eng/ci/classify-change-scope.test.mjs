@@ -45,7 +45,11 @@ describe("CI change scope classifier", () => {
       "eng/packaging/windows-installed-application-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
-      "eng/packaging/controlled-shutdown-fixture.test.mjs"
+      "eng/packaging/controlled-shutdown-fixture.test.mjs",
+      "eng/packaging/verify-windows-packaged-input-layout.mjs",
+      "eng/ci/windows-installer-source-run.mjs",
+      "eng/ci/verify-windows-installer-debug-scope.mjs",
+      "eng/ci/windows-installer-verifier-scope.mjs"
     ])).toMatchObject({
       reason: "windows-installer-verifier-only",
       runQuality: false,

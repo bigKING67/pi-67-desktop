@@ -1,15 +1,64 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   assertLayoutObservation,
+  inspectWindowsSyntheticRuntimeSurface,
   locateTaskInspector,
   prepareResponsiveLayoutControls,
   viewportWidthMatches,
+  waitForWindowsSyntheticRuntimeReady,
+  WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS,
   WINDOWS_SYNTHETIC_SCALE_FACTORS
 } from "./verify-windows-packaged-input-layout.mjs";
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
+    expect(WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("waits for either a ready or explicit failed runtime phase", async () => {
+    const waitFor = vi.fn();
+    const isVisible = vi.fn(async () => false);
+    const failed = { isVisible };
+    const ready = { or: vi.fn(() => ({ waitFor })) };
+    const window = {
+      locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
+    };
+
+    await waitForWindowsSyntheticRuntimeReady(window, () => "", 1.5, 12_345);
+
+    expect(ready.or).toHaveBeenCalledWith(failed);
+    expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 12_345 });
+    expect(isVisible).toHaveBeenCalledOnce();
+  });
+
+  it("reports bounded runtime and initialization diagnostics on failure", async () => {
+    const waitFor = vi.fn(async () => {
+      throw new Error("timeout");
+    });
+    const failed = { isVisible: vi.fn(async () => false) };
+    const ready = { or: vi.fn(() => ({ waitFor })) };
+    const surface = {
+      acknowledgementTimedOut: false,
+      conversationRowCount: 0,
+      runtimePhase: "starting",
+      title: "Pi-67 Desktop",
+      url: "app://pi67/index.html",
+      workspaceOpenFailed: false,
+      workspacePickerVisible: false
+    };
+    const window = {
+      evaluate: vi.fn(async () => surface),
+      locator: vi.fn((selector) => selector.includes("ready") ? ready : failed)
+    };
+    const output = [
+      '[agent-host:init] {"stage":"create-session","outcome":"started","durationMs":0}',
+      '[agent-host:init] {"stage":"load-model-runtime","outcome":"completed","durationMs":8}'
+    ].join("\n");
+
+    await expect(waitForWindowsSyntheticRuntimeReady(window, () => output, 1.25, 30_000))
+      .rejects.toThrow(/"runtimePhase":"starting"/u);
+    await expect(inspectWindowsSyntheticRuntimeSurface(window)).resolves.toEqual(surface);
   });
 
   it("locates only the task inspector complementary region", () => {

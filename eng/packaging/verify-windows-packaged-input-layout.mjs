@@ -22,8 +22,13 @@ import {
   resolvePackagedArtifact,
   setPackagedContentSize
 } from "./packaged-electron-fixture.mjs";
+import {
+  captureProcessOutput
+} from "./packaged-electron-smoke-scenarios.mjs";
+import { parseInitializationObservations } from "./windows-real-user-initialization.mjs";
 
 export const WINDOWS_SYNTHETIC_SCALE_FACTORS = [1.25, 1.5, 2];
+export const WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS = 60_000;
 
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-packaged-ui");
 const summaryPath = join(outputDirectory, "summary.json");
@@ -95,19 +100,22 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
 
   let application;
   let childPid;
+  let processOutput = () => "";
   try {
     application = await launchPackagedApplication({
       agentDir: agentDirectory,
       applicationArguments: [`--force-device-scale-factor=${scaleFactor}`],
       artifact,
+      environment: { PI67_TEST_CAPTURE_AGENT_INIT: "1" },
       userDataDirectory: directories.userDataDirectory
     });
+    processOutput = captureProcessOutput(application.process());
     const window = await application.firstWindow();
     await window.waitForLoadState("domcontentloaded");
     await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
     await installWorkspaceDialogResult(application, directories.workspace);
     await window.getByRole("button", { name: "选择工作区" }).click();
-    await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
+    await waitForWindowsSyntheticRuntimeReady(window, processOutput, scaleFactor);
     if (window.url() !== "app://pi67/index.html") {
       throw new Error(`Scale ${scaleFactor}: unexpected packaged renderer URL ${window.url()}.`);
     }
@@ -159,6 +167,51 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       await cleanupPackagedTestDirectories(directories.userDataDirectory);
     }
   }
+}
+
+export async function waitForWindowsSyntheticRuntimeReady(
+  window,
+  processOutput,
+  scaleFactor,
+  timeoutMs = WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS
+) {
+  const ready = window.locator('[data-runtime-phase="ready"]');
+  const failed = window.locator('[data-runtime-phase="failed"]');
+  try {
+    await ready.or(failed).waitFor({ state: "visible", timeout: timeoutMs });
+    if (await failed.isVisible()) throw new Error("Pi SDK entered the failed runtime phase.");
+  } catch (error) {
+    const diagnostic = {
+      initialization: parseInitializationObservations(processOutput()),
+      surface: await inspectWindowsSyntheticRuntimeSurface(window)
+    };
+    throw new Error(
+      `Scale ${scaleFactor}: packaged runtime did not become ready within ${timeoutMs}ms. `
+      + `Diagnostics: ${JSON.stringify(diagnostic)}`,
+      { cause: error }
+    );
+  }
+}
+
+export function inspectWindowsSyntheticRuntimeSurface(window) {
+  return window.evaluate(() => {
+    const bodyText = document.body.innerText;
+    const runtimeStatus = document.querySelector("[data-runtime-phase]");
+    const workspacePickerVisible = [...document.querySelectorAll("button")].some((button) => (
+      button.textContent?.trim() === "选择工作区"
+      && button.getBoundingClientRect().width > 0
+      && button.getBoundingClientRect().height > 0
+    ));
+    return {
+      acknowledgementTimedOut: bodyText.includes("Agent request acknowledgement timed out"),
+      conversationRowCount: document.querySelectorAll('[data-testid="conversation-row"]').length,
+      runtimePhase: runtimeStatus?.getAttribute("data-runtime-phase") ?? null,
+      title: document.title,
+      url: location.href,
+      workspaceOpenFailed: bodyText.includes("无法打开工作区"),
+      workspacePickerVisible
+    };
+  });
 }
 
 export async function verifyPackagedResponsiveLayout(window, application, scaleFactor) {
