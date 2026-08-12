@@ -177,7 +177,7 @@ async function revealResult(
 ): Promise<void> {
   if (!requestIsCurrent(revision, hostEpoch, task, currentRevision)) return;
   if (document.querySelector(`[data-message-id="${CSS.escape(id)}"]`)) {
-    requestTranscriptMessageJump({ id });
+    requestTranscriptMessageJump({ focus: "preserve", id });
     return;
   }
   try {
@@ -191,7 +191,7 @@ async function revealResult(
       !requestIsCurrent(revision, hostEpoch, task, currentRevision)
       || window.sessionId !== task.sessionId
     ) return;
-    requestTranscriptMessageJump({ id, window });
+    requestTranscriptMessageJump({ focus: "preserve", id, window });
   } catch {
     // The active search request will surface stale projections on the next navigation.
   }

@@ -40,6 +40,7 @@ test("finds current Pi JSONL text, locates an older window, and restores focus",
   ))).toEqual(["message.search", "message.locate"]);
   await expect(find).toContainText("1 / 1");
   await expect(page.locator('[data-message-id="entry-4"]')).toContainText("Historical release marker");
+  await expect(input).toBeFocused();
   const [search, locate] = (await recordedCommandDetails(page)).filter((command) => (
     command.type === "message.search" || command.type === "message.locate"
   ));
@@ -164,6 +165,7 @@ test("searches Workspace conversation text and opens the exact Session result", 
   await expect.poll(async () => (await recordedCommands(page)).filter((type) => (
     type === "session.open" || type === "message.locate"
   ))).toEqual(["session.open", "message.locate"]);
+  await expect(page.locator('[data-message-id="release-message-1"]')).toBeFocused();
   const commands = await recordedCommandDetails(page);
   expect(commands.find((command) => command.type === "session.open")?.payload).toEqual({
     path: sessionPath,

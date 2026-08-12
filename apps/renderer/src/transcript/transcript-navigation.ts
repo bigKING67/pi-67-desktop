@@ -2,6 +2,7 @@ import type { LocatedMessageWindow } from "@pi67/domain";
 
 export interface TranscriptMessageTarget {
   id: string;
+  focus?: "message" | "preserve";
   window?: LocatedMessageWindow;
 }
 

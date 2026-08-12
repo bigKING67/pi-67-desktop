@@ -58,6 +58,7 @@ export function Transcript() {
   const [messageEdit, setMessageEdit] = useState<InlineMessageEditState>();
   const [historicalWindow, setHistoricalWindow] = useState<LocatedMessageWindow>();
   const [highlightedMessageId, setHighlightedMessageId] = useState<string>();
+  const [focusHighlightedMessage, setFocusHighlightedMessage] = useState(true);
   const [atBottom, setAtBottom] = useState(true);
   const [unseenRowCount, setUnseenRowCount] = useState(0);
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
@@ -152,6 +153,7 @@ export function Transcript() {
 
   useEffect(() => subscribeTranscriptMessageJump((target) => {
     if (target.window) setHistoricalWindow(target.window);
+    setFocusHighlightedMessage(target.focus !== "preserve");
     setHighlightedMessageId(target.id);
   }), []);
 
@@ -212,6 +214,7 @@ export function Transcript() {
   }, [pendingUserTurn]);
 
   useTranscriptMessageFocus({
+    focusMessage: focusHighlightedMessage,
     highlightedMessageId,
     regionRef: transcriptRegionRef,
     rows: transcriptRows,

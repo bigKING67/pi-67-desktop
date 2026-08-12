@@ -3,6 +3,7 @@ import type { VirtuosoHandle } from "react-virtuoso";
 import type { TranscriptRow } from "./transcript-rows.js";
 
 interface TranscriptMessageFocusOptions {
+  focusMessage: boolean;
   highlightedMessageId: string | undefined;
   regionRef: RefObject<HTMLDivElement | null>;
   rows: TranscriptRow[];
@@ -11,6 +12,7 @@ interface TranscriptMessageFocusOptions {
 }
 
 export function useTranscriptMessageFocus({
+  focusMessage,
   highlightedMessageId,
   regionRef,
   rows,
@@ -30,8 +32,8 @@ export function useTranscriptMessageFocus({
         `[data-message-id="${CSS.escape(highlightedMessageId)}"]`
       );
       if (!target || target.getClientRects().length === 0) return false;
-      target.focus({ preventScroll: true });
-      return document.activeElement === target;
+      if (focusMessage) target.focus({ preventScroll: true });
+      return !focusMessage || document.activeElement === target;
     };
     const observer = new MutationObserver(() => {
       if (focusTarget()) observer.disconnect();
@@ -51,7 +53,7 @@ export function useTranscriptMessageFocus({
       observer.disconnect();
       window.clearTimeout(timeout);
     };
-  }, [highlightedMessageId, regionRef, rows, setHighlightedMessageId, virtuosoRef]);
+  }, [focusMessage, highlightedMessageId, regionRef, rows, setHighlightedMessageId, virtuosoRef]);
 }
 
 function reducedMotion(): boolean {
