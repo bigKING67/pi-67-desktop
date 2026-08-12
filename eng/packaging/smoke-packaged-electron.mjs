@@ -454,7 +454,7 @@ try {
   }
   await window.locator('[data-runtime-phase="ready"]').waitFor({ state: "visible", timeout: 30_000 });
 
-  const closeDurationMs = await runControlledShutdownScenario({
+  const shutdown = await runControlledShutdownScenario({
     application,
     childPidPath,
     lifecyclePath,
@@ -463,7 +463,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt shutdown (${closeDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

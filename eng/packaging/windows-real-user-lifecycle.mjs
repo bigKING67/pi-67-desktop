@@ -9,6 +9,10 @@ import {
   waitForControlledPromptRunning
 } from "./controlled-provider-interaction.mjs";
 import {
+  measureElectronApplicationShutdown,
+  productShutdownWithinBudget
+} from "./electron-shutdown-measurement.mjs";
+import {
   installWorkspaceDialogResult,
   launchPackagedApplication
 } from "./packaged-electron-fixture.mjs";
@@ -45,6 +49,7 @@ export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
 const REAL_USER_RUNTIME_TIMEOUT_MS = 15_000;
+const REAL_USER_SHUTDOWN_BUDGET_MS = 5_000;
 export const REAL_USER_RESTART_COUNT = 3;
 
 const POLL_INTERVAL_MS = 50;
@@ -172,12 +177,18 @@ async function runRealUserLaunch({
       throw new Error("Windows real-user lifecycle could not observe the Agent Host utility process.");
     }
 
-    const closeStartedAt = performance.now();
-    await application.close();
+    const shutdownMeasurement = await measureElectronApplicationShutdown({
+      application,
+      budgetMs: REAL_USER_SHUTDOWN_BUDGET_MS,
+      mainPid,
+      utilityPids
+    });
     application = undefined;
-    const closeDurationMs = performance.now() - closeStartedAt;
-    if (closeDurationMs > 5_000) {
-      throw new Error(`Windows real-user shutdown exceeded 5000ms: ${closeDurationMs.toFixed(1)}ms.`);
+    if (!productShutdownWithinBudget(shutdownMeasurement, REAL_USER_SHUTDOWN_BUDGET_MS)) {
+      throw new Error(
+        `Windows real-user product process shutdown exceeded ${REAL_USER_SHUTDOWN_BUDGET_MS}ms. `
+        + `Shutdown diagnostics: ${JSON.stringify(shutdownMeasurement)}`
+      );
     }
     if (mainPid !== undefined) await waitForProcessExit(mainPid);
     for (const pid of utilityPids) await waitForProcessExit(pid);
@@ -188,7 +199,8 @@ async function runRealUserLaunch({
       ...(create ? { create } : {}),
       report: {
         catalog,
-        closeDurationMs: round(closeDurationMs),
+        closeDurationMs: round(shutdownMeasurement.productExitDurationMs),
+        driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
         fileProjection,
         initialization,
         launchToReadyMs: round(launchToReadyMs),
@@ -199,6 +211,7 @@ async function runRealUserLaunch({
           mainOwnedAgentDirectoryVerified: environmentDriftInjected
         },
         providerConfiguration,
+        shutdownProcesses: shutdownMeasurement.processes,
         modelRuntimeInitialization,
         runtimeReadyMs: round(runtimeReadyMs),
         startupSurface

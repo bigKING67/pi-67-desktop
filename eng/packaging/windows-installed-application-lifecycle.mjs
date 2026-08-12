@@ -8,6 +8,10 @@ import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
 import {
+  measureElectronApplicationShutdown,
+  productShutdownWithinBudget
+} from "./electron-shutdown-measurement.mjs";
+import {
   installWorkspaceDialogResult,
   launchPackagedApplication
 } from "./packaged-electron-fixture.mjs";
@@ -18,8 +22,6 @@ import {
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 
 const RUNTIME_READINESS_PROPAGATION_MARGIN_MS = 15_000;
-const SHUTDOWN_PROCESS_POLL_INTERVAL_MS = 50;
-
 export const INSTALLED_SHUTDOWN_BUDGET_MS = 5_000;
 
 export const INSTALLED_RUNTIME_READINESS_TIMEOUT_MS =
@@ -111,8 +113,9 @@ export async function launchInstalledApplication({
     if (utilityPids.length === 0) throw new Error("Installed Agent Host utility process was not observable.");
 
     const lifecycleBeforeClose = await inspectInstalledShutdownLifecycle(lifecyclePath);
-    const shutdownMeasurement = await measureInstalledApplicationShutdown({
+    const shutdownMeasurement = await measureElectronApplicationShutdown({
       application,
+      budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
       childPid,
       mainPid,
       utilityPids
@@ -122,17 +125,17 @@ export async function launchInstalledApplication({
     const shutdown = {
       activeControlledOperation,
       budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
-      closeDurationMs: round(shutdownMeasurement.closeDurationMs),
+      closeDurationMs: round(shutdownMeasurement.productExitDurationMs),
+      driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       lifecycle: {
         afterClose: lifecycleAfterClose,
         beforeClose: lifecycleBeforeClose
       },
       processes: shutdownMeasurement.processes
     };
-    if (shutdownMeasurement.closeDurationMs > INSTALLED_SHUTDOWN_BUDGET_MS) {
+    if (!productShutdownWithinBudget(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS)) {
       throw new Error(
-        `Installed application shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms: `
-        + `${shutdownMeasurement.closeDurationMs.toFixed(1)}ms. `
+        `Installed product process shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms. `
         + `Shutdown diagnostics: ${JSON.stringify(shutdown)}`
       );
     }
@@ -141,7 +144,8 @@ export async function launchInstalledApplication({
     if (childPid !== undefined) await waitForProcessExit(childPid);
 
     return {
-      closeDurationMs: round(shutdownMeasurement.closeDurationMs),
+      closeDurationMs: round(shutdownMeasurement.productExitDurationMs),
+      driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       legacyUserInterface,
       launchToReadyMs: round(performance.now() - startedAt),
       runtime: {
@@ -158,51 +162,6 @@ export async function launchInstalledApplication({
     if (application) await application.close();
     if (childPid !== undefined && isProcessAlive(childPid)) process.kill(childPid);
   }
-}
-
-export async function measureInstalledApplicationShutdown({
-  application,
-  childPid,
-  mainPid,
-  now = () => performance.now(),
-  pollIntervalMs = SHUTDOWN_PROCESS_POLL_INTERVAL_MS,
-  processAlive = isProcessAlive,
-  utilityPids
-}) {
-  const startedAt = now();
-  const main = trackedProcess(mainPid, processAlive);
-  const utilities = utilityPids
-    .map((pid) => trackedProcess(pid, processAlive))
-    .filter(Boolean);
-  const controlledChild = trackedProcess(childPid, processAlive);
-  const tracked = [main, ...utilities, controlledChild].filter(Boolean);
-  const sample = () => {
-    const elapsedMs = round(now() - startedAt);
-    for (const state of tracked) {
-      state.aliveAfterClose = processAlive(state.pid);
-      if (!state.aliveAfterClose && state.exitObservedMs === null) {
-        state.exitObservedMs = elapsedMs;
-      }
-    }
-  };
-  const timer = setInterval(sample, pollIntervalMs);
-  timer.unref?.();
-  try {
-    await application.close();
-  } finally {
-    clearInterval(timer);
-    sample();
-  }
-
-  const closeDurationMs = now() - startedAt;
-  return {
-    closeDurationMs,
-    processes: {
-      controlledChild: summarizeTrackedProcess(controlledChild),
-      main: summarizeTrackedProcess(main, true),
-      utilities: summarizeUtilityProcesses(utilities)
-    }
-  };
 }
 
 export async function inspectInstalledShutdownLifecycle(path) {
@@ -346,52 +305,8 @@ function inspectInstalledRuntimeState(window) {
   });
 }
 
-function trackedProcess(pid, processAlive) {
-  if (!Number.isSafeInteger(pid) || pid <= 0) return undefined;
-  const alive = processAlive(pid);
-  return {
-    aliveAfterClose: alive,
-    aliveBeforeClose: alive,
-    exitObservedMs: alive ? null : 0,
-    pid
-  };
-}
-
-function summarizeTrackedProcess(state, includeProcessId = false) {
-  if (!state) {
-    return {
-      aliveAfterClose: false,
-      aliveBeforeClose: false,
-      exitObservedMs: null,
-      present: false,
-      ...(includeProcessId ? { processId: null } : {})
-    };
-  }
-  return {
-    aliveAfterClose: state.aliveAfterClose,
-    aliveBeforeClose: state.aliveBeforeClose,
-    exitObservedMs: state.exitObservedMs,
-    present: true,
-    ...(includeProcessId ? { processId: state.pid } : {})
-  };
-}
-
-function summarizeUtilityProcesses(states) {
-  const observedExitTimes = states
-    .map((state) => state.exitObservedMs)
-    .filter((value) => value !== null);
-  return {
-    aliveAfterCloseCount: states.filter((state) => state.aliveAfterClose).length,
-    aliveBeforeCloseCount: states.filter((state) => state.aliveBeforeClose).length,
-    count: states.length,
-    firstExitObservedMs: observedExitTimes.length > 0 ? Math.min(...observedExitTimes) : null,
-    lastExitObservedMs: observedExitTimes.length > 0 ? Math.max(...observedExitTimes) : null,
-    observedExitCount: observedExitTimes.length
-  };
-}
-
 function round(value) {
-  return Math.round(value * 10) / 10;
+  return value === null || value === undefined ? null : Math.round(value * 10) / 10;
 }
 
 function errorMessage(error) {

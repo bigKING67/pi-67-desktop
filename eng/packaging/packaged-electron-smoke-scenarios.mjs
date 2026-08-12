@@ -9,6 +9,12 @@ import {
   waitForProcessExit
 } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import {
+  measureElectronApplicationShutdown,
+  productShutdownWithinBudget
+} from "./electron-shutdown-measurement.mjs";
+
+const PACKAGED_SHUTDOWN_BUDGET_MS = 5_000;
 
 export async function verifyInitialRuntimeSettings(window, packagedProcessOutput) {
   const settings = await openSettingsSection(window, /^运行服务/u);
@@ -140,16 +146,30 @@ export async function runControlledShutdownScenario({
     .map((metric) => metric.pid));
   if (utilityPids.length === 0) throw new Error("Packaged Agent Host utility process was not observable.");
 
-  const closeStartedAt = Date.now();
-  await application.close();
-  const closeDurationMs = Date.now() - closeStartedAt;
-  if (closeDurationMs > 5_000) {
-    throw new Error(`Packaged application shutdown exceeded 5000ms: ${closeDurationMs}ms.`);
+  const shutdownMeasurement = await measureElectronApplicationShutdown({
+    application,
+    budgetMs: PACKAGED_SHUTDOWN_BUDGET_MS,
+    childPid: shutdownState.childPid,
+    mainPid: application.process().pid,
+    utilityPids
+  });
+  const shutdown = {
+    budgetMs: PACKAGED_SHUTDOWN_BUDGET_MS,
+    driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
+    lifecycle: await inspectShutdownLifecycle(lifecyclePath),
+    productExitDurationMs: round(shutdownMeasurement.productExitDurationMs),
+    processes: shutdownMeasurement.processes
+  };
+  if (!productShutdownWithinBudget(shutdownMeasurement, PACKAGED_SHUTDOWN_BUDGET_MS)) {
+    throw new Error(
+      `Packaged product process shutdown exceeded ${PACKAGED_SHUTDOWN_BUDGET_MS}ms. `
+      + `Shutdown diagnostics: ${JSON.stringify(shutdown)}`
+    );
   }
   await waitForProcessExit(shutdownState.childPid);
   for (const pid of utilityPids) await waitForProcessExit(pid);
   await assertSingleShutdownQuitLifecycle(lifecyclePath, "Packaged Pi Runtime");
-  return closeDurationMs;
+  return shutdown;
 }
 
 export async function waitForPersistedRuntimeRecovery(userDataDirectory, timeoutMs = 10_000) {
@@ -218,4 +238,19 @@ export function inspectRendererSurface(window) {
     title: document.title,
     url: location.href
   }));
+}
+
+function round(value) {
+  return value === null || value === undefined ? null : Math.round(value * 10) / 10;
+}
+
+async function inspectShutdownLifecycle(path) {
+  const entries = (await readFile(path, "utf8").catch(() => ""))
+    .split(/\r?\n/u)
+    .filter(Boolean);
+  return {
+    entryCount: entries.length,
+    otherEntryCount: entries.filter((entry) => entry !== "shutdown:quit").length,
+    quitEntryCount: entries.filter((entry) => entry === "shutdown:quit").length
+  };
 }
