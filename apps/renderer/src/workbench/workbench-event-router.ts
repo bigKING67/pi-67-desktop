@@ -102,6 +102,11 @@ export function applyWorkbenchAgentEvent(
       const snapshot = event.payload.snapshot;
       const sessionName = snapshot.sessionName?.trim();
       const sessionAuthority = eventSessionAuthority(envelope);
+      // Navigation is locked while creation is pending, so a background selection cannot supersede this intent.
+      const reselectPendingCreation = event.type === "session.bootstrap"
+        && event.payload.reason === "session-create"
+        && task.conversation.kind === "provisional"
+        && (task.creationStatus === "pending" || task.creationStatus === "confirming");
       workbench.updateTask(task.id, {
         ...(snapshot.sessionPath === undefined || snapshot.sessionFileIdentity === undefined
           ? {}
@@ -131,6 +136,7 @@ export function applyWorkbenchAgentEvent(
         creationId: undefined,
         creationStatus: undefined,
       });
+      if (reselectPendingCreation) workbench.selectTask(task.id);
       break;
     }
     case "task.toolMode.changed":
