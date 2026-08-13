@@ -8,6 +8,7 @@ export interface ApplicationShutdownController {
 }
 
 interface ApplicationShutdownOptions {
+  checkpointRenderer?: () => Promise<boolean>;
   stopAgentHost: () => Promise<unknown>;
   afterAgentHostStop?: () => Promise<unknown>;
   markCleanExit?: () => Promise<unknown>;
@@ -29,8 +30,14 @@ export function createApplicationShutdownController(
       if (shutdownPromise) return;
 
       phase = "stopping";
+      let rendererCheckpointed = options.checkpointRenderer === undefined;
       let agentHostStopped = false;
       shutdownPromise = Promise.resolve()
+        .then(async () => {
+          if (!options.checkpointRenderer) return;
+          rendererCheckpointed = await options.checkpointRenderer();
+        })
+        .catch((error: unknown) => options.onError?.(error))
         .then(() => options.stopAgentHost())
         .then(() => { agentHostStopped = true; })
         .catch((error: unknown) => options.onError?.(error))
@@ -39,7 +46,7 @@ export function createApplicationShutdownController(
           await options.afterAgentHostStop().catch((error: unknown) => options.onError?.(error));
         })
         .then(async () => {
-          if (!agentHostStopped || !options.markCleanExit) return;
+          if (!rendererCheckpointed || !agentHostStopped || !options.markCleanExit) return;
           await options.markCleanExit().catch((error: unknown) => options.onError?.(error));
         })
         .then(() => {

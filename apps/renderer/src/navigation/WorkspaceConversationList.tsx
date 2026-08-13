@@ -211,6 +211,13 @@ function WorkspaceConversationGroup({
       className={`${styles.workspaceGroup} ${current ? styles.currentGroup : ""}`}
       data-testid="workspace-group"
       data-workspace-id={workspace.id}
+      data-catalog-state={catalog.catalogState ?? "uninitialized"}
+      data-catalog-source={catalog.source ?? "uninitialized"}
+      data-catalog-rebuilding={catalog.rebuilding ? "true" : "false"}
+      data-catalog-revision={catalog.revision ?? "uninitialized"}
+      data-catalog-item-count={catalog.itemCount}
+      data-catalog-visible-count={rows.length}
+      data-catalog-incomplete={catalog.incomplete ? "true" : "false"}
       role="listitem"
     >
       <header className={styles.workspaceGroupHeader}>

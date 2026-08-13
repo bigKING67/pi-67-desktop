@@ -5,6 +5,10 @@ import {
   cancelSessionCatalogRetries,
   queryFirstSessionCatalog
 } from "../navigation/session-catalog-controller.js";
+import {
+  selectWorkspaceSessionCatalog,
+  useSessionCatalogStore
+} from "../navigation/session-catalog-store.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "./workbench-store.js";
 
@@ -60,7 +64,7 @@ async function ensureWorkspaceCatalog(
   const existing = catalogFlights.get(key);
   if (existing) return existing;
   const flight = queryFirstSessionCatalog(workspaceId, { refresh }).then((loaded) => {
-    if (loaded) queriedCatalogs.add(key);
+    if (loaded && catalogIsAuthoritative(workspaceId)) queriedCatalogs.add(key);
   });
   catalogFlights.set(key, flight);
   try {
@@ -68,6 +72,13 @@ async function ensureWorkspaceCatalog(
   } finally {
     if (catalogFlights.get(key) === flight) catalogFlights.delete(key);
   }
+}
+
+function catalogIsAuthoritative(workspaceId: string): boolean {
+  const catalog = selectWorkspaceSessionCatalog(useSessionCatalogStore.getState(), workspaceId);
+  return catalog.catalogState !== undefined
+    && catalog.catalogState !== "unavailable"
+    && !catalog.rebuilding;
 }
 
 function workspaceRegistrationKey(hostEpoch: number, workspace: WorkspaceDescriptor): string {

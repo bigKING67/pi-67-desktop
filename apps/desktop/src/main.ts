@@ -7,6 +7,10 @@ import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
 import { registerApplicationProtocol, registerAppSchemePrivileges } from "./app-protocol.js";
 import { createMainWindow } from "./main-window.js";
+import {
+  registerRendererShutdownCheckpoint,
+  type RendererShutdownCheckpointRegistration
+} from "./renderer-shutdown-checkpoint.js";
 import { registerPowerResumeRecovery } from "./power-resume.js";
 import { resolveDesktopToolchain } from "./desktop-toolchain.js";
 import {
@@ -76,6 +80,7 @@ let composerDraftState: ComposerDraftStateStore | undefined;
 let promptStashImages: PromptStashImageStore | undefined;
 let workspaceFileState: WorkspaceFileStateStore | undefined;
 let systemBridgeRegistration: SystemBridgeRegistration | undefined;
+let rendererShutdownCheckpoint: RendererShutdownCheckpointRegistration | undefined;
 const appInstanceId = randomUUID();
 const agentHostSupervisor = new AgentHostSupervisor({
   agentHostEntry,
@@ -99,6 +104,7 @@ const agentHostSupervisor = new AgentHostSupervisor({
   rendererUrl
 });
 const applicationShutdown = createApplicationShutdownController({
+  checkpointRenderer: () => rendererShutdownCheckpoint?.request() ?? Promise.resolve(false),
   stopAgentHost: () => agentHostSupervisor.stop(),
   afterAgentHostStop: async () => {
     await promptAttachments?.cleanup();
@@ -249,6 +255,9 @@ if (hasSingleInstanceLock) {
       agentDirectorySource: desktopAgentDirectorySource,
       getAgentHostDiagnostics: () => agentHostSupervisor.diagnostics()
     });
+    rendererShutdownCheckpoint = registerRendererShutdownCheckpoint({
+      getMainWindow: () => mainWindow
+    });
     unregisterPowerResumeRecovery = registerPowerResumeRecovery({
       getMainWindow: () => mainWindow,
       onResume: () => systemBridgeRegistration?.handlePowerResume()
@@ -273,6 +282,8 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", (event) => applicationShutdown.handleBeforeQuit(event));
 app.once("will-quit", () => {
+  rendererShutdownCheckpoint?.dispose();
+  rendererShutdownCheckpoint = undefined;
   systemBridgeRegistration?.dispose();
   systemBridgeRegistration = undefined;
   unregisterPowerResumeRecovery?.();

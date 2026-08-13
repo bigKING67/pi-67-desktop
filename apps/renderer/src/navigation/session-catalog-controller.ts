@@ -27,7 +27,7 @@ export async function queryFirstSessionCatalog(
   workspaceId: WorkspaceId,
   options: { query?: string; refresh?: boolean } = {}
 ): Promise<boolean> {
-  const generation = startRetrySequence(workspaceId);
+  const generation = reuseOrStartRetrySequence(workspaceId);
   return runFirstSessionCatalogQuery(workspaceId, options, generation, 0);
 }
 
@@ -156,6 +156,11 @@ function startRetrySequence(workspaceId: WorkspaceId): number {
   const generation = nextRetryGeneration++;
   retrySequences.set(workspaceId, { generation, timer: undefined });
   return generation;
+}
+
+function reuseOrStartRetrySequence(workspaceId: WorkspaceId): number {
+  const existing = retrySequences.get(workspaceId);
+  return existing?.generation ?? startRetrySequence(workspaceId);
 }
 
 function scheduleSessionCatalogRetry(

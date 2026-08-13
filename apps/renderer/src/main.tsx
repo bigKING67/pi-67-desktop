@@ -7,6 +7,10 @@ import { initializeTaskDraftPersistence } from "./workbench/task-draft-persisten
 import { initializeWorkspaceFilePersistence } from "./workspace-files/workspace-file-persistence.js";
 import { initializeNativeNotificationController } from "./notifications/native-notification-controller.js";
 import { reconcileRendererWorktreeCreations } from "./worktree/worktree-creation-recovery-controller.js";
+import {
+  installRendererShutdownCheckpoint,
+  rendererShutdownCheckpointDependencies
+} from "./workbench/renderer-shutdown-checkpoint.js";
 import "./styles/tokens.css";
 import "./styles/global.css";
 import "./styles/dialogs.css";
@@ -15,6 +19,7 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Pi-67 renderer root was not found.");
 
 initializeThemeController();
+installRendererShutdownCheckpoint(rendererShutdownCheckpointDependencies);
 const workbenchInitialization = initializeRendererWorkbench();
 initializeNativeNotificationController(workbenchInitialization);
 void workbenchInitialization

@@ -164,6 +164,9 @@ const systemBridge = {
   updateWorkbenchLayout: (layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5> => (
     ipcRenderer.invoke("pi67:workbench-layout-update", layout)
   ),
+  completeShutdownCheckpoint: (response: { requestId: string; succeeded: boolean }): Promise<boolean> => (
+    ipcRenderer.invoke("pi67:renderer-shutdown-checkpoint-complete", response)
+  ),
   pickAndAddWorkspace: (): Promise<WorkspaceDescriptor | undefined> => (
     ipcRenderer.invoke("pi67:workspace-pick-and-add")
   ),
@@ -260,6 +263,22 @@ const systemBridge = {
     );
     ipcRenderer.on("pi67:native-notification-activated", handler);
     return () => ipcRenderer.removeListener("pi67:native-notification-activated", handler);
+  },
+  onShutdownCheckpointRequested: (listener: (requestId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+      if (
+        typeof value !== "object"
+        || value === null
+        || Array.isArray(value)
+        || Object.keys(value).length !== 1
+        || typeof (value as { requestId?: unknown }).requestId !== "string"
+      ) return;
+      const requestId = (value as { requestId: string }).requestId;
+      if (requestId.length === 0 || requestId.length > 200) return;
+      listener(requestId);
+    };
+    ipcRenderer.on("pi67:renderer-shutdown-checkpoint-requested", handler);
+    return () => ipcRenderer.removeListener("pi67:renderer-shutdown-checkpoint-requested", handler);
   }
 };
 

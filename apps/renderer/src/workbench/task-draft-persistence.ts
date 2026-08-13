@@ -229,7 +229,13 @@ function persistTaskDraftState(
 }
 
 export async function persistTaskDraftStateCheckpoint(): Promise<void> {
-  await persistTaskDraftState(undefined, "checkpoint");
+  if (!await persistTaskDraftState(undefined, "checkpoint")) throw new Error("Composer draft checkpoint failed.");
+}
+
+export function beginTaskDraftShutdown(): void {
+  shuttingDown = true;
+  if (persistenceTimer !== undefined) window.clearTimeout(persistenceTimer);
+  persistenceTimer = undefined;
 }
 
 export function persistTaskDraftStateAcknowledged(taskId?: string): Promise<boolean> {
@@ -443,17 +449,10 @@ function publishPersistenceWarning(error: unknown): void {
   });
 }
 
-export function shouldScheduleDraftPersistenceRetry(
-  isShuttingDown: boolean,
-  timerScheduled: boolean
-): boolean {
+export function shouldScheduleDraftPersistenceRetry(isShuttingDown: boolean, timerScheduled: boolean): boolean {
   return !isShuttingDown && !timerScheduled;
 }
 
 export function shouldPublishBackgroundPersistenceFailure(
-  failureCount: number,
-  detail: string,
-  previousDetail: string | undefined
-): boolean {
-  return failureCount >= BACKGROUND_FAILURE_HISTORY_THRESHOLD && previousDetail !== detail;
-}
+  failureCount: number, detail: string, previousDetail: string | undefined
+): boolean { return failureCount >= BACKGROUND_FAILURE_HISTORY_THRESHOLD && previousDetail !== detail; }

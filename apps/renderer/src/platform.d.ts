@@ -82,6 +82,7 @@ declare global {
         loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
         updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
         updateWorkbenchLayout(layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5>;
+        completeShutdownCheckpoint(response: { requestId: string; succeeded: boolean }): Promise<boolean>;
         pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
         repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
         removeWorkspace(workspaceId: string): Promise<WorkbenchStateV5>;
@@ -119,6 +120,7 @@ declare global {
         onAgentHostFailed(listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): () => void;
         onPowerResume(listener: () => void): () => void;
         onNativeNotificationActivated(listener: (activation: NativeNotificationActivation) => void): () => void;
+        onShutdownCheckpointRequested(listener: (requestId: string) => void): () => void;
       };
     };
   }

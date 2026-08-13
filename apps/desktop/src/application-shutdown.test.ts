@@ -12,11 +12,10 @@ describe("ApplicationShutdownController", () => {
 
     controller.handleBeforeQuit(firstEvent);
     controller.handleBeforeQuit(repeatedEvent);
-    await Promise.resolve();
+    await vi.waitFor(() => expect(stopAgentHost).toHaveBeenCalledOnce());
     expect(controller.isShuttingDown()).toBe(true);
     expect(firstEvent.preventDefault).toHaveBeenCalledOnce();
     expect(repeatedEvent.preventDefault).toHaveBeenCalledOnce();
-    expect(stopAgentHost).toHaveBeenCalledOnce();
     expect(quit).not.toHaveBeenCalled();
 
     finishStop();
@@ -53,6 +52,41 @@ describe("ApplicationShutdownController", () => {
 
     controller.handleBeforeQuit({ preventDefault: vi.fn() });
     await vi.waitFor(() => expect(order).toEqual(["host-stopped", "workbench-clean", "quit"]));
+  });
+
+  it("checkpoints renderer-owned state before stopping the Agent Host", async () => {
+    const order: string[] = [];
+    const controller = createApplicationShutdownController({
+      checkpointRenderer: async () => { order.push("renderer-checkpointed"); return true; },
+      stopAgentHost: async () => { order.push("host-stopped"); },
+      markCleanExit: async () => { order.push("workbench-clean"); },
+      quit: () => { order.push("quit"); }
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.waitFor(() => expect(order).toEqual([
+      "renderer-checkpointed",
+      "host-stopped",
+      "workbench-clean",
+      "quit"
+    ]));
+  });
+
+  it("keeps the workbench dirty when the renderer checkpoint is not acknowledged", async () => {
+    const markCleanExit = vi.fn();
+    const stopAgentHost = vi.fn(async () => undefined);
+    const quit = vi.fn();
+    const controller = createApplicationShutdownController({
+      checkpointRenderer: async () => false,
+      stopAgentHost,
+      markCleanExit,
+      quit
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
+    expect(stopAgentHost).toHaveBeenCalledOnce();
+    expect(markCleanExit).not.toHaveBeenCalled();
   });
 
   it("cleans Main-owned transient resources after the Agent Host stops", async () => {

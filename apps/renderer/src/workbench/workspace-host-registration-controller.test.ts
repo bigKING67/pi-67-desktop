@@ -97,6 +97,20 @@ describe("workspace host registration coordinator", () => {
     await Promise.all([first, second]);
     expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
   });
+
+  it("does not cache a rebuilding first page as a completed Catalog query", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") return rebuildingPage() as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    await registerRendererWorkspaceWithHost(workspace());
+    await registerRendererWorkspaceWithHost(workspace());
+
+    expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "session.catalog.query")).toHaveLength(2);
+  });
 });
 
 function workspace(): WorkspaceDescriptor {
@@ -122,6 +136,15 @@ function emptyPage(): SessionCatalogPage {
     rebuilding: false,
     incomplete: false,
     skippedCount: 0
+  };
+}
+
+function rebuildingPage(): SessionCatalogPage {
+  return {
+    ...emptyPage(),
+    state: "rebuilding",
+    rebuilding: true,
+    incomplete: true
   };
 }
 
