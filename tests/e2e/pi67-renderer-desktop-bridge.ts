@@ -1,5 +1,11 @@
 import type { Page } from "@playwright/test";
 import type {
+  DesktopSystemBridge,
+  WorkbenchLayoutV5,
+  WorkspaceFilePersistedState,
+  WorkspaceEntryRequest
+} from "@pi67/protocol";
+import type {
   ComposerDraftPersistedState,
   NativeNotificationActivation,
   NativeNotificationRequest,
@@ -11,15 +17,35 @@ import {
   type MockDesktopBridgeOptions,
   type MockWorkspaceDescriptor
 } from "./pi67-renderer-desktop-bridge-contract.js";
-import { installMockDesktopCapabilityBridge } from "./pi67-renderer-desktop-capability-bridge.js";
+import {
+  installMockDesktopCapabilityBridge,
+  type MockDesktopCapabilityBridge
+} from "./pi67-renderer-desktop-capability-bridge.js";
+import {
+  installMockDesktopAttachmentBridge,
+  type MockDesktopAttachmentBridge
+} from "./pi67-renderer-desktop-attachment-bridge.js";
+import {
+  installMockDesktopRepositoryBridge,
+  type MockDesktopRepositoryBridge
+} from "./pi67-renderer-desktop-repository-bridge.js";
+import {
+  installMockDesktopShutdownBridge,
+  type MockDesktopShutdownBridge
+} from "./pi67-renderer-desktop-shutdown-bridge.js";
 import { installComposerDraftTestControl } from "./pi67-composer-draft-test-control.js";
 import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.js";
 
-export {
-  DEFAULT_MOCK_WORKSPACE,
-  type MockDesktopBridgeOptions,
-  type MockWorkspaceDescriptor
-} from "./pi67-renderer-desktop-bridge-contract.js";
+export { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge-contract.js";
+export type { MockDesktopBridgeOptions, MockWorkspaceDescriptor } from "./pi67-renderer-desktop-bridge-contract.js";
+
+type MockDesktopPrimaryBridge = Omit<
+  DesktopSystemBridge,
+  | keyof MockDesktopCapabilityBridge
+  | keyof MockDesktopAttachmentBridge
+  | keyof MockDesktopRepositoryBridge
+  | keyof MockDesktopShutdownBridge
+>;
 
 export async function installMockDesktopBridge(
   page: Page,
@@ -53,6 +79,9 @@ export async function installMockDesktopBridge(
       ? {}
       : { capabilityInitializingCalls: options.capabilityInitializingCalls }
   );
+  await installMockDesktopAttachmentBridge(page);
+  await installMockDesktopRepositoryBridge(page, options.repositoryEnvironmentSnapshot);
+  await installMockDesktopShutdownBridge(page);
   await installComposerDraftTestControl(page);
   await page.addInitScript((bridgeFixture) => {
     // Dev-mode module graphs can exceed Chromium's default 250-entry buffer.
@@ -63,7 +92,7 @@ export async function installMockDesktopBridge(
       workspaceOrder: string[];
       expandedWorkspaceIds: string[];
       currentWorkspaceId?: string;
-      selectedSurface?: MockDesktopBridgeOptions["selectedSurface"];
+      selectedSurface?: NonNullable<MockDesktopBridgeOptions["selectedSurface"]>;
       runtimeRecovery: RuntimeRecoveryRecord[];
       sessionCreationRecovery: SessionCreationRecoveryRecord[];
       workspaceEnvironments: Array<{
@@ -76,7 +105,6 @@ export async function installMockDesktopBridge(
       cleanExit: boolean;
     };
     let pickerIndex = 0;
-    let promptAttachmentCounter = 0;
     let updateState: Record<string, unknown> = {
       phase: "idle",
       channel: "unsigned-preview",
@@ -101,7 +129,7 @@ export async function installMockDesktopBridge(
         for (const listener of updateListeners) listener(structuredClone(updateState));
       }
     };
-    let workspaceFileState = { version: 1 as const, workspaces: [] as Array<Record<string, unknown>> };
+    let workspaceFileState: WorkspaceFilePersistedState = { version: 1 as const, workspaces: [] };
     let composerDraftState: ComposerDraftPersistedState = structuredClone(
       bridgeFixture.initialComposerDraftState
     );
@@ -128,12 +156,12 @@ export async function installMockDesktopBridge(
       }
     };
     const workspaceEntryTest = {
-      menus: [] as Array<Record<string, unknown>>,
+      menus: [] as WorkspaceEntryRequest[],
       menuManagement: [] as boolean[],
-      reveals: [] as Array<Record<string, unknown>>,
-      defaultOpens: [] as Array<Record<string, unknown>>,
-      copies: [] as Array<{ entry: Record<string, unknown>; kind: "absolute" | "relative" }>,
-      trashes: [] as Array<Record<string, unknown>>
+      reveals: [] as WorkspaceEntryRequest[],
+      defaultOpens: [] as WorkspaceEntryRequest[],
+      copies: [] as Array<{ entry: WorkspaceEntryRequest; kind: "absolute" | "relative" }>,
+      trashes: [] as WorkspaceEntryRequest[]
     };
     let workbenchState: FixtureWorkbenchState = {
       version: 5 as const,
@@ -153,27 +181,14 @@ export async function installMockDesktopBridge(
       settings: structuredClone(bridgeFixture.settings),
       cleanExit: false
     };
-    type SystemFixtureRegistry = { methods: Record<string, unknown> };
+    type SystemFixtureRegistry = { methods: Partial<DesktopSystemBridge> };
     const fixtureWindow = window as unknown as {
       __pi67SystemFixture?: SystemFixtureRegistry;
     };
     const systemFixture = fixtureWindow.__pi67SystemFixture ??= { methods: {} };
-    Object.assign(systemFixture.methods, {
+    const primaryBridge = {
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
-          inspectRepositoryEnvironment: async ({ workspaceId }: { workspaceId: string }) => ({
-            ...(bridgeFixture.repositoryEnvironmentSnapshot
-              ? structuredClone(bridgeFixture.repositoryEnvironmentSnapshot)
-              : {
-                  workspaceId,
-                  status: "non-git" as const,
-                  revision: 1,
-                  observedAt: Date.now(),
-                  stale: false,
-                  worktrees: []
-                }),
-            workspaceId
-          }),
           createWorktreeEnvironment: async () => {
             worktreeTest.createCalls += 1;
             return {
@@ -239,7 +254,7 @@ export async function installMockDesktopBridge(
             workspaceFileState = structuredClone(state);
             return { state: structuredClone(workspaceFileState), draftPersistence: "available" as const };
           },
-          updateWorkbenchLayout: async (layout: Record<string, unknown>) => {
+          updateWorkbenchLayout: async (layout: WorkbenchLayoutV5) => {
             workbenchState = { ...workbenchState, ...structuredClone(layout) } as FixtureWorkbenchState;
             return structuredClone(workbenchState);
           },
@@ -263,6 +278,10 @@ export async function installMockDesktopBridge(
               };
             }
             return structuredClone(workspace);
+          },
+          repairWorkspace: async (workspaceId: string) => {
+            const workspace = workbenchState.workspaces.find((item) => item.id === workspaceId);
+            return workspace ? structuredClone(workspace) : undefined;
           },
           removeWorkspace: async (workspaceId: string) => {
             const workspaceOrder = workbenchState.workspaceOrder.filter((id) => id !== workspaceId);
@@ -351,39 +370,31 @@ export async function installMockDesktopBridge(
               }
             };
           },
-          stagePromptAttachments: async (files: File[]) => files.map((file) => ({
-            id: `fixture_attachment_${++promptAttachmentCounter}`,
-            name: file.name,
-            mimeType: file.type || "application/octet-stream",
-            byteLength: file.size,
-            kind: promptAttachmentKind(file)
-          })),
-          releasePromptAttachments: async () => undefined,
           requestOpenExternal: async (url: string) => {
             updateTest.openedUrls.push(url);
             return updateTest.allowOpen;
           },
-          showWorkspaceEntryContextMenu: async (entry: Record<string, unknown>, includeManagement = false) => {
+          showWorkspaceEntryContextMenu: async (entry: WorkspaceEntryRequest, includeManagement = false) => {
             workspaceEntryTest.menus.push(structuredClone(entry));
             workspaceEntryTest.menuManagement.push(includeManagement);
             return entry.kind === "file" ? "pi67-open" as const : "reveal" as const;
           },
-          revealWorkspaceEntry: async (entry: Record<string, unknown>) => {
+          revealWorkspaceEntry: async (entry: WorkspaceEntryRequest) => {
             workspaceEntryTest.reveals.push(structuredClone(entry));
             return true;
           },
-          openWorkspaceEntryInDefaultApp: async (entry: Record<string, unknown>) => {
+          openWorkspaceEntryInDefaultApp: async (entry: WorkspaceEntryRequest) => {
             workspaceEntryTest.defaultOpens.push(structuredClone(entry));
             return true;
           },
           copyWorkspaceEntryPath: async (
-            entry: Record<string, unknown>,
+            entry: WorkspaceEntryRequest,
             kind: "absolute" | "relative"
           ) => {
             workspaceEntryTest.copies.push({ entry: structuredClone(entry), kind });
             return true;
           },
-          trashWorkspaceEntry: async (entry: Record<string, unknown>) => {
+          trashWorkspaceEntry: async (entry: WorkspaceEntryRequest) => {
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
@@ -414,10 +425,11 @@ export async function installMockDesktopBridge(
           },
           onAgentHostFailed: () => () => undefined,
           onPowerResume: () => () => undefined
-    });
+    } satisfies MockDesktopPrimaryBridge;
+    Object.assign(systemFixture.methods, primaryBridge);
     Object.defineProperty(window, "pi67", {
       configurable: false,
-      value: { system: systemFixture.methods }
+      value: { system: systemFixture.methods as DesktopSystemBridge }
     });
     Object.defineProperty(window, "__pi67UpdateTest", {
       configurable: false,
@@ -440,19 +452,6 @@ export async function installMockDesktopBridge(
       if (surface?.kind === "workspace") return surface.workspaceId;
       if (surface?.kind === "conversation") return surface.conversation.workspaceId;
       return undefined;
-    }
-
-    function promptAttachmentKind(file: File) {
-      const type = file.type.toLowerCase();
-      const name = file.name.toLowerCase();
-      if (type.startsWith("image/")) return "image";
-      if (type.startsWith("audio/")) return "audio";
-      if (type.startsWith("video/")) return "video";
-      if (/zip|gzip|tar|7z|rar/u.test(type) || /\.(?:zip|tar|tgz|gz)$/u.test(name)) return "archive";
-      if (type.startsWith("text/") || /pdf|word|excel|spreadsheet|presentation|opendocument|rtf|epub/u.test(type)) {
-        return "document";
-      }
-      return "file";
     }
 
   }, fixture);

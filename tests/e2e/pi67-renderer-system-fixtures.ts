@@ -1,4 +1,6 @@
-export function createMockPackageNetworkSnapshot() {
+import type { DesktopCapabilitySnapshot, PackageNetworkSnapshot } from "@pi67/protocol";
+
+export function createMockPackageNetworkSnapshot(): PackageNetworkSnapshot {
   return {
     settings: { npmMode: "automatic", gitMode: "automatic", gitMirrors: ["gitclone", "ghproxy"] },
     toolchain: {
@@ -19,7 +21,7 @@ export function createMockPackageNetworkSnapshot() {
   };
 }
 
-export function createMockDesktopCapabilitySnapshot() {
+export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot {
   const bundledSkills = [{
     id: "lark-doc",
     displayName: "lark-doc",

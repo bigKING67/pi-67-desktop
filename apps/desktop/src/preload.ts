@@ -3,7 +3,9 @@ import type {
   ComposerDraftPersistedState,
   ComposerDraftStateSnapshot,
   DesktopCapabilitySnapshot,
+  DesktopPlatformInfo,
   DesktopRecoverySnapshot,
+  DesktopSystemBridge,
   NativeNotificationActivation,
   NativeNotificationRequest,
   PackageNetworkSettings,
@@ -20,6 +22,7 @@ import type {
   RepositoryWorkingTreeInspectionRequest,
   RepositoryWorkingTreeSnapshot,
   SupportDiagnosticsExportRequest,
+  StagedPromptAttachment,
   WorktreeCreationRequest,
   WorktreeCreationAdvanceRequest,
   WorktreeCreationAdvanceResult,
@@ -63,14 +66,8 @@ export type {
   WorkspacePathIdentity
 } from "./workspace-identity.js";
 
-export interface PlatformInfo {
-  platform: "win32" | "darwin";
-  architecture: "x64" | "arm64";
-  version: string;
-}
-
 const systemBridge = {
-  getPlatformInfo: (): Promise<PlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
+  getPlatformInfo: (): Promise<DesktopPlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
   connectAgentHost: (options?: { replaceCurrent?: boolean }): Promise<void> => (
     ipcRenderer.invoke("pi67:agent-host-connect", options?.replaceCurrent === true)
   ),
@@ -280,6 +277,8 @@ const systemBridge = {
     ipcRenderer.on("pi67:renderer-shutdown-checkpoint-requested", handler);
     return () => ipcRenderer.removeListener("pi67:renderer-shutdown-checkpoint-requested", handler);
   }
+} satisfies Omit<DesktopSystemBridge, "stagePromptAttachments"> & {
+  stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
 };
 
 contextBridge.exposeInMainWorld("pi67", { system: systemBridge });

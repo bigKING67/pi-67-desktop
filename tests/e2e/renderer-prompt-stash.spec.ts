@@ -13,6 +13,11 @@ test("clears and restores exact Prompt text only after secure persistence acknow
   const composer = page.getByLabel("给 Pi 发送消息");
   const exactText = "  Preserve exact whitespace\n第二行  ";
   await composer.fill(exactText);
+  await page.getByLabel("选择附件").setInputFiles({
+    name: "fixture.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("fixture-image")
+  });
   await page.evaluate(() => (
     window as unknown as {
       __pi67ComposerDraftTest: { holdNextUpdate(): void };
@@ -35,6 +40,7 @@ test("clears and restores exact Prompt text only after secure persistence acknow
     }
   ).__pi67ComposerDraftTest.releaseHeldUpdate());
   await expect.poll(() => composer.inputValue()).toBe("");
+  await expect(page.locator('[data-attachment-kind="image"]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Prompt 暂存，1 条" })).toBeVisible();
 
   await page.setViewportSize({ width: 720, height: 520 });
@@ -48,6 +54,7 @@ test("clears and restores exact Prompt text only after secure persistence acknow
   });
   await item.click();
   await expect.poll(() => composer.inputValue()).toBe(exactText);
+  await expect(page.locator('[data-attachment-kind="image"]')).toContainText("fixture.png");
   await expect(page.getByRole("button", { name: "Prompt 暂存，0 条" })).toBeVisible();
   await expect(composer).toBeFocused();
   expect(await page.evaluate(() => (

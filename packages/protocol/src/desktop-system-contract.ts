@@ -1,3 +1,49 @@
+import type {
+  ComposerDraftPersistedState,
+  ComposerDraftStateSnapshot,
+  DesktopCapabilitySnapshot,
+  DesktopRecoverySnapshot,
+  NativeNotificationActivation,
+  NativeNotificationRequest,
+  PackageNetworkSettings,
+  PackageNetworkSnapshot,
+  RuntimeRecoveryRecord,
+  SessionCreationRecoveryRecord,
+  WorkbenchSettingsState,
+  WorkbenchStateV5,
+  WorkbenchSurface,
+  WorkspaceDescriptor,
+  WorkspaceEntryContextAction,
+  WorkspaceEntryRequest,
+  WorkspaceFilePersistedState,
+  WorkspaceFileStateSnapshot
+} from "@pi67/domain";
+import type { StagedPromptAttachment } from "./agent-messages.js";
+import type {
+  PromptStashImagesDeleteRequest,
+  PromptStashImagesRestoreRequest,
+  PromptStashImagesRestoreResult,
+  PromptStashImagesStoreRequest,
+  PromptStashImagesStoreResult
+} from "./prompt-stash-images.js";
+import type {
+  RepositoryChangeDetail,
+  RepositoryChangeDetailRequest,
+  RepositoryEnvironmentInspectionRequest,
+  RepositoryEnvironmentSnapshot,
+  RepositoryWorkingTreeInspectionRequest,
+  RepositoryWorkingTreeSnapshot
+} from "./repository-environment-contract.js";
+import type { SupportDiagnosticsExportRequest } from "./runtime-diagnostics-contract.js";
+import type {
+  WorktreeCreationAdvanceRequest,
+  WorktreeCreationAdvanceResult,
+  WorktreeCreationRequest,
+  WorktreeCreationResult,
+  WorktreeCreationRollbackRequest,
+  WorktreeCreationRollbackResult
+} from "./worktree-creation-contract.js";
+
 export {
   MAX_COMPOSER_DRAFTS,
   MAX_COMPOSER_DRAFT_TEXT_BYTES,
@@ -60,3 +106,98 @@ export {
   type WorkspaceFilePersistedTab,
   type WorkspaceFileStateSnapshot
 } from "@pi67/domain";
+
+export interface DesktopPlatformInfo {
+  platform: "win32" | "darwin";
+  architecture: "x64" | "arm64";
+  version: string;
+}
+
+/** Renderer-owned fields persisted through Electron Main. */
+export interface WorkbenchLayoutV5 {
+  expandedWorkspaceIds: string[];
+  currentWorkspaceId?: string;
+  selectedSurface?: WorkbenchSurface;
+  runtimeRecovery: RuntimeRecoveryRecord[];
+  sessionCreationRecovery: SessionCreationRecoveryRecord[];
+  settings: WorkbenchSettingsState;
+}
+
+export interface ShutdownCheckpointResponse {
+  requestId: string;
+  succeeded: boolean;
+}
+
+/** Complete, typed surface exposed by the sandboxed Desktop preload. */
+export interface DesktopSystemBridge {
+  getPlatformInfo(): Promise<DesktopPlatformInfo>;
+  connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
+  stagePromptAttachments(files: DesktopPromptAttachmentInput[]): Promise<StagedPromptAttachment[]>;
+  releasePromptAttachments(ids: string[]): Promise<void>;
+  storePromptStashImages(request: PromptStashImagesStoreRequest): Promise<PromptStashImagesStoreResult>;
+  restorePromptStashImages(request: PromptStashImagesRestoreRequest): Promise<PromptStashImagesRestoreResult>;
+  deletePromptStashImages(request: PromptStashImagesDeleteRequest): Promise<void>;
+  loadWorkbenchState(): Promise<WorkbenchStateV5>;
+  inspectRepositoryEnvironment(
+    request: RepositoryEnvironmentInspectionRequest
+  ): Promise<RepositoryEnvironmentSnapshot>;
+  inspectRepositoryWorkingTree(
+    request: RepositoryWorkingTreeInspectionRequest
+  ): Promise<RepositoryWorkingTreeSnapshot>;
+  readRepositoryChangeDetail(request: RepositoryChangeDetailRequest): Promise<RepositoryChangeDetail>;
+  createWorktreeEnvironment(request: WorktreeCreationRequest): Promise<WorktreeCreationResult>;
+  advanceWorktreeEnvironment(request: WorktreeCreationAdvanceRequest): Promise<WorktreeCreationAdvanceResult>;
+  rollbackWorktreeEnvironment(request: WorktreeCreationRollbackRequest): Promise<WorktreeCreationRollbackResult>;
+  loadComposerDraftState(): Promise<ComposerDraftStateSnapshot>;
+  updateComposerDraftState(state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot>;
+  loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
+  updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;
+  updateWorkbenchLayout(layout: WorkbenchLayoutV5): Promise<WorkbenchStateV5>;
+  completeShutdownCheckpoint(response: ShutdownCheckpointResponse): Promise<boolean>;
+  pickAndAddWorkspace(): Promise<WorkspaceDescriptor | undefined>;
+  repairWorkspace(workspaceId: string): Promise<WorkspaceDescriptor | undefined>;
+  removeWorkspace(workspaceId: string): Promise<WorkbenchStateV5>;
+  reorderWorkspaces(workspaceIds: string[]): Promise<WorkbenchStateV5>;
+  selectWorkspace(): Promise<string | undefined>;
+  selectSessionFile(): Promise<string | undefined>;
+  getRecoverySnapshot(): Promise<DesktopRecoverySnapshot>;
+  saveDiagnostics(request: SupportDiagnosticsExportRequest): Promise<string | undefined>;
+  showNativeNotification(request: NativeNotificationRequest): Promise<boolean>;
+  dismissNativeNotification(notificationId: string): Promise<boolean>;
+  requestOpenExternal(url: string): Promise<boolean>;
+  showWorkspaceEntryContextMenu(
+    entry: WorkspaceEntryRequest,
+    includeManagement?: boolean
+  ): Promise<WorkspaceEntryContextAction | undefined>;
+  revealWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
+  openWorkspaceEntryInDefaultApp(entry: WorkspaceEntryRequest): Promise<boolean>;
+  copyWorkspaceEntryPath(entry: WorkspaceEntryRequest, mode: "absolute" | "relative"): Promise<boolean>;
+  trashWorkspaceEntry(entry: WorkspaceEntryRequest): Promise<boolean>;
+  getPackageNetworkSnapshot(): Promise<PackageNetworkSnapshot>;
+  savePackageNetworkSettings(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
+  resetPackageNetworkSettings(): Promise<PackageNetworkSnapshot>;
+  probePackageSources(settings: PackageNetworkSettings): Promise<PackageNetworkSnapshot>;
+  getDesktopCapabilitySnapshot(): Promise<DesktopCapabilitySnapshot>;
+  setupBrowser67(): Promise<DesktopCapabilitySnapshot>;
+  doctorBrowser67(): Promise<DesktopCapabilitySnapshot>;
+  prepareBrowser67Extension(): Promise<DesktopCapabilitySnapshot>;
+  openBrowser67ExtensionPage(browser: "chrome" | "edge"): Promise<boolean>;
+  revealBrowser67Extension(): Promise<boolean>;
+  copyBrowser67ExtensionPath(): Promise<boolean>;
+  verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot>;
+  getUpdateState(): Promise<unknown>;
+  checkForUpdates(): Promise<unknown>;
+  onUpdateStateChanged(listener: (state: unknown) => void): () => void;
+  onAgentHostFailed(
+    listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void
+  ): () => void;
+  onPowerResume(listener: () => void): () => void;
+  onNativeNotificationActivated(listener: (activation: NativeNotificationActivation) => void): () => void;
+  onShutdownCheckpointRequested(listener: (requestId: string) => void): () => void;
+}
+
+export interface DesktopPromptAttachmentInput {
+  readonly name: string;
+  readonly type: string;
+  readonly size: number;
+}

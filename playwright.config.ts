@@ -26,8 +26,16 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "renderer-bootstrap",
+      testMatch: /renderer-bootstrap\.spec\.ts/u,
+      retries: 0,
+      use: { ...devices["Desktop Chrome"], channel: "chromium", viewport: { width: 1440, height: 920 } }
+    },
+    {
       name: "renderer-chromium",
       testMatch: /renderer(?:-[a-z-]+)?\.spec\.ts/u,
+      testIgnore: /renderer-bootstrap\.spec\.ts/u,
+      dependencies: ["renderer-bootstrap"],
       use: { ...devices["Desktop Chrome"], channel: "chromium", viewport: { width: 1440, height: 920 } }
     },
     {

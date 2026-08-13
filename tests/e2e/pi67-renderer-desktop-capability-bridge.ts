@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { DesktopSystemBridge, PackageNetworkSettings } from "@pi67/protocol";
 import {
   createMockDesktopCapabilitySnapshot,
   createMockPackageNetworkSnapshot
@@ -7,6 +8,22 @@ import {
 interface MockDesktopCapabilityBridgeOptions {
   capabilityInitializingCalls?: number;
 }
+
+export type MockDesktopCapabilityBridge = Pick<DesktopSystemBridge,
+  | "getPlatformInfo"
+  | "getPackageNetworkSnapshot"
+  | "savePackageNetworkSettings"
+  | "resetPackageNetworkSettings"
+  | "probePackageSources"
+  | "getDesktopCapabilitySnapshot"
+  | "setupBrowser67"
+  | "doctorBrowser67"
+  | "prepareBrowser67Extension"
+  | "openBrowser67ExtensionPage"
+  | "revealBrowser67Extension"
+  | "copyBrowser67ExtensionPath"
+  | "verifyBrowser67Extension"
+>;
 
 export async function installMockDesktopCapabilityBridge(
   page: Page,
@@ -19,20 +36,20 @@ export async function installMockDesktopCapabilityBridge(
   };
 
   await page.addInitScript((bridgeFixture) => {
-    type SystemFixtureRegistry = { methods: Record<string, unknown> };
+    type SystemFixtureRegistry = { methods: Partial<DesktopSystemBridge> };
     const fixtureWindow = window as unknown as {
       __pi67SystemFixture?: SystemFixtureRegistry;
     };
     const systemFixture = fixtureWindow.__pi67SystemFixture ??= { methods: {} };
     let capabilitySnapshotCalls = 0;
     const settingsActionsTest = {
-      packageSaves: [] as Array<Record<string, unknown>>,
+      packageSaves: [] as PackageNetworkSettings[],
       packageResets: 0,
-      packageProbes: [] as Array<Record<string, unknown>>,
+      packageProbes: [] as PackageNetworkSettings[],
       platformInfoCalls: 0
     };
 
-    Object.assign(systemFixture.methods, {
+    const capabilityBridge = {
       getPlatformInfo: async () => {
         settingsActionsTest.platformInfoCalls += 1;
         return {
@@ -42,7 +59,7 @@ export async function installMockDesktopCapabilityBridge(
         };
       },
       getPackageNetworkSnapshot: async () => structuredClone(bridgeFixture.packageNetworkSnapshot),
-      savePackageNetworkSettings: async (settings: Record<string, unknown>) => {
+      savePackageNetworkSettings: async (settings: PackageNetworkSettings) => {
         settingsActionsTest.packageSaves.push(structuredClone(settings));
         return {
           ...structuredClone(bridgeFixture.packageNetworkSnapshot),
@@ -53,7 +70,7 @@ export async function installMockDesktopCapabilityBridge(
         settingsActionsTest.packageResets += 1;
         return structuredClone(bridgeFixture.packageNetworkSnapshot);
       },
-      probePackageSources: async (settings: Record<string, unknown>) => {
+      probePackageSources: async (settings: PackageNetworkSettings) => {
         settingsActionsTest.packageProbes.push(structuredClone(settings));
         return {
           ...structuredClone(bridgeFixture.packageNetworkSnapshot),
@@ -138,7 +155,8 @@ export async function installMockDesktopCapabilityBridge(
           registry: "https://registry.npmmirror.com"
         }]
       })
-    });
+    } satisfies MockDesktopCapabilityBridge;
+    Object.assign(systemFixture.methods, capabilityBridge);
 
     Object.defineProperty(window, "__pi67SettingsTest", {
       configurable: false,
