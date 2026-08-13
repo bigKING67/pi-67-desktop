@@ -1,10 +1,54 @@
 import { describe, expect, it } from "vitest";
 import {
   shouldCreateInitialRealUserSession,
+  waitForCatalogRequestStart,
   waitForCatalogState
 } from "./windows-real-user-catalog-state.mjs";
 
 describe("Windows real-user Catalog state", () => {
+  it("starts the Catalog authority budget only after the request is observable", async () => {
+    const observations = [
+      {
+        agentConnected: "false",
+        catalogError: "false",
+        catalogLoading: "false",
+        catalogState: "uninitialized",
+        runtimePhase: "stopped",
+        workspaceOpenPending: "true"
+      },
+      {
+        agentConnected: "true",
+        catalogError: "false",
+        catalogLoading: "true",
+        catalogState: "uninitialized",
+        runtimePhase: "stopped",
+        workspaceOpenPending: "true"
+      }
+    ];
+    const window = catalogStartWindow(observations);
+
+    await expect(waitForCatalogRequestStart(window, 200)).resolves.toMatchObject({
+      agentConnected: "true",
+      catalogLoading: "true",
+      catalogState: "uninitialized"
+    });
+  });
+
+  it("fails closed with bounded startup diagnostics when the Catalog never starts", async () => {
+    const window = catalogStartWindow([{
+      agentConnected: "true",
+      catalogError: "false",
+      catalogLoading: "false",
+      catalogState: "uninitialized",
+      runtimePhase: "stopped",
+      workspaceOpenPending: "false"
+    }]);
+
+    await expect(waitForCatalogRequestStart(window, 1)).rejects.toThrow(
+      /request did not start.*"agentConnected":"true".*"workspaceOpenPending":"false"/s
+    );
+  });
+
   it("accepts a Catalog state only after the expected materialized Session is present", async () => {
     const workspaceGroup = {
       evaluate: async (_callback, expectedIdentity) => ({
@@ -195,3 +239,11 @@ describe("Windows real-user Catalog state", () => {
     })).toBe(false);
   });
 });
+
+function catalogStartWindow(observations) {
+  let index = 0;
+  return {
+    evaluate: async () => observations[Math.min(index++, observations.length - 1)],
+    getByTestId: () => ({ first: () => ({ waitFor: async () => undefined }) })
+  };
+}

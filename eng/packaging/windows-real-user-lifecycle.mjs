@@ -22,7 +22,11 @@ import {
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
-import { shouldCreateInitialRealUserSession, waitForCatalogState } from "./windows-real-user-catalog-state.mjs";
+import {
+  shouldCreateInitialRealUserSession,
+  waitForCatalogRequestStart,
+  waitForCatalogState
+} from "./windows-real-user-catalog-state.mjs";
 import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
 import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
 import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
@@ -42,6 +46,7 @@ export {
 export {
   REAL_USER_CATALOG_TIMEOUT_MS,
   shouldCreateInitialRealUserSession,
+  waitForCatalogRequestStart,
   waitForCatalogState
 } from "./windows-real-user-catalog-state.mjs";
 
@@ -155,6 +160,7 @@ async function runRealUserLaunch({
       expectedWorkspaceCwd
     );
 
+    const catalogRequestStart = await waitForCatalogRequestStart(window, INSTALLED_RUNTIME_READINESS_TIMEOUT_MS);
     const catalog = await waitForCatalogState(window, expectedSessionIdentity, undefined, {
       launchIndex,
       inspectExpectedSessionFile: () => inspectRealUserSessionFile(expectedSessionPath),
@@ -241,6 +247,7 @@ async function runRealUserLaunch({
       ...(create ? { create } : {}),
       report: {
         catalog,
+        catalogRequestStart,
         closeDurationMs: round(shutdownMeasurement.productExitDurationMs),
         driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
         fileProjection,

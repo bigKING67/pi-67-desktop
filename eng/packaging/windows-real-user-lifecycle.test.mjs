@@ -74,6 +74,12 @@ describe("Windows installed real-user lifecycle", () => {
       lifecycleSource.indexOf("async function runRealUserLaunch"),
       lifecycleSource.indexOf("export async function activateCatalogSession")
     );
+    const catalogRequestStart = launchFlow.indexOf("await waitForCatalogRequestStart(");
+    const catalogAuthority = launchFlow.indexOf("await waitForCatalogState(");
+    expect(catalogRequestStart).toBeGreaterThan(-1);
+    expect(catalogAuthority).toBeGreaterThan(catalogRequestStart);
+    expect(launchFlow.slice(catalogRequestStart, catalogAuthority))
+      .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
     const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
     const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir,");
     expect(creationAuthorityReady).toBeGreaterThan(-1);

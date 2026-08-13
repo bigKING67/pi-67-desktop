@@ -38,6 +38,7 @@ const KeyboardShortcutsDialog = lazy(() => import("../help/KeyboardShortcutsDial
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
   const connected = useAppStore((state) => state.connected);
+  const workspaceOpenPending = useAppStore((state) => state.workspaceOpenPending);
   const navigationVisible = useShellStore((state) => state.navigationVisible);
   const setNavigationVisible = useShellStore((state) => state.setNavigationVisible);
   const contextVisible = useShellStore((state) => state.contextVisible);
@@ -166,7 +167,11 @@ export function App() {
   };
 
   return (
-    <div className="application-shell" data-agent-connected={connected ? "true" : "false"}>
+    <div
+      className="application-shell"
+      data-agent-connected={connected ? "true" : "false"}
+      data-workspace-open-pending={workspaceOpenPending ? "true" : "false"}
+    >
       <WorkbenchProjectionBridge />
       <TitleBar navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0} navigationVisible={navigationVisible} onToggleNavigation={toggleNavigation} />
       {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" ? (

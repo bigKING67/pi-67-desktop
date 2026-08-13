@@ -4,6 +4,51 @@ export const REAL_USER_CATALOG_TIMEOUT_MS = 5_000;
 
 const POLL_INTERVAL_MS = 50;
 
+export async function waitForCatalogRequestStart(window, timeoutMs) {
+  const startedAt = performance.now();
+  const workspaceGroup = window.getByTestId("workspace-group").first();
+  await workspaceGroup.waitFor({ state: "visible", timeout: timeoutMs });
+  let latestObservation;
+  const observation = await waitForCatalogCondition(async () => {
+    const current = await window.evaluate(() => {
+      const shell = document.querySelector(".application-shell");
+      const group = document.querySelector('[data-testid="workspace-group"]');
+      const runtime = document.querySelector("[data-runtime-phase]");
+      return {
+        agentConnected: shell?.getAttribute("data-agent-connected") ?? null,
+        catalogError: group?.getAttribute("data-catalog-error") ?? null,
+        catalogLoading: group?.getAttribute("data-catalog-loading") ?? null,
+        catalogState: group?.getAttribute("data-catalog-state") ?? null,
+        runtimePhase: runtime?.getAttribute("data-runtime-phase") ?? null,
+        workspaceOpenPending: shell?.getAttribute("data-workspace-open-pending") ?? null
+      };
+    });
+    latestObservation = current;
+    if (current.runtimePhase === "failed") {
+      throw new Error(
+        `Windows real-user Workspace opening failed before the Session Catalog started. Diagnostics: ${JSON.stringify(current)}`
+      );
+    }
+    if (current.catalogError === "true") {
+      throw new Error(
+        `Windows real-user Session Catalog request failed during startup. Diagnostics: ${JSON.stringify(current)}`
+      );
+    }
+    if (
+      current.catalogLoading === "true"
+      || (current.catalogState !== null && current.catalogState !== "uninitialized")
+    ) return current;
+    return undefined;
+  }, timeoutMs, () => (
+    "Windows real-user Session Catalog request did not start after Workspace restoration or selection. "
+    + `Diagnostics: ${JSON.stringify(latestObservation)}`
+  ));
+  return {
+    ...observation,
+    durationMs: Math.round((performance.now() - startedAt) * 10) / 10
+  };
+}
+
 function catalogStateFromText(text, itemCount) {
   if (text.includes("Session 索引正在恢复")) return "fallback-recovering";
   if (text.includes("Session 索引暂时不可用")) return "fallback";

@@ -218,6 +218,8 @@ function WorkspaceConversationGroup({
       data-catalog-item-count={catalog.itemCount}
       data-catalog-visible-count={rows.length}
       data-catalog-incomplete={catalog.incomplete ? "true" : "false"}
+      data-catalog-loading={catalog.loading ? "true" : "false"}
+      data-catalog-error={catalog.error ? "true" : "false"}
       role="listitem"
     >
       <header className={styles.workspaceGroupHeader}>
