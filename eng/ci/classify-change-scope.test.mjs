@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { classifyChangedPaths, normalizeRepoPath } from "./classify-change-scope.mjs";
+import {
+  RENDERER_BROWSER_SUPPORT_PATHS,
+  rendererBrowserSupportGraphViolations,
+  verifyRendererBrowserSupportGraph
+} from "./renderer-browser-support-scope.mjs";
 
 describe("CI change scope classifier", () => {
   it("skips product validation for documentation-only changes", () => {
@@ -27,6 +32,23 @@ describe("CI change scope classifier", () => {
       fullValidation: false,
       reuseWindowsInstaller: false
     });
+  });
+
+  it("runs only quality validation for explicit Renderer browser support files", () => {
+    expect(classifyChangedPaths([...RENDERER_BROWSER_SUPPORT_PATHS])).toMatchObject({
+      reason: "quality-only",
+      runQuality: true,
+      runWindows: false,
+      runMacos: false,
+      windowsInstallerMode: "none",
+      fullValidation: false
+    });
+  });
+
+  it("keeps unknown E2E support and production bridge changes fail-safe", () => {
+    expect(classifyChangedPaths(["tests/e2e/pi67-new-native-fixture.ts"]).fullValidation).toBe(true);
+    expect(classifyChangedPaths(["apps/desktop/src/preload.ts"]).fullValidation).toBe(true);
+    expect(classifyChangedPaths(["packages/protocol/src/desktop-system-contract.ts"]).fullValidation).toBe(true);
   });
 
   it("keeps native Electron specs on fail-safe full validation", () => {
@@ -143,5 +165,20 @@ describe("CI change scope classifier", () => {
     expect(classifyChangedPaths(["eng/packaging/package-native-unsigned.mjs"])).toMatchObject({
       windowsInstallerMode: "full"
     });
+  });
+});
+
+describe("Renderer browser support import graph", () => {
+  it("keeps every allowlisted support file Renderer-only in the repository", () => {
+    expect(() => verifyRendererBrowserSupportGraph()).not.toThrow();
+  });
+
+  it("rejects an allowlisted fixture imported by a native Electron spec", () => {
+    const support = [...RENDERER_BROWSER_SUPPORT_PATHS][0];
+    expect(rendererBrowserSupportGraphViolations(new Map([
+      ["tests/e2e/electron.spec.ts", `import "./${support?.split("/").at(-1)?.replace(/\.ts$/u, ".js")}";`],
+      ["tests/e2e/renderer.spec.ts", `import "./${support?.split("/").at(-1)?.replace(/\.ts$/u, ".js")}";`],
+      ...[...RENDERER_BROWSER_SUPPORT_PATHS].map((path) => [path, ""])
+    ]))).toContain(`native Electron spec reaches Renderer-only support: ${support}`);
   });
 });

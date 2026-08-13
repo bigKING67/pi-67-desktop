@@ -3,6 +3,7 @@ import { appendFile, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isWindowsInstallerVerifierProductPath } from "./windows-installer-verifier-scope.mjs";
+import { isRendererBrowserSupportPath } from "./renderer-browser-support-scope.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -66,7 +67,8 @@ function isDocumentationPath(path) {
 }
 
 function isQualityOnlyPath(path) {
-  return /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path);
+  return /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path)
+    || isRendererBrowserSupportPath(path);
 }
 
 function isWindowsOnlyPath(path) {
