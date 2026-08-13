@@ -29,6 +29,13 @@ describe("Windows real-user Catalog state", () => {
     const expectedIdentity = "session:workspace-1:session-file-v1\0private-device\0private-inode";
     const workspaceGroup = {
       evaluate: async () => ({
+        catalogIncomplete: "false",
+        catalogItemCount: "0",
+        catalogRebuilding: "false",
+        catalogRevision: "7",
+        catalogSource: "sqlite",
+        catalogState: "ready",
+        catalogVisibleCount: "0",
         hasExpectedSession: false,
         itemCount: 0,
         provisionalItemCount: 0,
@@ -65,6 +72,9 @@ describe("Windows real-user Catalog state", () => {
     }).catch((error) => { failure = String(error); });
 
     expect(failure).toContain('"state":"ready-empty"');
+    expect(failure).toContain('"catalogState":"ready"');
+    expect(failure).toContain('"catalogSource":"sqlite"');
+    expect(failure).toContain('"catalogRevision":"7"');
     expect(failure).toContain('"launchIndex":1');
     expect(failure).toContain('"byteLength":321');
     expect(failure).toContain('"fileIdentityFingerprint":"0123456789ab"');
@@ -72,6 +82,33 @@ describe("Windows real-user Catalog state", () => {
     expect(failure).toContain('"expectedRecordWorkspaceMatch":false');
     expect(failure).not.toContain(expectedIdentity);
     expect(failure).not.toContain("private-device");
+  });
+
+  it("reports an uninitialized Store instead of inferring ready-empty from localized text", async () => {
+    const workspaceGroup = {
+      evaluate: async () => ({
+        catalogIncomplete: "false",
+        catalogItemCount: "0",
+        catalogRebuilding: "false",
+        catalogRevision: "uninitialized",
+        catalogSource: "uninitialized",
+        catalogState: "uninitialized",
+        catalogVisibleCount: "0",
+        hasExpectedSession: true,
+        itemCount: 0,
+        provisionalItemCount: 0,
+        sessionIdentities: [],
+        text: "这个工作区还没有会话"
+      }),
+      waitFor: async () => undefined
+    };
+    const window = {
+      getByTestId: () => ({ first: () => workspaceGroup })
+    };
+
+    await expect(waitForCatalogState(window, undefined, 10)).rejects.toThrow(
+      /"catalogState":"uninitialized".*"state":null/
+    );
   });
 
   it("fails closed when the installed Catalog reports unavailable", async () => {

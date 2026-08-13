@@ -60,7 +60,7 @@ async function ensureWorkspaceCatalog(
   workspaceId: string,
   refresh: boolean
 ): Promise<void> {
-  if (!refresh && queriedCatalogs.has(key)) return;
+  if (!refresh && queriedCatalogs.has(key) && catalogIsAuthoritative(workspaceId)) return;
   const existing = catalogFlights.get(key);
   if (existing) return existing;
   const flight = queryFirstSessionCatalog(workspaceId, { refresh }).then((loaded) => {

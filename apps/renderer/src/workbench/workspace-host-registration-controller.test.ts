@@ -111,6 +111,24 @@ describe("workspace host registration coordinator", () => {
     expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
     expect(request.mock.calls.filter(([type]) => type === "session.catalog.query")).toHaveLength(2);
   });
+
+  it("queries again after recovery resets an authoritative cached Catalog", async () => {
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "session.catalog.query") return emptyPage() as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    await registerRendererWorkspaceWithHost(workspace());
+    expect(useSessionCatalogStore.getState().byWorkspace["workspace-a"]?.catalogState).toBe("ready");
+
+    useSessionCatalogStore.getState().reset("workspace-a");
+    await registerRendererWorkspaceWithHost(workspace());
+
+    expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "session.catalog.query")).toHaveLength(2);
+    expect(useSessionCatalogStore.getState().byWorkspace["workspace-a"]?.catalogState).toBe("ready");
+  });
 });
 
 function workspace(): WorkspaceDescriptor {

@@ -14,6 +14,20 @@ function catalogStateFromText(text, itemCount) {
   return undefined;
 }
 
+function explicitCatalogState(observation) {
+  if (observation.catalogState === "uninitialized") return undefined;
+  if (observation.catalogRebuilding === "true") {
+    return observation.catalogState === "fallback" ? "fallback-recovering" : "rebuilding";
+  }
+  if (observation.catalogState === "ready") {
+    if (observation.catalogIncomplete === "true" && observation.itemCount === 0) return "incomplete-empty";
+    return observation.itemCount > 0 ? "ready" : "ready-empty";
+  }
+  if (observation.catalogState === "fallback") return "fallback";
+  if (observation.catalogState !== undefined && observation.catalogState !== null) return undefined;
+  return catalogStateFromText(observation.text, observation.itemCount);
+}
+
 export async function waitForCatalogState(
   window,
   expectedSessionIdentity,
@@ -32,6 +46,13 @@ export async function waitForCatalogState(
       const sessionIdentities = conversationIdentities
         .filter((identity) => identity?.startsWith("session:"));
       return {
+        catalogIncomplete: element.getAttribute("data-catalog-incomplete"),
+        catalogItemCount: element.getAttribute("data-catalog-item-count"),
+        catalogRebuilding: element.getAttribute("data-catalog-rebuilding"),
+        catalogRevision: element.getAttribute("data-catalog-revision"),
+        catalogSource: element.getAttribute("data-catalog-source"),
+        catalogState: element.getAttribute("data-catalog-state"),
+        catalogVisibleCount: element.getAttribute("data-catalog-visible-count"),
         hasExpectedSession: expectedIdentity ? sessionIdentities.includes(expectedIdentity) : true,
         itemCount: sessionIdentities.length,
         provisionalItemCount: conversationIdentities
@@ -41,14 +62,20 @@ export async function waitForCatalogState(
       };
     }, expectedSessionIdentity);
     latestObservation = {
+      catalogIncomplete: current.catalogIncomplete ?? null,
+      catalogItemCount: current.catalogItemCount ?? null,
+      catalogRebuilding: current.catalogRebuilding ?? null,
+      catalogRevision: current.catalogRevision ?? null,
+      catalogSource: current.catalogSource ?? null,
+      catalogState: current.catalogState ?? null,
+      catalogVisibleCount: current.catalogVisibleCount ?? null,
       hasExpectedSession: current.hasExpectedSession,
       itemCount: current.itemCount,
       provisionalItemCount: current.provisionalItemCount,
-      state: catalogStateFromText(current.text, current.itemCount) ?? null,
-      text: current.text,
+      state: explicitCatalogState(current) ?? null,
       visibleSessionIdentityFingerprints: (current.sessionIdentities ?? []).map(fingerprintSessionIdentity)
     };
-    if (current.text.includes("Session 目录暂不可用")) {
+    if (current.catalogState === "unavailable" || current.text.includes("Session 目录暂不可用")) {
       throw new Error("Windows real-user Session Catalog became unavailable.");
     }
     if (current.text.includes("Agent request acknowledgement timed out")) {
@@ -58,7 +85,7 @@ export async function waitForCatalogState(
     if (!expectedSessionIdentity && current.provisionalItemCount > 0) {
       return { itemCount: current.itemCount, state: "creating" };
     }
-    const explicitState = catalogStateFromText(current.text, current.itemCount);
+    const explicitState = explicitCatalogState(current);
     return explicitState ? { itemCount: current.itemCount, state: explicitState } : undefined;
   }, timeoutMs, async () => {
     const [expectedSessionFile, sessionCatalogDiscovery] = await Promise.all([
