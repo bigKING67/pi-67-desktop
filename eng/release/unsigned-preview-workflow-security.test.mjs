@@ -42,6 +42,23 @@ describe("unsigned preview candidate and promotion workflow security", () => {
     expect(diagnosticUpload).not.toContain("artifacts/release/");
   });
 
+  it("reuses the candidate build attempt when a failed certification job is rerun", async () => {
+    const source = await readFile(candidateUrl, "utf8");
+    const build = source.slice(source.indexOf("  build-windows:"), source.indexOf("  certify-installer:"));
+    const reverify = source.slice(
+      source.indexOf("      - name: Reverify exact Windows candidate bytes"),
+      source.indexOf("      - name: Verify full Windows NSIS installer lifecycle")
+    );
+
+    expect(build).toContain("candidate_run_attempt: ${{ steps.names.outputs.attempt }}");
+    expect(build).toContain('echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"');
+    expect(reverify).toContain(
+      "CANDIDATE_BUILD_ATTEMPT: ${{ needs.build-windows.outputs.candidate_run_attempt }}"
+    );
+    expect(reverify).toContain("--expected-run-attempt $env:CANDIDATE_BUILD_ATTEMPT");
+    expect(reverify).not.toContain("--expected-run-attempt $env:GITHUB_RUN_ATTEMPT");
+  });
+
   it("requires explicit manual test confirmation and publishes only a verified bundle", async () => {
     const source = await readFile(promotionUrl, "utf8");
     expect(source).toContain("confirm_windows_tested:");
