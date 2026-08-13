@@ -134,6 +134,17 @@ the only Runtime and behavior specification source.
   utility process. Desktop must not describe those runtime surfaces as isolated until
   Pi provides an executor/proxy boundary, Desktop maintains an audited loader fork,
   or unsupported third-party execution is explicitly disabled.
+- A Windows/macOS user with no prior Pi TUI Profile and a user who already owns a
+  populated Pi TUI Profile are both first-class Desktop users. Both use the same
+  canonical Pi Agent Profile and Pi JSONL Sessions; Desktop never selects a second
+  Profile or Runtime based on whether a system `pi` executable is installed.
+  Startup classifies the Profile as `fresh`, `existing-shared`, or
+  `desktop-managed-upgrade` from the directory and a validated Desktop capability
+  receipt. A missing, invalid, or legacy receipt without explicit Profile ownership
+  never grants Desktop ownership of existing
+  user resources. Desktop records `shared` origin when it first materializes its own
+  namespace inside an existing Profile, so later capability upgrades do not silently
+  reclassify the rest of that Profile as Desktop-owned.
 - Pi-67 Core, browser67, design-craft, and the commerce-growth-os Skill suite ship
   as pinned first-party capability snapshots. Desktop materializes verified
   copies under the Pi agent directory, preserves existing Package object filters,
@@ -150,9 +161,11 @@ the only Runtime and behavior specification source.
   the default catalog.
 - Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
   in the Pi Agent Profile with the private packaged Node executable. It updates only
-  entries carrying a matching Desktop receipt, fails closed on same-name user-owned
-  entries, invalid JSON, or compare-and-swap conflict, and never runs npm in the
-  packaged client. When the managed browser67 revision or server specification
+  entries carrying a matching Desktop receipt and never runs npm in the packaged
+  client. Same-name user-owned entries, invalid JSON, cache conflicts, and
+  compare-and-swap conflicts fail closed at the browser67 enhancement boundary:
+  Desktop preserves the user bytes, marks Agent Host startup `degraded`, and keeps
+  the core Pi runtime available. When the managed browser67 revision or server specification
   changes, Desktop removes only those two entries from valid `mcp-cache.json`, keeps
   unrelated cached servers, and records cache invalidation completion before startup
   proceeds.
@@ -271,8 +284,9 @@ the only Runtime and behavior specification source.
   environment, or bootstraps it into Pi. On Desktop startup, Agent Host removes only
   the exact former `tavily-bridge` URL/auth/token-env identity from `mcp.json` through
   an exact-revision atomic replacement. Same-name user-customized entries and every
-  unrelated field/server are preserved; a concurrent external edit wins and fences
-  Agent Host startup rather than loading an ambiguous retired route. Main attempts to
+  unrelated field/server are preserved. Cleanup runs only for a Profile with validated
+  Desktop ownership; a concurrent external edit wins and fences that cleanup, not core
+  Agent Host startup. Main attempts to
   remove only the former userData token file without following symlinks. Token cleanup
   failure does not block the application because the token is no longer injected.
 - Download-source probing validates and checks the current in-memory draft without
@@ -499,8 +513,9 @@ the only Runtime and behavior specification source.
   Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
   budget preserves it when available, while timeout, disconnection, or Host
   replacement still exports Main-owned recovery, Supervisor lifecycle, and Pi
-  configuration readability metadata. Main writes `pi67-support-diagnostics.v3`,
-  which adds bounded Main service health and Renderer acknowledgement latency;
+  configuration readability metadata. Main writes `pi67-support-diagnostics.v4`,
+  which adds bounded Profile mode, startup ready/degraded state, startup stage/issue,
+  Main service health, and Renderer acknowledgement latency;
   Renderer cannot submit arbitrary JSON or raw error text. The support file
   contains hashes, categories, counts, revisions, states, bounded timestamps,
   and bounded error classes, never raw Workspace or Agent Directory paths,

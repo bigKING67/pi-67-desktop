@@ -7,15 +7,10 @@ import type {
 import type {
   AgentConnectionIdentity,
   AgentEvent,
+  DesktopAgentHostFailureState,
   EventEnvelope,
   SequenceGap
 } from "@pi67/protocol";
-
-interface AgentHostFailureState {
-  code: number;
-  recoverable: boolean;
-  attempt?: number;
-}
 
 export interface AppState {
   connectionIdentity: AgentConnectionIdentity | undefined;
@@ -35,7 +30,7 @@ export interface AppState {
   handleAgentConnected: (identity: AgentConnectionIdentity) => void;
   handleAgentTeardown: (error: Error) => void;
   handleSequenceGap: (gap: SequenceGap) => void;
-  handleAgentHostFailed: (state: AgentHostFailureState) => void;
+  handleAgentHostFailed: (state: DesktopAgentHostFailureState) => void;
   handlePowerResume: () => void;
   receiveAgentEvent: (event: AgentEvent, envelope: EventEnvelope) => boolean;
 }

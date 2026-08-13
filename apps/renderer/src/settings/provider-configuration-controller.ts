@@ -1,6 +1,7 @@
 import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
+import { shouldSuppressAgentHostFollowup } from "../connection/agent-host-startup-state.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
@@ -215,6 +216,8 @@ function resolveWorkspace(workspaceId?: string) {
 function reportFailure(workspaceId: string, title: string, error: unknown): false {
   const message = error instanceof Error ? error.message : "未知错误";
   useProviderConfigurationStore.getState().fail(workspaceId, message);
-  publishNotification({ level: "error", title, message });
+  if (!shouldSuppressAgentHostFollowup(error)) {
+    publishNotification({ level: "error", title, message });
+  }
   return false;
 }

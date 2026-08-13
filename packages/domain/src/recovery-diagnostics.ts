@@ -15,6 +15,33 @@ export type AgentHostLifecyclePhase =
   | "failed"
   | "stopping";
 
+export type AgentHostProfileMode =
+  | "fresh"
+  | "existing-shared"
+  | "desktop-managed-upgrade";
+
+export type AgentHostStartupStage =
+  | "classify-profile"
+  | "desktop-capabilities"
+  | "managed-packages"
+  | "retired-mcp-cleanup"
+  | "browser67-mcp"
+  | "server-construction";
+
+export type AgentHostStartupIssueCode =
+  | "access-denied"
+  | "conflict"
+  | "invalid-state"
+  | "integrity-failure"
+  | "missing-resource"
+  | "io"
+  | "unknown";
+
+export interface AgentHostStartupIssue {
+  stage: AgentHostStartupStage;
+  code: AgentHostStartupIssueCode;
+}
+
 export interface DesktopRuntimeHealthDiagnostics {
   agentHost: {
     phase: AgentHostLifecyclePhase;
@@ -27,6 +54,19 @@ export interface DesktopRuntimeHealthDiagnostics {
       code: number;
       recoverable: boolean;
       attempt?: number;
+    };
+    lastStartup?: {
+      at: number;
+      hostEpoch: number;
+      profileMode: AgentHostProfileMode;
+      status: "ready" | "degraded";
+      issues: AgentHostStartupIssue[];
+    };
+    lastStartupFailure?: {
+      at: number;
+      hostEpoch: number;
+      profileMode?: AgentHostProfileMode;
+      issue: AgentHostStartupIssue;
     };
     restartScheduledAt?: number;
     restartCount: number;

@@ -177,13 +177,20 @@ describe("AgentHostSupervisor", () => {
       poisonedRuntimeReplacementPending: false
     });
 
-    firstHost.emit("message", { type: "agent-host-ready" });
+    firstHost.emit("message", readyMessage());
     expect(supervisor.diagnostics()).toEqual({
       phase: "running",
       hostEpoch: 1,
       processStartRequestedAt: 10_000,
       processStartedAt: 10_000,
       lastSpawnDurationMs: 0,
+      lastStartup: {
+        at: 10_000,
+        hostEpoch: 1,
+        profileMode: "fresh",
+        status: "ready",
+        issues: []
+      },
       restartCount: 0,
       portHandoffCount: 1,
       lastPortHandoffAt: 10_000,
@@ -202,6 +209,13 @@ describe("AgentHostSupervisor", () => {
         code: 17,
         recoverable: true,
         attempt: 1
+      },
+      lastStartup: {
+        at: 10_000,
+        hostEpoch: 1,
+        profileMode: "fresh",
+        status: "ready",
+        issues: []
       },
       restartScheduledAt: 11_500,
       restartCount: 1,
@@ -417,7 +431,14 @@ function fakeUtilityProcess() {
 
 function makeHostReady(host: ReturnType<typeof fakeUtilityProcess>): void {
   host.emit("spawn");
-  host.emit("message", { type: "agent-host-ready" });
+  host.emit("message", readyMessage());
+}
+
+function readyMessage() {
+  return {
+    type: "agent-host-ready",
+    startup: { profileMode: "fresh", status: "ready", issues: [] }
+  };
 }
 
 function fakeStream() {

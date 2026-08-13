@@ -67,17 +67,17 @@ describe("Windows installer lifecycle contract", () => {
   it("keeps upgrade and release evidence on the full lifecycle contract", () => {
     expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: true })).toEqual({
       certificationMode: "quick",
-      evidenceLevel: "windows-nsis-silent-install-real-user-lifecycle-uninstall",
+      evidenceLevel: "windows-nsis-silent-install-dual-profile-lifecycle-uninstall",
       verifyReinstall: false
     });
     expect(resolveWindowsInstallerLifecycleContract({ baseline: false, quick: false })).toEqual({
       certificationMode: "full",
-      evidenceLevel: "windows-nsis-silent-install-reinstall-real-user-lifecycle-uninstall",
+      evidenceLevel: "windows-nsis-silent-install-reinstall-dual-profile-lifecycle-uninstall",
       verifyReinstall: true
     });
     expect(resolveWindowsInstallerLifecycleContract({ baseline: true, quick: false })).toEqual({
       certificationMode: "full",
-      evidenceLevel: "windows-nsis-cross-version-upgrade-real-user-lifecycle-uninstall",
+      evidenceLevel: "windows-nsis-cross-version-upgrade-dual-profile-lifecycle-uninstall",
       verifyReinstall: true
     });
     expect(() => resolveWindowsInstallerLifecycleContract({ baseline: true, quick: true }))
@@ -130,10 +130,15 @@ describe("Windows installer lifecycle contract", () => {
       join(repositoryRoot, "eng/packaging/verify-windows-installer-lifecycle.mjs"),
       "utf8"
     );
-    const realUserGate = source.indexOf("await verifyInstalledRealUserLifecycle({");
+    const cleanProfileGate = source.indexOf("const cleanProfileLifecycle = await verifyInstalledRealUserLifecycle({");
+    const existingProfileGate = source.indexOf("const existingProfileLifecycle = await verifyInstalledRealUserLifecycle({");
     const uninstall = source.indexOf("const uninstallPath = await resolveUninstallerPath");
-    expect(realUserGate).toBeGreaterThan(-1);
-    expect(uninstall).toBeGreaterThan(realUserGate);
+    expect(cleanProfileGate).toBeGreaterThan(-1);
+    expect(existingProfileGate).toBeGreaterThan(cleanProfileGate);
+    expect(uninstall).toBeGreaterThan(existingProfileGate);
+    expect(source).toContain('lane: "clean-profile"');
+    expect(source).toContain('lane: "existing-pi-profile"');
+    expect(source).toContain("await assertWindowsExistingProfilePreserved(");
   });
 
   it("keeps initialization evidence structured and drops unrelated or malformed output", () => {

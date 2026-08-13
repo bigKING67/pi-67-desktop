@@ -15,6 +15,7 @@ import {
 import {
   AgentHostReadyMessageSchema,
   AgentHostRuntimePoisonedMessageSchema,
+  AgentHostStartupFailedMessageSchema,
   AgentHostShutdownCompleteMessageSchema,
   AgentHostShutdownRequestSchema
 } from "./supervisor-messages.js";
@@ -55,6 +56,7 @@ export function canonicalProtocolRevisionMaterial(): string {
     },
     supervisor: {
       ready: AgentHostReadyMessageSchema,
+      startupFailed: AgentHostStartupFailedMessageSchema,
       runtimePoisoned: AgentHostRuntimePoisonedMessageSchema,
       shutdownRequest: AgentHostShutdownRequestSchema,
       shutdownComplete: AgentHostShutdownCompleteMessageSchema

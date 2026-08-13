@@ -9,6 +9,7 @@ import { Welcome } from "../workspace/Welcome.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { NotificationToasts } from "../notifications/NotificationToasts.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { observeAgentHostStartup } from "../connection/agent-host-startup-state.js";
 import { createOperationFreshnessInstallation } from "../operation/operation-freshness-installation.js";
 import { WorkbenchProjectionBridge } from "../workbench/WorkbenchProjectionBridge.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
@@ -108,6 +109,11 @@ export function App() {
   useEffect(() => window.pi67.system.onAgentHostFailed((state) => {
     useAppStore.getState().handleAgentHostFailed(state);
   }), []);
+
+  useEffect(() => {
+    if (typeof window.pi67.system.onAgentHostStartup !== "function") return;
+    return window.pi67.system.onAgentHostStartup(observeAgentHostStartup);
+  }, []);
 
   useEffect(() => window.pi67.system.onPowerResume(() => {
     freshnessInstallationRef.current?.handlePowerResume();

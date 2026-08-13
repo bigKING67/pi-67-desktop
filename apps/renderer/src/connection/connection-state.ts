@@ -7,6 +7,7 @@ import type { AppState } from "../app/app-store.types.js";
 import { clearedTransientState, INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { observeAgentHostFailure } from "./agent-host-startup-state.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
@@ -196,6 +197,7 @@ function matchesProjectionAuthority(
 }
 
 export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailure): void {
+  const deterministicStartupFailure = observeAgentHostFailure(state);
   prepareRendererHostReplacement();
   useShellStore.getState().closeRuntimeBoundDialogs();
   set({
@@ -207,7 +209,9 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
     sessionBootstrapTransitionPending: false,
     runtime: {
       phase: state.recoverable ? "recovering" : "failed",
-      detail: state.recoverable
+      detail: deterministicStartupFailure
+        ? messages.runtime.connection.hostStartupFailed
+        : state.recoverable
         ? messages.runtime.connection.hostExitedRecovering(state.attempt ?? 1)
         : messages.runtime.connection.hostExitedStopped,
       recoverable: state.recoverable,
@@ -216,7 +220,11 @@ export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailu
   });
   publishNotification({
     level: "warning",
-    title: messages.runtime.connection.hostExitedTitle,
-    message: messages.credentials.clearedAfterHostReplacement
+    title: deterministicStartupFailure
+      ? messages.runtime.connection.hostStartupFailedTitle
+      : messages.runtime.connection.hostExitedTitle,
+    message: deterministicStartupFailure
+      ? messages.runtime.connection.hostStartupFailedDetail
+      : messages.credentials.clearedAfterHostReplacement
   });
 }

@@ -72,7 +72,7 @@ describe("Windows installed real-user lifecycle", () => {
     }
     const launchFlow = lifecycleSource.slice(
       lifecycleSource.indexOf("async function runRealUserLaunch"),
-      lifecycleSource.indexOf("export async function activateCatalogSession")
+      lifecycleSource.indexOf("export async function waitForRealUserRuntimeReady")
     );
     const catalogRequestStart = launchFlow.indexOf("await waitForCatalogRequestStart(");
     const catalogAuthority = launchFlow.indexOf("await waitForCatalogState(");
@@ -86,6 +86,23 @@ describe("Windows installed real-user lifecycle", () => {
     expect(controlledCreate).toBeGreaterThan(creationAuthorityReady);
     expect(launchFlow.slice(creationAuthorityReady, controlledCreate))
       .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
+  });
+
+  it("bootstraps a truly missing clean Profile before the controlled full lifecycle", async () => {
+    const lifecycleSource = await readFile(
+      new URL("./windows-real-user-lifecycle.mjs", import.meta.url),
+      "utf8"
+    );
+    const bootstrapSource = await readFile(
+      new URL("./windows-clean-profile-bootstrap.mjs", import.meta.url),
+      "utf8"
+    );
+    const bootstrap = lifecycleSource.indexOf("await bootstrapFreshProfileLaunch({");
+    const normalLaunches = lifecycleSource.indexOf("for (let launchIndex = 0;");
+    expect(bootstrap).toBeGreaterThan(-1);
+    expect(normalLaunches).toBeGreaterThan(bootstrap);
+    expect(bootstrapSource).toContain('profileMode: "fresh"');
+    expect(bootstrapSource).toContain("await initializeFirstLaunch();");
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {

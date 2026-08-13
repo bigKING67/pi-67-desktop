@@ -1,6 +1,7 @@
 import { DEFAULT_APPROVAL_MODE, type WorkspaceDescriptor } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
+import { shouldSuppressAgentHostFollowup } from "../connection/agent-host-startup-state.js";
 import {
   cancelSessionCatalogRetries,
   queryFirstSessionCatalog
@@ -108,6 +109,7 @@ export async function registerAvailableRendererWorkspaces(): Promise<void> {
     try {
       await registerRendererWorkspaceWithHost(workspace);
     } catch (error) {
+      if (shouldSuppressAgentHostFollowup(error)) return;
       publishNotification({
         level: "warning",
         title: `无法加载 ${workspace.displayName} 的会话`,

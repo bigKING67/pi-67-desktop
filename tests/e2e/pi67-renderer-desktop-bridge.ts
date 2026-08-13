@@ -424,6 +424,7 @@ export async function installMockDesktopBridge(
             };
           },
           onAgentHostFailed: () => () => undefined,
+          onAgentHostStartup: () => () => undefined,
           onPowerResume: () => () => undefined
     } satisfies MockDesktopPrimaryBridge;
     Object.assign(systemFixture.methods, primaryBridge);

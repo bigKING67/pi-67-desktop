@@ -18,9 +18,14 @@ import {
 } from "./windows-real-user-health.mjs";
 import {
   INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
-  readSelectedConversationIdentity,
+  INSTALLED_SHUTDOWN_BUDGET_MS,
   waitForInstalledStartupSurface
 } from "./windows-installed-application-lifecycle.mjs";
+import { bootstrapFreshProfileLaunch } from "./windows-clean-profile-bootstrap.mjs";
+import {
+  activateCatalogSession,
+  REAL_USER_RUNTIME_TIMEOUT_MS
+} from "./windows-real-user-catalog-activation.mjs";
 import { createControlledConversation } from "./windows-real-user-conversation.mjs";
 import {
   shouldCreateInitialRealUserSession,
@@ -38,6 +43,7 @@ import {
 } from "./windows-real-user-initialization.mjs";
 
 export { REAL_USER_PROVIDER_TIMEOUT_MS } from "./windows-real-user-provider-configuration.mjs";
+export { activateCatalogSession } from "./windows-real-user-catalog-activation.mjs";
 export {
   assertModelRuntimeInitialization,
   parseInitializationObservations,
@@ -54,8 +60,6 @@ export const REAL_USER_CREATE_TARGET_MS = 5_000;
 export const REAL_USER_CREATE_HARD_TIMEOUT_MS = 15_000;
 export const REAL_USER_MODEL_HYDRATION_TIMEOUT_MS = 30_000;
 export const REAL_USER_WORKBENCH_CONVERGENCE_TIMEOUT_MS = 10_000;
-const REAL_USER_RUNTIME_TIMEOUT_MS = 15_000;
-const REAL_USER_SHUTDOWN_BUDGET_MS = 5_000;
 export const REAL_USER_RESTART_COUNT = 3;
 
 const POLL_INTERVAL_MS = 50;
@@ -64,6 +68,8 @@ export async function verifyInstalledRealUserLifecycle({
   agentDir,
   artifact,
   environmentDriftAgentDir,
+  initializeFirstLaunch,
+  lane,
   userDataDirectory,
   workspace
 }) {
@@ -75,6 +81,17 @@ export async function verifyInstalledRealUserLifecycle({
   let expectedSessionPath;
   let expectedWorkspaceCwd;
   let create;
+  const bootstrap = initializeFirstLaunch
+    ? await bootstrapFreshProfileLaunch({
+      agentDir,
+      artifact,
+      environmentDriftAgentDir,
+      initializeFirstLaunch,
+      lane,
+      userDataDirectory,
+      workspace
+    })
+    : undefined;
 
   for (let launchIndex = 0; launchIndex <= REAL_USER_RESTART_COUNT; launchIndex += 1) {
     const result = await runRealUserLaunch({
@@ -84,6 +101,7 @@ export async function verifyInstalledRealUserLifecycle({
       expectedSessionIdentity,
       expectedSessionPath,
       expectedWorkspaceCwd,
+      lane,
       launchIndex,
       userDataDirectory,
       workspace
@@ -100,8 +118,10 @@ export async function verifyInstalledRealUserLifecycle({
   }
   return {
     create,
-    launchCount: launches.length,
+    ...(bootstrap ? { bootstrap } : {}),
+    launchCount: launches.length + (bootstrap ? 1 : 0),
     launches,
+    lane,
     offlineMode: "disabled",
     restartCount: REAL_USER_RESTART_COUNT
   };
@@ -114,6 +134,7 @@ async function runRealUserLaunch({
   expectedSessionIdentity,
   expectedSessionPath,
   expectedWorkspaceCwd,
+  lane,
   launchIndex,
   userDataDirectory,
   workspace
@@ -227,14 +248,14 @@ async function runRealUserLaunch({
 
     const shutdownMeasurement = await measureElectronApplicationShutdown({
       application,
-      budgetMs: REAL_USER_SHUTDOWN_BUDGET_MS,
+      budgetMs: INSTALLED_SHUTDOWN_BUDGET_MS,
       mainPid,
       utilityPids
     });
     application = undefined;
-    if (!productShutdownWithinBudget(shutdownMeasurement, REAL_USER_SHUTDOWN_BUDGET_MS)) {
+    if (!productShutdownWithinBudget(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS)) {
       throw new Error(
-        `Windows real-user product process shutdown exceeded ${REAL_USER_SHUTDOWN_BUDGET_MS}ms. `
+        `Windows real-user product process shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms. `
         + `Shutdown diagnostics: ${JSON.stringify(shutdownMeasurement)}`
       );
     }
@@ -255,6 +276,7 @@ async function runRealUserLaunch({
         launchToReadyMs: round(launchToReadyMs),
         lifecycleDurationMs: round(performance.now() - launchStartedAt),
         name: launchIndex === 0 ? "initial" : `restart-${launchIndex}`,
+        lane,
         profileAuthority: {
           environmentDriftInjected,
           mainOwnedAgentDirectoryVerified: environmentDriftInjected
@@ -272,61 +294,6 @@ async function runRealUserLaunch({
   } finally {
     if (application) await application.close();
   }
-}
-
-export async function activateCatalogSession(
-  window,
-  expectedSessionIdentity,
-  timeoutMs = REAL_USER_RUNTIME_TIMEOUT_MS
-) {
-  const deadline = performance.now() + timeoutMs;
-  const conversation = window.getByLabel("Pi conversation");
-  const rows = window.locator('[data-testid="conversation-row"]');
-  let targetSessionIdentity = expectedSessionIdentity;
-  let activationRequested = false;
-  let observation = { provisionalRowCount: 0, rowCount: 0, sessionRowCount: 0 };
-
-  while (performance.now() <= deadline) {
-    if (await conversation.isVisible()) {
-      const selectedIdentity = await readSelectedConversationIdentity(window);
-      if (targetSessionIdentity && selectedIdentity === targetSessionIdentity) {
-        return targetSessionIdentity;
-      }
-      if (!targetSessionIdentity && selectedIdentity?.startsWith("session:")) {
-        return selectedIdentity;
-      }
-    }
-
-    const rowCount = await rows.count();
-    for (let index = 0; index < rowCount; index += 1) {
-      const row = rows.nth(index);
-      const identity = await row.getAttribute("data-conversation-id");
-      if (
-        (targetSessionIdentity && identity === targetSessionIdentity)
-        || (!targetSessionIdentity && identity?.startsWith("session:"))
-      ) {
-        targetSessionIdentity = identity;
-        if (!activationRequested) {
-          await row.click({ timeout: Math.max(1, Math.ceil(deadline - performance.now())) });
-          activationRequested = true;
-        }
-        break;
-      }
-    }
-
-    observation = await rows.evaluateAll((visibleRows) => ({
-      provisionalRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("provisional:"))
-        .length,
-      rowCount: visibleRows.length,
-      sessionRowCount: visibleRows.filter((row) => row.getAttribute("data-conversation-id")?.startsWith("session:"))
-        .length
-    }));
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, POLL_INTERVAL_MS));
-  }
-
-  throw new Error(
-    `Windows real-user lifecycle could not activate a Catalog-backed Session: ${JSON.stringify(observation)}`
-  );
 }
 
 export async function waitForRealUserRuntimeReady(

@@ -42,8 +42,8 @@ describe("AgentHostSupervisor readiness", () => {
     expect(host.postMessage).not.toHaveBeenCalled();
     expect(window.postMessage).not.toHaveBeenCalled();
 
-    host.emit("message", { type: "agent-host-ready" });
-    host.emit("message", { type: "agent-host-ready" });
+    host.emit("message", readyMessage());
+    host.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "running", portHandoffCount: 1 });
     expect(host.postMessage).toHaveBeenCalledOnce();
@@ -65,12 +65,12 @@ describe("AgentHostSupervisor readiness", () => {
     firstHost.emit("exit", 1);
     await vi.advanceTimersByTimeAsync(500);
     secondHost.emit("spawn");
-    firstHost.emit("message", { type: "agent-host-ready" });
+    firstHost.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "starting", hostEpoch: 2 });
     expect(window.postMessage).not.toHaveBeenCalled();
 
-    secondHost.emit("message", { type: "agent-host-ready" });
+    secondHost.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "running", hostEpoch: 2 });
     expect(window.postMessage).toHaveBeenCalledOnce();
@@ -84,7 +84,7 @@ describe("AgentHostSupervisor readiness", () => {
     const supervisor = createSupervisor(window.value);
 
     supervisor.connect();
-    host.emit("message", { type: "agent-host-ready" });
+    host.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "starting", portHandoffCount: 0 });
     expect(window.postMessage).not.toHaveBeenCalled();
@@ -104,7 +104,7 @@ describe("AgentHostSupervisor readiness", () => {
     supervisor.connect();
     host.emit("spawn");
     void supervisor.stop();
-    host.emit("message", { type: "agent-host-ready" });
+    host.emit("message", readyMessage());
 
     expect(supervisor.diagnostics()).toMatchObject({ phase: "stopping", portHandoffCount: 0 });
     expect(window.postMessage).not.toHaveBeenCalled();
@@ -166,5 +166,12 @@ function fakeUtilityProcess() {
     emit(event: string, ...args: unknown[]) {
       for (const listener of listeners.get(event) ?? []) listener(...args);
     }
+  };
+}
+
+function readyMessage() {
+  return {
+    type: "agent-host-ready",
+    startup: { profileMode: "fresh", status: "ready", issues: [] }
   };
 }

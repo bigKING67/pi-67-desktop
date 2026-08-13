@@ -72,10 +72,18 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     expect(typeof serialized).toBe("string");
     expect(JSON.parse(serialized as string)).toEqual(expect.objectContaining({
-      schema: "pi67-support-diagnostics.v3",
+      schema: "pi67-support-diagnostics.v4",
       application: expect.objectContaining({ version: "0.1.0-alpha.10" }),
       desktop: expect.objectContaining({ previousRunExitStatus: "unclean" }),
-      agentHost: expect.objectContaining({ phase: "running", hostEpoch: 4 }),
+      agentHost: expect.objectContaining({
+        phase: "running",
+        hostEpoch: 4,
+        lastStartup: expect.objectContaining({
+          profileMode: "existing-shared",
+          status: "degraded",
+          issues: [{ stage: "browser67-mcp", code: "conflict" }]
+        })
+      }),
       piConfiguration: expect.objectContaining({
         agentDirectory: expect.objectContaining({ state: "missing" }),
         files: [
@@ -104,7 +112,7 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     const document = JSON.parse(String(serialized)) as Record<string, unknown>;
     expect(document).toMatchObject({
-      schema: "pi67-support-diagnostics.v3",
+      schema: "pi67-support-diagnostics.v4",
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
@@ -187,6 +195,13 @@ function registerFixture(): void {
     getAgentHostDiagnostics: vi.fn(() => ({
       phase: "running",
       hostEpoch: 4,
+      lastStartup: {
+        at: 2,
+        hostEpoch: 4,
+        profileMode: "existing-shared",
+        status: "degraded",
+        issues: [{ stage: "browser67-mcp", code: "conflict" }]
+      },
       restartCount: 0,
       portHandoffCount: 1,
       poisonedRuntimeReplacementCount: 0,

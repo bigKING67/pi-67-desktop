@@ -36,8 +36,12 @@ import {
 } from "./windows-installer-process.mjs";
 import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
 import {
+  assertWindowsExistingProfilePreserved,
+  inspectCleanWindowsRealUserProfile,
+  prepareFreshWindowsRealUserProfile,
   prepareWindowsRealUserProfile,
   resolveWindowsRealUserProfilePaths,
+  snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
 } from "./windows-real-user-profile.mjs";
 import {
@@ -112,7 +116,10 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     lifecycleAgentDir,
     lifecycleEnvironmentDriftAgentDir,
     lifecycleExtensionsDirectory,
-    lifecycleUserDataDirectory
+    lifecycleUserDataDirectory,
+    cleanLifecycleAgentDir,
+    cleanLifecycleEnvironmentDriftAgentDir,
+    cleanLifecycleUserDataDirectory
   } = resolveWindowsRealUserProfilePaths(root);
   const workspace = join(root, "中文工作区 包含空格");
   const childPidPath = join(root, "controlled-child.pid");
@@ -147,7 +154,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       agentDirectoryClass: "localized-space",
       environmentDriftProbe: true,
       expectedConfiguredProvider: WINDOWS_REAL_USER_CONFIGURED_PROVIDER,
-      isolatedLifecycleAgentProfile: true
+      lanes: ["clean-profile", "existing-pi-profile"]
     },
     phases: [],
     notVerified: [
@@ -156,7 +163,9 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       ...(baseline ? [] : ["upgrade from a distinct previously released version"]),
       ...(lifecycleContract.verifyReinstall ? [] : ["same-version reinstall and restored-startup persistence"]),
       "machine-wide installation",
-      "real user default-path uninstall data retention", "existing user Pi profile, credentials, history, Defender/EDR, OneDrive or redirected storage"
+      "real user default-path uninstall data retention",
+      "uncontrolled real-world Pi TUI profiles",
+      "Defender/EDR, OneDrive or redirected storage"
     ]
   };
   await writeReport(report);
@@ -169,10 +178,12 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         extensionsDirectory,
         lifecycleAgentDir,
         lifecycleEnvironmentDriftAgentDir,
-        lifecycleExtensionsDirectory
+        lifecycleExtensionsDirectory,
+        cleanLifecycleEnvironmentDriftAgentDir
       }),
       mkdir(userDataDirectory, { recursive: true }),
       mkdir(lifecycleUserDataDirectory, { recursive: true }),
+      mkdir(cleanLifecycleUserDataDirectory, { recursive: true }),
       mkdir(join(workspace, ".git"), { recursive: true })
     ]);
     await Promise.all([
@@ -187,6 +198,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       childPidPath,
       lifecyclePath
     });
+    const existingProfileBefore = await snapshotWindowsExistingProfile(lifecycleAgentDir);
     if (baseline) {
       await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
     } else {
@@ -287,16 +299,45 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       });
     }
 
-    const realUserLifecycle = await verifyInstalledRealUserLifecycle({
+    const cleanProfileLifecycle = await verifyInstalledRealUserLifecycle({
+      agentDir: cleanLifecycleAgentDir,
+      artifact: finalInstalledArtifact,
+      environmentDriftAgentDir: cleanLifecycleEnvironmentDriftAgentDir,
+      initializeFirstLaunch: () => prepareFreshWindowsRealUserProfile({
+        agentDir: cleanLifecycleAgentDir,
+        writeControlledExtension: (extensionPath) => writeControlledShutdownExtension({
+          extensionPath,
+          childPidPath,
+          lifecyclePath
+        })
+      }),
+      lane: "clean-profile",
+      userDataDirectory: cleanLifecycleUserDataDirectory,
+      workspace
+    });
+    const cleanProfileProvisioning = await inspectCleanWindowsRealUserProfile(cleanLifecycleAgentDir);
+    report.phases.push({
+      name: "clean-profile-lifecycle",
+      provisioning: cleanProfileProvisioning,
+      ...cleanProfileLifecycle
+    });
+
+    const existingProfileLifecycle = await verifyInstalledRealUserLifecycle({
       agentDir: lifecycleAgentDir,
       artifact: finalInstalledArtifact,
       environmentDriftAgentDir: lifecycleEnvironmentDriftAgentDir,
+      lane: "existing-pi-profile",
       userDataDirectory: lifecycleUserDataDirectory,
       workspace
     });
+    const existingProfilePreservation = await assertWindowsExistingProfilePreserved(
+      lifecycleAgentDir,
+      existingProfileBefore
+    );
     report.phases.push({
-      name: "real-user-lifecycle",
-      ...realUserLifecycle
+      name: "existing-pi-profile-lifecycle",
+      preservation: existingProfilePreservation,
+      ...existingProfileLifecycle
     });
 
     const uninstallPath = await resolveUninstallerPath(installDirectory);
@@ -306,12 +347,14 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       await waitForInstallationRemoval(installDirectory);
     });
     report.phases.push(uninstall);
-    const [preservedEntries, preservedLifecycleEntries] = await Promise.all([
+    const [preservedEntries, preservedLifecycleEntries, preservedCleanLifecycleEntries] = await Promise.all([
       assertPreservedUserData(userDataDirectory),
-      assertPreservedUserData(lifecycleUserDataDirectory)
+      assertPreservedUserData(lifecycleUserDataDirectory),
+      assertPreservedUserData(cleanLifecycleUserDataDirectory)
     ]);
     report.userData = {
       lifecycleProfileTopLevelEntryCount: preservedLifecycleEntries.length,
+      cleanLifecycleProfileTopLevelEntryCount: preservedCleanLifecycleEntries.length,
       preservedAfterUninstall: true,
       topLevelEntryCount: preservedEntries.length
     };
@@ -323,7 +366,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     console.log(
       `Windows NSIS ${lifecycleContract.certificationMode} lifecycle smoke passed: silent install, `
       + "installed app:// launch, controlled process shutdown, Provider/Catalog/create hard gates, "
-      + `${realUserLifecycle.restartCount} clean real-user restarts, `
+      + `${cleanProfileLifecycle.restartCount} clean-profile restarts and `
+      + `${existingProfileLifecycle.restartCount} existing-pi-profile restarts, `
       + reinstallEvidence
       + "silent uninstall, and isolated user-data preservation. "
       + `Evidence: ${relative(repositoryRoot, summaryPath)}.`

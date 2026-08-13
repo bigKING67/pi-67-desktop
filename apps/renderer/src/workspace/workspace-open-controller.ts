@@ -5,6 +5,7 @@ import {
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ProtocolRequestError } from "@pi67/protocol";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
+import { shouldSuppressAgentHostFollowup } from "../connection/agent-host-startup-state.js";
 import {
   invalidateProjectionRecoveryGeneration,
   resynchronizeRendererProjection
@@ -80,7 +81,9 @@ export async function selectRendererWorkspaceDescriptor(
         recoverable: true
       }
     });
-    publishNotification({ level: "error", title: "无法准备工作区", message: detail });
+    if (!shouldSuppressAgentHostFollowup(error)) {
+      publishNotification({ level: "error", title: "无法准备工作区", message: detail });
+    }
     return false;
   } finally {
     if (get().workspace === workspace) set({ workspaceOpenPending: false });
@@ -232,7 +235,9 @@ export async function openRendererWorkspaceDescriptor(
       });
     } else {
       if (task) rendererWorkbenchStore.getState().updateTask(task.id, { lifecycle: "lost", runtime });
-      publishNotification({ level: "error", title: failureTitle, message: detail });
+      if (!shouldSuppressAgentHostFollowup(error)) {
+        publishNotification({ level: "error", title: failureTitle, message: detail });
+      }
     }
     return false;
   } finally {

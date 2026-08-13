@@ -13,10 +13,10 @@ export function resolveWindowsInstallerLifecycleContract({ baseline, quick }) {
   return {
     certificationMode: quick ? "quick" : "full",
     evidenceLevel: baseline
-      ? "windows-nsis-cross-version-upgrade-real-user-lifecycle-uninstall"
+      ? "windows-nsis-cross-version-upgrade-dual-profile-lifecycle-uninstall"
       : quick
-        ? "windows-nsis-silent-install-real-user-lifecycle-uninstall"
-        : "windows-nsis-silent-install-reinstall-real-user-lifecycle-uninstall",
+        ? "windows-nsis-silent-install-dual-profile-lifecycle-uninstall"
+        : "windows-nsis-silent-install-reinstall-dual-profile-lifecycle-uninstall",
     verifyReinstall: !quick
   };
 }

@@ -27,6 +27,7 @@ export interface DesktopCapabilityBootstrapOptions {
   capabilitiesRoot?: string;
   agentDir: string;
   environment?: NodeJS.ProcessEnv;
+  profileOwnership?: "desktop" | "shared";
   createToken?: () => string;
 }
 
@@ -117,6 +118,7 @@ export async function bootstrapDesktopCapabilities(
     })),
     rules,
     agents,
+    profileOwnership: options.profileOwnership ?? "desktop",
     preparedAt: Date.now()
   }, createToken);
   if (process.platform !== "win32") await chmod(managedRoot, 0o700);

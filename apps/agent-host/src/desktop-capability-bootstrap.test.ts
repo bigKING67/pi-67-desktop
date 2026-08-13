@@ -60,6 +60,7 @@ describe("Desktop first-party capability bootstrap", () => {
       capabilitiesRoot,
       agentDir,
       environment,
+      profileOwnership: "shared",
       createToken: () => "fixture"
     });
 
@@ -69,6 +70,8 @@ describe("Desktop first-party capability bootstrap", () => {
       .toBe("desktop rule\n");
     expect(JSON.parse(environment.PI67_CAPABILITY_PACKAGE_PATHS ?? "[]")).toEqual(result.packagePaths);
     expect(environment.PI67_MANAGED_CAPABILITIES_ROOT).toBe(result.managedRoot);
+    expect(JSON.parse(await readFile(join(agentDir, "desktop-capabilities", "state.json"), "utf8")))
+      .toMatchObject({ profileOwnership: "shared" });
     expect(JSON.parse(environment.PI67_KNOWN_PACKAGE_BASELINES ?? "[]")).toEqual([{
       source: "npm:pi-observational-memory",
       packageName: "pi-observational-memory",

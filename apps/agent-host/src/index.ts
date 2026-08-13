@@ -3,17 +3,17 @@ import {
   type AgentHostReadyMessage,
   type AgentHostRuntimePoisonedMessage,
   type AgentHostShutdownCompleteMessage,
+  type AgentHostStartupFailedMessage,
   type ProtocolPort
 } from "@pi67/protocol";
-import { existsSync } from "node:fs";
+import {
+  AgentHostStartupError,
+  coordinateAgentHostStartup
+} from "./agent-host-startup.js";
 import { isAttachPortMessage } from "./connection-context.js";
-import { bootstrapDesktopCapabilities } from "./desktop-capability-bootstrap.js";
-import { provisionManagedBrowser67Mcp } from "./managed-browser67-mcp-provision.js";
-import { activateDesktopManagedPackages } from "./managed-package-bundle.js";
 import { AgentHostServer } from "./host-server.js";
 import { resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { createPromptAttachmentAccessOwner } from "./prompt-attachment-access.js";
-import { removeRetiredTeamMcpConfig } from "./retired-team-mcp-cleanup.js";
 
 interface ParentMessageEvent {
   data: unknown;
@@ -23,87 +23,97 @@ interface ParentMessageEvent {
 interface UtilityParentPort {
   on(type: "message", listener: (event: ParentMessageEvent) => void): void;
   postMessage(
-    message: AgentHostReadyMessage | AgentHostRuntimePoisonedMessage | AgentHostShutdownCompleteMessage
+    message:
+      | AgentHostReadyMessage
+      | AgentHostRuntimePoisonedMessage
+      | AgentHostShutdownCompleteMessage
+      | AgentHostStartupFailedMessage
   ): void;
 }
 
 const parentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 if (!parentPort) throw new Error("Pi-67 Agent Host must run as an Electron utility process.");
 
-const agentDir = resolveAgentDirectory(undefined);
-process.env.PI67_AGENT_PROFILE_FRESH = existsSync(agentDir) ? "0" : "1";
-const capabilityBootstrap = await bootstrapDesktopCapabilities({
-  agentDir
-});
-if (capabilityBootstrap.enabled) {
-  await activateDesktopManagedPackages({ agentDir });
-}
-const retiredTeamMcpCleanup = await removeRetiredTeamMcpConfig({
-  agentDir
-});
-if (retiredTeamMcpCleanup.status === "revision-conflict") {
-  throw new Error("Agent Host cannot start while retired Team MCP configuration cleanup conflicts with an external edit.");
-}
-if (capabilityBootstrap.enabled) {
-  const managedBrowser67Mcp = await provisionManagedBrowser67Mcp({ agentDir });
-  if (["invalid-json", "revision-conflict", "user-owned-conflict"].includes(managedBrowser67Mcp.status)) {
-    throw new Error(`Agent Host cannot provision managed browser67 MCP servers: ${managedBrowser67Mcp.status}.`);
-  }
-  if (["invalid-json", "revision-conflict"].includes(managedBrowser67Mcp.cacheStatus)) {
-    throw new Error(`Agent Host cannot invalidate managed browser67 MCP cache entries: ${managedBrowser67Mcp.cacheStatus}.`);
-  }
-}
-
-const promptAttachments = createPromptAttachmentAccessOwner(process.env.PI67_PROMPT_ATTACHMENT_ROOT);
-const server = new AgentHostServer(undefined, {
-  ...(promptAttachments === undefined ? {} : { promptAttachments }),
-  onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message),
-  onRuntimeInitializationObservation: (observation) => {
-    process.stderr.write(`[agent-host:init] ${JSON.stringify(observation)}\n`);
-  }
-});
-let shuttingDown = false;
-let shutdownPromise: Promise<void> | undefined;
 let poisonedRuntimeExitScheduled = false;
 
-parentPort.on("message", (event) => {
-  if (isAgentHostShutdownRequest(event.data)) {
-    void shutdown(event.data.deadlineMs, true);
-    return;
-  }
-  if (!isAttachPortMessage(event.data) || event.ports.length !== 1) return;
-  const port = event.ports[0];
-  if (!port) return;
-  if (shuttingDown) {
-    port.close?.();
-    return;
-  }
-  server.attachPort(port, event.data);
-});
-parentPort.postMessage({ type: "agent-host-ready" });
+void startAgentHost();
 
-function shutdown(deadlineMs = 1_000, notifyParent = false): Promise<void> {
-  if (shutdownPromise) return shutdownPromise;
-  shuttingDown = true;
-  shutdownPromise = server.shutdown(deadlineMs)
-    .then((result) => {
-      if (notifyParent) {
-        parentPort!.postMessage({ type: "agent-host-shutdown-complete", ...result });
+async function startAgentHost(): Promise<void> {
+  let started;
+  let shuttingDown = false;
+  try {
+    const agentDir = resolveAgentDirectory(undefined);
+    started = await coordinateAgentHostStartup({
+      agentDir,
+      constructServer: () => {
+        const promptAttachments = createPromptAttachmentAccessOwner(
+          process.env.PI67_PROMPT_ATTACHMENT_ROOT
+        );
+        return new AgentHostServer(undefined, {
+          ...(promptAttachments === undefined ? {} : { promptAttachments }),
+          onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message, () => shuttingDown),
+          onRuntimeInitializationObservation: (observation) => {
+            process.stderr.write(`[agent-host:init] ${JSON.stringify(observation)}\n`);
+          }
+        });
       }
-      scheduleExit(0);
-    })
-    .catch(() => {
-      scheduleExit(70);
     });
-  return shutdownPromise;
+  } catch (error) {
+    const failure = error instanceof AgentHostStartupError
+      ? error
+      : new AgentHostStartupError({ stage: "server-construction", code: "unknown" });
+    parentPort!.postMessage({
+      type: "agent-host-startup-failed",
+      ...(failure.profileMode === undefined ? {} : { profileMode: failure.profileMode }),
+      issue: failure.issue
+    });
+    scheduleExit(1);
+    return;
+  }
+
+  const { server, startup } = started;
+  let shutdownPromise: Promise<void> | undefined;
+  const shutdown = (deadlineMs = 1_000, notifyParent = false): Promise<void> => {
+    if (shutdownPromise) return shutdownPromise;
+    shuttingDown = true;
+    shutdownPromise = server.shutdown(deadlineMs)
+      .then((result) => {
+        if (notifyParent) {
+          parentPort!.postMessage({ type: "agent-host-shutdown-complete", ...result });
+        }
+        scheduleExit(0);
+      })
+      .catch(() => {
+        scheduleExit(70);
+      });
+    return shutdownPromise;
+  };
+
+  parentPort!.on("message", (event) => {
+    if (isAgentHostShutdownRequest(event.data)) {
+      void shutdown(event.data.deadlineMs, true);
+      return;
+    }
+    if (!isAttachPortMessage(event.data) || event.ports.length !== 1) return;
+    const port = event.ports[0];
+    if (!port) return;
+    if (shuttingDown) {
+      port.close?.();
+      return;
+    }
+    server.attachPort(port, event.data);
+  });
+  process.once("SIGTERM", () => void shutdown());
+  process.once("SIGINT", () => void shutdown());
+  process.once("beforeExit", () => void shutdown());
+  parentPort!.postMessage({ type: "agent-host-ready", startup });
 }
 
-process.once("SIGTERM", () => void shutdown());
-process.once("SIGINT", () => void shutdown());
-process.once("beforeExit", () => void shutdown());
-
-function schedulePoisonedRuntimeExit(message: AgentHostRuntimePoisonedMessage): void {
-  if (shuttingDown || poisonedRuntimeExitScheduled) return;
+function schedulePoisonedRuntimeExit(
+  message: AgentHostRuntimePoisonedMessage,
+  isShuttingDown: () => boolean
+): void {
+  if (isShuttingDown() || poisonedRuntimeExitScheduled) return;
   poisonedRuntimeExitScheduled = true;
   try {
     parentPort!.postMessage(message);

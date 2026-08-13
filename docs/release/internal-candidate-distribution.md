@@ -37,9 +37,13 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
 2. **Build Windows**：使用 `Windows candidate` workflow 构建精确 source SHA。只有 provenance、
    packaged smoke、synthetic scale/IME、candidate identity 和完整 NSIS lifecycle 全部成功后，才下载
    `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。NSIS lifecycle 必须在中文且带空格的受控 Pi
-   profile 中写入测试用 `auth.json` / `settings.json`，在 Main 初始化后把进程环境指向另一个空目录，
-   并验证 Agent Host 仍显示 OpenAI 已配置和凭据已持久化到 Pi `auth.json`，随后再验证 Catalog、创建、
-   Prompt、退出和三次冷重启。该探针只使用测试凭据，不读取操作者的真实 Pi profile。
+   profile 中运行两个并列 lane。`clean-profile` 从不存在的 Agent 目录启动，先验证完整 Desktop capability、
+   managed Package、Rules 和 browser67 MCP receipt，再写入受控测试 Provider；`existing-pi-profile` 预置
+   Pi TUI-like `auth/settings/models/mcp/mcp-cache/AGENTS/Rules/Extensions/Skills/Prompts/Themes/Sessions`，
+   包含用户拥有的同名 browser67 MCP，并对所有预置文件做 SHA-256 前后比对。两个 lane 都在 Main 初始化后
+   把进程环境指向另一个空目录，并分别验证 Agent Host ready、Workspace、Provider、Catalog、Session
+   materialization、Prompt、退出和三次冷重启。该探针只使用合成测试凭据和 Profile，不读取 runner 操作者
+   的真实 Pi profile。
 3. **Build macOS**：在 Apple Silicon Mac 上运行相关 quality gate 和
    `corepack pnpm run preview:mac:unsigned`。该命令必须重新打包、执行 packaged smoke 并打开当前仓库
    artifact；不能用一次 `open` 冒充新包已加载。分发的是生成的 DMG 和 ZIP。
@@ -53,7 +57,8 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
    file token，让飞书保留版本历史并避免目录出现重复名称。删除远端文件或历史版本需要单独授权。
 7. **Verify mirror**：上传成功后重新列出目标文件夹。目录必须恰好包含本轮期望的三个产品名称；逐项核对
    upload response 的远端 size 与本地 size。构建记录中的 SHA-256 继续作为内容身份，不以飞书文件名代替。
-8. **Manual test**：Windows x64 和 macOS Apple Silicon 分别下载并测试。人工结论必须记录所测文件的
+8. **Manual test**：Windows x64 和 macOS Apple Silicon 分别下载并测试。Windows 同一组 exact bytes
+   必须在一台从未安装/使用 Pi TUI 的电脑和一台已有 Pi TUI/Profile 的电脑上分别测试。人工结论必须记录所测文件的
    version、source SHA、size、SHA-256，以及 Windows run/attempt 和 identity；不得把一轮结论转移给
    另一轮 bytes。Windows 必须另外使用测试者正常启动路径和自己的现有 Pi profile，确认模型服务不再
    停留在“正在读取 Pi 配置”或暴露 acknowledgement timeout，已有 Workspace/Session 可打开，一次
@@ -69,8 +74,9 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
   有意复用尚未发布的 version/file token，必须记录新 source SHA 和 SHA-256，并明确废弃旧测试 receipt。
 - 三个新文件都上传成功并重新列目录复核之前，不清理旧候选。远端清理需要当前明确授权。
 - hosted Windows lifecycle、macOS packaged smoke 和飞书可下载都不能替代目标系统的人工真机结论。
-- hosted Windows 的受控配置探针证明 Main/Agent Host 目录一致性，但不覆盖真实凭据、历史 Session、
-  Defender/EDR、OneDrive、重解析点、网络盘或企业目录重定向；这些仍属于目标 Windows 的人工验收。
+- hosted Windows 的双 Profile lane 证明合成 clean/existing Profile 的 ownership、Main/Agent Host 目录
+  一致性和预置文件不变，但不覆盖同事真实 Profile 的全部第三方资源、真实凭据、历史规模、Defender/EDR、
+  OneDrive、重解析点、网络盘或企业目录重定向；这些仍属于两台目标 Windows 的人工验收。
 
 ## Formal release boundary
 

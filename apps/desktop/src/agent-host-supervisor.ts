@@ -8,8 +8,10 @@ import {
 import {
   isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
+  isAgentHostStartupFailedMessage,
   isAgentHostShutdownCompleteMessage,
-  type AgentHostLifecyclePhase,
+  type AgentHostStartupFailedMessage,
+  type AgentHostStartupState,
   type AgentHostShutdownCompleteMessage,
   type AgentHostShutdownRequest
 } from "@pi67/protocol";
@@ -22,6 +24,11 @@ import { planAgentHostRestart } from "./agent-host-restart.js";
 import { AgentHostInitializationOutputForwarder } from "./agent-host-initialization-output.js";
 import { redact } from "./redaction.js";
 import { isExpectedRendererLocation } from "./renderer-security.js";
+import { sendAgentHostStartupFailure } from "./agent-host-startup-notification.js";
+import { emptyAgentHostStopResult, rendererDocumentHandoffKey, resolveAgentHostShutdownDeadline,
+  type AgentHostStopResult, type AgentHostSupervisorDiagnostics, type AgentHostSupervisorPhase
+} from "./agent-host-supervisor-contract.js";
+export type { AgentHostStopResult, AgentHostSupervisorDiagnostics, AgentHostSupervisorPhase } from "./agent-host-supervisor-contract.js";
 
 interface AgentHostIdentity {
   hostEpoch: number;
@@ -37,36 +44,6 @@ interface AgentHostSupervisorOptions {
   getMainWindow: () => BrowserWindow | undefined;
   rendererUrl: string;
   shutdownDeadlineMs?: number;
-}
-
-export interface AgentHostStopResult {
-  graceful: boolean;
-  forced: boolean;
-  activeOperation: AgentHostShutdownCompleteMessage["activeOperation"];
-  queuedCommandsDropped: number;
-  extensionRequestsCancelled: number;
-}
-
-export type AgentHostSupervisorPhase = AgentHostLifecyclePhase;
-
-export interface AgentHostSupervisorDiagnostics {
-  phase: AgentHostSupervisorPhase;
-  hostEpoch?: number;
-  processStartRequestedAt?: number;
-  processStartedAt?: number;
-  lastSpawnDurationMs?: number;
-  lastExit?: {
-    at: number;
-    code: number;
-    recoverable: boolean;
-    attempt?: number;
-  };
-  restartScheduledAt?: number;
-  restartCount: number;
-  portHandoffCount: number;
-  lastPortHandoffAt?: number;
-  poisonedRuntimeReplacementCount: number;
-  poisonedRuntimeReplacementPending: boolean;
 }
 
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
@@ -93,6 +70,16 @@ export class AgentHostSupervisor {
   #processStartedAt: number | undefined;
   #lastSpawnDurationMs: number | undefined;
   #lastExit: AgentHostSupervisorDiagnostics["lastExit"];
+  #lastStartup: AgentHostSupervisorDiagnostics["lastStartup"];
+  #lastStartupFailure: AgentHostSupervisorDiagnostics["lastStartupFailure"];
+  #currentStartup: AgentHostStartupState | undefined;
+  #structuredStartupFailure: {
+    host: UtilityProcess;
+    hostEpoch: number;
+    message: AgentHostStartupFailedMessage;
+  } | undefined;
+  #startupBlocked = false;
+  #lastFailureNotificationKey: string | undefined;
   #restartScheduledAt: number | undefined;
   #restartCount = 0;
   #portHandoffCount = 0;
@@ -101,7 +88,10 @@ export class AgentHostSupervisor {
 
   constructor(options: AgentHostSupervisorOptions) {
     this.#options = options;
-    this.#shutdownDeadlineMs = shutdownDeadline(options.shutdownDeadlineMs);
+    this.#shutdownDeadlineMs = resolveAgentHostShutdownDeadline(
+      options.shutdownDeadlineMs,
+      DEFAULT_SHUTDOWN_DEADLINE_MS
+    );
   }
 
   diagnostics(): AgentHostSupervisorDiagnostics {
@@ -114,6 +104,18 @@ export class AgentHostSupervisor {
       ...(this.#processStartedAt === undefined ? {} : { processStartedAt: this.#processStartedAt }),
       ...(this.#lastSpawnDurationMs === undefined ? {} : { lastSpawnDurationMs: this.#lastSpawnDurationMs }),
       ...(this.#lastExit ? { lastExit: { ...this.#lastExit } } : {}),
+      ...(this.#lastStartup ? {
+        lastStartup: {
+          ...this.#lastStartup,
+          issues: this.#lastStartup.issues.map((issue) => ({ ...issue }))
+        }
+      } : {}),
+      ...(this.#lastStartupFailure ? {
+        lastStartupFailure: {
+          ...this.#lastStartupFailure,
+          issue: { ...this.#lastStartupFailure.issue }
+        }
+      } : {}),
       ...(this.#restartScheduledAt === undefined ? {} : { restartScheduledAt: this.#restartScheduledAt }),
       restartCount: this.#restartCount,
       portHandoffCount: this.#portHandoffCount,
@@ -125,6 +127,10 @@ export class AgentHostSupervisor {
 
   connect(replaceCurrent = false): void {
     if (this.#stopping) return;
+    if (this.#startupBlocked) {
+      this.#sendStructuredStartupFailure();
+      return;
+    }
     if (this.#agentHost && this.#identity) {
       this.attachPort(this.#options.getMainWindow(), replaceCurrent);
       return;
@@ -138,6 +144,9 @@ export class AgentHostSupervisor {
    */
   restart(): void {
     if (this.#stopping) return;
+    this.#startupBlocked = false;
+    this.#structuredStartupFailure = undefined;
+    this.#lastFailureNotificationKey = undefined;
     if (this.#restartTimer) {
       clearTimeout(this.#restartTimer);
       this.#restartTimer = undefined;
@@ -167,7 +176,7 @@ export class AgentHostSupervisor {
     this.#poisonedRuntimeTimer = undefined;
     const host = this.#agentHost;
     if (!host) {
-      this.#stopPromise = Promise.resolve(emptyStopResult(true, false));
+      this.#stopPromise = Promise.resolve(emptyAgentHostStopResult(true, false));
       return this.#stopPromise;
     }
 
@@ -218,6 +227,12 @@ export class AgentHostSupervisor {
       },
       [port2]
     );
+    if (this.#currentStartup) {
+      window.webContents.send("pi67:agent-host-startup", {
+        hostEpoch: this.#identity.hostEpoch,
+        startup: this.#currentStartup
+      });
+    }
     this.#lastHandoffKey = handoffKey;
     this.#portHandoffCount += 1;
     this.#lastPortHandoffAt = Date.now();
@@ -230,6 +245,8 @@ export class AgentHostSupervisor {
     this.#processStartRequestedAt = Date.now();
     this.#processStartedAt = undefined;
     this.#hostReadyReceived = false;
+    this.#currentStartup = undefined;
+    this.#structuredStartupFailure = undefined;
     this.#restartScheduledAt = undefined;
     let host: UtilityProcess;
     try {
@@ -274,6 +291,9 @@ export class AgentHostSupervisor {
 
   #handleExit(host: UtilityProcess, code: number): void {
     if (this.#agentHost !== host) return;
+    const structuredStartupFailure = this.#structuredStartupFailure?.host === host
+      ? this.#structuredStartupFailure
+      : undefined;
     if (this.#poisonedRuntimeTimer) clearTimeout(this.#poisonedRuntimeTimer);
     this.#poisonedRuntimeTimer = undefined;
     if (process.env.PI67_DEBUG_AGENT_STDERR === "1") {
@@ -292,6 +312,12 @@ export class AgentHostSupervisor {
     }
 
     const exitedAt = Date.now();
+    if (structuredStartupFailure) {
+      this.#lastExit = { at: exitedAt, code, recoverable: false };
+      this.#phase = "failed";
+      this.#startupBlocked = true;
+      return;
+    }
     const restart = planAgentHostRestart(this.#restartHistory, exitedAt);
     this.#restartHistory = restart.history;
     this.#lastExit = {
@@ -337,8 +363,37 @@ export class AgentHostSupervisor {
       && this.#phase === "starting"
       && isAgentHostReadyMessage(message)
     ) {
+      const at = Date.now();
+      this.#currentStartup = message.startup;
+      this.#lastStartup = {
+        at,
+        hostEpoch: this.#identity!.hostEpoch,
+        profileMode: message.startup.profileMode,
+        status: message.startup.status,
+        issues: message.startup.issues.map((issue) => ({ ...issue }))
+      };
+      this.#startupBlocked = false;
       this.#hostReadyReceived = true;
       this.#promoteReadyHost(host);
+      return;
+    }
+    if (
+      this.#agentHost === host
+      && !this.#stopping
+      && this.#phase === "starting"
+      && isAgentHostStartupFailedMessage(message)
+    ) {
+      const hostEpoch = this.#identity!.hostEpoch;
+      this.#structuredStartupFailure = { host, hostEpoch, message };
+      this.#lastStartupFailure = {
+        at: Date.now(),
+        hostEpoch,
+        ...(message.profileMode === undefined ? {} : { profileMode: message.profileMode }),
+        issue: { ...message.issue }
+      };
+      this.#startupBlocked = true;
+      this.#phase = "failed";
+      this.#sendStructuredStartupFailure();
       return;
     }
     if (
@@ -366,6 +421,17 @@ export class AgentHostSupervisor {
     this.attachPort();
   }
 
+  #sendStructuredStartupFailure(): void {
+    const failure = this.#structuredStartupFailure;
+    if (!failure) return;
+    this.#lastFailureNotificationKey = sendAgentHostStartupFailure({
+      window: this.#options.getMainWindow(),
+      rendererUrl: this.#options.rendererUrl,
+      lastNotificationKey: this.#lastFailureNotificationKey,
+      failure
+    });
+  }
+
   #forceStop(host: UtilityProcess): void {
     if (this.#stopHost !== host || !this.#resolveStop) return;
     try {
@@ -390,28 +456,4 @@ export class AgentHostSupervisor {
       extensionRequestsCancelled: completion?.extensionRequestsCancelled ?? 0
     });
   }
-}
-
-function rendererDocumentHandoffKey(window: BrowserWindow, hostEpoch: number): string | undefined {
-  const webContents = window.webContents;
-  if (webContents.isDestroyed()) return undefined;
-  const frame = webContents.mainFrame;
-  return `${hostEpoch}:${webContents.id}:${frame.processId}:${frame.routingId}`;
-}
-
-function shutdownDeadline(value = DEFAULT_SHUTDOWN_DEADLINE_MS): number {
-  if (!Number.isSafeInteger(value) || value < 100 || value > 10_000) {
-    throw new RangeError("shutdownDeadlineMs must be an integer between 100 and 10000.");
-  }
-  return value;
-}
-
-function emptyStopResult(graceful: boolean, forced: boolean): AgentHostStopResult {
-  return {
-    graceful,
-    forced,
-    activeOperation: "none",
-    queuedCommandsDropped: 0,
-    extensionRequestsCancelled: 0
-  };
 }

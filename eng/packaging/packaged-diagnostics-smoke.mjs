@@ -23,7 +23,7 @@ export async function verifyPackagedMainOnlyDiagnostics(options) {
   const text = await readFile(diagnosticsPath, "utf8");
   const diagnostics = JSON.parse(text);
   if (
-    diagnostics.schema !== "pi67-support-diagnostics.v3"
+    diagnostics.schema !== "pi67-support-diagnostics.v4"
     || diagnostics.runtime !== undefined
     || diagnostics.runtimeCollection?.failure !== "connection-unavailable"
     || diagnostics.renderer?.activeRequestCount !== 0

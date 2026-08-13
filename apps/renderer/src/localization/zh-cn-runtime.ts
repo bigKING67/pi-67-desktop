@@ -83,6 +83,11 @@ export const zhCNRuntimeMessages = {
     hostExitedRecovering: (attempt: number) => `Pi 运行服务已退出，正在进行第 ${attempt} 次恢复`,
     hostExitedStopped: "Pi 运行服务连续退出，自动恢复已停止",
     hostExitedTitle: "Pi 运行服务已退出",
+    hostStartupFailed: "Pi 运行服务启动失败，现有 Pi 配置未被删除或覆盖",
+    hostStartupFailedTitle: "Pi 运行服务启动失败",
+    hostStartupFailedDetail: "Pi-67 Desktop 已停止自动重试，并保留现有 Pi 配置。可导出脱敏诊断以定位具体启动阶段。",
+    hostStartedDegradedTitle: "已保留现有 Pi 配置",
+    hostStartedDegradedDetail: "核心 Pi 功能可以继续使用；部分 Pi-67 Desktop 增强因资源冲突未加载。",
     missingRuntimeReady: "Pi 运行服务未发送 authoritative runtime.ready 事件。"
   }
 } as const;

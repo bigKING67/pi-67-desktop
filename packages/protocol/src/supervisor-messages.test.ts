@@ -2,16 +2,45 @@ import { describe, expect, it } from "vitest";
 import {
   isAgentHostReadyMessage,
   isAgentHostRuntimePoisonedMessage,
+  isAgentHostStartupFailedMessage,
   isAgentHostShutdownCompleteMessage,
   isAgentHostShutdownRequest
 } from "./supervisor-messages.js";
 
 describe("Agent Host supervisor messages", () => {
-  it("accepts only the exact Agent Host readiness signal", () => {
-    expect(isAgentHostReadyMessage({ type: "agent-host-ready" })).toBe(true);
-    expect(isAgentHostReadyMessage({ type: "agent-host-ready", phase: "running" })).toBe(false);
+  it("accepts only bounded Agent Host readiness state", () => {
+    const message = {
+      type: "agent-host-ready",
+      startup: {
+        profileMode: "existing-shared",
+        status: "degraded",
+        issues: [{ stage: "browser67-mcp", code: "conflict" }]
+      }
+    };
+    expect(isAgentHostReadyMessage(message)).toBe(true);
+    expect(isAgentHostReadyMessage({ ...message, phase: "running" })).toBe(false);
+    expect(isAgentHostReadyMessage({ ...message, startup: { ...message.startup, path: "C:\\private" } })).toBe(false);
+    expect(isAgentHostReadyMessage({ ...message, startup: { ...message.startup, issues: Array(9).fill(message.startup.issues[0]) } })).toBe(false);
     expect(isAgentHostReadyMessage({ type: "agent-host-starting" })).toBe(false);
     expect(isAgentHostReadyMessage(undefined)).toBe(false);
+  });
+
+  it("accepts only safe deterministic startup failures", () => {
+    const message = {
+      type: "agent-host-startup-failed",
+      profileMode: "fresh",
+      issue: { stage: "desktop-capabilities", code: "integrity-failure" }
+    };
+    expect(isAgentHostStartupFailedMessage(message)).toBe(true);
+    expect(isAgentHostStartupFailedMessage({ ...message, error: "raw stack" })).toBe(false);
+    expect(isAgentHostStartupFailedMessage({
+      ...message,
+      issue: { ...message.issue, path: "C:\\private" }
+    })).toBe(false);
+    expect(isAgentHostStartupFailedMessage({
+      ...message,
+      issue: { stage: "unknown-stage", code: "unknown" }
+    })).toBe(false);
   });
 
   it("accepts only bounded structured abort watchdog failures", () => {

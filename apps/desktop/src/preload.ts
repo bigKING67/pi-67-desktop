@@ -3,6 +3,8 @@ import type {
   ComposerDraftPersistedState,
   ComposerDraftStateSnapshot,
   DesktopCapabilitySnapshot,
+  DesktopAgentHostFailureState,
+  DesktopAgentHostStartupState,
   DesktopPlatformInfo,
   DesktopRecoverySnapshot,
   DesktopSystemBridge,
@@ -242,10 +244,15 @@ const systemBridge = {
     ipcRenderer.on("pi67:update-state-changed", handler);
     return () => ipcRenderer.removeListener("pi67:update-state-changed", handler);
   },
-  onAgentHostFailed: (listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, state: { code: number; recoverable: boolean; attempt?: number }) => listener(state);
+  onAgentHostFailed: (listener: (state: DesktopAgentHostFailureState) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: DesktopAgentHostFailureState) => listener(state);
     ipcRenderer.on("pi67:agent-host-failed", handler);
     return () => ipcRenderer.removeListener("pi67:agent-host-failed", handler);
+  },
+  onAgentHostStartup: (listener: (state: DesktopAgentHostStartupState) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: DesktopAgentHostStartupState) => listener(state);
+    ipcRenderer.on("pi67:agent-host-startup", handler);
+    return () => ipcRenderer.removeListener("pi67:agent-host-startup", handler);
   },
   onPowerResume: (listener: () => void): (() => void) => {
     const handler = () => listener();

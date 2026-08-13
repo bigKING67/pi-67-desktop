@@ -20,6 +20,10 @@ import type {
 } from "@pi67/domain";
 import type { StagedPromptAttachment } from "./agent-messages.js";
 import type {
+  AgentHostStartupFailedMessage,
+  AgentHostStartupState
+} from "./supervisor-messages.js";
+import type {
   PromptStashImagesDeleteRequest,
   PromptStashImagesRestoreRequest,
   PromptStashImagesRestoreResult,
@@ -113,6 +117,19 @@ export interface DesktopPlatformInfo {
   version: string;
 }
 
+export interface DesktopAgentHostStartupState {
+  hostEpoch: number;
+  startup: AgentHostStartupState;
+}
+
+export interface DesktopAgentHostFailureState {
+  hostEpoch?: number;
+  code: number;
+  recoverable: boolean;
+  attempt?: number;
+  startupFailure?: AgentHostStartupFailedMessage;
+}
+
 /** Renderer-owned fields persisted through Electron Main. */
 export interface WorkbenchLayoutV5 {
   expandedWorkspaceIds: string[];
@@ -189,8 +206,9 @@ export interface DesktopSystemBridge {
   checkForUpdates(): Promise<unknown>;
   onUpdateStateChanged(listener: (state: unknown) => void): () => void;
   onAgentHostFailed(
-    listener: (state: { code: number; recoverable: boolean; attempt?: number }) => void
+    listener: (state: DesktopAgentHostFailureState) => void
   ): () => void;
+  onAgentHostStartup(listener: (state: DesktopAgentHostStartupState) => void): () => void;
   onPowerResume(listener: () => void): () => void;
   onNativeNotificationActivated(listener: (activation: NativeNotificationActivation) => void): () => void;
   onShutdownCheckpointRequested(listener: (requestId: string) => void): () => void;

@@ -1828,7 +1828,17 @@ loading error where the operation can produce those states
   not contain Task/Operation IDs, Prompt or Tool payloads, paths, credentials, or
   stdout/stderr, and they do not create OTLP, Grafana, remote telemetry, or a
   continuously updating dashboard. Diagnostic export uses
-  `pi67-support-diagnostics.v3` for the same redacted projection.
+  `pi67-support-diagnostics.v4` for the same redacted projection. Agent Host startup
+  adds only the bounded Profile mode, `ready | degraded` state, startup stage, and
+  safe issue code; paths, raw errors, configuration bodies, and stack traces remain
+  absent.
+- A degraded startup keeps the Workbench usable and produces at most one warning for
+  the Host epoch: existing Pi configuration was preserved and a Desktop enhancement
+  did not load. A deterministic startup failure produces one root notification and
+  stops automatic restart; Workspace, Session Catalog, and Provider connection
+  failures from that same failed Host are not repeated as separate Toasts. Unrelated
+  feature failures and unknown Host crashes retain their existing presentation and
+  bounded recovery behavior.
 - The Host authority row renders previous-run exit as one of first launch,
   clean, unclean, or unknown. First launch is neutral; unclean and unknown are
   warnings. The persisted `cleanExit=false` launch marker remains unchanged so a

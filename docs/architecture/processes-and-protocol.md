@@ -52,20 +52,34 @@ Context/Provider validation 或 Runtime reload 失败时，只有当前文件仍
 
 1. Main 注册 secure `app` scheme 并创建窗口；Welcome 不启动 Agent Host。
 2. 用户选定 workspace 或运行依赖 Agent Host 的恢复与诊断后，renderer 通过窄 IPC 请求按需启动。
-3. Agent Host `spawn` 后，Main 转移新的 MessagePort；窗口 reload 的 `did-finish-load` 以及 renderer
+3. Agent Host 启动协调器先按 Agent 目录和有效 Desktop capability receipt 分类
+   `fresh | existing-shared | desktop-managed-upgrade`，再依次处理 Desktop capabilities、managed Packages、
+   retired MCP cleanup、browser67 MCP 和核心 Server construction。它不检查系统 `pi` 命令，也不创建第二套
+   Profile。`existing-shared` 的无 receipt 资源全部视为用户拥有；Desktop 只写
+   `desktop-capabilities/**`、`rules/pi67-desktop/**` 和带有效 receipt 的精确 MCP 条目。首次在 shared
+   Profile 写入 capability state 时会持久化 `profileOwnership=shared`，后续升级仍保持 shared 分类。
+   Alpha.21 等旧 state 没有该 ownership 字段，同样按 shared 迁移，不能由旧 capability 安装事实推断整个
+   Profile 归 Desktop 所有。
+4. `fresh` packaged Profile 的 capability manifest/hash/private toolchain 错误属于确定性 fatal；
+   existing/shared 或 managed-upgrade Profile 的用户资源冲突、MCP cache/CAS conflict 和 Desktop-owned
+   enhancement I/O failure 只形成最多八条安全 startup issue。核心 Server 构造成功后 Host 发送严格的
+   `agent-host-ready { startup }`，状态可为 `ready` 或 `degraded`；消息不含 path、raw error 或 stack。
+5. Agent Host `spawn` 且 Main 收到有效 ready 后才转移新的 MessagePort；窗口 reload 的 `did-finish-load` 以及 renderer
    的显式恢复请求都会为仍存活的同一 Host broker 新 Port，而不会 fork 第二个 Host。若 Host 正处于
    supervised restart backoff，恢复请求不能绕过退避计时器。
-4. Preload 只在可信 renderer origin 上转交 MessagePort；renderer 的
+6. Preload 只在可信 renderer origin 上转交 MessagePort；renderer 的
    `AgentConnectionController` 独占 Client 生命周期；feature controller 发出 typed request，Store 只消费
    typed event 与 teardown，组件不持有底层 Port。Controller 只接受当前 window source 与精确 origin 的 handoff；
    Port `close`、`messageerror`、Host generation replacement 或 Controller dispose 会立即释放旧 Client、
    拒绝 pending request 并阻止旧响应重新进入 Store。Controller dispose 同时移除全局 message listener，
    后续 handoff 和公开请求均 fail closed。
-5. 用户选定 workspace 后发送 `workspace.open`；Host 以同一
+7. 用户选定 workspace 后发送 `workspace.open`；Host 以同一
    `runtime.initialize(payload)` 生命周期加载 Pi SDK，并通过 `runtime.ready` 投影权威
    `sessionGeneration`。`session.create` 只在当前 workspace 创建新 Session，不接受伪 cwd。
-6. Agent Host 在 60 秒内最多自动重启三次，退避为 0.5/1/2 秒。
-7. 新端口携带 `appInstanceId` 与 `hostEpoch`。Renderer 的连接请求是有界 single-flight：Port-only
+8. 未发送结构化 startup failure 的未知 crash 在 60 秒内最多自动重启三次，退避为 0.5/1/2 秒。
+   `agent-host-startup-failed` 是确定性失败：Main 记录安全 stage/issue、向当前 Renderer document 只发送
+   一次失败并停止自动重启。显式 Main-owned restart 可开始新 Host epoch。
+9. 新端口携带 `appInstanceId` 与 `hostEpoch`。Renderer 的连接请求是有界 single-flight：Port-only
    断线会自动请求 renewal，重复调用不会并行建立多条恢复链。若 Main 已交接一个开放 Port 但 welcome
    握手尚未完成，后续调用先等待该 Port，不能再次请求交接并关闭握手中的 Client。同 epoch 重连通过
    `projection.resync` 恢复 Snapshot、Recorded Changes、Catalog status、session generation 和 active
@@ -743,9 +757,9 @@ gap 后保留旧 Host 或旧 Session 的 Extension 状态。
 - Agent Host：`host-server`、`command-scheduler`、`operation-registry`、`operation-submission-ledger`、
   `control-mutation-ledger`、`connection-context` 和 `protocol-error` 分离协议、并发、Operation/watchdog、
   submission/control 幂等重放与错误映射。
-- Main Supervisor 只接受 `packages/protocol/supervisor-messages` 的严格 poisoned-runtime 与 shutdown
-  request/completion message；malformed 或携带额外 raw state 的 parent message 不触发 kill，也不能伪造
-  graceful shutdown completion。
+- Main Supervisor 只接受 `packages/protocol/supervisor-messages` 的严格 startup ready/failure、
+  poisoned-runtime 与 shutdown request/completion message；malformed 或携带额外 raw state 的 parent
+  message不触发 readiness、kill 或 deterministic failure，也不能伪造 graceful shutdown completion。
 - Renderer：`connection` 独占 Port 和有界 control-mutation retry，`conversation` 独占 settled page 与分页控制，`live-turn` 独占
   流式 chunk，`approval` 独占 Safety Approval projection/response lifecycle，`extension-ui` 独占普通 Extension UI
   projection/response lifecycle，`notifications` 独占内存通知历史、

@@ -3,11 +3,66 @@ import { strictObject } from "./schemas.js";
 
 const OperationIdSchema = Type.String({ minLength: 1, maxLength: 512 });
 
+export const AgentHostProfileModeSchema = Type.Union([
+  Type.Literal("fresh"),
+  Type.Literal("existing-shared"),
+  Type.Literal("desktop-managed-upgrade")
+]);
+
+export type AgentHostProfileMode = Static<typeof AgentHostProfileModeSchema>;
+
+export const AgentHostStartupStageSchema = Type.Union([
+  Type.Literal("classify-profile"),
+  Type.Literal("desktop-capabilities"),
+  Type.Literal("managed-packages"),
+  Type.Literal("retired-mcp-cleanup"),
+  Type.Literal("browser67-mcp"),
+  Type.Literal("server-construction")
+]);
+
+export type AgentHostStartupStage = Static<typeof AgentHostStartupStageSchema>;
+
+export const AgentHostStartupIssueCodeSchema = Type.Union([
+  Type.Literal("access-denied"),
+  Type.Literal("conflict"),
+  Type.Literal("invalid-state"),
+  Type.Literal("integrity-failure"),
+  Type.Literal("missing-resource"),
+  Type.Literal("io"),
+  Type.Literal("unknown")
+]);
+
+export type AgentHostStartupIssueCode = Static<typeof AgentHostStartupIssueCodeSchema>;
+
+export const AgentHostStartupIssueSchema = strictObject({
+  stage: AgentHostStartupStageSchema,
+  code: AgentHostStartupIssueCodeSchema
+});
+
+export type AgentHostStartupIssue = Static<typeof AgentHostStartupIssueSchema>;
+
+export const AgentHostStartupStateSchema = strictObject({
+  profileMode: AgentHostProfileModeSchema,
+  status: Type.Union([Type.Literal("ready"), Type.Literal("degraded")]),
+  issues: Type.Array(AgentHostStartupIssueSchema, { maxItems: 8 })
+});
+
+export type AgentHostStartupState = Static<typeof AgentHostStartupStateSchema>;
+
 export const AgentHostReadyMessageSchema = strictObject({
-  type: Type.Literal("agent-host-ready")
+  type: Type.Literal("agent-host-ready"),
+  startup: AgentHostStartupStateSchema
 });
 
 export type AgentHostReadyMessage = Static<typeof AgentHostReadyMessageSchema>;
+
+export const AgentHostStartupFailedMessageSchema = strictObject({
+  type: Type.Literal("agent-host-startup-failed"),
+  profileMode: Type.Optional(AgentHostProfileModeSchema),
+  issue: AgentHostStartupIssueSchema
+});
+
+export type AgentHostStartupFailedMessage = Static<typeof AgentHostStartupFailedMessageSchema>;
 
 export const AgentHostRuntimePoisonedMessageSchema = Type.Union([
   strictObject({
@@ -63,6 +118,12 @@ export const AgentHostShutdownCompleteMessageSchema = strictObject({
 
 export function isAgentHostReadyMessage(value: unknown): value is AgentHostReadyMessage {
   return Value.Check(AgentHostReadyMessageSchema, value);
+}
+
+export function isAgentHostStartupFailedMessage(
+  value: unknown
+): value is AgentHostStartupFailedMessage {
+  return Value.Check(AgentHostStartupFailedMessageSchema, value);
 }
 
 export function isAgentHostRuntimePoisonedMessage(
