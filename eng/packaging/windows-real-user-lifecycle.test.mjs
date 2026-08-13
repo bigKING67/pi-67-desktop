@@ -15,6 +15,7 @@ import {
   waitForHealthyWorkbenchConvergence,
   waitForRealUserRuntimeReady
 } from "./windows-real-user-lifecycle.mjs";
+import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
 describe("Windows installed real-user lifecycle", () => {
   it("keeps the installed product shutdown budget fixed", () => {
     expect(INSTALLED_SHUTDOWN_BUDGET_MS).toBe(5_000);
@@ -96,6 +97,35 @@ describe("Windows installed real-user lifecycle", () => {
         canonicalSessionPath,
         aliasAgentDir
       )).resolves.toBe(canonicalSessionPath);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the persisted Main Workspace authority for restart Catalog matching", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-real-user-workspace-authority-"));
+    const canonicalWorkspace = join(root, "canonical-workspace");
+    const selectedWorkspace = join(root, "selected-workspace");
+    try {
+      await mkdir(canonicalWorkspace);
+      await symlink(
+        canonicalWorkspace,
+        selectedWorkspace,
+        process.platform === "win32" ? "junction" : "dir"
+      );
+      const authority = await realpath(canonicalWorkspace);
+      const window = {
+        evaluate: async () => ({
+          availability: "available",
+          canonicalPath: authority,
+          workspaceCount: 1
+        })
+      };
+
+      await expect(resolveRealUserWorkspaceAuthority(window, selectedWorkspace, undefined))
+        .resolves.toBe(authority);
+      await expect(resolveRealUserWorkspaceAuthority(window, selectedWorkspace, `${authority}-drifted`))
+        .rejects.toThrow("changed the persisted Main Workspace authority spelling");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

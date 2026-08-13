@@ -25,6 +25,7 @@ import { createControlledConversation } from "./windows-real-user-conversation.m
 import { shouldCreateInitialRealUserSession, waitForCatalogState } from "./windows-real-user-catalog-state.mjs";
 import { inspectRealUserSessionCatalogDiscovery } from "./windows-real-user-catalog-discovery.mjs";
 import { inspectRealUserSessionFile } from "./windows-real-user-session-creation.mjs";
+import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
 export { canonicalContainedSessionPath } from "./windows-real-user-conversation.mjs";
 import { verifyProviderConfiguration } from "./windows-real-user-provider-configuration.mjs";
 import {
@@ -67,6 +68,7 @@ export async function verifyInstalledRealUserLifecycle({
   const launches = [];
   let expectedSessionIdentity;
   let expectedSessionPath;
+  let expectedWorkspaceCwd;
   let create;
 
   for (let launchIndex = 0; launchIndex <= REAL_USER_RESTART_COUNT; launchIndex += 1) {
@@ -76,12 +78,14 @@ export async function verifyInstalledRealUserLifecycle({
       environmentDriftAgentDir,
       expectedSessionIdentity,
       expectedSessionPath,
+      expectedWorkspaceCwd,
       launchIndex,
       userDataDirectory,
       workspace
     });
     expectedSessionIdentity = result.sessionIdentity;
     expectedSessionPath = result.sessionPath;
+    expectedWorkspaceCwd = result.workspaceCwd;
     create ??= result.create;
     launches.push(result.report);
   }
@@ -104,6 +108,7 @@ async function runRealUserLaunch({
   environmentDriftAgentDir,
   expectedSessionIdentity,
   expectedSessionPath,
+  expectedWorkspaceCwd,
   launchIndex,
   userDataDirectory,
   workspace
@@ -144,6 +149,11 @@ async function runRealUserLaunch({
       await installWorkspaceDialogResult(application, workspace);
       await window.getByRole("button", { name: "选择工作区" }).click();
     }
+    const workspaceCwd = await resolveRealUserWorkspaceAuthority(
+      window,
+      workspace,
+      expectedWorkspaceCwd
+    );
 
     const catalog = await waitForCatalogState(window, expectedSessionIdentity, undefined, {
       launchIndex,
@@ -152,7 +162,7 @@ async function runRealUserLaunch({
         agentDir,
         expectedSessionIdentity,
         sessionPath: expectedSessionPath,
-        workspace
+        workspace: workspaceCwd
       })
     });
     let create;
@@ -249,7 +259,8 @@ async function runRealUserLaunch({
         startupSurface
       },
       sessionIdentity,
-      sessionPath
+      sessionPath,
+      workspaceCwd
     };
   } finally {
     if (application) await application.close();
