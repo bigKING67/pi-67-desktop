@@ -78,6 +78,49 @@ describe("PiSdkRuntime Session creation identity", () => {
     }
   }, 15_000);
 
+  it("writes new Sessions with the injected Workspace authority spelling", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-workspace-spelling-"));
+    roots.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const storageRoot = join(root, "storage");
+    const sessionDir = join(root, "sessions");
+    await Promise.all([mkdir(cwd), mkdir(agentDir), mkdir(storageRoot), mkdir(sessionDir)]);
+    const windowsPlatform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const sessionCatalogOwner = catalogOwner(() => false);
+    const services = createPiWorkspaceRuntimeServices({
+      cwd,
+      agentDir,
+      storageRoot,
+      settingsManager: SettingsManager.inMemory({ sessionDir }),
+      sessionCatalogOwner
+    });
+    const runtime = new PiSdkRuntime({ workspaceServices: services });
+    try {
+      const inputSpelling = cwd.toUpperCase();
+      expect(inputSpelling).not.toBe(services.cwd);
+      await runtime.initialize({
+        cwd: inputSpelling,
+        agentDir,
+        trust: "trusted",
+        approvalMode: "guided",
+        creationId: "workspace-authority-spelling"
+      });
+
+      const identity = runtime.getIdentity();
+      expect(identity.sessionPath).toBeTruthy();
+      expect(SessionManager.open(identity.sessionPath!).getCwd()).toBe(services.cwd);
+      await expect(services.sessionCreationReceipts.resolve(
+        "workspace-authority-spelling"
+      )).resolves.toMatchObject({ status: "materialized", sessionPath: identity.sessionPath });
+    } finally {
+      await runtime.dispose();
+      await services.dispose();
+      await sessionCatalogOwner.dispose();
+      windowsPlatform.mockRestore();
+    }
+  }, 15_000);
+
   it("keeps a created Session authoritative when a later Catalog projection fails", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-sdk-session-creation-"));
     roots.push(root);

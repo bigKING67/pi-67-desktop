@@ -154,19 +154,21 @@ describe("Pi Workspace runtime services", () => {
 
   it("accepts Windows Workspace path casing changes without relaxing Agent directory identity", async () => {
     const windowsPlatform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const cwd = resolve("/Users/Runner/Workspace");
+    const agentDir = resolve("/Pi Agent");
     const workspaceServices = createPiWorkspaceRuntimeServices({
-      cwd: String.raw`C:\Users\Runner\Workspace`,
-      agentDir: String.raw`C:\Pi Agent`,
+      cwd,
+      agentDir,
       settingsManager: SettingsManager.inMemory()
     });
     try {
       expect(() => workspaceServices.assertCompatible(
-        String.raw`c:\users\runner\workspace`,
-        String.raw`C:\Pi Agent`
+        cwd.toLowerCase(),
+        agentDir
       )).not.toThrow();
       expect(() => workspaceServices.assertCompatible(
-        String.raw`c:\users\runner\workspace`,
-        String.raw`c:\pi agent`
+        cwd.toLowerCase(),
+        agentDir.toLowerCase()
       )).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
     } finally {
       await workspaceServices.dispose();

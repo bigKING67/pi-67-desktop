@@ -311,7 +311,7 @@ describe("AgentHostServer Workspace catalog", () => {
     try {
       await attach(server, port);
       expect((await hostCommand(port, WORKSPACE, "workspace.register", {
-        cwd: fixture.cwd,
+        cwd: canonicalCwd,
         trust: "trusted",
         approvalMode: "guided"
       }, "register-custom-session-dir")).response).toMatchObject({ ok: true });

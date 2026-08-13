@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   normalizeSessionCatalogPathIdentity,
   normalizeSessionCatalogWorkspaceIdentity,
+  normalizeWindowsFilesystemPathSpelling,
   resolveExistingSessionFileIdentity,
   versionSessionCatalogSourceIdentity
 } from "./session-path-identity.js";
@@ -27,8 +28,8 @@ describe("session path identity", () => {
   });
 
   it("matches Workspace cwd keys using Windows case-insensitive path semantics", () => {
-    const upper = join("CaseSensitive", "Workspace 中文");
-    const lower = join("casesensitive", "workspace 中文");
+    const upper = String.raw`C:\CaseSensitive\Workspace 中文`;
+    const lower = String.raw`c:\casesensitive\workspace 中文`;
 
     expect(normalizeSessionCatalogWorkspaceIdentity(upper, "win32")).toBe(
       normalizeSessionCatalogWorkspaceIdentity(lower, "win32")
@@ -36,6 +37,22 @@ describe("session path identity", () => {
     expect(normalizeSessionCatalogWorkspaceIdentity(upper, "darwin")).not.toBe(
       normalizeSessionCatalogWorkspaceIdentity(lower, "darwin")
     );
+  });
+
+  it("matches Windows extended drive, UNC, slash, and Unicode spellings", () => {
+    expect(normalizeSessionCatalogWorkspaceIdentity(
+      String.raw`\\?\C:\Workspace\项目`,
+      "win32"
+    )).toBe(normalizeSessionCatalogWorkspaceIdentity(String.raw`c:/workspace/项目`, "win32"));
+    expect(normalizeSessionCatalogWorkspaceIdentity(
+      String.raw`\\?\UNC\Server\Share\项目`,
+      "win32"
+    )).toBe(normalizeSessionCatalogWorkspaceIdentity(String.raw`\\server\share\项目`, "win32"));
+    expect(normalizeSessionCatalogWorkspaceIdentity(String.raw`C:\Café`, "win32")).toBe(
+      normalizeSessionCatalogWorkspaceIdentity(String.raw`c:\café`, "win32")
+    );
+    expect(normalizeWindowsFilesystemPathSpelling(String.raw`\\?\C:\Workspace\项目`))
+      .toBe(String.raw`c:\workspace\项目`);
   });
 
   it("deduplicates hard-linked JSONL aliases by physical file identity", async () => {

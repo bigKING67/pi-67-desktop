@@ -8,6 +8,7 @@ import type {
 import {
   createRuntimeSessionCatalogOwner,
   createPiWorkspaceRuntimeServices,
+  normalizeSessionCatalogCwd,
   PiConfigurationServiceRegistry,
   type AgentRuntime,
   type CreatePiWorkspaceRuntimeServicesOptions,
@@ -19,7 +20,9 @@ import { HostCommandError } from "./protocol-error.js";
 
 export interface WorkspaceContextRecord {
   readonly workspaceId: string;
+  /** Host-local realpath root used only for filesystem containment. */
   readonly canonicalCwd: string;
+  /** Main-provided spelling shared by Pi Sessions and the Session Catalog. */
   readonly cwd: string;
   readonly agentDir: string;
   readonly workspaceServices: PiWorkspaceRuntimeServices;
@@ -82,24 +85,25 @@ export class WorkspaceContextRegistry {
     workspaceId: string,
     options: RegisterWorkspaceContextOptions
   ): WorkspaceContextRecord {
-    const cwd = canonicalizeWorkspaceCwd(options.cwd);
-    const canonicalCwd = workspaceCwdIdentity(cwd);
+    const cwd = resolve(options.cwd);
+    const canonicalCwd = canonicalizeWorkspaceCwd(cwd);
+    const canonicalCwdIdentity = normalizeSessionCatalogCwd(canonicalCwd);
     const existing = this.records.get(workspaceId);
     if (existing) {
-      if (existing.canonicalCwd !== canonicalCwd) {
+      if (normalizeSessionCatalogCwd(existing.canonicalCwd) !== canonicalCwdIdentity) {
         throw new HostCommandError(
           "INVALID_PAYLOAD",
           "The Workspace identity is already registered for a different directory.",
           false
         );
       }
-      existing.workspaceServices.assertCompatible(cwd, options.agentDir);
+      existing.workspaceServices.assertCompatible(existing.cwd, options.agentDir);
       this.requireSessionCatalogOwner(options);
       existing.workspaceServices.setProjectTrusted(options.trust === "trusted");
       existing.initialization = initializationFrom(options, existing.cwd, existing.agentDir);
       return existing;
     }
-    const owner = this.workspaceIdsByCanonicalCwd.get(canonicalCwd);
+    const owner = this.workspaceIdsByCanonicalCwd.get(canonicalCwdIdentity);
     if (owner !== undefined) {
       throw new HostCommandError(
         "DUPLICATE_REQUEST",
@@ -152,7 +156,7 @@ export class WorkspaceContextRegistry {
       initialization: initializationFrom(options, workspaceServices.cwd, workspaceServices.agentDir)
     };
     this.records.set(workspaceId, record);
-    this.workspaceIdsByCanonicalCwd.set(canonicalCwd, workspaceId);
+    this.workspaceIdsByCanonicalCwd.set(canonicalCwdIdentity, workspaceId);
     return record;
   }
 
@@ -175,7 +179,9 @@ export class WorkspaceContextRegistry {
   }
 
   workspaceIdForCwd(cwd: string): string | undefined {
-    return this.workspaceIdsByCanonicalCwd.get(workspaceCwdIdentity(canonicalizeWorkspaceCwd(cwd)));
+    return this.workspaceIdsByCanonicalCwd.get(
+      normalizeSessionCatalogCwd(canonicalizeWorkspaceCwd(cwd))
+    );
   }
 
   queryCatalog(workspaceId: string, query: SessionCatalogQuery): Promise<SessionCatalogPage> {
@@ -199,7 +205,7 @@ export class WorkspaceContextRegistry {
     await record.sessionCatalog.dispose();
     await record.workspaceServices.dispose();
     this.records.delete(workspaceId);
-    this.workspaceIdsByCanonicalCwd.delete(record.canonicalCwd);
+    this.workspaceIdsByCanonicalCwd.delete(normalizeSessionCatalogCwd(record.canonicalCwd));
   }
 
   async disposeAll(): Promise<void> {
@@ -222,7 +228,7 @@ export class WorkspaceContextRegistry {
       }
       if (!disposed) continue;
       this.records.delete(record.workspaceId);
-      this.workspaceIdsByCanonicalCwd.delete(record.canonicalCwd);
+      this.workspaceIdsByCanonicalCwd.delete(normalizeSessionCatalogCwd(record.canonicalCwd));
     }
     try {
       await this.configurationServices.dispose();
@@ -313,8 +319,4 @@ function canonicalizeWorkspaceCwd(cwd: string): string {
     // A validated directory may disappear between Main validation and Host registration.
   }
   return canonical;
-}
-
-function workspaceCwdIdentity(cwd: string): string {
-  return process.platform === "win32" ? cwd.toLowerCase() : cwd;
 }

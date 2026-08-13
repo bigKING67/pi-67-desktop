@@ -70,6 +70,7 @@ export async function refreshPersistedWorkspaceDescriptor(
     return {
       ...observed,
       id: existing.id,
+      identity: { ...observed.identity, canonicalPath: existing.identity.canonicalPath },
       trust: existing.trust,
       trustProvenance: existing.trust === "trusted" ? "restored" : existing.trustProvenance
     };
@@ -189,7 +190,10 @@ export function refreshNativeWorkspaceDescriptor(
   existing: WorkspaceDescriptor,
   selected: NativeWorkspaceDescriptor
 ): NativeWorkspaceDescriptor {
-  return { ...selected, id: existing.id };
+  const canonicalPath = workspaceIdentityMatches(existing.identity, selected.identity)
+    ? existing.identity.canonicalPath
+    : selected.identity.canonicalPath;
+  return { ...selected, id: existing.id, identity: { ...selected.identity, canonicalPath } };
 }
 
 function workspaceIdentityMatches(

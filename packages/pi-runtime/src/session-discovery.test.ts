@@ -237,6 +237,40 @@ describe("Pi SDK Session Catalog discovery contract", () => {
       windowsPlatform.mockRestore();
     }
   });
+
+  it("matches Windows namespace and Unicode spellings after restart", async () => {
+    const fixture = await createFixture();
+    const sessionPath = join(fixture.sessionDirectory, "windows-namespace.jsonl");
+    const sessionId = "windows-namespace-session";
+    await writeFile(sessionPath, `${JSON.stringify({
+      type: "session",
+      version: 3,
+      id: sessionId,
+      timestamp: "2026-08-13T00:00:00.000Z",
+      cwd: "\\\\?\\C:\\Workspace\\Caf\u00e9"
+    })}\n`, "utf8");
+    const catalogDirectory = join(fixture.root, "namespace-catalog");
+    const windowsPlatform = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const context = createSessionCatalogContext({
+      agentDir: fixture.agentDir,
+      configuredSessionDir: fixture.sessionDirectory,
+      workspaceCwd: "c:\\workspace\\cafe\u0301"
+    });
+    const catalog = createSessionCatalog({ directory: catalogDirectory });
+
+    try {
+      await catalog.reconcile(context);
+      expect(await catalog.query({ scope: "workspace" }, context)).toMatchObject({
+        source: "sqlite",
+        state: "ready",
+        total: 1,
+        items: [expect.objectContaining({ id: sessionId, path: await realpath(sessionPath) })]
+      });
+    } finally {
+      await catalog.dispose();
+      windowsPlatform.mockRestore();
+    }
+  });
 });
 
 async function createFixture(): Promise<{

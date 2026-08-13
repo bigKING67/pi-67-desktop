@@ -54,18 +54,19 @@ export class PiSdkRuntimeSessionLifecycle {
     return this.options.sessionBindings.runTransition(async () => {
       let creationStarted = false;
       try {
+        const nextAgentDir = input.agentDir ?? getAgentDir();
+        this.options.workspaceServices?.assertCompatible(input.cwd, nextAgentDir);
+        const workspaceCwd = this.options.workspaceServices?.cwd ?? input.cwd;
         const creationJournal = input.creationId
-          ? this.creationReceipts(input.cwd)
+          ? this.creationReceipts(workspaceCwd)
           : undefined;
         if (input.creationId) await creationJournal!.reserve(input.creationId);
         this.options.cancelInteractiveRequests("runtime-dispose");
-        const nextAgentDir = input.agentDir ?? getAgentDir();
-        this.options.workspaceServices?.assertCompatible(input.cwd, nextAgentDir);
         const sessionManager = await runRuntimeInitializationStage(observeStage, "resolve-session", async () => {
           const sessionPath = input.sessionPath
-            ? await resolveManagedSessionPath(input.sessionPath, input.cwd, nextAgentDir)
+            ? await resolveManagedSessionPath(input.sessionPath, workspaceCwd, nextAgentDir)
             : undefined;
-          return sessionPath ? SessionManager.open(sessionPath, undefined, input.cwd) : undefined;
+          return sessionPath ? SessionManager.open(sessionPath, undefined, workspaceCwd) : undefined;
         });
         if (input.creationId && sessionManager) {
           throw new RuntimeError(
@@ -79,7 +80,7 @@ export class PiSdkRuntimeSessionLifecycle {
           () => this.options.sessionBindings.disposeRuntime()
         );
         this.options.setAgentDir(nextAgentDir);
-        this.options.toolSafety.initialize(input.cwd, input.trust, input.approvalMode);
+        this.options.toolSafety.initialize(workspaceCwd, input.trust, input.approvalMode);
         this.options.workspaceServices?.setProjectTrusted(input.trust === "trusted");
         await runRuntimeInitializationStage(observeStage, "create-session", async () => {
           if (input.creationId) {
@@ -87,7 +88,7 @@ export class PiSdkRuntimeSessionLifecycle {
             if (start.status !== "started") throw sessionCreationOutcomeUnknown(input.creationId);
             creationStarted = true;
           }
-          await this.options.sessionBindings.createInitial(input.cwd, sessionManager, observeStage);
+          await this.options.sessionBindings.createInitial(workspaceCwd, sessionManager, observeStage);
           if (!input.creationId) return;
           const manager = this.options.sessionBindings.requireSession().sessionManager;
           await appendSessionCreationMarker(manager, input.creationId);

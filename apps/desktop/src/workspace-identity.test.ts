@@ -93,6 +93,29 @@ describe("native workspace identity", () => {
     )).toBe(false);
   });
 
+  it("preserves an established canonical spelling only for matching filesystem identity", () => {
+    const established = descriptorFixture("existing", "/Workspace/Established", "filesystem");
+    const samePhysicalDirectory = descriptorFixture("selected", "/workspace/observed", "filesystem");
+    const replacement = {
+      ...samePhysicalDirectory,
+      identity: { ...samePhysicalDirectory.identity, inode: "different" }
+    };
+    const pathOnly = descriptorFixture("path-only", "/workspace/path-only", "path-only");
+
+    expect(refreshNativeWorkspaceDescriptor(established, samePhysicalDirectory)).toMatchObject({
+      id: "existing",
+      identity: { canonicalPath: "/Workspace/Established" }
+    });
+    expect(refreshNativeWorkspaceDescriptor(established, replacement)).toMatchObject({
+      id: "existing",
+      identity: { canonicalPath: "/workspace/observed" }
+    });
+    expect(refreshNativeWorkspaceDescriptor(pathOnly, samePhysicalDirectory)).toMatchObject({
+      id: "path-only",
+      identity: { canonicalPath: "/workspace/observed" }
+    });
+  });
+
   it("uses exact spelling only when both Workspace identities are path-only", () => {
     const upper = descriptorFixture("upper", "/Workspace/Project", "path-only");
     const exact = descriptorFixture("exact", "/Workspace/Project", "path-only");

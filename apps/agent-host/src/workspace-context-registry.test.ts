@@ -86,7 +86,7 @@ describe("WorkspaceContextRegistry", () => {
     })).toThrow(expect.objectContaining({ code: "INVALID_PAYLOAD" }));
   });
 
-  it("uses filesystem identity when a Workspace is reached through a directory link", async () => {
+  it("preserves Main's Workspace spelling while retaining filesystem containment identity", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-workspace-identity-"));
     const target = join(root, "target");
     const alias = join(root, "alias");
@@ -95,15 +95,21 @@ describe("WorkspaceContextRegistry", () => {
     const fixture = fakeServicesFactory();
     const registry = new WorkspaceContextRegistry({ createServices: fixture.createServices });
 
-    registry.register("workspace-1", {
-      cwd: target,
+    const record = registry.register("workspace-1", {
+      cwd: alias,
       agentDir: "/agent",
       trust: "trusted",
       approvalMode: "guided"
     });
+    expect(fixture.createServices).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: resolve(alias)
+    }));
+    expect(record.cwd).toBe(resolve(alias));
+    expect(record.canonicalCwd).toBe(await realpath(target));
     expect(registry.workspaceIdForCwd(alias)).toBe("workspace-1");
+    expect(registry.workspaceIdForCwd(target)).toBe("workspace-1");
     expect(() => registry.register("workspace-2", {
-      cwd: alias,
+      cwd: target,
       agentDir: "/agent",
       trust: "trusted",
       approvalMode: "guided"
