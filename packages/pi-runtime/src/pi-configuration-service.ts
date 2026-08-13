@@ -36,6 +36,7 @@ import {
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
 import {
+  currentValidatedRuntimeCandidate,
   refreshPiConfigurationProjection,
   type ValidatedConfigurationRuntimeCandidate
 } from "./pi-configuration-projection.js";
@@ -319,8 +320,9 @@ export class PiConfigurationService {
     const path = configurationPath(this.paths, state, target);
     let previousContent: string | undefined;
     let writtenContent = "";
+    let beforeBundle: WorkspaceBundle | undefined;
     await withConfigurationFileLock(path, async () => {
-      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
+      beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
       assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
       previousContent = beforeBundle.byKind[target].content;
       writtenContent = ensureTrailingNewline(update(previousContent));
@@ -342,7 +344,10 @@ export class PiConfigurationService {
       });
       throw error;
     }
-    await this.refreshLocked("desktop", true, true);
+    const validatedRuntime = beforeBundle
+      ? currentValidatedRuntimeCandidate(this.modelRuntime, state, beforeBundle)
+      : undefined;
+    await this.refreshLocked("desktop", true, true, undefined, validatedRuntime);
     return this.requireSnapshot(state);
   }
 

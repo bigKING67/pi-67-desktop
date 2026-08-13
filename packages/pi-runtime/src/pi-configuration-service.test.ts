@@ -84,6 +84,36 @@ describe("PiConfigurationService", () => {
     }
   }, 20_000);
 
+  it("reuses the current validated runtime when only default settings change", async () => {
+    const fixture = await createFixture();
+    try {
+      const initial = await fixture.service.get(fixture.cwd);
+      const saved = await fixture.service.saveProvider(
+        fixture.cwd,
+        initial.revision,
+        providerInput()
+      );
+      const createRuntime = vi.spyOn(ModelRuntime, "create")
+        .mockRejectedValue(new Error("settings-only mutation must not create another runtime"));
+      try {
+        const updated = await fixture.service.setDefaultModel(
+          fixture.cwd,
+          saved.revision,
+          "global",
+          { provider: "pi67-test", model: "fixture-model" }
+        );
+
+        expect(updated.defaults.global).toEqual({ provider: "pi67-test", model: "fixture-model" });
+        expect(updated.syncState).toBe("current");
+        expect(createRuntime).not.toHaveBeenCalled();
+      } finally {
+        createRuntime.mockRestore();
+      }
+    } finally {
+      await fixture.dispose();
+    }
+  }, 20_000);
+
   it("projects a credential mutation from the revision-pinned bundle without reloading auth.json", async () => {
     const fixture = await createFixture();
     const reload = vi.spyOn(PiAuthCredentialStore.prototype, "reload")

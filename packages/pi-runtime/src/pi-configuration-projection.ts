@@ -29,7 +29,24 @@ export interface ValidatedConfigurationRuntimeCandidate {
   runtime: ModelRuntime;
   modelsRevision: string;
   authRevision: string;
-  onAuthRevisionMismatch(content: string | undefined): void;
+  onAuthRevisionMismatch?(content: string | undefined): void;
+}
+
+export function currentValidatedRuntimeCandidate(
+  runtime: ModelRuntime | undefined,
+  state: WorkspaceConfigurationState,
+  bundle: Awaited<ReturnType<typeof readWorkspaceConfigurationBundle>>
+): ValidatedConfigurationRuntimeCandidate | undefined {
+  if (
+    !runtime
+    || state.snapshot?.syncState !== "current"
+    || state.snapshot.revision !== bundle.revision
+  ) return undefined;
+  return {
+    runtime,
+    modelsRevision: bundle.byKind.models.revision,
+    authRevision: bundle.byKind.auth.revision
+  };
 }
 
 interface RefreshPiConfigurationOptions {
@@ -60,7 +77,10 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
 
   const global = bundles[0]!;
   const validatedRuntime = options.validatedRuntime;
-  if (validatedRuntime && validatedRuntime.authRevision !== global.byKind.auth.revision) {
+  if (
+    validatedRuntime?.onAuthRevisionMismatch
+    && validatedRuntime.authRevision !== global.byKind.auth.revision
+  ) {
     validatedRuntime.onAuthRevisionMismatch(global.byKind.auth.content);
     throw new RuntimeError(
       "CONFIGURATION_CHANGED_EXTERNALLY",
