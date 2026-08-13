@@ -1,4 +1,5 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource,
   PiConfigurationFileKind,
@@ -24,6 +25,13 @@ import { reloadDesktopSettings } from "./desktop-package-toolchain.js";
 import { withPiConfigurationBudget } from "./pi-configuration-service-options.js";
 import { projectRuntimeProviders } from "./session-snapshot.js";
 
+export interface ValidatedConfigurationRuntimeCandidate {
+  runtime: ModelRuntime;
+  modelsRevision: string;
+  authRevision: string;
+  onAuthRevisionMismatch(content: string | undefined): void;
+}
+
 interface RefreshPiConfigurationOptions {
   states: WorkspaceConfigurationState[];
   paths: PiConfigurationPaths;
@@ -35,6 +43,7 @@ interface RefreshPiConfigurationOptions {
   fileAccessWaitMs: number;
   validationRuntimeWaitMs: number;
   settingsReloadWaitMs: number;
+  validatedRuntime?: ValidatedConfigurationRuntimeCandidate;
   createValidationRuntime(): Promise<ModelRuntime>;
   installModelRuntime(runtime: ModelRuntime): void;
 }
@@ -50,6 +59,15 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
   ) return;
 
   const global = bundles[0]!;
+  const validatedRuntime = options.validatedRuntime;
+  if (validatedRuntime && validatedRuntime.authRevision !== global.byKind.auth.revision) {
+    validatedRuntime.onAuthRevisionMismatch(global.byKind.auth.content);
+    throw new RuntimeError(
+      "CONFIGURATION_CHANGED_EXTERNALLY",
+      "Pi auth.json changed again while Desktop was validating the saved credential.",
+      { recoverable: true }
+    );
+  }
   const globalDiagnostics: Array<{ file: PiConfigurationFileKind; message: string }> = [];
   let modelsDocument: ReturnType<typeof parseModelsDocument> | undefined;
   let globalSettings: ReturnType<typeof parseSettingsDocument> | undefined;
@@ -69,11 +87,16 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
 
   if (modelsDocument && !authError) {
     try {
-      const probe = await withConfigurationProjectionBudget(
-        options.createValidationRuntime(),
-        options.validationRuntimeWaitMs,
-        "provider-validation-runtime"
-      );
+      const revisionsMatch = validatedRuntime
+        && validatedRuntime.modelsRevision === global.byKind.models.revision
+        && validatedRuntime.authRevision === global.byKind.auth.revision;
+      const probe = revisionsMatch
+        ? validatedRuntime.runtime
+        : await withConfigurationProjectionBudget(
+            options.createValidationRuntime(),
+            options.validationRuntimeWaitMs,
+            "provider-validation-runtime"
+          );
       const error = probe.getError();
       if (error) throw new Error(error);
       options.installModelRuntime(probe);

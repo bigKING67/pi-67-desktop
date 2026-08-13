@@ -19,7 +19,6 @@ import { withConfigurationFileLock, writePrivateFileAtomically } from "./atomic-
 import { removeProviderDocument, saveProviderDocument, setDefaultModelDocument } from "./pi-configuration-documents.js";
 import {
   authContentRevision,
-  PiAuthContentChangedError,
   PiAuthCredentialStore,
   revealStoredApiKey,
   type PiAuthCredentialMutationResult
@@ -28,7 +27,6 @@ import {
   assertExpectedConfigurationRevision,
   configurationPath,
   ensureTrailingNewline,
-  normalizeConfigurationMutationError,
   PiConfigurationWatcher,
   readOptionalConfigurationFile,
   readWorkspaceConfigurationBundle,
@@ -37,7 +35,10 @@ import {
   type WorkspaceBundle,
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
-import { refreshPiConfigurationProjection } from "./pi-configuration-projection.js";
+import {
+  refreshPiConfigurationProjection,
+  type ValidatedConfigurationRuntimeCandidate
+} from "./pi-configuration-projection.js";
 import {
   resolvePiConfigurationServiceOptions,
   withPiConfigurationBudget,
@@ -46,6 +47,7 @@ import {
 } from "./pi-configuration-service-options.js";
 import { normalizeSessionCatalogWorkspaceIdentity as workspaceIdentity } from "./session-path-identity.js";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
+import { commitPiCredentialMutation } from "./pi-credential-mutation-transaction.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 export interface PiConfigurationReloadTarget {
@@ -353,30 +355,19 @@ export class PiConfigurationService {
       const state = this.requireWorkspace(cwd);
       const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
       assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
-      let mutationResult: PiAuthCredentialMutationResult | undefined;
-      try {
-        mutationResult = await mutation(beforeBundle);
-        const validation = await this.createPiValidationRuntime();
-        await validation.listCredentials();
-      } catch (error) {
-        if (!(error instanceof PiAuthContentChangedError) && mutationResult) {
-          const failedMutation = mutationResult;
-          await withConfigurationFileLock(this.authPath, async () => {
-            const current = await readOptionalConfigurationFile(this.authPath, this.limits.fileAccessWaitMs);
-            if (current !== failedMutation.writtenContent) {
-              throw new RuntimeError(
-                "CONFIGURATION_CHANGED_EXTERNALLY",
-                "Pi auth.json changed again while Desktop was validating the saved credential.",
-                { recoverable: true }
-              );
-            }
-            await restoreConfigurationFile(this.authPath, failedMutation.previousContent);
-          });
-          await this.credentials.reload();
-        }
-        throw normalizeConfigurationMutationError(error);
-      }
-      await this.refreshLocked("desktop", true, true);
+      const committed = await commitPiCredentialMutation({
+        authPath: this.authPath,
+        credentials: this.credentials,
+        fileAccessWaitMs: this.limits.fileAccessWaitMs,
+        mutate: () => mutation(beforeBundle),
+        createValidationRuntime: () => this.createPiValidationRuntime()
+      });
+      await this.refreshLocked("desktop", true, true, undefined, {
+        runtime: committed.runtime,
+        modelsRevision: beforeBundle.byKind.models.revision,
+        authRevision: authContentRevision(committed.result.writtenContent),
+        onAuthRevisionMismatch: (content) => committed.restoreStore(content)
+      });
       return this.requireSnapshot(state);
     });
   }
@@ -385,11 +376,12 @@ export class PiConfigurationService {
     source: PiConfigurationChangeSource,
     emit: boolean,
     force: boolean,
-    states: WorkspaceConfigurationState[] = [...this.workspaces.values()]
+    states?: WorkspaceConfigurationState[],
+    validatedRuntime?: ValidatedConfigurationRuntimeCandidate
   ): Promise<void> {
     this.watcher.ensureDirectoryWatchers();
     await refreshPiConfigurationProjection({
-      states,
+      states: states ?? [...this.workspaces.values()],
       paths: this.paths,
       credentials: this.credentials,
       source,
@@ -399,6 +391,7 @@ export class PiConfigurationService {
       fileAccessWaitMs: this.limits.fileAccessWaitMs,
       validationRuntimeWaitMs: this.limits.validationRuntimeWaitMs,
       settingsReloadWaitMs: this.limits.settingsReloadWaitMs,
+      ...(validatedRuntime ? { validatedRuntime } : {}),
       createValidationRuntime: () => this.createPiValidationRuntime(),
       installModelRuntime: (runtime) => { this.modelRuntime = runtime; }
     });
