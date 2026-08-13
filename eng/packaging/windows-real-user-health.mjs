@@ -33,26 +33,34 @@ export async function assertNoFailureNotifications(window) {
 
 export async function verifyGitMetadataIsHidden(window) {
   let inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
-  if (!(await inspector.isVisible())) {
+  const openedByProbe = !(await inspector.isVisible());
+  if (openedByProbe) {
     await window.getByRole("button", { name: "显示任务检查器", exact: true }).click({ timeout: 10_000 });
     inspector = window.getByRole("complementary", { name: "任务检查器", exact: true });
   }
-  await inspector.waitFor({ state: "visible", timeout: 10_000 });
-  await inspector.getByRole("tab", { name: "文件", exact: true }).click({ timeout: 10_000 });
-  await inspector.locator(".inspector-file-name").getByText("README.md", { exact: true })
-    .waitFor({ state: "visible", timeout: 10_000 });
-  const rootNames = await inspector.locator(".inspector-file-name").allTextContents();
-  if (rootNames.includes(".git")) throw new Error("Windows real-user file projection exposed .git metadata.");
+  try {
+    await inspector.waitFor({ state: "visible", timeout: 10_000 });
+    await inspector.getByRole("tab", { name: "文件", exact: true }).click({ timeout: 10_000 });
+    await inspector.locator(".inspector-file-name").getByText("README.md", { exact: true })
+      .waitFor({ state: "visible", timeout: 10_000 });
+    const rootNames = await inspector.locator(".inspector-file-name").allTextContents();
+    if (rootNames.includes(".git")) throw new Error("Windows real-user file projection exposed .git metadata.");
 
-  const search = inspector.getByRole("textbox", { name: "搜索工作区文件" });
-  await search.fill(".git");
-  await search.press("Enter");
-  await inspector.getByText("没有匹配的文件。", { exact: true })
-    .waitFor({ state: "visible", timeout: 10_000 });
-  const searchNames = await inspector.locator(".inspector-file-name").allTextContents();
-  if (searchNames.some((name) => name === ".git" || name.startsWith(".git/"))) {
-    throw new Error("Windows real-user file search exposed .git metadata.");
+    const search = inspector.getByRole("textbox", { name: "搜索工作区文件" });
+    await search.fill(".git");
+    await search.press("Enter");
+    await inspector.getByText("没有匹配的文件。", { exact: true })
+      .waitFor({ state: "visible", timeout: 10_000 });
+    const searchNames = await inspector.locator(".inspector-file-name").allTextContents();
+    if (searchNames.some((name) => name === ".git" || name.startsWith(".git/"))) {
+      throw new Error("Windows real-user file search exposed .git metadata.");
+    }
+    await search.fill("");
+    return { gitMetadataHidden: true, readmeVisible: true };
+  } finally {
+    if (openedByProbe) {
+      await window.getByRole("button", { name: "隐藏任务检查器", exact: true }).click({ timeout: 10_000 });
+      await inspector.waitFor({ state: "detached", timeout: 10_000 });
+    }
   }
-  await search.fill("");
-  return { gitMetadataHidden: true, readmeVisible: true };
 }
