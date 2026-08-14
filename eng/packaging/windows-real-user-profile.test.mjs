@@ -1,7 +1,7 @@
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertWindowsExistingProfilePreserved,
   inspectCleanWindowsRealUserProfile,
@@ -11,6 +11,10 @@ import {
   snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
 } from "./windows-real-user-profile.mjs";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("Windows installed real-user Pi profile", () => {
   it("prepares a configured profile in a localized path and keeps the drift target empty", async () => {
@@ -67,6 +71,7 @@ describe("Windows installed real-user Pi profile", () => {
       await writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
         schema: "pi67.desktop-capability-state.v1",
         packages: [{ id: "pi67-core" }],
+        profileOwnership: "desktop",
         rules: "installed"
       }));
       await writeFile(join(agentDir, "mcp.json"), JSON.stringify({
@@ -77,18 +82,81 @@ describe("Windows installed real-user Pi profile", () => {
 
       await prepareFreshWindowsRealUserProfile({
         agentDir,
+        provisioningTimeoutMs: 1_000,
         writeControlledExtension: (path) => writeFile(path, "export default function fixture() {}\n")
       });
 
       await expect(inspectCleanWindowsRealUserProfile(agentDir)).resolves.toEqual({
         browser67ManagedServers: ["js-reverse", "tmwd_browser"],
         capabilityPackageCount: 1,
+        profileOwnership: "desktop",
         rules: "installed"
       });
       expect(JSON.parse(await readFile(join(agentDir, "auth.json"), "utf8")))
         .toMatchObject({ openai: { type: "api_key" } });
       expect(await readFile(join(agentDir, "extensions", "installer-lifecycle-fixture.ts"), "utf8"))
         .toContain("fixture");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the installed-runtime budget when clean provisioning exceeds the former 15-second limit", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-windows-slow-clean-profile-"));
+    const agentDir = join(root, "agent");
+    let simulatedNow = 0;
+    let provisioned = false;
+    vi.spyOn(Date, "now").mockImplementation(() => simulatedNow);
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((callback, delay = 0) => {
+      simulatedNow += Number(delay);
+      const provision = simulatedNow > 15_000 && !provisioned
+        ? writeCleanProvisioningState(agentDir).then(() => {
+          provisioned = true;
+        })
+        : Promise.resolve();
+      void provision.then(callback);
+      return 0;
+    });
+    try {
+      await prepareFreshWindowsRealUserProfile({
+        agentDir,
+        provisioningTimeoutMs: 75_000,
+        writeControlledExtension: (path) => writeFile(path, "export default function fixture() {}\n")
+      });
+
+      expect(simulatedNow).toBeGreaterThan(15_000);
+      await expect(inspectCleanWindowsRealUserProfile(agentDir)).resolves.toMatchObject({
+        profileOwnership: "desktop"
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("reports bounded provisioning state without paths or Profile contents", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-windows-clean-profile-diagnostic-"));
+    const agentDir = join(root, "private-agent-root");
+    try {
+      await mkdir(join(agentDir, "desktop-capabilities"), { recursive: true });
+      await writeFile(join(agentDir, "desktop-capabilities", "state.json"), "{invalid", "utf8");
+      await writeFile(join(agentDir, "mcp.json"), "{}\n", "utf8");
+
+      const error = await prepareFreshWindowsRealUserProfile({
+        agentDir,
+        provisioningTimeoutMs: 1,
+        writeControlledExtension: () => Promise.resolve()
+      }).then(() => undefined, (failure) => failure);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toContain("within 1ms");
+      expect(error.message).toContain('"profileRootExists":true');
+      expect(error.message).toContain('"state":{"status":"invalid"');
+      expect(error.message).toContain('"mcp":{"status":"valid"');
+      expect(error.message).toContain('"hasJsReverse":false');
+      expect(error.message).toContain('"hasTmwdBrowser":false');
+      expect(error.message).not.toContain(root);
+      expect(error.message).not.toContain("private-agent-root");
+      expect(error.message).not.toContain("{invalid");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -113,3 +181,20 @@ describe("Windows installed real-user Pi profile", () => {
     }
   });
 });
+
+async function writeCleanProvisioningState(agentDir) {
+  await mkdir(join(agentDir, "desktop-capabilities"), { recursive: true });
+  await Promise.all([
+    writeFile(join(agentDir, "desktop-capabilities", "state.json"), JSON.stringify({
+      schema: "pi67.desktop-capability-state.v1",
+      packages: [{ id: "pi67-core" }],
+      profileOwnership: "desktop",
+      rules: "installed"
+    })),
+    writeFile(join(agentDir, "mcp.json"), JSON.stringify({
+      pi67ManagedMcp: {
+        servers: { tmwd_browser: {}, "js-reverse": {} }
+      }
+    }))
+  ]);
+}

@@ -138,6 +138,8 @@ describe("Windows installer lifecycle contract", () => {
     expect(uninstall).toBeGreaterThan(existingProfileGate);
     expect(source).toContain('lane: "clean-profile"');
     expect(source).toContain('lane: "existing-pi-profile"');
+    expect(source).toContain("initializeFirstLaunch: ({ provisioningTimeoutMs })");
+    expect(source).toContain("provisioningTimeoutMs,");
     expect(source).toContain("await assertWindowsExistingProfilePreserved(");
   });
 

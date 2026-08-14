@@ -303,8 +303,9 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       agentDir: cleanLifecycleAgentDir,
       artifact: finalInstalledArtifact,
       environmentDriftAgentDir: cleanLifecycleEnvironmentDriftAgentDir,
-      initializeFirstLaunch: () => prepareFreshWindowsRealUserProfile({
+      initializeFirstLaunch: ({ provisioningTimeoutMs }) => prepareFreshWindowsRealUserProfile({
         agentDir: cleanLifecycleAgentDir,
+        provisioningTimeoutMs,
         writeControlledExtension: (extensionPath) => writeControlledShutdownExtension({
           extensionPath,
           childPidPath,

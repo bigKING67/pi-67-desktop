@@ -102,7 +102,10 @@ describe("Windows installed real-user lifecycle", () => {
     expect(bootstrap).toBeGreaterThan(-1);
     expect(normalLaunches).toBeGreaterThan(bootstrap);
     expect(bootstrapSource).toContain('profileMode: "fresh"');
-    expect(bootstrapSource).toContain("await initializeFirstLaunch();");
+    expect(bootstrapSource).toContain("await initializeFirstLaunch({");
+    expect(bootstrapSource).toContain(
+      "provisioningTimeoutMs: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS"
+    );
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {

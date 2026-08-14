@@ -45,7 +45,9 @@ export async function bootstrapFreshProfileLaunch({
     await installWorkspaceDialogResult(application, workspace);
     await window.getByRole("button", { name: "选择工作区" }).click();
     const workspaceCwd = await resolveRealUserWorkspaceAuthority(window, workspace, undefined);
-    await initializeFirstLaunch();
+    await initializeFirstLaunch({
+      provisioningTimeoutMs: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+    });
     const runtime = window.locator(
       '[data-runtime-phase="stopped"], [data-runtime-phase="ready"], [data-runtime-phase="failed"]'
     );

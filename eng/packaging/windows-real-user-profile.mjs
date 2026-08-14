@@ -47,9 +47,10 @@ export async function prepareWindowsRealUserProfile({
 
 export async function prepareFreshWindowsRealUserProfile({
   agentDir,
+  provisioningTimeoutMs,
   writeControlledExtension
 }) {
-  await waitForCleanDesktopProvisioning(agentDir);
+  await waitForCleanDesktopProvisioning(agentDir, provisioningTimeoutMs);
   await writeConfiguredProfile(agentDir);
   const extensionsDirectory = join(agentDir, "extensions");
   await mkdir(extensionsDirectory, { recursive: true });
@@ -57,24 +58,59 @@ export async function prepareFreshWindowsRealUserProfile({
 }
 
 export async function inspectCleanWindowsRealUserProfile(agentDir) {
-  const [state, mcp] = await Promise.all([
-    readJson(join(agentDir, "desktop-capabilities", "state.json")),
-    readJson(join(agentDir, "mcp.json"))
-  ]);
-  const managedServers = mcp?.pi67ManagedMcp?.servers;
-  const serverNames = Object.keys(managedServers ?? {}).sort();
-  if (
-    state?.schema !== "pi67.desktop-capability-state.v1"
-    || !Array.isArray(state.packages)
-    || state.packages.length === 0
-    || state.rules !== "installed"
-    || !serverNames.includes("tmwd_browser")
-    || !serverNames.includes("js-reverse")
-  ) throw new Error("Windows clean-profile lane did not receive complete Desktop capabilities.");
+  const observation = await inspectCleanWindowsProfileProvisioning(agentDir);
+  if (!observation.ready) {
+    throw new Error("Windows clean-profile lane did not receive complete Desktop capabilities.");
+  }
   return {
-    browser67ManagedServers: serverNames,
-    capabilityPackageCount: state.packages.length,
-    rules: state.rules
+    browser67ManagedServers: ["js-reverse", "tmwd_browser"],
+    capabilityPackageCount: observation.state.capabilityPackageCount,
+    profileOwnership: observation.state.profileOwnership,
+    rules: observation.state.rules
+  };
+}
+
+async function inspectCleanWindowsProfileProvisioning(agentDir) {
+  const [profileRootExists, stateFile, mcpFile] = await Promise.all([
+    lstat(agentDir).then((metadata) => metadata.isDirectory()).catch(() => false),
+    readJsonStatus(join(agentDir, "desktop-capabilities", "state.json")),
+    readJsonStatus(join(agentDir, "mcp.json"))
+  ]);
+  const state = stateFile.value;
+  const managedServers = mcpFile.value?.pi67ManagedMcp?.servers;
+  const hasJsReverse = hasOwn(managedServers, "js-reverse");
+  const hasTmwdBrowser = hasOwn(managedServers, "tmwd_browser");
+  const capabilityPackageCount = Array.isArray(state?.packages) ? state.packages.length : 0;
+  const schemaValid = state?.schema === "pi67.desktop-capability-state.v1";
+  const profileOwnership = state?.profileOwnership === "desktop" || state?.profileOwnership === "shared"
+    ? state.profileOwnership
+    : null;
+  const rules = state?.rules === "installed"
+    ? "installed"
+    : state?.rules === undefined ? null : "unexpected";
+  const ready = stateFile.status === "valid"
+    && schemaValid
+    && capabilityPackageCount > 0
+    && profileOwnership === "desktop"
+    && rules === "installed"
+    && mcpFile.status === "valid"
+    && hasJsReverse
+    && hasTmwdBrowser;
+  return {
+    ready,
+    profileRootExists,
+    state: {
+      status: stateFile.status,
+      schemaValid,
+      profileOwnership,
+      capabilityPackageCount,
+      rules
+    },
+    mcp: {
+      status: mcpFile.status,
+      hasJsReverse,
+      hasTmwdBrowser
+    }
   };
 }
 
@@ -161,14 +197,24 @@ async function writeExistingPiProfile(agentDir) {
   ]);
 }
 
-async function waitForCleanDesktopProvisioning(agentDir, timeoutMs = 15_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
-    const ready = await inspectCleanWindowsRealUserProfile(agentDir).then(() => true).catch(() => false);
-    if (ready) return;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+async function waitForCleanDesktopProvisioning(agentDir, timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error("Windows clean-profile provisioning timeout must be a positive finite number.");
   }
-  throw new Error("Windows clean-profile lane did not finish Desktop capability provisioning.");
+  const deadline = Date.now() + timeoutMs;
+  let observation;
+  while (true) {
+    observation = await inspectCleanWindowsProfileProvisioning(agentDir);
+    if (observation.ready) return;
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(50, remainingMs)));
+  }
+  const { ready: _ready, ...diagnostic } = observation;
+  throw new Error(
+    `Windows clean-profile lane did not finish Desktop capability provisioning within ${timeoutMs}ms. `
+    + `Provisioning diagnostics: ${JSON.stringify(diagnostic)}`
+  );
 }
 
 async function collectFiles(root, directory = root) {
@@ -191,4 +237,20 @@ async function collectFiles(root, directory = root) {
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
+}
+
+async function readJsonStatus(path) {
+  try {
+    return { status: "valid", value: await readJson(path) };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { status: "missing" };
+    if (error instanceof SyntaxError) return { status: "invalid" };
+    return { status: "unavailable" };
+  }
+}
+
+function hasOwn(value, key) {
+  return value !== null
+    && typeof value === "object"
+    && Object.prototype.hasOwnProperty.call(value, key);
 }
