@@ -159,7 +159,7 @@ async function writeExistingPiProfile(agentDir) {
   ]);
   await Promise.all([
     writeConfiguredProfile(agentDir),
-    writeFile(join(agentDir, "models.json"), "{\"providers\":[]}\n", "utf8"),
+    writeFile(join(agentDir, "models.json"), "{\"providers\":{}}\n", "utf8"),
     writeFile(join(agentDir, "mcp.json"), `${JSON.stringify({
       mcpServers: {
         tmwd_browser: { command: "user-browser67", args: ["--user-owned"] },

@@ -42,6 +42,8 @@ describe("Windows installed real-user Pi profile", () => {
         .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "settings.json"), "utf8")))
         .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
+      expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "models.json"), "utf8")))
+        .toEqual({ providers: {} });
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "mcp.json"), "utf8")))
         .toMatchObject({
           mcpServers: {
