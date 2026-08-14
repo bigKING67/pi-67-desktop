@@ -119,7 +119,18 @@ jobs:
           node eng/release/preview-candidate-source.mjs --source-commit "$SOURCE_COMMIT"
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm run package:native:unsigned
-      - run: corepack pnpm run package:smoke
+      - name: Run packaged Electron smoke
+        env:
+          PI67_PACKAGED_SCREENSHOT_DIR: artifacts/validation/windows-packaged-smoke
+        run: corepack pnpm run package:smoke
+      - name: Upload packaged Electron smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-packaged-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-packaged-smoke/
+          if-no-files-found: warn
+          retention-days: 3
       - name: Verify Windows packaged synthetic scale and IME contracts
         run: corepack pnpm run package:smoke:windows-ui
       - name: Create and verify Windows candidate identity

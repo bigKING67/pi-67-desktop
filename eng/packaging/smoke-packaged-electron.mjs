@@ -64,11 +64,12 @@ try {
   });
   packagedProcessOutput = captureProcessOutput(application.process());
   let window = await application.firstWindow();
-  await window.waitForLoadState("domcontentloaded");
   await verifyPackagedWelcome({
     agentDir,
     application,
+    captureScreenshot: capturePackagedScreenshot,
     packagedCredential,
+    packagedProcessOutput,
     userDataDirectory,
     window,
     workspace,
@@ -416,7 +417,6 @@ try {
     throw new Error(`Packaged Workspace did not restore after a cold restart: ${JSON.stringify(await inspectRendererSurface(window))}`, { cause: error });
   }
   await verifyColdProviderRestoration(window);
-
   if (!(await coldConversation.isVisible())) {
     if (await coldCreateConversation.isVisible()) await coldCreateConversation.click();
     else await window.keyboard.press(process.platform === "darwin" ? "Meta+N" : "Control+N");

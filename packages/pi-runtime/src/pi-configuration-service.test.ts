@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiConfigurationReloadState, PiProviderConfigurationChanged } from "@pi67/protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import { PiConfigurationService } from "./pi-configuration-service.js";
 
@@ -273,6 +274,8 @@ describe("PiConfigurationService", () => {
       watchDebounceMs: 60_000,
       validationRuntimeWaitMs: 10
     });
+    const recoveredRuntime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
+    await installFirstPartyModelProviders(recoveredRuntime);
     const stalled = new Promise<ModelRuntime>(() => undefined);
     const createRuntime = vi.spyOn(ModelRuntime, "create").mockReturnValue(stalled);
     try {
@@ -293,7 +296,7 @@ describe("PiConfigurationService", () => {
       });
       expect((result as Exclude<typeof result, string>).files).toHaveLength(4);
 
-      createRuntime.mockRestore();
+      createRuntime.mockResolvedValue(recoveredRuntime);
       await expect(fixture.service.reload(fixture.cwd)).resolves.toMatchObject({ syncState: "current" });
     } finally {
       createRuntime.mockRestore();

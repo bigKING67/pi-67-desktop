@@ -19,25 +19,39 @@ const PACKAGED_SHUTDOWN_BUDGET_MS = 5_000;
 export async function verifyPackagedWelcome({
   agentDir,
   application,
+  captureScreenshot,
   packagedCredential,
+  packagedProcessOutput,
   userDataDirectory,
   window,
   workspace,
   verifyMainOnlyDiagnostics
 }) {
-  await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
-  if (!(await window.getByRole("button", { name: "选择工作区" }).isEnabled())) {
-    throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
+  const rendererBootstrapFailures = captureRendererBootstrapFailures(window);
+  try {
+    await window.waitForLoadState("domcontentloaded");
+    await window.getByRole("button", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 15_000 });
+    if (!(await window.getByRole("button", { name: "选择工作区" }).isEnabled())) {
+      throw new Error("Packaged workspace action is unavailable before Agent Host demand.");
+    }
+    await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
+    await verifyMainOnlyDiagnostics({
+      agentDir,
+      application,
+      packagedCredential,
+      userDataDirectory,
+      window,
+      workspace
+    });
+  } catch (error) {
+    await captureScreenshot(window, "00-welcome-failure.png").catch(() => undefined);
+    const surface = await inspectRendererSurface(window).catch(() => ({ unavailable: true }));
+    throw new Error([
+      `Packaged welcome did not render: ${JSON.stringify(surface)}`,
+      `Renderer bootstrap failures: ${JSON.stringify(rendererBootstrapFailures())}`,
+      packagedProcessOutput() || "No packaged process diagnostics were emitted."
+    ].join("\n"), { cause: error });
   }
-  await window.getByLabel("当前状态：等待选择工作区").waitFor({ state: "visible", timeout: 15_000 });
-  await verifyMainOnlyDiagnostics({
-    agentDir,
-    application,
-    packagedCredential,
-    userDataDirectory,
-    window,
-    workspace
-  });
 }
 
 export async function captureWelcomeAndConnectAgentHost(window, captureScreenshot, packagedProcessOutput) {
@@ -265,6 +279,25 @@ export function captureProcessOutput(process) {
   return () => output;
 }
 
+export function captureRendererBootstrapFailures(window) {
+  const failures = [];
+  const capture = (kind, detail) => {
+    if (failures.length < 10) failures.push({ kind, detail: String(detail).slice(0, 1_000) });
+  };
+  window.on("pageerror", (error) => capture("pageerror", error.message));
+  window.on("requestfailed", (request) => {
+    if (isCriticalRendererAsset(request.resourceType())) {
+      capture("asset", `${request.url()} (${request.failure()?.errorText ?? "failed"})`);
+    }
+  });
+  window.on("response", (response) => {
+    if (isCriticalRendererAsset(response.request().resourceType()) && !response.ok()) {
+      capture("asset", `${response.url()} (${response.status()})`);
+    }
+  });
+  return () => failures;
+}
+
 export async function openSettingsSection(window, sectionName) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
   const settings = window.getByLabel("π 设置");
@@ -292,10 +325,15 @@ export function inspectRendererSurface(window) {
     bodyText: document.body.innerText.slice(0, 2_000),
     conversationCount: document.querySelectorAll('[aria-label="Pi conversation"]').length,
     conversationRowCount: document.querySelectorAll('[data-testid="conversation-row"]').length,
+    rootChildCount: document.querySelector("#root")?.childElementCount ?? 0,
     settingsVisible: Boolean(document.querySelector('[data-testid="settings-workbench"]')),
     title: document.title,
     url: location.href
   }));
+}
+
+function isCriticalRendererAsset(resourceType) {
+  return resourceType === "script" || resourceType === "stylesheet" || resourceType === "worker";
 }
 
 function round(value) {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  captureRendererBootstrapFailures,
   ensurePackagedNewSessionIntent,
   waitForPersistedRuntimeRecovery
 } from "./packaged-electron-smoke-scenarios.mjs";
@@ -57,6 +58,33 @@ describe("packaged New Session Intent", () => {
 
     expect(click).toHaveBeenCalledTimes(visible ? 0 : 1);
     expect(waitFor).toHaveBeenCalledWith({ state: "visible", timeout: 1234 });
+  });
+});
+
+describe("packaged Renderer bootstrap diagnostics", () => {
+  it("captures page errors and only critical failed assets", () => {
+    const listeners = new Map();
+    const window = {
+      on: vi.fn((event, listener) => listeners.set(event, listener))
+    };
+    const readFailures = captureRendererBootstrapFailures(window);
+
+    listeners.get("pageerror")(new Error("bootstrap failed"));
+    listeners.get("requestfailed")({
+      failure: () => ({ errorText: "ERR_FILE_NOT_FOUND" }),
+      resourceType: () => "script",
+      url: () => "app://pi67/assets/index.js"
+    });
+    listeners.get("requestfailed")({
+      failure: () => ({ errorText: "ERR_FAILED" }),
+      resourceType: () => "image",
+      url: () => "app://pi67/icon.png"
+    });
+
+    expect(readFailures()).toEqual([
+      { kind: "pageerror", detail: "bootstrap failed" },
+      { kind: "asset", detail: "app://pi67/assets/index.js (ERR_FILE_NOT_FOUND)" }
+    ]);
   });
 });
 
