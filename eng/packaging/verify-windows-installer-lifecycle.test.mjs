@@ -141,6 +141,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("initializeFirstLaunch: ({ provisioningTimeoutMs })");
     expect(source).toContain("provisioningTimeoutMs,");
     expect(source).toContain("resolvePackagedRuntimeAssetContract(initialVersion)");
+    expect(source).toContain("resolveInstalledUserInterfaceContract(initialVersion)");
     expect(source).toContain("assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract)");
     expect(source).toContain("assertPackagedRuntimeAssets(finalInstalledArtifact)");
     expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");

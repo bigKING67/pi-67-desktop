@@ -23,7 +23,10 @@ import {
   repositoryRoot
 } from "./packaged-electron-fixture.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
-import { launchInstalledApplication } from "./windows-installed-application-lifecycle.mjs";
+import {
+  launchInstalledApplication,
+  resolveInstalledUserInterfaceContract
+} from "./windows-installed-application-lifecycle.mjs";
 import {
   parseWindowsInstallerLifecycleArguments,
   resolveWindowsInstallerLifecycleContract
@@ -227,6 +230,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       requireWindowsPackageWorkerJob: initialRuntimeAssetContract.requireWindowsPackageWorkerJob,
       version: initialVersion
     };
+    const initialUserInterfaceContract = resolveInstalledUserInterfaceContract(initialVersion);
+    report.initialUserInterfaceContract = { ...initialUserInterfaceContract, version: initialVersion };
     const initialInstalledIdentity = await readLifecycleArtifactIdentity(
       installedArtifact.executablePath,
       expectedSigner,
@@ -248,7 +253,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       artifact: installedArtifact,
       childPidPath,
       expectedTheme: "system",
-      legacyUserInterface: Boolean(baseline),
+      legacyUserInterface: initialUserInterfaceContract.legacyUserInterface,
       lifecyclePath,
       probePackagedRendererIsolation: !baseline,
       selectLightTheme: true,
@@ -296,7 +301,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         agentDir,
         artifact: finalInstalledArtifact,
         expectedTheme: "light",
-        legacyUserInterface: false,
+        legacyUserInterface: resolveInstalledUserInterfaceContract(packageJson.version).legacyUserInterface,
         lifecyclePath,
         probePackagedRendererIsolation: true,
         selectLightTheme: false,

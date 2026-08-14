@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { CONTROL_MUTATION_ACK_TIMEOUT_MS } from "@pi67/protocol";
+import { lt as semverLessThan, valid as validSemver } from "semver";
 import {
   CONTROLLED_PROMPT_TEXT,
   isProcessAlive,
@@ -26,6 +27,19 @@ export const INSTALLED_SHUTDOWN_BUDGET_MS = 5_000;
 
 export const INSTALLED_RUNTIME_READINESS_TIMEOUT_MS =
   CONTROL_MUTATION_ACK_TIMEOUT_MS + RUNTIME_READINESS_PROPAGATION_MARGIN_MS;
+export const WINDOWS_SETTINGS_WORKBENCH_VERSION = "0.1.0-alpha.8";
+
+export function resolveInstalledUserInterfaceContract(version) {
+  if (!validSemver(version)) {
+    throw new Error(`Invalid version for installed user interface contract: ${String(version)}.`);
+  }
+  const legacyUserInterface = semverLessThan(version, WINDOWS_SETTINGS_WORKBENCH_VERSION);
+  return {
+    legacyUserInterface,
+    runtimeReadiness: legacyUserInterface ? "legacy-exact-label" : "runtime-phase-and-conversation",
+    settingsFlow: legacyUserInterface ? "legacy-toolbar-menu" : "settings-workbench"
+  };
+}
 
 export async function launchInstalledApplication({
   activeControlledOperation,

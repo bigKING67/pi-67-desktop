@@ -2,12 +2,32 @@ import { describe, expect, it, vi } from "vitest";
 import {
   activateRestoredWorkspace,
   INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
+  resolveInstalledUserInterfaceContract,
   selectLightThemePreference,
   waitForInstalledStartupSurface,
-  waitForRuntimeReady
+  waitForRuntimeReady,
+  WINDOWS_SETTINGS_WORKBENCH_VERSION
 } from "./windows-installed-application-lifecycle.mjs";
 
 describe("Windows installed application lifecycle", () => {
+  it("selects the installed UI contract by the version being launched", () => {
+    expect(WINDOWS_SETTINGS_WORKBENCH_VERSION).toBe("0.1.0-alpha.8");
+    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.7")).toEqual({
+      legacyUserInterface: true,
+      runtimeReadiness: "legacy-exact-label",
+      settingsFlow: "legacy-toolbar-menu"
+    });
+    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.8")).toEqual({
+      legacyUserInterface: false,
+      runtimeReadiness: "runtime-phase-and-conversation",
+      settingsFlow: "settings-workbench"
+    });
+    expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.22"))
+      .toMatchObject({ legacyUserInterface: false });
+    expect(() => resolveInstalledUserInterfaceContract("not-a-version"))
+      .toThrow("Invalid version for installed user interface contract");
+  });
+
   it("selects the current light theme through Appearance Settings and returns to the workbench", async () => {
     const actions = [];
     const button = (name) => ({ click: async () => actions.push(`click:${String(name)}`) });
