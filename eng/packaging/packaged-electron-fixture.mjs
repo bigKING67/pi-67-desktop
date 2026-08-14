@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron } from "@playwright/test";
+import { gte as semverGreaterThanOrEqual, valid as validSemver } from "semver";
 
 export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -45,6 +46,26 @@ export const packagedAttachmentExcludedAsarPaths = [
   "node_modules/officeparser/dist/officeparser.browser.slim.mjs"
 ];
 
+const PACKAGE_WORKER_ASAR_PATH = "apps/agent-host/dist/skill-pack-process-worker.mjs";
+export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.23";
+
+export function resolvePackagedRuntimeAssetContract(version) {
+  if (!validSemver(version)) {
+    throw new Error(`Invalid version for packaged Runtime asset contract: ${String(version)}.`);
+  }
+  const packageWorkerIsolated = semverGreaterThanOrEqual(
+    version,
+    WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION
+  );
+  return {
+    packageWorkerIsolated,
+    requiredAsarPaths: packageWorkerIsolated
+      ? packagedAttachmentRequiredAsarPaths
+      : packagedAttachmentRequiredAsarPaths.filter((path) => path !== PACKAGE_WORKER_ASAR_PATH),
+    requireWindowsPackageWorkerJob: packageWorkerIsolated
+  };
+}
+
 export function resolvePackagedArtifact(platform = process.platform, arch = process.arch) {
   const supportedHost = (platform === "darwin" && arch === "arm64")
     || (platform === "win32" && arch === "x64");
@@ -66,7 +87,10 @@ export function resolvePackagedArtifact(platform = process.platform, arch = proc
   };
 }
 
-export async function assertPackagedRuntimeAssets(artifact) {
+export async function assertPackagedRuntimeAssets(artifact, {
+  requiredAsarPaths = packagedAttachmentRequiredAsarPaths,
+  requireWindowsPackageWorkerJob = true
+} = {}) {
   const clipboardModule = artifact.platform === "darwin"
     ? "@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node"
     : "@mariozechner/clipboard-win32-x64-msvc/clipboard.win32-x64-msvc.node";
@@ -91,14 +115,14 @@ export async function assertPackagedRuntimeAssets(artifact) {
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-mcp-adapter/package.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-observational-memory/package.json")),
-    ...(artifact.platform === "win32"
+    ...(artifact.platform === "win32" && requireWindowsPackageWorkerJob
       ? [access(join(artifact.resourcesPath, "native/pi67-package-worker-job.exe"))]
       : []),
-    assertPackagedAsarContract(artifact)
+    assertPackagedAsarContract(artifact, requiredAsarPaths)
   ]);
 }
 
-function assertPackagedAsarContract(artifact) {
+function assertPackagedAsarContract(artifact, requiredAsarPaths) {
   const script = [
     "const { accessSync } = require('node:fs');",
     "const { join } = require('node:path');",
@@ -115,7 +139,7 @@ function assertPackagedAsarContract(artifact) {
       "-e",
       script,
       artifact.resourcesPath,
-      JSON.stringify(packagedAttachmentRequiredAsarPaths),
+      JSON.stringify(requiredAsarPaths),
       JSON.stringify(packagedAttachmentExcludedAsarPaths)
     ], {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   packagedApplicationEnvironment,
   packagedAttachmentExcludedAsarPaths,
-  packagedAttachmentRequiredAsarPaths
+  packagedAttachmentRequiredAsarPaths,
+  resolvePackagedRuntimeAssetContract,
+  WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION
 } from "./packaged-electron-fixture.mjs";
 
 describe("packaged Electron launch environment", () => {
@@ -85,5 +87,30 @@ describe("packaged Electron launch environment", () => {
       "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
       "node_modules/officeparser/dist/officeparser.browser.mjs"
     ]));
+  });
+
+  it("uses the asset contract of the version that is actually installed", () => {
+    const legacy = resolvePackagedRuntimeAssetContract("0.1.0-alpha.22");
+    expect(WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION).toBe("0.1.0-alpha.23");
+    expect(legacy).toMatchObject({
+      packageWorkerIsolated: false,
+      requireWindowsPackageWorkerJob: false
+    });
+    expect(legacy.requiredAsarPaths).not.toContain(
+      "apps/agent-host/dist/skill-pack-process-worker.mjs"
+    );
+
+    const isolated = resolvePackagedRuntimeAssetContract("0.1.0-alpha.23");
+    expect(isolated).toMatchObject({
+      packageWorkerIsolated: true,
+      requireWindowsPackageWorkerJob: true
+    });
+    expect(isolated.requiredAsarPaths).toContain(
+      "apps/agent-host/dist/skill-pack-process-worker.mjs"
+    );
+    expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.24"))
+      .toMatchObject({ packageWorkerIsolated: true });
+    expect(() => resolvePackagedRuntimeAssetContract("not-a-version"))
+      .toThrow("Invalid version for packaged Runtime asset contract");
   });
 });

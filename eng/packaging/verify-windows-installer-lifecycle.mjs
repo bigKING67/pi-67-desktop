@@ -19,6 +19,7 @@ import {
 } from "./controlled-shutdown-fixture.ts";
 import {
   assertPackagedRuntimeAssets,
+  resolvePackagedRuntimeAssetContract,
   repositoryRoot
 } from "./packaged-electron-fixture.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
@@ -218,7 +219,14 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     );
     report.phases.push(firstInstall);
     const installedArtifact = await resolveInstalledArtifact(installDirectory);
-    await assertPackagedRuntimeAssets(installedArtifact);
+    const initialRuntimeAssetContract = resolvePackagedRuntimeAssetContract(initialVersion);
+    await assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract);
+    report.initialRuntimeAssetContract = {
+      packageWorkerIsolated: initialRuntimeAssetContract.packageWorkerIsolated,
+      requiredAsarPathCount: initialRuntimeAssetContract.requiredAsarPaths.length,
+      requireWindowsPackageWorkerJob: initialRuntimeAssetContract.requireWindowsPackageWorkerJob,
+      version: initialVersion
+    };
     const initialInstalledIdentity = await readLifecycleArtifactIdentity(
       installedArtifact.executablePath,
       expectedSigner,
