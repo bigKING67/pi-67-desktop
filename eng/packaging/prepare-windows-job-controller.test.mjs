@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   prepareWindowsJobController,
   quoteWindowsCommandValue,
-  windowsJobControllerCompilerCommand
+  windowsJobControllerCompilerCommand,
+  windowsJobControllerCompilerInvocation
 } from "./prepare-windows-job-controller.mjs";
 
 describe("Windows Package Worker Job controller build", () => {
@@ -38,5 +39,15 @@ describe("Windows Package Worker Job controller build", () => {
     expect(command).toContain('/Fe:"C:\\repo\\artifacts\\native\\windows-x64\\pi67-package-worker-job.exe"');
     expect(command).toContain('"C:\\repo\\windows-package-worker-job.cpp"');
     expect(command).toContain("/W4 /WX /O2");
+  });
+
+  it("passes the cmd.exe compiler command without Node argument escaping", () => {
+    const command = 'call "C:\\Program Files\\Microsoft Visual Studio\\VsDevCmd.bat" -arch=x64';
+
+    expect(windowsJobControllerCompilerInvocation("C:\\Windows\\System32\\cmd.exe", command)).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      arguments: ["/d", "/s", "/c", command],
+      windowsVerbatimArguments: true
+    });
   });
 });

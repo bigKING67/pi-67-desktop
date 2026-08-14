@@ -53,10 +53,12 @@ export async function prepareWindowsJobController(
     windowsJobControllerObjectPath
   );
   const commandInterpreter = join(systemRoot, "System32", "cmd.exe");
-  await run(commandInterpreter, ["/d", "/s", "/c", command], {
+  const invocation = windowsJobControllerCompilerInvocation(commandInterpreter, command);
+  await run(invocation.command, invocation.arguments, {
     cwd: repositoryRoot,
     env: environment,
-    inheritOutput: true
+    inheritOutput: true,
+    windowsVerbatimArguments: invocation.windowsVerbatimArguments
   });
   await access(windowsJobControllerOutputPath);
   const { verifyWindowsJobController } = await import("./verify-windows-job-controller.mjs");
@@ -125,6 +127,15 @@ export function quoteWindowsCommandValue(value) {
   return `"${value}"`;
 }
 
+export function windowsJobControllerCompilerInvocation(commandInterpreter, command) {
+  return {
+    command: commandInterpreter,
+    arguments: ["/d", "/s", "/c", command],
+    // cmd.exe parses everything after /c itself. Node must not escape the embedded path quotes.
+    windowsVerbatimArguments: true
+  };
+}
+
 function runProcess(command, arguments_, options) {
   return new Promise((resolvePromise, reject) => {
     let stdout = "";
@@ -133,6 +144,7 @@ function runProcess(command, arguments_, options) {
       cwd: options.cwd,
       env: options.env,
       stdio: options.inheritOutput ? "inherit" : ["ignore", "pipe", "pipe"],
+      windowsVerbatimArguments: options.windowsVerbatimArguments === true,
       windowsHide: true
     });
     if (!options.inheritOutput) {
