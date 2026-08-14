@@ -104,8 +104,10 @@ const agentHostSupervisor = new AgentHostSupervisor({
   rendererUrl
 });
 const applicationShutdown = createApplicationShutdownController({
-  checkpointRenderer: () => rendererShutdownCheckpoint?.request() ?? Promise.resolve(false),
-  stopAgentHost: () => agentHostSupervisor.stop(),
+  checkpointRenderer: (deadlineMs) => (
+    rendererShutdownCheckpoint?.request(deadlineMs) ?? Promise.resolve(false)
+  ),
+  stopAgentHost: (deadlineMs) => agentHostSupervisor.stop(deadlineMs),
   afterAgentHostStop: async () => {
     await promptAttachments?.cleanup();
   },
@@ -115,6 +117,9 @@ const applicationShutdown = createApplicationShutdownController({
   quit: () => app.quit(),
   onError: (error) => {
     console.error(redact(error instanceof Error ? error.message : String(error)));
+  },
+  onComplete: (report) => {
+    console.info(`Application shutdown: ${JSON.stringify(report)}`);
   }
 });
 

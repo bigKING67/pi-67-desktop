@@ -165,9 +165,9 @@ export class AgentHostSupervisor {
       this.#startAgentHost();
     }
   }
-
-  stop(): Promise<AgentHostStopResult> {
+  stop(shutdownDeadlineMs = this.#shutdownDeadlineMs): Promise<AgentHostStopResult> {
     if (this.#stopPromise) return this.#stopPromise;
+    const resolvedShutdownDeadlineMs = resolveAgentHostShutdownDeadline(shutdownDeadlineMs, this.#shutdownDeadlineMs);
     this.#stopping = true;
     this.#phase = "stopping";
     if (this.#restartTimer) clearTimeout(this.#restartTimer);
@@ -184,11 +184,11 @@ export class AgentHostSupervisor {
     this.#stopPromise = new Promise<AgentHostStopResult>((resolve) => {
       this.#resolveStop = resolve;
     });
-    this.#stopTimer = setTimeout(() => this.#forceStop(host), this.#shutdownDeadlineMs);
+    this.#stopTimer = setTimeout(() => this.#forceStop(host), resolvedShutdownDeadlineMs);
     const request: AgentHostShutdownRequest = {
       type: "agent-host-shutdown",
       reason: "application-quit",
-      deadlineMs: Math.max(100, this.#shutdownDeadlineMs - 250)
+      deadlineMs: Math.max(100, resolvedShutdownDeadlineMs - 250)
     };
     try {
       host.postMessage(request);

@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApplicationShutdownController } from "./application-shutdown.js";
 
 describe("ApplicationShutdownController", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("prevents quit until the Agent Host stop settles, then allows the recursive quit", async () => {
     let finishStop!: () => void;
     const stopAgentHost = vi.fn(() => new Promise<void>((resolve) => { finishStop = resolve; }));
@@ -119,5 +121,120 @@ describe("ApplicationShutdownController", () => {
     controller.handleBeforeQuit({ preventDefault: vi.fn() });
     await vi.waitFor(() => expect(quit).toHaveBeenCalledOnce());
     expect(markCleanExit).not.toHaveBeenCalled();
+  });
+
+  it("shares one bounded deadline across a slow renderer checkpoint and Agent Host stop", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const checkpointRenderer = vi.fn((deadlineMs: number) => new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), deadlineMs);
+    }));
+    const stopAgentHost = vi.fn((deadlineMs: number) => new Promise<void>((resolve) => {
+      setTimeout(resolve, deadlineMs);
+    }));
+    const markCleanExit = vi.fn(async () => undefined);
+    const quit = vi.fn();
+    const onComplete = vi.fn();
+    const controller = createApplicationShutdownController({
+      checkpointRenderer,
+      stopAgentHost,
+      markCleanExit,
+      quit,
+      onComplete,
+      shutdownBudgetMs: 2_000,
+      rendererCheckpointBudgetMs: 400,
+      finalizationReserveMs: 300,
+      now: () => Date.now()
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    expect(checkpointRenderer).toHaveBeenCalledWith(400);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(stopAgentHost).toHaveBeenCalledWith(1_300);
+    await vi.advanceTimersByTimeAsync(1_300);
+
+    expect(markCleanExit).not.toHaveBeenCalled();
+    expect(quit).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      agentHostStopDurationMs: 1_300,
+      agentHostStopped: true,
+      budgetMs: 2_000,
+      deadlineExceeded: false,
+      durationMs: 1_700,
+      rendererCheckpointDurationMs: 400,
+      rendererCheckpointed: false
+    });
+  });
+
+  it("releases the application at the total deadline when a shutdown stage hangs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const stopAgentHost = vi.fn(() => new Promise<never>(() => undefined));
+    const markCleanExit = vi.fn(async () => undefined);
+    const quit = vi.fn();
+    const onComplete = vi.fn();
+    const controller = createApplicationShutdownController({
+      checkpointRenderer: async () => true,
+      stopAgentHost,
+      markCleanExit,
+      quit,
+      onComplete,
+      shutdownBudgetMs: 1_000,
+      rendererCheckpointBudgetMs: 200,
+      finalizationReserveMs: 200,
+      now: () => Date.now()
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stopAgentHost).toHaveBeenCalledWith(800);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(quit).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(quit).toHaveBeenCalledOnce();
+    expect(markCleanExit).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledWith({
+      agentHostStopped: false,
+      budgetMs: 1_000,
+      deadlineExceeded: true,
+      durationMs: 1_000,
+      rendererCheckpointDurationMs: 0,
+      rendererCheckpointed: true
+    });
+  });
+
+  it("keeps the workbench dirty if Main-owned finalization misses the total deadline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const markCleanExit = vi.fn(async () => undefined);
+    const quit = vi.fn();
+    const controller = createApplicationShutdownController({
+      checkpointRenderer: async () => true,
+      stopAgentHost: async () => undefined,
+      afterAgentHostStop: () => new Promise<never>(() => undefined),
+      markCleanExit,
+      quit,
+      shutdownBudgetMs: 1_000,
+      rendererCheckpointBudgetMs: 200,
+      finalizationReserveMs: 200,
+      now: () => Date.now()
+    });
+
+    controller.handleBeforeQuit({ preventDefault: vi.fn() });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(quit).toHaveBeenCalledOnce();
+    expect(markCleanExit).not.toHaveBeenCalled();
+  });
+
+  it("rejects stage budgets that cannot fit inside the application deadline", () => {
+    expect(() => createApplicationShutdownController({
+      stopAgentHost: async () => undefined,
+      quit: vi.fn(),
+      shutdownBudgetMs: 1_000,
+      rendererCheckpointBudgetMs: 700,
+      finalizationReserveMs: 300
+    })).toThrow("Application shutdown stage budgets exceed the total budget.");
   });
 });

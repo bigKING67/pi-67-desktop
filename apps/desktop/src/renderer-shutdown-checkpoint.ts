@@ -6,7 +6,7 @@ const COMPLETE_CHANNEL = "pi67:renderer-shutdown-checkpoint-complete";
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 export interface RendererShutdownCheckpointRegistration {
-  request(): Promise<boolean>;
+  request(timeoutMs?: number): Promise<boolean>;
   dispose(): void;
 }
 
@@ -18,10 +18,7 @@ interface RendererShutdownCheckpointOptions {
 export function registerRendererShutdownCheckpoint(
   options: RendererShutdownCheckpointOptions
 ): RendererShutdownCheckpointRegistration {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
-    throw new RangeError("Renderer shutdown checkpoint timeout is invalid.");
-  }
+  const defaultTimeoutMs = resolveTimeout(options.timeoutMs, DEFAULT_TIMEOUT_MS);
   let pending: PendingCheckpoint | undefined;
   let disposed = false;
 
@@ -50,9 +47,10 @@ export function registerRendererShutdownCheckpoint(
   };
 
   return {
-    request() {
+    request(timeoutMs = defaultTimeoutMs) {
       if (disposed) return Promise.resolve(false);
       if (pending) return pending.promise;
+      const resolvedTimeoutMs = resolveTimeout(timeoutMs, defaultTimeoutMs);
       const window = options.getMainWindow();
       if (!window || window.isDestroyed() || window.webContents.isDestroyed()) {
         return Promise.resolve(false);
@@ -64,7 +62,7 @@ export function registerRendererShutdownCheckpoint(
         requestId,
         promise,
         resolve: resolveRequest,
-        timer: setTimeout(() => settle(false), timeoutMs)
+        timer: setTimeout(() => settle(false), resolvedTimeoutMs)
       };
       try {
         window.webContents.send(REQUEST_CHANNEL, { requestId });
@@ -80,6 +78,14 @@ export function registerRendererShutdownCheckpoint(
       ipcMain.removeHandler(COMPLETE_CHANNEL);
     }
   };
+}
+
+function resolveTimeout(value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback;
+  if (!Number.isSafeInteger(resolved) || resolved < 100 || resolved > 30_000) {
+    throw new RangeError("Renderer shutdown checkpoint timeout is invalid.");
+  }
+  return resolved;
 }
 
 interface PendingCheckpoint {

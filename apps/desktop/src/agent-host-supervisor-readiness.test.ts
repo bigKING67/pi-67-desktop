@@ -115,6 +115,30 @@ describe("AgentHostSupervisor readiness", () => {
       deadlineMs: 3_750
     });
   });
+
+  it("uses the application-provided deadline for a bounded stop", async () => {
+    vi.useFakeTimers();
+    const host = fakeUtilityProcess();
+    const window = fakeWindow();
+    electronMocks.fork.mockReturnValue(host as unknown as UtilityProcess);
+    const supervisor = createSupervisor(window.value);
+    supervisor.connect();
+    host.emit("spawn");
+    host.emit("message", readyMessage());
+
+    const stopping = supervisor.stop(600);
+    expect(host.postMessage).toHaveBeenLastCalledWith({
+      type: "agent-host-shutdown",
+      reason: "application-quit",
+      deadlineMs: 350
+    });
+    await vi.advanceTimersByTimeAsync(599);
+    expect(host.kill).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(stopping).resolves.toMatchObject({ graceful: false, forced: true });
+    expect(host.kill).toHaveBeenCalledOnce();
+  });
 });
 
 function createSupervisor(window: BrowserWindow): AgentHostSupervisor {

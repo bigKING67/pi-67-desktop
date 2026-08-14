@@ -68,4 +68,39 @@ describe("renderer shutdown checkpoint Main bridge", () => {
     await expect(request).resolves.toBe(false);
     registration.dispose();
   });
+
+  it("honors the application deadline supplied for an individual request", async () => {
+    vi.useFakeTimers();
+    const window = {
+      isDestroyed: () => false,
+      webContents: { isDestroyed: () => false, send: vi.fn() }
+    } as unknown as BrowserWindow;
+    const registration = registerRendererShutdownCheckpoint({
+      getMainWindow: () => window,
+      timeoutMs: 5_000
+    });
+
+    const request = registration.request(250);
+    await vi.advanceTimersByTimeAsync(249);
+    let settled = false;
+    void request.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(request).resolves.toBe(false);
+    registration.dispose();
+  });
+
+  it("rejects an invalid per-request deadline before sending to the renderer", () => {
+    const send = vi.fn();
+    const window = {
+      isDestroyed: () => false,
+      webContents: { isDestroyed: () => false, send }
+    } as unknown as BrowserWindow;
+    const registration = registerRendererShutdownCheckpoint({ getMainWindow: () => window });
+
+    expect(() => registration.request(99)).toThrow("Renderer shutdown checkpoint timeout is invalid.");
+    expect(send).not.toHaveBeenCalled();
+    registration.dispose();
+  });
 });
