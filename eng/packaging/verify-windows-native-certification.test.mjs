@@ -118,7 +118,7 @@ function receipt(scale, sleepObserved) {
       secondEnter: { isComposing: false, isTrusted: true, keyCode: 13 }
     },
     responsive: {
-      contextViewport: viewport(scale, 1_040),
+      contextViewport: viewport(scale, 1_160),
       navigationViewport: viewport(scale, 760)
     },
     sleep: sleepObserved ? {
@@ -138,8 +138,8 @@ function viewport(scale, innerWidth) {
     devicePixelRatio: scale,
     horizontalOverflow: 0,
     innerWidth,
-    send: { contained: true, topmost: true },
-    stop: { contained: true, topmost: true },
+    send: { contained: true, topmost: true, topmostSurface: "control" },
+    stop: { contained: true, topmost: true, topmostSurface: "control" },
     titleBarNativeControlReserve: 140
   };
 }

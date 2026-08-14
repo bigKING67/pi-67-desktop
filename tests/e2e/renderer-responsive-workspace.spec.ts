@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await installMockDesktopBridge(page);
 });
 
-test("balances wide side columns and expands the shared conversation measure", async ({ page }, testInfo) => {
+test("bounds wide side columns and expands the shared conversation measure", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
@@ -28,9 +28,10 @@ test("balances wide side columns and expands the shared conversation measure", a
   await expect(inspector).toBeVisible();
 
   const wide = await measureWorkspace(navigation, inspector, message, composer);
-  expect(Math.abs(wide.navigationWidth! - wide.inspectorWidth!)).toBeLessThanOrEqual(1);
   expect(wide.navigationWidth).toBeGreaterThanOrEqual(248);
   expect(wide.navigationWidth).toBeLessThanOrEqual(288);
+  expect(wide.inspectorWidth).toBeGreaterThanOrEqual(360);
+  expect(wide.inspectorWidth).toBeLessThanOrEqual(384);
   expect(wide.messageWidth).toBeGreaterThanOrEqual(858);
   expect(wide.messageWidth).toBeLessThanOrEqual(862);
   expect(Math.abs(wide.messageWidth - wide.composerWidth)).toBeLessThanOrEqual(1);
@@ -58,7 +59,7 @@ test("balances wide side columns and expands the shared conversation measure", a
 });
 
 test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 1_040, height: 800 });
+  await page.setViewportSize({ width: 1_160, height: 800 });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -69,12 +70,13 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   const contextToggle = page.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
   await expect(inspector).toBeVisible();
-  expect((await inspector.boundingBox())?.width).toBeLessThanOrEqual(320);
+  expect((await inspector.boundingBox())?.width).toBeGreaterThanOrEqual(359);
+  expect((await inspector.boundingBox())?.width).toBeLessThanOrEqual(384);
   await expect(page.getByRole("tab", { name: "消息", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "关闭任务检查器抽屉" })).toBeVisible();
   const sendButton = page.getByRole("button", { name: "发送" });
   await expect(sendButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("context-drawer");
   await emitMockAgentEvent(page, {
     type: "operation.started",
     payload: {
@@ -99,22 +101,27 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   }, { operationId: "operation-context-drawer" });
   await page.getByLabel("给 Pi 发送消息").fill("Windows packaged responsive layout probe");
   await expect(sendButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("context-drawer");
   const stopButton = page.getByRole("button", { name: "停止" });
   await expect(stopButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(stopButton)).toBe(true);
+  await expect.poll(() => controlTopmostSurface(stopButton)).toBe("context-drawer");
   const columns = await page.locator(".workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns);
   expect(columns.split(" ").length).toBeLessThanOrEqual(2);
   await page.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
   await expect(inspector).toHaveCount(0);
   await expect(contextToggle).toBeFocused();
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
+  await expect.poll(() => controlTopmostSurface(stopButton)).toBe("control");
 });
 
-async function isControlTopmost(locator: import("@playwright/test").Locator): Promise<boolean> {
+async function controlTopmostSurface(locator: import("@playwright/test").Locator): Promise<string> {
   return locator.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const topmost = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    return topmost === element || (topmost !== null && element.contains(topmost));
+    if (topmost === element || (topmost !== null && element.contains(topmost))) return "control";
+    if (topmost?.closest(".context-pane, .context-drawer-scrim")) return "context-drawer";
+    if (topmost?.closest('.navigation-rail, [aria-label="关闭会话导航"]')) return "navigation-drawer";
+    return topmost ? "other" : "none";
   });
 }
 
@@ -161,17 +168,18 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await expect(navigation).not.toBeVisible();
   await expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
   await expect(sendButton).toBeVisible();
-  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
 
   await navigationToggle.click();
   await expect(navigation).toBeVisible();
-  await expect.poll(() => isControlTopmost(sendButton)).toBe(true);
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("navigation-drawer");
   await expect(page.getByRole("button", { name: "隐藏会话导航" })).toHaveAttribute("aria-expanded", "true");
   await expect(navigation.getByRole("button", { name: "添加或创建工作区" })).toBeFocused();
 
   await page.getByRole("button", { name: "关闭会话导航" }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
 
   await page.keyboard.press("Control+b");
   await expect(navigation).toBeVisible();
@@ -182,6 +190,7 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await page.keyboard.press("Control+Shift+b");
   await expect(inspector).toBeVisible();
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("context-drawer");
   const narrowLayout = await page.locator(".workspace-grid").evaluate((element) => ({
     columns: getComputedStyle(element).gridTemplateColumns,
     documentClientWidth: document.documentElement.clientWidth,
@@ -192,4 +201,5 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await page.keyboard.press("Control+Shift+b");
   await expect(inspector).toHaveCount(0);
   await expect(page.getByRole("button", { name: "显示任务检查器" })).toBeFocused();
+  await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
 });

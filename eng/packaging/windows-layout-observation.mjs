@@ -25,7 +25,7 @@ export async function observeLayout(window) {
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
       innerHeight: window.innerHeight,
       innerWidth: window.innerWidth,
-      matchesContextBreakpoint: window.matchMedia("(max-width: 1040px)").matches,
+      matchesContextBreakpoint: window.matchMedia("(max-width: 1160px)").matches,
       matchesNavigationBreakpoint: window.matchMedia("(max-width: 760px)").matches,
       navigationDrawerVisible: navigationDrawer !== null && getComputedStyle(navigationDrawer).display !== "none",
       outerWidth: window.outerWidth,
@@ -51,12 +51,23 @@ export async function observeLayout(window) {
     function controlObservation(element, width, height) {
       if (!element) return null;
       const value = element.getBoundingClientRect();
-      const topmost = document.elementFromPoint(value.left + value.width / 2, value.top + value.height / 2);
+      const topmostElement = document.elementFromPoint(value.left + value.width / 2, value.top + value.height / 2);
+      const topmost = topmostElement === element || (topmostElement !== null && element.contains(topmostElement));
       return {
         contained: value.left >= 0 && value.top >= 0 && value.right <= width && value.bottom <= height,
         rect: rectangle(value),
-        topmost: topmost === element || (topmost !== null && element.contains(topmost))
+        topmost,
+        topmostSurface: topmost
+          ? "control"
+          : classifyForegroundSurface(topmostElement)
       };
+    }
+
+    function classifyForegroundSurface(element) {
+      if (!element) return "none";
+      if (element.closest(".context-pane, .context-drawer-scrim")) return "context-drawer";
+      if (element.closest('.navigation-rail, [aria-label="关闭会话导航"]')) return "navigation-drawer";
+      return "other";
     }
   });
 }
@@ -78,7 +89,7 @@ export function assertLayoutObservation(observation, contract) {
     );
   }
   if (contract.breakpoint === "context-drawer" && !observation.matchesContextBreakpoint) {
-    throw new Error(`${prefix}: max-width 1040px media query did not match.`);
+    throw new Error(`${prefix}: max-width 1160px media query did not match.`);
   }
   if (contract.breakpoint === "navigation-drawer" && !observation.matchesNavigationBreakpoint) {
     throw new Error(`${prefix}: max-width 760px media query did not match.`);
@@ -92,7 +103,15 @@ export function assertLayoutObservation(observation, contract) {
   for (const [name, control] of [["Send", observation.send], ["Stop", observation.stop]]) {
     if (!control) throw new Error(`${prefix}: ${name} is unavailable.`);
     if (!control.contained) throw new Error(`${prefix}: ${name} is clipped.`);
-    if (!control.topmost) throw new Error(`${prefix}: ${name} is covered.`);
+    if (contract.expectedControlLayer) {
+      if (control.topmostSurface !== contract.expectedControlLayer) {
+        throw new Error(
+          `${prefix}: ${name} expected ${contract.expectedControlLayer} foreground, got ${control.topmostSurface}.`
+        );
+      }
+    } else if (!control.topmost) {
+      throw new Error(`${prefix}: ${name} is covered by ${control.topmostSurface}.`);
+    }
   }
   if (observation.titleBarNativeControlReserve < 136) {
     throw new Error(

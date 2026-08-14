@@ -185,7 +185,7 @@ Application-level surfaces use a separate wide-window shell:
   when either side column stops consuming layout width, and at most 1120px when
   neither side column consumes layout width. The workbench expands visibly when
   a side column closes without turning ordinary prose into full-window lines.
-- Below 1040px, context defaults closed and becomes an overlay drawer with a
+- At 1160px and below, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.

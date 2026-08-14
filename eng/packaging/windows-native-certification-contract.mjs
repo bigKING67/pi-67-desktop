@@ -82,7 +82,7 @@ export function validateWindowsNativeCertificationReceipts(
       || !/^[a-f0-9]{64}$/u.test(receipt.ime.acceptedTextSha256 ?? "")) {
       failures.push(`${label}: trusted Microsoft Pinyin confirmation and exactly-once submission are missing`);
     }
-    validateResponsiveReceipt(receipt.responsive?.contextViewport, scale, 1_040, `${label} context`, failures);
+    validateResponsiveReceipt(receipt.responsive?.contextViewport, scale, 1_160, `${label} context`, failures);
     validateResponsiveReceipt(receipt.responsive?.navigationViewport, scale, 760, `${label} navigation`, failures);
     if (receipt.sleep?.observed === true) {
       sleepObserved = true;

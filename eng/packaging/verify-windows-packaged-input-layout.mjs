@@ -243,7 +243,7 @@ export function locateTaskInspector(window) {
 }
 
 async function verifyContextDrawerLayout(window, application, scaleFactor) {
-  await setStableContentViewport(window, application, 1_040, 800);
+  await setStableContentViewport(window, application, 1_160, 800);
   const taskInspector = locateTaskInspector(window);
   await taskInspector.waitFor({ state: "detached" });
   const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
@@ -251,20 +251,28 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   await taskInspector.waitFor({ state: "visible" });
   await window.getByRole("button", { name: "关闭任务检查器抽屉" }).waitFor({ state: "visible" });
 
-  const observation = await observeLayout(window);
-  assertLayoutObservation(observation, {
+  const drawerObservation = await observeLayout(window);
+  await captureResponsiveScreenshot(window, scaleFactor, "context-drawer");
+  assertLayoutObservation(drawerObservation, {
     breakpoint: "context-drawer",
-    expectedWidth: 1_040,
+    expectedControlLayer: "context-drawer",
+    expectedWidth: 1_160,
     requestedScaleFactor: scaleFactor
   });
-  if (!observation.contextDrawerVisible) {
-    throw new Error(`Scale ${scaleFactor}: context drawer is not visible at the 1040px breakpoint.`);
+  if (!drawerObservation.contextDrawerVisible) {
+    throw new Error(`Scale ${scaleFactor}: context drawer is not visible at the 1160px breakpoint.`);
   }
 
   await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
   await taskInspector.waitFor({ state: "detached" });
   await waitForFocus(window, "显示任务检查器");
-  return observation;
+  const observation = await observeLayout(window);
+  assertLayoutObservation(observation, {
+    breakpoint: "context-drawer",
+    expectedWidth: 1_160,
+    requestedScaleFactor: scaleFactor
+  });
+  return { ...observation, drawer: drawerObservation };
 }
 
 async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
@@ -276,6 +284,22 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
   await navigation.waitFor({ state: "visible" });
   await window.getByRole("button", { name: "关闭会话导航" }).waitFor({ state: "visible" });
 
+  const drawerObservation = await observeLayout(window);
+  await captureResponsiveScreenshot(window, scaleFactor, "navigation-drawer");
+  assertLayoutObservation(drawerObservation, {
+    allowNativeFrameFloor: true,
+    breakpoint: "navigation-drawer",
+    expectedControlLayer: "navigation-drawer",
+    expectedWidth: 760,
+    requestedScaleFactor: scaleFactor
+  });
+  if (!drawerObservation.navigationDrawerVisible) {
+    throw new Error(`Scale ${scaleFactor}: navigation drawer is not visible at the 760px breakpoint.`);
+  }
+
+  await window.getByRole("button", { name: "关闭会话导航" }).click();
+  await navigation.waitFor({ state: "hidden" });
+  await waitForFocus(window, "显示会话导航");
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
     allowNativeFrameFloor: true,
@@ -283,14 +307,15 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
     expectedWidth: 760,
     requestedScaleFactor: scaleFactor
   });
-  if (!observation.navigationDrawerVisible) {
-    throw new Error(`Scale ${scaleFactor}: navigation drawer is not visible at the 760px breakpoint.`);
-  }
+  return { ...observation, drawer: drawerObservation };
+}
 
-  await window.getByRole("button", { name: "关闭会话导航" }).click();
-  await navigation.waitFor({ state: "hidden" });
-  await waitForFocus(window, "显示会话导航");
-  return observation;
+async function captureResponsiveScreenshot(window, scaleFactor, surface) {
+  const scaleLabel = String(Math.round(scaleFactor * 100));
+  await window.screenshot({
+    animations: "disabled",
+    path: join(outputDirectory, `scale-${scaleLabel}-${surface}.png`)
+  });
 }
 
 async function verifySyntheticComposition(window, scaleFactor) {

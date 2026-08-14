@@ -102,7 +102,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
   it("accepts contained topmost controls and the native title-bar reserve", () => {
     expect(() => assertLayoutObservation(observation(), {
       breakpoint: "context-drawer",
-      expectedWidth: 1_040,
+      expectedWidth: 1_160,
       requestedScaleFactor: 1.5
     })).not.toThrow();
   });
@@ -111,10 +111,10 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     expect(() => assertLayoutObservation({
       ...observation(),
       horizontalOverflow: 12,
-      send: { contained: true, topmost: false }
+      send: { contained: true, topmost: false, topmostSurface: "other" }
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_040,
+      expectedWidth: 1_160,
       requestedScaleFactor: 1.5
     })).toThrow(/overflows horizontally/u);
   });
@@ -125,17 +125,40 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       send: null
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_040,
+      expectedWidth: 1_160,
       requestedScaleFactor: 1.5
     })).toThrow(/Send is unavailable/u);
     expect(() => assertLayoutObservation({
       ...observation(),
-      send: { contained: true, topmost: false }
+      send: { contained: true, topmost: false, topmostSurface: "other" }
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_040,
+      expectedWidth: 1_160,
       requestedScaleFactor: 1.5
     })).toThrow(/Send is covered/u);
+  });
+
+  it("accepts only the expected drawer as the foreground owner while open", () => {
+    const drawerObservation = {
+      ...observation(),
+      send: { contained: true, topmost: false, topmostSurface: "context-drawer" },
+      stop: { contained: true, topmost: false, topmostSurface: "context-drawer" }
+    };
+    expect(() => assertLayoutObservation(drawerObservation, {
+      breakpoint: "context-drawer",
+      expectedControlLayer: "context-drawer",
+      expectedWidth: 1_160,
+      requestedScaleFactor: 1.5
+    })).not.toThrow();
+    expect(() => assertLayoutObservation({
+      ...drawerObservation,
+      stop: { contained: true, topmost: false, topmostSurface: "other" }
+    }, {
+      breakpoint: "context-drawer",
+      expectedControlLayer: "context-drawer",
+      expectedWidth: 1_160,
+      requestedScaleFactor: 1.5
+    })).toThrow(/Stop expected context-drawer foreground, got other/u);
   });
 
   it("accepts the renderer width left by the native frame at the production minimum", () => {
@@ -172,21 +195,21 @@ describe("Windows packaged synthetic-scale UI contract", () => {
 
 function observation() {
   return {
-    composer: { bottom: 780, height: 140, left: 240, right: 1_030, top: 640, width: 790 },
+    composer: { bottom: 780, height: 140, left: 240, right: 1_150, top: 640, width: 910 },
     contextDrawerVisible: true,
     devicePixelRatio: 1.5,
     horizontalOverflow: 0,
     innerHeight: 800,
-    innerWidth: 1_040,
+    innerWidth: 1_160,
     matchesContextBreakpoint: true,
     matchesNavigationBreakpoint: false,
     navigationDrawerVisible: false,
-    outerWidth: 1_040,
-    send: { contained: true, topmost: true },
-    stop: { contained: true, topmost: true },
-    titleBar: { bottom: 42, height: 42, left: 0, right: 1_040, top: 0, width: 1_040 },
+    outerWidth: 1_160,
+    send: { contained: true, topmost: true, topmostSurface: "control" },
+    stop: { contained: true, topmost: true, topmostSurface: "control" },
+    titleBar: { bottom: 42, height: 42, left: 0, right: 1_160, top: 0, width: 1_160 },
     titleBarNativeControlReserve: 152,
     visualViewportHeight: 800,
-    visualViewportWidth: 1_040
+    visualViewportWidth: 1_160
   };
 }

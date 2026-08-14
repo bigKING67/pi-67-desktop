@@ -133,6 +133,14 @@ jobs:
           retention-days: 3
       - name: Verify Windows packaged synthetic scale and IME contracts
         run: corepack pnpm run package:smoke:windows-ui
+      - name: Upload Windows packaged UI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-packaged-ui-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/validation/windows-packaged-ui/
+          if-no-files-found: warn
+          retention-days: 3
       - name: Create and verify Windows candidate identity
         shell: pwsh
         env:
