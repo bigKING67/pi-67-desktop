@@ -3,10 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  assertWindowsExistingProfileInteractionPreserved,
   assertWindowsExistingProfilePreserved,
   inspectCleanWindowsRealUserProfile,
   prepareFreshWindowsRealUserProfile,
   prepareWindowsRealUserProfile,
+  readWindowsExistingProfileSettings,
   resolveWindowsRealUserProfilePaths,
   snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
@@ -39,9 +41,19 @@ describe("Windows installed real-user Pi profile", () => {
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "auth.json"), "utf8")))
         .toMatchObject({ openai: { type: "api_key" } });
       expect(JSON.parse(await readFile(join(profile.agentDir, "settings.json"), "utf8")))
-        .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
+        .toEqual({
+          defaultProvider: "openai",
+          defaultModel: "gpt-5",
+          steeringMode: "one-at-a-time",
+          followUpMode: "one-at-a-time"
+        });
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "settings.json"), "utf8")))
-        .toEqual({ defaultProvider: "openai", defaultModel: "gpt-5" });
+        .toEqual({
+          defaultProvider: "openai",
+          defaultModel: "gpt-5",
+          steeringMode: "one-at-a-time",
+          followUpMode: "one-at-a-time"
+        });
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "models.json"), "utf8")))
         .toEqual({ providers: {} });
       expect(JSON.parse(await readFile(join(profile.lifecycleAgentDir, "mcp.json"), "utf8")))
@@ -178,6 +190,47 @@ describe("Windows installed real-user Pi profile", () => {
       await writeFile(join(profile.lifecycleAgentDir, "AGENTS.md"), "changed\n");
       await expect(assertWindowsExistingProfilePreserved(profile.lifecycleAgentDir, before))
         .rejects.toThrow("changed user files");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("allows only the controlled model selection after exact startup preservation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-windows-existing-profile-interaction-"));
+    try {
+      const profile = resolveWindowsRealUserProfilePaths(root);
+      await prepareWindowsRealUserProfile(profile);
+      const before = await snapshotWindowsExistingProfile(profile.lifecycleAgentDir);
+      const beforeSettings = await readWindowsExistingProfileSettings(profile.lifecycleAgentDir);
+      await writeFile(join(profile.lifecycleAgentDir, "settings.json"), JSON.stringify({
+        ...beforeSettings,
+        defaultProvider: "pi67-controlled",
+        defaultModel: "hold-open",
+        defaultThinkingLevel: "off"
+      }, null, 2));
+
+      await expect(assertWindowsExistingProfileInteractionPreserved(
+        profile.lifecycleAgentDir,
+        before,
+        beforeSettings,
+        { provider: "pi67-controlled", id: "hold-open" }
+      )).resolves.toMatchObject({
+        changedSettingsFields: ["defaultModel", "defaultProvider", "defaultThinkingLevel"],
+        preservationMode: "pre-interaction-exact-post-interaction-model-selection"
+      });
+
+      await writeFile(join(profile.lifecycleAgentDir, "settings.json"), JSON.stringify({
+        ...beforeSettings,
+        defaultProvider: "pi67-controlled",
+        defaultModel: "hold-open",
+        steeringMode: "all"
+      }, null, 2));
+      await expect(assertWindowsExistingProfileInteractionPreserved(
+        profile.lifecycleAgentDir,
+        before,
+        beforeSettings,
+        { provider: "pi67-controlled", id: "hold-open" }
+      )).rejects.toThrow("changed settings outside the controlled model selection");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

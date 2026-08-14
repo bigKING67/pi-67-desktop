@@ -42,6 +42,8 @@ describe("controlled shutdown fixture", () => {
     const source = await readFile(extensionPath, "utf8");
     expect(source).toContain('pi.registerCommand("hold-open"');
     expect(source).toContain('pi.registerProvider("pi67-controlled"');
+    expect(source).toContain('pi.on("before_agent_start"');
+    expect(source).not.toContain('pi.on("session_start"');
     expect(source).toContain('pi.on("session_shutdown"');
     expect(source).toContain('options?.signal?.addEventListener("abort"');
     expect(source).toContain("ELECTRON_RUN_AS_NODE");

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 export const WINDOWS_REAL_USER_CONFIGURED_PROVIDER = "openai";
 
@@ -133,6 +134,65 @@ export async function assertWindowsExistingProfilePreserved(agentDir, before) {
   return { preservedFileCount: Object.keys(before).length };
 }
 
+export async function readWindowsExistingProfileSettings(agentDir) {
+  const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8"));
+  if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+    throw new Error("Windows existing-pi-profile settings fixture must be a JSON object.");
+  }
+  return settings;
+}
+
+export async function assertWindowsExistingProfileInteractionPreserved(
+  agentDir,
+  before,
+  beforeSettings,
+  expectedModel
+) {
+  const after = await snapshotWindowsExistingProfile(agentDir);
+  const changedUserFiles = Object.entries(before).flatMap(([relativePath, sha256]) => (
+    relativePath === "settings.json" || after[relativePath] === sha256 ? [] : [relativePath]
+  ));
+  if (changedUserFiles.length > 0) {
+    throw new Error(
+      `Windows existing-pi-profile interaction changed user files: ${JSON.stringify(changedUserFiles.slice(0, 8))}`
+    );
+  }
+
+  const afterSettings = await readWindowsExistingProfileSettings(agentDir);
+  const allowedModelSelectionFields = new Set([
+    "defaultProvider",
+    "defaultModel",
+    "defaultThinkingLevel"
+  ]);
+  const settingsFields = new Set([
+    ...Object.keys(beforeSettings),
+    ...Object.keys(afterSettings)
+  ]);
+  const changedSettingsFields = [...settingsFields].filter((field) => (
+    !isDeepStrictEqual(beforeSettings[field], afterSettings[field])
+  ));
+  const unexpectedSettingsFields = changedSettingsFields.filter((field) => (
+    !allowedModelSelectionFields.has(field)
+  ));
+  if (unexpectedSettingsFields.length > 0) {
+    throw new Error(
+      "Windows existing-pi-profile interaction changed settings outside the controlled model selection: "
+      + JSON.stringify(unexpectedSettingsFields.slice(0, 8))
+    );
+  }
+  if (
+    afterSettings.defaultProvider !== expectedModel.provider
+    || afterSettings.defaultModel !== expectedModel.id
+  ) {
+    throw new Error("Windows existing-pi-profile interaction did not persist the controlled model selection.");
+  }
+  return {
+    changedSettingsFields: changedSettingsFields.sort(),
+    preservedFileCount: Object.keys(before).length,
+    preservationMode: "pre-interaction-exact-post-interaction-model-selection"
+  };
+}
+
 function writeConfiguredProfile(agentDir) {
   return Promise.all([
     writeFile(join(agentDir, "auth.json"), `${JSON.stringify({
@@ -143,7 +203,9 @@ function writeConfiguredProfile(agentDir) {
     }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 }),
     writeFile(join(agentDir, "settings.json"), `${JSON.stringify({
       defaultProvider: "openai",
-      defaultModel: "gpt-5"
+      defaultModel: "gpt-5",
+      steeringMode: "one-at-a-time",
+      followUpMode: "one-at-a-time"
     }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
   ]);
 }

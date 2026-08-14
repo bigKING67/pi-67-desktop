@@ -71,6 +71,7 @@ export async function verifyInstalledRealUserLifecycle({
   initializeFirstLaunch,
   lane,
   userDataDirectory,
+  verifyInitialProfileState,
   workspace
 }) {
   if (!environmentDriftAgentDir) {
@@ -81,6 +82,7 @@ export async function verifyInstalledRealUserLifecycle({
   let expectedSessionPath;
   let expectedWorkspaceCwd;
   let create;
+  let initialProfileVerification;
   const bootstrap = initializeFirstLaunch
     ? await bootstrapFreshProfileLaunch({
       agentDir,
@@ -104,12 +106,14 @@ export async function verifyInstalledRealUserLifecycle({
       lane,
       launchIndex,
       userDataDirectory,
+      verifyInitialProfileState,
       workspace
     });
     expectedSessionIdentity = result.sessionIdentity;
     expectedSessionPath = result.sessionPath;
     expectedWorkspaceCwd = result.workspaceCwd;
     create ??= result.create;
+    initialProfileVerification ??= result.initialProfileVerification;
     launches.push(result.report);
   }
 
@@ -120,6 +124,7 @@ export async function verifyInstalledRealUserLifecycle({
     create,
     ...(bootstrap ? { bootstrap } : {}),
     launchCount: launches.length + (bootstrap ? 1 : 0),
+    ...(initialProfileVerification ? { initialProfileVerification } : {}),
     launches,
     lane,
     offlineMode: "disabled",
@@ -137,6 +142,7 @@ async function runRealUserLaunch({
   lane,
   launchIndex,
   userDataDirectory,
+  verifyInitialProfileState,
   workspace
 }) {
   let application;
@@ -193,6 +199,7 @@ async function runRealUserLaunch({
       })
     });
     let create;
+    let initialProfileVerification;
     let sessionIdentity = expectedSessionIdentity;
     let sessionPath = expectedSessionPath;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
@@ -214,6 +221,9 @@ async function runRealUserLaunch({
         );
       }
       await assertHealthyWorkbench(window);
+      if (launchIndex === 0 && verifyInitialProfileState) {
+        initialProfileVerification = await verifyInitialProfileState();
+      }
       const created = await createControlledConversation(window, agentDir, conversationContract());
       create = created.report;
       sessionIdentity = created.sessionIdentity;
@@ -224,6 +234,9 @@ async function runRealUserLaunch({
     const runtimeReadyMs = await waitForRealUserRuntimeReady(window, sessionIdentity);
     const launchToReadyMs = performance.now() - launchStartedAt;
     await waitForHealthyWorkbenchConvergence(window);
+    if (launchIndex === 0 && verifyInitialProfileState && !initialProfileVerification) {
+      initialProfileVerification = await verifyInitialProfileState();
+    }
     const providerConfiguration = await verifyProviderConfiguration(window);
     const fileProjection = await verifyGitMetadataIsHidden(window);
 
@@ -266,6 +279,7 @@ async function runRealUserLaunch({
 
     return {
       ...(create ? { create } : {}),
+      ...(initialProfileVerification ? { initialProfileVerification } : {}),
       report: {
         catalog,
         catalogRequestStart,

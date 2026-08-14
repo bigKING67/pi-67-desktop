@@ -81,9 +81,12 @@ describe("Windows installed real-user lifecycle", () => {
     expect(launchFlow.slice(catalogRequestStart, catalogAuthority))
       .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
     const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
+    const initialProfileVerification = launchFlow.indexOf("await verifyInitialProfileState()");
     const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir,");
     expect(creationAuthorityReady).toBeGreaterThan(-1);
+    expect(initialProfileVerification).toBeGreaterThan(creationAuthorityReady);
     expect(controlledCreate).toBeGreaterThan(creationAuthorityReady);
+    expect(controlledCreate).toBeGreaterThan(initialProfileVerification);
     expect(launchFlow.slice(creationAuthorityReady, controlledCreate))
       .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
   });

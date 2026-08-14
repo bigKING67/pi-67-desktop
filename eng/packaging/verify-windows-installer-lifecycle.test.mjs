@@ -140,7 +140,8 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain('lane: "existing-pi-profile"');
     expect(source).toContain("initializeFirstLaunch: ({ provisioningTimeoutMs })");
     expect(source).toContain("provisioningTimeoutMs,");
-    expect(source).toContain("await assertWindowsExistingProfilePreserved(");
+    expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");
+    expect(source).toContain("await assertWindowsExistingProfileInteractionPreserved(");
   });
 
   it("keeps initialization evidence structured and drops unrelated or malformed output", () => {

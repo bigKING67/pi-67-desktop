@@ -12,6 +12,7 @@ import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertSingleShutdownQuitLifecycle,
+  CONTROLLED_MODEL_VALUE,
   resetControlledShutdownLifecycle,
   writeControlledShutdownExtension,
   writeShutdownLifecycleExtension
@@ -36,10 +37,12 @@ import {
 } from "./windows-installer-process.mjs";
 import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
 import {
+  assertWindowsExistingProfileInteractionPreserved,
   assertWindowsExistingProfilePreserved,
   inspectCleanWindowsRealUserProfile,
   prepareFreshWindowsRealUserProfile,
   prepareWindowsRealUserProfile,
+  readWindowsExistingProfileSettings,
   resolveWindowsRealUserProfilePaths,
   snapshotWindowsExistingProfile,
   WINDOWS_REAL_USER_CONFIGURED_PROVIDER
@@ -63,6 +66,7 @@ export {
 } from "./windows-installer-process.mjs";
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");
 const summaryPath = join(outputDirectory, "summary.json");
+const [controlledProvider, controlledModelId] = CONTROLLED_MODEL_VALUE.split("/");
 
 export async function verifyWindowsInstallerLifecycle(options = {}) {
   if (process.platform !== "win32" || process.arch !== "x64") {
@@ -199,6 +203,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       lifecyclePath
     });
     const existingProfileBefore = await snapshotWindowsExistingProfile(lifecycleAgentDir);
+    const existingProfileSettingsBefore = await readWindowsExistingProfileSettings(lifecycleAgentDir);
     if (baseline) {
       await writeShutdownLifecycleExtension({ extensionPath, lifecyclePath });
     } else {
@@ -329,11 +334,17 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       environmentDriftAgentDir: lifecycleEnvironmentDriftAgentDir,
       lane: "existing-pi-profile",
       userDataDirectory: lifecycleUserDataDirectory,
+      verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(
+        lifecycleAgentDir,
+        existingProfileBefore
+      ),
       workspace
     });
-    const existingProfilePreservation = await assertWindowsExistingProfilePreserved(
+    const existingProfilePreservation = await assertWindowsExistingProfileInteractionPreserved(
       lifecycleAgentDir,
-      existingProfileBefore
+      existingProfileBefore,
+      existingProfileSettingsBefore,
+      { provider: controlledProvider, id: controlledModelId }
     );
     report.phases.push({
       name: "existing-pi-profile-lifecycle",

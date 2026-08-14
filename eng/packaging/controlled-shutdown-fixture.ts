@@ -123,12 +123,14 @@ export async function writeControlledShutdownExtension({
           return stream;
         }
       });
-      pi.on("session_start", async (_event, ctx) => {
+      pi.on("before_agent_start", async (_event, ctx) => {
         const model = ctx.modelRegistry.find(
           ${JSON.stringify(CONTROLLED_PROVIDER_ID)},
           ${JSON.stringify(CONTROLLED_MODEL_ID)}
         );
-        if (model) await pi.setModel(model);
+        if (model && (ctx.model?.provider !== model.provider || ctx.model?.id !== model.id)) {
+          await pi.setModel(model);
+        }
       });
     }
   `, "utf8");
