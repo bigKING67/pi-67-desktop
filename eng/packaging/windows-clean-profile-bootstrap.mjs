@@ -72,13 +72,18 @@ export async function bootstrapFreshProfileLaunch({
     });
     application = undefined;
     if (!productShutdownWithinBudget(shutdownMeasurement, INSTALLED_SHUTDOWN_BUDGET_MS)) {
-      throw new Error("Windows clean-profile bootstrap did not shut down within the product budget.");
+      throw new Error(
+        `Windows clean-profile bootstrap product process shutdown exceeded ${INSTALLED_SHUTDOWN_BUDGET_MS}ms. `
+        + `Shutdown diagnostics: ${JSON.stringify(shutdownMeasurement)}`
+      );
     }
     return {
       closeDurationMs: round(shutdownMeasurement.productExitDurationMs),
+      driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
       durationMs: round(performance.now() - startedAt),
       lane,
       profileMode: "fresh",
+      shutdownProcesses: shutdownMeasurement.processes,
       startupSurface,
       workspaceAuthorityEstablished: Boolean(workspaceCwd)
     };

@@ -109,6 +109,9 @@ describe("Windows installed real-user lifecycle", () => {
     expect(bootstrapSource).toContain(
       "provisioningTimeoutMs: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS"
     );
+    expect(bootstrapSource).toContain("Shutdown diagnostics: ${JSON.stringify(shutdownMeasurement)}");
+    expect(bootstrapSource).toContain("driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs)");
+    expect(bootstrapSource).toContain("shutdownProcesses: shutdownMeasurement.processes");
   });
 
   it("canonicalizes the Agent root before checking a real Session path", async () => {
