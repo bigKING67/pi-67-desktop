@@ -9,8 +9,8 @@ export async function startControlledPrompt(page) {
 }
 
 async function submitControlledPrompt(page, timeoutMs = 30_000) {
-  await waitForControlledModel(page, timeoutMs);
   await submitControlledPromptInput(page);
+  await waitForControlledModel(page, timeoutMs);
 }
 
 export async function submitControlledPromptInput(page) {

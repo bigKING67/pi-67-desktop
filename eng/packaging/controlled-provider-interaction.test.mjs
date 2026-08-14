@@ -52,9 +52,9 @@ describe("controlled Provider interaction", () => {
     await startControlledPrompt(page);
 
     expect(actions).toEqual([
-      "model:visible:30000",
       `fill:${CONTROLLED_PROMPT_TEXT}`,
       "send",
+      "model:visible:30000",
       "stop:visible:10000"
     ]);
   });
