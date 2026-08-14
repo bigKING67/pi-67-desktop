@@ -134,6 +134,16 @@ the only Runtime and behavior specification source.
   utility process. Desktop must not describe those runtime surfaces as isolated until
   Pi provides an executor/proxy boundary, Desktop maintains an audited loader fork,
   or unsupported third-party execution is explicitly disabled.
+- On Windows, Package Worker and Desktop-owned Skill Pack subprocesses enter a
+  Main-selected native Job Object before their operation request is delivered.
+  `KILL_ON_JOB_CLOSE`, bounded inspection, forced termination, and zero-active-
+  process confirmation own descendant cleanup. Failure before attachment blocks
+  only that package operation as a toolchain-integrity failure; uncertainty after
+  attachment poisons the operation runtime instead of reporting a false success.
+  Read-only Git update checks probe every actual installed Git origin and select the
+  first configured mirror or official GitHub route that reaches all of them before
+  running Pi's update comparison once. npm failures never trigger Git source changes.
+  Commit, registry, manifest, and content-integrity failures remain fail closed.
 - A Windows/macOS user with no prior Pi TUI Profile and a user who already owns a
   populated Pi TUI Profile are both first-class Desktop users. Both use the same
   canonical Pi Agent Profile and Pi JSONL Sessions; Desktop never selects a second
@@ -146,14 +156,21 @@ the only Runtime and behavior specification source.
   namespace inside an existing Profile, so later capability upgrades do not silently
   reclassify the rest of that Profile as Desktop-owned.
 - Pi-67 Core, browser67, design-craft, and the commerce-growth-os Skill suite ship
-  as pinned first-party capability snapshots. Desktop materializes verified
-  copies under the Pi agent directory, preserves existing Package object filters,
-  namespaces managed Rules, and never overwrites an existing global `AGENTS.md`.
+  as pinned first-party capability snapshots. Build and packaging verify their full
+  locked trees. A packaged Agent Host validates bounded metadata and critical
+  entrypoints, then loads the read-only snapshot directly from Electron resources;
+  it does not hash or copy the full tree into the Pi Agent Profile on every launch.
+  The Profile keeps a separate writable managed Overlay root, preserves existing
+  Package object filters, namespaces managed Rules, and never overwrites an existing
+  global `AGENTS.md`. Legacy copied built-ins are removed only after Host readiness;
+  Skill Pack overlays, state, Pi settings, credentials, and JSONL Sessions remain.
 - The default Pi Package set stays bounded. In addition to Pi-67 first-party
   capability Packages, Desktop ships the complete locked runtime closures for
   `pi-mcp-adapter@2.11.0` and `pi-observational-memory@3.0.3`; the client never runs
-  npm to activate them. Both are enabled by default from a verified
-  `bundled -> staging -> active` Desktop projection. Observational Memory has a
+  npm to activate them. Build and packaging verify the complete bundle; packaged
+  startup loads it directly from the read-only `bundled` resource while retaining
+  only enablement state in the writable Overlay. Development and legacy recovery
+  may still use the verified `bundled -> staging -> active` projection. Observational Memory has a
   Desktop-owned durable opt-out state, does not rewrite shared Pi settings, and keeps
   upstream `debugLog=false`; an explicit opt-out UI is not yet a completed surface.
   Other recommended third-party Packages remain user-initiated. `pi-hy-memory`,
@@ -513,9 +530,10 @@ the only Runtime and behavior specification source.
   Agent Host `RuntimeDiagnostics` is optional: a three-second acknowledgement
   budget preserves it when available, while timeout, disconnection, or Host
   replacement still exports Main-owned recovery, Supervisor lifecycle, and Pi
-  configuration readability metadata. Main writes `pi67-support-diagnostics.v4`,
-  which adds bounded Profile mode, startup ready/degraded state, startup stage/issue,
-  Main service health, and Renderer acknowledgement latency;
+  configuration readability metadata. Main writes `pi67-support-diagnostics.v5`,
+  which adds bounded Profile mode, startup ready/degraded state, total and per-stage
+  startup duration, capability projection mode, startup issue, Main service health,
+  and Renderer acknowledgement latency;
   Renderer cannot submit arbitrary JSON or raw error text. The support file
   contains hashes, categories, counts, revisions, states, bounded timestamps,
   and bounded error classes, never raw Workspace or Agent Directory paths,

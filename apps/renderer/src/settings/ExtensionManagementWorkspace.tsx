@@ -198,7 +198,12 @@ export function ExtensionManagementWorkspace({ capability }: {
   };
 
   return (
-    <section className={styles.workspace} data-testid="extension-management-workspace" ref={workspaceRef}>
+    <section
+      className={styles.workspace}
+      data-package-update-check={phase === "failed" ? "failed" : updatesChecked ? "completed" : phase}
+      data-testid="extension-management-workspace"
+      ref={workspaceRef}
+    >
       <Tabs
         className={styles.tabs!}
         selectedKey={view}

@@ -93,6 +93,32 @@ describe("Desktop managed npm package activation", () => {
       join(first.activeRoot!, "packages", "pi-mcp-adapter", "index.ts")
     ]);
   });
+
+  it("uses the packaged bundle directly without creating an active copy", async () => {
+    const fixture = await createFixture();
+    const environment: NodeJS.ProcessEnv = {
+      PI67_DESKTOP: "1",
+      PI67_PACKAGED: "1",
+      PI67_CAPABILITIES_ROOT: fixture.capabilitiesRoot,
+      PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([fixture.firstPartyPackage]),
+      PI67_BUNDLED_CAPABILITIES_ROOT: fixture.capabilitiesRoot,
+      PI67_MANAGED_CAPABILITIES_ROOT: join(fixture.agentDir, "desktop-capabilities")
+    };
+
+    const result = await activateDesktopManagedPackages({
+      agentDir: fixture.agentDir,
+      environment
+    });
+
+    expect(result).toMatchObject({ enabled: true, activated: false, projectionMode: "packaged-direct" });
+    expect(result.activeRoot).toBe(join(fixture.capabilitiesRoot, "managed-packages", "bundled"));
+    await expect(stat(join(
+      fixture.agentDir,
+      "desktop-capabilities",
+      "managed-packages",
+      "active"
+    ))).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
 
 async function createFixture() {
@@ -110,6 +136,8 @@ async function createFixture() {
   await Promise.all([
     writeFile(join(bundled, "package-lock.json"), "{}\n", "utf8"),
     writeFile(join(bundled, "package.json"), "{}\n", "utf8"),
+    writeFile(join(bundled, "packages", "pi-mcp-adapter", "package.json"), "{\"name\":\"pi-mcp-adapter\"}\n", "utf8"),
+    writeFile(join(bundled, "packages", "pi-observational-memory", "package.json"), "{\"name\":\"pi-observational-memory\"}\n", "utf8"),
     writeFile(join(bundled, "packages", "pi-mcp-adapter", "index.ts"), "export default () => {};\n", "utf8"),
     writeFile(
       join(bundled, "packages", "pi-observational-memory", "src", "index.ts"),

@@ -268,15 +268,21 @@ export function packageSourceKind(source: string, environment: NodeJS.ProcessEnv
 }
 
 export function verifiedDesktopCapabilitySources(environment: NodeJS.ProcessEnv = process.env): Set<string> {
-  const managedRoot = environment.PI67_MANAGED_CAPABILITIES_ROOT;
+  const roots = [
+    environment.PI67_BUNDLED_CAPABILITIES_ROOT,
+    environment.PI67_MANAGED_CAPABILITIES_ROOT
+  ].filter((root): root is string => typeof root === "string" && isAbsolute(root));
   const serialized = environment.PI67_CAPABILITY_PACKAGE_PATHS;
-  if (!managedRoot || !isAbsolute(managedRoot) || !serialized) return new Set();
+  if (roots.length === 0 || !serialized) return new Set();
   try {
     const value = JSON.parse(serialized) as unknown;
     if (!Array.isArray(value) || value.length > 32) return new Set();
     const result = new Set<string>();
     for (const candidate of value) {
-      if (typeof candidate !== "string" || !isContainedPackagePath(candidate, managedRoot)) return new Set();
+      if (
+        typeof candidate !== "string"
+        || !roots.some((root) => isContainedPackagePath(candidate, root))
+      ) return new Set();
       result.add(normalizePackageAbsolutePath(candidate));
     }
     return result;

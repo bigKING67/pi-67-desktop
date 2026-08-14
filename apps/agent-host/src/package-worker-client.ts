@@ -19,9 +19,11 @@ import {
   type PackageWorkerRequest
 } from "./package-worker-protocol.js";
 import {
+  createPackageWorkerProcessTreeController,
   inspectPackageWorkerProcessTree,
   terminateAndWaitForPackageWorkerProcessTree,
   terminatePackageWorkerProcessTree,
+  type PackageWorkerProcessTreeController,
   type PackageWorkerProcessTreeInspector,
   type PackageWorkerProcessTreeTerminator
 } from "./package-worker-process-tree.js";
@@ -32,12 +34,12 @@ import {
 } from "./package-worker-result.js";
 
 export type {
-  PackageWorkerProcessTreeInspector,
+  PackageWorkerProcessTreeController,
   PackageWorkerProcessTreeTerminator
 } from "./package-worker-process-tree.js";
 
 const packageWorkerEntry = fileURLToPath(new URL("./package-worker.mjs", import.meta.url));
-const DEFAULT_PACKAGE_WORKER_TERMINATION_GRACE_MS = 500;
+const DEFAULT_PACKAGE_WORKER_TERMINATION_GRACE_MS = 4_000;
 const MIN_PACKAGE_WORKER_TERMINATION_GRACE_MS = 20;
 const MAX_PACKAGE_WORKER_TERMINATION_GRACE_MS = 5_000;
 const PACKAGE_WORKER_ENVIRONMENT_KEYS = [
@@ -51,6 +53,7 @@ const PACKAGE_WORKER_ENVIRONMENT_KEYS = [
   "LOGNAME",
   "PATH",
   "PATHEXT",
+  "PI_OFFLINE",
   "SHELL",
   "SystemRoot",
   "TEMP",
@@ -77,6 +80,7 @@ export interface PackageWorkerClientOptions {
   terminationGraceMs?: number;
   platform?: NodeJS.Platform;
   spawnWorker?: (executable: string, arguments_: string[], options: Parameters<typeof spawn>[2]) => ChildProcess;
+  createProcessTreeController?: () => PackageWorkerProcessTreeController;
   terminateProcessTree?: PackageWorkerProcessTreeTerminator;
   inspectProcessTree?: PackageWorkerProcessTreeInspector;
 }
@@ -102,8 +106,7 @@ export class PackageWorkerClient implements PackageWorkerPort {
   readonly #terminationGraceMs: number;
   readonly #platform: NodeJS.Platform;
   readonly #spawnWorker: NonNullable<PackageWorkerClientOptions["spawnWorker"]>;
-  readonly #terminateProcessTree: PackageWorkerProcessTreeTerminator;
-  readonly #inspectProcessTree: PackageWorkerProcessTreeInspector;
+  readonly #createProcessTreeController: () => PackageWorkerProcessTreeController;
   readonly #activeWorkers = new Set<ActivePackageWorker>();
   #shuttingDown = false;
   #shutdownPromise: Promise<void> | undefined;
@@ -115,8 +118,16 @@ export class PackageWorkerClient implements PackageWorkerPort {
     this.#terminationGraceMs = options.terminationGraceMs ?? DEFAULT_PACKAGE_WORKER_TERMINATION_GRACE_MS;
     this.#platform = options.platform ?? process.platform;
     this.#spawnWorker = options.spawnWorker ?? spawn;
-    this.#terminateProcessTree = options.terminateProcessTree ?? terminatePackageWorkerProcessTree;
-    this.#inspectProcessTree = options.inspectProcessTree ?? inspectPackageWorkerProcessTree;
+    this.#createProcessTreeController = options.createProcessTreeController ?? (
+      options.terminateProcessTree || options.inspectProcessTree
+        ? () => ({
+            attach: async () => undefined,
+            terminate: options.terminateProcessTree ?? terminatePackageWorkerProcessTree,
+            inspect: options.inspectProcessTree ?? inspectPackageWorkerProcessTree,
+            dispose: async () => undefined
+          })
+        : () => createPackageWorkerProcessTreeController(this.#platform, this.#environment)
+    );
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 1_000 || this.#timeoutMs > 10 * 60_000) {
       throw new RangeError("Package worker timeout must be between 1000 and 600000 milliseconds.");
     }
@@ -208,6 +219,7 @@ export class PackageWorkerClient implements PackageWorkerPort {
         reject(packageWorkerStartFailure(error));
         return;
       }
+      const processTree = this.#createProcessTreeController();
 
       let finalizing = false;
       let timer: NodeJS.Timeout | undefined;
@@ -241,14 +253,16 @@ export class PackageWorkerClient implements PackageWorkerPort {
           deadlineMs,
           this.#platform,
           this.#environment,
-          this.#terminateProcessTree,
-          this.#inspectProcessTree
+          processTree.terminate,
+          processTree.inspect
         )
-          .then(() => {
+          .then(async () => {
+            await processTree.dispose();
             operation();
             resolveDone(undefined);
           })
-          .catch((error: unknown) => {
+          .catch(async (error: unknown) => {
+            await processTree.dispose().catch(() => undefined);
             reject(error);
             resolveDone(error);
           })
@@ -258,12 +272,6 @@ export class PackageWorkerClient implements PackageWorkerPort {
           });
       };
 
-      timer = setTimeout(() => finish(() => reject(new HostCommandError(
-        "REQUEST_TIMEOUT",
-        "The isolated Pi package operation timed out.",
-        true
-      ))), this.#timeoutMs);
-      timer.unref?.();
       child.once("error", (error) => {
         if (child.pid === undefined) resolveExited();
         finish(() => reject(packageWorkerStartFailure(error)));
@@ -301,21 +309,32 @@ export class PackageWorkerClient implements PackageWorkerPort {
         }
         finish(() => resolvePromise(message.result));
       });
-      if (!child.send) {
-        finish(() => reject(packageWorkerConnectionClosed()));
-        return;
-      }
-      try {
-        child.send(request, (error) => {
-          if (error) finish(() => reject(new HostCommandError(
-            "CONNECTION_CLOSED",
-            "The isolated Pi package worker request could not be delivered.",
-            true
-          )));
-        });
-      } catch {
-        finish(() => reject(packageWorkerConnectionClosed()));
-      }
+      void processTree.attach(child).then(() => {
+        if (finalizing) return;
+        timer = setTimeout(() => finish(() => reject(new HostCommandError(
+          "REQUEST_TIMEOUT",
+          "The isolated Pi package operation timed out.",
+          true
+        ))), this.#timeoutMs);
+        timer.unref?.();
+        if (!child.send) {
+          finish(() => reject(packageWorkerConnectionClosed()));
+          return;
+        }
+        try {
+          child.send(request, (error) => {
+            if (error) finish(() => reject(new HostCommandError(
+              "CONNECTION_CLOSED",
+              "The isolated Pi package worker request could not be delivered.",
+              true
+            )));
+          });
+        } catch {
+          finish(() => reject(packageWorkerConnectionClosed()));
+        }
+      }).catch((error: unknown) => {
+        finish(() => reject(error));
+      });
     });
   }
 

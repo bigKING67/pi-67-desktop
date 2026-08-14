@@ -60,13 +60,17 @@ export async function packageUnsignedNative(
   if (options.preparedResources) {
     const { assertPreparedDesktopToolchain } = await import("./prepare-toolchain.mjs");
     const { assertPreparedDesktopCapabilities } = await import("../capabilities/prepared-capabilities-validation.mjs");
+    const { assertPreparedWindowsJobController } = await import("./prepare-windows-job-controller.mjs");
     await assertPreparedDesktopToolchain(platform, arch);
     await assertPreparedDesktopCapabilities();
+    await assertPreparedWindowsJobController(platform, arch);
   } else {
     const { prepareDesktopToolchain } = await import("./prepare-toolchain.mjs");
     const { prepareDesktopCapabilities } = await import("../capabilities/prepare-capabilities.mjs");
+    const { prepareWindowsJobController } = await import("./prepare-windows-job-controller.mjs");
     await prepareDesktopToolchain(platform, arch);
     await prepareDesktopCapabilities();
+    await prepareWindowsJobController(platform, arch);
   }
   const exitCode = await run(process.execPath, [electronBuilderCli, ...target.arguments], {
     cwd: root,

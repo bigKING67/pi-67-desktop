@@ -162,11 +162,21 @@ Application-level surfaces use a separate wide-window shell:
 - Clicking a conversation selects both that conversation and its Workspace.
   Switching conversations, collapsing a Workspace, or opening Settings never
   stops or reorders background tasks.
-- Navigation and Inspector share `clamp(248px, 18vw, 288px)` on the wide
-  three-region layout. Neither side column gains width at the other's expense;
-  long names truncate inside the shared measure.
+- Navigation uses `clamp(248px, 18vw, 288px)` and Inspector uses
+  `clamp(360px, 24vw, 384px)` on the wide three-region layout. Neither side
+  column gains width at the other's expense; long names truncate inside their
+  owned measure.
 - The Inspector tab strip uses five equal-width compact actions: `文件`, `修改`,
-  `消息`, `代理`, and `上下文`. Changes owns one bounded record list plus one independently
+  `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
+  one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
+  icons never collapse or hide, and the strip never introduces horizontal scroll.
+  At 1160px and below the Inspector becomes the existing right-side drawer so the
+  360px Inspector and 520px Transcript minima never force application-level
+  horizontal overflow.
+- The Transcript conversation grid uses `minmax(0, 1fr)` so Composer content
+  cannot widen its owning track. In drawer mode the Inspector and its scrim own
+  overlap above the Composer; Composer never establishes a higher stacking layer.
+  Changes owns one bounded record list plus one independently
   scrolling Patch detail; it does not widen the Inspector or introduce a fourth
   permanent application region.
 - Transcript owns remaining width and never drops below 520px on a wide layout.
@@ -1289,6 +1299,11 @@ loading error where the operation can produce those states
 
 ### Notifications
 
+- Settings load, refresh, and update-check operations use the current page's inline
+  notice as their single user-visible error owner. A mutation also stays inline when
+  that page or dialog already provides the recovery action. Preflight failures with
+  no mounted inline owner may use one Toast. The same operation never emits identical
+  inline and Toast errors, and a successful check is summarized in only one place.
 - Toasts provide transient feedback without becoming the primary task surface. At most
   four are visible; info and success dismiss after six seconds, warning after ten, and
   error remains until dismissed. Timers pause while the document is hidden or the Toast
@@ -1828,10 +1843,10 @@ loading error where the operation can produce those states
   not contain Task/Operation IDs, Prompt or Tool payloads, paths, credentials, or
   stdout/stderr, and they do not create OTLP, Grafana, remote telemetry, or a
   continuously updating dashboard. Diagnostic export uses
-  `pi67-support-diagnostics.v4` for the same redacted projection. Agent Host startup
-  adds only the bounded Profile mode, `ready | degraded` state, startup stage, and
-  safe issue code; paths, raw errors, configuration bodies, and stack traces remain
-  absent.
+  `pi67-support-diagnostics.v5` for the same redacted projection. Agent Host startup
+  adds only the bounded Profile mode, `ready | degraded` state, total/per-stage
+  durations, capability projection mode, startup stage, and safe issue code; paths,
+  raw errors, configuration bodies, and stack traces remain absent.
 - A degraded startup keeps the Workbench usable and produces at most one warning for
   the Host epoch: existing Pi configuration was preserved and a Desktop enhancement
   did not load. A deterministic startup failure produces one root notification and

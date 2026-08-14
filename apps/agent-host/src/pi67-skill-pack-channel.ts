@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { gitSourceCandidates } from "@pi67/domain";
 import {
-  hashManagedSkillSet,
   managedPackageTreeSha256,
   managedSkillPackRoot,
   writeManagedSkillPackState
@@ -11,33 +12,26 @@ import {
   runBoundedSkillPackProcess,
   type SkillPackProcessRunner
 } from "./skill-pack-process-runner.js";
+import {
+  isolatedGitEnvironment,
+  loadPackageNetworkSettings
+} from "./package-network-settings.js";
+import {
+  parsePi67RegistryBranch,
+  parsePi67SkillPackRelease,
+  type Pi67SkillPackRelease
+} from "./pi67-skill-pack-registry.js";
+
+export { compareSkillPackVersions } from "./pi67-skill-pack-registry.js";
+export type { Pi67SkillPackRelease } from "./pi67-skill-pack-registry.js";
 
 const PI67_REPOSITORY = "https://github.com/bigKING67/pi-67.git";
-const PI67_RAW_ROOT = "https://raw.githubusercontent.com/bigKING67/pi-67";
 const REGISTRY_PATH = "shared-skill-packs.json";
 const LOCK_PATH = "shared-skill-packs.lock.json";
-const PACK_ID = "ai-berkshire-investment-suite";
 const MAX_METADATA_BYTES = 512 * 1024;
 const CHECK_TIMEOUT_MS = 60_000;
-const FETCH_TIMEOUT_MS = 30_000;
 const UPDATE_TIMEOUT_MS = 5 * 60_000;
-const COMMIT_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
-const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
-const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
-const SKILL_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u;
 const IGNORED_DIRECTORIES = new Set(["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
-
-export interface Pi67SkillPackRelease {
-  id: typeof PACK_ID;
-  version: string;
-  upstream?: string;
-  sourceCommit: string;
-  registryCommit: string;
-  manifestSha256: string;
-  bundleSha256: string;
-  skills: Array<{ name: string; sha256: string }>;
-  independentlyInstallable: boolean;
-}
 
 export interface StagedPi67SkillPack {
   release: Pi67SkillPackRelease;
@@ -52,8 +46,6 @@ export interface Pi67SkillPackChannelPort {
 export interface Pi67SkillPackChannelOptions {
   environment?: NodeJS.ProcessEnv;
   repository?: string;
-  rawRoot?: string;
-  fetch?: typeof globalThis.fetch;
   runProcess?: SkillPackProcessRunner;
   createToken?: () => string;
   now?: () => number;
@@ -68,8 +60,6 @@ export function createPi67SkillPackChannel(
 export class Pi67SkillPackChannel implements Pi67SkillPackChannelPort {
   readonly #environment: NodeJS.ProcessEnv;
   readonly #repository: string;
-  readonly #rawRoot: string;
-  readonly #fetch: typeof globalThis.fetch;
   readonly #runProcess: SkillPackProcessRunner;
   readonly #createToken: () => string;
   readonly #now: () => number;
@@ -77,30 +67,18 @@ export class Pi67SkillPackChannel implements Pi67SkillPackChannelPort {
   constructor(options: Pi67SkillPackChannelOptions = {}) {
     this.#environment = options.environment ?? process.env;
     this.#repository = options.repository ?? PI67_REPOSITORY;
-    this.#rawRoot = (options.rawRoot ?? PI67_RAW_ROOT).replace(/\/+$/u, "");
-    this.#fetch = options.fetch ?? globalThis.fetch;
     this.#runProcess = options.runProcess ?? runBoundedSkillPackProcess;
     this.#createToken = options.createToken ?? randomUUID;
     this.#now = options.now ?? Date.now;
   }
 
   async check(): Promise<Pi67SkillPackRelease> {
-    const git = await this.#requireGit();
-    const result = await this.#runProcess(git, ["ls-remote", this.#repository, "refs/heads/main"], {
-      cwd: process.cwd(),
-      timeoutMs: CHECK_TIMEOUT_MS,
-      environment: this.#environment
-    });
-    const registryCommit = parseLsRemote(result.stdout);
-    const [registry, lock] = await Promise.all([
-      this.#readRemoteJson(`${this.#rawRoot}/${registryCommit}/${REGISTRY_PATH}`),
-      this.#readRemoteJson(`${this.#rawRoot}/${registryCommit}/${LOCK_PATH}`)
-    ]);
-    return parseRelease(registry, lock, registryCommit);
+    return (await this.#resolveRemote()).release;
   }
 
   async stage(agentDir: string): Promise<StagedPi67SkillPack> {
-    const release = await this.check();
+    const resolved = await this.#resolveRemote();
+    const { release } = resolved;
     if (!release.independentlyInstallable) {
       throw new Error("Pi-67 registry 尚未开放此 Skill Pack 的独立安装。");
     }
@@ -108,89 +86,178 @@ export class Pi67SkillPackChannel implements Pi67SkillPackChannelPort {
     const git = await this.#requireGit();
     const stableRoot = managedSkillPackRoot(agentDir, release.id);
     const parent = dirname(stableRoot);
-    const token = this.#createToken();
-    const repositoryRoot = join(parent, `.${release.id}.${process.pid}.${token}.repository`);
-    const stagingSuiteRoot = join(parent, `.${release.id}.${process.pid}.${token}.staging`);
     await mkdir(parent, { recursive: true, mode: 0o700 });
-    try {
-      await this.#runGit(git, ["init", repositoryRoot], parent);
-      await this.#runGit(git, ["-C", repositoryRoot, "remote", "add", "origin", this.#repository], parent);
-      await this.#runGit(git, [
-        "-C", repositoryRoot, "fetch", "--depth", "1", "--no-tags", "origin", release.registryCommit
-      ], parent);
-      await this.#runGit(git, ["-C", repositoryRoot, "checkout", "--detach", release.registryCommit], parent);
-      const checkedOutCommit = (await this.#runGit(
-        git,
-        ["-C", repositoryRoot, "rev-parse", "HEAD"],
-        parent
-      )).stdout.trim();
-      if (checkedOutCommit !== release.registryCommit) throw new Error("Pi-67 registry checkout commit 不匹配。");
-
-      const checkedRegistry = JSON.parse(await readFile(join(repositoryRoot, REGISTRY_PATH), "utf8")) as unknown;
-      const checkedLock = JSON.parse(await readFile(join(repositoryRoot, LOCK_PATH), "utf8")) as unknown;
-      const checkedRelease = parseRelease(checkedRegistry, checkedLock, release.registryCommit);
-      if (JSON.stringify(checkedRelease) !== JSON.stringify(release)) {
-        throw new Error("Pi-67 registry checkout 与检查结果不一致。");
-      }
-
-      const packageRoot = join(stagingSuiteRoot, "package");
-      await mkdir(join(packageRoot, "skills"), { recursive: true, mode: 0o700 });
-      for (const skill of release.skills) {
-        const source = join(repositoryRoot, "shared-skills", skill.name);
-        const destination = join(packageRoot, "skills", skill.name);
-        assertContained(source, join(repositoryRoot, "shared-skills"));
-        await copyDirectory(source, destination, source);
-        if (await managedPackageTreeSha256(destination) !== skill.sha256) {
-          throw new Error(`Pi-67 registry Skill 完整性校验失败：${skill.name}`);
+    const failures: string[] = [];
+    for (const transport of resolved.transports) {
+      const token = this.#createToken();
+      const repositoryRoot = join(parent, `.${release.id}.${process.pid}.${token}.repository`);
+      const stagingSuiteRoot = join(parent, `.${release.id}.${process.pid}.${token}.staging`);
+      try {
+        await this.#runGit(git, ["init", repositoryRoot], parent);
+        await this.#runGit(git, ["-C", repositoryRoot, "remote", "add", "origin", transport.transportUrl], parent);
+        try {
+          await this.#runGit(git, [
+            "-C", repositoryRoot, "fetch", "--depth", "1", "--no-tags", "origin", release.registryCommit
+          ], parent);
+        } catch (error) {
+          throw sourceTransportFailure(error);
         }
+        await this.#runGit(git, ["-C", repositoryRoot, "checkout", "--detach", release.registryCommit], parent);
+        const checkedOutCommit = (await this.#runGit(
+          git,
+          ["-C", repositoryRoot, "rev-parse", "HEAD"],
+          parent
+        )).stdout.trim();
+        if (checkedOutCommit !== release.registryCommit) {
+          throw integrityFailure("Pi-67 registry checkout commit 不匹配。");
+        }
+
+        const [checkedRegistry, checkedLock] = await Promise.all([
+          readBoundedJson(join(repositoryRoot, REGISTRY_PATH)),
+          readBoundedJson(join(repositoryRoot, LOCK_PATH))
+        ]);
+        const checkedRelease = parsePi67SkillPackRelease(checkedRegistry, checkedLock, release.registryCommit);
+        if (JSON.stringify(checkedRelease) !== JSON.stringify(release)) {
+          throw integrityFailure("Pi-67 registry checkout 与检查结果不一致。");
+        }
+
+        const packageRoot = join(stagingSuiteRoot, "package");
+        await mkdir(join(packageRoot, "skills"), { recursive: true, mode: 0o700 });
+        for (const skill of release.skills) {
+          const source = join(repositoryRoot, "shared-skills", skill.name);
+          const destination = join(packageRoot, "skills", skill.name);
+          assertContained(source, join(repositoryRoot, "shared-skills"));
+          await copyDirectory(source, destination, source);
+          if (await managedPackageTreeSha256(destination) !== skill.sha256) {
+            throw integrityFailure(`Pi-67 registry Skill 完整性校验失败：${skill.name}`);
+          }
+        }
+        const packageManifest = {
+          name: "@pi67/managed-ai-berkshire-investment-suite",
+          version: release.version,
+          private: true,
+          pi: { skills: release.skills.map((skill) => `skills/${skill.name}`) }
+        };
+        await writeFile(join(packageRoot, "package.json"), `${JSON.stringify(packageManifest, null, 2)}\n`, {
+          encoding: "utf8",
+          flag: "wx",
+          mode: 0o600
+        });
+        await writeManagedSkillPackState(stagingSuiteRoot, {
+          id: release.id,
+          version: release.version,
+          upstream: release.upstream,
+          sourceCommit: release.sourceCommit,
+          registryCommit: release.registryCommit,
+          manifestSha256: release.manifestSha256,
+          bundleSha256: release.bundleSha256,
+          skills: release.skills
+        }, this.#now);
+        return { release, stagingSuiteRoot };
+      } catch (error) {
+        await rm(stagingSuiteRoot, { recursive: true, force: true }).catch(() => undefined);
+        if (!isSourceTransportFailure(error)) throw error;
+        failures.push(`${transport.id}: ${boundedSourceFailure(error)}`);
+      } finally {
+        await rm(repositoryRoot, { recursive: true, force: true }).catch(() => undefined);
       }
-      const packageManifest = {
-        name: "@pi67/managed-ai-berkshire-investment-suite",
-        version: release.version,
-        private: true,
-        pi: { skills: release.skills.map((skill) => `skills/${skill.name}`) }
-      };
-      await writeFile(join(packageRoot, "package.json"), `${JSON.stringify(packageManifest, null, 2)}\n`, {
-        encoding: "utf8",
-        flag: "wx",
-        mode: 0o600
-      });
-    await writeManagedSkillPackState(stagingSuiteRoot, {
-        id: release.id,
-        version: release.version,
-        upstream: release.upstream,
-        sourceCommit: release.sourceCommit,
-        registryCommit: release.registryCommit,
-        manifestSha256: release.manifestSha256,
-        bundleSha256: release.bundleSha256,
-        skills: release.skills
-      }, this.#now);
-      return { release, stagingSuiteRoot };
-    } catch (error) {
-      await rm(stagingSuiteRoot, { recursive: true, force: true }).catch(() => undefined);
-      throw error;
-    } finally {
-      await rm(repositoryRoot, { recursive: true, force: true }).catch(() => undefined);
     }
+    throw new Error(`Pi-67 registry 下载源均不可用（${failures.join("；").slice(0, 800)}）。`);
   }
 
-  async #readRemoteJson(url: string): Promise<unknown> {
-    const response = await this.#fetch(url, {
-      headers: { accept: "application/json" },
-      redirect: "error",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    });
-    if (!response.ok) throw new Error(`Pi-67 registry 请求失败：HTTP ${response.status}`);
-    const contentLength = Number(response.headers.get("content-length") ?? "0");
-    if (Number.isFinite(contentLength) && contentLength > MAX_METADATA_BYTES) {
-      throw new Error("Pi-67 registry 元数据超出大小限制。");
+  async #resolveRemote(): Promise<{
+    release: Pi67SkillPackRelease;
+    transports: Array<{ id: string; transportUrl: string }>;
+  }> {
+    const git = await this.#requireGit();
+    const settings = await loadPackageNetworkSettings(this.#environment.PI67_PACKAGE_NETWORK_SETTINGS);
+    const candidates = gitSourceCandidates(settings, this.#repository);
+    if (candidates.length === 0) throw new Error("当前网络设置为离线模式，无法检查 Skill Pack 更新。");
+    const failures: string[] = [];
+    for (const [index, candidate] of candidates.entries()) {
+      let branchOutput: string;
+      try {
+        const result = await this.#runGit(
+          git,
+          ["ls-remote", candidate.transportUrl, "refs/heads/main"],
+          process.cwd(),
+          CHECK_TIMEOUT_MS
+        );
+        branchOutput = result.stdout;
+      } catch (error) {
+        failures.push(`${candidate.id}: ${boundedSourceFailure(error)}`);
+        continue;
+      }
+      let registryCommit: string;
+      try {
+        registryCommit = parsePi67RegistryBranch(branchOutput);
+      } catch (error) {
+        throw integrityFailure(error instanceof Error ? error.message : "Pi-67 registry branch 解析失败。");
+      }
+      try {
+        const release = await this.#readReleaseThroughGit(git, candidate.transportUrl, registryCommit);
+        return {
+          release,
+          transports: candidates.slice(index).map((transport) => ({
+            id: transport.id,
+            transportUrl: transport.transportUrl
+          }))
+        };
+      } catch (error) {
+        if (!isSourceTransportFailure(error)) throw error;
+        failures.push(`${candidate.id}: ${boundedSourceFailure(error)}`);
+      }
     }
-    const body = Buffer.from(await response.arrayBuffer());
-    if (body.byteLength > MAX_METADATA_BYTES) throw new Error("Pi-67 registry 元数据超出大小限制。");
+    throw new Error(`Pi-67 registry 下载源均不可用（${failures.join("；").slice(0, 800)}）。`);
+  }
+
+  async #readReleaseThroughGit(
+    git: string,
+    transportUrl: string,
+    registryCommit: string
+  ): Promise<Pi67SkillPackRelease> {
+    const repositoryRoot = join(tmpdir(), `pi67-skill-pack-check-${process.pid}-${this.#createToken()}`);
+    await mkdir(repositoryRoot, { recursive: false, mode: 0o700 });
     try {
-      return JSON.parse(body.toString("utf8")) as unknown;
-    } catch {
-      throw new Error("Pi-67 registry 返回了无效 JSON。");
+      await this.#runGit(git, ["init", repositoryRoot], tmpdir(), CHECK_TIMEOUT_MS);
+      await this.#runGit(
+        git,
+        ["-C", repositoryRoot, "remote", "add", "origin", transportUrl],
+        tmpdir(),
+        CHECK_TIMEOUT_MS
+      );
+      try {
+        await this.#runGit(git, [
+          "-C", repositoryRoot, "fetch", "--depth", "1", "--no-tags", "origin", registryCommit
+        ], tmpdir(), CHECK_TIMEOUT_MS);
+      } catch (error) {
+        throw sourceTransportFailure(error);
+      }
+      const fetchedCommit = (await this.#runGit(
+        git,
+        ["-C", repositoryRoot, "rev-parse", "FETCH_HEAD"],
+        tmpdir(),
+        CHECK_TIMEOUT_MS
+      )).stdout.trim();
+      if (fetchedCommit !== registryCommit) throw integrityFailure("Pi-67 registry fetch commit 不匹配。");
+      try {
+        await this.#runGit(git, [
+          "-C", repositoryRoot, "checkout", registryCommit, "--", REGISTRY_PATH, LOCK_PATH
+        ], tmpdir(), CHECK_TIMEOUT_MS);
+      } catch (error) {
+        throw integrityFailure(error instanceof Error ? error.message : "Pi-67 registry 元数据 checkout 失败。");
+      }
+      const [registry, lock] = await Promise.all([
+        readBoundedJson(join(repositoryRoot, REGISTRY_PATH)),
+        readBoundedJson(join(repositoryRoot, LOCK_PATH))
+      ]);
+      try {
+        return parsePi67SkillPackRelease(registry, lock, registryCommit);
+      } catch (error) {
+        throw integrityFailure(error instanceof Error ? error.message : "Pi-67 registry 元数据无效。");
+      }
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
@@ -230,106 +297,52 @@ export class Pi67SkillPackChannel implements Pi67SkillPackChannelPort {
     return git;
   }
 
-  #runGit(git: string, arguments_: string[], cwd: string) {
+  #runGit(git: string, arguments_: string[], cwd: string, timeoutMs = UPDATE_TIMEOUT_MS) {
     return this.#runProcess(git, arguments_, {
       cwd,
-      timeoutMs: UPDATE_TIMEOUT_MS,
-      environment: this.#environment
+      timeoutMs,
+      environment: isolatedGitEnvironment(this.#environment)
     });
   }
 }
 
-export function compareSkillPackVersions(left: string, right: string): number {
-  if (!VERSION_PATTERN.test(left) || !VERSION_PATTERN.test(right)) {
-    throw new Error("Skill Pack version 必须使用 MAJOR.MINOR.PATCH。");
+async function readBoundedJson(path: string): Promise<unknown> {
+  let metadata;
+  try {
+    metadata = await lstat(path);
+  } catch {
+    throw integrityFailure("Pi-67 registry 元数据缺失或不可读。");
   }
-  const leftParts = left.split(".").map(Number);
-  const rightParts = right.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    const difference = leftParts[index]! - rightParts[index]!;
-    if (difference !== 0) return difference < 0 ? -1 : 1;
+  if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > MAX_METADATA_BYTES) {
+    throw integrityFailure("Pi-67 registry 元数据超出大小限制。");
   }
-  return 0;
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as unknown;
+  } catch {
+    throw integrityFailure("Pi-67 registry 返回了无效 JSON。");
+  }
 }
 
-function parseRelease(registry: unknown, lock: unknown, registryCommit: string): Pi67SkillPackRelease {
-  if (!COMMIT_PATTERN.test(registryCommit)) throw new Error("Pi-67 registry commit 无效。");
-  if (!isRecord(registry) || registry.schema !== "pi67.shared-skill-packs.v1" || !Array.isArray(registry.packs)) {
-    throw new Error("Pi-67 Skill Pack registry schema 无效。");
-  }
-  if (!isRecord(lock) || lock.schema !== "pi67.shared-skill-packs-lock.v1" || !Array.isArray(lock.packs)) {
-    throw new Error("Pi-67 Skill Pack lock schema 无效。");
-  }
-  if (registry.packs.length > 64 || lock.packs.length > 64) throw new Error("Pi-67 Skill Pack registry 超出条目限制。");
-  const registryMatches = registry.packs.filter((entry) => isRecord(entry) && entry.name === PACK_ID);
-  const lockMatches = lock.packs.filter((entry) => isRecord(entry) && entry.name === PACK_ID);
-  if (registryMatches.length !== 1 || lockMatches.length !== 1) {
-    throw new Error("Pi-67 registry 缺少唯一的 AI Berkshire Skill Pack。");
-  }
-  const pack = registryMatches[0]!;
-  const locked = lockMatches[0]!;
-  const bundledReleaseOnly = pack.distribution === "bundled-release-only";
-  const upstream = isHttpsUrl(pack.upstream) && pack.upstream === locked.upstream
-    ? String(pack.upstream)
-    : undefined;
-  const legacyBundledWithoutUpstream = bundledReleaseOnly
-    && pack.upstream === undefined
-    && locked.upstream === "";
-  if (
-    !VERSION_PATTERN.test(String(pack.version ?? ""))
-    || pack.version !== locked.version
-    || (!upstream && !legacyBundledWithoutUpstream)
-    || !COMMIT_PATTERN.test(String(locked.source_commit ?? ""))
-    || !SHA256_PATTERN.test(String(locked.manifest_sha256 ?? ""))
-    || !SHA256_PATTERN.test(String(locked.bundle_sha256 ?? ""))
-    || (pack.distribution !== undefined && pack.distribution !== "bundled-release-only")
-    || !Array.isArray(pack.skills)
-    || !Array.isArray(locked.skills)
-    || pack.skills.length === 0
-    || pack.skills.length > 256
-    || locked.skills.length !== pack.skills.length
-  ) throw new Error("Pi-67 AI Berkshire Skill Pack 元数据不一致。");
-  const skills: Array<{ name: string; sha256: string }> = [];
-  for (let index = 0; index < pack.skills.length; index += 1) {
-    const name = pack.skills[index];
-    const lockedSkill = locked.skills[index];
-    if (
-      typeof name !== "string"
-      || !SKILL_PATTERN.test(name)
-      || !isRecord(lockedSkill)
-      || lockedSkill.name !== name
-      || typeof lockedSkill.sha256 !== "string"
-      || !SHA256_PATTERN.test(lockedSkill.sha256)
-    ) throw new Error("Pi-67 AI Berkshire Skill Pack 成员完整性无效。");
-    skills.push({ name, sha256: lockedSkill.sha256 });
-  }
-  if (new Set(skills.map((skill) => skill.name)).size !== skills.length) {
-    throw new Error("Pi-67 AI Berkshire Skill Pack 成员重复。");
-  }
-  if (hashManagedSkillSet(skills) !== locked.bundle_sha256) {
-    throw new Error("Pi-67 AI Berkshire Skill Pack bundle hash 无效。");
-  }
-  return {
-    id: PACK_ID,
-    version: String(pack.version),
-    ...(upstream ? { upstream } : {}),
-    sourceCommit: String(locked.source_commit),
-    registryCommit,
-    manifestSha256: String(locked.manifest_sha256),
-    bundleSha256: String(locked.bundle_sha256),
-    skills,
-    independentlyInstallable: !bundledReleaseOnly
-  };
+function sourceTransportFailure(cause: unknown): Error & { sourceTransportFailure: true } {
+  return Object.assign(new Error(boundedSourceFailure(cause), { cause }), {
+    sourceTransportFailure: true as const
+  });
 }
 
-function parseLsRemote(output: string): string {
-  const lines = output.split(/\r?\n/gu).map((line) => line.trim()).filter(Boolean);
-  if (lines.length !== 1) throw new Error("Pi-67 registry branch 解析失败。");
-  const [commit, ref, ...rest] = lines[0]!.split(/\s+/gu);
-  if (!commit || !COMMIT_PATTERN.test(commit) || ref !== "refs/heads/main" || rest.length > 0) {
-    throw new Error("Pi-67 registry branch 解析失败。");
-  }
-  return commit;
+function isSourceTransportFailure(error: unknown): error is Error & { sourceTransportFailure: true } {
+  return error instanceof Error
+    && "sourceTransportFailure" in error
+    && error.sourceTransportFailure === true;
+}
+
+function integrityFailure(message: string): Error & { registryIntegrityFailure: true } {
+  return Object.assign(new Error(message), { registryIntegrityFailure: true as const });
+}
+
+function boundedSourceFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/[\r\n\t]+/gu, " ").replace(/\s+/gu, " ").trim().slice(0, 180)
+    || "unavailable";
 }
 
 async function copyDirectory(source: string, destination: string, sourceRoot: string): Promise<void> {
@@ -369,17 +382,4 @@ function isContainedAbsolutePath(candidate: string, root: string): boolean {
     && fromRoot !== ".."
     && !fromRoot.startsWith(`..${sep}`)
     && !isAbsolute(fromRoot);
-}
-
-function isHttpsUrl(value: unknown): value is string {
-  if (typeof value !== "string" || value.length === 0 || value.length > 500) return false;
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

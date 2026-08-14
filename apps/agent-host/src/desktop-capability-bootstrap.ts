@@ -7,9 +7,9 @@ import {
   open,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
-  stat,
   writeFile
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -38,6 +38,7 @@ export interface DesktopCapabilityBootstrapResult {
   packagePaths: string[];
   rules: "installed" | "unavailable";
   agents: "installed" | "user-owned" | "unavailable";
+  projectionMode?: "packaged-direct" | "legacy-copy";
 }
 
 export async function bootstrapDesktopCapabilities(
@@ -52,6 +53,7 @@ export async function bootstrapDesktopCapabilities(
   const agentDir = resolve(options.agentDir);
   const managedRoot = join(agentDir, "desktop-capabilities");
   const createToken = options.createToken ?? randomUUID;
+  const packagedDirect = environment.PI67_PACKAGED === "1";
   let manifestValue: unknown;
   let catalogValue: unknown;
   try {
@@ -82,20 +84,25 @@ export async function bootstrapDesktopCapabilities(
   for (const entry of catalog.entries) {
     const integrity = manifestById.get(entry.id)!;
     const source = containedPath(capabilitiesRoot, entry.packagePath, "Capability package path");
-    const destination = join(managedRoot, "packages", entry.id);
-    const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
-    if (sourceHash !== integrity.treeSha256) {
-      throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
+    if (packagedDirect) {
+      await validatePackagedCapabilityPackage(capabilitiesRoot, source, entry.id);
+      bundledPackagePaths.push(source);
+    } else {
+      const destination = join(managedRoot, "packages", entry.id);
+      const sourceHash = await capabilityTreeSha256(source, integrity.includeNodeModules);
+      if (sourceHash !== integrity.treeSha256) {
+        throw new Error(`Desktop capability ${entry.id} failed bundled integrity verification.`);
+      }
+      await replaceDirectoryIfChanged(
+        source,
+        destination,
+        integrity.treeSha256,
+        managedRoot,
+        createToken,
+        integrity.includeNodeModules
+      );
+      bundledPackagePaths.push(destination);
     }
-    await replaceDirectoryIfChanged(
-      source,
-      destination,
-      integrity.treeSha256,
-      managedRoot,
-      createToken,
-      integrity.includeNodeModules
-    );
-    bundledPackagePaths.push(destination);
   }
 
   const pi67Core = bundledPackagePaths[catalog.entries.findIndex((entry) => entry.id === "pi67-core")];
@@ -127,6 +134,7 @@ export async function bootstrapDesktopCapabilities(
     ...await managedSkillPackPackagePaths(agentDir),
     ...bundledPackagePaths
   ];
+  environment.PI67_BUNDLED_CAPABILITIES_ROOT = capabilitiesRoot;
   environment.PI67_MANAGED_CAPABILITIES_ROOT = managedRoot;
   environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify(packagePaths);
   environment.PI67_KNOWN_PACKAGE_BASELINES = JSON.stringify(
@@ -149,8 +157,40 @@ export async function bootstrapDesktopCapabilities(
     managedRoot,
     packagePaths,
     rules,
-    agents
+    agents,
+    projectionMode: packagedDirect ? "packaged-direct" : "legacy-copy"
   };
+}
+
+async function validatePackagedCapabilityPackage(
+  capabilitiesRoot: string,
+  packageRoot: string,
+  packageId: string
+): Promise<void> {
+  const [rootMetadata, packageMetadata, canonicalRoot, canonicalPackage] = await Promise.all([
+    lstat(capabilitiesRoot),
+    lstat(packageRoot),
+    realpath(capabilitiesRoot),
+    realpath(packageRoot)
+  ]);
+  if (
+    rootMetadata.isSymbolicLink()
+    || !rootMetadata.isDirectory()
+    || packageMetadata.isSymbolicLink()
+    || !packageMetadata.isDirectory()
+    || !isContained(canonicalPackage, canonicalRoot)
+  ) throw new Error(`Desktop capability ${packageId} has an invalid packaged root.`);
+  const manifestPath = join(packageRoot, "package.json");
+  const manifestMetadata = await lstat(manifestPath);
+  if (
+    manifestMetadata.isSymbolicLink()
+    || !manifestMetadata.isFile()
+    || manifestMetadata.size > MAX_METADATA_BYTES
+  ) throw new Error(`Desktop capability ${packageId} has invalid packaged metadata.`);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+  if (!isRecord(manifest) || typeof manifest.name !== "string" || manifest.name.length > 214) {
+    throw new Error(`Desktop capability ${packageId} has invalid packaged metadata.`);
+  }
 }
 
 async function materializeRules(
@@ -308,8 +348,8 @@ async function directoryHashMatches(
 }
 
 async function readBoundedJson(path: string): Promise<unknown> {
-  const metadata = await stat(path);
-  if (!metadata.isFile() || metadata.size > MAX_METADATA_BYTES) {
+  const metadata = await lstat(path);
+  if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size > MAX_METADATA_BYTES) {
     throw new Error("Desktop capability metadata must be a bounded regular file.");
   }
   return JSON.parse(await readFile(path, "utf8")) as unknown;
@@ -348,4 +388,8 @@ function isContained(candidate: string, root: string): boolean {
 
 function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === code;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,7 +1,7 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DesktopCapabilityBootstrapResult } from "./desktop-capability-bootstrap.js";
 import type { ManagedPackageBundleResult } from "./managed-package-bundle.js";
 import type { ManagedBrowser67McpResult } from "./managed-browser67-mcp-provision.js";
@@ -11,6 +11,10 @@ import {
   classifyAgentHostProfile,
   coordinateAgentHostStartup
 } from "./agent-host-startup.js";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Agent Host startup", () => {
   it("classifies missing, shared Pi TUI, and valid Desktop-managed Profiles", async () => {
@@ -85,7 +89,7 @@ describe("Agent Host startup", () => {
       }
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       server: { kind: "server" },
       startup: { profileMode: "fresh", status: "ready", issues: [] }
     });
@@ -122,7 +126,7 @@ describe("Agent Host startup", () => {
       constructServer: () => ({ kind: "server" })
     });
 
-    expect(result.startup).toEqual({
+    expect(result.startup).toMatchObject({
       profileMode: "existing-shared",
       status: "degraded",
       issues: [{ stage: "browser67-mcp", code: "conflict" }]
@@ -160,7 +164,7 @@ describe("Agent Host startup", () => {
       constructServer: () => ({ kind: "server" })
     });
 
-    expect(result.startup).toEqual({
+    expect(result.startup).toMatchObject({
       profileMode: "desktop-managed-upgrade",
       status: "degraded",
       issues: [{ stage: "managed-packages", code: "access-denied" }]
@@ -186,15 +190,70 @@ describe("Agent Host startup", () => {
       constructServer: () => ({ kind: "server" })
     });
 
-    expect(result.startup).toEqual({
+    expect(result.startup).toMatchObject({
       profileMode: "desktop-managed-upgrade",
       status: "degraded",
       issues: [
         { stage: "retired-mcp-cleanup", code: "conflict" },
         { stage: "browser67-mcp", code: "invalid-state" },
         { stage: "browser67-mcp", code: "conflict" }
-      ]
+      ],
+      totalDurationMs: expect.any(Number),
+      stageTimings: expect.arrayContaining([
+        expect.objectContaining({ stage: "retired-mcp-cleanup", outcome: "degraded" }),
+        expect.objectContaining({ stage: "browser67-mcp", outcome: "degraded" })
+      ])
     });
+  });
+
+  it("removes only retired packaged copies after readiness and preserves Profile state", async () => {
+    vi.useFakeTimers();
+    const root = await fixtureRoot();
+    const agentDir = join(root, "managed");
+    const retired = [
+      join(agentDir, "desktop-capabilities", "packages"),
+      join(agentDir, "desktop-capabilities", "managed-packages", "active"),
+      join(agentDir, "desktop-capabilities", "managed-packages", "previous"),
+      join(agentDir, "desktop-capabilities", "managed-packages", "staging")
+    ];
+    const retained = [
+      join(agentDir, "desktop-capabilities", "managed-packages", "state.json"),
+      join(agentDir, "desktop-capabilities", "skill-packs", "suite", "state.json"),
+      join(agentDir, "settings.json"),
+      join(agentDir, "sessions", "session.jsonl")
+    ];
+    await Promise.all(retired.map((path) => mkdir(path, { recursive: true })));
+    await Promise.all(retained.map(async (path) => {
+      await mkdir(join(path, ".."), { recursive: true });
+      await writeFile(path, "retained\n");
+    }));
+
+    const result = await coordinateAgentHostStartup({
+      agentDir,
+      environment: packagedEnvironment(),
+      classifyProfile: async () => "desktop-managed-upgrade",
+      bootstrapCapabilities: async () => ({
+        ...enabledCapabilities(),
+        managedRoot: join(agentDir, "desktop-capabilities"),
+        projectionMode: "packaged-direct"
+      }),
+      activateManagedPackages: async () => ({
+        ...enabledManagedPackages(),
+        projectionMode: "packaged-direct"
+      }),
+      cleanupRetiredMcp: async () => retiredCleanup("missing", agentDir),
+      provisionBrowser67Mcp: async () => browser67Result("unchanged", "unchanged", agentDir),
+      constructServer: () => ({ kind: "server" })
+    });
+
+    expect(result.startup.capabilityProjectionMode).toBe("packaged-direct");
+    for (const path of retired) await expect(stat(path)).resolves.toBeDefined();
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+    vi.useRealTimers();
+    await vi.waitFor(async () => {
+      for (const path of retired) await expect(stat(path)).rejects.toMatchObject({ code: "ENOENT" });
+    });
+    for (const path of retained) expect(await readFile(path, "utf8")).toBe("retained\n");
   });
 
   it("fails a fresh packaged Profile closed on bundled integrity failure", async () => {

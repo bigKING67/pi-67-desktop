@@ -1,13 +1,13 @@
 {
   "name": "@pi67/agent-host",
-  "version": "0.1.0-alpha.22",
+  "version": "0.1.0-alpha.23",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/package-worker.ts src/prompt-attachment-worker.ts --format esm --dts false --deps.never-bundle electron --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core",
+    "build": "tsdown src/index.ts src/package-worker.ts src/prompt-attachment-worker.ts src/skill-pack-process-worker.ts --format esm --dts false --deps.never-bundle electron --deps.never-bundle @earendil-works/pi-coding-agent --deps.never-bundle @earendil-works/pi-agent-core",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

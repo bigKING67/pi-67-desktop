@@ -215,10 +215,10 @@ function withoutManagedNpmPackageSources(
 export function managedDesktopExtensionPaths(
   environment: NodeJS.ProcessEnv = process.env
 ): string[] {
-  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
+  const capabilityRoots = desktopCapabilityRoots(environment);
   const serialized = nonEmpty(environment.PI67_MANAGED_EXTENSION_PATHS);
   if (!serialized) return [];
-  if (!managedRoot || !isAbsolute(managedRoot)) {
+  if (capabilityRoots.length === 0) {
     throw new RuntimeError(
       "TOOLCHAIN_INTEGRITY_FAILED",
       "Pi-67 Desktop managed Extension root is unavailable.",
@@ -241,7 +241,7 @@ export function managedDesktopExtensionPaths(
     || candidates.some((path) => (
       typeof path !== "string"
       || path.length > 4_096
-      || !isContainedAbsolutePath(path, managedRoot)
+      || !capabilityRoots.some((root) => isContainedAbsolutePath(path, root))
     ))
   ) {
     throw new RuntimeError(
@@ -270,12 +270,12 @@ function desktopExtensionOverrides(
   packages: PackageSource[],
   environment: NodeJS.ProcessEnv
 ): string[] {
-  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
-  if (!managedRoot || !isAbsolute(managedRoot)) return configured;
-  const pi67CoreRoot = join(managedRoot, "packages", "pi67-core");
+  const pi67CoreRoots = desktopCapabilityRoots(environment)
+    .map((root) => join(root, "packages", "pi67-core"));
+  if (pi67CoreRoots.length === 0) return configured;
   const hasManagedPi67Core = packages.some((entry) => {
     const source = typeof entry === "string" ? entry : entry.source;
-    return isSameAbsolutePath(source, pi67CoreRoot);
+    return pi67CoreRoots.some((root) => isSameAbsolutePath(source, root));
   });
   if (!hasManagedPi67Core) return configured;
   return [...new Set([...configured, ...PI67_CORE_LEGACY_EXTENSION_EXCLUSIONS])];
@@ -297,9 +297,9 @@ function desktopCapabilityPackages(
   configured: PackageSource[],
   environment: NodeJS.ProcessEnv
 ): PackageSource[] {
-  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
+  const capabilityRoots = desktopCapabilityRoots(environment);
   const serialized = nonEmpty(environment.PI67_CAPABILITY_PACKAGE_PATHS);
-  if (!managedRoot || !isAbsolute(managedRoot)) return configured;
+  if (capabilityRoots.length === 0) return configured;
   const userConfigured = withoutManagedNpmPackageSources(
     withoutDesktopCapabilityPackages(configured, environment),
     environment
@@ -318,7 +318,10 @@ function desktopCapabilityPackages(
   if (
     !Array.isArray(candidates)
     || candidates.length > 32
-    || candidates.some((path) => typeof path !== "string" || !isContainedAbsolutePath(path, managedRoot))
+    || candidates.some((path) => (
+      typeof path !== "string"
+      || !capabilityRoots.some((root) => isContainedAbsolutePath(path, root))
+    ))
   ) {
     throw new RuntimeError(
       "TOOLCHAIN_INTEGRITY_FAILED",
@@ -357,12 +360,19 @@ function withoutDesktopCapabilityPackages(
   configured: PackageSource[],
   environment: NodeJS.ProcessEnv
 ): PackageSource[] {
-  const managedRoot = nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT);
-  if (!managedRoot || !isAbsolute(managedRoot)) return configured;
+  const capabilityRoots = desktopCapabilityRoots(environment);
+  if (capabilityRoots.length === 0) return configured;
   return configured.filter((entry) => {
     const source = typeof entry === "string" ? entry : entry.source;
-    return !isSameOrContainedAbsolutePath(source, managedRoot);
+    return !capabilityRoots.some((root) => isSameOrContainedAbsolutePath(source, root));
   });
+}
+
+function desktopCapabilityRoots(environment: NodeJS.ProcessEnv): string[] {
+  return [...new Set([
+    nonEmpty(environment.PI67_BUNDLED_CAPABILITIES_ROOT),
+    nonEmpty(environment.PI67_MANAGED_CAPABILITIES_ROOT)
+  ].filter((root): root is string => root !== undefined && isAbsolute(root)).map((root) => resolve(root)))];
 }
 
 function isSameOrContainedAbsolutePath(candidate: string, root: string): boolean {

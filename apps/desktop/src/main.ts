@@ -54,6 +54,14 @@ const toolchainRoot = app.isPackaged
 const capabilitiesRoot = app.isPackaged
   ? join(process.resourcesPath, "capabilities")
   : normalize(join(currentDirectory, "../../../artifacts/capabilities/current"));
+const windowsPackageWorkerJobController = process.platform === "win32"
+  ? app.isPackaged
+    ? join(process.resourcesPath, "native", "pi67-package-worker-job.exe")
+    : normalize(join(
+        currentDirectory,
+        "../../../artifacts/native/windows-x64/pi67-package-worker-job.exe"
+      ))
+  : undefined;
 const desktopToolchain = resolveDesktopToolchain(toolchainRoot, app.isPackaged);
 const rendererUrl = resolveRendererUrl(app.isPackaged, process.env.PI67_RENDERER_DEV_URL);
 const expectedRendererOrigin = rendererOrigin(rendererUrl);
@@ -97,7 +105,10 @@ const agentHostSupervisor = new AgentHostSupervisor({
       packageNetworkSettingsPath: packageNetworkSettings.requestedSettingsPath,
       promptAttachmentRoot: promptAttachments.root,
       packaged: app.isPackaged,
-      electronExecutable: process.execPath
+      electronExecutable: process.execPath,
+      ...(windowsPackageWorkerJobController === undefined
+        ? {}
+        : { windowsPackageWorkerJobController })
     };
   },
   getMainWindow: () => mainWindow,

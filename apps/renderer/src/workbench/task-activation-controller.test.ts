@@ -216,6 +216,36 @@ describe("task activation controller", () => {
     expect(rendererWorkbenchStore.getState().tasks["task-a"]?.recoveryHostEpoch).toBeUndefined();
   });
 
+  it("shares one task-scoped flight across concurrent activate and resume requests", async () => {
+    const registration = deferred<boolean>();
+    registerWorkspace.mockReturnValue(registration.promise);
+    resynchronize.mockResolvedValue("committed");
+
+    const activation = activateRendererTask("task-a");
+    const resume = resumeRendererTask("task-a");
+
+    expect(resume).toBe(activation);
+    await vi.waitFor(() => expect(registerWorkspace).toHaveBeenCalledOnce());
+    registration.resolve(true);
+    await expect(Promise.all([activation, resume])).resolves.toEqual([true, true]);
+    expect(resynchronize).toHaveBeenCalledOnce();
+  });
+
+  it("clears a failed task flight so an explicit retry can recover", async () => {
+    registerWorkspace.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    resynchronize.mockResolvedValue("committed");
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      lifecycle: "lost",
+      runtime: { phase: "failed", detail: "目标工作区当前不可用。" }
+    });
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(true);
+    expect(registerWorkspace).toHaveBeenCalledTimes(2);
+    expect(resynchronize).toHaveBeenCalledOnce();
+  });
+
   it("skips projection resync after the Agent Host identity changes", async () => {
     vi.spyOn(agentConnectionController, "identity", "get").mockReturnValue({
       appInstanceId: "app",

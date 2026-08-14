@@ -163,11 +163,14 @@ function collectPackageIdentities(
   environment: NodeJS.ProcessEnv
 ): Map<string, PackageIdentity[]> {
   const result = new Map<string, PackageIdentity[]>();
-  const managedRoot = absoluteEnvironmentPath(environment.PI67_MANAGED_CAPABILITIES_ROOT);
+  const managedRoots = [
+    absoluteEnvironmentPath(environment.PI67_BUNDLED_CAPABILITIES_ROOT),
+    absoluteEnvironmentPath(environment.PI67_MANAGED_CAPABILITIES_ROOT)
+  ].filter((root): root is string => root !== undefined);
   for (const entry of packages) {
     const source = typeof entry === "string" ? entry : entry.source;
     if (!isNonEmptyBoundedString(source, 4_096)) continue;
-    const managed = managedRoot !== undefined && isSameOrContainedPath(source, managedRoot);
+    const managed = managedRoots.some((root) => isSameOrContainedPath(source, root));
     const identity: PackageIdentity = {
       id: `${managed ? "managed" : "configured"}:${source}`,
       kind: managed ? "managed-package" : "configured-package",

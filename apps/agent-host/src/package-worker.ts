@@ -19,6 +19,10 @@ import {
   type PackageWorkerRequest,
   type PackageWorkerResponse
 } from "./package-worker-protocol.js";
+import {
+  checkGitPackageUpdatesWithFallback,
+  GitPackageSourcesUnavailableError
+} from "./package-worker-git-fallback.js";
 
 const MAX_NETWORK_SETTINGS_BYTES = 32 * 1_024;
 const SOURCE_PROBE_TIMEOUT_MS = 8_000;
@@ -59,10 +63,33 @@ async function execute(request: PackageWorkerRequest): Promise<unknown> {
     agentDir: request.agentDir,
     projectTrusted: request.projectTrusted
   });
-  await configureOperationSources(request, settings, runtime, toolchain);
+  const configuredPackages = request.action === "check-updates" ? runtime.configuredPackages() : [];
+  const required = await configureOperationSources(request, settings, runtime, configuredPackages, toolchain);
   switch (request.action) {
     case "check-updates":
-      return runtime.checkForUpdates();
+      if (!required.git) return runtime.checkForUpdates();
+      try {
+        return await checkGitPackageUpdatesWithFallback({
+          settings,
+          packages: configuredPackages.filter((entry) => classifyPackageSource(entry.source).git),
+          configureRewrite: configureGitRewrite,
+          probe: (installedPath) => runGit(toolchain.git, [
+            "-C",
+            installedPath,
+            "ls-remote",
+            "--exit-code",
+            "origin",
+            "HEAD"
+          ]),
+          check: () => runtime.checkForUpdates()
+        });
+      } catch (error) {
+        if (!(error instanceof GitPackageSourcesUnavailableError)) throw error;
+        throw coded("NO_REACHABLE_PACKAGE_SOURCE", "No reachable Git package source is available.", true, {
+          sourceKind: "git",
+          attempts: error.attempts
+        });
+      }
     case "install":
       return runtime.install(request.source!, request.scope!);
     case "update":
@@ -76,31 +103,33 @@ async function configureOperationSources(
   request: PackageWorkerRequest,
   settings: PackageNetworkSettings,
   runtime: DesktopPackageOperationRuntime,
+  configuredPackages: ReturnType<DesktopPackageOperationRuntime["configuredPackages"]>,
   toolchain: { node: string; npmCli: string; git: string }
-): Promise<void> {
-  const required = await requiredSourceKinds(request, runtime);
+): Promise<{ npm: boolean; git: boolean }> {
+  const required = requiredSourceKinds(request, configuredPackages);
   if (required.npm) {
     const registry = await selectNpmRegistry(settings);
     runtime.applyNpmCommand([toolchain.node, toolchain.npmCli, "--registry", registry]);
   } else {
     runtime.applyNpmCommand([toolchain.node, toolchain.npmCli]);
   }
-  if (required.git) {
+  if (required.git && request.action !== "check-updates") {
     const source = await selectGitSource(settings, toolchain.git);
     configureGitRewrite(source?.insteadOfPrefix);
-  } else {
+  } else if (!required.git) {
     configureGitRewrite(undefined);
   }
+  return required;
 }
 
-async function requiredSourceKinds(
+function requiredSourceKinds(
   request: PackageWorkerRequest,
-  runtime: DesktopPackageOperationRuntime
-): Promise<{ npm: boolean; git: boolean }> {
+  configuredPackages: ReturnType<DesktopPackageOperationRuntime["configuredPackages"]>
+): { npm: boolean; git: boolean } {
   if (request.action === "uninstall") return { npm: false, git: false };
   if (request.action !== "check-updates") return classifyPackageSource(request.source!);
-  return runtime.configuredSources().reduce<{ npm: boolean; git: boolean }>((result, source) => {
-    const kind = classifyPackageSource(source);
+  return configuredPackages.reduce<{ npm: boolean; git: boolean }>((result, entry) => {
+    const kind = classifyPackageSource(entry.source);
     return { npm: result.npm || kind.npm, git: result.git || kind.git };
   }, { npm: false, git: false });
 }

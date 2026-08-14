@@ -20,7 +20,7 @@ export async function loadSkillPacks(workspaceId?: string): Promise<boolean> {
     useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法读取受管技能套件", error, false);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -37,27 +37,9 @@ export async function checkSkillPackUpdates(workspaceId?: string): Promise<boole
       { context: workspaceContext(target.id) }
     );
     useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
-    const updates = result.items.filter((entry) => entry.updateStatus === "update-available").length;
-    const missing = result.items.filter((entry) => entry.updateStatus === "not-installed").length;
-    const attention = result.items.filter((entry) => (
-      entry.updateStatus === "modified"
-      || entry.updateStatus === "unavailable"
-      || entry.updateStatus === "not-installed"
-    ));
-    publishNotification({
-      level: attention.length > 0 ? "warning" : "info",
-      title: "技能更新检查完成",
-      message: updates > 0
-        ? `发现 ${updates} 个可更新的技能套件。`
-        : missing > 0
-          ? `有 ${missing} 个技能套件依赖尚未安装。`
-        : attention.length > 0
-          ? "没有可直接更新的套件；部分来源需要处理。"
-          : "当前受管技能套件均已是最新。"
-    });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法检查技能更新", error);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -83,7 +65,7 @@ export async function installSkillPack(id: string, workspaceId?: string): Promis
     });
     return true;
   } catch (error) {
-    return reportMutationFailure(target.id, id, "Lark CLI 安装失败", error);
+    return reportMutationFailure(target.id, id, error);
   }
 }
 
@@ -107,7 +89,7 @@ export async function updateSkillPack(id: string, workspaceId?: string): Promise
     });
     return true;
   } catch (error) {
-    return reportMutationFailure(target.id, id, "技能套件更新失败", error);
+    return reportMutationFailure(target.id, id, error);
   }
 }
 
@@ -133,7 +115,7 @@ export async function restoreSkillPack(id: string, workspaceId?: string): Promis
     });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "恢复内置技能套件失败", error);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -167,17 +149,15 @@ function workspaceContext(workspaceId: string) {
   return { scope: "workspace" as const, workspaceId };
 }
 
-function reportFailure(workspaceId: string, title: string, error: unknown, notify = true): false {
+function reportFailure(workspaceId: string, error: unknown): false {
   const message = error instanceof Error ? error.message : "未知错误";
   useSkillPackStore.getState().fail(workspaceId, message);
-  if (notify) publishNotification({ level: "error", title, message });
   return false;
 }
 
 async function reportMutationFailure(
   workspaceId: string,
   id: string,
-  title: string,
   error: unknown
 ): Promise<false> {
   const message = error instanceof Error ? error.message : "未知错误";
@@ -194,6 +174,5 @@ async function reportMutationFailure(
     // Keep the affected Pack explicitly unverified when the recovery check also fails.
   }
   useSkillPackStore.getState().fail(workspaceId, message);
-  publishNotification({ level: "error", title, message });
   return false;
 }

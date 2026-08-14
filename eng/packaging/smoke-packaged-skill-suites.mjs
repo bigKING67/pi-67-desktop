@@ -5,13 +5,15 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
     .waitFor({ state: "visible", timeout: 15_000 });
   await bundledRows.filter({ hasText: "Commerce Growth OS" })
     .waitFor({ state: "visible", timeout: 15_000 });
+  const aiBerkshireRow = bundledRows.filter({ hasText: "AI Berkshire 投资研究" });
+  await aiBerkshireRow.waitFor({ state: "visible", timeout: 15_000 });
   if (await bundledRows.getByText("packaged-skill", { exact: true }).count()) {
     throw new Error("Packaged user Skill was duplicated in the bundled Skill view.");
   }
   if (await bundledRows.getByText("design-craft", { exact: true }).count()) {
     throw new Error("Packaged bundled Skill summary flattened individual Skill entries.");
   }
-  await bundledSkillPanel.getByText("21 个技能 · 内置基线 1.0.1", { exact: true })
+  await aiBerkshireRow.getByText(/^21 个技能 · .*1\.0\.1/u)
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-bundled-skill-suites.png");
   await bundledSkillPanel.getByTestId("bundled-skill-suite-row")

@@ -9,6 +9,7 @@ export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 export const packagedAttachmentRequiredAsarPaths = [
   "apps/agent-host/dist/prompt-attachment-worker.mjs",
+  "apps/agent-host/dist/skill-pack-process-worker.mjs",
   "node_modules/mediainfo.js/dist/MediaInfoModule.wasm",
   "node_modules/officeparser/package.json",
   "node_modules/officeparser/dist/index.mjs",
@@ -90,6 +91,9 @@ export async function assertPackagedRuntimeAssets(artifact) {
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/manifest.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-mcp-adapter/package.json")),
     access(join(artifact.resourcesPath, "capabilities/managed-packages/bundled/packages/pi-observational-memory/package.json")),
+    ...(artifact.platform === "win32"
+      ? [access(join(artifact.resourcesPath, "native/pi67-package-worker-job.exe"))]
+      : []),
     assertPackagedAsarContract(artifact)
   ]);
 }

@@ -77,10 +77,16 @@ describe("Skill Pack controller", () => {
       checkedAt: 1_722_400_000_000,
       items: [{ updateStatus: "update-available", latestVersion: "1.0.80" }]
     });
-    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
-      title: "技能更新检查完成",
-      message: "发现 1 个可更新的技能套件。"
-    });
+    expect(useNotificationStore.getState().items).toEqual([]);
+  });
+
+  it("owns check failures inline without duplicating the same error as a toast", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("HTTP 502"));
+
+    await expect(checkSkillPackUpdates("workspace-skills")).resolves.toBe(false);
+
+    expect(useSkillPackStore.getState()).toMatchObject({ phase: "failed", error: "HTTP 502" });
+    expect(useNotificationStore.getState().items).toEqual([]);
   });
 
   it("blocks the global update while any Task consumes a run slot", async () => {

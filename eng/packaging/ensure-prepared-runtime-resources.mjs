@@ -6,6 +6,10 @@ import {
 } from "./prepare-toolchain.mjs";
 import { prepareDesktopCapabilities } from "../capabilities/prepare-capabilities.mjs";
 import { assertPreparedDesktopCapabilities } from "../capabilities/prepared-capabilities-validation.mjs";
+import {
+  assertPreparedWindowsJobController,
+  prepareWindowsJobController
+} from "./prepare-windows-job-controller.mjs";
 
 export async function ensurePreparedRuntimeResources(
   platform = process.platform,
@@ -29,13 +33,23 @@ export async function ensurePreparedRuntimeResources(
     await assertPreparedDesktopCapabilities();
   }
 
+  let reusedWindowsJobController = true;
+  try {
+    await assertPreparedWindowsJobController(platform, architecture);
+  } catch {
+    reusedWindowsJobController = false;
+    await prepareWindowsJobController(platform, architecture);
+    await assertPreparedWindowsJobController(platform, architecture);
+  }
+
   console.log(JSON.stringify({
     platform,
     architecture,
     reusedToolchain,
-    reusedCapabilities
+    reusedCapabilities,
+    reusedWindowsJobController
   }));
-  return { reusedToolchain, reusedCapabilities };
+  return { reusedToolchain, reusedCapabilities, reusedWindowsJobController };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

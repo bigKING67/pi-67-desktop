@@ -7,7 +7,7 @@
 }
 
 .navigationHidden {
-  grid-template-columns: minmax(520px, 1fr) var(--workspace-side-width, 248px);
+  grid-template-columns: minmax(520px, 1fr) var(--workspace-inspector-width, 360px);
 }
 
 .navigationHidden:global(.context-hidden) {
@@ -229,7 +229,7 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1160px) {
   .navigationHidden,
   .navigationHidden:global(.context-hidden) {
     grid-template-columns: minmax(520px, 1fr);

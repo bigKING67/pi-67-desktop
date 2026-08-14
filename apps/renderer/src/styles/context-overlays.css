@@ -10,7 +10,8 @@
 
 .context-pane-tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  min-width: 0;
   height: 43px;
   padding: 5px 7px;
   border-bottom: 1px solid var(--border);
@@ -18,15 +19,22 @@
 
 .context-pane-tabs [role="tab"] {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   gap: 5px;
+  padding: 0 3px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--text-tertiary);
   font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
+
+.context-pane-tab-icon { flex: 0 0 auto; }
+.context-pane-tabs [role="tab"] > span { flex: 0 0 auto; }
 
 .context-pane-tabs [role="tab"][data-selected] { background: var(--surface); color: var(--text-primary); }
 .context-pane [role="tabpanel"] { height: calc(100vh - var(--titlebar-height) - 43px); overflow: auto; }

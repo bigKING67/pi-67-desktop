@@ -72,7 +72,7 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     expect(typeof serialized).toBe("string");
     expect(JSON.parse(serialized as string)).toEqual(expect.objectContaining({
-      schema: "pi67-support-diagnostics.v4",
+      schema: "pi67-support-diagnostics.v5",
       application: expect.objectContaining({ version: "0.1.0-alpha.10" }),
       desktop: expect.objectContaining({ previousRunExitStatus: "unclean" }),
       agentHost: expect.objectContaining({
@@ -81,7 +81,12 @@ describe("system bridge recovery diagnostics", () => {
         lastStartup: expect.objectContaining({
           profileMode: "existing-shared",
           status: "degraded",
-          issues: [{ stage: "browser67-mcp", code: "conflict" }]
+          issues: [{ stage: "browser67-mcp", code: "conflict" }],
+          totalDurationMs: 123,
+          capabilityProjectionMode: "packaged-direct",
+          stageTimings: [
+            { stage: "desktop-capabilities", durationMs: 7, outcome: "completed" }
+          ]
         })
       }),
       piConfiguration: expect.objectContaining({
@@ -112,7 +117,7 @@ describe("system bridge recovery diagnostics", () => {
     const serialized = mocks.writeFile.mock.calls[0]?.[1];
     const document = JSON.parse(String(serialized)) as Record<string, unknown>;
     expect(document).toMatchObject({
-      schema: "pi67-support-diagnostics.v4",
+      schema: "pi67-support-diagnostics.v5",
       runtimeCollection: {
         status: "unavailable",
         failure: "acknowledgement-timeout"
@@ -200,7 +205,12 @@ function registerFixture(): void {
         hostEpoch: 4,
         profileMode: "existing-shared",
         status: "degraded",
-        issues: [{ stage: "browser67-mcp", code: "conflict" }]
+        issues: [{ stage: "browser67-mcp", code: "conflict" }],
+        totalDurationMs: 123,
+        capabilityProjectionMode: "packaged-direct",
+        stageTimings: [
+          { stage: "desktop-capabilities", durationMs: 7, outcome: "completed" }
+        ]
       },
       restartCount: 0,
       portHandoffCount: 1,

@@ -75,7 +75,7 @@ export async function provisionManagedBrowser67Mcp(options: {
   if (!nodeExecutable || !isAbsolute(nodeExecutable)) {
     throw new Error("Managed browser67 MCP requires the Desktop private Node executable.");
   }
-  const browser67Root = join(options.agentDir, "desktop-capabilities", "packages", "browser67");
+  const browser67Root = resolveBrowser67CapabilityRoot(options.agentDir, environment);
   const browser67Package = await readBoundedJson(join(browser67Root, "package.json"));
   if (!isRecord(browser67Package) || !isCommit(browser67Package.gitHead)) {
     throw new Error("Managed browser67 MCP package identity is unavailable.");
@@ -213,6 +213,41 @@ export async function provisionManagedBrowser67Mcp(options: {
     cache.status,
     cache.invalidatedServers
   );
+}
+
+function resolveBrowser67CapabilityRoot(agentDir: string, environment: NodeJS.ProcessEnv): string {
+  const serialized = environment.PI67_CAPABILITY_PACKAGE_PATHS;
+  if (serialized === undefined) {
+    return join(agentDir, "desktop-capabilities", "packages", "browser67");
+  }
+  let paths: unknown;
+  try {
+    paths = JSON.parse(serialized) as unknown;
+  } catch {
+    throw new Error("Managed browser67 capability paths are malformed.");
+  }
+  const expected = [
+    environment.PI67_BUNDLED_CAPABILITIES_ROOT,
+    environment.PI67_MANAGED_CAPABILITIES_ROOT
+  ].filter((root): root is string => typeof root === "string" && isAbsolute(root))
+    .map((root) => resolve(root, "packages", "browser67"));
+  if (!Array.isArray(paths) || paths.length > 32 || expected.length === 0) {
+    throw new Error("Managed browser67 capability paths are unavailable.");
+  }
+  const browser67Root = paths.find((path) => (
+    typeof path === "string" && expected.some((candidate) => samePath(path, candidate))
+  ));
+  if (typeof browser67Root !== "string") {
+    throw new Error("Managed browser67 capability package is unavailable.");
+  }
+  return resolve(browser67Root);
+}
+
+function samePath(left: string, right: string): boolean {
+  const normalize = process.platform === "win32"
+    ? (value: string) => resolve(value).toLowerCase()
+    : (value: string) => resolve(value);
+  return normalize(left) === normalize(right);
 }
 
 function managedReceipt(

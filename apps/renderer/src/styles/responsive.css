@@ -1,5 +1,5 @@
 
-@media (max-width: 1040px) {
+@media (max-width: 1160px) {
   .workspace-grid,
   .workspace-grid.has-context {
     --workspace-side-width: 226px;
@@ -17,7 +17,7 @@
     border: 0;
     background: color-mix(in srgb, var(--canvas) 34%, transparent);
   }
-  .context-pane { position: fixed; z-index: 30; top: var(--titlebar-height); right: 0; bottom: 0; width: min(320px, calc(100vw - 48px)); box-shadow: var(--shadow-floating); }
+  .context-pane { position: fixed; z-index: 30; top: var(--titlebar-height); right: 0; bottom: 0; width: min(var(--workspace-inspector-width), calc(100vw - 48px)); box-shadow: var(--shadow-floating); }
 }
 
 @media (max-width: 760px) {

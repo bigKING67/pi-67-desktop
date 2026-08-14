@@ -85,7 +85,7 @@ export function registerSupportDiagnosticsBridge(options: {
       agentDirectorySource: options.agentDirectorySource
     });
     const supportDiagnostics = {
-      schema: "pi67-support-diagnostics.v4" as const,
+      schema: "pi67-support-diagnostics.v5" as const,
       generatedAt: Date.now(),
       application: {
         version: app.getVersion(),

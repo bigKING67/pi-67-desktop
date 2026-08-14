@@ -29,7 +29,6 @@ import { emptyAgentHostStopResult, rendererDocumentHandoffKey, resolveAgentHostS
   type AgentHostStopResult, type AgentHostSupervisorDiagnostics, type AgentHostSupervisorPhase
 } from "./agent-host-supervisor-contract.js";
 export type { AgentHostStopResult, AgentHostSupervisorDiagnostics, AgentHostSupervisorPhase } from "./agent-host-supervisor-contract.js";
-
 interface AgentHostIdentity {
   hostEpoch: number;
   hostInstanceId: string;
@@ -107,7 +106,8 @@ export class AgentHostSupervisor {
       ...(this.#lastStartup ? {
         lastStartup: {
           ...this.#lastStartup,
-          issues: this.#lastStartup.issues.map((issue) => ({ ...issue }))
+          issues: this.#lastStartup.issues.map((issue) => ({ ...issue })),
+          ...(this.#lastStartup.stageTimings === undefined ? {} : { stageTimings: this.#lastStartup.stageTimings.map((stage) => ({ ...stage })) })
         }
       } : {}),
       ...(this.#lastStartupFailure ? {
@@ -368,9 +368,9 @@ export class AgentHostSupervisor {
       this.#lastStartup = {
         at,
         hostEpoch: this.#identity!.hostEpoch,
-        profileMode: message.startup.profileMode,
-        status: message.startup.status,
-        issues: message.startup.issues.map((issue) => ({ ...issue }))
+        ...message.startup,
+        issues: message.startup.issues.map((issue) => ({ ...issue })),
+        ...(message.startup.stageTimings === undefined ? {} : { stageTimings: message.startup.stageTimings.map((stage) => ({ ...stage })) })
       };
       this.#startupBlocked = false;
       this.#hostReadyReceived = true;

@@ -16,6 +16,8 @@ export interface AgentHostRuntimeEnvironment {
   readonly promptAttachmentRoot: string;
   readonly packaged: boolean;
   readonly electronExecutable: string;
+  /** Main-owned native containment helper; never accepted from the parent shell. */
+  readonly windowsPackageWorkerJobController?: string;
 }
 
 export function agentHostEnvironment(
@@ -35,6 +37,10 @@ export function agentHostEnvironment(
   delete environment.TAVILY_BRIDGE_MCP_TOKEN;
   delete environment.PI67_TEAM_MCP_RESOURCES;
   delete environment.PI67_TEAM_MCP_TOKEN_PATH;
+  delete environment.PI67_WINDOWS_JOB_CONTROLLER;
+  for (const key of Object.keys(environment)) {
+    if (/^GIT_CONFIG_(?:COUNT|KEY_\d+|VALUE_\d+)$/u.test(key)) delete environment[key];
+  }
   if (!runtime) return environment;
   // Do not let Main and the Utility Process independently infer the Pi profile.
   // Packaged Windows launches can inherit a different shell environment, so the
@@ -45,6 +51,9 @@ export function agentHostEnvironment(
   environment.PI67_CAPABILITIES_ROOT = runtime.capabilitiesRoot;
   environment.PI67_PACKAGE_NETWORK_SETTINGS = runtime.packageNetworkSettingsPath;
   environment.PI67_PROMPT_ATTACHMENT_ROOT = runtime.promptAttachmentRoot;
+  if (runtime.windowsPackageWorkerJobController) {
+    environment.PI67_WINDOWS_JOB_CONTROLLER = resolve(runtime.windowsPackageWorkerJobController);
+  }
   environment.PI67_TOOLCHAIN_ROOT = runtime.toolchain.root;
   if (!runtime.toolchain.ready) return environment;
   const nodeExecutable = requireToolPath(runtime.toolchain.nodeExecutable, "Node");
@@ -64,9 +73,6 @@ export function agentHostEnvironment(
   environment.GIT_TERMINAL_PROMPT = "0";
   environment.GCM_INTERACTIVE = "never";
   environment.GIT_EXEC_PATH = gitExecPath;
-  environment.GIT_CONFIG_COUNT = "1";
-  environment.GIT_CONFIG_KEY_0 = "url.https://gitclone.com/github.com/.insteadOf";
-  environment.GIT_CONFIG_VALUE_0 = "https://github.com/";
   return environment;
 }
 

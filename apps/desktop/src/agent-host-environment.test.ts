@@ -47,7 +47,19 @@ describe("Agent Host environment", () => {
       "git",
       ...(process.platform === "win32" ? ["mingw64", "libexec", "git-core"] : ["libexec", "git-core"])
     );
-    const environment = agentHostEnvironment({ PATH: "/usr/bin" }, {
+    const windowsPackageWorkerJobController = join(
+      process.platform === "win32" ? "C:\\app" : "/app",
+      "resources",
+      "native",
+      "pi67-package-worker-job.exe"
+    );
+    const environment = agentHostEnvironment({
+      PATH: "/usr/bin",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "url.https://gitclone.com/github.com/.insteadOf",
+      GIT_CONFIG_VALUE_0: "https://github.com/",
+      PI67_WINDOWS_JOB_CONTROLLER: "/untrusted/job-controller"
+    }, {
       storageRoot: "/app/user-data",
       capabilityProbeDirectory: "/app/user-data",
       sessionCatalogDirectory: "/app/user-data/projections/session-catalog"
@@ -71,7 +83,8 @@ describe("Agent Host environment", () => {
       promptAttachmentRoot: "/app/user-data/transient/prompt-attachments/run-a",
       packageNetworkSettingsPath: "/app/user-data/package-manager/network-settings.json",
       packaged: true,
-      electronExecutable: "/app/Pi-67 Desktop"
+      electronExecutable: "/app/Pi-67 Desktop",
+      windowsPackageWorkerJobController
     });
 
     expect(environment).toMatchObject({
@@ -84,10 +97,13 @@ describe("Agent Host environment", () => {
       PI67_CAPABILITIES_ROOT: "/app/resources/capabilities",
       PI67_PROMPT_ATTACHMENT_ROOT: "/app/user-data/transient/prompt-attachments/run-a",
       PI67_PACKAGE_NETWORK_SETTINGS: "/app/user-data/package-manager/network-settings.json",
+      PI67_WINDOWS_JOB_CONTROLLER: windowsPackageWorkerJobController,
       npm_config_registry: "https://registry.npmmirror.com",
-      GIT_CONFIG_VALUE_0: "https://github.com/",
       GIT_EXEC_PATH: gitExecPath
     });
+    expect(environment).not.toHaveProperty("GIT_CONFIG_COUNT");
+    expect(environment).not.toHaveProperty("GIT_CONFIG_KEY_0");
+    expect(environment).not.toHaveProperty("GIT_CONFIG_VALUE_0");
     expect(environment.PATH?.split(delimiter).slice(0, 2)).toEqual([
       dirname(nodeExecutable),
       dirname(gitExecutable)

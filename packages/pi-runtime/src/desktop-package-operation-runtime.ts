@@ -1,7 +1,6 @@
 import {
   DefaultPackageManager,
-  SettingsManager,
-  type PackageSource
+  SettingsManager
 } from "@earendil-works/pi-coding-agent";
 import type {
   ExtensionPackageMutationResult,
@@ -12,7 +11,7 @@ import { ExtensionPackageManagement } from "./extension-package-management.js";
 
 export interface DesktopPackageOperationRuntime {
   applyNpmCommand(command: string[]): void;
-  configuredSources(): string[];
+  configuredPackages(): Array<{ source: string; installedPath?: string }>;
   checkForUpdates(): Promise<ExtensionPackageUpdatesResult>;
   install(source: string, scope: ExtensionPackageScope): Promise<ExtensionPackageMutationResult>;
   update(source: string, scope: ExtensionPackageScope): Promise<ExtensionPackageMutationResult>;
@@ -28,31 +27,28 @@ export function createDesktopPackageOperationRuntime(options: {
     projectTrusted: options.projectTrusted
   });
   settingsManager.setProjectTrusted(options.projectTrusted);
+  const packageManager = new DefaultPackageManager({
+    cwd: options.cwd,
+    agentDir: options.agentDir,
+    settingsManager
+  });
   const management = new ExtensionPackageManagement({
     settingsManager,
-    packageManager: new DefaultPackageManager({
-      cwd: options.cwd,
-      agentDir: options.agentDir,
-      settingsManager
-    })
+    packageManager
   });
   return {
     applyNpmCommand(command) {
       settingsManager.applyOverrides({ npmCommand: [...command] });
     },
-    configuredSources() {
-      return [
-        ...(settingsManager.getGlobalSettings().packages ?? []),
-        ...(settingsManager.getProjectSettings().packages ?? [])
-      ].map(packageSource);
+    configuredPackages() {
+      return packageManager.listConfiguredPackages().map(({ source, installedPath }) => ({
+        source,
+        ...(installedPath === undefined ? {} : { installedPath })
+      }));
     },
     checkForUpdates: () => management.checkForUpdates(),
     install: (source, scope) => management.install(source, scope),
     update: (source, scope) => management.update(source, scope),
     uninstall: (source, scope) => management.uninstall(source, scope)
   };
-}
-
-function packageSource(entry: PackageSource): string {
-  return typeof entry === "string" ? entry : entry.source;
 }

@@ -15,11 +15,11 @@ export function ContextPane() {
     <aside aria-label="任务检查器" className="context-pane" id="task-inspector">
       <Tabs selectedKey={selectedTab} onSelectionChange={(key) => setSelectedTab(String(key) as typeof selectedTab)}>
         <TabList aria-label="任务检查器" className="context-pane-tabs">
-          <Tab id="files"><Files size={14} />文件</Tab>
-          <Tab id="changes"><FilePenLine size={14} />修改</Tab>
-          <Tab id="messages"><MessagesSquare size={14} />消息</Tab>
-          <Tab id="agents"><Bot size={14} />代理</Tab>
-          <Tab id="context"><Gauge size={14} />上下文</Tab>
+          <Tab id="files"><Files aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>文件</span></Tab>
+          <Tab id="changes"><FilePenLine aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>修改</span></Tab>
+          <Tab id="messages"><MessagesSquare aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>消息</span></Tab>
+          <Tab id="agents"><Bot aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>代理</span></Tab>
+          <Tab id="context"><Gauge aria-hidden="true" className="context-pane-tab-icon" size={14} /><span>上下文</span></Tab>
         </TabList>
         <TabPanel id="files" className="context-panel inspector-files-panel">
           <FilesPanel />

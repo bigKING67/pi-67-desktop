@@ -35,6 +35,7 @@ const SessionTreeDialog = lazy(() => import("../session-tree/SessionTreeDialog.j
 const WorkspaceConversationSearchDialog = lazy(() => import("../search/WorkspaceConversationSearchDialog.js").then((module) => ({ default: module.WorkspaceConversationSearchDialog })));
 const WorkspaceContentSearchDialog = lazy(() => import("../search/WorkspaceContentSearchDialog.js").then((module) => ({ default: module.WorkspaceContentSearchDialog })));
 const KeyboardShortcutsDialog = lazy(() => import("../help/KeyboardShortcutsDialog.js").then((module) => ({ default: module.KeyboardShortcutsDialog })));
+const CONTEXT_DRAWER_MEDIA_QUERY = "(max-width: 1160px)";
 
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
@@ -155,7 +156,7 @@ export function App() {
 
   useEffect(() => {
     if (!workspace) return;
-    const breakpoint = window.matchMedia("(max-width: 1040px)");
+    const breakpoint = window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY);
     const closeWhenNarrow = (matches: boolean) => {
       if (matches) setContextVisible(false);
     };

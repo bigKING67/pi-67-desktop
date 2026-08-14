@@ -22,6 +22,37 @@ export const AgentHostStartupStageSchema = Type.Union([
 
 export type AgentHostStartupStage = Static<typeof AgentHostStartupStageSchema>;
 
+export const AgentHostStartupTimingStageSchema = Type.Union([
+  Type.Literal("profile-classification"),
+  Type.Literal("desktop-capabilities"),
+  Type.Literal("managed-packages"),
+  Type.Literal("retired-mcp-cleanup"),
+  Type.Literal("browser67-mcp"),
+  Type.Literal("server-construction")
+]);
+
+export type AgentHostStartupTimingStage = Static<typeof AgentHostStartupTimingStageSchema>;
+
+export const AgentHostStartupStageTimingSchema = strictObject({
+  stage: AgentHostStartupTimingStageSchema,
+  durationMs: Type.Integer({ minimum: 0, maximum: 10 * 60_000 }),
+  outcome: Type.Union([
+    Type.Literal("completed"),
+    Type.Literal("degraded"),
+    Type.Literal("failed"),
+    Type.Literal("skipped")
+  ])
+});
+
+export type AgentHostStartupStageTiming = Static<typeof AgentHostStartupStageTimingSchema>;
+
+export const CapabilityProjectionModeSchema = Type.Union([
+  Type.Literal("packaged-direct"),
+  Type.Literal("legacy-copy")
+]);
+
+export type CapabilityProjectionMode = Static<typeof CapabilityProjectionModeSchema>;
+
 export const AgentHostStartupIssueCodeSchema = Type.Union([
   Type.Literal("access-denied"),
   Type.Literal("conflict"),
@@ -44,7 +75,10 @@ export type AgentHostStartupIssue = Static<typeof AgentHostStartupIssueSchema>;
 export const AgentHostStartupStateSchema = strictObject({
   profileMode: AgentHostProfileModeSchema,
   status: Type.Union([Type.Literal("ready"), Type.Literal("degraded")]),
-  issues: Type.Array(AgentHostStartupIssueSchema, { maxItems: 8 })
+  issues: Type.Array(AgentHostStartupIssueSchema, { maxItems: 8 }),
+  totalDurationMs: Type.Optional(Type.Integer({ minimum: 0, maximum: 10 * 60_000 })),
+  stageTimings: Type.Optional(Type.Array(AgentHostStartupStageTimingSchema, { maxItems: 6 })),
+  capabilityProjectionMode: Type.Optional(CapabilityProjectionModeSchema)
 });
 
 export type AgentHostStartupState = Static<typeof AgentHostStartupStateSchema>;

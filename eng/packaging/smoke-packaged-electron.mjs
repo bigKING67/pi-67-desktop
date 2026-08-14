@@ -21,15 +21,13 @@ import {
   verifyPackagedPrivateGitWorktreeContract,
   verifyReadySessionCatalog
 } from "./packaged-electron-smoke-scenarios.mjs";
-import { verifyPackagedMainOnlyDiagnostics } from "./packaged-diagnostics-smoke.mjs";
+import { verifyPackagedMainOnlyDiagnostics, verifyPackagedReadyDiagnostics } from "./packaged-diagnostics-smoke.mjs";
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
 import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
+import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } from "./packaged-package-update-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
-import {
-  assertNoWorkspaceChangesAuthorityWarning,
-  verifyPackagedChangesInspector
-} from "./packaged-changes-inspector-smoke.mjs";
+import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
 const artifact = resolvePackagedArtifact();
 await assertPackagedRuntimeAssets(artifact);
 const packagedScreenshotDirectory = process.env.PI67_PACKAGED_SCREENSHOT_DIR?.trim() || undefined;
@@ -77,6 +75,7 @@ try {
     verifyMainOnlyDiagnostics: verifyPackagedMainOnlyDiagnostics
   });
   await captureWelcomeAndConnectAgentHost(window, capturePackagedScreenshot, packagedProcessOutput);
+  const startupDiagnostics = await verifyPackagedReadyDiagnostics({ agentDir, application, packagedCredential, userDataDirectory, window, workspace });
   await openPackagedSmokeWorkspace({ application, window, workspace });
   await verifyPackagedPrivateGitWorktreeContract(window);
   if (await window.getByText("无法打开工作区", { exact: true }).count()) {
@@ -195,6 +194,7 @@ try {
   const extensionList = extensionWorkspace.getByTestId("extension-package-list-scroll");
   const extensionDetail = extensionWorkspace.getByTestId("extension-package-detail-scroll");
   await extensionList.waitFor({ state: "visible", timeout: 30_000 });
+  await verifyPackagedExtensionUpdateCheck(extensionWorkspace, window);
   if (await extensionDetail.isVisible()) {
     throw new Error("Packaged resource detail must not share the Package Catalog surface.");
   }
@@ -271,6 +271,7 @@ try {
   const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
+  await verifyPackagedSkillUpdateCheck(skillSettingsWorkspace, window);
   if (await globalSkillPanel.getByText("pi67-smoke-extension", { exact: true }).count()) {
     throw new Error("Packaged global Skill view repeated an Extension-only Package.");
   }
@@ -446,7 +447,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, private toolchain + first-party capabilities, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

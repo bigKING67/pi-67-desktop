@@ -14,13 +14,19 @@ import { registerRendererWorkspaceWithHost } from "./workspace-host-registration
 import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
 import { rotateRendererTaskForSessionOpen } from "./task-runtime-reopen.js";
 
-export async function activateRendererTask(taskId: string): Promise<boolean> {
+const taskActivationFlights = new Map<string, Promise<boolean>>();
+
+export function activateRendererTask(taskId: string): Promise<boolean> {
+  return runTaskActivationFlight(taskId, () => activateRendererTaskOnce(taskId));
+}
+
+async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
   if (!task || !workspace || !workbench.selectTask(taskId)) return false;
   if (task.runtime.phase === "stopped" || task.lifecycle === "lost" || task.lifecycle === "stopped") {
-    return task.conversation.kind === "session" ? resumeRendererTask(task.id) : true;
+    return task.conversation.kind === "session" ? resumeRendererTaskOnce(task.id) : true;
   }
 
   const projection = useSessionProjectionStore.getState().authority;
@@ -74,7 +80,11 @@ export async function activateRendererTask(taskId: string): Promise<boolean> {
   }
 }
 
-export async function resumeRendererTask(taskId: string): Promise<boolean> {
+export function resumeRendererTask(taskId: string): Promise<boolean> {
+  return runTaskActivationFlight(taskId, () => resumeRendererTaskOnce(taskId));
+}
+
+async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
   const workspace = task ? workbench.workspaces[task.workspaceId] : undefined;
@@ -95,7 +105,8 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     trust: workspace.trust
   });
   try {
-    await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+    const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
+    if (!registered) throw new Error("目标工作区当前不可用。");
     const identity = await ensureAgentConnection();
     const sameHost = task.recoveryHostInstanceId === identity.hostInstanceId
       && task.recoveryHostEpoch === identity.hostEpoch;
@@ -126,6 +137,20 @@ export async function resumeRendererTask(taskId: string): Promise<boolean> {
     markTaskRecoveryFailed(task.id, error);
     return false;
   }
+}
+
+function runTaskActivationFlight(
+  taskId: string,
+  operation: () => Promise<boolean>
+): Promise<boolean> {
+  const existing = taskActivationFlights.get(taskId);
+  if (existing) return existing;
+  const flight = operation();
+  taskActivationFlights.set(taskId, flight);
+  void flight.finally(() => {
+    if (taskActivationFlights.get(taskId) === flight) taskActivationFlights.delete(taskId);
+  }).catch(() => undefined);
+  return flight;
 }
 
 async function reopenRendererTask(

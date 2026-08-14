@@ -28,7 +28,7 @@ export async function loadExtensionPackages(workspaceId?: string): Promise<boole
     store.installList(target.id, result.items);
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法读取 Pi 扩展包", error);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -45,14 +45,9 @@ export async function checkExtensionPackageUpdates(workspaceId?: string): Promis
       { context: workspaceContext(target.id) }
     );
     useExtensionPackageStore.getState().installUpdates(target.id, result.items);
-    publishNotification({
-      level: "info",
-      title: "扩展包更新检查完成",
-      message: result.total === 0 ? "当前没有可用更新。" : `发现 ${result.total} 个可用更新。`
-    });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "无法检查扩展包更新", error);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -81,7 +76,7 @@ export async function getExtensionPackageOnboarding(
     );
     return result.state;
   } catch (error) {
-    reportFailure(target.id, "无法读取扩展包安装建议", error);
+    reportFailure(target.id, error);
     return undefined;
   }
 }
@@ -103,7 +98,7 @@ export async function declineExtensionPackageOnboarding(
     );
     return result.state;
   } catch (error) {
-    reportFailure(target.id, "无法保存扩展包安装选择", error);
+    reportFailure(target.id, error);
     return undefined;
   }
 }
@@ -244,7 +239,7 @@ async function mutate<T extends MutationType>(
         });
     return true;
   } catch (error) {
-    return reportFailure(target.id, "扩展包操作失败", error);
+    return reportFailure(target.id, error);
   }
 }
 
@@ -353,10 +348,9 @@ function packageEntry(
   return items.find((entry) => entry.source === source && entry.scope === scope);
 }
 
-function reportFailure(workspaceId: string, title: string, error: unknown): false {
+function reportFailure(workspaceId: string, error: unknown): false {
   const message = error instanceof Error ? error.message : "未知错误";
   useExtensionPackageStore.getState().fail(workspaceId, message);
-  publishNotification({ level: "error", title, message });
   return false;
 }
 

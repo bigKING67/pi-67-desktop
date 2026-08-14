@@ -47,6 +47,9 @@ protocols:
 win:
   icon: eng/packaging/pi.ico
   executableName: Pi-67 Desktop
+  extraResources:
+    - from: artifacts/native/windows-x64/pi67-package-worker-job.exe
+      to: native/pi67-package-worker-job.exe
   target:
     - target: nsis
       arch:

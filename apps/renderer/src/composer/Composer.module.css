@@ -1002,12 +1002,6 @@
   }
 }
 
-@media (max-width: 1040px) {
-  .region {
-    z-index: 31;
-  }
-}
-
 @media (max-height: 760px) {
   .region {
     padding-top: var(--space-5);

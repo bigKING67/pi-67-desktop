@@ -2,10 +2,11 @@ import type {
   AgentHostProfileMode,
   AgentHostStartupIssue,
   AgentHostStartupIssueCode,
+  AgentHostStartupStageTiming,
   AgentHostStartupStage,
   AgentHostStartupState
 } from "@pi67/protocol";
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   bootstrapDesktopCapabilities,
@@ -24,6 +25,7 @@ import {
   type RetiredTeamMcpCleanupResult
 } from "./retired-team-mcp-cleanup.js";
 
+const LEGACY_CAPABILITY_CLEANUP_DELAY_MS = 2 * 60_000;
 const DESKTOP_CAPABILITY_STATE_SCHEMA = "pi67.desktop-capability-state.v1";
 const MAX_STATE_BYTES = 1_000_000;
 const MAX_STARTUP_ISSUES = 8;
@@ -79,26 +81,36 @@ export async function coordinateAgentHostStartup<T>(
   const environment = options.environment ?? process.env;
   const agentDir = resolve(options.agentDir);
   const issues: AgentHostStartupIssue[] = [];
+  const startupStartedAt = Date.now();
+  const stageTimings: AgentHostStartupStageTiming[] = [];
   clearCapabilityProjection(environment);
 
-  let profileMode: AgentHostProfileMode;
-  try {
-    profileMode = await (options.classifyProfile ?? classifyAgentHostProfile)(agentDir);
-  } catch (error) {
-    throw startupError("classify-profile", error);
-  }
+  const classified = await captureStage(
+    "profile-classification",
+    () => (options.classifyProfile ?? classifyAgentHostProfile)(agentDir)
+  );
+  stageTimings.push(stageTiming(classified, "failed"));
+  if (!classified.ok) throw startupError("classify-profile", classified.error);
+  const profileMode = classified.value;
   environment.PI67_AGENT_PROFILE_FRESH = profileMode === "fresh" ? "1" : "0";
 
   let capabilities: DesktopCapabilityBootstrapResult | undefined;
-  try {
-    capabilities = await (options.bootstrapCapabilities ?? bootstrapDesktopCapabilities)({
+  const capabilityStage = await captureStage("desktop-capabilities", () => (
+    options.bootstrapCapabilities ?? bootstrapDesktopCapabilities
+  )({
       agentDir,
       environment,
       profileOwnership: profileMode === "existing-shared" ? "shared" : "desktop"
-    });
-  } catch (error) {
-    if (profileMode === "fresh") throw startupError("desktop-capabilities", error, profileMode);
-    addIssue(issues, startupIssue("desktop-capabilities", error));
+    }));
+  if (capabilityStage.ok) {
+    capabilities = capabilityStage.value;
+    stageTimings.push(stageTiming(capabilityStage, "failed"));
+  } else {
+    stageTimings.push(stageTiming(capabilityStage, profileMode === "fresh" ? "failed" : "degraded"));
+    if (profileMode === "fresh") {
+      throw startupError("desktop-capabilities", capabilityStage.error, profileMode);
+    }
+    addIssue(issues, startupIssue("desktop-capabilities", capabilityStage.error));
     clearCapabilityProjection(environment);
   }
   if (
@@ -113,66 +125,96 @@ export async function coordinateAgentHostStartup<T>(
     );
   }
 
+  let managedPackages: ManagedPackageBundleResult | undefined;
   if (capabilities?.enabled) {
-    try {
-      const managedPackages = await (
+    const managedPackageStage = await captureStage("managed-packages", async () => {
+      const result = await (
         options.activateManagedPackages ?? activateDesktopManagedPackages
       )({ agentDir, environment });
-      if (
-        !managedPackages.enabled
-        && profileMode === "fresh"
-        && environment.PI67_PACKAGED === "1"
-      ) {
+      if (!result.enabled && profileMode === "fresh" && environment.PI67_PACKAGED === "1") {
         throw new AgentHostStartupError(
           { stage: "managed-packages", code: "missing-resource" },
           profileMode
         );
       }
-    } catch (error) {
+      return result;
+    });
+    if (managedPackageStage.ok) {
+      managedPackages = managedPackageStage.value;
+      stageTimings.push(stageTiming(managedPackageStage, "failed"));
+    } else {
+      stageTimings.push(stageTiming(
+        managedPackageStage,
+        profileMode === "fresh" ? "failed" : "degraded"
+      ));
       resetManagedPackageProjection(environment, capabilities);
-      if (error instanceof AgentHostStartupError) throw error;
-      if (profileMode === "fresh") throw startupError("managed-packages", error, profileMode);
-      addIssue(issues, startupIssue("managed-packages", error));
+      if (profileMode === "fresh") {
+        throw startupError("managed-packages", managedPackageStage.error, profileMode);
+      }
+      addIssue(issues, startupIssue("managed-packages", managedPackageStage.error));
     }
+  } else {
+    stageTimings.push(skippedStageTiming("managed-packages"));
   }
 
   if (profileMode !== "existing-shared") {
-    try {
-      const cleanup = await (options.cleanupRetiredMcp ?? removeRetiredTeamMcpConfig)({
+    const cleanupStage = await captureStage("retired-mcp-cleanup", () => (
+      options.cleanupRetiredMcp ?? removeRetiredTeamMcpConfig
+    )({
         agentDir,
         environment
-      });
+      }));
+    if (cleanupStage.ok) {
+      const cleanup = cleanupStage.value;
       const cleanupIssue = retiredCleanupIssue(cleanup);
       if (cleanupIssue) addIssue(issues, cleanupIssue);
-    } catch (error) {
-      addIssue(issues, startupIssue("retired-mcp-cleanup", error));
+      const timing = stageTiming(cleanupStage, "failed");
+      if (cleanupIssue) timing.outcome = "degraded";
+      stageTimings.push(timing);
+    } else {
+      stageTimings.push(stageTiming(cleanupStage, "degraded"));
+      addIssue(issues, startupIssue("retired-mcp-cleanup", cleanupStage.error));
     }
+  } else {
+    stageTimings.push(skippedStageTiming("retired-mcp-cleanup"));
   }
 
   if (capabilities?.enabled) {
-    try {
-      const browser67 = await (
+    const browserStage = await captureStage("browser67-mcp", () => (
         options.provisionBrowser67Mcp ?? provisionManagedBrowser67Mcp
-      )({ agentDir, environment });
-      for (const issue of managedBrowser67Issues(browser67)) addIssue(issues, issue);
-    } catch (error) {
-      if (profileMode === "fresh") throw startupError("browser67-mcp", error, profileMode);
-      addIssue(issues, startupIssue("browser67-mcp", error));
+      )({ agentDir, environment }));
+    if (browserStage.ok) {
+      const browser67 = browserStage.value;
+      const browserIssues = managedBrowser67Issues(browser67);
+      for (const issue of browserIssues) addIssue(issues, issue);
+      const timing = stageTiming(browserStage, "failed");
+      if (browserIssues.length > 0) timing.outcome = "degraded";
+      stageTimings.push(timing);
+    } else {
+      stageTimings.push(stageTiming(browserStage, profileMode === "fresh" ? "failed" : "degraded"));
+      if (profileMode === "fresh") throw startupError("browser67-mcp", browserStage.error, profileMode);
+      addIssue(issues, startupIssue("browser67-mcp", browserStage.error));
     }
+  } else {
+    stageTimings.push(skippedStageTiming("browser67-mcp"));
   }
 
-  let server: T;
-  try {
-    server = options.constructServer();
-  } catch (error) {
-    throw startupError("server-construction", error, profileMode);
-  }
+  const serverStage = captureSynchronousStage("server-construction", options.constructServer);
+  stageTimings.push(stageTiming(serverStage, "failed"));
+  if (!serverStage.ok) throw startupError("server-construction", serverStage.error, profileMode);
+  const server = serverStage.value;
+  scheduleLegacyCapabilityCleanup(agentDir, capabilities, managedPackages);
   return {
     server,
     startup: {
       profileMode,
       status: issues.length === 0 ? "ready" : "degraded",
-      issues
+      issues,
+      totalDurationMs: boundedDuration(Date.now() - startupStartedAt),
+      stageTimings,
+      ...(capabilities?.projectionMode === undefined
+        ? {}
+        : { capabilityProjectionMode: capabilities.projectionMode })
     }
   };
 }
@@ -298,6 +340,7 @@ function addIssue(issues: AgentHostStartupIssue[], issue: AgentHostStartupIssue)
 }
 
 function clearCapabilityProjection(environment: NodeJS.ProcessEnv): void {
+  delete environment.PI67_BUNDLED_CAPABILITIES_ROOT;
   delete environment.PI67_MANAGED_CAPABILITIES_ROOT;
   delete environment.PI67_CAPABILITY_PACKAGE_PATHS;
   delete environment.PI67_KNOWN_PACKAGE_BASELINES;
@@ -333,4 +376,84 @@ function isBoundedString(value: unknown, maxLength: number): value is string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type CapturedStage<T> = {
+  ok: true;
+  stage: AgentHostStartupStageTiming["stage"];
+  durationMs: number;
+  value: T;
+} | {
+  ok: false;
+  stage: AgentHostStartupStageTiming["stage"];
+  durationMs: number;
+  error: unknown;
+};
+
+async function captureStage<T>(
+  stage: AgentHostStartupStageTiming["stage"],
+  operation: () => Promise<T>
+): Promise<CapturedStage<T>> {
+  const startedAt = Date.now();
+  try {
+    const value = await operation();
+    return { ok: true, stage, durationMs: boundedDuration(Date.now() - startedAt), value };
+  } catch (error) {
+    return { ok: false, stage, durationMs: boundedDuration(Date.now() - startedAt), error };
+  }
+}
+
+function captureSynchronousStage<T>(
+  stage: AgentHostStartupStageTiming["stage"],
+  operation: () => T
+): CapturedStage<T> {
+  const startedAt = Date.now();
+  try {
+    const value = operation();
+    return { ok: true, stage, durationMs: boundedDuration(Date.now() - startedAt), value };
+  } catch (error) {
+    return { ok: false, stage, durationMs: boundedDuration(Date.now() - startedAt), error };
+  }
+}
+
+function stageTiming<T>(
+  stage: CapturedStage<T>,
+  failedOutcome: "degraded" | "failed"
+): AgentHostStartupStageTiming {
+  return {
+    stage: stage.stage,
+    durationMs: stage.durationMs,
+    outcome: stage.ok ? "completed" : failedOutcome
+  };
+}
+
+function skippedStageTiming(
+  stage: AgentHostStartupStageTiming["stage"]
+): AgentHostStartupStageTiming {
+  return { stage, durationMs: 0, outcome: "skipped" };
+}
+
+function boundedDuration(value: number): number {
+  return Math.min(10 * 60_000, Math.max(0, Math.round(value)));
+}
+
+function scheduleLegacyCapabilityCleanup(
+  agentDir: string,
+  capabilities: DesktopCapabilityBootstrapResult | undefined,
+  managedPackages: ManagedPackageBundleResult | undefined
+): void {
+  if (capabilities?.projectionMode !== "packaged-direct") return;
+  const paths = [join(agentDir, "desktop-capabilities", "packages")];
+  if (managedPackages?.projectionMode === "packaged-direct") {
+    const managedRoot = join(agentDir, "desktop-capabilities", "managed-packages");
+    paths.push(
+      join(managedRoot, "active"),
+      join(managedRoot, "previous"),
+      join(managedRoot, "staging")
+    );
+  }
+  const timer = setTimeout(() => {
+    void Promise.all(paths.map((path) => rm(path, { recursive: true, force: true }).catch(() => undefined)));
+  }, LEGACY_CAPABILITY_CLEANUP_DELAY_MS);
+  timer.unref?.();
 }

@@ -4,6 +4,7 @@ import { useNotificationStore } from "../notifications/notification-store.js";
 import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import {
   approveObservedExtensionPackage,
+  checkExtensionPackageUpdates,
   declineExtensionPackageOnboarding,
   getExtensionPackageOnboarding,
   installExtensionPackage,
@@ -54,6 +55,18 @@ describe("Extension package controller", () => {
       phase: "idle",
       items: [{ source: "npm:example" }]
     });
+  });
+
+  it("owns check failures inline without duplicating the same error as a toast", async () => {
+    vi.spyOn(agentConnectionController, "request").mockRejectedValue(new Error("Package Worker cleanup failed"));
+
+    await expect(checkExtensionPackageUpdates("workspace-a")).resolves.toBe(false);
+
+    expect(useExtensionPackageStore.getState()).toMatchObject({
+      phase: "failed",
+      error: "Package Worker cleanup failed"
+    });
+    expect(useNotificationStore.getState().items).toEqual([]);
   });
 
   it("blocks global mutation while any Workspace has a running task", async () => {

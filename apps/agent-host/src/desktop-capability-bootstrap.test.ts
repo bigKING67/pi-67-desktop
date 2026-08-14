@@ -109,6 +109,40 @@ describe("Desktop first-party capability bootstrap", () => {
     })).rejects.toThrow("integrity verification");
   });
 
+  it("projects packaged capabilities directly after bounded metadata validation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-capabilities-packaged-direct-"));
+    const capabilitiesRoot = join(root, "bundled");
+    const agentDir = join(root, "agent");
+    const packageRoot = join(capabilitiesRoot, "packages", "pi67-core");
+    await mkdir(join(packageRoot, "rules"), { recursive: true });
+    await writeFile(join(packageRoot, "package.json"), "{\"name\":\"@pi67/core\"}\n", "utf8");
+    await writeFile(join(packageRoot, "rules", "desktop.md"), "desktop rule\n", "utf8");
+    await writeFile(join(capabilitiesRoot, "manifest.json"), JSON.stringify({
+      schema: "pi67.desktop-capabilities.v1",
+      catalogVersion: "test.1",
+      packages: [{ id: "pi67-core", treeSha256: "0".repeat(64) }]
+    }), "utf8");
+    await writeFile(join(capabilitiesRoot, "catalog.json"), JSON.stringify({
+      schema: "pi67.capability-catalog.v1",
+      catalogVersion: "test.1",
+      entries: [{
+        id: "pi67-core",
+        displayName: "Pi-67 Core",
+        packagePath: "packages/pi67-core",
+        resourceTypes: ["skill", "rule"]
+      }],
+      recommendedExternal: []
+    }), "utf8");
+    const environment: NodeJS.ProcessEnv = { PI67_DESKTOP: "1", PI67_PACKAGED: "1" };
+
+    const result = await bootstrapDesktopCapabilities({ capabilitiesRoot, agentDir, environment });
+
+    expect(result).toMatchObject({ enabled: true, projectionMode: "packaged-direct" });
+    expect(result.packagePaths).toContain(packageRoot);
+    expect(environment.PI67_BUNDLED_CAPABILITIES_ROOT).toBe(capabilitiesRoot);
+    expect(environment.PI67_MANAGED_CAPABILITIES_ROOT).toBe(join(agentDir, "desktop-capabilities"));
+  });
+
   it("allows an unprepared development checkout but keeps packaged builds fail closed", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-capabilities-missing-"));
     await expect(bootstrapDesktopCapabilities({

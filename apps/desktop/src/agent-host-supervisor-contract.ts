@@ -29,12 +29,9 @@ export interface AgentHostSupervisorDiagnostics {
     recoverable: boolean;
     attempt?: number;
   };
-  lastStartup?: {
+  lastStartup?: AgentHostStartupState & {
     at: number;
     hostEpoch: number;
-    profileMode: AgentHostProfileMode;
-    status: AgentHostStartupState["status"];
-    issues: AgentHostStartupIssue[];
   };
   lastStartupFailure?: {
     at: number;

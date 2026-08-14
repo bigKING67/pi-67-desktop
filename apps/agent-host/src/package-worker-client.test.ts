@@ -6,6 +6,7 @@ import {
   PackageWorkerClient,
   createWorkerBackedExtensionPackageManagement,
   type PackageWorkerClientOptions,
+  type PackageWorkerProcessTreeController,
   type PackageWorkerProcessTreeTerminator,
   type PackageWorkerPort
 } from "./package-worker-client.js";
@@ -28,6 +29,25 @@ describe("Isolated Package Worker client", () => {
     await expect(client.run("check-updates", services)).rejects.toMatchObject({
       code: "TOOLCHAIN_MISSING",
       recoverable: false
+    });
+    await services.dispose();
+  });
+
+  it("preserves the worker start failure when spawn never produced a PID", async () => {
+    const services = createServices();
+    const child = new FakePackageWorker(undefined);
+    const client = new PackageWorkerClient({
+      environment: desktopEnvironment(),
+      spawnWorker: () => child.asChildProcess()
+    });
+
+    const operation = client.run("check-updates", services);
+    child.emit("error", new Error("spawn failed"));
+
+    await expect(operation).rejects.toMatchObject({
+      code: "INTERNAL",
+      message: "The isolated Pi package worker could not start: spawn failed",
+      recoverable: true
     });
     await services.dispose();
   });
@@ -81,14 +101,14 @@ describe("Isolated Package Worker client", () => {
       environment: desktopEnvironment({
         LANG: "zh_CN.UTF-8",
         LC_ALL: "zh_CN.UTF-8",
+        PI_OFFLINE: "1",
         LC_AUTH_TOKEN: "secret-locale-token",
         TAVILY_BRIDGE_MCP_TOKEN: "secret-mcp-token",
         PROVIDER_API_KEY: "secret-provider-key",
         npm_config_auth: "secret-npm-token"
       }),
       spawnWorker,
-      terminateProcessTree,
-      inspectProcessTree: async (worker) => fakeTreeAlive(worker)
+      terminateProcessTree
     });
 
     const result = client.run("check-updates", services);
@@ -112,7 +132,8 @@ describe("Isolated Package Worker client", () => {
       PI67_GIT_EXECUTABLE: "/private/toolchain/git/bin/git",
       PI67_GIT_EXEC_PATH: "/private/toolchain/git/libexec/git-core",
       LANG: "zh_CN.UTF-8",
-      LC_ALL: "zh_CN.UTF-8"
+      LC_ALL: "zh_CN.UTF-8",
+      PI_OFFLINE: "1"
     });
     expect(spawnOptions!.env).not.toHaveProperty("TAVILY_BRIDGE_MCP_TOKEN");
     expect(spawnOptions!.env).not.toHaveProperty("PROVIDER_API_KEY");
@@ -150,6 +171,69 @@ describe("Isolated Package Worker client", () => {
     await expect(result).resolves.toEqual({ items: [], total: 0 });
     expect(terminateProcessTree).toHaveBeenCalledOnce();
     expect(child.disconnect).toHaveBeenCalledOnce();
+    await services.dispose();
+  });
+
+  it("attaches process-tree ownership before delivering the package request", async () => {
+    const services = createServices();
+    const child = new FakePackageWorker(152);
+    let finishAttach!: () => void;
+    const attach = vi.fn(() => new Promise<void>((resolve) => { finishAttach = resolve; }));
+    const controller: PackageWorkerProcessTreeController = {
+      attach,
+      terminate: async () => {
+        child.exit(0);
+        return true;
+      },
+      inspect: async (worker) => fakeTreeAlive(worker),
+      dispose: async () => undefined
+    };
+    const client = new PackageWorkerClient({
+      environment: desktopEnvironment(),
+      platform: "win32",
+      spawnWorker: () => child.asChildProcess(),
+      createProcessTreeController: () => controller
+    });
+
+    const result = client.run("check-updates", services);
+    await vi.waitFor(() => expect(attach).toHaveBeenCalledOnce());
+    expect(child.sent).toHaveLength(0);
+    finishAttach();
+    const request = await child.request();
+    child.emit("message", {
+      type: "package-worker-response",
+      requestId: request.requestId,
+      ok: true,
+      result: { items: [], total: 0 }
+    });
+
+    await expect(result).resolves.toEqual({ items: [], total: 0 });
+    await services.dispose();
+  });
+
+  it("dispatches no package request when process-tree attachment fails", async () => {
+    const services = createServices();
+    const child = new FakePackageWorker(153);
+    const dispose = vi.fn(async () => undefined);
+    const controller: PackageWorkerProcessTreeController = {
+      attach: async () => { throw new Error("Job attachment failed"); },
+      terminate: async () => {
+        child.exit(70);
+        return true;
+      },
+      inspect: async () => false,
+      dispose
+    };
+    const client = new PackageWorkerClient({
+      environment: desktopEnvironment(),
+      platform: "win32",
+      spawnWorker: () => child.asChildProcess(),
+      createProcessTreeController: () => controller
+    });
+
+    await expect(client.run("check-updates", services)).rejects.toThrow("Job attachment failed");
+    expect(child.sent).toHaveLength(0);
+    expect(dispose).toHaveBeenCalledOnce();
     await services.dispose();
   });
 
@@ -305,7 +389,7 @@ describe("Isolated Package Worker client", () => {
 });
 
 class FakePackageWorker extends EventEmitter {
-  readonly pid: number;
+  readonly pid: number | undefined;
   exitCode: number | null = null;
   signalCode: NodeJS.Signals | null = null;
   connected = true;
@@ -319,7 +403,7 @@ class FakePackageWorker extends EventEmitter {
   });
   readonly #child: ChildProcess;
 
-  constructor(pid: number) {
+  constructor(pid: number | undefined) {
     super();
     this.pid = pid;
     this.#child = this as unknown as ChildProcess;

@@ -32,6 +32,20 @@ describe("managed browser67 MCP provision", () => {
     });
   });
 
+  it("resolves the exact packaged browser67 path from the dual-root capability projection", async () => {
+    const fixture = await createFixture(true);
+
+    await expect(provisionManagedBrowser67Mcp(fixture)).resolves.toMatchObject({ status: "created" });
+
+    const config = JSON.parse(await readFile(fixture.mcpPath, "utf8"));
+    expect(config.mcpServers.tmwd_browser.args).toEqual([
+      join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")
+    ]);
+    expect(config.mcpServers["js-reverse"].args).toEqual([
+      join(fixture.browser67Root, "src", "mcp", "js-reverse", "server.mjs")
+    ]);
+  });
+
   it("invalidates only managed browser67 cache entries and preserves unrelated servers", async () => {
     const fixture = await createFixture();
     const unrelated = cacheEntry("linear-tool");
@@ -206,10 +220,14 @@ function cacheEntry(toolName: string) {
   };
 }
 
-async function createFixture() {
+async function createFixture(packagedDirect = false) {
   const root = await mkdtemp(join(tmpdir(), "pi67-browser67-mcp-"));
   const agentDir = join(root, "agent");
-  const browser67Root = join(agentDir, "desktop-capabilities", "packages", "browser67");
+  const capabilitiesRoot = join(root, "capabilities");
+  const managedRoot = join(agentDir, "desktop-capabilities");
+  const browser67Root = packagedDirect
+    ? join(capabilitiesRoot, "packages", "browser67")
+    : join(managedRoot, "packages", "browser67");
   const nodeExecutable = join(root, "toolchain", "node");
   const mcpPath = join(agentDir, "mcp.json");
   const cachePath = join(agentDir, "mcp-cache.json");
@@ -234,6 +252,14 @@ async function createFixture() {
     nodeExecutable,
     mcpPath,
     cachePath,
-    environment: { PI67_DESKTOP: "1", PI67_NODE_EXECUTABLE: nodeExecutable }
+    environment: {
+      PI67_DESKTOP: "1",
+      PI67_NODE_EXECUTABLE: nodeExecutable,
+      ...(packagedDirect ? {
+        PI67_BUNDLED_CAPABILITIES_ROOT: capabilitiesRoot,
+        PI67_MANAGED_CAPABILITIES_ROOT: managedRoot,
+        PI67_CAPABILITY_PACKAGE_PATHS: JSON.stringify([browser67Root])
+      } : {})
+    }
   };
 }

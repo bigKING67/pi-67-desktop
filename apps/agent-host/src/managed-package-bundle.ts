@@ -6,41 +6,24 @@ import {
   mkdir,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   stat
 } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { safeAtomicReplaceFile } from "@pi67/pi-runtime";
+import {
+  isManagedPackageRelativePath,
+  MAX_MANAGED_PACKAGE_TREE_BYTES,
+  MAX_MANAGED_PACKAGE_TREE_FILES,
+  parseManagedPackageManifest,
+  type ManagedPackageEntry,
+  type ManagedPackageManifest
+} from "./managed-package-manifest.js";
 
-const MANIFEST_SCHEMA = "pi67.managed-npm-bundle.v1";
 const STATE_SCHEMA = "pi67.managed-package-state.v1";
 const MAX_METADATA_BYTES = 1_000_000;
-const MAX_TREE_FILES = 50_000;
-const MAX_TREE_BYTES = 768 * 1024 * 1024;
-
-interface ManagedPackageEntry {
-  id: string;
-  packageName: string;
-  source: string;
-  version: string;
-  packageIntegrity: string;
-  packagePath: string;
-  extensionPaths: string[];
-  defaultEnabled: true;
-}
-
-interface ManagedPackageManifest {
-  schema: typeof MANIFEST_SCHEMA;
-  catalogVersion: string;
-  platform: string;
-  architecture: string;
-  lockfileSha256: string;
-  treeSha256: string;
-  fileCount: number;
-  totalBytes: number;
-  packages: ManagedPackageEntry[];
-}
 
 interface ManagedPackageState {
   schema: typeof STATE_SCHEMA;
@@ -53,6 +36,7 @@ export interface ManagedPackageBundleResult {
   packagePaths: string[];
   extensionPaths: string[];
   activated: boolean;
+  projectionMode?: "packaged-direct" | "legacy-copy";
 }
 
 export async function activateDesktopManagedPackages(options: {
@@ -77,7 +61,40 @@ export async function activateDesktopManagedPackages(options: {
   const active = join(root, "active");
   const previous = join(root, "previous");
   const createToken = options.createToken ?? randomUUID;
-  const bundledManifest = await verifyManagedPackageTree(bundled, platform, architecture);
+  const packagedDirect = environment.PI67_PACKAGED === "1";
+  const bundledManifest = packagedDirect
+    ? await verifyPackagedManagedPackageMetadata(bundled, platform, architecture)
+    : await verifyManagedPackageTree(bundled, platform, architecture);
+  if (packagedDirect) {
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    const state = await readOrCreateState(root, bundledManifest.packages, createToken);
+    const packagePaths: string[] = [];
+    const extensionPaths: string[] = [];
+    for (const entry of bundledManifest.packages) {
+      if (state.enabled[entry.id] !== true) continue;
+      const packagePath = containedPath(bundled, entry.packagePath, "Managed package path");
+      packagePaths.push(packagePath);
+      for (const extensionPath of entry.extensionPaths) {
+        extensionPaths.push(containedPath(packagePath, extensionPath, "Managed extension path"));
+      }
+    }
+    const existing = parsePackagePathEnvironment(environment.PI67_CAPABILITY_PACKAGE_PATHS, [
+      managedCapabilitiesRoot,
+      resolve(capabilitiesRoot)
+    ]);
+    environment.PI67_MANAGED_NPM_ROOT = bundled;
+    environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([...new Set([...existing, ...packagePaths])]);
+    environment.PI67_MANAGED_EXTENSION_PATHS = JSON.stringify(extensionPaths);
+    if (platform !== "win32") await chmod(root, 0o700);
+    return {
+      enabled: true,
+      activeRoot: bundled,
+      packagePaths,
+      extensionPaths,
+      activated: false,
+      projectionMode: "packaged-direct"
+    };
+  }
   let activated = false;
   let activeManifest = await verifyManagedPackageTreeIfPresent(active, platform, architecture);
   if (
@@ -138,12 +155,65 @@ export async function activateDesktopManagedPackages(options: {
       extensionPaths.push(resolvedExtension);
     }
   }
-  const existing = parsePackagePathEnvironment(environment.PI67_CAPABILITY_PACKAGE_PATHS, managedCapabilitiesRoot);
+  const existing = parsePackagePathEnvironment(environment.PI67_CAPABILITY_PACKAGE_PATHS, [managedCapabilitiesRoot]);
   environment.PI67_MANAGED_NPM_ROOT = active;
   environment.PI67_CAPABILITY_PACKAGE_PATHS = JSON.stringify([...new Set([...existing, ...packagePaths])]);
   environment.PI67_MANAGED_EXTENSION_PATHS = JSON.stringify(extensionPaths);
   if (platform !== "win32") await chmod(root, 0o700);
-  return { enabled: true, activeRoot: active, packagePaths, extensionPaths, activated };
+  return {
+    enabled: true,
+    activeRoot: active,
+    packagePaths,
+    extensionPaths,
+    activated,
+    projectionMode: "legacy-copy"
+  };
+}
+
+async function verifyPackagedManagedPackageMetadata(
+  root: string,
+  platform: NodeJS.Platform,
+  architecture: string
+): Promise<ManagedPackageManifest> {
+  const [rootMetadata, canonicalRoot] = await Promise.all([lstat(root), realpath(root)]);
+  if (rootMetadata.isSymbolicLink() || !rootMetadata.isDirectory()) {
+    throw new Error("Managed package bundle root is invalid.");
+  }
+  const manifest = parseManagedPackageManifest(await readBoundedJson(join(root, "manifest.json")));
+  if (manifest.platform !== platform || manifest.architecture !== architecture) {
+    throw new Error("Managed package bundle does not match the current platform.");
+  }
+  const lockPath = join(root, "package-lock.json");
+  const lockMetadata = await lstat(lockPath);
+  if (
+    lockMetadata.isSymbolicLink()
+    || !lockMetadata.isFile()
+    || lockMetadata.size > MAX_METADATA_BYTES
+    || sha256(await readFile(lockPath)) !== manifest.lockfileSha256
+  ) throw new Error("Managed package bundle metadata failed integrity verification.");
+  for (const entry of manifest.packages) {
+    const packageRoot = containedPath(root, entry.packagePath, "Managed package path");
+    const [packageMetadata, canonicalPackage] = await Promise.all([lstat(packageRoot), realpath(packageRoot)]);
+    if (
+      packageMetadata.isSymbolicLink()
+      || !packageMetadata.isDirectory()
+      || !isSameOrContained(canonicalPackage, canonicalRoot)
+    ) throw new Error(`Managed package root is invalid: ${entry.id}`);
+    const packageManifest = await lstat(join(packageRoot, "package.json"));
+    if (packageManifest.isSymbolicLink() || !packageManifest.isFile() || packageManifest.size > MAX_METADATA_BYTES) {
+      throw new Error(`Managed package metadata is invalid: ${entry.id}`);
+    }
+    for (const extensionPath of entry.extensionPaths) {
+      const extension = containedPath(packageRoot, extensionPath, "Managed extension path");
+      const [extensionMetadata, canonicalExtension] = await Promise.all([lstat(extension), realpath(extension)]);
+      if (
+        extensionMetadata.isSymbolicLink()
+        || !extensionMetadata.isFile()
+        || !isSameOrContained(canonicalExtension, canonicalPackage)
+      ) throw new Error(`Managed extension is unavailable: ${entry.id}`);
+    }
+  }
+  return manifest;
 }
 
 export async function managedPackageTreeSha256(root: string): Promise<{
@@ -169,7 +239,10 @@ export async function managedPackageTreeSha256(root: string): Promise<{
         const bytes = await readFile(path);
         fileCount += 1;
         totalBytes += bytes.byteLength;
-        if (fileCount > MAX_TREE_FILES || totalBytes > MAX_TREE_BYTES) {
+        if (
+          fileCount > MAX_MANAGED_PACKAGE_TREE_FILES
+          || totalBytes > MAX_MANAGED_PACKAGE_TREE_BYTES
+        ) {
           throw new Error("Managed package tree exceeds its integrity bounds.");
         }
         hash.update(`f\0${relativePath}\0`);
@@ -214,69 +287,6 @@ async function verifyManagedPackageTreeIfPresent(
     if (isNodeError(error, "ENOENT")) return undefined;
     return undefined;
   }
-}
-
-function parseManagedPackageManifest(value: unknown): ManagedPackageManifest {
-  if (
-    !isRecord(value)
-    || value.schema !== MANIFEST_SCHEMA
-    || !isVersion(value.catalogVersion)
-    || typeof value.platform !== "string"
-    || typeof value.architecture !== "string"
-    || !isSha256(value.lockfileSha256)
-    || !isSha256(value.treeSha256)
-    || !Number.isSafeInteger(value.fileCount)
-    || (value.fileCount as number) < 1
-    || (value.fileCount as number) > MAX_TREE_FILES
-    || !Number.isSafeInteger(value.totalBytes)
-    || (value.totalBytes as number) < 1
-    || (value.totalBytes as number) > MAX_TREE_BYTES
-    || !Array.isArray(value.packages)
-    || value.packages.length === 0
-    || value.packages.length > 16
-  ) throw new Error("Managed package manifest is invalid.");
-  const packages = value.packages.map(parseManagedPackageEntry);
-  if (new Set(packages.map((entry) => entry.id)).size !== packages.length) {
-    throw new Error("Managed package manifest contains duplicate entries.");
-  }
-  return {
-    schema: MANIFEST_SCHEMA,
-    catalogVersion: value.catalogVersion,
-    platform: value.platform,
-    architecture: value.architecture,
-    lockfileSha256: value.lockfileSha256,
-    treeSha256: value.treeSha256,
-    fileCount: value.fileCount as number,
-    totalBytes: value.totalBytes as number,
-    packages
-  };
-}
-
-function parseManagedPackageEntry(value: unknown): ManagedPackageEntry {
-  if (
-    !isRecord(value)
-    || !isId(value.id)
-    || value.packageName !== value.id
-    || value.source !== `npm:${value.packageName}`
-    || !isVersion(value.version)
-    || typeof value.packageIntegrity !== "string"
-    || !value.packageIntegrity.startsWith("sha512-")
-    || !isContainedRelativePath(value.packagePath)
-    || !Array.isArray(value.extensionPaths)
-    || value.extensionPaths.length === 0
-    || value.extensionPaths.some((path) => !isContainedRelativePath(path))
-    || value.defaultEnabled !== true
-  ) throw new Error("Managed package manifest entry is invalid.");
-  return {
-    id: value.id,
-    packageName: value.packageName,
-    source: value.source,
-    version: value.version,
-    packageIntegrity: value.packageIntegrity,
-    packagePath: value.packagePath,
-    extensionPaths: [...value.extensionPaths] as string[],
-    defaultEnabled: true
-  };
 }
 
 async function readOrCreateState(
@@ -328,7 +338,7 @@ async function copyDirectory(source: string, destination: string, sourceRoot: st
   }
 }
 
-function parsePackagePathEnvironment(value: string | undefined, root: string): string[] {
+function parsePackagePathEnvironment(value: string | undefined, roots: string[]): string[] {
   if (!value) return [];
   let parsed: unknown;
   try {
@@ -339,7 +349,9 @@ function parsePackagePathEnvironment(value: string | undefined, root: string): s
   if (
     !Array.isArray(parsed)
     || parsed.length > 32
-    || parsed.some((path) => typeof path !== "string" || !isSameOrContained(path, root))
+    || parsed.some((path) => (
+      typeof path !== "string" || !roots.some((root) => isSameOrContained(path, root))
+    ))
   ) throw new Error("Managed capability package paths escaped their verified root.");
   return parsed as string[];
 }
@@ -353,7 +365,7 @@ async function readBoundedJson(path: string): Promise<unknown> {
 }
 
 function containedPath(root: string, path: string, label: string): string {
-  if (!isContainedRelativePath(path)) throw new Error(`${label} is invalid.`);
+  if (!isManagedPackageRelativePath(path)) throw new Error(`${label} is invalid.`);
   const candidate = resolve(root, path);
   if (!isContained(candidate, root)) throw new Error(`${label} escaped its verified root.`);
   return candidate;
@@ -369,33 +381,12 @@ function isSameOrContained(candidate: string, root: string): boolean {
   return resolve(candidate) === resolve(root) || isContained(candidate, root);
 }
 
-function isContainedRelativePath(value: unknown): value is string {
-  return typeof value === "string"
-    && value.length > 0
-    && value.length <= 1_024
-    && !value.includes("\0")
-    && !isAbsolute(value)
-    && !value.split(/[\\/]/u).includes("..");
-}
-
 function isBooleanRecord(value: unknown): value is Record<string, boolean> {
   return isRecord(value) && Object.values(value).every((item) => typeof item === "boolean");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isId(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,79}$/u.test(value);
-}
-
-function isVersion(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 100 && !value.includes("\0");
-}
-
-function isSha256(value: unknown): value is string {
-  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
 }
 
 function sha256(bytes: Uint8Array): string {

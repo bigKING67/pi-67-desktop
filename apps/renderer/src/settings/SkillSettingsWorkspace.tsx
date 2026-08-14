@@ -50,8 +50,16 @@ type GlobalSkillSelection =
 
 export function SkillSettingsWorkspace() {
   const capability = useDesktopCapabilitySnapshot();
+  const checkedAt = useSkillPackStore((state) => state.checkedAt);
+  const packagePhase = useSkillPackStore((state) => state.phase);
   return (
-    <Tabs className={styles.workspace!} defaultSelectedKey="global" data-testid="skill-settings-workspace">
+    <Tabs
+      className={styles.workspace!}
+      data-package-update-check={packagePhase}
+      data-package-update-checked-at={checkedAt}
+      defaultSelectedKey="global"
+      data-testid="skill-settings-workspace"
+    >
       <TabList aria-label="技能可用范围" className={styles.tabList!}>
         <Tab className={styles.tab!} id="global">
           <Globe2 aria-hidden="true" size={15} />全局可用

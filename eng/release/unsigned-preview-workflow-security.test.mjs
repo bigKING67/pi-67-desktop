@@ -29,6 +29,20 @@ describe("unsigned preview candidate and promotion workflow security", () => {
     expect(source).toContain("windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}");
   });
 
+  it("requires an exact previous candidate before certifying a Windows upgrade", async () => {
+    const source = await readFile(candidateUrl, "utf8");
+    const inputs = source.slice(source.indexOf("    inputs:"), source.indexOf("concurrency:"));
+    const certification = source.slice(source.indexOf("  certify-installer:"));
+
+    for (const input of ["baseline_run_id", "baseline_run_attempt", "baseline_source_sha"]) {
+      expect(inputs).toMatch(new RegExp(`${input}:[\\s\\S]*?required: true`, "u"));
+    }
+    expect(source).toContain("actions: read");
+    expect(certification).toContain("Download exact previous-version candidate");
+    expect(certification).toContain("Verify exact previous-version upgrade baseline");
+    expect(certification).toContain("PI67_WINDOWS_BASELINE_INSTALLER=");
+  });
+
   it("preserves bounded installer lifecycle diagnostics when candidate certification fails", async () => {
     const source = await readFile(candidateUrl, "utf8");
     const diagnosticUpload = source.slice(
