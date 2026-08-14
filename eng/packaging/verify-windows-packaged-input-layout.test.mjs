@@ -7,13 +7,15 @@ import {
   viewportWidthMatches,
   waitForWindowsSyntheticRuntimeReady,
   WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS,
-  WINDOWS_SYNTHETIC_SCALE_FACTORS
+  WINDOWS_SYNTHETIC_SCALE_FACTORS,
+  WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS
 } from "./verify-windows-packaged-input-layout.mjs";
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
     expect(WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS).toBe(60_000);
+    expect(WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS).toBe(5_000);
   });
 
   it("waits for either a ready or explicit failed runtime phase", async () => {

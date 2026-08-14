@@ -5,13 +5,15 @@ import { release, tmpdir, version } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  assertSingleShutdownQuitLifecycle,
   isProcessAlive,
   readPositiveProcessId,
-  waitForProcessExit,
   writeControlledShutdownExtension
 } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
+import {
+  measureElectronApplicationShutdown,
+  productShutdownWithinBudget
+} from "./electron-shutdown-measurement.mjs";
 import {
   assertPackagedRuntimeAssets,
   cleanupPackagedTestDirectories,
@@ -37,6 +39,7 @@ export {
 
 export const WINDOWS_SYNTHETIC_SCALE_FACTORS = [1.25, 1.5, 2];
 export const WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS = 60_000;
+export const WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS = 5_000;
 
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-packaged-ui");
 const summaryPath = join(outputDirectory, "summary.json");
@@ -137,6 +140,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     const utilityPids = await application.evaluate(({ app }) => app.getAppMetrics()
       .filter((metric) => metric.type === "Utility")
       .map((metric) => metric.pid));
+    const mainPid = application.process().pid;
 
     const { contextViewport, navigationViewport } = await verifyPackagedResponsiveLayout(
       window,
@@ -147,14 +151,28 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
     const screenshotPath = join(outputDirectory, `scale-${scaleLabel}.png`);
     await window.screenshot({ animations: "disabled", path: screenshotPath });
 
-    await application.close();
+    // Packaged smoke owns session_shutdown(reason=quit); this UI gate repeats the
+    // independent no-leaked-process boundary for its responsive/IME scenario.
+    const shutdownMeasurement = await measureElectronApplicationShutdown({
+      application,
+      budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
+      childPid,
+      mainPid,
+      utilityPids
+    });
     application = undefined;
-    await waitForProcessExit(childPid);
-    for (const pid of utilityPids) await waitForProcessExit(pid);
-    await assertSingleShutdownQuitLifecycle(
-      lifecyclePath,
-      `Scale ${scaleFactor}: controlled Runtime`
-    );
+    const shutdown = {
+      budgetMs: WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS,
+      driverCloseDurationMs: round(shutdownMeasurement.driverCloseDurationMs),
+      processes: shutdownMeasurement.processes,
+      productExitDurationMs: round(shutdownMeasurement.productExitDurationMs)
+    };
+    if (!productShutdownWithinBudget(shutdownMeasurement, WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS)) {
+      throw new Error(
+        `Scale ${scaleFactor}: packaged process shutdown exceeded ${WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS}ms. `
+        + `Diagnostics: ${JSON.stringify(shutdown)}`
+      );
+    }
 
     return {
       composition,
@@ -162,6 +180,7 @@ async function verifyScaleScenario(artifact, scaleFactor, agentDirectory) {
       navigationViewport,
       requestedScaleFactor: scaleFactor,
       runtime,
+      shutdown,
       screenshot: {
         path: relative(repositoryRoot, screenshotPath),
         sha256: await hashFile(screenshotPath)
@@ -414,6 +433,10 @@ function hashFile(path) {
     stream.once("error", reject);
     stream.once("end", () => resolvePromise(hash.digest("hex")));
   });
+}
+
+function round(value) {
+  return value === null || value === undefined ? null : Math.round(value * 10) / 10;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
