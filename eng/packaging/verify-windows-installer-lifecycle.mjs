@@ -300,6 +300,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         activeControlledOperation: Boolean(baseline),
         agentDir,
         artifact: finalInstalledArtifact,
+        childPidPath,
         expectedTheme: "light",
         legacyUserInterface: resolveInstalledUserInterfaceContract(packageJson.version).legacyUserInterface,
         lifecyclePath,

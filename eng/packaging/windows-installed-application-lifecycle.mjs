@@ -54,6 +54,10 @@ export async function launchInstalledApplication({
   userDataDirectory,
   workspace
 }) {
+  if (activeControlledOperation && (typeof childPidPath !== "string" || childPidPath.length === 0)) {
+    throw new Error("Installed controlled operation requires a child PID path.");
+  }
+
   let application;
   let childPid;
   let restoredActivation;

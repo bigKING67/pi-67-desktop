@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   activateRestoredWorkspace,
   INSTALLED_RUNTIME_READINESS_TIMEOUT_MS,
+  launchInstalledApplication,
   resolveInstalledUserInterfaceContract,
   selectLightThemePreference,
   waitForInstalledStartupSurface,
@@ -10,6 +11,12 @@ import {
 } from "./windows-installed-application-lifecycle.mjs";
 
 describe("Windows installed application lifecycle", () => {
+  it("fails before launch when a controlled operation has no child PID path", async () => {
+    await expect(launchInstalledApplication({ activeControlledOperation: true })).rejects.toThrow(
+      "Installed controlled operation requires a child PID path."
+    );
+  });
+
   it("selects the installed UI contract by the version being launched", () => {
     expect(WINDOWS_SETTINGS_WORKBENCH_VERSION).toBe("0.1.0-alpha.8");
     expect(resolveInstalledUserInterfaceContract("0.1.0-alpha.7")).toEqual({

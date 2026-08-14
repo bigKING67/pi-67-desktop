@@ -200,6 +200,21 @@ describe("Windows installer lifecycle contract", () => {
     expect(childObserved).toBeGreaterThan(projectionReady);
   });
 
+  it("passes the controlled child PID path to the post-upgrade launch", async () => {
+    const source = await readFile(
+      join(repositoryRoot, "eng/packaging/verify-windows-installer-lifecycle.mjs"),
+      "utf8"
+    );
+    const secondLaunchStart = source.indexOf("const secondLaunch = await launchInstalledApplication({");
+    const secondLaunchEnd = source.indexOf("assertRuntimeVersion(secondLaunch", secondLaunchStart);
+    const secondLaunch = source.slice(secondLaunchStart, secondLaunchEnd);
+
+    expect(secondLaunchStart).toBeGreaterThan(-1);
+    expect(secondLaunchEnd).toBeGreaterThan(secondLaunchStart);
+    expect(secondLaunch).toContain("activeControlledOperation: Boolean(baseline)");
+    expect(secondLaunch).toContain("childPidPath,");
+  });
+
   it("summarizes controlled shutdown lifecycle entries without exposing raw contents", async () => {
     const root = await createTemporaryDirectory();
     const lifecyclePath = join(root, "controlled-lifecycle.txt");
