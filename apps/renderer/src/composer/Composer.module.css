@@ -4,7 +4,9 @@
   grid-area: composer;
   padding: var(--space-6) 20px var(--space-4);
   background: linear-gradient(180deg, transparent, var(--surface) 16%);
-  contain: layout style;
+  container-name: composer;
+  container-type: inline-size;
+  contain: layout style inline-size;
 }
 
 .shell {
@@ -264,19 +266,22 @@
 
 .tools {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   gap: 6px;
 }
 
 .actions {
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 1 1 0;
+  justify-content: flex-end;
   gap: 7px;
   margin-left: auto;
 }
 
 .runtimeControls {
   min-width: 0;
+  max-width: 303px;
+  flex: 1 1 176px;
   align-items: flex-start;
   gap: 5px;
 }
@@ -284,7 +289,20 @@
 .modelRuntimeControl {
   display: grid;
   min-width: 0;
+  max-width: 170px;
+  flex: 1 1 88px;
   gap: 3px;
+}
+
+.modelRuntimeControl > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.runtimeControls > :last-child {
+  min-width: 0;
+  max-width: 128px;
+  flex: 1 1 68px;
 }
 
 .runtimeField {
@@ -310,11 +328,11 @@
 }
 
 .runtimeSelectButton[data-runtime-select="model"] {
-  width: min(170px, 22vw);
+  width: 100%;
 }
 
 .runtimeSelectButton[data-runtime-select="thinking"] {
-  max-width: min(128px, 18vw);
+  width: 100%;
 }
 
 .runtimeSelectButton[data-hovered] {
@@ -968,7 +986,7 @@
   font-family: var(--font-code);
 }
 
-@media (max-width: 900px) {
+@container composer (max-width: 620px) {
   .toolbar {
     align-items: stretch;
     flex-direction: column;

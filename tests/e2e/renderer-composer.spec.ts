@@ -101,6 +101,12 @@ test("shows the accepted user message without waiting for the first Pi token", a
   await expect(composerRegion.getByRole("button", { name: "发送", exact: true })).toBeVisible();
   const activeGeometry = await composerToolbarGeometry(page);
   expect(activeGeometry.toolbarRows).toBe(1);
+  expect(activeGeometry.toolbarScrollWidth).toBeLessThanOrEqual(activeGeometry.toolbarClientWidth);
+  expect(activeGeometry.toolsScrollWidth).toBeLessThanOrEqual(activeGeometry.toolsClientWidth);
+  expect(activeGeometry.actionsScrollWidth).toBeLessThanOrEqual(activeGeometry.actionsClientWidth);
+  expect(activeGeometry.streamModeTopmost).toBe("control");
+  expect(activeGeometry.sendTopmost).toBe("control");
+  expect(activeGeometry.stopTopmost).toBe("control");
   expect(activeGeometry.stopRight).toBeGreaterThan(activeGeometry.sendRight);
   expect(activeGeometry.toolbarHeight).toBeLessThanOrEqual(idleGeometry.toolbarHeight + 2);
   await streamMode.click();
