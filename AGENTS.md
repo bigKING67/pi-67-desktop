@@ -56,6 +56,17 @@
   clean up its temporary branch after reachability verification, and confirm
   that only the canonical root checkout remains.
 
+## Execution plans
+
+- Use `PLANS.md` for L2 work that spans modules, sessions, migrations, recovery,
+  or candidate/release checkpoints. Do not create a plan artifact for routine L0
+  or L1 work.
+- Execution plans are temporary coordination and evidence artifacts, not a second
+  product, architecture, runtime, session, or release source of truth.
+- Trellis is not part of the current solo-developer workflow. Reconsider it only
+  when sustained multi-owner work requires dependency, ownership, and priority
+  state that Git, `PLANS.md`, and handoffs cannot represent reliably.
+
 ## Security and privacy
 
 - Never log or persist API keys, OAuth tokens, cookies, credential payloads,
