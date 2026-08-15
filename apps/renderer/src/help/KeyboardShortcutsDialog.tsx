@@ -8,12 +8,12 @@ import {
   useDesktopShortcutRevision
 } from "../app/desktop-shortcut-preferences.js";
 import { useShellStore } from "../shell/shell-store.js";
+import { closeKeyboardShortcutsDialog } from "./keyboard-shortcuts-dialog-controller.js";
 import styles from "./KeyboardShortcutsDialog.module.css";
 
 export function KeyboardShortcutsDialog() {
   useDesktopShortcutRevision();
   const open = useShellStore((state) => state.keyboardShortcutsDialogOpen);
-  const setOpen = useShellStore((state) => state.setKeyboardShortcutsDialogOpen);
   if (!open) return null;
 
   return (
@@ -21,7 +21,9 @@ export function KeyboardShortcutsDialog() {
       className={`modal-overlay ${styles.overlay}`}
       isDismissable
       isOpen
-      onOpenChange={setOpen}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) closeKeyboardShortcutsDialog();
+      }}
     >
       <Modal className={`modal-surface ${styles.modal}`}>
         <Dialog aria-label="键盘快捷键" className={styles.dialog!}>
@@ -31,7 +33,7 @@ export function KeyboardShortcutsDialog() {
               <Heading slot="title">键盘快捷键</Heading>
               <p>Windows 使用 Ctrl，macOS 使用 Command。</p>
             </span>
-            <Button aria-label="关闭键盘快捷键" className={styles.close!} onPress={() => setOpen(false)}>
+            <Button aria-label="关闭键盘快捷键" className={styles.close!} onPress={closeKeyboardShortcutsDialog}>
               <X aria-hidden="true" size={16} />
             </Button>
           </header>

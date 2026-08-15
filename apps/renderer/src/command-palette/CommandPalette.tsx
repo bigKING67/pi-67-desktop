@@ -6,6 +6,7 @@ import { requestConversationFind } from "../search/conversation-find-events.js";
 import { runRuntimeDoctor, saveRuntimeDiagnostics } from "../doctor/runtime-diagnostics-controller.js";
 import { isImeConfirmationKey } from "../input/ime-keyboard.js";
 import { messages } from "../localization/message-catalog.js";
+import { openKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { invokeRuntimeCommand } from "../operation/operation-controller.js";
 import { executePiDesktopAction } from "../pi-actions/pi-desktop-actions.js";
@@ -127,7 +128,7 @@ export function CommandPalette() {
       "find-current-conversation": () => requestConversationFind("current"),
       "find-workspace-conversations": () => requestConversationFind("workspace"),
       "find-workspace-content": () => useShellStore.getState().setWorkspaceContentSearchDialogOpen(true),
-      "keyboard-shortcuts": () => useShellStore.getState().setKeyboardShortcutsDialogOpen(true)
+      "keyboard-shortcuts": () => openKeyboardShortcutsDialog()
     }
     }),
     ...messageSearch.items.map((item): PaletteAction => ({

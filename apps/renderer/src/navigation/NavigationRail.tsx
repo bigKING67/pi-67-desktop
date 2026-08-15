@@ -11,6 +11,7 @@ import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-compone
 import piIconUrl from "../assets/pi-icon-64.png";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
+import { openKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { useUpdateStore } from "../updates/update-store.js";
@@ -125,7 +126,6 @@ export function NavigationRail({
 
 function HelpMenu() {
   const setUpdateDialogOpen = useShellStore((state) => state.setUpdateDialogOpen);
-  const setKeyboardShortcutsDialogOpen = useShellStore((state) => state.setKeyboardShortcutsDialogOpen);
   const update = useUpdateStore((state) => state.update);
   const updateAvailable = update.phase === "available";
   const updateLabel = updateAvailable ? `发现新版本 ${update.version}` : "检查更新";
@@ -157,7 +157,7 @@ function HelpMenu() {
           </MenuItem>
           <MenuItem
             className={styles.menuItem!}
-            onAction={() => setKeyboardShortcutsDialogOpen(true)}
+            onAction={() => openKeyboardShortcutsDialog()}
             textValue="键盘快捷键"
           ><Info aria-hidden="true" size={14} />键盘快捷键</MenuItem>
           <MenuItem

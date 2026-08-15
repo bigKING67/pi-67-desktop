@@ -10,6 +10,10 @@ import {
 } from "./desktop-action-registry.js";
 import { effectiveDesktopActions } from "./desktop-shortcut-preferences.js";
 import { isActiveOperationLifecycle } from "../operation/operation-lifecycle.js";
+import {
+  closeKeyboardShortcutsDialog,
+  openKeyboardShortcutsDialog
+} from "../help/keyboard-shortcuts-dialog-controller.js";
 
 interface GlobalShortcutTarget {
   addEventListener(type: "keydown", listener: (event: KeyboardEvent) => void): void;
@@ -30,7 +34,7 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
     && !ownedByOverlay
   ) {
     event.preventDefault();
-    useShellStore.getState().setKeyboardShortcutsDialogOpen(false);
+    closeKeyboardShortcutsDialog();
     return;
   }
   if (ownedByOverlay) return;
@@ -50,7 +54,7 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
   }
   if (action.id === "keyboard-shortcuts") {
     event.preventDefault();
-    useShellStore.getState().setKeyboardShortcutsDialogOpen(true);
+    openKeyboardShortcutsDialog(event.target);
     return;
   }
 

@@ -101,7 +101,7 @@ describe("global shortcuts", () => {
     expect(useShellStore.getState().keyboardShortcutsDialogOpen).toBe(false);
   });
 
-  it("leaves a focused keyboard dialog Escape to React Aria focus restoration", () => {
+  it("leaves a focused keyboard dialog Escape to its overlay controller", () => {
     class OverlayElement {
       closest(selector: string) {
         return selector === '[role="dialog"]' ? this : null;

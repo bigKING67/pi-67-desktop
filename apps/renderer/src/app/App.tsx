@@ -23,6 +23,7 @@ import styles from "./App.module.css";
 import { initializeUpdateProjection } from "../updates/update-store.js";
 import { dismissConversationFind } from "../search/conversation-find-events.js";
 import { refreshConversationSnoozeClock } from "../navigation/conversation-snooze-clock.js";
+import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -208,7 +209,7 @@ export function App() {
         <LazySurfaceBoundary
           description="关闭后可通过 Cmd/Ctrl+/ 或帮助菜单重新打开。"
           kind="overlay"
-          onDismiss={() => useShellStore.getState().setKeyboardShortcutsDialogOpen(false)}
+          onDismiss={closeKeyboardShortcutsDialog}
           surface="keyboard-shortcuts-dialog"
           title="快捷键帮助未能加载"
         >
