@@ -37,6 +37,25 @@
 - Do not create generic `utils`, `helpers`, `common`, `misc`, `temp`, `new`, or
   `final` directories. Shared code needs two real callers.
 
+## Repository and worktree hygiene
+
+- `/Users/gaoqian/Documents/sixseven/codeproject/pi-67-desktop` is the canonical
+  local development checkout. Continue routine work directly in this root
+  checkout; do not create another clone, repository, copied project directory,
+  or sibling worktree merely to obtain a clean baseline or run work in parallel.
+- A temporary `git worktree` is an exception, not a default workflow. Use one
+  only when a prescribed exact-SHA candidate/recovery flow requires isolation,
+  or when verified conflicting WIP makes the root checkout unsafe to modify,
+  and only with explicit current user authorization and a bounded cleanup plan.
+- Keep at most one active temporary task worktree. Create it with Git worktree
+  commands rather than a raw directory copy, never treat it as a second
+  repository or permanent backup, and keep the canonical root checkout as the
+  intended final workspace.
+- When the isolated task ends, preserve, integrate, or discard older WIP only as
+  authorized; then remove the registered worktree with `git worktree remove`,
+  clean up its temporary branch after reachability verification, and confirm
+  that only the canonical root checkout remains.
+
 ## Security and privacy
 
 - Never log or persist API keys, OAuth tokens, cookies, credential payloads,
