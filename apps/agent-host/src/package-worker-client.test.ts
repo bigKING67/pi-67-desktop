@@ -108,7 +108,8 @@ describe("Isolated Package Worker client", () => {
         npm_config_auth: "secret-npm-token"
       }),
       spawnWorker,
-      terminateProcessTree
+      terminateProcessTree,
+      inspectProcessTree: async (worker) => fakeTreeAlive(worker)
     });
 
     const result = client.run("check-updates", services);
