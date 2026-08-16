@@ -91,7 +91,7 @@ describe("packaged Electron launch environment", () => {
 
   it("uses the asset contract of the version that is actually installed", () => {
     const legacy = resolvePackagedRuntimeAssetContract("0.1.0-alpha.22");
-    expect(WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION).toBe("0.1.0-alpha.23");
+    expect(WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION).toBe("0.1.0-alpha.24");
     expect(legacy).toMatchObject({
       packageWorkerIsolated: false,
       requireWindowsPackageWorkerJob: false
@@ -100,7 +100,7 @@ describe("packaged Electron launch environment", () => {
       "apps/agent-host/dist/skill-pack-process-worker.mjs"
     );
 
-    const isolated = resolvePackagedRuntimeAssetContract("0.1.0-alpha.23");
+    const isolated = resolvePackagedRuntimeAssetContract("0.1.0-alpha.24");
     expect(isolated).toMatchObject({
       packageWorkerIsolated: true,
       requireWindowsPackageWorkerJob: true

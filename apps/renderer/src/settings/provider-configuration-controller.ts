@@ -11,6 +11,7 @@ const PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS = 12_000;
 export const GLOBAL_PROVIDER_CONFIGURATION_KEY = "app";
 
 export function loadProviderConfiguration(_workspaceId?: string): Promise<boolean> {
+  useProviderConfigurationStore.getState().beginLoad(GLOBAL_PROVIDER_CONFIGURATION_KEY);
   const existing = providerLoadFlights.get(GLOBAL_PROVIDER_CONFIGURATION_KEY);
   if (existing) return existing;
   const flight = performProviderConfigurationLoad();
@@ -25,6 +26,7 @@ export function loadProviderConfiguration(_workspaceId?: string): Promise<boolea
 
 export function loadProjectProviderConfiguration(workspaceId: string): Promise<boolean> {
   const key = projectConfigurationKey(workspaceId);
+  useProviderConfigurationStore.getState().beginLoad(key);
   const existing = providerLoadFlights.get(key);
   if (existing) return existing;
   const flight = performProjectProviderConfigurationLoad(workspaceId, key);
@@ -36,7 +38,6 @@ export function loadProjectProviderConfiguration(workspaceId: string): Promise<b
 }
 
 async function performProviderConfigurationLoad(): Promise<boolean> {
-  useProviderConfigurationStore.getState().beginLoad(GLOBAL_PROVIDER_CONFIGURATION_KEY);
   try {
     await ensureAgentConnection();
     const snapshot = await request(
@@ -52,7 +53,6 @@ async function performProviderConfigurationLoad(): Promise<boolean> {
 }
 
 async function performProjectProviderConfigurationLoad(workspaceId: string, key: string): Promise<boolean> {
-  useProviderConfigurationStore.getState().beginLoad(key);
   try {
     const workspace = rendererWorkbenchStore.getState().workspaces[workspaceId];
     if (!workspace || workspace.availability !== "available") {
@@ -114,8 +114,9 @@ export async function storePersistentCredential(
   if (state.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY || !state.baselineRevision) {
     if (!await loadProviderConfiguration()) return false;
   }
-  const revision = useProviderConfigurationStore.getState().baselineRevision;
-  if (!revision) return false;
+  const current = useProviderConfigurationStore.getState();
+  const revision = current.baselineRevision;
+  if (current.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY || !revision) return false;
   return mutateGlobal("provider.credential.store", {
     expectedRevision: revision,
     provider,
@@ -146,8 +147,11 @@ export async function revealPersistentCredential(
       throw new Error("Pi Provider 配置尚未就绪。");
     }
   }
-  const revision = useProviderConfigurationStore.getState().baselineRevision;
-  if (!revision) throw new Error("Pi Provider 配置缺少有效 revision。");
+  const current = useProviderConfigurationStore.getState();
+  const revision = current.baselineRevision;
+  if (current.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY || !revision) {
+    throw new Error("Pi Provider 配置缺少有效 revision。");
+  }
   return request("provider.credential.reveal", {
     expectedRevision: revision,
     provider
@@ -163,6 +167,7 @@ export async function setDefaultModelConfiguration(
   const revision = state.baselineRevision;
   if (!revision) return false;
   if (scope === "global") {
+    if (state.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY) return false;
     return mutateGlobal("model.default.set", {
       expectedRevision: revision,
       scope,
@@ -179,8 +184,9 @@ export async function setDefaultModelConfiguration(
 export async function setGlobalVisionAssistantConfiguration(
   selection: { provider: string; model: string } | undefined
 ): Promise<boolean> {
-  const revision = useProviderConfigurationStore.getState().baselineRevision;
-  if (!revision) return false;
+  const state = useProviderConfigurationStore.getState();
+  const revision = state.baselineRevision;
+  if (state.workspaceId !== GLOBAL_PROVIDER_CONFIGURATION_KEY || !revision) return false;
   return mutateGlobal("vision.assistant.global.set", {
     expectedRevision: revision,
     ...selection

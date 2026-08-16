@@ -292,7 +292,7 @@ function retiredCleanupIssue(
 
 function managedBrowser67Issues(result: ManagedBrowser67McpResult): AgentHostStartupIssue[] {
   const issues: AgentHostStartupIssue[] = [];
-  if (result.status === "user-owned-conflict" || result.status === "revision-conflict") {
+  if (result.status === "revision-conflict") {
     addIssue(issues, { stage: "browser67-mcp", code: "conflict" });
   } else if (result.status === "invalid-json") {
     addIssue(issues, { stage: "browser67-mcp", code: "invalid-state" });

@@ -68,6 +68,21 @@ describe("RuntimePromptAttachments visual assistance", () => {
     expect(fixture.prompt).not.toHaveBeenCalled();
   });
 
+  it("points an unconfigured text-only image request to Visual Assistance settings", async () => {
+    const fixture = sessionFixture({
+      mainInput: ["text"],
+      completeSimple: vi.fn(),
+      order: []
+    });
+    const attachments = runtimeAttachments(async () => undefined);
+
+    await expect(attachments.submit(fixture.session, "Inspect", attachmentSet()))
+      .rejects.toThrow("Settings > Visual Assistance");
+    expect(fixture.appendCustomEntry).not.toHaveBeenCalled();
+    expect(fixture.sendCustomMessage).not.toHaveBeenCalled();
+    expect(fixture.prompt).not.toHaveBeenCalled();
+  });
+
   it("keeps native image delivery primary for image-capable chat models", async () => {
     const resolver = vi.fn(async () => ({ provider: "vision", model: "vision-model" }));
     const fixture = sessionFixture({

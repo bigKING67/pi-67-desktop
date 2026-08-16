@@ -47,7 +47,7 @@ export const packagedAttachmentExcludedAsarPaths = [
 ];
 
 const PACKAGE_WORKER_ASAR_PATH = "apps/agent-host/dist/skill-pack-process-worker.mjs";
-export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.23";
+export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.24";
 
 export function resolvePackagedRuntimeAssetContract(version) {
   if (!validSemver(version)) {

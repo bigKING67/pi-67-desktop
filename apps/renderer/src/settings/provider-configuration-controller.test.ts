@@ -10,6 +10,7 @@ import {
   resetProviderConfigurationLoadState,
   saveProviderConfiguration,
   setDefaultModelConfiguration,
+  setGlobalVisionAssistantConfiguration,
   storePersistentCredential
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
@@ -94,6 +95,7 @@ describe("provider configuration controller", () => {
   it("sends a persistent credential only through its write-only mutation", async () => {
     const initial = snapshot("1");
     const saved = snapshot("2", [{ provider: "custom", type: "api_key" }]);
+    useProviderConfigurationStore.getState().beginLoad("app");
     useProviderConfigurationStore.getState().install("app", initial);
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(saved as never);
     const credential = "controller-write-only-credential";
@@ -113,6 +115,7 @@ describe("provider configuration controller", () => {
 
   it("preserves the draft when a stale revision blocks saving", async () => {
     const initial = snapshot("1");
+    useProviderConfigurationStore.getState().beginLoad("app");
     useProviderConfigurationStore.getState().install("app", initial);
     useProviderConfigurationStore.getState().updateDraft((draft) => ({
       ...draft,
@@ -142,6 +145,7 @@ describe("provider configuration controller", () => {
     const global = snapshot("2");
     global.defaults.global = { provider: "custom", model: "model-a" };
     global.defaults.effective = global.defaults.global;
+    useProviderConfigurationStore.getState().beginLoad("app");
     useProviderConfigurationStore.getState().install("app", initial);
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(global as never);
 
@@ -161,6 +165,25 @@ describe("provider configuration controller", () => {
       [],
       { context: { scope: "app" } }
     );
+  });
+
+  it("rejects global mutations while a project snapshot is current", async () => {
+    const project = snapshot("2");
+    useProviderConfigurationStore.getState().beginLoad("project:workspace-a");
+    useProviderConfigurationStore.getState().install("project:workspace-a", project);
+    const request = vi.spyOn(agentConnectionController, "request");
+
+    await expect(setDefaultModelConfiguration(
+      "global",
+      { provider: "custom", model: "model-a" },
+      "workspace-a"
+    )).resolves.toBe(false);
+    await expect(setGlobalVisionAssistantConfiguration({
+      provider: "custom",
+      model: "model-a"
+    })).resolves.toBe(false);
+
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("registers a trusted Workspace before loading and mutating project overrides", async () => {
@@ -190,6 +213,109 @@ describe("provider configuration controller", () => {
       [],
       { context: { scope: "workspace", workspaceId: "workspace-a" } }
     );
+  });
+
+  it("keeps the project snapshot when a late global load completes", async () => {
+    const global = deferred<PiProviderConfigurationSnapshot>();
+    const project = deferred<PiProviderConfigurationSnapshot>();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation((type) => {
+      if (type === "provider.configuration.get") return global.promise as never;
+      if (type === "workspace.register") return Promise.resolve({ registered: true }) as never;
+      if (type === "provider.projectConfiguration.get") return project.promise as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    const globalLoad = loadProviderConfiguration();
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.configuration.get")
+    ).toHaveLength(1));
+    const projectLoad = loadProjectProviderConfiguration("workspace-a");
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.projectConfiguration.get")
+    ).toHaveLength(1));
+
+    const projectSnapshot = snapshot("2");
+    project.resolve(projectSnapshot);
+    await expect(projectLoad).resolves.toBe(true);
+    const globalSnapshot = snapshot("1");
+    global.resolve(globalSnapshot);
+    await expect(globalLoad).resolves.toBe(true);
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      workspaceId: "project:workspace-a",
+      snapshot: projectSnapshot,
+      baselineRevision: projectSnapshot.revision
+    });
+  });
+
+  it("keeps the global snapshot when a late project load completes", async () => {
+    const global = deferred<PiProviderConfigurationSnapshot>();
+    const project = deferred<PiProviderConfigurationSnapshot>();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation((type) => {
+      if (type === "provider.configuration.get") return global.promise as never;
+      if (type === "workspace.register") return Promise.resolve({ registered: true }) as never;
+      if (type === "provider.projectConfiguration.get") return project.promise as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    const projectLoad = loadProjectProviderConfiguration("workspace-a");
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.projectConfiguration.get")
+    ).toHaveLength(1));
+    const globalLoad = loadProviderConfiguration();
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.configuration.get")
+    ).toHaveLength(1));
+
+    const globalSnapshot = snapshot("1");
+    global.resolve(globalSnapshot);
+    await expect(globalLoad).resolves.toBe(true);
+    const projectSnapshot = snapshot("2");
+    project.resolve(projectSnapshot);
+    await expect(projectLoad).resolves.toBe(true);
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      workspaceId: "app",
+      snapshot: globalSnapshot,
+      baselineRevision: globalSnapshot.revision
+    });
+  });
+
+  it("restores the requested scope when reusing an in-flight load", async () => {
+    const global = deferred<PiProviderConfigurationSnapshot>();
+    const project = deferred<PiProviderConfigurationSnapshot>();
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation((type) => {
+      if (type === "provider.configuration.get") return global.promise as never;
+      if (type === "workspace.register") return Promise.resolve({ registered: true }) as never;
+      if (type === "provider.projectConfiguration.get") return project.promise as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    const firstGlobalLoad = loadProviderConfiguration();
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.configuration.get")
+    ).toHaveLength(1));
+    const projectLoad = loadProjectProviderConfiguration("workspace-a");
+    await vi.waitFor(() => expect(
+      request.mock.calls.filter(([type]) => type === "provider.projectConfiguration.get")
+    ).toHaveLength(1));
+
+    const secondGlobalLoad = loadProviderConfiguration();
+    expect(secondGlobalLoad).toBe(firstGlobalLoad);
+    expect(useProviderConfigurationStore.getState().workspaceId).toBe("app");
+
+    const globalSnapshot = snapshot("1");
+    global.resolve(globalSnapshot);
+    await expect(secondGlobalLoad).resolves.toBe(true);
+    const projectSnapshot = snapshot("2");
+    project.resolve(projectSnapshot);
+    await expect(projectLoad).resolves.toBe(true);
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      workspaceId: "app",
+      snapshot: globalSnapshot,
+      baselineRevision: globalSnapshot.revision
+    });
   });
 });
 
@@ -237,11 +363,14 @@ function file(kind: PiProviderConfigurationSnapshot["files"][number]["kind"]) {
 
 function deferred<T>(): {
   promise: Promise<T>;
+  resolve: (value: T) => void;
   reject: (error: unknown) => void;
 } {
+  let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((_resolve, rejectPromise) => {
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
     reject = rejectPromise;
   });
-  return { promise, reject };
+  return { promise, resolve, reject };
 }

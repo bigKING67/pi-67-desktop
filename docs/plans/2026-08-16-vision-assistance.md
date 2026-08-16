@@ -1,9 +1,9 @@
 # Visual Assistance and Global Model Settings
 
-Status: complete
+Status: complete (local implementation and pre-commit validation)
 Owner: Codex
 Started: 2026-08-16
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 
 ## Goal
 
@@ -25,11 +25,14 @@ Make global Pi Provider, credential, default-model, and visual-assistance settin
 - Visual-assistance failure does not invoke the main model and leaves the draft recoverable.
 - Pi JSONL persists replayable visual evidence without sending image bytes to the text-only main model.
 - The managed capability bundle no longer includes pi-vision-bridge or xtalpi-pi-tools.
+- A user-managed `tmwd_browser` or `js-reverse` MCP remains active without falsely degrading Agent Host startup.
+- Global and project Provider snapshots cannot overwrite each other when requests finish out of order.
+- The release candidate version uniquely identifies the new product bytes.
 
 ## Delivery boundary
 
 - Local implementation: authorized
-- Commit: authorized on 2026-08-16; this plan is included in the scoped local commit
+- Commit: the original implementation was committed as `a7c9147`; the current release-review remediation was explicitly authorized for one scoped local commit on 2026-08-17
 - Push: not authorized
 - Candidate build/upload: not authorized
 - Tag/release/promotion: not authorized
@@ -43,10 +46,15 @@ Make global Pi Provider, credential, default-model, and visual-assistance settin
 | OBSERVED | Persisted Workspaces are identity-changed, matching the visible reconfirmation banner and Host error. | bounded workbench state inspection | 2026-08-16 |
 | OBSERVED | Pi exposes image capability in model metadata and supports provider-authenticated `completeSimple` calls. | installed Pi SDK types/runtime source | 2026-08-16 |
 | OBSERVED | The helper is a first-party mechanism reimplementation informed by Qwen-MM-Plugins commit `06fd61333e226613bb9725ed148156275910aeed`; no upstream source is forked or bundled. | source and capability lock | 2026-08-16 |
+| OBSERVED | The final `a7c9147` clean-HEAD check failed because `ProviderEditorSectionRequest` was exported without an external caller. | `corepack pnpm run check` | 2026-08-16 |
+| OBSERVED | The active shared Pi Profile already owns `tmwd_browser` and `js-reverse`; startup preserved them but incorrectly converted that normal state into a degraded warning. | bounded active-profile metadata plus startup source | 2026-08-16 |
+| OBSERVED | Global and project configuration loads write to one visible store and previously lacked a current-scope fence. | controller/store timing trace | 2026-08-16 |
+| OBSERVED | Reusing an in-flight configuration load previously did not restore its requested scope, and global default/vision mutations did not independently reject a current project snapshot. | controller/store timing trace and regression tests | 2026-08-17 |
+| OBSERVED | The remote source already has an alpha.23 Windows candidate, so new bytes require a distinct prerelease identity. | package metadata and remote candidate receipt | 2026-08-16 |
 
 ## Affected boundaries
 
-- Modules/processes: protocol, domain, Pi runtime, Agent Host, Renderer, capability packaging
+- Modules/processes: protocol, domain, Pi runtime, Agent Host startup, Renderer, capability packaging
 - Protocol or persisted state: command authority, Pi settings.json, Pi JSONL custom entries
 - Platform/artifact: Electron Renderer and macOS arm64 unsigned preview
 - Security/privacy: credentials remain masked; images/prompts are not diagnostics
@@ -61,6 +69,9 @@ Make global Pi Provider, credential, default-model, and visual-assistance settin
 | The helper is first-party Pi runtime code. | Preserves the single Provider and Session truth. | Pi SDK removes provider-neutral image completion support. |
 | Native image delivery stays primary. | Avoids an unnecessary second call and preserves Provider-native capability. | User explicitly adopts an always-helper product contract. |
 | Visual evidence is a non-context custom entry plus a text-only hidden context message. | Keeps JSONL replay while preventing images from reaching a text-only Provider. | Pi adds a native out-of-context attachment evidence entry. |
+| A user-managed same-name Browser67 MCP is a ready state, not a degraded state. | The preserved server remains Pi's active configuration; only invalid JSON, revision conflicts, access failures, or integrity failures mean an enhancement did not load safely. | Desktop gains a verified compatibility contract that proves the user server is unusable. |
+| The visible Provider store accepts snapshots only for its current scope key. | Prevents late global/project responses and late mutations from replacing the current settings surface. | The store becomes an explicitly keyed multi-snapshot cache. |
+| New candidate bytes use `0.1.0-alpha.24`. | Avoids binding two source SHAs and byte sets to the same prerelease file identity. | The previous alpha.23 receipt is explicitly invalidated before any distribution and all replacement identities are recorded. |
 
 ## Checkpoints
 
@@ -68,17 +79,18 @@ Make global Pi Provider, credential, default-model, and visual-assistance settin
 - [x] 2. Global/project visual settings and Provider presets are implemented.
 - [x] 3. Runtime image routing, failure recovery, evidence projection, and explicit retry are implemented.
 - [x] 4. Managed legacy vision extensions and documentation are updated.
-- [x] 5. Source, tests, runtime, and packaged artifact validation are complete.
+- [x] 5. Review findings and false degraded-startup handling are implemented with targeted regressions.
+- [x] 6. Final scoped-source full gate, production E2E, and exact macOS artifact validation are complete.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
-| Source | targeted protocol/runtime/renderer tests | authority, persistence, routing, projection, error ownership | passed; targeted suites and the full repository gate are green |
-| Tests | `corepack pnpm run check`; production-build Renderer E2E | final exit code and decisive failures | passed; 558 test files, 2,868 tests passed and 2 skipped; 8/8 relevant E2E cases passed |
-| Runtime/host | production-build Renderer plus Agent Host fixture/smoke | global settings with identity-changed Workspace | passed; App configuration loaded without `workspace.register`, and packaged Agent Host roundtrip passed |
-| Packaged artifact | `corepack pnpm run preview:mac:unsigned` | packaged smoke plus opened repository artifact | passed; repository app opened from `artifacts/release/mac-arm64/Pi-67 Desktop.app` |
-| Target OS/manual | macOS Apple Silicon inspection | settings and visual-assistance states | partial; unsigned macOS arm64 package smoke/open passed and fresh light/dark Renderer screenshots passed visual review; no billable Provider call or packaged settings walkthrough was performed |
+| Source | targeted startup/runtime/renderer/packaging tests | scope fencing, correct recovery path, user-MCP preservation, alpha.24 identity | passed; original remediation set passed 5 files and 33 tests; final Provider controller/store rerun passed 2 files and 17 tests |
+| Tests | `corepack pnpm run check`; `corepack pnpm run test:e2e` | final exit code and decisive failures | passed after the final scope fix; 558 test files, 2,879 tests passed and 2 skipped in the full gate; production E2E passed 194/194 |
+| Runtime/host | production-build Renderer plus Agent Host fixture/smoke | shared Profile with user-managed Browser67 MCP reports ready | passed; exact Host regression reports ready, and packaged smoke completed a real Agent Host roundtrip |
+| Packaged artifact | `corepack pnpm run preview:mac:unsigned` | current scoped source plus packaged smoke and opened repository artifact | passed after the final scope fix for current uncommitted source; `0.1.0-alpha.24` opened at `artifacts/release/mac-arm64/Pi-67 Desktop.app`; `app.asar` SHA-256 `bd9474c44335e8b29f021de87c90a312e827847a05f00bb7a6ed3392eb01d97a` |
+| Target OS/manual | macOS Apple Silicon inspection | no false degraded warning and settings/visual-assistance states | source regression and exact packaged runtime passed; direct notification-center inspection remains unverified because the read-only Accessibility request timed out; live billable Provider and Windows x64 validation remain separate |
 
 ## Rollback
 
@@ -99,12 +111,17 @@ Revert only the scoped implementation paths. Existing Pi files require no destru
 - 2026-08-16: Unsigned macOS arm64 preview packaged, passed exact-artifact smoke, and opened from the repository artifact path.
 - 2026-08-16: Visual-helper selection was aligned with the Host contract: only configured image-capable models are selectable, and stale unavailable selections remain explicit.
 - 2026-08-16: User authorized one scoped local commit; push, tag, release, and upload remain unauthorized.
+- 2026-08-16: Release review reopened this plan after finding a dead-code gate failure, a global/project load race, a stale recovery path, alpha.23 identity reuse, and stale validation evidence.
+- 2026-08-16: User-managed Browser67 MCP preservation was confirmed as the source of the false degraded-startup warning; normal preservation now remains ready while genuine configuration failures still degrade.
+- 2026-08-16: Targeted remediation tests, typecheck, lint, and dead-code checks pass.
+- 2026-08-17: Final diff review also fenced reused in-flight loads and all global default/vision writes against the current Provider scope; the final controller/store regressions passed 17/17.
+- 2026-08-17: The final full gate passed with 558 test files, 2,879 passing tests, 2 skipped tests, and 82.12% statements, 76.12% branches, 85.96% functions, and 86.08% lines; production E2E passed 194/194.
+- 2026-08-17: The current uncommitted alpha.24 macOS arm64 source was repackaged after the final fix, passed exact-artifact smoke including a real Agent Host roundtrip, and opened from the repository artifact path as process 96557.
+- 2026-08-16: Read-only desktop inspection was attempted but the macOS Accessibility AppleEvent timed out; no manual UI claim is inferred from the source or smoke evidence.
 
 ## Closeout
 
-- Base source SHA: `364bc595458c75af74be6e2bedb19ca4cbbf29dc`; the resulting commit identity is recorded by Git because this plan is part of that commit
-- Changed files: 83 modified tracked paths plus 13 new plan/runtime/Host/Renderer/E2E paths; 96 working-tree paths in total
-- Validation completed: full `check`, final build, 8/8 production-build Renderer E2E, fresh light/dark visual review, unsigned macOS arm64 packaging, packaged Electron smoke, and artifact open
-- Validation not completed: live Qwen or Doubao billable API calls, Windows x64 packaging/runtime, and a manual walkthrough of the packaged settings screen
-- Remaining risks: Provider aliases/model IDs may drift; actual latency, cost, and response quality remain credential- and Provider-dependent
-- Commit/push/release state: one scoped local commit authorized; push, tag, release, and upload remain unauthorized
+- Current remediation base: `a7c9147d33261236f1a3078df51dda1249816143`; the containing scoped commit becomes the exact final source identity for the subsequent clean-commit rebuild and candidate receipts.
+- Validation completed: targeted startup, Provider scope, visual-assistance recovery, and package-identity tests; full repository gate; full production E2E; exact alpha.24 macOS arm64 packaging, smoke, Agent Host roundtrip, and open.
+- Validation still outside this local closeout: direct notification-center inspection, live Qwen or Doubao billable calls, and Windows x64 build/runtime/manual evidence.
+- Commit/push/release state: one scoped local remediation commit is authorized; push, tag, release, upload, signing, and promotion remain unauthorized.

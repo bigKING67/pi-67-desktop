@@ -103,7 +103,7 @@ describe("Agent Host startup", () => {
     ]);
   });
 
-  it("preserves an existing Pi TUI Profile and degrades conflicting Desktop MCP only", async () => {
+  it("preserves user-managed browser MCP without treating the shared Profile as degraded", async () => {
     const root = await fixtureRoot();
     const agentDir = join(root, "shared");
     const files = await writeSharedProfile(agentDir);
@@ -128,8 +128,11 @@ describe("Agent Host startup", () => {
 
     expect(result.startup).toMatchObject({
       profileMode: "existing-shared",
-      status: "degraded",
-      issues: [{ stage: "browser67-mcp", code: "conflict" }]
+      status: "ready",
+      issues: [],
+      stageTimings: expect.arrayContaining([
+        expect.objectContaining({ stage: "browser67-mcp", outcome: "completed" })
+      ])
     });
     expect(cleanupRetiredMcp).not.toHaveBeenCalled();
     expect(bootstrapCapabilities).toHaveBeenCalledWith(expect.objectContaining({

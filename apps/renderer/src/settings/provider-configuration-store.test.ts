@@ -18,6 +18,7 @@ describe("provider configuration store", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");
     const store = useProviderConfigurationStore.getState();
+    store.beginLoad("workspace-a");
     store.install("workspace-a", initial);
     store.observeExternal("workspace-a", change(external));
 
@@ -34,6 +35,7 @@ describe("provider configuration store", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");
     const store = useProviderConfigurationStore.getState();
+    store.beginLoad("workspace-a");
     store.install("workspace-a", initial);
     store.updateDraft((draft) => ({ ...draft, name: "Unsaved draft" }));
     store.observeExternal("workspace-a", change(external));
@@ -59,6 +61,7 @@ describe("provider configuration store", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");
     const store = useProviderConfigurationStore.getState();
+    store.beginLoad("workspace-a");
     store.install("workspace-a", initial);
     store.updateDraft((draft) => ({ ...draft, name: "Unsaved draft" }));
     store.observeExternal("workspace-a", change(external));
@@ -79,6 +82,7 @@ describe("provider configuration store", () => {
   it("ignores events belonging to another Workspace", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");
+    useProviderConfigurationStore.getState().beginLoad("workspace-a");
     useProviderConfigurationStore.getState().install("workspace-a", initial);
     useProviderConfigurationStore.getState().observeExternal("workspace-b", change(external));
 
@@ -103,6 +107,24 @@ describe("provider configuration store", () => {
     expect(store.consumeProviderEditorRequest("project:workspace-a")).toBeUndefined();
     expect(store.consumeProviderEditorRequest("app")).toBe("configuration");
     expect(store.consumeProviderEditorRequest("app")).toBeUndefined();
+  });
+
+  it("ignores a late snapshot from a configuration scope that is no longer current", () => {
+    const global = snapshot("1", "Global");
+    const project = snapshot("2", "Project");
+    const store = useProviderConfigurationStore.getState();
+
+    store.beginLoad("app");
+    store.beginLoad("project:workspace-a");
+    store.install("project:workspace-a", project);
+    store.install("app", global);
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      workspaceId: "project:workspace-a",
+      snapshot: project,
+      baselineRevision: project.revision,
+      phase: "idle"
+    });
   });
 });
 

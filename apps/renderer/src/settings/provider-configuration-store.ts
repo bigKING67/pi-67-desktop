@@ -7,7 +7,7 @@ import type {
 import { create } from "zustand";
 
 type ProviderConfigurationPhase = "idle" | "loading" | "saving" | "failed";
-export type ProviderEditorSectionRequest = "configuration" | "models";
+type ProviderEditorSectionRequest = "configuration" | "models";
 
 export interface ProviderConfigurationState {
   workspaceId: string | undefined;
@@ -58,6 +58,7 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
 
   install(workspaceId, snapshot) {
     const state = get();
+    if (state.workspaceId !== workspaceId) return;
     const selectedProviderId = selectAvailableProvider(snapshot, state.selectedProviderId);
     set({
       workspaceId,

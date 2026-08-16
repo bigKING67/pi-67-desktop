@@ -103,7 +103,7 @@ export class RuntimePromptAttachments {
     if (!selection) {
       throw new RuntimeError(
         "UNSUPPORTED",
-        "The selected chat model cannot read images. Configure a visual-assistance model in Settings > Models.",
+        "The selected chat model cannot read images. Configure a visual-assistance model in Settings > Visual Assistance.",
         {
           recoverable: true,
           details: { phase: "vision-assistance", reason: "not-configured" }

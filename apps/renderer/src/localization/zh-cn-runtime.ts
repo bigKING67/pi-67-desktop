@@ -87,7 +87,7 @@ export const zhCNRuntimeMessages = {
     hostStartupFailedTitle: "Pi 运行服务启动失败",
     hostStartupFailedDetail: "Pi-67 Desktop 已停止自动重试，并保留现有 Pi 配置。可导出脱敏诊断以定位具体启动阶段。",
     hostStartedDegradedTitle: "已保留现有 Pi 配置",
-    hostStartedDegradedDetail: "核心 Pi 功能可以继续使用；部分 Pi-67 Desktop 增强因资源冲突未加载。",
+    hostStartedDegradedDetail: "核心 Pi 功能可以继续使用；部分 Pi-67 Desktop 增强资源未能加载。可在“更新与诊断”中导出脱敏诊断以查看具体阶段。",
     missingRuntimeReady: "Pi 运行服务未发送 authoritative runtime.ready 事件。"
   }
 } as const;
