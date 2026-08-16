@@ -132,9 +132,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       installed: true
     }],
     bundledExtensions: [
-      "pi-rules-loader",
-      "pi-vision-bridge",
-      "xtalpi-pi-tools"
+      "pi-rules-loader"
     ].map((id) => ({
       id,
       displayName: id,

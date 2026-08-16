@@ -14,6 +14,7 @@ const AUTHORITY = authority("session-a", 3, 1);
 
 describe("conversation store", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     useConversationStore.getState().reset();
   });
 
@@ -199,10 +200,12 @@ describe("conversation store", () => {
 
     expect(useConversationStore.getState().markPendingUserTurnFailed(
       "operation-a",
-      "Pi runtime stopped"
+      "Pi runtime stopped",
+      true
     )).toBe(true);
     expect(useConversationStore.getState().pendingUserTurn).toMatchObject({
       status: "failed",
+      retryableVisionAssistance: true,
       message: { error: "发送失败：Pi runtime stopped" }
     });
     expect(useConversationStore.getState().markPendingUserTurnFailed(
@@ -234,6 +237,32 @@ describe("conversation store", () => {
     expect(revoke).toHaveBeenCalledOnce();
     expect(revoke).toHaveBeenCalledWith("blob:prompt-a");
     expect(useConversationStore.getState().pendingUserTurn).toBeUndefined();
+  });
+
+  it("retains a shared preview while replacing a failed Turn for retry", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    useConversationStore.getState().replaceSnapshot(snapshot("session-a", 0, false), AUTHORITY);
+    const attachment = {
+      id: "attachment-a",
+      name: "prompt.png",
+      mimeType: "image/png",
+      byteLength: 5,
+      kind: "image" as const,
+      previewUrl: "blob:prompt-a"
+    };
+    useConversationStore.getState().installPendingUserTurn({
+      ...pendingUserTurn("operation-a", AUTHORITY),
+      attachments: [attachment]
+    });
+    useConversationStore.getState().installPendingUserTurn({
+      ...pendingUserTurn("operation-retry", AUTHORITY),
+      attachments: [{ ...attachment }]
+    });
+
+    expect(revoke).not.toHaveBeenCalled();
+    useConversationStore.getState().reset();
+    expect(revoke).toHaveBeenCalledOnce();
+    expect(revoke).toHaveBeenCalledWith("blob:prompt-a");
   });
 });
 

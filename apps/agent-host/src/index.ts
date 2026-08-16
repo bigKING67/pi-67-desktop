@@ -50,6 +50,7 @@ async function startAgentHost(): Promise<void> {
           process.env.PI67_PROMPT_ATTACHMENT_ROOT
         );
         return new AgentHostServer(undefined, {
+          agentDir,
           ...(promptAttachments === undefined ? {} : { promptAttachments }),
           onRuntimePoisoned: (message) => schedulePoisonedRuntimeExit(message, () => shuttingDown),
           onRuntimeInitializationObservation: (observation) => {

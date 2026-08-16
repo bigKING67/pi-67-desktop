@@ -6,6 +6,8 @@ import {
   LoaderCircle,
   MessageSquarePlus,
   Pencil,
+  RotateCcw,
+  ScanSearch,
   TriangleAlert
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -40,6 +42,7 @@ interface MessageCardProps {
   actionDisabledReason?: string | undefined;
   highlighted?: boolean;
   onContinue?: (() => Promise<boolean>) | undefined;
+  onRetry?: (() => Promise<boolean>) | undefined;
   onEditStart?: (() => void) | undefined;
   edit?: {
     value: string;
@@ -59,6 +62,7 @@ export function MessageCard({
   actionDisabledReason,
   highlighted = false,
   onContinue,
+  onRetry,
   onEditStart,
   edit
 }: MessageCardProps) {
@@ -133,6 +137,26 @@ export function MessageCard({
               />
             );
           }
+          if (part.type === "vision-evidence") {
+            return (
+              <details className={styles.visionEvidence} key={`${message.id}-vision-${index}`}>
+                <summary>
+                  <ScanSearch aria-hidden="true" size={14} />
+                  <span>
+                    <strong>视觉辅助证据</strong>
+                    <small>{part.provider} / {part.model} · {part.attachments.length} 张图片 · {part.totalTokens} tokens</small>
+                  </span>
+                </summary>
+                <div>
+                  <ul>{part.attachments.map((attachment) => (
+                    <li key={attachment.id}>{attachment.name} <small>{attachment.mimeType}</small></li>
+                  ))}</ul>
+                  <TranscriptMarkdownView mode="settled">{part.description}</TranscriptMarkdownView>
+                  <footer>输入 {part.inputTokens} · 输出 {part.outputTokens} · 估算成本 ${part.totalCost.toFixed(6)}</footer>
+                </div>
+              </details>
+            );
+          }
           if (part.type === "tool-call") return <ToolCard key={part.id} tool={part} />;
           return null;
         })}
@@ -155,8 +179,10 @@ export function MessageCard({
           actionDisabledReason={actionDisabledReason}
           isSettled={isSettled}
           message={message}
+          deliveryStatus={deliveryStatus}
           onContinue={onContinue}
           onEditStart={onEditStart}
+          onRetry={onRetry}
         />
       ) : null}
     </article>
@@ -224,20 +250,24 @@ function InlineUserMessageEditor({ edit }: {
   );
 }
 
-type MessageAction = "continue";
+type MessageAction = "continue" | "retry";
 
 function MessageFooter({
   message,
   isSettled,
   actionDisabledReason,
+  deliveryStatus,
   onContinue,
-  onEditStart
+  onEditStart,
+  onRetry
 }: {
   message: SessionMessageView;
   isSettled: boolean;
   actionDisabledReason?: string | undefined;
+  deliveryStatus?: "accepted" | "failed" | undefined;
   onContinue?: (() => Promise<boolean>) | undefined;
   onEditStart?: (() => void) | undefined;
+  onRetry?: (() => Promise<boolean>) | undefined;
 }) {
   const isUser = message.role === "user";
   const copyText = messageTextForCopy(message);
@@ -294,6 +324,19 @@ function MessageFooter({
       <footer className={`${styles.footer} ${styles.userFooter}`} data-message-footer="user">
         {timestamp}
         {copyControl}
+        {deliveryStatus === "failed" && onRetry ? (
+          <MessageActionControl
+            ariaLabel="重试视觉识别"
+            disabled={pendingAction !== undefined}
+            icon={pendingAction === "retry"
+              ? <LoaderCircle aria-hidden="true" className={styles.spinning} size={14} />
+              : <RotateCcw aria-hidden="true" size={14} />}
+            label="使用当前视觉模型重新识别并发送"
+            onClick={() => void runAction("retry", onRetry)}
+            placement="bottom end"
+            state={pendingAction === "retry" ? "pending" : "idle"}
+          />
+        ) : null}
         {isSettled && onEditStart ? (
           <MessageActionControl
             ariaLabel={messages.transcript.editMessage}

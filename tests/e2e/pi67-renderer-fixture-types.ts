@@ -74,6 +74,7 @@ export interface FixtureContextFiles {
 }
 
 export interface MockEventOptions {
+  context?: "app" | "workspace" | "task";
   hostEpoch?: number;
   operationId?: string;
   sequence?: number;

@@ -6,7 +6,8 @@ import {
   projectProviderConfigurations,
   removeProviderDocument,
   saveProviderDocument,
-  setDefaultModelDocument
+  setDefaultModelDocument,
+  setVisionAssistantDocument
 } from "./pi-configuration-documents.js";
 
 describe("Pi configuration documents", () => {
@@ -149,5 +150,22 @@ describe("Pi configuration documents", () => {
     expect(parseModelsDocument(removeProviderDocument(models, "remove")).providers).toEqual({
       keep: { models: [] }
     });
+  });
+
+  it("round-trips global and project visual-assistance overrides as Pi JSONC", () => {
+    const settings = "{\n  // preserve user fields\n  \"theme\": \"dark\"\n}\n";
+    const selected = setVisionAssistantDocument(settings, {
+      mode: "model",
+      provider: "bailian",
+      model: "qwen3.7-flash"
+    });
+    expect(parseSettingsDocument(selected)).toMatchObject({
+      root: { theme: "dark" },
+      visionAssistant: { mode: "model", provider: "bailian", model: "qwen3.7-flash" }
+    });
+    expect(parseSettingsDocument(setVisionAssistantDocument(selected, { mode: "disabled" })).visionAssistant)
+      .toEqual({ mode: "disabled" });
+    expect(parseSettingsDocument(setVisionAssistantDocument(selected, undefined)).visionAssistant)
+      .toBeUndefined();
   });
 });

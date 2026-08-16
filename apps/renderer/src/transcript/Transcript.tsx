@@ -6,6 +6,7 @@ import { useAppStore } from "../app/app-store.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { selectSessionGeneration, selectSessionId } from "../session/session-projection-selectors.js";
 import { requestComposerPrefill } from "../composer/composer-events.js";
+import { retryPendingVisualAssistance } from "../composer/prompt-submission-controller.js";
 import { loadOlderConversation } from "../conversation/conversation-controller.js";
 import { useCommittedConversationProjection } from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
@@ -292,7 +293,8 @@ export function Transcript() {
           loadingOlder: historicalWindow ? false : loadingOlder,
           conversationError: historicalWindow ? undefined : conversationError,
           liveProcess: historicalWindow ? undefined : liveProcess,
-          loadOlderMessages: loadOlderConversation
+          loadOlderMessages: loadOlderConversation,
+          retryPendingVisualAssistance
         }}
         data={transcriptRows}
         computeItemKey={(_index, row) => row.key}

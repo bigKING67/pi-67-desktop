@@ -67,6 +67,7 @@ export interface EventPayloads {
     recoverable: boolean;
   };
   "provider.configuration.changed": PiProviderConfigurationChanged;
+  "provider.projectConfiguration.changed": PiProviderConfigurationChanged;
   "turn.streamBatch": { events: StreamDelta[] };
   "operation.started": { operation: OperationView };
   "operation.heartbeat": { operationId: string; observedAt: number; lastActivityAt: number };

@@ -24,6 +24,10 @@ import {
   PLAN_IMPLEMENTATION_ENTRY_TYPE,
   PROPOSED_PLAN_ENTRY_TYPE
 } from "./plan-mode-controller.js";
+import {
+  parseVisionAssistanceEvidence,
+  VISION_ASSISTANCE_ENTRY_TYPE
+} from "./vision-assistance.js";
 
 export const DEFAULT_MESSAGE_PAGE_SIZE = 100;
 export const MAX_MESSAGE_PAGE_SIZE = 200;
@@ -81,7 +85,7 @@ export function projectMessagePage(
   );
   let normalizedIndex = 0;
   const normalized = collectedPage.map((record) => (
-    record.kind === "plan-proposal"
+    record.kind === "projected"
       ? record.message
       : normalizedMessages[normalizedIndex++]!
   ));
@@ -146,7 +150,7 @@ function projectedJsonBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), "utf8") + 1;
 }
 
-type MessageEntryRecord = ContextMessageEntryRecord | PlanProposalEntryRecord;
+type MessageEntryRecord = ContextMessageEntryRecord | ProjectedEntryRecord;
 
 interface ContextMessageEntryRecord {
   kind: "message";
@@ -155,8 +159,8 @@ interface ContextMessageEntryRecord {
   entryIndex: number;
 }
 
-interface PlanProposalEntryRecord {
-  kind: "plan-proposal";
+interface ProjectedEntryRecord {
+  kind: "projected";
   id: string;
   message: SessionMessageView;
   entryIndex: number;
@@ -213,12 +217,37 @@ function projectEntryRecord(
   entryIndex: number,
   planStatuses: ReadonlyMap<number, PlanProposalStatus>
 ): MessageEntryRecord | undefined {
+  if (entry.type === "custom" && entry.customType === VISION_ASSISTANCE_ENTRY_TYPE) {
+    const evidence = parseVisionAssistanceEvidence(entry.data);
+    if (!evidence) return undefined;
+    return {
+      kind: "projected",
+      id: entry.id,
+      entryIndex,
+      message: {
+        id: entry.id,
+        role: "system",
+        createdAt: evidence.createdAt,
+        parts: [{
+          type: "vision-evidence",
+          provider: evidence.provider,
+          model: evidence.model,
+          attachments: evidence.attachments,
+          description: evidence.description,
+          inputTokens: evidence.usage.input,
+          outputTokens: evidence.usage.output,
+          totalTokens: evidence.usage.totalTokens,
+          totalCost: evidence.usage.cost.total
+        }]
+      }
+    };
+  }
   if (entry.type === "custom" && entry.customType === PROPOSED_PLAN_ENTRY_TYPE) {
     const plan = parseActiveProposedPlan(entry.data);
     const status = planStatuses.get(entryIndex);
     if (!plan || !status) return undefined;
     return {
-      kind: "plan-proposal",
+      kind: "projected",
       id: entry.id,
       entryIndex,
       message: {

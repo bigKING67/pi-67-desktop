@@ -250,8 +250,6 @@ try {
   await extensionSettingsWorkspace.getByRole("tab", { name: "内置扩展", exact: true }).click();
   await extensionSettingsWorkspace.getByText("pi-rules-loader", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await extensionSettingsWorkspace.getByText("xtalpi-pi-tools", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
   await capturePackagedScreenshot(window, "06-bundled-extensions.png");
   await extensionSettingsWorkspace.getByRole("tab", { name: "本地扩展", exact: true }).click();
   const localExtensionPanel = extensionSettingsWorkspace.getByRole("tabpanel", { name: "本地扩展", exact: true });

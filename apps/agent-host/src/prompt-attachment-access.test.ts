@@ -34,6 +34,49 @@ describe("Agent Host prompt attachment access", () => {
     expect(JSON.parse(listing.text)).toEqual(first!.attachments);
   });
 
+  it("reuses the verified Task-scoped set when a failed Prompt retries with a new submission id", async () => {
+    const fixture = await createFixture();
+    await stageFixture(
+      fixture.root,
+      "draft_image",
+      "screen.png",
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      "image/png",
+      "image"
+    );
+    const task = fixture.owner.forTask("task-a");
+    const first = await task.claim("submission-first", [{ id: "draft_image" }]);
+    const retry = await task.claim("submission-retry", [{ id: "draft_image" }]);
+
+    expect(retry).toEqual(first);
+    await expect(access(join(
+      fixture.root,
+      "claimed",
+      createHash("sha256").update("task-a").digest("hex"),
+      createHash("sha256").update("submission-retry").digest("hex")
+    ))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(task.readImages(retry!.id)).resolves.toEqual([{
+      type: "image",
+      mimeType: "image/png",
+      data: "iVBORw=="
+    }]);
+  });
+
+  it("recovers the reusable set by attachment identity after Host replacement", async () => {
+    const fixture = await createFixture();
+    await stageFixture(fixture.root, "draft_a", "a.txt", "safe", "text/plain", "document");
+    const first = await fixture.owner.forTask("task-a")
+      .claim("submission-first", [{ id: "draft_a" }]);
+    await fixture.owner.dispose();
+
+    const replacement = createPromptAttachmentAccessOwner(fixture.root);
+    if (!replacement) throw new Error("Expected replacement attachment access.");
+    const retry = await replacement.forTask("task-a")
+      .claim("submission-retry", [{ id: "draft_a" }]);
+    expect(retry).toEqual(first);
+    await replacement.dispose();
+  });
+
   it("rejects submission reuse with different refs and isolates opaque sets by Task", async () => {
     const fixture = await createFixture();
     await stageFixture(fixture.root, "draft_a", "a.txt", "a", "text/plain", "document");

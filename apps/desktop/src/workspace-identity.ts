@@ -46,13 +46,18 @@ export interface WorkspaceIdentityOptions {
   now?: () => number;
 }
 
+export interface WorkspaceRefreshOptions {
+  platform?: NodeJS.Platform;
+}
+
 export interface AppOwnedWorkspaceIdentityOptions {
   id: string;
   now?: () => number;
 }
 
 export async function refreshPersistedWorkspaceDescriptor(
-  existing: WorkspaceDescriptor
+  existing: WorkspaceDescriptor,
+  options: WorkspaceRefreshOptions = {}
 ): Promise<WorkspaceDescriptor> {
   let observed: NativeWorkspaceDescriptor;
   try {
@@ -66,13 +71,21 @@ export async function refreshPersistedWorkspaceDescriptor(
     return { ...existing, availability: "unavailable" };
   }
 
-  if (workspaceIdentityMatches(existing.identity, observed.identity)) {
+  const identityMatch = persistedWorkspaceIdentityMatch(
+    existing.identity,
+    observed.identity,
+    options.platform ?? process.platform
+  );
+  if (identityMatch !== "changed") {
+    const trust = identityMatch === "macos-device-rebound" && isLegacyDeviceDriftState(existing)
+      ? "trusted"
+      : existing.trust;
     return {
       ...observed,
       id: existing.id,
       identity: { ...observed.identity, canonicalPath: existing.identity.canonicalPath },
-      trust: existing.trust,
-      trustProvenance: existing.trust === "trusted" ? "restored" : existing.trustProvenance
+      trust,
+      trustProvenance: trust === "trusted" ? "restored" : existing.trustProvenance
     };
   }
   if (existing.identity.assurance === "path-only") {
@@ -207,6 +220,38 @@ function workspaceIdentityMatches(
     && existing.device === observed.device
     && existing.inode === observed.inode
     && existing.birthtimeNs === observed.birthtimeNs;
+}
+
+function persistedWorkspaceIdentityMatch(
+  existing: WorkspacePathIdentity,
+  observed: WorkspacePathIdentity,
+  platform: NodeJS.Platform
+): "exact" | "macos-device-rebound" | "changed" {
+  if (workspaceIdentityMatches(existing, observed)) return "exact";
+  if (
+    platform !== "darwin"
+    || existing.assurance !== "filesystem"
+    || observed.assurance !== "filesystem"
+    || existing.canonicalPath !== observed.canonicalPath
+    || existing.device === undefined
+    || observed.device === undefined
+    || existing.device === observed.device
+    || existing.inode === undefined
+    || existing.inode !== observed.inode
+    || existing.birthtimeNs === undefined
+    || existing.birthtimeNs !== observed.birthtimeNs
+  ) return "changed";
+
+  // APFS device numbers can change across a reboot or volume remount. The
+  // canonical path plus stable file identity still guards directory replacement.
+  return "macos-device-rebound";
+}
+
+function isLegacyDeviceDriftState(existing: WorkspaceDescriptor): boolean {
+  return existing.lastVerifiedAt !== undefined
+    && existing.trust === "unknown"
+    && existing.trustProvenance === "identity-changed"
+    && existing.availability === "identity-changed";
 }
 
 export function parseNativeWorkspaceDescriptor(value: unknown): NativeWorkspaceDescriptor | undefined {

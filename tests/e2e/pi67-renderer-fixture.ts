@@ -5,13 +5,8 @@ import type { MockPayloadSanitizer } from "./pi67-renderer-payload-sanitizer.js"
 import type { MockOperationViewFactory, MockPlanImplementationLifecycleScheduler, MockProjectionAcknowledgementFactory } from "./pi67-renderer-operation-fixture.js";
 import { createMockAgentFixtureInput } from "./pi67-renderer-agent-input-fixture.js";
 import { installMockAgentHandlers } from "./pi67-renderer-agent-installation.js";
-import type {
-  FixtureAgentState,
-  FixtureMessage,
-  FixtureWindow,
-  MockAgentOptions,
-  TestPort
-} from "./pi67-renderer-fixture-types.js";
+import type { FixtureAgentState, FixtureMessage, FixtureWindow,
+  MockAgentOptions, TestPort } from "./pi67-renderer-fixture-types.js";
 export type { FixtureMessage, MockAgentOptions } from "./pi67-renderer-fixture-types.js";
 export { createMockProviderConfigurationSnapshot } from "./pi67-provider-configuration-snapshot-fixture.js";
 export {
@@ -375,15 +370,18 @@ export async function attachMockAgent(
         const sessionFileIdentity = emitOptions.sessionFileIdentity
           ?? String(state.snapshot.sessionFileIdentity);
         const sessionGeneration = emitOptions.sessionGeneration ?? state.sessionGeneration;
-        const workspaceEvent = event.type === "provider.configuration.changed";
+        const eventContext = emitOptions.context
+          ?? (event.type === "provider.configuration.changed" ? "app" : "task");
         state.activePort?.postMessage({
           protocolVersion: fixtureProtocolVersion,
           kind: "event",
           hostEpoch: targetEpoch,
           sequence,
-          context: workspaceEvent
-            ? { scope: "workspace", workspaceId: state.workspaceId }
-            : {
+          context: eventContext === "app"
+            ? { scope: "app" }
+            : eventContext === "workspace"
+              ? { scope: "workspace", workspaceId: state.workspaceId }
+              : {
                 scope: "task",
                 workspaceId: state.workspaceId,
                 taskId: state.taskId,
@@ -393,7 +391,7 @@ export async function attachMockAgent(
                 sessionGeneration,
                 ...(emitOptions.operationId === undefined ? {} : { operationId: emitOptions.operationId })
               },
-          ...(workspaceEvent ? {} : { taskSequence }),
+          ...(eventContext === "task" ? { taskSequence } : {}),
           type: event.type,
           payload: event.payload
         });

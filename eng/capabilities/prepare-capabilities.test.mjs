@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.12.1");
+    expect(lock.catalogVersion).toBe("2026.08.16.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -27,7 +27,7 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
       commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
-      includedExtensions: ["pi-rules-loader", "pi-vision-bridge", "xtalpi-pi-tools"]
+      includedExtensions: ["pi-rules-loader"]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.4.0",
@@ -73,7 +73,7 @@ describe("Desktop first-party capability source lock", () => {
     expect(() => assertCapabilitySourceLock(withoutSelection)).toThrow(/bundled Extension selection/u);
 
     const unordered = structuredClone(lock);
-    unordered.sources[coreIndex].includedExtensions = ["xtalpi-pi-tools", "pi-rules-loader"];
+    unordered.sources[coreIndex].includedExtensions = ["pi-rules-loader", "pi-rules-loader"];
     expect(() => assertCapabilitySourceLock(unordered)).toThrow(/bundled Extension selection/u);
   });
 

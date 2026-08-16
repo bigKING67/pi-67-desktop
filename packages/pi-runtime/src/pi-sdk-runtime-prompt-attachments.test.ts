@@ -127,6 +127,10 @@ async function initializedRuntime(access: PromptAttachmentAccess): Promise<{
   const session = (runtime as unknown as {
     sessionBindings: { requireSession(): AgentSession };
   }).sessionBindings.requireSession();
+  Object.defineProperty(session, "model", {
+    configurable: true,
+    value: { input: ["text", "image"] }
+  });
   return { runtime, session };
 }
 

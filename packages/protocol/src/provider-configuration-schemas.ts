@@ -69,6 +69,18 @@ export interface PiDefaultModelConfiguration {
   projectTrusted: boolean;
 }
 
+export type PiVisionAssistantOverride =
+  | { mode: "disabled" }
+  | { mode: "model"; provider: string; model: string };
+
+export interface PiVisionAssistantConfiguration {
+  global?: PiDefaultModelSelection;
+  project?: PiVisionAssistantOverride;
+  effective?: PiDefaultModelSelection;
+  disabledByProject: boolean;
+  projectTrusted: boolean;
+}
+
 export interface PiProviderConfigurationSnapshot {
   revision: string;
   syncState: "current" | "invalid";
@@ -76,6 +88,7 @@ export interface PiProviderConfigurationSnapshot {
   providers: PiProviderConfigurationView[];
   credentials: PiCredentialSummary[];
   defaults: PiDefaultModelConfiguration;
+  vision: PiVisionAssistantConfiguration;
   files: PiConfigurationFileStatus[];
   diagnostics: PiConfigurationDiagnostic[];
 }
@@ -248,6 +261,23 @@ const PiDefaultModelConfigurationSchema = strictObject({
   projectTrusted: Type.Boolean()
 });
 
+const PiVisionAssistantOverrideSchema = Type.Union([
+  strictObject({ mode: Type.Literal("disabled") }),
+  strictObject({
+    mode: Type.Literal("model"),
+    provider: IdentifierSchema,
+    model: IdentifierSchema
+  })
+]);
+
+const PiVisionAssistantConfigurationSchema = strictObject({
+  global: Type.Optional(PiDefaultModelSelectionSchema),
+  project: Type.Optional(PiVisionAssistantOverrideSchema),
+  effective: Type.Optional(PiDefaultModelSelectionSchema),
+  disabledByProject: Type.Boolean(),
+  projectTrusted: Type.Boolean()
+});
+
 export const PiProviderConfigurationSnapshotSchema = strictObject({
   revision: RevisionSchema,
   syncState: Type.Union([Type.Literal("current"), Type.Literal("invalid")]),
@@ -255,6 +285,7 @@ export const PiProviderConfigurationSnapshotSchema = strictObject({
   providers: Type.Array(PiProviderConfigurationViewSchema, { maxItems: 512 }),
   credentials: Type.Array(PiCredentialSummarySchema, { maxItems: 512 }),
   defaults: PiDefaultModelConfigurationSchema,
+  vision: PiVisionAssistantConfigurationSchema,
   files: Type.Array(PiConfigurationFileStatusSchema, { minItems: 4, maxItems: 4 }),
   diagnostics: Type.Array(PiConfigurationDiagnosticSchema, { maxItems: 64 })
 });

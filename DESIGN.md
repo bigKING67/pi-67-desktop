@@ -739,9 +739,9 @@ loading error where the operation can produce those states
   summary; global-only sections do not repeat a redundant `全局设置` label, while
   project-aware sections retain the explicit scope switch in the same header row.
 - Settings owns `账户`, `外观`, `模型`, `扩展`, `技能`,
-  `提示词模板`, `工作规则`, `飞书`, `浏览器集成`, `运行服务`, `用量分析`,
+  `提示词模板`, `工作规则`, `飞书`, `视觉辅助`, `浏览器集成`, `运行服务`, `用量分析`,
   `下载源与网络`, `更新与诊断`, and `关于`. The directory groups them as
-  `应用`, `Pi`, `办公`, `连接与集成`, and `系统与支持`. Account, Appearance,
+  `应用`, `Pi`, `办公`, `能力与集成`, and `系统与支持`. Account, Appearance,
   Model Services, managed Rules, Lark, Browser Integration, Runtime, Usage,
   Download Sources/Network, Updates, and About are global-only and do not show a
   meaningless page-level scope control. Only the Extension workspace and Prompt
@@ -1061,7 +1061,7 @@ loading error where the operation can produce those states
 - At high zoom or an equivalently narrow effective viewport, Settings moves its
   category navigation from a fixed left column to one grouped Popover trigger above
   the content. The trigger names the current group and category; the Popover repeats
-  all visible search results under `应用`, `Pi`, `办公`, `连接与集成`, and `系统与支持`, is at
+  all visible search results under `应用`, `Pi`, `办公`, `能力与集成`, and `系统与支持`, is at
   most `320px` wide and bounded by the viewport height. The scope switch and current
   section remain at the top of the same document, while the content owns vertical
   scrolling without introducing document-level or two-dimensional overflow.
@@ -1073,9 +1073,13 @@ loading error where the operation can produce those states
   and move-down controls as the keyboard-accessible equivalent. Reordering never
   changes conversation recency or the selected Workspace.
 - Main verifies restored filesystem identity before the Renderer can reopen a
-  Workspace. Missing, unavailable, or identity-changed directories get a visible
-  recovery surface; identity change clears project trust until the user confirms
-  a directory again through the native picker.
+  Workspace. On macOS, an APFS remount may change only the mount-scoped device
+  number; when native canonical path, inode, and nanosecond birth time still match,
+  Main refreshes that device value without showing recovery UI or revoking an
+  established trust decision. A changed path, inode, or birth time still fails
+  closed. Missing, unavailable, or genuinely identity-changed directories get a
+  visible recovery surface, and genuine identity change clears project trust until
+  the user confirms a directory again through the native picker.
 - Workspace removal uses an application dialog rather than a native confirm. It
   states that only the workbench registration is removed and that the directory,
   Pi Sessions, and project files are not deleted. Open or live Tasks must be
@@ -1100,6 +1104,26 @@ loading error where the operation can produce those states
   configuration, not a parallel Desktop registry. Its file-status region names
   `~/.pi/agent/models.json`, `auth.json`, `settings.json`, and the trusted
   Workspace `.pi/settings.json` as the current source of truth.
+- The global `模型` document loads through App authority and never registers or
+  selects a Workspace as a prerequisite. It owns the Provider Catalog and Provider
+  editor. The project-scoped document is available only for the current trusted
+  Workspace and contains the project default override plus project file diagnostics.
+  An identity-reconfirmation error does not replace the global document with an
+  empty-state failure.
+- `视觉辅助` is an independent Settings document under `能力与集成`. It names the
+  effective image-capable Provider/model and states that
+  native visual models still receive images directly. Global scope offers
+  `关闭视觉辅助`; project scope offers `继承全局设置`, `当前项目关闭`, and explicit
+  configured image-capable models. Catalog-only or otherwise unconfigured models
+  never appear as selectable helpers. When none are usable, the document keeps the
+  disable/inherit controls available, shows a bounded empty state, and points to the
+  setup presets. A stale saved selection remains visible as unavailable rather than
+  being presented as effective. `Qwen3.7 Flash` is the first setup preset and
+  `Doubao Seed 2.0 Mini` is second. Global and project scope use the shared Settings
+  scope switch. A preset opens the existing custom Provider
+  editor with editable Endpoint, protocol, and model fields; it never saves,
+  requests a credential, or selects the helper until the user performs those
+  existing explicit actions.
 - Built-in Pi Providers and models remain visible for credential and default
   selection but are read-only. Creating or editing a custom Provider writes only
   its `models.json` entry; Desktop never copies built-in definitions into that
@@ -1287,8 +1311,20 @@ loading error where the operation can produce those states
   create a duplicate Session or stack the same resource reload.
 - Session import, compaction, and Extension command invocation reuse one caller-stable
   submission ID for at most one same-Host acknowledgement retry. A new Host epoch fails
-  closed instead of silently repeating work. Prompt attachments stay in the Composer
-  and require an explicit retry because transferred image buffers cannot be replayed.
+  closed instead of silently repeating work. After Agent Host claims Prompt
+  attachments, a failed visual-assistance Turn retains its pending preview and the
+  verified Task-scoped claimed set. `重试视觉识别` creates a new submission identity,
+  reuses that exact set only when its ordered opaque attachment identities match,
+  and reruns visual assistance before the main model. No failure silently resends
+  the Prompt, and Task release removes the claimed payloads.
+- Visual assistance runs only when the selected chat model is text-only and the
+  Turn contains static images. One Provider call receives every image plus bounded
+  user-task context. Success appends a typed out-of-context evidence entry and a
+  hidden text context entry to Pi JSONL before invoking the main model without
+  image bytes. The visible transcript card is collapsed by default and shows
+  Provider/model, image names and MIME types, token/cost metadata, and the generated
+  description. Missing configuration, unavailable image capability, cancellation,
+  and Provider failure leave the main model untouched and expose the explicit retry.
 - A delayed or replayed acknowledgement cannot turn a completed, failed, cancelled,
   or lost Operation back into accepted/running. Failed, cancelled, lost, and recovery
   states remain inline and observable. Successful completion yields to the Assistant
@@ -1709,12 +1745,13 @@ loading error where the operation can produce those states
   and unsupported versions stay unverified.
 - The Desktop-only Pi settings projection gives verified managed `pi67-core`
   runtime precedence over its legacy auto-discovered copies. It adds exact
-  force-exclusions for `pi-rules-loader`, `pi-vision-bridge`, and
-  `xtalpi-pi-tools` only while the managed Package path is active. No file
-  or persisted setting is mutated, unrelated Extensions are untouched, and
-  removing managed `pi67-core` restores normal legacy discovery. The visible
-  result is one Tool source, one rule activation notification, and no conflict
-  diagnostic for the same first-party extension.
+  force-exclusion for `pi-rules-loader` only while the managed Package path is
+  active. `pi-vision-bridge` and `xtalpi-pi-tools` are absent from the managed
+  capability catalog and are not Desktop force-exclusions. No file or persisted
+  setting is mutated, unrelated Extensions are untouched, and removing managed
+  `pi67-core` restores normal legacy discovery. The visible result is one rule
+  activation notification and no conflict diagnostic for that first-party
+  extension.
 - Verified `pi-mcp-adapter@2.10.0` and `2.11.0` `mcp` proxy calls distinguish
   local capability discovery from execution. Empty status, cached server lists,
   bounded search/describe, and current-Session UI-message reads use the

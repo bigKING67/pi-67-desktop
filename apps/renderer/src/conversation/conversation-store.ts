@@ -1,4 +1,5 @@
 import type {
+  ComposerWorkspaceFileRef,
   ConversationPage,
   MessagePageMetadata,
   SessionMessageView,
@@ -29,7 +30,7 @@ interface RecentConversationProjectionOptions {
   operationId?: string;
 }
 
-interface PendingUserAttachment extends StagedPromptAttachment {
+export interface PendingUserAttachment extends StagedPromptAttachment {
   previewUrl?: string;
 }
 
@@ -39,7 +40,9 @@ export interface PendingUserTurn {
   authority: ConversationAuthority;
   message: SessionMessageView;
   attachments: PendingUserAttachment[];
+  workspaceFiles?: ComposerWorkspaceFileRef[];
   status: "accepted" | "failed";
+  retryableVisionAssistance?: true;
 }
 
 export interface ConversationProjectionView {
@@ -85,7 +88,11 @@ interface ConversationState {
     options: RecentConversationProjectionOptions
   ) => boolean;
   installPendingUserTurn: (turn: PendingUserTurn) => boolean;
-  markPendingUserTurnFailed: (operationId: string, error: string) => boolean;
+  markPendingUserTurnFailed: (
+    operationId: string,
+    error: string,
+    retryableVisionAssistance?: boolean
+  ) => boolean;
   setStreaming: (streaming: boolean, authority: ConversationAuthority) => boolean;
 }
 
@@ -249,18 +256,19 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     ) return true;
     const replaced = state.pendingUserTurn;
     set({ pendingUserTurn: turn });
-    revokePendingAttachments(replaced);
+    revokePendingAttachments(replaced, turn.attachments);
     return true;
   },
 
-  markPendingUserTurnFailed(operationId, error) {
+  markPendingUserTurnFailed(operationId, error, retryableVisionAssistance = false) {
     const pendingUserTurn = get().pendingUserTurn;
     if (!pendingUserTurn || pendingUserTurn.operationId !== operationId) return false;
     set({
       pendingUserTurn: {
         ...pendingUserTurn,
         status: "failed",
-        message: { ...pendingUserTurn.message, error: `发送失败：${error}` }
+        message: { ...pendingUserTurn.message, error: `发送失败：${error}` },
+        ...(retryableVisionAssistance ? { retryableVisionAssistance: true as const } : {})
       }
     });
     return true;
@@ -373,9 +381,17 @@ function confirmsPendingUserTurn(
   return page.messages.some((message) => message.role === "user" && !currentIds.has(message.id));
 }
 
-function revokePendingAttachments(pending: PendingUserTurn | undefined): void {
+function revokePendingAttachments(
+  pending: PendingUserTurn | undefined,
+  retained: readonly PendingUserAttachment[] = []
+): void {
   if (!pending) return;
+  const retainedUrls = new Set(retained.flatMap((attachment) => (
+    attachment.previewUrl ? [attachment.previewUrl] : []
+  )));
   for (const attachment of pending.attachments) {
-    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+    if (attachment.previewUrl && !retainedUrls.has(attachment.previewUrl)) {
+      URL.revokeObjectURL(attachment.previewUrl);
+    }
   }
 }

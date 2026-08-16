@@ -223,7 +223,7 @@ test("uses a list-to-detail model flow in a narrow Settings workspace", async ({
   await expect(editor).toBeHidden();
 });
 
-test("persists a Provider credential from a registered Workspace without starting a Task", async ({ page }) => {
+test("persists a Provider credential through App authority without starting a Task", async ({ page }) => {
   const providerConfigurationSnapshot = createMockDeepSeekProviderConfigurationSnapshot();
   await page.goto("/");
   await attachMockAgent(page, [], {}, {
@@ -266,12 +266,12 @@ test("persists a Provider credential from a registered Workspace without startin
   await expect(apiKeyInput).toHaveAttribute("type", "password");
   await dialog.getByRole("button", { name: "保存到 Pi" }).click();
 
-  await expect(dialog.getByText("已持久化到 Pi auth.json")).toBeVisible();
+  await expect(page.getByText("凭据已保存到 Pi auth.json", { exact: true }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("workspace-secret-1234");
   expect(await recordedCommandDetails(page)).toContainEqual(expect.objectContaining({
     type: "provider.credential.store",
     payload: expect.objectContaining({ provider: "deepseek", apiKey: "[redacted]" }),
-    context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+    context: { scope: "app" }
   }));
   await clearRecordedCommands(page);
   await dialog.getByRole("button", { name: "移除持久凭据" }).click();
@@ -291,7 +291,7 @@ test("persists a Provider credential from a registered Workspace without startin
   expect(commands).toContainEqual(expect.objectContaining({
     type: "provider.credential.remove",
     payload: expect.objectContaining({ provider: "deepseek" }),
-    context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id }
+    context: { scope: "app" }
   }));
 });
 
@@ -396,7 +396,7 @@ test("edits Pi Provider files, selects built-in defaults, and preserves a stale 
     command.type === "provider.configuration.save"
   ));
   expect(saveCommand).toMatchObject({
-    context: { scope: "workspace", workspaceId: DEFAULT_MOCK_WORKSPACE.id },
+    context: { scope: "app" },
     payload: {
       provider: {
         id: "host-custom",

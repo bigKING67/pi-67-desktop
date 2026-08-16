@@ -25,43 +25,58 @@ const TASK_CONTEXT: TaskProtocolContext = {
   taskGeneration: 1
 };
 
-describe("Workspace Provider protocol", () => {
-  it("requires Workspace authority and explicit replay safety for every mutation", () => {
-    const queries = [
-      "provider.list",
+describe("Provider configuration protocol", () => {
+  it("separates global App authority from Workspace runtime and project authority", () => {
+    const appQueries = [
       "provider.configuration.get",
       "provider.configuration.reload",
       "provider.credential.reveal"
     ] as const;
-    const mutations = [
-      "provider.setRuntimeKey",
+    const appMutations = [
       "provider.configuration.save",
       "provider.configuration.remove",
       "provider.credential.store",
       "provider.credential.remove",
-      "model.default.set"
+      "model.default.set",
+      "vision.assistant.global.set"
     ] as const;
-    for (const type of [...queries, ...mutations]) {
+    const workspaceQueries = [
+      "provider.list",
+      "provider.projectConfiguration.get",
+      "provider.projectConfiguration.reload"
+    ] as const;
+    const workspaceMutations = [
+      "provider.setRuntimeKey",
+      "model.projectDefault.set",
+      "vision.assistant.project.set"
+    ] as const;
+    for (const type of [...appQueries, ...appMutations]) {
+      expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type]).toBe("app");
+      expect(hasValidCommandContext(type, APP_PROTOCOL_CONTEXT)).toBe(true);
+      expect(hasValidCommandContext(type, WORKSPACE_CONTEXT)).toBe(false);
+      expect(hasValidCommandContext(type, TASK_CONTEXT)).toBe(false);
+    }
+    for (const type of [...workspaceQueries, ...workspaceMutations]) {
       expect(COMMAND_CONTEXT_SCOPE_REQUIREMENTS[type]).toBe("workspace");
       expect(hasValidCommandContext(type, WORKSPACE_CONTEXT)).toBe(true);
       expect(hasValidCommandContext(type, APP_PROTOCOL_CONTEXT)).toBe(false);
       expect(hasValidCommandContext(type, TASK_CONTEXT)).toBe(false);
     }
-    for (const type of queries) expect(isReplaySafeControlMutation(type)).toBe(false);
-    for (const type of mutations) expect(isReplaySafeControlMutation(type)).toBe(true);
+    for (const type of [...appQueries, ...workspaceQueries]) expect(isReplaySafeControlMutation(type)).toBe(false);
+    for (const type of [...appMutations, ...workspaceMutations]) expect(isReplaySafeControlMutation(type)).toBe(true);
   });
 
-  it("allows one bounded credential reveal response only for an explicit Workspace request", () => {
+  it("allows one bounded credential reveal response only for an explicit App request", () => {
     const revision = "a".repeat(64);
     const request = commandEnvelope("provider.credential.reveal", {
       expectedRevision: revision,
       provider: "anthropic"
-    }, WORKSPACE_CONTEXT, 4);
+    }, APP_PROTOCOL_CONTEXT, 4);
     expect(isRequestEnvelope(request)).toBe(true);
     expect(isRequestEnvelope({ ...request, context: TASK_CONTEXT })).toBe(false);
     expect(isReplaySafeControlMutation(request.type)).toBe(false);
 
-    const response = responseEnvelope("reveal-provider", 4, WORKSPACE_CONTEXT, {
+    const response = responseEnvelope("reveal-provider", 4, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "provider.credential.reveal",
       result: {
@@ -129,7 +144,7 @@ describe("Workspace Provider protocol", () => {
     const save = commandEnvelope("provider.configuration.save", {
       expectedRevision: revision,
       provider
-    }, WORKSPACE_CONTEXT, 4, "save-provider");
+    }, APP_PROTOCOL_CONTEXT, 4, "save-provider");
     expect(isRequestEnvelope(save)).toBe(true);
     expect(isRequestEnvelope({ ...save, idempotencyKey: undefined })).toBe(false);
     expect(isRequestEnvelope({
@@ -145,7 +160,7 @@ describe("Workspace Provider protocol", () => {
       expectedRevision: revision,
       provider: "custom",
       apiKey: "write-only-credential"
-    }, WORKSPACE_CONTEXT, 4, "store-credential");
+    }, APP_PROTOCOL_CONTEXT, 4, "store-credential");
     expect(isRequestEnvelope(credential)).toBe(true);
     expect(isRequestEnvelope({
       ...credential,
@@ -154,10 +169,10 @@ describe("Workspace Provider protocol", () => {
 
     const defaultModel = commandEnvelope("model.default.set", {
       expectedRevision: revision,
-      scope: "project",
+      scope: "global",
       provider: "custom",
       model: "model-a"
-    }, WORKSPACE_CONTEXT, 4, "set-default-model");
+    }, APP_PROTOCOL_CONTEXT, 4, "set-default-model");
     expect(isRequestEnvelope(defaultModel)).toBe(true);
     expect(isRequestEnvelope({
       ...defaultModel,
@@ -167,7 +182,7 @@ describe("Workspace Provider protocol", () => {
       ...defaultModel,
       payload: {
         expectedRevision: revision,
-        scope: "project"
+        scope: "global"
       }
     })).toBe(true);
   });
@@ -201,6 +216,10 @@ describe("Workspace Provider protocol", () => {
         effective: { provider: "custom", model: "model-a" },
         projectTrusted: true
       },
+      vision: {
+        disabledByProject: false,
+        projectTrusted: true
+      },
       files: [
         { kind: "models" as const, path: "/fixture/models.json", exists: true, valid: true },
         { kind: "auth" as const, path: "/fixture/auth.json", exists: true, valid: true },
@@ -209,7 +228,7 @@ describe("Workspace Provider protocol", () => {
       ],
       diagnostics: []
     };
-    const response = responseEnvelope("configuration", 4, WORKSPACE_CONTEXT, {
+    const response = responseEnvelope("configuration", 4, APP_PROTOCOL_CONTEXT, {
       ok: true,
       type: "provider.configuration.get",
       result: snapshot
@@ -224,7 +243,7 @@ describe("Workspace Provider protocol", () => {
     }, {
       hostEpoch: 4,
       sequence: 1,
-      context: WORKSPACE_CONTEXT
+      context: APP_PROTOCOL_CONTEXT
     });
     expect(isEventEnvelope(event)).toBe(true);
     const serialized = JSON.stringify({ response, event });

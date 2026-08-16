@@ -59,7 +59,6 @@ test("separates extension packages, extensions, skills, prompt templates, and co
 
   await extensionTabs.getByRole("tab", { name: "内置扩展", exact: true }).click();
   await expect(extensionWorkspace.getByText("pi-rules-loader", { exact: true })).toBeVisible();
-  await expect(extensionWorkspace.getByText("xtalpi-pi-tools", { exact: true })).toBeVisible();
   await expect(extensionWorkspace.getByText("随应用更新", { exact: false }).first()).toBeVisible();
 
   await extensionTabs.getByRole("tab", { name: "本地扩展", exact: true }).click();

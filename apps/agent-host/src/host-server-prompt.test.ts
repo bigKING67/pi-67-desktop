@@ -176,7 +176,9 @@ describe("AgentHostServer prompt routing", () => {
 
     complete();
     await vi.waitFor(() => expect(flushStream).toHaveBeenCalledOnce());
-    const operationEvents = port.sent.filter(isEventEnvelope).map((event) => event.type);
+    const operationEvents = port.sent.filter(isEventEnvelope)
+      .map((event) => event.type)
+      .filter((type) => type.startsWith("operation."));
     expect(operationEvents).toEqual(["operation.started", "operation.completed"]);
     await server.shutdown();
   });

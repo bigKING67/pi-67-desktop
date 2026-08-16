@@ -74,7 +74,7 @@ the only Runtime and behavior specification source.
    without exposing credentials or private content.
 6. Move sequentially between Desktop and Pi TUI using the same Pi JSONL session.
 7. Open the singleton Settings surface across Application, Pi, Office,
-   Connections & Integrations, and System & Support categories without losing
+   Capabilities & Integrations, and System & Support categories without losing
    drafts or background work.
 8. Install and operate Pi Extensions, Skills, Prompts, and Rules; configure
    external MCP services; and prepare supported browser integrations without
@@ -290,8 +290,8 @@ the only Runtime and behavior specification source.
   is not authorization expiry: `needs_refresh` remains usable and is described as
   automatic renewal on the next user API call; only an invalid or expired refresh
   grant requires a new browser authorization.
-- Browser capability readiness is the only first-party task under Settings'
-  Connections & Integrations group. The separate Office group owns Lark identity;
+- Visual assistance and browser capability readiness are the first-party tasks under
+  Settings' Capabilities & Integrations group. The separate Office group owns Lark identity;
   it is not a generic MCP endpoint or credential editor.
   `浏览器集成` owns browser-specific dependency preparation and runtime diagnostics.
   Pi user-owned MCP configuration remains visible through normal Runtime capability
@@ -440,12 +440,12 @@ the only Runtime and behavior specification source.
   cursors fail closed outside `YOLO` because their original root cannot be
   proven.
 - While the verified managed `pi67-core` Package is active, the Task-local Pi
-  settings view force-excludes the three first-party legacy auto-discovered copies
-  under `~/.pi/agent/extensions` (`pi-rules-loader`, `pi-vision-bridge`, and
-  `xtalpi-pi-tools`). The legacy files and user settings
-  are not deleted or rewritten; the managed Package becomes the single runtime
-  source. If managed `pi67-core` is absent, Desktop applies no exclusion. This
-  prevents duplicate Tool registrations, duplicate rule notifications, and
+  settings view force-excludes the first-party legacy auto-discovered
+  `pi-rules-loader` copy under `~/.pi/agent/extensions`. The legacy file and user
+  settings are not deleted or rewritten; the managed Package becomes the single
+  runtime source. `pi-vision-bridge` and `xtalpi-pi-tools` are no longer managed,
+  bundled, or force-excluded by Desktop. If managed `pi67-core` is absent,
+  Desktop applies no exclusion. This prevents duplicate rule notifications and
   duplicate-source ambiguity without taking ownership of unrelated user
   Extensions. Individual Tool capabilities still follow their own Safety
   Profile; deduplication does not grant authority by itself.
@@ -513,7 +513,8 @@ the only Runtime and behavior specification source.
   scope are explicit only where meaningful, and changing the current workspace
   retargets project scope instead of creating another Settings instance.
 - Settings navigation groups `账户` and `外观` under Application; Pi resources
-  under Pi; `飞书` under Office; browser work under Connections & Integrations;
+  under Pi; `飞书` under Office; visual assistance and browser work under
+  Capabilities & Integrations;
   and runtime, network, updates, and About under System & Support. Category
   search searches these navigation targets rather than arbitrary page content.
   Narrow windows use the same grouped information architecture in a bounded
@@ -595,6 +596,34 @@ the only Runtime and behavior specification source.
   `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
   `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
   model configuration copy.
+- Global Provider, credential, default-model, and visual-assistance settings use
+  App authority and remain available before any Workspace is registered. Project
+  default and visual-assistance overrides remain Workspace- and trust-bound; an
+  unavailable, identity-changed, or untrusted Workspace cannot block the global
+  settings view and cannot be used to read or mutate project configuration.
+- Visual assistance is an optional Pi setting stored at
+  `pi67Desktop.visionAssistant`. The global value selects one configured
+  image-capable Pi Provider/model pair. A trusted project may inherit it, disable
+  it, or select a different configured image-capable pair. The Settings presets
+  for `Qwen3.7 Flash` and `Doubao Seed 2.0 Mini` only prefill editable custom Pi
+  Provider definitions; they do not create a second Provider registry, embed a
+  credential, or assert that a billable live request has succeeded.
+- A selected chat model that accepts images receives static image attachments
+  directly through Pi. For a text-only chat model, all images in the Turn and a
+  bounded copy of the user's task text are sent once to the effective visual
+  assistant through Pi's existing authenticated `ModelRuntime.completeSimple`
+  path before the main Prompt begins. The resulting text description, never the
+  image bytes, becomes hidden context for the selected text-only model. Desktop
+  does not silently change the selected chat model or route a failed native image
+  call through the helper.
+- Successful helper output is persisted in Pi JSONL as a typed, non-context
+  `pi67.vision-assistance.v1` evidence entry plus its hidden text-only context.
+  The transcript exposes a collapsed evidence card with the Provider/model,
+  attachment identities, token/cost metadata, and description. Prompt, image
+  bytes, credentials, and raw Provider payloads remain absent from diagnostics.
+  If helper configuration or execution fails, the main model is not invoked; the
+  failed pending Turn and its Task-scoped claimed attachment set remain available
+  for an explicit retry with a new submission identity.
 - Desktop registers one built-in `Groland` Provider with one Pi credential and
   seven image-capable reasoning models. `claude-opus-4-6`, `claude-opus-4-7`,
   `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-sonnet-5` use Anthropic
@@ -639,12 +668,14 @@ the only Runtime and behavior specification source.
   view adopts external TUI, script, or manual edits automatically; an unsaved
   draft remains intact and must explicitly adopt the newer revision before it
   can overwrite anything.
-- Initial Provider configuration reads are independent of Task Runtime and
-  Session Catalog initialization. Manual get/reload refreshes only the requested
-  Workspace, while file access, offline Pi model validation, settings reload, and
-  Renderer acknowledgement each have nested budgets. A stalled validation returns
-  an `invalid` snapshot with bounded diagnostics; a stalled file read returns a
-  structured recoverable error before the Renderer transport budget expires.
+- Initial global Provider configuration reads are independent of Workspace,
+  Task Runtime, and Session Catalog initialization. Manual global get/reload
+  refreshes the canonical Pi agent files; project get/reload refreshes only its
+  available trusted Workspace. File access, offline Pi model validation, settings
+  reload, and Renderer acknowledgement each have nested budgets. A stalled
+  validation returns an `invalid` snapshot with bounded diagnostics; a stalled
+  file read returns a structured recoverable error before the Renderer transport
+  budget expires.
 - Creating the Pi `ModelRuntime` for a real Task uses the same 4-second Host-side
   offline startup budget. If Pi configuration loading stalls, Workspace/Session
   initialization returns a structured recoverable `RUNTIME_NOT_READY` failure with
@@ -1081,13 +1112,20 @@ the only Runtime and behavior specification source.
   keeps the current in-memory draft but writes no plaintext fallback. The document never stores
   attachments, staged attachment handles, transcript, Tool payloads, source bodies, credentials,
   or a second authoritative Session history.
-- Electron Main may persist a bounded, schema-validated Workbench V4 layout with
+- Electron Main may persist a bounded, schema-validated Workbench V5 layout with
   Workspace identity and ordering, expanded Workspace IDs, the selected
   conversation or Settings surface, Settings scope, at most eight runtime recovery
   identities, and clean-exit state. Ordinary idle Session rows are rebuilt from
   Catalog instead of being persisted as open UI objects. Draft text, attachments,
   transcript, runtime detail, private fallback titles, and credential material
   never enter that layout.
+- Workspace restoration distinguishes durable directory evidence from a
+  mount-scoped device number. On macOS, exact native canonical path, inode, and
+  nanosecond birth time permit a device-only APFS remount rebind and refresh the
+  persisted device value without another picker prompt. This also repairs the
+  bounded legacy false-positive state produced by the former strict comparison.
+  Any path, inode, or birth-time change, and every path-only registration, remains
+  fail-closed and requires the existing explicit native-picker confirmation.
 - Revision-aware Pi configuration, Context Markdown, and Workspace-file saves use
   one same-directory atomic-replace implementation: the new file is flushed before
   a final revision fence and rename. On Windows only `EACCES`, `EPERM`, and `EBUSY`

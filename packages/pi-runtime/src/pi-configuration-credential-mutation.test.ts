@@ -22,8 +22,7 @@ describe("PiConfigurationService credential mutations", () => {
       const saved = await registerProvider(fixture);
       const createRuntime = vi.spyOn(ModelRuntime, "create");
 
-      const snapshot = await fixture.service.storeCredential(
-        fixture.cwd,
+      const snapshot = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "single-validation-runtime-credential"
@@ -58,8 +57,7 @@ describe("PiConfigurationService credential mutations", () => {
         return runtime;
       });
 
-      const snapshot = await fixture.service.storeCredential(
-        fixture.cwd,
+      const snapshot = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "models-revision-credential"
@@ -83,8 +81,7 @@ describe("PiConfigurationService credential mutations", () => {
         new Error("credential validation failed")
       );
 
-      await expect(fixture.service.storeCredential(
-        fixture.cwd,
+      await expect(fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "must-be-rolled-back"
@@ -93,7 +90,7 @@ describe("PiConfigurationService credential mutations", () => {
       await expect(readFile(fixture.service.authPath, "utf8"))
         .rejects.toMatchObject({ code: "ENOENT" });
       await expect(configurationCredentialStore(fixture.service).list()).resolves.toEqual([]);
-      expect((await fixture.service.get(fixture.cwd)).credentials).toEqual([]);
+      expect((await fixture.service.getGlobal()).credentials).toEqual([]);
     } finally {
       await fixture.dispose();
     }
@@ -117,8 +114,7 @@ describe("PiConfigurationService credential mutations", () => {
         return runtime;
       });
 
-      await expect(fixture.service.storeCredential(
-        fixture.cwd,
+      await expect(fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "desktop-credential"
@@ -138,16 +134,14 @@ describe("PiConfigurationService credential mutations", () => {
     const fixture = await createFixture();
     try {
       const saved = await registerProvider(fixture);
-      const stored = await fixture.service.storeCredential(
-        fixture.cwd,
+      const stored = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "credential-to-remove"
       );
       const createRuntime = vi.spyOn(ModelRuntime, "create");
 
-      const removed = await fixture.service.removeCredential(
-        fixture.cwd,
+      const removed = await fixture.service.removeGlobalCredential(
         stored.revision,
         "pi67-test"
       );
@@ -165,15 +159,14 @@ describe("PiConfigurationService credential mutations", () => {
     const fixture = await createFixture();
     try {
       const saved = await registerProvider(fixture);
-      const stored = await fixture.service.storeCredential(
-        fixture.cwd,
+      const stored = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "last-known-good-credential"
       );
       await writeFile(fixture.service.authPath, "{ invalid external auth JSON\n", "utf8");
 
-      const invalid = await fixture.service.reload(fixture.cwd);
+      const invalid = await fixture.service.reloadGlobal();
 
       expect(invalid).toMatchObject({
         syncState: "invalid",
@@ -210,8 +203,8 @@ async function createFixture() {
 }
 
 async function registerProvider(fixture: Awaited<ReturnType<typeof createFixture>>) {
-  const initial = await fixture.service.get(fixture.cwd);
-  return fixture.service.saveProvider(fixture.cwd, initial.revision, {
+  const initial = await fixture.service.getGlobal();
+  return fixture.service.saveGlobalProvider(initial.revision, {
     id: "pi67-test",
     name: "Pi 67 Test",
     baseUrl: "https://example.invalid/v1",

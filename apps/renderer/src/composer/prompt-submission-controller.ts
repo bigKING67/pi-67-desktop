@@ -4,7 +4,10 @@ import {
 } from "@pi67/domain";
 import type { OperationSubmissionResult } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
-import { useConversationStore } from "../conversation/conversation-store.js";
+import {
+  useConversationStore,
+  type PendingUserAttachment
+} from "../conversation/conversation-store.js";
 import { useLiveTurnStore } from "../live-turn/live-turn-store.js";
 import { publishNotification } from "../notifications/notification-store.js";
 import { useAppStore } from "../app/app-store.js";
@@ -17,7 +20,6 @@ import {
 } from "../app/prompt-submission-authority.js";
 import { userMessagePreview } from "../workbench/recent-user-message.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/workbench-store.js";
-import type { DraftAttachment } from "./composer-attachments.js";
 
 export type PromptSubmissionResult =
   | { accepted: true; operationId: string; retainsAttachmentPreviews: boolean; terminalError?: string }
@@ -27,7 +29,7 @@ export async function submitRendererPrompt(
   text: string,
   behavior: "send" | "steer" | "followUp",
   submissionId: string,
-  attachments: readonly DraftAttachment[] = [],
+  attachments: readonly PendingUserAttachment[] = [],
   workspaceFiles: readonly ComposerWorkspaceFileRef[] = []
 ): Promise<PromptSubmissionResult> {
   if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
@@ -63,7 +65,7 @@ export async function submitRendererPrompt(
     const result = applyAcceptedPrompt(accepted, expectedAuthority);
     const taskStillSelected = selectedTaskId !== undefined
       && selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === selectedTaskId;
-    const terminalError = settledPromptError(accepted);
+    const terminalFailure = settledPromptFailure(accepted);
     const retainsAttachmentPreviews = result.accepted
       && delivery === "new-turn"
       && taskStillSelected
@@ -89,12 +91,16 @@ export async function submitRendererPrompt(
             })
           ],
           createdAt: Date.now(),
-          ...(terminalError === undefined
+          ...(terminalFailure === undefined
             ? {}
-            : { error: `发送失败：${terminalError}` })
+            : { error: `发送失败：${terminalFailure.message}` })
         },
         attachments: attachments.map((attachment) => ({ ...attachment })),
-        status: terminalError === undefined ? "accepted" : "failed"
+        workspaceFiles: workspaceFiles.map((file) => ({ ...file })),
+        status: terminalFailure === undefined ? "accepted" : "failed",
+        ...(terminalFailure?.retryableVisionAssistance
+          ? { retryableVisionAssistance: true as const }
+          : {})
       });
     if (result.accepted && selectedTaskId) {
       const preview = userMessagePreview(text, attachments.length > 0);
@@ -108,7 +114,7 @@ export async function submitRendererPrompt(
       ? {
           ...result,
           retainsAttachmentPreviews,
-          ...(terminalError === undefined ? {} : { terminalError })
+          ...(terminalFailure === undefined ? {} : { terminalError: terminalFailure.message })
         }
       : result;
   } catch (error) {
@@ -120,6 +126,22 @@ export async function submitRendererPrompt(
     });
     return { accepted: false, error: detail };
   }
+}
+
+export async function retryPendingVisualAssistance(): Promise<boolean> {
+  const pending = useConversationStore.getState().pendingUserTurn;
+  if (pending?.status !== "failed" || !pending.retryableVisionAssistance) return false;
+  const text = pending.message.parts.flatMap((part) => (
+    part.type === "text" ? [part.text] : []
+  )).join("\n");
+  const result = await submitRendererPrompt(
+    text,
+    "send",
+    crypto.randomUUID(),
+    pending.attachments,
+    pending.workspaceFiles ?? []
+  );
+  return result.accepted;
 }
 
 function applyAcceptedPrompt(
@@ -153,9 +175,17 @@ function applyAcceptedPrompt(
   return { accepted: true, operationId: accepted.operationId, retainsAttachmentPreviews: false };
 }
 
-function settledPromptError(result: OperationSubmissionResult): string | undefined {
+function settledPromptFailure(result: OperationSubmissionResult): {
+  message: string;
+  retryableVisionAssistance: boolean;
+} | undefined {
   if (result.kind !== "settled" || result.lifecycle === "completed") return undefined;
-  return result.lifecycle === "failed" ? result.error.message : result.reason;
+  return result.lifecycle === "failed"
+    ? {
+        message: result.error.message,
+        retryableVisionAssistance: result.error.details?.phase === "vision-assistance"
+      }
+    : { message: result.reason, retryableVisionAssistance: false };
 }
 
 function errorMessage(error: unknown): string {

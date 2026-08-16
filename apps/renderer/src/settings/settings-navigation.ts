@@ -5,6 +5,7 @@ import {
   ChartNoAxesCombined,
   Blocks,
   Bot,
+  Eye,
   FileText,
   Globe,
   Info,
@@ -139,8 +140,23 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
     ]
   },
   {
-    label: messages.settings.groups.connections,
+    label: messages.settings.groups.capabilities,
     items: [
+      {
+        id: "vision",
+        ...messages.settings.sections.vision,
+        searchTerms: [
+          "视觉模型",
+          "图片识别",
+          "图像识别",
+          "多模态",
+          "Qwen VL",
+          "豆包",
+          "vision",
+          "image"
+        ],
+        icon: Eye
+      },
       {
         id: "integrations",
         ...messages.settings.sections.integrations,
@@ -198,7 +214,9 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
 export const SETTINGS_SECTIONS = SETTINGS_GROUPS.flatMap((group) => group.items);
 
 export function sectionSupportsProjectScope(section: SettingsSection): boolean {
-  return section === "packages"
+  return section === "providers"
+    || section === "vision"
+    || section === "packages"
     || section === "extensions"
     || section === "prompts"
     || section === "usage";

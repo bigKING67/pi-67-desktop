@@ -1,0 +1,180 @@
+.section {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-raised) 86%, var(--accent) 2%);
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.heading > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.heading strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.heading small {
+  max-width: 780px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--focus) 30%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--focus) 9%, var(--surface));
+  color: var(--focus);
+}
+
+.controlRow {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, auto);
+  gap: 12px;
+  align-items: end;
+}
+
+.controlRow label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.controlRow select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 34px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.controlRow select:focus-visible {
+  border-color: var(--focus);
+  outline: 2px solid color-mix(in srgb, var(--focus) 18%, transparent);
+  outline-offset: 1px;
+}
+
+.noModels {
+  color: var(--warning);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.effective {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.effective svg {
+  color: var(--success);
+}
+
+.effectiveWarning {
+  border-color: color-mix(in srgb, var(--warning) 32%, var(--border));
+  background: color-mix(in srgb, var(--warning) 7%, var(--surface-muted));
+}
+
+.effectiveWarning svg {
+  color: var(--warning);
+}
+
+.effective strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.presets article {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.presets article > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 2px 7px;
+  align-items: center;
+}
+
+.presets em {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  grid-row: 1 / span 2;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.presets strong,
+.presets small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presets strong {
+  font-size: 11px;
+}
+
+.presets small {
+  color: var(--text-tertiary);
+  font-size: 9px;
+}
+
+@media (max-width: 920px) {
+  .controlRow,
+  .presets {
+    grid-template-columns: 1fr;
+  }
+}

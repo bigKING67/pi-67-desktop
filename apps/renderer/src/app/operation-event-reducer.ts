@@ -100,7 +100,14 @@ export function reduceOperationEvent<TState extends AppEventState>(
         settledAt: event.payload.failedAt,
         error: event.payload.error
       });
-      finishOperation(set, event.payload.operationId, "failed", event.payload.error.message, sessionAuthority);
+      finishOperation(
+        set,
+        event.payload.operationId,
+        "failed",
+        event.payload.error.message,
+        sessionAuthority,
+        event.payload.error.details?.phase === "vision-assistance"
+      );
       return true;
     case "operation.cancelled":
       if (!sessionAuthority || !acceptOperationTerminal(get(), event.payload.operationId, sessionAuthority)) return false;
@@ -213,11 +220,16 @@ function finishOperation<TState extends AppEventState>(
   operationId: string,
   lifecycle: OperationLifecycle,
   detail: string,
-  authority: RendererSessionAuthority
+  authority: RendererSessionAuthority,
+  retryableVisionAssistance = false
 ): void {
   useLiveTurnStore.getState().finish(operationId, lifecycle);
   if (lifecycle !== "completed") {
-    useConversationStore.getState().markPendingUserTurnFailed(operationId, detail);
+    useConversationStore.getState().markPendingUserTurnFailed(
+      operationId,
+      detail,
+      retryableVisionAssistance
+    );
   }
   useConversationStore.getState().setStreaming(false, authority);
   set((state) => state.operation?.operationId === operationId ? {

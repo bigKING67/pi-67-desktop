@@ -2,6 +2,7 @@ import {
   isResponseEnvelope,
   responseEnvelope,
   type AgentCommandType,
+  type AppProtocolContext,
   type WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { describe, expect, it } from "vitest";
@@ -11,6 +12,7 @@ const WORKSPACE_CONTEXT: WorkspaceProtocolContext = {
   scope: "workspace",
   workspaceId: "workspace-test"
 };
+const APP_CONTEXT: AppProtocolContext = { scope: "app" };
 
 const PROVIDER_SNAPSHOT_COMMANDS = [
   "provider.configuration.get",
@@ -19,7 +21,14 @@ const PROVIDER_SNAPSHOT_COMMANDS = [
   "provider.configuration.remove",
   "provider.credential.store",
   "provider.credential.remove",
-  "model.default.set"
+  "model.default.set",
+  "vision.assistant.global.set"
+] as const satisfies readonly AgentCommandType[];
+const PROJECT_PROVIDER_SNAPSHOT_COMMANDS = [
+  "provider.projectConfiguration.get",
+  "provider.projectConfiguration.reload",
+  "model.projectDefault.set",
+  "vision.assistant.project.set"
 ] as const satisfies readonly AgentCommandType[];
 
 describe("renderer Provider command fixture", () => {
@@ -27,6 +36,14 @@ describe("renderer Provider command fixture", () => {
     const snapshot = createMockProviderConfigurationSnapshot();
 
     for (const type of PROVIDER_SNAPSHOT_COMMANDS) {
+      const response = responseEnvelope(`fixture-${type}`, 1, APP_CONTEXT, {
+        ok: true,
+        type,
+        result: snapshot
+      } as never);
+      expect(isResponseEnvelope(response), type).toBe(true);
+    }
+    for (const type of PROJECT_PROVIDER_SNAPSHOT_COMMANDS) {
       const response = responseEnvelope(`fixture-${type}`, 1, WORKSPACE_CONTEXT, {
         ok: true,
         type,
@@ -40,7 +57,7 @@ describe("renderer Provider command fixture", () => {
   });
 
   it("accepts the explicit one-shot Provider reveal response without adding it to snapshots", () => {
-    const response = responseEnvelope("fixture-provider-reveal", 1, WORKSPACE_CONTEXT, {
+    const response = responseEnvelope("fixture-provider-reveal", 1, APP_CONTEXT, {
       ok: true,
       type: "provider.credential.reveal",
       result: {

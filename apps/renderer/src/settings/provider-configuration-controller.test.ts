@@ -6,6 +6,7 @@ import { rendererWorkbenchStore } from "../workbench/workbench-store.js";
 import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host-registration-controller.js";
 import {
   loadProviderConfiguration,
+  loadProjectProviderConfiguration,
   resetProviderConfigurationLoadState,
   saveProviderConfiguration,
   setDefaultModelConfiguration,
@@ -38,32 +39,25 @@ describe("provider configuration controller", () => {
     });
   });
 
-  it("loads through explicit Workspace authority without starting a Task", async () => {
+  it("loads through App authority without registering or starting a Workspace", async () => {
     const configuration = snapshot("1");
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
-      if (type === "workspace.register") return { registered: true } as never;
       if (type === "provider.configuration.get") return configuration as never;
       throw new Error(`Unexpected command: ${type}`);
     });
 
     await expect(loadProviderConfiguration("workspace-a")).resolves.toBe(true);
     expect(request).toHaveBeenNthCalledWith(1,
-      "workspace.register",
-      { cwd: "/work/a", trust: "trusted", approvalMode: "balanced" },
-      [],
-      { context: { scope: "workspace", workspaceId: "workspace-a" } }
-    );
-    expect(request).toHaveBeenNthCalledWith(2,
       "provider.configuration.get",
       {},
       [],
       {
-        context: { scope: "workspace", workspaceId: "workspace-a" },
+        context: { scope: "app" },
         ackTimeoutMs: 12_000
       }
     );
     expect(useProviderConfigurationStore.getState()).toMatchObject({
-      workspaceId: "workspace-a",
+      workspaceId: "app",
       snapshot: configuration,
       baselineRevision: configuration.revision,
       dirty: false
@@ -73,7 +67,6 @@ describe("provider configuration controller", () => {
   it("shares one Provider load and one failure notification across concurrent mounts", async () => {
     const pending = deferred<PiProviderConfigurationSnapshot>();
     const request = vi.spyOn(agentConnectionController, "request").mockImplementation((type) => {
-      if (type === "workspace.register") return Promise.resolve({ registered: true }) as never;
       if (type === "provider.configuration.get") return pending.promise as never;
       throw new Error(`Unexpected command: ${type}`);
     });
@@ -89,21 +82,19 @@ describe("provider configuration controller", () => {
     await expect(first).resolves.toBe(false);
     await expect(second).resolves.toBe(false);
 
-    expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(1);
+    expect(request.mock.calls.filter(([type]) => type === "workspace.register")).toHaveLength(0);
     expect(useProviderConfigurationStore.getState()).toMatchObject({
-      workspaceId: "workspace-a",
+      workspaceId: "app",
       phase: "failed",
       error: "provider request timed out"
     });
-    expect(useNotificationStore.getState().items.filter((item) => (
-      item.title === "无法读取 Pi Provider 配置"
-    ))).toHaveLength(1);
+    expect(useNotificationStore.getState().items).toHaveLength(0);
   });
 
   it("sends a persistent credential only through its write-only mutation", async () => {
     const initial = snapshot("1");
     const saved = snapshot("2", [{ provider: "custom", type: "api_key" }]);
-    useProviderConfigurationStore.getState().install("workspace-a", initial);
+    useProviderConfigurationStore.getState().install("app", initial);
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(saved as never);
     const credential = "controller-write-only-credential";
 
@@ -112,7 +103,7 @@ describe("provider configuration controller", () => {
       "provider.credential.store",
       { expectedRevision: initial.revision, provider: "custom", apiKey: credential },
       [],
-      { context: { scope: "workspace", workspaceId: "workspace-a" } }
+      { context: { scope: "app" } }
     );
     expect(JSON.stringify(useProviderConfigurationStore.getState())).not.toContain(credential);
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
@@ -122,7 +113,7 @@ describe("provider configuration controller", () => {
 
   it("preserves the draft when a stale revision blocks saving", async () => {
     const initial = snapshot("1");
-    useProviderConfigurationStore.getState().install("workspace-a", initial);
+    useProviderConfigurationStore.getState().install("app", initial);
     useProviderConfigurationStore.getState().updateDraft((draft) => ({
       ...draft,
       name: "Unsaved Provider Draft"
@@ -151,7 +142,7 @@ describe("provider configuration controller", () => {
     const global = snapshot("2");
     global.defaults.global = { provider: "custom", model: "model-a" };
     global.defaults.effective = global.defaults.global;
-    useProviderConfigurationStore.getState().install("workspace-a", initial);
+    useProviderConfigurationStore.getState().install("app", initial);
     const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue(global as never);
 
     await expect(setDefaultModelConfiguration(
@@ -164,6 +155,35 @@ describe("provider configuration controller", () => {
       {
         expectedRevision: initial.revision,
         scope: "global",
+        provider: "custom",
+        model: "model-a"
+      },
+      [],
+      { context: { scope: "app" } }
+    );
+  });
+
+  it("registers a trusted Workspace before loading and mutating project overrides", async () => {
+    const initial = snapshot("1");
+    const project = snapshot("2");
+    project.defaults.project = { provider: "custom", model: "model-a" };
+    const request = vi.spyOn(agentConnectionController, "request").mockImplementation(async (type) => {
+      if (type === "workspace.register") return { registered: true } as never;
+      if (type === "provider.projectConfiguration.get") return initial as never;
+      if (type === "model.projectDefault.set") return project as never;
+      throw new Error(`Unexpected command: ${type}`);
+    });
+
+    await expect(loadProjectProviderConfiguration("workspace-a")).resolves.toBe(true);
+    await expect(setDefaultModelConfiguration(
+      "project",
+      { provider: "custom", model: "model-a" },
+      "workspace-a"
+    )).resolves.toBe(true);
+    expect(request).toHaveBeenLastCalledWith(
+      "model.projectDefault.set",
+      {
+        expectedRevision: initial.revision,
         provider: "custom",
         model: "model-a"
       },
@@ -200,6 +220,7 @@ function snapshot(
     }],
     credentials,
     defaults: { projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true },
     files: [
       file("models"),
       file("auth"),

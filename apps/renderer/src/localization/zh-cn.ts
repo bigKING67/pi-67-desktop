@@ -17,7 +17,7 @@ export const zhCNMessages = {
       application: "应用",
       pi: "Pi",
       office: "办公",
-      connections: "连接与集成",
+      capabilities: "能力与集成",
       systemSupport: "系统与支持"
     },
     sections: {
@@ -56,6 +56,10 @@ export const zhCNMessages = {
       lark: {
         label: "飞书",
         summary: "配置飞书应用，并管理个人飞书用户授权。"
+      },
+      vision: {
+        label: "视觉辅助",
+        summary: "为不支持图片输入的文本模型配置可回放的视觉识别辅助。"
       },
       integrations: {
         label: "浏览器集成",

@@ -2,20 +2,19 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  APP_PROTOCOL_CONTEXT,
   isEventEnvelope,
   isResponseEnvelope,
   type AgentCommandType,
   type CommandPayloads,
   type ProtocolContext,
   type ResponseEnvelope,
-  type WorkspaceProtocolContext
 } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentHostServer } from "./host-server.js";
 import { attach, FakePort } from "./host-server-multi-task-fixture.js";
 import { commandEnvelopeForContext } from "./protocol-test-fixtures.js";
 
-const WORKSPACE: WorkspaceProtocolContext = { scope: "workspace", workspaceId: "workspace-1" };
 // This integration path creates and refreshes real Pi ModelRuntime instances.
 const HOST_RESPONSE_TIMEOUT_MS = 60_000;
 const PROVIDER_CONFIGURATION_TEST_TIMEOUT_MS = 120_000;
@@ -46,19 +45,16 @@ describe("AgentHostServer Provider configuration", () => {
   it("routes Pi file mutations without loading a Task and never returns write-only values", async () => {
     const fixture = await createFixture();
     const runtimeLoader = vi.fn(async () => { throw new Error("Task Runtime must not load."); });
-    const server = new AgentHostServer(runtimeLoader, { sdkVersionLoader: async () => "0.81.1" });
+    const server = new AgentHostServer(runtimeLoader, {
+      agentDir: fixture.agentDir,
+      sdkVersionLoader: async () => "0.81.1"
+    });
     const port = new FakePort();
     await attach(server, port);
     try {
-      expect((await hostCommand(port, WORKSPACE, "workspace.register", {
-        cwd: fixture.cwd,
-        trust: "trusted",
-        approvalMode: "guided"
-      }, "register-provider-workspace")).response).toMatchObject({ ok: true });
-
       const initialResponse = (await hostCommand(
         port,
-        WORKSPACE,
+        APP_PROTOCOL_CONTEXT,
         "provider.configuration.get",
         {}
       )).response;
@@ -66,6 +62,12 @@ describe("AgentHostServer Provider configuration", () => {
       expect(initialResponse.result.providers.some((provider) => (
         provider.origin === "builtin" && provider.models.length > 0
       ))).toBe(true);
+      const imageModel = initialResponse.result.providers.flatMap((provider) => (
+        provider.models
+          .filter((model) => model.input.includes("image"))
+          .map((model) => ({ provider: provider.id, model: model.id }))
+      ))[0];
+      expect(imageModel).toBeDefined();
 
       const savePayload = {
         expectedRevision: initialResponse.result.revision,
@@ -85,7 +87,7 @@ describe("AgentHostServer Provider configuration", () => {
       };
       const savedResponse = (await hostCommand(
         port,
-        WORKSPACE,
+        APP_PROTOCOL_CONTEXT,
         "provider.configuration.save",
         savePayload,
         "save-provider"
@@ -106,7 +108,7 @@ describe("AgentHostServer Provider configuration", () => {
 
       const replayResponse = (await hostCommand(
         port,
-        WORKSPACE,
+        APP_PROTOCOL_CONTEXT,
         "provider.configuration.save",
         savePayload,
         "save-provider"
@@ -118,7 +120,7 @@ describe("AgentHostServer Provider configuration", () => {
       });
 
       const credentialValue = "fixture-persistent-host-credential";
-      const credentialResponse = (await hostCommand(port, WORKSPACE, "provider.credential.store", {
+      const credentialResponse = (await hostCommand(port, APP_PROTOCOL_CONTEXT, "provider.credential.store", {
         expectedRevision: savedResponse.result.revision,
         provider: "pi67-host-test",
         apiKey: credentialValue
@@ -131,7 +133,7 @@ describe("AgentHostServer Provider configuration", () => {
       expect(JSON.stringify(credentialResponse)).not.toContain(credentialValue);
       expect(await readFile(join(fixture.agentDir, "auth.json"), "utf8")).toContain(credentialValue);
 
-      const revealResponse = (await hostCommand(port, WORKSPACE, "provider.credential.reveal", {
+      const revealResponse = (await hostCommand(port, APP_PROTOCOL_CONTEXT, "provider.credential.reveal", {
         expectedRevision: credentialResponse.result.revision,
         provider: "pi67-host-test"
       })).response;
@@ -144,7 +146,7 @@ describe("AgentHostServer Provider configuration", () => {
         }
       });
 
-      const conflictingResponse = (await hostCommand(port, WORKSPACE, "provider.credential.store", {
+      const conflictingResponse = (await hostCommand(port, APP_PROTOCOL_CONTEXT, "provider.credential.store", {
         expectedRevision: savedResponse.result.revision,
         provider: "pi67-host-test",
         apiKey: "different-fixture-credential"
@@ -156,7 +158,7 @@ describe("AgentHostServer Provider configuration", () => {
       expect(JSON.stringify(conflictingResponse)).not.toContain(credentialValue);
       expect(JSON.stringify(conflictingResponse)).not.toContain("different-fixture-credential");
 
-      const defaultResponse = (await hostCommand(port, WORKSPACE, "model.default.set", {
+      const defaultResponse = (await hostCommand(port, APP_PROTOCOL_CONTEXT, "model.default.set", {
         expectedRevision: credentialResponse.result.revision,
         scope: "global",
         provider: "pi67-host-test",
@@ -171,14 +173,29 @@ describe("AgentHostServer Provider configuration", () => {
           }
         }
       });
+      const visionResponse = (await hostCommand(
+        port,
+        APP_PROTOCOL_CONTEXT,
+        "vision.assistant.global.set",
+        {
+          expectedRevision: defaultResponse.result.revision,
+          ...imageModel!
+        },
+        "set-vision-assistant"
+      )).response;
+      if (!visionResponse.ok) throw new Error(JSON.stringify(visionResponse.error));
+      expect(visionResponse.result.vision).toMatchObject({
+        global: imageModel,
+        effective: imageModel
+      });
       expect(runtimeLoader).not.toHaveBeenCalled();
 
       const configurationEvents = port.sent.filter((candidate) => (
         isEventEnvelope(candidate) && candidate.type === "provider.configuration.changed"
       ));
-      expect(configurationEvents.length).toBeGreaterThanOrEqual(3);
+      expect(configurationEvents.length).toBeGreaterThanOrEqual(4);
       expect(configurationEvents.every((event) => (
-        isEventEnvelope(event) && event.context.scope === "workspace"
+        isEventEnvelope(event) && event.context.scope === "app"
       ))).toBe(true);
       const serializedEvents = JSON.stringify(configurationEvents);
       for (const secret of [

@@ -7,6 +7,7 @@ import type {
 import { create } from "zustand";
 
 type ProviderConfigurationPhase = "idle" | "loading" | "saving" | "failed";
+export type ProviderEditorSectionRequest = "configuration" | "models";
 
 export interface ProviderConfigurationState {
   workspaceId: string | undefined;
@@ -18,11 +19,14 @@ export interface ProviderConfigurationState {
   externalConflict: PiProviderConfigurationChanged | undefined;
   phase: ProviderConfigurationPhase;
   error: string | undefined;
+  providerEditorRequest: { workspaceId: string; section: ProviderEditorSectionRequest } | undefined;
   beginLoad(workspaceId: string): void;
   install(workspaceId: string, snapshot: PiProviderConfigurationSnapshot): void;
   fail(workspaceId: string, error: string): void;
   selectProvider(providerId: string): void;
-  startProvider(): void;
+  startProvider(preset?: PiProviderConfigurationInput): void;
+  requestProviderEditor(workspaceId: string, section: ProviderEditorSectionRequest): void;
+  consumeProviderEditorRequest(workspaceId: string): ProviderEditorSectionRequest | undefined;
   updateDraft(update: (draft: PiProviderConfigurationInput) => PiProviderConfigurationInput): void;
   beginSave(): void;
   observeExternal(workspaceId: string, change: PiProviderConfigurationChanged): void;
@@ -41,6 +45,7 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
   externalConflict: undefined,
   phase: "idle",
   error: undefined,
+  providerEditorRequest: undefined,
 
   beginLoad(workspaceId) {
     set((state) => ({
@@ -85,16 +90,27 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
     });
   },
 
-  startProvider() {
+  startProvider(preset) {
     const snapshot = get().snapshot;
     set({
       selectedProviderId: undefined,
-      draft: { id: "", models: [], advancedJson: "{}" },
+      draft: preset ?? { id: "", models: [], advancedJson: "{}" },
       baselineRevision: snapshot?.revision,
       dirty: true,
       externalConflict: undefined,
       error: undefined
     });
+  },
+
+  requestProviderEditor(workspaceId, section) {
+    set({ providerEditorRequest: { workspaceId, section } });
+  },
+
+  consumeProviderEditorRequest(workspaceId) {
+    const request = get().providerEditorRequest;
+    if (!request || request.workspaceId !== workspaceId) return undefined;
+    set({ providerEditorRequest: undefined });
+    return request.section;
   },
 
   updateDraft(update) {
@@ -139,7 +155,8 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
       workspaceId: undefined,
       ...emptyConfigurationState(),
       phase: "idle",
-      error: undefined
+      error: undefined,
+      providerEditorRequest: undefined
     });
   }
 }));

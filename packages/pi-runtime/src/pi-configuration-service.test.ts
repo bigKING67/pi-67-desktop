@@ -1,31 +1,36 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { PiConfigurationReloadState, PiProviderConfigurationChanged } from "@pi67/protocol";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
-import { PiConfigurationService } from "./pi-configuration-service.js";
-
-const temporaryDirectories: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
-});
+import {
+  configurationDelay as delay,
+  createPiConfigurationFixture as createFixture,
+  deferredConfigurationValue as deferred,
+  piConfigurationProviderInput as providerInput,
+  waitForConfiguration as waitFor
+} from "./pi-configuration-service-test-fixture.js";
 
 describe("PiConfigurationService", () => {
   it("projects built-in models and persists Provider, credential, and default mutations to Pi files", async () => {
     const fixture = await createFixture();
     try {
-      const initial = await fixture.service.get(fixture.cwd);
+      const initial = await fixture.service.getGlobal();
       const builtin = initial.providers.find((provider) => (
         provider.origin === "builtin" && provider.models.length > 0
       ));
+      const imageModel = initial.providers.flatMap((provider) => (
+        provider.models
+          .filter((model) => model.input.includes("image"))
+          .map((model) => ({ provider: provider.id, model: model.id }))
+      ))[0];
       expect(builtin).toBeDefined();
+      expect(imageModel).toBeDefined();
       expect(initial.providers.flatMap((provider) => provider.models).length).toBeGreaterThan(0);
 
-      const saved = await fixture.service.saveProvider(fixture.cwd, initial.revision, {
+      const saved = await fixture.service.saveGlobalProvider(initial.revision, {
         id: "pi67-test",
         name: "Pi 67 Test",
         baseUrl: "https://example.invalid/v1",
@@ -55,8 +60,7 @@ describe("PiConfigurationService", () => {
       });
 
       const credentialValue = "fixture-persistent-credential";
-      const credentialSnapshot = await fixture.service.storeCredential(
-        fixture.cwd,
+      const credentialSnapshot = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         credentialValue
@@ -65,10 +69,8 @@ describe("PiConfigurationService", () => {
       expect(JSON.stringify(credentialSnapshot)).not.toContain(credentialValue);
       expect(await readFile(fixture.service.authPath, "utf8")).toContain(credentialValue);
 
-      const defaultSnapshot = await fixture.service.setDefaultModel(
-        fixture.cwd,
+      const defaultSnapshot = await fixture.service.setGlobalDefaultModel(
         credentialSnapshot.revision,
-        "global",
         { provider: builtin!.id, model: builtin!.models[0]!.id }
       );
       expect(defaultSnapshot.defaults.global).toEqual({
@@ -80,6 +82,40 @@ describe("PiConfigurationService", () => {
         defaultProvider: builtin!.id,
         defaultModel: builtin!.models[0]!.id
       });
+
+      const globalSnapshot = await fixture.service.getGlobal();
+      const visionSnapshot = await fixture.service.setGlobalVisionAssistant(
+        globalSnapshot.revision,
+        imageModel
+      );
+      expect(visionSnapshot.vision).toMatchObject({
+        global: imageModel,
+        effective: imageModel,
+        disabledByProject: false
+      });
+      const projectSnapshot = await fixture.service.get(fixture.cwd);
+      const disabled = await fixture.service.setProjectVisionAssistant(
+        fixture.cwd,
+        projectSnapshot.revision,
+        { mode: "disabled" }
+      );
+      expect(disabled.vision).toMatchObject({
+        global: imageModel,
+        project: { mode: "disabled" },
+        disabledByProject: true
+      });
+      expect(disabled.vision.effective).toBeUndefined();
+      const inherited = await fixture.service.setProjectVisionAssistant(
+        fixture.cwd,
+        disabled.revision,
+        undefined
+      );
+      expect(inherited.vision).toMatchObject({
+        global: imageModel,
+        effective: imageModel,
+        disabledByProject: false
+      });
+      expect(inherited.vision.project).toBeUndefined();
     } finally {
       await fixture.dispose();
     }
@@ -88,19 +124,16 @@ describe("PiConfigurationService", () => {
   it("reuses the current validated runtime when only default settings change", async () => {
     const fixture = await createFixture();
     try {
-      const initial = await fixture.service.get(fixture.cwd);
-      const saved = await fixture.service.saveProvider(
-        fixture.cwd,
+      const initial = await fixture.service.getGlobal();
+      const saved = await fixture.service.saveGlobalProvider(
         initial.revision,
         providerInput()
       );
       const createRuntime = vi.spyOn(ModelRuntime, "create")
         .mockRejectedValue(new Error("settings-only mutation must not create another runtime"));
       try {
-        const updated = await fixture.service.setDefaultModel(
-          fixture.cwd,
+        const updated = await fixture.service.setGlobalDefaultModel(
           saved.revision,
-          "global",
           { provider: "pi67-test", model: "fixture-model" }
         );
 
@@ -120,15 +153,13 @@ describe("PiConfigurationService", () => {
     const reload = vi.spyOn(PiAuthCredentialStore.prototype, "reload")
       .mockResolvedValue("redundant auth.json reload");
     try {
-      const initial = await fixture.service.get(fixture.cwd);
-      const saved = await fixture.service.saveProvider(
-        fixture.cwd,
+      const initial = await fixture.service.getGlobal();
+      const saved = await fixture.service.saveGlobalProvider(
         initial.revision,
         providerInput()
       );
 
-      const credentialSnapshot = await fixture.service.storeCredential(
-        fixture.cwd,
+      const credentialSnapshot = await fixture.service.storeGlobalCredential(
         saved.revision,
         "pi67-test",
         "revision-pinned-credential"
@@ -150,16 +181,15 @@ describe("PiConfigurationService", () => {
   it("keeps the last-known-good projection for invalid external JSON and rejects stale writes", async () => {
     const fixture = await createFixture();
     try {
-      const initial = await fixture.service.get(fixture.cwd);
-      const saved = await fixture.service.saveProvider(fixture.cwd, initial.revision, providerInput());
+      const initial = await fixture.service.getGlobal();
+      const saved = await fixture.service.saveGlobalProvider(initial.revision, providerInput());
       await writeFile(fixture.service.modelsPath, "{ invalid external JSONC\n", "utf8");
 
-      const invalid = await fixture.service.reload(fixture.cwd);
+      const invalid = await fixture.service.reloadGlobal();
       expect(invalid.syncState).toBe("invalid");
       expect(invalid.providers).toEqual(saved.providers);
       expect(invalid.diagnostics).toContainEqual(expect.objectContaining({ file: "models" }));
-      await expect(fixture.service.saveProvider(
-        fixture.cwd,
+      await expect(fixture.service.saveGlobalProvider(
         saved.revision,
         providerInput("Changed")
       )).rejects.toMatchObject({ code: "CONFIGURATION_CHANGED_EXTERNALLY" });
@@ -393,61 +423,3 @@ describe("PiConfigurationService", () => {
     }
   }, 20_000);
 });
-
-async function createFixture(options: {
-  fallbackPollMs?: number;
-  watchDebounceMs?: number;
-  runtimeReloadWaitMs?: number;
-  fileAccessWaitMs?: number;
-  validationRuntimeWaitMs?: number;
-  settingsReloadWaitMs?: number;
-} = {}) {
-  const root = await mkdtemp(join(tmpdir(), "pi67-configuration-service-"));
-  temporaryDirectories.push(root);
-  const cwd = join(root, "workspace");
-  const agentDir = join(root, "agent");
-  await Promise.all([mkdir(cwd), mkdir(agentDir)]);
-  const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: true });
-  const service = new PiConfigurationService(agentDir, options);
-  const unregister = service.registerWorkspace({ cwd, settingsManager, projectTrusted: true });
-  return {
-    root,
-    cwd,
-    settingsManager,
-    service,
-    async dispose() {
-      unregister();
-      await service.dispose();
-    }
-  };
-}
-
-function providerInput(name = "Pi 67 Test") {
-  return {
-    id: "pi67-test",
-    name,
-    baseUrl: "https://example.invalid/v1",
-    api: "openai-responses",
-    models: [{ id: "fixture-model", input: ["text" as const], reasoning: false }]
-  };
-}
-
-async function waitFor(predicate: () => boolean, timeoutMs = 4_000): Promise<void> {
-  const startedAt = Date.now();
-  while (!predicate()) {
-    if (Date.now() - startedAt >= timeoutMs) throw new Error("Timed out waiting for configuration change.");
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
-
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}

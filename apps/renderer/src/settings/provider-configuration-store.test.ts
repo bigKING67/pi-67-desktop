@@ -95,6 +95,15 @@ describe("provider configuration store", () => {
     expect(input.models[0]).not.toHaveProperty("headers");
     expect(JSON.stringify(input)).not.toMatch(/Authorization|X-Custom|X-Model-Secret/u);
   });
+
+  it("delivers a cross-category Provider editor request only to its owning configuration scope", () => {
+    const store = useProviderConfigurationStore.getState();
+    store.requestProviderEditor("app", "configuration");
+
+    expect(store.consumeProviderEditorRequest("project:workspace-a")).toBeUndefined();
+    expect(store.consumeProviderEditorRequest("app")).toBe("configuration");
+    expect(store.consumeProviderEditorRequest("app")).toBeUndefined();
+  });
 });
 
 function snapshot(revisionCharacter: string, name: string): PiProviderConfigurationSnapshot {
@@ -105,6 +114,7 @@ function snapshot(revisionCharacter: string, name: string): PiProviderConfigurat
     providers: [providerView(name)],
     credentials: [],
     defaults: { projectTrusted: true },
+    vision: { disabledByProject: false, projectTrusted: true },
     files: [
       file("models"),
       file("auth"),

@@ -64,6 +64,9 @@ function LiveTurnFooter({ context }: { context: TranscriptContext }) {
               : []
           ))}
           message={context.pendingUserTurn.message}
+          onRetry={context.pendingUserTurn.retryableVisionAssistance
+            ? context.retryPendingVisualAssistance
+            : undefined}
         />
       ) : null}
       {context.liveProcess ? (

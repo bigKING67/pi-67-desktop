@@ -39,10 +39,12 @@ const UNSET_MODEL_OPTION: DefaultModelOption = {
 
 export function ProviderDefaultModelEditor({
   snapshot,
-  workspaceId
+  workspaceId,
+  scope
 }: {
   snapshot: PiProviderConfigurationSnapshot;
   workspaceId: string;
+  scope: "global" | "project";
 }) {
   const options = useMemo<DefaultModelOption[]>(() => snapshot.providers.flatMap((provider) => (
     provider.models.map((model) => {
@@ -63,30 +65,29 @@ export function ProviderDefaultModelEditor({
   return (
     <section className={styles.section}>
       <header className={styles.sectionIntro}>
-        <strong>默认模型</strong>
-        <small>按 Provider、模型名称或 Model ID 搜索；全局和项目选择分别写入 Pi settings.json。</small>
+        <strong>{scope === "global" ? "全局默认模型" : "项目默认模型"}</strong>
+        <small>{scope === "global"
+          ? "作为未设置项目覆盖时的默认选择，写入全局 Pi settings.json。"
+          : "仅覆盖当前可信 Workspace；未设置时继承全局默认模型。"}</small>
       </header>
-      <div className={styles.defaultGrid}>
-        <DefaultModelCombobox
-          label="全局默认"
-          onChange={(selection) => void setDefaultModelConfiguration("global", selection, workspaceId)}
-          options={options}
-          value={snapshot.defaults.global ? defaultModelKey(snapshot.defaults.global.provider, snapshot.defaults.global.model) : UNSET_MODEL_KEY}
-        />
-        <DefaultModelCombobox
-          disabled={!snapshot.defaults.projectTrusted}
-          label="项目默认"
-          onChange={(selection) => void setDefaultModelConfiguration("project", selection, workspaceId)}
-          options={options}
-          value={snapshot.defaults.project ? defaultModelKey(snapshot.defaults.project.provider, snapshot.defaults.project.model) : UNSET_MODEL_KEY}
-        />
-      </div>
+      <DefaultModelCombobox
+        disabled={scope === "project" && !snapshot.defaults.projectTrusted}
+        label={scope === "global" ? "全局默认" : "当前项目覆盖"}
+        onChange={(selection) => void setDefaultModelConfiguration(scope, selection, workspaceId)}
+        options={options}
+        value={(scope === "global" ? snapshot.defaults.global : snapshot.defaults.project)
+          ? defaultModelKey(
+            (scope === "global" ? snapshot.defaults.global : snapshot.defaults.project)!.provider,
+            (scope === "global" ? snapshot.defaults.global : snapshot.defaults.project)!.model
+          )
+          : UNSET_MODEL_KEY}
+      />
       <div className={styles.effectiveDefault}>
         <span>当前生效</span>
         <strong>{snapshot.defaults.effective ? `${snapshot.defaults.effective.provider} / ${snapshot.defaults.effective.model}` : "未设置"}</strong>
         <small>运行中的任务会在当前 Operation 结束后应用目录变更。</small>
       </div>
-      {!snapshot.defaults.projectTrusted ? <p className={styles.trustNotice}>信任当前 Workspace 后才能读取和修改项目级 Pi settings.json。</p> : null}
+      {scope === "project" && !snapshot.defaults.projectTrusted ? <p className={styles.trustNotice}>信任当前 Workspace 后才能读取和修改项目级 Pi settings.json。</p> : null}
     </section>
   );
 }

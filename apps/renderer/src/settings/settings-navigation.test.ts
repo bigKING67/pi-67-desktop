@@ -36,8 +36,9 @@ describe("settings navigation", () => {
         ]
       },
       {
-        label: "连接与集成",
+        label: "能力与集成",
         items: [
+          { id: "vision", label: "视觉辅助" },
           { id: "integrations", label: "浏览器集成" }
         ]
       },
@@ -55,7 +56,7 @@ describe("settings navigation", () => {
   });
 
   it("keeps every category in the shared Settings document flow", () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(14);
+    expect(SETTINGS_SECTIONS).toHaveLength(15);
     expect(SETTINGS_SECTIONS.every((item) => !("layout" in item))).toBe(true);
   });
 
@@ -66,6 +67,7 @@ describe("settings navigation", () => {
     const prompt = items.find((item) => item.id === "prompts");
     const rule = items.find((item) => item.id === "rules");
     const browserIntegration = items.find((item) => item.id === "integrations");
+    const vision = items.find((item) => item.id === "vision");
     const runtime = items.find((item) => item.id === "runtime");
     const usage = items.find((item) => item.id === "usage");
     const lark = items.find((item) => item.id === "lark");
@@ -88,11 +90,14 @@ describe("settings navigation", () => {
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "browser67")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "doctor")).toBe(true);
     expect(browserIntegration && matchesSettingsQuery(browserIntegration, "tavily")).toBe(false);
+    expect(vision && matchesSettingsQuery(vision, "图片识别")).toBe(true);
+    expect(vision && matchesSettingsQuery(vision, "qwen vl")).toBe(true);
     expect(runtime && matchesSettingsQuery(runtime, "session")).toBe(true);
     expect(usage && matchesSettingsQuery(usage, "usage")).toBe(true);
     expect(usage && matchesSettingsQuery(usage, "token")).toBe(true);
     expect(sectionSupportsProjectScope("prompts")).toBe(true);
-    expect(sectionSupportsProjectScope("providers")).toBe(false);
+    expect(sectionSupportsProjectScope("providers")).toBe(true);
+    expect(sectionSupportsProjectScope("vision")).toBe(true);
     expect(sectionSupportsProjectScope("rules")).toBe(false);
     expect(lark && matchesSettingsQuery(lark, "用户授权")).toBe(true);
     expect(lark && matchesSettingsQuery(lark, "oauth")).toBe(true);

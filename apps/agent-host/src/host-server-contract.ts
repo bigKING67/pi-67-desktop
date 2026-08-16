@@ -1,4 +1,5 @@
 import type {
+  PiConfigurationServiceRegistry,
   RuntimeCredentialOverrideStore,
   RuntimeInitializationObservation
 } from "@pi67/pi-runtime";
@@ -27,6 +28,8 @@ export interface AttachPortOptions {
 export type AgentRuntimeLoader = TaskRuntimeLoader;
 
 export interface AgentHostServerOptions {
+  agentDir?: string;
+  configurationServices?: PiConfigurationServiceRegistry;
   abortWatchdogMs?: number;
   operationHeartbeatIntervalMs?: number;
   operationReceiptStorageRoot?: string;

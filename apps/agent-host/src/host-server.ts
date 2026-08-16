@@ -1,8 +1,5 @@
-import {
-  createRuntimeCredentialOverrideStore,
-  type AgentRuntime,
-  type RuntimeCredentialOverrideStore
-} from "@pi67/pi-runtime";
+import { createRuntimeCredentialOverrideStore, PiConfigurationServiceRegistry,
+  type AgentRuntime, type RuntimeCredentialOverrideStore } from "@pi67/pi-runtime";
 import {
   createMessageId,
   type AgentCommand,
@@ -25,7 +22,7 @@ import { HostSdkVersionLoader } from "./host-sdk-version-loader.js";
 import { createHostSessionWriterLeaseRegistry } from "./host-session-writer-leases.js";
 import { boundedMetadataCount, shutdownDeadline } from "./host-shutdown-contract.js";
 import { HostTaskStateCoordinator, type TaskHostState } from "./host-task-state-coordinator.js";
-import { HostTaskRuntimeLifecycle } from "./host-task-runtime-lifecycle.js";
+import { HostTaskRuntimeLifecycle, resolveAgentDirectory } from "./host-task-runtime-lifecycle.js";
 import { captureProjectionMutationAcknowledgement, captureProjectionResync } from "./host-projection.js";
 import {
   createLarkAuthManagement,
@@ -37,6 +34,7 @@ import { TaskRuntimeRegistry } from "./task-runtime-registry.js";
 import { WorkspaceCommandRouter } from "./workspace-command-router.js";
 import { WorkspaceContextRegistry } from "./workspace-context-registry.js";
 import { WorkspaceFileCommandRouter } from "./workspace-file-command-router.js";
+import { AppConfigurationCommandRouter } from "./app-configuration-command-router.js";
 export type { AgentHostServerOptions, AgentHostShutdownResult, AgentRuntimeLoader, AttachPortOptions } from "./host-server-contract.js";
 const DEFAULT_SHUTDOWN_DEADLINE_MS = 4_000;
 const MAX_RESYNC_INTERACTIVE_REQUESTS = 512;
@@ -45,7 +43,8 @@ export class AgentHostServer {
   private compatibilityRuntime: AgentRuntime | undefined;
   private compatibilityRuntimeLoad: Promise<AgentRuntime> | undefined;
   private compatibilityRuntimeUnsubscribe: (() => void) | undefined;
-  private readonly workspaces = new WorkspaceContextRegistry();
+  private readonly workspaces: WorkspaceContextRegistry;
+  private readonly appConfiguration: AppConfigurationCommandRouter;
   private readonly sessionWriterLeases: SessionWriterLeaseRegistry;
   private readonly workspaceCommands: WorkspaceCommandRouter;
   private readonly workspaceFiles: WorkspaceFileCommandRouter;
@@ -71,6 +70,10 @@ export class AgentHostServer {
   ) {
     this.runtimeLoader = runtimeLoader ?? defaultRuntimeLoader;
     this.usesCompatibilityRuntime = runtimeLoader !== undefined && options.sdkVersionLoader === undefined;
+    const configurationServices = options.configurationServices ?? new PiConfigurationServiceRegistry();
+    const configuration = configurationServices.acquire(options.agentDir ?? resolveAgentDirectory(undefined));
+    this.workspaces = new WorkspaceContextRegistry({ configurationServices });
+    this.appConfiguration = new AppConfigurationCommandRouter(configuration);
     this.sessionWriterLeases = options.sessionWriterLeaseRegistry
       ?? createHostSessionWriterLeaseRegistry(() => this.hostIdentity, options.onRuntimePoisoned);
     this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
@@ -129,6 +132,7 @@ export class AgentHostServer {
       getRuntime: () => this.tasks.activeState()?.record.runtime ?? this.compatibilityRuntime,
       getProtocolContext: () => this.tasks.eventProtocolContext()
     });
+    this.appConfiguration.bindEvents(this.events);
     this.workspaceCommands = new WorkspaceCommandRouter(
       this.workspaces,
       this.taskRuntimes,
@@ -163,7 +167,9 @@ export class AgentHostServer {
       {
         isShuttingDown: () => this.shuttingDown,
         runtimeStatus: () => this.tasks.runtimeStatus(this.compatibilityRuntime !== undefined),
-        dispatchAppCommand: (command) => dispatchHostAppCommand(command, {
+        dispatchAppCommand: (command, idempotencyKey) => dispatchHostAppCommand(command, {
+          appConfiguration: this.appConfiguration,
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
           larkAuth: this.larkAuth,
           loadRuntime: async () => this.tasks.activeState()?.record.runtime ?? this.loadCompatibilityRuntime(),
           collectDiagnostics: (runtime) => collectHostRuntimeDiagnostics({
@@ -181,7 +187,8 @@ export class AgentHostServer {
         shutdownResources: async (deadlineMs) => {
           const results = await Promise.allSettled([
             resourceManagement.shutdown(deadlineMs),
-            this.larkAuth.shutdown()
+            this.larkAuth.shutdown(),
+            this.appConfiguration.shutdown()
           ]);
           const rejected = results.find(
             (result): result is PromiseRejectedResult => result.status === "rejected"
@@ -348,9 +355,7 @@ export class AgentHostServer {
     const activeOperation = operationResults.includes("lost")
       ? "lost"
       : operationResults.includes("cancelled") ? "cancelled" : "none";
-
     const writerRuntimesDisposed = await this.taskLifecycle.disposeAllForShutdown(rememberError);
-
     let compatibilityRuntime = this.compatibilityRuntime;
     if (!compatibilityRuntime && this.compatibilityRuntimeLoad) {
       try {
@@ -373,11 +378,8 @@ export class AgentHostServer {
     }
     this.compatibilityRuntime = undefined;
     this.compatibilityRuntimeLoad = undefined;
-
     await this.taskLifecycle.releaseWriterLeasesForShutdown(writerRuntimesDisposed, rememberError);
-
     await requestShutdown;
-
     try {
       await this.workspaces.disposeAll();
     } catch (error) {
@@ -414,7 +416,6 @@ export class AgentHostServer {
       extensionRequestsCancelled: boundedMetadataCount(extensionRequestsCancelled)
     };
   }
-
   private async handleProjectionResync(
     origin: HostConnectionContext,
     request: RequestEnvelope<"projection.resync">,

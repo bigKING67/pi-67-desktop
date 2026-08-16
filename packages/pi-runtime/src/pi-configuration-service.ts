@@ -7,36 +7,21 @@ import {
 import { RuntimeError } from "@pi67/domain";
 import type {
   PiConfigurationChangeSource,
-  PiConfigurationFileKind,
   PiConfigurationReloadState,
   PiCredentialRevealResult,
   PiDefaultModelSelection,
   PiProviderConfigurationChanged,
   PiProviderConfigurationInput,
-  PiProviderConfigurationSnapshot
+  PiProviderConfigurationSnapshot,
+  PiVisionAssistantOverride
 } from "@pi67/protocol";
-import { withConfigurationFileLock, writePrivateFileAtomically } from "./atomic-private-file.js";
-import { removeProviderDocument, saveProviderDocument, setDefaultModelDocument } from "./pi-configuration-documents.js";
+import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import {
-  authContentRevision,
-  PiAuthCredentialStore,
-  revealStoredApiKey,
-  type PiAuthCredentialMutationResult
-} from "./pi-auth-credential-store.js";
-import {
-  assertExpectedConfigurationRevision,
-  configurationPath,
-  ensureTrailingNewline,
   PiConfigurationWatcher,
-  readOptionalConfigurationFile,
-  readWorkspaceConfigurationBundle,
-  restoreConfigurationFile,
   type PiConfigurationPaths,
-  type WorkspaceBundle,
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
 import {
-  currentValidatedRuntimeCandidate,
   refreshPiConfigurationProjection,
   type ValidatedConfigurationRuntimeCandidate
 } from "./pi-configuration-projection.js";
@@ -48,7 +33,7 @@ import {
 } from "./pi-configuration-service-options.js";
 import { normalizeSessionCatalogWorkspaceIdentity as workspaceIdentity } from "./session-path-identity.js";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
-import { commitPiCredentialMutation } from "./pi-credential-mutation-transaction.js";
+import { PiConfigurationMutations } from "./pi-configuration-mutations.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 export interface PiConfigurationReloadTarget {
@@ -66,9 +51,11 @@ export class PiConfigurationService {
   readonly globalSettingsPath: string;
   private readonly paths: PiConfigurationPaths;
   private readonly credentials: PiAuthCredentialStore;
+  private readonly globalState: WorkspaceConfigurationState;
   private readonly workspaces = new Map<string, WorkspaceConfigurationState>();
   private readonly watcher: PiConfigurationWatcher;
   private readonly limits: ResolvedPiConfigurationServiceOptions;
+  private readonly mutations: PiConfigurationMutations;
   private modelRuntime: ModelRuntime | undefined;
   private operationTail: Promise<unknown> = Promise.resolve();
   private disposed = false;
@@ -87,6 +74,14 @@ export class PiConfigurationService {
     this.credentials = new PiAuthCredentialStore(this.authPath, {
       readWaitMs: this.limits.fileAccessWaitMs
     });
+    this.globalState = {
+      cwd: this.agentDir,
+      settingsManager: SettingsManager.create(this.agentDir, this.agentDir, { projectTrusted: false }),
+      projectTrusted: false,
+      registrations: 1,
+      listeners: new Set(),
+      runtimes: new Set()
+    };
     this.watcher = new PiConfigurationWatcher({
       agentDir: this.agentDir,
       fallbackPollMs: this.limits.fallbackPollMs,
@@ -95,6 +90,29 @@ export class PiConfigurationService {
       isDisposed: () => this.disposed,
       refresh: () => this.serial(() => this.refreshLocked("external", true, false))
     });
+    this.mutations = new PiConfigurationMutations({
+      agentDir: this.agentDir,
+      authPath: this.authPath,
+      paths: this.paths,
+      credentials: this.credentials,
+      globalState: this.globalState,
+      limits: this.limits,
+      serial: (operation) => this.serial(operation),
+      requireWorkspace: (cwd) => this.requireWorkspace(cwd),
+      requireModelRuntime: () => this.requireModelRuntime(),
+      createValidationRuntime: () => this.createPiValidationRuntime(),
+      currentModelRuntime: () => this.modelRuntime,
+      refresh: (source, emit, force, states, validatedRuntime) => (
+        this.refreshLocked(source, emit, force, states, validatedRuntime)
+      )
+    });
+    this.watcher.start();
+  }
+
+  subscribeGlobal(listener: (change: PiProviderConfigurationChanged) => void): () => void {
+    this.assertActive();
+    this.globalState.listeners.add(listener);
+    return () => this.globalState.listeners.delete(listener);
   }
 
   registerWorkspace(options: RegisterPiConfigurationWorkspaceOptions): () => void {
@@ -157,6 +175,13 @@ export class PiConfigurationService {
     });
   }
 
+  getGlobal(): Promise<PiProviderConfigurationSnapshot> {
+    return this.serial(async () => {
+      await this.refreshLocked("manual", false, this.globalState.snapshot === undefined, [this.globalState]);
+      return this.requireSnapshot(this.globalState);
+    });
+  }
+
   reload(cwd: string): Promise<PiProviderConfigurationSnapshot> {
     return this.serial(async () => {
       const state = this.requireWorkspace(cwd);
@@ -165,125 +190,71 @@ export class PiConfigurationService {
     });
   }
 
-  saveProvider(
-    cwd: string,
+  reloadGlobal(): Promise<PiProviderConfigurationSnapshot> {
+    return this.serial(async () => {
+      await this.refreshLocked("manual", true, true, [this.globalState]);
+      return this.requireSnapshot(this.globalState);
+    });
+  }
+
+  saveGlobalProvider(
     expectedRevision: string,
     provider: PiProviderConfigurationInput
   ): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutateDocument(cwd, expectedRevision, "models", (content) => (
-      saveProviderDocument(content, provider)
-    ), async () => {
-      const runtime = await this.createPiValidationRuntime();
-      const error = runtime.getError();
-      if (error) throw new Error(`Pi rejected models.json: ${error}`);
-      if (!runtime.getProvider(provider.id)) {
-        throw new Error(`Pi did not register the saved Provider: ${provider.id}.`);
-      }
-    });
+    return this.mutations.saveGlobalProvider(expectedRevision, provider);
   }
 
-  removeProvider(
-    cwd: string,
+  removeGlobalProvider(
     expectedRevision: string,
     providerId: string
   ): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutateDocument(cwd, expectedRevision, "models", (content) => (
-      removeProviderDocument(content, providerId)
-    ), async () => {
-      const runtime = await this.createPiValidationRuntime();
-      const error = runtime.getError();
-      if (error) throw new Error(`Pi rejected models.json: ${error}`);
-    });
+    return this.mutations.removeGlobalProvider(expectedRevision, providerId);
   }
 
-  storeCredential(
-    cwd: string,
+  storeGlobalCredential(
     expectedRevision: string,
     providerId: string,
     apiKey: string
   ): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutateCredential(cwd, expectedRevision, async (bundle) => {
-      const runtime = await this.requireModelRuntime();
-      const provider = runtime.getProvider(providerId);
-      const apiKeyAuthentication = provider?.auth.apiKey;
-      if (!apiKeyAuthentication?.login) {
-        throw new RuntimeError(
-          "UNSUPPORTED",
-          "This Pi Provider does not support persistent API-key login.",
-          { recoverable: false, details: { provider: providerId } }
-        );
-      }
-      const credential = await apiKeyAuthentication.login({
-        prompt: async (prompt) => {
-          if (prompt.type === "secret" || prompt.type === "text" || prompt.type === "manual_code") {
-            return apiKey;
-          }
-          throw new Error("This Provider requires an interactive authentication choice that is not an API key.");
-        },
-        notify: () => undefined
-      });
-      return this.credentials.replaceExpected(
-        providerId,
-        credential,
-        authContentRevision(bundle.byKind.auth.content)
-      );
-    });
+    return this.mutations.storeGlobalCredential(expectedRevision, providerId, apiKey);
   }
 
-  removeCredential(
-    cwd: string,
+  removeGlobalCredential(
     expectedRevision: string,
     providerId: string
   ): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutateCredential(cwd, expectedRevision, (bundle) => (
-      this.credentials.deleteExpected(
-        providerId,
-        authContentRevision(bundle.byKind.auth.content)
-      )
-    ));
+    return this.mutations.removeGlobalCredential(expectedRevision, providerId);
   }
 
-  revealCredential(cwd: string, expectedRevision: string, providerId: string): Promise<PiCredentialRevealResult> {
-    return this.serial(async () => {
-      const state = this.requireWorkspace(cwd);
-      const bundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
-      assertExpectedConfigurationRevision(bundle, expectedRevision);
-      return {
-        provider: providerId,
-        ...revealStoredApiKey(bundle.byKind.auth.content, providerId)
-      };
-    });
+  revealGlobalCredential(expectedRevision: string, providerId: string): Promise<PiCredentialRevealResult> {
+    return this.mutations.revealGlobalCredential(expectedRevision, providerId);
   }
 
-  setDefaultModel(cwd: string, expectedRevision: string, scope: "global" | "project",
+  setGlobalDefaultModel(
+    expectedRevision: string,
+    selection?: PiDefaultModelSelection
+  ): Promise<PiProviderConfigurationSnapshot> {
+    return this.mutations.setGlobalDefaultModel(expectedRevision, selection);
+  }
+
+  setGlobalVisionAssistant(
+    expectedRevision: string,
+    selection?: PiDefaultModelSelection
+  ): Promise<PiProviderConfigurationSnapshot> {
+    return this.mutations.setGlobalVisionAssistant(expectedRevision, selection);
+  }
+
+  setProjectVisionAssistant(
+    cwd: string,
+    expectedRevision: string,
+    override?: PiVisionAssistantOverride
+  ): Promise<PiProviderConfigurationSnapshot> {
+    return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override);
+  }
+
+  setProjectDefaultModel(cwd: string, expectedRevision: string,
     selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
-    const state = this.requireWorkspace(cwd);
-    if (scope === "project" && !state.projectTrusted) {
-      return Promise.reject(new RuntimeError(
-        "WORKSPACE_NOT_TRUSTED",
-        "Trust this Workspace before writing project Pi settings.",
-        { recoverable: false }
-      ));
-    }
-    return this.serial(async () => {
-      if (selection) {
-        const runtime = await this.requireModelRuntime();
-        if (!runtime.getModel(selection.provider, selection.model)) {
-          throw new RuntimeError("MODEL_NOT_FOUND", "The selected Pi default model is not configured.", {
-            recoverable: false,
-            details: { provider: selection.provider, modelId: selection.model }
-          });
-        }
-      }
-      const target: PiConfigurationFileKind = scope === "global" ? "global-settings" : "project-settings";
-      return this.mutateDocumentLocked(state, expectedRevision, target, (content) => (
-        setDefaultModelDocument(content, selection)
-      ), async () => {
-        const validation = SettingsManager.create(state.cwd, this.agentDir, { projectTrusted: true });
-        const errors = validation.drainErrors().filter((item) => item.scope === scope);
-        if (errors[0]) throw errors[0].error;
-      });
-    });
+    return this.mutations.setProjectDefaultModel(cwd, expectedRevision, selection);
   }
 
   async dispose(): Promise<void> {
@@ -291,90 +262,9 @@ export class PiConfigurationService {
     this.disposed = true;
     this.watcher.dispose();
     await this.operationTail.catch(() => undefined);
+    this.globalState.listeners.clear();
+    this.globalState.runtimes.clear();
     this.workspaces.clear();
-  }
-
-  private mutateDocument(
-    cwd: string,
-    expectedRevision: string,
-    target: PiConfigurationFileKind,
-    update: (content: string | undefined) => string,
-    validate: () => Promise<void>
-  ): Promise<PiProviderConfigurationSnapshot> {
-    return this.serial(() => this.mutateDocumentLocked(
-      this.requireWorkspace(cwd),
-      expectedRevision,
-      target,
-      update,
-      validate
-    ));
-  }
-
-  private async mutateDocumentLocked(
-    state: WorkspaceConfigurationState,
-    expectedRevision: string,
-    target: PiConfigurationFileKind,
-    update: (content: string | undefined) => string,
-    validate: () => Promise<void>
-  ): Promise<PiProviderConfigurationSnapshot> {
-    const path = configurationPath(this.paths, state, target);
-    let previousContent: string | undefined;
-    let writtenContent = "";
-    let beforeBundle: WorkspaceBundle | undefined;
-    await withConfigurationFileLock(path, async () => {
-      beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
-      assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
-      previousContent = beforeBundle.byKind[target].content;
-      writtenContent = ensureTrailingNewline(update(previousContent));
-      await writePrivateFileAtomically(path, writtenContent);
-    });
-    try {
-      await validate();
-    } catch (error) {
-      await withConfigurationFileLock(path, async () => {
-        const current = await readOptionalConfigurationFile(path, this.limits.fileAccessWaitMs);
-        if (current !== writtenContent) {
-          throw new RuntimeError(
-            "CONFIGURATION_CHANGED_EXTERNALLY",
-            "Pi configuration changed again while Desktop was validating the saved file.",
-            { recoverable: true }
-          );
-        }
-        await restoreConfigurationFile(path, previousContent);
-      });
-      throw error;
-    }
-    const validatedRuntime = beforeBundle
-      ? currentValidatedRuntimeCandidate(this.modelRuntime, state, beforeBundle)
-      : undefined;
-    await this.refreshLocked("desktop", true, true, undefined, validatedRuntime);
-    return this.requireSnapshot(state);
-  }
-
-  private mutateCredential(
-    cwd: string,
-    expectedRevision: string,
-    mutation: (bundle: WorkspaceBundle) => Promise<PiAuthCredentialMutationResult>
-  ): Promise<PiProviderConfigurationSnapshot> {
-    return this.serial(async () => {
-      const state = this.requireWorkspace(cwd);
-      const beforeBundle = await readWorkspaceConfigurationBundle(this.paths, state, this.limits.fileAccessWaitMs);
-      assertExpectedConfigurationRevision(beforeBundle, expectedRevision);
-      const committed = await commitPiCredentialMutation({
-        authPath: this.authPath,
-        credentials: this.credentials,
-        fileAccessWaitMs: this.limits.fileAccessWaitMs,
-        mutate: () => mutation(beforeBundle),
-        createValidationRuntime: () => this.createPiValidationRuntime()
-      });
-      await this.refreshLocked("desktop", true, true, undefined, {
-        runtime: committed.runtime,
-        modelsRevision: beforeBundle.byKind.models.revision,
-        authRevision: authContentRevision(committed.result.writtenContent),
-        onAuthRevisionMismatch: (content) => committed.restoreStore(content)
-      });
-      return this.requireSnapshot(state);
-    });
   }
 
   private async refreshLocked(
@@ -386,7 +276,7 @@ export class PiConfigurationService {
   ): Promise<void> {
     this.watcher.ensureDirectoryWatchers();
     await refreshPiConfigurationProjection({
-      states: states ?? [...this.workspaces.values()],
+      states: states ?? [this.globalState, ...this.workspaces.values()],
       paths: this.paths,
       credentials: this.credentials,
       source,

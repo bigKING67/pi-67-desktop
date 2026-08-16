@@ -13,7 +13,8 @@ import type {
   PiModelConfigurationInput,
   PiModelConfigurationView,
   PiProviderConfigurationInput,
-  PiProviderConfigurationView
+  PiProviderConfigurationView,
+  PiVisionAssistantOverride
 } from "@pi67/protocol";
 
 type JsonObject = Record<string, unknown>;
@@ -26,6 +27,7 @@ export interface ParsedModelsDocument {
 export interface ParsedSettingsDocument {
   root: JsonObject;
   selection?: PiDefaultModelSelection;
+  visionAssistant?: PiVisionAssistantOverride;
 }
 
 export interface RuntimeModelConfigurationProjection {
@@ -58,13 +60,22 @@ export function parseModelsDocument(content: string | undefined): ParsedModelsDo
 }
 
 export function parseSettingsDocument(content: string | undefined): ParsedSettingsDocument {
-  const parsed: unknown = content === undefined || content.trim() === "" ? {} : JSON.parse(content);
+  const errors: ParseError[] = [];
+  const parsed: unknown = content === undefined || content.trim() === ""
+    ? {}
+    : parse(content, errors, { allowTrailingComma: true, disallowComments: false });
+  if (errors.length > 0) {
+    throw new Error(`settings.json is invalid JSONC (${printParseErrorCode(errors[0]!.error)}).`);
+  }
   if (!isPlainObject(parsed)) throw new Error("settings.json must contain an object.");
   const provider = optionalString(parsed.defaultProvider);
   const model = optionalString(parsed.defaultModel);
+  const pi67Desktop = isPlainObject(parsed.pi67Desktop) ? parsed.pi67Desktop : undefined;
+  const visionAssistant = parseVisionAssistant(pi67Desktop?.visionAssistant);
   return {
     root: parsed,
-    ...(provider && model ? { selection: { provider, model } } : {})
+    ...(provider && model ? { selection: { provider, model } } : {}),
+    ...(visionAssistant ? { visionAssistant } : {})
   };
 }
 
@@ -149,6 +160,15 @@ export function setDefaultModelDocument(
   let next = setOptional(source, ["defaultProvider"], selection?.provider);
   next = setOptional(next, ["defaultModel"], selection?.model);
   return next;
+}
+
+export function setVisionAssistantDocument(
+  content: string | undefined,
+  value: PiVisionAssistantOverride | undefined
+): string {
+  const source = content ?? "{}\n";
+  parseSettingsDocument(source);
+  return editJsonc(source, ["pi67Desktop", "visionAssistant"], value);
 }
 
 function projectProvider(
@@ -387,6 +407,16 @@ function normalizedOptional(value: string | undefined): string | undefined {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function parseVisionAssistant(value: unknown): PiVisionAssistantOverride | undefined {
+  if (value === undefined) return undefined;
+  if (!isPlainObject(value)) throw new Error("settings.json pi67Desktop.visionAssistant must contain an object.");
+  if (value.mode === "disabled") return { mode: "disabled" };
+  const provider = optionalString(value.provider);
+  const model = optionalString(value.model);
+  if (value.mode === "model" && provider && model) return { mode: "model", provider, model };
+  throw new Error("settings.json pi67Desktop.visionAssistant must select a Provider/model or be disabled.");
 }
 
 function positiveNumber(value: unknown): number | undefined {

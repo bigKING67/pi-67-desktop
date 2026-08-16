@@ -58,6 +58,12 @@ export function createMockProviderConfigurationSnapshot(): PiProviderConfigurati
       effective: { provider: "openai", model: "gpt-test" },
       projectTrusted: true
     },
+    vision: {
+      global: { provider: "openai", model: "gpt-test" },
+      effective: { provider: "openai", model: "gpt-test" },
+      disabledByProject: false,
+      projectTrusted: true
+    },
     files: [
       { kind: "models", path: "/Users/test/.pi/agent/models.json", exists: false, valid: true },
       { kind: "auth", path: "/Users/test/.pi/agent/auth.json", exists: true, valid: true },

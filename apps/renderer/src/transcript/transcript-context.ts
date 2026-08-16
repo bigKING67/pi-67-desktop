@@ -19,4 +19,5 @@ export interface TranscriptContext {
     running: boolean;
   } | undefined;
   loadOlderMessages: () => Promise<void>;
+  retryPendingVisualAssistance: () => Promise<boolean>;
 }

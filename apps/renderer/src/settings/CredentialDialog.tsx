@@ -13,6 +13,7 @@ import {
   loadWorkspaceProviderCatalog
 } from "./workspace-provider-controller.js";
 import {
+  GLOBAL_PROVIDER_CONFIGURATION_KEY,
   loadProviderConfiguration,
   removePersistentCredential,
   revealPersistentCredential,
@@ -20,7 +21,6 @@ import {
 } from "./provider-configuration-controller.js";
 import { useProviderConfigurationStore } from "./provider-configuration-store.js";
 import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
-
 export function CredentialDialog() {
   const open = useShellStore((state) => state.credentialDialogOpen);
   const targetProviderId = useShellStore((state) => state.credentialDialogProviderId);
@@ -28,10 +28,10 @@ export function CredentialDialog() {
   const setOpen = useShellStore((state) => state.setCredentialDialogOpen);
   const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId ?? state.currentWorkspaceId);
   const configuration = useProviderConfigurationStore((state) => (
-    state.workspaceId === workspaceId ? state.snapshot : undefined
+    state.workspaceId === GLOBAL_PROVIDER_CONFIGURATION_KEY ? state.snapshot : undefined
   ));
   const configurationError = useProviderConfigurationStore((state) => (
-    state.workspaceId === workspaceId ? state.error : undefined
+    state.workspaceId === GLOBAL_PROVIDER_CONFIGURATION_KEY ? state.error : undefined
   ));
   const [providers, setProviders] = useState<ProviderSummary[] | undefined>(undefined);
   const providerList = useMemo(() => providers ?? [], [providers]);

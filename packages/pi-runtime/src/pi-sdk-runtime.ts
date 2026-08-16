@@ -46,7 +46,6 @@ import {
 } from "./pi-runtime-observability.js";
 import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
-
 export interface PiSdkRuntimeOptions {
   workspaceServices?: PiWorkspaceRuntimeServices;
   runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
@@ -85,7 +84,9 @@ export class PiSdkRuntime implements AgentRuntime {
   constructor(options: PiSdkRuntimeOptions = {}) {
     this.workspaceServices = options.workspaceServices;
     this.promptAttachmentAccess = options.promptAttachmentAccess;
-    this.promptAttachments = new RuntimePromptAttachments(this.promptAttachmentAccess);
+    this.promptAttachments = new RuntimePromptAttachments(this.promptAttachmentAccess, async (cwd) => (
+      await this.workspaceServices?.configurationService?.get(cwd)
+    )?.vision.effective);
     this.ownsRuntimeCredentialOverrides = options.runtimeCredentialOverrides === undefined;
     this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
       ?? createRuntimeCredentialOverrideStore();
@@ -364,6 +365,7 @@ export class PiSdkRuntime implements AgentRuntime {
   async abort(): Promise<void> {
     this.uiBridge.cancelAll("abort");
     this.projections.requestToolCancellation();
+    this.promptAttachments.abort();
     await this.sessionBindings.requireSession().abort();
   }
 

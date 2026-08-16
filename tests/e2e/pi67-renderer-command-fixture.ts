@@ -1,8 +1,4 @@
-import type {
-  FixtureAgentState,
-  FixtureMessage,
-  FixtureWindow
-} from "./pi67-renderer-fixture-types.js";
+import type { FixtureAgentState, FixtureMessage, FixtureWindow } from "./pi67-renderer-fixture-types.js";
 import type { MockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
@@ -161,7 +157,8 @@ export function installMockCommandResponseHandler({
       if (configured) current.snapshot = configured.snapshot;
       return current.snapshot.providers;
     }
-    if (type === "provider.configuration.get" || type === "provider.configuration.reload") {
+    if (type === "provider.configuration.get" || type === "provider.configuration.reload"
+      || type === "provider.projectConfiguration.get" || type === "provider.projectConfiguration.reload") {
       return current.providerConfiguration;
     }
     if (type === "provider.credential.reveal") {
@@ -211,6 +208,17 @@ export function installMockCommandResponseHandler({
         current.providerConfiguration,
         payload
       );
+      return current.providerConfiguration;
+    }
+    if (type === "model.projectDefault.set") {
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(
+        "default", current.providerConfiguration, { ...payload, scope: "project" });
+      return current.providerConfiguration;
+    }
+    if (type === "vision.assistant.global.set" || type === "vision.assistant.project.set") {
+      const mutation = type === "vision.assistant.global.set" ? "vision-global" : "vision-project";
+      current.providerConfiguration = resolveMockProviderConfigurationCommand(mutation,
+        current.providerConfiguration, payload);
       return current.providerConfiguration;
     }
     if (

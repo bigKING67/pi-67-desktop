@@ -82,6 +82,7 @@ export const WORKBENCH_SETTINGS_SECTIONS = [
   "prompts",
   "rules",
   "lark",
+  "vision",
   "integrations",
   "runtime",
   "usage",

@@ -1,14 +1,19 @@
 import type {
   PiProviderConfigurationInput,
-  PiProviderConfigurationSnapshot,
   PiProviderConfigurationView
 } from "@pi67/protocol";
-import { AlertTriangle, Check, FileJson2, KeyRound, RefreshCw, Save, Trash2 } from "lucide-react";
+import { KeyRound, Save, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Input, TextArea } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import { ProviderDefaultModelEditor } from "./ProviderDefaultModelEditor.js";
+import { ProjectProviderConfigurationPanel } from "./ProjectProviderConfigurationPanel.js";
+import {
+  ProviderConfigurationEmpty as PanelEmpty,
+  ProviderConfigurationFiles as ConfigurationFiles,
+  ProviderConfigurationStatusBar as ConfigurationStatusBar
+} from "./ProviderConfigurationStatus.js";
 import { BuiltInProviderConnection } from "./BuiltInProviderConnection.js";
 import {
   defaultProviderCatalogView,
@@ -21,8 +26,7 @@ import { SettingsDestructiveActionDialog } from "./SettingsActionDialogs.js";
 import { useSettingsDraftRegistration } from "./SettingsDraftGuard.js";
 import {
   SettingsBackAction,
-  SettingsNotice,
-  SettingsToolbar
+  SettingsNotice
 } from "./SettingsPrimitives.js";
 import {
   loadProviderConfiguration,
@@ -36,7 +40,15 @@ import styles from "./ProviderConfigurationPanel.module.css";
 type ProviderSection = "configuration" | "models" | "defaults" | "diagnostics";
 
 export function ProviderConfigurationPanel() {
-  const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId ?? state.currentWorkspaceId);
+  const scope = useWorkbenchStore((state) => state.settingsScope);
+  const workspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
+  return scope === "project"
+    ? <ProjectProviderConfigurationPanel workspaceId={workspaceId} />
+    : <GlobalProviderConfigurationPanel />;
+}
+
+function GlobalProviderConfigurationPanel() {
+  const workspaceId = "app";
   const snapshot = useProviderConfigurationStore((state) => state.snapshot);
   const draft = useProviderConfigurationStore((state) => state.draft);
   const selectedProviderId = useProviderConfigurationStore((state) => state.selectedProviderId);
@@ -46,10 +58,15 @@ export function ProviderConfigurationPanel() {
   const error = useProviderConfigurationStore((state) => state.error);
   const storeWorkspaceId = useProviderConfigurationStore((state) => state.workspaceId);
   const setCredentialDialogOpen = useShellStore((state) => state.setCredentialDialogOpen);
+  const initialEditorRequestRef = useRef(
+    useProviderConfigurationStore.getState().providerEditorRequest?.workspaceId === workspaceId
+      ? useProviderConfigurationStore.getState().providerEditorRequest?.section
+      : undefined
+  );
   const [providerQuery, setProviderQuery] = useState("");
   const [providerCatalogView, setProviderCatalogView] = useState<ProviderCatalogView>("configured");
-  const [section, setSection] = useState<ProviderSection>("models");
-  const [providerDetailOpen, setProviderDetailOpen] = useState(false);
+  const [section, setSection] = useState<ProviderSection>(initialEditorRequestRef.current ?? "models");
+  const [providerDetailOpen, setProviderDetailOpen] = useState(initialEditorRequestRef.current !== undefined);
   const [pendingProviderId, setPendingProviderId] = useState<string | null>();
   const [removalTarget, setRemovalTarget] = useState<string>();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -58,23 +75,22 @@ export function ProviderConfigurationPanel() {
   const restoreCatalogScrollRef = useRef(false);
 
   useEffect(() => {
+    const providerState = useProviderConfigurationStore.getState();
+    const requestedSection = initialEditorRequestRef.current;
+    providerState.consumeProviderEditorRequest(workspaceId);
     setProviderQuery("");
     setProviderCatalogView("configured");
-    setSection("models");
-    setProviderDetailOpen(false);
     setPendingProviderId(undefined);
     catalogScrollTopRef.current = 0;
     catalogViewWorkspaceRef.current = undefined;
     restoreCatalogScrollRef.current = false;
-    if (!workspaceId) {
-      useProviderConfigurationStore.getState().reset();
-      return;
+    if (requestedSection === undefined || providerState.workspaceId !== workspaceId || !providerState.snapshot) {
+      void loadProviderConfiguration(workspaceId);
     }
-    void loadProviderConfiguration(workspaceId);
   }, [workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || !snapshot || storeWorkspaceId !== workspaceId) return;
+    if (!snapshot || storeWorkspaceId !== workspaceId) return;
     if (catalogViewWorkspaceRef.current === workspaceId) return;
     catalogViewWorkspaceRef.current = workspaceId;
     setProviderCatalogView(defaultProviderCatalogView(snapshot.providers));
@@ -102,9 +118,6 @@ export function ProviderConfigurationPanel() {
     discard: () => useProviderConfigurationStore.getState().discardDraft()
   });
 
-  if (!workspaceId) {
-    return <PanelEmpty title="先打开一个工作区" detail="Pi 配置命令需要明确的 Workspace authority。" />;
-  }
   if (phase === "loading" && (!snapshot || storeWorkspaceId !== workspaceId)) {
     return <PanelEmpty title="正在读取 Pi 配置" detail="从 models.json、auth.json 与 settings.json 建立安全投影。" />;
   }
@@ -200,6 +213,7 @@ export function ProviderConfigurationPanel() {
         </SettingsNotice>
       ) : null}
       {!providerDetailOpen ? (
+        <div className={styles.catalogView}>
         <ProviderCatalog
           busy={phase === "saving"}
           onNew={() => requestProvider(null)}
@@ -211,6 +225,7 @@ export function ProviderConfigurationPanel() {
           selectedProviderId={selectedProviderId}
           view={providerCatalogView}
         />
+        </div>
       ) : (
         <main className={styles.editor} data-testid="provider-configuration-editor">
             {draft ? (
@@ -273,7 +288,7 @@ export function ProviderConfigurationPanel() {
                       selectedView={selectedView}
                     />
                   ) : null}
-                  {section === "defaults" ? <ProviderDefaultModelEditor snapshot={snapshot} workspaceId={workspaceId} /> : null}
+                  {section === "defaults" ? <ProviderDefaultModelEditor scope="global" snapshot={snapshot} workspaceId={workspaceId} /> : null}
                   {section === "diagnostics" ? <ConfigurationFiles snapshot={snapshot} /> : null}
                 </div>
               </>
@@ -402,44 +417,8 @@ function ProviderConfigurationEditor({
   );
 }
 
-function ConfigurationFiles({ snapshot }: { snapshot: PiProviderConfigurationSnapshot }) {
-  const validCount = snapshot.files.filter((file) => file.valid).length;
-  const [expanded, setExpanded] = useState(snapshot.syncState === "invalid" || snapshot.diagnostics.length > 0);
-  return (
-    <section className={styles.secondarySection}>
-      <header className={styles.sectionIntro}><strong>文件与诊断</strong><small>Pi 文件是唯一真源；正常状态保持紧凑，发生错误时自动展开。</small></header>
-      {snapshot.diagnostics.length ? <ul className={styles.diagnostics}>{snapshot.diagnostics.map((item, index) => <li key={`${item.file}-${index}`}><strong>{item.file}</strong>{item.message}</li>)}</ul> : null}
-      <details className={styles.fileDetails} open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
-        <summary>
-          <span><FileJson2 aria-hidden="true" size={15} /><strong>Pi 文件同步</strong></span>
-          <em data-valid={validCount === snapshot.files.length}>{validCount}/{snapshot.files.length} 有效</em>
-        </summary>
-        <div className={styles.fileList}>{snapshot.files.map((file) => (
-          <div key={file.kind}>
-            <FileJson2 aria-hidden="true" size={15} />
-            <span><strong>{file.kind}</strong><small title={file.path}>{file.path}</small></span>
-            <em data-valid={file.valid}>{file.valid ? "有效" : "无效"}</em>
-          </div>
-        ))}</div>
-      </details>
-    </section>
-  );
-}
-
-function ConfigurationStatusBar({ snapshot, busy, onReload }: { snapshot: PiProviderConfigurationSnapshot; busy: boolean; onReload: () => void }) {
-  return <SettingsToolbar
-    className={styles.statusBar!}
-    status={<span className={styles.syncStatus} data-current={snapshot.syncState === "current"}>{snapshot.syncState === "current" ? <Check aria-hidden="true" size={14} /> : <AlertTriangle aria-hidden="true" size={14} />}<strong>{snapshot.syncState === "current" ? "已与 Pi 文件同步" : "Pi 文件需要处理"}</strong><small>revision {snapshot.revision.slice(0, 10)}</small></span>}
-    actions={<Button className="secondary-button" isDisabled={busy} onPress={onReload}><RefreshCw aria-hidden="true" size={14} />重新加载</Button>}
-  />;
-}
-
 function Field({ label, detail, children }: { label: string; detail?: string; children: ReactNode }) {
   return <label className={styles.field}><span>{label}</span>{children}{detail ? <small>{detail}</small> : null}</label>;
-}
-
-function PanelEmpty({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
-  return <div className={styles.panelEmpty} role="status"><strong>{title}</strong><span>{detail}</span>{action}</div>;
 }
 
 function updateOptionalProvider(key: "name" | "baseUrl" | "api", value: string): void {

@@ -10,6 +10,7 @@ import {
   PLAN_IMPLEMENTATION_ENTRY_TYPE,
   PROPOSED_PLAN_ENTRY_TYPE
 } from "./plan-mode-controller.js";
+import { VISION_ASSISTANCE_ENTRY_TYPE } from "./vision-assistance.js";
 
 describe("projectMessagePage", () => {
   it("projects Plan proposals in branch order and resolves their historical status", () => {
@@ -92,6 +93,76 @@ describe("projectMessagePage", () => {
     ));
 
     expect(projectedPlanStatus(manager, "plan-started")).toBe("implemented");
+  });
+
+  it("projects replayable visual-assistance evidence without image bytes", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "vision-evidence-session" });
+    manager.appendCustomEntry(VISION_ASSISTANCE_ENTRY_TYPE, {
+      version: 1,
+      provider: "bailian",
+      model: "qwen3.7-flash",
+      attachments: [{
+        id: "image-a",
+        name: "settings.png",
+        mimeType: "image/png",
+        byteLength: 3
+      }],
+      description: "The settings page shows a Workspace initialization error.",
+      usage: {
+        input: 20,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 30,
+        cost: { input: 0.001, output: 0.001, cacheRead: 0, cacheWrite: 0, total: 0.002 }
+      },
+      createdAt: 2
+    });
+    manager.appendMessage({ role: "user", content: "How do I fix it?", timestamp: 3 });
+
+    const page = projectMessagePage(manager);
+
+    expect(page.messages[0]).toMatchObject({
+      role: "system",
+      parts: [{
+        type: "vision-evidence",
+        provider: "bailian",
+        model: "qwen3.7-flash",
+        description: "The settings page shows a Workspace initialization error.",
+        totalTokens: 30
+      }]
+    });
+    expect(JSON.stringify(page)).not.toContain("AQID");
+  });
+
+  it("skips visual evidence with malformed persisted cost metadata", () => {
+    const manager = SessionManager.inMemory("/tmp", { id: "invalid-vision-evidence-session" });
+    manager.appendCustomEntry(VISION_ASSISTANCE_ENTRY_TYPE, {
+      version: 1,
+      provider: "bailian",
+      model: "qwen3.7-flash",
+      attachments: [{
+        id: "image-a",
+        name: "settings.png",
+        mimeType: "image/png",
+        byteLength: 3
+      }],
+      description: "Untrusted evidence",
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { total: "not-a-number" }
+      },
+      createdAt: 2
+    });
+    manager.appendMessage({ role: "user", content: "Visible", timestamp: 3 });
+
+    expect(projectMessagePage(manager).messages).toEqual([
+      expect.objectContaining({ role: "user", parts: [{ type: "text", text: "Visible" }] })
+    ]);
   });
 
   it("bootstraps only the newest 100 messages and pages older history without overlap", () => {

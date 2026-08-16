@@ -5,7 +5,7 @@ import type {
 } from "@pi67/protocol";
 
 export type MockProviderConfigurationCommandHandler = (
-  mutation: "save" | "remove" | "credential" | "default",
+  mutation: "save" | "remove" | "credential" | "default" | "vision-global" | "vision-project",
   value: PiProviderConfigurationSnapshot,
   payload: Record<string, unknown>,
   persistent?: boolean
@@ -108,6 +108,36 @@ export function installMockProviderConfigurationCommandHandler(): void {
     return nextConfigurationRevision(snapshot);
   }
 
+  function updateVisionConfiguration(
+    value: PiProviderConfigurationSnapshot,
+    payload: Record<string, unknown>,
+    scope: "global" | "project"
+  ): PiProviderConfigurationSnapshot {
+    const snapshot = structuredClone(value);
+    const selection = typeof payload.provider === "string" && typeof payload.model === "string"
+      ? { provider: payload.provider, model: payload.model }
+      : undefined;
+    if (scope === "global") {
+      if (selection) snapshot.vision.global = selection;
+      else delete snapshot.vision.global;
+    } else if (payload.mode === "model" && selection) {
+      snapshot.vision.project = { mode: "model", ...selection };
+      snapshot.vision.disabledByProject = false;
+    } else if (payload.mode === "disabled") {
+      snapshot.vision.project = { mode: "disabled" };
+      snapshot.vision.disabledByProject = true;
+    } else {
+      delete snapshot.vision.project;
+      snapshot.vision.disabledByProject = false;
+    }
+    const effective = snapshot.vision.project?.mode === "model"
+      ? { provider: snapshot.vision.project.provider, model: snapshot.vision.project.model }
+      : snapshot.vision.project?.mode === "disabled" ? undefined : snapshot.vision.global;
+    if (effective) snapshot.vision.effective = effective;
+    else delete snapshot.vision.effective;
+    return nextConfigurationRevision(snapshot);
+  }
+
   function nextConfigurationRevision(
     snapshot: PiProviderConfigurationSnapshot
   ): PiProviderConfigurationSnapshot {
@@ -135,6 +165,8 @@ export function installMockProviderConfigurationCommandHandler(): void {
     if (mutation === "save") return saveProviderConfiguration(value, payload);
     if (mutation === "remove") return removeProviderConfiguration(value, payload);
     if (mutation === "credential") return updateCredentialConfiguration(value, payload, persistent === true);
+    if (mutation === "vision-global") return updateVisionConfiguration(value, payload, "global");
+    if (mutation === "vision-project") return updateVisionConfiguration(value, payload, "project");
     return updateDefaultConfiguration(value, payload);
   };
 }

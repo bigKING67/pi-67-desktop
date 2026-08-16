@@ -152,6 +152,90 @@ describe("native workspace identity", () => {
     });
   });
 
+  it("rebinds a macOS mount device change when the stable directory identity still matches", async () => {
+    const root = await temporaryRoot();
+    const workspace = join(root, "remounted-workspace");
+    await mkdir(workspace);
+    const observed = await createNativeWorkspaceDescriptor(workspace, { createId: () => "remounted" });
+    const persisted: WorkspaceDescriptor = {
+      ...observed,
+      identity: { ...observed.identity, device: differentDecimal(observed.identity.device) }
+    };
+
+    await expect(refreshPersistedWorkspaceDescriptor(persisted, { platform: "darwin" }))
+      .resolves.toMatchObject({
+        id: "remounted",
+        identity: observed.identity,
+        trust: "trusted",
+        trustProvenance: "restored",
+        availability: "available"
+      });
+  });
+
+  it("repairs the legacy false-positive state from a macOS device-only change", async () => {
+    const root = await temporaryRoot();
+    const workspace = join(root, "legacy-remounted-workspace");
+    await mkdir(workspace);
+    const observed = await createNativeWorkspaceDescriptor(workspace, { createId: () => "legacy-remounted" });
+    const persisted: WorkspaceDescriptor = {
+      ...observed,
+      identity: { ...observed.identity, device: differentDecimal(observed.identity.device) },
+      trust: "unknown",
+      trustProvenance: "identity-changed",
+      availability: "identity-changed"
+    };
+
+    await expect(refreshPersistedWorkspaceDescriptor(persisted, { platform: "darwin" }))
+      .resolves.toMatchObject({
+        id: "legacy-remounted",
+        identity: observed.identity,
+        trust: "trusted",
+        trustProvenance: "restored",
+        availability: "available"
+      });
+  });
+
+  it("preserves non-trusted state while rebinding a macOS mount device change", async () => {
+    const root = await temporaryRoot();
+    const workspace = join(root, "untrusted-remounted-workspace");
+    await mkdir(workspace);
+    const observed = await createNativeWorkspaceDescriptor(workspace, { createId: () => "untrusted-remounted" });
+    const persisted: WorkspaceDescriptor = {
+      ...observed,
+      identity: { ...observed.identity, device: differentDecimal(observed.identity.device) },
+      trust: "untrusted",
+      trustProvenance: "indirect"
+    };
+
+    await expect(refreshPersistedWorkspaceDescriptor(persisted, { platform: "darwin" }))
+      .resolves.toMatchObject({
+        identity: observed.identity,
+        trust: "untrusted",
+        trustProvenance: "indirect",
+        availability: "available"
+      });
+  });
+
+  it("does not relax device identity on other platforms or when stable identity changes", async () => {
+    const root = await temporaryRoot();
+    const workspace = join(root, "strict-workspace");
+    await mkdir(workspace);
+    const observed = await createNativeWorkspaceDescriptor(workspace, { createId: () => "strict" });
+    const deviceChanged: WorkspaceDescriptor = {
+      ...observed,
+      identity: { ...observed.identity, device: differentDecimal(observed.identity.device) }
+    };
+    const birthtimeChanged: WorkspaceDescriptor = {
+      ...deviceChanged,
+      identity: { ...deviceChanged.identity, birthtimeNs: differentDecimal(observed.identity.birthtimeNs) }
+    };
+
+    await expect(refreshPersistedWorkspaceDescriptor(deviceChanged, { platform: "win32" }))
+      .resolves.toMatchObject({ trust: "unknown", availability: "identity-changed" });
+    await expect(refreshPersistedWorkspaceDescriptor(birthtimeChanged, { platform: "darwin" }))
+      .resolves.toMatchObject({ trust: "unknown", availability: "identity-changed" });
+  });
+
   it("marks missing and replaced workspace paths without trusting the replacement", async () => {
     const root = await temporaryRoot();
     const missingPath = join(root, "missing-workspace");
@@ -290,4 +374,8 @@ function descriptorFixture(
     trustProvenance: "native-picker",
     availability: "available"
   };
+}
+
+function differentDecimal(value: string): string {
+  return value === "1" ? "2" : "1";
 }

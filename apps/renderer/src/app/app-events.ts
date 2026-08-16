@@ -11,7 +11,10 @@ import type { ProjectionAgentEvent } from "./incremental-projection.js";
 import { reduceInteractiveEvent } from "./interactive-event-reducer.js";
 import { reduceOperationEvent } from "./operation-event-reducer.js";
 import { reduceRuntimeEvent } from "./runtime-event-reducer.js";
-import { handleProviderConfigurationChanged } from "../settings/provider-configuration-controller.js";
+import {
+  handleProjectProviderConfigurationChanged,
+  handleProviderConfigurationChanged
+} from "../settings/provider-configuration-controller.js";
 
 export type RoutedAgentEvent = Exclude<AgentEvent, ProjectionAgentEvent>;
 
@@ -72,8 +75,11 @@ export function handleAgentEvent<TState extends AppEventState>(
       });
       return true;
     case "provider.configuration.changed":
+      if (envelope.context.scope === "app") handleProviderConfigurationChanged(event.payload);
+      return true;
+    case "provider.projectConfiguration.changed":
       if (envelope.context.scope === "workspace") {
-        handleProviderConfigurationChanged(envelope.context.workspaceId, event.payload);
+        handleProjectProviderConfigurationChanged(envelope.context.workspaceId, event.payload);
       }
       return true;
     case "resource.changed":

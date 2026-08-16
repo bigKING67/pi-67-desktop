@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.12.1",
+  "catalogVersion": "2026.08.16.1",
   "sources": [
     {
       "id": "pi67-core",
@@ -11,9 +11,7 @@
       "localSibling": "../pi-67",
       "version": "0.15.8",
       "includedExtensions": [
-        "pi-rules-loader",
-        "pi-vision-bridge",
-        "xtalpi-pi-tools"
+        "pi-rules-loader"
       ]
     },
     {

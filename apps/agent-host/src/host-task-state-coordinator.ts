@@ -10,6 +10,7 @@ import {
   type RequestEnvelope
 } from "@pi67/protocol";
 import { CommandScheduler } from "./command-scheduler.js";
+import { isAppConfigurationCommand } from "./app-configuration-command-router.js";
 import { ControlMutationLedger } from "./control-mutation-ledger.js";
 import type { ExtensionPackageTaskView } from "./extension-package-command-router.js";
 import { GlobalRunAdmission, type RunAdmissionLease } from "./global-run-admission.js";
@@ -282,7 +283,8 @@ export class HostTaskStateCoordinator {
 }
 
 function allowsAppContext(request: RequestEnvelope): boolean {
-  return request.type === "runtime.getStatus"
+  return isAppConfigurationCommand(request.type)
+    || request.type === "runtime.getStatus"
     || request.type === "diagnostics.collect"
     || request.type === "doctor.run"
     || request.type === "lark.auth.status"

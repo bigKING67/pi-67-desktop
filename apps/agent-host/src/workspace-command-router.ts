@@ -27,30 +27,20 @@ type WorkspaceLifecycleResult = CommandResults[WorkspaceLifecycleCommandType];
 export type WorkspaceProviderCommandType =
   | "provider.list"
   | "provider.setRuntimeKey"
-  | "provider.configuration.get"
-  | "provider.configuration.save"
-  | "provider.configuration.remove"
-  | "provider.credential.store"
-  | "provider.credential.reveal"
-  | "provider.credential.remove"
-  | "model.default.set"
-  | "provider.configuration.reload";
+  | "provider.projectConfiguration.get"
+  | "provider.projectConfiguration.reload"
+  | "model.projectDefault.set"
+  | "vision.assistant.project.set";
 type WorkspaceProviderCommand = AgentCommand<WorkspaceProviderCommandType>;
 type WorkspaceProviderResult = CommandResults[WorkspaceProviderCommandType];
 type WorkspaceProviderMutationCommandType = Exclude<WorkspaceProviderCommandType,
   | "provider.list"
-  | "provider.configuration.get"
-  | "provider.configuration.reload"
-  | "provider.credential.reveal">;
+  | "provider.projectConfiguration.get"
+  | "provider.projectConfiguration.reload">;
 type WorkspaceProviderMutationCommand = AgentCommand<WorkspaceProviderMutationCommandType>;
 type WorkspaceProviderMutationResult = CommandResults[WorkspaceProviderMutationCommandType];
 type WorkspaceMutationCommandType = WorkspaceLifecycleCommandType
-  | "provider.setRuntimeKey"
-  | "provider.configuration.save"
-  | "provider.configuration.remove"
-  | "provider.credential.store"
-  | "provider.credential.remove"
-  | "model.default.set"
+  | WorkspaceProviderMutationCommandType
   | WorkspaceConversationCommandType;
 type WorkspaceMutationCommand = AgentCommand<WorkspaceMutationCommandType>;
 type WorkspaceMutationResult = CommandResults[WorkspaceMutationCommandType];
@@ -136,19 +126,11 @@ export class WorkspaceCommandRouter {
   ): Promise<WorkspaceProviderResult> {
     const workspace = this.workspaces.require(context.workspaceId);
     if (command.type === "provider.list") return workspace.workspaceServices.providerCatalog.list();
-    const configuration = workspace.workspaceServices.configurationService;
-    if (command.type === "provider.configuration.get") {
-      return requireConfigurationService(configuration).get(workspace.cwd);
+    if (command.type === "provider.projectConfiguration.get") {
+      return requireConfigurationService(workspace).get(workspace.cwd);
     }
-    if (command.type === "provider.configuration.reload") {
-      return requireConfigurationService(configuration).reload(workspace.cwd);
-    }
-    if (command.type === "provider.credential.reveal") {
-      return requireConfigurationService(configuration).revealCredential(
-        workspace.cwd,
-        command.payload.expectedRevision,
-        command.payload.provider
-      );
+    if (command.type === "provider.projectConfiguration.reload") {
+      return requireConfigurationService(workspace).reload(workspace.cwd);
     }
     if (!idempotencyKey) {
       return Promise.reject(new HostCommandError(
@@ -178,50 +160,49 @@ export class WorkspaceCommandRouter {
       await this.runtimeCredentialOverrides.set(command.payload.provider, command.payload.apiKey);
       return workspace.workspaceServices.providerCatalog.list();
     }
-    const configuration = requireConfigurationService(workspace.workspaceServices.configurationService);
-    switch (command.type) {
-      case "provider.configuration.save":
-        return configuration.saveProvider(
-          workspace.cwd,
-          command.payload.expectedRevision,
-          command.payload.provider
-        );
-      case "provider.configuration.remove":
-        return configuration.removeProvider(
-          workspace.cwd,
-          command.payload.expectedRevision,
-          command.payload.provider
-        );
-      case "provider.credential.store":
-        return configuration.storeCredential(
-          workspace.cwd,
-          command.payload.expectedRevision,
-          command.payload.provider,
-          command.payload.apiKey
-        );
-      case "provider.credential.remove":
-        return configuration.removeCredential(
-          workspace.cwd,
-          command.payload.expectedRevision,
-          command.payload.provider
-        );
-      case "model.default.set": {
-        const { provider, model } = command.payload;
-        if ((provider === undefined) !== (model === undefined)) {
-          throw new HostCommandError(
-            "INVALID_PAYLOAD",
-            "A Pi default model requires both Provider and model identifiers.",
-            false
-          );
-        }
-        return configuration.setDefaultModel(
-          workspace.cwd,
-          command.payload.expectedRevision,
-          command.payload.scope,
-          provider === undefined || model === undefined ? undefined : { provider, model }
+    const configuration = requireConfigurationService(workspace);
+    if (command.type === "model.projectDefault.set") {
+      const { provider, model } = command.payload;
+      if ((provider === undefined) !== (model === undefined)) {
+        throw new HostCommandError(
+          "INVALID_PAYLOAD",
+          "A project Pi default model requires both Provider and model identifiers.",
+          false
         );
       }
+      return configuration.setProjectDefaultModel(
+        workspace.cwd,
+        command.payload.expectedRevision,
+        provider === undefined || model === undefined ? undefined : { provider, model }
+      );
     }
+    if (command.type === "vision.assistant.project.set") {
+      const { provider, model } = command.payload;
+      if (command.payload.mode === "model" && (provider === undefined || model === undefined)) {
+        throw new HostCommandError(
+          "INVALID_PAYLOAD",
+          "A project visual-assistance model requires both Provider and model identifiers.",
+          false
+        );
+      }
+      if (command.payload.mode !== "model" && (provider !== undefined || model !== undefined)) {
+        throw new HostCommandError(
+          "INVALID_PAYLOAD",
+          "Only a project model override accepts Provider and model identifiers.",
+          false
+        );
+      }
+      return configuration.setProjectVisionAssistant(
+        workspace.cwd,
+        command.payload.expectedRevision,
+        command.payload.mode === "inherit"
+          ? undefined
+          : command.payload.mode === "disabled"
+            ? { mode: "disabled" }
+            : { mode: "model", provider: provider!, model: model! }
+      );
+    }
+    throw new HostCommandError("INVALID_PAYLOAD", "Unsupported Workspace Provider mutation.", false);
   }
 
   queryCatalog(
@@ -395,23 +376,20 @@ export function isWorkspaceProviderCommand(
 ): type is WorkspaceProviderCommandType {
   return type === "provider.list"
     || type === "provider.setRuntimeKey"
-    || type === "provider.configuration.get"
-    || type === "provider.configuration.save"
-    || type === "provider.configuration.remove"
-    || type === "provider.credential.store"
-    || type === "provider.credential.reveal"
-    || type === "provider.credential.remove"
-    || type === "model.default.set"
-    || type === "provider.configuration.reload";
+    || type === "provider.projectConfiguration.get"
+    || type === "provider.projectConfiguration.reload"
+    || type === "model.projectDefault.set"
+    || type === "vision.assistant.project.set";
 }
 
 function requireConfigurationService(
-  service: NonNullable<ReturnType<WorkspaceContextRegistry["require"]>["workspaceServices"]["configurationService"]> | undefined
+  workspace: ReturnType<WorkspaceContextRegistry["require"]>
 ): NonNullable<ReturnType<WorkspaceContextRegistry["require"]>["workspaceServices"]["configurationService"]> {
-  if (service) return service;
+  const configuration = workspace.workspaceServices.configurationService;
+  if (configuration) return configuration;
   throw new HostCommandError(
     "RUNTIME_NOT_READY",
-    "Pi configuration services are not available for this Workspace.",
+    "Pi configuration is unavailable for this Workspace.",
     true
   );
 }

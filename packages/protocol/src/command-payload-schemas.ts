@@ -225,6 +225,36 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     })
   ]),
   "provider.configuration.reload": EmptyPayloadSchema,
+  "provider.projectConfiguration.get": EmptyPayloadSchema,
+  "provider.projectConfiguration.reload": EmptyPayloadSchema,
+  "model.projectDefault.set": Type.Union([
+    strictObject({ expectedRevision: PiConfigurationExpectedRevisionSchema }),
+    strictObject({
+      expectedRevision: PiConfigurationExpectedRevisionSchema,
+      provider: PiConfigurationProviderIdSchema,
+      model: PiConfigurationProviderIdSchema
+    })
+  ]),
+  "vision.assistant.global.set": Type.Union([
+    strictObject({ expectedRevision: PiConfigurationExpectedRevisionSchema }),
+    strictObject({
+      expectedRevision: PiConfigurationExpectedRevisionSchema,
+      provider: PiConfigurationProviderIdSchema,
+      model: PiConfigurationProviderIdSchema
+    })
+  ]),
+  "vision.assistant.project.set": Type.Union([
+    strictObject({
+      expectedRevision: PiConfigurationExpectedRevisionSchema,
+      mode: Type.Union([Type.Literal("inherit"), Type.Literal("disabled")])
+    }),
+    strictObject({
+      expectedRevision: PiConfigurationExpectedRevisionSchema,
+      mode: Type.Literal("model"),
+      provider: PiConfigurationProviderIdSchema,
+      model: PiConfigurationProviderIdSchema
+    })
+  ]),
   "thinking.set": strictObject({ level: Type.String({ minLength: 1, maxLength: 32 }) }),
   "resource.list": EmptyPayloadSchema,
   "resource.reload": EmptyPayloadSchema,

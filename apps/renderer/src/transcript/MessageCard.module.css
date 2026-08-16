@@ -194,6 +194,87 @@
   font-size: 10px;
 }
 
+.visionEvidence {
+  width: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--focus) 24%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--focus) 2%);
+}
+
+.visionEvidence > summary {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--focus);
+  cursor: pointer;
+  list-style: none;
+}
+
+.visionEvidence > summary::-webkit-details-marker {
+  display: none;
+}
+
+.visionEvidence > summary > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.visionEvidence > summary strong {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.visionEvidence > summary small {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visionEvidence > div {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.visionEvidence ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.visionEvidence li {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.visionEvidence li small {
+  margin-left: 4px;
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 8px;
+}
+
+.visionEvidence footer {
+  color: var(--text-tertiary);
+  font-family: var(--font-code);
+  font-size: 9px;
+}
+
 .toolResult {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);

@@ -1,0 +1,7 @@
+.settings {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 12px;
+  padding-bottom: 20px;
+}

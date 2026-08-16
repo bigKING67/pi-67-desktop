@@ -104,6 +104,33 @@ export async function recoverClaimedRecord(
   return undefined;
 }
 
+export async function recoverClaimedManifestBySourceIds(
+  claimedRoot: string,
+  taskKey: string,
+  sourceIds: readonly string[]
+): Promise<{ directory: string; manifest: ClaimedManifest } | undefined> {
+  const taskDirectory = join(claimedRoot, stableKey(taskKey));
+  const taskState = await lstat(taskDirectory).catch((error: unknown) => {
+    if (isNodeError(error, "ENOENT")) return undefined;
+    throw error;
+  });
+  if (!taskState) return undefined;
+  const entries = await readStableClaimedSetEntries(claimedRoot, taskKey, taskDirectory);
+  if (entries.length > MAX_CLAIMED_SETS_PER_TASK) {
+    throw new Error("Claimed attachment recovery exceeds the bounded set limit.");
+  }
+  for (const entry of entries) {
+    const directory = join(taskDirectory, entry);
+    const candidate = await readClaimedManifest(directory).catch(() => undefined);
+    if (!candidate
+      || candidate.sourceIds.length !== sourceIds.length
+      || candidate.sourceIds.some((id, index) => id !== sourceIds[index])) continue;
+    const manifest = await validateClaimedSet(taskDirectory, directory, entry);
+    return { directory, manifest };
+  }
+  return undefined;
+}
+
 export async function validateClaimedSet(
   taskDirectory: string,
   directory: string,

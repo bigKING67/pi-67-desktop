@@ -20,6 +20,7 @@ import {
   cleanupTemporaryClaimDirectories,
   type ClaimedManifest,
   type ClaimedSetRecord,
+  recoverClaimedManifestBySourceIds,
   recoverClaimedRecord,
   stableKey,
   validateClaimedSet
@@ -127,6 +128,10 @@ class AgentHostPromptAttachmentAccess implements PromptAttachmentAccessOwner {
     if (destinationState) {
       const existing = await validateClaimedSet(taskDirectory, destination, submissionKey);
       return this.adoptExisting(taskKey, destination, sourceIds, existing);
+    }
+    const reusable = await recoverClaimedManifestBySourceIds(this.claimedRoot, taskKey, sourceIds);
+    if (reusable) {
+      return this.adoptExisting(taskKey, reusable.directory, sourceIds, reusable.manifest);
     }
     await assertClaimCapacity(this.claimedRoot, taskKey, taskDirectory);
 

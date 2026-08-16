@@ -204,7 +204,7 @@ if (hasSingleInstanceLock) {
     await workbenchState.update(beginWorkbenchRun);
     const persistedWorkbench = (await workbenchState.load()).state;
     const refreshedWorkspaces = await Promise.all(
-      persistedWorkbench.workspaces.map(refreshPersistedWorkspaceDescriptor)
+      persistedWorkbench.workspaces.map((workspace) => refreshPersistedWorkspaceDescriptor(workspace))
     );
     await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
     const privateGitRunner = new BoundedPrivateGitRunner(desktopToolchain);

@@ -44,7 +44,24 @@ export interface AttachmentPart {
   kind: AttachmentKind;
 }
 
-export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart | PlanProposalPart;
+export interface VisionEvidencePart {
+  type: "vision-evidence";
+  provider: string;
+  model: string;
+  attachments: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    byteLength: number;
+  }>;
+  description: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
+export type MessagePart = TextPart | ToolCallPart | ImagePart | AttachmentPart | VisionEvidencePart | PlanProposalPart;
 
 export interface SessionMessageView {
   id: string;

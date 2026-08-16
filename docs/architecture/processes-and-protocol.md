@@ -34,9 +34,12 @@ Agent 消息不经过 IPC invoke、HTTP 或 WebSocket。Preload 的 invoke API �
 ## Workspace identity and atomic file mutations
 
 Electron Main 的 Workspace Registry 保存稳定 `workspaceId`、native canonical path、lossless
-`dev` / `ino` / `birthtimeNs` 物理身份（可用时）和最近一次成功验证时间。启动恢复只在物理身份仍匹配时
-恢复原 trust；路径缺失按 offline 状态保留注册但禁止 Host admission，相同路径出现不同物理目录时标记
-identity changed 并撤销继承 trust。只有 path-only 证据时，即使 canonical path 字符串相同也进入
+`dev` / `ino` / `birthtimeNs` 物理身份（可用时）和最近一次成功验证时间。同一挂载周期内的重复目录判定
+继续严格比较三项物理字段；跨启动恢复则区分持久文件身份和挂载期设备编号：macOS/APFS 在重启或重挂载后
+可能只改变 `dev`，因此仅当 native canonical path、`ino` 和 `birthtimeNs` 仍全部精确匹配时，Main 才更新
+`dev` 并恢复原 trust。旧版严格比较已经生成的 bounded `identity-changed + unknown` 误报也只在这组精确条件
+下恢复。路径、`ino` 或 `birthtimeNs` 任一变化仍标记 identity changed 并撤销继承 trust；路径缺失按
+offline 状态保留注册但禁止 Host admission。只有 path-only 证据时，即使 canonical path 字符串相同也进入
 `needs-confirmation`，必须经 native picker 明确修复。用户通过 picker 选择移动后的同一目录或明确选择替代
 目录属于显式 rebind；Main 不扫描无关用户目录猜测 relocation。
 

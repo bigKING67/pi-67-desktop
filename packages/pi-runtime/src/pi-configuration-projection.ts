@@ -194,6 +194,13 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
         ? "pending"
         : reloads.includes("applied") ? "applied" : "not-loaded";
       const effectiveProject = state.projectTrusted ? projectSettings?.selection : undefined;
+      const projectVision = state.projectTrusted ? projectSettings?.visionAssistant : undefined;
+      const globalVision = globalSettings.visionAssistant?.mode === "model"
+        ? globalSettings.visionAssistant
+        : undefined;
+      const effectiveVision = projectVision?.mode === "model"
+        ? projectVision
+        : projectVision?.mode === "disabled" ? undefined : globalVision;
       state.snapshot = {
         revision: bundle.revision,
         syncState: "current",
@@ -208,6 +215,13 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
             : {}),
           projectTrusted: state.projectTrusted
         },
+        vision: {
+          ...(globalVision ? { global: { provider: globalVision.provider, model: globalVision.model } } : {}),
+          ...(projectVision ? { project: projectVision } : {}),
+          ...(effectiveVision ? { effective: { provider: effectiveVision.provider, model: effectiveVision.model } } : {}),
+          disabledByProject: projectVision?.mode === "disabled",
+          projectTrusted: state.projectTrusted
+        },
         files,
         diagnostics: []
       };
@@ -220,6 +234,10 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
         providers: previous?.providers ?? [],
         credentials: previous?.credentials ?? [],
         defaults: previous?.defaults ?? { projectTrusted: state.projectTrusted },
+        vision: previous?.vision ?? {
+          disabledByProject: false,
+          projectTrusted: state.projectTrusted
+        },
         files,
         diagnostics
       };

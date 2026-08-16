@@ -40,7 +40,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await categoryTrigger.click();
   const categoryMenu = page.getByRole("menu", { name: "选择设置分类" });
   await expect(categoryMenu).toBeVisible();
-  for (const group of ["应用", "Pi", "办公", "连接与集成", "系统与支持"]) {
+  for (const group of ["应用", "Pi", "办公", "能力与集成", "系统与支持"]) {
     await expect(categoryMenu.getByText(group, { exact: true })).toBeVisible();
   }
   const categoryPopover = page.getByRole("dialog", { name: "选择设置分类" });
@@ -189,7 +189,8 @@ test("keeps local Settings workspaces inside a 1040 pixel application surface", 
   const providerList = settings.getByTestId("provider-configuration-list");
   const providerEditor = settings.getByTestId("provider-configuration-editor");
   const manageCredentials = page.getByRole("button", { name: /API Key/u });
-  await expect(scope).toHaveCount(0);
+  await expect(scope).toBeVisible();
+  await expect(scope.getByRole("button", { name: "全局", exact: true })).toBeVisible();
   await expect(providerList).toBeVisible();
   await expect(providerEditor).toBeHidden();
   await providerList.getByRole("button").first().click();

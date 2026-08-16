@@ -99,8 +99,7 @@ describe("Pi SettingsManager Desktop package toolchain override", () => {
     expect(sessionView.getGlobalSettings().extensions).toEqual([
       "extensions/user-tool/index.ts",
       "-extensions/xtalpi-pi-tools/index.ts",
-      "-extensions/pi-rules-loader/index.ts",
-      "-extensions/pi-vision-bridge/index.ts"
+      "-extensions/pi-rules-loader/index.ts"
     ]);
     expect(settingsManager.getGlobalSettings().packages).toEqual(["npm:user-package"]);
     expect(settingsManager.getGlobalSettings().extensions).toEqual([

@@ -273,6 +273,16 @@ export interface CommandPayloads extends
     model?: string;
   };
   "provider.configuration.reload": Record<string, never>;
+  "provider.projectConfiguration.get": Record<string, never>;
+  "provider.projectConfiguration.reload": Record<string, never>;
+  "model.projectDefault.set": { expectedRevision: string; provider?: string; model?: string };
+  "vision.assistant.global.set": { expectedRevision: string; provider?: string; model?: string };
+  "vision.assistant.project.set": {
+    expectedRevision: string;
+    mode: "inherit" | "disabled" | "model";
+    provider?: string;
+    model?: string;
+  };
   "thinking.set": { level: string };
   "resource.list": Record<string, never>;
   "resource.reload": Record<string, never>;
@@ -380,6 +390,11 @@ export interface CommandResults extends
   "provider.credential.remove": PiProviderConfigurationSnapshot;
   "model.default.set": PiProviderConfigurationSnapshot;
   "provider.configuration.reload": PiProviderConfigurationSnapshot;
+  "provider.projectConfiguration.get": PiProviderConfigurationSnapshot;
+  "provider.projectConfiguration.reload": PiProviderConfigurationSnapshot;
+  "model.projectDefault.set": PiProviderConfigurationSnapshot;
+  "vision.assistant.global.set": PiProviderConfigurationSnapshot;
+  "vision.assistant.project.set": PiProviderConfigurationSnapshot;
   "thinking.set": SessionControlResult;
   "resource.list": ResourceSummary[];
   "resource.reload": SessionResourceCatalogResult;

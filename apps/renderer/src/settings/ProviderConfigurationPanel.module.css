@@ -8,6 +8,23 @@
   gap: 8px;
 }
 
+.catalogView,
+.projectPanel {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 12px;
+}
+
+.catalogView {
+  min-height: 0;
+}
+
+.projectPanel {
+  width: 100%;
+  padding-bottom: 20px;
+}
+
 .frame {
   display: flex;
   container-type: inline-size;

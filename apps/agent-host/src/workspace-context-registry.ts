@@ -141,7 +141,7 @@ export class WorkspaceContextRegistry {
     const configurationUnsubscribe = workspaceServices.configurationService?.subscribe(
       workspaceServices.cwd,
       (change) => this.emitWorkspaceEvent(workspaceId, {
-        type: "provider.configuration.changed",
+        type: "provider.projectConfiguration.changed",
         payload: change
       })
     );
