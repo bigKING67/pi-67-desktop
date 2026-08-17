@@ -8,7 +8,7 @@ import {
 import {
   appendBoundedProcessOutput,
   decodeSkillPackProcessOutput,
-  windowsCommandShellArguments
+  windowsCommandShellInvocation
 } from "./skill-pack-process-execution.js";
 
 process.once("message", (message: unknown) => {
@@ -22,15 +22,17 @@ process.once("message", (message: unknown) => {
     return;
   }
   const useCommandShell = /\.(?:cmd|bat)$/iu.test(message.executable);
-  const command = useCommandShell ? message.environment.ComSpec ?? "cmd.exe" : message.executable;
-  const arguments_ = useCommandShell
-    ? windowsCommandShellArguments(message.executable, message.arguments)
-    : message.arguments;
+  const shellInvocation = useCommandShell
+    ? windowsCommandShellInvocation(message.executable, message.arguments, message.environment.ComSpec)
+    : undefined;
+  const command = shellInvocation?.command ?? message.executable;
+  const arguments_ = shellInvocation?.arguments ?? message.arguments;
   let child;
   try {
     child = spawn(command, arguments_, {
       cwd: message.cwd,
       stdio: [message.stdinBase64 === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+      windowsVerbatimArguments: shellInvocation?.windowsVerbatimArguments ?? false,
       windowsHide: true,
       env: message.environment
     });

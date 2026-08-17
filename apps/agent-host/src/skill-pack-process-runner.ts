@@ -17,7 +17,7 @@ import {
 import {
   appendBoundedProcessOutput,
   decodeSkillPackProcessOutput,
-  windowsCommandShellArguments
+  windowsCommandShellInvocation
 } from "./skill-pack-process-execution.js";
 
 export { MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES } from "./skill-pack-process-execution.js";
@@ -51,14 +51,16 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
   options
 ) => new Promise((resolve, reject) => {
   const useCommandShell = process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(executable);
-  const command = useCommandShell ? options.environment.ComSpec ?? "cmd.exe" : executable;
-  const commandArguments = useCommandShell
-    ? windowsCommandShellArguments(executable, arguments_)
-    : arguments_;
+  const shellInvocation = useCommandShell
+    ? windowsCommandShellInvocation(executable, arguments_, options.environment.ComSpec)
+    : undefined;
+  const command = shellInvocation?.command ?? executable;
+  const commandArguments = shellInvocation?.arguments ?? arguments_;
   const child = spawn(command, commandArguments, {
     cwd: options.cwd,
     stdio: [options.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     detached: process.platform !== "win32",
+    windowsVerbatimArguments: shellInvocation?.windowsVerbatimArguments ?? false,
     windowsHide: true,
     env: {
       ...options.environment,

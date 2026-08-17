@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   appendBoundedProcessOutput,
   decodeSkillPackProcessOutput,
-  windowsCommandShellArguments
+  windowsCommandShellArguments,
+  windowsCommandShellInvocation
 } from "./skill-pack-process-execution.js";
 
 describe("Skill Pack process execution", () => {
@@ -20,6 +21,23 @@ describe("Skill Pack process execution", () => {
       "/c",
       "\"\"C:\\Users\\Fixture User\\bin\\lark-cli.cmd\" \"update\" \"--check\" \"--json\"\""
     ]);
+  });
+
+  it("keeps the complete cmd invocation verbatim for Node spawn", () => {
+    expect(windowsCommandShellInvocation(
+      "C:\\Users\\Fixture User\\bin\\lark-cli.cmd",
+      ["update check"],
+      "C:\\Windows\\System32\\cmd.exe"
+    )).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      arguments: [
+        "/d",
+        "/s",
+        "/c",
+        "\"\"C:\\Users\\Fixture User\\bin\\lark-cli.cmd\" \"update check\"\""
+      ],
+      windowsVerbatimArguments: true
+    });
   });
 
   it("decodes native Chinese Windows command output without mojibake", () => {
@@ -65,7 +83,9 @@ function runWindowsCommand(
   arguments_: string[]
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.env.ComSpec ?? "cmd.exe", windowsCommandShellArguments(executable, arguments_), {
+    const invocation = windowsCommandShellInvocation(executable, arguments_, process.env.ComSpec);
+    const child = spawn(invocation.command, invocation.arguments, {
+      windowsVerbatimArguments: invocation.windowsVerbatimArguments,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"]
     });

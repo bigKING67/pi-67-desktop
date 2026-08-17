@@ -39,6 +39,23 @@ export function windowsCommandShellArguments(executable: string, arguments_: str
   return ["/d", "/s", "/c", `"${command}"`];
 }
 
+export function windowsCommandShellInvocation(
+  executable: string,
+  arguments_: string[],
+  commandInterpreter = "cmd.exe"
+): {
+  command: string;
+  arguments: string[];
+  windowsVerbatimArguments: true;
+} {
+  return {
+    command: commandInterpreter,
+    arguments: windowsCommandShellArguments(executable, arguments_),
+    // cmd.exe must receive the nested quotes exactly as constructed above.
+    windowsVerbatimArguments: true
+  };
+}
+
 function decodeUtf8WithoutTrailingPartialSequence(value: Uint8Array): string | undefined {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   const minimumLength = Math.max(0, value.byteLength - 3);
