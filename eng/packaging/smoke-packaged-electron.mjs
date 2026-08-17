@@ -61,6 +61,7 @@ try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    hideNativeWindow: !packagedScreenshotDirectory,
     isolateNativeWindow: true,
     userDataDirectory
   });
@@ -325,6 +326,7 @@ try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    hideNativeWindow: !packagedScreenshotDirectory,
     isolateNativeWindow: true,
     userDataDirectory
   });

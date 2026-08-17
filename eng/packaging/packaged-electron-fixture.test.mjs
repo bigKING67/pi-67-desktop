@@ -17,13 +17,14 @@ describe("packaged Electron launch environment", () => {
       on: vi.fn((event, handler) => {
         if (event === "show") showHandler = handler;
       }),
+      setFocusable: vi.fn(),
       setIgnoreMouseEvents: vi.fn(),
       webContents: { setBackgroundThrottling: vi.fn() }
     };
     const application = {
-      evaluate: vi.fn(async (callback) => callback({
+      evaluate: vi.fn(async (callback, argument) => callback({
         BrowserWindow: { getAllWindows: () => [window] }
-      })),
+      }, argument)),
       firstWindow: vi.fn(async () => ({}))
     };
 
@@ -32,9 +33,36 @@ describe("packaged Electron launch environment", () => {
     expect(application.firstWindow).toHaveBeenCalledOnce();
     expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
     expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
+    expect(window.setFocusable).toHaveBeenCalledWith(false);
     expect(window.hide).toHaveBeenCalledOnce();
     showHandler?.();
     expect(window.hide).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps visual-evidence windows compositable while blocking operator input", async () => {
+    const window = {
+      hide: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      on: vi.fn(),
+      setFocusable: vi.fn(),
+      setIgnoreMouseEvents: vi.fn(),
+      webContents: { setBackgroundThrottling: vi.fn() }
+    };
+    const application = {
+      evaluate: vi.fn(async (callback, argument) => callback({
+        BrowserWindow: { getAllWindows: () => [window] }
+      }, argument)),
+      firstWindow: vi.fn(async () => ({}))
+    };
+
+    await isolatePackagedAutomationWindow(application, { hideNativeWindow: false });
+
+    expect(application.firstWindow).toHaveBeenCalledOnce();
+    expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
+    expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
+    expect(window.setFocusable).toHaveBeenCalledWith(false);
+    expect(window.on).not.toHaveBeenCalled();
+    expect(window.hide).not.toHaveBeenCalled();
   });
 
   it("injects an external renderer URL only when probing packaged isolation", () => {

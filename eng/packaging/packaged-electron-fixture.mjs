@@ -171,6 +171,7 @@ export async function launchPackagedApplication({
   applicationArguments = [],
   artifact,
   environment = {},
+  hideNativeWindow = true,
   isolateNativeWindow = false,
   offline = true,
   probePackagedRendererIsolation = true,
@@ -186,24 +187,32 @@ export async function launchPackagedApplication({
       probePackagedRendererIsolation
     })
   });
-  if (isolateNativeWindow) await isolatePackagedAutomationWindow(application);
+  if (isolateNativeWindow) {
+    await isolatePackagedAutomationWindow(application, { hideNativeWindow });
+  }
   return application;
 }
 
-export async function isolatePackagedAutomationWindow(application) {
+export async function isolatePackagedAutomationWindow(
+  application,
+  { hideNativeWindow = true } = {}
+) {
   await application.firstWindow();
-  await application.evaluate(({ BrowserWindow }) => {
+  await application.evaluate(({ BrowserWindow }, shouldHideNativeWindow) => {
     const window = BrowserWindow.getAllWindows()[0];
     if (!window) throw new Error("Packaged BrowserWindow is unavailable.");
 
     window.webContents.setBackgroundThrottling(false);
     window.setIgnoreMouseEvents(true);
+    window.setFocusable(false);
+    if (!shouldHideNativeWindow) return;
+
     const keepHidden = () => {
       if (!window.isDestroyed()) window.hide();
     };
     window.on("show", keepHidden);
     keepHidden();
-  });
+  }, hideNativeWindow);
 }
 
 export function packagedApplicationEnvironment({
