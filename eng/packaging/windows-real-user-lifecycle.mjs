@@ -204,9 +204,8 @@ async function runRealUserLaunch({
     let sessionPath = expectedSessionPath;
     if (shouldCreateInitialRealUserSession({ catalog, expectedSessionIdentity, launchIndex })) {
       try {
-        await waitForRealUserRuntimeReady(
+        await waitForRealUserCreationAuthority(
           window,
-          undefined,
           INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
         );
       } catch (error) {
@@ -216,7 +215,7 @@ async function runRealUserLaunch({
             .catch(() => ({ available: false }))
         };
         throw new Error(
-          `Windows real-user initial Pi Runtime authority did not become ready. Diagnostics: ${JSON.stringify(diagnostic)}`,
+          `Windows real-user initial Session creation authority did not become ready. Diagnostics: ${JSON.stringify(diagnostic)}`,
           { cause: error }
         );
       }
@@ -308,6 +307,26 @@ async function runRealUserLaunch({
   } finally {
     if (application) await application.close();
   }
+}
+
+export async function waitForRealUserCreationAuthority(
+  window,
+  timeoutMs = INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
+) {
+  const startedAt = performance.now();
+  const shell = window.locator(
+    '.application-shell[data-agent-connected="true"][data-workspace-open-pending="false"]'
+  );
+  const failed = window.locator('[data-runtime-phase="failed"]');
+  await shell.or(failed).waitFor({ state: "visible", timeout: timeoutMs });
+  if (await failed.isVisible()) {
+    throw new Error("Windows real-user Pi Runtime entered a failed phase before Session creation.");
+  }
+  await window.getByTestId("new-session-intent").waitFor({
+    state: "visible",
+    timeout: remainingTimeout(startedAt, timeoutMs)
+  });
+  return performance.now() - startedAt;
 }
 
 export async function waitForRealUserRuntimeReady(

@@ -13,6 +13,7 @@ import {
   canonicalContainedSessionPath,
   inspectRealUserRuntimeSurface,
   waitForHealthyWorkbenchConvergence,
+  waitForRealUserCreationAuthority,
   waitForRealUserRuntimeReady
 } from "./windows-real-user-lifecycle.mjs";
 import { resolveRealUserWorkspaceAuthority } from "./windows-real-user-workspace-authority.mjs";
@@ -80,7 +81,7 @@ describe("Windows installed real-user lifecycle", () => {
     expect(catalogAuthority).toBeGreaterThan(catalogRequestStart);
     expect(launchFlow.slice(catalogRequestStart, catalogAuthority))
       .toContain("INSTALLED_RUNTIME_READINESS_TIMEOUT_MS");
-    const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserRuntimeReady(");
+    const creationAuthorityReady = launchFlow.indexOf("await waitForRealUserCreationAuthority(");
     const initialProfileVerification = launchFlow.indexOf("await verifyInitialProfileState()");
     const controlledCreate = launchFlow.indexOf("await createControlledConversation(window, agentDir,");
     expect(creationAuthorityReady).toBeGreaterThan(-1);
@@ -350,32 +351,48 @@ describe("Windows installed real-user lifecycle", () => {
     expect(evaluate).toHaveBeenCalledTimes(2);
   });
 
-  it("admits initial Session creation only after the Workspace runtime is ready", async () => {
-    const runtimeState = [
-      { runtimePhase: "starting", selectionMatches: true },
-      { runtimePhase: "ready", selectionMatches: true }
-    ];
-    const waitFor = vi.fn(async () => undefined);
-    const readyOrFailed = { waitFor };
-    const ready = { or: () => readyOrFailed };
+  it("admits initial Session creation after Agent Host and Workspace authority settle", async () => {
+    const shellWaitFor = vi.fn(async () => undefined);
+    const intentWaitFor = vi.fn(async () => undefined);
+    const shellOrFailed = { waitFor: shellWaitFor };
+    const shell = { or: () => shellOrFailed };
     const failed = { isVisible: async () => false };
-    const evaluate = vi.fn(async () => runtimeState.shift());
     const window = {
-      evaluate,
-      getByLabel: () => ({ waitFor: async () => undefined }),
-      locator: (selector) => selector.includes('="ready"') ? ready : failed
+      getByTestId: () => ({ waitFor: intentWaitFor }),
+      locator: (selector) => selector.startsWith(".application-shell") ? shell : failed
     };
 
-    await expect(waitForRealUserRuntimeReady(
+    await expect(waitForRealUserCreationAuthority(
       window,
-      undefined,
       INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
     )).resolves.toBeGreaterThanOrEqual(0);
-    expect(waitFor).toHaveBeenCalledWith({
+    expect(shellWaitFor).toHaveBeenCalledWith({
       state: "visible",
       timeout: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
     });
-    expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(intentWaitFor).toHaveBeenCalledWith({
+      state: "visible",
+      timeout: expect.any(Number)
+    });
+    expect(intentWaitFor.mock.calls[0][0].timeout).toBeGreaterThan(0);
+    expect(intentWaitFor.mock.calls[0][0].timeout)
+      .toBeLessThanOrEqual(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS);
+  });
+
+  it("fails closed when Pi Runtime fails before initial Session creation", async () => {
+    const intentWaitFor = vi.fn(async () => undefined);
+    const failed = { isVisible: async () => true };
+    const window = {
+      getByTestId: () => ({ waitFor: intentWaitFor }),
+      locator: (selector) => selector.startsWith(".application-shell")
+        ? { or: () => ({ waitFor: async () => undefined }) }
+        : failed
+    };
+
+    await expect(waitForRealUserCreationAuthority(window, 100)).rejects.toThrow(
+      "Pi Runtime entered a failed phase before Session creation"
+    );
+    expect(intentWaitFor).not.toHaveBeenCalled();
   });
 
   it("reports bounded and redacted initial runtime failure diagnostics", async () => {
