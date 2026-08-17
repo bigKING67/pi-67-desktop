@@ -1035,7 +1035,13 @@ loading error where the operation can produce those states
   Workspace's Pi JSONL through `workspace.usage.report`; switching window, Workspace,
   or Host epoch invalidates the prior request. Metrics distinguish Pi-recorded token,
   input/output, cache read/write, and `Pi 记录成本（非账单）`. UTC date and coverage
-  are explicit. Incomplete coverage owns a warning with discovered/scanned/skipped
+  are explicit. Daily usage is a vertical column time series with UTC date on the
+  horizontal axis and token volume on the vertical axis. Every calendar date in the
+  selected window retains a position, including zero-usage dates; `7 天` labels every
+  date while `30 天` and `90 天` reduce only label density, never data density.
+  Hover and keyboard focus expose the exact daily breakdown without adding a chart
+  dependency or converting the discrete daily totals into a continuous line.
+  Incomplete coverage owns a warning with discovered/scanned/skipped
   counts; empty, loading, disconnected, no-Workspace, and error states remain distinct.
   The view does not invent reasoning/subagent token attribution, billing truth, public
   pricing estimates, or an incremental cache that the Host has not implemented.

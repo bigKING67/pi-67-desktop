@@ -120,6 +120,30 @@ describe("scanSessionUsage", () => {
     })]);
   });
 
+  it("uses consecutive UTC calendar dates instead of a rolling-hour cutoff", async () => {
+    const session = await writeSession("utc-window", [
+      { type: "session", version: 3, id: "utc-window", cwd: "/workspace" },
+      assistantUsage("2026-08-03T00:01:00.000Z", 10),
+      assistantUsage("2026-08-02T23:59:00.000Z", 20),
+      assistantUsage("2026-08-10T00:00:00.000Z", 30)
+    ]);
+
+    const report = await scanSessionUsage({
+      workspaceId: "workspace-1",
+      sessions: [session],
+      discoveredSessions: 1,
+      catalogIncomplete: false,
+      catalogSkippedCount: 0,
+      window: "7d",
+      now: Date.UTC(2026, 7, 9, 12)
+    });
+
+    expect(report.totals.total).toBe(10);
+    expect(report.buckets).toEqual([
+      expect.objectContaining({ date: "2026-08-03", totals: expect.objectContaining({ total: 10 }) })
+    ]);
+  });
+
   it("marks a future-format Session as partial coverage", async () => {
     const future = await writeSession("future", [
       { type: "session", version: 4, id: "future", cwd: "/workspace", timestamp: "2026-08-09T00:00:00.000Z" }

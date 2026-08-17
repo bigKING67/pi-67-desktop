@@ -1,4 +1,4 @@
-import type { UsageBucket, UsageReport, UsageWindow } from "@pi67/domain";
+import type { UsageReport, UsageWindow } from "@pi67/domain";
 import { AlertTriangle, BarChart3, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "react-aria-components";
@@ -7,6 +7,13 @@ import { agentConnectionController } from "../connection/AgentConnectionControll
 import { rendererWorkbenchStore, useWorkbenchStore } from "../workbench/workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
 import { SettingsNotice, SettingsSectionBlock } from "./SettingsPrimitives.js";
+import {
+  createDailyUsageSeries,
+  showUsageDateLabel,
+  usageAxisMaximum,
+  usageAxisTicks,
+  type DailyUsagePoint
+} from "./usage-daily-series.js";
 import { isUsageReportRequestCurrent } from "./usage-report-request.js";
 import styles from "./UsageSettings.module.css";
 
@@ -90,9 +97,8 @@ export function UsageSettings() {
     };
   }, [workspace, connected, hostEpoch, window, refreshRevision]);
 
-  const daily = useMemo(() => aggregateDaily(report?.buckets ?? []), [report]);
+  const daily = useMemo(() => report ? createDailyUsageSeries(report) : [], [report]);
   const modelRows = report?.models ?? [];
-  const maxDaily = Math.max(1, ...daily.map((item) => item.total));
 
   return (
     <SettingsSectionBlock
@@ -143,17 +149,12 @@ export function UsageSettings() {
         </div>
 
         <section className={styles.chartSection}>
-          <header><div><BarChart3 size={15} /><strong>每日 token</strong></div><span>UTC 日期</span></header>
-          {daily.length === 0 ? <p className={styles.empty}>当前窗口没有可用 usage 记录。</p> : (
-            <div className={styles.chart}>
-              {daily.map((item) => (
-                <div className={styles.barRow} key={item.date}>
-                  <time>{item.date}</time>
-                  <span><i style={{ width: `${Math.max(2, item.total / maxDaily * 100)}%` }} /></span>
-                  <b>{formatNumber(item.total)}</b>
-                </div>
-              ))}
-            </div>
+          <header>
+            <div><BarChart3 aria-hidden="true" size={15} /><strong>每日 Token</strong></div>
+            <span>连续 {daily.length} 天 · UTC 日期</span>
+          </header>
+          {report.buckets.length === 0 ? <p className={styles.empty}>当前窗口没有可用 usage 记录。</p> : (
+            <DailyUsageChart daily={daily} window={report.window} />
           )}
         </section>
 
@@ -188,13 +189,106 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function aggregateDaily(buckets: UsageBucket[]): Array<{ date: string; total: number }> {
-  const totals = new Map<string, number>();
-  for (const bucket of buckets) {
-    if (!bucket.date) continue;
-    totals.set(bucket.date, (totals.get(bucket.date) ?? 0) + bucket.totals.total);
-  }
-  return [...totals].map(([date, total]) => ({ date, total })).sort((left, right) => left.date.localeCompare(right.date));
+function DailyUsageChart({ daily, window }: { daily: DailyUsagePoint[]; window: UsageWindow }) {
+  const [activeDate, setActiveDate] = useState<string>();
+  const active = daily.find((point) => point.date === activeDate);
+  const axisMaximum = usageAxisMaximum(daily);
+  const ticks = usageAxisTicks(axisMaximum);
+
+  return <div className={styles.chart}>
+    <div aria-hidden="true" className={styles.chartDetail}>
+      {active ? <>
+        <time>{formatUtcDateLong(active.date)}</time>
+        <span>总计 <strong>{formatNumber(active.totals.total)}</strong></span>
+        <span>输入 / 输出 <strong>{formatNumber(active.totals.input)} / {formatNumber(active.totals.output)}</strong></span>
+        <span>缓存读 / 写 <strong>{formatNumber(active.totals.cacheRead)} / {formatNumber(active.totals.cacheWrite)}</strong></span>
+        <span>记录成本 <strong>{active.totals.recordedCost === undefined ? "无记录" : `$${active.totals.recordedCost.toFixed(4)}`}</strong></span>
+      </> : <span>悬停柱形或使用 Tab 键查看每日明细</span>}
+    </div>
+    <div className={styles.chartFrame}>
+      <div aria-hidden="true" className={styles.yAxis}>
+        {ticks.map((tick) => <span key={tick}>{formatAxisNumber(tick)}</span>)}
+      </div>
+      <div className={styles.plot}>
+        <div aria-hidden="true" className={styles.gridLines}>
+          {ticks.map((tick) => <span key={tick} />)}
+        </div>
+        <div
+          aria-label="每日 Token 柱状图"
+          className={styles.columns}
+          role="list"
+          style={{ gridTemplateColumns: `repeat(${daily.length}, minmax(0, 1fr))` }}
+        >
+          {daily.map((point) => {
+            const percentage = point.totals.total === 0 ? 0 : Math.max(1.5, point.totals.total / axisMaximum * 100);
+            const label = dailyUsageAriaLabel(point);
+            return <div
+              aria-label={label}
+              className={styles.dailyColumn}
+              key={point.date}
+              onFocus={() => setActiveDate(point.date)}
+              onMouseEnter={() => setActiveDate(point.date)}
+              role="listitem"
+              tabIndex={0}
+              title={label}
+            >
+              <span className={styles.dailyBar} style={{ height: `${percentage}%` }} />
+            </div>;
+          })}
+        </div>
+      </div>
+      <div
+        aria-hidden="true"
+        className={styles.xAxis}
+        style={{ gridTemplateColumns: `repeat(${daily.length}, minmax(0, 1fr))` }}
+      >
+        {daily.map((point, index) => (
+          <time className={styles.xLabel} key={point.date}>
+            {showUsageDateLabel(index, window) ? formatUtcDateShort(point.date) : ""}
+          </time>
+        ))}
+      </div>
+    </div>
+  </div>;
+}
+
+function dailyUsageAriaLabel(point: DailyUsagePoint): string {
+  return [
+    formatUtcDateLong(point.date),
+    `总 Token ${formatNumber(point.totals.total)}`,
+    `输入 ${formatNumber(point.totals.input)}`,
+    `输出 ${formatNumber(point.totals.output)}`,
+    `缓存读取 ${formatNumber(point.totals.cacheRead)}`,
+    `缓存写入 ${formatNumber(point.totals.cacheWrite)}`,
+    `记录成本 ${point.totals.recordedCost === undefined ? "无记录" : `$${point.totals.recordedCost.toFixed(4)}`}`
+  ].join("，");
+}
+
+function formatUtcDateShort(date: string): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function formatUtcDateLong(date: string): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function formatAxisNumber(value: number): string {
+  if (value >= 1_000_000) return `${trimAxisFraction(value / 1_000_000)}M`;
+  if (value >= 1_000) return `${trimAxisFraction(value / 1_000)}K`;
+  return formatNumber(value);
+}
+
+function trimAxisFraction(value: number): string {
+  return value.toFixed(value >= 10 || Number.isInteger(value) ? 0 : 1);
 }
 
 function formatNumber(value: number): string {

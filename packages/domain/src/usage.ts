@@ -1,6 +1,14 @@
 export type UsageWindow = "7d" | "30d" | "90d";
 export type UsageSource = "assistant-message" | "tool-result" | "compaction" | "branch-summary";
 
+const UTC_DAY_MS = 24 * 60 * 60 * 1_000;
+
+const USAGE_WINDOW_DAY_COUNTS: Record<UsageWindow, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90
+};
+
 export interface UsageTotals {
   input: number;
   output: number;
@@ -52,3 +60,34 @@ export interface UsageReport {
 export const MAX_USAGE_REPORT_BUCKETS = 1_000;
 export const MAX_USAGE_REPORT_MODELS = 1_000;
 export const MAX_USAGE_REPORT_SESSIONS = 500;
+
+export function usageWindowDayCount(window: UsageWindow): number {
+  return USAGE_WINDOW_DAY_COUNTS[window];
+}
+
+export function usageWindowStartUtc(now: number, window: UsageWindow): number {
+  const current = new Date(now);
+  const currentUtcDay = Date.UTC(
+    current.getUTCFullYear(),
+    current.getUTCMonth(),
+    current.getUTCDate()
+  );
+  return currentUtcDay - (usageWindowDayCount(window) - 1) * UTC_DAY_MS;
+}
+
+export function usageWindowEndUtcExclusive(now: number): number {
+  const current = new Date(now);
+  return Date.UTC(
+    current.getUTCFullYear(),
+    current.getUTCMonth(),
+    current.getUTCDate() + 1
+  );
+}
+
+export function usageWindowDatesUtc(now: number, window: UsageWindow): string[] {
+  const start = usageWindowStartUtc(now, window);
+  return Array.from(
+    { length: usageWindowDayCount(window) },
+    (_, index) => new Date(start + index * UTC_DAY_MS).toISOString().slice(0, 10)
+  );
+}

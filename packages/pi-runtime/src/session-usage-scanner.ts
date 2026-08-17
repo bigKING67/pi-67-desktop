@@ -11,7 +11,9 @@ import {
   type UsageReport,
   type UsageSource,
   type UsageTotals,
-  type UsageWindow
+  type UsageWindow,
+  usageWindowEndUtcExclusive,
+  usageWindowStartUtc
 } from "@pi67/domain";
 
 const MAX_USAGE_SESSION_BYTES = 16 * 1024 * 1024;
@@ -54,7 +56,8 @@ interface MutableTotals extends UsageTotals {
 
 export async function scanSessionUsage(options: SessionUsageScanOptions): Promise<UsageReport> {
   const now = options.now ?? Date.now();
-  const since = now - usageWindowDays(options.window) * 24 * 60 * 60 * 1_000;
+  const since = usageWindowStartUtc(now, options.window);
+  const until = usageWindowEndUtcExclusive(now);
   const deadline = Date.now() + USAGE_SCAN_DEADLINE_MS;
   const uniqueSessions = deduplicateSessions(options.sessions).slice(0, MAX_USAGE_REPORT_SESSIONS);
   const buckets = new Map<string, MutableBucket>();
@@ -115,7 +118,7 @@ export async function scanSessionUsage(options: SessionUsageScanOptions): Promis
         sessionFuture ||= version > CURRENT_SESSION_VERSION;
         continue;
       }
-      const projected = usageEntry(entry, since);
+      const projected = usageEntry(entry, since, until);
       if (!projected) continue;
       if (projected.date === undefined) undatedUsageEntries += 1;
       addTotals(totals, projected.totals);
@@ -205,7 +208,8 @@ export async function scanSessionUsage(options: SessionUsageScanOptions): Promis
 
 function usageEntry(
   entry: Record<string, unknown>,
-  since: number
+  since: number,
+  until: number
 ): {
   date?: string;
   provider: string;
@@ -238,7 +242,7 @@ function usageEntry(
   } else return undefined;
   const totals = parseUsage(usage);
   if (!totals) return undefined;
-  if (timestamp !== undefined && timestamp < since) return undefined;
+  if (timestamp !== undefined && (timestamp < since || timestamp >= until)) return undefined;
   return {
     ...(timestamp === undefined ? {} : { date: new Date(timestamp).toISOString().slice(0, 10) }),
     provider,
@@ -416,12 +420,6 @@ function deduplicateSessions(sessions: readonly SessionSummary[]): SessionSummar
     seen.add(session.fileIdentity);
     return true;
   });
-}
-
-function usageWindowDays(window: UsageWindow): number {
-  if (window === "7d") return 7;
-  if (window === "30d") return 30;
-  return 90;
 }
 
 function usageScanCancelled(): Error {

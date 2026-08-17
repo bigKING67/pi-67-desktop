@@ -654,7 +654,10 @@ the only Runtime and behavior specification source.
 - Settings `用量分析` rebuilds a `7d`, `30d`, or `90d` report only from the current
   Workspace's Pi JSONL. It aggregates assistant-message, tool-result, compaction, and
   branch-summary usage by UTC date and Provider/model, including input, output,
-  cache-read, cache-write, total token, and Pi-recorded cost when present. Unique
+  cache-read, cache-write, total token, and Pi-recorded cost when present.
+  Each window covers exactly that many consecutive UTC calendar dates ending on the
+  report's generated UTC date; zero-usage dates remain explicit positions in the daily
+  series rather than disappearing or extending the window to older active dates. Unique
   Session counts are calculated by the bounded Host scanner. Pi-recorded cost is not
   a Provider bill or public-pricing estimate, and Pi-67 does not invent reasoning or
   subagent token attribution. Catalog gaps, unreadable/invalid/future-format Sessions,
