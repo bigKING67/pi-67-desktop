@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  isolatePackagedAutomationWindow,
   packagedApplicationEnvironment,
   packagedAttachmentExcludedAsarPaths,
   packagedAttachmentRequiredAsarPaths,
@@ -8,6 +9,34 @@ import {
 } from "./packaged-electron-fixture.mjs";
 
 describe("packaged Electron launch environment", () => {
+  it("keeps automation windows hidden from native operator input", async () => {
+    let showHandler;
+    const window = {
+      hide: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      on: vi.fn((event, handler) => {
+        if (event === "show") showHandler = handler;
+      }),
+      setIgnoreMouseEvents: vi.fn(),
+      webContents: { setBackgroundThrottling: vi.fn() }
+    };
+    const application = {
+      evaluate: vi.fn(async (callback) => callback({
+        BrowserWindow: { getAllWindows: () => [window] }
+      })),
+      firstWindow: vi.fn(async () => ({}))
+    };
+
+    await isolatePackagedAutomationWindow(application);
+
+    expect(application.firstWindow).toHaveBeenCalledOnce();
+    expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
+    expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
+    expect(window.hide).toHaveBeenCalledOnce();
+    showHandler?.();
+    expect(window.hide).toHaveBeenCalledTimes(2);
+  });
+
   it("injects an external renderer URL only when probing packaged isolation", () => {
     const environment = packagedApplicationEnvironment({
       agentDir: "C:\\fixture\\agent",

@@ -60,6 +60,7 @@ try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    isolateNativeWindow: true,
     userDataDirectory
   });
   packagedProcessOutput = captureProcessOutput(application.process());
@@ -412,6 +413,7 @@ try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    isolateNativeWindow: true,
     userDataDirectory
   });
   packagedProcessOutput = captureProcessOutput(application.process());

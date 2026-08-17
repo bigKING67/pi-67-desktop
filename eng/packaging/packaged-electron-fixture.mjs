@@ -166,16 +166,17 @@ export async function createPackagedTestDirectories(prefix, workspaceName = "wor
   return { agentDir, extensionsDirectory, userDataDirectory, workspace };
 }
 
-export function launchPackagedApplication({
+export async function launchPackagedApplication({
   agentDir,
   applicationArguments = [],
   artifact,
   environment = {},
+  isolateNativeWindow = false,
   offline = true,
   probePackagedRendererIsolation = true,
   userDataDirectory
 }) {
-  return electron.launch({
+  const application = await electron.launch({
     executablePath: artifact.executablePath,
     args: [...applicationArguments, `--user-data-dir=${userDataDirectory}`],
     env: packagedApplicationEnvironment({
@@ -184,6 +185,24 @@ export function launchPackagedApplication({
       offline,
       probePackagedRendererIsolation
     })
+  });
+  if (isolateNativeWindow) await isolatePackagedAutomationWindow(application);
+  return application;
+}
+
+export async function isolatePackagedAutomationWindow(application) {
+  await application.firstWindow();
+  await application.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (!window) throw new Error("Packaged BrowserWindow is unavailable.");
+
+    window.webContents.setBackgroundThrottling(false);
+    window.setIgnoreMouseEvents(true);
+    const keepHidden = () => {
+      if (!window.isDestroyed()) window.hide();
+    };
+    window.on("show", keepHidden);
+    keepHidden();
   });
 }
 
