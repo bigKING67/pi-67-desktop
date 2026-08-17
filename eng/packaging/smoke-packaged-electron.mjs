@@ -213,6 +213,12 @@ try {
     skillSettingsWorkspace,
     (fileName) => capturePackagedScreenshot(window, fileName)
   );
+  await settingsNavigation.getByRole("button", { name: "浏览器集成", exact: true }).click();
+  const browser67DependencyRow = workspaceSettings.getByText("运行依赖", { exact: true })
+    .locator("xpath=../..");
+  await browser67DependencyRow.getByText("已准备", { exact: true })
+    .waitFor({ state: "visible", timeout: 15_000 });
+  await capturePackagedScreenshot(window, "08-browser67-packaged-direct.png");
   await settingsNavigation.getByRole("button", { name: "提示词模板", exact: true }).click();
   await workspaceSettings.getByText("/packaged-review", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
@@ -378,7 +384,7 @@ try {
   });
   childPid = shutdownState.childPid;
   application = undefined;
-  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
+  console.log(`Packaged Electron smoke passed: ${process.platform}/${process.arch}, Main-only redacted diagnostics before Agent Host demand, packaged-direct Agent Host startup (${startupDiagnostics.totalDurationMs}ms), private toolchain + first-party capabilities, Desktop browser67 packaged-direct dependency resolution, packaged GUI Extension/Skill update checks with bounded worker cleanup, bounded Provider workbench search/scrolling + segmented single-model catalog + one-shot literal credential reveal, Lark user-first Tabs + persisted Main layout, app://pi67, theme persistence, sandbox, node:sqlite utility lifecycle, Session Catalog rebuild, packaged Changes inspector, exact Session creation marker ${sessionCreation.creationId} (${sessionCreation.durationMs}ms), cold Workspace/Provider restoration, synthetic powerMonitor resume resync, real Agent Host roundtrip, and bounded active-prompt product shutdown (${shutdown.productExitDurationMs}ms; Playwright driver close ${shutdown.driverCloseDurationMs}ms).`);
 } finally {
   try {
     if (application) await application.close();

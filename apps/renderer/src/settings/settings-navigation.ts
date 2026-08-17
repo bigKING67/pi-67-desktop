@@ -124,7 +124,7 @@ export const SETTINGS_GROUPS: ReadonlyArray<{
           "Lark",
           "Lark CLI",
           "用户授权",
-          "飞书应用",
+          "应用连接",
           "App ID",
           "App Secret",
           "OAuth",

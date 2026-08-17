@@ -26,6 +26,8 @@ type LarkSettingsTab = "user" | "application";
 
 export function LarkOfficeSettings() {
   const mounted = useRef(true);
+  const connectionSetupPending = useRef(false);
+  const continuingLogin = useRef(false);
   const [snapshot, setSnapshot] = useState<LarkAuthSnapshot>();
   const [login, setLogin] = useState<LarkAuthLoginStartResult>();
   const [busy, setBusy] = useState(false);
@@ -50,7 +52,13 @@ export function LarkOfficeSettings() {
       if (!mounted.current) return;
       setSnapshot(next);
       setError(undefined);
-      if (next.phase !== "authorizing") setLogin(undefined);
+      if (connectionSetupPending.current && next.phase === "error") {
+        connectionSetupPending.current = false;
+      }
+      if (next.phase !== "authorizing"
+        && !(connectionSetupPending.current && next.appStatus === "ready")) {
+        setLogin(undefined);
+      }
     } catch (cause) {
       if (!mounted.current) return;
       setError(errorMessage(cause, "无法读取飞书连接状态。"));
@@ -85,23 +93,7 @@ export function LarkOfficeSettings() {
     };
   }, [refresh, snapshot?.phase]);
 
-  const beginLogin = async (): Promise<void> => {
-    setBusy(true);
-    setError(undefined);
-    try {
-      const started = await beginLarkUserLogin();
-      if (!mounted.current) return;
-      setLogin(started);
-      setSnapshot(started.status);
-      await openAuthorizationPage(started.verificationUrl);
-    } catch (cause) {
-      if (mounted.current) setError(errorMessage(cause, "无法发起飞书用户授权。"));
-    } finally {
-      if (mounted.current) setBusy(false);
-    }
-  };
-
-  const openAuthorizationPage = async (url: string): Promise<void> => {
+  const openAuthorizationPage = useCallback(async (url: string): Promise<void> => {
     let opened = false;
     try {
       opened = await window.pi67.system.requestOpenExternal(url);
@@ -111,14 +103,40 @@ export function LarkOfficeSettings() {
     if (mounted.current) setError(opened
       ? undefined
       : "未能打开飞书授权页，请检查系统默认浏览器后重试。");
-  };
+  }, []);
+
+  const beginLogin = useCallback(async (): Promise<void> => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const started = await beginLarkUserLogin();
+      if (!mounted.current) return;
+      connectionSetupPending.current = started.stage === "connection-setup";
+      setLogin(started);
+      setSnapshot(started.status);
+      await openAuthorizationPage(started.verificationUrl);
+    } catch (cause) {
+      if (mounted.current) setError(errorMessage(cause, "无法发起飞书用户授权。"));
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }, [openAuthorizationPage]);
 
   const authorizing = snapshot?.phase === "authorizing";
   const cliMissing = snapshot?.cliStatus === "missing";
   const userConnected = snapshot?.verified === true;
   const needsRefresh = snapshot?.tokenStatus === "needs-refresh";
-  const appReady = snapshot?.appStatus === "ready";
   const installingCli = skillPackPhase === "installing";
+
+  useEffect(() => {
+    if (!connectionSetupPending.current
+      || continuingLogin.current
+      || snapshot?.appStatus !== "ready"
+      || snapshot.phase !== "disconnected") return;
+    continuingLogin.current = true;
+    connectionSetupPending.current = false;
+    void beginLogin().finally(() => { continuingLogin.current = false; });
+  }, [beginLogin, snapshot?.appStatus, snapshot?.phase]);
 
   const installLarkCli = async (): Promise<void> => {
     const installed = await installSkillPack(LARK_CLI_SKILL_PACK_ID);
@@ -138,7 +156,7 @@ export function LarkOfficeSettings() {
         <UserRound aria-hidden="true" size={15} />用户授权
       </Tab>
       <Tab className={styles.tab!} id="application">
-        <Bot aria-hidden="true" size={15} />应用配置
+        <Bot aria-hidden="true" size={15} />应用连接
       </Tab>
     </TabList>
 
@@ -157,14 +175,16 @@ export function LarkOfficeSettings() {
             leading={<UserRound aria-hidden="true" size={17} />}
             title={snapshot?.userName ?? "飞书用户"}
             description={userDescription(snapshot)}
-            value={userStatusLabel(snapshot, busy)}
+            value={userStatusLabel(snapshot, busy, login?.stage)}
             actions={<Button
               className={userConnected ? "secondary-button" : "primary-button"}
-              isDisabled={busy || authorizing || cliMissing || !appReady || snapshot === undefined}
+              isDisabled={busy || authorizing || cliMissing || snapshot === undefined}
               onPress={() => void beginLogin()}
             >
               <ExternalLink aria-hidden="true" size={14} />
-              {authorizing ? "等待授权" : userConnected ? "重新授权" : "登录飞书"}
+              {authorizing
+                ? login?.stage === "connection-setup" ? "准备连接" : "等待授权"
+                : userConnected ? "重新授权" : "登录飞书"}
             </Button>}
           />
           <SettingsRow
@@ -193,23 +213,22 @@ export function LarkOfficeSettings() {
           onPress={() => void openAuthorizationPage(login.verificationUrl)}
         >
           <ExternalLink aria-hidden="true" size={14} />
-          打开授权页
+          {login.stage === "connection-setup" ? "打开准备页" : "打开授权页"}
         </Button> : undefined}>
           <span>
-            请在浏览器完成飞书确认，页面会自动刷新。
+            {login?.stage === "connection-setup"
+              ? "请在浏览器确认一键准备飞书连接；完成后会自动继续个人账号授权。"
+              : "请在浏览器完成飞书确认，页面会自动刷新。"}
             {login?.userCode ? <> 验证码：<code>{login.userCode}</code>。</> : null}
           </span>
         </SettingsNotice> : null}
         {needsRefresh ? <SettingsNotice>
           当前访问令牌待续期；Lark CLI 会在下一次用户身份 API 调用时自动完成续期。
         </SettingsNotice> : null}
-        {!cliMissing && snapshot !== undefined && !appReady ? <SettingsNotice
-          actions={<Button className="secondary-button" onPress={() => setSelectedTab("application")}>
-            前往应用配置
-          </Button>}
-          tone="warning"
-        >
-          请先配置并验证飞书应用，再登录个人飞书账号。
+        {!cliMissing && snapshot !== undefined && snapshot.appStatus !== "ready" && !authorizing ? <SettingsNotice>
+          首次登录只申请 Lark CLI 推荐权限，并一键准备基础连接，无需填写 App ID 或 App Secret。
+          其他能力缺少权限时再按需增量授权；如果组织策略限制应用创建或权限审批，需由管理员批准，
+          或在“应用连接”中复用已有应用。
         </SettingsNotice> : null}
         {error ? <SettingsNotice tone="danger">{error}</SettingsNotice> : null}
       </SettingsSectionBlock>
@@ -235,9 +254,13 @@ export function LarkOfficeSettings() {
   /> : null}</>;
 }
 
-function userStatusLabel(snapshot: LarkAuthSnapshot | undefined, busy: boolean): string {
+function userStatusLabel(
+  snapshot: LarkAuthSnapshot | undefined,
+  busy: boolean,
+  stage: LarkAuthLoginStartResult["stage"] | undefined
+): string {
   if (!snapshot) return busy ? "正在读取" : "未知";
-  if (snapshot.phase === "authorizing") return "授权中";
+  if (snapshot.phase === "authorizing") return stage === "connection-setup" ? "准备登录" : "授权中";
   if (snapshot.phase === "error") return "检查失败";
   if (snapshot.cliStatus === "missing") return "CLI 未安装";
   if (snapshot.verified && snapshot.tokenStatus === "needs-refresh") return "待自动续期";

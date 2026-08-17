@@ -3,9 +3,27 @@ import {
   createLarkAuthManagement,
   type LarkAuthManagementOptions
 } from "./lark-auth-management.js";
+import { parseConnectionSetupUrl } from "./lark-auth-parsing.js";
 import type { SkillPackProcessRunner } from "./skill-pack-process-runner.js";
 
 const EXECUTABLE = "/tools/lark-cli";
+
+describe("parseConnectionSetupUrl", () => {
+  it("extracts only credential-free Feishu or Lark setup URLs", () => {
+    expect(parseConnectionSetupUrl(
+      "请打开 https://open.feishu.cn/setup/connection?state=opaque。"
+    )).toBe("https://open.feishu.cn/setup/connection?state=opaque");
+    expect(parseConnectionSetupUrl(
+      "Open https://open.larksuite.com/setup/connection?state=opaque"
+    )).toBe("https://open.larksuite.com/setup/connection?state=opaque");
+  });
+
+  it("rejects insecure, credential-bearing, or lookalike setup URLs", () => {
+    expect(parseConnectionSetupUrl("http://open.feishu.cn/setup")).toBeUndefined();
+    expect(parseConnectionSetupUrl("https://user:secret@open.feishu.cn/setup")).toBeUndefined();
+    expect(parseConnectionSetupUrl("https://open.feishu.cn.evil.example/setup")).toBeUndefined();
+  });
+});
 
 describe("LarkAuthManagement", () => {
   it("reports a missing CLI without loading credentials or starting authorization", async () => {
@@ -23,6 +41,24 @@ describe("LarkAuthManagement", () => {
       detail: "未找到 lark-cli，请先安装或修复 Lark CLI。"
     });
     await expect(manager.beginLogin()).rejects.toThrow("LARK_CLI_NOT_FOUND");
+  });
+
+  it("treats missing application configuration as a normal first-login state", async () => {
+    const runProcess = vi.fn<SkillPackProcessRunner>(async () => {
+      throw new Error(
+        "lark-cli exited with 3: {\"error\":{\"subtype\":\"not_configured\",\"message\":\"not configured\"}}"
+      );
+    });
+    const manager = managerWith(runProcess, () => 1_500);
+
+    await expect(manager.status()).resolves.toEqual({
+      cliStatus: "ready",
+      phase: "disconnected",
+      verified: false,
+      checkedAt: 1_500,
+      appStatus: "missing",
+      detail: "首次登录时将一键准备飞书连接，无需填写 App ID 或 App Secret。"
+    });
   });
 
   it("parses verified user and bot identities while dropping sensitive CLI fields", async () => {
@@ -161,6 +197,13 @@ describe("LarkAuthManagement", () => {
     let pollingSignal: AbortSignal | undefined;
     const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
       if (arguments_.includes("--no-wait")) {
+        expect(arguments_).toEqual([
+          "auth",
+          "login",
+          "--recommend",
+          "--no-wait",
+          "--json"
+        ]);
         return {
           stdout: JSON.stringify({
             data: {
@@ -188,6 +231,7 @@ describe("LarkAuthManagement", () => {
 
     expect(repeated).toEqual(first);
     expect(first).toEqual({
+      stage: "user-authorization",
       status: expect.objectContaining({ phase: "authorizing", appStatus: "unknown" }),
       verificationUrl: "https://open.feishu.cn/device?state=opaque",
       userCode: "ABCD-EFGH",
@@ -200,6 +244,102 @@ describe("LarkAuthManagement", () => {
 
     await manager.shutdown();
     expect(pollingSignal?.aborted).toBe(true);
+  });
+
+  it("prepares a missing App connection before continuing user authorization", async () => {
+    let completeSetup!: () => void;
+    const setupCompletion = new Promise<void>((resolve) => { completeSetup = resolve; });
+    let appReady = false;
+    const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
+      if (arguments_.includes("--no-wait")) {
+        expect(arguments_).toEqual([
+          "auth",
+          "login",
+          "--recommend",
+          "--no-wait",
+          "--json"
+        ]);
+        if (!appReady) throw new Error("not configured (missing app config)");
+        return {
+          stdout: JSON.stringify({
+            device_code: "host-only-user-device-code",
+            verification_url: "https://open.feishu.cn/device/user",
+            expires_in: 600
+          }),
+          stderr: ""
+        };
+      }
+      if (arguments_[0] === "config") {
+        options.onOutput?.({
+          stream: "stderr",
+          chunk: Buffer.from("打开链接 https://open.feishu.cn/setup/connection?opaque=1\n", "utf8")
+        });
+        await setupCompletion;
+        appReady = true;
+        return { stdout: JSON.stringify({ appId: "cli_created123", appSecret: "****" }), stderr: "" };
+      }
+      if (arguments_.includes("status")) {
+        return {
+          stdout: JSON.stringify({
+            verified: true,
+            appId: "cli_created123",
+            brand: "feishu",
+            identities: {
+              bot: { status: "ready", available: true, verified: true, appName: "一键连接" },
+              user: { status: "missing", available: false, verified: false }
+            }
+          }),
+          stderr: ""
+        };
+      }
+      if (arguments_.includes("--device-code")) {
+        return new Promise((_resolve, reject) => {
+          options.signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+        });
+      }
+      throw new Error(`Unexpected command: ${arguments_.join(" ")}`);
+    });
+    const manager = managerWith(runProcess, () => 10_000);
+
+    const setup = await manager.beginLogin();
+    expect(setup).toMatchObject({
+      stage: "connection-setup",
+      verificationUrl: "https://open.feishu.cn/setup/connection?opaque=1",
+      status: { phase: "authorizing", appStatus: "missing" }
+    });
+    expect(JSON.stringify(setup)).not.toContain("host-only-user-device-code");
+
+    completeSetup();
+    await vi.waitFor(async () => {
+      await expect(manager.status()).resolves.toMatchObject({
+        phase: "disconnected",
+        appStatus: "ready",
+        appId: "cli_created123"
+      });
+    });
+
+    const authorization = await manager.beginLogin();
+    expect(authorization).toMatchObject({
+      stage: "user-authorization",
+      verificationUrl: "https://open.feishu.cn/device/user"
+    });
+    expect(runProcess.mock.calls.filter((call) => call[1][0] === "config")).toHaveLength(1);
+    await manager.shutdown();
+  });
+
+  it("does not fabricate a setup URL by joining stdout and stderr", async () => {
+    const runProcess = vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
+      if (arguments_.includes("--no-wait")) throw new Error("not configured");
+      if (arguments_[0] === "config") {
+        options.onOutput?.({ stream: "stdout", chunk: Buffer.from("https://open.", "utf8") });
+        options.onOutput?.({ stream: "stderr", chunk: Buffer.from("feishu.cn/setup\n", "utf8") });
+        return { stdout: "", stderr: "" };
+      }
+      throw new Error(`Unexpected command: ${arguments_.join(" ")}`);
+    });
+    const manager = managerWith(runProcess, () => 10_000);
+
+    await expect(manager.beginLogin()).rejects.toThrow("LARK_CONNECTION_SETUP_FAILED");
   });
 
   it("publishes the verified status after the Device Flow completes", async () => {

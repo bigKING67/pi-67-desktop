@@ -32,21 +32,24 @@ export async function resolveLarkCli(options: {
   }
   const configured = options.environment.PI67_LARK_CLI_PATH;
   if (configured) {
-    const verified = await executablePath(configured, platform);
+    const verified = await preferredLarkCliExecutable(configured, platform);
     if (verified && isUserManagedExecutable(verified)) return verified;
   }
   const names = platform === "win32"
-    ? ["lark-cli.cmd", "lark-cli.exe", "lark-cli"]
+    ? ["lark-cli.exe", "lark-cli.cmd", "lark-cli"]
     : ["lark-cli"];
   for (const directory of (options.environment.PATH ?? "").split(delimiter).filter(Boolean)) {
     for (const name of names) {
-      const verified = await executablePath(join(directory, name), platform);
+      const verified = await preferredLarkCliExecutable(join(directory, name), platform);
       if (verified && isUserManagedExecutable(verified)) return verified;
     }
   }
   if (platform === "win32" && options.environment.APPDATA) {
     for (const name of names) {
-      const verified = await executablePath(join(options.environment.APPDATA, "npm", name), platform);
+      const verified = await preferredLarkCliExecutable(
+        join(options.environment.APPDATA, "npm", name),
+        platform
+      );
       if (verified && isUserManagedExecutable(verified)) return verified;
     }
   }
@@ -164,6 +167,23 @@ async function executablePath(candidate: string, platform: NodeJS.Platform): Pro
   } catch {
     return undefined;
   }
+}
+
+async function preferredLarkCliExecutable(
+  candidate: string,
+  platform: NodeJS.Platform
+): Promise<string | undefined> {
+  const verified = await executablePath(candidate, platform);
+  if (!verified || platform !== "win32" || !verified.toLowerCase().endsWith(".cmd")) return verified;
+  const native = join(
+    dirname(verified),
+    "node_modules",
+    "@larksuite",
+    "cli",
+    "bin",
+    "lark-cli.exe"
+  );
+  return await executablePath(native, platform) ?? verified;
 }
 
 function isContainedAbsolutePath(candidate: string, root: string): boolean {

@@ -1,6 +1,7 @@
 import type { SessionMessageView } from "@pi67/domain";
 import { describe, expect, it } from "vitest";
 import {
+  hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows
 } from "./transcript-rows.js";
@@ -85,6 +86,32 @@ describe("projectTranscriptRows", () => {
       expect.objectContaining({ kind: "message", key: "assistant-empty" })
     ]);
     expect(hasProcessGroupAfterLatestUser(rows)).toBe(false);
+  });
+
+  it("recognizes a committed final answer only after the latest User turn", () => {
+    const rows = projectTranscriptRows([
+      message("assistant-old", "assistant", [{ type: "text", text: "旧回答" }]),
+      message("user-current", "user", [{ type: "text", text: "当前问题" }]),
+      message("assistant-current", "assistant", [{ type: "text", text: "当前回答" }])
+    ]);
+
+    expect(hasFinalAnswerAfterLatestUser(rows)).toBe(true);
+    expect(hasFinalAnswerAfterLatestUser(projectTranscriptRows([
+      message("assistant-old", "assistant", [{ type: "text", text: "旧回答" }]),
+      message("user-current", "user", [{ type: "text", text: "当前问题" }])
+    ]))).toBe(false);
+  });
+
+  it("does not treat an Assistant error as a committed final answer", () => {
+    const rows = projectTranscriptRows([
+      message("user-current", "user", [{ type: "text", text: "当前问题" }]),
+      {
+        ...message("assistant-error", "assistant", [{ type: "text", text: "模型未返回内容" }]),
+        error: "模型未返回内容"
+      }
+    ]);
+
+    expect(hasFinalAnswerAfterLatestUser(rows)).toBe(false);
   });
 
   it("keeps a recovered Tool failure as a completed warning when a final answer exists", () => {

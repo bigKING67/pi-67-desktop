@@ -195,6 +195,7 @@ if (hasSingleInstanceLock) {
     ));
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
+      capabilityProjectionMode: app.isPackaged ? "packaged-direct" : "legacy-copy",
       agentDir: desktopAgentDirectory,
       toolchain: desktopToolchain,
       packageNetworkSettings

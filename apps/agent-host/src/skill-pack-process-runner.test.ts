@@ -47,4 +47,22 @@ describe("runBoundedSkillPackProcess", () => {
 
     expect(result.stdout).toBe(String(input.length));
   });
+
+  it("observes bounded process output before the process exits", async () => {
+    let resolveObserved!: (value: string) => void;
+    const observed = new Promise<string>((resolve) => { resolveObserved = resolve; });
+    const running = runBoundedSkillPackProcess(
+      process.execPath,
+      ["-e", "process.stderr.write('open https://open.feishu.cn/setup\\n');setTimeout(()=>process.exit(0),100)"],
+      {
+        cwd: process.cwd(),
+        timeoutMs: 10_000,
+        environment: process.env,
+        onOutput: ({ chunk }) => resolveObserved(Buffer.from(chunk).toString("utf8"))
+      }
+    );
+
+    await expect(observed).resolves.toContain("https://open.feishu.cn/setup");
+    await expect(running).resolves.toMatchObject({ stderr: expect.stringContaining("https://open.feishu.cn/setup") });
+  });
 });

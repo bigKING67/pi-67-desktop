@@ -83,6 +83,7 @@ export async function createDesktopCapabilityFixture() {
   };
   return {
     capabilitiesRoot,
+    capabilityProjectionMode: "legacy-copy" as const,
     agentDir,
     packageRoot,
     toolchain,

@@ -170,7 +170,7 @@ Application-level surfaces use a separate wide-window shell:
   `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
   one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
   icons never collapse or hide, and the strip never introduces horizontal scroll.
-  At 1160px and below the Inspector becomes the existing right-side drawer so the
+  At 1140px and below the Inspector becomes the existing right-side drawer so the
   360px Inspector and 520px Transcript minima never force application-level
   horizontal overflow.
 - The Transcript conversation grid uses `minmax(0, 1fr)` so Composer content
@@ -185,7 +185,7 @@ Application-level surfaces use a separate wide-window shell:
   when either side column stops consuming layout width, and at most 1120px when
   neither side column consumes layout width. The workbench expands visibly when
   a side column closes without turning ordinary prose into full-window lines.
-- At 1160px and below, context defaults closed and becomes an overlay drawer with a
+- At 1140px and below, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.
@@ -763,15 +763,23 @@ loading error where the operation can produce those states
   around it. Section headings remain outside all three surfaces.
 - `飞书` uses the same page-level Tab language as other Settings workspaces instead
   of stacking both identity workflows into one long page. `用户授权` is the first and
-  default tab; `应用配置` is second. Each panel contains its own explicit Grouped
+  default tab; `应用连接` is second. Each panel contains its own explicit Grouped
   Settings section rather than one ambiguous connection card. When Lark CLI is
   missing, both panels place one warning prerequisite before their disabled rows:
   `需要先安装 Lark CLI`, a primary `安装 Lark CLI`, and a secondary `前往技能`.
   Installation opens a one-shot confirmation that names the official source, latest
   stable target, current-user scope, and global resource reload; success refreshes
-  identity state in place. Both Bot identity and the user Device Flow still depend on the active App, so an unconfigured user panel
-  explains the dependency and provides a direct `前往应用配置` action. User-managed
-  configuration shows the complete App ID after save and presents App ID, region,
+  identity state in place. The platform-level user Device Flow still depends on an
+  App, but the primary user flow does not require manual App credentials. When the
+  App is missing, `登录飞书` starts the official one-click connection preparation,
+  opens only the validated HTTPS setup URL, and automatically continues to the user
+  authorization URL after preparation. Initial login requests only Lark CLI's
+  recommended scopes and explains that other permissions are added incrementally when
+  a capability needs them. The same neutral notice explains that
+  organization policy may require administrator approval; it does not disable login
+  or redirect ordinary users to advanced configuration. `应用连接` remains an
+  optional advanced path for an existing self-managed or organization-provided App.
+  User-managed connection shows the complete App ID after save and presents App ID, region,
   and a masked App Secret editor with a draft-only reveal control. Saving requires a
   fresh App Secret, uses a dedicated one-shot credential command, and never offers
   saved-secret reveal; success clears the draft and shows `已安全保存`. An organization-
@@ -783,7 +791,7 @@ loading error where the operation can produce those states
   never cross Protocol. `needs_refresh` is neutral `待自动续期`, not a reauthorization
   warning; only invalid or expired refresh credentials request user action. Identity
   readiness does not imply that a specific Drive, Calendar, message, task, or mail
-  request has passed. Missing CLI, editing, saving, connected, needs-refresh,
+  request has passed. Missing CLI, connection-setup, editing, saving, connected, needs-refresh,
   disconnected, expired, and error states keep the same row geometry and explicit
   text; polling is bounded to the active Device Flow.
 - Provider, model, and Package catalogs always use explicit drill-down rather

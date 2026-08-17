@@ -263,21 +263,29 @@ the only Runtime and behavior specification source.
   Multi-source design suites have no invented aggregate version, and Lark's bundled
   copy remains explicitly unversioned until its build provenance supplies a
   verifiable suite version.
-- Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用配置`
+- Settings owns one global `办公 -> 飞书` surface with `用户授权` and `应用连接`
   page-level tabs. `用户授权` is first and selected by default because the user's
   personal identity is the primary office task. Both tabs first expose a missing
   Lark CLI as an explicit prerequisite with `安装 Lark CLI` and `前往技能` actions;
   the confirmation explicitly identifies a current-user global installation and
   `~/.agents/skills` sharing scope. Application editing and user login stay disabled
-  until that installation verifies.
-  The Device Flow still depends on a verified App identity; when one is missing, the
-  user tab explains that dependency and links directly to `应用配置` instead of
-  exposing both workflows in one long page. App ID remains visible, while a newly entered App Secret may be revealed only
+  only until that installation verifies.
+  Feishu user OAuth still requires an App identity at the platform layer, but ordinary
+  users do not manually provide App credentials. `登录飞书` first attempts the user
+  Device Flow; when Lark CLI reports a missing App configuration, Agent Host starts
+  the official one-click `config init --new` flow, exposes only its validated HTTPS
+  verification URL, and automatically continues the user Device Flow after the App
+  connection verifies. Initial authorization requests only Lark CLI's recommended
+  scopes; additional business capabilities request missing scopes incrementally rather
+  than granting every domain up front. Organization policy may still require administrator approval
+  for App creation, scopes, or publication; Desktop reports that boundary and never
+  claims to bypass it. `应用连接` is an optional advanced path for an existing
+  self-managed or organization-provided App. App ID remains visible, while a newly entered App Secret may be revealed only
   in the active editor and crosses a dedicated one-shot credential command to Agent
   Host. Agent Host passes it to the resolved user-owned `lark-cli` through stdin, never argv,
   and clears its mutable input buffer after the bounded configuration attempt. Saved
   App Secrets are not read back or duplicated by Desktop; organization-managed
-  application sources remain read-only when such provenance becomes available.
+  connection sources remain read-only when such provenance becomes available.
   `用户授权` invokes the `lark-cli` Device Flow, Renderer opens only the validated HTTPS verification URL,
   and the resulting user OAuth identity is used for personal Drive, Calendar, IM,
   Task, Mail, and other user-authorized resources. Bot identity never uses the user

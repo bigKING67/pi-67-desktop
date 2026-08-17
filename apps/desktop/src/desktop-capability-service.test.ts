@@ -86,6 +86,65 @@ describe("Desktop capability service", () => {
     expect(runBrowserEntrypointCheck).toHaveBeenCalledOnce();
   });
 
+  it("uses the immutable bundled browser67 package for packaged-direct projection", async () => {
+    const fixture = await createFixture();
+    const bundledPackageRoot = join(fixture.capabilitiesRoot, "packages", "browser67");
+    await mkdir(join(bundledPackageRoot, "bin"), { recursive: true });
+    await writeFile(join(bundledPackageRoot, "package.json"), JSON.stringify({
+      version: "0.4.0",
+      gitHead: "1".repeat(40)
+    }), "utf8");
+    await writeFile(join(bundledPackageRoot, "bin", "browser67.mjs"), "", "utf8");
+    await prepareBrowserDependencies(bundledPackageRoot);
+    await rm(fixture.packageRoot, { recursive: true });
+    await fixture.packageNetworkSettings.save({
+      npmMode: "offline",
+      gitMode: "offline",
+      gitMirrors: []
+    });
+    const runNpm = vi.fn(async () => undefined);
+    const runBrowserEntrypointCheck = vi.fn(async () => undefined);
+    const service = new DesktopCapabilityService({
+      ...fixture,
+      capabilityProjectionMode: "packaged-direct",
+      runNpm,
+      runBrowserEntrypointCheck,
+      now: () => 125,
+      createToken: () => "packaged-direct"
+    });
+
+    await expect(service.setupBrowser67()).resolves.toMatchObject({
+      integrations: [{
+        dependencyState: "prepared",
+        preparedAt: 125,
+        detail: "内置运行依赖与命令入口已验证；浏览器扩展尚未完成连接。"
+      }]
+    });
+    expect(runNpm).not.toHaveBeenCalled();
+    expect(runBrowserEntrypointCheck).toHaveBeenCalledWith(bundledPackageRoot, fixture.toolchain);
+  });
+
+  it("does not modify the immutable packaged browser67 root when bundled dependencies are incomplete", async () => {
+    const fixture = await createFixture();
+    const bundledPackageRoot = join(fixture.capabilitiesRoot, "packages", "browser67");
+    await mkdir(join(bundledPackageRoot, "bin"), { recursive: true });
+    await writeFile(join(bundledPackageRoot, "package.json"), JSON.stringify({
+      version: "0.4.0",
+      gitHead: "1".repeat(40)
+    }), "utf8");
+    await writeFile(join(bundledPackageRoot, "bin", "browser67.mjs"), "", "utf8");
+    const runNpm = vi.fn(async () => undefined);
+
+    await expect(new DesktopCapabilityService({
+      ...fixture,
+      capabilityProjectionMode: "packaged-direct",
+      runNpm
+    }).setupBrowser67()).rejects.toThrow(
+      "Bundled browser67 dependencies are unavailable; reinstall or update Pi-67 Desktop."
+    );
+    expect(runNpm).not.toHaveBeenCalled();
+  });
+
   it("reports missing, malformed, and stale capability metadata without false readiness", async () => {
     const missingState = await createFixture();
     await unlink(join(missingState.agentDir, "desktop-capabilities", "state.json"));

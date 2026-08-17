@@ -342,7 +342,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
         ? canInstall
           ? "官方办公 Skills 尚未完整安装到 ~/.agents/skills；确认安装后可供 Pi-67 与其他兼容 Agent 共享。"
           : "点击检查更新后，由 Lark CLI 验证版本和官方技能同步状态。"
-        : "需要先安装官方 Lark CLI，才能检查技能更新、配置飞书应用和进行用户授权。"
+        : "需要先安装官方 Lark CLI，才能检查技能更新、准备飞书连接和进行用户授权。"
     };
   }
 

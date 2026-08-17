@@ -9,12 +9,12 @@ export async function verifyPackagedLarkSettings({
   await larkSettings.waitFor({ state: "visible", timeout: 15_000 });
   const larkTabs = larkSettings.getByRole("tab");
   const larkTabLabels = (await larkTabs.allTextContents()).map((label) => label.trim());
-  if (JSON.stringify(larkTabLabels) !== JSON.stringify(["用户授权", "应用配置"])) {
+  if (JSON.stringify(larkTabLabels) !== JSON.stringify(["用户授权", "应用连接"])) {
     throw new Error(`Packaged Lark Settings rendered the wrong Tab order: ${JSON.stringify(larkTabLabels)}.`);
   }
 
   const userTab = larkSettings.getByRole("tab", { name: "用户授权", exact: true });
-  const applicationTab = larkSettings.getByRole("tab", { name: "应用配置", exact: true });
+  const applicationTab = larkSettings.getByRole("tab", { name: "应用连接", exact: true });
   if (await userTab.getAttribute("aria-selected") !== "true") {
     throw new Error("Packaged Lark Settings did not default to user authorization.");
   }
@@ -31,7 +31,7 @@ export async function verifyPackagedLarkSettings({
 
   await applicationTab.click();
   if (await applicationTab.getAttribute("aria-selected") !== "true") {
-    throw new Error("Packaged Lark Settings did not switch to application configuration.");
+    throw new Error("Packaged Lark Settings did not switch to the optional application connection.");
   }
-  await capturePackagedScreenshot(window, "10-lark-application-configuration.png");
+  await capturePackagedScreenshot(window, "10-lark-application-connection.png");
 }

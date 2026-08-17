@@ -28,6 +28,7 @@ export function installMockLarkCommandHandler(): void {
     if (type === "lark.auth.login.begin") {
       const now = Date.now();
       return {
+        stage: "user-authorization",
         status: {
           ...applicationSnapshot(),
           phase: "authorizing",

@@ -21,11 +21,19 @@ export type SkillPackProcessWorkerResponse = {
   message: string;
 };
 
+export interface SkillPackProcessWorkerOutput {
+  type: "skill-pack-process-output";
+  requestId: string;
+  stream: "stdout" | "stderr";
+  chunkBase64: string;
+}
+
 const MAX_ARGUMENTS = 256;
 const MAX_ARGUMENT_BYTES = 512 * 1024;
 const MAX_ENVIRONMENT_ENTRIES = 512;
 const MAX_ENVIRONMENT_VALUE_LENGTH = 32 * 1024;
 const MAX_STDIN_BASE64_LENGTH = 2 * 1024 * 1024;
+const MAX_OUTPUT_CHUNK_BASE64_LENGTH = 96 * 1024;
 
 export function isSkillPackProcessWorkerRequest(
   value: unknown
@@ -59,6 +67,20 @@ export function isSkillPackProcessWorkerResponse(
     ? typeof value.stdout === "string" && value.stdout.length <= 64 * 1024
       && typeof value.stderr === "string" && value.stderr.length <= 64 * 1024
     : isBoundedString(value.message, 2_048);
+}
+
+export function isSkillPackProcessWorkerOutput(
+  value: unknown,
+  requestId: string
+): value is SkillPackProcessWorkerOutput {
+  return isRecord(value)
+    && value.type === "skill-pack-process-output"
+    && value.requestId === requestId
+    && (value.stream === "stdout" || value.stream === "stderr")
+    && typeof value.chunkBase64 === "string"
+    && value.chunkBase64.length > 0
+    && value.chunkBase64.length <= MAX_OUTPUT_CHUNK_BASE64_LENGTH
+    && /^[A-Za-z0-9+/]+={0,2}$/u.test(value.chunkBase64);
 }
 
 function isStringRecord(value: unknown): value is Record<string, string> {

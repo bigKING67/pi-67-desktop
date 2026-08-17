@@ -39,9 +39,9 @@ import {
 } from "./browser67-capability-process.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
-
 export interface DesktopCapabilityServiceOptions extends Partial<Browser67ProcessRunners> {
   capabilitiesRoot: string;
+  capabilityProjectionMode: "packaged-direct" | "legacy-copy";
   agentDir: string;
   toolchain: DesktopToolchain;
   packageNetworkSettings: PackageNetworkSettingsStore;
@@ -55,6 +55,8 @@ export interface DesktopCapabilityServiceOptions extends Partial<Browser67Proces
 export class DesktopCapabilityService {
   readonly #capabilitiesRoot: string;
   readonly #managedRoot: string;
+  readonly #capabilityProjectionMode: DesktopCapabilityServiceOptions["capabilityProjectionMode"];
+  readonly #browser67PackageRoot: string;
   readonly #toolchain: DesktopToolchain;
   readonly #packageNetworkSettings: PackageNetworkSettingsStore;
   readonly #runNpm: NonNullable<DesktopCapabilityServiceOptions["runNpm"]>;
@@ -75,6 +77,10 @@ export class DesktopCapabilityService {
   constructor(options: DesktopCapabilityServiceOptions) {
     this.#capabilitiesRoot = resolve(options.capabilitiesRoot);
     this.#managedRoot = join(resolve(options.agentDir), "desktop-capabilities");
+    this.#capabilityProjectionMode = options.capabilityProjectionMode;
+    const browser67PackageContainmentRoot = options.capabilityProjectionMode === "packaged-direct" ? this.#capabilitiesRoot : this.#managedRoot;
+    this.#browser67PackageRoot = join(browser67PackageContainmentRoot, "packages", "browser67");
+    if (!isContainedManagedCapabilityPath(this.#browser67PackageRoot, browser67PackageContainmentRoot)) throw new Error("browser67 package escaped its verified capability root.");
     this.#toolchain = options.toolchain;
     this.#packageNetworkSettings = options.packageNetworkSettings;
     this.#runNpm = options.runNpm ?? runBrowser67NpmInstall;
@@ -216,6 +222,9 @@ export class DesktopCapabilityService {
         ...(previous?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: previous.extensionCheckedAt })
       });
       return this.#snapshotUnlocked();
+    }
+    if (this.#capabilityProjectionMode === "packaged-direct") {
+      throw new Error("Bundled browser67 dependencies are unavailable; reinstall or update Pi-67 Desktop.");
     }
     const candidates = npmRegistryCandidates(await this.#packageNetworkSettings.load());
     if (candidates.length === 0) throw new Error("Package downloads are offline; browser67 dependencies cannot be prepared.");
@@ -435,16 +444,13 @@ export class DesktopCapabilityService {
 
   async #requireBrowser67Package(): Promise<string> {
     const packageRoot = this.#browserPackageRoot();
-    if (!isContainedManagedCapabilityPath(packageRoot, this.#managedRoot)) {
-      throw new Error("browser67 package escaped the managed capability root.");
-    }
     const metadata = await lstat(packageRoot);
     if (metadata.isSymbolicLink() || !metadata.isDirectory()) throw new Error("browser67 managed package is unavailable.");
     return packageRoot;
   }
 
   #browserPackageRoot(): string {
-    return join(this.#managedRoot, "packages", "browser67");
+    return this.#browser67PackageRoot;
   }
 
   async #writeBrowserState(state: Browser67IntegrationState): Promise<void> {

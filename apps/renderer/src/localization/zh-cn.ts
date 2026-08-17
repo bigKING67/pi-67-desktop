@@ -55,7 +55,7 @@ export const zhCNMessages = {
       },
       lark: {
         label: "飞书",
-        summary: "配置飞书应用，并管理个人飞书用户授权。"
+        summary: "登录个人飞书，并按需管理高级应用连接。"
       },
       vision: {
         label: "视觉辅助",

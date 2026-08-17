@@ -233,6 +233,8 @@ jobs:
           eng/packaging/verify-windows-installer-lifecycle.test.mjs
           eng/packaging/windows-installed-application-lifecycle.test.mjs
           eng/packaging/windows-artifact-identity.test.mjs
+          apps/agent-host/src/lark-cli-resolution.test.ts
+          apps/agent-host/src/skill-pack-process-execution.test.ts
       - name: Reverify exact Windows candidate bytes
         shell: pwsh
         env:

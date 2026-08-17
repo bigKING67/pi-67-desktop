@@ -33,6 +33,7 @@ export interface LarkAuthSnapshot {
 }
 
 export interface LarkAuthLoginStartResult {
+  stage: "connection-setup" | "user-authorization";
   status: LarkAuthSnapshot;
   verificationUrl: string;
   userCode?: string;

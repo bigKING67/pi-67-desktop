@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   assertPackagedRuntimeAssets,
@@ -36,14 +37,20 @@ try {
 
   const mcpConfig = await readJson(`${agentDir}/mcp.json`);
   assert(mcpConfig.pi67ManagedMcp?.schema === "pi67.browser67-mcp.v1", "managed MCP receipt is missing");
-  const browser67Root = `${agentDir}/desktop-capabilities/packages/browser67`;
+  const browser67Root = join(artifact.resourcesPath, "capabilities", "packages", "browser67");
+  const tmwdBrowserEntrypoint = mcpConfig.mcpServers?.tmwd_browser?.args?.[0];
+  assert(
+    typeof tmwdBrowserEntrypoint === "string"
+      && resolve(dirname(tmwdBrowserEntrypoint), "../../..") === resolve(browser67Root),
+    "managed MCP did not resolve browser67 from the packaged capability root"
+  );
   const browser67Package = await readJson(`${browser67Root}/package.json`);
   assert(browser67Package.version === "0.4.0", "unexpected browser67 version");
   assert(/^[0-9a-f]{40}$/u.test(browser67Package.gitHead), "browser67 gitHead is missing");
 
-  const managedRoot = `${agentDir}/desktop-capabilities/managed-packages`;
-  const managedManifest = await readJson(`${managedRoot}/active/manifest.json`);
-  const managedState = await readJson(`${managedRoot}/state.json`);
+  const managedBundleRoot = join(artifact.resourcesPath, "capabilities", "managed-packages", "bundled");
+  const managedManifest = await readJson(join(managedBundleRoot, "manifest.json"));
+  const managedState = await readJson(`${agentDir}/desktop-capabilities/managed-packages/state.json`);
   const managedPackages = Object.fromEntries(managedManifest.packages.map((entry) => [entry.id, entry]));
   assertManagedPackage(managedPackages, managedState, "pi-mcp-adapter", "2.11.0");
   assertManagedPackage(managedPackages, managedState, "pi-observational-memory", "3.0.3");

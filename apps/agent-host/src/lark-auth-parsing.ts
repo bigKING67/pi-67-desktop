@@ -6,6 +6,20 @@ import type {
 
 const DEFAULT_AUTHORIZATION_LIFETIME_MS = 10 * 60_000;
 const MAX_AUTHORIZATION_LIFETIME_MS = 30 * 60_000;
+const LARK_CONNECTION_HOST_SUFFIXES = [".feishu.cn", ".larksuite.com"] as const;
+
+export function parseConnectionSetupUrl(output: string): string | undefined {
+  for (const match of output.matchAll(/https:\/\/[^\s<>"'，。；！？、）】]+/gu)) {
+    const candidate = match[0].replace(/[),.;!?]+$/u, "");
+    const url = secureUrl(candidate);
+    if (!url) continue;
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (LARK_CONNECTION_HOST_SUFFIXES.some((suffix) => (
+      hostname === suffix.slice(1) || hostname.endsWith(suffix)
+    ))) return url;
+  }
+  return undefined;
+}
 
 export function parseLoginStart(stdout: string, now: number): {
   deviceCode: string;

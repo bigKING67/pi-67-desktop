@@ -86,10 +86,14 @@ spacing, component states, and motion as `DESIGN.md`.
   input; persisted credentials and Header values never gain a theme-specific
   value preview, and focus rings remain visible on every raised surface.
 - Lark uses the same two page-level Tabs in both themes: `用户授权` is first and
-  selected by default, while `应用配置` is second. The selected, hover, and
+  selected by default, while `应用连接` is second. The selected, hover, and
   focus-visible states reuse the neutral Settings Tab family without glow or a green
   identity treatment. Each panel keeps its own neutral Grouped Settings section.
-  Connected, needs-refresh, authorizing, missing-CLI, unconfigured-App, editing,
+  First login keeps the normal primary action enabled and uses a neutral notice to
+  explain recommended-scope authorization, one-click connection preparation, and
+  possible organization approval; broader permissions remain incremental;
+  manual App credentials remain an optional advanced path. Connected,
+  needs-refresh, connection-setup, authorizing, missing-CLI, unconfigured-App, editing,
   saving, and error states use semantic text and notices rather than glowing identity
   cards. The application editor uses the normal Settings field and focus tokens; App
   ID remains readable, while App Secret reveal exists only for the current draft and

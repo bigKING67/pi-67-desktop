@@ -9,9 +9,14 @@ import {
   errorSnapshot,
   missingCliSnapshot,
   normalizeApplicationInput,
+  parseConnectionSetupUrl,
   parseLoginStart,
   parseStatus
 } from "./lark-auth-parsing.js";
+import {
+  appendBoundedProcessOutput,
+  decodeSkillPackProcessOutput
+} from "./skill-pack-process-execution.js";
 import {
   runBoundedSkillPackProcess,
   type SkillPackProcessRunner
@@ -20,6 +25,8 @@ import { HostCommandError } from "./protocol-error.js";
 
 const STATUS_TIMEOUT_MS = 20_000;
 const LOGIN_START_TIMEOUT_MS = 30_000;
+const CONNECTION_SETUP_TIMEOUT_MS = 10 * 60_000;
+const CONNECTION_SETUP_URL_TIMEOUT_MS = 45_000;
 const APPLICATION_CONFIGURATION_TIMEOUT_MS = 30_000;
 export interface LarkAuthManagementPort {
   status(): Promise<LarkAuthSnapshot>;
@@ -60,6 +67,7 @@ class LarkAuthManagement implements LarkAuthManagementPort {
   readonly #runProcess: SkillPackProcessRunner;
   readonly #resolveLarkCli: () => Promise<string | undefined>;
   #pending: PendingLogin | undefined;
+  #loginStarting: Promise<LarkAuthLoginStartResult> | undefined;
   #configuration: PendingApplicationConfiguration | undefined;
   #lastSnapshot: LarkAuthSnapshot | undefined;
 
@@ -102,6 +110,17 @@ class LarkAuthManagement implements LarkAuthManagementPort {
   }
 
   async beginLogin(): Promise<LarkAuthLoginStartResult> {
+    if (this.#loginStarting) return this.#loginStarting;
+    const starting = this.#beginLoginUnlocked();
+    this.#loginStarting = starting;
+    try {
+      return await starting;
+    } finally {
+      if (this.#loginStarting === starting) this.#loginStarting = undefined;
+    }
+  }
+
+  async #beginLoginUnlocked(): Promise<LarkAuthLoginStartResult> {
     if (this.#configuration) {
       throw new Error("LARK_APP_CONFIGURATION_BUSY: 飞书应用配置正在保存，请稍后再登录。");
     }
@@ -114,21 +133,29 @@ class LarkAuthManagement implements LarkAuthManagementPort {
 
     const executable = await this.#resolveLarkCli();
     if (!executable) throw new Error("LARK_CLI_NOT_FOUND: 未找到 lark-cli，请先安装或修复 Lark CLI。");
-    let started: Awaited<ReturnType<SkillPackProcessRunner>>;
     try {
-      started = await this.#runProcess(
-        executable,
-        ["auth", "login", "--domain", "all", "--no-wait", "--json"],
-        {
-          cwd: this.#homeDirectory,
-          timeoutMs: LOGIN_START_TIMEOUT_MS,
-          environment: larkCliProcessEnvironment(this.#environment, executable)
-        }
-      );
+      return await this.#startUserAuthorization(executable);
     } catch (error) {
+      if (isMissingApplicationConfiguration(error)) {
+        return this.#startConnectionSetup(executable);
+      }
+      if (isLoginResponseValidationFailure(error)) throw error;
       if (isProcessTreeCleanupFailure(error)) throw error;
       throw new Error("LARK_AUTH_LOGIN_START_FAILED: 无法发起飞书用户授权，请检查网络后重试。");
     }
+  }
+
+  async #startUserAuthorization(executable: string): Promise<LarkAuthLoginStartResult> {
+    let started: Awaited<ReturnType<SkillPackProcessRunner>>;
+    started = await this.#runProcess(
+      executable,
+      ["auth", "login", "--recommend", "--no-wait", "--json"],
+      {
+        cwd: this.#homeDirectory,
+        timeoutMs: LOGIN_START_TIMEOUT_MS,
+        environment: larkCliProcessEnvironment(this.#environment, executable)
+      }
+    );
     const authorization = parseLoginStart(started.stdout, this.#now());
     const status: LarkAuthSnapshot = {
       cliStatus: "ready",
@@ -139,6 +166,7 @@ class LarkAuthManagement implements LarkAuthManagementPort {
       detail: "授权页已打开；完成飞书确认后会自动更新连接状态。"
     };
     const result: LarkAuthLoginStartResult = {
+      stage: "user-authorization",
       status,
       verificationUrl: authorization.verificationUrl,
       ...(authorization.userCode === undefined ? {} : { userCode: authorization.userCode }),
@@ -151,6 +179,98 @@ class LarkAuthManagement implements LarkAuthManagementPort {
       authorization.expiresAt,
       controller.signal
     );
+    const pending: PendingLogin = { controller, result, completion };
+    this.#pending = pending;
+    void completion.finally(() => {
+      if (this.#pending === pending) this.#pending = undefined;
+    }).catch(() => undefined);
+    return result;
+  }
+
+  async #startConnectionSetup(executable: string): Promise<LarkAuthLoginStartResult> {
+    const controller = new AbortController();
+    let stdoutOutput: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderrOutput: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let resolveUrl!: (url: string) => void;
+    let rejectUrl!: (error: Error) => void;
+    let settledUrl = false;
+    let setupUrlTimer: ReturnType<typeof setTimeout> | undefined;
+    const setupUrl = new Promise<string>((resolve, reject) => {
+      resolveUrl = resolve;
+      rejectUrl = reject;
+    });
+    const resolveSetupUrl = (url: string): void => {
+      if (settledUrl) return;
+      settledUrl = true;
+      if (setupUrlTimer) clearTimeout(setupUrlTimer);
+      resolveUrl(url);
+    };
+    const rejectSetupUrl = (error: Error): void => {
+      if (settledUrl) return;
+      settledUrl = true;
+      if (setupUrlTimer) clearTimeout(setupUrlTimer);
+      rejectUrl(error);
+    };
+    setupUrlTimer = setTimeout(() => {
+      controller.abort();
+      rejectSetupUrl(new Error("LARK_CONNECTION_SETUP_URL_TIMEOUT"));
+    }, CONNECTION_SETUP_URL_TIMEOUT_MS);
+    const observe = (stream: "stdout" | "stderr", chunk: Uint8Array): void => {
+      const current = stream === "stdout" ? stdoutOutput : stderrOutput;
+      const output = appendBoundedProcessOutput(current, Buffer.from(chunk));
+      if (stream === "stdout") stdoutOutput = output;
+      else stderrOutput = output;
+      const parsed = parseConnectionSetupUrl(decodeSkillPackProcessOutput(output));
+      if (parsed) resolveSetupUrl(parsed);
+    };
+    const running = this.#runProcess(
+      executable,
+      ["config", "init", "--new", "--brand", "feishu", "--lang", "zh"],
+      {
+        cwd: this.#homeDirectory,
+        timeoutMs: CONNECTION_SETUP_TIMEOUT_MS,
+        environment: larkCliProcessEnvironment(this.#environment, executable),
+        signal: controller.signal,
+        onOutput: ({ stream, chunk }) => observe(stream, chunk)
+      }
+    );
+    const completion = running.then(async (result) => {
+      observe("stdout", Buffer.from(result.stdout, "utf8"));
+      observe("stderr", Buffer.from(result.stderr, "utf8"));
+      rejectSetupUrl(new Error("LARK_CONNECTION_SETUP_URL_MISSING"));
+      if (controller.signal.aborted) return;
+      const snapshot = await this.#readVerifiedStatus(executable);
+      this.#lastSnapshot = snapshot.appStatus === "ready"
+        ? { ...snapshot, detail: "飞书基础连接已准备，正在继续个人用户授权。" }
+        : errorSnapshot(this.#now(), "飞书基础连接未能通过验证，请重试。");
+    }).catch((error: unknown) => {
+      rejectSetupUrl(new Error("LARK_CONNECTION_SETUP_FAILED"));
+      if (!controller.signal.aborted) {
+        this.#lastSnapshot = errorSnapshot(
+          this.#now(),
+          "无法一键准备飞书连接；组织可能限制应用创建或审批，请联系管理员提供组织应用，或在“应用连接”中使用已有凭据。"
+        );
+      }
+      if (isProcessTreeCleanupFailure(error)) throw error;
+    });
+    const verificationUrl = await setupUrl.catch(() => {
+      controller.abort();
+      throw new Error("LARK_CONNECTION_SETUP_FAILED: 无法发起飞书连接准备，请检查网络或组织策略后重试。");
+    });
+    const status: LarkAuthSnapshot = {
+      cliStatus: "ready",
+      phase: "authorizing",
+      verified: false,
+      checkedAt: this.#now(),
+      appStatus: "missing",
+      detail: "请在浏览器确认一键准备飞书连接；完成后将自动继续个人用户授权。"
+    };
+    const result: LarkAuthLoginStartResult = {
+      stage: "connection-setup",
+      status,
+      verificationUrl,
+      authorizationExpiresAt: this.#now() + CONNECTION_SETUP_TIMEOUT_MS
+    };
     const pending: PendingLogin = { controller, result, completion };
     this.#pending = pending;
     void completion.finally(() => {
@@ -277,6 +397,16 @@ class LarkAuthManagement implements LarkAuthManagementPort {
       return parseStatus(result.stdout, this.#now());
     } catch (error) {
       if (isProcessTreeCleanupFailure(error)) throw error;
+      if (isMissingApplicationConfiguration(error)) {
+        return {
+          cliStatus: "ready",
+          phase: "disconnected",
+          verified: false,
+          checkedAt: this.#now(),
+          appStatus: "missing",
+          detail: "首次登录时将一键准备飞书连接，无需填写 App ID 或 App Secret。"
+        };
+      }
       return errorSnapshot(this.#now(), "无法验证飞书用户授权，请检查网络后重试。");
     }
   }
@@ -284,4 +414,13 @@ class LarkAuthManagement implements LarkAuthManagementPort {
 
 function isProcessTreeCleanupFailure(error: unknown): error is HostCommandError {
   return error instanceof HostCommandError && error.code === "RUNTIME_POISONED";
+}
+
+function isMissingApplicationConfiguration(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /not[_ -]?configured|missing app config|尚未配置|未配置.*应用/iu.test(error.message);
+}
+
+function isLoginResponseValidationFailure(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("LARK_AUTH_LOGIN_INVALID:");
 }

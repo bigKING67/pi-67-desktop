@@ -180,15 +180,19 @@ function hasVisibleAnswer(message: SessionMessageView): boolean {
 }
 
 export function hasProcessGroupAfterLatestUser(rows: readonly TranscriptRow[]): boolean {
-  let latestUserIndex = -1;
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index];
-    if (row?.kind === "message" && row.message.role === "user") {
-      latestUserIndex = index;
-      break;
-    }
-  }
+  const latestUserIndex = findLatestUserRowIndex(rows);
   return rows.slice(latestUserIndex + 1).some((row) => row.kind === "process-group");
+}
+
+export function hasFinalAnswerAfterLatestUser(rows: readonly TranscriptRow[]): boolean {
+  const latestUserIndex = findLatestUserRowIndex(rows);
+  if (latestUserIndex < 0) return false;
+  return rows.slice(latestUserIndex + 1).some((row) => (
+    row.kind === "message"
+    && row.message.role === "assistant"
+    && row.message.error === undefined
+    && hasVisibleAnswer(row.message)
+  ));
 }
 
 export function createLiveProcessRow(
@@ -241,4 +245,12 @@ function splitAssistantResult(message: SessionMessageView): SessionMessageView[]
     { ...message, id: `${message.id}:process`, parts: thinking },
     { ...message, parts: result }
   ];
+}
+
+function findLatestUserRowIndex(rows: readonly TranscriptRow[]): number {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row?.kind === "message" && row.message.role === "user") return index;
+  }
+  return -1;
 }

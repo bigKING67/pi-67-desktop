@@ -39,4 +39,45 @@ describe("Lark CLI resolution", () => {
       APPDATA: "C:\\Users\\fixture\\AppData\\Roaming"
     }, "win32")).toMatch(/[\\/]npm[\\/]lark-cli\.exe$/u);
   });
+
+  it("resolves the native Windows binary behind an npm cmd shim", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-lark-cli-windows-shim-"));
+    const commandRoot = join(root, "node-bin");
+    const shim = join(commandRoot, "lark-cli.cmd");
+    const native = join(
+      commandRoot,
+      "node_modules",
+      "@larksuite",
+      "cli",
+      "bin",
+      "lark-cli.exe"
+    );
+    await mkdir(dirname(native), { recursive: true });
+    await writeFile(shim, "@echo off\r\n", "utf8");
+    await writeFile(native, "native", "utf8");
+
+    await expect(resolveLarkCli({
+      environment: { PATH: commandRoot },
+      homeDirectory: join(root, "home"),
+      shellPath: undefined,
+      runProcess: vi.fn(),
+      platform: "win32"
+    })).resolves.toBe(resolve(native));
+  });
+
+  it("keeps a Windows cmd shim as a compatibility fallback when no native binary exists", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-lark-cli-windows-fallback-"));
+    const commandRoot = join(root, "node-bin");
+    const shim = join(commandRoot, "lark-cli.cmd");
+    await mkdir(commandRoot, { recursive: true });
+    await writeFile(shim, "@echo off\r\n", "utf8");
+
+    await expect(resolveLarkCli({
+      environment: { PATH: commandRoot },
+      homeDirectory: join(root, "home"),
+      shellPath: undefined,
+      runProcess: vi.fn(),
+      platform: "win32"
+    })).resolves.toBe(resolve(shim));
+  });
 });

@@ -10,11 +10,17 @@ import {
 } from "./package-worker-process-tree.js";
 import { HostCommandError } from "./protocol-error.js";
 import {
+  isSkillPackProcessWorkerOutput,
   isSkillPackProcessWorkerResponse,
   type SkillPackProcessWorkerRequest
 } from "./skill-pack-process-worker-protocol.js";
+import {
+  appendBoundedProcessOutput,
+  decodeSkillPackProcessOutput,
+  windowsCommandShellArguments
+} from "./skill-pack-process-execution.js";
 
-export const MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES = 64 * 1024;
+export { MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES } from "./skill-pack-process-execution.js";
 const PROCESS_TREE_TERMINATION_DEADLINE_MS = 4_000;
 const skillPackProcessWorkerEntry = fileURLToPath(new URL("./skill-pack-process-worker.mjs", import.meta.url));
 
@@ -27,6 +33,7 @@ export type SkillPackProcessRunner = (
     environment: NodeJS.ProcessEnv;
     signal?: AbortSignal;
     stdin?: Uint8Array;
+    onOutput?: (output: { stream: "stdout" | "stderr"; chunk: Uint8Array }) => void;
   }
 ) => Promise<{ stdout: string; stderr: string }>;
 
@@ -46,7 +53,7 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
   const useCommandShell = process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(executable);
   const command = useCommandShell ? options.environment.ComSpec ?? "cmd.exe" : executable;
   const commandArguments = useCommandShell
-    ? ["/d", "/s", "/c", windowsCommand(executable, arguments_)]
+    ? windowsCommandShellArguments(executable, arguments_)
     : arguments_;
   const child = spawn(command, commandArguments, {
     cwd: options.cwd,
@@ -60,8 +67,8 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
       GCM_INTERACTIVE: "never"
     }
   });
-  let stdout = "";
-  let stderr = "";
+  let stdout: Buffer = Buffer.alloc(0);
+  let stderr: Buffer = Buffer.alloc(0);
   let settled = false;
   let terminating = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -93,13 +100,12 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
     );
   };
   const onAbort = () => terminate("Skill Pack operation was cancelled.");
-  const capture = (current: string, chunk: Buffer): string => (
-    current.length >= MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES
-      ? current
-      : current + chunk.toString("utf8").slice(0, MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES - current.length)
-  );
-  child.stdout!.on("data", (chunk: Buffer) => { stdout = capture(stdout, chunk); });
-  child.stderr!.on("data", (chunk: Buffer) => { stderr = capture(stderr, chunk); });
+  child.stdout!.on("data", (chunk: Buffer) => {
+    stdout = appendAndObserveProcessOutput(stdout, chunk, "stdout", options.onOutput);
+  });
+  child.stderr!.on("data", (chunk: Buffer) => {
+    stderr = appendAndObserveProcessOutput(stderr, chunk, "stderr", options.onOutput);
+  });
   if (child.stdin) {
     child.stdin.on("error", () => undefined);
     child.stdin.end(options.stdin);
@@ -112,9 +118,11 @@ const runDirectSkillPackProcess: SkillPackProcessRunner = (
     markExited();
     if (terminating) return;
     settle(() => {
-      if (code === 0) resolve({ stdout, stderr });
+      const decodedStdout = decodeSkillPackProcessOutput(stdout);
+      const decodedStderr = decodeSkillPackProcessOutput(stderr);
+      if (code === 0) resolve({ stdout: decodedStdout, stderr: decodedStderr });
       else reject(new Error(
-        `${basename(executable)} exited with ${signal ?? code}: ${boundedProcessMessage(stderr || stdout) ?? "no output"}`
+        `${basename(executable)} exited with ${signal ?? code}: ${boundedProcessMessage(decodedStderr || decodedStdout) ?? "no output"}`
       ));
     });
   });
@@ -221,6 +229,13 @@ const runWindowsContainedSkillPackProcess: SkillPackProcessRunner = (
     )));
   });
   child.on("message", (message: unknown) => {
+    if (isSkillPackProcessWorkerOutput(message, requestId)) {
+      notifyProcessOutput(options.onOutput, {
+        stream: message.stream,
+        chunk: Buffer.from(message.chunkBase64, "base64")
+      });
+      return;
+    }
     if (!isSkillPackProcessWorkerResponse(message, requestId)) return;
     if (message.ok) finish(() => resolve({ stdout: message.stdout, stderr: message.stderr }));
     else finish(() => reject(new Error(message.message)));
@@ -249,9 +264,27 @@ const runWindowsContainedSkillPackProcess: SkillPackProcessRunner = (
   }).catch((error: unknown) => finish(() => reject(error)));
 });
 
-function windowsCommand(executable: string, arguments_: string[]): string {
-  const quote = (value: string) => `"${value.replaceAll("\"", "\"\"")}"`;
-  return [executable, ...arguments_].map(quote).join(" ");
+function appendAndObserveProcessOutput(
+  current: Buffer,
+  chunk: Buffer,
+  stream: "stdout" | "stderr",
+  observer: Parameters<SkillPackProcessRunner>[2]["onOutput"]
+): Buffer {
+  const next = appendBoundedProcessOutput(current, chunk);
+  const appended = next.subarray(current.byteLength);
+  if (appended.byteLength > 0) notifyProcessOutput(observer, { stream, chunk: appended });
+  return next;
+}
+
+function notifyProcessOutput(
+  observer: Parameters<SkillPackProcessRunner>[2]["onOutput"],
+  output: { stream: "stdout" | "stderr"; chunk: Uint8Array }
+): void {
+  try {
+    observer?.(output);
+  } catch {
+    // Output observation must not weaken process completion or cleanup authority.
+  }
 }
 
 function boundedProcessMessage(value: string): string | undefined {

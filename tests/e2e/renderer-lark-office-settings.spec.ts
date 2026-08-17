@@ -69,7 +69,7 @@ const MISSING_LARK_PACK = {
   effectiveSource: "managed",
   canRestore: false,
   source: "@larksuite/cli",
-  detail: "需要先安装官方 Lark CLI，才能检查技能更新、配置飞书应用和进行用户授权。"
+  detail: "需要先安装官方 Lark CLI，才能检查技能更新、准备飞书连接和进行用户授权。"
 } as const;
 
 test.beforeEach(async ({ page }) => {
@@ -91,6 +91,7 @@ test("configures a user-managed Feishu app and keeps user authorization separate
         appName: "用户应用"
       },
       "lark.auth.login.begin": {
+        stage: "user-authorization",
         status: AUTHORIZING,
         verificationUrl,
         userCode: "ABCD-EFGH",
@@ -103,23 +104,23 @@ test("configures a user-managed Feishu app and keeps user authorization separate
 
   await expect(settings.getByRole("heading", { name: "飞书", exact: true, level: 1 })).toBeVisible();
   const userTab = settings.getByRole("tab", { name: "用户授权", exact: true });
-  const applicationTab = settings.getByRole("tab", { name: "应用配置", exact: true });
+  const applicationTab = settings.getByRole("tab", { name: "应用连接", exact: true });
   await expect(userTab).toHaveAttribute("aria-selected", "true");
   await expect(applicationTab).toHaveAttribute("aria-selected", "false");
   await expect(settings.getByRole("heading", { name: "用户授权", exact: true })).toBeVisible();
-  await expect(settings.getByRole("heading", { name: "飞书应用", exact: true })).toBeHidden();
+  await expect(settings.getByRole("heading", { name: "应用连接", exact: true })).toBeHidden();
   await expect(settings.getByRole("button", { name: "登录飞书", exact: true })).toBeVisible();
 
   await applicationTab.click();
   await expect(applicationTab).toHaveAttribute("aria-selected", "true");
-  await expect(settings.getByRole("heading", { name: "飞书应用", exact: true })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "应用连接", exact: true })).toBeVisible();
   await expect(settings.getByRole("heading", { name: "用户授权", exact: true })).toBeHidden();
   await expect(settings.getByText("Pi-67 Office", { exact: true })).toBeVisible();
   await expect(settings.getByText("cli_test123", { exact: true })).toBeVisible();
   await expect(settings.getByText("已安全保存", { exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "编辑配置", exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "编辑连接", exact: true })).toBeVisible();
 
-  await settings.getByRole("button", { name: "编辑配置", exact: true }).click();
+  await settings.getByRole("button", { name: "编辑连接", exact: true }).click();
   const applicationForm = settings.getByRole("form", { name: "飞书应用配置" });
   await expect(applicationForm.getByLabel("App ID")).toHaveValue("cli_test123");
   await applicationForm.getByLabel("App ID").fill("cli_updated123");
@@ -216,22 +217,81 @@ test("configures a user-managed Feishu app and keeps user authorization separate
   });
 });
 
-test("routes an unconfigured user authorization to application configuration", async ({ page }) => {
+test("prepares a first-time connection and automatically continues personal authorization", async ({ page }, testInfo) => {
+  const visualArtifactDirectory = process.env.PI67_VISUAL_ARTIFACT_DIR;
+  if (visualArtifactDirectory) await mkdir(visualArtifactDirectory, { recursive: true });
+  const setupUrl = "https://open.feishu.cn/setup/connection?state=pi67-setup";
+  const userUrl = "https://open.feishu.cn/device?state=pi67-user";
   await page.goto("/");
   await attachMockAgent(page, [], {}, {
-    responseResults: { "lark.auth.status": UNCONFIGURED }
+    responseResults: {
+      "lark.auth.status": UNCONFIGURED,
+      "lark.auth.login.begin": {
+        stage: "connection-setup",
+        status: {
+          ...UNCONFIGURED,
+          phase: "authorizing",
+          checkedAt: 1_754_731_201_000,
+          detail: "请在浏览器确认一键准备飞书连接；完成后将自动继续个人用户授权。"
+        },
+        verificationUrl: setupUrl,
+        authorizationExpiresAt: 1_754_731_801_000
+      }
+    }
   });
   await page.getByRole("button", { name: "选择工作区" }).click();
   const settings = await openLarkSettings(page);
 
-  const userTab = settings.getByRole("tab", { name: "用户授权", exact: true });
-  const applicationTab = settings.getByRole("tab", { name: "应用配置", exact: true });
-  await expect(userTab).toHaveAttribute("aria-selected", "true");
-  await expect(settings.getByText("请先配置并验证飞书应用，再登录个人飞书账号。")).toBeVisible();
-  await settings.getByRole("button", { name: "前往应用配置", exact: true }).click();
-  await expect(applicationTab).toHaveAttribute("aria-selected", "true");
-  await expect(settings.getByRole("heading", { name: "飞书应用", exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "配置应用", exact: true })).toBeVisible();
+  await expect(settings.getByText(/无需填写 App ID 或 App Secret/u)).toBeVisible();
+  const loginButton = settings.getByRole("button", { name: "登录飞书", exact: true });
+  await expect(loginButton).toBeEnabled();
+  await page.evaluate(() => {
+    (window as unknown as { __pi67UpdateTest: { allowOpen: boolean } }).__pi67UpdateTest.allowOpen = true;
+  });
+  await loginButton.click();
+
+  await expect(settings.getByText("准备登录", { exact: true })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "打开准备页", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (
+    window as unknown as { __pi67UpdateTest: { openedUrls: string[] } }
+  ).__pi67UpdateTest.openedUrls)).toEqual([setupUrl]);
+  const setupScreenshotPath = visualArtifactDirectory
+    ? resolve(visualArtifactDirectory, "lark-office-settings-first-login-setup-light.png")
+    : testInfo.outputPath("lark-office-settings-first-login-setup-light.png");
+  await page.screenshot({ path: setupScreenshotPath, animations: "disabled" });
+  await testInfo.attach("lark-office-settings-first-login-setup-light", {
+    path: setupScreenshotPath,
+    contentType: "image/png"
+  });
+
+  await setMockAgentResponseResult(page, "lark.auth.status", {
+    ...DISCONNECTED,
+    checkedAt: 1_754_731_202_000,
+    appId: "cli_created123",
+    appName: "一键连接"
+  });
+  await setMockAgentResponseResult(page, "lark.auth.login.begin", {
+    stage: "user-authorization",
+    status: {
+      ...AUTHORIZING,
+      checkedAt: 1_754_731_203_000,
+      appId: "cli_created123",
+      appName: "一键连接"
+    },
+    verificationUrl: userUrl,
+    userCode: "ABCD-EFGH",
+    authorizationExpiresAt: 1_754_731_803_000
+  });
+
+  await expect.poll(() => page.evaluate(() => (
+    window as unknown as { __pi67UpdateTest: { openedUrls: string[] } }
+  ).__pi67UpdateTest.openedUrls), { timeout: 7_000 }).toEqual([setupUrl, userUrl]);
+  await expect(settings.getByText(/验证码：/u)).toContainText("ABCD-EFGH");
+  await expect(settings.getByRole("button", { name: "打开授权页", exact: true })).toBeVisible();
+  const loginCommands = (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "lark.auth.login.begin"
+  ));
+  expect(loginCommands).toHaveLength(2);
 });
 
 test("offers a verified Lark CLI install before application or user authorization", async ({ page }, testInfo) => {
@@ -274,9 +334,9 @@ test("offers a verified Lark CLI install before application or user authorizatio
     path: missingCliScreenshot,
     contentType: "image/png"
   });
-  await settings.getByRole("tab", { name: "应用配置", exact: true }).click();
+  await settings.getByRole("tab", { name: "应用连接", exact: true }).click();
   await expect(settings.getByText("需要先安装 Lark CLI", { exact: true })).toBeVisible();
-  await expect(settings.getByRole("button", { name: "配置应用", exact: true })).toBeDisabled();
+  await expect(settings.getByRole("button", { name: "连接已有应用", exact: true })).toBeDisabled();
   await settings.getByRole("tab", { name: "用户授权", exact: true }).click();
   await settings.getByRole("button", { name: "安装 Lark CLI", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "安装 Lark CLI" });
@@ -297,7 +357,8 @@ test("offers a verified Lark CLI install before application or user authorizatio
 
   await expect(dialog).toHaveCount(0);
   await expect(settings.getByText("需要先安装 Lark CLI", { exact: true })).toHaveCount(0);
-  await expect(settings.getByText("请先配置并验证飞书应用，再登录个人飞书账号。")).toBeVisible();
+  await expect(settings.getByText(/无需填写 App ID 或 App Secret/u)).toBeVisible();
+  await expect(settings.getByRole("button", { name: "登录飞书", exact: true })).toBeEnabled();
   const installCommands = (await recordedCommandDetails(page)).filter((command) => (
     command.type === "skill.pack.install"
   ));

@@ -2,10 +2,14 @@ import { spawn } from "node:child_process";
 import { basename } from "node:path";
 import {
   isSkillPackProcessWorkerRequest,
+  type SkillPackProcessWorkerOutput,
   type SkillPackProcessWorkerResponse
 } from "./skill-pack-process-worker-protocol.js";
-
-const MAX_OUTPUT_BYTES = 64 * 1024;
+import {
+  appendBoundedProcessOutput,
+  decodeSkillPackProcessOutput,
+  windowsCommandShellArguments
+} from "./skill-pack-process-execution.js";
 
 process.once("message", (message: unknown) => {
   if (!isSkillPackProcessWorkerRequest(message)) {
@@ -20,7 +24,7 @@ process.once("message", (message: unknown) => {
   const useCommandShell = /\.(?:cmd|bat)$/iu.test(message.executable);
   const command = useCommandShell ? message.environment.ComSpec ?? "cmd.exe" : message.executable;
   const arguments_ = useCommandShell
-    ? ["/d", "/s", "/c", windowsCommand(message.executable, message.arguments)]
+    ? windowsCommandShellArguments(message.executable, message.arguments)
     : message.arguments;
   let child;
   try {
@@ -34,16 +38,15 @@ process.once("message", (message: unknown) => {
     sendFailure(message.requestId, error);
     return;
   }
-  let stdout = "";
-  let stderr = "";
+  let stdout: Buffer = Buffer.alloc(0);
+  let stderr: Buffer = Buffer.alloc(0);
   let settled = false;
-  const capture = (current: string, chunk: Buffer): string => (
-    current.length >= MAX_OUTPUT_BYTES
-      ? current
-      : current + chunk.toString("utf8").slice(0, MAX_OUTPUT_BYTES - current.length)
-  );
-  child.stdout?.on("data", (chunk: Buffer) => { stdout = capture(stdout, chunk); });
-  child.stderr?.on("data", (chunk: Buffer) => { stderr = capture(stderr, chunk); });
+  child.stdout?.on("data", (chunk: Buffer) => {
+    stdout = appendAndForward(message.requestId, stdout, chunk, "stdout");
+  });
+  child.stderr?.on("data", (chunk: Buffer) => {
+    stderr = appendAndForward(message.requestId, stderr, chunk, "stderr");
+  });
   if (child.stdin) {
     child.stdin.on("error", () => undefined);
     child.stdin.end(Buffer.from(message.stdinBase64!, "base64"));
@@ -56,13 +59,15 @@ process.once("message", (message: unknown) => {
   child.once("exit", (code, signal) => {
     if (settled) return;
     settled = true;
+    const decodedStdout = decodeSkillPackProcessOutput(stdout, "win32");
+    const decodedStderr = decodeSkillPackProcessOutput(stderr, "win32");
     if (code === 0) {
       send({
         type: "skill-pack-process-response",
         requestId: message.requestId,
         ok: true,
-        stdout,
-        stderr
+        stdout: decodedStdout,
+        stderr: decodedStderr
       });
       return;
     }
@@ -70,7 +75,7 @@ process.once("message", (message: unknown) => {
       type: "skill-pack-process-response",
       requestId: message.requestId,
       ok: false,
-      message: `${basename(message.executable)} exited with ${signal ?? code}: ${boundedMessage(stderr || stdout)}`
+      message: `${basename(message.executable)} exited with ${signal ?? code}: ${boundedMessage(decodedStderr || decodedStdout)}`
     });
   });
 });
@@ -84,14 +89,30 @@ function sendFailure(requestId: string, error: unknown): void {
   });
 }
 
+function appendAndForward(
+  requestId: string,
+  current: Buffer,
+  chunk: Buffer,
+  stream: SkillPackProcessWorkerOutput["stream"]
+): Buffer {
+  const next = appendBoundedProcessOutput(current, chunk);
+  const appended = next.subarray(current.byteLength);
+  if (appended.byteLength > 0) sendOutput({
+    type: "skill-pack-process-output",
+    requestId,
+    stream,
+    chunkBase64: appended.toString("base64")
+  });
+  return next;
+}
+
+function sendOutput(output: SkillPackProcessWorkerOutput): void {
+  process.send?.(output);
+}
+
 function send(response: SkillPackProcessWorkerResponse): void {
   if (!process.send) return;
   process.send(response, undefined, undefined, () => process.disconnect());
-}
-
-function windowsCommand(executable: string, arguments_: string[]): string {
-  const quote = (value: string) => `"${value.replaceAll("\"", "\"\"")}"`;
-  return [executable, ...arguments_].map(quote).join(" ");
 }
 
 function boundedMessage(value: string): string {

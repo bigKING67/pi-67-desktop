@@ -59,7 +59,7 @@ test("bounds wide side columns and expands the shared conversation measure", asy
 });
 
 test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 1_160, height: 800 });
+  await page.setViewportSize({ width: 1_140, height: 800 });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -112,6 +112,81 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect(contextToggle).toBeFocused();
   await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
   await expect.poll(() => controlTopmostSurface(stopButton)).toBe("control");
+});
+
+test("reflows the Composer inside the docked Inspector work plane", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1_148, height: 800 });
+  await page.goto("/");
+  await attachMockAgent(page, [{
+    id: "adaptive-composer-message",
+    role: "assistant",
+    parts: [{ type: "text", text: "Inspector 打开后，对话和输入区必须留在中间工作区内。" }]
+  }]);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const inspector = page.getByRole("complementary", { name: "任务检查器" });
+  const inspectorToggle = page.getByTestId("inspector-toggle");
+  const message = page.getByRole("article", { name: "Pi 消息", exact: true });
+  const sendButton = page.getByRole("button", { name: "发送", exact: true });
+  if (await inspectorToggle.getAttribute("aria-expanded") === "false") {
+    await inspectorToggle.click();
+  }
+  await expect(inspector).toBeVisible();
+  await expect(message).toContainText("Inspector 打开后，对话和输入区必须留在中间工作区内。");
+  await expect(sendButton).toBeVisible();
+
+  const geometry = await page.getByTestId("composer-region").evaluate((region) => {
+    const conversation = region.closest<HTMLElement>(".conversation-region");
+    const inspectorElement = document.querySelector<HTMLElement>(".context-pane");
+    const messageElement = document.querySelector<HTMLElement>('[aria-label="Pi 消息"]');
+    const shell = region.querySelector<HTMLElement>('[data-testid="composer-shell"]');
+    const toolbar = region.querySelector<HTMLElement>("[class*='_toolbar_']");
+    const tools = toolbar?.children.item(0) as HTMLElement | null;
+    const actions = toolbar?.children.item(1) as HTMLElement | null;
+    const send = [...(actions?.querySelectorAll<HTMLElement>("button") ?? [])]
+      .find((button) => button.textContent?.trim() === "发送");
+    if (!conversation || !inspectorElement || !messageElement || !shell || !toolbar || !tools || !actions || !send) {
+      throw new Error("Docked Inspector Composer geometry is unavailable.");
+    }
+    const conversationRect = conversation.getBoundingClientRect();
+    const inspectorRect = inspectorElement.getBoundingClientRect();
+    const messageRect = messageElement.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const toolsRect = tools.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const sendRect = send.getBoundingClientRect();
+    const topmost = document.elementFromPoint(sendRect.left + sendRect.width / 2, sendRect.top + sendRect.height / 2);
+    return {
+      conversationRight: conversationRect.right,
+      inspectorLeft: inspectorRect.left,
+      messageLeft: messageRect.left,
+      messageRight: messageRect.right,
+      shellLeft: shellRect.left,
+      shellRight: shellRect.right,
+      toolbarClientWidth: toolbar.clientWidth,
+      toolbarScrollWidth: toolbar.scrollWidth,
+      rows: Math.min(toolsRect.bottom, actionsRect.bottom) > Math.max(toolsRect.top, actionsRect.top) ? 1 : 2,
+      sendLeft: sendRect.left,
+      sendRight: sendRect.right,
+      sendTopmost: topmost === send || (topmost !== null && send.contains(topmost)),
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth
+    };
+  });
+
+  expect(geometry.conversationRight).toBeLessThanOrEqual(geometry.inspectorLeft + 1);
+  expect(geometry.messageLeft).toBeGreaterThanOrEqual(geometry.shellLeft - 1);
+  expect(geometry.messageRight).toBeLessThanOrEqual(geometry.inspectorLeft + 1);
+  expect(geometry.sendLeft).toBeGreaterThanOrEqual(geometry.shellLeft - 1);
+  expect(geometry.sendRight).toBeLessThanOrEqual(geometry.shellRight + 1);
+  expect(geometry.toolbarScrollWidth).toBeLessThanOrEqual(geometry.toolbarClientWidth + 1);
+  expect(geometry.rows).toBe(2);
+  expect(geometry.sendTopmost).toBe(true);
+  expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);
+  await page.screenshot({
+    path: testInfo.outputPath("docked-inspector-1148px.png"),
+    animations: "disabled"
+  });
 });
 
 async function controlTopmostSurface(locator: import("@playwright/test").Locator): Promise<string> {

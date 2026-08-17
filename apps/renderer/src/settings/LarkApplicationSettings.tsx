@@ -84,8 +84,8 @@ export function LarkApplicationSettings({
   const configured = snapshot?.appStatus === "ready";
   const cliMissing = snapshot?.cliStatus === "missing";
   return <SettingsSectionBlock
-    title="飞书应用"
-    description="配置当前设备使用的飞书开放平台应用；Bot 身份和用户授权都会基于该应用工作。"
+    title="应用连接"
+    description="可选高级入口：复用已有自建或组织应用。普通个人登录无需在此填写 App ID 或 App Secret。"
   >
     {cliMissing ? <LarkCliRequiredNotice
       canInstall={canInstallLarkCli}
@@ -104,7 +104,7 @@ export function LarkApplicationSettings({
           onPress={beginEditing}
         >
           <Pencil aria-hidden="true" size={14} />
-          {snapshot?.appId ? "编辑配置" : "配置应用"}
+          {snapshot?.appId ? "编辑连接" : "连接已有应用"}
         </Button>}
       />
       {snapshot?.appId ? <SettingsRow
@@ -119,7 +119,7 @@ export function LarkApplicationSettings({
       />
       <SettingsRow
         title="配置来源"
-        description="当前版本管理本机 lark-cli 的生效配置；组织托管配置后续保持只读。"
+        description="当前版本管理本机 lark-cli 的生效连接；一键准备或组织托管来源均由 CLI 保管。"
         value={snapshot?.appBrand === "lark" ? "本机 Lark CLI" : "本机飞书 CLI"}
       />
     </SettingsRows>
@@ -133,7 +133,7 @@ export function LarkApplicationSettings({
       }}
     >
       <header className={styles.editorHeader}>
-        <strong>{snapshot?.appId ? "编辑飞书应用" : "配置飞书应用"}</strong>
+        <strong>{snapshot?.appId ? "编辑应用连接" : "连接已有应用"}</strong>
         <small>验证成功后，App ID 会继续显示；App Secret 只在本次编辑中可见。</small>
       </header>
       <div className={styles.fields}>
@@ -149,7 +149,7 @@ export function LarkApplicationSettings({
             value={appId}
             onChange={(event) => setAppId(event.target.value)}
           />
-          <small>通常以 <code>cli_</code> 开头，可在飞书开放平台的应用凭证页找到。</small>
+          <small>仅在管理员或开发者已提供应用凭据时填写，通常以 <code>cli_</code> 开头。</small>
         </label>
         <label className={styles.field}>
           <span>区域</span>
@@ -228,12 +228,12 @@ function applicationStatusLabel(snapshot: LarkAuthSnapshot | undefined): string 
 }
 
 function applicationDescription(snapshot: LarkAuthSnapshot | undefined): string {
-  if (!snapshot) return "正在读取应用配置。";
-  if (snapshot.appStatus === "ready") return "应用身份已验证，可用于 Bot 身份及后续用户授权。";
-  if (snapshot.cliStatus === "missing") return "安装 Lark CLI 后即可配置应用。";
+  if (!snapshot) return "正在读取应用连接。";
+  if (snapshot.appStatus === "ready") return "当前应用连接已验证，可供 Bot 身份及用户授权复用。";
+  if (snapshot.cliStatus === "missing") return "安装 Lark CLI 后即可检查或连接已有应用。";
   return snapshot.appId
     ? "已检测到 App ID，但应用身份尚未通过验证。"
-    : "配置自己的 App ID 与 App Secret 后即可使用飞书能力。";
+    : "尚未连接已有应用；普通用户可直接返回“用户授权”登录。";
 }
 
 function errorMessage(cause: unknown): string {

@@ -39,6 +39,7 @@ import { useTranscriptMessageFocus } from "./transcript-message-focus.js";
 import { subscribeTranscriptMessageJump } from "./transcript-navigation.js";
 import {
   createLiveProcessRow,
+  hasFinalAnswerAfterLatestUser,
   hasProcessGroupAfterLatestUser,
   projectTranscriptRows
 } from "./transcript-rows.js";
@@ -116,6 +117,9 @@ export function Transcript() {
     )))
     : undefined;
   const hasCurrentProcessGroup = !pendingUserTurn && hasProcessGroupAfterLatestUser(transcriptRows);
+  const hasCurrentFinalAnswer = !pendingUserTurn
+    && operation?.kind === "prompt"
+    && hasFinalAnswerAfterLatestUser(transcriptRows);
   const currentProcessGroupKey = hasCurrentProcessGroup
     ? [...transcriptRows].reverse().find((row) => row.kind === "process-group")?.key
     : undefined;
@@ -140,7 +144,7 @@ export function Transcript() {
     && operationMatchesSession
     && (operation.kind === "prompt" || operation.kind === "command")
     ? {
-      row: createLiveProcessRow(operation, Boolean(liveText)),
+      row: createLiveProcessRow(operation, Boolean(liveText) || hasCurrentFinalAnswer),
       operation,
       timeline: matchingOperationTimeline,
       running: currentProcessRunning

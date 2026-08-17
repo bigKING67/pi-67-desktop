@@ -68,6 +68,7 @@ describe("Lark authorization protocol", () => {
 
   it("accepts only a bounded HTTPS verification URL without credentials", () => {
     const result = {
+      stage: "user-authorization",
       status: {
         ...connected,
         phase: "authorizing",
@@ -79,6 +80,14 @@ describe("Lark authorization protocol", () => {
       authorizationExpiresAt: 600_000
     } as const;
     expect(Value.Check(CommandResultSchemas["lark.auth.login.begin"], result)).toBe(true);
+    expect(Value.Check(CommandResultSchemas["lark.auth.login.begin"], {
+      ...result,
+      stage: "connection-setup"
+    })).toBe(true);
+    expect(Value.Check(CommandResultSchemas["lark.auth.login.begin"], {
+      ...result,
+      stage: "unknown"
+    })).toBe(false);
     expect(Value.Check(CommandResultSchemas["lark.auth.login.begin"], {
       ...result,
       verificationUrl: "http://open.feishu.cn/device"

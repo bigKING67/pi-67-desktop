@@ -26,6 +26,7 @@ describe("AgentHostServer Lark authorization", () => {
       tokenStatus: "valid" as const
     };
     const login = {
+      stage: "user-authorization" as const,
       status: { ...snapshot, phase: "authorizing" as const, verified: false },
       verificationUrl: "https://open.feishu.cn/device",
       userCode: "ABCD-EFGH",

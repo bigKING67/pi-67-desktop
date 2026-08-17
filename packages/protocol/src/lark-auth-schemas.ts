@@ -61,6 +61,10 @@ export const LarkAuthSnapshotSchema = strictObject({
 });
 
 export const LarkAuthLoginStartResultSchema = strictObject({
+  stage: Type.Union([
+    Type.Literal("connection-setup"),
+    Type.Literal("user-authorization")
+  ]),
   status: LarkAuthSnapshotSchema,
   verificationUrl: Type.String({
     minLength: 1,
