@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComposerReviewComment } from "@pi67/domain";
+import { MAX_PROMPT_TEXT_CHARS } from "@pi67/protocol";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import type { DraftAttachment } from "./composer-attachments.js";
 
@@ -86,6 +87,26 @@ describe("composer submission controller", () => {
       common.attachments,
       common.workspaceFiles
     );
+  });
+
+  it("rejects an oversized draft before creating a Session or requesting Pi", async () => {
+    const result = await submitComposerDraft({
+      taskId: "task-a",
+      provisional: true,
+      text: "x".repeat(MAX_PROMPT_TEXT_CHARS + 1),
+      submissionId: "submission-a",
+      attachments: [attachment()],
+      workspaceFiles: [],
+      activeStreaming: false,
+      streamBehavior: "followUp"
+    });
+
+    expect(result).toEqual({
+      accepted: false,
+      error: "消息超出 120,000 字符上限（多出 1 个字符）。请缩短或拆分后再发送。"
+    });
+    expect(mocks.newSession).not.toHaveBeenCalled();
+    expect(mocks.prompt).not.toHaveBeenCalled();
   });
 
   it("clears only the exact accepted review snapshot and releases unretained previews", () => {

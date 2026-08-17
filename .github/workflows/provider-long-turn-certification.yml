@@ -52,15 +52,15 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.tag }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -217,7 +217,7 @@ jobs:
             --expected-run-id $env:GITHUB_RUN_ID `
             --expected-run-attempt $env:GITHUB_RUN_ATTEMPT `
             --expected-signer $env:EXPECTED_SIGNER_THUMBPRINT
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: ${{ always() && steps.provider_certification.outcome != 'skipped' }}
         with:
           name: provider-long-turn-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}

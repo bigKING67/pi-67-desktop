@@ -27,8 +27,9 @@ The reusable lane still installs frozen dependencies, builds the minimum protoco
 runs installer helper tests, downloads the exact source artifact, and executes the full silent
 install, launch, reinstall, restore, shutdown, uninstall, and user-data preservation lifecycle.
 
-Both ordinary CI and the reusable installer lane use `pnpm/setup@v1` with explicit
-`pnpm 11.16.0` and `Node.js 24.18.0` versions. This is the pnpm 11 native setup path; workflow
+Both ordinary CI and the reusable installer lane use `pnpm/setup` pinned to a full commit SHA
+with a `# v1` major-version annotation, plus explicit `pnpm 11.16.0` and `Node.js 24.18.0`
+versions. This is the pnpm 11 native setup path; workflow
 commands call its standalone `pnpm` binary directly rather than invoking Corepack or installing
 pnpm and Node through separate setup actions. CI verifies both the direct Node runtime and the
 runtime resolved through `pnpm exec`. The pnpm store is not cached because a frozen install is

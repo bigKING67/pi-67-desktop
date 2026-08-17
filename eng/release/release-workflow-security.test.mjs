@@ -154,7 +154,7 @@ describe("signed release workflow security", () => {
 
     const pathBindingStep = nativeJob.slice(
       nativeJob.indexOf("- name: Bind isolated Windows native paths"),
-      nativeJob.indexOf("- uses: actions/checkout@v5")
+      nativeJob.search(/- uses: actions\/checkout@[0-9a-f]{40} # v5/u)
     );
     expect(pathBindingStep).toContain('$installLeaf = "pi67-native-install-{0}-{1}" -f');
     expect(pathBindingStep).toContain('$env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT');

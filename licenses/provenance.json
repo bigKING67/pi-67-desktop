@@ -315,6 +315,36 @@
       },
       "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
       "modifications": "Reimplemented durable timing receipts as a strict bounded Pi JSONL custom entry containing only Tool identity, terminal status, and timestamps. Raw Tool payloads and t3code source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "949feb61e4bfd96669ba0e8cf3dca7c6d7f885b3",
+      "sourcePath": "packages/contracts/src/orchestration.ts",
+      "sourceSha256": "c9fe8d097b90605f8dd1c0441b2510e2f32c62d87b352014ee713b71464913b2",
+      "targetPath": "packages/protocol/src/prompt-text-limits.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented the bounded Provider-turn text contract as a shared Pi-67 Protocol constant. Pi remains the only runtime, and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "949feb61e4bfd96669ba0e8cf3dca7c6d7f885b3",
+      "sourcePath": "apps/web/src/components/chat/composerSubmission.ts",
+      "sourceSha256": "e5d35313f4c1968a73834bfe69a9e15a0d728dcd44de124247bb97858164ddb3",
+      "targetPath": "apps/renderer/src/composer/prompt-text-validation.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented pre-dispatch oversized Prompt validation with Chinese recovery copy, existing Pi-67 inline alert presentation, preserved drafts and attachments, and a no-Session-creation guard for provisional submissions. No t3code source code was copied."
     }
   ]
 }

@@ -1378,6 +1378,11 @@ loading error where the operation can produce those states
   Assistant output so the next input reads as a stable action zone rather than
   another message card.
 - Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
+- Provider-bound Prompt text has one shared 120,000-character limit at the
+  Renderer and Protocol boundary. An oversized submission stays editable, does
+  not create a provisional Session or start a Provider Turn, and uses the existing
+  inline `role="alert"` error surface with the exact excess and a shorten-or-split
+  recovery action; attachments and draft content remain intact.
 - During a cancellable Turn, `停止` is the rightmost primary action. A non-empty
   steer or follow-up draft keeps a quieter adjacent `发送` action; with no draft,
   only `停止` remains. Stop availability never depends on draft validity.

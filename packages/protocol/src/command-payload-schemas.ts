@@ -31,6 +31,7 @@ import {
 } from "./native-subagent-schemas.js";
 import { WorkspaceRegisterPayloadSchema } from "./workspace-registration-schemas.js";
 import { WorkspaceUsageReportPayloadSchema } from "./usage-schemas.js";
+import { MAX_PROMPT_TEXT_CHARS } from "./prompt-text-limits.js";
 import {
   WorkspaceFileContentSearchPayloadSchema,
   WorkspaceFileCreatePayloadSchema,
@@ -59,7 +60,8 @@ const TaskToolModeSchema = Type.Union([
   Type.Literal("yolo")
 ]);
 const PathSchema = Type.String({ minLength: 1, maxLength: 32_768 });
-const PromptSchema = Type.String({ maxLength: 2_000_000 });
+const PromptSchema = Type.String({ maxLength: MAX_PROMPT_TEXT_CHARS });
+const CompactionInstructionsSchema = Type.String({ maxLength: 2_000_000 });
 const SubmissionIdSchema = Type.String({ minLength: 1, maxLength: 512 });
 const PlanIdSchema = Type.String({ minLength: 1, maxLength: 128 });
 const PromptAttachmentRefSchema = strictObject({
@@ -149,7 +151,10 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     entryId: Type.String({ minLength: 1 })
   }),
   "session.rollback": strictObject({ entryId: Type.String({ minLength: 1 }), summarize: Type.Optional(Type.Boolean()) }),
-  "session.compact": strictObject({ submissionId: SubmissionIdSchema, instructions: Type.Optional(PromptSchema) }),
+  "session.compact": strictObject({
+    submissionId: SubmissionIdSchema,
+    instructions: Type.Optional(CompactionInstructionsSchema)
+  }),
   "session.name": strictObject({ mutation: SessionNameMutationSchema }),
   "session.interactionMode.set": strictObject({
     mode: Type.Union([Type.Literal("execute"), Type.Literal("plan")])

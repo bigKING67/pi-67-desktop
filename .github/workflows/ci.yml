@@ -39,7 +39,7 @@ jobs:
       full_validation: ${{ steps.scope.outputs.full_validation }}
       scope_reason: ${{ steps.scope.outputs.scope_reason }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Classify affected validation scope
@@ -75,8 +75,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/setup@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: 11.16.0
           runtime: node@24.18.0
@@ -91,6 +91,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
+      - name: Audit production dependencies
+        run: pnpm run check:dependencies
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: production-dependency-audit-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/production-dependency-audit.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Quality gates
         run: pnpm run check
 
@@ -104,8 +113,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/setup@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: 11.16.0
           runtime: node@24.18.0
@@ -130,7 +139,7 @@ jobs:
         env:
           PI67_E2E_RENDERER_MODE: preview
         run: pnpm exec playwright test --project=renderer-chromium --workers=2 --retries=0
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: renderer-e2e-failure-evidence-arm64
@@ -150,8 +159,8 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/setup@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: 11.16.0
           runtime: node@24.18.0
@@ -167,14 +176,14 @@ jobs:
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Restore Electron packaging downloads
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
           key: pi67-electron-packaging-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'electron-builder.yml') }}
       - name: Restore prepared runtime resources
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             artifacts/toolchain/cache
@@ -213,7 +222,7 @@ jobs:
           else
             pnpm run package:smoke:windows-installer
           fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: windows-installer-debug-candidate-${{ github.run_id }}
@@ -222,21 +231,21 @@ jobs:
             artifacts/release/win-unpacked/Pi-67 Desktop.exe
           if-no-files-found: warn
           retention-days: 7
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: windows-packaged-ui-x64
           path: artifacts/validation/windows-packaged-ui/
           if-no-files-found: warn
           retention-days: 14
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: windows-installer-lifecycle-x64
           path: artifacts/validation/windows-installer-lifecycle/
           if-no-files-found: warn
           retention-days: 14
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: native-smoke-failure-evidence-x64
@@ -268,8 +277,8 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/setup@v1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: 11.16.0
           runtime: node@24.18.0
@@ -285,7 +294,7 @@ jobs:
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Restore prepared runtime resources
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             artifacts/toolchain/cache
@@ -307,7 +316,7 @@ jobs:
         run: pnpm exec node eng/packaging/package-native-unsigned.mjs --prepared-resources
       - name: Smoke packaged Electron runtime
         run: pnpm run package:smoke
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: failure()
         with:
           name: native-smoke-failure-evidence-arm64
@@ -324,7 +333,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Verify selected validation jobs
         env:
           SCOPE_RESULT: ${{ needs.change-scope.result }}

@@ -5,6 +5,7 @@ import {
   isEnvelopeWithinByteLimit,
   isRequestEnvelope
 } from "./envelope.js";
+import { MAX_PROMPT_TEXT_CHARS } from "./prompt-text-limits.js";
 
 describe("protocol envelope limits", () => {
   it("accepts only bounded opaque attachment references across the Host boundary", () => {
@@ -37,6 +38,19 @@ describe("protocol envelope limits", () => {
     }))))).toBe(false);
     expect(isRequestEnvelope(submit([{ id: "../outside", revision: "revision_123" }]))).toBe(false);
     expect(isRequestEnvelope(submit([{ id: "file_123", revision: "stale/revision" }]))).toBe(false);
+  });
+
+  it("rejects oversized Prompt text before it can cross the Host boundary", () => {
+    const submit = (text: string) => commandEnvelope("prompt.submit", {
+      submissionId: "submission-prompt-limit",
+      text,
+      delivery: "new-turn"
+    }, APP_PROTOCOL_CONTEXT, 1);
+
+    expect(isRequestEnvelope(submit("x".repeat(MAX_PROMPT_TEXT_CHARS)))).toBe(true);
+    expect(isRequestEnvelope(submit("x".repeat(MAX_PROMPT_TEXT_CHARS + 1)))).toBe(false);
+    expect(isRequestEnvelope(submit("😀".repeat(MAX_PROMPT_TEXT_CHARS)))).toBe(true);
+    expect(isRequestEnvelope(submit("😀".repeat(MAX_PROMPT_TEXT_CHARS + 1)))).toBe(false);
   });
 
   it("enforces UTF-8 envelope bytes without charging transferred ArrayBuffer contents", () => {

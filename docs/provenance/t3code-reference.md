@@ -3,20 +3,64 @@
 参考仓库：`pingdotgg/t3code`
 
 治理记录：`references.catalog.json#t3code`、`references.lock.json#t3code`。t3code 是综合
-参考源，不是 Harness-only 项目，也不是可 merge 的 Git upstream。固定审阅 commit：
+参考源，不是 Harness-only 项目，也不是可 merge 的 Git upstream。当前固定审阅 commit：
 
 ```text
-5661c6116c9d6e9e93e59cf067fc02dd3303ceef
+949feb61e4bfd96669ba0e8cf3dca7c6d7f885b3
 ```
 
-2026-08-10 初次审阅时该 commit 同时是 `main` 的 remote HEAD。2026-08-11 扩展 Tool Harness
-审阅路径时，现场 remote HEAD 为 `e5c82d79a09e010d1a87c715f405635f8c45f1f7`；来源权威仍固定
-在上述 reviewed commit，不追随漂移的远端。上游使用 MIT License：
+2026-08-17 现场 fetch 后，默认分支 `main` 与 remote HEAD 均为上述 commit。此前
+`5661c6116c9d6e9e93e59cf067fc02dd3303ceef` 的 Plan、Tool lifecycle 与 Harness 审阅仍作为
+历史 provenance 保留；本轮把当前锁点推进到 live HEAD，而不是把远端漂移当作已吸收。
+上游使用 MIT License：
 
 ```text
 LICENSE SHA-256 935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43
 Copyright (c) 2026 T3 Tools Inc.
 ```
+
+## 2026-08-17 当前 HEAD 增量审阅
+
+旧锁点到当前 HEAD 共 271 个提交、920 个变更文件（`+107,738/-16,623`）。本轮先盘点完整
+commit/range，再对决定性路径做源码审阅；该范围盘点不等价于逐行审阅 920 个文件，也不支持
+“已全面吸收”的结论。
+
+本轮唯一立即重实现的是“Provider Turn 启动前拒绝超大 Prompt”：t3code 在 contracts 与
+Composer 共用 120,000 字符上限，并在 dispatch 前保留可编辑草稿。Pi-67 以自身边界重做：
+
+- `packages/protocol/src/prompt-text-limits.ts` 与 TypeBox command schema 共用上限，越界请求不能
+  穿过 MessagePort 进入 Agent Host；
+- `apps/renderer/src/composer/prompt-text-validation.ts` 给出精确超额与拆分建议；
+- `submitComposerDraft` 在 provisional Session materialize 前拒绝，`submitRendererPrompt` 再做
+  独立防线；草稿、附件和现有 `role="alert"` 错误面保持不丢失；
+- 没有引入 t3code 的 Provider adapter、Effect contracts、server、SQLite、RPC 或 WebSocket。
+
+决定性当前源码证据：
+
+```text
+packages/contracts/src/orchestration.ts
+SHA-256 c9fe8d097b90605f8dd1c0441b2510e2f32c62d87b352014ee713b71464913b2
+
+packages/contracts/src/provider.ts
+SHA-256 79a71ae1c67965265c85cbc3eb06cabdab27386da53290db83a2f51aff900251
+
+apps/web/src/components/chat/composerSubmission.ts
+SHA-256 e5d35313f4c1968a73834bfe69a9e15a0d728dcd44de124247bb97858164ddb3
+
+apps/web/src/components/chat/ComposerPromptLengthValidation.tsx
+SHA-256 d696d3cca7a49dfa40e7b1af3d67b9ad7fbdba6eaf10ec676e261113af133238
+```
+
+其余高信号变化按比例处置：
+
+- `KEEP`：Pi-67 已有图片 MIME 白名单、Task-bound 草稿防迟到覆盖、Operation receipt/authority
+  fencing、pending Approval/Extension input settlement 与 Host shutdown 合同，不重复实现；
+- `DEFER`：原生 `title` tooltip 迁移、长按退出、24 小时用量视图有产品价值，但不构成本次
+  候选安全 blocker；其中 Usage 继续服从当前 7/30/90 天 UTC 日期横轴合同；
+- `REJECT`：mobile、remote relay、localhost server、业务 WebSocket、多 Provider runtime、SQLite
+  Session projection 与 Pi-67 的 Electron/Pi JSONL/security boundary 冲突；
+- 最新 HEAD 的 browser default settings 只作为 Browser 集成后续候选，不在本轮改写现有
+  browser67 权威、登录态或 managed-tab 生命周期。
 
 ## 综合审阅范围
 

@@ -20,6 +20,7 @@ import {
 } from "../app/prompt-submission-authority.js";
 import { userMessagePreview } from "../workbench/recent-user-message.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "../workbench/workbench-store.js";
+import { promptTextValidationMessage } from "./prompt-text-validation.js";
 
 export type PromptSubmissionResult =
   | { accepted: true; operationId: string; retainsAttachmentPreviews: boolean; terminalError?: string }
@@ -32,6 +33,15 @@ export async function submitRendererPrompt(
   attachments: readonly PendingUserAttachment[] = [],
   workspaceFiles: readonly ComposerWorkspaceFileRef[] = []
 ): Promise<PromptSubmissionResult> {
+  const validationError = promptTextValidationMessage(text);
+  if (validationError) {
+    publishNotification({
+      level: "warning",
+      title: "消息过长",
+      message: `${validationError} 草稿和附件已保留。`
+    });
+    return { accepted: false, error: validationError };
+  }
   if (!agentConnectionController.identity) throw new Error("Pi 运行服务尚未连接。");
   const delivery = behavior === "steer"
     ? "steer"

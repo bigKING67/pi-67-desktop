@@ -13,15 +13,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
       - name: Verify locked capability sources are remotely fetchable
         run: node eng/capabilities/verify-capability-source-lock.mjs
       - name: Verify first-party capability freshness
         run: node eng/capabilities/check-capability-freshness.mjs --json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: capability-freshness-${{ github.run_id }}-${{ github.run_attempt }}

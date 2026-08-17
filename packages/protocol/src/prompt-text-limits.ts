@@ -1,0 +1,1 @@
+export const MAX_PROMPT_TEXT_CHARS = 120_000;

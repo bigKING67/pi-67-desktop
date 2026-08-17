@@ -134,7 +134,7 @@ describe("Windows installer debug artifact reuse", () => {
       const installStep = workflow.indexOf("- name: Install frozen dependencies");
       const pnpmRuntimeStep = workflow.indexOf("- name: Verify pnpm execution runtime");
 
-      expect(workflow).toContain("uses: pnpm/setup@v1");
+      expect(workflow).toMatch(/uses: pnpm\/setup@[0-9a-f]{40} # v1/u);
       expect(workflow).toContain("runtime: node@24.18.0");
       expect(workflow).toContain("cache: false");
       expect(workflow).toContain("install: false");

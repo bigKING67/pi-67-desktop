@@ -44,16 +44,16 @@ jobs:
       tag: ${{ steps.source.outputs.tag }}
       version: ${{ steps.source.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -80,6 +80,15 @@ jobs:
           --source-commit "$SOURCE_COMMIT"
           --github-output "$GITHUB_OUTPUT"
       - run: corepack pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        run: corepack pnpm run check:dependencies
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: production-dependency-audit-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/production-dependency-audit.json
+          if-no-files-found: error
+          retention-days: 30
       - run: corepack pnpm run verify:extension-adapters
       - name: Require a new version identity
         shell: bash
@@ -95,7 +104,7 @@ jobs:
             echo "Release $RELEASE_TAG already exists." >&2
             exit 1
           fi
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: extension-adapter-provenance-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
@@ -108,15 +117,15 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.provenance.outputs.source_commit }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -133,15 +142,15 @@ jobs:
     outputs:
       artifact_name: ${{ steps.name.outputs.artifact }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.provenance.outputs.source_commit }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -154,7 +163,7 @@ jobs:
       - name: Resolve macOS artifact name
         id: name
         run: echo "artifact=unsigned-preview-macos-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.name.outputs.artifact }}
           path: |
@@ -168,28 +177,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.provenance.outputs.source_commit }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
       - run: corepack pnpm install --frozen-lockfile
       - name: Download exact manually tested Windows candidate
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: windows-candidate-${{ inputs.candidate_run_id }}-${{ inputs.candidate_run_attempt }}
           path: artifacts
           github-token: ${{ github.token }}
           run-id: ${{ inputs.candidate_run_id }}
       - name: Download macOS artifacts from this promotion run
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ needs.build-macos.outputs.artifact_name }}
           path: artifacts/release
@@ -227,7 +236,7 @@ jobs:
       - run: corepack pnpm run release:preview:prepare
       - run: corepack pnpm run release:preview:verify
       - run: corepack pnpm run release:preview:bundle:prepare
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: verified-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/verified-unsigned-preview/
@@ -243,7 +252,7 @@ jobs:
       contents: write
     steps:
       - name: Download verified unsigned preview bundle
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: verified-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/verified-unsigned-preview

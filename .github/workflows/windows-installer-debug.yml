@@ -44,12 +44,12 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.verifier_ref }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/setup@v1
+      - uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
           version: 11.16.0
           runtime: node@24.18.0
@@ -86,7 +86,7 @@ jobs:
       - name: Build verifier workspace dependencies
         run: pnpm run build:packages
       - name: Download source Windows installer candidate
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: windows-installer-debug-candidate-${{ inputs.source_run_id }}
           path: artifacts/release
@@ -102,7 +102,7 @@ jobs:
           eng/packaging/windows-artifact-identity.test.mjs
       - name: Verify Windows NSIS installer lifecycle
         run: pnpm run package:smoke:windows-installer
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: windows-installer-debug-evidence-${{ github.run_id }}-${{ github.run_attempt }}

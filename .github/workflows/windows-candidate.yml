@@ -36,16 +36,16 @@ jobs:
       source_commit: ${{ steps.source.outputs.source_commit }}
       version: ${{ steps.source.outputs.version }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -76,8 +76,17 @@ jobs:
       - name: Verify locked capability sources are remotely fetchable
         run: node eng/capabilities/verify-capability-source-lock.mjs
       - run: corepack pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        run: corepack pnpm run check:dependencies
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: production-dependency-audit-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/production-dependency-audit.json
+          if-no-files-found: error
+          retention-days: 14
       - run: corepack pnpm run verify:extension-adapters
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: extension-adapter-provenance-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
@@ -93,16 +102,16 @@ jobs:
       internal_artifact_name: ${{ steps.names.outputs.internal }}
       candidate_run_attempt: ${{ steps.names.outputs.attempt }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.provenance.outputs.source_commit }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -125,7 +134,7 @@ jobs:
         run: corepack pnpm run package:smoke
       - name: Upload packaged Electron smoke evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-packaged-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/validation/windows-packaged-smoke/
@@ -135,7 +144,7 @@ jobs:
         run: corepack pnpm run package:smoke:windows-ui
       - name: Upload Windows packaged UI evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-packaged-ui-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/validation/windows-packaged-ui/
@@ -173,7 +182,7 @@ jobs:
         run: |
           echo "internal=windows-candidate-build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "attempt=${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.names.outputs.internal }}
           path: |
@@ -189,15 +198,15 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ needs.provenance.outputs.source_commit }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 11.16.0
           run_install: false
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.18.0
           cache: pnpm
@@ -205,12 +214,12 @@ jobs:
       - name: Build verifier workspace dependencies
         run: corepack pnpm run build:packages
       - name: Download exact candidate build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ needs.build-windows.outputs.internal_artifact_name }}
           path: artifacts
       - name: Download exact previous-version candidate
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: windows-candidate-${{ inputs.baseline_run_id }}-${{ inputs.baseline_run_attempt }}
           path: artifacts/baseline
@@ -263,7 +272,7 @@ jobs:
       - name: Verify full Windows NSIS installer lifecycle
         run: corepack pnpm run package:smoke:windows-installer
       - name: Upload Windows installer lifecycle diagnostics
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: windows-installer-lifecycle-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
@@ -271,7 +280,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Upload testable Windows candidate
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

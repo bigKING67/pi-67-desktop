@@ -20,6 +20,9 @@ SHA-256：
 887989ae1d3323becad917f0cdc9ca67f6c185416304b65f85c471fdbfbf798c
 ```
 
+2026-08-17 再次现场 fetch 后，`origin/main` 仍为上述 commit；因此没有伪造新版本或推进
+source lock，仅更新本次复核日期。现有重实现与边界决定保持不变。
+
 ## 本次吸收范围
 
 本次针对 Workspace / Session 主链路研究并重新实现以下状态流：
