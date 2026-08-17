@@ -204,9 +204,13 @@ export async function isolatePackagedAutomationWindow(
 
     window.webContents.setBackgroundThrottling(false);
     window.setIgnoreMouseEvents(true);
-    window.setFocusable(false);
-    if (!shouldHideNativeWindow) return;
+    if (!shouldHideNativeWindow) {
+      window.setSkipTaskbar(true);
+      window.blur();
+      return;
+    }
 
+    window.setFocusable(false);
     const keepHidden = () => {
       if (!window.isDestroyed()) window.hide();
     };

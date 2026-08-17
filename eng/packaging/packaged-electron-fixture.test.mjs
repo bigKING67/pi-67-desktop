@@ -17,8 +17,10 @@ describe("packaged Electron launch environment", () => {
       on: vi.fn((event, handler) => {
         if (event === "show") showHandler = handler;
       }),
+      blur: vi.fn(),
       setFocusable: vi.fn(),
       setIgnoreMouseEvents: vi.fn(),
+      setSkipTaskbar: vi.fn(),
       webContents: { setBackgroundThrottling: vi.fn() }
     };
     const application = {
@@ -34,6 +36,8 @@ describe("packaged Electron launch environment", () => {
     expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
     expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
     expect(window.setFocusable).toHaveBeenCalledWith(false);
+    expect(window.setSkipTaskbar).not.toHaveBeenCalled();
+    expect(window.blur).not.toHaveBeenCalled();
     expect(window.hide).toHaveBeenCalledOnce();
     showHandler?.();
     expect(window.hide).toHaveBeenCalledTimes(2);
@@ -41,11 +45,13 @@ describe("packaged Electron launch environment", () => {
 
   it("keeps visual-evidence windows compositable while blocking operator input", async () => {
     const window = {
+      blur: vi.fn(),
       hide: vi.fn(),
       isDestroyed: vi.fn(() => false),
       on: vi.fn(),
       setFocusable: vi.fn(),
       setIgnoreMouseEvents: vi.fn(),
+      setSkipTaskbar: vi.fn(),
       webContents: { setBackgroundThrottling: vi.fn() }
     };
     const application = {
@@ -60,7 +66,9 @@ describe("packaged Electron launch environment", () => {
     expect(application.firstWindow).toHaveBeenCalledOnce();
     expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
     expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
-    expect(window.setFocusable).toHaveBeenCalledWith(false);
+    expect(window.setFocusable).not.toHaveBeenCalled();
+    expect(window.setSkipTaskbar).toHaveBeenCalledWith(true);
+    expect(window.blur).toHaveBeenCalledOnce();
     expect(window.on).not.toHaveBeenCalled();
     expect(window.hide).not.toHaveBeenCalled();
   });
