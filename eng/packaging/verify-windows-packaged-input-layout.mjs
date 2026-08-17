@@ -30,11 +30,13 @@ import {
 import { parseInitializationObservations } from "./windows-real-user-initialization.mjs";
 import {
   assertLayoutObservation,
-  observeLayout
+  observeLayout,
+  WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
 } from "./windows-layout-observation.mjs";
 export {
   assertLayoutObservation,
-  viewportWidthMatches
+  viewportWidthMatches,
+  WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
 } from "./windows-layout-observation.mjs";
 
 export const WINDOWS_SYNTHETIC_SCALE_FACTORS = [1.25, 1.5, 2];
@@ -262,7 +264,7 @@ export function locateTaskInspector(window) {
 }
 
 async function verifyContextDrawerLayout(window, application, scaleFactor) {
-  await setStableContentViewport(window, application, 1_160, 800);
+  await setStableContentViewport(window, application, WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX, 800);
   const taskInspector = locateTaskInspector(window);
   await taskInspector.waitFor({ state: "detached" });
   const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
@@ -275,11 +277,13 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   assertLayoutObservation(drawerObservation, {
     breakpoint: "context-drawer",
     expectedControlLayer: "context-drawer",
-    expectedWidth: 1_160,
+    expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
     requestedScaleFactor: scaleFactor
   });
   if (!drawerObservation.contextDrawerVisible) {
-    throw new Error(`Scale ${scaleFactor}: context drawer is not visible at the 1160px breakpoint.`);
+    throw new Error(
+      `Scale ${scaleFactor}: context drawer is not visible at the ${WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX}px breakpoint.`
+    );
   }
 
   await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
@@ -288,7 +292,7 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
     breakpoint: "context-drawer",
-    expectedWidth: 1_160,
+    expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
     requestedScaleFactor: scaleFactor
   });
   return { ...observation, drawer: drawerObservation };

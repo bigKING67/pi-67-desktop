@@ -1,5 +1,8 @@
+export const WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX = 1_140;
+const WINDOWS_NAVIGATION_DRAWER_BREAKPOINT_PX = 760;
+
 export async function observeLayout(window) {
-  return window.evaluate(() => {
+  return window.evaluate((breakpoints) => {
     const rect = (element) => element ? rectangle(element.getBoundingClientRect()) : null;
     const composer = document.querySelector('[data-testid="composer-shell"]');
     const contextDrawer = document.querySelector(".context-pane");
@@ -25,8 +28,8 @@ export async function observeLayout(window) {
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
       innerHeight: window.innerHeight,
       innerWidth: window.innerWidth,
-      matchesContextBreakpoint: window.matchMedia("(max-width: 1160px)").matches,
-      matchesNavigationBreakpoint: window.matchMedia("(max-width: 760px)").matches,
+      matchesContextBreakpoint: window.matchMedia(`(max-width: ${breakpoints.context}px)`).matches,
+      matchesNavigationBreakpoint: window.matchMedia(`(max-width: ${breakpoints.navigation}px)`).matches,
       navigationDrawerVisible: navigationDrawer !== null && getComputedStyle(navigationDrawer).display !== "none",
       outerWidth: window.outerWidth,
       send: controlObservation(send, viewportWidth, viewportHeight),
@@ -69,6 +72,9 @@ export async function observeLayout(window) {
       if (element.closest('.navigation-rail, [aria-label="关闭会话导航"]')) return "navigation-drawer";
       return "other";
     }
+  }, {
+    context: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
+    navigation: WINDOWS_NAVIGATION_DRAWER_BREAKPOINT_PX
   });
 }
 
@@ -89,10 +95,10 @@ export function assertLayoutObservation(observation, contract) {
     );
   }
   if (contract.breakpoint === "context-drawer" && !observation.matchesContextBreakpoint) {
-    throw new Error(`${prefix}: max-width 1160px media query did not match.`);
+    throw new Error(`${prefix}: max-width ${WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX}px media query did not match.`);
   }
   if (contract.breakpoint === "navigation-drawer" && !observation.matchesNavigationBreakpoint) {
-    throw new Error(`${prefix}: max-width 760px media query did not match.`);
+    throw new Error(`${prefix}: max-width ${WINDOWS_NAVIGATION_DRAWER_BREAKPOINT_PX}px media query did not match.`);
   }
   if (observation.horizontalOverflow > 1) {
     throw new Error(`${prefix}: document overflows horizontally by ${observation.horizontalOverflow}px.`);

@@ -6,6 +6,7 @@ import {
   prepareResponsiveLayoutControls,
   viewportWidthMatches,
   waitForWindowsSyntheticRuntimeReady,
+  WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
   WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS,
   WINDOWS_SYNTHETIC_SCALE_FACTORS,
   WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS
@@ -13,6 +14,7 @@ import {
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
+    expect(WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX).toBe(1_140);
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
     expect(WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS).toBe(60_000);
     expect(WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS).toBe(5_000);
@@ -104,7 +106,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
   it("accepts contained topmost controls and the native title-bar reserve", () => {
     expect(() => assertLayoutObservation(observation(), {
       breakpoint: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).not.toThrow();
   });
@@ -116,7 +118,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       send: { contained: true, topmost: false, topmostSurface: "other" }
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).toThrow(/overflows horizontally/u);
   });
@@ -127,7 +129,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       send: null
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).toThrow(/Send is unavailable/u);
     expect(() => assertLayoutObservation({
@@ -135,7 +137,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
       send: { contained: true, topmost: false, topmostSurface: "other" }
     }, {
       breakpoint: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).toThrow(/Send is covered/u);
   });
@@ -149,7 +151,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     expect(() => assertLayoutObservation(drawerObservation, {
       breakpoint: "context-drawer",
       expectedControlLayer: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).not.toThrow();
     expect(() => assertLayoutObservation({
@@ -158,7 +160,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     }, {
       breakpoint: "context-drawer",
       expectedControlLayer: "context-drawer",
-      expectedWidth: 1_160,
+      expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
       requestedScaleFactor: 1.5
     })).toThrow(/Stop expected context-drawer foreground, got other/u);
   });
@@ -197,21 +199,28 @@ describe("Windows packaged synthetic-scale UI contract", () => {
 
 function observation() {
   return {
-    composer: { bottom: 780, height: 140, left: 240, right: 1_150, top: 640, width: 910 },
+    composer: { bottom: 780, height: 140, left: 240, right: 1_130, top: 640, width: 890 },
     contextDrawerVisible: true,
     devicePixelRatio: 1.5,
     horizontalOverflow: 0,
     innerHeight: 800,
-    innerWidth: 1_160,
+    innerWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
     matchesContextBreakpoint: true,
     matchesNavigationBreakpoint: false,
     navigationDrawerVisible: false,
-    outerWidth: 1_160,
+    outerWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
     send: { contained: true, topmost: true, topmostSurface: "control" },
     stop: { contained: true, topmost: true, topmostSurface: "control" },
-    titleBar: { bottom: 42, height: 42, left: 0, right: 1_160, top: 0, width: 1_160 },
+    titleBar: {
+      bottom: 42,
+      height: 42,
+      left: 0,
+      right: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
+      top: 0,
+      width: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
+    },
     titleBarNativeControlReserve: 152,
     visualViewportHeight: 800,
-    visualViewportWidth: 1_160
+    visualViewportWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
   };
 }
