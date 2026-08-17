@@ -353,12 +353,10 @@ describe("Windows installed real-user lifecycle", () => {
 
   it("admits initial Session creation after Agent Host and Workspace authority settle", async () => {
     const shellWaitFor = vi.fn(async () => undefined);
-    const intentWaitFor = vi.fn(async () => undefined);
     const shellOrFailed = { waitFor: shellWaitFor };
     const shell = { or: () => shellOrFailed };
     const failed = { isVisible: async () => false };
     const window = {
-      getByTestId: () => ({ waitFor: intentWaitFor }),
       locator: (selector) => selector.startsWith(".application-shell") ? shell : failed
     };
 
@@ -370,20 +368,11 @@ describe("Windows installed real-user lifecycle", () => {
       state: "visible",
       timeout: INSTALLED_RUNTIME_READINESS_TIMEOUT_MS
     });
-    expect(intentWaitFor).toHaveBeenCalledWith({
-      state: "visible",
-      timeout: expect.any(Number)
-    });
-    expect(intentWaitFor.mock.calls[0][0].timeout).toBeGreaterThan(0);
-    expect(intentWaitFor.mock.calls[0][0].timeout)
-      .toBeLessThanOrEqual(INSTALLED_RUNTIME_READINESS_TIMEOUT_MS);
   });
 
   it("fails closed when Pi Runtime fails before initial Session creation", async () => {
-    const intentWaitFor = vi.fn(async () => undefined);
     const failed = { isVisible: async () => true };
     const window = {
-      getByTestId: () => ({ waitFor: intentWaitFor }),
       locator: (selector) => selector.startsWith(".application-shell")
         ? { or: () => ({ waitFor: async () => undefined }) }
         : failed
@@ -392,7 +381,6 @@ describe("Windows installed real-user lifecycle", () => {
     await expect(waitForRealUserCreationAuthority(window, 100)).rejects.toThrow(
       "Pi Runtime entered a failed phase before Session creation"
     );
-    expect(intentWaitFor).not.toHaveBeenCalled();
   });
 
   it("reports bounded and redacted initial runtime failure diagnostics", async () => {

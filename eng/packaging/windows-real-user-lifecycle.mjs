@@ -322,10 +322,7 @@ export async function waitForRealUserCreationAuthority(
   if (await failed.isVisible()) {
     throw new Error("Windows real-user Pi Runtime entered a failed phase before Session creation.");
   }
-  await window.getByTestId("new-session-intent").waitFor({
-    state: "visible",
-    timeout: remainingTimeout(startedAt, timeoutMs)
-  });
+  // The following create flow trial-clicks the Workspace-scoped New Session action.
   return performance.now() - startedAt;
 }
 
