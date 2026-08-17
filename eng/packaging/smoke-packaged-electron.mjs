@@ -25,6 +25,7 @@ import { verifyPackagedMainOnlyDiagnostics, verifyPackagedReadyDiagnostics } fro
 import { createPackagedVisualEvidence } from "./packaged-electron-visual-evidence.mjs";
 import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } from "./packaged-package-update-smoke.mjs";
+import { verifyPackagedProviderSettings } from "./packaged-provider-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
@@ -94,102 +95,13 @@ try {
   }
   await verifyPackagedChangesInspector(window, capturePackagedScreenshot);
   const workspaceSettings = await verifyReadySessionCatalog(window);
-  await workspaceSettings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: "模型", exact: true }).click();
-  const providerPanel = workspaceSettings.getByTestId("provider-configuration-panel");
-  const configurationProviderSearch = providerPanel.getByRole("textbox", { name: "搜索 Pi Provider" });
-  const configurationProviderList = providerPanel.getByTestId("provider-configuration-list");
-  const configurationProviderEditor = providerPanel.getByTestId("provider-configuration-editor");
-  await configurationProviderSearch.waitFor({ state: "visible", timeout: 15_000 });
-  await configurationProviderList.waitFor({ state: "visible", timeout: 15_000 });
-  if (await configurationProviderEditor.isVisible()) {
-    throw new Error("Packaged Provider editor must not share the Provider Catalog surface.");
-  }
   await assertNoWorkspaceChangesAuthorityWarning(window);
-  const providerCatalogTabs = providerPanel.getByRole("tablist", { name: "模型服务分类" });
-  const availableProvidersTab = providerCatalogTabs.getByRole("tab", { name: /^可配置 \d+$/u });
-  await availableProvidersTab.click();
-  if ((await availableProvidersTab.getAttribute("aria-selected")) !== "true") {
-    throw new Error("Packaged Provider Catalog did not switch to the configurable task view.");
-  }
-  await capturePackagedScreenshot(window, "01-provider-catalog.png");
-  const settingsScrollRegion = workspaceSettings.getByTestId("settings-scroll-region");
-  const [providerListLayout, settingsScrollLayout] = await Promise.all([
-    configurationProviderList.evaluate((element) => ({
-      overflowY: getComputedStyle(element).overflowY,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight
-    })),
-    settingsScrollRegion.evaluate((element) => ({
-      overflowY: getComputedStyle(element).overflowY,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight
-    }))
-  ]);
-  if (
-    providerListLayout.overflowY !== "visible"
-    || settingsScrollLayout.overflowY !== "auto"
-    || settingsScrollLayout.scrollHeight <= settingsScrollLayout.clientHeight
-  ) {
-    throw new Error(`Packaged Provider Catalog did not use the shared Settings scroll: ${JSON.stringify({
-      providerList: providerListLayout,
-      settings: settingsScrollLayout
-    })}`);
-  }
-  const configuredProvidersTab = providerCatalogTabs.getByRole("tab", { name: /^已配置 \d+$/u });
-  await configuredProvidersTab.click();
-  await configurationProviderSearch.fill("anthropic");
-  const packagedProviderRow = configurationProviderList.getByRole("button", { name: /^Anthropic\b/u });
-  await packagedProviderRow.waitFor({ state: "visible", timeout: 15_000 });
-  await packagedProviderRow.click();
-  await configurationProviderEditor.waitFor({ state: "visible", timeout: 15_000 });
-  await configurationProviderList.waitFor({ state: "hidden", timeout: 15_000 });
-  const providerSectionTabs = providerPanel.getByRole("tablist", { name: "Provider 设置分区" });
-  const providerModelTab = providerSectionTabs.getByRole("tab", { name: /^模型 \d+$/u });
-  await providerModelTab.waitFor({ state: "visible", timeout: 15_000 });
-  if ((await providerModelTab.getAttribute("aria-selected")) !== "true") {
-    throw new Error("Packaged Provider workbench did not open on the model catalog.");
-  }
-  const providerModelList = providerPanel.getByTestId("provider-model-list");
-  await providerModelList.waitFor({ state: "visible", timeout: 15_000 });
-  const packagedModelRows = providerModelList.getByTestId("provider-model-row");
-  await packagedModelRows.first().waitFor({ state: "visible", timeout: 15_000 });
-  if ((await packagedModelRows.count()) < 1) {
-    throw new Error("Packaged Provider workbench rendered an empty model catalog.");
-  }
-  const packagedModelDetail = providerPanel.getByTestId("provider-model-detail");
-  if (await packagedModelDetail.isVisible()) {
-    throw new Error("Packaged model detail must not share the model Catalog surface.");
-  }
-  if ((await providerPanel.getByLabel("Model ID").count()) !== 0) {
-    throw new Error("Packaged model Catalog mounted a detail editor before selection.");
-  }
-  await capturePackagedScreenshot(window, "02-model-catalog.png");
-  await packagedModelRows.first().click();
-  await packagedModelDetail.waitFor({ state: "visible", timeout: 15_000 });
-  await providerModelList.waitFor({ state: "hidden", timeout: 15_000 });
-  if ((await providerPanel.getByLabel("Model ID").count()) !== 1) {
-    throw new Error("Packaged model detail did not render exactly one editor.");
-  }
-  await capturePackagedScreenshot(window, "03-model-detail.png");
-  await providerPanel.getByRole("button", { name: "返回模型列表" }).click();
-  await providerModelList.waitFor({ state: "visible", timeout: 15_000 });
-  await workspaceSettings.getByRole("button", { name: "更新 API Key", exact: true }).click();
-  const credentialDialog = window.getByRole("dialog", { name: "配置 Anthropic API Key" });
-  await credentialDialog.waitFor({ state: "visible", timeout: 15_000 });
-  if (await credentialDialog.getByLabel("Pi Provider 列表").count()) {
-    throw new Error("Packaged targeted credential dialog rendered a second Provider picker.");
-  }
-  await credentialDialog.getByText("已持久化到 Pi auth.json", { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await credentialDialog.getByRole("button", { name: "显示已保存 API Key（15 秒）" }).click();
-  await credentialDialog.getByText(packagedCredential, { exact: true })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  await credentialDialog.getByRole("button", { name: "隐藏已保存 API Key" }).click();
-  if (await credentialDialog.getByText(packagedCredential, { exact: true }).count()) {
-    throw new Error("Packaged credential reveal remained mounted after the user hid it.");
-  }
-  await credentialDialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await verifyPackagedProviderSettings({
+    capturePackagedScreenshot,
+    packagedCredential,
+    window,
+    workspaceSettings
+  });
   await workspaceSettings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "扩展", exact: true }).click();
   const extensionWorkspace = workspaceSettings.getByTestId("extension-management-workspace");
