@@ -267,6 +267,23 @@ try {
   await capturePackagedScreenshot(window, "06-local-extensions.png");
   await settingsNavigation.getByRole("button", { name: "技能", exact: true }).click();
   const skillSettingsWorkspace = workspaceSettings.getByTestId("skill-settings-workspace");
+  try {
+    await skillSettingsWorkspace.waitFor({ state: "visible", timeout: 15_000 });
+  } catch (error) {
+    const [dialogs, selectedSections, surface] = await Promise.all([
+      window.getByRole("dialog").allTextContents(),
+      settingsNavigation.locator('[aria-current="page"]').allTextContents(),
+      inspectRendererSurface(window)
+    ]);
+    throw new Error(
+      `Packaged Settings did not open Skills: ${JSON.stringify({
+        dialogs: dialogs.slice(0, 4),
+        selectedSections: selectedSections.slice(0, 4),
+        surface
+      })}\n${packagedProcessOutput() || "No packaged process diagnostics were emitted."}`,
+      { cause: error }
+    );
+  }
   const globalSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   await globalSkillPanel.getByText("packaged-skill", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });

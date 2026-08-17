@@ -25,21 +25,41 @@ export async function verifyPackagedSkillUpdateCheck(workspace, window) {
 
 async function verifyPackagedUpdateCheck({ button, idleLabel, surface, window }) {
   const checkedAtBefore = await surface.getAttribute("data-package-update-checked-at");
-  await button.waitFor({ state: "visible", timeout: PACKAGE_UPDATE_CHECK_TIMEOUT_MS });
-  await button.click();
-  const deadline = Date.now() + PACKAGE_UPDATE_CHECK_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const phase = await surface.getAttribute("data-package-update-check");
-    const checkedAt = await surface.getAttribute("data-package-update-checked-at");
-    if (phase === "failed") break;
-    if (phase === "completed" || (checkedAt !== null && checkedAt !== checkedAtBefore)) {
-      await assertNoUpdateCheckError(surface, window, idleLabel);
-      return { status: (await button.innerText()).trim() };
+  const pageErrors = [];
+  const capturePageError = (error) => {
+    if (pageErrors.length < 4) pageErrors.push(error.message.slice(0, 1_000));
+  };
+  window.on("pageerror", capturePageError);
+  try {
+    await button.waitFor({ state: "visible", timeout: PACKAGE_UPDATE_CHECK_TIMEOUT_MS });
+    await button.click();
+    const deadline = Date.now() + PACKAGE_UPDATE_CHECK_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const state = await surface.evaluateAll((elements) => {
+        const element = elements[0];
+        return element ? {
+          checkedAt: element.getAttribute("data-package-update-checked-at"),
+          phase: element.getAttribute("data-package-update-check")
+        } : undefined;
+      });
+      if (!state) {
+        throw new Error(`Packaged ${idleLabel} removed its Settings surface: ${JSON.stringify({
+          pageErrors,
+          surface: await inspectUpdateCheckSurface(window)
+        })}`);
+      }
+      if (state.phase === "failed") break;
+      if (state.phase === "completed" || (state.checkedAt !== null && state.checkedAt !== checkedAtBefore)) {
+        await assertNoUpdateCheckError(surface, window, idleLabel);
+        return { status: (await button.innerText()).trim() };
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    await assertNoUpdateCheckError(surface, window, idleLabel);
+    throw new Error(`Packaged ${idleLabel} did not finish within ${PACKAGE_UPDATE_CHECK_TIMEOUT_MS}ms.`);
+  } finally {
+    window.off("pageerror", capturePageError);
   }
-  await assertNoUpdateCheckError(surface, window, idleLabel);
-  throw new Error(`Packaged ${idleLabel} did not finish within ${PACKAGE_UPDATE_CHECK_TIMEOUT_MS}ms.`);
 }
 
 async function assertNoUpdateCheckError(surface, window, label) {
@@ -51,4 +71,17 @@ async function assertNoUpdateCheckError(surface, window, label) {
       inlineErrors: inlineErrors.slice(0, 4)
     })}`);
   }
+}
+
+function inspectUpdateCheckSurface(window) {
+  return window.evaluate(() => ({
+    bodyText: document.body.innerText.slice(0, 2_000),
+    rootChildCount: document.querySelector("#root")?.childElementCount ?? 0,
+    selectedSettings: [...document.querySelectorAll('[aria-current="page"]')]
+      .slice(0, 4)
+      .map((element) => element.textContent?.trim() ?? ""),
+    settingsVisible: Boolean(document.querySelector('[data-testid="settings-workbench"]')),
+    title: document.title,
+    url: location.href
+  }));
 }
