@@ -927,10 +927,11 @@ loading error where the operation can produce those states
   to `Lark CLI 官方 Skills`, never to the capability Package carrying the immutable
   baseline. Runtime prefers the Desktop-managed current-user native CLI, remains
   compatible with a verified existing user CLI, and updates the Desktop-managed path
-  through a staged atomic replacement. Only global Skills already owned by the
-  verified `larksuite/cli` lock source may be replaced; external user installations
-  retain their owning CLI update path. A failed update rechecks that same source or
-  invalidates the stale success state. Extension Package
+  through a staged atomic replacement. Confirming an update from an external Scoop,
+  npm, or other verified installation creates and prefers that Desktop-managed copy
+  without modifying the external installation. Only global Skills already owned by the
+  verified `larksuite/cli` lock source may be replaced. A failed update rechecks the
+  activated source or invalidates the stale success state. Extension Package
   Skills remain in Package detail,
   bundled Skill suites retain an immutable Desktop baseline, and Desktop never
   performs a live `git pull` of an arbitrary Skill repository. AI Berkshire records

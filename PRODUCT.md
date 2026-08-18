@@ -224,11 +224,13 @@ the only Runtime and behavior specification source.
   never installation targets; CLI, launcher, global Skill lock, Skill activation,
   and Workspace reload failures restore the previous user state. Runtime resolution
   prefers this Desktop-managed native executable and remains compatible with a
-  verified existing user installation. External user installations continue to use
-  their owning CLI update path, while Desktop-managed installations update through
-  a newly staged and validated atomic replacement. A complete official Skill set
-  already at the latest reported Skill version remains updateable when only the CLI
-  version is behind; incomplete or otherwise unverified Skill drift blocks overwrite.
+  verified existing user installation. Confirming an update from a verified external
+  installation stages and activates a Desktop-managed current-user copy without
+  modifying the existing Scoop, npm, or other external installation. Desktop-managed
+  installations update through the same validated atomic replacement. A complete
+  official Skill set already at the latest reported Skill version remains updateable
+  when only the CLI version is behind; incomplete or otherwise unverified Skill drift
+  blocks overwrite.
   Pi resources reload only after the updater verifies convergence. Settings reports
   the current CLI, official Skills, and latest stable version separately.
   AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one

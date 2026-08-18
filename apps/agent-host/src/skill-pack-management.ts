@@ -54,7 +54,6 @@ import { boundedError } from "./skill-pack-validation.js";
 
 const AI_BERKSHIRE_PACK_ID = "ai-berkshire-investment-suite";
 const CHECK_TIMEOUT_MS = 60_000;
-const UPDATE_TIMEOUT_MS = 5 * 60_000;
 
 export interface SkillPackManagementPort {
   list(): Promise<SkillPackListResult>;
@@ -209,37 +208,21 @@ export class SkillPackManagement implements SkillPackManagementPort {
     }
     if (!current.canUpdate) {
       throw new HostCommandError(
-        "INVALID_PAYLOAD",
-        "The current Lark CLI installation requires a manual update.",
-        false
-      );
-    }
-    if (isDesktopManagedLarkCliExecutable(executable, this.#homeDirectory)) {
-      const suite = await readLarkSuite(this.#capabilitiesRoot);
-      return beginDesktopManagedLarkSkillPackUpdate({
-        homeDirectory: this.#homeDirectory,
-        skillIds: suite.skillIds,
-        environment: this.#environment,
-        runProcess: this.#runProcess,
-        installLarkCli: this.#installLarkCli,
-        checkEntry: (updatedExecutable) => this.#checkLarkEntry(updatedExecutable),
-        mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
-      });
-    }
-    await this.#runProcess(executable, ["update", "--json"], {
-      cwd: this.#homeDirectory,
-      timeoutMs: UPDATE_TIMEOUT_MS,
-      environment: larkCliProcessEnvironment(this.#environment, executable)
-    });
-    const updated = await this.#checkLarkEntry(executable);
-    if (!updated || updated.updateStatus !== "current" || updated.localState !== "clean") {
-      throw new HostCommandError(
-        "INTERNAL",
-        "The Lark CLI update did not converge at the same verified installation.",
+        "RUNTIME_NOT_READY",
+        current.detail ?? "The Lark CLI Skill Pack cannot be updated in its current state.",
         true
       );
     }
-    return noOpTransaction(await this.#mutationResultWithEntry(updated, true));
+    const suite = await readLarkSuite(this.#capabilitiesRoot);
+    return beginDesktopManagedLarkSkillPackUpdate({
+      homeDirectory: this.#homeDirectory,
+      skillIds: suite.skillIds,
+      environment: this.#environment,
+      runProcess: this.#runProcess,
+      installLarkCli: this.#installLarkCli,
+      checkEntry: (updatedExecutable) => this.#checkLarkEntry(updatedExecutable),
+      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
+    });
   }
 
   async #beginAiBerkshireUpdate(): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
@@ -394,7 +377,9 @@ export class SkillPackManagement implements SkillPackManagementPort {
         timeoutMs: CHECK_TIMEOUT_MS,
         environment: larkCliProcessEnvironment(this.#environment, executable)
       });
-      const checked = applyLarkUpdateCheck(entry, parseLarkUpdateResult(result.stdout));
+      const checked = applyLarkUpdateCheck(entry, parseLarkUpdateResult(result.stdout), {
+        desktopManaged: isDesktopManagedLarkCliExecutable(executable, this.#homeDirectory)
+      });
       return entry.canInstall
         ? {
             ...checked,

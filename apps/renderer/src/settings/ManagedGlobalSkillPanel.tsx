@@ -298,7 +298,9 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
           <p>{action === "install"
             ? <>Desktop 将验证并启用官方 @larksuite/cli，把办公 Skills 安装到 <code>~/.agents/skills</code>。这是当前用户全局安装，Pi-67 与其他兼容 Agent 都可复用；已有非受管同名 Skill 不会被覆盖。</>
             : action === "update"
-              ? "更新会原子替换已验证归属于该套件的当前用户全局组件，并在完成后重新加载所有 Workspace 中的 Pi 资源。"
+              ? pack.manager === "lark-cli"
+                ? "Desktop 将下载并验证最新 Lark CLI，原子更新当前用户共享副本与受管官方 Skills，并在完成后重新加载所有 Workspace 中的 Pi 资源。现有 Scoop、npm 或其他外部安装不会被修改。"
+                : "更新会原子替换已验证归属于该套件的当前用户全局组件，并在完成后重新加载所有 Workspace 中的 Pi 资源。"
               : "恢复会移除受管 Overlay，重新启用随 Desktop 发布的不可变内置基线，并重新加载所有 Workspace 中的 Pi 资源。"}</p>
           <dl className={styles.updateSummary}>
             <div><dt>套件</dt><dd>{pack.displayName}</dd></div>
@@ -339,7 +341,7 @@ function skillPackStatus(pack: SkillPackEntry): {
   if (pack.updateStatus === "not-installed") return { tone: "unavailable", label: "CLI 未安装" };
   if (pack.updateStatus === "current") return { tone: "ready", label: "已是最新" };
   if (pack.updateStatus === "update-available") {
-    return { tone: "partial", label: pack.canUpdate ? "可更新" : "需手动更新" };
+    return { tone: "partial", label: pack.canUpdate ? "可更新" : pack.canInstall ? "需完成安装" : "暂不可更新" };
   }
   if (pack.updateStatus === "modified") return { tone: "unavailable", label: "有本地修改" };
   if (pack.updateStatus === "unavailable") return { tone: "unavailable", label: "检查失败" };

@@ -1,9 +1,8 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
-  SkillPackManagement,
-  type SkillPackManagementOptions
+  SkillPackManagement
 } from "./skill-pack-management.js";
 import {
   inspectManagedSkillPack,
@@ -175,96 +174,31 @@ describe("SkillPackManagement", () => {
     });
   });
 
-  it("updates through the owning CLI, verifies convergence, and never exposes the executable path", async () => {
+  it("offers a Desktop-managed update when the existing Lark CLI cannot update itself", async () => {
     const fixture = await createFixture();
-    const executable = join(fixture.root, "canonical", "bin", process.platform === "win32" ? "lark-cli.cmd" : "lark-cli");
-    const privateNodeDirectory = join(fixture.root, "private-toolchain", "node", "bin");
-    const environment: NodeJS.ProcessEnv = {
-      PATH: [privateNodeDirectory, dirname(executable), "/usr/bin"].join(delimiter),
-      PI67_NODE_EXECUTABLE: join(privateNodeDirectory, process.platform === "win32" ? "node.exe" : "node")
-    };
-    let checkCount = 0;
-    const runProcess = vi.fn(async (
-      _executable: string,
-      arguments_: string[],
-      _options: Parameters<NonNullable<SkillPackManagementOptions["runProcess"]>>[2]
-    ) => {
-      if (!arguments_.includes("--check")) return { stdout: JSON.stringify({ ok: true }), stderr: "" };
-      checkCount += 1;
-      return {
-        stdout: JSON.stringify(checkCount === 1 ? {
+    const management = createManagement(fixture, {
+      runProcess: vi.fn(async () => ({
+        stdout: JSON.stringify({
           ok: true,
           action: "update_available",
-          auto_update: true,
-          current_version: "1.0.65",
-          latest_version: "1.0.80",
-          skills_status: { in_sync: true }
-        } : {
-          ok: true,
-          action: "up_to_date",
-          auto_update: true,
-          current_version: "1.0.80",
-          latest_version: "1.0.80",
-          skills_status: { in_sync: true }
+          auto_update: false,
+          current_version: "1.0.57",
+          latest_version: "1.0.87",
+          skills_status: { current: "1.0.87", in_sync: true }
         }),
         stderr: ""
-      };
-    });
-    const resolveLarkCli = vi.fn(async () => executable);
-    const management = new SkillPackManagement(fixture.services, {
-      capabilitiesRoot: fixture.capabilitiesRoot,
-      homeDirectory: fixture.homeDirectory,
-      environment,
-      now: () => 1_722_400_000_000,
-      resolveLarkCli,
-      runProcess,
-      pi67Channel: currentPi67Channel()
+      }))
     });
 
-    const transaction = await management.beginUpdate("lark-cli-global");
-    expect(transaction.result.changed).toBe(true);
-    expect(transaction.result.items.find((item) => item.id === "lark-cli-global")).toMatchObject({
-        installedVersion: "1.0.80",
-        latestVersion: "1.0.80",
-        updateStatus: "current",
-        canUpdate: false
+    const checked = await management.checkForUpdates();
+    expect(checked.items.find((item) => item.id === "lark-cli-global")).toMatchObject({
+      installedVersion: "1.0.57",
+      latestVersion: "1.0.87",
+      updateStatus: "update-available",
+      localState: "clean",
+      canUpdate: true,
+      detail: expect.stringContaining("现有 Scoop、npm 或其他外部安装保持不变")
     });
-    expect(JSON.stringify(transaction.result)).not.toContain("/mock/lark-cli");
-    expect(runProcess).toHaveBeenCalledTimes(3);
-    expect(resolveLarkCli).toHaveBeenCalledTimes(2);
-    expect(runProcess.mock.calls.every(([calledExecutable]) => calledExecutable === executable)).toBe(true);
-    expect(runProcess.mock.calls.every(([, , options]) => (
-      options.environment.PATH?.split(delimiter)[0] === dirname(executable)
-      && !options.environment.PATH?.split(delimiter).includes(privateNodeDirectory)
-    ))).toBe(true);
-  });
-
-  it("fails when an exit-zero update leaves the pinned Lark CLI installation behind", async () => {
-    const fixture = await createFixture();
-    const runProcess = vi.fn(async (_executable: string, arguments_: string[]) => ({
-      stdout: JSON.stringify(arguments_.includes("--check") ? {
-        ok: true,
-        action: "update_available",
-        auto_update: true,
-        current_version: "1.0.65",
-        latest_version: "1.0.80",
-        skills_status: {
-          current: "1.0.80",
-          in_sync: false,
-          official: 27,
-          target: "1.0.65",
-          updated: 27
-        }
-      } : { ok: true }),
-      stderr: ""
-    }));
-    const management = createManagement(fixture, { runProcess });
-
-    await expect(management.beginUpdate("lark-cli-global")).rejects.toMatchObject({
-      code: "INTERNAL",
-      message: expect.stringContaining("same verified installation")
-    });
-    expect(runProcess).toHaveBeenCalledTimes(3);
   });
 
   it("ignores a Lark CLI accidentally installed inside the Desktop private toolchain", async () => {

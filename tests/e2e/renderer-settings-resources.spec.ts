@@ -120,10 +120,20 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   const larkSuiteRow = globalPanel.getByTestId("bundled-skill-suite-row")
     .filter({ hasText: "飞书 Lark CLI" });
   await expect(larkSuiteRow).toContainText("当前 CLI 1.0.65");
+  const larkUpdateAction = globalPanel.getByRole("button", { name: "更新 飞书 Lark CLI", exact: true });
+  await expect(larkUpdateAction).toBeVisible();
+  if (visualArtifactDirectory) {
+    await page.screenshot({ path: resolve(visualArtifactDirectory, "settings-skills-lark-update.png") });
+  }
+  await larkUpdateAction.click();
+  const larkUpdateDialog = page.getByRole("dialog", { name: "更新技能套件" });
+  await expect(larkUpdateDialog).toContainText("现有 Scoop、npm 或其他外部安装不会被修改");
+  await larkUpdateDialog.getByRole("button", { name: "取消", exact: true }).click();
   await larkSuiteRow.click();
   await expect(suiteDetail.getByText("当前 CLI", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("官方 Skills", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("最新稳定版本", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByRole("button", { name: "更新套件", exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("Lark CLI 官方 Skills · 1.0.80", { exact: true })).toHaveCount(2);
   await expect(suiteDetail.getByText("Pi-67 Core · 1.0.65", { exact: true })).toHaveCount(0);
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();

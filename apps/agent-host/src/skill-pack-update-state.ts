@@ -26,7 +26,8 @@ export function parseLarkUpdateResult(text: string): Record<string, unknown> {
 
 export function applyLarkUpdateCheck(
   entry: SkillPackEntry,
-  value: Record<string, unknown>
+  value: Record<string, unknown>,
+  options: { desktopManaged: boolean }
 ): SkillPackEntry {
   const installedVersion = boundedVersion(value.current_version ?? value.previous_version);
   const latestVersion = boundedVersion(value.latest_version);
@@ -48,7 +49,6 @@ export function applyLarkUpdateCheck(
     : skillsStatus?.in_sync === false
       ? "modified" as const
       : "unknown" as const;
-  const automatic = value.auto_update === true;
   if (localState === "modified") {
     return {
       ...entry,
@@ -69,12 +69,12 @@ export function applyLarkUpdateCheck(
       ...(latestVersion ? { latestVersion } : {}),
       updateStatus: "update-available",
       localState,
-      canUpdate: automatic,
-      detail: automatic
+      canUpdate: true,
+      detail: options.desktopManaged
         ? installedVersion && installedSkillVersion
-          ? `当前 CLI ${installedVersion} 待更新；官方 Skills 已是 ${installedSkillVersion}。`
-          : "Lark CLI 可更新自身并同步整套官方技能。"
-        : "当前安装方式需要按照 Lark CLI 提示手动更新。"
+          ? `当前 CLI ${installedVersion} 待更新；官方 Skills 已是 ${installedSkillVersion}。Desktop 将原子更新当前用户共享副本。`
+          : "Desktop 将下载、验证并原子更新当前用户共享的 Lark CLI 与官方 Skills。"
+        : "Desktop 将安装并优先使用经验证的当前用户共享副本；现有 Scoop、npm 或其他外部安装保持不变。"
     };
   }
   return {

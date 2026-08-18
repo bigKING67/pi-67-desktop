@@ -145,7 +145,9 @@ export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: Skill
   label: string;
 } {
   if (pack?.updateStatus === "not-installed") return { id: "unavailable", label: "CLI 未安装" };
-  if (pack?.updateStatus === "update-available") return { id: "partial", label: pack.canUpdate ? "可更新" : "需手动更新" };
+  if (pack?.updateStatus === "update-available") {
+    return { id: "partial", label: pack.canUpdate ? "可更新" : pack.canInstall ? "需完成安装" : "暂不可更新" };
+  }
   if (pack?.updateStatus === "modified") {
     return { id: "unavailable", label: pack.manager === "lark-cli" ? "技能不同步" : "Overlay 异常" };
   }

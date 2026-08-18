@@ -200,6 +200,22 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
     else if (loadedWorkspaceId !== workspaceId) void loadSkillPacks(workspaceId);
   }, [loadedWorkspaceId, workspaceId]);
 
+  const mutationDialog = pending ? <SkillPackMutationDialog
+    action={pending.action}
+    busy={phase === "installing" || phase === "updating" || phase === "restoring"}
+    error={phase === "failed" ? error : undefined}
+    pack={pending.pack}
+    onCancel={() => setPending(undefined)}
+    onConfirm={async () => {
+      const completed = pending.action === "install"
+        ? await installSkillPack(pending.pack.id, workspaceId)
+        : pending.action === "update"
+          ? await updateSkillPack(pending.pack.id, workspaceId)
+          : await restoreSkillPack(pending.pack.id, workspaceId);
+      if (completed) setPending(undefined);
+    }}
+  /> : null;
+
   if (selectedSuite) {
     const pack = managedBySuiteId.get(selectedSuite.id);
     return (
@@ -216,26 +232,12 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
           onMutation={(action, target) => setPending({ action, pack: target })}
           onQueryChange={setQuery}
         />
-        {pending ? <SkillPackMutationDialog
-          action={pending.action}
-          busy={phase === "installing" || phase === "updating" || phase === "restoring"}
-          error={phase === "failed" ? error : undefined}
-          pack={pending.pack}
-          onCancel={() => setPending(undefined)}
-          onConfirm={async () => {
-            const completed = pending.action === "install"
-              ? await installSkillPack(pending.pack.id, workspaceId)
-              : pending.action === "update"
-                ? await updateSkillPack(pending.pack.id, workspaceId)
-                : await restoreSkillPack(pending.pack.id, workspaceId);
-            if (completed) setPending(undefined);
-          }}
-        /> : null}
+        {mutationDialog}
       </>
     );
   }
   const skillCount = suites.reduce((total, suite) => total + suite.skills.length, 0);
-  return (
+  return <>
     <SettingsSectionBlock
       actions={<span className={styles.detailActions}>
         <Button
@@ -271,6 +273,16 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
         const status = suiteStatus(suite, pack);
         return (
           <SettingsCatalogRow
+            actions={pack?.updateStatus === "update-available" && pack.canUpdate ? (
+              <Button
+                aria-label={`更新 ${suite.displayName}`}
+                className="secondary-button"
+                isDisabled={busy}
+                onPress={() => setPending({ action: "update", pack })}
+              >
+                更新
+              </Button>
+            ) : undefined}
             key={suite.id}
             description={suite.description}
             leading={<span className={styles.suiteIcon} data-status={status.id}>
@@ -299,5 +311,6 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
         内置技能对所有项目可用并由 Desktop 管理；当前任务最终使用哪个同名技能，以 Pi 的资源解析结果为准。
       </SettingsNotice>
     </SettingsSectionBlock>
-  );
+    {mutationDialog}
+  </>;
 }

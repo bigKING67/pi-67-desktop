@@ -78,6 +78,7 @@ export function SettingsCatalogRow({
   leading,
   meta,
   trailing,
+  actions,
   selected = false,
   testId,
   onSelect
@@ -87,12 +88,13 @@ export function SettingsCatalogRow({
   leading?: ReactNode;
   meta?: ReactNode;
   trailing?: ReactNode;
+  actions?: ReactNode;
   selected?: boolean;
   testId?: string;
   onSelect: () => void;
 }) {
   return (
-    <div className={styles.catalogItem} role="listitem">
+    <div className={styles.catalogItem} data-actions={actions ? true : undefined} role="listitem">
       <button
         aria-pressed={selected}
         className={styles.catalogRow}
@@ -108,6 +110,7 @@ export function SettingsCatalogRow({
         </span>
         {trailing ? <span className={styles.catalogTrailing}>{trailing}</span> : null}
       </button>
+      {actions ? <div className={styles.catalogActions}>{actions}</div> : null}
     </div>
   );
 }
