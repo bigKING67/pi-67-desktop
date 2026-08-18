@@ -70,6 +70,9 @@ export type {
 
 const systemBridge = {
   getPlatformInfo: (): Promise<DesktopPlatformInfo> => ipcRenderer.invoke("pi67:platform-info"),
+  ensureContextPanelRoom: async (): Promise<boolean> => (
+    await ipcRenderer.invoke("pi67:context-panel-room") === true
+  ),
   connectAgentHost: (options?: { replaceCurrent?: boolean }): Promise<void> => (
     ipcRenderer.invoke("pi67:agent-host-connect", options?.replaceCurrent === true)
   ),

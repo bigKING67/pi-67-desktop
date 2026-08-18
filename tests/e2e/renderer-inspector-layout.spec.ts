@@ -34,7 +34,7 @@ test("keeps all five Inspector icon-label tabs equal, visible, and single-line",
   let previousWidth = 1_600;
   for (const scaleCase of scaleCases) {
     await page.setViewportSize({ width: scaleCase.width, height: scaleCase.height });
-    if (previousWidth > 1_140 && scaleCase.width <= 1_140) {
+    if (previousWidth > 1_320 && scaleCase.width <= 1_320) {
       await expect(inspectorToggle).toHaveAttribute("aria-expanded", "false");
     }
     if (await inspectorToggle.getAttribute("aria-expanded") === "false") {

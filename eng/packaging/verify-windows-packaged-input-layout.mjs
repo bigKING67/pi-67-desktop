@@ -29,11 +29,13 @@ import {
 } from "./packaged-electron-smoke-scenarios.mjs";
 import { parseInitializationObservations } from "./windows-real-user-initialization.mjs";
 import {
+  assertContextPanelActivation,
   assertLayoutObservation,
   observeLayout,
   WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
 } from "./windows-layout-observation.mjs";
 export {
+  assertContextPanelActivation,
   assertLayoutObservation,
   viewportWidthMatches,
   WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX
@@ -267,35 +269,38 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
   await setStableContentViewport(window, application, WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX, 800);
   const taskInspector = locateTaskInspector(window);
   await taskInspector.waitFor({ state: "detached" });
-  const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
-  await contextToggle.click();
-  await taskInspector.waitFor({ state: "visible" });
-  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).waitFor({ state: "visible" });
-
-  const drawerObservation = await observeLayout(window);
-  await captureResponsiveScreenshot(window, scaleFactor, "context-drawer");
-  assertLayoutObservation(drawerObservation, {
+  const collapsedObservation = await observeLayout(window);
+  assertLayoutObservation(collapsedObservation, {
     breakpoint: "context-drawer",
-    expectedControlLayer: "context-drawer",
     expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
     requestedScaleFactor: scaleFactor
   });
-  if (!drawerObservation.contextDrawerVisible) {
-    throw new Error(
-      `Scale ${scaleFactor}: context drawer is not visible at the ${WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX}px breakpoint.`
-    );
-  }
+  const contextToggle = window.getByRole("button", { name: "显示任务检查器" });
+  await contextToggle.click();
+  await taskInspector.waitFor({ state: "visible" });
+  await waitForTwoAnimationFrames(window);
 
-  await window.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
+  const activatedObservation = await observeLayout(window);
+  const activationMode = assertContextPanelActivation(activatedObservation, scaleFactor);
+  await captureResponsiveScreenshot(window, scaleFactor, `context-${activationMode}`);
+
+  const closeControl = activationMode === "drawer"
+    ? window.getByRole("button", { name: "关闭任务检查器抽屉" })
+    : window.getByRole("button", { name: "隐藏任务检查器" });
+  await closeControl.click();
   await taskInspector.waitFor({ state: "detached" });
   await waitForFocus(window, "显示任务检查器");
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
-    breakpoint: "context-drawer",
-    expectedWidth: WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
+    breakpoint: observation.matchesContextBreakpoint ? "context-drawer" : "context-expanded",
+    expectedWidth: observation.innerWidth,
     requestedScaleFactor: scaleFactor
   });
-  return { ...observation, drawer: drawerObservation };
+  return {
+    ...collapsedObservation,
+    activation: { ...activatedObservation, mode: activationMode },
+    afterClose: observation
+  };
 }
 
 async function verifyNavigationDrawerLayout(window, application, scaleFactor) {

@@ -57,6 +57,7 @@ export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
   restartAgentHost?: () => void;
   getMainWindow: () => BrowserWindow | undefined;
+  ensureContextPanelRoom?: () => boolean;
   activateMainWindow: () => Promise<BrowserWindow | undefined>;
   desktopToolchain: DesktopToolchain;
   desktopCapabilities: DesktopCapabilityService;
@@ -147,6 +148,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     architecture: process.arch,
     version: app.getVersion()
   }));
+  ipcMain.handle("pi67:context-panel-room", () => options.ensureContextPanelRoom?.() === true);
   ipcMain.handle("pi67:agent-host-connect", (_event, replaceCurrent: unknown) => (
     options.connectAgentHost(replaceCurrent === true)
   ));

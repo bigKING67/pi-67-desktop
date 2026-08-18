@@ -1,4 +1,4 @@
-export const WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX = 1_140;
+export const WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX = 1_320;
 const WINDOWS_NAVIGATION_DRAWER_BREAKPOINT_PX = 760;
 
 export async function observeLayout(window) {
@@ -6,6 +6,7 @@ export async function observeLayout(window) {
     const rect = (element) => element ? rectangle(element.getBoundingClientRect()) : null;
     const composer = document.querySelector('[data-testid="composer-shell"]');
     const contextDrawer = document.querySelector(".context-pane");
+    const contextDrawerScrim = document.querySelector(".context-drawer-scrim");
     const navigationDrawer = document.querySelector(".navigation-rail");
     const send = [...document.querySelectorAll("button")]
       .find((button) => button.textContent?.trim() === "发送");
@@ -23,6 +24,7 @@ export async function observeLayout(window) {
     const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     return {
       composer: rect(composer),
+      contextDrawerMode: contextDrawerScrim !== null && getComputedStyle(contextDrawerScrim).display !== "none",
       contextDrawerVisible: contextDrawer !== null && getComputedStyle(contextDrawer).display !== "none",
       devicePixelRatio: window.devicePixelRatio,
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
@@ -124,6 +126,31 @@ export function assertLayoutObservation(observation, contract) {
       `${prefix}: title actions reserve only ${observation.titleBarNativeControlReserve}px for native Windows controls.`
     );
   }
+}
+
+export function assertContextPanelActivation(observation, requestedScaleFactor) {
+  const mode = observation.matchesContextBreakpoint ? "drawer" : "docked-after-expansion";
+  assertLayoutObservation(observation, {
+    breakpoint: mode === "drawer" ? "context-drawer" : "context-expanded",
+    ...(mode === "drawer" ? { expectedControlLayer: "context-drawer" } : {}),
+    expectedWidth: observation.innerWidth,
+    requestedScaleFactor
+  });
+  if (!observation.contextDrawerVisible) {
+    throw new Error(`Scale ${requestedScaleFactor}: context panel is not visible after activation.`);
+  }
+  if (mode === "drawer" && !observation.contextDrawerMode) {
+    throw new Error(`Scale ${requestedScaleFactor}: constrained context activation did not use the drawer.`);
+  }
+  if (mode === "docked-after-expansion") {
+    if (observation.innerWidth <= WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX) {
+      throw new Error(`Scale ${requestedScaleFactor}: context activation did not expand beyond the drawer breakpoint.`);
+    }
+    if (observation.contextDrawerMode) {
+      throw new Error(`Scale ${requestedScaleFactor}: expanded context activation retained the drawer scrim.`);
+    }
+  }
+  return mode;
 }
 
 export function viewportWidthMatches({ allowNativeFrameFloor, expectedWidth, innerWidth, outerWidth }) {

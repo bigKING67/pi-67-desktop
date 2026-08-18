@@ -14,6 +14,7 @@ import {
   closeKeyboardShortcutsDialog,
   openKeyboardShortcutsDialog
 } from "../help/keyboard-shortcuts-dialog-controller.js";
+import { toggleRendererContext } from "../shell/context-panel-controller.js";
 
 interface GlobalShortcutTarget {
   addEventListener(type: "keydown", listener: (event: KeyboardEvent) => void): void;
@@ -82,7 +83,7 @@ export function handleGlobalShortcut(event: KeyboardEvent) {
   if (action.id === "toggle-context") {
     const shell = useShellStore.getState();
     const nextVisible = !shell.contextVisible;
-    shell.setContextVisible(nextVisible);
+    void toggleRendererContext();
     if (!nextVisible) restoreShortcutTriggerFocus(".context-toggle");
     return;
   }

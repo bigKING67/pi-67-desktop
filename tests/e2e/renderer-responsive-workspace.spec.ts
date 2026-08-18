@@ -58,8 +58,8 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   await page.screenshot({ path: testInfo.outputPath("conversation-measure-sides-hidden.png"), animations: "disabled" });
 });
 
-test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 1_140, height: 800 });
+test("keeps the transcript primary at the context-drawer breakpoint", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1_320, height: 800 });
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
@@ -67,6 +67,10 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await expect(inspector).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("context-auto-collapsed-1320px.png"),
+    animations: "disabled"
+  });
   const contextToggle = page.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
   await expect(inspector).toBeVisible();
@@ -107,6 +111,10 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect.poll(() => controlTopmostSurface(stopButton)).toBe("context-drawer");
   const columns = await page.locator(".workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns);
   expect(columns.split(" ").length).toBeLessThanOrEqual(2);
+  await page.screenshot({
+    path: testInfo.outputPath("context-drawer-1320px.png"),
+    animations: "disabled"
+  });
   await page.getByRole("button", { name: "关闭任务检查器抽屉" }).click();
   await expect(inspector).toHaveCount(0);
   await expect(contextToggle).toBeFocused();
@@ -114,8 +122,8 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect.poll(() => controlTopmostSurface(stopButton)).toBe("control");
 });
 
-test("reflows the Composer inside the docked Inspector work plane", async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1_148, height: 800 });
+test("keeps the Composer inside the comfortable docked Inspector work plane", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1_328, height: 800 });
   await page.goto("/");
   await attachMockAgent(page, [{
     id: "adaptive-composer-message",
@@ -180,11 +188,11 @@ test("reflows the Composer inside the docked Inspector work plane", async ({ pag
   expect(geometry.sendLeft).toBeGreaterThanOrEqual(geometry.shellLeft - 1);
   expect(geometry.sendRight).toBeLessThanOrEqual(geometry.shellRight + 1);
   expect(geometry.toolbarScrollWidth).toBeLessThanOrEqual(geometry.toolbarClientWidth + 1);
-  expect(geometry.rows).toBe(2);
+  expect(geometry.rows).toBe(1);
   expect(geometry.sendTopmost).toBe(true);
   expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);
   await page.screenshot({
-    path: testInfo.outputPath("docked-inspector-1148px.png"),
+    path: testInfo.outputPath("docked-inspector-1328px.png"),
     animations: "disabled"
   });
 });

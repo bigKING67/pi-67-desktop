@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { dirname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, safeStorage } from "electron";
+import { app, BrowserWindow, safeStorage, screen } from "electron";
 import { AgentHostSupervisor } from "./agent-host-supervisor.js";
 import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
@@ -44,6 +44,7 @@ import { RepositoryWorkingTreeService } from "./repository-working-tree-service.
 import { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
 import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-service.js";
 import { PromptStashImageStore } from "./prompt-stash-image-store.js";
+import { ensureMainWindowContextRoom } from "./main-window-context-room.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -253,6 +254,14 @@ if (hasSingleInstanceLock) {
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       restartAgentHost: () => agentHostSupervisor.restart(),
       getMainWindow: () => mainWindow,
+      ensureContextPanelRoom: () => {
+        const window = mainWindow;
+        if (!window || window.isDestroyed()) return false;
+        return ensureMainWindowContextRoom(
+          window,
+          screen.getDisplayMatching(window.getBounds()).workArea
+        );
+      },
       activateMainWindow,
       desktopToolchain,
       desktopCapabilities,

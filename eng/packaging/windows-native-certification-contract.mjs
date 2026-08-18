@@ -1,4 +1,5 @@
 import { candidateBindingsMatch } from "./windows-native-candidate-binding.mjs";
+import { WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX } from "./windows-layout-observation.mjs";
 
 export const WINDOWS_NATIVE_CERTIFICATION_SCALES = [1.25, 1.5, 2];
 
@@ -82,7 +83,13 @@ export function validateWindowsNativeCertificationReceipts(
       || !/^[a-f0-9]{64}$/u.test(receipt.ime.acceptedTextSha256 ?? "")) {
       failures.push(`${label}: trusted Microsoft Pinyin confirmation and exactly-once submission are missing`);
     }
-    validateResponsiveReceipt(receipt.responsive?.contextViewport, scale, 1_160, `${label} context`, failures);
+    validateResponsiveReceipt(
+      receipt.responsive?.contextViewport,
+      scale,
+      WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX,
+      `${label} context`,
+      failures
+    );
     validateResponsiveReceipt(receipt.responsive?.navigationViewport, scale, 760, `${label} navigation`, failures);
     if (receipt.sleep?.observed === true) {
       sleepObserved = true;

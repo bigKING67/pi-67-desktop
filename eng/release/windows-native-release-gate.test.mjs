@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   candidateBindingFromIdentity
 } from "../packaging/windows-native-candidate-binding.mjs";
+import { WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX } from "../packaging/windows-layout-observation.mjs";
 import {
   hashWindowsSignedCandidateIdentity
 } from "./windows-signed-candidate-identity.mjs";
@@ -186,7 +187,7 @@ function receipt(scale, sleepObserved, candidate) {
       secondEnter: { isComposing: false, isTrusted: true, keyCode: 13 }
     },
     responsive: {
-      contextViewport: viewport(scale, 1_160),
+      contextViewport: viewport(scale, WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX),
       navigationViewport: viewport(scale, 760)
     },
     sleep: sleepObserved ? {

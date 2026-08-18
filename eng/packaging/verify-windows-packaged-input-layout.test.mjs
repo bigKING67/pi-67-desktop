@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assertContextPanelActivation,
   assertLayoutObservation,
   inspectWindowsSyntheticRuntimeSurface,
   locateTaskInspector,
@@ -14,7 +15,7 @@ import {
 
 describe("Windows packaged synthetic-scale UI contract", () => {
   it("keeps the release scale matrix explicit", () => {
-    expect(WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX).toBe(1_140);
+    expect(WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX).toBe(1_320);
     expect(WINDOWS_SYNTHETIC_SCALE_FACTORS).toEqual([1.25, 1.5, 2]);
     expect(WINDOWS_SYNTHETIC_RUNTIME_TIMEOUT_MS).toBe(60_000);
     expect(WINDOWS_SYNTHETIC_SHUTDOWN_BUDGET_MS).toBe(5_000);
@@ -165,6 +166,27 @@ describe("Windows packaged synthetic-scale UI contract", () => {
     })).toThrow(/Stop expected context-drawer foreground, got other/u);
   });
 
+  it("accepts drawer fallback and docked activation after a safe native expansion", () => {
+    const drawer = {
+      ...observation(),
+      contextDrawerMode: true,
+      send: { contained: true, topmost: false, topmostSurface: "context-drawer" },
+      stop: { contained: true, topmost: false, topmostSurface: "context-drawer" }
+    };
+    expect(assertContextPanelActivation(drawer, 1.5)).toBe("drawer");
+
+    const expandedWidth = WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX + 1;
+    const expanded = {
+      ...observation(),
+      innerWidth: expandedWidth,
+      matchesContextBreakpoint: false,
+      outerWidth: expandedWidth,
+      titleBar: { bottom: 42, height: 42, left: 0, right: expandedWidth, top: 0, width: expandedWidth },
+      visualViewportWidth: expandedWidth
+    };
+    expect(assertContextPanelActivation(expanded, 1.5)).toBe("docked-after-expansion");
+  });
+
   it("accepts the renderer width left by the native frame at the production minimum", () => {
     expect(viewportWidthMatches({
       allowNativeFrameFloor: true,
@@ -200,6 +222,7 @@ describe("Windows packaged synthetic-scale UI contract", () => {
 function observation() {
   return {
     composer: { bottom: 780, height: 140, left: 240, right: 1_130, top: 640, width: 890 },
+    contextDrawerMode: false,
     contextDrawerVisible: true,
     devicePixelRatio: 1.5,
     horizontalOverflow: 0,

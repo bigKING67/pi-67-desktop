@@ -117,6 +117,9 @@ export interface DesktopPlatformInfo {
   version: string;
 }
 
+/** Largest content width that still uses the Inspector drawer instead of a docked third region. */
+export const DESKTOP_CONTEXT_DRAWER_MAX_WIDTH = 1_320;
+
 export interface DesktopAgentHostStartupState {
   hostEpoch: number;
   startup: AgentHostStartupState;
@@ -148,6 +151,7 @@ export interface ShutdownCheckpointResponse {
 /** Complete, typed surface exposed by the sandboxed Desktop preload. */
 export interface DesktopSystemBridge {
   getPlatformInfo(): Promise<DesktopPlatformInfo>;
+  ensureContextPanelRoom(): Promise<boolean>;
   connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
   stagePromptAttachments(files: DesktopPromptAttachmentInput[]): Promise<StagedPromptAttachment[]>;
   releasePromptAttachments(ids: string[]): Promise<void>;

@@ -42,6 +42,7 @@ import {
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import styles from "./TitleBar.module.css";
+import { toggleRendererContext } from "./context-panel-controller.js";
 
 interface TitleBarProps {
   navigationAvailable: boolean;
@@ -59,7 +60,6 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const operationDetail = useAppStore((state) => state.operationDetail);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
   const contextVisible = useShellStore((state) => state.contextVisible);
-  const setContextVisible = useShellStore((state) => state.setContextVisible);
   const setCommandPaletteOpen = useShellStore((state) => state.setCommandPaletteOpen);
   const selectedTask = useWorkbenchStore(selectedWorkbenchTask);
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
@@ -195,7 +195,7 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             aria-keyshortcuts={desktopShortcutAriaKeys(contextShortcut)}
             aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
             data-testid="inspector-toggle"
-            onClick={() => setContextVisible(!contextVisible)}
+            onClick={() => void toggleRendererContext()}
             type="button"
           >
             {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}

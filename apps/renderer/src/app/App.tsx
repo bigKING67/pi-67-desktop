@@ -24,6 +24,7 @@ import { initializeUpdateProjection } from "../updates/update-store.js";
 import { dismissConversationFind } from "../search/conversation-find-events.js";
 import { refreshConversationSnoozeClock } from "../navigation/conversation-snooze-clock.js";
 import { closeKeyboardShortcutsDialog } from "../help/keyboard-shortcuts-dialog-controller.js";
+import { CONTEXT_DRAWER_MEDIA_QUERY } from "../shell/context-panel-controller.js";
 
 const WorkspaceShell = lazy(() => import("./WorkspaceShell.js").then((module) => ({ default: module.WorkspaceShell })));
 const ApprovalDialog = lazy(() => import("../approval/ApprovalDialog.js").then((module) => ({ default: module.ApprovalDialog })));
@@ -36,8 +37,6 @@ const SessionTreeDialog = lazy(() => import("../session-tree/SessionTreeDialog.j
 const WorkspaceConversationSearchDialog = lazy(() => import("../search/WorkspaceConversationSearchDialog.js").then((module) => ({ default: module.WorkspaceConversationSearchDialog })));
 const WorkspaceContentSearchDialog = lazy(() => import("../search/WorkspaceContentSearchDialog.js").then((module) => ({ default: module.WorkspaceContentSearchDialog })));
 const KeyboardShortcutsDialog = lazy(() => import("../help/KeyboardShortcutsDialog.js").then((module) => ({ default: module.KeyboardShortcutsDialog })));
-const CONTEXT_DRAWER_MEDIA_QUERY = "(max-width: 1140px)";
-
 export function App() {
   const workspace = useAppStore((state) => state.workspace);
   const connected = useAppStore((state) => state.connected);

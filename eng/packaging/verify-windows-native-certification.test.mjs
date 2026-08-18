@@ -3,6 +3,7 @@ import {
   parseWindowsNativeVerificationArguments,
   validateWindowsNativeCertificationReceipts
 } from "./verify-windows-native-certification.mjs";
+import { WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX } from "./windows-layout-observation.mjs";
 
 const EXPECTED_ARTIFACT = {
   byteLength: 123_456,
@@ -118,7 +119,7 @@ function receipt(scale, sleepObserved) {
       secondEnter: { isComposing: false, isTrusted: true, keyCode: 13 }
     },
     responsive: {
-      contextViewport: viewport(scale, 1_160),
+      contextViewport: viewport(scale, WINDOWS_CONTEXT_DRAWER_BREAKPOINT_PX),
       navigationViewport: viewport(scale, 760)
     },
     sleep: sleepObserved ? {

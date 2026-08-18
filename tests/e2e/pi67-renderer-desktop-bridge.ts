@@ -46,7 +46,6 @@ type MockDesktopPrimaryBridge = Omit<
   | keyof MockDesktopRepositoryBridge
   | keyof MockDesktopShutdownBridge
 >;
-
 export async function installMockDesktopBridge(
   page: Page,
   options: MockDesktopBridgeOptions = {}
@@ -187,6 +186,7 @@ export async function installMockDesktopBridge(
     };
     const systemFixture = fixtureWindow.__pi67SystemFixture ??= { methods: {} };
     const primaryBridge = {
+          ensureContextPanelRoom: async () => false,
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
           createWorktreeEnvironment: async () => {

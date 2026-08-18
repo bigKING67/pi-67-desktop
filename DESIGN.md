@@ -170,9 +170,12 @@ Application-level surfaces use a separate wide-window shell:
   `消息`, `代理`, and `上下文`. Every action retains its 14px icon and full label on
   one line across platforms and display scaling; columns use `minmax(0, 1fr)`,
   icons never collapse or hide, and the strip never introduces horizontal scroll.
-  At 1140px and below the Inspector becomes the existing right-side drawer so the
-  360px Inspector and 520px Transcript minima never force application-level
-  horizontal overflow.
+  At 1320px and below the Inspector defaults closed and becomes the existing
+  right-side drawer. This preserves a comfortable central work plane instead of
+  waiting until the 360px Inspector and 520px Transcript reach their physical
+  minimum. Explicitly opening Inspector first asks Electron Main to widen a
+  normal window within its current display work area; a constrained, maximized,
+  or full-screen window stays in the dismissible drawer mode.
 - The Transcript conversation grid uses `minmax(0, 1fr)` so Composer content
   cannot widen its owning track. In drawer mode the Inspector and its scrim own
   overlap above the Composer; Composer never establishes a higher stacking layer.
@@ -185,7 +188,7 @@ Application-level surfaces use a separate wide-window shell:
   when either side column stops consuming layout width, and at most 1120px when
   neither side column consumes layout width. The workbench expands visibly when
   a side column closes without turning ordinary prose into full-window lines.
-- At 1140px and below, context defaults closed and becomes an overlay drawer with a
+- At 1320px and below, context defaults closed and becomes an overlay drawer with a
   dismissible scrim, so trust, transcript, and composer actions are never
   covered before the user explicitly opens context.
 - Below 760px, navigation becomes a drawer; transcript remains primary.

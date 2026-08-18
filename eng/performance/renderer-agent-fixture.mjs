@@ -379,6 +379,7 @@ export async function installPerformanceSystemBridge(page) {
       value: {
         system: {
           getPlatformInfo: async () => ({ platform: "darwin", architecture: "arm64", version: "performance" }),
+          ensureContextPanelRoom: async () => false,
           connectAgentHost: async () => undefined,
           loadWorkbenchState: async () => structuredClone(workbenchState),
           updateWorkbenchLayout: async (layout) => {
