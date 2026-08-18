@@ -39,6 +39,16 @@
   display: grid;
 }
 
+.authorizationNotice {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--info);
+  background: color-mix(in srgb, var(--info) 7%, var(--surface));
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .commandBand {
   display: flex;
   min-width: 0;

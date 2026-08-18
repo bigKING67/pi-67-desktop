@@ -40,6 +40,7 @@ const ToolAuthorizationProjectionSchema = strictObject({
   mode: Type.Literal("auto"),
   reason: Type.Union([
     Type.Literal("configured-source"),
+    Type.Literal("installed-capability"),
     Type.Literal("read-only"),
     Type.Literal("workspace-command"),
     Type.Literal("workspace-write")

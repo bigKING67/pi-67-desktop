@@ -106,7 +106,6 @@ export class DesktopCapabilityService {
   setupBrowser67(): Promise<DesktopCapabilitySnapshot> {
     return this.#enqueue(() => this.#setupBrowser67Unlocked());
   }
-
   prepareBrowser67Extension(): Promise<DesktopCapabilitySnapshot> {
     return this.#enqueue(async () => {
       if (!browser67DependenciesPrepared(this.#browserPackageRoot())) {
@@ -139,10 +138,11 @@ export class DesktopCapabilityService {
         if (!extension.installedCurrent && !extension.identityMetadataOnlyDrift) {
           throw new Error("browser67 extension files did not match the bundled source after setup.");
         }
-        let detail = alreadyCurrent
-          ? "扩展文件已是当前内置版本；请验证连接。"
-          : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。";
-        if (!alreadyCurrent && previous?.extensionState === "connected") {
+        const browserSyncRequired = previous?.extensionState === "reload-required" || (!alreadyCurrent && previous?.extensionState === "connected");
+        let detail = alreadyCurrent ? "扩展文件已是当前内置版本；请验证连接。" : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。";
+        if (previous?.extensionState === "reload-required") {
+          detail = alreadyCurrent ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。" : "受管扩展文件已更新；浏览器仍需核对并同步 Pi-67 提供的加载来源。";
+        } else if (!alreadyCurrent && previous?.extensionState === "connected") {
           try {
             await this.#runBrowserExtensionReload(packageRoot, this.#toolchain);
             detail = "扩展文件已更新并请求浏览器重新加载；请验证连接。";
@@ -154,7 +154,7 @@ export class DesktopCapabilityService {
         await this.#writeBrowserState({
           schema: INTEGRATION_STATE_SCHEMA,
           dependencyState: "prepared",
-          extensionState: "prepared",
+          extensionState: browserSyncRequired ? "reload-required" : "prepared",
           doctorState: "degraded",
           detail,
           ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
@@ -302,7 +302,7 @@ export class DesktopCapabilityService {
           doctorState: "degraded",
           detail: extensionState === "not-prepared"
             ? "扩展文件尚未准备，请先安装浏览器扩展。"
-            : "扩展文件与当前内置版本不一致，请更新并重新加载扩展。",
+            : "受管扩展目录与当前内置版本不一致。请先更新目录，再在扩展管理页核对并同步加载来源。",
           ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
           ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
           checkedAt: now,

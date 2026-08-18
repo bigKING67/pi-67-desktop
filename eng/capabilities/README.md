@@ -13,16 +13,29 @@ from the locked Pi-67 Core source and overlays only the verified Pack members on
 the Core capability. It never advances the tracked branch implicitly and fails if
 the generated provenance differs from the lock.
 
+## Tracked source policy
+
+Each source remains pinned to an immutable `commit`. A first-party source may
+also declare a canonical branch `ref` when Desktop intentionally carries
+reviewed post-tag fixes from that branch. The freshness audit then requires the
+remote ref to resolve to the exact locked commit. `pi67-core` and `browser67`
+track `refs/heads/main`; this keeps candidate preparation current without ever
+making runtime startup, an ordinary build, or an installed Desktop follow a
+floating branch.
+
+Sources without `ref` use the stable release policy below.
+
 ## Stable release policy
 
 The freshness audit treats the highest `vMAJOR.MINOR.PATCH` or
 `MAJOR.MINOR.PATCH` Git tag as the latest stable release. Prerelease tags and an
 untagged default-branch `HEAD` do not make a Desktop capability stale.
 
-Branch-owned Skill Pack sources use a separate rule: the audit reads only the
-declared ref and requires its current commit to equal the exact locked commit. The
-ordinary build still consumes only the lock; network freshness remains confined to
-the scheduled/manual audit and release gate.
+Branch-owned first-party and Skill Pack sources use the same exact-ref rule: the
+audit reads only the declared ref and requires its current commit to equal the
+exact locked commit. The ordinary build still consumes only the lock; network
+freshness remains confined to scheduled/manual audits, candidate provenance, and
+the release gate.
 
 Run the live audit with:
 
@@ -47,15 +60,17 @@ and reproducible builds remain valid.
 
 - `.github/workflows/capability-freshness.yml` runs the audit every Monday and
   supports manual `workflow_dispatch` execution.
-- `.github/workflows/release.yml` runs the same audit before a signed release can
-  proceed.
-- Both workflows upload the JSON report even when the audit fails.
+- `.github/workflows/windows-candidate.yml` and `.github/workflows/release.yml`
+  run the same audit before a candidate or signed release can proceed.
+- Every workflow uploads the JSON report even when the audit fails.
 
 ## Updating a stale source
 
-1. Verify the upstream stable tag, release commit, and the version declared by
-   the source repository.
-2. Update `version` and `commit` in `capability-sources.lock.json`.
+1. For a branch-tracked source, verify the canonical remote `ref`, review the
+   exact old-to-new commit diff, and record the resolved commit. For a stable
+   source, verify the upstream stable tag, release commit, and declared version.
+2. Update `commit` and, when the package version changed, `version` in
+   `capability-sources.lock.json`.
 3. Increment `catalogVersion` and update the Renderer capability fixture.
 4. Run `prepare:capabilities`; every bundled Skill must still have exactly one
    suite membership.

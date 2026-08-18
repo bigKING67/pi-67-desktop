@@ -276,6 +276,9 @@ export function ExtensionManagementWorkspace({ capability }: {
           </div>
 
           <div className={styles.installedFeedback}>
+            <p className={styles.authorizationNotice}>
+              已启用且内容已确认的扩展包，在可信工作区的 AUTO 模式下可直接执行其工具；ASK 仍逐次确认，未知、重复或内容漂移的来源继续阻止。
+            </p>
             {packageError ? <p className={styles.errorBanner} role="alert">{packageError}</p> : null}
             {capability.error ? <p className={styles.errorBanner} role="alert">{capability.error}</p> : null}
           </div>
@@ -371,7 +374,7 @@ function DiscoverExtensions({ entries, installed, loading, error, onInstall }: {
       <header>
         <span className={styles.eyebrow}>可信来源目录</span>
         <h2>推荐扩展包</h2>
-        <p>推荐项不会自动安装。安装前仍会确认来源、作用域和运行权限。</p>
+        <p>推荐项不会自动安装。安装并确认内容后，AUTO 会授权其已验证工具；安装前仍会确认来源和作用域。</p>
       </header>
       {error ? <p className={styles.errorBanner} role="alert">{error}</p> : null}
       {loading && entries.length === 0 ? <p className={styles.panelEmpty}>正在读取推荐目录…</p> : null}

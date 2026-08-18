@@ -7,6 +7,7 @@ import { ConfiguredCapabilityCatalog } from "./configured-capability-catalog.js"
 import {
   createDesktopSafetyExtension,
   type DesktopApprovalRequester,
+  type DesktopToolAuthorizationRecorder,
   type SafetyPolicyState
 } from "./safety-extension.js";
 
@@ -74,8 +75,8 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
     }), expect.any(Object));
   });
 
-  it("applies Memory add-versus-delete policy to MCP Direct Tools", async () => {
-    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+  it("auto-allows installed MCP Direct Tools including persistent deletion", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
     const tools = [
       packageTool("agent_memory_remember", "npm:pi-mcp-adapter@2.11.0"),
       packageTool("agent_memory_forget", "npm:pi-mcp-adapter@2.11.0")
@@ -94,14 +95,34 @@ describe("createDesktopSafetyExtension configured capabilities", () => {
       toolCallId: "memory-delete",
       toolName: "agent_memory_forget",
       input: { id: "memory-1" }
-    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+    }, { hasUI: true })).resolves.toBeUndefined();
 
-    expect(requestApproval).toHaveBeenCalledTimes(1);
-    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
-      category: "persistent-state-delete",
-      target: "forget",
-      toolSource: "MCP · agent_memory"
-    }), expect.any(Object));
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("auto-allows external paths from an installed Package and records the grant basis", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const recordAuthorization = vi.fn<DesktopToolAuthorizationRecorder>();
+    const handler = await safetyHandler(
+      autoPolicy(),
+      requestApproval,
+      [packageTool("export_file", "npm:pi-export@1.0.0")],
+      ["pi-export"],
+      undefined,
+      recordAuthorization
+    );
+
+    await expect(handler({
+      toolCallId: "configured-external-path",
+      toolName: "export_file",
+      input: { outputPath: join(tmpdir(), "pi67-export.txt") }
+    }, { hasUI: true })).resolves.toBeUndefined();
+
+    expect(requestApproval).not.toHaveBeenCalled();
+    expect(recordAuthorization).toHaveBeenCalledWith(
+      "configured-external-path",
+      "installed-capability"
+    );
   });
 
   it("auto-allows task-scoped JS-Reverse instrumentation and configured MCP reads", async () => {
@@ -145,7 +166,8 @@ async function safetyHandler(
   requestApproval: DesktopApprovalRequester,
   tools: ReturnType<ExtensionAPI["getAllTools"]>,
   packages: string[],
-  mcp?: McpFixture
+  mcp?: McpFixture,
+  recordAuthorization?: DesktopToolAuthorizationRecorder
 ): Promise<SafetyHandler> {
   const root = await mkdtemp(join(tmpdir(), "pi67-configured-safety-"));
   temporaryDirectories.push(root);
@@ -176,7 +198,14 @@ async function safetyHandler(
       if (event === "tool_call") handler = candidate;
     }
   } as unknown as ExtensionAPI;
-  const extension = createDesktopSafetyExtension(() => policy, requestApproval, undefined, catalog);
+  const effectivePolicy = { ...policy, cwd: root };
+  const extension = createDesktopSafetyExtension(
+    () => effectivePolicy,
+    requestApproval,
+    undefined,
+    catalog,
+    recordAuthorization
+  );
   if (!("factory" in extension)) throw new Error("Expected the Desktop safety extension factory.");
   void extension.factory(api);
   if (!handler) throw new Error("Desktop safety extension did not register a tool_call handler.");

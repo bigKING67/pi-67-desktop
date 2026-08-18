@@ -11,6 +11,7 @@ import {
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const lockPath = resolve(repositoryRoot, "eng/capabilities/capability-sources.lock.json");
 const outputRoot = resolve(repositoryRoot, "artifacts/capabilities/current");
+const trackedBranchPattern = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,249}$/u;
 
 export async function assertPreparedDesktopCapabilities() {
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
@@ -128,6 +129,9 @@ export function assertCapabilitySourceLock(lock) {
     if (!/^[0-9a-f]{40}$/u.test(source.commit) || !source.repository.startsWith("https://github.com/")) {
       throw new Error(`Capability source ${source.id} is not pinned to a canonical Git commit.`);
     }
+    if (source.ref !== undefined && !isTrackedBranchRef(source.ref)) {
+      throw new Error(`Capability source ${source.id} has an invalid tracked branch ref.`);
+    }
     assertLocalSibling(source.localSibling, "capability local sibling");
     if (source.id === "pi67-core") assertIncludedExtensions(source.includedExtensions);
     else if (source.includedExtensions !== undefined) {
@@ -148,6 +152,15 @@ export function assertCapabilitySourceLock(lock) {
     throw new Error("Recommended Extension package ids are invalid.");
   }
   for (const entry of lock.recommendedExternal) assertRecommendedPackage(entry);
+}
+
+function isTrackedBranchRef(value) {
+  return typeof value === "string"
+    && trackedBranchPattern.test(value)
+    && !value.includes("..")
+    && !value.includes("//")
+    && !value.includes("@{")
+    && !value.endsWith("/");
 }
 
 function assertIncludedExtensions(value) {

@@ -61,7 +61,7 @@ describe("createDesktopSafetyExtension pi-mcp-adapter classification", () => {
     expect(requestApproval).not.toHaveBeenCalled();
   });
 
-  it("auto-allows configured MCP connections and ordinary nested calls while retaining auth approval", async () => {
+  it("auto-allows configured MCP connections and authentication in AUTO", async () => {
     const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
     const handler = await safetyHandler(autoPolicy(), requestApproval, () => [
       packageTool("mcp", "npm:pi-mcp-adapter@2.11.0")
@@ -69,7 +69,15 @@ describe("createDesktopSafetyExtension pi-mcp-adapter classification", () => {
 
     for (const [index, input] of [
       { connect: "tmwd_browser" },
-      { tool: "tmwd_browser_browser_snapshot", args: "{}", server: "tmwd_browser" }
+      { tool: "tmwd_browser_browser_snapshot", args: "{}", server: "tmwd_browser" },
+      { tool: "browser_scan", args: { query: "main" }, server: "tmwd_browser" },
+      { tool: "browser_extract", args: { selector: "main" }, server: "tmwd_browser" },
+      { tool: "browser_tab_ops", args: { action: "navigate", url: "https://example.invalid" }, server: "tmwd_browser" },
+      { tool: "browser_screenshot_ops", args: { action: "capture" }, server: "tmwd_browser" },
+      { tool: "browser_transport_health", args: {}, server: "tmwd_browser" },
+      { tool: "browser_file_ops", args: { action: "inspect_inputs" }, server: "tmwd_browser" },
+      { action: "auth-start", server: "linear" },
+      { action: "auth-complete", server: "linear", args: "{\"code\":\"test\"}" }
     ].entries()) {
       await expect(handler({
         toolCallId: `configured-${index}`,
@@ -78,25 +86,52 @@ describe("createDesktopSafetyExtension pi-mcp-adapter classification", () => {
       }, { hasUI: true })).resolves.toBeUndefined();
     }
 
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("auto-allows installed browser67 JavaScript, native input, auth, clipboard, and file side effects", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>();
+    const handler = await safetyHandler(autoPolicy(), requestApproval, () => [
+      packageTool("mcp", "npm:pi-mcp-adapter@2.11.0")
+    ]);
+
     for (const [index, input] of [
-      { action: "auth-start", server: "linear" },
-      { action: "auth-complete", server: "linear", args: "{\"code\":\"test\"}" }
+      { tool: "browser_execute_js", args: { expression: "document.title" }, server: "tmwd_browser" },
+      { tool: "browser_native_input", args: { action: "click" }, server: "tmwd_browser" },
+      { tool: "browser_auth_ops", args: { action: "login" }, server: "tmwd_browser" },
+      { tool: "browser_clipboard_ops", args: { action: "write" }, server: "tmwd_browser" },
+      { tool: "browser_file_ops", args: { action: "set_files" }, server: "tmwd_browser" }
     ].entries()) {
       await expect(handler({
-        toolCallId: `side-effect-${index}`,
+        toolCallId: `browser-sensitive-${index}`,
         toolName: "mcp",
         input
-      }, { hasUI: true })).resolves.toMatchObject({ block: true });
+      }, { hasUI: true })).resolves.toBeUndefined();
     }
 
-    expect(requestApproval.mock.calls.map(([request]) => ({
-      category: request.category,
-      target: request.target,
-      source: request.toolSource
-    }))).toEqual([
-      { category: "credential-or-auth", target: "auth-start: linear", source: "MCP · linear" },
-      { category: "credential-or-auth", target: "auth-complete: linear", source: "MCP · linear" }
+    expect(requestApproval).not.toHaveBeenCalled();
+  });
+
+  it("keeps installed browser67 side effects behind one-shot approval in ASK", async () => {
+    const requestApproval = vi.fn<DesktopApprovalRequester>().mockResolvedValue({ status: "denied" });
+    const handler = await safetyHandler(askPolicy(), requestApproval, () => [
+      packageTool("mcp", "npm:pi-mcp-adapter@2.11.0")
     ]);
+
+    await expect(handler({
+      toolCallId: "browser-sensitive-ask",
+      toolName: "mcp",
+      input: {
+        tool: "browser_execute_js",
+        args: { expression: "document.title" },
+        server: "tmwd_browser"
+      }
+    }, { hasUI: true })).resolves.toMatchObject({ block: true });
+
+    expect(requestApproval).toHaveBeenCalledWith(expect.objectContaining({
+      category: "external-submit",
+      toolSource: "MCP · tmwd_browser"
+    }), expect.any(Object));
   });
 
   it("corrects pi-fff proxy misroutes without opening an approval", async () => {
@@ -189,6 +224,10 @@ function autoPolicy(): SafetyPolicyState {
   return { cwd: "/workspace", trust: "trusted", approvalMode: "balanced", taskToolMode: "auto" };
 }
 
+function askPolicy(): SafetyPolicyState {
+  return { cwd: "/workspace", trust: "trusted", approvalMode: "guided", taskToolMode: "ask" };
+}
+
 async function safetyHandler(
   policy: SafetyPolicyState,
   requestApproval: DesktopApprovalRequester,
@@ -224,7 +263,21 @@ async function configuredCatalog(): Promise<ConfiguredCapabilityCatalog> {
     writeFile(join(root, "mcp-cache.json"), JSON.stringify({
       version: 1,
       servers: {
-        tmwd_browser: { tools: [{ name: "tmwd_browser_browser_snapshot", inputSchema: { type: "object" } }] },
+        tmwd_browser: {
+          tools: [
+            "tmwd_browser_browser_snapshot",
+            "browser_scan",
+            "browser_extract",
+            "browser_tab_ops",
+            "browser_screenshot_ops",
+            "browser_transport_health",
+            "browser_execute_js",
+            "browser_native_input",
+            "browser_auth_ops",
+            "browser_clipboard_ops",
+            "browser_file_ops"
+          ].map((name) => ({ name, inputSchema: { type: "object" } }))
+        },
         linear: { tools: [] },
         "external-server": { tools: [{ name: "fffind", inputSchema: { type: "object" } }] }
       }

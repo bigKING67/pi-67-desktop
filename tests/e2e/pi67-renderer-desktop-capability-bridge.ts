@@ -7,6 +7,7 @@ import {
 
 interface MockDesktopCapabilityBridgeOptions {
   capabilityInitializingCalls?: number;
+  browser67ExtensionState?: "not-prepared" | "reload-required";
 }
 
 export type MockDesktopCapabilityBridge = Pick<DesktopSystemBridge,
@@ -29,9 +30,21 @@ export async function installMockDesktopCapabilityBridge(
   page: Page,
   options: MockDesktopCapabilityBridgeOptions = {}
 ): Promise<void> {
+  const capabilitySnapshot = createMockDesktopCapabilitySnapshot();
+  if (options.browser67ExtensionState === "reload-required") {
+    capabilitySnapshot.integrations = capabilitySnapshot.integrations.map((integration) => integration.id === "browser67"
+      ? {
+          ...integration,
+          dependencyState: "prepared",
+          extensionState: "reload-required",
+          doctorState: "degraded",
+          detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
+        }
+      : integration);
+  }
   const fixture = {
     capabilityInitializingCalls: options.capabilityInitializingCalls ?? 0,
-    capabilitySnapshot: createMockDesktopCapabilitySnapshot(),
+    capabilitySnapshot,
     packageNetworkSnapshot: createMockPackageNetworkSnapshot()
   };
 
@@ -124,10 +137,16 @@ export async function installMockDesktopCapabilityBridge(
           displayName: "browser67",
           bundled: true,
           dependencyState: "prepared",
-          extensionState: "prepared",
+          extensionState: bridgeFixture.capabilitySnapshot.integrations.some((integration) => (
+            integration.id === "browser67" && integration.extensionState === "reload-required"
+          )) ? "reload-required" : "prepared",
           doctorState: "degraded",
           availableBrowsers: ["chrome", "edge"],
-          detail: "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。",
+          detail: bridgeFixture.capabilitySnapshot.integrations.some((integration) => (
+            integration.id === "browser67" && integration.extensionState === "reload-required"
+          ))
+            ? "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。"
+            : "扩展文件已准备；请在 Chrome 或 Edge 中加载后验证连接。",
           preparedAt: 1_784_800_000_000,
           extensionPreparedAt: 1_784_800_000_000,
           extensionCheckedAt: 1_784_800_000_000,

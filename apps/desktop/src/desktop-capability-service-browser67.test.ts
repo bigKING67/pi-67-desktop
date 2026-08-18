@@ -97,12 +97,37 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
     });
     expect(await service.prepareBrowser67Extension()).toMatchObject({
       integrations: [{
-        extensionState: "prepared",
+        extensionState: "reload-required",
         doctorState: "degraded",
         detail: "扩展文件已更新并请求浏览器重新加载；请验证连接。"
       }]
     });
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a known live identity mismatch after preparing the managed directory", async () => {
+    const fixture = await createDesktopCapabilityFixture();
+    await prepareBrowserDependencies(fixture.packageRoot);
+    await writeExtensionManifest(fixture.browser67ExtensionDirectory);
+    await writeBrowserIntegrationState(fixture.agentDir, {
+      dependencyState: "prepared",
+      extensionState: "reload-required",
+      doctorState: "degraded"
+    });
+    const service = new DesktopCapabilityService({
+      ...fixture,
+      runBrowserExtensionDoctor: vi.fn(async () => currentExtensionDoctorResult()),
+      now: () => 510.5,
+      createToken: () => "preserve-mismatch"
+    });
+
+    expect(await service.prepareBrowser67Extension()).toMatchObject({
+      integrations: [{
+        extensionState: "reload-required",
+        doctorState: "degraded",
+        detail: "受管扩展文件已是当前版本；浏览器仍需核对并同步 Pi-67 提供的加载来源。"
+      }]
+    });
   });
 
   it("does not rewrite a shared extension when only equivalent build provenance differs", async () => {
@@ -194,7 +219,7 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
         ready: false,
         extensionConnected: true,
         identityMatch: false,
-        detail: "浏览器中运行的扩展版本与当前内置版本不一致，请重新加载扩展。"
+        detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
       })),
       now: () => 540,
       createToken: () => "mismatch-extension"
@@ -272,7 +297,7 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
       ready: false,
       extensionConnected: true,
       identityMatch: false,
-      detail: "浏览器中运行的扩展版本与当前内置版本不一致，请重新加载扩展。"
+      detail: "浏览器中运行的扩展不是当前受管版本。请在扩展管理页核对加载目录；若仍指向旧目录，请移除旧条目后从 Pi-67 提供的目录重新“加载已解压的扩展”。"
     });
   });
 

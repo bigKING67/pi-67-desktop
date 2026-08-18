@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { safeAtomicReplaceFile } from "@pi67/pi-runtime";
+import { isRetiredBrowser67ServerPair } from "./retired-browser67-mcp.js";
 
 const MANAGED_SCHEMA = "pi67.browser67-mcp.v1";
 const SERVER_NAMES = ["tmwd_browser", "js-reverse"] as const;
@@ -44,6 +46,7 @@ export interface ManagedBrowser67McpResult {
   status: ManagedBrowser67McpStatus;
   path: string;
   conflicts: ManagedServerName[];
+  migratedLegacyServers: ManagedServerName[];
   cacheStatus: ManagedBrowser67McpCacheStatus;
   cachePath: string;
   invalidatedCacheServers: ManagedServerName[];
@@ -52,11 +55,13 @@ export interface ManagedBrowser67McpResult {
 export async function provisionManagedBrowser67Mcp(options: {
   agentDir: string;
   environment?: NodeJS.ProcessEnv;
+  homeDirectory?: string;
   readFile?: (path: string) => Promise<Uint8Array>;
 }): Promise<ManagedBrowser67McpResult> {
   const environment = options.environment ?? process.env;
   const path = join(options.agentDir, "mcp.json");
   const cachePath = join(options.agentDir, "mcp-cache.json");
+  let migratedLegacyServers: ManagedServerName[] = [];
   const result = (
     status: ManagedBrowser67McpStatus,
     conflicts: ManagedServerName[] = [],
@@ -66,6 +71,7 @@ export async function provisionManagedBrowser67Mcp(options: {
     status,
     path,
     conflicts,
+    migratedLegacyServers,
     cacheStatus,
     cachePath,
     invalidatedCacheServers
@@ -121,14 +127,24 @@ export async function provisionManagedBrowser67Mcp(options: {
   if (config.pi67ManagedMcp !== undefined && !metadata) {
     return result("invalid-json");
   }
+  const retiredPair = isRetiredBrowser67ServerPair({
+    servers,
+    managedReceipts: metadata?.servers,
+    agentDir: options.agentDir,
+    currentBrowser67Root: browser67Root,
+    homeDirectory: options.homeDirectory ?? homedir()
+  });
   const conflicts: ManagedServerName[] = [];
   for (const name of SERVER_NAMES) {
     const existing = servers[name];
     if (existing === undefined) continue;
     const receipt = metadata?.servers[name];
-    if (!receipt || receipt.specSha256 !== specSha256(existing)) conflicts.push(name);
+    if (receipt?.specSha256 === specSha256(existing)) continue;
+    if (retiredPair) continue;
+    conflicts.push(name);
   }
   if (conflicts.length > 0) return result("user-owned-conflict", conflicts);
+  if (retiredPair) migratedLegacyServers = [...SERVER_NAMES];
 
   const nextReceipts: Record<ManagedServerName, ManagedServerReceipt> = {
     tmwd_browser: managedReceipt(browser67Commit, expected.tmwd_browser),

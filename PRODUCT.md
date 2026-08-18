@@ -334,6 +334,13 @@ the only Runtime and behavior specification source.
   `Load unpacked`; a second one-shot confirmation may start or reuse the local Hub
   before live identity verification. Desktop never installs through browser policy,
   mutates a browser profile, or treats copied files as proof that Chrome/Edge loaded them.
+  When live identity differs, Desktop keeps that repair context after refreshing the
+  managed files and asks the user to verify the browser's loaded source. A different
+  source directory must be removed and loaded again from the Pi-67-provided directory;
+  an ordinary browser reload is not presented as sufficient to replace an old source.
+  The integration remains `reload-required` until a new live Doctor result proves the
+  browser-loaded identity matches; preparing files alone never demotes it to a generic
+  unloaded state.
 - One Electron window can register multiple workspaces. The navigation rail is
   the only Workspace and conversation switcher: each Workspace is a collapsible
   group containing active work, drafts, and Catalog-backed recent sessions.
@@ -400,10 +407,13 @@ the only Runtime and behavior specification source.
   configured operations, persistent writes, Workspace writes and commands, and
   higher-risk effects request a one-shot decision. `AUTO` additionally permits
   canonical Workspace writes, bounded local inspection/test/build commands,
-  ordinary operations from the Task's effective configured Package or MCP
-  sources, and non-destructive persistent-state writes. `YOLO` permits every
-  registered Tool in that trusted Task Runtime, including workspace-external,
-  destructive, system, and network-side-effect calls.
+  non-destructive persistent-state writes, and every operation from an enabled,
+  installed/admitted Package or MCP capability whose effective identity resolves
+  uniquely. That persistent capability grant includes authentication, JavaScript,
+  native input, clipboard, external paths/files, upload, external submission,
+  deletion, system, dependency, publish, remote, and network side effects.
+  `YOLO` permits every registered Tool in that trusted Task Runtime, including
+  calls which do not have an installed-capability grant.
 - AUTO trusts an effective configured source, not an arbitrary registered Tool
   name. At Session resource load, Desktop builds a bounded in-memory capability
   catalog from the effective Task-local Package settings plus that Task's valid
@@ -431,10 +441,11 @@ the only Runtime and behavior specification source.
   results, unsafe redirects, and responses over 2 MiB. Successful search or fetch
   results receive an in-memory bounded `responseId` for `get_search_content`; the
   reference neither performs a second network request nor broadens Tool authority.
-  External paths, persistent-state deletion, upload or external submit, authentication or
-  credential actions, dependency changes, destructive commands, publishing,
-  remote Git, system changes, and external writes retain one-shot approval in
-  AUTO. Calls that approval cannot make valid -- including unregistered or
+  Outside an exact installed-capability grant, external paths, persistent-state
+  deletion, upload or external submit, authentication or credential actions,
+  dependency changes, destructive commands, publishing, remote Git, system
+  changes, and external writes retain one-shot approval in AUTO. Calls that
+  approval cannot make valid -- including unregistered or
   ambiguous Tools, reserved Tool identity mismatches, malformed MCP routing, and
   unverifiable opaque cursors -- are rejected with a corrective message and no
   approval dialog. The retired `@ff-labs/pi-fff@0.10.1` is not installed or
@@ -445,10 +456,10 @@ the only Runtime and behavior specification source.
   names rather than native fallbacks, and Desktop tells the model to use and
   describe those exact names accordingly. In the default named mode the live
   names remain `ffgrep` and `fffind`.
-  Workspace-local roots run normally, workspace-external and symlink-escaped
-  roots expose the canonical path for one-shot approval, and opaque pagination
-  cursors fail closed outside `YOLO` because their original root cannot be
-  proven.
+  Workspace-local roots run normally. In AUTO, canonical workspace-external and
+  symlink-escaped roots use the installed-capability grant; ASK exposes that
+  canonical path for one-shot approval. Opaque pagination cursors fail closed
+  outside `YOLO` because their original root cannot be proven.
 - While the verified managed `pi67-core` Package is active, the Task-local Pi
   settings view force-excludes the first-party legacy auto-discovered
   `pi-rules-loader` copy under `~/.pi/agent/extensions`. The legacy file and user
@@ -463,10 +474,12 @@ the only Runtime and behavior specification source.
   read-only capability: status, cached server Tool lists, bounded
   search/describe, and current-Session UI-message inspection run in `ASK` and
   `AUTO`. In AUTO, connecting a server already present in effective `mcp.json`
-  and invoking a nested Tool present in the effective cache follow that Tool's
-  actual side-effect classification; ASK still requests a one-shot decision for
-  connect and configured operations. Adding a server, OAuth/authentication,
-  credential changes, or permission expansion remains a confirmation boundary.
+  and invoking a nested Tool present in the effective cache use that resolved
+  installed-capability grant for every classified side effect, including the
+  configured target's OAuth/authentication and credential flow. ASK still requests
+  a one-shot decision for connect and configured operations. Adding an unconfigured
+  server or expanding the configured server catalog remains a separate configuration
+  confirmation boundary.
   An unconfigured server, missing or ambiguous nested Tool, malformed proxy args,
   unsupported Package identity, or duplicate `mcp` source is rejected without a
   meaningless approval. A proxy call
@@ -478,12 +491,12 @@ the only Runtime and behavior specification source.
   the normal `ASK`/`AUTO` path policy.
 - Configured Memory reads and search/list/recall operations are read-only;
   remember/add/learn/propose/flush are non-destructive persistent writes and run
-  in AUTO; forget/delete/purge remain one-shot decisions. Configured browser
-  passive inspection, extraction, wait, screenshot, and download operations run
-  in AUTO subject to canonical path checks, while JavaScript execution, native
-  input, clipboard mutation, upload, and authentication remain higher-risk.
-  Task-scoped JS-Reverse instrumentation, including hook removal and finalization,
-  is a configured operation rather than persistent user-data deletion.
+  in AUTO. When Memory, browser67, JS-Reverse, or another Package/MCP source is
+  installed/admitted and resolves uniquely, its complete configured Tool surface
+  runs in AUTO: this includes forget/delete/purge, JavaScript execution, native
+  input, clipboard mutation, upload, authentication, external file effects, hook
+  removal, and finalization. Their effect categories remain visible for ASK,
+  PLAN, audit, and diagnostics; authorization is not inferred from Tool names.
 - Restored Workspace registrations are checked against their persisted filesystem
   identity before project resources load. A missing or replaced directory stays
   inactive until the user explicitly repairs it through the native directory
@@ -1080,10 +1093,10 @@ the only Runtime and behavior specification source.
   An authoritative Operation terminal invalidates any still-rendered interactive
   request for that exact Operation without granting or retrying the Tool.
 - An automatically admitted Tool exposes one bounded Host/Runtime-authored reason
-  in its execution row: `AUTO · 已配置来源`, `AUTO · 只读`, or
-  `AUTO · Workspace 内写入`. Renderer code never infers this reason and Pi JSONL
-  is not rewritten to persist it; raw Tool args, results, prompts, source paths,
-  URLs, and credentials never enter this projection.
+  in its execution row: `AUTO · 已安装能力`, `AUTO · 已配置来源`, `AUTO · 只读`,
+  `AUTO · 工作区命令`, or `AUTO · Workspace 内写入`. Renderer code never infers
+  this reason and Pi JSONL is not rewritten to persist it; raw Tool args, results,
+  prompts, source paths, URLs, and credentials never enter this projection.
 - The approval dialog names the verified Tool source and offers `拒绝`,
   `仅允许本次`, and `本任务开启 YOLO`. The third action atomically allows the
   current and other pending Safety Approval requests in the same Runtime, but it

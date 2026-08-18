@@ -36,6 +36,7 @@ export const zhCNOperationMessages = {
   timelineCompleted: (count: number, duration: string) => `执行过程 · ${count} 个步骤 · ${duration}`,
   autoAuthorizationReasons: {
     "configured-source": "AUTO · 已配置来源",
+    "installed-capability": "AUTO · 已安装能力",
     "read-only": "AUTO · 只读",
     "workspace-command": "AUTO · 工作区命令",
     "workspace-write": "AUTO · Workspace 内写入"

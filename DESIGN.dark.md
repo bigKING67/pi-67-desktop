@@ -107,6 +107,12 @@ spacing, component states, and motion as `DESIGN.md`.
 - The Title Bar Repository status uses the same neutral, success, warning, danger,
   focus, and hover roles as light mode. Primary/linked identity never relies on a
   glowing badge, and stale or unavailable state remains legible by icon and text.
+- The pane-aligned Title Bar uses the same three ownership zones and responsive
+  collapse rules as light mode. Navigation and docked Inspector zones use quiet
+  `surface-muted` separation with one-pixel borders; the centered workbench title
+  sits on its own low-glare header plane above, not on top of, the Transcript
+  canvas. Dark mode must not turn those zones into glowing cards, add a full-width
+  overlay, or visually merge the title with the conversation body.
 - The provisional `运行环境` radio family keeps the same topology, copy, focus
   order, and one-column breakpoint as light mode. Selected state uses
   `accent-soft` plus border, Check, icon, and text contrast; disabled, checking,

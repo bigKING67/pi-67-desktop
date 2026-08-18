@@ -10,11 +10,10 @@
   position: relative;
   z-index: 20;
   display: grid;
-  grid-template-columns: auto minmax(24px, 1fr) auto auto;
   align-items: center;
   min-width: 0;
   height: var(--titlebar-height);
-  padding: 0 12px;
+  padding: 0;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--canvas) 92%, transparent);
   -webkit-app-region: drag;
@@ -55,14 +54,6 @@
 .title-actions {
   gap: 5px;
   -webkit-app-region: no-drag;
-}
-
-html[data-platform="win32"] .title-actions {
-  padding-right: 140px;
-}
-
-html[data-platform="darwin"] .title-bar {
-  padding-left: 78px;
 }
 
 .icon-button {

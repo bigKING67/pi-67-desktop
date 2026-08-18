@@ -30,7 +30,6 @@
   }
   .navigation-rail { display: none; }
   .runtime-controls { display: none; }
-  .title-actions { padding-right: 120px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

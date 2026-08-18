@@ -60,6 +60,16 @@
   line-height: 1.5;
 }
 
+.installWarning {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--warning) 36%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .installSteps {
   display: grid;
   gap: 0;

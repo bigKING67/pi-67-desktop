@@ -96,7 +96,7 @@ completing a real session without learning terminal UI conventions first.
 
 ```text
 +----------------------------------------------------------------------------+
-| navigation | current Workspace / conversation | status | notices | Inspector |
+| navigation zone      | current Workspace / conversation      | Inspector zone |
 +----------------------+--------------------------------------+----------------+
 | Workspace groups     | Conversation or Settings workbench   | Inspector      |
 | active / recent      | Transcript / tools / Composer        | Files          |
@@ -104,6 +104,15 @@ completing a real session without learning terminal UI conventions first.
 +----------------------+--------------------------------------+----------------+
 ```
 
+- The TitleBar is one native draggable shell whose visual zones align exactly
+  with the active pane tracks below it. The center workbench zone is a distinct
+  pane header, not part of the Transcript canvas: its conversation title is
+  geometrically centered in the center pane and stays centered there as side
+  panes open or close. Navigation-owned controls remain in the navigation zone;
+  Inspector-owned actions remain in the Inspector zone while it is docked.
+  Quiet semantic surfaces and a single-pixel divider establish pane ownership;
+  the header does not imitate a terminal card, add a second toolbar frame, or
+  place an opaque layer over conversation content.
 - The navigation rail is the single persistent product-brand location inside
   the conversation workbench. Its brand lockup is one non-wrapping row containing
   the locked π mark and `Pi-67`; `会话工作台` remains assistive context rather than
@@ -115,7 +124,9 @@ completing a real session without learning terminal UI conventions first.
   opened. The π mark appears in the TitleBar only when no Workspace context exists.
 - Settings uses the plain TitleBar context `设置`. Compact widths may omit the
   Workspace prefix, but preserve the current surface title until the existing
-  narrow-window action layout requires hiding the whole context lockup.
+  narrow-window action layout requires hiding the whole context lockup. Settings
+  uses a navigation-zone plus application-content-zone title topology rather than
+  an empty third pane.
 
 Application-level surfaces use a separate wide-window shell:
 
@@ -132,8 +143,11 @@ Application-level surfaces use a separate wide-window shell:
   provisional drafts, and Catalog-backed recent Sessions.
 - The Title Bar contains navigation, the current Workspace/conversation title,
   status, notifications, command actions, and the Inspector toggle. It contains
-  no horizontal task strip. The Inspector toggle is the final application action
-  before the Windows caption safe area and the rightmost app action on macOS.
+  no horizontal task strip. At 1320px and below the docked Inspector title zone
+  disappears with its pane and the actions return to the center workbench zone;
+  below 760px the navigation title zone follows the navigation drawer. The
+  Inspector toggle is the final application action before the Windows caption safe
+  area and the rightmost app action on macOS.
 - When a Workspace is selected, the title identity area includes one compact,
   keyboard-focusable Repository status control. It distinguishes checking,
   primary Worktree, linked Worktree, non-Git, stale, private-Git-unavailable,
@@ -380,8 +394,8 @@ loading error where the operation can produce those states
   `复制详情` copies only the bounded redacted projection, progress, and failure text,
   never the entire raw Tool payload.
 - An AUTO-admitted Tool row may append one non-interactive, low-emphasis reason:
-  `AUTO · 已配置来源`, `AUTO · 只读`, `AUTO · 工作区命令`, or
-  `AUTO · Workspace 内写入`. The reason
+  `AUTO · 已安装能力`, `AUTO · 已配置来源`, `AUTO · 只读`,
+  `AUTO · 工作区命令`, or `AUTO · Workspace 内写入`. The reason
   is a fixed enum projected by Host/Runtime authority, stays on the same unwrapped
   header line without becoming a badge, and remains visible when a completed
   process is reopened. It never competes with the Tool name, compact summary, or
@@ -973,6 +987,12 @@ loading error where the operation can produce those states
   downloading or reinstalling. It names the trust state, bounded integrity reason,
   and last observation time without displaying install paths, directory identities,
   receipt digests, or raw receipt content.
+  The installed view always includes one quiet authorization disclosure: an
+  enabled Package whose current content is confirmed may execute its uniquely
+  resolved Tools directly in trusted-Workspace AUTO; ASK remains one-shot and
+  unknown, duplicate, unverified, or drifted content remains blocked. The
+  discovery view states the same consequence before installation without implying
+  that a recommendation is already installed, admitted, or authorized.
   A successful mutation with an `active` or `removed` receipt produces one Package-specific floating result containing
   the display name, available version transition, scope, and completed resource
   reload. An `ambiguous` receipt instead shows one warning that the operation was not
@@ -1068,7 +1088,11 @@ loading error where the operation can produce those states
   only when the current Desktop process observes a WS or Link Doctor route with
   `ok=true`, `detail=extension_identity_ok`, and `identity_match=true`. Missing
   connection keeps prepared files in `待浏览器加载`; a live identity mismatch becomes
-  `需要重新加载`; malformed files or operations fail visibly. A persisted connected
+  `需要同步受管版本`; malformed files or operations fail visibly. The repair dialog
+  retains the mismatch context after managed files refresh, distinguishes a same-path
+  reload from an old loaded source, and instructs the user to remove the old entry and
+  load the Pi-67-provided directory when those sources differ. File preparation keeps
+  `需要同步受管版本` visible until live identity verification succeeds. A persisted connected
   result is demoted until this process rechecks it. The dialog scrolls vertically
   inside the viewport at high zoom and never creates document-level horizontal overflow.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
@@ -1410,7 +1434,9 @@ loading error where the operation can produce those states
   all three options and their short consequences visible, uses neutral styling
   for `ASK`, restrained accent for `AUTO`, and semantic warning styling rather
   than destructive red for `YOLO`. It remains usable during a running Operation
-  so the user can correct later Tool decisions without stopping the Turn.
+  so the user can correct later Tool decisions without stopping the Turn. AUTO's
+  short consequence reads `已安装能力与常规操作自动，未知来源受限`; it does not
+  claim that every high-risk call must still ask after installation authorization.
 - `ASK` and `AUTO` switch directly after an authoritative Host acknowledgement;
   the resting control never changes optimistically. Selecting `YOLO` replaces
   the same menu content with a second confirmation naming workspace-external,
@@ -1736,9 +1762,13 @@ loading error where the operation can produce those states
   Package Tools never gain first-party identity or authorization.
 - New trusted Workspaces default to `AUTO` (`balanced`). Exact Workspace
   read/write Tools, exact current-Session loaded resource reads, first-party
-  read-only web Tools, ordinary effective configured Package/MCP operations,
-  non-destructive persistent writes, and conservatively classified local
-  inspection/test/build Shell commands proceed without repetitive approval. A
+  read-only web Tools, non-destructive persistent writes, conservatively classified
+  local inspection/test/build Shell commands, and every operation from an enabled,
+  installed/admitted Package or MCP capability whose effective identity resolves
+  uniquely proceed without repetitive approval. The installed-capability grant
+  includes authentication, JavaScript, native input, clipboard, external files,
+  upload/submission, deletion, system, dependency, publish, remote, and network
+  side effects. A
   bounded `&&` chain or read-only pipeline is admitted only when every segment is
   independently safe; Workspace-local `cd` and the small CI environment allowlist
   never widen a following segment's authority. Redirection, substitution, unknown
@@ -1753,12 +1783,16 @@ loading error where the operation can produce those states
   Reload atomically replaces those grants. Symlink escape, arbitrary home files,
   persistent deletion, upload or external submit, credentials/authentication,
   dependencies, destructive or ambiguous Shell, publish, remote Git, system
-  changes, and external writes retain the dedicated one-shot flow.
+  changes, and external writes retain the dedicated one-shot flow only when they
+  do not originate from an exact installed-capability grant. PLAN remains read-only;
+  ASK remains one-shot; unconfigured, duplicate, malformed, unverified, or drifted
+  identities remain corrective failures rather than approvable shortcuts.
 - Retired `@ff-labs/pi-fff` is neither bundled nor recommended. If a user
   explicitly installs and admits legacy `@ff-labs/pi-fff@0.10.1`, its `grep`/`find` and fallback
   `ffgrep`/`fffind` names share one source-and-contract profile. Workspace-local
   paths and globs follow normal read policy; `~`, absolute, `../`, and symlink
-  escapes display the canonical external path before one-shot approval. An
+  escapes use the installed-capability grant in AUTO and display the canonical
+  external path before one-shot approval in ASK. An
   opaque pagination cursor is not approvable in `ASK` or `AUTO` because Desktop
   cannot prove the original root; the model is instructed to restart without
   the cursor. When pi-fff registers the override names, Desktop's per-turn Tool
@@ -1779,22 +1813,24 @@ loading error where the operation can produce those states
   local capability discovery from execution. Empty status, cached server lists,
   bounded search/describe, and current-Session UI-message reads use the
   read-only capability category in `ASK` and `AUTO`. AUTO connects an already
-  configured server and runs a cached nested Tool according to its classified
-  side effect; ASK requests one-shot approval for connect and configured
-  operations. New server setup, OAuth/authentication, credentials, and permission
-  expansion remain confirmation boundaries. Missing or ambiguous servers/Tools,
+  configured server and runs a cached nested Tool under the resolved installed-
+  capability grant for every classified side effect, including that target's
+  OAuth/authentication and credential flow; ASK requests one-shot approval for
+  connect and configured operations. New server setup or catalog expansion remains
+  a separate configuration confirmation boundary. Missing or ambiguous servers/Tools,
   malformed args, duplicate sources, and unsupported versions are corrective
   errors rather than approvable actions. When a proxy call instead targets the currently verified
   direct `pi-fff` capability, Desktop treats it as a routing error rather than a
   user authorization decision: it opens no dialog, names the active direct Tool,
   and lets the model retry through the ordinary Workspace path classifier.
-- Configured Memory read/list/recall calls run as reads; add/remember/learn/
-  propose/flush run as non-destructive persistent writes in AUTO; delete/forget/
-  purge require one-shot approval. Configured browser passive scan, wait,
-  extraction, screenshot, and download run in AUTO subject to path containment;
-  execute-JS, native input, clipboard mutation, upload, and authentication remain
-  higher-risk. JS-Reverse task instrumentation and hook cleanup remain ordinary
-  configured operations rather than filename-based delete guesses.
+- Configured Memory read/list/recall calls remain classified as reads, and
+  add/remember/learn/propose/flush remain classified as persistent writes. When
+  Memory, browser67, JS-Reverse, or another Package/MCP source is installed/admitted
+  and resolves uniquely, AUTO also executes its delete/forget/purge, JavaScript,
+  native input, clipboard, upload, authentication, external-file, hook cleanup,
+  and finalization operations. Classification remains visible in ASK, PLAN, audit,
+  and diagnostics even when the installed-capability grant removes duplicate AUTO
+  approval.
 - Approval makes bidi, zero-width, control, and non-standard line-separator
   characters explicit in a non-mutating safe display. At constrained height,
   details scroll independently while all three decision actions remain visible.

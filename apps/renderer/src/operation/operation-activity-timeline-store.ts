@@ -273,11 +273,13 @@ function toolActivityDetail(activity: Extract<OperationActivity, { kind: "tool" 
       ? undefined
       : activity.authorization.reason === "configured-source"
         ? "AUTO · 已配置来源"
-        : activity.authorization.reason === "read-only"
-          ? "AUTO · 只读"
-          : activity.authorization.reason === "workspace-command"
-            ? "AUTO · 工作区命令"
-            : "AUTO · Workspace 内写入",
+        : activity.authorization.reason === "installed-capability"
+          ? "AUTO · 已安装能力"
+          : activity.authorization.reason === "read-only"
+            ? "AUTO · 只读"
+            : activity.authorization.reason === "workspace-command"
+              ? "AUTO · 工作区命令"
+              : "AUTO · Workspace 内写入",
     activity.aliasTarget === undefined ? undefined : `已兼容转发到 ${activity.aliasTarget}`,
     result
   ].filter((value): value is string => value !== undefined).join(" · ");

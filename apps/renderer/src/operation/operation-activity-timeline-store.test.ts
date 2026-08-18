@@ -206,6 +206,23 @@ describe("operation activity timeline", () => {
     });
   });
 
+  it("labels AUTO-authorized installed capabilities distinctly", () => {
+    let timeline = createOperationActivityTimeline(operation());
+    timeline = recordOperationTimelineActivity(timeline, {
+      kind: "tool",
+      toolCallId: "tool-auto-installed-capability",
+      toolName: "mcp",
+      toolKind: "extension",
+      status: "completed",
+      authorization: { mode: "auto", reason: "installed-capability" }
+    }, 20);
+
+    expect(timeline.steps.at(-1)).toMatchObject({
+      detail: "AUTO · 已安装能力 · 执行成功",
+      activity: { authorization: { mode: "auto", reason: "installed-capability" } }
+    });
+  });
+
   it("adds a late AUTO reason to the running Tool without creating a duplicate step", () => {
     let timeline = createOperationActivityTimeline(operation());
     timeline = recordOperationTimelineActivity(timeline, {

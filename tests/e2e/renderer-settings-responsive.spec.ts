@@ -154,7 +154,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   expect(await page.locator(".title-bar").evaluate((element) => ({
     columns: getComputedStyle(element).gridTemplateColumns.split(" ").length,
     brandDisplay: getComputedStyle(element.querySelector<HTMLElement>(".brand-lockup")!).display
-  }))).toEqual({ columns: 2, brandDisplay: "none" });
+  }))).toEqual({ columns: 1, brandDisplay: "flex" });
   expect(await page.evaluate(() => ({
     width: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,

@@ -16,6 +16,7 @@ const GIT_TIMEOUT_MS = 30_000;
 const gitObjectPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
 const stableVersionPattern = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/u;
 const stableTagPattern = /^v?(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/u;
+const trackedBranchPattern = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,249}$/u;
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
@@ -37,10 +38,19 @@ export async function createCapabilityFreshnessReport({
     const base = {
       id: source.id,
       repository: source.repository,
+      ...(source.ref ? { ref: source.ref } : {}),
       lockedVersion: source.version,
       lockedCommit: source.commit
     };
     try {
+      if (source.ref) {
+        const latestCommit = await resolveRef(source.repository, source.ref);
+        return {
+          ...base,
+          status: latestCommit === source.commit ? "current" : "stale",
+          latestCommit
+        };
+      }
       const latest = await resolveLatest(source.repository);
       const comparison = compareStableVersions(source.version, latest.version);
       return {
@@ -233,6 +243,7 @@ function assertCapabilityLock(lock) {
       || source.repository.length === 0
       || source.repository.length > 4_096
       || !gitObjectPattern.test(source.commit)
+      || (source.ref !== undefined && !isTrackedBranchRef(source.ref))
     ) throw new Error("Capability source lock entry is invalid");
     parseStableVersion(source.version);
     const repository = new URL(source.repository);
@@ -254,6 +265,15 @@ function parseStableVersion(value) {
   return match.slice(1).map(Number);
 }
 
+function isTrackedBranchRef(value) {
+  return typeof value === "string"
+    && trackedBranchPattern.test(value)
+    && !value.includes("..")
+    && !value.includes("//")
+    && !value.includes("@{")
+    && !value.endsWith("/");
+}
+
 function renderSummary(report) {
   const lines = [
     "## First-party capability freshness",
@@ -261,14 +281,14 @@ function renderSummary(report) {
     `Catalog: ${report.catalogVersion}`,
     `Result: ${report.status}`,
     "",
-    "| Source | Locked | Latest stable | Status | Release commit |",
+    "| Source | Locked | Tracked target | Status | Latest commit |",
     "| --- | --- | --- | --- | --- |"
   ];
   for (const source of report.sources) {
     lines.push([
       escapeTable(source.id),
       escapeTable(source.lockedVersion),
-      escapeTable(source.latestVersion ?? source.error ?? "unknown"),
+      escapeTable(source.ref ?? source.latestVersion ?? source.error ?? "unknown"),
       source.status,
       source.latestCommit?.slice(0, 12) ?? "unknown"
     ].join(" | ").replace(/^/u, "| ").replace(/$/u, " |"));

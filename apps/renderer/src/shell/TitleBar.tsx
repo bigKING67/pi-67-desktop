@@ -45,12 +45,20 @@ import styles from "./TitleBar.module.css";
 import { toggleRendererContext } from "./context-panel-controller.js";
 
 interface TitleBarProps {
+  contextIsDrawer: boolean;
   navigationAvailable: boolean;
+  navigationIsDrawer: boolean;
   navigationVisible: boolean;
   onToggleNavigation: () => void;
 }
 
-export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavigation }: TitleBarProps) {
+export function TitleBar({
+  contextIsDrawer,
+  navigationAvailable,
+  navigationIsDrawer,
+  navigationVisible,
+  onToggleNavigation
+}: TitleBarProps) {
   const liveRuntime = useAppStore((state) => state.runtime);
   const workspace = useAppStore((state) => state.workspace);
   const sessionName = useSessionProjectionStore(selectSessionName);
@@ -106,7 +114,9 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
     sessionId
   });
   const currentTitle = settingsSelected ? "设置" : activeSessionName || workspaceName || "π";
-  const contextWorkspaceName = !settingsSelected && !navigationVisible && activeSessionName && workspaceName
+  const navigationDocked = navigationAvailable && navigationVisible && !navigationIsDrawer && !settingsSelected;
+  const inspectorDocked = Boolean(selectedWorkspace) && contextVisible && !contextIsDrawer && !settingsSelected;
+  const contextWorkspaceName = !settingsSelected && !navigationDocked && activeSessionName && workspaceName
     ? workspaceName
     : undefined;
   const fullContextTitle = contextWorkspaceName
@@ -116,27 +126,76 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
   const navigationShortcut = desktopAction("toggle-navigation");
   const paletteShortcut = desktopAction("command-palette");
   const contextShortcut = desktopAction("toggle-context");
+  const navigationControl = navigationAvailable && !settingsSelected ? (
+    <button
+      className={`icon-button navigation-toggle ${styles.iconButton}`}
+      aria-controls="session-navigation"
+      aria-describedby="navigation-toggle-tooltip"
+      aria-expanded={navigationVisible}
+      aria-keyshortcuts={desktopShortcutAriaKeys(navigationShortcut)}
+      aria-label={navigationVisible ? messages.shell.hideNavigation : messages.shell.showNavigation}
+      onClick={onToggleNavigation}
+      type="button"
+    >
+      {navigationVisible ? <PanelLeftClose aria-hidden="true" size={16} /> : <PanelLeftOpen aria-hidden="true" size={16} />}
+      <ControlTooltip id="navigation-toggle-tooltip">{`${navigationVisible
+        ? messages.shell.hideNavigation
+        : messages.shell.showNavigation} · ${formatDesktopShortcut(navigationShortcut)}`}</ControlTooltip>
+    </button>
+  ) : null;
+  const applicationActions = (
+    <div className={`title-actions ${styles.actions}`}>
+      <NotificationCenter />
+      <button
+        className={`icon-button ${styles.iconButton}`}
+        aria-describedby="command-palette-tooltip"
+        aria-keyshortcuts={desktopShortcutAriaKeys(paletteShortcut)}
+        aria-label={messages.shell.openCommandPalette}
+        onClick={() => setCommandPaletteOpen(true)}
+        type="button"
+      >
+        <Command aria-hidden="true" size={16} />
+        <ControlTooltip id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
+      </button>
+      {selectedWorkspace && !settingsSelected ? (
+        <button
+          className={`icon-button context-toggle ${styles.iconButton}`}
+          aria-controls="task-inspector"
+          aria-describedby="context-toggle-tooltip"
+          aria-expanded={contextVisible}
+          aria-keyshortcuts={desktopShortcutAriaKeys(contextShortcut)}
+          aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
+          data-testid="inspector-toggle"
+          onClick={() => void toggleRendererContext()}
+          type="button"
+        >
+          {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
+          <ControlTooltip id="context-toggle-tooltip">{`${contextVisible
+            ? messages.shell.hideContextPanel
+            : messages.shell.showContextPanel} · ${formatDesktopShortcut(contextShortcut)}`}</ControlTooltip>
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
-    <header className={`title-bar ${styles.header}`}>
-      <div className={styles.identity}>
-        {navigationAvailable && !settingsSelected ? (
-          <button
-            className={`icon-button navigation-toggle ${styles.iconButton}`}
-            aria-controls="session-navigation"
-            aria-describedby="navigation-toggle-tooltip"
-            aria-expanded={navigationVisible}
-            aria-keyshortcuts={desktopShortcutAriaKeys(navigationShortcut)}
-            aria-label={navigationVisible ? messages.shell.hideNavigation : messages.shell.showNavigation}
-            onClick={onToggleNavigation}
-            type="button"
-          >
-            {navigationVisible ? <PanelLeftClose aria-hidden="true" size={16} /> : <PanelLeftOpen aria-hidden="true" size={16} />}
-            <ControlTooltip id="navigation-toggle-tooltip">{`${navigationVisible
-              ? messages.shell.hideNavigation
-              : messages.shell.showNavigation} · ${formatDesktopShortcut(navigationShortcut)}`}</ControlTooltip>
-          </button>
-        ) : null}
+    <header
+      className={`title-bar ${styles.header}`}
+      data-context-docked={inspectorDocked ? "true" : "false"}
+      data-navigation-docked={navigationDocked ? "true" : "false"}
+      data-surface={settingsSelected ? "settings" : "workbench"}
+    >
+      {navigationDocked || settingsSelected ? (
+        <div className={styles.navigationZone} data-testid="title-navigation-zone">
+          {navigationDocked ? navigationControl : null}
+        </div>
+      ) : null}
+
+      <div className={styles.workbenchZone} data-testid="title-workbench-zone">
+        <div className={styles.leadingControls}>
+          {!navigationDocked && !settingsSelected ? navigationControl : null}
+          {!settingsSelected ? <RepositoryEnvironmentStatus workspaceId={selectedWorkspace?.id} /> : null}
+        </div>
         <div className={`brand-lockup ${styles.brand}`} title={fullContextTitle}>
           {showBrandMark ? (
             <img
@@ -161,50 +220,25 @@ export function TitleBar({ navigationAvailable, navigationVisible, onToggleNavig
             </strong>
           </span>
         </div>
-        {!settingsSelected ? <RepositoryEnvironmentStatus workspaceId={selectedWorkspace?.id} /> : null}
+        <div className={styles.trailingControls}>
+          <div
+            className={`${styles.status} ${styles[status.tone]!}`}
+            aria-label={messages.shell.currentStatus(status.label)}
+            data-runtime-phase={runtime.phase}
+            title={status.label}
+          >
+            <StatusIcon kind={status.icon} {...(status.spinning === undefined ? {} : { spinning: status.spinning })} />
+            <span>{status.label}</span>
+          </div>
+          {!inspectorDocked ? applicationActions : null}
+        </div>
       </div>
 
-      <div className={`title-actions ${styles.actions}`}>
-        <div
-          className={`${styles.status} ${styles[status.tone]!}`}
-          aria-label={messages.shell.currentStatus(status.label)}
-          data-runtime-phase={runtime.phase}
-          title={status.label}
-        >
-          <StatusIcon kind={status.icon} {...(status.spinning === undefined ? {} : { spinning: status.spinning })} />
-          <span>{status.label}</span>
+      {inspectorDocked ? (
+        <div className={styles.inspectorZone} data-testid="title-inspector-zone">
+          {applicationActions}
         </div>
-        <NotificationCenter />
-        <button
-          className={`icon-button ${styles.iconButton}`}
-          aria-describedby="command-palette-tooltip"
-          aria-keyshortcuts={desktopShortcutAriaKeys(paletteShortcut)}
-          aria-label={messages.shell.openCommandPalette}
-          onClick={() => setCommandPaletteOpen(true)}
-          type="button"
-        >
-          <Command aria-hidden="true" size={16} />
-          <ControlTooltip id="command-palette-tooltip">{`${messages.shell.commandPalette} · ${formatDesktopShortcut(paletteShortcut)}`}</ControlTooltip>
-        </button>
-        {selectedWorkspace && !settingsSelected ? (
-          <button
-            className={`icon-button context-toggle ${styles.iconButton}`}
-            aria-controls="task-inspector"
-            aria-describedby="context-toggle-tooltip"
-            aria-expanded={contextVisible}
-            aria-keyshortcuts={desktopShortcutAriaKeys(contextShortcut)}
-            aria-label={contextVisible ? messages.shell.hideContext : messages.shell.showContext}
-            data-testid="inspector-toggle"
-            onClick={() => void toggleRendererContext()}
-            type="button"
-          >
-            {contextVisible ? <PanelRightClose aria-hidden="true" size={16} /> : <PanelRightOpen aria-hidden="true" size={16} />}
-            <ControlTooltip id="context-toggle-tooltip">{`${contextVisible
-              ? messages.shell.hideContextPanel
-              : messages.shell.showContextPanel} · ${formatDesktopShortcut(contextShortcut)}`}</ControlTooltip>
-          </button>
-        ) : null}
-      </div>
+      ) : null}
     </header>
   );
 }

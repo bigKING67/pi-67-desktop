@@ -26,6 +26,7 @@ export type ToolPresentationKind =
 
 export type ToolAutoAuthorizationReason =
   | "configured-source"
+  | "installed-capability"
   | "read-only"
   | "workspace-command"
   | "workspace-write";

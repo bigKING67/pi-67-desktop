@@ -33,7 +33,8 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
 ## Default development loop
 
 1. **Freeze source**：完成相关测试后 scoped commit；push 必须有当前明确授权。记录完整 source SHA，
-   并确认本地 HEAD 与目标远端分支的关系。未提交的并发 WIP 不得进入本轮候选。
+   并确认本地 HEAD 与目标远端分支的关系。运行 capability source reachability 与 freshness；包括
+   `browser67` 在内的分支跟踪能力必须让远端 ref 精确等于 lock commit。未提交的并发 WIP 不得进入本轮候选。
 2. **Build Windows**：使用 `Windows candidate` workflow 构建精确 source SHA。只有 provenance、
    packaged smoke、synthetic scale/IME、candidate identity 和完整 NSIS lifecycle 全部成功后，才下载
    `windows-candidate-<run-id>-<attempt>` 中的 NSIS EXE。NSIS lifecycle 必须在中文且带空格的受控 Pi

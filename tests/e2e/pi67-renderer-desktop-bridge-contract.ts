@@ -44,6 +44,7 @@ export interface MockDesktopBridgeOptions {
     workspaceId?: string;
   };
   capabilityInitializingCalls?: number;
+  browser67ExtensionState?: "not-prepared" | "reload-required";
   deferInitialUpdateState?: boolean;
   repositoryEnvironmentSnapshot?: RepositoryEnvironmentSnapshot;
 }

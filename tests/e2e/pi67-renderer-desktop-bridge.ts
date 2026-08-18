@@ -72,12 +72,10 @@ export async function installMockDesktopBridge(
     repositoryEnvironmentSnapshot: options.repositoryEnvironmentSnapshot,
     runtimeHealth: MOCK_DESKTOP_RUNTIME_HEALTH
   };
-  await installMockDesktopCapabilityBridge(
-    page,
-    options.capabilityInitializingCalls === undefined
-      ? {}
-      : { capabilityInitializingCalls: options.capabilityInitializingCalls }
-  );
+  await installMockDesktopCapabilityBridge(page, {
+    ...(options.capabilityInitializingCalls === undefined ? {} : { capabilityInitializingCalls: options.capabilityInitializingCalls }),
+    ...(options.browser67ExtensionState === undefined ? {} : { browser67ExtensionState: options.browser67ExtensionState })
+  });
   await installMockDesktopAttachmentBridge(page);
   await installMockDesktopRepositoryBridge(page, options.repositoryEnvironmentSnapshot);
   await installMockDesktopShutdownBridge(page);

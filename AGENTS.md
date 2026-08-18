@@ -75,15 +75,21 @@
   approval.
 - New trusted Workspaces default to `balanced`: bounded Workspace reads/writes,
   current-Session loaded-resource reads, verified read-only web Tools, and
-  conservatively classified local checks may run without a duplicate dialog.
-  Unknown Shell/third-party Tools and destructive, system, external-path, upload,
-  publish, dependency, or remote side effects remain one-shot approvals.
+  conservatively classified local checks may run without a duplicate dialog. An
+  enabled Package or MCP capability whose installed content is admitted and whose
+  effective Tool identity resolves uniquely is also an AUTO authorization grant,
+  including its destructive, system, external-path, upload, authentication,
+  publish, dependency, or remote side effects. ASK remains one-shot; PLAN remains
+  read-only. Unknown, unconfigured, duplicate, malformed, drifted, or ambiguous
+  capabilities fail closed instead of inheriting that grant.
 - Extensions cannot inject HTML, JavaScript, or React components into the
   renderer. TUI-only custom UI must fail explicitly instead of hanging.
-- Destructive, external, system, or workspace-external actions require an
-  explicit one-shot approval. The only Workspace-external read exception is the
-  canonical file or Skill directory already loaded by that exact Session's Pi
-  `ResourceLoader`; it never grants write or arbitrary home-directory access.
+- Destructive, external, system, or workspace-external actions outside an exact
+  installed-capability AUTO grant require an explicit one-shot approval. Loaded
+  resources alone never create that grant: the only Workspace-external read
+  exception is the canonical file or Skill directory already loaded by that exact
+  Session's Pi `ResourceLoader`; it never grants write or arbitrary home-directory
+  access.
 
 ## Candidate distribution
 

@@ -75,6 +75,7 @@ interface ClassifiedToolIntent extends ToolIntent {
   targetKind: ApprovalTargetKind;
   sourceLabel: string;
   nonApprovableReason?: string;
+  autoAuthorizationReason?: ToolAutoAuthorizationReason;
 }
 
 export function createDesktopSafetyExtension(
@@ -117,6 +118,14 @@ export function createDesktopSafetyExtension(
         if (state.trust === "trusted" && state.taskToolMode === "yolo") return undefined;
         if (intent.nonApprovableReason) {
           return { block: true, reason: intent.nonApprovableReason };
+        }
+        if (
+          state.trust === "trusted"
+          && state.taskToolMode === "auto"
+          && intent.autoAuthorizationReason !== undefined
+        ) {
+          recordToolAuthorization?.(event.toolCallId, intent.autoAuthorizationReason);
+          return undefined;
         }
 
         const approvalMode: ApprovalMode = state.taskToolMode === "ask" ? "guided" : "balanced";
@@ -328,12 +337,15 @@ async function classifyToolIntent(
     } catch {
       // The configured MCP catalog still remains authoritative for proxy calls.
     }
-    return classifyPiMcpAdapterIntent(profile, input, {
+    const intent = await classifyPiMcpAdapterIntent(profile, input, {
       catalog: configuredCapabilities,
       workspace,
       ...(loadedResourceReadAccess === undefined ? {} : { loadedResourceReadAccess }),
       isDirectTool: (candidate) => candidate !== "mcp" && activeTools.has(candidate)
     });
+    return intent.nonApprovableReason === undefined && intent.sourceLabel !== profile.sourceLabel
+      ? { ...intent, autoAuthorizationReason: "installed-capability" }
+      : intent;
   }
 
   if (
@@ -341,7 +353,7 @@ async function classifyToolIntent(
     || profile.kind === "managed-package"
     || profile.kind === "configured-mcp"
   ) {
-    return classifyConfiguredToolIntent({
+    const intent = await classifyConfiguredToolIntent({
       toolName,
       input: record,
       workspace,
@@ -351,6 +363,7 @@ async function classifyToolIntent(
         ? { serverName: profile.serverName, remoteToolName: profile.remoteToolName }
         : {})
     });
+    return { ...intent, autoAuthorizationReason: "installed-capability" };
   }
 
   return {

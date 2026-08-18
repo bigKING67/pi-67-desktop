@@ -101,6 +101,28 @@ describe("first-party capability freshness", () => {
     expect(report.status).toBe("failed");
   });
 
+  it("requires branch-tracked first-party sources to match the exact remote commit", async () => {
+    const lock = fixtureLock();
+    lock.sources[0].ref = "refs/heads/main";
+    const report = await createCapabilityFreshnessReport({
+      lock,
+      resolveLatest: async (repository) => ({
+        version: lock.sources.find((source) => source.repository === repository).version,
+        tag: "v1.0.0",
+        commit: CURRENT_COMMIT
+      }),
+      resolveRef: async (repository) => repository.endsWith("/current.git") ? LATEST_COMMIT : CURRENT_COMMIT
+    });
+
+    expect(report.sources[0]).toMatchObject({
+      id: "current",
+      ref: "refs/heads/main",
+      lockedCommit: CURRENT_COMMIT,
+      latestCommit: LATEST_COMMIT,
+      status: "stale"
+    });
+  });
+
   it("rejects ambiguous stable tag aliases that resolve to different commits", () => {
     const output = [
       `${CURRENT_COMMIT}\trefs/tags/1.0.0`,
@@ -115,6 +137,7 @@ describe("first-party capability freshness", () => {
       import.meta.url
     ), "utf8");
     const release = await readFile(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8");
+    const candidate = await readFile(new URL("../../.github/workflows/windows-candidate.yml", import.meta.url), "utf8");
     const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8"));
 
     expect(workflow).toContain("workflow_dispatch:");
@@ -126,6 +149,8 @@ describe("first-party capability freshness", () => {
     expect(workflow).not.toContain("pnpm install");
     expect(release).toContain("Verify first-party capability freshness");
     expect(release).toContain("capability-freshness-signed-release-${{ github.run_id }}-${{ github.run_attempt }}");
+    expect(candidate).toContain("Verify first-party capability freshness");
+    expect(candidate).toContain("capability-freshness-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}");
     expect(packageJson.scripts["check:capability-freshness"])
       .toBe("node eng/capabilities/check-capability-freshness.mjs");
   });

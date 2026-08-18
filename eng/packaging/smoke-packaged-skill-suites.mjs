@@ -23,7 +23,7 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
     .waitFor({ state: "visible", timeout: 15_000 });
   await suiteDetail.getByText("https://github.com/xbtlin/ai-berkshire", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await suiteDetail.getByText("66e556262", { exact: true })
+  await suiteDetail.getByText("6fb75c97a", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-ai-berkshire-skill-suite-detail.png");
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();

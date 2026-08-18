@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.16.1");
+    expect(lock.catalogVersion).toBe("2026.08.18.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -27,11 +27,13 @@ describe("Desktop first-party capability source lock", () => {
     expect(lock.sources.every((source) => /^[0-9a-f]{40}$/u.test(source.commit))).toBe(true);
     expect(lock.sources.find((source) => source.id === "pi67-core")).toMatchObject({
       commit: "500f3f63a14d80b0297a1dcc04237b5e2cf87894",
+      ref: "refs/heads/main",
       includedExtensions: ["pi-rules-loader"]
     });
     expect(lock.sources.find((source) => source.id === "browser67")).toMatchObject({
       version: "0.4.0",
-      commit: "c2394ca7810e01fed73dbba34a29bac8e1be5196"
+      ref: "refs/heads/main",
+      commit: "bb43570f139feafc2632f8da19f34b4863e6bccb"
     });
     expect(lock.skillPacks).toEqual([{
       name: "ai-berkshire-investment-suite",
@@ -39,11 +41,11 @@ describe("Desktop first-party capability source lock", () => {
       adapterSourceId: "pi67-core",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "66e556262d6486a9819286252e5c9f90a4cfa386",
+      commit: "6fb75c97ae14ba198998a3b5d9b586acda3ca7b5",
       localSibling: "../ai-berkshire",
       version: "1.0.1",
-      manifestSha256: "ce79fbc1c20d8da9e6a3171dc267df50470fe89c52db577ff441c8c582556ab0",
-      bundleSha256: "7438834d7e26b0043332c886503cfdf45ac3dab5d1e46def95ce2b899f08d018"
+      manifestSha256: "cdfc2ed95fdb67171f19f12f3e1fdaff40e5d31d677ff1e3e1cece2b5ed00b10",
+      bundleSha256: "347b411e1b3b7b06bb061aa19ef1fd4bd762cec9b3793b2406e4b7fb24f334fd"
     }]);
     expect(() => assertPi67SkillPackSource(lock.skillPacks[0])).not.toThrow();
     expect(lock.managedNpmBundles).toMatchObject([{
@@ -89,6 +91,12 @@ describe("Desktop first-party capability source lock", () => {
       manifestSha256: "invalid",
       bundleSha256: "2".repeat(64)
     })).toThrow(/source is invalid/u);
+  });
+
+  it("rejects malformed first-party tracked branch refs", async () => {
+    const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+    lock.sources[0].ref = "refs/heads/../main";
+    expect(() => assertCapabilitySourceLock(lock)).toThrow(/invalid tracked branch ref/u);
   });
 
   it("rejects prepared capability metadata that drifts from locked sources", async () => {

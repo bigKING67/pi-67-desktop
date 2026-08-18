@@ -259,6 +259,33 @@ test("keeps browser integration as the only first-party connection surface", asy
   await installer.getByRole("button", { name: "完成", exact: true }).click();
 });
 
+test("keeps the managed-source repair instructions after refreshing browser67 files", async ({ page }, testInfo) => {
+  await installMockDesktopBridge(page, { browser67ExtensionState: "reload-required" });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.keyboard.press("Control+,");
+
+  const settings = page.getByLabel("π 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: "浏览器集成", exact: true }).click();
+  await expect(settings.getByText("需要同步受管版本", { exact: true })).toBeVisible();
+  await settings.getByRole("button", { name: "修复浏览器扩展", exact: true }).click();
+
+  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
+  await expect(installer.getByRole("status")).toContainText("目录不一致时移除旧条目");
+  await expect(installer.getByText("核对并替换加载来源", { exact: true })).toBeVisible();
+  await expect(installer).toContainText("旧目录必须移除后");
+  await expect(installer.getByRole("button", { name: "复制扩展目录", exact: true })).toBeEnabled();
+  await expect(settings.getByText("需要同步受管版本", { exact: true })).toBeVisible();
+  const repairScreenshotPath = testInfo.outputPath("settings-browser-managed-source-repair.png");
+  await page.screenshot({ path: repairScreenshotPath, animations: "disabled" });
+  await testInfo.attach("settings-browser-managed-source-repair", {
+    path: repairScreenshotPath,
+    contentType: "image/png"
+  });
+});
+
 test("opens, previews, edits, creates, and conflict-checks Context Markdown files", async ({ page }) => {
   const remoteImageRequests: string[] = [];
   page.on("request", (request) => {

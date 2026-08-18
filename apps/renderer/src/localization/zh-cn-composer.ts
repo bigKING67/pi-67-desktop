@@ -21,7 +21,7 @@ export const zhCNComposerMessages = {
     },
     auto: {
       label: "AUTO",
-      description: "常规操作自动，高风险询问"
+      description: "已安装能力与常规操作自动，未知来源受限"
     },
     yolo: {
       label: "YOLO",

@@ -342,6 +342,7 @@ function browser67Result(
     status,
     path: join(agentDir, "mcp.json"),
     conflicts,
+    migratedLegacyServers: [],
     cacheStatus,
     cachePath: join(agentDir, "mcp-cache.json"),
     invalidatedCacheServers: []

@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -20,6 +21,31 @@ const { agentDir, userDataDirectory, workspace } = directories;
 let application;
 
 try {
+  const retiredBrowser67Root = join(homedir(), ".agents", "packages", "browser67");
+  await Promise.all([
+    writeFile(`${agentDir}/mcp.json`, `${JSON.stringify({
+      settings: { toolPrefix: "server" },
+      mcpServers: {
+        retained_fixture: { command: "retained-fixture" },
+        tmwd_browser: {
+          command: "node",
+          args: [join(retiredBrowser67Root, "src", "mcp", "browser", "server.mjs")]
+        },
+        "js-reverse": {
+          command: "node",
+          args: [join(retiredBrowser67Root, "src", "mcp", "js-reverse", "server.mjs")]
+        }
+      }
+    }, null, 2)}\n`, "utf8"),
+    writeFile(`${agentDir}/mcp-cache.json`, `${JSON.stringify({
+      version: 1,
+      servers: {
+        retained_fixture: { tools: [] },
+        tmwd_browser: { tools: [{ name: "stale-browser-tool" }] },
+        "js-reverse": { tools: [{ name: "stale-reverse-tool" }] }
+      }
+    })}\n`, "utf8")
+  ]);
   application = await launchPackagedApplication({
     agentDir,
     artifact,
@@ -37,12 +63,17 @@ try {
 
   const mcpConfig = await readJson(`${agentDir}/mcp.json`);
   assert(mcpConfig.pi67ManagedMcp?.schema === "pi67.browser67-mcp.v1", "managed MCP receipt is missing");
+  assert(mcpConfig.mcpServers?.retained_fixture?.command === "retained-fixture", "unrelated MCP config was not preserved");
+  const mcpCache = await readJson(`${agentDir}/mcp-cache.json`);
+  assert(mcpCache.servers?.retained_fixture !== undefined, "unrelated MCP cache was not preserved");
+  assert(mcpCache.servers?.tmwd_browser === undefined, "retired tmwd_browser cache was not invalidated");
+  assert(mcpCache.servers?.["js-reverse"] === undefined, "retired js-reverse cache was not invalidated");
   const browser67Root = join(artifact.resourcesPath, "capabilities", "packages", "browser67");
   const tmwdBrowserEntrypoint = mcpConfig.mcpServers?.tmwd_browser?.args?.[0];
   assert(
     typeof tmwdBrowserEntrypoint === "string"
       && resolve(dirname(tmwdBrowserEntrypoint), "../../..") === resolve(browser67Root),
-    "managed MCP did not resolve browser67 from the packaged capability root"
+    "managed MCP did not migrate browser67 to the packaged capability root"
   );
   const browser67Package = await readJson(`${browser67Root}/package.json`);
   assert(browser67Package.version === "0.4.0", "unexpected browser67 version");
@@ -136,7 +167,12 @@ async function runPackagedDoctor({ nodeExecutable, browser67Root }) {
     "--disable-event-log"
   ], {
     cwd: browser67Root,
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      BROWSER67_EXTENSION_BUILD_REVISION: "",
+      GITHUB_SHA: "",
+      GIT_CEILING_DIRECTORIES: dirname(resolve(browser67Root))
+    },
     maxBuffer: 8 * 1024 * 1024,
     timeout: 30_000
   });

@@ -72,6 +72,134 @@ describe("managed browser67 MCP provision", () => {
     });
   });
 
+  it("migrates the exact retired Windows browser67 pair and invalidates its stale cache", async () => {
+    const fixture = await createFixture(true);
+    const homeDirectory = "C:\\Users\\Groland";
+    const legacyRoot = `${homeDirectory}\\.agents\\packages\\browser67`;
+    await mkdir(fixture.agentDir, { recursive: true });
+    await writeFile(fixture.mcpPath, JSON.stringify({
+      settings: { toolPrefix: "server" },
+      mcpServers: {
+        linear: { url: "https://redacted.invalid/mcp" },
+        tmwd_browser: {
+          command: "C:\\Users\\Groland\\scoop\\apps\\nodejs-lts\\current\\bin\\node.exe",
+          args: [`${legacyRoot}\\src\\mcp\\browser\\server.mjs`],
+          env: {
+            BROWSER_STRUCTURED_TMWD_MODE: "tmwd",
+            BROWSER_STRUCTURED_TMWD_TRANSPORT: "auto",
+            BROWSER_STRUCTURED_TMWD_WS_ENDPOINT: "ws://127.0.0.1:18765",
+            BROWSER_STRUCTURED_TMWD_LINK_ENDPOINT: "http://127.0.0.1:18766/link"
+          }
+        },
+        "js-reverse": {
+          command: "node",
+          args: [`${legacyRoot}\\src\\mcp\\js-reverse\\server.mjs`]
+        }
+      }
+    }), "utf8");
+    const unrelated = cacheEntry("linear-tool");
+    await writeFile(fixture.cachePath, JSON.stringify({
+      version: 1,
+      servers: {
+        linear: unrelated,
+        tmwd_browser: cacheEntry("stale-browser-tool"),
+        "js-reverse": cacheEntry("stale-reverse-tool")
+      }
+    }), "utf8");
+
+    await expect(provisionManagedBrowser67Mcp({
+      ...fixture,
+      homeDirectory
+    })).resolves.toMatchObject({
+      status: "updated",
+      conflicts: [],
+      migratedLegacyServers: ["tmwd_browser", "js-reverse"],
+      cacheStatus: "updated",
+      invalidatedCacheServers: ["tmwd_browser", "js-reverse"]
+    });
+
+    const config = JSON.parse(await readFile(fixture.mcpPath, "utf8"));
+    expect(config.settings).toEqual({ toolPrefix: "server" });
+    expect(config.mcpServers.linear).toEqual({ url: "https://redacted.invalid/mcp" });
+    expect(config.mcpServers.tmwd_browser).toEqual({
+      command: fixture.nodeExecutable,
+      args: [join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")]
+    });
+    expect(config.mcpServers["js-reverse"]).toEqual({
+      command: fixture.nodeExecutable,
+      args: [join(fixture.browser67Root, "src", "mcp", "js-reverse", "server.mjs")]
+    });
+    expect(config.pi67ManagedMcp.schema).toBe("pi67.browser67-mcp.v1");
+    expect(JSON.parse(await readFile(fixture.cachePath, "utf8"))).toEqual({
+      version: 1,
+      servers: { linear: unrelated }
+    });
+    await expect(provisionManagedBrowser67Mcp({
+      ...fixture,
+      homeDirectory
+    })).resolves.toMatchObject({
+      status: "unchanged",
+      migratedLegacyServers: [],
+      cacheStatus: "skipped"
+    });
+  });
+
+  it("does not claim a partial or arbitrary browser67 checkout as a retired Desktop pair", async () => {
+    const fixture = await createFixture();
+    const homeDirectory = "C:\\Users\\Groland";
+    const legacyRoot = `${homeDirectory}\\.agents\\packages\\browser67`;
+    await writeFile(fixture.mcpPath, JSON.stringify({
+      mcpServers: {
+        tmwd_browser: {
+          command: "node.exe",
+          args: [`${legacyRoot}\\src\\mcp\\browser\\server.mjs`]
+        },
+        "js-reverse": {
+          command: "node.exe",
+          args: ["C:\\Users\\Groland\\source\\browser67\\src\\mcp\\js-reverse\\server.mjs"]
+        }
+      }
+    }), "utf8");
+
+    await expect(provisionManagedBrowser67Mcp({
+      ...fixture,
+      homeDirectory
+    })).resolves.toMatchObject({
+      status: "user-owned-conflict",
+      conflicts: ["tmwd_browser", "js-reverse"],
+      migratedLegacyServers: [],
+      cacheStatus: "skipped"
+    });
+  });
+
+  it("preserves an exact-path browser67 pair when its legacy environment was customized", async () => {
+    const fixture = await createFixture();
+    const homeDirectory = "C:\\Users\\Groland";
+    const legacyRoot = `${homeDirectory}\\.agents\\packages\\browser67`;
+    await writeFile(fixture.mcpPath, JSON.stringify({
+      mcpServers: {
+        tmwd_browser: {
+          command: "node.exe",
+          args: [`${legacyRoot}\\src\\mcp\\browser\\server.mjs`],
+          env: { BROWSER_STRUCTURED_TMWD_WS_ENDPOINT: "custom-endpoint" }
+        },
+        "js-reverse": {
+          command: "node.exe",
+          args: [`${legacyRoot}\\src\\mcp\\js-reverse\\server.mjs`]
+        }
+      }
+    }), "utf8");
+
+    await expect(provisionManagedBrowser67Mcp({
+      ...fixture,
+      homeDirectory
+    })).resolves.toMatchObject({
+      status: "user-owned-conflict",
+      conflicts: ["tmwd_browser", "js-reverse"],
+      migratedLegacyServers: []
+    });
+  });
+
   it("fails closed for user-owned same-name entries and invalid JSON", async () => {
     const conflict = await createFixture();
     await writeFile(conflict.mcpPath, JSON.stringify({
@@ -85,6 +213,7 @@ describe("managed browser67 MCP provision", () => {
       status: "user-owned-conflict",
       path: conflict.mcpPath,
       conflicts: ["tmwd_browser"],
+      migratedLegacyServers: [],
       cacheStatus: "skipped",
       invalidatedCacheServers: []
     });

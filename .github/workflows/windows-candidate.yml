@@ -75,6 +75,15 @@ jobs:
           fi
       - name: Verify locked capability sources are remotely fetchable
         run: node eng/capabilities/verify-capability-source-lock.mjs
+      - name: Verify first-party capability freshness
+        run: node eng/capabilities/check-capability-freshness.mjs --json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: capability-freshness-windows-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/quality/capability-freshness.json
+          if-no-files-found: error
+          retention-days: 14
       - run: corepack pnpm install --frozen-lockfile
       - name: Audit production dependencies
         run: corepack pnpm run check:dependencies

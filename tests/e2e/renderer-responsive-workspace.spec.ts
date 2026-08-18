@@ -36,8 +36,28 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   expect(wide.messageWidth).toBeLessThanOrEqual(862);
   expect(Math.abs(wide.messageWidth - wide.composerWidth)).toBeLessThanOrEqual(1);
 
+  const wideTitleGeometry = await measurePaneTitleGeometry(page);
+  expect(Math.abs(wideTitleGeometry.navigationRight! - wideTitleGeometry.workbenchLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wideTitleGeometry.workbenchRight - wideTitleGeometry.inspectorLeft!)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wideTitleGeometry.workbenchCenter - wideTitleGeometry.titleCenter)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wideTitleGeometry.navigationWidth! - wide.navigationWidth!)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wideTitleGeometry.inspectorWidth! - wide.inspectorWidth!)).toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: testInfo.outputPath("pane-aligned-titlebar-wide-light.png"),
+    animations: "disabled"
+  });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.screenshot({
+    path: testInfo.outputPath("pane-aligned-titlebar-wide-dark.png"),
+    animations: "disabled"
+  });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
   await page.getByTestId("inspector-toggle").click();
   await expect(inspector).toHaveCount(0);
+  await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
   await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBeGreaterThan(1010);
   const contextHidden = await measureWorkspace(navigation, undefined, message, composer);
   expect(contextHidden.messageWidth).toBeGreaterThan(wide.messageWidth + 150);
@@ -46,6 +66,7 @@ test("bounds wide side columns and expands the shared conversation measure", asy
 
   await page.getByRole("button", { name: "隐藏会话导航" }).click();
   await expect(navigation).not.toBeVisible();
+  await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
   await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBeGreaterThan(1110);
   const sidesHidden = await measureWorkspace(undefined, undefined, message, composer);
   expect(sidesHidden.workspaceClass).toContain("navigation-hidden");
@@ -67,6 +88,7 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await expect(inspector).toHaveCount(0);
+  await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("context-auto-collapsed-1320px.png"),
     animations: "disabled"
@@ -74,6 +96,7 @@ test("keeps the transcript primary at the context-drawer breakpoint", async ({ p
   const contextToggle = page.getByRole("button", { name: "显示任务检查器" });
   await contextToggle.click();
   await expect(inspector).toBeVisible();
+  await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
   expect((await inspector.boundingBox())?.width).toBeGreaterThanOrEqual(359);
   expect((await inspector.boundingBox())?.width).toBeLessThanOrEqual(384);
   await expect(page.getByRole("tab", { name: "消息", exact: true })).toBeVisible();
@@ -249,6 +272,8 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   const navigationToggle = page.getByRole("button", { name: "显示会话导航" });
   const sendButton = page.getByRole("button", { name: "发送" });
   await expect(navigation).not.toBeVisible();
+  await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
+  await expect(page.getByTestId("title-inspector-zone")).toHaveCount(0);
   await expect(navigationToggle).toHaveAttribute("aria-expanded", "false");
   await expect(sendButton).toBeVisible();
   await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
@@ -286,3 +311,27 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await expect(page.getByRole("button", { name: "显示任务检查器" })).toBeFocused();
   await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
 });
+
+async function measurePaneTitleGeometry(page: import("@playwright/test").Page) {
+  return page.locator(".title-bar").evaluate((header) => {
+    const navigation = header.querySelector<HTMLElement>('[data-testid="title-navigation-zone"]');
+    const workbench = header.querySelector<HTMLElement>('[data-testid="title-workbench-zone"]');
+    const inspector = header.querySelector<HTMLElement>('[data-testid="title-inspector-zone"]');
+    const title = header.querySelector<HTMLElement>('[data-testid="title-context-current"]');
+    if (!workbench || !title) throw new Error("Pane-aligned TitleBar geometry is unavailable.");
+    const navigationRect = navigation?.getBoundingClientRect();
+    const workbenchRect = workbench.getBoundingClientRect();
+    const inspectorRect = inspector?.getBoundingClientRect();
+    const titleRect = title.getBoundingClientRect();
+    return {
+      navigationRight: navigationRect?.right,
+      navigationWidth: navigationRect?.width,
+      workbenchLeft: workbenchRect.left,
+      workbenchRight: workbenchRect.right,
+      workbenchCenter: workbenchRect.left + workbenchRect.width / 2,
+      inspectorLeft: inspectorRect?.left,
+      inspectorWidth: inspectorRect?.width,
+      titleCenter: titleRect.left + titleRect.width / 2
+    };
+  });
+}

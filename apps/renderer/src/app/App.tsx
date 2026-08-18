@@ -58,6 +58,7 @@ export function App() {
   const selectedSurface = useWorkbenchStore((state) => state.selectedSurface);
   const workbenchWorkspaceCount = useWorkbenchStore((state) => state.workspaceOrder.length);
   const [navigationIsDrawer, setNavigationIsDrawer] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  const [contextIsDrawer, setContextIsDrawer] = useState(() => window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY).matches);
   const freshnessInstallationRef = useRef<ReturnType<typeof createOperationFreshnessInstallation> | undefined>(undefined);
   if (!freshnessInstallationRef.current) {
     freshnessInstallationRef.current = createOperationFreshnessInstallation({
@@ -155,16 +156,16 @@ export function App() {
   }, [contextVisible, navigationIsDrawer, setNavigationVisible]);
 
   useEffect(() => {
-    if (!workspace) return;
     const breakpoint = window.matchMedia(CONTEXT_DRAWER_MEDIA_QUERY);
-    const closeWhenNarrow = (matches: boolean) => {
+    const syncContextMode = (matches: boolean) => {
+      setContextIsDrawer(matches);
       if (matches) setContextVisible(false);
     };
-    const onBreakpointChange = (event: MediaQueryListEvent) => closeWhenNarrow(event.matches);
-    closeWhenNarrow(breakpoint.matches);
+    const onBreakpointChange = (event: MediaQueryListEvent) => syncContextMode(event.matches);
+    syncContextMode(breakpoint.matches);
     breakpoint.addEventListener("change", onBreakpointChange);
     return () => breakpoint.removeEventListener("change", onBreakpointChange);
-  }, [setContextVisible, workspace]);
+  }, [setContextVisible]);
 
   const closeContextDrawer = () => {
     setContextVisible(false);
@@ -180,7 +181,13 @@ export function App() {
       data-workspace-open-pending={workspaceOpenPending ? "true" : "false"}
     >
       <WorkbenchProjectionBridge />
-      <TitleBar navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0} navigationVisible={navigationVisible} onToggleNavigation={toggleNavigation} />
+      <TitleBar
+        contextIsDrawer={contextIsDrawer}
+        navigationAvailable={Boolean(workspace) || workbenchWorkspaceCount > 0}
+        navigationIsDrawer={navigationIsDrawer}
+        navigationVisible={navigationVisible}
+        onToggleNavigation={toggleNavigation}
+      />
       {!workspace && workbenchWorkspaceCount === 0 && selectedSurface?.kind !== "settings" ? (
         <Welcome />
       ) : (
