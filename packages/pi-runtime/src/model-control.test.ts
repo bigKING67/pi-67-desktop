@@ -1,8 +1,16 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { getBuiltinModel } from "@earendil-works/pi-ai/providers/all";
 import { describe, expect, it, vi } from "vitest";
 import { selectSessionModel } from "./model-control.js";
 
 describe("model control", () => {
+  it("exposes the Pi 0.84 DeepSeek Flash thinking levels without renderer-owned aliases", () => {
+    const model = getBuiltinModel("deepseek", "deepseek-v4-flash");
+
+    expect(getSupportedThinkingLevels(model)).toEqual(["off", "low", "high", "max"]);
+  });
+
   it("does not append another Pi model change when the requested model is already active", async () => {
     const getModel = vi.fn();
     const setModel = vi.fn();

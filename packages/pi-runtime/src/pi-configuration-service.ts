@@ -18,6 +18,7 @@ import type {
 import { PiAuthCredentialStore } from "./pi-auth-credential-store.js";
 import {
   PiConfigurationWatcher,
+  readWorkspaceConfigurationBundle,
   type PiConfigurationPaths,
   type WorkspaceConfigurationState
 } from "./pi-configuration-file-state.js";
@@ -44,6 +45,13 @@ export interface RegisterPiConfigurationWorkspaceOptions {
   settingsManager: PiSettingsManager;
   projectTrusted: boolean;
 }
+
+interface TaskModelRuntimeCandidate {
+  runtime: ModelRuntime;
+  modelsRevision: string;
+  authRevision: string;
+}
+
 export class PiConfigurationService {
   readonly agentDir: string;
   readonly modelsPath: string;
@@ -57,6 +65,8 @@ export class PiConfigurationService {
   private readonly limits: ResolvedPiConfigurationServiceOptions;
   private readonly mutations: PiConfigurationMutations;
   private modelRuntime: ModelRuntime | undefined;
+  private taskModelRuntimeCandidate: TaskModelRuntimeCandidate | undefined;
+  private taskModelRuntimeLoad: Promise<TaskModelRuntimeCandidate> | undefined;
   private operationTail: Promise<unknown> = Promise.resolve();
   private disposed = false;
 
@@ -160,11 +170,24 @@ export class PiConfigurationService {
 
   createModelRuntime(): Promise<ModelRuntime> {
     this.assertActive();
+    const candidate = this.resolveTaskModelRuntimeCandidate(true);
+    const activeLoad = this.taskModelRuntimeLoad;
     return withPiConfigurationBudget(
-      this.createPiModelRuntime(),
+      candidate.then(({ runtime }) => runtime),
       this.limits.validationRuntimeWaitMs,
       "session-model-runtime"
-    );
+    ).catch((error: unknown) => {
+      if (activeLoad && this.taskModelRuntimeLoad === activeLoad) {
+        this.taskModelRuntimeLoad = undefined;
+        this.taskModelRuntimeCandidate = undefined;
+      }
+      throw error;
+    });
+  }
+
+  prewarmModelRuntime(): void {
+    this.assertActive();
+    void this.resolveTaskModelRuntimeCandidate(false).catch(() => undefined);
   }
 
   get(cwd: string): Promise<PiProviderConfigurationSnapshot> {
@@ -265,6 +288,8 @@ export class PiConfigurationService {
     this.globalState.listeners.clear();
     this.globalState.runtimes.clear();
     this.workspaces.clear();
+    this.taskModelRuntimeCandidate = undefined;
+    this.taskModelRuntimeLoad = undefined;
   }
 
   private async refreshLocked(
@@ -293,6 +318,14 @@ export class PiConfigurationService {
   }
 
   private async createPiValidationRuntime(): Promise<ModelRuntime> {
+    if (this.taskModelRuntimeCandidate || this.taskModelRuntimeLoad) {
+      const candidate = await withPiConfigurationBudget(
+        this.resolveTaskModelRuntimeCandidate(false),
+        this.limits.validationRuntimeWaitMs,
+        "provider-validation-runtime"
+      );
+      return candidate.runtime;
+    }
     return withPiConfigurationBudget(
       this.createPiModelRuntime(),
       this.limits.validationRuntimeWaitMs,
@@ -313,6 +346,76 @@ export class PiConfigurationService {
     });
     await installFirstPartyModelProviders(runtime);
     return runtime;
+  }
+
+  private resolveTaskModelRuntimeCandidate(consume: boolean): Promise<TaskModelRuntimeCandidate> {
+    const operation = this.taskModelRuntimeCandidate
+      ? Promise.resolve(this.taskModelRuntimeCandidate)
+      : this.taskModelRuntimeLoad ?? this.beginTaskModelRuntimeLoad();
+    return operation.then(async (candidate) => {
+      const current = await readWorkspaceConfigurationBundle(
+        this.paths,
+        this.globalState,
+        this.limits.fileAccessWaitMs
+      );
+      const matches = candidate.modelsRevision === current.byKind.models.revision
+        && candidate.authRevision === current.byKind.auth.revision;
+      if (!matches) {
+        if (this.taskModelRuntimeCandidate === candidate) this.taskModelRuntimeCandidate = undefined;
+        if (this.taskModelRuntimeLoad === operation) this.taskModelRuntimeLoad = undefined;
+        return this.resolveTaskModelRuntimeCandidate(consume);
+      }
+      if (consume && this.taskModelRuntimeCandidate === candidate) {
+        this.taskModelRuntimeCandidate = undefined;
+      }
+      if (consume && this.taskModelRuntimeLoad === operation) this.taskModelRuntimeLoad = undefined;
+      return candidate;
+    });
+  }
+
+  private beginTaskModelRuntimeLoad(): Promise<TaskModelRuntimeCandidate> {
+    const load = (async () => {
+      const before = await readWorkspaceConfigurationBundle(
+        this.paths,
+        this.globalState,
+        this.limits.fileAccessWaitMs
+      );
+      const authError = this.credentials.loadContent(before.byKind.auth.content);
+      if (authError) {
+        throw new Error(`Pi could not load auth.json: ${authError}`);
+      }
+      const runtime = await this.createPiModelRuntime();
+      const after = await readWorkspaceConfigurationBundle(
+        this.paths,
+        this.globalState,
+        this.limits.fileAccessWaitMs
+      );
+      if (
+        before.byKind.models.revision !== after.byKind.models.revision
+        || before.byKind.auth.revision !== after.byKind.auth.revision
+      ) {
+        throw new RuntimeError(
+          "CONFIGURATION_CHANGED_EXTERNALLY",
+          "Pi Provider configuration changed while Desktop was preparing the first Task runtime.",
+          { recoverable: true }
+        );
+      }
+      return {
+        runtime,
+        modelsRevision: after.byKind.models.revision,
+        authRevision: after.byKind.auth.revision
+      };
+    })();
+    this.taskModelRuntimeLoad = load;
+    void load.then((candidate) => {
+      if (this.taskModelRuntimeLoad === load) {
+        this.taskModelRuntimeCandidate = candidate;
+        this.taskModelRuntimeLoad = undefined;
+      }
+    }, () => {
+      if (this.taskModelRuntimeLoad === load) this.taskModelRuntimeLoad = undefined;
+    });
+    return load;
   }
 
   private unregisterWorkspace(cwd: string): void {

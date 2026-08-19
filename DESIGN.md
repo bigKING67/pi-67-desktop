@@ -925,8 +925,11 @@ loading error where the operation can produce those states
   visibly actionable as a recovery state. A missing owning CLI says `CLI 未安装`
   rather than `检查失败`; its detail leads with `安装 Lark CLI`, and the confirmed
   operation remains globally fenced while any Pi Task is active. Desktop stages the
-  official npm package outside the active directory with npm lifecycle scripts
-  disabled, verifies its identity and bounded install entry before executing that one
+  official npm package outside the active directory by trying each configured npm
+  source in order through the real isolated install operation; a failed mirror install
+  is cleaned before the official fallback. npm lifecycle scripts remain disabled.
+  Desktop verifies package identity, the exact checked update target (or resolved
+  stable version for first install), monotonic upgrade relation, and bounded install entry before executing that one
   entry, verifies native/update identity, atomically swaps the current-user shared
   tool installation, and installs the exact official suite into
   `~/.agents/skills`. The confirmation names that current-user global scope and says
@@ -1055,7 +1058,9 @@ loading error where the operation can produce those states
   and does not block Main because no token is injected.
 - Capability bootstrap provisions `tmwd_browser` and `js-reverse` into `mcp.json`
   with Desktop private Node and browser67 entrypoints under the active Pi Agent
-  Profile. Same-name entries without an exact Desktop receipt are user-owned conflicts
+  Profile. The managed `tmwd_browser` specification includes `directTools=true`; a
+  previously receipted proxy-only specification is revision-migrated and its cached
+  Tool schema is invalidated. Same-name entries without an exact Desktop receipt are user-owned conflicts
   and are never overwritten. Revision-checked atomic replacement prevents lost updates.
   A changed browser67 commit or server spec invalidates only those two entries in a
   structurally valid `mcp-cache.json`; unrelated server metadata is preserved. Cache
@@ -1087,12 +1092,13 @@ loading error where the operation can produce those states
 - `已安装并连接` is a live state, not an optimistic completion label. It appears
   only when the current Desktop process observes a WS or Link Doctor route with
   `ok=true`, `detail=extension_identity_ok`, and `identity_match=true`. Missing
-  connection keeps prepared files in `待浏览器加载`; a live identity mismatch becomes
-  `需要同步受管版本`; malformed files or operations fail visibly. The repair dialog
-  retains the mismatch context after managed files refresh, distinguishes a same-path
-  reload from an old loaded source, and instructs the user to remove the old entry and
-  load the Pi-67-provided directory when those sources differ. File preparation keeps
-  `需要同步受管版本` visible until live identity verification succeeds. A persisted connected
+  connection keeps prepared files in `待浏览器连接`; a live identity mismatch becomes
+  `需要重新加载验证`; malformed files or operations fail visibly. Explicit verification
+  first requests an in-place reload of current managed files and repeats live Doctor.
+  The repair dialog does not run file preparation for `reload-required`, distinguishes
+  a same-path reload from an old loaded source, and instructs the user to remove the old
+  entry only when its source differs from the Pi-67-provided directory. File preparation keeps
+  `需要重新加载验证` visible until live identity verification succeeds. A persisted connected
   result is demoted until this process rechecks it. The dialog scrolls vertically
   inside the viewport at high zoom and never creates document-level horizontal overflow.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
@@ -1281,9 +1287,11 @@ loading error where the operation can produce those states
   selector. An empty configured-model set names that next action explicitly.
 - The thinking control localizes its product label but preserves Pi's canonical
   lowercase Runtime values, such as `思考：off`, `思考：high`, and `思考：max`.
-  Its bounded React Aria picker exposes only levels supported by the authoritative
-  current model and explains that model-specific scope without translating or
-  inventing Runtime semantics.
+  Its bounded React Aria picker projects the exact ordered result of Pi SDK
+  `AgentSession.getAvailableThinkingLevels()` for the authoritative current model.
+  The footer names that model and the returned values, and states that omitted
+  levels are not sent; Desktop never fills gaps, translates values, or invents
+  Runtime semantics.
 - Model selection is an explicit Renderer-owned mutation state rather than an
   optimistic projection write. While one target is pending, the selector keeps
   that target visible, disables duplicate selection, and exposes `正在切换到…`
@@ -1724,7 +1732,7 @@ loading error where the operation can produce those states
 ### Extension UI and approval
 
 - Dialogs identify the extension or tool only when the runtime supplies an
-  authoritative identity. Pi SDK `0.83.0` does not identify the caller for
+  authoritative identity. Pi SDK `0.84.2` does not identify the caller for
   shared `ctx.ui` primitives, so those dialogs use the truthful generic label
   `Pi extension` instead of guessing a package.
 - Safety Approval is a dedicated dialog and protocol, not an Extension `confirm`.
@@ -1914,9 +1922,11 @@ loading error where the operation can produce those states
   Settings reload latency. Validation timeout produces an `invalid` snapshot with
   a fixed diagnostic; file-access timeout produces a structured recoverable error
   without exposing the affected absolute path.
-- A real Task does not reuse the diagnostic projection's partial state. Its own
-  offline `ModelRuntime.create()` is bounded to 4 seconds inside Agent Host and
-  fails with recoverable stage `session-model-runtime` before Workspace/Session
+- A real Task never reuses an invalid or partial diagnostic projection. Agent Host
+  starts one revision-bound runtime prewarm before Workspace restoration; the first
+  complete Provider validation and first Task may share it only after current
+  `models.json` and `auth.json` revisions match. The resulting startup remains bounded
+  to 4 seconds inside Agent Host and fails with recoverable stage `session-model-runtime` before Workspace/Session
   acknowledgement expires. Retry starts a new Pi runtime creation attempt; the
   late result of the timed-out attempt is never installed as Task authority.
 - Credential inputs never refill. Persistent storage in Pi `auth.json` is the

@@ -146,8 +146,10 @@ function dependencyLabel(integration: DesktopIntegrationStatus | undefined): str
 
 function extensionLabel(integration: DesktopIntegrationStatus | undefined): string {
   if (!integration) return "检查中";
-  if (integration.extensionState === "prepared") return "待浏览器加载";
-  if (integration.extensionState === "reload-required") return "需要同步受管版本";
+  if (integration.extensionState === "prepared") {
+    return integration.detail?.startsWith("扩展曾通过身份验证") ? "待验证现有连接" : "待浏览器连接";
+  }
+  if (integration.extensionState === "reload-required") return "需要重新加载验证";
   if (integration.extensionState === "connected") return "已安装并连接";
   if (integration.extensionState === "failed") return "失败";
   return "未安装";
@@ -161,7 +163,7 @@ function extensionTone(integration: DesktopIntegrationStatus | undefined): "read
 
 function installActionLabel(integration: DesktopIntegrationStatus | undefined): string {
   if (integration?.extensionState === "connected") return "查看扩展连接";
-  if (integration?.extensionState === "prepared") return "继续安装";
-  if (integration?.extensionState === "reload-required") return "修复浏览器扩展";
+  if (integration?.extensionState === "prepared") return "验证现有扩展";
+  if (integration?.extensionState === "reload-required") return "重新加载并验证";
   return "安装浏览器扩展";
 }

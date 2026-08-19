@@ -64,10 +64,17 @@ try {
   const mcpConfig = await readJson(`${agentDir}/mcp.json`);
   assert(mcpConfig.pi67ManagedMcp?.schema === "pi67.browser67-mcp.v1", "managed MCP receipt is missing");
   assert(mcpConfig.mcpServers?.retained_fixture?.command === "retained-fixture", "unrelated MCP config was not preserved");
+  assert(mcpConfig.mcpServers?.tmwd_browser?.directTools === true, "tmwd_browser direct Tools were not enabled");
   const mcpCache = await readJson(`${agentDir}/mcp-cache.json`);
   assert(mcpCache.servers?.retained_fixture !== undefined, "unrelated MCP cache was not preserved");
-  assert(mcpCache.servers?.tmwd_browser === undefined, "retired tmwd_browser cache was not invalidated");
-  assert(mcpCache.servers?.["js-reverse"] === undefined, "retired js-reverse cache was not invalidated");
+  assert(
+    !mcpCacheContainsTool(mcpCache, "tmwd_browser", "stale-browser-tool"),
+    "retired tmwd_browser cache content was not invalidated"
+  );
+  assert(
+    !mcpCacheContainsTool(mcpCache, "js-reverse", "stale-reverse-tool"),
+    "retired js-reverse cache content was not invalidated"
+  );
   const browser67Root = join(artifact.resourcesPath, "capabilities", "packages", "browser67");
   const tmwdBrowserEntrypoint = mcpConfig.mcpServers?.tmwd_browser?.args?.[0];
   assert(
@@ -186,6 +193,11 @@ function assertManagedPackage(packages, state, id, version) {
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
+}
+
+function mcpCacheContainsTool(cache, serverName, toolName) {
+  const tools = cache?.servers?.[serverName]?.tools;
+  return Array.isArray(tools) && tools.some((tool) => tool?.name === toolName);
 }
 
 function assert(condition, message) {

@@ -9,7 +9,7 @@ const CONNECTION: AgentConnectionIdentity = {
   appInstanceId: "app-1",
   hostInstanceId: "host-1",
   hostEpoch: 1,
-  sdkVersion: "0.83.0",
+  sdkVersion: "0.84.2",
   eventSequence: 0
 };
 

@@ -31,6 +31,6 @@ export async function restoreRuntimeApiKeys(
   runtimeApiKeys: ReadonlyMap<string, string>
 ): Promise<void> {
   for (const [provider, apiKey] of runtimeApiKeys) {
-    await services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false });
+    await services.modelRuntime.setRuntimeApiKey(provider, apiKey);
   }
 }

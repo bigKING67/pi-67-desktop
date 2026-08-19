@@ -37,6 +37,7 @@ import {
   runBrowser67NpmInstall,
   type Browser67ProcessRunners
 } from "./browser67-capability-process.js";
+import { verifyBrowser67LiveIdentity } from "./browser67-live-identity-verification.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 export interface DesktopCapabilityServiceOptions extends Partial<Browser67ProcessRunners> {
@@ -311,21 +312,20 @@ export class DesktopCapabilityService {
         return this.#snapshotUnlocked();
       }
       extensionFilesCurrent = true;
-      const live = await this.#runBrowserLiveDoctor(packageRoot, ensureHub, this.#toolchain);
-      this.#liveIdentityVerified = live.ready;
-      const extensionState = live.ready
-        ? "connected" as const
-        : live.extensionConnected && !live.identityMatch
-          ? "reload-required" as const
-          : "prepared" as const;
+      const verification = await verifyBrowser67LiveIdentity({
+        packageRoot,
+        ensureHub,
+        toolchain: this.#toolchain,
+        runDoctor: this.#runBrowserLiveDoctor,
+        runReload: this.#runBrowserExtensionReload
+      });
+      this.#liveIdentityVerified = verification.live.ready;
       await this.#writeBrowserState({
         schema: INTEGRATION_STATE_SCHEMA,
         dependencyState,
-        extensionState,
-        doctorState: live.ready ? "ready" : "degraded",
-        detail: live.ready
-          ? "browser67 扩展身份与当前内置版本一致，真实受管浏览器连接已就绪。"
-          : live.detail,
+        extensionState: verification.extensionState,
+        doctorState: verification.live.ready ? "ready" : "degraded",
+        detail: verification.detail,
         ...(previous?.preparedAt === undefined ? {} : { preparedAt: previous.preparedAt }),
         ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
         ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),

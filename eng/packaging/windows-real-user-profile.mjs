@@ -80,7 +80,8 @@ async function inspectCleanWindowsProfileProvisioning(agentDir) {
   const state = stateFile.value;
   const managedServers = mcpFile.value?.pi67ManagedMcp?.servers;
   const hasJsReverse = hasOwn(managedServers, "js-reverse");
-  const hasTmwdBrowser = hasOwn(managedServers, "tmwd_browser");
+  const hasTmwdBrowser = hasOwn(managedServers, "tmwd_browser")
+    && mcpFile.value?.mcpServers?.tmwd_browser?.directTools === true;
   const capabilityPackageCount = Array.isArray(state?.packages) ? state.packages.length : 0;
   const schemaValid = state?.schema === "pi67.desktop-capability-state.v1";
   const profileOwnership = state?.profileOwnership === "desktop" || state?.profileOwnership === "shared"

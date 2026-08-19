@@ -201,6 +201,37 @@ describe("SkillPackManagement", () => {
     });
   });
 
+  it("preserves a user-updated Lark CLI when the checked channel is older", async () => {
+    const fixture = await createFixture();
+    const installLarkCli = vi.fn();
+    const management = createManagement(fixture, {
+      installLarkCli,
+      runProcess: vi.fn(async () => ({
+        stdout: JSON.stringify({
+          ok: true,
+          action: "up_to_date",
+          auto_update: true,
+          current_version: "1.0.90",
+          latest_version: "1.0.88",
+          skills_status: { current: "1.0.90", in_sync: true }
+        }),
+        stderr: ""
+      }))
+    });
+
+    const checked = await management.checkForUpdates();
+    expect(checked.items.find((item) => item.id === "lark-cli-global")).toMatchObject({
+      installedVersion: "1.0.90",
+      latestVersion: "1.0.88",
+      updateStatus: "current",
+      canUpdate: false,
+      detail: expect.stringContaining("不会降级")
+    });
+    const transaction = await management.beginUpdate("lark-cli-global");
+    expect(transaction.result.changed).toBe(false);
+    expect(installLarkCli).not.toHaveBeenCalled();
+  });
+
   it("ignores a Lark CLI accidentally installed inside the Desktop private toolchain", async () => {
     const fixture = await createFixture();
     const privateToolchainRoot = join(fixture.root, "private-toolchain");

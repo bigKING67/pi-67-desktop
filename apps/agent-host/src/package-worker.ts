@@ -4,7 +4,6 @@ import { dirname, isAbsolute } from "node:path";
 import {
   defaultPackageNetworkSettings,
   gitSourceCandidates,
-  npmRegistryCandidates,
   parsePackageNetworkSettings,
   type PackageNetworkSettings
 } from "@pi67/domain";
@@ -23,6 +22,10 @@ import {
   checkGitPackageUpdatesWithFallback,
   GitPackageSourcesUnavailableError
 } from "./package-worker-git-fallback.js";
+import {
+  NpmRegistryUnavailableError,
+  selectReachableNpmRegistry
+} from "./package-network-settings.js";
 
 const MAX_NETWORK_SETTINGS_BYTES = 32 * 1_024;
 const SOURCE_PROBE_TIMEOUT_MS = 8_000;
@@ -108,7 +111,15 @@ async function configureOperationSources(
 ): Promise<{ npm: boolean; git: boolean }> {
   const required = requiredSourceKinds(request, configuredPackages);
   if (required.npm) {
-    const registry = await selectNpmRegistry(settings);
+    let registry: string;
+    try {
+      registry = await selectReachableNpmRegistry(settings);
+    } catch (error) {
+      if (!(error instanceof NpmRegistryUnavailableError)) throw error;
+      throw coded("NO_REACHABLE_PACKAGE_SOURCE", "No reachable npm package source is available.", true, {
+        sourceKind: "npm"
+      });
+    }
     runtime.applyNpmCommand([toolchain.node, toolchain.npmCli, "--registry", registry]);
   } else {
     runtime.applyNpmCommand([toolchain.node, toolchain.npmCli]);
@@ -132,23 +143,6 @@ function requiredSourceKinds(
     const kind = classifyPackageSource(entry.source);
     return { npm: result.npm || kind.npm, git: result.git || kind.git };
   }, { npm: false, git: false });
-}
-
-async function selectNpmRegistry(settings: PackageNetworkSettings): Promise<string> {
-  for (const candidate of npmRegistryCandidates(settings)) {
-    try {
-      const response = await fetch(`${candidate.url}/-/ping`, {
-        signal: AbortSignal.timeout(SOURCE_PROBE_TIMEOUT_MS),
-        headers: { Accept: "application/json" }
-      });
-      if (response.ok) return candidate.url;
-    } catch {
-      // Try the next configured public source.
-    }
-  }
-  throw coded("NO_REACHABLE_PACKAGE_SOURCE", "No reachable npm package source is available.", true, {
-    sourceKind: "npm"
-  });
 }
 
 async function selectGitSource(settings: PackageNetworkSettings, git: string) {

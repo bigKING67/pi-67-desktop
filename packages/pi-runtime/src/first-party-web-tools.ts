@@ -239,12 +239,15 @@ export async function executeNativeSearch(
   route: NativeSearchRoute,
   modelId: string,
   apiKey: string,
-  inheritedHeaders: Record<string, string> | undefined,
+  inheritedHeaders: Readonly<Record<string, string | null>> | undefined,
   request: SearchRequest,
   signal?: AbortSignal,
   onDeepSeekSearchState?: (state: DeepSeekWebSearchState) => void
 ): Promise<SearchResult> {
-  const headers = new Headers(inheritedHeaders);
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(inheritedHeaders ?? {})) {
+    if (value !== null) headers.set(name, value);
+  }
   headers.set("content-type", "application/json");
   let body: Record<string, unknown>;
   if (route.protocol === "anthropic-web-search") {

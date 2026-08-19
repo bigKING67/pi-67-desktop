@@ -165,6 +165,31 @@ describe("first-party web tools", () => {
     expect(result.urls).toEqual(["https://example.test/source"]);
   });
 
+  it("omits Pi 0.84 nullable Provider headers before sending native search", async () => {
+    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("x-remove-me")).toBeNull();
+      expect(headers.get("x-keep-me")).toBe("present");
+      return jsonResponse({ output_text: "Current result", output: [] });
+    });
+    const route = resolveNativeSearchRoute({
+      provider: "groland",
+      id: "gpt-5.5",
+      api: "openai-responses",
+      baseUrl: "https://api.sciencetoken.ai/proxy/openai/v1"
+    });
+    if (!route) throw new Error("missing route");
+
+    await executeNativeSearch(
+      fetchImpl as typeof fetch,
+      route,
+      "gpt-5.5",
+      "fixture-key",
+      { "x-remove-me": null, "x-keep-me": "present" },
+      { queries: ["current answer"], numResults: 5 }
+    );
+  });
+
   it("uses Bearer for Responses and never calls an alternate provider after a sent request fails", async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const headers = new Headers(init?.headers);

@@ -82,6 +82,8 @@ describe("SkillPackManagement external Lark CLI update", () => {
     expect(JSON.stringify(transaction.result)).not.toContain("/mock/lark-cli");
     expect(installLarkCli).toHaveBeenCalledWith(expect.objectContaining({
       operation: "update",
+      minimumVersion: "1.0.57",
+      targetVersion: "1.0.87",
       skillIds: expect.arrayContaining(["lark-calendar", "lark-doc"])
     }));
     expect(runProcess).toHaveBeenCalledTimes(2);

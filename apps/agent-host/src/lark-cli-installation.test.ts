@@ -13,6 +13,7 @@ import {
 import type { SkillPackProcessRunner } from "./skill-pack-process-runner.js";
 
 const SKILL_IDS = ["lark-doc", "lark-im"];
+const NPM_REGISTRY = "https://registry.npmjs.org";
 
 describe("Desktop-managed Lark CLI installation", () => {
   it("stages, verifies, activates, and rolls back without exposing private toolchain secrets", async () => {
@@ -23,7 +24,8 @@ describe("Desktop-managed Lark CLI installation", () => {
       homeDirectory: fixture.homeDirectory,
       skillIds: SKILL_IDS,
       environment: fixture.environment,
-      runProcess
+      runProcess,
+      selectNpmRegistry: async () => NPM_REGISTRY
     });
 
     expect(swap.version).toBe("1.0.85");
@@ -32,7 +34,7 @@ describe("Desktop-managed Lark CLI installation", () => {
     expect(installEnvironment).not.toHaveProperty("PROVIDER_API_KEY");
     expect(installEnvironment).not.toHaveProperty("SCIENCETOKEN_API_KEY");
     expect(runProcess.mock.calls.map(([, arguments_]) => arguments_)).toEqual([
-      expect.arrayContaining(["install", "@larksuite/cli@latest"]),
+      expect.arrayContaining(["install", "--registry", NPM_REGISTRY, "@larksuite/cli@latest"]),
       [expect.stringMatching(/scripts[/\\\\]install\.js$/u)],
       ["--version"],
       ["update", "--check", "--json"],
@@ -64,7 +66,8 @@ describe("Desktop-managed Lark CLI installation", () => {
       homeDirectory: fixture.homeDirectory,
       skillIds: SKILL_IDS,
       environment: fixture.environment,
-      runProcess: installerRunner("1.0.85")
+      runProcess: installerRunner("1.0.85"),
+      selectNpmRegistry: async () => NPM_REGISTRY
     });
     await swap.rollback();
 
@@ -82,7 +85,8 @@ describe("Desktop-managed Lark CLI installation", () => {
       homeDirectory: fixture.homeDirectory,
       skillIds: SKILL_IDS,
       environment: fixture.environment,
-      runProcess
+      runProcess,
+      selectNpmRegistry: async () => NPM_REGISTRY
     })).rejects.toMatchObject({ stage: "validation" });
     await expect(readFile(join(stableRoot, "previous.txt"), "utf8")).resolves.toBe("previous");
     expect(runProcess).toHaveBeenCalledTimes(1);
@@ -98,12 +102,75 @@ describe("Desktop-managed Lark CLI installation", () => {
       homeDirectory: fixture.homeDirectory,
       skillIds: SKILL_IDS,
       environment: fixture.environment,
-      runProcess: installerRunner("1.0.85")
+      runProcess: installerRunner("1.0.85"),
+      selectNpmRegistry: async () => NPM_REGISTRY
     })).rejects.toMatchObject({ stage: "activation" });
 
     await expect(readFile(launcher, "utf8")).resolves.toBe("user-launcher");
     await expect(access(join(globalAgentSkillsRoot(fixture.homeDirectory), "lark-doc")))
       .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("installs the exact checked update target through the selected registry", async () => {
+    const fixture = await installationFixture();
+    const runProcess = installerRunner("1.0.88");
+
+    const swap = await beginDesktopLarkCliInstallation({
+      homeDirectory: fixture.homeDirectory,
+      skillIds: SKILL_IDS,
+      environment: fixture.environment,
+      runProcess,
+      operation: "update",
+      targetVersion: "1.0.88",
+      minimumVersion: "1.0.57",
+      selectNpmRegistry: async () => NPM_REGISTRY
+    });
+
+    expect(runProcess.mock.calls[0]?.[1]).toEqual(expect.arrayContaining([
+      "--registry",
+      NPM_REGISTRY,
+      "@larksuite/cli@1.0.88"
+    ]));
+    await swap.rollback();
+  });
+
+  it("rejects a staged version mismatch before running package code", async () => {
+    const fixture = await installationFixture();
+    const runProcess = installerRunner("1.0.87");
+
+    await expect(beginDesktopLarkCliInstallation({
+      homeDirectory: fixture.homeDirectory,
+      skillIds: SKILL_IDS,
+      environment: fixture.environment,
+      runProcess,
+      operation: "update",
+      targetVersion: "1.0.88",
+      minimumVersion: "1.0.57",
+      selectNpmRegistry: async () => NPM_REGISTRY
+    })).rejects.toMatchObject({ stage: "validation" });
+    expect(runProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a channel downgrade before using the network", async () => {
+    const fixture = await installationFixture();
+    const runProcess = installerRunner("1.0.87");
+    const selectNpmRegistry = vi.fn(async () => NPM_REGISTRY);
+
+    await expect(beginDesktopLarkCliInstallation({
+      homeDirectory: fixture.homeDirectory,
+      skillIds: SKILL_IDS,
+      environment: fixture.environment,
+      runProcess,
+      operation: "update",
+      targetVersion: "1.0.87",
+      minimumVersion: "1.0.88",
+      selectNpmRegistry
+    })).rejects.toMatchObject({
+      stage: "validation",
+      message: expect.stringContaining("拒绝降级")
+    });
+    expect(selectNpmRegistry).not.toHaveBeenCalled();
+    expect(runProcess).not.toHaveBeenCalled();
   });
 });
 

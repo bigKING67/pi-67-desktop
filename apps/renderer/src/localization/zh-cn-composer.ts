@@ -108,5 +108,7 @@ export const zhCNComposerMessages = {
   modelSwitchStateUnconfirmed: "Pi 返回后仍无法确认当前模型，请稍后重试。",
   thinkingLabel: "Pi 思考级别",
   thinkingValue: (level: string) => `思考：${level}`,
-  thinkingAvailabilityHint: "仅显示当前模型支持的等级"
+  thinkingAvailabilityHint: (model: string, levels: readonly string[]) => (
+    `Pi SDK 为 ${model} 声明：${levels.join("、")}；未列出的等级不会发送。`
+  )
 } as const;

@@ -80,6 +80,8 @@ export async function beginLarkSkillPackInstallation(options: {
 export async function beginDesktopManagedLarkSkillPackUpdate(options: {
   homeDirectory: string;
   skillIds: string[];
+  installedVersion: string;
+  targetVersion: string;
   environment: NodeJS.ProcessEnv;
   runProcess: SkillPackProcessRunner;
   installLarkCli: typeof beginDesktopLarkCliInstallation;
@@ -93,7 +95,9 @@ export async function beginDesktopManagedLarkSkillPackUpdate(options: {
       skillIds: options.skillIds,
       environment: options.environment,
       runProcess: options.runProcess,
-      operation: "update"
+      operation: "update",
+      targetVersion: options.targetVersion,
+      minimumVersion: options.installedVersion
     });
   } catch (error) {
     if (error instanceof LarkCliInstallationError) throw installationFailure(error);

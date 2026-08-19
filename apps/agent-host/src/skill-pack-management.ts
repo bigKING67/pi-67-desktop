@@ -213,10 +213,19 @@ export class SkillPackManagement implements SkillPackManagementPort {
         true
       );
     }
+    if (!current.installedVersion || !current.latestVersion) {
+      throw new HostCommandError(
+        "RUNTIME_NOT_READY",
+        "Lark CLI 更新通道缺少可验证的当前版本或目标版本，已取消更新。",
+        true
+      );
+    }
     const suite = await readLarkSuite(this.#capabilitiesRoot);
     return beginDesktopManagedLarkSkillPackUpdate({
       homeDirectory: this.#homeDirectory,
       skillIds: suite.skillIds,
+      installedVersion: current.installedVersion,
+      targetVersion: current.latestVersion,
       environment: this.#environment,
       runProcess: this.#runProcess,
       installLarkCli: this.#installLarkCli,

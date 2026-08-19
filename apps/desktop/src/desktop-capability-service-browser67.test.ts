@@ -245,6 +245,69 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
     });
   });
 
+  it("reloads a current installed extension in place before requiring source replacement", async () => {
+    const fixture = await createDesktopCapabilityFixture();
+    await prepareBrowserDependencies(fixture.packageRoot);
+    const liveDoctor = vi.fn()
+      .mockResolvedValueOnce({
+        ready: false,
+        extensionConnected: true,
+        identityMatch: false,
+        detail: "extension_identity_mismatch:source_digest"
+      })
+      .mockResolvedValueOnce({
+        ready: true,
+        extensionConnected: true,
+        identityMatch: true,
+        detail: "extension_identity_ok"
+      });
+    const reload = vi.fn(async () => undefined);
+    const service = new DesktopCapabilityService({
+      ...fixture,
+      runBrowserExtensionDoctor: vi.fn(async () => currentExtensionDoctorResult()),
+      runBrowserLiveDoctor: liveDoctor,
+      runBrowserExtensionReload: reload,
+      now: () => 542,
+      createToken: () => "reuse-current-extension"
+    });
+
+    expect(await service.verifyBrowser67Extension({ startHub: true })).toMatchObject({
+      integrations: [{
+        extensionState: "connected",
+        doctorState: "ready",
+        detail: "已复用并重新加载现有 browser67 扩展；身份与当前内置版本一致，真实受管浏览器连接已就绪。"
+      }]
+    });
+    expect(reload).toHaveBeenCalledOnce();
+    expect(liveDoctor).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps current extension files and gives a reload-first recovery when live reload fails", async () => {
+    const fixture = await createDesktopCapabilityFixture();
+    await prepareBrowserDependencies(fixture.packageRoot);
+    const service = new DesktopCapabilityService({
+      ...fixture,
+      runBrowserExtensionDoctor: vi.fn(async () => currentExtensionDoctorResult()),
+      runBrowserLiveDoctor: vi.fn(async () => ({
+        ready: false,
+        extensionConnected: true,
+        identityMatch: false,
+        detail: "extension_identity_mismatch:source_digest"
+      })),
+      runBrowserExtensionReload: vi.fn(async () => { throw new Error("reload unavailable"); }),
+      now: () => 543,
+      createToken: () => "reload-current-extension-failed"
+    });
+
+    expect(await service.verifyBrowser67Extension({ startHub: true })).toMatchObject({
+      integrations: [{
+        extensionState: "reload-required",
+        doctorState: "degraded",
+        detail: "现有扩展文件是当前版本，但浏览器自动重新加载失败。请在扩展管理页点击该扩展的重新加载按钮后再次验证。"
+      }]
+    });
+  });
+
   it("does not reuse a persisted connected label without current-process live proof", async () => {
     const fixture = await createDesktopCapabilityFixture();
     await prepareBrowserDependencies(fixture.packageRoot);

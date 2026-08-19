@@ -46,10 +46,10 @@ export function createPiWorkspaceProviderCatalog(
       if (disposed) throw disposedError();
       await installFirstPartyModelProviders(services.modelRuntime);
       unsubscribe = runtimeCredentialOverrides.subscribe((provider, apiKey) => (
-        services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false })
+        services.modelRuntime.setRuntimeApiKey(provider, apiKey)
       ));
       await runtimeCredentialOverrides.applyTo((provider, apiKey) => (
-        services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false })
+        services.modelRuntime.setRuntimeApiKey(provider, apiKey)
       ));
       return services;
     }).catch((error: unknown) => {

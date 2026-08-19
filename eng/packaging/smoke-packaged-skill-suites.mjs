@@ -1,3 +1,24 @@
+import { readFileSync } from "node:fs";
+
+const capabilitySourcesLock = JSON.parse(
+  readFileSync(new URL("../capabilities/capability-sources.lock.json", import.meta.url), "utf8")
+);
+const aiBerkshireSourceCommit = resolveSkillPackSourceCommit(
+  capabilitySourcesLock,
+  "ai-berkshire-investment-suite"
+);
+
+export function resolveSkillPackSourceCommit(lock, packName) {
+  if (lock?.schema !== "pi67.capability-sources-lock.v1" || !Array.isArray(lock.skillPacks)) {
+    throw new Error("Capability source lock does not contain a valid Skill Pack catalog.");
+  }
+  const matches = lock.skillPacks.filter((pack) => pack?.name === packName);
+  if (matches.length !== 1 || !/^[0-9a-f]{40}$/u.test(matches[0]?.commit ?? "")) {
+    throw new Error(`Capability source lock does not uniquely pin Skill Pack ${packName}.`);
+  }
+  return matches[0].commit;
+}
+
 export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureScreenshot) {
   const bundledSkillPanel = skillSettingsWorkspace.getByRole("tabpanel", { name: "全局可用", exact: true });
   const bundledRows = bundledSkillPanel.getByTestId("bundled-skill-suite-row");
@@ -23,7 +44,7 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
     .waitFor({ state: "visible", timeout: 15_000 });
   await suiteDetail.getByText("https://github.com/xbtlin/ai-berkshire", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await suiteDetail.getByText("6fb75c97a", { exact: true })
+  await suiteDetail.getByText(aiBerkshireSourceCommit.slice(0, 9), { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-ai-berkshire-skill-suite-detail.png");
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();

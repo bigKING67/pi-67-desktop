@@ -18,6 +18,7 @@ import type {
 import type { ImageAssetProjector } from "./message-normalizer.js";
 import { projectMessagePage } from "./message-projection.js";
 import { sanitizeRuntimeText } from "./runtime-redaction.js";
+import { runtimeDisplayLabel } from "./runtime-display-label.js";
 import type { SessionProjectionIndex } from "./session-projection-index.js";
 import { projectSessionTree } from "./session-tree-projection.js";
 
@@ -101,7 +102,7 @@ function projectRuntimeModels(runtime: ModelRuntime): ModelSummary[] {
   return runtime.getModels().map((model) => ({
     provider: model.provider,
     id: model.id,
-    label: model.name || model.id,
+    label: runtimeDisplayLabel(model.name, model.id),
     configured: runtime.hasConfiguredAuth(model.provider),
     contextWindow: model.contextWindow,
     reasoning: model.reasoning
@@ -122,7 +123,7 @@ export function projectRuntimeProviders(
       const auth = runtime.getProviderAuthStatus(provider.id);
       return {
         id: provider.id,
-        label: provider.name || provider.id,
+        label: runtimeDisplayLabel(provider.name, provider.id),
         configured: auth.configured,
         ...(auth.source ? { credentialSource: auth.source } : {}),
         ...(auth.label ? { credentialLabel: auth.label.slice(0, 120) } : {}),

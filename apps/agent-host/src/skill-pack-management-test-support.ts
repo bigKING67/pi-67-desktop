@@ -15,7 +15,10 @@ import {
 
 export function createManagement(
   fixture: Awaited<ReturnType<typeof createFixture>>,
-  options: { runProcess: NonNullable<SkillPackManagementOptions["runProcess"]> }
+  options: {
+    runProcess: NonNullable<SkillPackManagementOptions["runProcess"]>;
+    installLarkCli?: NonNullable<SkillPackManagementOptions["installLarkCli"]>;
+  }
 ) {
   return new SkillPackManagement(fixture.services, {
     capabilitiesRoot: fixture.capabilitiesRoot,
@@ -23,6 +26,7 @@ export function createManagement(
     now: () => 1_722_400_000_000,
     resolveLarkCli: async () => "/mock/lark-cli",
     runProcess: options.runProcess,
+    ...(options.installLarkCli ? { installLarkCli: options.installLarkCli } : {}),
     pi67Channel: currentPi67Channel()
   });
 }

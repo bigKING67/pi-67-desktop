@@ -110,6 +110,7 @@ export class PiConfigurationMutations {
         );
       }
       const credential = await apiKeyAuthentication.login({
+        signal: AbortSignal.timeout(this.host.limits.validationRuntimeWaitMs),
         prompt: async (prompt) => {
           if (prompt.type === "secret" || prompt.type === "text" || prompt.type === "manual_code") {
             return apiKey;

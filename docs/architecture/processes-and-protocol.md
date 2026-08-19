@@ -159,7 +159,7 @@ Package 不会被 Pi ResourceLoader 隐式安装或加载。第三方 bounded co
 `node_modules`，限制 10,000 files、128 MiB、depth 32 和五秒；它不是 registry integrity、签名、provenance、
 完整依赖树证明或不可变文件系统 snapshot。
 
-当前 Pi SDK 0.83.0 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
+当前 Pi SDK 0.84.2 没有 Extension executor、module-loader transport、Hook/Tool RPC 或 MCP supervisor
 injection point。`DefaultResourceLoader -> jiti.import -> factory(pi) -> ExtensionRunner` 仍在 Agent Host
 utility process 内运行。Package worker 也不拥有第三方 Extension 自行启动的 MCP child。真正的 runtime
 isolation 需要上游 executor/proxy port、经审计的 loader/runner fork，或明确禁用 unsupported third-party
@@ -522,7 +522,7 @@ rebuilding 并调度 bounded discovery。Retry 重新打开 SQLite 后，在完�
 single-owner lock；文件替换、恶意重写 version cookie、多 utility-process 和 Windows lock timing 仍需独立证据。
 Catalog 当前继续使用 DELETE journal。WAL 的 main/`-wal`/`-shm` private-file 校验、checkpoint、整组隔离、
 外部 writer detection 和 Windows Defender/同步盘锁定尚未形成同等证据，因此不与 schema v3 同时切换。
-当前 Pi SDK `0.83.0` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
+当前 Pi SDK `0.84.2` 的 cold discovery 内部仍会临时构造 `allMessagesText`，但该值在适配边界立即
 丢弃，不进入 SQLite、Protocol、Renderer、日志或 diagnostics。当前不实现 FTS 或 transcript index；
 活动 Session watcher 与 Catalog metadata discovery 保持独立，前者不会把 JSONL entry 写入 SQLite。
 
@@ -662,7 +662,7 @@ Notification history 已迁移到独立 `notificationStore`，App Store 不再�
   Approval 绑定 `hostEpoch + sessionId + sessionGeneration + operationId + requestId + toolCallId`；
   Port 不可投递、session/operation 过期、requester 异常、等待期间 abort 或 target/cwd 无法完整
   展示时立即拒绝，不能等待超时后继续执行。
-- Pi `0.83.0` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
+- Pi `0.84.2` 中用户 Extension 先运行，Desktop inline Safety Extension 后运行；Safety 因而检查
   其他 Extension 修改后的最终 Tool 输入。真实 Pi ordering contract test 固定该属性，SDK
   升级若改变顺序必须失败。
 - Project trust only enables project resources. It does not replace per-action

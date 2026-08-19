@@ -72,6 +72,7 @@ export class AgentHostServer {
     this.usesCompatibilityRuntime = runtimeLoader !== undefined && options.sdkVersionLoader === undefined;
     const configurationServices = options.configurationServices ?? new PiConfigurationServiceRegistry();
     const configuration = configurationServices.acquire(options.agentDir ?? resolveAgentDirectory(undefined));
+    configuration.prewarmModelRuntime();
     this.workspaces = new WorkspaceContextRegistry({ configurationServices });
     this.appConfiguration = new AppConfigurationCommandRouter(configuration);
     this.sessionWriterLeases = options.sessionWriterLeaseRegistry
@@ -432,7 +433,6 @@ export class AgentHostServer {
     // Projection and sequence are captured before the synchronous response so later events stay ordered after it.
     origin.sendSuccess(request.requestId, request.type, this.captureProjectionResync(runtime, state));
   }
-
   private captureProjectionResync(
     runtime: AgentRuntime,
     state: TaskHostState

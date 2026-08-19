@@ -228,7 +228,7 @@ export class PiSdkRuntime implements AgentRuntime {
       async (provider, apiKey) => {
         const services = this.sessionBindings.services;
         if (!services) return;
-        await services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false });
+        await services.modelRuntime.setRuntimeApiKey(provider, apiKey);
       }
     );
     this.configurationRuntimeUnsubscribe = this.workspaceServices?.configurationService?.registerRuntime(

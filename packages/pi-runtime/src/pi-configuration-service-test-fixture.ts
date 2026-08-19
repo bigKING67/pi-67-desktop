@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
@@ -11,11 +11,15 @@ export async function createPiConfigurationFixture(options: {
   fileAccessWaitMs?: number;
   validationRuntimeWaitMs?: number;
   settingsReloadWaitMs?: number;
+  initialAuthContent?: string;
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "pi67-configuration-service-"));
   const cwd = join(root, "workspace");
   const agentDir = join(root, "agent");
   await Promise.all([mkdir(cwd), mkdir(agentDir)]);
+  if (options.initialAuthContent !== undefined) {
+    await writeFile(join(agentDir, "auth.json"), options.initialAuthContent, "utf8");
+  }
   const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: true });
   const service = new PiConfigurationService(agentDir, options);
   const unregister = service.registerWorkspace({ cwd, settingsManager, projectTrusted: true });

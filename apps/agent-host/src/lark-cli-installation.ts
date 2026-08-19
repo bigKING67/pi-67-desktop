@@ -19,6 +19,12 @@ import {
   larkCliProcessEnvironment,
   userGlobalLarkCliLauncher
 } from "./lark-cli-resolution.js";
+import { compareLarkCliVersions, isLarkCliVersion } from "./lark-cli-version.js";
+import {
+  loadPackageNetworkSettings,
+  NpmRegistryUnavailableError,
+  runWithNpmRegistryFallback
+} from "./package-network-settings.js";
 import type { SkillPackProcessRunner } from "./skill-pack-process-runner.js";
 import { parseLarkUpdateResult } from "./skill-pack-update-state.js";
 
@@ -60,6 +66,9 @@ export async function beginDesktopLarkCliInstallation(options: {
   runProcess: SkillPackProcessRunner;
   platform?: NodeJS.Platform;
   operation?: "install" | "update";
+  targetVersion?: string;
+  minimumVersion?: string;
+  selectNpmRegistry?: () => Promise<string>;
 }): Promise<LarkCliInstallationSwap> {
   const platform = options.platform ?? process.platform;
   const toolchain = resolveDesktopPackageToolchain(options.environment);
@@ -82,41 +91,25 @@ export async function beginDesktopLarkCliInstallation(options: {
   const operationId = randomUUID();
   const stagingRoot = join(toolsRoot, `.lark-cli.staging-${operationId}`);
   const backupRoot = join(toolsRoot, `.lark-cli.backup-${operationId}`);
-  const environment = larkCliInstallEnvironment(
-    options.environment,
-    toolchain.nodeExecutable,
-    toolchain.gitExecutable,
-    toolchain.gitExecPath
-  );
+  validateRequestedVersions(options.targetVersion, options.minimumVersion);
   await mkdir(toolsRoot, { recursive: true });
 
   try {
-    try {
-      await options.runProcess(toolchain.nodeExecutable, [
-        toolchain.npmCli,
-        "install",
-        "--prefix",
-        stagingRoot,
-        "--no-audit",
-        "--no-fund",
-        "--no-package-lock",
-        "--omit=dev",
-        "--ignore-scripts",
-        `${LARK_CLI_PACKAGE_NAME}@latest`
-      ], {
-        cwd: options.homeDirectory,
-        timeoutMs: INSTALL_TIMEOUT_MS,
-        environment
-      });
-    } catch (error) {
-      throw new LarkCliInstallationError(
-        "package-install",
-        "无法下载并安装官方 Lark CLI，请检查安装网络设置后重试。",
-        { cause: error }
-      );
-    }
+    const environment = await downloadStagedLarkCliPackage({
+      environment: options.environment,
+      homeDirectory: options.homeDirectory,
+      npmCli: toolchain.npmCli,
+      nodeExecutable: toolchain.nodeExecutable,
+      gitExecutable: toolchain.gitExecutable,
+      gitExecPath: toolchain.gitExecPath,
+      runProcess: options.runProcess,
+      selectNpmRegistry: options.selectNpmRegistry,
+      stagingRoot,
+      targetVersion: options.targetVersion ?? "latest"
+    });
 
     const stagedPackage = await validateStagedLarkCliPackage(stagingRoot);
+    validateStagedVersion(stagedPackage.version, options.targetVersion, options.minimumVersion);
     try {
       await options.runProcess(toolchain.nodeExecutable, [stagedPackage.installScript], {
         cwd: stagedPackage.packageRoot,
@@ -188,6 +181,137 @@ export async function beginDesktopLarkCliInstallation(options: {
   } catch (error) {
     await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
     throw error;
+  }
+}
+
+async function downloadStagedLarkCliPackage(options: {
+  environment: NodeJS.ProcessEnv;
+  homeDirectory: string;
+  npmCli: string;
+  nodeExecutable: string;
+  gitExecutable: string;
+  gitExecPath: string;
+  runProcess: SkillPackProcessRunner;
+  selectNpmRegistry: (() => Promise<string>) | undefined;
+  stagingRoot: string;
+  targetVersion: string;
+}): Promise<NodeJS.ProcessEnv> {
+  let settings: Awaited<ReturnType<typeof loadPackageNetworkSettings>> | undefined;
+  try {
+    if (!options.selectNpmRegistry) {
+      settings = await loadPackageNetworkSettings(options.environment.PI67_PACKAGE_NETWORK_SETTINGS);
+    }
+  } catch (error) {
+    throw new LarkCliInstallationError(
+      "package-install",
+      "下载源配置无效，无法更新 Lark CLI。请在“下载源与网络”中保存有效设置后重试。",
+      { cause: error }
+    );
+  }
+
+  const attempt = async (registry: string): Promise<NodeJS.ProcessEnv> => {
+    const environment = larkCliInstallEnvironment(
+      options.environment,
+      options.nodeExecutable,
+      options.gitExecutable,
+      options.gitExecPath
+    );
+    environment.NPM_CONFIG_REGISTRY = registry;
+    environment.npm_config_registry = registry;
+    await rm(options.stagingRoot, { recursive: true, force: true });
+    try {
+      await options.runProcess(options.nodeExecutable, [
+        options.npmCli,
+        "install",
+        "--registry",
+        registry,
+        "--prefix",
+        options.stagingRoot,
+        "--no-audit",
+        "--no-fund",
+        "--no-package-lock",
+        "--omit=dev",
+        "--ignore-scripts",
+        `${LARK_CLI_PACKAGE_NAME}@${options.targetVersion}`
+      ], {
+        cwd: options.homeDirectory,
+        timeoutMs: INSTALL_TIMEOUT_MS,
+        environment
+      });
+      return environment;
+    } catch (error) {
+      await rm(options.stagingRoot, { recursive: true, force: true }).catch(() => undefined);
+      throw error;
+    }
+  };
+
+  try {
+    if (options.selectNpmRegistry) return await attempt(await options.selectNpmRegistry());
+    return (await runWithNpmRegistryFallback(settings!, attempt, {
+      resourcePath: larkCliRegistryResourcePath(options.targetVersion)
+    })).value;
+  } catch (error) {
+    if (error instanceof NpmRegistryUnavailableError) {
+      throw new LarkCliInstallationError(
+        "package-install",
+        error.candidateCount === 0
+          ? "当前下载源设置为离线模式，无法更新 Lark CLI。请在“下载源与网络”中启用 npm 下载源后重试。"
+          : error.reachableCandidateCount === 0
+            ? "无法连接已配置的 npm 下载源。请在“下载源与网络”中检查或切换 npm 源后重试。"
+            : "已配置的 npm 下载源均未能完成 Lark CLI 下载；已自动尝试后续来源。请检查安装网络设置后重试。",
+        { cause: error }
+      );
+    }
+    throw new LarkCliInstallationError(
+      "package-install",
+      "无法下载并安装官方 Lark CLI，请检查安装网络设置后重试。",
+      { cause: error }
+    );
+  }
+}
+
+function larkCliRegistryResourcePath(version: string): string {
+  return `/@larksuite%2Fcli/${encodeURIComponent(version)}`;
+}
+
+function validateRequestedVersions(targetVersion: string | undefined, minimumVersion: string | undefined): void {
+  if (
+    (targetVersion !== undefined && !isLarkCliVersion(targetVersion))
+    || (minimumVersion !== undefined && !isLarkCliVersion(minimumVersion))
+  ) {
+    throw new LarkCliInstallationError(
+      "validation",
+      "Lark CLI 更新通道返回了无效版本，未下载或替换现有安装。"
+    );
+  }
+  if (
+    targetVersion !== undefined
+    && minimumVersion !== undefined
+    && compareLarkCliVersions(targetVersion, minimumVersion) < 0
+  ) {
+    throw new LarkCliInstallationError(
+      "validation",
+      `Lark CLI 目标版本 ${targetVersion} 低于当前版本 ${minimumVersion}，已拒绝降级。`
+    );
+  }
+}
+
+function validateStagedVersion(
+  stagedVersion: string,
+  targetVersion: string | undefined,
+  minimumVersion: string | undefined
+): void {
+  if (targetVersion !== undefined && stagedVersion !== targetVersion) {
+    throw new LarkCliInstallationError(
+      "validation",
+      `下载的 Lark CLI 版本 ${stagedVersion} 与已确认目标 ${targetVersion} 不一致，未执行或替换现有安装。`
+    );
+  }
+  if (minimumVersion !== undefined && compareLarkCliVersions(stagedVersion, minimumVersion) < 0) {
+    throw new LarkCliInstallationError(
+      "validation",
+      `下载的 Lark CLI 版本 ${stagedVersion} 低于当前版本 ${minimumVersion}，已拒绝降级。`
+    );
   }
 }
 
@@ -302,7 +426,7 @@ function isLarkCliManifest(value: unknown): value is { name: string; version: st
   const record = value as Record<string, unknown>;
   return record.name === LARK_CLI_PACKAGE_NAME
     && typeof record.version === "string"
-    && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(record.version);
+    && isLarkCliVersion(record.version);
 }
 
 function escapeRegExp(value: string): string {

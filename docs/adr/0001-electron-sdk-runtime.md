@@ -19,7 +19,7 @@ macOS。RPC 方案需要发现系统 Pi、处理版本漂移、严格 JSONL fram
 ## Decision
 
 采用 Electron + React + Node/TypeScript，并固定
-`@earendil-works/pi-coding-agent@0.83.0` 作为唯一 runtime。
+`@earendil-works/pi-coding-agent@0.84.2` 作为唯一 runtime。
 
 - Pi SDK 运行在 Electron utility process Agent Host；
 - renderer 运行于 sandbox，只通过 MessagePort 使用版本化 protocol；

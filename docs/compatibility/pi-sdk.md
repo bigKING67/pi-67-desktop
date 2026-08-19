@@ -5,10 +5,10 @@
 当前唯一支持版本：
 
 ```text
-@earendil-works/pi-coding-agent 0.83.0
-@earendil-works/pi-agent-core   0.83.0
-@earendil-works/pi-ai           0.83.0
-@earendil-works/pi-tui          0.83.0 (transitive override)
+@earendil-works/pi-coding-agent 0.84.2
+@earendil-works/pi-agent-core   0.84.2
+@earendil-works/pi-ai           0.84.2
+@earendil-works/pi-tui          0.84.2 (transitive override)
 ```
 
 根依赖和 `pnpm-workspace.yaml#overrides` 双重固定，避免上游内部 caret dependency 在重新
@@ -81,7 +81,7 @@ unsigned preview 共用该 contract，不维护另一份运行时版本常量。
   component 注入 renderer；
 - 不支持同一 JSONL session 的并发 Desktop/TUI writer；watcher 只检测并止损，不把外部 JSONL
   entry 合并进当前 `SessionManager`、Conversation projection 或 Renderer；
-- Pi SDK `0.83.0` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
+- Pi SDK `0.84.2` 的 cold Session discovery 会临时构造 `firstMessage/allMessagesText`；Desktop
   立即丢弃这些字段，既不持久化也不跨进程传输。Catalog 不做 FTS、transcript index 或 Prompt
   派生名称，cold reconcile 的时间和 RSS 仍需按平台持续测量；
 - 不实现 system Pi/RPC session import adapter。当前 agent directory 内的已

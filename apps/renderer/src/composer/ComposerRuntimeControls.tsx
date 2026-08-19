@@ -130,7 +130,10 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
       <ComposerRuntimeSelect
         ariaLabel={messages.composer.thinkingLabel}
         disabled={disabled || modelSelectionPending || thinkingOptions.length === 0}
-        footer={messages.composer.thinkingAvailabilityHint}
+        footer={messages.composer.thinkingAvailabilityHint(
+          modelLabel,
+          thinkingOptions.map((option) => option.label)
+        )}
         icon={<Brain aria-hidden="true" size={14} />}
         isOpen={thinkingPickerOpen}
         onOpenChange={setThinkingPickerOpen}

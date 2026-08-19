@@ -1,6 +1,7 @@
 import type { SkillPackEntry } from "@pi67/domain";
 import type { Pi67SkillPackRelease } from "./pi67-skill-pack-channel.js";
 import { compareSkillPackVersions } from "./pi67-skill-pack-channel.js";
+import { compareLarkCliVersions, isLarkCliVersion } from "./lark-cli-version.js";
 import { MAX_SKILL_PACK_PROCESS_OUTPUT_BYTES } from "./skill-pack-process-runner.js";
 import {
   boundedNonNegativeInteger,
@@ -32,8 +33,13 @@ export function applyLarkUpdateCheck(
   const installedVersion = boundedVersion(value.current_version ?? value.previous_version);
   const latestVersion = boundedVersion(value.latest_version);
   const skillsStatus = isRecord(value.skills_status) ? value.skills_status : undefined;
-  const updateAvailable = value.action === "update_available"
-    || Boolean(installedVersion && latestVersion && installedVersion !== latestVersion);
+  const versionComparison = installedVersion
+    && latestVersion
+    && isLarkCliVersion(installedVersion)
+    && isLarkCliVersion(latestVersion)
+    ? compareLarkCliVersions(latestVersion, installedVersion)
+    : undefined;
+  const updateAvailable = versionComparison !== undefined && versionComparison > 0;
   const officialSkillCount = boundedNonNegativeInteger(skillsStatus?.official);
   const updatedSkillCount = boundedNonNegativeInteger(skillsStatus?.updated);
   const installedSkillVersion = boundedVersion(skillsStatus?.current);
@@ -61,6 +67,15 @@ export function applyLarkUpdateCheck(
       detail: "官方技能与受管版本不一致。为避免覆盖本地修改，Desktop 不会自动更新。"
     };
   }
+  if (value.action === "update_available" && versionComparison === undefined) {
+    return {
+      ...entry,
+      updateStatus: "unavailable",
+      localState,
+      canUpdate: false,
+      detail: "Lark CLI 更新通道未返回可验证的当前版本与目标版本，Desktop 不会执行不确定更新。"
+    };
+  }
   if (updateAvailable) {
     return {
       ...entry,
@@ -75,6 +90,18 @@ export function applyLarkUpdateCheck(
           ? `当前 CLI ${installedVersion} 待更新；官方 Skills 已是 ${installedSkillVersion}。Desktop 将原子更新当前用户共享副本。`
           : "Desktop 将下载、验证并原子更新当前用户共享的 Lark CLI 与官方 Skills。"
         : "Desktop 将安装并优先使用经验证的当前用户共享副本；现有 Scoop、npm 或其他外部安装保持不变。"
+    };
+  }
+  if (installedVersion && latestVersion && versionComparison !== undefined && versionComparison < 0) {
+    return {
+      ...entry,
+      installedVersion,
+      ...(installedSkillVersion ? { installedSkillVersion } : {}),
+      latestVersion,
+      updateStatus: "current",
+      localState,
+      canUpdate: false,
+      detail: `当前 CLI ${installedVersion} 高于更新通道 ${latestVersion}；Desktop 将保留当前版本，不会降级。`
     };
   }
   return {

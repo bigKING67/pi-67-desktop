@@ -109,7 +109,7 @@ export async function createDesktopSessionServices(
   bindConfiguredCapabilityCatalog(services.resourceLoader, configuredCapabilities);
   if (options.runtimeCredentialOverrides) {
     await options.runtimeCredentialOverrides.applyTo((provider, apiKey) => (
-      services.modelRuntime.setRuntimeApiKey(provider, apiKey, { allowNetwork: false })
+      services.modelRuntime.setRuntimeApiKey(provider, apiKey)
     ));
   } else {
     await restoreRuntimeApiKeys(services, options.runtimeApiKeys ?? new Map());

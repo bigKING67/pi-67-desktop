@@ -128,7 +128,7 @@ the only Runtime and behavior specification source.
   already-live Task reloaded resources. A Task reload failure stays observable after
   the receipt commit; Desktop does not roll back the receipt or rerun the Package
   side effect blindly.
-- Package Worker isolation covers check/install/update/uninstall only. Pi SDK 0.83.0
+- Package Worker isolation covers check/install/update/uninstall only. Pi SDK 0.84.2
   still imports third-party Extension modules and executes their factory, hooks,
   commands, Tools, Extension UI, and any MCP child launcher inside the Agent Host
   utility process. Desktop must not describe those runtime surfaces as isolated until
@@ -177,7 +177,10 @@ the only Runtime and behavior specification source.
   `@ff-labs/pi-fff`, and `@victor-software-house/pi-curated-themes` are retired from
   the default catalog.
 - Desktop provisions `tmwd_browser` and `js-reverse` as managed browser67 MCP servers
-  in the Pi Agent Profile with the private packaged Node executable. It updates only
+  in the Pi Agent Profile with the private packaged Node executable. `tmwd_browser`
+  is admitted with `directTools=true`, so its effective browser Tools enter Pi's
+  normal installed-capability identity and AUTO authorization path instead of being
+  trapped behind the generic MCP proxy Tool. Desktop updates only
   entries carrying a matching Desktop receipt and never runs npm in the packaged
   client. Same-name user-owned entries, invalid JSON, cache conflicts, and
   compare-and-swap conflicts fail closed at the browser67 enhancement boundary:
@@ -208,8 +211,11 @@ the only Runtime and behavior specification source.
 - Global Skills with an explicit owning updater and verified suite manifest may be
   checked and updated once per Skill Pack. A missing Lark CLI remains a visible
   `not-installed` dependency instead of a generic failed check. After one explicit
-  confirmation, Desktop uses its private Node/npm only as the installer, downloads
-  `@larksuite/cli@latest` with npm lifecycle scripts disabled, validates the exact
+  confirmation, Desktop uses its private Node/npm only as the installer and tries the
+  configured npm source order with automatic mirror-to-official fallback at the real
+  isolated install step, not only at a health probe. Updates download the exact version
+  confirmed by the check; an initial install resolves the current stable version. In
+  both cases npm lifecycle scripts stay disabled while Desktop validates the exact
   package identity and bounded official install entry before executing that one entry,
   validates the native executable, reported version, and official update-check JSON,
   then atomically activates it under the current user's shared Agent tools root and
@@ -231,6 +237,12 @@ the only Runtime and behavior specification source.
   official Skill set already at the latest reported Skill version remains updateable
   when only the CLI version is behind; incomplete or otherwise unverified Skill drift
   blocks overwrite.
+  A current-user CLI newer than the checked channel remains current and is never
+  downgraded. Installing or reinstalling Desktop never invokes this updater and
+  never replaces `~/.agents/tools/lark-cli`, its launcher, or `~/.agents/skills`;
+  only the user's explicit confirmed mutation may change those shared locations.
+  A newer Desktop release may advertise a newer checked target, but it still uses
+  the same monotonic, exact-target transaction.
   Pi resources reload only after the updater verifies convergence. Settings reports
   the current CLI, official Skills, and latest stable version separately.
   AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one
@@ -334,10 +346,11 @@ the only Runtime and behavior specification source.
   `Load unpacked`; a second one-shot confirmation may start or reuse the local Hub
   before live identity verification. Desktop never installs through browser policy,
   mutates a browser profile, or treats copied files as proof that Chrome/Edge loaded them.
-  When live identity differs, Desktop keeps that repair context after refreshing the
-  managed files and asks the user to verify the browser's loaded source. A different
-  source directory must be removed and loaded again from the Pi-67-provided directory;
-  an ordinary browser reload is not presented as sufficient to replace an old source.
+  When current managed files exist but live identity differs, explicit verification
+  first requests an in-place browser extension reload and repeats live Doctor. Only a
+  different loaded source directory must be removed and loaded again from the
+  Pi-67-provided directory; same-directory installations are reused across Desktop
+  updates and are not sent through file preparation again.
   The integration remains `reload-required` until a new live Doctor result proves the
   browser-loaded identity matches; preparing files alone never demotes it to a generic
   unloaded state.
@@ -618,7 +631,11 @@ the only Runtime and behavior specification source.
 - Pi configuration files are the only source of truth: Desktop reads and writes
   `~/.pi/agent/models.json`, `auth.json`, and `settings.json`, plus trusted
   `<workspace>/.pi/settings.json`. It never creates a Desktop-owned Provider or
-  model configuration copy.
+  model configuration copy. Main resolves that same Profile once and passes its
+  absolute path to Agent Host; install order between Pi TUI and Desktop does not
+  create a second configuration. Desktop capability startup may update only its
+  namespaced receipts, Rules, and managed Package overlays and preserves the
+  user-owned configuration bytes.
 - Global Provider, credential, default-model, and visual-assistance settings use
   App authority and remain available before any Workspace is registered. Project
   default and visual-assistance overrides remain Workspace- and trust-bound; an
@@ -703,7 +720,12 @@ the only Runtime and behavior specification source.
   file read returns a structured recoverable error before the Renderer transport
   budget expires.
 - Creating the Pi `ModelRuntime` for a real Task uses the same 4-second Host-side
-  offline startup budget. If Pi configuration loading stalls, Workspace/Session
+  offline startup budget. Agent Host prewarms one revision-bound first-Task runtime
+  while Desktop starts; Provider validation and the first restored Task may reuse
+  that exact complete runtime only while `models.json` and `auth.json` revisions still
+  match. Corrupt display labels are never persisted or repaired in place: projections
+  preserve valid UTF-8 names and fall back to the stable Provider/model identity when
+  mojibake reaches the runtime boundary. If Pi configuration loading stalls, Workspace/Session
   initialization returns a structured recoverable `RUNTIME_NOT_READY` failure with
   stage `session-model-runtime` instead of waiting for the Renderer acknowledgement
   timeout; a later retry creates a fresh runtime attempt rather than adopting the

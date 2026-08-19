@@ -18,7 +18,8 @@ describe("managed browser67 MCP provision", () => {
     expect(config.mcpServers.linear).toEqual({ url: "https://redacted.invalid/mcp" });
     expect(config.mcpServers.tmwd_browser).toEqual({
       command: fixture.nodeExecutable,
-      args: [join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")]
+      args: [join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")],
+      directTools: true
     });
     expect(config.mcpServers["js-reverse"]).toEqual({
       command: fixture.nodeExecutable,
@@ -123,7 +124,8 @@ describe("managed browser67 MCP provision", () => {
     expect(config.mcpServers.linear).toEqual({ url: "https://redacted.invalid/mcp" });
     expect(config.mcpServers.tmwd_browser).toEqual({
       command: fixture.nodeExecutable,
-      args: [join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")]
+      args: [join(fixture.browser67Root, "src", "mcp", "browser", "server.mjs")],
+      directTools: true
     });
     expect(config.mcpServers["js-reverse"]).toEqual({
       command: fixture.nodeExecutable,

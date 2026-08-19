@@ -165,7 +165,14 @@ export async function verifyColdProviderRestoration(window) {
     .getByRole("tab", { name: /^模型 \d+$/u });
   await modelTab.waitFor({ state: "visible", timeout: 30_000 });
   if ((await modelTab.getAttribute("aria-selected")) !== "true") {
-    throw new Error("Packaged cold restart did not restore the Provider model catalog surface.");
+    const tabs = await providerPanel
+      .getByRole("tablist", { name: "Provider 设置分区" })
+      .getByRole("tab")
+      .evaluateAll((elements) => elements.map((element) => ({
+        label: element.textContent?.trim() ?? "",
+        selected: element.getAttribute("aria-selected")
+      })));
+    throw new Error(`Packaged cold restart did not restore the Provider model catalog surface: ${JSON.stringify(tabs)}.`);
   }
   const modelList = providerPanel.getByTestId("provider-model-list");
   const modelRow = modelList.getByTestId("provider-model-row").first();

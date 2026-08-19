@@ -90,7 +90,8 @@ export async function provisionManagedBrowser67Mcp(options: {
   const expected = {
     tmwd_browser: {
       command: resolve(nodeExecutable),
-      args: [join(browser67Root, "src", "mcp", "browser", "server.mjs")]
+      args: [join(browser67Root, "src", "mcp", "browser", "server.mjs")],
+      directTools: true
     },
     "js-reverse": {
       command: resolve(nodeExecutable),

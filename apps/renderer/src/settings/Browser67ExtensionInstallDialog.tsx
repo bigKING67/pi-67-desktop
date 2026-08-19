@@ -32,15 +32,13 @@ export function Browser67ExtensionInstallDialog({
   const preparedForOpen = useRef(false);
   const [localError, setLocalError] = useState<string>();
   const [auxiliaryBusy, setAuxiliaryBusy] = useState<string>();
-  const [repairRequired, setRepairRequired] = useState(false);
   const extensionState = integration?.extensionState ?? "not-prepared";
-  const needsPrepare = extensionState === "not-prepared"
-    || extensionState === "reload-required"
-    || extensionState === "failed";
+  const needsPrepare = browser67ExtensionNeedsPrepare(extensionState);
   const filesPrepared = extensionState === "prepared"
     || extensionState === "reload-required"
     || extensionState === "connected";
   const connected = extensionState === "connected" && integration?.doctorState === "ready";
+  const repairRequired = extensionState === "reload-required";
   const preparing = operation === "prepare";
   const verifying = operation === "verify";
   const busy = preparing || verifying;
@@ -49,10 +47,8 @@ export function Browser67ExtensionInstallDialog({
     if (!open) {
       preparedForOpen.current = false;
       setLocalError(undefined);
-      setRepairRequired(false);
       return;
     }
-    if (extensionState === "reload-required") setRepairRequired(true);
     if (preparedForOpen.current || !needsPrepare) return;
     preparedForOpen.current = true;
     void onPrepare();
@@ -78,16 +74,16 @@ export function Browser67ExtensionInstallDialog({
       onOpenChange={(next) => { if (!next && !busy && auxiliaryBusy === undefined) onClose(); }}
     >
       <Modal className={`modal-surface ${styles.installModal}`}>
-        <Dialog aria-label="安装 browser67 浏览器扩展" className={styles.installDialog!}>
+        <Dialog aria-label="browser67 浏览器扩展连接" className={styles.installDialog!}>
           <span className="dialog-eyebrow">BROWSER67</span>
-          <Heading slot="title">安装浏览器扩展</Heading>
+          <Heading slot="title">浏览器扩展连接</Heading>
           <p className={styles.installIntro}>
             Pi-67 会准备受完整性保护的 unpacked extension；Chrome/Edge 首次加载仍需你在扩展管理页确认。
           </p>
 
           {repairRequired ? (
             <div className={styles.installWarning} role="status">
-              检测到浏览器当前运行的扩展不是这次准备的受管版本。请先核对扩展的加载目录：目录不一致时移除旧条目，再从下方 Pi-67 提供的目录重新“加载已解压的扩展”；目录一致时再点击扩展页的“重新加载”。
+              受管扩展文件已经是当前版本，但浏览器中的运行身份尚未同步。验证时 Pi-67 会先尝试原位重新加载；仅当验证后仍不匹配且加载目录不是下方 Pi-67 目录时，才需要移除旧条目并重新加载。
             </div>
           ) : null}
 
@@ -101,10 +97,8 @@ export function Browser67ExtensionInstallDialog({
               title="准备扩展文件"
               description="自动补齐运行依赖，并把当前内置扩展复制到 browser67 活动目录。"
             >
-              {(needsPrepare || connected) && !busy ? <Button className="secondary-button" onPress={() => void onPrepare()}>
-              {connected
-                  ? "重新安装扩展"
-                  : extensionState === "reload-required" ? "同步受管扩展文件" : "重新准备"}
+              {needsPrepare && !busy ? <Button className="secondary-button" onPress={() => void onPrepare()}>
+                {extensionState === "failed" ? "重新准备" : "准备扩展文件"}
               </Button> : null}
               {preparing ? <span className={styles.inlineProgress} role="status"><LoaderCircle aria-hidden="true" size={14} />准备中…</span> : null}
             </InstallStep>
@@ -113,9 +107,9 @@ export function Browser67ExtensionInstallDialog({
               complete={connected}
               current={filesPrepared && !connected}
               number="2"
-              title={repairRequired ? "核对并替换加载来源" : "在浏览器中加载"}
+              title={repairRequired ? "重新加载现有扩展" : "在浏览器中加载"}
               description={repairRequired
-                ? "打开扩展管理页，核对 browser67 TMWD Bridge 的加载目录。旧目录必须移除后，再从 Pi-67 提供的目录重新“加载已解压的扩展”。"
+                ? "先直接验证，Pi-67 会请求浏览器重新加载现有扩展。若仍失败，再打开扩展管理页核对 browser67 TMWD Bridge 的加载目录。"
                 : "打开扩展管理页、开启开发者模式，然后选择“加载已解压的扩展”。"}
             >
               <div className={styles.browserActions}>
@@ -169,7 +163,7 @@ export function Browser67ExtensionInstallDialog({
           <div className="dialog-actions">
             <Button className="secondary-button" isDisabled={busy || auxiliaryBusy !== undefined} onPress={onClose}>关闭</Button>
             {filesPrepared && !connected ? <Button className="primary-button" isDisabled={busy || auxiliaryBusy !== undefined} onPress={() => void onVerify()}>
-              <Radio aria-hidden="true" size={14} />{verifying ? "验证中…" : "启动连接并验证"}
+              <Radio aria-hidden="true" size={14} />{verifying ? "验证中…" : repairRequired ? "重新加载并验证" : "启动连接并验证"}
             </Button> : null}
             {connected ? <Button className="primary-button" isDisabled={auxiliaryBusy !== undefined} onPress={onClose}>完成</Button> : null}
           </div>
@@ -177,6 +171,12 @@ export function Browser67ExtensionInstallDialog({
       </Modal>
     </ModalOverlay>
   );
+}
+
+export function browser67ExtensionNeedsPrepare(
+  extensionState: DesktopIntegrationStatus["extensionState"]
+): boolean {
+  return extensionState === "not-prepared" || extensionState === "failed";
 }
 
 function InstallStep({ complete, current, number, title, description, children }: {
