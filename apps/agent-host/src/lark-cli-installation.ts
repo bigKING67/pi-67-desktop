@@ -45,6 +45,8 @@ const INSTALL_ENVIRONMENT_KEYS = [
   "NPM_CONFIG_REGISTRY",
   "PATH",
   "PATHEXT",
+  "PI67_ELECTRON_EXECUTABLE",
+  "PI67_WINDOWS_JOB_CONTROLLER",
   "SHELL",
   "SystemRoot",
   "TEMP",
@@ -404,6 +406,9 @@ function larkCliInstallEnvironment(
   gitExecPath: string
 ): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
+  // Windows package operations run inside the Main-owned Electron worker and
+  // Job Object controller. These paths are execution infrastructure, not user
+  // configuration or credentials, and must survive the secret-stripping copy.
   for (const key of INSTALL_ENVIRONMENT_KEYS) {
     const value = source[key];
     if (typeof value === "string") environment[key] = value;

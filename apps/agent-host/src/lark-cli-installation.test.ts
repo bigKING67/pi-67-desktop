@@ -31,6 +31,10 @@ describe("Desktop-managed Lark CLI installation", () => {
     expect(swap.version).toBe("1.0.85");
     await expect(access(swap.executable)).resolves.toBeUndefined();
     const installEnvironment = runProcess.mock.calls[0]?.[2].environment;
+    expect(installEnvironment).toMatchObject({
+      PI67_ELECTRON_EXECUTABLE: fixture.environment.PI67_ELECTRON_EXECUTABLE,
+      PI67_WINDOWS_JOB_CONTROLLER: fixture.environment.PI67_WINDOWS_JOB_CONTROLLER
+    });
     expect(installEnvironment).not.toHaveProperty("PROVIDER_API_KEY");
     expect(installEnvironment).not.toHaveProperty("SCIENCETOKEN_API_KEY");
     expect(runProcess.mock.calls.map(([, arguments_]) => arguments_)).toEqual([
@@ -191,6 +195,8 @@ async function installationFixture() {
       PI67_NPM_CLI: npmCli,
       PI67_GIT_EXECUTABLE: join(toolchainRoot, "git", "bin", process.platform === "win32" ? "git.exe" : "git"),
       PI67_GIT_EXEC_PATH: join(toolchainRoot, "git", "libexec", "git-core"),
+      PI67_ELECTRON_EXECUTABLE: join(root, "Pi-67 Desktop.exe"),
+      PI67_WINDOWS_JOB_CONTROLLER: join(toolchainRoot, "pi67-package-worker-job.exe"),
       PATH: "/usr/bin:/bin",
       PROVIDER_API_KEY: "provider-secret",
       SCIENCETOKEN_API_KEY: "company-secret"

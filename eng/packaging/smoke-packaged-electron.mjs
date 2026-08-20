@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
+import { delimiter, join } from "node:path";
 import { CONTROLLED_PROMPT_TEXT, isProcessAlive } from "./controlled-shutdown-fixture.ts";
 import { startControlledPrompt } from "./controlled-provider-interaction.mjs";
 import { preparePackagedSmokeProfile } from "./packaged-electron-smoke-profile.mjs";
@@ -57,10 +58,12 @@ let application;
 let childPid;
 const shutdownState = { childPid: undefined };
 let packagedProcessOutput = () => "";
+const smokeEnvironment = packagedSmokeEnvironment(userDataDirectory);
 try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    environment: smokeEnvironment,
     hideNativeWindow: !packagedScreenshotDirectory,
     isolateNativeWindow: true,
     userDataDirectory
@@ -110,6 +113,7 @@ try {
   const extensionDetail = extensionWorkspace.getByTestId("extension-package-detail-scroll");
   await extensionList.waitFor({ state: "visible", timeout: 30_000 });
   await verifyPackagedExtensionUpdateCheck(extensionWorkspace, window);
+  await prepareOfflinePackageNetwork(userDataDirectory);
   if (await extensionDetail.isVisible()) {
     throw new Error("Packaged resource detail must not share the Package Catalog surface.");
   }
@@ -332,6 +336,7 @@ try {
   application = await launchPackagedApplication({
     agentDir,
     artifact,
+    environment: smokeEnvironment,
     hideNativeWindow: !packagedScreenshotDirectory,
     isolateNativeWindow: true,
     userDataDirectory
@@ -393,4 +398,30 @@ try {
   } finally {
     await cleanupPackagedTestDirectories(userDataDirectory);
   }
+}
+
+function packagedSmokeEnvironment(profileRoot) {
+  const windowsRoot = process.env.SystemRoot ?? "C:\\Windows";
+  return {
+    HOME: profileRoot,
+    USERPROFILE: profileRoot,
+    APPDATA: join(profileRoot, "app-data", "roaming"),
+    LOCALAPPDATA: join(profileRoot, "app-data", "local"),
+    PATH: process.platform === "win32"
+      ? [join(windowsRoot, "System32"), windowsRoot].join(delimiter)
+      : "/usr/bin:/bin:/usr/sbin:/sbin"
+  };
+}
+
+async function prepareOfflinePackageNetwork(userDataDirectory) {
+  const directory = join(userDataDirectory, "package-manager");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "network-settings.json"), `${JSON.stringify({
+    schema: "pi67.package-network.v1",
+    settings: {
+      npmMode: "offline",
+      gitMode: "offline",
+      gitMirrors: []
+    }
+  })}\n`, { encoding: "utf8", mode: 0o600 });
 }
