@@ -115,7 +115,10 @@ test("keeps configured models and canonical thinking values in bounded runtime p
     "xhigh",
     "max"
   ]);
-  await expect(page.getByText("仅显示当前模型支持的等级", { exact: true })).toBeVisible();
+  await expect(page.getByText(
+    "Pi SDK 为 GPT Test Extended Reasoning Preview 声明：off、minimal、low、medium、high、xhigh、max；未列出的等级不会发送。",
+    { exact: true }
+  )).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("runtime-thinking-picker.png"), animations: "disabled" });
   await page.keyboard.press("Escape");

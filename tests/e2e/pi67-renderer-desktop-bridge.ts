@@ -109,12 +109,15 @@ export async function installMockDesktopBridge(
       automaticChecks: true
     };
     const updateListeners = new Set<(state: unknown) => void>();
+    let finishUpdate: ((state: Record<string, unknown>) => void) | undefined;
     let resolveInitialUpdateState: (() => void) | undefined;
     const initialUpdateStateGate = bridgeFixture.deferInitialUpdateState
       ? new Promise<void>((resolve) => { resolveInitialUpdateState = resolve; })
       : Promise.resolve();
     const updateTest = {
       checks: 0,
+      starts: 0,
+      cancellations: 0,
       openedUrls: [] as string[],
       allowOpen: false,
       finishInitialRead() {
@@ -396,30 +399,29 @@ export async function installMockDesktopBridge(
             workspaceEntryTest.trashes.push(structuredClone(entry));
             return true;
           },
-          getUpdateState: async () => {
-            await initialUpdateStateGate;
-            return structuredClone(updateState);
-          },
+          getUpdateState: async () => { await initialUpdateStateGate; return structuredClone(updateState); },
           checkForUpdates: async () => {
             updateTest.checks += 1;
-            updateState = {
-              phase: "available",
-              channel: "unsigned-preview",
-              currentVersion: "0.1.0-alpha.1",
-              version: "0.1.0-alpha.2",
-              releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
-              publishedAt: "2026-07-23T06:00:00.000Z",
-              automaticChecks: true,
-              checkedAt: "2026-08-03T08:00:00.000Z"
-            };
+            updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
             for (const listener of updateListeners) listener(structuredClone(updateState));
+            return structuredClone(updateState);
+          },
+          startUpdate: async () => {
+            updateTest.starts += 1;
+            updateState = { phase: "downloading", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, transferred: 52_428_800, percent: 50, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
+            for (const listener of updateListeners) listener(structuredClone(updateState));
+            return new Promise<Record<string, unknown>>((resolve) => { finishUpdate = resolve; });
+          },
+          cancelUpdate: async () => {
+            updateTest.cancellations += 1;
+            updateState = { phase: "available", channel: "unsigned-preview", currentVersion: "0.1.0-alpha.1", version: "0.1.0-alpha.2", artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip", artifactBytes: 104_857_600, automaticChecks: true, checkedAt: "2026-08-03T08:00:00.000Z" };
+            for (const listener of updateListeners) listener(structuredClone(updateState));
+            finishUpdate?.(structuredClone(updateState)); finishUpdate = undefined;
             return structuredClone(updateState);
           },
           onUpdateStateChanged: (listener: (state: unknown) => void) => {
             updateListeners.add(listener);
-            return () => {
-              updateListeners.delete(listener);
-            };
+            return () => { updateListeners.delete(listener); };
           },
           onAgentHostFailed: () => () => undefined,
           onAgentHostStartup: () => () => undefined,

@@ -37,6 +37,8 @@ describe("browser67 persisted integration state", () => {
       checkedAt: 20,
       extensionPreparedAt: 30,
       extensionCheckedAt: 40,
+      verifiedAt: 40,
+      verifiedPackageIdentity: `0.4.0:${"1".repeat(40)}`,
       registry: "https://registry.npmjs.org"
     };
     expect(parseBrowserState(valid)).toEqual(valid);
@@ -45,6 +47,8 @@ describe("browser67 persisted integration state", () => {
       { ...valid, detail: 42 },
       { ...valid, extensionPreparedAt: -1 },
       { ...valid, extensionCheckedAt: Number.NaN },
+      { ...valid, verifiedAt: -1 },
+      { ...valid, verifiedPackageIdentity: "0.4.0:not-a-commit" },
       { ...valid, registry: false }
     ]) {
       expect(() => parseBrowserState(invalid)).toThrow("browser67 integration state is invalid.");

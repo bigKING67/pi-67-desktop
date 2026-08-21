@@ -931,13 +931,20 @@ loading error where the operation can produce those states
   Desktop verifies package identity, the exact checked update target (or resolved
   stable version for first install), monotonic upgrade relation, and bounded install entry before executing that one
   entry, verifies native/update identity, atomically swaps the current-user shared
-  tool installation, and installs the exact official suite into
-  `~/.agents/skills`. The confirmation names that current-user global scope and says
+  tool installation. It then attempts the exact official suite as an independently
+  recoverable synchronization into `~/.agents/skills`. The confirmation names that
+  current-user global scope and says
   other compatible Agents can reuse the standard directory. It also states that
-  non-managed same-name Skills are preserved. CLI, launcher, Skill directories, and
-  the global Skill lock roll back together if Pi resources cannot reload. Before a
-  check, an installed updater-owned suite says
-  `尚未检查`; after a successful check it says `已是最新` or `可更新`. A newer legacy
+  non-managed same-name Skills are preserved. A validated CLI remains active when all
+  official Skills sources fail; the row becomes `CLI 已更新，Skills 待同步`, uses a
+  warning notice, and offers `同步官方 Skills` without downloading or reverting the
+  CLI. CLI/launcher activation and Skill/lock activation retain separate atomic
+  rollback boundaries. Before the first check for an effective local identity, an
+  installed updater-owned suite says `尚未检查`; after a successful check it says
+  `已是最新` or `可更新`. The last checked timestamp and identity-bound result persist
+  in the shared Pi Agent Profile across Desktop restart or upgrade. Executable, lock,
+  manifest, Overlay, or source drift invalidates that receipt and returns only the
+  affected Pack to `尚未检查`. A newer legacy
   registry record that is not independently installable says `暂无可安装更新`, while an
   older record is labeled `Registry 记录版本` rather than `最新兼容版本`. Lark official Skills update through the
   installed Lark CLI as one Pack. When all official Skills already match the latest
@@ -1098,8 +1105,13 @@ loading error where the operation can produce those states
   The repair dialog does not run file preparation for `reload-required`, distinguishes
   a same-path reload from an old loaded source, and instructs the user to remove the old
   entry only when its source differs from the Pi-67-provided directory. File preparation keeps
-  `需要重新加载验证` visible until live identity verification succeeds. A persisted connected
-  result is demoted until this process rechecks it. The dialog scrolls vertically
+  `需要重新加载验证` visible until live identity verification succeeds. A successful
+  package-identity receipt persists in the shared Pi Agent Profile. On restart or an
+  unchanged Desktop upgrade, Settings shows `上次验证通过，正在确认` and automatically
+  runs the read-only Doctor; it never starts the Hub or reloads the browser without
+  the existing explicit confirmation. A changed or legacy identity says
+  `上次验证通过，版本待确认` and remains demoted until live verification succeeds.
+  The dialog scrolls vertically
   inside the viewport at high zoom and never creates document-level horizontal overflow.
 - Settings and Inspector are structurally mutually exclusive: mounting Settings
   removes the Workspace Inspector surface and its focus targets from the DOM.
@@ -1250,6 +1262,10 @@ loading error where the operation can produce those states
   Provider-setting sections rather than Task tabs. They prevent frequent
   controls, advanced compatibility fields, and diagnostics from being presented
   as equally weighted cards.
+- The Catalog intro and sync status explicitly say that Desktop reads the current
+  user's Pi Profile shared with Pi TUI. Row provenance uses `Pi 内置` or
+  `Pi models.json`; it never presents a user-owned legacy definition as a
+  Desktop-bundled Provider or silently deletes it during installation.
 - Provider sync status, Provider Catalog, section tabs, and editor do not share
   a bounded outer frame. `返回模型服务列表` restores the Catalog's search,
   selection, and scroll position without discarding the Provider draft.
@@ -1923,9 +1939,10 @@ loading error where the operation can produce those states
   a fixed diagnostic; file-access timeout produces a structured recoverable error
   without exposing the affected absolute path.
 - A real Task never reuses an invalid or partial diagnostic projection. Agent Host
-  starts one revision-bound runtime prewarm before Workspace restoration; the first
-  complete Provider validation and first Task may share it only after current
-  `models.json` and `auth.json` revisions match. The resulting startup remains bounded
+  maintains one revision-bound independent Task runtime standby: consuming one queues
+  the next standby after current `models.json` and `auth.json` revisions are rechecked,
+  while Provider validation may inspect the current standby without consuming it. The
+  resulting startup remains bounded
   to 4 seconds inside Agent Host and fails with recoverable stage `session-model-runtime` before Workspace/Session
   acknowledgement expires. Retry starts a new Pi runtime creation attempt; the
   late result of the timed-out attempt is never installed as Task authority.
@@ -1978,13 +1995,22 @@ loading error where the operation can produce those states
   confirms that Runtime state was unavailable without exposing the raw transport
   error. No destructive repair, force unlock, replay, or clear-all action appears
   in this surface.
-- Settings and the update dialog disclose that automatic checks request only
-  public GitHub Release metadata and send no Workspace, Session, model-service,
-  or credential data. Packaged builds check 10 seconds after startup and at most
-  once per 24 hours while running; development builds stay offline. Current and
-  automatic-error results do not interrupt work. Unsigned Preview checks and
-  opening the canonical GitHub Release page remain separate actions. Unsigned
-  builds expose no in-app download, background download, or quit-to-install path.
+- Settings and the update dialog disclose that automatic checks request only the
+  fixed `updates.52671314.xyz` R2 manifest and send no Workspace, Session,
+  model-service, or credential data. Packaged builds check 10 seconds after startup
+  and at most once per 24 hours while running; development builds stay offline.
+  Current and automatic-error results do not interrupt work, and automatic checks
+  never download. An available Unsigned Preview exposes one primary
+  `下载并安装` action with artifact size. Downloading owns a determinate progress
+  bar, transferred/total bytes, and explicit cancellation; it is not dismissible as
+  a hidden background side effect. After exact size and SHA-256 verification, the
+  state becomes `正在安装`, the dialog stops accepting actions, and Main performs
+  the normal shutdown checkpoint before platform handoff. Windows starts the
+  per-user NSIS update mode. macOS validates the extracted bundle identity and
+  version, requires a writable same-volume destination, and uses an adjacent backup
+  for replacement rollback before restart. Failures keep the current application
+  and Pi Session state visible and actionable; local paths, hashes, and remote
+  manifest payloads never enter Renderer state.
 
 ### Empty, loading, and error states
 

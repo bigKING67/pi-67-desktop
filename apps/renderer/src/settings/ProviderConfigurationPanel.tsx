@@ -235,7 +235,7 @@ function GlobalProviderConfigurationPanel() {
                   <span>
                     <strong>{selectedProviderId ? (selectedView?.name ?? selectedProviderId) : "新建模型服务"}</strong>
                     <small>{editable
-                      ? "Endpoint 与模型写入 Pi models.json；API Key 单独保存"
+                      ? "写入当前用户共享的 Pi models.json；Pi TUI 同步使用，API Key 单独保存"
                       : selectedView?.configured
                         ? "Pi 内置服务已连接；Endpoint 与协议由 Pi 管理"
                         : "先配置 API Key；Endpoint 与协议由 Pi 管理"}</small>
@@ -300,10 +300,11 @@ function GlobalProviderConfigurationPanel() {
     <SettingsDestructiveActionDialog
       busy={phase === "saving"}
       confirmLabel="移除模型服务"
-      description={<>这会从 Pi <code>models.json</code> 移除模型服务定义。<code>auth.json</code> 中的持久凭据不会被删除。</>}
+      description={<>这会从 Desktop 与 Pi TUI 共用的 Pi <code>models.json</code> 移除模型服务定义。<code>auth.json</code> 中的持久凭据不会被删除。</>}
       error={removalTarget ? error : undefined}
       facts={[
         { label: "模型服务", value: removalView?.name ?? removalTarget ?? "-" },
+        { label: "Pi TUI", value: "同步移除该定义" },
         { label: "未保存草稿", value: dirty ? "将一并丢弃" : "无" },
         { label: "持久凭据", value: "保留" }
       ]}
@@ -373,7 +374,7 @@ function ProviderConfigurationEditor({
     <section className={styles.formSection}>
       <header className={styles.sectionIntro}>
         <strong>基本配置</strong>
-        <small>Provider ID、Endpoint 与协议直接对应 Pi models.json。新服务保存后再单独配置 API Key。</small>
+        <small>Provider ID、Endpoint 与协议直接写入 Desktop 与 Pi TUI 共用的 Pi models.json。新服务保存后再单独配置 API Key。</small>
       </header>
       <div className={styles.fieldGrid}>
         <Field label="Provider ID" detail="写入 providers.<id>">

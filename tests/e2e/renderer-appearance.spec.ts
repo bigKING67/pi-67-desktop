@@ -346,7 +346,7 @@ test("renders user messages as compact right-aligned bubbles", async ({ page }) 
   });
 });
 
-test("keeps unsigned preview downloads user initiated after automatic metadata checks", async ({ page }) => {
+test("keeps unsigned preview downloads explicit, observable, and cancellable", async ({ page }) => {
   await page.goto("/");
   await openWorkspace(page);
   await page.getByRole("button", { name: "帮助与设置" }).click();
@@ -354,27 +354,27 @@ test("keeps unsigned preview downloads user initiated after automatic metadata c
     .getByRole("menuitem", { name: "检查更新", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Pi-67 更新" });
-  await expect(dialog.getByText(/不会发送工作区、会话、模型服务或密钥信息/u)).toBeVisible();
+  await expect(dialog.getByText(/updates\.52671314\.xyz/u)).toBeVisible();
   await expect(dialog.getByText("正在等待自动检查")).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(0);
   await dialog.getByRole("button", { name: "检查更新" }).click();
   await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
-  await expect(dialog.getByText(/核对 SHA-256 后手动下载安装/u)).toBeVisible();
+  await expect(dialog.getByText(/自动下载、校验，并启动内部更新安装/u)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { checks: number } }).__pi67UpdateTest.checks)).toBe(1);
 
-  await dialog.getByRole("button", { name: "查看更新" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("GitHub 更新页未打开");
+  await dialog.getByRole("button", { name: "下载并安装" }).click();
+  await expect(dialog.getByText("正在下载 Pi-67 0.1.0-alpha.2")).toBeVisible();
+  await expect(dialog.getByRole("progressbar", { name: "更新下载进度" })).toHaveAttribute("aria-valuenow", "50");
+  await expect(dialog.getByText(/50\.0 MB \/ 100\.0 MB（50%）/u)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "取消下载" })).toBeEnabled();
+  await dialog.getByRole("button", { name: "取消下载" }).click();
   await expect(dialog.getByText("发现 Pi-67 0.1.0-alpha.2")).toBeVisible();
-
-  await page.evaluate(() => {
-    (window as unknown as { __pi67UpdateTest: { allowOpen: boolean } }).__pi67UpdateTest.allowOpen = true;
-  });
-  await dialog.getByRole("button", { name: "查看更新" }).click();
-  const releaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2";
-  expect(await page.evaluate(() => (window as unknown as { __pi67UpdateTest: { openedUrls: string[] } }).__pi67UpdateTest.openedUrls)).toEqual([
-    releaseUrl,
-    releaseUrl
-  ]);
+  expect(await page.evaluate(() => {
+    const state = (window as unknown as {
+      __pi67UpdateTest: { starts: number; cancellations: number; openedUrls: string[] };
+    }).__pi67UpdateTest;
+    return { starts: state.starts, cancellations: state.cancellations, openedUrls: state.openedUrls };
+  })).toEqual({ starts: 1, cancellations: 1, openedUrls: [] });
 });
 
 test("projects an automatically discovered version into the help entry and menu", async ({ page }) => {
@@ -388,7 +388,8 @@ test("projects an automatically discovered version into the help entry and menu"
       channel: "unsigned-preview",
       currentVersion: "0.1.0-alpha.1",
       version: "0.1.0-alpha.2",
-      releaseUrl: "https://github.com/bigKING67/pi-67-desktop/releases/tag/v0.1.0-alpha.2",
+      artifactName: "Pi-67-Desktop-0.1.0-alpha.2-mac-arm64-unsigned-preview.zip",
+      artifactBytes: 104_857_600,
       automaticChecks: true,
       checkedAt: "2026-08-03T08:00:00.000Z"
     });

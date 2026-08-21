@@ -46,7 +46,8 @@ describe("global Lark Skill installation", () => {
     ) as { skills: Record<string, { source: string }>; dismissed: Record<string, unknown> };
     expect(installedLock.skills["design-craft"]?.source).toBe("sixseven/design-craft");
     expect(installedLock.skills["lark-doc"]?.source).toBe("user-existing");
-    expect(installedLock.skills["lark-im"]?.source).toBe("larksuite/cli");
+    expect(installedLock.skills["lark-im"]?.source)
+      .toBe("https://open.feishu.cn/lark-cli/skills/regular");
     expect(installedLock.dismissed).toEqual({ legacy: true });
 
     await swap.rollback();
@@ -74,6 +75,47 @@ describe("global Lark Skill installation", () => {
       .resolves.toBeUndefined();
   });
 
+  it("accepts the official Feishu source lock with a normalized trailing slash", async () => {
+    const homeDirectory = await mkdtemp(join(tmpdir(), "pi67-global-lark-skills-"));
+    const swap = await beginGlobalLarkSkillInstallation({
+      homeDirectory,
+      skillIds: SKILL_IDS,
+      nodeExecutable: "/toolchain/node",
+      npmCli: "/toolchain/npm-cli.js",
+      gitExecPath: "/toolchain/git-core",
+      environment: { PATH: "/usr/bin:/bin" },
+      runProcess: stagedSkillsRunner(SKILL_IDS, (source) => `${source}/`)
+    });
+
+    await swap.commit();
+    await expect(access(join(globalAgentSkillsRoot(homeDirectory), "lark-doc", "SKILL.md")))
+      .resolves.toBeUndefined();
+  });
+
+  it("falls back when the primary source returns an invalid Skill inventory", async () => {
+    const homeDirectory = await mkdtemp(join(tmpdir(), "pi67-global-lark-skills-"));
+    const runner = stagedSkillsRunner((source) => (
+      source.startsWith("https://open.feishu.cn/") ? [...SKILL_IDS, "lark-unexpected"] : SKILL_IDS
+    ));
+
+    const swap = await beginGlobalLarkSkillInstallation({
+      homeDirectory,
+      skillIds: SKILL_IDS,
+      nodeExecutable: "/toolchain/node",
+      npmCli: "/toolchain/npm-cli.js",
+      gitExecPath: "/toolchain/git-core",
+      environment: { PATH: "/usr/bin:/bin" },
+      runProcess: runner
+    });
+
+    expect(runner).toHaveBeenCalledTimes(2);
+    await swap.commit();
+    const installedLock = JSON.parse(
+      await readFile(join(homeDirectory, ".agents", ".skill-lock.json"), "utf8")
+    ) as { skills: Record<string, { source: string }> };
+    expect(installedLock.skills["lark-doc"]?.source).toBe("larksuite/cli");
+  });
+
   it("rejects an unexpected upstream Skill without changing the user directory", async () => {
     const homeDirectory = await mkdtemp(join(tmpdir(), "pi67-global-lark-skills-"));
     await expect(beginGlobalLarkSkillInstallation({
@@ -84,7 +126,7 @@ describe("global Lark Skill installation", () => {
       gitExecPath: "/toolchain/git-core",
       environment: { PATH: "/usr/bin:/bin" },
       runProcess: stagedSkillsRunner([...SKILL_IDS, "lark-unexpected"])
-    })).rejects.toThrow("验证清单不一致");
+    })).rejects.toThrow("官方 Lark Skills 下载源均未能完成安装");
     await expect(access(globalAgentSkillsRoot(homeDirectory))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -156,7 +198,8 @@ describe("global Lark Skill installation", () => {
 });
 
 function stagedSkillsRunner(
-  stagedSkillIds: string[]
+  stagedSkillIds: string[] | ((source: string) => string[]),
+  lockSource: (source: string) => string = (source) => source
 ): ReturnType<typeof vi.fn<SkillPackProcessRunner>> {
   return vi.fn<SkillPackProcessRunner>(async (_executable, arguments_, options) => {
     expect(arguments_).toEqual(expect.arrayContaining([
@@ -164,18 +207,19 @@ function stagedSkillsRunner(
       "--package=skills@1.5.22",
       "skills",
       "add",
-      "larksuite/cli",
       "-g"
     ]));
+    const source = arguments_[arguments_.indexOf("add") + 1]!;
+    const currentSkillIds = typeof stagedSkillIds === "function" ? stagedSkillIds(source) : stagedSkillIds;
     const stagingHome = options.environment.HOME!;
     const skillsRoot = join(stagingHome, ".agents", "skills");
     await mkdir(skillsRoot, { recursive: true });
     const skills: Record<string, unknown> = {};
-    for (const skillId of stagedSkillIds) {
+    for (const skillId of currentSkillIds) {
       await mkdir(join(skillsRoot, skillId), { recursive: true });
       await writeFile(join(skillsRoot, skillId, "SKILL.md"), `---\nname: ${skillId}\n---\n`, "utf8");
       skills[skillId] = {
-        source: "larksuite/cli",
+        source: lockSource(source),
         sourceType: "github",
         skillPath: `skills/${skillId}/SKILL.md`
       };

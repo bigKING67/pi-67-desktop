@@ -1,11 +1,39 @@
-import { createMessageId } from "@pi67/protocol";
+import { createMessageId, type AgentConnectionIdentity } from "@pi67/protocol";
+import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import {
   rendererWorkbenchStore,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
+import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
 
-export function rotateRendererTaskForSessionOpen(
+export async function rotateRendererTaskForSessionReopen(
+  task: RendererWorkbenchTask,
+  options: { retireCurrentHostTask: boolean }
+): Promise<RendererWorkbenchTask | undefined> {
+  if (options.retireCurrentHostTask) {
+    await agentConnectionController.request(
+      "task.close",
+      { mode: "dispose" },
+      [],
+      { context: workbenchProtocolContextForTask(task) }
+    );
+  }
+  return rotateRendererTaskForSessionOpen(task);
+}
+
+export function rendererTaskBelongsToAgentHost(
+  task: RendererWorkbenchTask,
+  identity: AgentConnectionIdentity
+): boolean {
+  const hasRecoveryHostIdentity = task.recoveryHostInstanceId !== undefined
+    || task.recoveryHostEpoch !== undefined;
+  if (!hasRecoveryHostIdentity) return true;
+  return task.recoveryHostInstanceId === identity.hostInstanceId
+    && task.recoveryHostEpoch === identity.hostEpoch;
+}
+
+function rotateRendererTaskForSessionOpen(
   task: RendererWorkbenchTask
 ): RendererWorkbenchTask | undefined {
   if (

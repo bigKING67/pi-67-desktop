@@ -4,6 +4,7 @@ export type SkillPackUpdateOwner = "managed-pack" | "desktop";
 export type SkillPackUpdateStatus =
   | "not-installed"
   | "not-checked"
+  | "sync-pending"
   | "current"
   | "update-available"
   | "application-managed"

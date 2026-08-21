@@ -28,6 +28,7 @@ vi.mock("./workspace-host-registration-controller.js", () => ({
 const resynchronize = vi.mocked(resynchronizeRendererProjection);
 const openWorkspace = vi.mocked(openRendererWorkspaceDescriptor);
 const registerWorkspace = vi.mocked(registerRendererWorkspaceWithHost);
+const request = vi.fn<typeof agentConnectionController.request>();
 
 describe("task activation controller", () => {
   beforeEach(() => {
@@ -35,6 +36,7 @@ describe("task activation controller", () => {
     resynchronize.mockReset();
     openWorkspace.mockReset();
     registerWorkspace.mockReset();
+    request.mockReset();
     registerWorkspace.mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
     useConversationAttentionStore.getState().reset();
@@ -76,6 +78,11 @@ describe("task activation controller", () => {
       sdkVersion: "fixture",
       eventSequence: 0
     });
+    request.mockImplementation(async (type) => {
+      if (type === "task.close") return { closed: true, stopped: false } as never;
+      throw new Error(`Unexpected request: ${type}`);
+    });
+    vi.spyOn(agentConnectionController, "request").mockImplementation(request);
   });
 
   it("resynchronizes the exact selected Task and only reports committed activation as success", async () => {
@@ -157,6 +164,15 @@ describe("task activation controller", () => {
     await expect(activateRendererTask("task-a")).resolves.toBe(true);
 
     expect(rendererWorkbenchStore.getState().tasks["task-a"]).toBeUndefined();
+    expect(request).toHaveBeenCalledWith(
+      "task.close",
+      { mode: "dispose" },
+      [],
+      { context: expect.objectContaining({ taskId: "task-a", taskGeneration: 3 }) }
+    );
+    expect(request.mock.invocationCallOrder[0]).toBeLessThan(
+      openWorkspace.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
     expect(openWorkspace).toHaveBeenCalledOnce();
     expect(openWorkspace).toHaveBeenCalledWith(
       expect.objectContaining({ id: "workspace-a" }),
@@ -259,6 +275,12 @@ describe("task activation controller", () => {
     await expect(resumeRendererTask("task-a")).resolves.toBe(true);
 
     expect(resynchronize).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalledWith(
+      "task.close",
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
     expect(openWorkspace).toHaveBeenCalledWith(
       expect.objectContaining({ id: "workspace-a" }),
       "/sessions/a.jsonl",
@@ -315,6 +337,43 @@ describe("task activation controller", () => {
       "/sessions/a.jsonl",
       "session-file-a"
     );
+  });
+
+  it("keeps the old Task authority when Host retirement fails", async () => {
+    resynchronize.mockResolvedValue("runtime-not-ready");
+    request.mockRejectedValueOnce(new Error("Host close failed"));
+
+    await expect(resumeRendererTask("task-a")).resolves.toBe(false);
+
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      id: "task-a",
+      lifecycle: "lost",
+      runtime: { phase: "failed", detail: "Host close failed", recoverable: true }
+    });
+  });
+
+  it("does not replace newer Task authority after an old Host retirement finishes", async () => {
+    resynchronize.mockResolvedValue("runtime-not-ready");
+    const retirement = deferred<{ closed: true; stopped: false }>();
+    request.mockReturnValueOnce(retirement.promise as never);
+
+    const recovery = resumeRendererTask("task-a");
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      taskGeneration: 4,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "Newer Task authority", recoverable: true }
+    });
+    retirement.resolve({ closed: true, stopped: false });
+
+    await expect(recovery).resolves.toBe(false);
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      taskGeneration: 4,
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "Newer Task authority" }
+    });
   });
 
   it("reports failure when the saved Session cannot be initialized", async () => {

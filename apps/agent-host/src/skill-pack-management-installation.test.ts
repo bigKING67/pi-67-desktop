@@ -91,9 +91,8 @@ describe("SkillPackManagement Lark CLI installation", () => {
     });
     await mkdir(join(fixture.services.agentDir, "skills", "lark-calendar"), { recursive: true });
     const existing = join(fixture.root, "user-bin", "lark-cli");
-    const managed = desktopManagedLarkCliExecutable(fixture.homeDirectory);
     const installLarkCli = vi.fn(async (_options: unknown) => ({
-      executable: managed,
+      executable: existing,
       version: "1.0.85",
       commit: async () => undefined,
       rollback: async () => undefined
@@ -109,16 +108,19 @@ describe("SkillPackManagement Lark CLI installation", () => {
       }),
       stderr: ""
     }));
-    let resolved = existing;
     const management = new SkillPackManagement(fixture.services, {
       capabilitiesRoot: fixture.capabilitiesRoot,
       homeDirectory: fixture.homeDirectory,
-      resolveLarkCli: async () => resolved,
-      installLarkCli: async (options) => {
-        const swap = await installLarkCli(options);
+      resolveLarkCli: async () => existing,
+      installLarkCli,
+      synchronizeLarkSkills: async () => {
         await mkdir(join(fixture.homeDirectory, ".agents", "skills", "lark-calendar"), { recursive: true });
-        resolved = managed;
-        return swap;
+        return {
+          changed: true,
+          installedSkillCount: 2,
+          commit: async () => undefined,
+          rollback: async () => undefined
+        };
       },
       runProcess,
       pi67Channel: currentPi67Channel()
@@ -132,7 +134,7 @@ describe("SkillPackManagement Lark CLI installation", () => {
       detail: expect.stringContaining("~/.agents/skills")
     });
     const transaction = await management.beginInstall("lark-cli-global");
-    expect(installLarkCli).toHaveBeenCalledOnce();
+    expect(installLarkCli).not.toHaveBeenCalled();
     await transaction.rollback();
   });
 

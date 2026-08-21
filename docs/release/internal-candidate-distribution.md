@@ -81,5 +81,9 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
 
 ## Formal release boundary
 
+小团队的未签名应用内更新是候选测试之后的独立分发层，使用 Cloudflare R2，并遵循
+[`internal-r2-update-distribution.md`](./internal-r2-update-distribution.md)。飞书候选通过不会自动上传 R2；
+R2 安装包和可变 manifest 上传仍要求对 exact version 的当前明确授权。
+
 只有用户明确要求正式发布时，才从已验证候选进入签名、公证、promotion、Tag 或 GitHub Release。正式流程
 必须重新核对授权、版本、source SHA、目标平台证据和 exact bytes；内部飞书候选通过不等于已经发布。

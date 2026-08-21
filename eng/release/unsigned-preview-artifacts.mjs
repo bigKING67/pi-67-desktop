@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import { lstat, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
@@ -32,10 +32,14 @@ export async function prepareUnsignedPreview(releaseDirectory, version, runtimeV
   const files = await Promise.all(unsignedPreviewArtifactSpecs(version).map(async (spec) => {
     const source = join(releaseDirectory, spec.source);
     const destination = join(releaseDirectory, spec.name);
+    const metadata = await lstat(source);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) {
+      throw new Error(`${spec.source}: source is not a regular file`);
+    }
     await rename(source, destination);
     return {
       name: spec.name,
-      bytes: (await stat(destination)).size,
+      bytes: metadata.size,
       sha256: await hashFile(destination),
       target: spec.target
     };
@@ -62,6 +66,7 @@ export async function prepareUnsignedPreview(releaseDirectory, version, runtimeV
 export async function verifyUnsignedPreview(releaseDirectory, version, runtimeVersion) {
   const manifest = JSON.parse(await readFile(join(releaseDirectory, "unsigned-preview-manifest.json"), "utf8"));
   const failures = validateUnsignedPreviewManifest(manifest, version, runtimeVersion);
+  if (failures.length > 0) throwUnsignedPreviewFailures(failures);
   const checksums = await readFile(join(releaseDirectory, "SHA256SUMS.txt"), "utf8");
 
   const fileFailures = await Promise.all((Array.isArray(manifest.files) ? manifest.files : []).map(async (entry) => {
@@ -69,7 +74,11 @@ export async function verifyUnsignedPreview(releaseDirectory, version, runtimeVe
     const path = join(releaseDirectory, entry.name);
     try {
       const entryFailures = [];
-      const bytes = (await stat(path)).size;
+      const metadata = await lstat(path);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) {
+        return [`${entry.name}: source is not a regular file`];
+      }
+      const bytes = metadata.size;
       const sha256 = await hashFile(path);
       if (bytes !== entry.bytes) entryFailures.push(`${entry.name}: size mismatch`);
       if (sha256 !== entry.sha256) entryFailures.push(`${entry.name}: SHA-256 mismatch`);
@@ -82,9 +91,13 @@ export async function verifyUnsignedPreview(releaseDirectory, version, runtimeVe
   failures.push(...fileFailures.flat());
 
   if (failures.length > 0) {
-    throw new Error(`Unsigned preview verification failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
+    throwUnsignedPreviewFailures(failures);
   }
   console.log(`Verified ${manifest.files.length} unsigned preview artifact(s) for ${version}.`);
+}
+
+function throwUnsignedPreviewFailures(failures) {
+  throw new Error(`Unsigned preview verification failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
 }
 
 export function validateUnsignedPreviewManifest(manifest, version, runtimeVersion) {

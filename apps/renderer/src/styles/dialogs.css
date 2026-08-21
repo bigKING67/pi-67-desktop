@@ -267,6 +267,19 @@
 .update-summary > div { display: grid; gap: 2px; }
 .update-summary strong { color: var(--text-primary); font-size: 12px; }
 .update-summary span { color: var(--text-secondary); font-size: 11px; }
+.update-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.update-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 160ms ease-out;
+}
 .update-network-note { color: var(--text-tertiary); font-size: 10px; line-height: 1.6; }
 .update-action-error { color: var(--danger); font-size: 11px; line-height: 1.5; }
 

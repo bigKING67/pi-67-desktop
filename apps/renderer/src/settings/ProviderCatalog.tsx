@@ -46,7 +46,7 @@ export function ProviderCatalog({
     <section className={styles.providerCatalog} aria-label="Pi Provider 导航">
       <header className={styles.catalogIntro}>
         <strong>模型服务目录</strong>
-        <small>先按当前任务查看模型服务，再进入配置；自定义服务可以同时出现在“已配置”和“自定义”中。</small>
+        <small>Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile；在这里保存或移除的 models.json 定义会同步供 Pi TUI 使用。</small>
       </header>
       <div className={styles.catalogCommandBand}>
         <nav aria-label="模型服务分类" className={styles.catalogTabs} role="tablist">
@@ -103,7 +103,7 @@ export function ProviderCatalog({
                 title={provider.name ?? provider.id}
                 trailing={<span className={styles.providerMeta}>
                   <strong data-configured={provider.configured}>{provider.configured ? "已配置" : "待配置"}</strong>
-                  <small>{provider.origin === "builtin" ? "内置" : "自定义"} · {provider.modelCount} 个模型</small>
+                  <small>{provider.origin === "builtin" ? "Pi 内置" : "Pi models.json"} · {provider.modelCount} 个模型</small>
                 </span>}
               />
             ))}
@@ -146,7 +146,7 @@ function ProviderCatalogEmpty({ view, hasQuery }: {
   }
   return <div className={styles.providerListEmpty} role="status">
     <strong>尚未创建自定义模型服务</strong>
-    <small>自定义定义只写入 Pi models.json，不会复制内置 Provider。</small>
+    <small>这里直接管理与 Pi TUI 共用的 models.json；任一端的外部修改都可重新加载，不会复制内置 Provider。</small>
   </div>;
 }
 

@@ -148,6 +148,32 @@ describe("Skill Pack controller", () => {
     });
   });
 
+  it("keeps an installed CLI and reports retryable official Skills synchronization", async () => {
+    const pending = {
+      ...PACK,
+      updateStatus: "sync-pending" as const,
+      canInstall: true,
+      canUpdate: false,
+      installedVersion: "1.0.88",
+      latestVersion: "1.0.88",
+      detail: "Lark CLI 已更新；官方全局 Skills 待同步。"
+    };
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [pending],
+      total: 1,
+      changed: true,
+      checkedAt: 1_722_400_000_075
+    } as never);
+
+    await expect(installSkillPack(PACK.id, "workspace-skills")).resolves.toBe(true);
+    expect(useSkillPackStore.getState().items).toEqual([pending]);
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "Lark CLI 已安装，Skills 待同步",
+      message: expect.stringContaining("无需重新下载 CLI")
+    });
+  });
+
   it("installs the verified post-update inventory", async () => {
     const current = {
       ...PACK,
@@ -170,6 +196,31 @@ describe("Skill Pack controller", () => {
       { context: { scope: "workspace", workspaceId: "workspace-skills" } }
     );
     expect(useSkillPackStore.getState().items).toEqual([current]);
+  });
+
+  it("keeps a verified CLI update when optional official Skills synchronization is pending", async () => {
+    const pending = {
+      ...PACK,
+      updateStatus: "sync-pending" as const,
+      canInstall: true,
+      canUpdate: false,
+      installedVersion: "1.0.88",
+      latestVersion: "1.0.88"
+    };
+    vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      items: [pending],
+      total: 1,
+      changed: true,
+      checkedAt: 1_722_400_000_125
+    } as never);
+
+    await expect(updateSkillPack(PACK.id, "workspace-skills")).resolves.toBe(true);
+    expect(useSkillPackStore.getState().items).toEqual([pending]);
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "Lark CLI 已更新，Skills 待同步",
+      message: expect.stringContaining("CLI 1.0.88 已完成验证并保留")
+    });
   });
 
   it("rechecks after an update failure instead of preserving a stale current state", async () => {

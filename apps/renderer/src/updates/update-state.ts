@@ -1,32 +1,25 @@
 const channel = "unsigned-preview" as const;
-const releasePageBaseUrl = "https://github.com/bigKING67/pi-67-desktop/releases/tag/";
+const maximumArtifactBytes = 2 * 1_024 * 1_024 * 1_024;
 
-export type UpdateState =
-  | {
-      phase: "idle" | "current";
-      channel: typeof channel;
-      currentVersion: string;
-      automaticChecks: boolean;
-      checkedAt?: string;
-    }
-  | {
-      phase: "available";
-      channel: typeof channel;
-      currentVersion: string;
-      version: string;
-      releaseUrl: string;
-      automaticChecks: boolean;
-      publishedAt?: string;
-      checkedAt?: string;
-    }
-  | {
-      phase: "disabled" | "error";
-      channel: typeof channel;
-      currentVersion: string;
-      detail: string;
-      automaticChecks: boolean;
-      checkedAt?: string;
-    };
+interface UpdateMetadata {
+  channel: typeof channel;
+  currentVersion: string;
+  automaticChecks: boolean;
+  checkedAt?: string;
+}
+
+interface UpdateArtifactMetadata {
+  version: string;
+  artifactName: string;
+  artifactBytes: number;
+}
+
+export type UpdateState = UpdateMetadata & (
+  | { phase: "checking" | "current" | "idle" }
+  | ({ phase: "available" | "installing" } & UpdateArtifactMetadata)
+  | ({ phase: "downloading"; transferred: number; percent: number } & UpdateArtifactMetadata)
+  | { phase: "disabled" | "error"; detail: string }
+);
 
 export const idleUpdateState: UpdateState = {
   phase: "idle",
@@ -47,28 +40,53 @@ export function parseUpdateState(value: unknown): UpdateState {
   const currentVersion = value.currentVersion;
   const automaticChecks = value.automaticChecks;
   const checkedAt = parseDate(value.checkedAt);
-  const metadata = { automaticChecks, ...(checkedAt ? { checkedAt } : {}) };
-  if (value.phase === "idle" || value.phase === "current") {
-    return { phase: value.phase, channel, currentVersion, ...metadata };
+  const metadata = {
+    channel,
+    currentVersion,
+    automaticChecks,
+    ...(checkedAt ? { checkedAt } : {})
+  };
+  if (value.phase === "idle" || value.phase === "checking" || value.phase === "current") {
+    return { phase: value.phase, ...metadata };
   }
-  if (value.phase === "available" && isBoundedString(value.version, 100)) {
-    const releaseUrl = `${releasePageBaseUrl}v${value.version}`;
-    if (value.releaseUrl !== releaseUrl) {
-      return updateErrorState("更新服务返回了无效的下载地址；没有打开外部页面。", currentVersion, automaticChecks);
+  if (value.phase === "available" || value.phase === "installing" || value.phase === "downloading") {
+    const artifact = parseArtifactMetadata(value);
+    if (!artifact) {
+      return updateErrorState(
+        "更新服务返回了无效的安装包信息；没有执行下载或安装。",
+        currentVersion,
+        automaticChecks
+      );
     }
-    const publishedAt = parseDate(value.publishedAt);
-    return {
-      phase: "available",
-      channel,
-      currentVersion,
-      version: value.version,
-      releaseUrl,
-      ...metadata,
-      ...(publishedAt ? { publishedAt } : {})
-    };
+    if (value.phase === "downloading") {
+      if (
+        typeof value.transferred !== "number"
+        || !Number.isSafeInteger(value.transferred)
+        || value.transferred < 0
+        || value.transferred > artifact.artifactBytes
+        || typeof value.percent !== "number"
+        || !Number.isFinite(value.percent)
+        || value.percent < 0
+        || value.percent > 100
+      ) {
+        return updateErrorState(
+          "更新服务返回了无效的下载进度；已停止显示该进度。",
+          currentVersion,
+          automaticChecks
+        );
+      }
+      return {
+        phase: value.phase,
+        ...artifact,
+        transferred: value.transferred,
+        percent: value.percent,
+        ...metadata
+      };
+    }
+    return { phase: value.phase, ...artifact, ...metadata };
   }
   if ((value.phase === "disabled" || value.phase === "error") && isBoundedString(value.detail, 500)) {
-    return { phase: value.phase, channel, currentVersion, detail: value.detail, ...metadata };
+    return { phase: value.phase, detail: value.detail, ...metadata };
   }
   return updateErrorState(
     "更新服务返回了无法识别的状态；没有执行下载或安装。",
@@ -88,6 +106,27 @@ export function updateErrorState(
     currentVersion,
     detail: detail.slice(0, 500),
     automaticChecks
+  };
+}
+
+function parseArtifactMetadata(value: Record<string, unknown>): UpdateArtifactMetadata | undefined {
+  if (
+    !isBoundedString(value.version, 100)
+    || !isBoundedString(value.artifactName, 240)
+    || typeof value.artifactBytes !== "number"
+    || !Number.isSafeInteger(value.artifactBytes)
+    || value.artifactBytes < 1
+    || value.artifactBytes > maximumArtifactBytes
+  ) {
+    return undefined;
+  }
+  const expectedWindows = `Pi-67-Desktop-${value.version}-win-x64-unsigned-preview.exe`;
+  const expectedMacos = `Pi-67-Desktop-${value.version}-mac-arm64-unsigned-preview.zip`;
+  if (value.artifactName !== expectedWindows && value.artifactName !== expectedMacos) return undefined;
+  return {
+    version: value.version,
+    artifactName: value.artifactName,
+    artifactBytes: value.artifactBytes
   };
 }
 

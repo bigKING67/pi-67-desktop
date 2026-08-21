@@ -58,3 +58,30 @@ export async function checkForUpdatesNow(): Promise<UpdateState> {
     return update;
   }
 }
+
+export async function startUpdateNow(): Promise<UpdateState> {
+  try {
+    const update = parseUpdateState(await window.pi67.system.startUpdate());
+    useUpdateStore.getState().install(update);
+    return update;
+  } catch {
+    const current = useUpdateStore.getState().update;
+    const update = updateErrorState(
+      "更新下载或安装没有启动。当前版本和 Pi 会话保持不变，可以重新检查后再试。",
+      current.currentVersion,
+      current.automaticChecks
+    );
+    useUpdateStore.getState().install(update);
+    return update;
+  }
+}
+
+export async function cancelUpdateNow(): Promise<UpdateState> {
+  try {
+    const update = parseUpdateState(await window.pi67.system.cancelUpdate());
+    useUpdateStore.getState().install(update);
+    return update;
+  } catch {
+    return useUpdateStore.getState().update;
+  }
+}

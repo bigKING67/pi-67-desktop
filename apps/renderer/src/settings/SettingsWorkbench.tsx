@@ -349,7 +349,12 @@ function UpdateSettings() {
   const [checking, setChecking] = useState(false);
   const handleUpdateAction = async (): Promise<void> => {
     if (!initialized) return;
-    if (update.phase === "available" || update.phase === "disabled") {
+    if (
+      update.phase === "available"
+      || update.phase === "downloading"
+      || update.phase === "installing"
+      || update.phase === "disabled"
+    ) {
       setUpdateDialogOpen(true);
       return;
     }
@@ -367,7 +372,7 @@ function UpdateSettings() {
         <SettingsRow
           leading={<DownloadCloud aria-hidden="true" size={17} />}
           title="自动检查更新"
-          description="打包版启动 10 秒后自动检查；持续运行时每天最多检查一次，不会自动下载或安装。"
+          description="打包版启动 10 秒后检查固定 R2 清单；持续运行时每天最多检查一次，点击前不会下载或安装。"
           value={initialized ? (update.automaticChecks ? "已开启" : "仅打包版可用") : "正在读取…"}
         />
         <SettingsRow
@@ -376,13 +381,17 @@ function UpdateSettings() {
           value={updateSettingsStatus(update, initialized)}
           actions={<Button
             className="secondary-button"
-            isDisabled={checking || !initialized}
+            isDisabled={checking || update.phase === "checking" || update.phase === "installing" || !initialized}
             onPress={() => void handleUpdateAction()}
           >
             {!initialized
               ? "正在读取…"
               : checking
               ? "正在检查…"
+              : update.phase === "downloading"
+                ? "查看进度"
+                : update.phase === "installing"
+                  ? "正在安装…"
               : update.phase === "available"
                 ? "查看更新"
                 : update.phase === "disabled"
@@ -404,6 +413,9 @@ function UpdateSettings() {
 function updateSettingsStatus(update: UpdateState, initialized: boolean): string {
   if (!initialized) return "正在读取…";
   if (update.phase === "available") return `新版本 ${update.version}`;
+  if (update.phase === "downloading") return `下载 ${Math.round(update.percent)}%`;
+  if (update.phase === "installing") return "正在安装";
+  if (update.phase === "checking") return "正在检查";
   if (update.phase === "current") return "已是最新版本";
   if (update.phase === "error") return "检查未完成";
   if (update.phase === "disabled") return "开发构建";
@@ -423,9 +435,14 @@ function updateSettingsDescription(update: UpdateState, initialized: boolean): s
   if (update.phase === "available") {
     return `当前版本 ${update.currentVersion}，可用版本 ${update.version}。${checkedAt}`;
   }
+  if (update.phase === "downloading") {
+    return `正在下载 ${update.version}，完成后会校验并启动安装。${checkedAt}`;
+  }
+  if (update.phase === "installing") return `正在用已校验安装包更新至 ${update.version}。`;
+  if (update.phase === "checking") return "正在读取固定 R2 更新清单。";
   if (update.phase === "current") return `当前版本 ${update.currentVersion}。${checkedAt}`;
   if (update.phase === "error") return `上次检查未完成，可以手动重试。${checkedAt}`;
-  if (update.phase === "disabled") return "开发构建不会请求 GitHub Release。";
+  if (update.phase === "disabled") return "开发构建不会请求 R2 更新清单。";
   return `当前版本 ${update.currentVersion}；等待启动后的首次自动检查。`;
 }
 

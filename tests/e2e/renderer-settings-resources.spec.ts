@@ -127,7 +127,9 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   }
   await larkUpdateAction.click();
   const larkUpdateDialog = page.getByRole("dialog", { name: "更新技能套件" });
-  await expect(larkUpdateDialog).toContainText("现有 Scoop、npm 或其他外部安装不会被修改");
+  await expect(larkUpdateDialog).toContainText(
+    "重装 Desktop 以及现有 Scoop、npm 或其他外部安装都不会修改这份用户级副本"
+  );
   await larkUpdateDialog.getByRole("button", { name: "取消", exact: true }).click();
   await larkSuiteRow.click();
   await expect(suiteDetail.getByText("当前 CLI", { exact: true })).toBeVisible();
@@ -234,9 +236,9 @@ test("keeps browser integration as the only first-party connection surface", asy
   await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
   await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
-  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
+  const installer = page.getByRole("dialog", { name: "browser67 浏览器扩展连接" });
   await expect(installer).toBeVisible();
-  await expect(settings.getByText("待浏览器加载", { exact: true })).toBeVisible();
+  await expect(settings.getByText("待浏览器连接", { exact: true })).toBeVisible();
   for (const action of [
     "打开 Chrome 扩展页",
     "打开 Edge 扩展页",
@@ -269,15 +271,15 @@ test("keeps the managed-source repair instructions after refreshing browser67 fi
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "浏览器集成", exact: true }).click();
-  await expect(settings.getByText("需要同步受管版本", { exact: true })).toBeVisible();
-  await settings.getByRole("button", { name: "修复浏览器扩展", exact: true }).click();
+  await expect(settings.getByText("需要重新加载验证", { exact: true })).toBeVisible();
+  await settings.getByRole("button", { name: "重新加载并验证", exact: true }).click();
 
-  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
-  await expect(installer.getByRole("status")).toContainText("目录不一致时移除旧条目");
-  await expect(installer.getByText("核对并替换加载来源", { exact: true })).toBeVisible();
-  await expect(installer).toContainText("旧目录必须移除后");
+  const installer = page.getByRole("dialog", { name: "browser67 浏览器扩展连接" });
+  await expect(installer.getByRole("status")).toContainText("先尝试原位重新加载");
+  await expect(installer.getByText("重新加载现有扩展", { exact: true })).toBeVisible();
+  await expect(installer).toContainText("若仍失败，再打开扩展管理页核对");
   await expect(installer.getByRole("button", { name: "复制扩展目录", exact: true })).toBeEnabled();
-  await expect(settings.getByText("需要同步受管版本", { exact: true })).toBeVisible();
+  await expect(settings.getByText("需要重新加载验证", { exact: true })).toBeVisible();
   const repairScreenshotPath = testInfo.outputPath("settings-browser-managed-source-repair.png");
   await page.screenshot({ path: repairScreenshotPath, animations: "disabled" });
   await testInfo.attach("settings-browser-managed-source-repair", {

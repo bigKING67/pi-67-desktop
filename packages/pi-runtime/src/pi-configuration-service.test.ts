@@ -116,6 +116,16 @@ describe("PiConfigurationService", () => {
         disabledByProject: false
       });
       expect(inherited.vision.project).toBeUndefined();
+
+      const beforeRemoval = await fixture.service.getGlobal();
+      const removed = await fixture.service.removeGlobalProvider(
+        beforeRemoval.revision,
+        "pi67-test"
+      );
+      expect(removed.providers.some((provider) => provider.id === "pi67-test")).toBe(false);
+      const modelsAfterRemoval = JSON.parse(await readFile(fixture.service.modelsPath, "utf8"));
+      expect(modelsAfterRemoval.providers?.["pi67-test"]).toBeUndefined();
+      expect(await readFile(fixture.service.authPath, "utf8")).toContain(credentialValue);
     } finally {
       await fixture.dispose();
     }

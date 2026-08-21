@@ -5,7 +5,11 @@ import { globalAgentSkillsRoot } from "./lark-cli-resolution.js";
 import type { SkillPackProcessRunner } from "./skill-pack-process-runner.js";
 
 const GLOBAL_SKILLS_INSTALLER = "skills@1.5.22";
-const GLOBAL_SKILLS_SOURCE = "larksuite/cli";
+const GLOBAL_SKILLS_SOURCES = [
+  "https://open.feishu.cn/lark-cli/skills/regular",
+  "larksuite/cli"
+] as const;
+const SKILLS_INSTALL_TIMEOUT_MS = 60_000;
 const MAX_LOCK_BYTES = 2 * 1024 * 1024;
 const MAX_SKILL_FILES = 4_096;
 const MAX_SKILL_BYTES = 64 * 1024 * 1024;
@@ -48,30 +52,7 @@ export async function beginGlobalLarkSkillInstallation(options: {
   const platform = options.platform ?? process.platform;
 
   try {
-    await mkdir(stagingHome, { recursive: true });
-    await options.runProcess(options.nodeExecutable, [
-      options.npmCli,
-      "exec",
-      "--yes",
-      `--package=${GLOBAL_SKILLS_INSTALLER}`,
-      "--",
-      "skills",
-      "add",
-      GLOBAL_SKILLS_SOURCE,
-      "-y",
-      "-g"
-    ], {
-      cwd: stagingHome,
-      timeoutMs: 5 * 60_000,
-      environment: stagingEnvironment(
-        options.environment,
-        stagingHome,
-        options.gitExecPath,
-        platform
-      )
-    });
-
-    const staged = await validateStagedSkills(stagingHome, skillIds);
+    const staged = await installStagedSkills({ ...options, platform, skillIds, stagingHome });
     const currentLock = await readExistingLock(lockPath);
     const activationIds = await activationSkillIds({
       currentLock: currentLock.value,
@@ -164,6 +145,51 @@ export async function beginGlobalLarkSkillInstallation(options: {
   }
 }
 
+async function installStagedSkills(options: {
+  homeDirectory: string;
+  skillIds: string[];
+  nodeExecutable: string;
+  npmCli: string;
+  gitExecPath: string;
+  environment: NodeJS.ProcessEnv;
+  runProcess: SkillPackProcessRunner;
+  platform: NodeJS.Platform;
+  stagingHome: string;
+}): Promise<{ skillsRoot: string; lock: SkillLock }> {
+  const errors: unknown[] = [];
+  for (const source of GLOBAL_SKILLS_SOURCES) {
+    await rm(options.stagingHome, { recursive: true, force: true });
+    await mkdir(options.stagingHome, { recursive: true });
+    try {
+      await options.runProcess(options.nodeExecutable, [
+        options.npmCli,
+        "exec",
+        "--yes",
+        `--package=${GLOBAL_SKILLS_INSTALLER}`,
+        "--",
+        "skills",
+        "add",
+        source,
+        "-y",
+        "-g"
+      ], {
+        cwd: options.stagingHome,
+        timeoutMs: SKILLS_INSTALL_TIMEOUT_MS,
+        environment: stagingEnvironment(
+          options.environment,
+          options.stagingHome,
+          options.gitExecPath,
+          options.platform
+        )
+      });
+      return await validateStagedSkills(options.stagingHome, options.skillIds);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  throw new AggregateError(errors, "官方 Lark Skills 下载源均未能完成安装。");
+}
+
 function stagingEnvironment(
   source: NodeJS.ProcessEnv,
   stagingHome: string,
@@ -218,7 +244,7 @@ async function validateStagedSkills(stagingHome: string, expectedIds: string[]):
   const lock = await readLock(join(stagingHome, ".agents", ".skill-lock.json"));
   for (const skillId of expectedIds) {
     const entry = lock.skills[skillId];
-    if (!isRecord(entry) || entry.source !== GLOBAL_SKILLS_SOURCE) {
+    if (!isRecord(entry) || !isOfficialSkillsSource(entry.source)) {
       throw new Error(`${skillId} 缺少官方全局安装来源记录。`);
     }
   }
@@ -336,12 +362,18 @@ async function activationSkillIds(options: {
       metadata.isSymbolicLink()
       || !metadata.isDirectory()
       || !isRecord(lockEntry)
-      || lockEntry.source !== GLOBAL_SKILLS_SOURCE
+      || !isOfficialSkillsSource(lockEntry.source)
     ) {
       throw new Error(`全局 Skill ${skillId} 不属于 Desktop 验证的官方来源，未覆盖现有内容。`);
     }
   }
   return options.skillIds;
+}
+
+function isOfficialSkillsSource(source: unknown): boolean {
+  if (typeof source !== "string") return false;
+  const normalized = source.endsWith("/") ? source.slice(0, -1) : source;
+  return GLOBAL_SKILLS_SOURCES.includes(normalized as typeof GLOBAL_SKILLS_SOURCES[number]);
 }
 
 async function missingSkillIds(root: string, skillIds: string[]): Promise<string[]> {

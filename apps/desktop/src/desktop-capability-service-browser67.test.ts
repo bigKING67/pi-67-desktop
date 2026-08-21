@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { parseBrowser67LiveDoctorPayload } from "./browser67-capability-process.js";
@@ -320,7 +320,58 @@ describe("Desktop capability service browser67 extension lifecycle", () => {
       integrations: [{
         extensionState: "prepared",
         doctorState: "degraded",
-        detail: "扩展曾通过身份验证；请运行诊断确认本次应用进程中的真实连接。"
+        verificationState: "stale",
+        detail: "扩展曾通过身份验证；正在确认当前内置版本与本次应用进程连接。"
+      }]
+    });
+  });
+
+  it("retains an identity-bound verification receipt across Desktop restarts and marks package drift stale", async () => {
+    const fixture = await createDesktopCapabilityFixture();
+    await prepareBrowserDependencies(fixture.packageRoot);
+    const first = new DesktopCapabilityService({
+      ...fixture,
+      runBrowserExtensionDoctor: vi.fn(async () => currentExtensionDoctorResult()),
+      runBrowserLiveDoctor: vi.fn(async () => ({
+        ready: true,
+        extensionConnected: true,
+        identityMatch: true,
+        detail: "extension_identity_ok"
+      })),
+      now: () => 545,
+      createToken: () => "verified-receipt"
+    });
+    expect(await first.verifyBrowser67Extension({ startHub: true })).toMatchObject({
+      integrations: [{
+        extensionState: "connected",
+        doctorState: "ready",
+        verificationState: "verified",
+        verifiedAt: 545
+      }]
+    });
+
+    expect(await new DesktopCapabilityService(fixture).snapshot()).toMatchObject({
+      integrations: [{
+        extensionState: "prepared",
+        doctorState: "degraded",
+        verificationState: "verified",
+        verifiedAt: 545,
+        detail: "当前内置 browser67 与上次验证身份一致；正在确认本次应用进程中的真实连接。"
+      }]
+    });
+
+    const catalogPath = join(fixture.capabilitiesRoot, "catalog.json");
+    const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as {
+      entries: Array<{ id: string; commit: string }>;
+    };
+    catalog.entries.find((entry) => entry.id === "browser67")!.commit = "2".repeat(40);
+    await writeFile(catalogPath, JSON.stringify(catalog), "utf8");
+    expect(await new DesktopCapabilityService(fixture).snapshot()).toMatchObject({
+      integrations: [{
+        extensionState: "prepared",
+        doctorState: "degraded",
+        verificationState: "stale",
+        verifiedAt: 545
       }]
     });
   });

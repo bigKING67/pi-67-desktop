@@ -33,7 +33,10 @@ import {
 import { rendererWorkspaceId } from "../workbench/renderer-workspace-identity.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
-import { rotateRendererTaskForSessionOpen } from "../workbench/task-runtime-reopen.js";
+import {
+  rendererTaskBelongsToAgentHost,
+  rotateRendererTaskForSessionReopen
+} from "../workbench/task-runtime-reopen.js";
 import {
   preferredWorkspaceSession,
   waitForWorkspaceCatalogDecision,
@@ -110,7 +113,7 @@ export async function openRendererWorkspaceDescriptor(
   let refreshCatalogAfterBootstrap = Boolean(sessionPath);
   try {
     await registerRendererWorkspaceWithHost(descriptor, { queryCatalog: false });
-    await ensureAgentConnection();
+    const connectionIdentity = await ensureAgentConnection();
     if (!runtimeSessionPath) {
       // Catalog IPC may itself time out after the product opening budget. Start it
       // eagerly, then let the bounded store-level decision race its completion.
@@ -142,10 +145,11 @@ export async function openRendererWorkspaceDescriptor(
         refreshCatalogAfterBootstrap = true;
       }
     }
-    task = ensureWorkspaceRuntimeTask(
+    task = await ensureWorkspaceRuntimeTask(
       descriptor,
       runtimeSessionPath,
-      runtimeSessionFileIdentity
+      runtimeSessionFileIdentity,
+      connectionIdentity
     );
     const transitionTarget = requireRendererSessionTransition(get());
     target = transitionTarget;
@@ -252,11 +256,12 @@ function clearOpenedConversationAttention(taskId: string): void {
   }
 }
 
-function ensureWorkspaceRuntimeTask(
+async function ensureWorkspaceRuntimeTask(
   descriptor: WorkspaceDescriptor,
   sessionPath?: string,
-  sessionFileIdentity?: string
-): RendererWorkbenchTask {
+  sessionFileIdentity?: string,
+  connectionIdentity?: Awaited<ReturnType<typeof ensureAgentConnection>>
+): Promise<RendererWorkbenchTask> {
   const workbench = rendererWorkbenchStore.getState();
   if (sessionPath && sessionFileIdentity) {
     const conversation = {
@@ -272,7 +277,10 @@ function ensureWorkspaceRuntimeTask(
         || matching.lifecycle === "lost"
         || matching.lifecycle === "stopped"
       ) {
-        const replacement = rotateRendererTaskForSessionOpen(matching);
+        const replacement = await rotateRendererTaskForSessionReopen(matching, {
+          retireCurrentHostTask: connectionIdentity === undefined
+            || rendererTaskBelongsToAgentHost(matching, connectionIdentity)
+        });
         if (replacement) return replacement;
       }
       workbench.selectTask(matching.id);

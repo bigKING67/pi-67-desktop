@@ -24,6 +24,7 @@ const SkillPackEntrySchema = strictObject({
   updateStatus: Type.Union([
     Type.Literal("not-installed"),
     Type.Literal("not-checked"),
+    Type.Literal("sync-pending"),
     Type.Literal("current"),
     Type.Literal("update-available"),
     Type.Literal("application-managed"),

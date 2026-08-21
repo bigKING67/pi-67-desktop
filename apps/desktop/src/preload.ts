@@ -242,6 +242,8 @@ const systemBridge = {
   ),
   getUpdateState: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-state"),
   checkForUpdates: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-check"),
+  startUpdate: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-start"),
+  cancelUpdate: (): Promise<unknown> => ipcRenderer.invoke("pi67:update-cancel"),
   onUpdateStateChanged: (listener: (state: unknown) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown) => listener(state);
     ipcRenderer.on("pi67:update-state-changed", handler);

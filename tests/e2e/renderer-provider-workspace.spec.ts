@@ -79,7 +79,6 @@ test("organizes Provider task views while search and drill-down preserve the act
   await page.goto("/");
   await attachMockAgent(page, [], {}, { providerConfigurationSnapshot });
   await page.keyboard.press("Control+,");
-
   const settings = page.getByLabel("π 设置");
   await settings.getByRole("navigation", { name: "设置分类" })
     .getByRole("button", { name: "模型", exact: true }).click();
@@ -94,10 +93,13 @@ test("organizes Provider task views while search and drill-down preserve the act
   const availableTab = panel.getByRole("tab", { name: `可配置 ${providerCatalog.length - 1}` });
   const customTab = panel.getByRole("tab", { name: "自定义 1" });
 
+  await expect(panel.getByText("Desktop 与 Pi TUI 双向共用当前用户的 Pi Profile", { exact: false })).toBeVisible();
+  await expect(panel.getByText("已与当前用户 Pi Profile 同步", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/Desktop 与 Pi TUI 双向共用 · revision/u)).toBeVisible();
   await expect(search).toBeVisible();
   await expect(configuredTab).toHaveAttribute("aria-selected", "true");
   await expect(providerList.getByRole("button")).toHaveCount(2);
-  await expect(providerList.getByRole("button", { name: /Anthropic.*已配置.*自定义/u })).toBeVisible();
+  await expect(providerList.getByRole("button", { name: /Anthropic.*已配置.*Pi models\.json/u })).toBeVisible();
   await customTab.click();
   await expect(providerList.getByRole("button")).toHaveCount(1);
   await expect(providerList.getByRole("button", { name: /Anthropic/u })).toBeVisible();
@@ -294,7 +296,6 @@ test("persists a Provider credential through App authority without starting a Ta
     context: { scope: "app" }
   }));
 });
-
 test("protects Provider drafts and confirms models.json definition removal", async ({ page }) => {
   const providerConfigurationSnapshot = createMockProviderConfigurationSnapshot();
   providerConfigurationSnapshot.providers = providerConfigurationSnapshot.providers.map((provider) => (
@@ -333,6 +334,7 @@ test("protects Provider drafts and confirms models.json definition removal", asy
   const removal = page.getByRole("dialog", { name: "移除模型服务定义？" });
   await expect(removal).toContainText("models.json");
   await expect(removal).toContainText("auth.json");
+  await expect(removal).toContainText("同步移除该定义");
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "provider.configuration.remove"))
     .toHaveLength(0);
   await removal.getByRole("button", { name: "取消", exact: true }).click();
@@ -346,7 +348,6 @@ test("protects Provider drafts and confirms models.json definition removal", asy
   expect(removeCommands).toHaveLength(1);
   expect(removeCommands[0]).toMatchObject({ payload: { provider: "anthropic" } });
 });
-
 test("edits Pi Provider files, selects built-in defaults, and preserves a stale draft", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);

@@ -65,6 +65,42 @@ describe("SkillPackManagement", () => {
     );
   });
 
+  it("reuses identity-bound update receipts after restart and invalidates them after local Skill drift", async () => {
+    const fixture = await createFixture();
+    const runProcess = vi.fn(async () => ({
+      stdout: JSON.stringify({
+        ok: true,
+        action: "up_to_date",
+        auto_update: true,
+        current_version: "1.0.88",
+        latest_version: "1.0.88",
+        skills_status: { current: "1.0.88", in_sync: true }
+      }),
+      stderr: ""
+    }));
+    await createManagement(fixture, { runProcess }).checkForUpdates();
+
+    const restarted = createManagement(fixture, { runProcess });
+    const restored = await restarted.list();
+    expect(restored.checkedAt).toBe(1_722_400_000_000);
+    expect(restored.items.find((item) => item.id === "lark-cli-global")).toMatchObject({
+      updateStatus: "current",
+      installedVersion: "1.0.88",
+      latestVersion: "1.0.88"
+    });
+    expect(runProcess).toHaveBeenCalledOnce();
+
+    await writeFile(
+      join(fixture.homeDirectory, ".agents", "skills", "lark-doc", "SKILL.md"),
+      "# locally changed\n",
+      "utf8"
+    );
+    const drifted = await createManagement(fixture, { runProcess }).list();
+    const driftedLark = drifted.items.find((item) => item.id === "lark-cli-global");
+    expect(driftedLark).toMatchObject({ updateStatus: "not-checked" });
+    expect(driftedLark).not.toHaveProperty("installedVersion");
+  });
+
   it("distinguishes a newer bundled-only registry record from a failed check", async () => {
     const fixture = await createFixture();
     const release = {

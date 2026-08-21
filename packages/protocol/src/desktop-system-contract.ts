@@ -208,6 +208,8 @@ export interface DesktopSystemBridge {
   verifyBrowser67Extension(options: { startHub: boolean }): Promise<DesktopCapabilitySnapshot>;
   getUpdateState(): Promise<unknown>;
   checkForUpdates(): Promise<unknown>;
+  startUpdate(): Promise<unknown>;
+  cancelUpdate(): Promise<unknown>;
   onUpdateStateChanged(listener: (state: unknown) => void): () => void;
   onAgentHostFailed(
     listener: (state: DesktopAgentHostFailureState) => void

@@ -119,7 +119,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await expect(settings.getByRole("button", { name: "安装浏览器扩展", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "运行诊断", exact: true })).toBeVisible();
   await settings.getByRole("button", { name: "安装浏览器扩展", exact: true }).click();
-  const installer = page.getByRole("dialog", { name: "安装 browser67 浏览器扩展" });
+  const installer = page.getByRole("dialog", { name: "browser67 浏览器扩展连接" });
   await expect(installer).toBeVisible();
   await expect(installer.getByRole("button", { name: "打开 Chrome 扩展页", exact: true })).toBeVisible();
   const installerBounds = await installer.evaluate((element) => {

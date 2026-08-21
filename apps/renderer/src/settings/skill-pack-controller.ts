@@ -56,6 +56,15 @@ export async function installSkillPack(id: string, workspaceId?: string): Promis
       { context: workspaceContext(target.id) }
     );
     useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
+    const installed = result.items.find((entry) => entry.id === id);
+    if (installed?.updateStatus === "sync-pending") {
+      publishNotification({
+        level: "warning",
+        title: "Lark CLI 已安装，Skills 待同步",
+        message: "CLI 已完成验证并保留；官方全局 Skills 同步未完成，可在套件详情直接重试，无需重新下载 CLI。"
+      });
+      return true;
+    }
     publishNotification({
       level: "success",
       title: "Lark CLI 已安装",
@@ -82,6 +91,15 @@ export async function updateSkillPack(id: string, workspaceId?: string): Promise
       { context: workspaceContext(target.id) }
     );
     useSkillPackStore.getState().install(target.id, result.items, result.checkedAt);
+    const updated = result.items.find((entry) => entry.id === id);
+    if (updated?.updateStatus === "sync-pending") {
+      publishNotification({
+        level: "warning",
+        title: "Lark CLI 已更新，Skills 待同步",
+        message: `CLI ${updated.installedVersion ?? "目标版本"} 已完成验证并保留；可在套件详情直接重试官方 Skills 同步，无需重新下载 CLI。`
+      });
+      return true;
+    }
     publishNotification({
       level: "success",
       title: "技能套件已更新",

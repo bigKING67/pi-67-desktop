@@ -57,8 +57,8 @@ export function ProviderConfigurationStatusBar({
       {snapshot.syncState === "current"
         ? <Check aria-hidden="true" size={14} />
         : <AlertTriangle aria-hidden="true" size={14} />}
-      <strong>{snapshot.syncState === "current" ? "已与 Pi 文件同步" : "Pi 文件需要处理"}</strong>
-      <small>revision {snapshot.revision.slice(0, 10)}</small>
+      <strong>{snapshot.syncState === "current" ? "已与当前用户 Pi Profile 同步" : "Pi Profile 需要处理"}</strong>
+      <small>Desktop 与 Pi TUI 双向共用 · revision {snapshot.revision.slice(0, 10)}</small>
     </span>}
     actions={<Button className="secondary-button" isDisabled={busy} onPress={onReload}>
       <RefreshCw aria-hidden="true" size={14} />重新加载

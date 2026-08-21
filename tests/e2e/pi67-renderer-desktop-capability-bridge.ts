@@ -122,6 +122,7 @@ export async function installMockDesktopCapabilityBridge(
           dependencyState: "prepared",
           extensionState: "not-prepared",
           doctorState: "degraded",
+          verificationState: "never",
           availableBrowsers: ["chrome", "edge"],
           detail: "依赖与命令入口已验证；真实 managed browser 连接仍需独立检查。",
           preparedAt: 1_784_800_000_000,
@@ -141,6 +142,7 @@ export async function installMockDesktopCapabilityBridge(
             integration.id === "browser67" && integration.extensionState === "reload-required"
           )) ? "reload-required" : "prepared",
           doctorState: "degraded",
+          verificationState: "never",
           availableBrowsers: ["chrome", "edge"],
           detail: bridgeFixture.capabilitySnapshot.integrations.some((integration) => (
             integration.id === "browser67" && integration.extensionState === "reload-required"
@@ -165,12 +167,14 @@ export async function installMockDesktopCapabilityBridge(
           dependencyState: "prepared",
           extensionState: "connected",
           doctorState: "ready",
+          verificationState: "verified",
           availableBrowsers: ["chrome", "edge"],
           detail: "browser67 扩展身份与当前内置版本一致，真实受管浏览器连接已就绪。",
           preparedAt: 1_784_800_000_000,
           checkedAt: 1_784_800_000_100,
           extensionPreparedAt: 1_784_800_000_000,
           extensionCheckedAt: 1_784_800_000_100,
+          verifiedAt: 1_784_800_000_100,
           registry: "https://registry.npmmirror.com"
         }]
       })

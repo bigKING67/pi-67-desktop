@@ -213,6 +213,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       dependencyState: "not-prepared",
       extensionState: "not-prepared",
       doctorState: "not-checked",
+      verificationState: "never",
       availableBrowsers: ["chrome", "edge"]
     }]
   };

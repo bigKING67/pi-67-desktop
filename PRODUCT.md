@@ -219,16 +219,21 @@ the only Runtime and behavior specification source.
   package identity and bounded official install entry before executing that one entry,
   validates the native executable, reported version, and official update-check JSON,
   then atomically activates it under the current user's shared Agent tools root and
-  creates a native user launcher. The same confirmed transaction stages the exact
+  creates a native user launcher. CLI activation is the primary result: after the
+  executable is verified and activated, Desktop separately stages the exact
   catalogued official suite through the pinned `skills` installer, validates its
   bounded trees and source lock, and installs missing members into
-  `~/.agents/skills`. Existing same-name Skills are preserved. A later
+  `~/.agents/skills`. Existing same-name Skills are preserved. If every official
+  Skills source fails, the validated CLI remains active and Settings reports
+  `sync-pending`; retrying synchronization never downloads or rolls back that CLI.
+  A later
   Desktop-managed update may replace only members whose lock source is already
   `larksuite/cli`; any unowned or unverifiable member blocks overwrite. This makes
   the official Skills reusable by Pi-67 and other compatible Agents that read the
   standard shared directory. The packaged toolchain and application resources are
-  never installation targets; CLI, launcher, global Skill lock, Skill activation,
-  and Workspace reload failures restore the previous user state. Runtime resolution
+  never installation targets. CLI/launcher activation and official Skill activation
+  each keep their own atomic rollback boundary; a Workspace reload failure restores
+  the component changed by that mutation. Runtime resolution
   prefers this Desktop-managed native executable and remains compatible with a
   verified existing user installation. Confirming an update from a verified external
   installation stages and activates a Desktop-managed current-user copy without
@@ -243,8 +248,13 @@ the only Runtime and behavior specification source.
   only the user's explicit confirmed mutation may change those shared locations.
   A newer Desktop release may advertise a newer checked target, but it still uses
   the same monotonic, exact-target transaction.
-  Pi resources reload only after the updater verifies convergence. Settings reports
-  the current CLI, official Skills, and latest stable version separately.
+  Pi resources reload only after the updater verifies the applicable mutation.
+  Settings reports the current CLI, official Skills, and latest stable version
+  separately. Successful update checks persist a bounded receipt in the canonical
+  Pi Agent Profile, keyed to the effective executable, Skill lock, manifests, and
+  managed Pack identity. An unchanged identity therefore retains its last checked
+  result and timestamp across Desktop restart or upgrade; local or source drift
+  invalidates only that receipt and returns the Pack to `not-checked`.
   AI Berkshire uses the Pi-67 Skill Pack registry instead: Desktop resolves one
   exact Pi-67 `main` commit, validates the bounded registry/lock and every declared
   Skill hash, installs only those Skills as a separate Pi Package Overlay, activates
@@ -337,8 +347,11 @@ the only Runtime and behavior specification source.
   extension files, a browser-loaded extension, and a live identity-matched managed
   connection as distinct facts. `已安装并连接` requires a current-process Doctor
   result whose WS or Link route reports `extension_identity_ok` with
-  `identity_match=true`; persisted success from an earlier application process is
-  only a prompt to recheck.
+  `identity_match=true`. Desktop persists the successful package identity and
+  timestamp in the canonical Pi Agent Profile. The same identity remains visible as
+  `上次验证通过` across Desktop restart or upgrade while a read-only live Doctor
+  rechecks the current process; changed or legacy identity is marked stale, never
+  silently promoted to live readiness.
 - Browser-extension installation is guided rather than silent. After one-shot
   confirmation, Desktop may prepare dependencies and files, then opens a detected
   Chrome or Edge extension page and reveals or copies the validated extension
@@ -720,10 +733,11 @@ the only Runtime and behavior specification source.
   file read returns a structured recoverable error before the Renderer transport
   budget expires.
 - Creating the Pi `ModelRuntime` for a real Task uses the same 4-second Host-side
-  offline startup budget. Agent Host prewarms one revision-bound first-Task runtime
-  while Desktop starts; Provider validation and the first restored Task may reuse
-  that exact complete runtime only while `models.json` and `auth.json` revisions still
-  match. Corrupt display labels are never persisted or repaired in place: projections
+  offline startup budget. Agent Host keeps one revision-bound Task runtime warm while
+  Desktop runs; each Task consumes one complete runtime and queues a fresh independent
+  standby only while `models.json` and `auth.json` revisions still match. Provider
+  validation may reuse the current standby without consuming it. Corrupt display
+  labels are never persisted or repaired in place: projections
   preserve valid UTF-8 names and fall back to the stable Provider/model identity when
   mojibake reaches the runtime boundary. If Pi configuration loading stalls, Workspace/Session
   initialization returns a structured recoverable `RUNTIME_NOT_READY` failure with
@@ -1227,11 +1241,14 @@ the only Runtime and behavior specification source.
   repository-external Feishu folder for target-OS manual testing. This internal
   loop stops after mirror verification by default and does not imply a Tag,
   GitHub Release, or promotion.
-- Packaged Desktop builds automatically check the bounded public GitHub Release
-  metadata after startup and at most once per 24 hours while running. Development
-  builds stay offline. Current-version results and automatic failures are
-  non-blocking; an available version is projected into the Help entry and menu.
-  Manual retry remains available and explicit.
+- Packaged Desktop builds automatically check the bounded manifest at the fixed
+  `https://updates.52671314.xyz` R2 origin after startup and at most once per 24
+  hours while running. Development builds stay offline. Current-version results
+  and automatic failures are non-blocking; an available version is projected into
+  the Help entry and menu. Automatic checks never download or install. One explicit
+  user action downloads only the exact platform artifact, bounds it by manifest
+  size, verifies SHA-256, and starts the internal unsigned platform update. Manual
+  retry and download cancellation remain available and explicit.
 - Extension Package completion names the affected Package and, when available,
   its previous and installed versions. Resource reload events and routine
   informational Extension messages remain in Notification history rather than
@@ -1248,8 +1265,17 @@ the only Runtime and behavior specification source.
   Build-time AI Berkshire refreshes are a separate immutable release input: they pin
   one upstream commit and reproduce the locked Pi-67 Pack hashes without following a
   branch during runtime.
-- Unsigned Preview checks accept only complete prerelease artifact sets and open
-  a canonical GitHub Release page; they never download or install in-app.
+- The small-team Unsigned Preview update channel accepts only one complete,
+  canonical SemVer artifact set whose Windows x64 NSIS and macOS arm64 DMG/ZIP
+  names, sizes, hashes, targets, and fixed-origin URLs match the application-owned
+  contract. Windows hands a verified EXE to the existing per-user NSIS update mode.
+  Because official macOS auto-updaters require signing, the accepted unsigned
+  internal path instead validates one exact ZIP application bundle, waits for the
+  normal Pi-67 shutdown checkpoint, then performs a same-volume replacement with
+  an adjacent rollback bundle before restart. A non-writable install parent fails
+  visibly without replacing the current app. Artifacts upload before the mutable
+  manifest; equal versions, downgrades, arbitrary URLs, and same-name byte changes
+  fail closed.
 - Diagnostic export is local, bounded, and redacted by default.
 
 ## Non-goals for v1

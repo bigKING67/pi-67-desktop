@@ -18,6 +18,7 @@ export function Browser67IntegrationPanel() {
   const { snapshot, setSnapshot, phase, error, setError, refresh } = useDesktopCapabilitySnapshot();
   const [operation, setOperation] = useState<"prepare" | "doctor" | "verify">();
   const [installerOpen, setInstallerOpen] = useState(false);
+  const autoRefreshAttempted = useRef(false);
   const integration = snapshot?.integrations.find((entry) => entry.id === "browser67");
   const execute = useCallback(async (kind: "prepare" | "doctor" | "verify") => {
     setOperation(kind);
@@ -34,6 +35,18 @@ export function Browser67IntegrationPanel() {
       setOperation(undefined);
     }
   }, [setError, setSnapshot]);
+  useEffect(() => {
+    if (
+      autoRefreshAttempted.current
+      || integration === undefined
+      || integration.verificationState === "never"
+      || integration.doctorState === "ready"
+      || integration.extensionState === "not-prepared"
+      || integration.extensionState === "failed"
+    ) return;
+    autoRefreshAttempted.current = true;
+    void execute("doctor");
+  }, [execute, integration]);
   return (
     <>
     <SettingsSectionBlock
@@ -132,6 +145,12 @@ function delay(milliseconds: number): Promise<void> {
 
 function doctorLabel(integration: DesktopIntegrationStatus | undefined): string {
   if (!integration || integration.doctorState === "not-checked") return "尚未检查";
+  if (integration.doctorState === "degraded" && integration.verificationState === "verified") {
+    return "上次验证通过，正在确认";
+  }
+  if (integration.doctorState === "degraded" && integration.verificationState === "stale") {
+    return "上次验证通过，版本待确认";
+  }
   if (integration.doctorState === "degraded") return "部分可用";
   if (integration.doctorState === "ready") return "就绪";
   return "失败";
@@ -147,7 +166,9 @@ function dependencyLabel(integration: DesktopIntegrationStatus | undefined): str
 function extensionLabel(integration: DesktopIntegrationStatus | undefined): string {
   if (!integration) return "检查中";
   if (integration.extensionState === "prepared") {
-    return integration.detail?.startsWith("扩展曾通过身份验证") ? "待验证现有连接" : "待浏览器连接";
+    if (integration.verificationState === "verified") return "已验证，正在确认连接";
+    if (integration.verificationState === "stale") return "已验证，当前版本待确认";
+    return "待浏览器连接";
   }
   if (integration.extensionState === "reload-required") return "需要重新加载验证";
   if (integration.extensionState === "connected") return "已安装并连接";
@@ -156,8 +177,9 @@ function extensionLabel(integration: DesktopIntegrationStatus | undefined): stri
 }
 
 function extensionTone(integration: DesktopIntegrationStatus | undefined): "ready" | "failed" | "warning" {
-  if (integration?.extensionState === "connected") return "ready";
   if (integration?.extensionState === "failed") return "failed";
+  if (integration?.extensionState === "connected") return "ready";
+  if (integration?.extensionState === "prepared" && integration.verificationState === "verified") return "ready";
   return "warning";
 }
 

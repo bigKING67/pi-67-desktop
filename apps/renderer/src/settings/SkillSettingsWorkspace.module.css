@@ -265,6 +265,12 @@
   gap: var(--space-2);
 }
 
+.checkedAt {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .spinning {
   animation: skill-settings-spin 0.9s linear infinite;
 }

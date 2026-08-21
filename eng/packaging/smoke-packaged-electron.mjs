@@ -283,7 +283,7 @@ try {
     packagedVersion,
     expectedPlatformLabel,
     expectedArchitectureLabel,
-    "Unsigned Preview · 自动检查，手动安装"
+    "Internal Unsigned · 点击更新"
   ]) {
     await workspaceSettings.getByText(value, { exact: true }).waitFor({ state: "visible", timeout: 15_000 });
   }

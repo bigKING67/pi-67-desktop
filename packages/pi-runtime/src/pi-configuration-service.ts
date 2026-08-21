@@ -220,32 +220,19 @@ export class PiConfigurationService {
     });
   }
 
-  saveGlobalProvider(
-    expectedRevision: string,
-    provider: PiProviderConfigurationInput
-  ): Promise<PiProviderConfigurationSnapshot> {
+  saveGlobalProvider(expectedRevision: string, provider: PiProviderConfigurationInput): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.saveGlobalProvider(expectedRevision, provider);
   }
 
-  removeGlobalProvider(
-    expectedRevision: string,
-    providerId: string
-  ): Promise<PiProviderConfigurationSnapshot> {
+  removeGlobalProvider(expectedRevision: string, providerId: string): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.removeGlobalProvider(expectedRevision, providerId);
   }
 
-  storeGlobalCredential(
-    expectedRevision: string,
-    providerId: string,
-    apiKey: string
-  ): Promise<PiProviderConfigurationSnapshot> {
+  storeGlobalCredential(expectedRevision: string, providerId: string, apiKey: string): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.storeGlobalCredential(expectedRevision, providerId, apiKey);
   }
 
-  removeGlobalCredential(
-    expectedRevision: string,
-    providerId: string
-  ): Promise<PiProviderConfigurationSnapshot> {
+  removeGlobalCredential(expectedRevision: string, providerId: string): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.removeGlobalCredential(expectedRevision, providerId);
   }
 
@@ -253,25 +240,16 @@ export class PiConfigurationService {
     return this.mutations.revealGlobalCredential(expectedRevision, providerId);
   }
 
-  setGlobalDefaultModel(
-    expectedRevision: string,
-    selection?: PiDefaultModelSelection
-  ): Promise<PiProviderConfigurationSnapshot> {
+  setGlobalDefaultModel(expectedRevision: string, selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setGlobalDefaultModel(expectedRevision, selection);
   }
 
-  setGlobalVisionAssistant(
-    expectedRevision: string,
-    selection?: PiDefaultModelSelection
-  ): Promise<PiProviderConfigurationSnapshot> {
+  setGlobalVisionAssistant(expectedRevision: string, selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setGlobalVisionAssistant(expectedRevision, selection);
   }
 
-  setProjectVisionAssistant(
-    cwd: string,
-    expectedRevision: string,
-    override?: PiVisionAssistantOverride
-  ): Promise<PiProviderConfigurationSnapshot> {
+  setProjectVisionAssistant(cwd: string, expectedRevision: string,
+    override?: PiVisionAssistantOverride): Promise<PiProviderConfigurationSnapshot> {
     return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override);
   }
 
@@ -284,6 +262,14 @@ export class PiConfigurationService {
     if (this.disposed) return;
     this.disposed = true;
     this.watcher.dispose();
+    const activeTaskModelRuntimeLoad = this.taskModelRuntimeLoad;
+    if (activeTaskModelRuntimeLoad) {
+      await withPiConfigurationBudget(
+        activeTaskModelRuntimeLoad,
+        this.limits.validationRuntimeWaitMs,
+        "session-model-runtime"
+      ).catch(() => undefined);
+    }
     await this.operationTail.catch(() => undefined);
     this.globalState.listeners.clear();
     this.globalState.runtimes.clear();
@@ -353,6 +339,7 @@ export class PiConfigurationService {
       ? Promise.resolve(this.taskModelRuntimeCandidate)
       : this.taskModelRuntimeLoad ?? this.beginTaskModelRuntimeLoad();
     return operation.then(async (candidate) => {
+      this.assertActive();
       const current = await readWorkspaceConfigurationBundle(
         this.paths,
         this.globalState,
@@ -369,7 +356,15 @@ export class PiConfigurationService {
         this.taskModelRuntimeCandidate = undefined;
       }
       if (consume && this.taskModelRuntimeLoad === operation) this.taskModelRuntimeLoad = undefined;
+      if (consume) this.scheduleTaskModelRuntimePrewarm();
       return candidate;
+    });
+  }
+
+  private scheduleTaskModelRuntimePrewarm(): void {
+    queueMicrotask(() => {
+      if (this.disposed || this.taskModelRuntimeCandidate || this.taskModelRuntimeLoad) return;
+      void this.resolveTaskModelRuntimeCandidate(false).catch(() => undefined);
     });
   }
 
@@ -385,6 +380,13 @@ export class PiConfigurationService {
         throw new Error(`Pi could not load auth.json: ${authError}`);
       }
       const runtime = await this.createPiModelRuntime();
+      if (this.disposed) {
+        return {
+          runtime,
+          modelsRevision: before.byKind.models.revision,
+          authRevision: before.byKind.auth.revision
+        };
+      }
       const after = await readWorkspaceConfigurationBundle(
         this.paths,
         this.globalState,
@@ -408,7 +410,7 @@ export class PiConfigurationService {
     })();
     this.taskModelRuntimeLoad = load;
     void load.then((candidate) => {
-      if (this.taskModelRuntimeLoad === load) {
+      if (!this.disposed && this.taskModelRuntimeLoad === load) {
         this.taskModelRuntimeCandidate = candidate;
         this.taskModelRuntimeLoad = undefined;
       }

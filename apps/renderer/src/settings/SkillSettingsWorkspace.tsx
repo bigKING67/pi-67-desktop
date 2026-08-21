@@ -180,7 +180,13 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
   const settingsWorkspaceId = useWorkbenchStore((state) => state.settingsWorkspaceId);
   const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
   const workspaceId = settingsWorkspaceId ?? currentWorkspaceId;
-  const { items: managedPacks, phase, error, workspaceId: loadedWorkspaceId } = useSkillPackStore();
+  const {
+    items: managedPacks,
+    phase,
+    error,
+    checkedAt,
+    workspaceId: loadedWorkspaceId
+  } = useSkillPackStore();
   const suites = capability.snapshot?.bundledSkillSuites ?? [];
   const selectedSuite = suites.find((suite) => suite.id === selectedSuiteId);
   const managedBySuiteId = useMemo(() => new Map(
@@ -192,7 +198,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
     || phase === "updating"
     || phase === "restoring";
   const updateCount = suites.filter((suite) => (
-    managedBySuiteId.get(suite.id)?.updateStatus === "update-available"
+    ["update-available", "sync-pending"].includes(managedBySuiteId.get(suite.id)?.updateStatus ?? "")
   )).length;
 
   useEffect(() => {
@@ -240,6 +246,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
   return <>
     <SettingsSectionBlock
       actions={<span className={styles.detailActions}>
+        {checkedAt === undefined ? null : <SkillPackCheckedAt checkedAt={checkedAt} />}
         <Button
           className="secondary-button"
           isDisabled={!workspaceId || busy}
@@ -250,7 +257,7 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
             className={phase === "checking" ? styles.spinning : undefined}
             size={14}
           />
-          {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查技能更新"}
+          {phase === "checking" ? "检查中…" : updateCount > 0 ? `待处理 ${updateCount}` : "检查技能更新"}
         </Button>
         <Button
           className="secondary-button"
@@ -281,6 +288,15 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
                 onPress={() => setPending({ action: "update", pack })}
               >
                 更新
+              </Button>
+            ) : pack?.updateStatus === "sync-pending" && pack.canInstall ? (
+              <Button
+                aria-label={`同步 ${suite.displayName} 官方 Skills`}
+                className="secondary-button"
+                isDisabled={busy}
+                onPress={() => setPending({ action: "install", pack })}
+              >
+                同步 Skills
               </Button>
             ) : undefined}
             key={suite.id}
@@ -313,4 +329,13 @@ function BundledSkillPanel({ capability, selectedSuiteId, onBack, onSelectSuite 
     </SettingsSectionBlock>
     {mutationDialog}
   </>;
+}
+
+function SkillPackCheckedAt({ checkedAt }: { checkedAt: number }) {
+  const date = new Date(checkedAt);
+  return (
+    <time className={styles.checkedAt!} dateTime={date.toISOString()} title={date.toLocaleString()}>
+      上次检查 {date.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+    </time>
+  );
 }

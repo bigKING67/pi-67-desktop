@@ -35,7 +35,7 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
   const currentWorkspaceId = useWorkbenchStore((state) => state.currentWorkspaceId);
   const workspaceId = settingsWorkspaceId ?? currentWorkspaceId;
   const resources = useSessionProjectionStore(selectSessionResources) ?? [];
-  const { items, phase, error, workspaceId: loadedWorkspaceId } = useSkillPackStore();
+  const { items, phase, error, checkedAt, workspaceId: loadedWorkspaceId } = useSkillPackStore();
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<{ action: SkillPackMutationAction; pack: SkillPackEntry }>();
   const allManagedPacks = useMemo(
@@ -56,7 +56,7 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
     || phase === "installing"
     || phase === "updating"
     || phase === "restoring";
-  const updateCount = managedPacks.filter((entry) => entry.updateStatus === "update-available").length;
+  const updateCount = managedPacks.filter(skillPackNeedsAction).length;
 
   useEffect(() => {
     if (!workspaceId) useSkillPackStore.getState().reset();
@@ -77,6 +77,7 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
           }}
           onQueryChange={setQuery}
           onRestore={(pack) => setPending({ action: "restore", pack })}
+          onInstall={(pack) => setPending({ action: "install", pack })}
           onUpdate={(pack) => setPending({ action: "update", pack })}
         />
         {pending ? (
@@ -103,18 +104,21 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
   return (
     <div className={styles.managedGlobalSkills}>
       {managedPacks.length > 0 ? <SettingsSectionBlock
-        actions={<Button
-          className="secondary-button"
-          isDisabled={!workspaceId || busy}
-          onPress={() => void checkSkillPackUpdates(workspaceId)}
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={phase === "checking" ? styles.spinning : undefined}
-            size={14}
-          />
-          {phase === "checking" ? "检查中…" : updateCount > 0 ? `更新可用 ${updateCount}` : "检查技能更新"}
-        </Button>}
+        actions={<span className={styles.detailActions}>
+          {checkedAt === undefined ? null : <SkillPackCheckedAt checkedAt={checkedAt} />}
+          <Button
+            className="secondary-button"
+            isDisabled={!workspaceId || busy}
+            onPress={() => void checkSkillPackUpdates(workspaceId)}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={phase === "checking" ? styles.spinning : undefined}
+              size={14}
+            />
+            {phase === "checking" ? "检查中…" : updateCount > 0 ? `待处理 ${updateCount}` : "检查技能更新"}
+          </Button>
+        </span>}
         title="受管技能套件"
         description="由可信更新器维护并对所有项目可用；一个套件只检查和更新一次。"
       >
@@ -130,6 +134,7 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
                 onSelectPack(pack.id);
               }}
               onUpdate={() => setPending({ action: "update", pack })}
+              onInstall={() => setPending({ action: "install", pack })}
             />
           ))}
         </div>
@@ -172,15 +177,16 @@ export function ManagedGlobalSkillPanel({ selectedPackId, excludedSuiteIds, onSe
   );
 }
 
-function ManagedSkillPackRow({ pack, busy, onSelect, onUpdate }: {
+function ManagedSkillPackRow({ pack, busy, onSelect, onInstall, onUpdate }: {
   pack: SkillPackEntry;
   busy: boolean;
   onSelect: () => void;
+  onInstall: () => void;
   onUpdate: () => void;
 }) {
   const status = skillPackStatus(pack);
   return (
-    <div className={styles.packRow} data-update={pack.updateStatus === "update-available" || undefined} role="listitem">
+    <div className={styles.packRow} data-update={skillPackNeedsAction(pack) || undefined} role="listitem">
       <button className={styles.packIdentity} data-testid="managed-skill-pack-row" onClick={onSelect} type="button">
         <span className={styles.suiteIcon} data-status={status.tone}>
           <Layers3 aria-hidden="true" size={16} />
@@ -202,18 +208,28 @@ function ManagedSkillPackRow({ pack, busy, onSelect, onUpdate }: {
         >
           更新
         </Button>
+      ) : pack.updateStatus === "sync-pending" && pack.canInstall ? (
+        <Button
+          className={styles.packUpdateButton!}
+          data-testid="managed-skill-pack-sync"
+          isDisabled={busy}
+          onPress={onInstall}
+        >
+          同步 Skills
+        </Button>
       ) : null}
     </div>
   );
 }
 
-function ManagedSkillPackDetail({ pack, query, resources, busy, onBack, onQueryChange, onRestore, onUpdate }: {
+function ManagedSkillPackDetail({ pack, query, resources, busy, onBack, onQueryChange, onInstall, onRestore, onUpdate }: {
   pack: SkillPackEntry;
   query: string;
   resources: ResourceSummary[];
   busy: boolean;
   onBack: () => void;
   onQueryChange: (query: string) => void;
+  onInstall: (pack: SkillPackEntry) => void;
   onRestore: (pack: SkillPackEntry) => void;
   onUpdate: (pack: SkillPackEntry) => void;
 }) {
@@ -234,6 +250,9 @@ function ManagedSkillPackDetail({ pack, query, resources, busy, onBack, onQueryC
           {pack.updateStatus === "update-available" && pack.canUpdate ? (
             <Button className="primary-button" isDisabled={busy} onPress={() => onUpdate(pack)}>更新套件</Button>
           ) : null}
+          {pack.updateStatus === "sync-pending" && pack.canInstall ? (
+            <Button className="primary-button" isDisabled={busy} onPress={() => onInstall(pack)}>同步官方 Skills</Button>
+          ) : null}
           {pack.canRestore ? (
             <Button className="secondary-button" isDisabled={busy} onPress={() => onRestore(pack)}>恢复内置版本</Button>
           ) : null}
@@ -252,7 +271,11 @@ function ManagedSkillPackDetail({ pack, query, resources, busy, onBack, onQueryC
           />
         </label>
         {pack.detail ? (
-          <SettingsNotice tone={pack.updateStatus === "modified" || pack.updateStatus === "unavailable" ? "warning" : "info"}>
+          <SettingsNotice tone={[
+            "modified",
+            "sync-pending",
+            "unavailable"
+          ].includes(pack.updateStatus) ? "warning" : "info"}>
             {pack.detail}
           </SettingsNotice>
         ) : null}
@@ -287,15 +310,18 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
 }) {
+  const syncingLarkSkills = action === "install" && pack.updateStatus === "sync-pending";
   return (
     <ModalOverlay className="modal-overlay" isDismissable={!busy} isOpen onOpenChange={(open) => { if (!open) onCancel(); }}>
       <Modal className={`modal-surface ${styles.modal}`}>
         <Dialog
-          aria-label={action === "install" ? "安装 Lark CLI" : action === "update" ? "更新技能套件" : "恢复内置技能套件"}
+          aria-label={syncingLarkSkills ? "同步 Lark CLI 官方 Skills" : action === "install" ? "安装 Lark CLI" : action === "update" ? "更新技能套件" : "恢复内置技能套件"}
           className={styles.dialog!}
         >
-          <h2>{action === "install" ? "安装 Lark CLI？" : action === "update" ? "更新技能套件？" : "恢复内置版本？"}</h2>
-          <p>{action === "install"
+          <h2>{syncingLarkSkills ? "同步官方 Skills？" : action === "install" ? "安装 Lark CLI？" : action === "update" ? "更新技能套件？" : "恢复内置版本？"}</h2>
+          <p>{syncingLarkSkills
+            ? <>当前 Lark CLI 已完成更新和验证。Desktop 只会重试把官方办公 Skills 同步到 <code>~/.agents/skills</code>，不会重新下载或回退 CLI，也不会覆盖非受管同名 Skill。</>
+            : action === "install"
             ? <>Desktop 将验证并启用官方 @larksuite/cli，把办公 Skills 安装到 <code>~/.agents/skills</code>。这是当前用户全局安装，Pi-67 与其他兼容 Agent 都可复用；已有非受管同名 Skill 不会被覆盖。</>
             : action === "update"
               ? pack.manager === "lark-cli"
@@ -305,9 +331,11 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
           <dl className={styles.updateSummary}>
             <div><dt>套件</dt><dd>{pack.displayName}</dd></div>
             <div><dt>来源</dt><dd>{pack.source ?? "受管来源"}</dd></div>
-            <div><dt>当前版本</dt><dd>{action === "install" ? "未安装" : pack.installedVersion ?? "未知"}</dd></div>
-            <div><dt>目标版本</dt><dd>{action === "install"
-              ? "官方最新稳定版"
+            <div><dt>当前版本</dt><dd>{action === "install" && !syncingLarkSkills ? "未安装" : pack.installedVersion ?? "未知"}</dd></div>
+            <div><dt>目标版本</dt><dd>{syncingLarkSkills
+              ? "当前 CLI 对应官方 Skills"
+              : action === "install"
+                ? "官方最新稳定版"
               : action === "update"
                 ? pack.latestVersion ?? "最新稳定版"
                 : pack.baselineVersion ?? "内置基线"}</dd></div>
@@ -324,8 +352,8 @@ export function SkillPackMutationDialog({ action, pack, busy, error, onCancel, o
               onPress={() => void onConfirm()}
             >
               {busy
-                ? action === "install" ? "安装中…" : action === "update" ? "更新中…" : "恢复中…"
-                : action === "install" ? "确认安装" : action === "update" ? "确认更新" : "确认恢复"}
+                ? syncingLarkSkills ? "同步中…" : action === "install" ? "安装中…" : action === "update" ? "更新中…" : "恢复中…"
+                : syncingLarkSkills ? "确认同步" : action === "install" ? "确认安装" : action === "update" ? "确认更新" : "确认恢复"}
             </Button>
           </div>
         </Dialog>
@@ -339,6 +367,7 @@ function skillPackStatus(pack: SkillPackEntry): {
   label: string;
 } {
   if (pack.updateStatus === "not-installed") return { tone: "unavailable", label: "CLI 未安装" };
+  if (pack.updateStatus === "sync-pending") return { tone: "partial", label: "CLI 已更新，Skills 待同步" };
   if (pack.updateStatus === "current") return { tone: "ready", label: "已是最新" };
   if (pack.updateStatus === "update-available") {
     return { tone: "partial", label: pack.canUpdate ? "可更新" : pack.canInstall ? "需完成安装" : "暂不可更新" };
@@ -347,6 +376,10 @@ function skillPackStatus(pack: SkillPackEntry): {
   if (pack.updateStatus === "unavailable") return { tone: "unavailable", label: "检查失败" };
   if (pack.updateStatus === "application-managed") return { tone: "ready", label: "随应用更新" };
   return { tone: "partial", label: "尚未检查" };
+}
+
+function skillPackNeedsAction(pack: SkillPackEntry): boolean {
+  return pack.updateStatus === "update-available" || pack.updateStatus === "sync-pending";
 }
 
 function skillPackMeta(pack: SkillPackEntry): string {
@@ -368,4 +401,13 @@ function skillPackMeta(pack: SkillPackEntry): string {
         ? "Pi-67 registry Overlay"
         : "Desktop 内置基线"
   ].filter(Boolean).join(" · ");
+}
+
+function SkillPackCheckedAt({ checkedAt }: { checkedAt: number }) {
+  const date = new Date(checkedAt);
+  return (
+    <time className={styles.checkedAt!} dateTime={date.toISOString()} title={date.toLocaleString()}>
+      上次检查 {date.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
+    </time>
+  );
 }

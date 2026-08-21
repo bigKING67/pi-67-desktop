@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -51,5 +51,19 @@ describe("unsigned preview release artifacts", () => {
     expect(() => expectedVersionTag("latest")).toThrow(/Invalid package version/u);
     expect(expectedStableVersionTag("1.2.3")).toBe("v1.2.3");
     expect(() => expectedStableVersionTag("1.2.3-alpha.1")).toThrow(/canonical MAJOR\.MINOR\.PATCH/u);
+  });
+
+  it("rejects symbolic-link build inputs before preparing release artifacts", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "pi67-unsigned-preview-symlink-"));
+    temporaryDirectories.push(directory);
+    const version = "0.1.0-alpha.1";
+    const specs = unsignedPreviewArtifactSpecs(version);
+    const target = join(directory, "outside.exe");
+    await writeFile(target, "fixture");
+    await symlink(target, join(directory, specs[0].source));
+    await Promise.all(specs.slice(1).map((spec) => writeFile(join(directory, spec.source), "fixture")));
+
+    await expect(prepareUnsignedPreview(directory, version, "9.8.7"))
+      .rejects.toThrow("source is not a regular file");
   });
 });

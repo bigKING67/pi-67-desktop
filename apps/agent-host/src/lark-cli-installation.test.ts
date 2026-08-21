@@ -42,7 +42,12 @@ describe("Desktop-managed Lark CLI installation", () => {
       [expect.stringMatching(/scripts[/\\\\]install\.js$/u)],
       ["--version"],
       ["update", "--check", "--json"],
-      expect.arrayContaining(["skills", "add", "larksuite/cli", "-g"])
+      expect.arrayContaining([
+        "skills",
+        "add",
+        "https://open.feishu.cn/lark-cli/skills/regular",
+        "-g"
+      ])
     ]);
     expect(runProcess.mock.calls[0]?.[1]).toContain("--ignore-scripts");
     expect(runProcess.mock.calls[0]?.[1]).not.toContain("--ignore-scripts=false");
@@ -136,6 +141,45 @@ describe("Desktop-managed Lark CLI installation", () => {
       "@larksuite/cli@1.0.88"
     ]));
     await swap.rollback();
+  });
+
+  it("keeps a validated CLI active when optional official Skills synchronization fails", async () => {
+    const fixture = await installationFixture();
+    const stableRoot = desktopManagedLarkCliRoot(fixture.homeDirectory);
+    await mkdir(stableRoot, { recursive: true });
+    await writeFile(join(stableRoot, "previous.txt"), "previous", "utf8");
+    const baseRunner = installerRunner("1.0.88");
+    const runProcess = vi.fn<SkillPackProcessRunner>(async (...arguments_) => {
+      const processArguments = arguments_[1];
+      if (processArguments.includes("skills") && processArguments.includes("add")) {
+        throw new Error("skills source unavailable");
+      }
+      return baseRunner(...arguments_);
+    });
+
+    const swap = await beginDesktopLarkCliInstallation({
+      homeDirectory: fixture.homeDirectory,
+      skillIds: SKILL_IDS,
+      environment: fixture.environment,
+      runProcess,
+      operation: "update",
+      targetVersion: "1.0.88",
+      minimumVersion: "1.0.57",
+      selectNpmRegistry: async () => NPM_REGISTRY
+    });
+
+    expect(swap).toMatchObject({
+      version: "1.0.88",
+      skills: {
+        state: "pending",
+        detail: expect.stringContaining("无需重新下载 CLI")
+      }
+    });
+    await expect(access(swap.executable)).resolves.toBeUndefined();
+    await expect(access(join(stableRoot, "previous.txt"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    await swap.rollback();
+    await expect(readFile(join(stableRoot, "previous.txt"), "utf8")).resolves.toBe("previous");
   });
 
   it("rejects a staged version mismatch before running package code", async () => {

@@ -1,5 +1,6 @@
 import { app, clipboard, dialog, ipcMain, Menu, net, Notification, shell, type BrowserWindow } from "electron";
-import { ManualUpdateController } from "./manual-update-controller.js";
+import { join } from "node:path";
+import { DesktopUpdateController } from "./desktop-update-controller.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { DesktopCapabilityService } from "./desktop-capability-service.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
@@ -95,16 +96,26 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       console.error(redact(error instanceof Error ? error.message : String(error)));
     }
   });
-  const updateController = new ManualUpdateController({
+  if (process.platform !== "darwin" && process.platform !== "win32") {
+    throw new Error(`Pi-67 updates do not support ${process.platform}.`);
+  }
+  const updateController = new DesktopUpdateController({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
+    platform: process.platform,
+    updateDirectory: app.isPackaged
+      ? join(app.getPath("userData"), "updates", "unsigned-preview")
+      : "",
+    executablePath: process.execPath,
+    processId: process.pid,
     fetcher: (input, init) => net.fetch(input, init),
     publish: (state) => {
       const window = options.getMainWindow();
       if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
       window.webContents.send("pi67:update-state-changed", state);
     },
-    sanitizeError: (error) => redact(error instanceof Error ? error.message : String(error))
+    sanitizeError: (error) => redact(error instanceof Error ? error.message : String(error)),
+    quit: () => app.quit()
   });
   const pickAndRegisterWorkspace = async (): Promise<NativeWorkspaceDescriptor | undefined> => {
     const result = await dialog.showOpenDialog(options.getMainWindow()!, {
@@ -421,6 +432,8 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
       : options.desktopCapabilities.snapshot();
   });
   ipcMain.handle("pi67:update-check", () => updateController.checkNow());
+  ipcMain.handle("pi67:update-start", () => updateController.startUpdate());
+  ipcMain.handle("pi67:update-cancel", () => updateController.cancelUpdate());
   updateController.startAutomaticChecks();
   return {
     handlePowerResume: () => updateController.checkIfDue(),

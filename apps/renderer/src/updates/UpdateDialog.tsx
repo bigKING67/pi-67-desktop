@@ -1,65 +1,108 @@
-import { CircleCheck, ExternalLink, LoaderCircle, RefreshCw, TriangleAlert } from "lucide-react";
+import { CircleCheck, Download, LoaderCircle, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import { useShellStore } from "../shell/shell-store.js";
 import type { UpdateState } from "./update-state.js";
-import { checkForUpdatesNow, useUpdateStore } from "./update-store.js";
+import {
+  cancelUpdateNow,
+  checkForUpdatesNow,
+  startUpdateNow,
+  useUpdateStore
+} from "./update-store.js";
 
-type UpdateAction = "check" | "open";
+type UpdateAction = "check" | "install";
 
 export function UpdateDialog() {
   const open = useShellStore((state) => state.updateDialogOpen);
   const setOpen = useShellStore((state) => state.setUpdateDialogOpen);
   const update = useUpdateStore((state) => state.update);
   const initialized = useUpdateStore((state) => state.initialized);
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<UpdateAction>();
+  const [cancelling, setCancelling] = useState(false);
   const [actionError, setActionError] = useState<string>();
 
   if (!open) return null;
   const action = initialized ? updateAction(update) : undefined;
+  const pending = pendingAction !== undefined;
+  const operationActive = pending || cancelling || update.phase === "downloading" || update.phase === "installing";
 
   const runAction = async () => {
-    if (!initialized || !action || pending) return;
-    setPending(true);
+    if (!initialized || !action || pending || cancelling) return;
+    setPendingAction(action);
     setActionError(undefined);
     try {
-      if (action === "check") {
-        await checkForUpdatesNow();
-      } else if (update.phase === "available") {
-        const opened = await window.pi67.system.requestOpenExternal(update.releaseUrl);
-        if (!opened) setActionError("GitHub 更新页未打开；当前版本和 Pi 会话均未改变，可以再次尝试。");
-      }
+      if (action === "check") await checkForUpdatesNow();
+      else await startUpdateNow();
     } catch {
       setActionError(action === "check"
         ? "更新检查失败。当前版本和 Pi 会话保持不变，请稍后重试。"
-        : "无法打开 GitHub 更新页；当前版本和 Pi 会话均未改变，可以再次尝试。");
+        : "更新没有启动。当前版本和 Pi 会话保持不变，可以重新检查后再试。");
     } finally {
-      setPending(false);
+      setPendingAction(undefined);
+    }
+  };
+
+  const cancelDownload = async () => {
+    if (update.phase !== "downloading" || cancelling) return;
+    setCancelling(true);
+    setActionError(undefined);
+    try {
+      await cancelUpdateNow();
+    } finally {
+      setCancelling(false);
     }
   };
 
   return (
-    <ModalOverlay className="modal-overlay" isOpen isDismissable={!pending} onOpenChange={setOpen}>
+    <ModalOverlay
+      className="modal-overlay"
+      isOpen
+      isDismissable={!operationActive}
+      onOpenChange={setOpen}
+    >
       <Modal className="modal-surface update-dialog">
         <Dialog aria-label="Pi-67 更新">
           <div className="diagnostic-dialog-content">
-            <span className="dialog-eyebrow">Unsigned Preview</span>
+            <span className="dialog-eyebrow">Internal Unsigned Update</span>
             <Heading slot="title">Pi-67 更新</Heading>
             <UpdateSummary update={update} initialized={initialized} pending={pending} action={action} />
+            {update.phase === "downloading" ? (
+              <div
+                className="update-progress-track"
+                role="progressbar"
+                aria-label="更新下载进度"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(update.percent)}
+              >
+                <span style={{ width: `${update.percent}%` }} />
+              </div>
+            ) : null}
             <div className="update-network-note">
-              自动检查只请求 Pi-67 的公开 GitHub Release 元数据，不会发送工作区、会话、模型服务或密钥信息，也不会自动下载或安装。
+              更新只连接 updates.52671314.xyz，不发送工作区、会话、模型服务或密钥信息。安装包下载完成后会核对大小和 SHA-256，再退出并启动内部未签名更新。
             </div>
             {actionError ? <div className="update-action-error" role="alert">{actionError}</div> : null}
             <div className="dialog-actions">
-              <Button className="secondary-button" onPress={() => setOpen(false)} isDisabled={pending}>
-                {update.phase === "available" ? "稍后处理" : "关闭"}
-              </Button>
+              {update.phase === "downloading" ? (
+                <Button className="secondary-button" onPress={() => void cancelDownload()} isDisabled={cancelling}>
+                  <X size={14} aria-hidden="true" />
+                  {cancelling ? "正在取消…" : "取消下载"}
+                </Button>
+              ) : (
+                <Button
+                  className="secondary-button"
+                  onPress={() => setOpen(false)}
+                  isDisabled={operationActive}
+                >
+                  {update.phase === "available" ? "稍后处理" : "关闭"}
+                </Button>
+              )}
               {action ? (
-                <Button className="primary-button" onPress={() => void runAction()} isDisabled={pending}>
+                <Button className="primary-button" onPress={() => void runAction()} isDisabled={pending || cancelling}>
                   {pending
                     ? <LoaderCircle className="spin" size={14} aria-hidden="true" />
-                    : action === "open"
-                      ? <ExternalLink size={14} aria-hidden="true" />
+                    : action === "install"
+                      ? <Download size={14} aria-hidden="true" />
                       : <RefreshCw size={14} aria-hidden="true" />}
                   {updateActionLabel(action, pending)}
                 </Button>
@@ -78,18 +121,24 @@ function UpdateSummary({ update, initialized, pending, action }: {
   pending: boolean;
   action: UpdateAction | undefined;
 }) {
-  const Icon = !initialized || pending
+  const Icon = !initialized || pending || update.phase === "checking" || update.phase === "installing"
     ? LoaderCircle
     : update.phase === "error"
       ? TriangleAlert
       : update.phase === "current"
         ? CircleCheck
-        : update.phase === "available"
-          ? ExternalLink
+        : update.phase === "available" || update.phase === "downloading"
+          ? Download
           : RefreshCw;
   return (
     <div className={`update-summary phase-${update.phase}`} role="status">
-      <Icon className={!initialized || pending ? "spin" : undefined} size={18} aria-hidden="true" />
+      <Icon
+        className={!initialized || pending || update.phase === "checking" || update.phase === "installing"
+          ? "spin"
+          : undefined}
+        size={18}
+        aria-hidden="true"
+      />
       <div>
         <strong>{updateTitle(update, initialized, pending, action)}</strong>
         <span>{updateDetail(update, initialized)}</span>
@@ -105,35 +154,54 @@ function updateTitle(
   action?: UpdateAction
 ): string {
   if (!initialized) return "正在读取更新状态";
-  if (pending) return action === "open" ? "正在打开 GitHub 更新页" : "正在检查更新";
+  if (pending && action === "check") return "正在检查更新";
+  if (update.phase === "checking") return "正在检查更新";
+  if (update.phase === "downloading") return `正在下载 Pi-67 ${update.version}`;
+  if (update.phase === "installing") return `正在安装 Pi-67 ${update.version}`;
   if (update.phase === "available") return `发现 Pi-67 ${update.version}`;
   if (update.phase === "current") return "当前已是最新版本";
   if (update.phase === "disabled") return "开发构建不检查更新";
-  if (update.phase === "error") return "更新检查未完成";
+  if (update.phase === "error") return "更新操作未完成";
   return update.automaticChecks ? "正在等待自动检查" : "尚未检查更新";
 }
 
 function updateDetail(update: UpdateState, initialized: boolean): string {
   if (!initialized) return "正在确认当前版本和自动检查设置。";
   if (update.phase === "available") {
-    const published = update.publishedAt ? `发布于 ${update.publishedAt.slice(0, 10)}。` : "";
-    return `Unsigned Preview 不会自动下载或安装。${published}查看 GitHub Release，核对 SHA-256 后手动下载安装。`;
+    return `安装包 ${formatBytes(update.artifactBytes)}。点击后会自动下载、校验，并启动内部更新安装。`;
+  }
+  if (update.phase === "downloading") {
+    return `${formatBytes(update.transferred)} / ${formatBytes(update.artifactBytes)}（${Math.round(update.percent)}%）`;
+  }
+  if (update.phase === "installing") {
+    return "安装包已通过 SHA-256 校验；应用即将退出、替换并重新启动。";
   }
   if (update.phase === "current") {
-    return `当前版本 ${update.currentVersion}；自动检查已开启，不会自动下载或安装。`;
+    return `当前版本 ${update.currentVersion}；自动检查已开启，但不会在未点击时下载或安装。`;
   }
   if (update.phase === "error") return update.detail;
-  if (update.phase === "disabled") return "开发构建不会请求 GitHub Release；打包预览版会自动检查更新。";
-  return `当前版本 ${update.currentVersion}；打包版启动后会自动检查，但不会自动下载或安装。`;
+  if (update.phase === "disabled") return "开发构建不会请求更新；打包预览版才启用内部更新。";
+  if (update.phase === "checking") return "正在读取固定 R2 更新清单，不会自动下载安装包。";
+  return `当前版本 ${update.currentVersion}；打包版启动后会自动检查，但下载和安装需要点击确认。`;
 }
 
 function updateAction(update: UpdateState): UpdateAction | undefined {
-  if (update.phase === "available") return "open";
-  if (update.phase === "disabled") return undefined;
+  if (update.phase === "available") return "install";
+  if (
+    update.phase === "disabled"
+    || update.phase === "checking"
+    || update.phase === "downloading"
+    || update.phase === "installing"
+  ) return undefined;
   return "check";
 }
 
 function updateActionLabel(action: UpdateAction, pending: boolean): string {
-  if (pending) return action === "open" ? "正在打开…" : "正在检查…";
-  return action === "open" ? "查看更新" : "检查更新";
+  if (pending) return action === "install" ? "正在启动…" : "正在检查…";
+  return action === "install" ? "下载并安装" : "检查更新";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(2)} GB`;
+  return `${(bytes / 1_048_576).toFixed(1)} MB`;
 }

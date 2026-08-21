@@ -1,4 +1,3 @@
-import { rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type {
@@ -12,8 +11,10 @@ import type {
 import { LARK_CLI_SKILL_PACK_ID } from "@pi67/domain";
 import { HostCommandError } from "./protocol-error.js";
 import type { ResourceMutationTransaction } from "./resource-management-coordinator.js";
+import { beginAiBerkshireSkillPackUpdate } from "./ai-berkshire-skill-pack-update.js";
 import {
-  beginDesktopLarkCliInstallation
+  beginDesktopLarkCliInstallation,
+  beginDesktopLarkSkillSynchronization
 } from "./lark-cli-installation.js";
 import {
   beginDesktopManagedLarkSkillPackUpdate,
@@ -26,20 +27,21 @@ import {
   resolveOptionalPath
 } from "./lark-cli-resolution.js";
 import {
-  activateManagedSkillPack,
   inspectManagedSkillPack,
   removeManagedSkillPack
 } from "./managed-skill-pack-state.js";
 import {
-  compareSkillPackVersions,
   createPi67SkillPackChannel,
-  type Pi67SkillPackChannelPort,
-  type Pi67SkillPackRelease
+  type Pi67SkillPackChannelPort
 } from "./pi67-skill-pack-channel.js";
 import {
   runBoundedSkillPackProcess,
   type SkillPackProcessRunner
 } from "./skill-pack-process-runner.js";
+import {
+  checkReceiptPersistenceWarning,
+  SkillPackCheckProjector
+} from "./skill-pack-check-receipts.js";
 import {
   countInstalledSkills,
   readLarkSuite,
@@ -71,6 +73,7 @@ export interface SkillPackManagementOptions {
   resolveLarkCli?: () => Promise<string | undefined>;
   runProcess?: SkillPackProcessRunner;
   installLarkCli?: typeof beginDesktopLarkCliInstallation;
+  synchronizeLarkSkills?: typeof beginDesktopLarkSkillSynchronization;
   pi67Channel?: Pi67SkillPackChannelPort;
 }
 
@@ -89,7 +92,9 @@ export class SkillPackManagement implements SkillPackManagementPort {
   readonly #runProcess: NonNullable<SkillPackManagementOptions["runProcess"]>;
   readonly #resolveLarkCli: () => Promise<string | undefined>;
   readonly #installLarkCli: NonNullable<SkillPackManagementOptions["installLarkCli"]>;
+  readonly #synchronizeLarkSkills: NonNullable<SkillPackManagementOptions["synchronizeLarkSkills"]>;
   readonly #pi67Channel: Pi67SkillPackChannelPort;
+  readonly #checkProjection: SkillPackCheckProjector;
 
   constructor(
     private readonly services: PiWorkspaceRuntimeServices,
@@ -103,6 +108,7 @@ export class SkillPackManagement implements SkillPackManagementPort {
     this.#now = options.now ?? Date.now;
     this.#runProcess = options.runProcess ?? runBoundedSkillPackProcess;
     this.#installLarkCli = options.installLarkCli ?? beginDesktopLarkCliInstallation;
+    this.#synchronizeLarkSkills = options.synchronizeLarkSkills ?? beginDesktopLarkSkillSynchronization;
     this.#pi67Channel = options.pi67Channel ?? createPi67SkillPackChannel({
       environment: this.#environment,
       runProcess: this.#runProcess,
@@ -114,22 +120,36 @@ export class SkillPackManagement implements SkillPackManagementPort {
       shellPath: this.services.settingsManager.getShellPath(),
       runProcess: this.#runProcess
     }));
+    this.#checkProjection = new SkillPackCheckProjector(
+      this.services.agentDir,
+      this.#homeDirectory,
+      this.#resolveLarkCli
+    );
   }
 
   async list(): Promise<SkillPackListResult> {
-    const [lark, aiBerkshire] = await Promise.all([this.#larkEntry(), this.#aiBerkshireEntry()]);
-    const items = [lark, aiBerkshire];
-    return { items, total: items.length };
+    const [larkExecutable, aiBerkshire] = await Promise.all([
+      this.#resolveLarkCli(),
+      this.#aiBerkshireEntry()
+    ]);
+    const lark = await this.#larkEntryForExecutable(larkExecutable);
+    return this.#checkProjection.applyStored([lark, aiBerkshire], larkExecutable);
   }
 
   async checkForUpdates(): Promise<SkillPackListResult> {
     const checkedAt = this.#now();
+    const larkExecutable = await this.#resolveLarkCli();
     const [lark, aiBerkshire] = await Promise.all([
-      this.#checkLarkEntry(),
+      this.#checkLarkEntry(larkExecutable),
       this.#checkAiBerkshireEntry()
     ]);
     const items = [lark, aiBerkshire];
-    return { items, total: items.length, checkedAt };
+    const persisted = await this.#checkProjection.persist(items, checkedAt, larkExecutable);
+    return {
+      items: persisted ? items : items.map(checkReceiptPersistenceWarning),
+      total: items.length,
+      checkedAt
+    };
   }
 
   async beginInstall(id: string): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
@@ -145,8 +165,11 @@ export class SkillPackManagement implements SkillPackManagementPort {
       runProcess: this.#runProcess,
       resolveLarkCli: this.#resolveLarkCli,
       installLarkCli: this.#installLarkCli,
+      synchronizeLarkSkills: this.#synchronizeLarkSkills,
       checkEntry: (executable) => this.#checkLarkEntry(executable),
-      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
+      mutationResult: (entry, changed, executable) => (
+        this.#mutationResultWithEntry(entry, changed, executable)
+      )
     });
   }
 
@@ -230,74 +253,22 @@ export class SkillPackManagement implements SkillPackManagementPort {
       runProcess: this.#runProcess,
       installLarkCli: this.#installLarkCli,
       checkEntry: (updatedExecutable) => this.#checkLarkEntry(updatedExecutable),
-      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed)
+      mutationResult: (entry, changed, updatedExecutable) => (
+        this.#mutationResultWithEntry(entry, changed, updatedExecutable)
+      )
     });
   }
 
   async #beginAiBerkshireUpdate(): Promise<ResourceMutationTransaction<SkillPackMutationResult>> {
-    const current = await this.#aiBerkshireEntry();
-    if (current.localState === "modified") {
-      throw new HostCommandError(
-        "INVALID_PAYLOAD",
-        "The managed AI Berkshire Overlay is invalid. Restore the bundled version before installing an update.",
-        false
-      );
-    }
-    let release: Pi67SkillPackRelease;
-    try {
-      release = await this.#pi67Channel.check();
-    } catch (error) {
-      throw new HostCommandError("RUNTIME_NOT_READY", boundedError(error), true);
-    }
-    const effectiveVersion = current.installedVersion ?? current.baselineVersion;
-    if (!effectiveVersion) throw new HostCommandError("INTERNAL", "AI Berkshire baseline version is unavailable.", true);
-    if (compareSkillPackVersions(release.version, effectiveVersion) <= 0) {
-      const checked = applyPi67UpdateCheck(current, release);
-      return noOpTransaction(await this.#mutationResultWithEntry(checked, false));
-    }
-    if (!release.independentlyInstallable) {
-      throw new HostCommandError(
-        "RUNTIME_NOT_READY",
-        "Pi-67 registry 尚未开放此 Skill Pack 的独立安装。",
-        true
-      );
-    }
-    const staged = await this.#pi67Channel.stage(this.services.agentDir);
-    try {
-      if (compareSkillPackVersions(staged.release.version, effectiveVersion) <= 0) {
-        await rm(staged.stagingSuiteRoot, { recursive: true, force: true });
-        const checked = applyPi67UpdateCheck(current, staged.release);
-        return noOpTransaction(await this.#mutationResultWithEntry(checked, false));
-      }
-      const swap = await activateManagedSkillPack({
-        agentDir: this.services.agentDir,
-        id: AI_BERKSHIRE_PACK_ID,
-        stagingSuiteRoot: staged.stagingSuiteRoot,
-        environment: this.#environment
-      });
-      try {
-        const list = await this.list();
-        return {
-          result: { ...list, checkedAt: this.#now(), changed: true },
-          commit: () => swap.commit(),
-          rollback: () => swap.rollback()
-        };
-      } catch (error) {
-        await rollbackManagedSkillPackMutation(
-          swap,
-          error,
-          "Skill Pack Overlay 激活后的结果投影失败，且无法恢复之前的 Overlay。"
-        );
-        throw error;
-      }
-    } catch (error) {
-      await rm(staged.stagingSuiteRoot, { recursive: true, force: true }).catch(() => undefined);
-      throw error;
-    }
-  }
-
-  async #larkEntry(): Promise<SkillPackEntry> {
-    return this.#larkEntryForExecutable(await this.#resolveLarkCli());
+    return beginAiBerkshireSkillPackUpdate({
+      agentDir: this.services.agentDir,
+      environment: this.#environment,
+      current: await this.#aiBerkshireEntry(),
+      channel: this.#pi67Channel,
+      list: () => this.list(),
+      mutationResult: (entry, changed) => this.#mutationResultWithEntry(entry, changed),
+      now: this.#now
+    });
   }
 
   async #larkEntryForExecutable(executable: string | undefined): Promise<SkillPackEntry> {
@@ -389,13 +360,19 @@ export class SkillPackManagement implements SkillPackManagementPort {
       const checked = applyLarkUpdateCheck(entry, parseLarkUpdateResult(result.stdout), {
         desktopManaged: isDesktopManagedLarkCliExecutable(executable, this.#homeDirectory)
       });
-      return entry.canInstall
-        ? {
-            ...checked,
-            canUpdate: false,
-            detail: "请先将官方办公 Skills 安装到 ~/.agents/skills，再检查整套更新状态。"
-          }
-        : checked;
+      if (!entry.canInstall) return checked;
+      if (checked.updateStatus === "update-available") {
+        return {
+          ...checked,
+          detail: "Lark CLI 可更新；更新后会继续同步官方全局 Skills。若 Skills 网络失败，新 CLI 仍会保留并可单独重试同步。"
+        };
+      }
+      return {
+        ...checked,
+        updateStatus: "sync-pending",
+        canUpdate: false,
+        detail: "Lark CLI 已验证；官方全局 Skills 尚未完整同步到 ~/.agents/skills，可直接重试同步。"
+      };
     } catch (error) {
       return { ...entry, updateStatus: "unavailable", canUpdate: false, detail: boundedError(error) };
     }
@@ -412,11 +389,15 @@ export class SkillPackManagement implements SkillPackManagementPort {
 
   async #mutationResultWithEntry(
     entry: SkillPackEntry,
-    changed: boolean
+    changed: boolean,
+    larkExecutable?: string
   ): Promise<SkillPackMutationResult> {
     const list = await this.list();
-    const items = list.items.map((candidate) => candidate.id === entry.id ? entry : candidate);
-    return { items, total: items.length, checkedAt: this.#now(), changed };
+    const checkedAt = this.#now();
+    const persisted = await this.#checkProjection.persist([entry], checkedAt, larkExecutable);
+    const projectedEntry = persisted ? entry : checkReceiptPersistenceWarning(entry);
+    const items = list.items.map((candidate) => candidate.id === entry.id ? projectedEntry : candidate);
+    return { items, total: items.length, checkedAt, changed };
   }
 
   async #requireLarkCli(): Promise<string> {

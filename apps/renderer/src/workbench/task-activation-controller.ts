@@ -12,7 +12,10 @@ import {
 } from "./workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
-import { rotateRendererTaskForSessionOpen } from "./task-runtime-reopen.js";
+import {
+  rendererTaskBelongsToAgentHost,
+  rotateRendererTaskForSessionReopen
+} from "./task-runtime-reopen.js";
 
 const taskActivationFlights = new Map<string, Promise<boolean>>();
 
@@ -67,7 +70,7 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
       return true;
     }
     if (recovery !== "runtime-not-ready" || !isSelectedRendererTask(task)) return false;
-    return reopenRendererTask(task, workspace);
+    return await reopenRendererTask(task, workspace, true);
   } catch (error) {
     if (!isSelectedRendererTask(task)) return false;
     useAppStore.setState({ sessionTransitionPending: false });
@@ -108,8 +111,7 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
     const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
     if (!registered) throw new Error("目标工作区当前不可用。");
     const identity = await ensureAgentConnection();
-    const sameHost = task.recoveryHostInstanceId === identity.hostInstanceId
-      && task.recoveryHostEpoch === identity.hostEpoch;
+    const sameHost = rendererTaskBelongsToAgentHost(task, identity);
     if (sameHost) {
       const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
         hostEpoch: identity.hostEpoch,
@@ -132,7 +134,7 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
         return false;
       }
     }
-    return reopenRendererTask(task, workspace);
+    return await reopenRendererTask(task, workspace, sameHost);
   } catch (error) {
     markTaskRecoveryFailed(task.id, error);
     return false;
@@ -155,9 +157,12 @@ function runTaskActivationFlight(
 
 async function reopenRendererTask(
   task: RendererWorkbenchTask,
-  workspace: Parameters<typeof openRendererWorkspaceDescriptor>[0]
+  workspace: Parameters<typeof openRendererWorkspaceDescriptor>[0],
+  retireCurrentHostTask: boolean
 ): Promise<boolean> {
-  const replacement = rotateRendererTaskForSessionOpen(task);
+  const replacement = await rotateRendererTaskForSessionReopen(task, {
+    retireCurrentHostTask
+  });
   if (!replacement) return false;
   return openRendererWorkspaceDescriptor(
     workspace,

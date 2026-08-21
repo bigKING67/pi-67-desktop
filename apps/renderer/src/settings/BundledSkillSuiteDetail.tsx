@@ -40,7 +40,7 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
           <span className={styles.detailStatus} data-status={status.id}>{status.label}</span>
           {pack?.canInstall ? (
             <Button className="primary-button" isDisabled={busy} onPress={() => onMutation("install", pack)}>
-              安装 Lark CLI
+              {pack.updateStatus === "sync-pending" ? "同步官方 Skills" : "安装 Lark CLI"}
             </Button>
           ) : null}
           {pack?.updateStatus === "update-available" && pack.canUpdate ? (
@@ -104,7 +104,11 @@ export function BundledSkillSuiteDetail({ suite, pack, query, busy, onBack, onMu
           /> : null}
         </SettingsRows>
         {pack?.detail ? <SettingsNotice
-          tone={pack.updateStatus === "modified" || pack.updateStatus === "unavailable" ? "warning" : "info"}
+          tone={[
+            "modified",
+            "sync-pending",
+            "unavailable"
+          ].includes(pack.updateStatus) ? "warning" : "info"}
         >{pack.detail}</SettingsNotice> : null}
         <label className={styles.skillSearch!}>
           <Search aria-hidden="true" size={15} />
@@ -145,6 +149,9 @@ export function suiteStatus(suite: DesktopBundledSkillSuiteSummary, pack?: Skill
   label: string;
 } {
   if (pack?.updateStatus === "not-installed") return { id: "unavailable", label: "CLI 未安装" };
+  if (pack?.updateStatus === "sync-pending") {
+    return { id: "partial", label: "CLI 已更新，Skills 待同步" };
+  }
   if (pack?.updateStatus === "update-available") {
     return { id: "partial", label: pack.canUpdate ? "可更新" : pack.canInstall ? "需完成安装" : "暂不可更新" };
   }

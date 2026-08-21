@@ -41,7 +41,7 @@ test("keeps Network drafts in memory until the user saves or discards them", asy
   await expect(settings.getByText("0.1.0-alpha.1", { exact: true })).toBeVisible();
   await expect(settings.getByText("macOS", { exact: true })).toBeVisible();
   await expect(settings.getByText("Apple Silicon (arm64)", { exact: true })).toBeVisible();
-  await expect(settings.getByText("Unsigned Preview · 自动检查，手动安装", { exact: true })).toBeVisible();
+  await expect(settings.getByText("Internal Unsigned · 点击更新", { exact: true })).toBeVisible();
   expect((await settingsActionState(page)).platformInfoCalls).toBeGreaterThan(0);
 
   await navigation.getByRole("button", { name: "运行服务", exact: true }).click();

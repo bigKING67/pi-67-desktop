@@ -23,8 +23,15 @@ export class LarkCliInstallationError extends Error {
 export interface LarkCliInstallationSwap {
   readonly executable: string;
   readonly version: string;
+  readonly skills?: LarkSkillSynchronizationResult;
   commit(): Promise<void>;
   rollback(): Promise<void>;
+}
+
+export interface LarkSkillSynchronizationResult {
+  readonly state: "synchronized" | "pending";
+  readonly installedSkillCount: number;
+  readonly detail?: string;
 }
 
 export async function activateDesktopLarkCli(options: {
@@ -126,6 +133,10 @@ export function combinedInstallationSwap(
   return {
     executable: cli.executable,
     version: cli.version,
+    skills: {
+      state: "synchronized",
+      installedSkillCount: skills.installedSkillCount
+    },
     async commit() {
       if (finalized) return;
       await cli.commit();

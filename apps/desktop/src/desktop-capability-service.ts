@@ -3,8 +3,7 @@ import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   npmRegistryCandidates,
-  type DesktopCapabilitySnapshot,
-  type DesktopIntegrationStatus
+  type DesktopCapabilitySnapshot
 } from "@pi67/protocol";
 import {
   INTEGRATION_STATE_SCHEMA,
@@ -38,6 +37,10 @@ import {
   type Browser67ProcessRunners
 } from "./browser67-capability-process.js";
 import { verifyBrowser67LiveIdentity } from "./browser67-live-identity-verification.js";
+import {
+  browser67PackageIdentity,
+  readBrowser67IntegrationStatus
+} from "./browser67-integration-status.js";
 import type { DesktopToolchain } from "./desktop-toolchain.js";
 import type { PackageNetworkSettingsStore } from "./package-network-settings.js";
 export interface DesktopCapabilityServiceOptions extends Partial<Browser67ProcessRunners> {
@@ -320,6 +323,11 @@ export class DesktopCapabilityService {
         runReload: this.#runBrowserExtensionReload
       });
       this.#liveIdentityVerified = verification.live.ready;
+      const identity = verification.live.ready
+        ? browser67PackageIdentity(parseBundledCatalog(
+            await readBoundedJson(join(this.#capabilitiesRoot, "catalog.json"))
+          ))
+        : undefined;
       await this.#writeBrowserState({
         schema: INTEGRATION_STATE_SCHEMA,
         dependencyState,
@@ -330,7 +338,10 @@ export class DesktopCapabilityService {
         ...(previous?.registry === undefined ? {} : { registry: previous.registry }),
         ...(previous?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: previous.extensionPreparedAt }),
         checkedAt: now,
-        extensionCheckedAt: now
+        extensionCheckedAt: now,
+        ...(verification.live.ready && identity !== undefined
+          ? { verifiedAt: now, verifiedPackageIdentity: identity }
+          : {})
       });
     } catch (error) {
       this.#liveIdentityVerified = false;
@@ -369,13 +380,13 @@ export class DesktopCapabilityService {
     } catch (error) {
       if (!isNodeError(error, "ENOENT")) {
         return {
-          ...snapshotFromCatalog(catalog, undefined, await this.#browserStatus()),
+          ...snapshotFromCatalog(catalog, undefined, await this.#browserStatus(catalog)),
           phase: "error",
           detail: boundedError(error)
         };
       }
     }
-    const browser = await this.#browserStatus();
+    const browser = await this.#browserStatus(catalog);
     const snapshot = snapshotFromCatalog(catalog, state, browser);
     if (!state) return { ...snapshot, phase: "initializing", detail: "Agent Host 正在准备内置能力。" };
     const allInstalled = snapshot.packages.every((entry) => entry.installed);
@@ -388,49 +399,14 @@ export class DesktopCapabilityService {
     };
   }
 
-  async #browserStatus(): Promise<DesktopIntegrationStatus> {
-    let state: Browser67IntegrationState | undefined;
-    try {
-      state = await this.#browserState.read();
-    } catch (error) {
-      if (!isNodeError(error, "ENOENT")) {
-        return {
-          id: "browser67",
-          displayName: "browser67",
-          bundled: true,
-          dependencyState: "failed",
-          extensionState: "failed",
-          doctorState: "failed",
-          availableBrowsers: this.#availableBrowsers(),
-          detail: boundedError(error)
-        };
-      }
-    }
-    const prepared = browser67DependenciesPrepared(this.#browserPackageRoot());
-    const persistedConnected = state?.extensionState === "connected";
-    const extensionState = persistedConnected && !this.#liveIdentityVerified
-      ? "prepared" as const
-      : state?.extensionState ?? "not-prepared";
-    const doctorState = persistedConnected && !this.#liveIdentityVerified
-      ? "degraded" as const
-      : prepared ? state?.doctorState ?? "not-checked" : "not-checked";
-    return {
-      id: "browser67",
-      displayName: "browser67",
-      bundled: true,
-      dependencyState: prepared ? "prepared" : state?.dependencyState ?? "not-prepared",
-      extensionState,
-      doctorState,
-      availableBrowsers: this.#availableBrowsers(),
-      ...(persistedConnected && !this.#liveIdentityVerified
-        ? { detail: "扩展曾通过身份验证；请运行诊断确认本次应用进程中的真实连接。" }
-        : state?.detail === undefined ? {} : { detail: state.detail }),
-      ...(state?.preparedAt === undefined ? {} : { preparedAt: state.preparedAt }),
-      ...(state?.checkedAt === undefined ? {} : { checkedAt: state.checkedAt }),
-      ...(state?.extensionPreparedAt === undefined ? {} : { extensionPreparedAt: state.extensionPreparedAt }),
-      ...(state?.extensionCheckedAt === undefined ? {} : { extensionCheckedAt: state.extensionCheckedAt }),
-      ...(state?.registry === undefined ? {} : { registry: state.registry })
-    };
+  #browserStatus(catalog?: BundledCapabilityCatalog) {
+    return readBrowser67IntegrationStatus({
+      stateStore: this.#browserState,
+      packageRoot: this.#browserPackageRoot(),
+      ...(catalog === undefined ? {} : { catalog }),
+      liveIdentityVerified: this.#liveIdentityVerified,
+      availableBrowsers: this.#availableBrowsers
+    });
   }
 
   async #readBrowserState(): Promise<Browser67IntegrationState | undefined> {
@@ -454,6 +430,17 @@ export class DesktopCapabilityService {
   }
 
   async #writeBrowserState(state: Browser67IntegrationState): Promise<void> {
-    await this.#browserState.write(state);
+    const previous = await this.#readBrowserState();
+    await this.#browserState.write({
+      ...state,
+      ...(state.verifiedAt !== undefined
+        ? { verifiedAt: state.verifiedAt }
+        : previous?.verifiedAt === undefined ? {} : { verifiedAt: previous.verifiedAt }),
+      ...(state.verifiedPackageIdentity !== undefined
+        ? { verifiedPackageIdentity: state.verifiedPackageIdentity }
+        : previous?.verifiedPackageIdentity === undefined
+          ? {}
+          : { verifiedPackageIdentity: previous.verifiedPackageIdentity })
+    });
   }
 }

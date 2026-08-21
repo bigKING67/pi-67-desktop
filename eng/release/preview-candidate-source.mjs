@@ -33,6 +33,13 @@ export async function verifyPreviewCandidateSource({
   return { mainCommit, sourceCommit, tag, version: packageJson.version };
 }
 
+export function assertCleanPreviewCandidateSource({ root = repositoryRoot } = {}) {
+  const status = git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
+  if (status.length > 0) {
+    throw new Error("R2 publication requires a clean exact-SHA source checkout.");
+  }
+}
+
 function git(cwd, arguments_) {
   return execFileSync("git", arguments_, { cwd, encoding: "utf8" }).trim();
 }
