@@ -1,6 +1,6 @@
 {
   "name": "pi-67-desktop",
-  "version": "0.1.0-alpha.30",
+  "version": "0.1.0-alpha.31",
   "description": "Pi-first desktop client for Windows x64 and macOS Apple Silicon.",
   "author": "bigKING67",
   "private": true,
@@ -89,8 +89,10 @@
     "@pi67/renderer": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
+    "@aws-sdk/client-s3": "3.1115.0",
+    "@aws-sdk/lib-storage": "3.1115.0",
     "@pi67/protocol": "workspace:*",
+    "@playwright/test": "1.61.1",
     "@types/node": "24.10.1",
     "@vitest/coverage-v8": "4.1.10",
     "electron": "43.2.0",

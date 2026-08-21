@@ -1,6 +1,6 @@
 # R2 internal unsigned auto-update
 
-Status: complete locally; unpublished
+Status: Alpha.31 candidate preparation in progress; unpublished
 Owner: Codex
 Started: 2026-08-20
 Last updated: 2026-08-21
@@ -33,11 +33,12 @@ SHA-256, and start the platform update handoff.
 
 ## Delivery boundary
 
-- Local implementation: authorized.
-- Commit: not authorized.
-- Push: not authorized.
-- Candidate build/upload: not authorized in this turn.
-- Tag/release/promotion: not authorized.
+- Alpha.31 source preparation, scoped commit, push, exact candidate builds, and bounded internal
+  distribution: authorized on 2026-08-21.
+- R2 artifact upload and manifest cutover remain conditional on an exact verified bundle,
+  repository-external least-privilege credentials, public readback, and target-platform evidence.
+- Old-version deletion and cache purge remain a separate post-upgrade action.
+- Tag, GitHub Release, signed-channel promotion, and public-store distribution are not authorized.
 
 ## Current evidence
 
@@ -69,6 +70,7 @@ SHA-256, and start the platform update handoff.
 | Use a fixed JSON manifest plus exact SHA-256/size verification. | Works for R2 and both current artifact types without a publishing service. | A signed manifest or updater framework replaces this trust model. |
 | Treat macOS as a custom internal updater, not electron-updater. | Official electron-updater rejects unsigned macOS updates. | Developer ID signing becomes available. |
 | Upload immutable artifacts before mutable metadata. | Prevents clients from caching a metadata reference to a missing artifact. | Never; this is the publication invariant. |
+| Use R2's S3-compatible API for object operations and multipart uploads. | Current macOS artifacts exceed the Cloudflare REST object endpoint's 300 MB limit; the S3 transport streams and resumes large transfers without changing artifact identity. | A reviewed Workers-based publisher provides the same ordering, integrity, and abort guarantees. |
 
 ## Checkpoints
 
@@ -131,15 +133,21 @@ SHA-256, and start the platform update handoff.
 - 2026-08-21: Hardened concurrent update checks, rejected unsafe update directories and local
   symlink artifacts, and made Cloudflare publication fail closed on unsuccessful JSON envelopes,
   manifest redirects, or public URL drift. The complete source gate now passes without exceptions.
+- 2026-08-21: Live public probing still returned HTTP 404 for the fixed manifest, confirming that no
+  R2 version is currently discoverable. Replaced the 300 MB-limited Cloudflare REST object path with
+  the official S3-compatible API and multipart-capable streaming uploads; targeted release tests pass
+  16/16. Alpha.31 remains unpublished pending exact candidates, target-platform evidence, and
+  repository-external R2 credentials.
 
 ## Closeout
 
-- Base source SHA: `96d2078c4bc5ab6a7301f6733db43375e4afe061`; implementation remains uncommitted in a dirty tree
-- Changed files: Desktop update controller/validator/downloader/installers, narrow IPC/Preload bridge,
-  Renderer projection/dialog/settings, release preparation, candidate/smoke contracts, tests, and docs
-- Validation completed: targeted and full tests, typecheck, lint, build, Chromium update interaction,
-  architecture, transport, dependency, dead-code, protocol revision, and macOS packaged smoke
-- Validation not completed: Windows/macOS target-machine upgrade, formal publication
-- Remaining risks: unsigned publisher trust, Cloudflare/build-authority compromise, target-OS lifecycle,
-  later macOS startup failure after `open`, and unmeasured mainland carrier throughput
-- Commit/push/release state: none authorized
+- Bootstrap source SHA: `6e1c2e6db0399f6a3696d2c5d0407d1dd1fe7cf8` (`0.1.0-alpha.30`).
+- Alpha.31 source identity: assigned by the scoped candidate commit that contains the version bump
+  and S3 multipart publisher; candidate and public artifact identities must bind to that exact SHA.
+- Validation completed for current Alpha.31 source: targeted R2 tests 16/16, full source gate 581
+  files and 2,999 passing tests plus 3 skipped, dependency audit, typecheck, lint, architecture,
+  transport, workflow, structure, and production build.
+- Validation not completed: Alpha.31 exact packaging, Windows/manual candidate test, installed
+  Alpha.30-to-Alpha.31 Windows/macOS upgrade, R2 publication, carrier throughput, or cleanup.
+- Remaining risks: unsigned publisher trust, Cloudflare/build-authority compromise, target-OS
+  lifecycle, later macOS startup failure after `open`, and unmeasured mainland carrier throughput.

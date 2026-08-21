@@ -1,61 +1,87 @@
+import {
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  S3Client
+} from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 
 export function createCloudflareR2Client({
   accountId,
-  apiToken,
+  accessKeyId,
+  secretAccessKey,
   bucketName,
+  apiToken,
   zoneId,
-  fetchImpl = fetch
+  fetchImpl = fetch,
+  s3Client,
+  createUpload = (options) => new Upload(options),
+  statImpl = stat,
+  createReadStreamImpl = createReadStream
 }) {
-  const bucketUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/r2/buckets/${encodeURIComponent(bucketName)}/objects`;
-  const authorizedHeaders = { Authorization: `Bearer ${apiToken}` };
+  const objectClient = s3Client ?? new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey }
+  });
 
   return {
     async listObjects() {
       const objects = [];
-      let cursor;
+      let continuationToken;
       do {
-        const url = new URL(bucketUrl);
-        url.searchParams.set("per_page", "1000");
-        if (cursor) url.searchParams.set("cursor", cursor);
-        const payload = await cloudflareEnvelope(fetchImpl, url, { headers: authorizedHeaders });
-        const page = payload.result;
-        if (!Array.isArray(page)) throw new Error("Cloudflare R2 object list returned an invalid page.");
-        objects.push(...page.map((entry) => ({ key: entry.key, size: Number(entry.size) })));
-        cursor = payload.result_info?.is_truncated ? payload.result_info.cursor : undefined;
-      } while (cursor);
+        const page = await objectClient.send(new ListObjectsV2Command({
+          Bucket: bucketName,
+          MaxKeys: 1000,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {})
+        }));
+        if (!Array.isArray(page.Contents)) {
+          if (page.Contents !== undefined) throw new Error("Cloudflare R2 object list returned an invalid page.");
+        } else {
+          for (const entry of page.Contents) {
+            if (typeof entry.Key !== "string" || entry.Key.length === 0 || !Number.isSafeInteger(entry.Size)) {
+              throw new Error("Cloudflare R2 object list returned invalid object metadata.");
+            }
+            objects.push({ key: entry.Key, size: entry.Size });
+          }
+        }
+        if (page.IsTruncated && !page.NextContinuationToken) {
+          throw new Error("Cloudflare R2 object list omitted its continuation token.");
+        }
+        continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (continuationToken);
       return objects;
     },
 
     async putFile(key, path, contentType) {
-      const metadata = await stat(path);
-      if (metadata.size > 300_000_000) {
-        throw new Error(`${key}: Cloudflare REST object upload limit is 300 MB.`);
-      }
-      await cloudflareEnvelope(fetchImpl, `${bucketUrl}/${encodeURIComponent(key)}`, {
-        method: "PUT",
-        headers: {
-          ...authorizedHeaders,
-          "Content-Length": String(metadata.size),
-          "Content-Type": contentType
+      const metadata = await statImpl(path);
+      const upload = createUpload({
+        client: objectClient,
+        params: {
+          Bucket: bucketName,
+          Key: key,
+          Body: createReadStreamImpl(path),
+          ContentLength: metadata.size,
+          ContentType: contentType
         },
-        body: createReadStream(path),
-        duplex: "half"
+        queueSize: 4,
+        partSize: 16 * 1024 * 1024,
+        leavePartsOnError: false
       });
+      await upload.done();
     },
 
     async deleteObject(key) {
-      await cloudflareEnvelope(fetchImpl, `${bucketUrl}/${encodeURIComponent(key)}`, {
-        method: "DELETE",
-        headers: authorizedHeaders
-      });
+      await objectClient.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
     },
 
     async purgeExactUrls(urls) {
       if (urls.length === 0) return;
       if (!zoneId) throw new Error("PI67_CLOUDFLARE_ZONE_ID is required for exact cache purge.");
+      if (!apiToken) throw new Error("PI67_CLOUDFLARE_API_TOKEN is required for exact cache purge.");
+      const authorizedHeaders = { Authorization: `Bearer ${apiToken}` };
       for (let offset = 0; offset < urls.length; offset += 30) {
         await cloudflareEnvelope(
           fetchImpl,

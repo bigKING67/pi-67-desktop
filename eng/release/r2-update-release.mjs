@@ -111,7 +111,7 @@ async function main() {
     throw new Error(`--confirm-version must exactly match package version ${version}.`);
   }
 
-  const client = createClientFromEnvironment(command === "cleanup");
+  const client = createClientFromEnvironment(command);
   if (command === "cleanup") {
     const receipt = await cleanupR2Release({
       client,
@@ -144,12 +144,22 @@ async function main() {
   printJson(result);
 }
 
-function createClientFromEnvironment(requireZone) {
+function createClientFromEnvironment(command) {
   const accountId = requiredEnvironment("PI67_R2_ACCOUNT_ID");
-  const apiToken = requiredEnvironment("PI67_R2_API_TOKEN");
+  const accessKeyId = requiredEnvironment("PI67_R2_ACCESS_KEY_ID");
+  const secretAccessKey = requiredEnvironment("PI67_R2_SECRET_ACCESS_KEY");
   const bucketName = process.env.PI67_R2_BUCKET_NAME ?? "pi67-desktop-updates";
-  const zoneId = requireZone ? requiredEnvironment("PI67_CLOUDFLARE_ZONE_ID") : process.env.PI67_CLOUDFLARE_ZONE_ID;
-  return createCloudflareR2Client({ accountId, apiToken, bucketName, zoneId });
+  const cleanup = command === "cleanup";
+  const apiToken = cleanup ? requiredEnvironment("PI67_CLOUDFLARE_API_TOKEN") : undefined;
+  const zoneId = cleanup ? requiredEnvironment("PI67_CLOUDFLARE_ZONE_ID") : undefined;
+  return createCloudflareR2Client({
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucketName,
+    apiToken,
+    zoneId
+  });
 }
 
 function requiredEnvironment(name) {

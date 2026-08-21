@@ -68,11 +68,12 @@ upload order with `unsigned-preview-manifest.json` last.
 
 ## Read-only publication plan
 
-Before any write, configure a least-privilege Cloudflare API token outside the repository and run:
+Before any write, configure least-privilege R2 S3 credentials outside the repository and run:
 
 ```bash
 PI67_R2_ACCOUNT_ID=... \
-PI67_R2_API_TOKEN=... \
+PI67_R2_ACCESS_KEY_ID=... \
+PI67_R2_SECRET_ACCESS_KEY=... \
 corepack pnpm run release:r2:plan
 ```
 
@@ -109,7 +110,8 @@ After current authorization for the exact package version, publication is invoke
 
 ```bash
 PI67_R2_ACCOUNT_ID=... \
-PI67_R2_API_TOKEN=... \
+PI67_R2_ACCESS_KEY_ID=... \
+PI67_R2_SECRET_ACCESS_KEY=... \
 corepack pnpm run release:r2:publish -- \
   --confirm-version <version> \
   --source-commit <40-char-source-sha>
@@ -120,10 +122,12 @@ reachable from `origin/main`, or a source SHA that differs from the candidate id
 the local R2 bundle. `--bundle` can select another verified local bundle; unknown or duplicate
 flags fail closed.
 
-The Cloudflare REST object upload endpoint has a 300 MB per-object limit. The command fails before
-uploading an artifact that exceeds that boundary; such a candidate must move to a separately
-reviewed multipart/S3 transport instead of silently changing the release path. Successful publish
-writes a credential-free receipt under ignored `artifacts/r2-release-receipts/`.
+The release tool uses Cloudflare R2's S3-compatible API for object listing, uploads, and deletion.
+Uploads stream from disk; the AWS high-level uploader automatically uses multipart transfer for
+large DMG/ZIP artifacts, aborts incomplete parts on failure, and never buffers a complete installer
+in memory. The Cloudflare REST API is used only for the separately authorized exact cache purge.
+Successful publish writes a credential-free receipt under ignored
+`artifacts/r2-release-receipts/`.
 
 Uploading metadata first is forbidden because clients could retain a reference to a missing
 artifact. The JSON/YML/SIG cache rule bypasses edge caching for the mutable manifest; immutable
@@ -185,7 +189,9 @@ With separate deletion/cache-purge authorization, run:
 
 ```bash
 PI67_R2_ACCOUNT_ID=... \
-PI67_R2_API_TOKEN=... \
+PI67_R2_ACCESS_KEY_ID=... \
+PI67_R2_SECRET_ACCESS_KEY=... \
+PI67_CLOUDFLARE_API_TOKEN=... \
 PI67_CLOUDFLARE_ZONE_ID=... \
 corepack pnpm run release:r2:cleanup -- \
   --confirm-version <version> \
