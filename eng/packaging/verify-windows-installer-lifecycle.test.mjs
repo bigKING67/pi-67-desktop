@@ -30,7 +30,9 @@ import {
   resolveUpgradeBaselineInstaller,
   resolveWindowsInstallerLifecycleContract,
   resolveWindowsInstallerPath,
+  waitForInstallationRemoval,
   waitForPathState,
+  WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
 } from "./verify-windows-installer-lifecycle.mjs";
 
@@ -100,6 +102,23 @@ describe("Windows installer lifecycle contract", () => {
 
   it("keeps enough process-timeout margin for variable GitHub Windows installer performance", () => {
     expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(240_000);
+  });
+
+  it("allows bounded time for deferred NSIS self-cleanup", async () => {
+    expect(WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS).toBe(90_000);
+    const root = await createTemporaryDirectory();
+    const installDirectory = join(root, "Pi-67 Desktop");
+    await mkdir(installDirectory, { recursive: true });
+    await writeFile(join(installDirectory, "Uninstall Pi-67 Desktop.exe"), "pending");
+    const cleanup = setTimeout(() => {
+      void rm(installDirectory, { recursive: true, force: true });
+    }, 75);
+
+    try {
+      await waitForInstallationRemoval(installDirectory, 1_000);
+    } finally {
+      clearTimeout(cleanup);
+    }
   });
 
   it("aligns installed runtime readiness with the replay-safe control mutation timeout", () => {

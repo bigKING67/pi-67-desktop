@@ -66,6 +66,8 @@ export {
 } from "./windows-installer-lifecycle-contract.mjs";
 export {
   buildNsisInstallArguments,
+  waitForInstallationRemoval,
+  WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   waitForPathState
 } from "./windows-installer-process.mjs";
 const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");

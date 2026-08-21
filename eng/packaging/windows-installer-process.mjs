@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS } from "./windows-installer-lifecycle-contract.mjs";
 
 const FILE_STATE_TIMEOUT_MS = 30_000;
+export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
 
 export function buildNsisInstallArguments(installDirectory) {
   if (typeof installDirectory !== "string" || installDirectory.length === 0) {
@@ -78,8 +79,11 @@ export async function waitForPathState(path, shouldExist, timeoutMs = FILE_STATE
   throw new Error(`Timed out waiting for ${path} to become ${shouldExist ? "present" : "absent"}.`);
 }
 
-export async function waitForInstallationRemoval(installDirectory) {
-  const deadline = Date.now() + FILE_STATE_TIMEOUT_MS;
+export async function waitForInstallationRemoval(
+  installDirectory,
+  timeoutMs = WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS
+) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (!(await pathExists(installDirectory))) return;
     const remaining = await readdir(installDirectory).catch(() => []);
