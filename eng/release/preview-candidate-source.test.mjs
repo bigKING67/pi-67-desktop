@@ -3,7 +3,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { verifyPreviewCandidateSource } from "./preview-candidate-source.mjs";
+import {
+  verifyPreviewCandidateSource,
+  verifyR2PublicationSource
+} from "./preview-candidate-source.mjs";
 
 const temporaryDirectories = [];
 
@@ -36,6 +39,29 @@ describe("preview candidate source", () => {
       root: fixture.root,
       sourceCommit: "main"
     })).rejects.toThrow("full lowercase Git commit SHA");
+  });
+
+  it("allows clean main release tooling to publish an exact ancestor candidate", async () => {
+    const fixture = await gitFixture();
+    git(fixture.root, ["checkout", "main"]);
+    const result = await verifyR2PublicationSource({
+      root: fixture.root,
+      sourceCommit: fixture.candidate
+    });
+    expect(result).toMatchObject({
+      mainCommit: fixture.main,
+      releaseToolCommit: fixture.main,
+      sourceCommit: fixture.candidate,
+      version: "0.1.0-alpha.10"
+    });
+  });
+
+  it("rejects release tooling that is not the current origin/main authority", async () => {
+    const fixture = await gitFixture();
+    await expect(verifyR2PublicationSource({
+      root: fixture.root,
+      sourceCommit: fixture.candidate
+    })).rejects.toThrow("does not match origin/main");
   });
 });
 

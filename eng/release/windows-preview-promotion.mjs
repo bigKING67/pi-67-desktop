@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { verifyWindowsPreviewCandidateFiles } from "./windows-preview-candidate.mjs";
 
 export const WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA = "pi67.windows-preview-manual-test.v1";
+export const WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA = "pi67.windows-preview-manual-test.v2";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const MAX_METADATA_BYTES = 1024 * 1024;
@@ -34,7 +35,7 @@ export async function verifyWindowsPreviewPromotion({
     packagedExecutablePath
   });
   const run = await readBoundedJson(candidateRunMetadataPath, "candidate workflow metadata");
-  assertCandidateRun(run, { candidateRunAttempt, candidateRunId, repository });
+  assertWindowsPreviewCandidateRun(run, { candidateRunAttempt, candidateRunId, repository });
   const receipt = {
     schema: WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA,
     status: "passed",
@@ -63,9 +64,61 @@ export async function verifyWindowsPreviewPromotion({
   return { candidate, receipt };
 }
 
+export async function recordWindowsPreviewManualTest({
+  actor,
+  candidateIdentityPath,
+  candidateRunAttempt,
+  candidateRunId,
+  candidateRunMetadataPath,
+  installerPath,
+  outputPath,
+  packagedExecutablePath,
+  repository,
+  sourceCommit
+}) {
+  const candidate = await verifyWindowsPreviewCandidateFiles({
+    candidateIdentityPath,
+    expectedRepository: repository,
+    expectedRunAttempt: candidateRunAttempt,
+    expectedRunId: candidateRunId,
+    expectedSourceCommit: sourceCommit,
+    installerPath,
+    packagedExecutablePath
+  });
+  const run = await readBoundedJson(candidateRunMetadataPath, "candidate workflow metadata");
+  assertWindowsPreviewCandidateRun(run, { candidateRunAttempt, candidateRunId, repository });
+  const receipt = {
+    schema: WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
+    status: "passed",
+    evidenceLevel: "manual-windows-x64-test-confirmed",
+    repository,
+    source: { commit: sourceCommit },
+    candidate: {
+      identitySha256: candidate.identitySha256,
+      runId: candidateRunId,
+      runAttempt: candidateRunAttempt,
+      installerSha256: candidate.identity.installer.sha256,
+      packagedExecutableSha256: candidate.identity.packagedExecutable.sha256
+    },
+    attestation: { actor, channel: "operator-confirmed" }
+  };
+  assertWindowsPreviewManualTestReceipt(receipt, {
+    candidateIdentitySha256: candidate.identitySha256,
+    candidateRunAttempt,
+    candidateRunId,
+    repository,
+    sourceCommit
+  });
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  return { candidate, receipt };
+}
+
 export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
   const failures = [];
-  if (value?.schema !== WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA
+  const isPromotionReceipt = value?.schema === WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA;
+  const isOperatorReceipt = value?.schema === WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA;
+  if ((!isPromotionReceipt && !isOperatorReceipt)
     || value?.status !== "passed"
     || value?.evidenceLevel !== "manual-windows-x64-test-confirmed") {
     failures.push("invalid manual test status");
@@ -74,11 +127,22 @@ export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
   if (!FULL_COMMIT.test(value?.source?.commit ?? "")) failures.push("invalid source commit");
   for (const [label, field] of [
     ["candidate run ID", value?.candidate?.runId],
-    ["candidate run attempt", value?.candidate?.runAttempt],
-    ["promotion run ID", value?.promotion?.runId],
-    ["promotion run attempt", value?.promotion?.runAttempt]
+    ["candidate run attempt", value?.candidate?.runAttempt]
   ]) {
     if (!POSITIVE_INTEGER.test(field ?? "")) failures.push(`invalid ${label}`);
+  }
+  if (isPromotionReceipt) {
+    for (const [label, field] of [
+      ["promotion run ID", value?.promotion?.runId],
+      ["promotion run attempt", value?.promotion?.runAttempt]
+    ]) {
+      if (!POSITIVE_INTEGER.test(field ?? "")) failures.push(`invalid ${label}`);
+    }
+  } else if (isOperatorReceipt) {
+    if (value?.attestation?.channel !== "operator-confirmed") {
+      failures.push("invalid operator attestation channel");
+    }
+    if (value?.promotion !== undefined) failures.push("operator receipt must not claim a promotion run");
   }
   for (const [label, field] of [
     ["candidate identity", value?.candidate?.identitySha256],
@@ -110,7 +174,7 @@ export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
   return value;
 }
 
-function assertCandidateRun(run, expected) {
+export function assertWindowsPreviewCandidateRun(run, expected) {
   const failures = [];
   if (String(run?.id) !== expected.candidateRunId) failures.push("run ID mismatch");
   if (String(run?.run_attempt) !== expected.candidateRunAttempt) failures.push("run attempt mismatch");

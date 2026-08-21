@@ -37,8 +37,34 @@ bytes. `unsigned-preview-manifest.json` is the only mutable publication pointer.
 ## Prepare locally
 
 The normal candidate gates still apply. After the exact Windows and macOS artifacts for one source
-SHA have been built and tested, prepare the existing unsigned-preview manifest and then the R2
-allowlist bundle:
+SHA have been built and tested, bind the operator's Windows x64 acceptance to the exact successful
+candidate run and bytes. Fetch the bounded workflow metadata into ignored release output, then
+record the receipt without creating or claiming a GitHub promotion run:
+
+```bash
+gh api repos/bigKING67/pi-67-desktop/actions/runs/<candidate-run-id> \
+  > artifacts/release/windows-candidate-run.json
+
+corepack pnpm run release:r2:windows-test:record -- \
+  --actor <attesting-operator> \
+  --candidate-identity artifacts/release/windows-preview-candidate-identity.json \
+  --candidate-run-id <candidate-run-id> \
+  --candidate-run-attempt <candidate-run-attempt> \
+  --candidate-run-metadata artifacts/release/windows-candidate-run.json \
+  --installer artifacts/release/Pi-67-Desktop-<version>-win-x64.exe \
+  --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' \
+  --repository bigKING67/pi-67-desktop \
+  --source-commit <40-char-source-sha> \
+  --output artifacts/release/windows-preview-manual-test.json
+```
+
+The command verifies the candidate identity, workflow name/status/repository/run, source SHA,
+installer SHA-256, and packaged executable SHA-256 before writing the credential-free receipt. It
+does not treat a hosted workflow as the manual test, publish anything, create a Tag/Release, or
+invent a promotion run. The current operator must run it only after receiving the exact Windows
+test confirmation.
+
+Then prepare the existing unsigned-preview manifest and R2 allowlist bundle:
 
 ```bash
 corepack pnpm run release:preview:prepare
@@ -117,10 +143,13 @@ corepack pnpm run release:r2:publish -- \
   --source-commit <40-char-source-sha>
 ```
 
-Publish refuses a dirty source checkout, a SHA that is not the current `HEAD`, a SHA that is not
-reachable from `origin/main`, or a source SHA that differs from the candidate identity retained in
-the local R2 bundle. `--bundle` can select another verified local bundle; unknown or duplicate
-flags fail closed.
+Publish refuses a dirty release-tooling checkout, a release-tooling `HEAD` that is not exactly
+`origin/main`, an artifact source SHA that is not an ancestor of that tooling commit, or a source SHA
+that differs from the candidate identity retained in the local R2 bundle. The candidate identity,
+manual-test receipt, installer bytes, package version, and manifest remain bound to the artifact
+source SHA; the publication receipt separately records the later release-tooling commit. This
+allows a release-only tooling fix without rebuilding different application bytes under the same
+version. `--bundle` can select another verified local bundle; unknown or duplicate flags fail closed.
 
 The release tool uses Cloudflare R2's S3-compatible API for object listing, uploads, and deletion.
 Uploads stream from disk; the AWS high-level uploader automatically uses multipart transfer for

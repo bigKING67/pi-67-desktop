@@ -5,7 +5,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { prepareUnsignedPreviewBundle, unsignedPreviewBundleFiles } from "./prepare-unsigned-preview-bundle.mjs";
 import { prepareUnsignedPreview } from "./unsigned-preview-artifacts.mjs";
 import { createWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
-import { verifyWindowsPreviewPromotion } from "./windows-preview-promotion.mjs";
+import { parseWindowsPreviewManualTestArguments } from "./windows-preview-manual-test.mjs";
+import {
+  WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
+  recordWindowsPreviewManualTest,
+  verifyWindowsPreviewPromotion
+} from "./windows-preview-promotion.mjs";
 
 const temporaryDirectories = [];
 
@@ -14,6 +19,13 @@ afterEach(async () => {
 });
 
 describe("Windows preview promotion", () => {
+  it("accepts the pnpm argument separator only at the CLI boundary", () => {
+    expect(parseWindowsPreviewManualTestArguments(["--", "--actor", "bigKING67"]).get("--actor"))
+      .toBe("bigKING67");
+    expect(() => parseWindowsPreviewManualTestArguments(["--actor", "bigKING67", "--"]))
+      .toThrow("arguments are incomplete");
+  });
+
   it("binds manual confirmation to a successful candidate run and prepares an exact bundle", async () => {
     const fixture = await promotionFixture();
     const result = await verifyWindowsPreviewPromotion(fixture.promotionOptions);
@@ -60,6 +72,40 @@ describe("Windows preview promotion", () => {
       runtimeVersion: "0.81.1",
       version: fixture.version
     })).rejects.toThrow("Unsigned preview Windows installer bytes do not match");
+  });
+
+  it("records an operator-confirmed receipt without inventing a promotion run", async () => {
+    const fixture = await promotionFixture();
+    const result = await recordWindowsPreviewManualTest({
+      actor: fixture.promotionOptions.actor,
+      candidateIdentityPath: fixture.promotionOptions.candidateIdentityPath,
+      candidateRunAttempt: fixture.promotionOptions.candidateRunAttempt,
+      candidateRunId: fixture.promotionOptions.candidateRunId,
+      candidateRunMetadataPath: fixture.promotionOptions.candidateRunMetadataPath,
+      installerPath: fixture.promotionOptions.installerPath,
+      outputPath: fixture.promotionOptions.outputPath,
+      packagedExecutablePath: fixture.promotionOptions.packagedExecutablePath,
+      repository: fixture.promotionOptions.repository,
+      sourceCommit: fixture.promotionOptions.sourceCommit
+    });
+    expect(result.receipt).toMatchObject({
+      schema: WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
+      status: "passed",
+      evidenceLevel: "manual-windows-x64-test-confirmed",
+      candidate: { runId: "42", runAttempt: "2" },
+      attestation: { actor: "bigKING67", channel: "operator-confirmed" }
+    });
+    expect(result.receipt).not.toHaveProperty("promotion");
+
+    await prepareUnsignedPreview(fixture.releaseRoot, fixture.version, "0.81.1");
+    const outputRoot = join(fixture.root, "operator-bundle");
+    await prepareUnsignedPreviewBundle({
+      outputRoot,
+      releaseRoot: fixture.releaseRoot,
+      runtimeVersion: "0.81.1",
+      version: fixture.version
+    });
+    expect((await readdir(outputRoot)).sort()).toEqual(unsignedPreviewBundleFiles(fixture.version).sort());
   });
 });
 

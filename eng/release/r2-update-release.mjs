@@ -18,7 +18,7 @@ import {
 import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 import {
   assertCleanPreviewCandidateSource,
-  verifyPreviewCandidateSource
+  verifyR2PublicationSource
 } from "./preview-candidate-source.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -124,18 +124,25 @@ async function main() {
     return;
   }
 
-  const release = await loadLocalR2Release({
+  let release = await loadLocalR2Release({
     directory: flags.get("bundle") ?? defaultBundleDirectory,
     version,
     runtimeVersion
   });
   if (command === "publish") {
     const sourceCommit = flags.get("source-commit");
-    await verifyPreviewCandidateSource({ root, sourceCommit });
+    const authority = await verifyR2PublicationSource({ root, sourceCommit });
     assertCleanPreviewCandidateSource({ root });
     if (release.provenance.sourceCommit !== sourceCommit) {
       throw new Error("R2 bundle source commit does not match --source-commit.");
     }
+    release = {
+      ...release,
+      provenance: {
+        ...release.provenance,
+        releaseToolCommit: authority.releaseToolCommit
+      }
+    };
   }
   const result = command === "plan"
     ? await planR2Release({ release, client })

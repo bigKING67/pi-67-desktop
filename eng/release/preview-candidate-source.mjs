@@ -33,6 +33,37 @@ export async function verifyPreviewCandidateSource({
   return { mainCommit, sourceCommit, tag, version: packageJson.version };
 }
 
+export async function verifyR2PublicationSource({
+  mainReference = "origin/main",
+  root = repositoryRoot,
+  sourceCommit
+}) {
+  if (!FULL_COMMIT.test(sourceCommit ?? "")) {
+    throw new Error("R2 artifact source must be a full lowercase Git commit SHA.");
+  }
+  const releaseToolCommit = git(root, ["rev-parse", "HEAD"]);
+  const mainCommit = git(root, ["rev-parse", mainReference]);
+  if (releaseToolCommit !== mainCommit) {
+    throw new Error(`R2 release tooling checkout ${releaseToolCommit} does not match ${mainReference} ${mainCommit}.`);
+  }
+  const ancestor = spawnSync("git", ["merge-base", "--is-ancestor", sourceCommit, releaseToolCommit], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  if (ancestor.error) throw ancestor.error;
+  if (ancestor.status !== 0) {
+    throw new Error(`R2 artifact source ${sourceCommit} is not an ancestor of release tooling ${releaseToolCommit}.`);
+  }
+  const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+  return {
+    mainCommit,
+    releaseToolCommit,
+    sourceCommit,
+    tag: expectedVersionTag(packageJson.version),
+    version: packageJson.version
+  };
+}
+
 export function assertCleanPreviewCandidateSource({ root = repositoryRoot } = {}) {
   const status = git(root, ["status", "--porcelain=v1", "--untracked-files=all"]);
   if (status.length > 0) {
