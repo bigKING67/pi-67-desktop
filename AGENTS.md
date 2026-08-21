@@ -13,6 +13,24 @@
   runtime lifecycle, recovery, tests, and engineering quality. Neither is a
   merge upstream or overrides Pi-67 product and security contracts.
 
+## Harness contract
+
+- Treat Pi as the only harness and agentic-loop authority. Use supported Pi SDK,
+  ResourceLoader, Extension, Tool, and Provider seams; do not introduce a second
+  prompt composer, agent loop, Tool orchestrator, model router, or Session truth.
+- Keep Desktop-added system context bounded, purpose-specific, reviewable, and
+  injected through supported Pi seams. Preserve Pi resource precedence and
+  user-owned `SYSTEM.md`, `APPEND_SYSTEM.md`, `AGENTS.md`, Skills, and Prompts.
+- The model chooses when and how to request an available Tool. Desktop owns exact
+  Tool identity/schema exposure, authorization, execution lifecycle,
+  cancellation/recovery, and truthful Tool Result projection. Safety modes and
+  Plan constraints restrict availability or execution; they do not create a
+  second workflow planner.
+- Keep the selected model, Provider, and protocol explicit and stable for a Turn.
+  Do not silently switch or retry through another model, Provider, protocol,
+  Extension, MCP service, search path, or runtime unless a narrower product
+  contract explicitly requires and exposes that behavior.
+
 ## Platform and runtime
 
 - Release only Windows x64 NSIS and macOS arm64 DMG/ZIP artifacts.

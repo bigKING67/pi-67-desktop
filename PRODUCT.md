@@ -31,6 +31,22 @@ a provider marketplace, an RPC wrapper, or a full IDE. It favors truthful
 state, fast interaction, safe recovery, and Pi compatibility over feature
 count.
 
+## Harness principles
+
+Pi-67 Desktop is the graphical interaction, control, observation, safety, and
+recovery surface for the user-owned Pi harness; it is not a second harness.
+Pi's ResourceLoader and runtime contracts own instruction composition, the
+agentic loop, Tool semantics, model/Provider translation, and Pi JSONL Session
+truth. Desktop integrates through supported Pi seams and makes that runtime
+configurable, inspectable, interruptible, and recoverable across processes
+without replacing its source of truth.
+
+The canonical Pi Agent Profile, user resources, Provider/model choices,
+Extensions, Skills, Prompts, and JSONL Sessions remain user-owned and
+interoperable with Pi TUI. Local-first ownership does not imply offline
+inference: Provider and Tool network effects remain explicit and governed by
+the selected trust and approval contract.
+
 ## Reference policy
 
 Pi-67 only follows `pi-gui` and `t3code` as comprehensive implementation
