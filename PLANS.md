@@ -105,7 +105,18 @@ Last updated: YYYY-MM-DD
 
 ## Trellis boundary
 
-Do not introduce Trellis for the current solo-developer, main-plus-one-task-
-worktree workflow. Re-evaluate only when multiple persistent owners and parallel
-workstreams need durable dependency, ownership, blocked-state, and priority
-coordination that this plan format and handoffs cannot provide.
+Pi-67 uses Trellis for local development coordination and sequential handoff,
+not as a product/runtime/session/release source of truth:
+
+- L0 stays direct; L1/L2 use a task by default under the project's standing
+  authorization.
+- The current CLI or its native sub-agents implement by default. L2 adds one
+  cross-provider Channel check worker; Channel implementation is explicit-only.
+- A task's `design.md` and `implement.md` are the active L2 execution plan and
+  follow this document's required sections. Do not maintain a duplicate active
+  plan elsewhere.
+- Durable Relay Channels contain bounded handoff metadata. Ephemeral Worker
+  Channels contain one implementation/check run. Neither overrides Git, task
+  artifacts, live evidence, or the canonical root checkout.
+- Switching Codex, Claude Code, Pi, or Grok is sequential. At most one platform
+  main session owns edits, and at most one Channel worker may be live.

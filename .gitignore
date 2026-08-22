@@ -22,5 +22,9 @@ test-results/
 !eng/packaging/pi-icon-sources/png/*.png
 !apps/renderer/src/assets/pi-icon-64.png
 
+# Claude Code local permission state is machine-local and never committed
+# (project-local bypassPermissions must not leak into the repository).
+.claude/settings.local.json
+
 # Team Tavily Bridge client token is injected at package time (never commit).
 apps/desktop/resources/team-mcp/tavily-bridge.token

@@ -11,11 +11,11 @@ export function classifyChangedPaths(paths) {
   const changedPaths = [...new Set(paths.map(normalizeRepoPath).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right));
   if (changedPaths.length === 0) return fullValidation("empty-diff", changedPaths);
-  if (changedPaths.every(isDocumentationPath)) {
+  if (changedPaths.every((path) => isDocumentationPath(path) && !isDeveloperWorkflowPath(path))) {
     return scopeResult("docs-only", changedPaths, false, false, false, false, "none");
   }
 
-  const productPaths = changedPaths.filter((path) => !isDocumentationPath(path));
+  const productPaths = changedPaths.filter((path) => !isDocumentationPath(path) || isDeveloperWorkflowPath(path));
   if (productPaths.every(isQualityOnlyPath)) {
     return scopeResult("quality-only", changedPaths, true, false, false, false, "none");
   }
@@ -68,7 +68,20 @@ function isDocumentationPath(path) {
 
 function isQualityOnlyPath(path) {
   return /^tests\/e2e\/renderer(?:-[a-z-]+)?\.spec\.ts$/u.test(path)
-    || isRendererBrowserSupportPath(path);
+    || isRendererBrowserSupportPath(path)
+    || isDeveloperWorkflowPath(path);
+}
+
+function isDeveloperWorkflowPath(path) {
+  return path === "AGENTS.md"
+    || path === "PLANS.md"
+    || path === "eng/quality/check-trellis-integration.mjs"
+    || path.startsWith(".agents/")
+    || path.startsWith(".claude/")
+    || path.startsWith(".codex/")
+    || path.startsWith(".grok/")
+    || path.startsWith(".pi/")
+    || path.startsWith(".trellis/");
 }
 
 function isWindowsOnlyPath(path) {

@@ -1,0 +1,5 @@
+{"file":"AGENTS.md","reason":"Verify final workflow preserves repository authority, security and dirty-worktree contracts."}
+{"file":"PLANS.md","reason":"Verify the final plan hierarchy has one task execution source rather than duplicate plans."}
+{"file":".trellis/tasks/08-22-review-trellis-multi-agent-flow/research/codex-review.md","reason":"Re-check every confirmed blocker and host-runtime evidence gap."}
+{"file":".agents/skills/trellis-channel/references/command-reference.md","reason":"Verify commands use supported Trellis 0.6.15 flags and terminal events."}
+{"file":".agents/skills/trellis-meta/references/local-architecture/multi-agent-channel.md","reason":"Verify Worker ownership, task boundaries and Channel storage rules."}

@@ -1,0 +1,5 @@
+{"file":"AGENTS.md","reason":"Repository authority, security, Git, worktree, runtime and validation contracts."}
+{"file":"PLANS.md","reason":"Execution-plan authority and current Trellis prohibition that must be reconciled."}
+{"file":".trellis/tasks/08-22-review-trellis-multi-agent-flow/research/codex-review.md","reason":"Verified current capabilities, blockers and platform limitations."}
+{"file":".agents/skills/trellis-meta/references/local-architecture/multi-agent-channel.md","reason":"Installed Trellis 0.6.15 Channel architecture and customization boundary."}
+{"file":".agents/skills/trellis-channel/references/command-reference.md","reason":"Authoritative installed CLI event and command contract."}

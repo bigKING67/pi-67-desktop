@@ -74,16 +74,30 @@
   clean up its temporary branch after reachability verification, and confirm
   that only the canonical root checkout remains.
 
-## Execution plans
+## Execution plans and Trellis development workflow
 
-- Use `PLANS.md` for L2 work that spans modules, sessions, migrations, recovery,
-  or candidate/release checkpoints. Do not create a plan artifact for routine L0
-  or L1 work.
-- Execution plans are temporary coordination and evidence artifacts, not a second
-  product, architecture, runtime, session, or release source of truth.
-- Trellis is not part of the current solo-developer workflow. Reconsider it only
-  when sustained multi-owner work requires dependency, ownership, and priority
-  state that Git, `PLANS.md`, and handoffs cannot represent reliably.
+- L0 work stays direct and does not create a Trellis task. L1 and L2 work use a
+  Trellis task by default so another local AI CLI can recover the exact task,
+  artifacts, Git state, and next action when quota or output quality requires a
+  sequential handoff.
+- Implementation is native-first: the current CLI or that platform's native
+  sub-agents own implementation. A Channel implement worker is allowed only
+  when the user explicitly requests it.
+- L2 tasks default to one cross-provider Trellis Channel check worker for an
+  independent review. The main session stops overlapping edits while the worker
+  runs, re-reads the resulting diff, owns final judgment, and ensures the worker
+  exits. Do not keep several cross-platform workers alive concurrently.
+- Cross-CLI handoff uses the task artifacts plus a durable, metadata-only Relay
+  Channel. Channel state is supplemental: live Git/worktree evidence and task
+  artifacts win on conflict, and Trellis remains developer coordination rather
+  than product runtime or Pi JSONL Session truth.
+- For L2 work, the task's `design.md` and `implement.md` satisfy the execution-
+  plan requirement. `PLANS.md` remains the repository-wide plan contract; do
+  not duplicate the same active plan in two artifacts.
+- Execution plans and Channel logs are temporary coordination/evidence, not a
+  second product, architecture, runtime, session, Git, or release source of
+  truth. Channel workers currently support Claude/Codex only; Pi/Grok participate
+  through their interactive CLI and explicit task paths.
 
 ## Security and privacy
 

@@ -45,6 +45,23 @@ describe("CI change scope classifier", () => {
     });
   });
 
+  it("runs quality checks without native packaging for Trellis developer workflow changes", () => {
+    expect(classifyChangedPaths([
+      "AGENTS.md",
+      ".agents/skills/trellis-continue/SKILL.md",
+      ".claude/commands/trellis/continue.md",
+      ".trellis/config.yaml",
+      ".trellis/scripts/trellis_relay.py"
+    ])).toMatchObject({
+      reason: "quality-only",
+      runQuality: true,
+      runWindows: false,
+      runMacos: false,
+      windowsInstallerMode: "none",
+      fullValidation: false
+    });
+  });
+
   it("keeps unknown E2E support and production bridge changes fail-safe", () => {
     expect(classifyChangedPaths(["tests/e2e/pi67-new-native-fixture.ts"]).fullValidation).toBe(true);
     expect(classifyChangedPaths(["apps/desktop/src/preload.ts"]).fullValidation).toBe(true);
