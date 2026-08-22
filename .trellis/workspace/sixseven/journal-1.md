@@ -39,3 +39,23 @@ Added a Native-first Trellis workflow with Channel review and sequential Codex, 
 ### Next Steps
 
 - Use native implementation by default; start a new Task for future work and invoke Channel implementation only when explicitly requested.
+
+## Session 2: Harden Trellis workflow validation
+
+**Date**: 2026-08-22
+**Task**: Harden Trellis workflow validation
+**Branch**: `main`
+
+### Summary
+
+Enforced routing metadata before task start, pinned the repo-local Trellis CLI, integrated Relay tests into the quality gate, and completed an independent Claude Channel review.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `656f9ac` | (see git log) |
+
+### Status
+
+[OK] **Completed**
