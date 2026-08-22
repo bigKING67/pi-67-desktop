@@ -4,8 +4,8 @@
 
 - Goal: establish Native-first implementation, one L2 cross-provider Channel
   check, and sequential Codex/Claude/Pi/Grok Relay recovery.
-- Status: implementation and local verification complete; task remains active
-  pending user review and separately authorized scoped commit.
+- Status: implementation, local verification, scoped work commit, and task
+  archive complete.
 
 ## Decisions
 
@@ -16,9 +16,10 @@
 
 ## Git/Dirty Scope
 
-- Branch: `main`, one commit ahead of `origin/main` before this task.
+- Branch: `main`; task work committed as `769a2fe` after the pre-existing
+  one-commit lead over `origin/main`.
 - Existing Trellis/platform directories and `.gitattributes` began as user WIP.
-- No commit, push, tag, release, deploy, or product runtime change is authorized.
+- No push, tag, release, deploy, or product runtime change was performed.
 
 ## Changed Scope
 
@@ -53,12 +54,12 @@
 
 ## Next Action
 
-Review the scoped diff. If the user explicitly authorizes commit, perform only
-scoped staging/commit for this task, then archive/finish the task separately.
-Do not push, publish, deploy, change Grok trust, or run additional paid smokes.
+No further action remains for this Task. A future CLI should start or resume a
+different Task rather than reopening this archived one. Push, publish, deploy,
+Grok trust changes, and additional paid smokes still require separate intent.
 
 ## Actor/Time/Hash
 
 - Actor: Codex main.
-- Updated: 2026-08-22 Asia/Shanghai after final full repository gate.
+- Updated: 2026-08-22 Asia/Shanghai after scoped commit and archive.
 - Hash: computed and bound by the next Relay checkpoint event.
