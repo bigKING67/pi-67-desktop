@@ -123,15 +123,17 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>  # detailed 
   The [workflow-state:STATUS] blocks embedded in the ## Phase Index section
   below are the SINGLE source of truth for the per-turn `<workflow-state>`
   breadcrumb that every supported AI platform's UserPromptSubmit hook
-  reads. inject-workflow-state.py (Python platforms) and
-  inject-workflow-state.js (OpenCode plugin) only parse them — there is no
+  reads. The installed platform parsers, including
+  `.claude/hooks/inject-workflow-state.py` and
+  `.codex/hooks/inject-workflow-state.py`, only parse them — there is no
   fallback dict baked into the scripts after v0.5.0-rc.0.
 
   STATUS charset: [A-Za-z0-9_-]+. When the hook can't find a tag, it
   degrades to a generic "Refer to workflow.md for current step." line —
   intentionally visible so users notice and fix a broken workflow.md.
 
-  INVARIANT (test/regression.test.ts):
+  INVARIANT (`eng/quality/check-trellis-integration.mjs` and
+  `corepack pnpm run check:trellis`):
     Every workflow-walkthrough step marked `[required · once]` must have a
     matching enforcement line in its phase's [workflow-state:*] block. The
     breadcrumb is the only per-turn channel; if a mandatory step isn't
@@ -159,7 +161,7 @@ python3 ./.trellis/scripts/get_context.py --mode phase --step <X.Y>  # detailed 
     - Run `trellis update` after editing to push the new bodies to
       downstream user projects (block-level managed replacement)
     - Project runtime/authority contract:
-      .trellis/spec/guides/trellis-development-workflow.md
+      .trellis/spec/guides/workflow-state-contract.md
 -->
 
 ## Phase Index
@@ -755,5 +757,5 @@ Supported events: `after_create / after_start / after_finish / after_archive`. N
 
 For the workflow state machine's runtime contract, the locations of all status writers, pseudo-statuses (`no_task` / `stale_<source_type>`), the hook reachability matrix, and other deep details, see:
 
-- `.trellis/spec/cli/backend/workflow-state-contract.md` — runtime contract + writer table + test invariants
-- `.trellis/scripts/inject-workflow-state.py` — actual parser (reads workflow.md only, no embedded text)
+- `.trellis/spec/guides/workflow-state-contract.md` — runtime map + writer table + test invariants
+- `.claude/hooks/inject-workflow-state.py` and `.codex/hooks/inject-workflow-state.py` — installed parsers (read workflow.md only, no embedded text)

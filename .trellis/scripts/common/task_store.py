@@ -56,6 +56,7 @@ from .task_utils import (
     resolve_task_dir,
     run_task_hooks,
 )
+from .task_routing import validate_routing_value
 
 
 # =============================================================================
@@ -189,6 +190,10 @@ def _parse_meta_pairs(pairs: list[str] | None) -> dict[str, str] | None:
                 colored(f"Error: malformed --meta value '{pair}' (expected key=value)", Colors.RED),
                 file=sys.stderr,
             )
+            return None
+        error = validate_routing_value(key, value)
+        if error:
+            print(colored(f"Error: invalid routing metadata: {error}", Colors.RED), file=sys.stderr)
             return None
         meta[key] = value
     return meta
@@ -957,6 +962,11 @@ def cmd_set_meta(args: argparse.Namespace) -> int:
     if not key:
         print(colored("Error: Missing arguments", Colors.RED))
         print("Usage: python3 task.py set-meta <task-dir> <key> <value>")
+        return 1
+
+    error = validate_routing_value(key, value)
+    if error:
+        print(colored(f"Error: invalid routing metadata: {error}", Colors.RED))
         return 1
 
     if not target_dir:

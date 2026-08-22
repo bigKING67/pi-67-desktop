@@ -47,6 +47,7 @@ from common.active_task import (
 from common.io import read_json, write_json
 from common.task_utils import resolve_task_dir, run_task_hooks
 from common.tasks import iter_active_tasks, children_progress
+from common.task_routing import routing_remediation, validate_routing_metadata
 
 # Import command handlers from split modules (also re-exports for plan.py compatibility)
 from common.task_store import (
@@ -105,6 +106,24 @@ def cmd_start(args: argparse.Namespace) -> int:
 
     task_json_path = full_path / FILE_TASK_JSON
 
+    # Starting is the lifecycle boundary: reject incomplete or malformed
+    # routing before it can persist a pointer, change status, or run hooks.
+    task_data = read_json(task_json_path) if task_json_path.is_file() else None
+    errors = validate_routing_metadata(
+        task_data.get("meta") if isinstance(task_data, dict) else None,
+        require_complete=True,
+    )
+    if errors:
+        print(colored(
+            "Routing metadata fail-closed: task remains in planning; no active pointer, "
+            "lifecycle hook, or Worker was started.",
+            Colors.RED,
+        ))
+        for error in errors:
+            print(f"- {error}")
+        print(f"Remediation: {routing_remediation()}")
+        return 1
+
     if not resolve_context_key():
         # Degraded mode: no session identity available.
         # Hook didn't inject TRELLIS_CONTEXT_ID (common on Windows + Claude Code,
@@ -122,11 +141,10 @@ def cmd_start(args: argparse.Namespace) -> int:
         ))
 
         # Still flip task.json status: planning → in_progress so downstream phases proceed.
-        if task_json_path.is_file():
-            data = read_json(task_json_path)
-            if data and data.get("status") == "planning":
-                data["status"] = "in_progress"
-                if write_json(task_json_path, data):
+        if isinstance(task_data, dict):
+            if task_data.get("status") == "planning":
+                task_data["status"] = "in_progress"
+                if write_json(task_json_path, task_data):
                     print(colored("✓ Status: planning → in_progress (degraded)", Colors.GREEN))
             run_task_hooks("after_start", task_json_path, repo_root)
         return 0
@@ -136,11 +154,10 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(colored(f"✓ Current task set to: {task_dir}", Colors.GREEN))
         print(f"Source: {active.source}")
 
-        if task_json_path.is_file():
-            data = read_json(task_json_path)
-            if data and data.get("status") == "planning":
-                data["status"] = "in_progress"
-                if write_json(task_json_path, data):
+        if isinstance(task_data, dict):
+            if task_data.get("status") == "planning":
+                task_data["status"] = "in_progress"
+                if write_json(task_json_path, task_data):
                     print(colored("✓ Status: planning → in_progress", Colors.GREEN))
 
         print()
@@ -421,7 +438,7 @@ Examples:
   python3 task.py create "Add login feature" --slug add-login --package cli
   python3 task.py create "Add login feature" --meta linear=ENG-123 --meta epic=auth
   python3 task.py create "Child task" --slug child --parent .trellis/tasks/01-21-parent
-  python3 task.py add-context <dir> implement .trellis/spec/cli/backend/auth.md "Auth guidelines"
+  python3 task.py add-context <dir> implement .trellis/spec/guides/trellis-development-workflow.md "Workflow guidance"
   python3 task.py set-branch <dir> task/add-login
   python3 task.py start .trellis/tasks/01-21-add-login
   python3 task.py current --source

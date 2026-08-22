@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +53,53 @@ async function checkAuthority() {
     /execution_mode=channel[^\n]+explicit user request|Channel implementation is explicit-only/iu,
     "workflow must keep Channel implementation explicit-only"
   );
+}
+
+async function checkToolchainAndAuthoritativePaths() {
+  const [packageJsonSource, version, lockfile] = await Promise.all([
+    read("package.json"),
+    read(".trellis/.version"),
+    read("pnpm-lock.yaml")
+  ]);
+  const expectedVersion = version.trim();
+  const packageJson = JSON.parse(packageJsonSource);
+  if (packageJson.devDependencies?.["@mindfoldhq/trellis"] !== expectedVersion) {
+    failures.push("package.json must pin @mindfoldhq/trellis to .trellis/.version exactly");
+  }
+  requireIncludes(
+    lockfile,
+    `'@mindfoldhq/trellis':\n        specifier: ${expectedVersion}\n        version: ${expectedVersion}`,
+    "pnpm-lock.yaml must record the root Trellis dev dependency pinned to .trellis/.version"
+  );
+
+  for (const relativePath of [
+    ".trellis/spec/guides/workflow-state-contract.md",
+    ".claude/hooks/inject-workflow-state.py",
+    ".codex/hooks/inject-workflow-state.py",
+    ".trellis/scripts/common/task_routing.py"
+  ]) {
+    if (!(await exists(relativePath))) failures.push(`authoritative Trellis path is missing: ${relativePath}`);
+  }
+
+  const lifecycleCopies = [
+    ".agents/skills/trellis-meta/references/customize-local/change-task-lifecycle.md",
+    ".claude/skills/trellis-meta/references/customize-local/change-task-lifecycle.md",
+    ".grok/skills/trellis-meta/references/customize-local/change-task-lifecycle.md"
+  ];
+  const sources = await Promise.all(lifecycleCopies.map(read));
+  if (new Set(sources).size !== 1) failures.push("task-lifecycle reference copies must remain identical");
+
+  const operationalSources = await Promise.all([
+    read(".trellis/workflow.md"),
+    read(".trellis/scripts/task.py"),
+    read(".trellis/scripts/add_session.py"),
+    ...lifecycleCopies.map(read)
+  ]);
+  for (const source of operationalSources) {
+    requireExcludes(source, ".trellis/spec/cli/backend/", "operational Trellis references must not use a nonexistent cli spec path");
+    requireExcludes(source, ".trellis/scripts/inject-workflow-state.py", "operational Trellis references must name an installed workflow-state parser");
+    requireExcludes(source, "test/regression.test.ts", "operational Trellis references must not name a missing regression test");
+  }
 }
 
 async function checkConfig() {
@@ -174,16 +222,18 @@ async function checkLocalClaudePermissions() {
 }
 
 function checkLiveCli() {
+  const localCli = resolve(repositoryRoot, "node_modules/.bin/trellis");
+  const expectedVersion = readFileSync(resolve(repositoryRoot, ".trellis/.version"), "utf8").trim();
   let version;
   try {
-    version = execFileSync("trellis", ["--version"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
+    version = execFileSync(localCli, ["--version"], { cwd: repositoryRoot, encoding: "utf8" }).trim();
   } catch {
-    failures.push("trellis CLI must be installed for --live-cli validation");
+    failures.push("repo-local node_modules/.bin/trellis must be installed for --live-cli validation");
     return;
   }
-  if (version !== "0.6.15") failures.push(`trellis CLI must be 0.6.15, observed ${version || "empty"}`);
-  const sendHelp = execFileSync("trellis", ["channel", "send", "--help"], { cwd: repositoryRoot, encoding: "utf8" });
-  const spawnHelp = execFileSync("trellis", ["channel", "spawn", "--help"], { cwd: repositoryRoot, encoding: "utf8" });
+  if (version !== expectedVersion) failures.push(`trellis CLI must be ${expectedVersion}, observed ${version || "empty"}`);
+  const sendHelp = execFileSync(localCli, ["channel", "send", "--help"], { cwd: repositoryRoot, encoding: "utf8" });
+  const spawnHelp = execFileSync(localCli, ["channel", "spawn", "--help"], { cwd: repositoryRoot, encoding: "utf8" });
   requireIncludes(sendHelp, "--text-file", "trellis channel send must support --text-file");
   requireExcludes(sendHelp, "--tag", "trellis channel send unexpectedly exposes --tag; review Relay contract");
   requireIncludes(spawnHelp, "--sandbox", "trellis channel spawn must support explicit Codex sandbox");
@@ -200,7 +250,8 @@ async function main() {
     checkConfig(),
     checkRelayAndEntrypoints(),
     checkSpecMaps(),
-    checkLocalClaudePermissions()
+    checkLocalClaudePermissions(),
+    checkToolchainAndAuthoritativePaths()
   ]);
   if (arguments_.includes("--live-cli")) checkLiveCli();
   if (failures.length > 0) {

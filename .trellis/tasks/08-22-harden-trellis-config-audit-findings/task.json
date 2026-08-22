@@ -1,0 +1,31 @@
+{
+  "id": "harden-trellis-config-audit-findings",
+  "name": "harden-trellis-config-audit-findings",
+  "title": "Harden Trellis configuration after Claude audit",
+  "description": "Remediate the verified P2/P3 Trellis configuration findings, run targeted and repository gates, then obtain one final independent Claude Channel review.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "sixseven",
+  "assignee": "sixseven",
+  "createdAt": "2026-08-22",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "risk_level": "L2",
+    "execution_mode": "native",
+    "review_mode": "channel",
+    "handoff_mode": "relay"
+  }
+}

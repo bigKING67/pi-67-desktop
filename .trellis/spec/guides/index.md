@@ -24,6 +24,7 @@ These guides help you **ask the right questions before coding**.
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
 | [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
 | [Trellis Development Workflow](./trellis-development-workflow.md) | Preserve Native/Channel/Relay authority and evidence boundaries | Any L1/L2 task or AI CLI handoff |
+| [Workflow-State Contract](./workflow-state-contract.md) | Map live state writers, hook parsers, routing validation, and regression ownership | Changing task lifecycle, routing metadata, or breadcrumbs |
 
 ---
 

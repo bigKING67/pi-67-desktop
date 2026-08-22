@@ -25,8 +25,16 @@ SPEC.loader.exec_module(relay)
 
 class RelayCliTest(unittest.TestCase):
     def setUp(self) -> None:
-        if shutil.which("trellis") is None:
-            self.skipTest("trellis CLI is not installed")
+        local_cli = REPO_ROOT / "node_modules" / ".bin" / "trellis"
+        path_cli = shutil.which("trellis")
+        if local_cli.is_file():
+            self.trellis_cli = str(local_cli)
+            self.trellis_bin_dir = str(local_cli.parent)
+        elif path_cli:
+            self.trellis_cli = path_cli
+            self.trellis_bin_dir = None
+        else:
+            raise RuntimeError("Trellis CLI is required for Relay tests; install project devDependencies or add trellis to PATH.")
         self.tempdir = tempfile.TemporaryDirectory()
         self.repo = Path(self.tempdir.name) / "repo"
         self.repo.mkdir()
@@ -55,6 +63,8 @@ class RelayCliTest(unittest.TestCase):
         inherited_project: str | None = None,
     ) -> tuple[int, dict]:
         env = {**os.environ, "TRELLIS_CHANNEL_ROOT": str(self.channel_root)}
+        if self.trellis_bin_dir:
+            env["PATH"] = f"{self.trellis_bin_dir}{os.pathsep}{env.get('PATH', '')}"
         if identity:
             env["TRELLIS_CONTEXT_ID"] = identity
         if hook:
@@ -132,7 +142,7 @@ class RelayCliTest(unittest.TestCase):
         code, ensured = self.invoke("ensure", task_ref)
         self.assertEqual(code, 0, ensured)
         duplicate = subprocess.run(
-            ["trellis", "channel", "create", "relay-duplicate", "--task", task_ref, "--cwd", str(self.repo.resolve()), "--by", "test"],
+            [self.trellis_cli, "channel", "create", "relay-duplicate", "--task", task_ref, "--cwd", str(self.repo.resolve()), "--by", "test"],
             cwd=self.repo.resolve(), env={**os.environ, "TRELLIS_CHANNEL_ROOT": str(self.channel_root)}, capture_output=True, text=True,
         )
         self.assertEqual(duplicate.returncode, 0, duplicate.stderr)
@@ -146,7 +156,7 @@ class RelayCliTest(unittest.TestCase):
         channel_env.pop("TRELLIS_CHANNEL_PROJECT", None)
         worker_channel = subprocess.run(
             [
-                "trellis", "channel", "create", "check-relay-test-r1",
+                self.trellis_cli, "channel", "create", "check-relay-test-r1",
                 "--task", task_ref, "--cwd", str(self.repo.resolve()),
                 "--by", "test", "--ephemeral",
             ],
@@ -166,6 +176,12 @@ class RelayCliTest(unittest.TestCase):
         self.assertEqual(status["channelState"], "unavailable")
         self.assertFalse(status["relayWritten"])
         self.assertIn("fallback", status)
+
+    def test_close_without_matching_channel_reports_metadata_absence(self) -> None:
+        code, closed = self.invoke("close", ".trellis/tasks/08-22-relay-test")
+        self.assertEqual(code, 0, closed)
+        self.assertEqual(closed["channelState"], "missing")
+        self.assertIn("No matching Relay Channel metadata", closed["fallback"])
 
     def test_inherited_worker_project_does_not_misroute_relay_channel(self) -> None:
         task_ref = ".trellis/tasks/08-22-relay-test"

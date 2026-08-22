@@ -31,7 +31,6 @@
     ".pi/extensions/trellis/index.ts"
   ],
   "ignoreBinaries": [
-    "pwsh",
-    "trellis"
+    "pwsh"
   ]
 }

@@ -570,7 +570,7 @@ def _run_action(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:
             }
         payload = {"ok": True, "taskPath": task.relative_path, "channel": channel, "channelState": state, "action": command}
         if channel is None:
-            payload["fallback"] = "Relay Channel unavailable; task artifacts and Git were not modified."
+            payload["fallback"] = "No matching Relay Channel metadata exists; task artifacts and Git were not modified."
             return payload
         event = _make_event(task, repo_root, command, actor, mode)
         _send_event(channel, event, repo_root)

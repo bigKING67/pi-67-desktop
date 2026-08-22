@@ -16,7 +16,7 @@
 - Channel implementation requires an explicit current user request.
 - Switching Codex, Claude Code, Pi, or Grok is sequential; only one platform main session owns edits.
 
-Task metadata must name `risk_level`, `execution_mode`, `review_mode`, and `handoff_mode`. Missing or invalid values fail closed to Native execution and visible degraded review, never to an unexpected Worker.
+Planning tasks may omit routing metadata. `task.py start` requires valid `risk_level`, `execution_mode`, `review_mode`, and `handoff_mode` before it mutates an active pointer, status, or lifecycle hook. Missing or invalid values fail closed in `planning` with a visible remediation message; they never select Native or Channel execution implicitly.
 
 ## Channel contracts
 
