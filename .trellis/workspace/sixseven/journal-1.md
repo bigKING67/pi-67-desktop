@@ -59,3 +59,24 @@ Enforced routing metadata before task start, pinned the repo-local Trellis CLI, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: Composer model Provider grouping
+
+**Date**: 2026-08-24
+**Task**: Composer model Provider grouping
+**Branch**: `main`
+
+### Summary
+
+Grouped Composer model choices by authoritative Pi Provider identity, preserved selection behavior, added regression coverage, and verified light/dark visuals plus the macOS packaged preview.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `007dbca` | (see git log) |
+
+### Status
+
+[OK] **Completed**

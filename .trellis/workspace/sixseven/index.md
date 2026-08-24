@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
-- **Last Active**: 2026-08-22
+- **Total Sessions**: 3
+- **Last Active**: 2026-08-24
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~62 | Active |
+| `journal-1.md` | ~82 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-08-24 | Composer model Provider grouping | `007dbca` | `main` |
 | 2 | 2026-08-22 | Harden Trellis workflow validation | `656f9ac` | `main` |
 | 1 | 2026-08-22 | Trellis cross-CLI workflow | `769a2fe` | `main` |
 <!-- @@@/auto:session-history -->
