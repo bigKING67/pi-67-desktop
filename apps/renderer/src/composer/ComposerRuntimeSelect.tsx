@@ -2,8 +2,10 @@ import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   Button as AriaButton,
+  Header,
   ListBox,
   ListBoxItem,
+  ListBoxSection,
   Popover,
   Select
 } from "react-aria-components";
@@ -15,6 +17,12 @@ export interface ComposerRuntimeSelectOption {
   detail?: string;
 }
 
+export interface ComposerRuntimeSelectOptionGroup {
+  id: string;
+  label: string;
+  options: readonly ComposerRuntimeSelectOption[];
+}
+
 interface ComposerRuntimeSelectProps {
   ariaLabel: string;
   disabled: boolean;
@@ -23,6 +31,7 @@ interface ComposerRuntimeSelectProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectionChange: (key: string) => void;
+  optionGroups?: readonly ComposerRuntimeSelectOptionGroup[];
   options: readonly ComposerRuntimeSelectOption[];
   selectedKey: string | null;
   valueText: string;
@@ -37,6 +46,7 @@ export function ComposerRuntimeSelect({
   isOpen,
   onOpenChange,
   onSelectionChange,
+  optionGroups,
   options,
   selectedKey,
   valueText,
@@ -68,28 +78,58 @@ export function ComposerRuntimeSelect({
         placement="top end"
         shouldFlip
       >
-        <ListBox
-          className={styles.runtimeSelectList!}
-          data-runtime-select={variant}
-        >
-          {options.map((option) => (
-            <ListBoxItem
-              className={styles.runtimeSelectOption!}
-              data-runtime-select={variant}
-              id={option.id}
-              key={option.id}
-              textValue={option.label}
-            >
-              <span className={styles.runtimeSelectOptionCopy}>
-                <strong>{option.label}</strong>
-                {option.detail ? <small>{option.detail}</small> : null}
-              </span>
-              <Check aria-hidden="true" className={styles.runtimeSelectCheck} size={14} />
-            </ListBoxItem>
-          ))}
-        </ListBox>
+        <ComposerRuntimeSelectOptions
+          {...(optionGroups === undefined ? {} : { optionGroups })}
+          options={options}
+          variant={variant}
+        />
         {footer ? <small className={styles.runtimeSelectFooter}>{footer}</small> : null}
       </Popover>
     </Select>
+  );
+}
+
+export function ComposerRuntimeSelectOptions({
+  optionGroups,
+  options,
+  variant
+}: Pick<ComposerRuntimeSelectProps, "optionGroups" | "options" | "variant">) {
+  return (
+    <ListBox className={styles.runtimeSelectList!} data-runtime-select={variant}>
+      {optionGroups && optionGroups.length > 0
+        ? optionGroups.map((group) => (
+            <ListBoxSection className={styles.runtimeSelectSection!} id={group.id} key={group.id}>
+              <Header className={styles.runtimeSelectSectionHeader!}>
+                <span>{group.label}</span>
+                <span aria-label={`${group.options.length} 个模型`}>{group.options.length}</span>
+              </Header>
+              {group.options.map((option) => <RuntimeSelectOption key={option.id} option={option} variant={variant} />)}
+            </ListBoxSection>
+          ))
+        : options.map((option) => <RuntimeSelectOption key={option.id} option={option} variant={variant} />)}
+    </ListBox>
+  );
+}
+
+function RuntimeSelectOption({
+  option,
+  variant
+}: {
+  option: ComposerRuntimeSelectOption;
+  variant: ComposerRuntimeSelectProps["variant"];
+}) {
+  return (
+    <ListBoxItem
+      className={styles.runtimeSelectOption!}
+      data-runtime-select={variant}
+      id={option.id}
+      textValue={option.label}
+    >
+      <span className={styles.runtimeSelectOptionCopy}>
+        <strong>{option.label}</strong>
+        {option.detail ? <small>{option.detail}</small> : null}
+      </span>
+      <Check aria-hidden="true" className={styles.runtimeSelectCheck} size={14} />
+    </ListBoxItem>
   );
 }

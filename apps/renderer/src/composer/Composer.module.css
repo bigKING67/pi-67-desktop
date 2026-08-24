@@ -392,6 +392,38 @@
   outline: none;
 }
 
+.runtimeSelectList[data-runtime-select="model"] {
+  gap: 6px;
+}
+
+.runtimeSelectSection {
+  display: grid;
+  gap: 2px;
+}
+
+.runtimeSelectSectionHeader {
+  position: sticky;
+  z-index: 1;
+  top: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+  line-height: 1.2;
+}
+
+.runtimeSelectSectionHeader > span:last-child {
+  font-family: var(--font-code);
+  font-size: 10px;
+  font-weight: 540;
+}
+
 .runtimeSelectOption {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18px;

@@ -78,6 +78,54 @@ test("groups Pi Desktop actions and routes exact Enter without sending native ac
   expect((await scenarioCommandTypes(page)).filter((type) => type === "prompt.submit")).toEqual([]);
 });
 
+test("groups Composer models by Provider without changing selected-row keyboard selection", async ({ page }) => {
+  await page.setViewportSize({ width: 796, height: 756 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("/model");
+  await composer.press("Enter");
+
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+  await expect(listbox.locator('[role="group"]')).toHaveCount(2);
+  await expect(listbox.locator('[role="group"]').first()).toContainText("OpenAI");
+  await expect(listbox.locator('[role="group"]').last()).toContainText("DeepSeek");
+  await expect(listbox.getByRole("option")).toHaveCount(2);
+  await expect(listbox.getByRole("option", { selected: true })).toBeFocused();
+  await expect(listbox.getByRole("option", { selected: true })).toContainText("openai/gpt-test");
+  await page.screenshot({
+    path: "artifacts/visual-review/composer-model-provider-groups-dark.png",
+    animations: "disabled"
+  });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.screenshot({
+    path: "artifacts/visual-review/composer-model-provider-groups-light.png",
+    animations: "disabled"
+  });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await clearRecordedCommands(page);
+  await page.keyboard.press("d");
+  await expect(listbox.getByRole("option", { name: /DeepSeek V4 Flash/u })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(listbox.getByRole("option", { name: /GPT Test Extended/u })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(listbox.getByRole("option", { name: /DeepSeek V4 Flash/u })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => scenarioCommandTypes(page)).toEqual(["model.select"]);
+  expect((await scenarioCommands(page))[0]?.payload).toMatchObject({
+    provider: "deepseek",
+    id: "deepseek-v4-flash"
+  });
+  await expect(listbox).toBeHidden();
+});
+
 test("keeps Desktop builtins available on Runtime catalog failure and blocks unsupported Pi TUI commands", async ({ page }) => {
   await page.goto("/");
   await attachMockAgent(page);

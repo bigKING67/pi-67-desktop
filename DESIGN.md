@@ -1318,7 +1318,12 @@ loading error where the operation can produce those states
 - The collapsed model trigger shows only the readable model name and truncates
   it on one line. Provider and the complete `provider/model-id` appear only in
   the open list, where they disambiguate equal labels without widening the
-  resting Composer.
+  resting Composer. The open model list uses non-collapsible React Aria Provider
+  sections: each heading shows the projected Provider label and visible count,
+  follows the projected Provider catalog order, and stays legible while its
+  rows scroll. A model belongs only to its exact projected `provider` identity;
+  an unavailable projection falls back to that ID, so mixed-protocol Providers
+  such as Groland remain one section rather than splitting by model vendor.
 - Model and thinking controls share one compact trigger, focus, selection, and
   raised-Popover language. Their Popovers open toward the conversation, retain
   viewport collision handling, and bound long model catalogs to roughly five or

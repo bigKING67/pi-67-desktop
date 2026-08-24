@@ -8,10 +8,12 @@ import {
   setSessionThinkingLevel
 } from "../session/session-control-controller.js";
 import {
+  groupVisibleSessionModelsByProvider,
   selectAvailableThinkingLevels,
   selectSelectedModel,
   selectSessionId,
   selectSessionModels,
+  selectSessionModelProviders,
   selectThinkingLevel
 } from "../session/session-projection-selectors.js";
 import {
@@ -33,6 +35,7 @@ const MODEL_CONFIRMATION_VISIBLE_MS = 4_000;
 export function ComposerRuntimeControls({ submitting }: { submitting: boolean }) {
   const sessionId = useSessionProjectionStore(selectSessionId);
   const models = useSessionProjectionStore(selectSessionModels);
+  const providers = useSessionProjectionStore(selectSessionModelProviders);
   const selectedModel = useSessionProjectionStore(selectSelectedModel);
   const thinkingLevel = useSessionProjectionStore(selectThinkingLevel);
   const availableThinkingLevels = useSessionProjectionStore(selectAvailableThinkingLevels);
@@ -67,9 +70,8 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
   const selectedModelValue = selectedModel
     ? `${selectedModel.provider}/${selectedModel.id}`
     : "";
-  const visibleModels = models?.filter((model) => (
-    model.configured || `${model.provider}/${model.id}` === selectedModelValue
-  )) ?? [];
+  const modelGroups = groupVisibleSessionModelsByProvider(models, providers, selectedModel);
+  const visibleModels = modelGroups.flatMap((group) => group.models);
   const disabled = submitting || streaming || sessionTransitionPending;
   const modelValue = modelSelection.status === "pending"
     ? modelSelectionTargetKey(modelSelection.target) ?? selectedModelValue
@@ -90,6 +92,15 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
         label: messages.composer.noAvailableModels,
         detail: messages.composer.configureProvider
       }];
+  const modelOptionGroups = modelGroups.map((group) => ({
+    id: group.id,
+    label: group.label,
+    options: group.models.map((model) => ({
+      id: `${model.provider}/${model.id}`,
+      label: model.label,
+      detail: `${model.provider}/${model.id}${model.configured ? "" : ` ${messages.composer.unauthenticatedModel}`}`
+    }))
+  }));
   const thinkingOptions: ComposerRuntimeSelectOption[] = (availableThinkingLevels ?? []).map((level) => ({
     id: level,
     label: level
@@ -113,6 +124,7 @@ export function ComposerRuntimeControls({ submitting }: { submitting: boolean })
             const model = visibleModels.find((candidate) => `${candidate.provider}/${candidate.id}` === value);
             if (model) void selectSessionModel(model.provider, model.id);
           }}
+          optionGroups={modelOptionGroups}
           options={modelOptions}
           selectedKey={modelValue || null}
           valueText={modelLabel}
