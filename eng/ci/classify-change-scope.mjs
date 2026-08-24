@@ -75,13 +75,11 @@ function isQualityOnlyPath(path) {
 function isDeveloperWorkflowPath(path) {
   return path === "AGENTS.md"
     || path === "PLANS.md"
-    || path === "eng/quality/check-trellis-integration.mjs"
     || path.startsWith(".agents/")
     || path.startsWith(".claude/")
     || path.startsWith(".codex/")
     || path.startsWith(".grok/")
-    || path.startsWith(".pi/")
-    || path.startsWith(".trellis/");
+    || path.startsWith(".pi/");
 }
 
 function isWindowsOnlyPath(path) {

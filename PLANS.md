@@ -2,7 +2,7 @@
 
 Use an execution plan only for L2 work that spans modules, sessions, migrations,
 recovery, or candidate/release checkpoints. Routine L0 and L1 work should stay in
-the task context and Git diff.
+the current CLI context and Git diff.
 
 Create an active plan under `docs/plans/YYYY-MM-DD-<short-name>.md` by copying the
 template below. Keep it current while work is active. On completion, retain it
@@ -103,20 +103,23 @@ Last updated: YYYY-MM-DD
 - Commit/push/release state:
 ```
 
-## Trellis boundary
+## Lightweight coordination boundary
 
-Pi-67 uses Trellis for local development coordination and sequential handoff,
-not as a product/runtime/session/release source of truth:
+Pi-67 uses repository documents and live Git state for development coordination:
 
-- L0 stays direct; L1/L2 use a task by default under the project's standing
-  authorization.
-- The current CLI or its native sub-agents implement by default. L2 adds one
-  cross-provider Channel check worker; Channel implementation is explicit-only.
-- A task's `design.md` and `implement.md` are the active L2 execution plan and
-  follow this document's required sections. Do not maintain a duplicate active
-  plan elsewhere.
-- Durable Relay Channels contain bounded handoff metadata. Ephemeral Worker
-  Channels contain one implementation/check run. Neither overrides Git, task
-  artifacts, live evidence, or the canonical root checkout.
-- Switching Codex, Claude Code, Pi, or Grok is sequential. At most one platform
-  main session owns edits, and at most one Channel worker may be live.
+- L0/L1 stays direct. L2 uses one ordinary Markdown execution plan under
+  `docs/plans/`; no persistent task runtime or per-prompt workflow injection is
+  required.
+- The current CLI or its native sub-agents implement by default. Independent
+  review is risk-based or explicitly requested, not an automatic phase.
+- Cross-CLI handoff is sequential and bounded. Record only the goal, current
+  Git/dirty scope, decisions, validation, risks, and next action in the active
+  plan or an explicitly requested handoff.
+- The receiving CLI re-checks the canonical checkout, branch, HEAD, dirty paths,
+  relevant files, and live runtime before editing. Handoff text never overrides
+  newer Git or runtime evidence.
+- Plans, handoffs, reviewer reports, and AI memories are supplemental. They do
+  not become a second product, runtime, Session, Git, or release source of truth.
+- A repository-wide workflow scaffold may be reconsidered only after repeated,
+  measured cross-CLI context loss makes the lightweight flow insufficient and
+  the user explicitly approves the added maintenance surface.

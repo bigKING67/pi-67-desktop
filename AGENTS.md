@@ -74,30 +74,27 @@
   clean up its temporary branch after reachability verification, and confirm
   that only the canonical root checkout remains.
 
-## Execution plans and Trellis development workflow
+## Execution plans and lightweight development workflow
 
-- L0 work stays direct and does not create a Trellis task. L1 and L2 work use a
-  Trellis task by default so another local AI CLI can recover the exact task,
-  artifacts, Git state, and next action when quota or output quality requires a
-  sequential handoff.
-- Implementation is native-first: the current CLI or that platform's native
-  sub-agents own implementation. A Channel implement worker is allowed only
-  when the user explicitly requests it.
-- L2 tasks default to one cross-provider Trellis Channel check worker for an
-  independent review. The main session stops overlapping edits while the worker
-  runs, re-reads the resulting diff, owns final judgment, and ensures the worker
-  exits. Do not keep several cross-platform workers alive concurrently.
-- Cross-CLI handoff uses the task artifacts plus a durable, metadata-only Relay
-  Channel. Channel state is supplemental: live Git/worktree evidence and task
-  artifacts win on conflict, and Trellis remains developer coordination rather
-  than product runtime or Pi JSONL Session truth.
-- For L2 work, the task's `design.md` and `implement.md` satisfy the execution-
-  plan requirement. `PLANS.md` remains the repository-wide plan contract; do
-  not duplicate the same active plan in two artifacts.
-- Execution plans and Channel logs are temporary coordination/evidence, not a
-  second product, architecture, runtime, session, Git, or release source of
-  truth. Channel workers currently support Claude/Codex only; Pi/Grok participate
-  through their interactive CLI and explicit task paths.
+- L0 and L1 work stays in the current CLI context and Git diff. Do not create a
+  persistent task runtime, task pointer, journal, or generated workflow artifact
+  for routine work.
+- L2 work uses one execution plan under `docs/plans/` following `PLANS.md`. Keep
+  the plan focused on durable decisions, checkpoints, evidence, rollback, and
+  the explicit delivery boundary; do not copy raw conversation history into it.
+- Implementation is native-first: the current CLI or its native sub-agents own
+  implementation. Use an independent reviewer only when risk or the user asks
+  for one, and never let a reviewer edit concurrently with the main session.
+- Switching Codex, Claude Code, Pi, or Grok is sequential. Before handoff,
+  record a bounded checkpoint in the active execution plan or an explicitly
+  requested handoff: goal, Git/dirty scope, decisions, validation, risks, and
+  next action. The receiving CLI must re-check live Git and runtime state.
+- Git, current files, tests, packaged artifacts, and target-platform evidence
+  remain authoritative. Plans, handoffs, AI memories, and reviewer reports are
+  supplemental and never become product runtime, Session, release, or Git truth.
+- Do not install or regenerate a repository-wide workflow scaffold merely to
+  coordinate one developer or an occasional cross-CLI review. Reintroducing one
+  requires a demonstrated recurring handoff problem and explicit user approval.
 
 ## Security and privacy
 
@@ -156,6 +153,10 @@
 - Keep streaming batched, transcripts virtualized, and async work cancellable.
 - Add targeted tests for protocol, policy, Pi SDK, recovery, and visible UI
   changes. Do not infer runtime quality from source alone.
+- Build grouped choices with React Aria `ListBoxSection` and `Header`, not
+  disabled heading options. Derive grouping from authoritative identity,
+  preserve source order and stable option identity, and test section semantics,
+  keyboard traversal, recovery selection, and exactly-once dispatch.
 - Renderer-owned Pi Desktop Slash actions must call the existing feature
   Controllers. Do not send `/new`, `/model`, `/compact`, `/resume`, `/tree`,
   `/reload`, `/settings`, `/plan`, or `/default` through `command.invoke` or as

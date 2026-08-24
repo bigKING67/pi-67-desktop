@@ -45,13 +45,15 @@ describe("CI change scope classifier", () => {
     });
   });
 
-  it("runs quality checks without native packaging for Trellis developer workflow changes", () => {
+  it("runs quality checks without native packaging for developer workflow changes", () => {
     expect(classifyChangedPaths([
       "AGENTS.md",
-      ".agents/skills/trellis-continue/SKILL.md",
-      ".claude/commands/trellis/continue.md",
-      ".trellis/config.yaml",
-      ".trellis/scripts/trellis_relay.py"
+      "PLANS.md",
+      ".agents/skills/project-review/SKILL.md",
+      ".claude/settings.json",
+      ".codex/config.toml",
+      ".grok/settings.json",
+      ".pi/settings.json"
     ])).toMatchObject({
       reason: "quality-only",
       runQuality: true,

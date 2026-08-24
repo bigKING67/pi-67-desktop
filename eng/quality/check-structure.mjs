@@ -5,8 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const failures = [];
 const bannedDirectories = new Set(["utils", "helpers", "common", "misc", "temp", "new", "final", "legacy"]);
-// Generated AI/Trellis adapters are governed by check-trellis-integration.mjs,
-// not by product module naming and source-size rules.
+// AI CLI project configuration is not product source.
 const ignoredDirectories = new Set([
   ".agents",
   ".claude",
@@ -14,7 +13,6 @@ const ignoredDirectories = new Set([
   ".git",
   ".grok",
   ".pi",
-  ".trellis",
   "node_modules",
   "dist",
   "artifacts",

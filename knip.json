@@ -27,9 +27,6 @@
     "electron",
     "pnpm"
   ],
-  "ignore": [
-    ".pi/extensions/trellis/index.ts"
-  ],
   "ignoreBinaries": [
     "pwsh"
   ]
