@@ -1,0 +1,33 @@
+{
+  "id": "composer-model-provider-groups",
+  "name": "composer-model-provider-groups",
+  "title": "Group Composer models by Provider",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "apps/renderer",
+  "package": null,
+  "priority": "P2",
+  "creator": "sixseven",
+  "assignee": "sixseven",
+  "createdAt": "2026-08-24",
+  "completedAt": "2026-08-24",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "risk_level": "L1",
+    "execution_mode": "native",
+    "review_mode": "native",
+    "handoff_mode": "relay",
+    "frontend_tier": "L1-V",
+    "selected_skill": "design-craft"
+  }
+}
