@@ -146,7 +146,10 @@ Application-level surfaces use a separate wide-window shell:
 
 - The navigation rail is the only Workspace and conversation switcher. Each
   Workspace is a collapsible group containing active tasks, waiting tasks,
-  provisional drafts, and Catalog-backed recent Sessions.
+  provisional drafts, and Catalog-backed recent Sessions. Workspace groups use
+  whitespace, indentation, and restrained current/selected surfaces rather than
+  full-width horizontal dividers; hard lines remain reserved for pane boundaries
+  or distinct semantic subsections.
 - The Title Bar contains navigation, the current Workspace/conversation title,
   status, notifications, command actions, and the Inspector toggle. It contains
   no horizontal task strip. At 1320px and below the docked Inspector title zone

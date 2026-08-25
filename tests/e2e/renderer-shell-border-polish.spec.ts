@@ -20,6 +20,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   const navigationSearch = page.getByRole("searchbox", { name: "搜索对话" });
   const inspectorSearch = inspector.getByRole("textbox", { name: "搜索工作区文件" });
+  const workspaceGroup = page.getByTestId("workspace-group").first();
   const composerShell = page.getByTestId("composer-shell");
   const composer = page.getByLabel("给 Pi 发送消息");
   const modelControl = page.getByRole("button", { name: "Pi 模型", exact: true });
@@ -31,6 +32,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await expect(modelControl).toBeVisible();
   await expect(idleConversation).toBeVisible();
   expect(await leadingCopyInset(idleConversation)).toBeLessThan(16);
+  await expect(workspaceGroup).toHaveCSS("border-bottom-width", "0px");
   await expect(navigation.locator("header").first()).toHaveCSS("border-bottom-width", "0px");
   await expect(inspector.getByRole("tablist", { name: "任务检查器" }))
     .toHaveCSS("border-bottom-width", "0px");
@@ -69,6 +71,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expectRestingSearch(navigationSearch, "rgb(24, 28, 25)");
   await expectRestingSearch(inspectorSearch, "rgb(24, 28, 25)");
+  await expect(workspaceGroup).toHaveCSS("border-bottom-width", "0px");
   await expect(navigation.locator("header").first()).toHaveCSS("border-bottom-width", "0px");
   await expect(inspector.getByRole("tablist", { name: "任务检查器" }))
     .toHaveCSS("border-bottom-width", "0px");
