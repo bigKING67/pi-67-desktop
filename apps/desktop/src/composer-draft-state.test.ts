@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
 import {
   ComposerDraftStateStore,
@@ -52,6 +52,45 @@ describe("ComposerDraftStateStore", () => {
 
     await expect(new ComposerDraftStateStore(root, { encryption: unavailableEncryption() }).load())
       .resolves.toEqual({ state: { version: 1, drafts: [] }, persistence: "unavailable" });
+  });
+
+  it("does not probe safe storage for an explicitly empty draft state", async () => {
+    const root = await userData();
+    const isAvailable = vi.fn(() => { throw new Error("safe storage must stay lazy"); });
+    const encrypt = vi.fn(() => { throw new Error("empty state must not be encrypted"); });
+    const decrypt = vi.fn(() => { throw new Error("empty state must not be decrypted"); });
+    const encryption: DesktopTextEncryption = {
+      isAvailable,
+      encrypt,
+      decrypt
+    };
+    const store = new ComposerDraftStateStore(root, { encryption });
+
+    await expect(store.load()).resolves.toEqual({
+      state: { version: 1, drafts: [] },
+      persistence: "available"
+    });
+    await expect(store.update({ version: 1, drafts: [] })).resolves.toEqual({
+      state: { version: 1, drafts: [] },
+      persistence: "available"
+    });
+    expect(await readFile(store.requestedStatePath, "utf8")).toContain('"emptyState":true');
+
+    await expect(new ComposerDraftStateStore(root, { encryption }).load()).resolves.toEqual({
+      state: { version: 1, drafts: [] },
+      persistence: "available"
+    });
+
+    await writeFile(store.requestedStatePath, "{broken", "utf8");
+    await writeFile(store.requestedBackupPath, "{broken", "utf8");
+    await expect(new ComposerDraftStateStore(root, { encryption }).load()).resolves.toEqual({
+      state: { version: 1, drafts: [] },
+      persistence: "available",
+      recovery: "corrupt-reset"
+    });
+    expect(isAvailable).not.toHaveBeenCalled();
+    expect(encrypt).not.toHaveBeenCalled();
+    expect(decrypt).not.toHaveBeenCalled();
   });
 
   it("removes all drafts owned by an unregistered workspace", async () => {

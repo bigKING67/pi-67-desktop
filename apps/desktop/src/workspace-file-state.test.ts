@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceFileStateStore, type WorkspaceFileEncryption } from "./workspace-file-state.js";
 
 const roots: string[] = [];
@@ -55,6 +55,39 @@ describe("WorkspaceFileStateStore", () => {
     await writeFile(unavailable.requestedStatePath, "{broken", "utf8");
     const restored = await new WorkspaceFileStateStore(root, { encryption: reversibleEncryption() }).load();
     expect(restored).toMatchObject({ state: { version: 1, workspaces: [] }, recovery: "corrupt-reset" });
+  });
+
+  it("does not probe safe storage until a Workspace file has a dirty draft", async () => {
+    const root = await userData();
+    const isAvailable = vi.fn(() => { throw new Error("safe storage must stay lazy"); });
+    const encrypt = vi.fn(() => { throw new Error("empty state must not be encrypted"); });
+    const decrypt = vi.fn(() => { throw new Error("empty state must not be decrypted"); });
+    const encryption = { isAvailable, encrypt, decrypt };
+    const store = new WorkspaceFileStateStore(root, { encryption });
+
+    await expect(store.load()).resolves.toEqual({
+      state: { version: 1, workspaces: [] },
+      draftPersistence: "available"
+    });
+    const cleanState = {
+      version: 1 as const,
+      workspaces: [{
+        workspaceId: "workspace-clean",
+        activeRelativePath: "README.md",
+        tabs: [{ relativePath: "README.md" }]
+      }]
+    };
+    await expect(store.update(cleanState)).resolves.toEqual({
+      state: cleanState,
+      draftPersistence: "available"
+    });
+    await expect(new WorkspaceFileStateStore(root, { encryption }).load()).resolves.toEqual({
+      state: cleanState,
+      draftPersistence: "available"
+    });
+    expect(isAvailable).not.toHaveBeenCalled();
+    expect(encrypt).not.toHaveBeenCalled();
+    expect(decrypt).not.toHaveBeenCalled();
   });
 });
 

@@ -118,7 +118,9 @@ export class WorkspaceFileStateStore {
   #snapshot(state: WorkspaceFilePersistedState): WorkspaceFileStateSnapshot {
     return {
       state: structuredClone(state),
-      draftPersistence: this.#encryption.isAvailable() ? "available" : "unavailable"
+      draftPersistence: !hasWorkspaceFileDrafts(state) || this.#encryption.isAvailable()
+        ? "available"
+        : "unavailable"
     };
   }
 
@@ -325,7 +327,7 @@ function encodeStoredState(
   state: WorkspaceFilePersistedState,
   encryption: WorkspaceFileEncryption
 ): StoredWorkspaceFileState {
-  const canEncrypt = encryption.isAvailable();
+  const canEncrypt = !hasWorkspaceFileDrafts(state) || encryption.isAvailable();
   return {
     version: 1,
     workspaces: state.workspaces.map((workspace) => ({
@@ -383,6 +385,12 @@ function decodeStoredState(
 
 function emptyState(): WorkspaceFilePersistedState {
   return { version: 1, workspaces: [] };
+}
+
+function hasWorkspaceFileDrafts(state: WorkspaceFilePersistedState): boolean {
+  return state.workspaces.some((workspace) => (
+    workspace.tabs.some((tab) => tab.draft !== undefined)
+  ));
 }
 
 function isWorkspaceId(value: unknown): value is string {

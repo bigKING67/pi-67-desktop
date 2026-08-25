@@ -29,7 +29,11 @@ type StoredReadResult =
   | { kind: "state"; state: StoredComposerDraftState };
 
 type DecodedState =
-  | { kind: "state"; state: ComposerDraftPersistedState }
+  | {
+      kind: "state";
+      persistence: "available" | "unavailable";
+      state: ComposerDraftPersistedState;
+    }
   | { kind: "decrypt-failed" }
   | { kind: "invalid" };
 
@@ -47,6 +51,7 @@ export class ComposerDraftStateStore {
   readonly #now: () => number;
   readonly #createToken: () => string;
   #memoryState: ComposerDraftPersistedState | undefined;
+  #memoryPersistence: "available" | "unavailable" | undefined;
   #pending: Promise<void> = Promise.resolve();
 
   constructor(userData: string, options: ComposerDraftStateStoreOptions) {
@@ -69,9 +74,10 @@ export class ComposerDraftStateStore {
     return this.#enqueue(async () => {
       const state = parseComposerDraftPersistedState(value);
       if (!state) throw new Error("Composer draft state update is invalid.");
-      await this.#writeUnlocked(state);
+      const persistence = await this.#writeUnlocked(state);
       this.#memoryState = structuredClone(state);
-      return this.#snapshot(state);
+      this.#memoryPersistence = persistence;
+      return this.#snapshot(state, persistence);
     });
   }
 
@@ -87,7 +93,7 @@ export class ComposerDraftStateStore {
             ? { selectedConversation: loaded.state.selectedConversation }
             : {})
       };
-      await this.#writeUnlocked(state);
+      this.#memoryPersistence = await this.#writeUnlocked(state);
       this.#memoryState = state;
     });
   }
@@ -99,7 +105,12 @@ export class ComposerDraftStateStore {
   }
 
   async #loadUnlocked(): Promise<ComposerDraftStateSnapshot> {
-    if (this.#memoryState) return this.#snapshot(this.#memoryState);
+    if (this.#memoryState) {
+      if (!this.#memoryPersistence) {
+        throw new Error("Composer draft persistence state is unavailable.");
+      }
+      return this.#snapshot(this.#memoryState, this.#memoryPersistence);
+    }
     const directory = await this.#ensureStorageDirectory();
     const statePath = join(directory, STATE_FILENAME);
     const backupPath = join(directory, BACKUP_FILENAME);
@@ -107,16 +118,18 @@ export class ComposerDraftStateStore {
     const decodedPrimary = primary.kind === "state" ? this.#decodeStoredState(primary.state) : undefined;
     if (decodedPrimary?.kind === "state") {
       this.#memoryState = decodedPrimary.state;
+      this.#memoryPersistence = decodedPrimary.persistence;
       if (process.platform !== "win32") await chmod(statePath, 0o600);
-      return this.#snapshot(decodedPrimary.state);
+      return this.#snapshot(decodedPrimary.state, decodedPrimary.persistence);
     }
 
     const backup = await this.#readStoredState(backupPath);
     const decodedBackup = backup.kind === "state" ? this.#decodeStoredState(backup.state) : undefined;
     if (decodedBackup?.kind === "state") {
-      await this.#writeUnlocked(decodedBackup.state);
+      const persistence = await this.#writeUnlocked(decodedBackup.state);
       this.#memoryState = decodedBackup.state;
-      return { ...this.#snapshot(decodedBackup.state), recovery: "backup-restored" };
+      this.#memoryPersistence = persistence;
+      return { ...this.#snapshot(decodedBackup.state, persistence), recovery: "backup-restored" };
     }
 
     if (
@@ -125,26 +138,32 @@ export class ComposerDraftStateStore {
     ) {
       const state = emptyComposerDraftState();
       this.#memoryState = state;
-      return { ...this.#snapshot(state), recovery: "draft-decrypt-failed" };
+      this.#memoryPersistence = "unavailable";
+      return { ...this.#snapshot(state, "unavailable"), recovery: "draft-decrypt-failed" };
     }
 
     if (primary.kind === "missing" && backup.kind === "missing") {
       const state = emptyComposerDraftState();
       this.#memoryState = state;
-      return this.#snapshot(state);
+      this.#memoryPersistence = "available";
+      return this.#snapshot(state, "available");
     }
 
     await this.#quarantine(statePath);
     await this.#quarantine(backupPath);
     const state = emptyComposerDraftState();
     this.#memoryState = state;
-    return { ...this.#snapshot(state), recovery: "corrupt-reset" };
+    this.#memoryPersistence = "available";
+    return { ...this.#snapshot(state, "available"), recovery: "corrupt-reset" };
   }
 
-  #snapshot(state: ComposerDraftPersistedState): ComposerDraftStateSnapshot {
+  #snapshot(
+    state: ComposerDraftPersistedState,
+    persistence: "available" | "unavailable"
+  ): ComposerDraftStateSnapshot {
     return {
       state: structuredClone(state),
-      persistence: this.#encryption.isAvailable() ? "available" : "unavailable"
+      persistence
     };
   }
 
@@ -177,18 +196,31 @@ export class ComposerDraftStateStore {
   }
 
   #decodeStoredState(stored: StoredComposerDraftState): DecodedState {
-    if (stored.encryptedState === undefined) return { kind: "state", state: emptyComposerDraftState() };
+    if (stored.emptyState) {
+      return { kind: "state", persistence: "available", state: emptyComposerDraftState() };
+    }
+    if (stored.encryptedState === undefined) {
+      return {
+        kind: "state",
+        persistence: this.#encryption.isAvailable() ? "available" : "unavailable",
+        state: emptyComposerDraftState()
+      };
+    }
     if (!this.#encryption.isAvailable()) return { kind: "decrypt-failed" };
     try {
       const decrypted = this.#encryption.decrypt(Buffer.from(stored.encryptedState, "base64"));
       const parsed = parseComposerDraftPersistedState(JSON.parse(decrypted) as unknown);
-      return parsed ? { kind: "state", state: parsed } : { kind: "invalid" };
+      return parsed
+        ? { kind: "state", persistence: "available", state: parsed }
+        : { kind: "invalid" };
     } catch {
       return { kind: "decrypt-failed" };
     }
   }
 
-  async #writeUnlocked(state: ComposerDraftPersistedState): Promise<void> {
+  async #writeUnlocked(
+    state: ComposerDraftPersistedState
+  ): Promise<"available" | "unavailable"> {
     const stored = encodeStoredComposerDraftState(state, this.#encryption);
     const serialized = `${JSON.stringify(stored)}\n`;
     if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_COMPOSER_DRAFT_STATE_BYTES) {
@@ -197,6 +229,7 @@ export class ComposerDraftStateStore {
     const directory = await this.#ensureStorageDirectory();
     await this.#writeAtomic(join(directory, BACKUP_FILENAME), serialized);
     await this.#writeAtomic(join(directory, STATE_FILENAME), serialized);
+    return stored.emptyState || stored.encryptedState ? "available" : "unavailable";
   }
 
   async #writeAtomic(path: string, serialized: string): Promise<void> {

@@ -7,6 +7,7 @@ import { createAgentHostStoragePaths } from "./agent-host-storage.js";
 import { createApplicationShutdownController } from "./application-shutdown.js";
 import { registerApplicationProtocol, registerAppSchemePrivileges } from "./app-protocol.js";
 import { createMainWindow } from "./main-window.js";
+import { observeStartupStage } from "./startup-stage-observer.js";
 import {
   registerRendererShutdownCheckpoint,
   type RendererShutdownCheckpointRegistration
@@ -147,7 +148,9 @@ if (hasSingleInstanceLock) {
     registerApplicationProtocol(rendererDirectory);
     workbenchState = new WorkbenchStateStore(app.getPath("userData"));
     packageNetworkSettings = new PackageNetworkSettingsStore(app.getPath("userData"));
-    const retiredTokenCleanup = await removeRetiredTeamMcpToken(app.getPath("userData"));
+    const retiredTokenCleanup = await observeStartupStage("profile-retired-token", () => (
+      removeRetiredTeamMcpToken(app.getPath("userData"))
+    ));
     if (retiredTokenCleanup === "failed") {
       console.info("Retired Team MCP token cleanup failed; the token is not injected into Agent Host.");
     }
@@ -188,12 +191,6 @@ if (hasSingleInstanceLock) {
       },
       staging: promptAttachments
     });
-    const draftSnapshot = await composerDraftState.load();
-    await promptStashImages.reconcile(new Set(
-      draftSnapshot.state.drafts.flatMap((draft) => (
-        (draft.promptStash ?? []).flatMap((item) => item.attachments?.length ? [item.id] : [])
-      ))
-    ));
     desktopCapabilities = new DesktopCapabilityService({
       capabilitiesRoot,
       capabilityProjectionMode: app.isPackaged ? "packaged-direct" : "legacy-copy",
@@ -201,23 +198,33 @@ if (hasSingleInstanceLock) {
       toolchain: desktopToolchain,
       packageNetworkSettings
     });
-    const initialWorkbenchLoad = await workbenchState.load();
-    const previousRunExit = previousRunExitStatus(initialWorkbenchLoad);
-    await workbenchState.update(beginWorkbenchRun);
-    const persistedWorkbench = (await workbenchState.load()).state;
-    const refreshedWorkspaces = await Promise.all(
-      persistedWorkbench.workspaces.map((workspace) => refreshPersistedWorkspaceDescriptor(workspace))
+    const initialWorkbenchLoad = await observeStartupStage(
+      "workbench-load",
+      () => workbenchState!.load()
     );
-    await workbenchState.update((state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces));
+    const previousRunExit = previousRunExitStatus(initialWorkbenchLoad);
+    await observeStartupStage("workbench-begin-run", () => workbenchState!.update(beginWorkbenchRun));
+    const persistedWorkbench = (await observeStartupStage(
+      "workbench-reload",
+      () => workbenchState!.load()
+    )).state;
+    const refreshedWorkspaces = await observeStartupStage("workspace-refresh", () => Promise.all(
+      persistedWorkbench.workspaces.map((workspace) => refreshPersistedWorkspaceDescriptor(workspace))
+    ));
+    await observeStartupStage("workspace-persist", () => workbenchState!.update(
+      (state) => replaceWorkspaceRegistrations(state, refreshedWorkspaces)
+    ));
     const privateGitRunner = new BoundedPrivateGitRunner(desktopToolchain);
     const repositoryMutationScheduler = new RepositoryMutationScheduler();
     try {
-      const recovery = await new WorktreeStartupReconcileService({
-        userData: app.getPath("userData"),
-        runner: privateGitRunner,
-        scheduler: repositoryMutationScheduler,
-        workbenchState
-      }).reconcile();
+      const recovery = await observeStartupStage("worktree-reconcile", () => (
+        new WorktreeStartupReconcileService({
+          userData: app.getPath("userData"),
+          runner: privateGitRunner,
+          scheduler: repositoryMutationScheduler,
+          workbenchState: workbenchState!
+        }).reconcile()
+      ));
       if (recovery.inspected > 0 || recovery.protected > 0 || recovery.indeterminate > 0) {
         console.info(
           `Worktree startup reconcile inspected=${recovery.inspected}`
@@ -288,7 +295,18 @@ if (hasSingleInstanceLock) {
       getMainWindow: () => mainWindow,
       onResume: () => systemBridgeRegistration?.handlePowerResume()
     });
-    await openMainWindow();
+    // Create the renderer target before macOS safeStorage restoration can wait on Keychain.
+    const mainWindowReady = observeStartupStage("main-window", openMainWindow);
+    const draftSnapshot = await observeStartupStage(
+      "profile-composer-drafts",
+      () => composerDraftState!.load()
+    );
+    await observeStartupStage("profile-prompt-stash", () => promptStashImages!.reconcile(new Set(
+      draftSnapshot.state.drafts.flatMap((draft) => (
+        (draft.promptStash ?? []).flatMap((item) => item.attachments?.length ? [item.id] : [])
+      ))
+    )));
+    await mainWindowReady;
   }).catch((error: unknown) => {
     if (applicationShutdown.isShuttingDown()) return;
     console.error(redact(error instanceof Error ? error.message : String(error)));

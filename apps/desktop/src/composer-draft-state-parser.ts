@@ -27,6 +27,7 @@ const MAX_SESSION_PATH_CHARS = 32_768;
 export interface StoredComposerDraftState {
   version: 1;
   encryptedState?: string;
+  emptyState?: true;
 }
 
 export function parseComposerDraftPersistedState(value: unknown): ComposerDraftPersistedState | undefined {
@@ -119,9 +120,15 @@ export function parseComposerDraftPersistedState(value: unknown): ComposerDraftP
 }
 
 export function parseStoredComposerDraftState(value: unknown): StoredComposerDraftState | undefined {
-  if (!isRecordWithAllowedKeys(value, ["version", "encryptedState"], ["version"]) || value.version !== 1) {
+  if (
+    !isRecordWithAllowedKeys(value, ["version", "encryptedState", "emptyState"], ["version"])
+    || value.version !== 1
+    || (value.emptyState !== undefined && value.emptyState !== true)
+    || (value.emptyState === true && value.encryptedState !== undefined)
+  ) {
     return undefined;
   }
+  if (value.emptyState === true) return { version: 1, emptyState: true };
   if (value.encryptedState === undefined) return { version: 1 };
   if (
     typeof value.encryptedState !== "string"
@@ -136,6 +143,7 @@ export function encodeStoredComposerDraftState(
   state: ComposerDraftPersistedState,
   encryption: DesktopTextEncryption
 ): StoredComposerDraftState {
+  if (state.drafts.length === 0) return { version: 1, emptyState: true };
   if (!encryption.isAvailable()) return { version: 1 };
   return {
     version: 1,
