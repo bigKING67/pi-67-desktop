@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 import { SessionAutomaticTitleReader } from "./session-automatic-title.js";
+import { SESSION_SEMANTIC_TITLE_ENTRY_TYPE } from "./session-semantic-title.js";
 
 const roots: string[] = [];
 
@@ -27,12 +28,22 @@ describe("SessionAutomaticTitleReader", () => {
   it("invalidates its cache when a multilingual Session is appended", async () => {
     const root = await temporaryRoot();
     const manager = SessionManager.create(root, root);
-    manager.appendMessage({ role: "user", content: "第一轮问题", timestamp: Date.now() });
+    const firstUserEntryId = manager.appendMessage({ role: "user", content: "第一轮问题", timestamp: Date.now() });
     manager.appendMessage(assistant("第一轮回复"));
     const reader = new SessionAutomaticTitleReader();
     await expect(reader.read(manager.getSessionFile()!)).resolves.toBe("第一轮问题");
     manager.appendMessage({ role: "user", content: "第二轮 café 问题", timestamp: Date.now() + 1 });
-    await expect(reader.read(manager.getSessionFile()!)).resolves.toBe("第二轮 café 问题");
+    await expect(reader.read(manager.getSessionFile()!)).resolves.toBe("第一轮问题");
+    manager.appendCustomEntry(SESSION_SEMANTIC_TITLE_ENTRY_TYPE, {
+      version: 1,
+      status: "generated",
+      title: "多语言 café 会话",
+      basedOnEntryId: firstUserEntryId,
+      provider: "test",
+      model: "fixture",
+      generatedAt: Date.now() + 2
+    });
+    await expect(reader.read(manager.getSessionFile()!)).resolves.toBe("多语言 café 会话");
   });
 });
 

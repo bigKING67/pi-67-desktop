@@ -9,7 +9,7 @@ import {
 } from "../workbench/workbench-store.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
 
-export async function openPaletteMessageResult(item: WorkspaceMessageSearchItem): Promise<void> {
+export async function openWorkspaceMessageResult(item: WorkspaceMessageSearchItem): Promise<void> {
   try {
     await openRendererSession(item.sessionPath, item.sessionFileIdentity);
     const task = selectedWorkbenchTask(rendererWorkbenchStore.getState());
@@ -34,3 +34,5 @@ export async function openPaletteMessageResult(item: WorkspaceMessageSearchItem)
     });
   }
 }
+
+export const openPaletteMessageResult = openWorkspaceMessageResult;

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { conversationTitleCandidate } from "./conversation-title.js";
+import {
+  conversationTitleCandidate,
+  semanticConversationTitleCandidate
+} from "./conversation-title.js";
 
 describe("conversation title candidate", () => {
   it.each(["继续", "继续吧", "好的", "按你的建议来", "commit 一下", "push", "/plan", "/new", "/model"])(
@@ -17,5 +20,12 @@ describe("conversation title candidate", () => {
     expect(title).not.toContain("\u202e");
     expect(title?.endsWith("…")).toBe(true);
     expect(conversationTitleCandidate("", true)).toBe("图片消息");
+  });
+
+  it("normalizes semantic model output without keeping labels or wrapping quotes", () => {
+    expect(semanticConversationTitleCandidate("标题：\"Session 搜索性能优化。\""))
+      .toBe("Session 搜索性能优化");
+    expect(semanticConversationTitleCandidate("继续吧")).toBeUndefined();
+    expect(Array.from(semanticConversationTitleCandidate("标".repeat(80)) ?? "")).toHaveLength(40);
   });
 });

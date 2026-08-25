@@ -195,6 +195,14 @@ export class WorkspaceContextRegistry {
     return this.require(workspaceId).sessionCatalog.query(query);
   }
 
+  searchCatalogContent(
+    workspaceId: string,
+    query: string,
+    signal?: AbortSignal
+  ) {
+    return this.require(workspaceId).sessionCatalog.searchContent(workspaceId, query, signal);
+  }
+
   statusFor(workspaceId: string): SessionCatalogStatus {
     return this.require(workspaceId).sessionCatalog.status();
   }

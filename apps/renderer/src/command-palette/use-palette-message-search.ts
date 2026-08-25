@@ -35,13 +35,14 @@ export function usePaletteMessageSearch(options: {
 
   useEffect(() => {
     const requestRevision = ++revision.current;
-    if (!options.open || normalized.length < 2) {
+    const controller = new AbortController();
+    if (!options.open || Array.from(normalized).length < 2) {
       setState({ status: "idle", items: [], incomplete: false, error: undefined });
-      return;
+      return () => controller.abort();
     }
     if (!options.connected || options.hostEpoch === undefined || !workspace) {
       setState({ status: "unavailable", items: [], incomplete: false, error: undefined });
-      return;
+      return () => controller.abort();
     }
     setState((current) => ({ ...current, status: "loading", error: undefined }));
     const timer = window.setTimeout(() => {
@@ -55,7 +56,10 @@ export function usePaletteMessageSearch(options: {
         });
       });
     }, SEARCH_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
 
     async function executeSearch(): Promise<void> {
       await registerRendererWorkspaceWithHost(workspace!, { queryCatalog: false });
@@ -64,7 +68,10 @@ export function usePaletteMessageSearch(options: {
         "session.catalog.contentSearch",
         { query: normalized },
         [],
-        { context: { scope: "workspace", workspaceId: workspace!.id } }
+        {
+          context: { scope: "workspace", workspaceId: workspace!.id },
+          signal: controller.signal
+        }
       );
       if (revision.current !== requestRevision || result.workspaceId !== workspace!.id) return;
       setState({

@@ -13,6 +13,7 @@ export const REPLAY_SAFE_CONTROL_MUTATION_TYPES = [
   "session.forkFromTask",
   "session.rollback",
   "session.name",
+  "session.title.regenerate",
   "session.interactionMode.set",
   "session.nameByPath",
   "conversation.pin",

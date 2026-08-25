@@ -279,6 +279,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "session.rollback": ProjectionMutationAcknowledgementSchema,
   "session.compact": operationSubmissionResultSchema(Type.Literal("compaction")),
   "session.name": ProjectionMutationAcknowledgementSchema,
+  "session.title.regenerate": ProjectionMutationAcknowledgementSchema,
   "session.interactionMode.set": ProjectionMutationAcknowledgementSchema,
   "plan.implement": operationSubmissionResultSchema(Type.Literal("prompt")),
   "session.nameByPath": strictObject({ revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }),

@@ -276,6 +276,9 @@ export async function dispatchHostCommand(
         command.payload.mutation.action === "set" ? command.payload.mutation.name : undefined
       );
       return context.captureProjectionMutationAcknowledgement(runtime);
+    case "session.title.regenerate":
+      await runtime.regenerateSessionTitle();
+      return context.captureProjectionMutationAcknowledgement(runtime);
     case "session.interactionMode.set":
       await runtime.setInteractionMode(command.payload.mode);
       return context.captureProjectionMutationAcknowledgement(runtime);

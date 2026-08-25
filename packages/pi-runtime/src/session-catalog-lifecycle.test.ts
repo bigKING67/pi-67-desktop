@@ -62,6 +62,8 @@ describe("Session Catalog lifecycle", () => {
       },
       replaceAll: () => state,
       upsert: () => state,
+      upsertMany: () => state,
+      setIncomplete: () => state,
       close: vi.fn()
     };
     const never = () => new Promise<SessionCatalogDiscoveryResult>(() => undefined);
@@ -185,6 +187,8 @@ function fakeSqlite(
     }),
     replaceAll: () => state,
     upsert: () => state,
+    upsertMany: () => state,
+    setIncomplete: () => state,
     close
   };
 }

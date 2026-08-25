@@ -376,6 +376,16 @@ function catalogOwner(shouldFail: () => boolean): RuntimeSessionCatalogOwner {
           total: 0,
           hasMore: false
         }),
+        searchContent: async (workspaceId, query) => ({
+          workspaceId,
+          query,
+          items: [],
+          sessionsVisited: 0,
+          entriesVisited: 0,
+          skippedCount: 0,
+          incomplete: false,
+          truncated: false
+        }),
         status: () => ({
           revision: 0,
           itemCount: 0,

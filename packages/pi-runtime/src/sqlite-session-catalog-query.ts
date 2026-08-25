@@ -66,7 +66,7 @@ export function querySqliteSessionCatalog(
   }
   const pageWhere = pageFilters.length > 0 ? ` WHERE ${pageFilters.join(" AND ")}` : "";
   const rows = database.prepare(`
-    SELECT file_identity, path, session_id, cwd, cwd_key, explicit_name, modified_at_ms, message_count,
+    SELECT file_identity, path, session_id, cwd, cwd_key, explicit_name, automatic_name, automatic_name_source, modified_at_ms, message_count,
            parent_session_path, pinned_at_ms, archived_at_ms, snoozed_until_ms
     FROM sessions${pageWhere}
     ORDER BY ${view === "archived"

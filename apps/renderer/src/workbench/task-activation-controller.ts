@@ -12,6 +12,7 @@ import {
 } from "./workbench-store.js";
 import { registerRendererWorkspaceWithHost } from "./workspace-host-registration-controller.js";
 import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
+import { rendererTaskTransitionDetail } from "./task-transition-detail.js";
 import {
   rendererTaskBelongsToAgentHost,
   rotateRendererTaskForSessionReopen
@@ -50,7 +51,7 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
     workspace: workspace.identity.canonicalPath,
     trust: workspace.trust,
     sessionTransitionPending: true,
-    runtime: { phase: "recovering", detail: `正在切换任务：${task.title}`, recoverable: true }
+    runtime: { phase: "recovering", detail: rendererTaskTransitionDetail(task, "recovering"), recoverable: true }
   });
   try {
     const registered = await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
@@ -60,8 +61,8 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
     const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
       hostEpoch: identity.hostEpoch,
       context: workbenchProtocolContextForTask(task),
-      recoveringDetail: `正在恢复任务：${task.title}`,
-      readyDetail: `已切换到任务：${task.title}`,
+      recoveringDetail: rendererTaskTransitionDetail(task, "recovering"),
+      readyDetail: rendererTaskTransitionDetail(task, "ready"),
       failureTitle: "无法切换任务",
       deferRuntimeNotReady: true
     });
@@ -101,7 +102,7 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
   ) return false;
   workbench.updateTask(task.id, {
     lifecycle: "initializing",
-    runtime: { phase: "starting", detail: `正在恢复任务：${task.title}`, recoverable: true }
+    runtime: { phase: "starting", detail: rendererTaskTransitionDetail(task, "restoring"), recoverable: true }
   });
   useAppStore.setState({
     workspace: workspace.identity.canonicalPath,
@@ -116,7 +117,7 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
       const recovery = await resynchronizeRendererProjection(useAppStore.getState, useAppStore.setState, {
         hostEpoch: identity.hostEpoch,
         context: workbenchProtocolContextForTask(task),
-        recoveringDetail: `正在重新连接任务：${task.title}`,
+        recoveringDetail: rendererTaskTransitionDetail(task, "reconnecting"),
         readyDetail: "Pi SDK 已就绪",
         failureTitle: "无法恢复任务",
         deferRuntimeNotReady: true

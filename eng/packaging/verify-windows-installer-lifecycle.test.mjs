@@ -198,13 +198,20 @@ describe("Windows installer lifecycle contract", () => {
       )
     });
 
-    await waitForControlledPromptProjection({ locator });
+    await waitForControlledPromptProjection({
+      locator,
+      getByLabel: (label) => {
+        actions.push(`label:${label}`);
+        return locator(`label:${label}`);
+      }
+    });
 
     expect(actions).toEqual([
       "filter:[data-testid=\"conversation-row\"]:Keep the controlled Pi runtime active.",
       "wait:[data-testid=\"conversation-row\"]:filtered:visible:10000",
-      "text:.brand-lockup:Keep the controlled Pi runtime active.:true",
-      "wait:.brand-lockup:text:visible:10000"
+      "label:Pi conversation",
+      "text:label:Pi conversation:Keep the controlled Pi runtime active.:true",
+      "wait:label:Pi conversation:text:visible:10000"
     ]);
 
     const source = await readFile(

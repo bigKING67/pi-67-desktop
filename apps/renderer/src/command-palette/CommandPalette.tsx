@@ -298,8 +298,8 @@ function paletteStatus(options: {
   messageSearch: ReturnType<typeof usePaletteMessageSearch>;
 }): string {
   if (options.messageSearch.status === "failed") return options.messageSearch.error ?? "对话正文搜索失败";
-  if (options.messageSearch.status === "loading") return "正在搜索对话正文…";
-  if (options.messageSearch.incomplete) return "对话正文结果已按本地读取预算截断";
+  if (options.messageSearch.status === "loading") return "正在建立或查询对话内容索引…";
+  if (options.messageSearch.incomplete) return "对话内容索引尚未完整覆盖当前工作区";
   if (options.sessionSearch.status === "failed") return options.sessionSearch.error;
   if (options.extensionStatus === "failed") return messages.commandPalette.extensionLoadFailedWithFallback;
   if (options.sessionSearch.status === "loading") return messages.commandPalette.searchingSessions;

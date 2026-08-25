@@ -11,6 +11,7 @@ interface PiRuntimePromptActionsOptions {
   configurationReload: PiRuntimeConfigurationReload;
   promptAttachments: RuntimePromptAttachments;
   assertWritable: () => Promise<void>;
+  generateSemanticTitle: () => void;
 }
 
 export class PiRuntimePromptActions {
@@ -20,12 +21,15 @@ export class PiRuntimePromptActions {
     await this.options.assertWritable();
     await this.options.configurationReload.assertReady();
     const session = this.options.sessionBindings.requireSession();
+    let completed = false;
     try {
       await this.options.promptAttachments.submit(session, text, attachments);
+      completed = true;
     } finally {
       await this.options.sessionCatalog.upsertCurrent("session-updated");
       await this.options.configurationReload.apply();
     }
+    if (completed) this.options.generateSemanticTitle();
   }
 
   async steer(text: string, attachments?: PreparedPromptAttachmentSet): Promise<void> {

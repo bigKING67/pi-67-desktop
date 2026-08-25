@@ -114,7 +114,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
   "subagent.resume": NativeSubagentResumePayloadSchema,
   "session.catalog.query": SessionCatalogQuerySchema,
   "session.catalog.contentSearch": strictObject({
-    query: Type.String({ minLength: 1, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
+    query: Type.String({ minLength: 2, maxLength: MAX_MESSAGE_SEARCH_QUERY_CHARS })
   }),
   "workspace.usage.report": WorkspaceUsageReportPayloadSchema,
   "session.tree": EmptyPayloadSchema,
@@ -156,6 +156,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     instructions: Type.Optional(CompactionInstructionsSchema)
   }),
   "session.name": strictObject({ mutation: SessionNameMutationSchema }),
+  "session.title.regenerate": strictObject({}),
   "session.interactionMode.set": strictObject({
     mode: Type.Union([Type.Literal("execute"), Type.Literal("plan")])
   }),

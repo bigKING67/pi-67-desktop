@@ -5,6 +5,7 @@ import {
   configureCatalogDatabase,
   CorruptCatalogError,
   createCatalogSchema,
+  recordFromRow,
   recordValues,
   SchemaMismatchError,
   stateFromRow,
@@ -53,6 +54,7 @@ export interface SessionCatalogRecord {
   cwdKey: string;
   explicitName?: string;
   automaticName?: string;
+  automaticNameSource?: "generated" | "seed";
   pinnedAt?: number;
   archivedAt?: number;
   snoozedUntil?: number;
@@ -68,6 +70,37 @@ export interface SqliteCatalogState {
   itemCount: number;
   incomplete: boolean;
   skippedCount: number;
+}
+
+export interface SessionContentIndexMessage {
+  messageId: string;
+  role: "user" | "assistant";
+  createdAt?: number;
+  entryOrder: number;
+  contentFingerprint: string;
+  tokenHashes: readonly string[];
+}
+
+export interface SessionContentIndexDocument {
+  fileIdentity: string;
+  projectionVersion: string;
+  indexedEntries: number;
+  incomplete: boolean;
+  messages: readonly SessionContentIndexMessage[];
+}
+
+export interface SessionContentIndexCandidate {
+  fileIdentity: string;
+  messageId: string;
+  role: "user" | "assistant";
+  createdAt?: number;
+  contentFingerprint: string;
+}
+
+export interface SessionContentIndexCoverage {
+  sessionCount: number;
+  indexedEntries: number;
+  incompleteCount: number;
 }
 
 interface CatalogDatabaseVersion {
@@ -93,13 +126,49 @@ export interface SqliteSessionCatalog {
     metadata: { reconciledAt: number; incomplete: boolean; skippedCount: number },
     minimumRevision: number
   ): SqliteCatalogState;
+  preserveAutomaticNames?(sourceKey: string, records: SessionCatalogRecord[]): SessionCatalogRecord[];
+  contentIndexSalt?(): string;
+  contentIndexVersions?(): Map<string, string>;
+  replaceContentIndex?(document: SessionContentIndexDocument): void;
+  replaceContentIndexes?(documents: readonly SessionContentIndexDocument[]): void;
+  removeContentIndex?(fileIdentity: string): void;
+  pruneContentIndex?(fileIdentities: ReadonlySet<string>): void;
+  queryContentIndex?(cwdKey: string, tokenHashes: readonly string[], limit: number): SessionContentIndexCandidate[];
+  contentIndexCoverage?(cwdKey: string): SessionContentIndexCoverage;
   upsert(record: SessionCatalogRecord, minimumRevision: number): SqliteCatalogState;
+  upsertMany(records: readonly SessionCatalogRecord[], minimumRevision: number): SqliteCatalogState;
+  setIncomplete(incomplete: boolean, skippedCount: number): SqliteCatalogState;
   organize?(path: string, organization: SessionCatalogOrganization, minimumRevision: number): SqliteCatalogState;
   organizeMany?(
     organizations: readonly { path: string; organization: SessionCatalogOrganization }[],
     minimumRevision: number
   ): SqliteCatalogState;
   close(): void;
+}
+
+export type IndexedSqliteSessionCatalog = SqliteSessionCatalog & Required<Pick<
+  SqliteSessionCatalog,
+  | "contentIndexSalt"
+  | "contentIndexVersions"
+  | "replaceContentIndex"
+  | "replaceContentIndexes"
+  | "removeContentIndex"
+  | "pruneContentIndex"
+  | "queryContentIndex"
+  | "contentIndexCoverage"
+>>;
+
+export function supportsSessionContentIndex(
+  catalog: SqliteSessionCatalog
+): catalog is IndexedSqliteSessionCatalog {
+  return typeof catalog.contentIndexSalt === "function"
+    && typeof catalog.contentIndexVersions === "function"
+    && typeof catalog.replaceContentIndex === "function"
+    && typeof catalog.replaceContentIndexes === "function"
+    && typeof catalog.removeContentIndex === "function"
+    && typeof catalog.pruneContentIndex === "function"
+    && typeof catalog.queryContentIndex === "function"
+    && typeof catalog.contentIndexCoverage === "function";
 }
 
 export type SqliteCatalogOpenResult =
@@ -235,6 +304,172 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
     return result;
   }
 
+  contentIndexSalt(): string {
+    this.assertDatabaseVersion();
+    const salt = this.database.prepare("SELECT salt FROM content_index_state WHERE singleton = 1").get()?.salt;
+    if (typeof salt !== "string" || !/^[0-9a-f]{64}$/u.test(salt)) {
+      throw new SchemaMismatchError("Content index salt is invalid.");
+    }
+    return salt;
+  }
+
+  contentIndexVersions(): Map<string, string> {
+    this.assertDatabaseVersion();
+    const rows = this.database.prepare(`
+      SELECT file_identity, projection_version FROM session_content_versions
+    `).all();
+    this.assertDatabaseVersion();
+    return new Map(rows.map((row) => {
+      if (typeof row.file_identity !== "string" || typeof row.projection_version !== "string") {
+        throw new SchemaMismatchError("Content index version is invalid.");
+      }
+      return [row.file_identity, row.projection_version] as const;
+    }));
+  }
+
+  replaceContentIndex(document: SessionContentIndexDocument): void {
+    this.replaceContentIndexes([document]);
+  }
+
+  replaceContentIndexes(documents: readonly SessionContentIndexDocument[]): void {
+    if (documents.length === 0) return;
+    this.assertDatabaseVersion();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.assertDatabaseVersion();
+      const deleteTokens = this.database.prepare("DELETE FROM session_content_tokens WHERE file_identity = ?");
+      const deleteMessages = this.database.prepare("DELETE FROM session_content_messages WHERE file_identity = ?");
+      const deleteVersion = this.database.prepare("DELETE FROM session_content_versions WHERE file_identity = ?");
+      const insertMessage = this.database.prepare(`
+        INSERT INTO session_content_messages (
+          file_identity, message_id, role, created_at_ms, entry_order, content_fingerprint
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const insertToken = this.database.prepare(`
+        INSERT INTO session_content_tokens (file_identity, message_id, token_hash)
+        VALUES (?, ?, ?)
+      `);
+      const insertVersion = this.database.prepare(`
+        INSERT INTO session_content_versions (
+          file_identity, projection_version, indexed_entries, incomplete
+        ) VALUES (?, ?, ?, ?)
+      `);
+      for (const document of documents) {
+        deleteTokens.run(document.fileIdentity);
+        deleteMessages.run(document.fileIdentity);
+        deleteVersion.run(document.fileIdentity);
+        for (const message of document.messages) {
+          insertMessage.run(
+            document.fileIdentity,
+            message.messageId,
+            message.role,
+            message.createdAt ?? null,
+            message.entryOrder,
+            message.contentFingerprint
+          );
+          for (const tokenHash of message.tokenHashes) {
+            insertToken.run(document.fileIdentity, message.messageId, tokenHash);
+          }
+        }
+        insertVersion.run(
+          document.fileIdentity,
+          document.projectionVersion,
+          document.indexedEntries,
+          document.incomplete ? 1 : 0
+        );
+      }
+      this.database.exec("COMMIT");
+    } catch (error) {
+      rollback(this.database);
+      throw error;
+    }
+  }
+
+  removeContentIndex(fileIdentity: string): void {
+    this.assertDatabaseVersion();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.database.prepare("DELETE FROM session_content_tokens WHERE file_identity = ?").run(fileIdentity);
+      this.database.prepare("DELETE FROM session_content_messages WHERE file_identity = ?").run(fileIdentity);
+      this.database.prepare("DELETE FROM session_content_versions WHERE file_identity = ?").run(fileIdentity);
+      this.database.exec("COMMIT");
+    } catch (error) {
+      rollback(this.database);
+      throw error;
+    }
+  }
+
+  pruneContentIndex(fileIdentities: ReadonlySet<string>): void {
+    this.assertDatabaseVersion();
+    const indexed = this.database.prepare("SELECT file_identity FROM session_content_versions").all();
+    const stale = indexed.flatMap((row) => (
+      typeof row.file_identity === "string" && !fileIdentities.has(row.file_identity) ? [row.file_identity] : []
+    ));
+    if (stale.length === 0) return;
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const deleteTokens = this.database.prepare("DELETE FROM session_content_tokens WHERE file_identity = ?");
+      const deleteMessages = this.database.prepare("DELETE FROM session_content_messages WHERE file_identity = ?");
+      const deleteVersion = this.database.prepare("DELETE FROM session_content_versions WHERE file_identity = ?");
+      for (const fileIdentity of stale) {
+        deleteTokens.run(fileIdentity);
+        deleteMessages.run(fileIdentity);
+        deleteVersion.run(fileIdentity);
+      }
+      this.database.exec("COMMIT");
+    } catch (error) {
+      rollback(this.database);
+      throw error;
+    }
+  }
+
+  queryContentIndex(
+    cwdKey: string,
+    tokenHashes: readonly string[],
+    limit: number
+  ): SessionContentIndexCandidate[] {
+    if (tokenHashes.length === 0 || limit < 1) return [];
+    this.assertDatabaseVersion();
+    const placeholders = tokenHashes.map(() => "?").join(", ");
+    const rows = this.database.prepare(`
+      SELECT messages.file_identity, messages.message_id, messages.role,
+             messages.created_at_ms, messages.content_fingerprint
+      FROM session_content_tokens AS tokens
+      JOIN session_content_messages AS messages
+        USING (file_identity, message_id)
+      JOIN sessions ON sessions.file_identity = messages.file_identity
+      WHERE sessions.cwd_key = ?
+        AND sessions.archived_at_ms IS NULL
+        AND tokens.token_hash IN (${placeholders})
+      GROUP BY messages.file_identity, messages.message_id
+      HAVING COUNT(DISTINCT tokens.token_hash) = ?
+      ORDER BY sessions.modified_at_ms DESC,
+               CASE messages.role WHEN 'user' THEN 0 ELSE 1 END,
+               messages.entry_order ASC
+      LIMIT ?
+    `).all(cwdKey, ...tokenHashes, tokenHashes.length, limit);
+    this.assertDatabaseVersion();
+    return rows.map((row) => contentIndexCandidateFromRow(row));
+  }
+
+  contentIndexCoverage(cwdKey: string): SessionContentIndexCoverage {
+    this.assertDatabaseVersion();
+    const row = this.database.prepare(`
+      SELECT COUNT(*) AS session_count,
+             COALESCE(SUM(versions.indexed_entries), 0) AS indexed_entries,
+             COALESCE(SUM(versions.incomplete), 0) AS incomplete_count
+      FROM session_content_versions AS versions
+      JOIN sessions USING (file_identity)
+      WHERE sessions.cwd_key = ? AND sessions.archived_at_ms IS NULL
+    `).get(cwdKey);
+    this.assertDatabaseVersion();
+    return {
+      sessionCount: readCount(row?.session_count, "content index session count"),
+      indexedEntries: readCount(row?.indexed_entries, "content index entry count"),
+      incompleteCount: readCount(row?.incomplete_count, "content index incomplete count")
+    };
+  }
+
   replaceAll(
     sourceKey: string,
     records: SessionCatalogRecord[],
@@ -243,18 +478,30 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
   ): SqliteCatalogState {
     assertSessionCatalogRecordSetConsistency(records);
     this.assertDatabaseVersion();
+    const recordsToWrite = this.preserveAutomaticNames(sourceKey, records);
     const insert = this.database.prepare(`
       INSERT INTO sessions (
-        file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+        file_identity, path, session_id, cwd, cwd_key, explicit_name, automatic_name, automatic_name_source, search_name, search_path, search_id,
         modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms, snoozed_until_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.database.exec("BEGIN IMMEDIATE");
     try {
       this.assertDatabaseVersion();
       const revision = Math.max(this.readState().revision, minimumRevision) + 1;
       this.database.exec("DELETE FROM sessions");
-      for (const record of records) insert.run(...recordValues(record));
+      for (const record of recordsToWrite) insert.run(...recordValues(record));
+      const currentIdentities = new Set(recordsToWrite.map((record) => record.fileIdentity));
+      const indexedIdentities = this.database.prepare("SELECT file_identity FROM session_content_versions").all();
+      const deleteTokens = this.database.prepare("DELETE FROM session_content_tokens WHERE file_identity = ?");
+      const deleteMessages = this.database.prepare("DELETE FROM session_content_messages WHERE file_identity = ?");
+      const deleteVersion = this.database.prepare("DELETE FROM session_content_versions WHERE file_identity = ?");
+      for (const row of indexedIdentities) {
+        if (typeof row.file_identity !== "string" || currentIdentities.has(row.file_identity)) continue;
+        deleteTokens.run(row.file_identity);
+        deleteMessages.run(row.file_identity);
+        deleteVersion.run(row.file_identity);
+      }
       this.database.prepare(`
         UPDATE catalog_state
         SET source_key = ?, revision = ?, reconciled_at_ms = ?, item_count = ?, incomplete = ?, skipped_count = ?
@@ -263,7 +510,7 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
         sourceKey,
         revision,
         metadata.reconciledAt,
-        records.length,
+        recordsToWrite.length,
         metadata.incomplete ? 1 : 0,
         metadata.skippedCount
       );
@@ -282,22 +529,29 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
   }
 
   upsert(record: SessionCatalogRecord, minimumRevision: number): SqliteCatalogState {
+    return this.upsertMany([record], minimumRevision);
+  }
+
+  upsertMany(records: readonly SessionCatalogRecord[], minimumRevision: number): SqliteCatalogState {
+    if (records.length === 0) return this.getState();
     this.assertDatabaseVersion();
     this.database.exec("BEGIN IMMEDIATE");
     try {
       this.assertDatabaseVersion();
-      this.assertUpsertIdentity(record);
+      for (const record of records) this.assertUpsertIdentity(record);
       const revision = Math.max(this.readState().revision, minimumRevision) + 1;
-      this.database.prepare(`
+      const upsert = this.database.prepare(`
         INSERT INTO sessions (
-          file_identity, path, session_id, cwd, cwd_key, explicit_name, search_name, search_path, search_id,
+          file_identity, path, session_id, cwd, cwd_key, explicit_name, automatic_name, automatic_name_source, search_name, search_path, search_id,
           modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms, snoozed_until_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_identity) DO UPDATE SET
           path = excluded.path,
           cwd = excluded.cwd,
           cwd_key = excluded.cwd_key,
           explicit_name = excluded.explicit_name,
+          automatic_name = excluded.automatic_name,
+          automatic_name_source = excluded.automatic_name_source,
           search_name = excluded.search_name,
           search_path = excluded.search_path,
           search_id = excluded.search_id,
@@ -307,12 +561,29 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
           pinned_at_ms = excluded.pinned_at_ms,
           archived_at_ms = excluded.archived_at_ms,
           snoozed_until_ms = excluded.snoozed_until_ms
-      `).run(...recordValues(record));
+      `);
+      for (const record of records) upsert.run(...recordValues(record));
       this.database.prepare(`
         UPDATE catalog_state
         SET revision = ?, item_count = (SELECT COUNT(*) FROM sessions)
         WHERE singleton = 1
       `).run(revision);
+      this.database.exec("COMMIT");
+    } catch (error) {
+      rollback(this.database);
+      throw error;
+    }
+    return this.getState();
+  }
+
+  setIncomplete(incomplete: boolean, skippedCount: number): SqliteCatalogState {
+    this.assertDatabaseVersion();
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      this.assertDatabaseVersion();
+      this.database.prepare(`
+        UPDATE catalog_state SET incomplete = ?, skipped_count = ? WHERE singleton = 1
+      `).run(incomplete ? 1 : 0, skippedCount);
       this.database.exec("COMMIT");
     } catch (error) {
       rollback(this.database);
@@ -383,6 +654,39 @@ class NodeSqliteSessionCatalog implements SqliteSessionCatalog {
       );
     }
   }
+
+  preserveAutomaticNames(sourceKey: string, records: SessionCatalogRecord[]): SessionCatalogRecord[] {
+    const current = this.readState();
+    if (current.sourceKey !== sourceKey) return records;
+    const previous = this.database.prepare(`
+      SELECT file_identity, path, session_id, cwd, cwd_key, explicit_name, automatic_name, automatic_name_source, search_name, search_path,
+             search_id, modified_at_ms, message_count, parent_session_path, pinned_at_ms, archived_at_ms,
+             snoozed_until_ms
+      FROM sessions
+    `).all();
+    const namesByIdentity = new Map(previous.map((row) => {
+      const record = recordFromRow(row);
+      return [record.fileIdentity, record] as const;
+    }));
+    return records.map((record) => {
+      if (record.explicitName !== undefined || record.automaticName !== undefined) return record;
+      const old = namesByIdentity.get(record.fileIdentity);
+      if (!old || old.automaticName === undefined || !sameSessionProjection(record, old)) return record;
+      return {
+        ...record,
+        automaticName: old.automaticName,
+        automaticNameSource: old.automaticNameSource ?? "seed"
+      };
+    });
+  }
+}
+
+function sameSessionProjection(next: SessionCatalogRecord, previous: SessionCatalogRecord): boolean {
+  return next.fileIdentity === previous.fileIdentity
+    && next.id === previous.id
+    && next.path === previous.path
+    && next.modifiedAt === previous.modifiedAt
+    && next.messageCount === previous.messageCount;
 }
 
 function prepareCatalogForUse(database: DatabaseLike, create: boolean): CatalogDatabaseVersion {
@@ -426,6 +730,30 @@ function readInteger(value: unknown, field: string): number {
     throw new SchemaMismatchError(`Catalog ${field} is invalid.`);
   }
   return value;
+}
+
+function readCount(value: unknown, field: string): number {
+  return readInteger(value, field);
+}
+
+function contentIndexCandidateFromRow(row: Record<string, unknown>): SessionContentIndexCandidate {
+  if (typeof row.file_identity !== "string"
+    || typeof row.message_id !== "string"
+    || (row.role !== "user" && row.role !== "assistant")
+    || typeof row.content_fingerprint !== "string"
+    || !/^[0-9a-f]{64}$/u.test(row.content_fingerprint)) {
+    throw new SchemaMismatchError("Content index candidate is invalid.");
+  }
+  const createdAt = row.created_at_ms === null
+    ? undefined
+    : readInteger(row.created_at_ms, "content index created_at_ms");
+  return {
+    fileIdentity: row.file_identity,
+    messageId: row.message_id,
+    role: row.role,
+    contentFingerprint: row.content_fingerprint,
+    ...(createdAt === undefined ? {} : { createdAt })
+  };
 }
 
 async function loadNodeSqlite(): Promise<DatabaseConstructor> {

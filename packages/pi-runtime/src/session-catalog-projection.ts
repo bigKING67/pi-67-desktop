@@ -85,12 +85,18 @@ export function sanitizeSessionCatalogDiscovery(
 
 export function sanitizeSessionCatalogRecord(record: SessionCatalogRecord): SessionCatalogRecord | undefined {
   const explicitName = record.explicitName?.trim() || undefined;
+  const automaticName = record.automaticName?.trim() || undefined;
+  const automaticNameSource = automaticName === undefined
+    ? undefined
+    : record.automaticNameSource ?? "seed";
   if (!validText(record.fileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
     || !validText(record.id, MAX_SESSION_CATALOG_ID_CHARS)
     || !validText(record.path, MAX_SESSION_CATALOG_PATH_CHARS)
     || !validText(record.cwd, MAX_SESSION_CATALOG_PATH_CHARS)
     || !validText(record.cwdKey, MAX_SESSION_CATALOG_PATH_CHARS)
     || (explicitName !== undefined && !validText(explicitName, MAX_SESSION_CATALOG_NAME_CHARS))
+    || (automaticName !== undefined && !validText(automaticName, MAX_SESSION_CATALOG_NAME_CHARS))
+    || (automaticNameSource !== undefined && automaticNameSource !== "generated" && automaticNameSource !== "seed")
     || (record.parentSessionPath !== undefined && !validText(record.parentSessionPath, MAX_SESSION_CATALOG_PATH_CHARS))
     || !Number.isSafeInteger(record.modifiedAt)
     || !Number.isSafeInteger(record.messageCount)
@@ -103,6 +109,13 @@ export function sanitizeSessionCatalogRecord(record: SessionCatalogRecord): Sess
   const safe = { ...record };
   if (explicitName === undefined) delete safe.explicitName;
   else safe.explicitName = explicitName;
+  if (automaticName === undefined) {
+    delete safe.automaticName;
+    delete safe.automaticNameSource;
+  } else {
+    safe.automaticName = automaticName;
+    safe.automaticNameSource = automaticNameSource ?? "seed";
+  }
   return safe;
 }
 
@@ -144,7 +157,7 @@ export function createBoundedSessionCatalogPage(
   limit: number,
   queryKey: string
 ): SessionCatalogPage {
-  const items = result.records.slice(0, limit).map(toSummary);
+  const items = result.records.slice(0, limit).map(sessionCatalogSummaryFromRecord);
   const full = pageWithItems(items, result.total, result.hasMore, status, queryKey);
   if (Buffer.byteLength(JSON.stringify(full), "utf8") <= MAX_SESSION_CATALOG_PAGE_JSON_BYTES) return full;
   let low = 0;
@@ -211,7 +224,7 @@ function isAfterCursor(
     ));
 }
 
-function toSummary(record: SessionCatalogRecord): SessionSummary {
+export function sessionCatalogSummaryFromRecord(record: SessionCatalogRecord): SessionSummary {
   return {
     fileIdentity: record.fileIdentity,
     id: record.id,
@@ -220,7 +233,7 @@ function toSummary(record: SessionCatalogRecord): SessionSummary {
     name: record.explicitName ?? record.automaticName ?? UNTITLED_SESSION_NAME,
     nameSource: record.explicitName !== undefined
       ? "explicit"
-      : record.automaticName !== undefined ? "latest-user" : "fallback",
+      : record.automaticName !== undefined ? record.automaticNameSource ?? "seed" : "fallback",
     modifiedAt: record.modifiedAt,
     messageCount: record.messageCount,
     ...(record.pinnedAt === undefined ? {} : { pinnedAt: record.pinnedAt }),

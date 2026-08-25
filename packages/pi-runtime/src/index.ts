@@ -29,6 +29,8 @@ export * from "./safe-atomic-io.js";
 export * from "./safety-extension.js";
 export * from "./session-catalog.js";
 export * from "./session-content-search.js";
+export * from "./session-content-index.js";
+export * from "./session-semantic-title.js";
 export * from "./session-creation-receipt-store.js";
 export * from "./session-projection-index.js";
 export * from "./session-tree-projection.js";

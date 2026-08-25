@@ -293,24 +293,44 @@ describe("AgentHostServer Session Catalog", () => {
       expect(await responseFor(port, clearName.requestId)).toMatchObject({ ok: true });
       const automaticTitleEventsBefore = port.sent.filter(isAutomaticTitleCatalogEvent).length;
       const pendingAutomatic = await queryCatalog(port, context, { view: "active" });
-      expect(pendingAutomatic.items.find((item) => item.path === sessionPath)).toEqual(
-        expect.objectContaining({
-          path: sessionPath,
-          name: "未命名对话",
-          nameSource: "fallback"
-        })
-      );
-      await vi.waitFor(() => expect(port.sent.filter(isAutomaticTitleCatalogEvent).length)
-        .toBeGreaterThan(automaticTitleEventsBefore));
-      const automatic = await queryCatalog(port, context, { view: "active" });
+      const pendingItem = pendingAutomatic.items.find((item) => item.path === sessionPath);
+      expect(pendingItem).toEqual(expect.objectContaining({ path: sessionPath }));
+      if (pendingItem?.nameSource === "fallback") {
+        await vi.waitFor(() => expect(port.sent.filter(isAutomaticTitleCatalogEvent).length)
+          .toBeGreaterThan(automaticTitleEventsBefore));
+      }
+      const automatic = pendingItem?.nameSource === "seed"
+        ? pendingAutomatic
+        : await queryCatalog(port, context, { view: "active" });
       const restoredItem = automatic.items.find((item) => item.path === sessionPath);
       expect(restoredItem).toEqual(expect.objectContaining({
         path: sessionPath,
         name: "修复冷启动对话标题",
-        nameSource: "latest-user"
+        nameSource: "seed"
       }));
       expect(restoredItem).not.toHaveProperty("pinnedAt");
       expect(restoredItem).not.toHaveProperty("archivedAt");
+
+      const contentSearch = commandEnvelopeForContext("session.catalog.contentSearch", {
+        query: "冷启动"
+      }, context, 9);
+      port.emit(contentSearch);
+      const contentResponse = await responseFor(port, contentSearch.requestId);
+      expect(contentResponse).toMatchObject({
+        ok: true,
+        type: "session.catalog.contentSearch",
+        result: {
+          workspaceId: context.workspaceId,
+          items: [
+            expect.objectContaining({ role: "user", snippet: expect.stringContaining("冷启动") }),
+            expect.objectContaining({ role: "user", snippet: expect.stringContaining("冷启动") }),
+            expect.objectContaining({ role: "user", snippet: expect.stringContaining("冷启动") })
+          ],
+          sessionsVisited: 3,
+          entriesVisited: 6,
+          incomplete: false
+        }
+      });
       expect(runtimeLoader).not.toHaveBeenCalled();
     } finally {
       await server.shutdown();

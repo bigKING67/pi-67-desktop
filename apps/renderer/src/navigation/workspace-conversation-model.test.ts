@@ -27,7 +27,7 @@ describe("workspace conversation model", () => {
     expect(rows[0]?.title).toBe("服务端命中");
   });
 
-  it("uses the latest in-memory user message as the row title without losing the stable Session name", () => {
+  it("keeps the stable Session title while retaining latest-message search context", () => {
     const session = {
       fileIdentity: "session-file-fixture-67",
       id: "session-identity-67",
@@ -63,8 +63,8 @@ describe("workspace conversation model", () => {
     const [row] = conversationRows("workspace-test", [task], [session], "");
 
     expect(row).toMatchObject({
-      title: "重新检查双栏设置的响应式问题",
-      meta: expect.stringContaining("稳定的 Pi 会话名")
+      title: "稳定的 Pi 会话名",
+      meta: expect.stringContaining("重新检查双栏设置的响应式问题")
     });
     expect(conversationRows("workspace-test", [task], [session], "重新检查")).toHaveLength(1);
     expect(conversationRows("workspace-test", [task], [session], "稳定的 Pi 会话名")).toHaveLength(1);

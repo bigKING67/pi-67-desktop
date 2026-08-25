@@ -185,7 +185,8 @@ export async function launchPackagedApplication({
       environment,
       offline,
       probePackagedRendererIsolation
-    })
+    }),
+    timeout: 30_000
   });
   if (isolateNativeWindow) {
     await isolatePackagedAutomationWindow(application, { hideNativeWindow });
@@ -197,7 +198,7 @@ export async function isolatePackagedAutomationWindow(
   application,
   { hideNativeWindow = true } = {}
 ) {
-  await application.firstWindow();
+  await application.firstWindow({ timeout: 60_000 });
   await application.evaluate(({ BrowserWindow }, shouldHideNativeWindow) => {
     const window = BrowserWindow.getAllWindows()[0];
     if (!window) throw new Error("Packaged BrowserWindow is unavailable.");

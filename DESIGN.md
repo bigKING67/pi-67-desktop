@@ -113,6 +113,12 @@ completing a real session without learning terminal UI conventions first.
   Quiet semantic surfaces and a single-pixel divider establish pane ownership;
   the header does not imitate a terminal card, add a second toolbar frame, or
   place an opaque layer over conversation content.
+- The global TitleBar baseline and the navigation/Inspector pane dividers are
+  the resting shell boundaries. Navigation brand and Inspector tab groups use
+  spacing and quiet semantic surfaces rather than a second local underline;
+  their search fields use filled resting surfaces, a bounded hover edge, and a
+  stronger focus treatment. Selected rows, selected tabs, warnings, Popovers,
+  and dialogs retain their stateful boundaries.
 - The navigation rail is the single persistent product-brand location inside
   the conversation workbench. Its brand lockup is one non-wrapping row containing
   the locked π mark and `Pi-67`; `会话工作台` remains assistive context rather than
@@ -694,6 +700,12 @@ loading error where the operation can produce those states
 - Selecting a conversation automatically expands its Workspace and keeps the row
   visible. A collapsed Workspace with background work shows running and waiting
   counts on its group header without relying on color alone.
+- Conversation rows have no default leading glyph or reserved marker column;
+  an idle Session must read as conversation history rather than an unchecked
+  task or radio option. Selection is expressed only by the active surface and
+  the inset accent edge. Running, waiting, draft, pinned, snoozed, and attention
+  semantics appear only when present in the trailing indicator area, where text
+  remains the non-color authority.
 - A selected idle, stopped, or lost conversation never inherits a stale live
   projection merely because its Session ID still matches. Until Pi reacquires
   runtime authority, the center surface shows an explicit `打开会话` or `恢复任务`
@@ -723,13 +735,13 @@ loading error where the operation can produce those states
   accepted, running, approval-wait, or Extension-input-wait Task. Idle and
   terminal conversations never expose a non-functional stop action.
 - Conversation titles have one semantic authority across cold Catalog rows and
-  loaded Tasks: explicit Pi `session_info.name`, then the latest topical User
-  message on the current Pi branch, then `未命名对话`. Routine follow-ups and bare
-  navigation commands do not displace the previous topic. The title stays on one
-  line in navigation and truncates rather than wrapping the row. Automatic titles
-  are derived locally without a model and remain query-time/memory-only; the
-  explicit rename and empty-name restore operations alone append Pi
-  `session_info` entries.
+  loaded Tasks: explicit Pi `session_info.name`, generated semantic metadata on
+  the current Pi branch, the first meaningful User request as a deterministic
+  seed, then `未命名对话`. Routine follow-ups and bare navigation commands do not
+  displace the stable title. The title stays on one line in navigation and
+  truncates rather than wrapping the row. Generated or failed title metadata is
+  a typed Pi JSONL custom entry; explicit rename and empty-name restore remain
+  Pi `session_info` operations.
 - Archive is reversible organization rather than deletion. Active,
   initializing, provisional, and draft conversations expose a disabled archive
   action with the Controller retaining the same fail-closed check. Successful
@@ -1442,6 +1454,9 @@ loading error where the operation can produce those states
   remains present for settled history, pending Prompts, Turn activity, and live
   Assistant output so the next input reads as a stable action zone rather than
   another message card.
+- The Composer shell owns its focus boundary only while its textarea owns focus.
+  Toolbar and runtime controls retain focus on the exact control instead of
+  promoting the shell, so nested focus rings never compete.
 - Main action is `发送`/`Send` or `停止`/`Stop`, never a generic submit label.
 - Provider-bound Prompt text has one shared 120,000-character limit at the
   Renderer and Protocol boundary. An oversized submission stays editable, does
@@ -1633,6 +1648,50 @@ loading error where the operation can produce those states
   in the Agent Host rather than filtering an eagerly transferred full array.
   Cold rebuild shows `正在建立 Session 目录…`; fallback or incomplete discovery is
   visible and must not be presented as an authoritative empty result.
+- Automatic titles are stable Session metadata rather than a latest-message
+  Renderer overlay. The first meaningful current-branch User request provides an
+  immediate deterministic seed; after the first successful Assistant Turn,
+  Desktop may make one asynchronous, abortable `completeSimple` call through the
+  Turn's selected Pi model and persist the bounded result as a typed Pi JSONL
+  custom entry. SQLite and fallback projections use
+  `explicit name -> generated title -> seed title -> fallback name` precedence.
+  Later prompts never silently retitle the conversation. Tool/system/raw payload
+  content is excluded, cross-model fallback is forbidden, and generation failure
+  cannot change the completed Turn result or retry automatically.
+- A historical Session with completed User/Assistant context and no explicit,
+  generated, or failed title metadata schedules the same bounded generation only
+  after the user activates it as a live Task. Catalog browsing, background index
+  rebuilds, and cold startup never bulk-generate titles. The deterministic seed
+  remains visible while generation is pending.
+- Task transition feedback resolves the same effective Catalog/Task title used by
+  the conversation row. It never interpolates `未命名会话`, `未命名任务`, or
+  `未命名对话`; when no authoritative title is available it uses the neutral
+  `正在切换会话` / `已切换到会话` copy until title projection converges.
+- A nonempty Catalog name query waits for the current bounded automatic-title
+  indexing flight and its writes before returning, while ordinary list pages
+  remain responsive. Manual semantic-title regeneration is available only for a
+  live Task so the current model and Session generation remain explicit; an
+  explicit user name stays authoritative until the user restores automatic mode.
+- The rail search is unified but visually grouped: `会话` contains Catalog
+  name/path/ID matches and `对话内容` contains at most one best user/assistant text
+  hit per Session. Content selection opens the exact physical Session, requests
+  `message.locate`, then focuses the verified message; a content hit is never
+  treated as a Session identity by itself.
+- Cross-Session content search uses the Host-owned disposable private SQLite
+  projection. It stores only per-database-salted opaque HMAC bigrams, physical
+  Session/message identity, role/time/order, content fingerprint, and coverage
+  state; message bodies, snippets, Tool/system/custom payloads, and paths are not
+  copied into content-index tables. Every candidate is re-read from the current
+  Pi JSONL branch and fingerprinted before a bounded snippet crosses protocol.
+  Two-character Chinese and Latin substrings are supported. Stale, oversized,
+  malformed, cancelled, or only partially indexed sources remain visibly
+  incomplete; SQLite unavailability uses the existing bounded direct scan only
+  as a degraded fallback and never presents it as complete authority.
+- Automatic-title indexing is shared, uses at most four Session readers across
+  replacement generations, and applies current physical versions in batches of
+  at most 16. Applied title batches advance Catalog revision before publishing;
+  stale callbacks are ignored and unreadable current sources remain visibly
+  incomplete rather than producing authoritative empty search results.
 - The Agent Host owns one Session Catalog owner and SQLite connection for all
   Workspace bindings that share the Main-owned storage identity. Workspace and
   Task services dispose only their bindings; competing SQLite owners must never
@@ -1697,13 +1756,13 @@ loading error where the operation can produce those states
   the Workspace surface. It never opens, moves, rewrites, or deletes Pi JSONL. A
   draft or attachment disables the destructive interpretation and keeps the
   placeholder with an explanatory warning.
-- Sessions without an explicit Pi `session_info.name` receive a query-time title
-  from the latest topical User message on the current Pi branch. The Host reads
-  the JSONL tail backwards in bounded chunks, follows the leaf's `id -> parentId`
-  chain, limits title length, and parses at most the already requested page with
-  four concurrent readers. File identity, inode, nanosecond mtime, and size bind
-  a bounded LRU cache. No model call, cold Runtime, SQLite title, Workbench title,
-  log, telemetry, or full-history scan is permitted; no valid title falls back to
+- Sessions without an explicit Pi `session_info.name` resolve generated title
+  metadata or the first meaningful User request seed from the current Pi branch.
+  The Host reads JSONL backwards in bounded chunks, follows the leaf's
+  `id -> parentId` chain, limits title length, and uses at most four concurrent
+  readers. File identity, inode, nanosecond mtime, and size bind a bounded LRU
+  cache. Catalog reads make no model call and open no cold Runtime; SQLite stores
+  only the disposable generated/seed projection. No valid title falls back to
   `未命名对话`.
 - Active Catalog pages sort live/waiting/draft work first in the Renderer, then
   pinned conversations by most recent pin, then ordinary modified time. Archived

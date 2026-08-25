@@ -105,6 +105,7 @@ describe("Inspector protocol", () => {
       truncated: false
     })).toBe(true);
     expect(Value.Check(CommandPayloadSchemas["session.catalog.contentSearch"], { query: "release" })).toBe(true);
+    expect(Value.Check(CommandPayloadSchemas["session.catalog.contentSearch"], { query: "x" })).toBe(false);
     expect(Value.Check(CommandResultSchemas["session.catalog.contentSearch"], {
       workspaceId: "workspace-1",
       query: "release",

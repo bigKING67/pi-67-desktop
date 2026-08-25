@@ -62,7 +62,7 @@ describe("PiSdkRuntime Session fork", () => {
       await runtime.rollback(fixture.firstUserEntryId, false);
 
       expect(runtime.getIdentity()).toEqual(forkIdentity);
-      expect(events.map((event) => event.type)).toEqual([
+      expect(events.filter((event) => event.type !== "session.catalog.changed").map((event) => event.type)).toEqual([
         "conversation.changed",
         "tree.changed",
         "usage.changed"

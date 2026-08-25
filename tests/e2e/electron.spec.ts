@@ -71,7 +71,7 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await doctorDialog.getByRole("button", { name: "开始检查" }).click();
     const catalogCheck = doctorDialog.locator(".doctor-check").filter({ hasText: "Session 目录" });
     await expect(catalogCheck.getByText("通过", { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(catalogCheck.getByText(/schema v4; ready/u)).toBeVisible();
+    await expect(catalogCheck.getByText(/schema v7; ready/u)).toBeVisible();
     await doctorDialog.getByRole("button", { name: "关闭" }).click();
     await settings.getByRole("button", { name: "返回工作台" }).click();
     await expect(window.getByLabel("Pi conversation")).toBeVisible();

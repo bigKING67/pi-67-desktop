@@ -262,6 +262,26 @@ describe("Session Catalog orchestration", () => {
     });
     await catalog.dispose();
   });
+  it("searches the readable projection while a same-source refresh is pending", async () => {
+    const catalog = createSessionCatalog({
+      openSqlite: async () => ({ kind: "fallback", reason: "unavailable" })
+    });
+    const initial = makeContext("source", async () => discovery([record(1)]));
+    await catalog.reconcile(initial);
+    let release!: (value: SessionCatalogDiscoveryResult) => void;
+    const refresh = makeContext("source", () => new Promise((resolve) => { release = resolve; }));
+    const rebuilding = catalog.reconcile(refresh);
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+    const live = record(2, { explicitName: "Searchable during rebuild" });
+    await catalog.upsert(live, initial, "session-created");
+
+    const page = await catalog.query({ scope: "all", search: "during rebuild" }, initial);
+
+    expect(page.items).toMatchObject([{ id: live.id, name: live.explicitName }]);
+    release(discovery([record(1)]));
+    await rebuilding;
+    await catalog.dispose();
+  });
   it("rebuilds the complete SDK fallback after a runtime SQLite query failure", async () => {
     const state: SqliteCatalogState = {
       sourceKey: "source",
@@ -276,6 +296,8 @@ describe("Session Catalog orchestration", () => {
       query: () => { throw new Error("SQLITE_IOERR"); },
       replaceAll: () => state,
       upsert: () => state,
+      upsertMany: () => state,
+      setIncomplete: () => state,
       close: vi.fn()
     };
     let release!: (value: SessionCatalogDiscoveryResult) => void;
@@ -314,6 +336,8 @@ describe("Session Catalog orchestration", () => {
       query: () => ({ records: [], total: 0, hasMore: false }),
       replaceAll: () => state,
       upsert: () => { throw new Error("SQLITE_IOERR"); },
+      upsertMany: () => state,
+      setIncomplete: () => state,
       close: vi.fn()
     };
     let release!: (value: SessionCatalogDiscoveryResult) => void;

@@ -7,6 +7,7 @@ export function conversationPrimaryTitle(
 ): string {
   if (task.pendingTitle) return task.pendingTitle;
   if (task.titleSource === "explicit") return task.title;
+  if (session && session.nameSource !== "fallback") return session.name;
   return task.recentUserMessagePreview ?? conversationStableTitle(task, session);
 }
 

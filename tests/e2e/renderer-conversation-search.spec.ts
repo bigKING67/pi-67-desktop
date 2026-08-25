@@ -141,6 +141,13 @@ test("searches Workspace conversation text and opens the exact Session result", 
   });
   await clearRecordedCommands(page);
 
+  const navigationSearch = page.getByRole("searchbox", { name: "搜索会话" });
+  await navigationSearch.fill("installer marker");
+  await expect(page.getByText("对话内容", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Release verification.*installer marker verified/u })).toBeVisible();
+  await expect(page.locator('[data-content-search-visible-count="1"]')).toBeVisible();
+  await page.getByRole("button", { name: "清除会话搜索" }).click();
+
   await page.getByLabel("给 Pi 发送消息").focus();
   await page.keyboard.press("Control+Shift+f");
   const dialog = page.getByRole("dialog", { name: "搜索工作区对话正文" });
@@ -148,7 +155,7 @@ test("searches Workspace conversation text and opens the exact Session result", 
   await page.getByLabel("搜索当前工作区的对话正文").fill("installer marker");
   await dialog.getByRole("button", { name: "搜索", exact: true }).click();
   await expect(dialog.getByText("installer marker verified", { exact: true })).toBeVisible();
-  await expect(dialog).toContainText("已扫描 2 个对话、4 条事件");
+  await expect(dialog).toContainText("已索引 2 个对话、4 条消息");
 
   await dialog.getByRole("button", { name: /Release verification/u }).click();
   await expect.poll(async () => (await recordedCommands(page)).includes("session.open")).toBe(true);

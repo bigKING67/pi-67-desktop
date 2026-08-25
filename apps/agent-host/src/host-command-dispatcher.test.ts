@@ -225,6 +225,22 @@ describe("operationSubmissionIdentity", () => {
     });
   });
 
+  it("regenerates the semantic title before acknowledging the current projection", async () => {
+    const acknowledgement = { revision: 19 } as never;
+    const regenerateSessionTitle = vi.fn().mockResolvedValue(undefined);
+    const captureProjectionMutationAcknowledgement = vi.fn(() => acknowledgement);
+    const runtime = { regenerateSessionTitle } as unknown as AgentRuntime;
+
+    await expect(dispatchHostCommand(
+      runtime,
+      { type: "session.title.regenerate", payload: {} },
+      { captureProjectionMutationAcknowledgement } as never
+    )).resolves.toBe(acknowledgement);
+
+    expect(regenerateSessionTitle).toHaveBeenCalledOnce();
+    expect(captureProjectionMutationAcknowledgement).toHaveBeenCalledWith(runtime);
+  });
+
   it("publishes the AUTO reset when Workspace trust revocation drops YOLO", async () => {
     const reloadResult = { resources: [] } as never;
     const setWorkspacePolicy = vi.fn(() => "auto" as const);

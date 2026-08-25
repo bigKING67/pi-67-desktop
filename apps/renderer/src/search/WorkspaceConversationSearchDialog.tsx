@@ -32,6 +32,7 @@ export function WorkspaceConversationSearchDialog() {
   const [openingId, setOpeningId] = useState<string>();
   const [error, setError] = useState<string>();
   const requestRevision = useRef(0);
+  const activeRequest = useRef<AbortController | undefined>(undefined);
   const openedHostEpoch = useRef<number | undefined>(undefined);
   const openedWorkspaceId = useRef<string | undefined>(undefined);
   const restoreFocusTarget = useRef<HTMLElement | undefined>(undefined);
@@ -40,6 +41,8 @@ export function WorkspaceConversationSearchDialog() {
 
   const closeDialog = useCallback((restoreFocus = true) => {
     requestRevision.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = undefined;
     setOpen(false);
     setLoading(false);
     setResult(undefined);
@@ -104,7 +107,10 @@ export function WorkspaceConversationSearchDialog() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
-            <Button isDisabled={loading || !query.trim() || !workspace || !connected} type="submit">
+            <Button
+              isDisabled={loading || Array.from(query.normalize("NFKC").trim()).length < 2 || !workspace || !connected}
+              type="submit"
+            >
               {loading
                 ? <LoaderCircle aria-hidden="true" className={styles.spin} size={14} />
                 : <Search aria-hidden="true" size={14} />}
@@ -117,12 +123,12 @@ export function WorkspaceConversationSearchDialog() {
               : workspace
                 ? `工作区：${workspace.displayName}`
                 : "当前没有可搜索的工作区"}
-            {result ? ` · 已扫描 ${result.sessionsVisited} 个对话、${result.entriesVisited} 条事件` : ""}
+            {result ? ` · 已索引 ${result.sessionsVisited} 个对话、${result.entriesVisited} 条消息` : ""}
           </p>
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
           {result?.incomplete ? (
             <p className={styles.warning} role="status">
-              搜索结果不完整{result.skippedCount > 0 ? `，跳过 ${result.skippedCount} 个对话` : ""}。
+              索引结果不完整{result.skippedCount > 0 ? `，${result.skippedCount} 个对话或版本尚未覆盖` : ""}。
             </p>
           ) : null}
           <div className={styles.results}>
@@ -151,8 +157,12 @@ export function WorkspaceConversationSearchDialog() {
 
   async function search(): Promise<void> {
     const requestHostEpoch = useAppStore.getState().hostEpoch;
-    if (!workspace || loading || !query.trim() || requestHostEpoch === undefined) return;
+    const normalizedQuery = query.normalize("NFKC").trim();
+    if (!workspace || loading || Array.from(normalizedQuery).length < 2 || requestHostEpoch === undefined) return;
     const revision = ++requestRevision.current;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setLoading(true);
     setResult(undefined);
     setError(undefined);
@@ -161,9 +171,12 @@ export function WorkspaceConversationSearchDialog() {
       if (!requestIsCurrent(revision, requestHostEpoch, workspace.id)) return;
       const next = await agentConnectionController.request(
         "session.catalog.contentSearch",
-        { query: query.trim() },
+        { query: normalizedQuery },
         [],
-        { context: { scope: "workspace", workspaceId: workspace.id } }
+        {
+          context: { scope: "workspace", workspaceId: workspace.id },
+          signal: controller.signal
+        }
       );
       if (!requestIsCurrent(revision, requestHostEpoch, workspace.id) || next.workspaceId !== workspace.id) return;
       setResult(next);
@@ -172,6 +185,7 @@ export function WorkspaceConversationSearchDialog() {
         setError(cause instanceof Error ? cause.message : "跨对话搜索失败，请重试。");
       }
     } finally {
+      if (activeRequest.current === controller) activeRequest.current = undefined;
       if (requestIsCurrent(revision, requestHostEpoch, workspace.id)) setLoading(false);
     }
   }

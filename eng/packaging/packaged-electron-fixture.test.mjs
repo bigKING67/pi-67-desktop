@@ -33,6 +33,7 @@ describe("packaged Electron launch environment", () => {
     await isolatePackagedAutomationWindow(application);
 
     expect(application.firstWindow).toHaveBeenCalledOnce();
+    expect(application.firstWindow).toHaveBeenCalledWith({ timeout: 60_000 });
     expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
     expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
     expect(window.setFocusable).toHaveBeenCalledWith(false);
@@ -64,6 +65,7 @@ describe("packaged Electron launch environment", () => {
     await isolatePackagedAutomationWindow(application, { hideNativeWindow: false });
 
     expect(application.firstWindow).toHaveBeenCalledOnce();
+    expect(application.firstWindow).toHaveBeenCalledWith({ timeout: 60_000 });
     expect(window.webContents.setBackgroundThrottling).toHaveBeenCalledWith(false);
     expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true);
     expect(window.setFocusable).not.toHaveBeenCalled();

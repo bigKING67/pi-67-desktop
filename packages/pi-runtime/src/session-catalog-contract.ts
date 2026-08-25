@@ -3,10 +3,12 @@ import type {
   SessionCatalogChangedReason,
   SessionCatalogPage,
   SessionCatalogQuery,
-  SessionCatalogStatus
+  SessionCatalogStatus,
+  WorkspaceMessageSearchResult
 } from "@pi67/domain";
 import type { SessionCatalogDiscoveryResult } from "./session-catalog-projection.js";
 import type { SessionCatalogOrganizationMutation } from "./session-catalog-record-enricher.js";
+import type { AutomaticTitleReader } from "./session-automatic-title.js";
 import type {
   OpenSqliteSessionCatalog,
   SessionCatalogRecord
@@ -20,6 +22,12 @@ export interface SessionCatalogContext {
 
 export interface SessionCatalog {
   query(query: SessionCatalogQuery, context: SessionCatalogContext): Promise<SessionCatalogPage>;
+  searchContent(
+    workspaceId: string,
+    query: string,
+    context: SessionCatalogContext,
+    signal?: AbortSignal
+  ): Promise<WorkspaceMessageSearchResult>;
   status(): SessionCatalogStatus;
   reconcile(context: SessionCatalogContext, reason?: SessionCatalogChangedReason): Promise<void>;
   upsert(
@@ -41,5 +49,6 @@ export interface CreateSessionCatalogOptions {
   storageRoot?: string;
   onChanged?: (event: SessionCatalogChangedEvent) => void;
   openSqlite?: OpenSqliteSessionCatalog;
+  automaticTitleReader?: AutomaticTitleReader;
   now?: () => number;
 }

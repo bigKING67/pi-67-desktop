@@ -101,6 +101,7 @@ export interface AgentRuntime {
   rollback(entryId: string, summarize?: boolean): Promise<void>;
   compact(instructions?: string): Promise<void>;
   setSessionName(name?: string): Promise<void>;
+  regenerateSessionTitle(): Promise<void>;
   setInteractionMode(mode: SessionInteractionMode): Promise<void>;
   implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void>;
   preparePromptAttachments(

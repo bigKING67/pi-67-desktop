@@ -7,6 +7,7 @@ import {
   conversationNeedsAttention,
   useConversationAttentionStore
 } from "../navigation/conversation-attention-store.js";
+import { useSessionCatalogStore } from "../navigation/session-catalog-store.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import { rendererWorkbenchStore, selectedWorkbenchTask } from "./workbench-store.js";
@@ -40,6 +41,7 @@ describe("task activation controller", () => {
     registerWorkspace.mockResolvedValue(true);
     rendererWorkbenchStore.getState().reset();
     useConversationAttentionStore.getState().reset();
+    useSessionCatalogStore.setState(useSessionCatalogStore.getInitialState(), true);
     useTaskDraftStore.getState().dispose();
     useAppStore.setState(useAppStore.getInitialState(), true);
     rendererWorkbenchStore.getState().registerWorkspace({
@@ -118,6 +120,50 @@ describe("task activation controller", () => {
       "workspace-a",
       "session-file-a"
     )).toBe(false);
+  });
+
+  it("uses the authoritative Catalog title in Task transition feedback", async () => {
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      title: "未命名会话",
+      titleSource: "fallback",
+      recentUserMessagePreview: "今天杭州天气如何"
+    });
+    installCatalogTitle("杭州实时天气查询", "generated");
+    markTaskActive();
+    resynchronize.mockResolvedValue("committed");
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(useAppStore.getState().runtime.detail).toBe("正在切换任务：杭州实时天气查询");
+    expect(resynchronize).toHaveBeenCalledWith(
+      useAppStore.getState,
+      useAppStore.setState,
+      expect.objectContaining({
+        recoveringDetail: "正在切换任务：杭州实时天气查询",
+        readyDetail: "已切换到任务：杭州实时天气查询"
+      })
+    );
+  });
+
+  it("never exposes an internal unnamed placeholder in Task transition feedback", async () => {
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      title: "未命名会话",
+      titleSource: "fallback"
+    });
+    markTaskActive();
+    resynchronize.mockResolvedValue("committed");
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(useAppStore.getState().runtime.detail).toBe("正在切换会话");
+    expect(resynchronize).toHaveBeenCalledWith(
+      useAppStore.getState,
+      useAppStore.setState,
+      expect.objectContaining({
+        recoveringDetail: "正在切换会话",
+        readyDetail: "已切换到会话"
+      })
+    );
   });
 
   it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
@@ -436,6 +482,32 @@ function markTaskActive(): void {
     lifecycle: "idle",
     runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true },
     sessionGeneration: 4
+  });
+}
+
+function installCatalogTitle(name: string, nameSource: "generated" | "seed"): void {
+  const store = useSessionCatalogStore.getState();
+  const target = store.beginFirstPage("workspace-a");
+  store.finishFirstPage(target, {
+    items: [{
+      fileIdentity: "session-file-a",
+      id: "session-a",
+      path: "/sessions/a.jsonl",
+      cwd: "/work/a",
+      name,
+      nameSource,
+      modifiedAt: 1,
+      messageCount: 2
+    }],
+    total: 1,
+    hasMore: false,
+    revision: 1,
+    itemCount: 1,
+    source: "sqlite",
+    state: "ready",
+    rebuilding: false,
+    incomplete: false,
+    skippedCount: 0
   });
 }
 

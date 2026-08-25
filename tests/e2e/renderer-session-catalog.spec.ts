@@ -231,7 +231,7 @@ test("keeps Command Palette server search independent from navigation search", a
 test("renames the automatically opened catalog Session and restores its automatic title", async ({ page }) => {
   const automatic = {
     ...session(1, "检查冷启动标题"),
-    nameSource: "latest-user" as const
+    nameSource: "seed" as const
   };
   await openCatalogWorkspace(page, { items: [automatic] });
   await expect(sessionButton(page, automatic.name)).toBeVisible();

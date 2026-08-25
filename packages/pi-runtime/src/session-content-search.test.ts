@@ -48,19 +48,13 @@ describe("Workspace Session content search", () => {
       incomplete: true,
       truncated: false
     });
-    expect(result.items).toEqual([
-      expect.objectContaining({
-        sessionFileIdentity: "file-first",
-        sessionName: "First",
-        messageId: firstUser,
-        role: "user"
-      }),
-      expect.objectContaining({
-        sessionFileIdentity: "file-first",
-        messageId: firstAssistant,
-        role: "assistant"
-      })
-    ]);
+    expect(result.items).toEqual([expect.objectContaining({
+      sessionFileIdentity: "file-first",
+      sessionName: "First",
+      messageId: firstUser,
+      role: "user"
+    })]);
+    expect(result.items.map((item) => item.messageId)).not.toContain(firstAssistant);
     expect(result.items.every((item) => Array.from(item.snippet).length <= 240)).toBe(true);
   });
 });

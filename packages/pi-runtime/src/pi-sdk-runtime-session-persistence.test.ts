@@ -4,14 +4,65 @@ import { dirname, join } from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PiSdkRuntime } from "./pi-sdk-runtime.js";
+import { SessionSemanticTitleGenerator } from "./session-semantic-title.js";
 
 const temporaryDirectories: string[] = [];
+const zeroUsage = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+};
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
 describe("PiSdkRuntime session persistence", () => {
+  it("schedules one automatic semantic title when a historical Session becomes live", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pi67-sdk-session-title-activation-"));
+    temporaryDirectories.push(root);
+    const cwd = join(root, "workspace");
+    const agentDir = join(root, "agent");
+    const sessionDirectory = join(agentDir, "sessions");
+    await Promise.all([mkdir(cwd), mkdir(sessionDirectory, { recursive: true })]);
+    const historical = SessionManager.create(cwd, sessionDirectory);
+    historical.appendMessage({ role: "user", content: "查询杭州今天的实时天气", timestamp: 1 });
+    historical.appendMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "已获取杭州天气。" }],
+      api: "openai-responses",
+      provider: "pi67-test",
+      model: "fixture",
+      usage: zeroUsage,
+      stopReason: "stop",
+      timestamp: 2
+    });
+    const sessionPath = requireSessionPath(historical.getSessionFile());
+    const generate = vi.spyOn(SessionSemanticTitleGenerator.prototype, "generate")
+      .mockResolvedValue({ kind: "generated", title: "杭州实时天气查询" });
+    const runtime = new PiSdkRuntime();
+    try {
+      await runtime.initialize({
+        cwd,
+        agentDir,
+        sessionPath,
+        trust: "trusted",
+        approvalMode: "guided"
+      });
+
+      expect(generate).toHaveBeenCalledOnce();
+      expect(generate).toHaveBeenCalledWith(expect.anything(), expect.any(Number), "automatic");
+      await runtime.createSession("session-creation-after-title-activation");
+      expect(generate).toHaveBeenCalledOnce();
+    } finally {
+      await runtime.dispose();
+    }
+  }, 15_000);
+
   it("materializes fresh and explicitly created Sessions before publishing their snapshots", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi67-sdk-session-persistence-"));
     temporaryDirectories.push(root);

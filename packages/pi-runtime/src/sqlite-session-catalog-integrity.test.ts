@@ -93,6 +93,35 @@ describe("SQLite Session Catalog integrity", () => {
     replaced.close();
   });
 
+  it("replaces a quick-check-clean content index with orphaned opaque postings", async () => {
+    const root = await temporaryRoot();
+    const catalog = await openReady(root);
+    catalog.replaceAll("source", [record(1)], metadata(), 1);
+    if (!catalog.replaceContentIndex) throw new Error("Expected the real content index.");
+    catalog.replaceContentIndex({
+      fileIdentity: record(1).fileIdentity,
+      projectionVersion: "a".repeat(64),
+      indexedEntries: 1,
+      incomplete: false,
+      messages: [{
+        messageId: "message-1",
+        role: "user",
+        entryOrder: 0,
+        contentFingerprint: "b".repeat(64),
+        tokenHashes: ["c".repeat(32)]
+      }]
+    });
+    catalog.close();
+    const damaged = new DatabaseSync(join(root, SESSION_CATALOG_DATABASE_FILENAME));
+    damaged.exec("DELETE FROM session_content_messages;");
+    expect(damaged.prepare("PRAGMA quick_check").get()).toEqual({ quick_check: "ok" });
+    damaged.close();
+
+    const replaced = await openReady(root);
+    expect(replaced.getState()).toMatchObject({ sourceKey: "", revision: 0, itemCount: 0 });
+    replaced.close();
+  });
+
   it("replaces projections whose derived search or workspace metadata was altered", async () => {
     for (const [column, value] of [
       ["search_name", "wrong-name"],

@@ -53,7 +53,7 @@ export function conversationRows(
     const title = conversationPrimaryTitle(task, session);
     const meta = session
       ? task.recentUserMessagePreview
-        ? `${stableTitle} · ${sessionMeta(session, snoozed)}`
+        ? `${task.recentUserMessagePreview} · ${sessionMeta(session, snoozed)}`
         : sessionMeta(session, snoozed)
       : task.conversation.kind === "provisional" ? "尚未保存 · 当前草稿" : stableTitle;
     return {

@@ -80,7 +80,7 @@ export interface SessionSummary {
   path: string;
   cwd: string;
   name: string;
-  nameSource: "explicit" | "latest-user" | "fallback";
+  nameSource: "explicit" | "generated" | "seed" | "fallback";
   modifiedAt: number;
   messageCount: number;
   pinnedAt?: number;

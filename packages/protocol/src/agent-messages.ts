@@ -245,6 +245,7 @@ export interface CommandPayloads extends
   "session.rollback": { entryId: string; summarize?: boolean };
   "session.compact": { submissionId: string; instructions?: string };
   "session.name": { mutation: SessionNameMutation };
+  "session.title.regenerate": Record<string, never>;
   "session.interactionMode.set": { mode: SessionInteractionMode };
   "plan.implement": { submissionId: string; planId: string };
   "prompt.submit": PromptSubmitRequest;
@@ -370,6 +371,7 @@ export interface CommandResults extends
   "session.rollback": ProjectionMutationAcknowledgement;
   "session.compact": OperationSubmissionResult;
   "session.name": ProjectionMutationAcknowledgement;
+  "session.title.regenerate": ProjectionMutationAcknowledgement;
   "session.interactionMode.set": ProjectionMutationAcknowledgement;
   "plan.implement": OperationSubmissionResult;
   "prompt.submit": OperationSubmissionResult;

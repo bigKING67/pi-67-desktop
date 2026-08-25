@@ -129,7 +129,7 @@ export function applyWorkbenchAgentEvent(
         title: sessionName
           || task.pendingTitle
           || messages.runtime.workbench.unnamedSession,
-        titleSource: sessionName ? "explicit" : task.pendingTitle ? "latest-user" : "fallback",
+        titleSource: sessionName ? "explicit" : task.pendingTitle ? "seed" : "fallback",
         ...(sessionName ? { pendingTitle: undefined } : {}),
         lifecycle: "idle",
         runtime: { phase: "ready", detail: messages.runtime.workbench.sessionReady, recoverable: true },

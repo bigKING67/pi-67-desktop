@@ -83,7 +83,7 @@ export async function verifyReadySessionCatalog(window) {
     .locator(".doctor-check").filter({ hasText: "Session 目录" });
   await doctorDialog.getByRole("button", { name: /重新检查/u }).click();
   await sessionCatalogCheck.getByText("通过", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v4; ready/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v7; ready/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   return settings;
 }
@@ -120,7 +120,7 @@ async function verifyInitialRuntimeSettings(window, packagedProcessOutput) {
     .waitFor({ state: "visible", timeout: 30_000 });
   const sessionCatalogCheck = doctorResults.locator(".doctor-check").filter({ hasText: "Session 目录" });
   await sessionCatalogCheck.getByText("需注意", { exact: true }).waitFor({ state: "visible", timeout: 30_000 });
-  await sessionCatalogCheck.getByText(/schema v4; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
+  await sessionCatalogCheck.getByText(/schema v7; unavailable/u).waitFor({ state: "visible", timeout: 30_000 });
   await doctorDialog.getByRole("button", { name: "关闭" }).click();
   await settings.getByRole("button", { name: "返回工作台" }).click();
   await settings.waitFor({ state: "hidden", timeout: 15_000 });
@@ -214,7 +214,7 @@ export async function runControlledShutdownScenario({
   await startControlledPrompt(window);
   await window.locator('[data-testid="conversation-row"][aria-current="page"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT }).waitFor({ state: "visible", timeout: 10_000 });
-  await window.locator(".brand-lockup").getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
+  await window.getByLabel("Pi conversation").getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
     .waitFor({ state: "visible", timeout: 10_000 });
   shutdownState.childPid = await readPositiveProcessId(childPidPath);
   if (!isProcessAlive(shutdownState.childPid)) {

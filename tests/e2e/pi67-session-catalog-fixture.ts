@@ -47,7 +47,7 @@ export async function installSessionCatalogFixture(
       path: string;
       cwd: string;
       name: string;
-      nameSource?: "explicit" | "latest-user" | "fallback";
+      nameSource?: "explicit" | "generated" | "seed" | "fallback";
       pinnedAt?: number;
       snoozedUntil?: number;
       archivedAt?: number;

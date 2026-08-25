@@ -1,83 +1,60 @@
 import { open, stat } from "node:fs/promises";
 import { conversationTitleCandidate } from "@pi67/domain";
+import {
+  sessionSemanticTitleMetadata,
+  type SessionAutomaticTitleValue
+} from "./session-semantic-title.js";
 
 const READ_CHUNK_BYTES = 128 * 1024;
 const MAX_LINE_BYTES = 4 * 1024 * 1024;
-const MAX_TAIL_BYTES = 8 * 1024 * 1024;
+const MAX_TAIL_BYTES = 16 * 1024 * 1024;
 const DEFAULT_CACHE_ITEMS = 512;
-const MAX_BACKGROUND_WORKERS = 4;
+
+export type AutomaticTitleReadResult =
+  | { kind: "title"; title: string; source?: "generated" | "seed" }
+  | { kind: "none" }
+  | { kind: "failed" };
+
+export interface AutomaticTitleReader {
+  readOutcome(path: string): Promise<AutomaticTitleReadResult>;
+  clear(): void;
+}
 
 interface CachedTitle {
   key: string;
-  value: string | undefined;
+  value: SessionAutomaticTitleValue | undefined;
 }
 
-export class SessionAutomaticTitleReader {
+export class SessionAutomaticTitleReader implements AutomaticTitleReader {
   private readonly cache = new Map<string, CachedTitle>();
-  private readonly queuedCallbacks = new Map<string, Set<(path: string) => void>>();
-  private readonly queue: string[] = [];
-  private activeWorkers = 0;
-  private generation = 0;
 
   constructor(private readonly maximumItems = DEFAULT_CACHE_ITEMS) {}
 
   async read(path: string): Promise<string | undefined> {
-    const loaded = await this.load(path);
-    if (!loaded) return undefined;
-    this.touch(path, loaded);
-    return loaded.value;
+    const outcome = await this.readOutcome(path);
+    return outcome.kind === "title" ? outcome.title : undefined;
+  }
+
+  async readOutcome(path: string): Promise<AutomaticTitleReadResult> {
+    try {
+      const loaded = await this.load(path);
+      if (!loaded) return { kind: "failed" };
+      this.touch(path, loaded);
+      return loaded.value === undefined ? { kind: "none" } : { kind: "title", ...loaded.value };
+    } catch {
+      return { kind: "failed" };
+    }
   }
 
   peek(path: string): string | undefined {
     const cached = this.cache.get(path);
     if (!cached) return undefined;
     this.touch(path, cached);
-    return cached.value;
-  }
-
-  enqueue(paths: readonly string[], onTitleChanged: (path: string) => void): void {
-    for (const path of paths) {
-      const callbacks = this.queuedCallbacks.get(path);
-      if (callbacks) {
-        callbacks.add(onTitleChanged);
-        continue;
-      }
-      this.queuedCallbacks.set(path, new Set([onTitleChanged]));
-      this.queue.push(path);
-    }
-    this.drain();
+    return cached.value?.title;
   }
 
   clear(): void {
-    this.generation += 1;
-    this.queue.length = 0;
-    this.queuedCallbacks.clear();
     this.cache.clear();
-  }
-
-  private drain(): void {
-    while (this.activeWorkers < MAX_BACKGROUND_WORKERS) {
-      const path = this.queue.shift();
-      if (!path) return;
-      this.activeWorkers += 1;
-      const generation = this.generation;
-      void this.refreshQueued(path, generation).finally(() => {
-        this.activeWorkers -= 1;
-        this.drain();
-      });
-    }
-  }
-
-  private async refreshQueued(path: string, generation: number): Promise<void> {
-    const previous = this.cache.get(path)?.value;
-    const loaded = await this.load(path);
-    if (generation !== this.generation) return;
-    const callbacks = this.queuedCallbacks.get(path);
-    this.queuedCallbacks.delete(path);
-    if (!loaded) return;
-    this.touch(path, loaded);
-    if (loaded.value === undefined || loaded.value === previous) return;
-    for (const callback of callbacks ?? []) callback(path);
   }
 
   private async load(path: string): Promise<CachedTitle | undefined> {
@@ -101,13 +78,14 @@ export class SessionAutomaticTitleReader {
   }
 }
 
-async function readLatestUserTitle(path: string, size: number): Promise<string | undefined> {
+async function readLatestUserTitle(path: string, size: number): Promise<SessionAutomaticTitleValue | undefined> {
   if (!Number.isSafeInteger(size) || size <= 0) return undefined;
   const handle = await open(path, "r");
   let offset = size;
   const minimumOffset = Math.max(0, size - MAX_TAIL_BYTES);
   let suffix = Buffer.alloc(0);
   let targetId: string | null | undefined;
+  let seed: string | undefined;
   try {
     while (offset > minimumOffset) {
       const length = Math.min(READ_CHUNK_BYTES, offset - minimumOffset);
@@ -127,14 +105,21 @@ async function readLatestUserTitle(path: string, size: number): Promise<string |
       for (let index = lines.length - 1; index >= 0; index -= 1) {
         const outcome = inspectLine(lines[index] ?? "", targetId);
         if (!outcome) continue;
-        if (outcome.title !== undefined) return outcome.title;
+        if (outcome.generatedTitle !== undefined) {
+          return { title: outcome.generatedTitle, source: "generated" };
+        }
+        if (outcome.seedTitle !== undefined) seed = outcome.seedTitle;
         targetId = outcome.parentId;
-        if (targetId === null) return undefined;
+        if (targetId === null) return seed === undefined ? undefined : { title: seed, source: "seed" };
       }
       if (suffix.byteLength > MAX_LINE_BYTES) return undefined;
     }
     const outcome = inspectLine(suffix.toString("utf8"), targetId);
-    return outcome?.title;
+    if (outcome?.generatedTitle !== undefined) {
+      return { title: outcome.generatedTitle, source: "generated" };
+    }
+    if (outcome?.seedTitle !== undefined) seed = outcome.seedTitle;
+    return seed === undefined ? undefined : { title: seed, source: "seed" };
   } finally {
     await handle.close();
   }
@@ -143,7 +128,7 @@ async function readLatestUserTitle(path: string, size: number): Promise<string |
 function inspectLine(
   line: string,
   targetId: string | null | undefined
-): { parentId: string | null; title?: string } | undefined {
+): { parentId: string | null; generatedTitle?: string; seedTitle?: string } | undefined {
   if (!line.trim()) return undefined;
   let entry: Record<string, unknown>;
   try {
@@ -154,12 +139,14 @@ function inspectLine(
   if (entry.type === "session" || typeof entry.id !== "string") return undefined;
   if (targetId !== undefined && entry.id !== targetId) return undefined;
   const parentId = typeof entry.parentId === "string" ? entry.parentId : null;
+  const semanticTitle = sessionSemanticTitleMetadata(entry);
+  if (semanticTitle?.status === "generated") return { parentId, generatedTitle: semanticTitle.title };
   if (entry.type !== "message") return { parentId };
   const message = isRecord(entry.message) ? entry.message : undefined;
   if (message?.role !== "user") return { parentId };
   const { text, hasImage } = extractUserContent(message.content);
   const title = conversationTitleCandidate(text, hasImage);
-  return title === undefined ? { parentId } : { parentId, title };
+  return title === undefined ? { parentId } : { parentId, seedTitle: title };
 }
 
 function extractUserContent(content: unknown): { text: string; hasImage: boolean } {

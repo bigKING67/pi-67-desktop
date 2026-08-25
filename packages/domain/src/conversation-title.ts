@@ -1,4 +1,5 @@
 const MAX_CONVERSATION_TITLE_GRAPHEMES = 72;
+const MAX_SEMANTIC_TITLE_GRAPHEMES = 40;
 const TRIVIAL_TITLE_PATTERNS = [
   /^(?:好|好的|可以|确认|继续|继续吧|继续呀|行|收到)[。！!,.，\s]*$/iu,
   /^按(?:你|您)的建议(?:来|继续|做|改)(?:吧|呀)?[。！!,.，\s]*$/iu,
@@ -14,6 +15,21 @@ export function conversationTitleCandidate(text: string, hasImage = false): stri
   return graphemes.length <= MAX_CONVERSATION_TITLE_GRAPHEMES
     ? normalized
     : `${graphemes.slice(0, MAX_CONVERSATION_TITLE_GRAPHEMES).join("")}…`;
+}
+
+export function semanticConversationTitleCandidate(text: string): string | undefined {
+  const normalized = sanitizeConversationTitleText(text)
+    .replace(/^(?:title|标题)\s*[:：]\s*/iu, "")
+    .replace(/^["'“‘《【]+|["'”’》】]+$/gu, "")
+    .replace(/[。！？!?；;：:,，]+$/gu, "")
+    .trim();
+  if (!normalized || TRIVIAL_TITLE_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return undefined;
+  }
+  const graphemes = segmentGraphemes(normalized);
+  return graphemes.length <= MAX_SEMANTIC_TITLE_GRAPHEMES
+    ? normalized
+    : graphemes.slice(0, MAX_SEMANTIC_TITLE_GRAPHEMES).join("");
 }
 
 export function sanitizeConversationTitleText(text: string): string {

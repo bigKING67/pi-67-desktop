@@ -44,7 +44,8 @@ const SessionSummarySchema = strictObject({
   name: Type.String({ minLength: 1, maxLength: MAX_SESSION_CATALOG_NAME_CHARS }),
   nameSource: Type.Union([
     Type.Literal("explicit"),
-    Type.Literal("latest-user"),
+    Type.Literal("generated"),
+    Type.Literal("seed"),
     Type.Literal("fallback")
   ]),
   modifiedAt: TimestampSchema,

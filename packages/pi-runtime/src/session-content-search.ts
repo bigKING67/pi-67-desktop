@@ -23,6 +23,7 @@ export interface WorkspaceSessionContentSearchOptions {
   catalogIncomplete: boolean;
   catalogSkippedCount: number;
   deadlineMs?: number;
+  signal?: AbortSignal;
 }
 
 export async function searchWorkspaceSessionContent(
@@ -47,6 +48,7 @@ export async function searchWorkspaceSessionContent(
   let truncated = false;
 
   for (let sessionIndex = 0; sessionIndex < candidates.length; sessionIndex += 1) {
+    if (options.signal?.aborted) throw new DOMException("Session content search was cancelled.", "AbortError");
     const session = candidates[sessionIndex]!;
     if (Date.now() >= deadline || entriesVisited >= MAX_WORKSPACE_MESSAGE_SEARCH_ENTRIES) {
       skippedCount += candidates.length - sessionIndex;
@@ -73,17 +75,14 @@ export async function searchWorkspaceSessionContent(
       if (entries.length < branch.length) incomplete = true;
       sessionsVisited += 1;
       entriesVisited += entries.length;
+      let bestMatch: WorkspaceMessageSearchItem | undefined;
       for (const entry of entries) {
+        if (options.signal?.aborted) throw new DOMException("Session content search was cancelled.", "AbortError");
         const searchable = searchableEntry(entry);
         if (!searchable) continue;
         const matchIndex = searchable.text.toLocaleLowerCase().indexOf(needle);
         if (matchIndex < 0) continue;
-        if (items.length >= MAX_WORKSPACE_MESSAGE_SEARCH_RESULTS) {
-          truncated = true;
-          incomplete = true;
-          break;
-        }
-        items.push({
+        const match = {
           sessionFileIdentity: session.fileIdentity,
           sessionPath: session.path,
           sessionName: session.name,
@@ -91,11 +90,17 @@ export async function searchWorkspaceSessionContent(
           role: searchable.role,
           snippet: boundedSnippet(searchable.text, matchIndex, query.length),
           ...(searchable.createdAt === undefined ? {} : { createdAt: searchable.createdAt })
-        });
+        } satisfies WorkspaceMessageSearchItem;
+        if (!bestMatch || (bestMatch.role === "assistant" && match.role === "user")) bestMatch = match;
       }
-      if (truncated) {
-        skippedCount += candidates.length - sessionIndex - 1;
-        break;
+      if (bestMatch) {
+        if (items.length >= MAX_WORKSPACE_MESSAGE_SEARCH_RESULTS) {
+          truncated = true;
+          incomplete = true;
+          skippedCount += candidates.length - sessionIndex;
+          break;
+        }
+        items.push(bestMatch);
       }
     } catch {
       skippedCount += 1;

@@ -206,7 +206,7 @@ export async function waitForControlledPromptProjection(window) {
   await window.locator('[data-testid="conversation-row"]')
     .filter({ hasText: CONTROLLED_PROMPT_TEXT })
     .waitFor({ state: "visible", timeout: 10_000 });
-  await window.locator(".brand-lockup")
+  await window.getByLabel("Pi conversation")
     .getByText(CONTROLLED_PROMPT_TEXT, { exact: true })
     .waitFor({ state: "visible", timeout: 10_000 });
 }

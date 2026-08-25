@@ -30,7 +30,7 @@ export interface RendererWorkbenchTask {
   lifecycle: TaskLifecycle;
   runtime: RuntimeStatus;
   title: string;
-  titleSource?: "explicit" | "latest-user" | "fallback";
+  titleSource?: "explicit" | "generated" | "seed" | "fallback";
   pendingTitle?: string | undefined;
   recentUserMessagePreview?: string;
   sessionPath?: string;

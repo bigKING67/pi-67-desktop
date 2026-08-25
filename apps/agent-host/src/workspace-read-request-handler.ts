@@ -40,7 +40,7 @@ export function handleWorkspaceReadRequest(
       type: request.type,
       payload: request.payload
     } as AgentCommand<"session.catalog.contentSearch">;
-    void commands.searchCatalogContent(request.context, command)
+    void commands.searchCatalogContent(request.context, command, origin.signalForRequest(request.requestId))
       .then((result) => origin.sendSuccess(request.requestId, request.type, result))
       .catch(onError);
     return true;

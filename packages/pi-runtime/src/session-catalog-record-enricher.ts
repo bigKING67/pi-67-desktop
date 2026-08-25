@@ -1,6 +1,10 @@
 import { RuntimeError } from "@pi67/domain";
 import { ConversationOrganizationStore } from "./conversation-organization-store.js";
-import { SessionAutomaticTitleReader } from "./session-automatic-title.js";
+import {
+  SessionAutomaticTitleReader,
+  type AutomaticTitleReadResult,
+  type AutomaticTitleReader
+} from "./session-automatic-title.js";
 import { sortSessionCatalogRecords } from "./session-catalog-projection.js";
 import type { SessionCatalogRecord } from "./sqlite-session-catalog.js";
 
@@ -15,11 +19,12 @@ export type SessionCatalogOrganizationMutation =
   | { kind: "snooze"; value: number | undefined };
 
 export class SessionCatalogRecordEnricher {
-  private readonly automaticTitles = new SessionAutomaticTitleReader();
+  private readonly automaticTitles: AutomaticTitleReader;
   private readonly organizationStore: ConversationOrganizationStore;
 
-  constructor(storageRoot?: string) {
+  constructor(storageRoot?: string, automaticTitles: AutomaticTitleReader = new SessionAutomaticTitleReader()) {
     this.organizationStore = new ConversationOrganizationStore(storageRoot);
+    this.automaticTitles = automaticTitles;
   }
 
   initialize(): Promise<void> {
@@ -38,19 +43,8 @@ export class SessionCatalogRecordEnricher {
     return records.map((record) => this.withOrganization(sourceKey, record));
   }
 
-  withCachedAutomaticTitles(records: SessionCatalogRecord[]): SessionCatalogRecord[] {
-    return records.map((record) => {
-      if (record.explicitName !== undefined) return record;
-      const automaticName = this.automaticTitles.peek(record.path);
-      return automaticName === undefined ? record : { ...record, automaticName };
-    });
-  }
-
-  queueAutomaticTitles(records: SessionCatalogRecord[], onTitleChanged: () => void): void {
-    this.automaticTitles.enqueue(
-      records.filter((record) => record.explicitName === undefined).map((record) => record.path),
-      onTitleChanged
-    );
+  readAutomaticTitle(path: string): Promise<AutomaticTitleReadResult> {
+    return this.automaticTitles.readOutcome(path);
   }
 
   async organize(

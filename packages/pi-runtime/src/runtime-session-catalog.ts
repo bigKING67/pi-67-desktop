@@ -4,7 +4,8 @@ import type {
   SessionCatalogChangedReason,
   SessionCatalogPage,
   SessionCatalogQuery,
-  SessionCatalogStatus
+  SessionCatalogStatus,
+  WorkspaceMessageSearchResult
 } from "@pi67/domain";
 import type { AgentEvent } from "@pi67/protocol";
 import { createSessionCatalog, type SessionCatalog } from "./session-catalog.js";
@@ -33,6 +34,7 @@ export interface RuntimeSessionCatalogTarget {
 
 export interface RuntimeSessionCatalog {
   query(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
+  searchContent(workspaceId: string, query: string, signal?: AbortSignal): Promise<WorkspaceMessageSearchResult>;
   status(): SessionCatalogStatus;
   upsertCurrent(reason: UpsertReason): Promise<void>;
   upsertRecord(record: SessionCatalogRecord, reason: UpsertReason): Promise<void>;
@@ -72,6 +74,10 @@ export function createRuntimeSessionCatalogOwner(
         query(query) {
           if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
           return catalog.query(query, createContext(target));
+        },
+        searchContent(workspaceId, query, signal) {
+          if (bindingDisposed) throw new Error("The Runtime Session Catalog binding has been disposed.");
+          return catalog.searchContent(workspaceId, query, createContext(target), signal);
         },
         status: () => catalog.status(),
         upsertCurrent(reason) {
@@ -116,6 +122,7 @@ export function createRuntimeSessionCatalog(
   const binding = owner.createBinding(target);
   return {
     query: (query) => binding.query(query),
+    searchContent: (workspaceId, query, signal) => binding.searchContent(workspaceId, query, signal),
     status: () => binding.status(),
     upsertCurrent: (reason) => binding.upsertCurrent(reason),
     upsertRecord: (record, reason) => binding.upsertRecord(record, reason),

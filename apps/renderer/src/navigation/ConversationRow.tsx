@@ -3,7 +3,6 @@ import {
   Archive,
   Calendar1,
   CalendarDays,
-  Circle,
   Clock3,
   ArrowDown,
   ArrowUp,
@@ -13,6 +12,7 @@ import {
   Pin,
   PinOff,
   RotateCcw,
+  Sparkles,
   Square
 } from "lucide-react";
 import type { MutableRefObject } from "react";
@@ -30,6 +30,7 @@ import {
   archiveRendererConversation,
   moveRendererPinnedConversation,
   placeRendererPinnedConversationBefore,
+  regenerateRendererConversationTitle,
   renameRendererConversation,
   setRendererConversationPinned,
   snoozeRendererConversation,
@@ -51,9 +52,6 @@ export function ConversationRow({
   selectedRow: MutableRefObject<HTMLElement | null>;
   disabled: boolean;
 }) {
-  const StatusIcon = row.status === "running"
-    ? LoaderCircle
-    : row.status === "waiting" || row.snoozed ? Clock3 : Circle;
   const task = row.task;
   const sessionConversation = row.conversation.kind === "session" ? row.conversation : undefined;
   const needsAttention = useConversationAttentionStore((state) => (
@@ -110,14 +108,14 @@ export function ConversationRow({
         }}
         type="button"
       >
-        <span className={styles.conversationMarker} data-status={row.snoozed ? "snoozed" : row.status ?? "idle"}>
-          <StatusIcon aria-hidden="true" className={row.status === "running" ? styles.spinning : undefined} size={11} />
-        </span>
-        <span className={styles.conversationCopy}>
+        <span className={styles.conversationCopy} data-testid="conversation-copy">
           <strong>{row.title}</strong>
           <small>{row.meta}</small>
         </span>
         <span className={styles.conversationIndicators}>
+          {row.status === "running" ? (
+            <LoaderCircle aria-hidden="true" className={styles.spinning} size={11} />
+          ) : null}
           {row.pinned ? <Pin aria-label="已置顶" className={styles.pinnedIcon} size={11} /> : null}
           {row.snoozed ? <span className={styles.conversationState}>稍后</span> : null}
           {needsAttention ? <span className={styles.conversationAttention}>待查看</span> : null}
@@ -189,6 +187,17 @@ export function ConversationRow({
                   undefined
                 )} textValue="恢复自动标题">
                   <RotateCcw aria-hidden="true" size={13} />恢复自动标题
+                </MenuItem>
+              ) : null}
+              {task && task.sessionGeneration !== undefined && task.runtime.phase !== "stopped" ? (
+                <MenuItem className={styles.menuItem!} onAction={() => void regenerateRendererConversationTitle(
+                  sessionConversation.workspaceId,
+                  {
+                    fileIdentity: sessionConversation.sessionFileIdentity,
+                    path: sessionConversation.sessionPath
+                  }
+                )} textValue="重新生成自动标题">
+                  <Sparkles aria-hidden="true" size={13} />重新生成自动标题
                 </MenuItem>
               ) : null}
               <Separator className={styles.menuSeparator!} />

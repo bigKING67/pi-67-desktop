@@ -63,13 +63,50 @@ describe("SQLite Session Catalog", () => {
       record(1, { explicitName: "中文 ＡＢＣ" }),
       record(2, { explicitName: "literal % value" }),
       record(3, { explicitName: "literal _ value" }),
-      record(4, { explicitName: "literal \\ value" })
+      record(4, { explicitName: "literal \\ value" }),
+      automaticRecord(5, "小红书自动标题")
     ], metadata(), 1);
 
     expect(querySearch(catalog, "中文 abc")).toHaveLength(1);
     expect(querySearch(catalog, "%").map((item) => item.explicitName)).toEqual(["literal % value"]);
     expect(querySearch(catalog, "_").map((item) => item.explicitName)).toEqual(["literal _ value"]);
     expect(querySearch(catalog, "\\").map((item) => item.explicitName)).toEqual(["literal \\ value"]);
+    expect(querySearch(catalog, "小红书").map((item) => item.automaticName)).toEqual(["小红书自动标题"]);
+    catalog.close();
+  });
+
+  it("persists automatic names across an unchanged reconcile and clears them for changed Sessions", async () => {
+    const root = await temporaryRoot();
+    const catalog = await openReady(root);
+    const original = automaticRecord(1, "小红书自动标题");
+    catalog.replaceAll("source", [original], metadata(), 1);
+    catalog.close();
+
+    const reopened = await openReady(root);
+    expect(querySearch(reopened, "小红书")).toHaveLength(1);
+    const { automaticName: _automaticName, ...unresolved } = original;
+    reopened.replaceAll("source", [unresolved], metadata(), 2);
+    expect(querySearch(reopened, "小红书")).toHaveLength(1);
+    reopened.replaceAll("source", [{ ...unresolved, modifiedAt: original.modifiedAt + 1 }], metadata(), 3);
+    expect(querySearch(reopened, "小红书")).toHaveLength(0);
+    reopened.close();
+
+    const changedReopened = await openReady(root);
+    expect(querySearch(changedReopened, "小红书")).toHaveLength(0);
+    changedReopened.close();
+  });
+
+  it("commits an automatic-name batch in one revision", async () => {
+    const root = await temporaryRoot();
+    const catalog = await openReady(root);
+    const records = Array.from({ length: 17 }, (_, index) => automaticRecord(index, `自动标题 ${index}`));
+    const before = catalog.getState().revision;
+
+    const state = catalog.upsertMany(records, before);
+
+    expect(state.revision).toBe(before + 1);
+    expect(state.itemCount).toBe(records.length);
+    expect(querySearch(catalog, "自动标题")).toHaveLength(records.length);
     catalog.close();
   });
 
@@ -410,6 +447,11 @@ function record(index: number, overrides: Partial<SessionCatalogRecord> = {}): S
     messageCount: index,
     ...overrides
   };
+}
+
+function automaticRecord(index: number, automaticName: string): SessionCatalogRecord {
+  const { explicitName: _explicitName, ...recordWithoutExplicitName } = record(index);
+  return { ...recordWithoutExplicitName, automaticName };
 }
 
 function metadata() {

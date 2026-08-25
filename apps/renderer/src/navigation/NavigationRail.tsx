@@ -27,6 +27,7 @@ import {
   SessionCatalogSearch,
   useSessionCatalogSearch
 } from "./SessionCatalogSearch.js";
+import { useNavigationMessageSearch } from "./use-navigation-message-search.js";
 
 const WorkspaceRemovalDialog = lazy(async () => {
   const module = await import("./WorkspaceRemovalDialog.js");
@@ -53,6 +54,7 @@ export function NavigationRail({
     visibleWorkspaceIds,
     searchableWorkspaceIds
   );
+  const messageSearchByWorkspace = useNavigationMessageSearch(query, searchableWorkspaceIds);
   const [removalWorkspaceId, setRemovalWorkspaceId] = useState<string>();
   const sessionSearchFocusRevision = useShellStore((state) => state.sessionSearchFocusRevision);
   const sessionSearchHandledRevision = useShellStore((state) => state.sessionSearchHandledRevision);
@@ -94,6 +96,7 @@ export function NavigationRail({
       </div>
 
       <WorkspaceConversationList
+        messageSearchByWorkspace={messageSearchByWorkspace}
         query={query}
         onRequestRemoval={(workspaceId) => requestWorkspaceRemoval(workspaceId, setRemovalWorkspaceId)}
       />

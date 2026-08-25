@@ -391,16 +391,24 @@ the only Runtime and behavior specification source.
   source of truth. Each group initially shows six ordinary recent sessions and
   offers an explicit load-more action.
 - A conversation title resolves in one order everywhere: explicit Pi
-  `session_info.name`, otherwise the most recent topical user message on the
-  current Pi branch, otherwise `未命名对话`. Follow-ups such as `继续吧`, bare
-  confirmation, commit/push acknowledgements, and standalone navigation Slash
-  commands do not replace an earlier useful topic. Automatic titles are derived
-  locally without a model call and are never written into SQLite, Workbench
-  persistence, logs, diagnostics, or telemetry.
+  `session_info.name`, generated semantic title metadata on the current Pi
+  branch, the first meaningful current-branch User request as a deterministic
+  seed, then `未命名对话`. Follow-ups such as `继续吧`, bare confirmation,
+  commit/push acknowledgements, and standalone navigation Slash commands never
+  displace the stable title. After the first successful Assistant Turn, Desktop
+  may make one bounded asynchronous title call through that Turn's selected Pi
+  model. A historical Session without title-attempt metadata receives the same
+  one-time generation only when the user makes it a live Task; startup and
+  Catalog browsing never bulk-backfill or silently load cold Sessions. Generated
+  or failed metadata is persisted as a typed Pi JSONL custom entry, while SQLite,
+  Workbench persistence, logs, diagnostics, and telemetry never become title
+  truth or store transcript bodies for title generation.
 - Explicit rename remains stable across later prompts. `恢复自动标题` appends an
   empty Pi `session_info` name and returns the conversation to the branch-derived
-  title contract. A live Task uses Task authority for the mutation; a cold
-  Catalog row uses Workspace authority and never creates a hidden Runtime.
+  title contract. Automatic failure does not retry on later activation; a user
+  may explicitly request `重新生成自动标题` from a live Task. A live Task uses
+  Task authority for the mutation; a cold Catalog row uses Workspace authority
+  and never creates a hidden Runtime.
 - The application admits at most eight top-level Session tasks (`MAX_RUNNING_TASKS = 8`) in accepted,
   running, approval-wait, or Extension-input-wait states. Subagents launched
   inside a Task do not consume additional top-level admission slots. The Renderer
@@ -1004,13 +1012,13 @@ the only Runtime and behavior specification source.
   locator. A locator change for the same physical file updates one row; equal Pi
   Session IDs on distinct physical files remain distinct. An incremental identity
   contradiction fails closed and requires full JSONL reconciliation.
-- For unnamed rows, the Agent Host reads only a bounded reverse JSONL stream and
-  walks from the current leaf through `parentId` to find the latest topical user
-  message on that branch. It does not open a cold Task Runtime, parse every
-  Session through `SessionManager.open()`, scan outside the requested page, or
-  persist the derived text. Consequently Catalog search is authoritative for
-  explicit names, Session path, and Session ID; it does not perform an unbounded
-  all-history Prompt scan to find cold automatic titles.
+- For rows without an explicit name, the Agent Host reads only a bounded reverse
+  JSONL stream and walks the current `id -> parentId` branch to resolve generated
+  title metadata or the first meaningful User request seed. Catalog reads never
+  open a cold Task Runtime, call a model, scan outside the requested bounded
+  indexing flight, or persist transcript bodies. SQLite may cache the disposable
+  generated/seed projection for bounded list and search, but Pi JSONL remains the
+  title authority.
 - The active managed Session uses file and parent-directory watchers only as dirty
   signals. An authoritative bounded JSONL tail verifies file identity, byte offsets,
   strict UTF-8, physical-line limits, and complete JSON records. Appends already

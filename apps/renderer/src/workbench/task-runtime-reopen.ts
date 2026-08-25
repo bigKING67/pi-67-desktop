@@ -5,6 +5,7 @@ import {
   rendererWorkbenchStore,
   type RendererWorkbenchTask
 } from "./workbench-store.js";
+import { rendererTaskTransitionDetail } from "./task-transition-detail.js";
 import { workbenchProtocolContextForTask } from "./workbench-protocol-context.js";
 
 export async function rotateRendererTaskForSessionReopen(
@@ -55,7 +56,7 @@ function rotateRendererTaskForSessionOpen(
     taskGeneration: 1,
     sessionFileIdentity: task.sessionFileIdentity,
     lifecycle: "initializing",
-    runtime: { phase: "starting", detail: `正在恢复任务：${task.title}`, recoverable: true },
+    runtime: { phase: "starting", detail: rendererTaskTransitionDetail(task, "restoring"), recoverable: true },
     title: task.title,
     ...(task.titleSource === undefined ? {} : { titleSource: task.titleSource }),
     ...(task.pendingTitle === undefined ? {} : { pendingTitle: task.pendingTitle }),

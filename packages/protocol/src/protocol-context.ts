@@ -114,6 +114,7 @@ export const COMMAND_CONTEXT_SCOPE_REQUIREMENTS: Readonly<Partial<
   "subagent.stop": "task",
   "subagent.resume": "task",
   "session.interactionMode.set": "task",
+  "session.title.regenerate": "task",
   "plan.implement": "task",
   "extension.package.list": "workspace",
   "extension.package.checkUpdates": "workspace",

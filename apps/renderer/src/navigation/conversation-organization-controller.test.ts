@@ -13,6 +13,7 @@ import {
   conversationSnoozeUntil,
   moveRendererPinnedConversation,
   placeRendererPinnedConversationBefore,
+  regenerateRendererConversationTitle,
   renameRendererConversation,
   setRendererConversationPinned,
   snoozeRendererConversation,
@@ -229,7 +230,7 @@ describe("conversation organization controller", () => {
     ]);
     expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
       title: "修复冷启动标题",
-      titleSource: "latest-user"
+      titleSource: "seed"
     });
   });
 
@@ -257,6 +258,29 @@ describe("conversation organization controller", () => {
         { context: { scope: "workspace", workspaceId: "workspace-a" } }
       ]
     ]);
+  });
+
+  it("regenerates a title only through a live Task model authority", async () => {
+    installTask("idle", { phase: "ready", detail: "ready", recoverable: true });
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({} as never);
+
+    await expect(regenerateRendererConversationTitle("workspace-a", session("a"))).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith(
+      "session.title.regenerate",
+      {},
+      [],
+      { context: taskContext() }
+    );
+    expect(refreshCatalog).toHaveBeenCalledWith("workspace-a");
+
+    rendererWorkbenchStore.getState().removeRuntimeTask("task-a");
+    request.mockClear();
+    await expect(regenerateRendererConversationTitle("workspace-a", session("cold"))).resolves.toBe(false);
+    expect(request).not.toHaveBeenCalled();
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "请先打开这个对话"
+    });
   });
 
   it("does not attach a replacement physical file to a stale live Task at the same path", async () => {

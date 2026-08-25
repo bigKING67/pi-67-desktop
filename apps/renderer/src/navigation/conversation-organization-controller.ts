@@ -41,7 +41,7 @@ export async function renameRendererConversation(
           : task.recentUserMessagePreview ?? "未命名任务",
         titleSource: mutation.action === "set"
           ? "explicit"
-          : task.recentUserMessagePreview ? "latest-user" : "fallback"
+          : task.recentUserMessagePreview ? "seed" : "fallback"
       });
     } else {
       await agentConnectionController.request(
@@ -61,6 +61,39 @@ export async function renameRendererConversation(
     publishNotification({
       level: "error",
       title: mutation.action === "set" ? "无法重命名对话" : "无法恢复自动标题",
+      message: errorMessage(error)
+    });
+    return false;
+  }
+}
+
+export async function regenerateRendererConversationTitle(
+  workspaceId: WorkspaceId,
+  session: RendererSessionLocator
+): Promise<boolean> {
+  const task = taskForSession(workspaceId, session);
+  if (!task || task.sessionGeneration === undefined || task.runtime.phase === "stopped") {
+    publishNotification({
+      level: "warning",
+      title: "请先打开这个对话",
+      message: "重新生成标题会使用该对话当前选择的 Pi 模型。"
+    });
+    return false;
+  }
+  try {
+    await agentConnectionController.request(
+      "session.title.regenerate",
+      {},
+      [],
+      { context: workbenchProtocolContextForTask(task) }
+    );
+    await queryFirstSessionCatalog(workspaceId);
+    publishNotification({ level: "success", title: "自动标题已重新生成" });
+    return true;
+  } catch (error) {
+    publishNotification({
+      level: "error",
+      title: "无法重新生成标题",
       message: errorMessage(error)
     });
     return false;

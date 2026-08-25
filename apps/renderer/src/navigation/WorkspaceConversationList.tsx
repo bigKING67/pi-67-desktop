@@ -1,5 +1,6 @@
 import {
   taskConsumesRunSlot,
+  type WorkspaceMessageSearchItem,
   type WorkspaceDescriptor
 } from "@pi67/domain";
 import {
@@ -10,6 +11,7 @@ import {
   Ellipsis,
   FileInput,
   FolderSearch,
+  MessageSquareText,
   Plus,
   RefreshCw,
   Trash2
@@ -32,6 +34,7 @@ import {
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { ConversationRow } from "./ConversationRow.js";
+import { openWorkspaceMessageResult } from "../command-palette/palette-message-result.js";
 import styles from "./NavigationRail.module.css";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { useConversationSnoozeClock } from "./conversation-snooze-clock.js";
@@ -49,13 +52,16 @@ import {
   conversationRows,
   workspaceStatus
 } from "./workspace-conversation-model.js";
+import type { NavigationMessageSearchWorkspaceState } from "./use-navigation-message-search.js";
 
 const RECENT_SESSION_LIMIT = 6;
 
 export function WorkspaceConversationList({
+  messageSearchByWorkspace,
   query,
   onRequestRemoval
 }: {
+  messageSearchByWorkspace: Record<string, NavigationMessageSearchWorkspaceState>;
   query: string;
   onRequestRemoval: (workspaceId: string) => void;
 }) {
@@ -126,6 +132,7 @@ export function WorkspaceConversationList({
         return (
           <WorkspaceConversationGroup
             catalog={catalog}
+            messageSearch={messageSearchByWorkspace[workspaceId]}
             current={workspaceId === currentWorkspaceId}
             expanded={expanded}
             index={index}
@@ -158,6 +165,7 @@ function WorkspaceConversationGroup({
   workspace,
   tasks,
   catalog,
+  messageSearch,
   query,
   sessionTransitionPending,
   workspaceOpenPending,
@@ -175,6 +183,7 @@ function WorkspaceConversationGroup({
   workspace: WorkspaceDescriptor;
   tasks: RendererWorkbenchTask[];
   catalog: WorkspaceSessionCatalogState;
+  messageSearch: NavigationMessageSearchWorkspaceState | undefined;
   query: string;
   sessionTransitionPending: boolean;
   workspaceOpenPending: boolean;
@@ -204,6 +213,8 @@ function WorkspaceConversationGroup({
   const catalogUnavailable = catalog.catalogState === "unavailable";
   const catalogFallback = catalog.catalogState === "fallback";
   const catalogIncompleteEmpty = catalog.incomplete && rows.length === 0;
+  const contentItems = messageSearch?.items ?? [];
+  const hasVisibleResults = rows.length > 0 || contentItems.length > 0;
 
   return (
     <section
@@ -217,6 +228,7 @@ function WorkspaceConversationGroup({
       data-catalog-revision={catalog.revision ?? "uninitialized"}
       data-catalog-item-count={catalog.itemCount}
       data-catalog-visible-count={rows.length}
+      data-content-search-visible-count={contentItems.length}
       data-catalog-incomplete={catalog.incomplete ? "true" : "false"}
       data-catalog-loading={catalog.loading ? "true" : "false"}
       data-catalog-error={catalog.error ? "true" : "false"}
@@ -263,6 +275,7 @@ function WorkspaceConversationGroup({
       </header>
       {expanded ? (
         <div className={styles.workspaceConversations}>
+          {query && rows.length > 0 ? <p className={styles.searchResultGroupLabel}>会话</p> : null}
           {priority.map((row) => (
             <ConversationRow
               disabled={sessionTransitionPending || workspaceOpenPending}
@@ -310,6 +323,27 @@ function WorkspaceConversationGroup({
               selectedRow={selectedRow}
             />
           ))}
+          {query && contentItems.length > 0 ? (
+            <div className={styles.contentSearchResults}>
+              <p className={styles.searchResultGroupLabel}>对话内容</p>
+              {contentItems.map((item) => (
+                <ConversationContentResult
+                  disabled={sessionTransitionPending || workspaceOpenPending}
+                  item={item}
+                  key={`${item.sessionFileIdentity}:${item.messageId}`}
+                />
+              ))}
+            </div>
+          ) : null}
+          {query && messageSearch?.status === "loading" ? (
+            <p aria-live="polite" className={styles.catalogNotice} role="status">正在建立或查询对话内容索引…</p>
+          ) : null}
+          {query && messageSearch?.status === "failed" ? (
+            <p className={styles.catalogNotice} role="status">对话内容索引暂时不可用，当前仅显示会话名称结果。</p>
+          ) : null}
+          {query && messageSearch?.status === "ready" && messageSearch.incomplete ? (
+            <p className={styles.catalogNotice} role="status">对话内容结果不完整，部分 Session 尚未完成索引。</p>
+          ) : null}
           {catalog.rebuilding && !catalogFallback ? (
             <p aria-live="polite" className={styles.catalogNotice} role="status">
               {messages.navigation.catalogRebuilding}
@@ -343,7 +377,8 @@ function WorkspaceConversationGroup({
             && !catalog.rebuilding
             && !catalogUnavailable
             && !catalog.error
-            && rows.length === 0 ? (
+            && !hasVisibleResults
+            && messageSearch?.status !== "loading" ? (
             <p className={styles.workspaceEmpty}>{catalogIncompleteEmpty
               ? messages.navigation.catalogIncompleteEmpty
               : "这个工作区还没有会话。"}</p>
@@ -362,6 +397,29 @@ function WorkspaceConversationGroup({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ConversationContentResult({
+  disabled,
+  item
+}: {
+  disabled: boolean;
+  item: WorkspaceMessageSearchItem;
+}) {
+  return (
+    <button
+      className={styles.contentSearchResult}
+      disabled={disabled}
+      onClick={() => void openWorkspaceMessageResult(item)}
+      type="button"
+    >
+      <MessageSquareText aria-hidden="true" size={13} />
+      <span>
+        <strong>{item.sessionName}</strong>
+        <small>{item.role === "user" ? "用户" : "Pi"} · {item.snippet}</small>
+      </span>
+    </button>
   );
 }
 
