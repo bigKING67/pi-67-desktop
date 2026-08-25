@@ -69,7 +69,7 @@ export function SessionResourcePanel({
         </SettingsRow>
       ))}</SettingsRows> : (
         <SettingsNotice>{resources === undefined
-          ? "当前 Pi 会话尚未就绪；请返回工作台打开会话后再查看或重新加载资源。"
+          ? "当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。"
           : empty}</SettingsNotice>
       )}
     </SettingsSectionBlock>

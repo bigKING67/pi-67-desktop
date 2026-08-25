@@ -55,7 +55,7 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   {
     id: "command-palette",
     label: "打开命令面板",
-    detail: "搜索会话、Pi 操作和应用命令",
+    detail: "搜索对话、Pi 操作和应用命令",
     keywords: "command palette 命令 面板",
     requiresWorkspace: false,
     contexts: [
@@ -70,17 +70,17 @@ export const DESKTOP_ACTIONS: readonly DesktopActionDescriptor[] = [
   },
   {
     id: "new-session",
-    label: "新建会话",
-    detail: "在当前工作区创建一个待发送的会话",
-    keywords: "new session conversation 新建 会话",
+    label: "新建对话",
+    detail: "在当前工作区创建一个待发送的对话",
+    keywords: "new session conversation 新建 对话 会话",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],
     bindings: [{ key: "n" }, { key: "t" }]
   },
   {
     id: "toggle-navigation",
-    label: "显示或隐藏会话导航",
-    detail: "切换左侧工作区与会话列表",
+    label: "显示或隐藏对话导航",
+    detail: "切换左侧工作区与对话列表",
     keywords: "navigation sidebar left 侧栏 导航",
     requiresWorkspace: true,
     contexts: ["workspaceOpen", "composerFocus", "fileEditorFocus", "taskRunning", "taskIdle"],

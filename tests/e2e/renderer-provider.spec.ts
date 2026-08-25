@@ -169,7 +169,7 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "显示会话导航" }).click();
+  await page.getByRole("button", { name: "显示对话导航" }).click();
   await openProviderDialog(page);
 
   const dialog = page.getByRole("dialog", { name: "Provider 与凭据" });
@@ -199,7 +199,7 @@ test("keeps Provider management usable in a narrow dark workspace", async ({ pag
 async function openProviderDialog(page: Page): Promise<void> {
   await page.keyboard.press("Control+k");
   const palette = page.getByRole("dialog", { name: "命令面板" });
-  const search = palette.getByLabel("搜索会话、对话正文、扩展命令和应用操作");
+  const search = palette.getByLabel("搜索对话标题、正文、扩展命令和应用操作");
   await search.fill("模型服务与凭据");
   await palette.getByRole("option", { name: /模型服务与凭据/u }).click();
 }
@@ -219,7 +219,7 @@ async function openSettingsSection(page: Page, sectionName: RegExp) {
       .getByRole("menuitem", { name: "设置", exact: true }).click();
   }
   await expect(settings).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "对话导航" })).toHaveCount(0);
   const compactCategoryTrigger = settings.getByRole("button", {
     name: "选择设置分类",
     exact: true

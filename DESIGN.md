@@ -708,7 +708,7 @@ loading error where the operation can produce those states
   remains the non-color authority.
 - A selected idle, stopped, or lost conversation never inherits a stale live
   projection merely because its Session ID still matches. Until Pi reacquires
-  runtime authority, the center surface shows an explicit `打开会话` or `恢复任务`
+  runtime authority, the center surface shows an explicit `打开对话` or `恢复任务`
   action and does not mount the Transcript, Composer, or Inspector projection.
 - Opening a Workspace with no known formal conversation keeps the center in one bounded
   loading/recovery state while the first Catalog page is decided. Existing rows open before
@@ -1664,15 +1664,17 @@ loading error where the operation can produce those states
   rebuilds, and cold startup never bulk-generate titles. The deterministic seed
   remains visible while generation is pending.
 - Task transition feedback resolves the same effective Catalog/Task title used by
-  the conversation row. It never interpolates `未命名会话`, `未命名任务`, or
-  `未命名对话`; when no authoritative title is available it uses the neutral
-  `正在切换会话` / `已切换到会话` copy until title projection converges.
+  the conversation row, but presents the user-visible navigation object as a
+  Conversation: `正在切换至「{title}」` / `已切换至「{title}」`. It never
+  interpolates `未命名会话`, `未命名任务`, or `未命名对话`; when no authoritative
+  title is available it uses the neutral `正在切换对话` / `已切换到对话` copy until
+  title projection converges.
 - A nonempty Catalog name query waits for the current bounded automatic-title
   indexing flight and its writes before returning, while ordinary list pages
   remain responsive. Manual semantic-title regeneration is available only for a
   live Task so the current model and Session generation remain explicit; an
   explicit user name stays authoritative until the user restores automatic mode.
-- The rail search is unified but visually grouped: `会话` contains Catalog
+- The rail search is unified but visually grouped: `对话` contains Catalog
   name/path/ID matches and `对话内容` contains at most one best user/assistant text
   hit per Session. Content selection opens the exact physical Session, requests
   `message.locate`, then focuses the verified message; a content hit is never

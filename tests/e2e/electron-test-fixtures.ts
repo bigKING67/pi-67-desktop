@@ -39,7 +39,7 @@ export async function openRuntimeSettings(window: Page) {
   await window.keyboard.press(process.platform === "darwin" ? "Meta+," : "Control+,");
   const settings = window.getByLabel("π 设置");
   await expect(settings).toBeVisible();
-  await expect(window.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
+  await expect(window.getByRole("complementary", { name: "对话导航" })).toHaveCount(0);
   await expect(window.getByTestId("inspector-toggle")).toHaveCount(0);
   await expect(settings.getByRole("button", { name: "返回工作台" })).toBeVisible();
   await settings.getByRole("navigation", { name: "设置分类" })

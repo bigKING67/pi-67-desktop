@@ -89,7 +89,7 @@ test("runs independent real Pi tasks across Sessions and Workspaces", async () =
     await expect(secondaryGroup.getByText("运行中", { exact: true })).toHaveCount(1);
     await expect.poll(() => utilityProcessCount(application!)).toBe(utilityProcessesBeforeSecondWorkspace);
     await expect(window.getByText("无法打开工作区", { exact: true })).toHaveCount(0);
-    await expect(window.getByText("无法切换任务", { exact: true })).toHaveCount(0);
+    await expect(window.getByText("无法切换对话", { exact: true })).toHaveCount(0);
     await expect(window.getByText("无法加载本会话修改记录", { exact: true })).toHaveCount(0);
   } finally {
     if (application) await application.close();

@@ -194,8 +194,8 @@ describe("Windows installed application lifecycle", () => {
 
   it.each([
     { visibleAction: "恢复任务", expected: "task-restored" },
-    { visibleAction: "打开会话", expected: "session-opened" },
-    { visibleAction: "新建会话", expected: "session-created" }
+    { visibleAction: "打开对话", expected: "session-opened" },
+    { visibleAction: "新建对话", expected: "session-created" }
   ])("activates a restored Workspace through $visibleAction", async ({ visibleAction, expected }) => {
     const actions = [];
     const window = {

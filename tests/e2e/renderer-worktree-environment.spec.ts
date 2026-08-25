@@ -33,7 +33,7 @@ test("selects Local or Worktree without mutating Git and checkpoints the draft i
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "在 pi-demo 新建会话" }).click();
+  await page.getByRole("button", { name: "在 pi-demo 新建对话" }).click();
 
   const selector = page.getByTestId("new-session-environment-selector");
   const local = selector.getByRole("radio", { name: /当前工作区/u });
@@ -77,9 +77,9 @@ test("keeps the environment selector single-column and legible in narrow dark mo
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "显示会话导航" }).click();
-  await page.getByRole("button", { name: "在 pi-demo 新建会话" }).click();
-  await page.getByRole("button", { name: "关闭会话导航" }).click();
+  await page.getByRole("button", { name: "显示对话导航" }).click();
+  await page.getByRole("button", { name: "在 pi-demo 新建对话" }).click();
+  await page.getByRole("button", { name: "关闭对话导航" }).click();
 
   const selector = page.getByTestId("new-session-environment-selector");
   const localOption = selector.locator("label").filter({ hasText: "当前工作区" });
@@ -102,7 +102,7 @@ test("keeps Worktree unavailable when the selected workspace is not a Git Reposi
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: "在 pi-demo 新建会话" }).click();
+  await page.getByRole("button", { name: "在 pi-demo 新建对话" }).click();
 
   const selector = page.getByTestId("new-session-environment-selector");
   const local = selector.getByRole("radio", { name: /当前工作区/u });

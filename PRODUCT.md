@@ -906,7 +906,7 @@ the only Runtime and behavior specification source.
   use stable idempotency keys and a bounded same-key transport retry. Lost responses
   cannot duplicate Session creation or replay a control mutation into a newer Session
   generation.
-- `新建会话`, `Cmd/Ctrl+N`, `Cmd/Ctrl+T`, and `/new` first create only a
+- `新建对话`, `Cmd/Ctrl+N`, `Cmd/Ctrl+T`, and `/new` first create only a
   Renderer-owned New Session Intent. The intent is an offline-capable Composer surface,
   not a Pi Session: it does not connect a Runtime, call `session.create`, or create Pi
   JSONL until the first Prompt is submitted. That first submit materializes the same

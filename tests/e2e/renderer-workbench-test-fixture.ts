@@ -30,7 +30,7 @@ export async function openWorkbench(
   ).some((command) => command.type === "workspace.open" || command.type === "runtime.initialize"))
     .toBe(true);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
-  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "工作区与对话" })).toBeVisible();
 }
 
 export function workspaceGroup(page: Page, workspaceName: string): Locator {

@@ -78,7 +78,7 @@ test("uses a bounded first page, server search payload, and the bound next curso
   });
 
   await clearSessionCatalogRequests(page);
-  await page.getByRole("searchbox", { name: "搜索会话" }).fill("hidden-folder");
+  await page.getByRole("searchbox", { name: "搜索对话" }).fill("hidden-folder");
   await expect.poll(async () => (await sessionCatalogRequests(page))
     .find((request) => request.payload.search === "hidden-folder")?.payload).toEqual({
     scope: "workspace",
@@ -106,7 +106,7 @@ test("invalidates pages on a revision event and applies explicit refresh data on
   await queueSessionCatalogRefresh(page, { revision: 3, items: [session(3, "手动刷新会话")] });
   await clearSessionCatalogRequests(page);
   await page.getByRole("button", { name: "pi-demo 工作区菜单" }).click();
-  await page.getByRole("menuitem", { name: "刷新会话" }).click();
+  await page.getByRole("menuitem", { name: "刷新对话" }).click();
   await expect.poll(async () => (await sessionCatalogRequests(page))
     .find((request) => request.payload.refresh === true)?.payload).toEqual({
     scope: "workspace",
@@ -213,14 +213,14 @@ test("keeps Command Palette server search independent from navigation search", a
     ]
   });
 
-  const navigationSearch = page.getByRole("searchbox", { name: "搜索会话" });
+  const navigationSearch = page.getByRole("searchbox", { name: "搜索对话" });
   await navigationSearch.fill("navigation-only");
   await expect(sessionButton(page, "导航结果")).toBeVisible();
   await clearSessionCatalogRequests(page);
 
   await page.getByRole("button", { name: "打开命令面板" }).click();
   const palette = page.getByRole("dialog", { name: "命令面板" });
-  await palette.getByRole("combobox", { name: "搜索会话、对话正文、扩展命令和应用操作" }).fill("palette-only");
+  await palette.getByRole("combobox", { name: "搜索对话标题、正文、扩展命令和应用操作" }).fill("palette-only");
   await expect.poll(async () => (await sessionCatalogRequests(page)).some((request) => (
     request.payload.search === "palette-only"
   ))).toBe(true);

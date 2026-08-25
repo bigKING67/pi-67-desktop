@@ -18,7 +18,7 @@ test("keeps shell ownership while quieting resting header and Composer chrome", 
 
   const navigation = page.locator("#session-navigation");
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
-  const navigationSearch = page.getByRole("searchbox", { name: "搜索会话" });
+  const navigationSearch = page.getByRole("searchbox", { name: "搜索对话" });
   const inspectorSearch = inspector.getByRole("textbox", { name: "搜索工作区文件" });
   const composerShell = page.getByTestId("composer-shell");
   const composer = page.getByLabel("给 Pi 发送消息");

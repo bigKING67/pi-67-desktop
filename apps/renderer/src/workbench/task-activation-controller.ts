@@ -63,7 +63,7 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
       context: workbenchProtocolContextForTask(task),
       recoveringDetail: rendererTaskTransitionDetail(task, "recovering"),
       readyDetail: rendererTaskTransitionDetail(task, "ready"),
-      failureTitle: "无法切换任务",
+      failureTitle: "无法切换对话",
       deferRuntimeNotReady: true
     });
     if (recovery === "committed") {
@@ -77,7 +77,7 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
     useAppStore.setState({ sessionTransitionPending: false });
     publishNotification({
       level: "error",
-      title: "无法切换任务",
+      title: "无法切换对话",
       message: error instanceof Error ? error.message : "未知错误"
     });
     return false;

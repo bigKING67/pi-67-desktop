@@ -16,8 +16,8 @@ test.beforeEach(async ({ page }) => {
 test("opens a trusted Pi workspace through the MessagePort contract", async ({ page }, testInfo) => {
   await page.goto("/");
   await attachMockAgent(page);
-  await expect(page.getByRole("heading", { name: "开始一个 Pi 会话" })).toBeVisible();
-  await expect(page.getByText("选择一个工作区，继续已有 Pi 会话或开始新会话。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "开始一个 Pi 对话" })).toBeVisible();
+  await expect(page.getByText("选择一个工作区，继续已有对话或开始新对话。")).toBeVisible();
   await expect(page.getByText("复用现有 Pi 配置和会话")).toBeVisible();
   await expect(page.getByText("数据保存在本机")).toBeVisible();
   await expect(page.getByText(/Pi SDK|Agent Host|内部服务器|agent runtime/u)).toHaveCount(0);
@@ -32,9 +32,9 @@ test("opens a trusted Pi workspace through the MessagePort contract", async ({ p
   await expect(page.getByRole("button", { name: /创建 Worktree|删除 Worktree|强制删除/u })).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
-  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "工作区与对话" })).toBeVisible();
   const navigationBrand = page.getByTestId("navigation-brand");
-  await expect(navigationBrand).toHaveAccessibleName("Pi-67 会话工作台");
+  await expect(navigationBrand).toHaveAccessibleName("Pi-67 对话工作台");
   await expect(navigationBrand.getByText("Pi-67", { exact: true })).toBeVisible();
   await expect(navigationBrand.locator("small")).toHaveCount(0);
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
@@ -55,8 +55,8 @@ test("gives the first on-demand Pi runtime connection one initialization owner",
 
   await expect(page.getByRole("button", { name: "pi-demo 工作区菜单" })).toBeVisible();
   await expect(page.getByText("工作区尚未信任")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "开始一个新会话" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "在 pi-demo 新建会话" })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "开始一个新对话" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "在 pi-demo 新建对话" })).toBeDisabled();
 
   await attachMockAgent(page);
 
@@ -66,7 +66,7 @@ test("gives the first on-demand Pi runtime connection one initialization owner",
   await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
     command === "workspace.open"
   ))).toHaveLength(1);
-  await expect(page.getByRole("button", { name: "在 pi-demo 新建会话" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "在 pi-demo 新建对话" })).toBeEnabled();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
 });
 
@@ -186,7 +186,7 @@ test("serializes new-session transitions and keeps one terminal notification acr
   await page.getByRole("button", { name: "选择工作区" }).click();
   await clearRecordedCommands(page);
 
-  const createButton = page.getByRole("button", { name: "在 pi-demo 新建会话" });
+  const createButton = page.getByRole("button", { name: "在 pi-demo 新建对话" });
   await createButton.click();
   await expect(page.getByTestId("new-session-intent")).toBeVisible();
   expect((await recordedCommands(page)).filter((command) => command === "session.create"))

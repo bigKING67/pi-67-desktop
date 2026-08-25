@@ -61,7 +61,7 @@ export function refreshConversation(
     }
   }).catch((error: unknown) => {
     if (revision === recentPageRevision) {
-      useConversationStore.getState().finishOlder(target, `无法刷新会话消息：${errorMessage(error)}`);
+      useConversationStore.getState().finishOlder(target, `无法刷新对话消息：${errorMessage(error)}`);
     }
   });
 }

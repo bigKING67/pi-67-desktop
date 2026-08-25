@@ -71,7 +71,7 @@ export function NavigationRail({
       aria-label={messages.navigation.region}
     >
       <header className={styles.railHeader}>
-        <div className={styles.railBrand} aria-label="Pi-67 会话工作台" data-testid="navigation-brand">
+        <div className={styles.railBrand} aria-label="Pi-67 对话工作台" data-testid="navigation-brand">
           <img alt="" aria-hidden="true" src={piIconUrl} />
           <strong>Pi-67</strong>
         </div>
@@ -183,7 +183,7 @@ function requestWorkspaceRemoval(
     publishNotification({
       level: "warning",
       title: "无法移除工作区",
-      message: "请先处理这个工作区仍在运行、等待或包含草稿的会话。"
+      message: "请先处理这个工作区仍在运行、等待或包含草稿的对话。"
     });
     return;
   }

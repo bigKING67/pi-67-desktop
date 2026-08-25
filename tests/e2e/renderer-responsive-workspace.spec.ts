@@ -20,7 +20,7 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   }]);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const navigation = page.getByRole("complementary", { name: "会话导航" });
+  const navigation = page.getByRole("complementary", { name: "对话导航" });
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   const message = page.getByRole("article", { name: "Pi 消息", exact: true });
   const composer = page.getByTestId("composer-shell");
@@ -64,7 +64,7 @@ test("bounds wide side columns and expands the shared conversation measure", asy
   expect(contextHidden.messageWidth).toBeLessThanOrEqual(1042);
   expect(Math.abs(contextHidden.messageWidth - contextHidden.composerWidth)).toBeLessThanOrEqual(1);
 
-  await page.getByRole("button", { name: "隐藏会话导航" }).click();
+  await page.getByRole("button", { name: "隐藏对话导航" }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
   await expect.poll(async () => (await message.boundingBox())?.width ?? 0).toBeGreaterThan(1110);
@@ -226,7 +226,7 @@ async function controlTopmostSurface(locator: import("@playwright/test").Locator
     const topmost = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     if (topmost === element || (topmost !== null && element.contains(topmost))) return "control";
     if (topmost?.closest(".context-pane, .context-drawer-scrim")) return "context-drawer";
-    if (topmost?.closest('.navigation-rail, [aria-label="关闭会话导航"]')) return "navigation-drawer";
+    if (topmost?.closest('.navigation-rail, [aria-label="关闭对话导航"]')) return "navigation-drawer";
     return topmost ? "other" : "none";
   });
 }
@@ -268,8 +268,8 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
 
-  const navigation = page.getByLabel("会话导航", { exact: true });
-  const navigationToggle = page.getByRole("button", { name: "显示会话导航" });
+  const navigation = page.getByLabel("对话导航", { exact: true });
+  const navigationToggle = page.getByRole("button", { name: "显示对话导航" });
   const sendButton = page.getByRole("button", { name: "发送" });
   await expect(navigation).not.toBeVisible();
   await expect(page.getByTestId("title-navigation-zone")).toHaveCount(0);
@@ -281,19 +281,19 @@ test("opens narrow session navigation as a focus-restoring drawer", async ({ pag
   await navigationToggle.click();
   await expect(navigation).toBeVisible();
   await expect.poll(() => controlTopmostSurface(sendButton)).toBe("navigation-drawer");
-  await expect(page.getByRole("button", { name: "隐藏会话导航" })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "隐藏对话导航" })).toHaveAttribute("aria-expanded", "true");
   await expect(navigation.getByRole("button", { name: "添加或创建工作区" })).toBeFocused();
 
-  await page.getByRole("button", { name: "关闭会话导航" }).click();
+  await page.getByRole("button", { name: "关闭对话导航" }).click();
   await expect(navigation).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "显示对话导航" })).toBeFocused();
   await expect.poll(() => controlTopmostSurface(sendButton)).toBe("control");
 
   await page.keyboard.press("Control+b");
   await expect(navigation).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(navigation).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "显示对话导航" })).toBeFocused();
 
   const inspector = page.getByRole("complementary", { name: "任务检查器" });
   await page.keyboard.press("Control+Shift+b");

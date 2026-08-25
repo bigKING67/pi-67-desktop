@@ -12,7 +12,7 @@ describe("Renderer message catalog", () => {
     const catalog: MessageCatalog = messages;
 
     expect(appLocale).toBe("zh-CN");
-    expect(catalog.navigation.rowLabel("会话", "运行中", 3)).toBe("会话，运行中，3 条消息");
+    expect(catalog.navigation.rowLabel("对话", "运行中", 3)).toBe("对话，运行中，3 条消息");
     expect(catalog.composer.removeAttachment("image.png")).toBe("移除附件：image.png");
     expect(catalog.approval.suspiciousDescription(2)).toContain("2 个可疑字符");
     expect(catalog.extensionCatalog.countSummary(1, 2)).toBe("1 命令 · 2 工具");

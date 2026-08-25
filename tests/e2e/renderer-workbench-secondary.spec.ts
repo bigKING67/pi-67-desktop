@@ -77,11 +77,11 @@ test("stops a running task from its conversation row without deleting Pi JSONL h
     .toMatchObject({ payload: { mode: "stop" } });
   expect((await recordedCommandDetails(page)).filter((command) => command.type === "conversation.archive"))
     .toHaveLength(0);
-  await expect(page.getByRole("heading", { name: "Pi 会话", exact: true })).toBeVisible();
-  await expect(page.getByText("会话未在运行，打开后可继续。", {
+  await expect(page.getByRole("heading", { name: "未命名对话", exact: true })).toBeVisible();
+  await expect(page.getByText("对话当前未在运行，打开后可继续。", {
     exact: true
   })).toBeVisible();
-  await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();
 });
 
 test("opens Settings, update, and help from the lower-left help menu", async ({ page }) => {
@@ -128,7 +128,7 @@ test("keeps long workspace and session names inside the navigation column", asyn
     sessionCatalogItemsByWorkspace: { [longWorkspace.id]: [longSession] }
   });
 
-  const navigation = page.getByRole("complementary", { name: "会话导航" });
+  const navigation = page.getByRole("complementary", { name: "对话导航" });
   const metrics = await navigation.evaluate((element) => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,

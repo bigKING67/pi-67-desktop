@@ -148,7 +148,7 @@ test("keeps Settings navigation and primary actions reachable at a 200 percent z
   await updateDialog.getByRole("button", { name: "稍后处理", exact: true }).click();
   await expect(page.getByRole("button", { name: /^导出脱敏诊断/u })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "显示对话导航" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "返回工作台" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^(显示|隐藏)上下文/u })).toHaveCount(0);
   expect(await page.locator(".title-bar").evaluate((element) => ({

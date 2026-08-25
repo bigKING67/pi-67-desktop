@@ -305,12 +305,12 @@ async function verifyContextDrawerLayout(window, application, scaleFactor) {
 
 async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
   await setStableMinimumWindowWidth(window, application, 760);
-  const navigation = window.getByLabel("会话导航", { exact: true });
+  const navigation = window.getByLabel("对话导航", { exact: true });
   await navigation.waitFor({ state: "hidden" });
-  const navigationToggle = window.getByRole("button", { name: "显示会话导航" });
+  const navigationToggle = window.getByRole("button", { name: "显示对话导航" });
   await navigationToggle.click();
   await navigation.waitFor({ state: "visible" });
-  await window.getByRole("button", { name: "关闭会话导航" }).waitFor({ state: "visible" });
+  await window.getByRole("button", { name: "关闭对话导航" }).waitFor({ state: "visible" });
 
   const drawerObservation = await observeLayout(window);
   await captureResponsiveScreenshot(window, scaleFactor, "navigation-drawer");
@@ -325,9 +325,9 @@ async function verifyNavigationDrawerLayout(window, application, scaleFactor) {
     throw new Error(`Scale ${scaleFactor}: navigation drawer is not visible at the 760px breakpoint.`);
   }
 
-  await window.getByRole("button", { name: "关闭会话导航" }).click();
+  await window.getByRole("button", { name: "关闭对话导航" }).click();
   await navigation.waitFor({ state: "hidden" });
-  await waitForFocus(window, "显示会话导航");
+  await waitForFocus(window, "显示对话导航");
   const observation = await observeLayout(window);
   assertLayoutObservation(observation, {
     allowNativeFrameFloor: true,

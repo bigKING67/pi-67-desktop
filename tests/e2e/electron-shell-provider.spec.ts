@@ -41,8 +41,8 @@ test("boots the real sandboxed Electron shell over app://", async () => {
     await window.waitForLoadState("domcontentloaded");
     await expect(window).toHaveTitle("π");
     expect(window.url()).toBe("app://pi67/index.html");
-    await expect(window.getByRole("heading", { name: "开始一个 Pi 会话" })).toBeVisible();
-    await expect(window.getByText("选择一个工作区，继续已有 Pi 会话或开始新会话。")).toBeVisible();
+    await expect(window.getByRole("heading", { name: "开始一个 Pi 对话" })).toBeVisible();
+    await expect(window.getByText("选择一个工作区，继续已有对话或开始新对话。")).toBeVisible();
     await expect(window.getByRole("button", { name: "选择工作区" })).toBeEnabled();
     await expect(window.getByText("数据保存在本机")).toBeVisible();
     await expect(window.locator("html")).toHaveAttribute("data-theme-preference", "system");

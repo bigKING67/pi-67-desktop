@@ -112,11 +112,11 @@ export function WorkspaceConversationList({
   }, [selectedIdentity, expandedWorkspaceIds]);
 
   if (workspaceOrder.length === 0) {
-    return <p className={styles.empty}>还没有工作区。添加一个本地目录后，会话会按工作区显示在这里。</p>;
+    return <p className={styles.empty}>还没有工作区。添加一个本地目录后，对话会按工作区显示在这里。</p>;
   }
 
   return (
-    <div aria-label="工作区与会话" className={styles.workspaceConversationList} role="list">
+    <div aria-label="工作区与对话" className={styles.workspaceConversationList} role="list">
       {workspaceOrder.map((workspaceId, index) => {
         const workspace = workspaces[workspaceId];
         if (!workspace) return null;
@@ -259,11 +259,11 @@ function WorkspaceConversationGroup({
           <span className={styles.backgroundBadge} title={`${backgroundCount} 个后台任务`}>{backgroundCount}</span>
         ) : null}
         <button
-          aria-label={`在 ${workspace.displayName} 新建会话`}
+          aria-label={`在 ${workspace.displayName} 新建对话`}
           className={styles.workspaceQuickAction}
           disabled={workspace.availability !== "available" || sessionTransitionPending || workspaceOpenPending}
           onClick={() => void beginRendererSessionIntentInWorkspace(workspace)}
-          title="新建会话"
+          title="新建对话"
           type="button"
         ><Plus aria-hidden="true" size={13} /></button>
         <WorkspaceMenu
@@ -275,7 +275,7 @@ function WorkspaceConversationGroup({
       </header>
       {expanded ? (
         <div className={styles.workspaceConversations}>
-          {query && rows.length > 0 ? <p className={styles.searchResultGroupLabel}>会话</p> : null}
+          {query && rows.length > 0 ? <p className={styles.searchResultGroupLabel}>对话</p> : null}
           {priority.map((row) => (
             <ConversationRow
               disabled={sessionTransitionPending || workspaceOpenPending}
@@ -339,7 +339,7 @@ function WorkspaceConversationGroup({
             <p aria-live="polite" className={styles.catalogNotice} role="status">正在建立或查询对话内容索引…</p>
           ) : null}
           {query && messageSearch?.status === "failed" ? (
-            <p className={styles.catalogNotice} role="status">对话内容索引暂时不可用，当前仅显示会话名称结果。</p>
+            <p className={styles.catalogNotice} role="status">对话内容索引暂时不可用，当前仅显示对话名称结果。</p>
           ) : null}
           {query && messageSearch?.status === "ready" && messageSearch.incomplete ? (
             <p className={styles.catalogNotice} role="status">对话内容结果不完整，部分 Session 尚未完成索引。</p>
@@ -381,7 +381,7 @@ function WorkspaceConversationGroup({
             && messageSearch?.status !== "loading" ? (
             <p className={styles.workspaceEmpty}>{catalogIncompleteEmpty
               ? messages.navigation.catalogIncompleteEmpty
-              : "这个工作区还没有会话。"}</p>
+              : "这个工作区还没有对话。"}</p>
           ) : null}
           {canShowMore ? (
             <button
@@ -445,8 +445,8 @@ function WorkspaceMenu({
       </Button>
       <Popover className={styles.menuPopover!} placement="bottom end" offset={5}>
         <Menu className={styles.menu!} aria-label={`${workspace.displayName} 工作区菜单`}>
-          <MenuItem className={styles.menuItem!} onAction={() => void refreshWorkspace(workspace)} textValue="刷新会话">
-            <RefreshCw aria-hidden="true" size={14} />刷新会话
+          <MenuItem className={styles.menuItem!} onAction={() => void refreshWorkspace(workspace)} textValue="刷新对话">
+            <RefreshCw aria-hidden="true" size={14} />刷新对话
           </MenuItem>
           <MenuItem className={styles.menuItem!} onAction={() => void importIntoWorkspace(workspace)} textValue="导入 Pi Session">
             <FileInput aria-hidden="true" size={14} />导入 Pi Session

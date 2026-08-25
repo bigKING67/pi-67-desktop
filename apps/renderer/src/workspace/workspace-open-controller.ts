@@ -187,7 +187,7 @@ export async function openRendererWorkspaceDescriptor(
           context: workbenchProtocolContextForTask(task),
           recoveringDetail: "正在同步会话状态",
           readyDetail: "Pi 会话已恢复",
-          failureTitle: "无法打开会话"
+          failureTitle: "无法打开对话"
         });
         if (recovery === "committed") clearOpenedConversationAttention(task.id);
         return recovery === "committed";
@@ -218,7 +218,7 @@ export async function openRendererWorkspaceDescriptor(
     }
     const missingSession = task !== undefined && Boolean(runtimeSessionPath) && isMissingSessionError(error);
     const detail = missingSession ? "对话记录已不存在" : errorMessage(error);
-    const failureTitle = runtimeSessionPath ? "无法打开会话" : "无法打开工作区";
+    const failureTitle = runtimeSessionPath ? "无法打开对话" : "无法打开工作区";
     const runtime = {
       phase: missingSession ? "stopped" as const : "failed" as const,
       detail: missingSession ? detail : `${failureTitle}：${detail}`,

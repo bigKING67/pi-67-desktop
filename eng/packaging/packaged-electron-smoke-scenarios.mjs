@@ -66,7 +66,7 @@ export async function openPackagedSmokeWorkspace({ application, window, workspac
   }, workspace);
   await window.getByRole("button", { name: "选择工作区" }).click();
   await window.getByLabel("当前状态：Pi SDK 已就绪").waitFor({ state: "visible", timeout: 30_000 });
-  await window.getByRole("list", { name: "工作区与会话" }).waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 30_000 });
   const rows = window.locator('[data-testid="conversation-row"]');
   await rows.first().waitFor({ state: "visible", timeout: 30_000 });
   const rowCount = await rows.count();
@@ -148,7 +148,7 @@ export async function verifyPackagedPrivateGitWorktreeContract(window) {
 export async function ensurePackagedNewSessionIntent(window, timeoutMs = 30_000) {
   const intent = window.getByTestId("new-session-intent");
   if (!(await intent.isVisible())) {
-    await window.getByRole("button", { name: /新建会话$/u }).first().click({ timeout: timeoutMs });
+    await window.getByRole("button", { name: /新建对话$/u }).first().click({ timeout: timeoutMs });
   }
   await intent.waitFor({ state: "visible", timeout: timeoutMs });
 }
@@ -316,7 +316,7 @@ export async function openSettingsSection(window, sectionName) {
   if (settingsLayout.columns.trim().split(/\s+/u).length !== 2) {
     throw new Error(`Expected two-column packaged Settings at ${settingsLayout.width}px, received ${settingsLayout.columns}.`);
   }
-  if (await window.getByRole("complementary", { name: "会话导航" }).count()) {
+  if (await window.getByRole("complementary", { name: "对话导航" }).count()) {
     throw new Error("Packaged Settings must not retain the workspace navigation column.");
   }
   if (await window.getByTestId("inspector-toggle").count()) {

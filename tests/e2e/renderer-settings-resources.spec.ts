@@ -16,7 +16,7 @@ test("keeps Pi resource reload unavailable for a provisional task without a Sess
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.getByRole("button", { name: `在 ${DEFAULT_MOCK_WORKSPACE.displayName} 新建会话` }).click();
+  await page.getByRole("button", { name: `在 ${DEFAULT_MOCK_WORKSPACE.displayName} 新建对话` }).click();
   await expect(page.getByTestId("new-session-intent")).toBeVisible();
   await page.keyboard.press("Control+,");
 
@@ -32,7 +32,7 @@ test("keeps Pi resource reload unavailable for a provisional task without a Sess
     "重新加载不可用：当前 Pi 会话尚未就绪。"
   );
   await expect(settings.getByText(
-    "当前 Pi 会话尚未就绪；请返回工作台打开会话后再查看或重新加载资源。",
+    "当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。",
     { exact: true }
   )).toBeVisible();
   expect(await recordedCommands(page)).not.toContain("resource.reload");

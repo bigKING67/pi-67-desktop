@@ -141,12 +141,12 @@ test("searches Workspace conversation text and opens the exact Session result", 
   });
   await clearRecordedCommands(page);
 
-  const navigationSearch = page.getByRole("searchbox", { name: "搜索会话" });
+  const navigationSearch = page.getByRole("searchbox", { name: "搜索对话" });
   await navigationSearch.fill("installer marker");
   await expect(page.getByText("对话内容", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Release verification.*installer marker verified/u })).toBeVisible();
   await expect(page.locator('[data-content-search-visible-count="1"]')).toBeVisible();
-  await page.getByRole("button", { name: "清除会话搜索" }).click();
+  await page.getByRole("button", { name: "清除对话搜索" }).click();
 
   await page.getByLabel("给 Pi 发送消息").focus();
   await page.keyboard.press("Control+Shift+f");

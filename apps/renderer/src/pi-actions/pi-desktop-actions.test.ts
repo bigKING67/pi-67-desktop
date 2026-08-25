@@ -84,7 +84,7 @@ describe("Pi Desktop actions", () => {
     expect(piDesktopActionUnavailableReason(
       piDesktopAction("new")!,
       { ...READY_CONTEXT, sessionTransitionPending: true }
-    )).toBe("正在切换会话，请稍候。");
+    )).toBe("正在切换对话，请稍候。");
   });
 
   it("routes /plan and /default through the native Session Plan controller", async () => {

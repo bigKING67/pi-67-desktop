@@ -71,7 +71,7 @@ export async function observeLayout(window) {
     function classifyForegroundSurface(element) {
       if (!element) return "none";
       if (element.closest(".context-pane, .context-drawer-scrim")) return "context-drawer";
-      if (element.closest('.navigation-rail, [aria-label="关闭会话导航"]')) return "navigation-drawer";
+      if (element.closest('.navigation-rail, [aria-label="关闭对话导航"]')) return "navigation-drawer";
       return "other";
     }
   }, {

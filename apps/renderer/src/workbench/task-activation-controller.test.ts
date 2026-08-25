@@ -122,7 +122,7 @@ describe("task activation controller", () => {
     )).toBe(false);
   });
 
-  it("uses the authoritative Catalog title in Task transition feedback", async () => {
+  it("uses the authoritative Catalog title in conversation transition feedback", async () => {
     rendererWorkbenchStore.getState().updateTask("task-a", {
       title: "未命名会话",
       titleSource: "fallback",
@@ -134,18 +134,18 @@ describe("task activation controller", () => {
 
     await expect(activateRendererTask("task-a")).resolves.toBe(true);
 
-    expect(useAppStore.getState().runtime.detail).toBe("正在切换任务：杭州实时天气查询");
+    expect(useAppStore.getState().runtime.detail).toBe("正在切换至「杭州实时天气查询」");
     expect(resynchronize).toHaveBeenCalledWith(
       useAppStore.getState,
       useAppStore.setState,
       expect.objectContaining({
-        recoveringDetail: "正在切换任务：杭州实时天气查询",
-        readyDetail: "已切换到任务：杭州实时天气查询"
+        recoveringDetail: "正在切换至「杭州实时天气查询」",
+        readyDetail: "已切换至「杭州实时天气查询」"
       })
     );
   });
 
-  it("never exposes an internal unnamed placeholder in Task transition feedback", async () => {
+  it("never exposes an internal unnamed placeholder in conversation transition feedback", async () => {
     rendererWorkbenchStore.getState().updateTask("task-a", {
       title: "未命名会话",
       titleSource: "fallback"
@@ -155,13 +155,13 @@ describe("task activation controller", () => {
 
     await expect(activateRendererTask("task-a")).resolves.toBe(true);
 
-    expect(useAppStore.getState().runtime.detail).toBe("正在切换会话");
+    expect(useAppStore.getState().runtime.detail).toBe("正在切换对话");
     expect(resynchronize).toHaveBeenCalledWith(
       useAppStore.getState,
       useAppStore.setState,
       expect.objectContaining({
-        recoveringDetail: "正在切换会话",
-        readyDetail: "已切换到会话"
+        recoveringDetail: "正在切换对话",
+        readyDetail: "已切换到对话"
       })
     );
   });

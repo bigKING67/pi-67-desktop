@@ -300,13 +300,13 @@ describe("App Store workspace open authority", () => {
       sessionTransitionPending: false,
       runtime: {
         phase: "failed",
-        detail: "无法打开会话：Workspace registration failed"
+        detail: "无法打开对话：Workspace registration failed"
       }
     });
     expect(Object.values(rendererWorkbenchStore.getState().tasks)).toEqual([]);
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "error",
-      title: "无法打开会话",
+      title: "无法打开对话",
       message: "Workspace registration failed"
     });
   });

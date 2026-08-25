@@ -9,7 +9,7 @@ import {
 const SESSION_CREATION_POLL_INTERVAL_MS = 50;
 
 export async function prepareRealUserSessionCreation(window, agentDir, timeoutMs) {
-  const createAction = window.getByRole("button", { name: /^在 .+ 新建会话$/u }).first();
+  const createAction = window.getByRole("button", { name: /^在 .+ 新建对话$/u }).first();
   // Capture the baseline only after Workspace initialization admits the action.
   await createAction.click({ trial: true, timeout: timeoutMs });
   const existingIdentities = new Set(await window.locator('[data-testid="conversation-row"]')

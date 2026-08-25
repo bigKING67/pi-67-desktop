@@ -233,8 +233,8 @@ export async function waitForInstalledStartupSurface(window, legacyUserInterface
   const runtimeReady = runtimeReadyLocator(window, legacyUserInterface);
   const restoredWorkspace = window.getByLabel("Pi conversation")
     .or(window.getByRole("button", { name: "恢复任务", exact: true }))
-    .or(window.getByRole("button", { name: "打开会话", exact: true }))
-    .or(window.getByRole("button", { name: "新建会话", exact: true }));
+    .or(window.getByRole("button", { name: "打开对话", exact: true }))
+    .or(window.getByRole("button", { name: "新建对话", exact: true }));
   await workspacePicker.or(runtimeReady).or(restoredWorkspace)
     .waitFor({ state: "visible", timeout: 30_000 });
   if (await workspacePicker.isVisible()) return "workspace-picker";
@@ -246,8 +246,8 @@ export async function activateRestoredWorkspace(window) {
 
   for (const [name, result] of [
     ["恢复任务", "task-restored"],
-    ["打开会话", "session-opened"],
-    ["新建会话", "session-created"]
+    ["打开对话", "session-opened"],
+    ["新建对话", "session-created"]
   ]) {
     const action = window.getByRole("button", { name, exact: true });
     if (await action.isVisible()) {
@@ -303,7 +303,7 @@ function inspectInstalledRuntimeState(window) {
       && (element.getClientRects().length > 0 || element.getBoundingClientRect().width > 0)
     );
     const activationActions = Object.fromEntries(
-      ["恢复任务", "打开会话", "新建会话"].map((name) => {
+      ["恢复任务", "打开对话", "新建对话"].map((name) => {
         const button = [...document.querySelectorAll("button")]
           .find((candidate) => candidate.textContent?.trim() === name);
         return [name, visible(button)];

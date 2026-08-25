@@ -188,7 +188,7 @@ export function WorkspaceShell({
       <NavigationRail containerRef={navigationRef} />
       {navigationIsDrawer && navigationVisible ? (
         <button
-          aria-label="关闭会话导航"
+          aria-label="关闭对话导航"
           className={styles.navigationDrawerScrim}
           onClick={onCloseNavigation}
           type="button"
@@ -243,14 +243,14 @@ function StoppedConversationState({ sessionName, sessionFileIdentity, sessionPat
     <section className={styles.emptyWorkspace}>
       <div>
         <span className="section-label">{workspace.displayName}</span>
-        <h2>{sessionName?.trim() || "Pi 会话"}</h2>
-        <p>会话未在运行，打开后可继续。</p>
+        <h2>{sessionName?.trim() || "未命名对话"}</h2>
+        <p>对话当前未在运行，打开后可继续。</p>
         <button
           className="primary-button"
           disabled={workspace.availability !== "available"}
           onClick={() => void open()}
           type="button"
-        >打开会话</button>
+        >打开对话</button>
       </div>
     </section>
   );
@@ -418,8 +418,8 @@ function WorkspaceEmptyState() {
     <section className={styles.emptyWorkspace}>
       <div>
         <span className="section-label">当前工作区</span>
-        <h2>开始一个新会话</h2>
-        <p>新会话会出现在当前工作区列表中。切换工作区或会话不会停止仍在后台运行的 Pi 任务。</p>
+        <h2>开始一个新对话</h2>
+        <p>新对话会出现在当前工作区列表中。切换工作区或对话不会停止仍在后台运行的 Pi 任务。</p>
         <button
           className="primary-button"
           disabled={
@@ -429,7 +429,7 @@ function WorkspaceEmptyState() {
           }
           onClick={() => void start()}
           type="button"
-        >新建会话</button>
+        >新建对话</button>
       </div>
     </section>
   );

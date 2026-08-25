@@ -315,7 +315,7 @@ try {
   await window.locator('html[data-theme-preference="light"][data-theme="light"]').waitFor({ state: "attached" });
   const restoredConversation = window.getByLabel("Pi conversation");
   const restoreTask = window.getByRole("button", { name: "恢复任务", exact: true });
-  const createConversation = window.getByRole("button", { name: "新建会话", exact: true });
+  const createConversation = window.getByRole("button", { name: "新建对话", exact: true });
   try {
     await restoredConversation.or(restoreTask).or(createConversation)
       .waitFor({ state: "visible", timeout: 30_000 });
@@ -344,14 +344,14 @@ try {
   packagedProcessOutput = captureProcessOutput(application.process());
   window = await application.firstWindow();
   await window.waitForLoadState("domcontentloaded");
-  await window.getByRole("list", { name: "工作区与会话" }).waitFor({ state: "visible", timeout: 30_000 });
+  await window.getByRole("list", { name: "工作区与对话" }).waitFor({ state: "visible", timeout: 30_000 });
   if (await window.getByLabel("当前状态：等待选择工作区").count()) {
     throw new Error(`Packaged cold restart lost Workspace authority: ${JSON.stringify(await inspectRendererSurface(window))}`);
   }
   const coldConversation = window.getByLabel("Pi conversation");
   const coldRestoreTask = window.getByRole("button", { name: "恢复任务", exact: true });
-  const coldOpenConversation = window.getByRole("button", { name: "打开会话", exact: true });
-  const coldCreateConversation = window.getByRole("button", { name: "新建会话", exact: true });
+  const coldOpenConversation = window.getByRole("button", { name: "打开对话", exact: true });
+  const coldCreateConversation = window.getByRole("button", { name: "新建对话", exact: true });
   try {
     await coldConversation.or(coldRestoreTask).or(coldOpenConversation).or(coldCreateConversation)
       .waitFor({ state: "visible", timeout: 30_000 });

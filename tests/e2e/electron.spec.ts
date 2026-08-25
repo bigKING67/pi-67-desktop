@@ -75,11 +75,11 @@ test("initializes and trusts a workspace through the on-demand real Agent Host",
     await doctorDialog.getByRole("button", { name: "关闭" }).click();
     await settings.getByRole("button", { name: "返回工作台" }).click();
     await expect(window.getByLabel("Pi conversation")).toBeVisible();
-    await expect(window.getByRole("complementary", { name: "会话导航" })).toBeVisible();
+    await expect(window.getByRole("complementary", { name: "对话导航" })).toBeVisible();
 
     await expect(window.getByText("工作区尚未信任")).toHaveCount(0);
 
-    const createSessionButton = window.getByRole("button", { name: "在 workspace 新建会话" });
+    const createSessionButton = window.getByRole("button", { name: "在 workspace 新建对话" });
     await expect(createSessionButton).toBeEnabled();
     await createSessionButton.click();
     await expect(window.getByTestId("new-session-intent")).toBeVisible();
@@ -200,7 +200,7 @@ test("opens, switches, creates, and restores exact Sessions across a real Electr
       .toBeVisible({ timeout: 30_000 });
     await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled();
 
-    const createSessionButton = window.getByRole("button", { name: "在 workspace 新建会话" });
+    const createSessionButton = window.getByRole("button", { name: "在 workspace 新建对话" });
     await createSessionButton.click();
     await expect(window.getByTestId("new-session-intent")).toBeVisible();
     await window.getByLabel("给 Pi 发送消息").fill("创建第三个 Session 并验证重启恢复");
@@ -242,8 +242,8 @@ test("opens, switches, creates, and restores exact Sessions across a real Electr
       selectedConversationId!,
       { timeout: 30_000 }
     );
-    await expect(window.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
-    await window.getByRole("button", { name: "打开会话", exact: true }).click();
+    await expect(window.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();
+    await window.getByRole("button", { name: "打开对话", exact: true }).click();
     await expect(window.getByLabel("给 Pi 发送消息")).toBeEnabled({ timeout: 30_000 });
     await expect(window.getByRole("banner").getByText("Pi SDK 已就绪", { exact: true }))
       .toBeVisible({ timeout: 30_000 });

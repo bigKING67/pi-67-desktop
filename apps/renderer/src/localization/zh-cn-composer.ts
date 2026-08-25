@@ -63,7 +63,7 @@ export const zhCNComposerMessages = {
     disconnected: "Pi 运行服务尚未连接。",
     workspace: "请先打开可用工作区。",
     session: "当前 Pi 会话尚未就绪。",
-    transition: "正在切换会话，请稍候。",
+    transition: "正在切换对话，请稍候。",
     running: "当前任务结束或停止后可用。",
     model: "当前没有已配置的可用模型。"
   },

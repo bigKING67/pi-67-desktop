@@ -54,10 +54,10 @@ test("restores persisted Workspace authority without asking for the Workspace ag
 
   await expect(page.getByText("等待选择工作区", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("当前状态：会话待打开")).toBeVisible();
-  await expect(page.getByRole("list", { name: "工作区与会话" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "工作区与对话" })).toBeVisible();
   await expect(page.getByTestId("conversation-row").filter({ hasText: "已保存的会话" })).toBeVisible();
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打开会话", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开对话", exact: true })).toBeVisible();
   await expect(page.getByTestId("title-context-current")).toHaveText("已保存的会话");
   await expect(page.getByTestId("title-context-workspace")).toHaveCount(0);
   await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
@@ -70,14 +70,14 @@ test("restores persisted Workspace authority without asking for the Workspace ag
     return commands.filter((command) => command.type === "session.catalog.query").length;
   }).toBeGreaterThanOrEqual(1);
 
-  await page.getByRole("button", { name: "隐藏会话导航" }).click();
+  await page.getByRole("button", { name: "隐藏对话导航" }).click();
   await expect(page.getByTestId("title-context-workspace")).toHaveText(DEFAULT_MOCK_WORKSPACE.displayName);
   await expect(page.getByTestId("title-context-current")).toHaveText("已保存的会话");
   await page.screenshot({ path: testInfo.outputPath("title-context-collapsed.png"), animations: "disabled" });
-  await page.getByRole("button", { name: "显示会话导航" }).click();
+  await page.getByRole("button", { name: "显示对话导航" }).click();
   await page.screenshot({ path: testInfo.outputPath("title-context-expanded.png"), animations: "disabled" });
 
-  await page.getByRole("button", { name: "打开会话", exact: true }).click();
+  await page.getByRole("button", { name: "打开对话", exact: true }).click();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
   await expect(page.getByLabel("给 Pi 发送消息")).toBeVisible();
   await expect(page.getByLabel("当前状态：Pi SDK 已就绪")).toBeVisible();
@@ -105,7 +105,7 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   await expect(page.getByRole("group", { name: "设置作用域" })).toHaveCount(0);
   await expect(page.getByLabel("Pi conversation")).toHaveCount(0);
   await expect(page.getByTestId("inspector-toggle")).toHaveCount(0);
-  await expect(page.getByRole("complementary", { name: "会话导航" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "对话导航" })).toHaveCount(0);
   await expect(page.getByTestId("title-context-current")).toHaveText("设置");
   await expect(page.getByTestId("title-brand-mark")).toHaveCount(0);
 
@@ -117,7 +117,7 @@ test("uses the left workspace conversation list instead of horizontal task tabs"
   expect(settingsColumns.columns.split(" ")).toHaveLength(2);
 
   await page.getByRole("button", { name: "返回工作台" }).click();
-  await expect(page.getByRole("complementary", { name: "会话导航" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "对话导航" })).toBeVisible();
   await expect(page.getByLabel("Pi conversation")).toBeVisible();
 });
 
@@ -159,7 +159,7 @@ test("shows six recent sessions first and expands beyond the former 20-tab limit
 
   await page.getByRole("button", { name: `${DEFAULT_MOCK_WORKSPACE.displayName} 工作区菜单` }).click();
   const workspaceMenu = page.getByRole("menu", { name: `${DEFAULT_MOCK_WORKSPACE.displayName} 工作区菜单` });
-  await expect(workspaceMenu.getByRole("menuitem", { name: "刷新会话" })).toBeVisible();
+  await expect(workspaceMenu.getByRole("menuitem", { name: "刷新对话" })).toBeVisible();
   await expect(workspaceMenu.getByRole("menuitem", { name: "导入 Pi Session" })).toBeVisible();
   await expect(workspaceMenu.getByRole("menuitem", { name: "已归档对话" })).toBeVisible();
 });
@@ -253,9 +253,9 @@ test("supports new-task aliases and leaves Cmd/Ctrl+W to the native window", asy
   await expect(page.getByRole("tablist", { name: "已打开的任务" })).toHaveCount(0);
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+b`);
-  await expect(page.getByRole("button", { name: "显示会话导航" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "显示对话导航" })).toBeVisible();
   await page.keyboard.press(`${PRIMARY_MODIFIER}+b`);
-  await expect(page.getByRole("button", { name: "隐藏会话导航" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "隐藏对话导航" })).toBeVisible();
 
   await page.keyboard.press(`${PRIMARY_MODIFIER}+Shift+b`);
   await expect(page.getByTestId("inspector-toggle")).toHaveAttribute("aria-expanded", "true");
