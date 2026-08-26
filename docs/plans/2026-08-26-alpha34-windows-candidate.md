@@ -129,6 +129,13 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   source Git fixture at 5.78 seconds; that file passed 4/4 in isolation, and the
   complete 595-file coverage suite passed with 50% workers (3,086 passed, 3
   skipped). The timeout remains recorded rather than weakening its test budget.
+- 2026-08-26: Scoped source commit `1686bf05` was pushed with exact branch
+  parity. Windows Candidate run `32952238687/1` built and packaged that exact
+  source, but certification failed before shortcut-target evaluation because the
+  lifecycle harness appended a Unicode shortcut path directly after PowerShell's
+  `-Command` script. The failed run uploaded diagnostics but correctly withheld
+  the testable Candidate. Repair keeps PowerShell code and data separate by using
+  process-scoped environment variables; a new source commit and run are required.
 
 ## Closeout
 

@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS } from "./windows-installer-lifecycle-contract.mjs";
 
 const FILE_STATE_TIMEOUT_MS = 30_000;
+const POWERSHELL_TIMEOUT_MS = 15_000;
 const WINDOWS_POST_UPDATE_LAUNCH_TIMEOUT_MS = 30_000;
 const execFileAsync = promisify(execFile);
 export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
@@ -56,17 +57,17 @@ export async function resolveWindowsDesktopShortcutPath(shortcutName) {
 export async function assertWindowsShortcutTarget(shortcutPath, executablePath) {
   await access(shortcutPath);
   const command = [
+    "$shortcutPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_SHORTCUT_PATH', 'Process')",
     "$shell = New-Object -ComObject WScript.Shell",
-    "$shortcut = $shell.CreateShortcut($args[0])",
+    "$shortcut = $shell.CreateShortcut($shortcutPath)",
     "[Console]::Out.Write($shortcut.TargetPath)"
   ].join("; ");
   const { stdout } = await execFileAsync("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
     "-Command",
-    command,
-    shortcutPath
-  ], { encoding: "utf8", timeout: 15_000 });
+    command
+  ], powershellOptions({ PI67_WINDOWS_SHORTCUT_PATH: shortcutPath }));
   const targetPath = stdout.trim();
   if (resolve(targetPath).toLowerCase() !== resolve(executablePath).toLowerCase()) {
     throw new Error("Windows Desktop shortcut does not target the installed Pi-67 executable.");
@@ -161,7 +162,8 @@ async function waitForWindowsExecutableLaunch(executablePath) {
 
 async function findWindowsMainProcess(executablePath) {
   const command = [
-    "$target = [IO.Path]::GetFullPath($args[0])",
+    "$targetPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_EXECUTABLE_PATH', 'Process')",
+    "$target = [IO.Path]::GetFullPath($targetPath)",
     "$match = Get-CimInstance -ClassName Win32_Process | Where-Object {",
     "  $_.ExecutablePath -and",
     "  [IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) -and",
@@ -173,9 +175,8 @@ async function findWindowsMainProcess(executablePath) {
     "-NoProfile",
     "-NonInteractive",
     "-Command",
-    command,
-    executablePath
-  ], { encoding: "utf8", timeout: 15_000 });
+    command
+  ], powershellOptions({ PI67_WINDOWS_EXECUTABLE_PATH: executablePath }));
   const value = stdout.trim();
   if (value.length === 0) return undefined;
   const processId = Number.parseInt(value, 10);
@@ -183,13 +184,16 @@ async function findWindowsMainProcess(executablePath) {
 }
 
 async function isWindowsProcessRunning(processId) {
+  const command = [
+    "$processId = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_PROCESS_ID', 'Process')",
+    "if (Get-Process -Id $processId -ErrorAction SilentlyContinue) { [Console]::Out.Write('1') }"
+  ].join("; ");
   const { stdout } = await execFileAsync("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
     "-Command",
-    "if (Get-Process -Id $args[0] -ErrorAction SilentlyContinue) { [Console]::Out.Write('1') }",
-    String(processId)
-  ], { encoding: "utf8", timeout: 15_000 });
+    command
+  ], powershellOptions({ PI67_WINDOWS_PROCESS_ID: String(processId) }));
   return stdout.trim() === "1";
 }
 
@@ -200,6 +204,14 @@ async function waitForWindowsProcessExit(processId) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   throw new Error(`Timed out waiting for Windows process ${processId} to exit.`);
+}
+
+function powershellOptions(environment) {
+  return {
+    encoding: "utf8",
+    env: { ...process.env, ...environment },
+    timeout: POWERSHELL_TIMEOUT_MS
+  };
 }
 
 export async function waitForInstallationRemoval(

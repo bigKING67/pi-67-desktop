@@ -161,6 +161,10 @@ describe("Windows installer lifecycle contract", () => {
       join(repositoryRoot, "eng/packaging/windows-installer-update-lifecycle.mjs"),
       "utf8"
     );
+    const processSource = await readFile(
+      join(repositoryRoot, "eng/packaging/windows-installer-process.mjs"),
+      "utf8"
+    );
     const cleanProfileGate = source.indexOf("const cleanProfileLifecycle = await verifyInstalledRealUserLifecycle({");
     const existingProfileGate = source.indexOf("const existingProfileLifecycle = await verifyInstalledRealUserLifecycle({");
     const uninstall = source.indexOf("const uninstallPath = await resolveUninstallerPath");
@@ -180,6 +184,10 @@ describe("Windows installer lifecycle contract", () => {
     expect(updateSource).toContain("automaticPostInstallLaunch: true");
     expect(updateSource).toContain("desktopShortcut: await assertWindowsShortcutTarget(");
     expect(updateSource).toMatch(/finally \{[\s\S]*?await stopWindowsProcessTree\(processId\)/u);
+    expect(processSource).not.toContain("$args[0]");
+    expect(processSource).toContain("PI67_WINDOWS_SHORTCUT_PATH");
+    expect(processSource).toContain("PI67_WINDOWS_EXECUTABLE_PATH");
+    expect(processSource).toContain("PI67_WINDOWS_PROCESS_ID");
     expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");
     expect(source).toContain("await assertWindowsExistingProfileInteractionPreserved(");
   });
