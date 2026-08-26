@@ -253,10 +253,11 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       );
     }
     report.initialInstalledExecutable = initialInstalledIdentity;
-    report.initialDesktopShortcut = await assertWindowsShortcutTarget(
+    report.initialDesktopShortcut = await prepareInitialDesktopShortcutEvidence({
+      baseline,
       desktopShortcutPath,
-      installedArtifact.executablePath
-    );
+      installedExecutablePath: installedArtifact.executablePath
+    });
 
     await resetControlledShutdownLifecycle(lifecyclePath);
     const firstLaunch = await launchInstalledApplication({
@@ -416,6 +417,22 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     });
     await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
+}
+
+export async function prepareInitialDesktopShortcutEvidence({
+  baseline,
+  desktopShortcutPath,
+  installedExecutablePath
+}) {
+  if (!baseline) {
+    return assertWindowsShortcutTarget(desktopShortcutPath, installedExecutablePath);
+  }
+  await rm(desktopShortcutPath, { force: true });
+  await waitForPathState(desktopShortcutPath, false);
+  return {
+    exists: false,
+    repairScenario: "missing-before-cross-version-upgrade"
+  };
 }
 
 export async function assertPreservedUserData(userDataDirectory) {

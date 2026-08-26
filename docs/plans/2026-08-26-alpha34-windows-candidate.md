@@ -136,6 +136,14 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   `-Command` script. The failed run uploaded diagnostics but correctly withheld
   the testable Candidate. Repair keeps PowerShell code and data separate by using
   process-scoped environment variables; a new source commit and run are required.
+- 2026-08-26: Repair commit `6b90b55b` passed 28/28 focused tests and type-aware
+  lint, reached `origin/main`, and removed the PowerShell parser failure in run
+  `32953644192/1`. The lifecycle then stopped on a newly added pre-upgrade
+  assertion that required the Alpha.33 shortcut to already target the fixture's
+  custom install directory. That contradicts this recovery Candidate's missing
+  shortcut scenario and Alpha.33's own successful report did not assert it.
+  The final gate explicitly removes and observes the baseline shortcut before
+  update, then requires Alpha.34 to recreate a canonically matching target.
 
 ## Closeout
 

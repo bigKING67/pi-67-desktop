@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, readdir } from "node:fs/promises";
+import { access, readdir, realpath } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS } from "./windows-installer-lifecycle-contract.mjs";
@@ -69,8 +69,14 @@ export async function assertWindowsShortcutTarget(shortcutPath, executablePath) 
     command
   ], powershellOptions({ PI67_WINDOWS_SHORTCUT_PATH: shortcutPath }));
   const targetPath = stdout.trim();
-  if (resolve(targetPath).toLowerCase() !== resolve(executablePath).toLowerCase()) {
-    throw new Error("Windows Desktop shortcut does not target the installed Pi-67 executable.");
+  const [canonicalTargetPath, canonicalExecutablePath] = await Promise.all([
+    realpath(targetPath),
+    realpath(executablePath)
+  ]);
+  if (resolve(canonicalTargetPath).toLowerCase() !== resolve(canonicalExecutablePath).toLowerCase()) {
+    throw new Error(
+      `Windows Desktop shortcut target ${JSON.stringify(targetPath)} does not match the installed Pi-67 executable ${JSON.stringify(executablePath)}.`
+    );
   }
   return { exists: true, targetsInstalledExecutable: true };
 }

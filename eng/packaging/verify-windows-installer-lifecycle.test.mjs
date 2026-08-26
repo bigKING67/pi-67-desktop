@@ -27,6 +27,7 @@ import {
   buildNsisInstallArguments,
   buildNsisUpdateArguments,
   parseWindowsInstallerLifecycleArguments,
+  prepareInitialDesktopShortcutEvidence,
   resolveExpectedLifecycleSigner,
   resolveUpgradeBaselineInstaller,
   resolveWindowsInstallerLifecycleContract,
@@ -112,6 +113,22 @@ describe("Windows installer lifecycle contract", () => {
     expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(240_000);
   });
 
+  it("models a missing baseline Desktop shortcut before cross-version repair", async () => {
+    const root = await createTemporaryDirectory();
+    const shortcutPath = join(root, "π.lnk");
+    await writeFile(shortcutPath, "stale shortcut", "utf8");
+
+    await expect(prepareInitialDesktopShortcutEvidence({
+      baseline: { version: "0.1.0-alpha.33" },
+      desktopShortcutPath: shortcutPath,
+      installedExecutablePath: join(root, "Pi-67 Desktop.exe")
+    })).resolves.toEqual({
+      exists: false,
+      repairScenario: "missing-before-cross-version-upgrade"
+    });
+    await expect(readFile(shortcutPath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("allows bounded time for deferred NSIS self-cleanup", async () => {
     expect(WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS).toBe(90_000);
     const root = await createTemporaryDirectory();
@@ -179,6 +196,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("resolveInstalledUserInterfaceContract(initialVersion)");
     expect(source).toContain("assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract)");
     expect(source).toContain("await verifyWindowsInstallerUpdateLifecycle({");
+    expect(source).toContain("repairScenario: \"missing-before-cross-version-upgrade\"");
     expect(updateSource).toContain("await assertPackagedRuntimeAssets(installedArtifact)");
     expect(updateSource).toContain("processId = await installNsisUpdatePackage(");
     expect(updateSource).toContain("automaticPostInstallLaunch: true");
