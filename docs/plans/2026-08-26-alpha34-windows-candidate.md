@@ -1,6 +1,6 @@
 # Alpha.34 Windows candidate
 
-Status: blocked
+Status: active
 Owner: root agent
 Started: 2026-08-26
 Last updated: 2026-08-26
@@ -60,6 +60,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Alpha.33 Candidate `32944754809/1` was built from `a04b684148b9136914856d7b787334f1735651ce` and remains the exact previous-version workflow baseline. | live workflow contract and Alpha.33 release evidence | 2026-08-26 |
 | OBSERVED | Final attempted source `e254c38155eb99cbca9a65d534874568b4ea4b8a` is pushed with `main == origin/main`; run `32954970758/1` passed provenance, packaging, packaged smoke/UI, candidate identity, and exact Alpha.33 baseline verification. | live Git and GitHub Actions | 2026-08-26 |
 | OBSERVED | Run `32954970758/1` installed and launched Alpha.33 and observed the simulated missing shortcut, but the lifecycle harness then failed while parsing space-joined PowerShell process-detection statements. It did not verify automatic relaunch or the repaired shortcut and withheld the testable Candidate. | exact lifecycle diagnostic artifact and failed job log | 2026-08-26 |
+| OBSERVED | The user resumed the blocked Candidate flow. The next attempt must first execute the process-discovery command in the workflow's Windows helper-test stage, before the full installer lifecycle. | current authorization and workflow order | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -89,6 +90,8 @@ and verify that the Desktop shortcut targets the updated executable.
 - [x] 3. Push the exact commit to `origin/main` and verify branch equality.
 - [x] 4. Dispatch and monitor the exact-source Windows Candidate workflow using
   the exact Alpha.33 baseline.
+- [ ] 4a. Pass the Windows process-discovery syntax regression and complete a
+  new exact-source Candidate run.
 - [ ] 5. Download the successful Candidate artifact, verify its bound identity,
   and record the Windows manual-test handoff without publishing it.
 
@@ -97,9 +100,9 @@ and verify that the Desktop shortcut targets the updated executable.
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Source | version scan, `git diff --check`, typecheck, lint, architecture, dead-code, references, structure, transport, and workflow checks | eight Alpha.34 manifests and zero source gate failure | passed; standard `check` reached coverage and only an unrelated 5-second Git fixture timed out under full concurrency |
-| Tests | updater/lifecycle tests and full coverage | update args, relaunch, shortcut, and repository regression gates | final focused candidate/update tests 29/29; timed-out Git fixture 4/4 in isolation; 50% worker coverage 595 files, 3,086 passed, 3 skipped |
-| Runtime/host | Windows Candidate packaged smoke/UI and NSIS lifecycle | exact hosted Windows x64 receipts | blocked: packaged smoke/UI passed; all three certification runs failed in newly exercised harness boundaries before a complete lifecycle receipt |
-| Packaged artifact | Candidate identity verification and local readback | exact version/source/size/SHA-256 binding | blocked: build-stage identity passed, but no certified testable Candidate was uploaded or downloaded |
+| Tests | updater/lifecycle tests and full coverage | update args, relaunch, shortcut, and repository regression gates | prior focused candidate/update tests 29/29; resumed workflow helper suite 52 passed/1 Windows-only execution skipped on macOS; timed-out Git fixture 4/4 in isolation; 50% worker coverage 595 files, 3,086 passed, 3 skipped |
+| Runtime/host | Windows Candidate packaged smoke/UI and NSIS lifecycle | exact hosted Windows x64 receipts | pending resumed run: packaged smoke/UI passed previously; process-discovery now requires an actual Windows helper-test receipt before lifecycle execution |
+| Packaged artifact | Candidate identity verification and local readback | exact version/source/size/SHA-256 binding | pending resumed run: prior build-stage identity passed, but no certified testable Candidate was uploaded or downloaded |
 | Target OS/manual | installed Alpha.33-to-Alpha.34 in-app update | automatic restart and working Desktop shortcut | pending user test |
 
 ## Rollback
@@ -156,8 +159,15 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   subsequent real-user lanes, uninstall, and the final Candidate upload were not
   executed. After three unsuccessful certification runs, work stops at this
   reproducible harness blocker instead of issuing another blind rebuild.
+- 2026-08-26: The user explicitly resumed the blocked flow. The repair separates
+  the multi-line `Where-Object` predicate from PowerShell's top-level statements,
+  delimits those statements explicitly, and adds a Windows-only execution
+  regression to the workflow helper-test stage before another full lifecycle.
+  The exact seven-file helper suite passed locally with 52 tests passed and the
+  Windows-only execution test skipped on macOS; type-aware lint, workflow
+  PowerShell discovery, and `git diff --check` also passed.
 
-## Closeout
+## Prior blocked closeout
 
 - Final attempted source SHA: `e254c38155eb99cbca9a65d534874568b4ea4b8a`
 - Changed files: eight workspace manifests, NSIS shortcut repair, Windows

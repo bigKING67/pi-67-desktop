@@ -37,6 +37,9 @@ import {
   WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
 } from "./verify-windows-installer-lifecycle.mjs";
+import {
+  findWindowsMainProcess
+} from "./windows-installer-process.mjs";
 
 const temporaryDirectories = [];
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -111,6 +114,12 @@ describe("Windows installer lifecycle contract", () => {
 
   it("keeps enough process-timeout margin for variable GitHub Windows installer performance", () => {
     expect(WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS).toBe(240_000);
+  });
+
+  it("executes the main-process PowerShell probe on Windows", async () => {
+    if (process.platform !== "win32") return;
+
+    await expect(findWindowsMainProcess(process.execPath)).resolves.toBeGreaterThan(0);
   });
 
   it("models a missing baseline Desktop shortcut before cross-version repair", async () => {

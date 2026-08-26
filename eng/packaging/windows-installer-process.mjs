@@ -166,17 +166,18 @@ async function waitForWindowsExecutableLaunch(executablePath) {
   throw new Error("NSIS update did not automatically launch the updated Pi-67 executable.");
 }
 
-async function findWindowsMainProcess(executablePath) {
+export async function findWindowsMainProcess(executablePath) {
+  const processPredicate = [
+    "$_.ExecutablePath -and",
+    "[IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) -and",
+    "$_.CommandLine -notmatch '--type='"
+  ].join(" ");
   const command = [
     "$targetPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_EXECUTABLE_PATH', 'Process')",
     "$target = [IO.Path]::GetFullPath($targetPath)",
-    "$match = Get-CimInstance -ClassName Win32_Process | Where-Object {",
-    "  $_.ExecutablePath -and",
-    "  [IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) -and",
-    "  $_.CommandLine -notmatch '--type='",
-    "} | Select-Object -First 1 -ExpandProperty ProcessId",
+    `$match = Get-CimInstance -ClassName Win32_Process | Where-Object { ${processPredicate} } | Select-Object -First 1 -ExpandProperty ProcessId`,
     "if ($null -ne $match) { [Console]::Out.Write($match) }"
-  ].join(" ");
+  ].join("; ");
   const { stdout } = await execFileAsync("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
