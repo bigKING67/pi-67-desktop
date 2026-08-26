@@ -389,6 +389,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(processSource).toContain("resolveWindowsShortcutWithWScript(preservedShortcutPath)");
     expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(shortcutPath)");
     expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(preservedShortcutPath)");
+    expect(processSource).toContain("inspection?.resolvers.shellApplicationOriginal.targetPath");
   });
 
   it("waits for a path to become present or absent", async () => {

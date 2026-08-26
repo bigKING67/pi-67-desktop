@@ -68,11 +68,11 @@ export async function assertWindowsShortcutTarget(shortcutPath, executablePath, 
   const inspection = options.evidenceDirectory
     ? await inspectWindowsShortcutTarget(shortcutPath, options.evidenceDirectory)
     : undefined;
-  const targetPath = inspection?.resolvers.wscriptOriginal.targetPath
-    ?? await resolveWindowsShortcutWithWScript(shortcutPath);
+  const targetPath = inspection?.resolvers.shellApplicationOriginal.targetPath
+    ?? await resolveWindowsShortcutWithShellApplication(shortcutPath);
   if (targetPath.length === 0) {
     throw new Error(
-      "Windows Desktop shortcut exists but WScript.Shell exposed an empty target."
+      "Windows Desktop shortcut exists but Shell.Application exposed an empty target."
       + (inspection ? " Independent resolver evidence was preserved." : "")
     );
   }

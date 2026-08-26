@@ -65,6 +65,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Run `32958302320/1` passed the real Windows process probe, exact candidate and baseline identity, installed Alpha.33, removed its shortcut, installed byte-exact Alpha.34, and automatically launched the updated process. The recreated `π.lnk` existed but exposed an empty target, so certification stopped before the remaining lanes and withheld the Candidate. | exact lifecycle summary and failed job log | 2026-08-26 |
 | OBSERVED | Final run `32960108896/1` at source `7a56fae25121f76ac09d01997064b1cdf1e5e982` passed provenance, Windows build/package evidence, all 53 Windows helper tests, candidate and exact Alpha.33 baseline identity, baseline install/launch, missing-shortcut observation, byte-exact Alpha.34 installation, and automatic updated-process launch. The recreated `π.lnk` still exposed an empty target after direct executable binding, so certification withheld the Candidate. | live Git, exact workflow jobs, and lifecycle diagnostic summary | 2026-08-26 |
 | OBSERVED | The user resumed the blocked flow, and the exact failed-run Alpha.34 build artifact `windows-candidate-build-32960108896-1` plus the exact Alpha.33 baseline remain available. The next run will reuse those bytes, preserve the generated link, and compare `WScript.Shell` with `Shell.Application` against both the Unicode original and an ASCII-named byte copy; it will not rebuild the application. | live GitHub Actions artifact inventory and current verifier diff | 2026-08-26 |
+| OBSERVED | Lifecycle-only run `32969170526/1` reused and reverified the exact Alpha34 and Alpha33 artifacts. Its preserved 3,079-byte `π.lnk` (`ecf52527...dde563`) resolved to the complete installed executable through `Shell.Application` for both the Unicode original and an ASCII-named byte copy. `WScript.Shell` alone returned empty for `π.lnk` and replaced the copied link's Chinese target segment with question marks. The prior certification failure is therefore a Unicode-unsafe verifier false negative, not a malformed Alpha34 shortcut. | exact dual-resolver JSON, preserved link bytes, and workflow log | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -84,7 +85,8 @@ and verify that the Desktop shortcut targets the updated executable.
 | Use Alpha.34 as a new immutable version. | Alpha.33 is already public and its bytes must not be overwritten. | None. |
 | Use the exact Alpha.33 Candidate as the hosted upgrade baseline. | The next-hop behavior must prove the installed Alpha.33 source updater and Alpha.34 target installer together. | The baseline artifact fails exact identity verification. |
 | Recreate the Desktop shortcut on every in-app update. | A missing shortcut may be damage from an earlier broken update; preserving a reliable launch path takes priority. | A durable explicit suppression preference is implemented and verified. |
-| Keep the recovered shortcut bound directly to `$INSTDIR\${APP_EXECUTABLE_FILENAME}` while diagnosing the link. | The direct installed path is simpler than the mutable `$appExe` value and matches electron-builder's own launch fallback, but final hosted evidence proves that this change alone is insufficient. | Exact link inspection identifies a different canonical target or proves the direct binding harmful. |
+| Bind the recovered shortcut directly to `$INSTDIR\${APP_EXECUTABLE_FILENAME}`. | The direct installed path is simpler than the mutable `$appExe` value, matches electron-builder's own launch fallback, and exact Shell inspection resolves it to the byte-exact installed executable. | Exact link inspection identifies a different canonical target or proves the direct binding harmful. |
+| Use `Shell.Application` as shortcut-target certification authority and retain `WScript.Shell` only as comparative diagnostics. | Exact Windows evidence shows the former resolves the Unicode link name and localized target correctly, while the latter returns an empty or lossy result for the same bytes. | A native Unicode shell-link resolver disagrees with `Shell.Application` on the exact preserved link. |
 | Stop at a verified Candidate. | Hosted evidence cannot replace the user's installed Windows x64 upgrade. | The user separately accepts the exact Candidate and authorizes R2 publication. |
 
 ## Checkpoints
@@ -97,7 +99,7 @@ and verify that the Desktop shortcut targets the updated executable.
   the exact Alpha.33 baseline.
 - [x] 4a. Pass the Windows process-discovery syntax regression and complete a
   new exact-source certification run; record its shortcut-target blocker.
-- [ ] 4b. Distinguish an actually malformed link from a Unicode-path
+- [x] 4b. Distinguish an actually malformed link from a Unicode-path
   `WScript.Shell` inspection failure before another full Candidate build.
 - [ ] 5. Download the successful Candidate artifact, verify its bound identity,
   and record the Windows manual-test handoff without publishing it.
@@ -205,6 +207,13 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   exact artifacts, preserve the generated `.lnk`, and inspect the Unicode
   original plus an ASCII-named byte copy through `WScript.Shell` and
   `Shell.Application`. This diagnostic does not rebuild or publish Alpha.34.
+- 2026-08-26: Lifecycle-only run `32969170526/1` authenticated and reused the
+  exact failed-run Alpha34 bytes and Alpha33 baseline. It preserved the generated
+  3,079-byte link with SHA-256 `ecf52527fb065d1e9392e9cd3aecfe803b4c0ef0901897c5986019ad01dde563`.
+  `Shell.Application` resolved the complete localized executable target from
+  both link names, while `WScript.Shell` returned empty for `π.lnk` and a lossy
+  target for its ASCII-named copy. Certification now uses the Unicode-safe Shell
+  result; another lifecycle-only reuse run is required, not another package.
 
 ## Most recent blocked checkpoint
 
