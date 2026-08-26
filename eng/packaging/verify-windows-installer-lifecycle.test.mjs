@@ -43,6 +43,7 @@ import {
 
 const temporaryDirectories = [];
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+const WINDOWS_PROCESS_PROBE_TEST_TIMEOUT_MS = 20_000;
 
 it("retains redacted Session creation notification details", () => {
   expect(createSessionCreationDiagnostic({
@@ -120,7 +121,7 @@ describe("Windows installer lifecycle contract", () => {
     if (process.platform !== "win32") return;
 
     await expect(findWindowsMainProcess(process.execPath)).resolves.toBeGreaterThan(0);
-  });
+  }, WINDOWS_PROCESS_PROBE_TEST_TIMEOUT_MS);
 
   it("models a missing baseline Desktop shortcut before cross-version repair", async () => {
     const root = await createTemporaryDirectory();

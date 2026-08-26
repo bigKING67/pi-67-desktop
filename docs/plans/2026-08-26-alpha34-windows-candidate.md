@@ -61,6 +61,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Final attempted source `e254c38155eb99cbca9a65d534874568b4ea4b8a` is pushed with `main == origin/main`; run `32954970758/1` passed provenance, packaging, packaged smoke/UI, candidate identity, and exact Alpha.33 baseline verification. | live Git and GitHub Actions | 2026-08-26 |
 | OBSERVED | Run `32954970758/1` installed and launched Alpha.33 and observed the simulated missing shortcut, but the lifecycle harness then failed while parsing space-joined PowerShell process-detection statements. It did not verify automatic relaunch or the repaired shortcut and withheld the testable Candidate. | exact lifecycle diagnostic artifact and failed job log | 2026-08-26 |
 | OBSERVED | The user resumed the blocked Candidate flow. The next attempt must first execute the process-discovery command in the workflow's Windows helper-test stage, before the full installer lifecycle. | current authorization and workflow order | 2026-08-26 |
+| OBSERVED | Run `32957178689/1` passed provenance and the complete build/package evidence, then stopped in the intended Windows helper-test stage because the new PowerShell/CIM execution exceeded Vitest's default 5-second test timeout. The production probe retains its separate 15-second child-process timeout; no lifecycle or Candidate upload ran. | exact failed helper-test log | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -166,6 +167,12 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   The exact seven-file helper suite passed locally with 52 tests passed and the
   Windows-only execution test skipped on macOS; type-aware lint, workflow
   PowerShell discovery, and `git diff --check` also passed.
+- 2026-08-26: Exact-source run `32957178689/1` passed provenance, Windows
+  packaging, packaged smoke/UI, and candidate build identity. The new helper
+  test reached its Windows execution branch but Vitest canceled it at 5.005
+  seconds, before the production probe's own 15-second timeout. The regression
+  now has a bounded 20-second test budget so success or the production timeout,
+  rather than the test framework, is authoritative on the next run.
 
 ## Prior blocked closeout
 
