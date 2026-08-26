@@ -53,11 +53,13 @@ Desktop shortcut when one existed before update.
 
 | State | Evidence | Source | Verified at |
 | --- | --- | --- | --- |
-| OBSERVED | `main` contains local commit `541e7181b1e0bc94caf5af664c1205acf3163c02` over `origin/main` `776615c2a26eefa3a721554218b5009e6845ab60`; it is the completed scoped t3code mechanism program. | live Git and commit metadata | 2026-08-26 |
+| OBSERVED | The scoped t3code commit `541e7181b1e0bc94caf5af664c1205acf3163c02` and Alpha.33 preparation commit `6842f36a1351042859f7e43eccaafde0fedfa866` were pushed to `origin/main`. | live Git and push receipt | 2026-08-26 |
 | OBSERVED | Alpha.32 Windows application replacement reached the new executable, but did not relaunch it and left an existing Desktop shortcut with a missing target. | real Windows target-machine execution and screenshots | 2026-08-26 |
 | OBSERVED | The local remediation passes `--force-run`, pins the final NSIS `/D=` to the running executable directory, and rewrites only a Desktop shortcut that existed before the update. | updater, NSIS include, and focused tests | 2026-08-26 |
 | OBSERVED | The mutable R2 manifest now carries `Cache-Control: no-store`; local release tooling has a regression test for future manifest writes. | live public headers and release tooling tests | 2026-08-26 |
 | OBSERVED | The complete repository gate passed before the Alpha.33 version bump with 589 test files, 3,047 passing tests, and 3 skipped. | `corepack pnpm run check` exit 0 | 2026-08-26 |
+| OBSERVED | The exact `6842f36a` source passed the complete repository gate with 595 test files, 3,086 passing tests, and 3 skipped; its macOS arm64 DMG/ZIP were rebuilt and packaged smoke passed. | `corepack pnpm run check` and `preview:mac:unsigned` exits 0 | 2026-08-26 |
+| OBSERVED | Windows Candidate `32943391827/1` built and passed packaged smoke/UI/identity, then failed while inspecting the installed Alpha.32 baseline because the current fixture required Alpha.33-only HEIC assets from Alpha.32. | GitHub Actions job `98100934560`, lifecycle summary, exact failed log | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -82,7 +84,7 @@ Desktop shortcut when one existed before update.
 
 ## Checkpoints
 
-- [ ] 1. Commit every current modification with Alpha.33 version metadata and
+- [x] 1. Commit every current modification with Alpha.33 version metadata and
   prove clean `main` equals `origin/main` after push.
 - [ ] 2. Run the exact-source full gate and build/verify macOS arm64 artifacts.
 - [ ] 3. Build the exact-SHA Windows Candidate and obtain real Windows acceptance.
@@ -125,6 +127,11 @@ preserve failed candidate bytes and credential-free receipts for diagnosis.
 - 2026-08-26: User authorized exact Alpha.33 publication and committing all
   current work. Live Git found completed local commit `541e7181` plus the updater
   and R2 release-tooling remediation; all eight manifests were moved to Alpha.33.
+- 2026-08-26: Pushed `541e7181` and `6842f36a`; exact-source full gate and macOS
+  packaging passed. Windows Candidate `32943391827/1` stopped before producing a
+  testable candidate because its cross-version fixture applied Alpha.33 HEIC asset
+  requirements to the installed Alpha.32 baseline. The fixture now versions that
+  contract from Alpha.33 onward before rebuilding both exact-source candidates.
 
 ## Closeout
 

@@ -50,7 +50,13 @@ export const packagedAttachmentExcludedAsarPaths = [
 ];
 
 const PACKAGE_WORKER_ASAR_PATH = "apps/agent-host/dist/skill-pack-process-worker.mjs";
+const HEIC_NORMALIZATION_ASAR_PATHS = new Set([
+  "apps/desktop/dist/prompt-image-normalization-worker.mjs",
+  "node_modules/heic-decode/index.js",
+  "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
+]);
 export const WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION = "0.1.0-alpha.24";
+export const HEIC_NORMALIZATION_ASSET_VERSION = "0.1.0-alpha.33";
 
 export function resolvePackagedRuntimeAssetContract(version) {
   if (!validSemver(version)) {
@@ -60,11 +66,17 @@ export function resolvePackagedRuntimeAssetContract(version) {
     version,
     WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION
   );
+  const heicNormalizationAssetsIncluded = semverGreaterThanOrEqual(
+    version,
+    HEIC_NORMALIZATION_ASSET_VERSION
+  );
   return {
+    heicNormalizationAssetsIncluded,
     packageWorkerIsolated,
-    requiredAsarPaths: packageWorkerIsolated
-      ? packagedAttachmentRequiredAsarPaths
-      : packagedAttachmentRequiredAsarPaths.filter((path) => path !== PACKAGE_WORKER_ASAR_PATH),
+    requiredAsarPaths: packagedAttachmentRequiredAsarPaths.filter((path) =>
+      (packageWorkerIsolated || path !== PACKAGE_WORKER_ASAR_PATH)
+      && (heicNormalizationAssetsIncluded || !HEIC_NORMALIZATION_ASAR_PATHS.has(path))
+    ),
     requireWindowsPackageWorkerJob: packageWorkerIsolated
   };
 }

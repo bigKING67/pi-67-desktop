@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  HEIC_NORMALIZATION_ASSET_VERSION,
   isolatePackagedAutomationWindow,
   packagedApplicationEnvironment,
   packagedAttachmentExcludedAsarPaths,
@@ -163,6 +164,7 @@ describe("packaged Electron launch environment", () => {
     const legacy = resolvePackagedRuntimeAssetContract("0.1.0-alpha.22");
     expect(WINDOWS_PACKAGE_WORKER_ISOLATION_VERSION).toBe("0.1.0-alpha.24");
     expect(legacy).toMatchObject({
+      heicNormalizationAssetsIncluded: false,
       packageWorkerIsolated: false,
       requireWindowsPackageWorkerJob: false
     });
@@ -172,12 +174,31 @@ describe("packaged Electron launch environment", () => {
 
     const isolated = resolvePackagedRuntimeAssetContract("0.1.0-alpha.24");
     expect(isolated).toMatchObject({
+      heicNormalizationAssetsIncluded: false,
       packageWorkerIsolated: true,
       requireWindowsPackageWorkerJob: true
     });
     expect(isolated.requiredAsarPaths).toContain(
       "apps/agent-host/dist/skill-pack-process-worker.mjs"
     );
+    expect(isolated.requiredAsarPaths).not.toContain(
+      "apps/desktop/dist/prompt-image-normalization-worker.mjs"
+    );
+    expect(HEIC_NORMALIZATION_ASSET_VERSION).toBe("0.1.0-alpha.33");
+    const alpha32 = resolvePackagedRuntimeAssetContract("0.1.0-alpha.32");
+    expect(alpha32.heicNormalizationAssetsIncluded).toBe(false);
+    expect(alpha32.requiredAsarPaths).not.toEqual(expect.arrayContaining([
+      "apps/desktop/dist/prompt-image-normalization-worker.mjs",
+      "node_modules/heic-decode/index.js",
+      "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
+    ]));
+    const alpha33 = resolvePackagedRuntimeAssetContract("0.1.0-alpha.33");
+    expect(alpha33.heicNormalizationAssetsIncluded).toBe(true);
+    expect(alpha33.requiredAsarPaths).toEqual(expect.arrayContaining([
+      "apps/desktop/dist/prompt-image-normalization-worker.mjs",
+      "node_modules/heic-decode/index.js",
+      "node_modules/libheif-js/libheif-wasm/libheif-bundle.js"
+    ]));
     expect(resolvePackagedRuntimeAssetContract("0.1.0-alpha.24"))
       .toMatchObject({ packageWorkerIsolated: true });
     expect(() => resolvePackagedRuntimeAssetContract("not-a-version"))
