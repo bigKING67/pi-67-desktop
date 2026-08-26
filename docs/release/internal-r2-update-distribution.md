@@ -138,7 +138,7 @@ After current authorization for the exact package version, publication is invoke
 PI67_R2_ACCOUNT_ID=... \
 PI67_R2_ACCESS_KEY_ID=... \
 PI67_R2_SECRET_ACCESS_KEY=... \
-corepack pnpm run release:r2:publish -- \
+corepack pnpm run release:r2:publish \
   --confirm-version <version> \
   --source-commit <40-char-source-sha>
 ```
@@ -228,7 +228,7 @@ PI67_R2_ACCESS_KEY_ID=... \
 PI67_R2_SECRET_ACCESS_KEY=... \
 PI67_CLOUDFLARE_API_TOKEN=... \
 PI67_CLOUDFLARE_ZONE_ID=... \
-corepack pnpm run release:r2:cleanup -- \
+corepack pnpm run release:r2:cleanup \
   --confirm-version <version> \
   --confirm-target-upgrades
 ```

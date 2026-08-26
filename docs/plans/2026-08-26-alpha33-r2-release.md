@@ -1,6 +1,6 @@
 # Alpha.33 R2 release
 
-Status: active
+Status: published; target upgrades pending
 Owner: root agent
 Started: 2026-08-26
 Last updated: 2026-08-26
@@ -60,6 +60,10 @@ Desktop shortcut when one existed before update.
 | OBSERVED | The complete repository gate passed before the Alpha.33 version bump with 589 test files, 3,047 passing tests, and 3 skipped. | `corepack pnpm run check` exit 0 | 2026-08-26 |
 | OBSERVED | The exact `6842f36a` source passed the complete repository gate with 595 test files, 3,086 passing tests, and 3 skipped; its macOS arm64 DMG/ZIP were rebuilt and packaged smoke passed. | `corepack pnpm run check` and `preview:mac:unsigned` exits 0 | 2026-08-26 |
 | OBSERVED | Windows Candidate `32943391827/1` built and passed packaged smoke/UI/identity, then failed while inspecting the installed Alpha.32 baseline because the current fixture required Alpha.33-only HEIC assets from Alpha.32. | GitHub Actions job `98100934560`, lifecycle summary, exact failed log | 2026-08-26 |
+| OBSERVED | Commit `a04b684148b9136914856d7b787334f1735651ce` versions the cross-release packaged-asset contract; exact Candidate `32944754809/1` then passed provenance, packaged smoke/UI, Alpha.32-to-Alpha.33 NSIS lifecycle, dual-Profile recovery, and uninstall gates. | live Git and GitHub Actions jobs `98103015708`, `98103167720`, `98105485674` | 2026-08-26 |
+| OBSERVED | The user accepted the exact Alpha.33 Windows candidate; the operator receipt binds that conclusion to run `32944754809/1`, candidate identity `b07c2cbd...`, installer SHA-256 `98ce183e...`, and source `a04b684...`. | current user confirmation and generated credential-free receipt | 2026-08-26 |
+| OBSERVED | The credentialed R2 plan reported Alpha.32 public, three Alpha.33 uploads, zero immutable conflicts, and zero unknown objects. Publication uploaded and publicly verified all three versioned files before switching the manifest last. | R2 plan and publish receipt `2026-08-26T08-36-22.711Z` | 2026-08-26 |
+| OBSERVED | The public manifest advertises Alpha.33 with `Cache-Control: no-store`; all three artifact endpoints return Range `206` with the manifest byte counts. | bounded public HTTP readback | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -86,24 +90,25 @@ Desktop shortcut when one existed before update.
 
 - [x] 1. Commit every current modification with Alpha.33 version metadata and
   prove clean `main` equals `origin/main` after push.
-- [ ] 2. Run the exact-source full gate and build/verify macOS arm64 artifacts.
-- [ ] 3. Build the exact-SHA Windows Candidate and obtain real Windows acceptance.
-- [ ] 4. Prepare and credential-check the R2 bundle; ensure the read-only plan has
+- [x] 2. Run the exact-source full gate and build/verify macOS arm64 artifacts.
+- [x] 3. Build the exact-SHA Windows Candidate and obtain real Windows acceptance.
+- [x] 4. Prepare and credential-check the R2 bundle; ensure the read-only plan has
   no conflict or unknown-object blocker.
-- [ ] 5. Upload immutable artifacts, verify public bytes/hashes/Range, and publish
+- [x] 5. Upload immutable artifacts, verify public bytes/hashes/Range, and publish
   the `no-store` manifest last.
 - [ ] 6. Verify Alpha.32-to-Alpha.33 in-app upgrades on Windows x64 and macOS arm64.
-- [ ] 7. Record closeout and leave old-version cleanup pending separate approval.
+- [x] 7. Record publication closeout and leave old-version cleanup pending separate
+  approval.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
-| Source | `corepack pnpm run check` on exact source | every required gate exit 0 | pending exact Alpha.33 SHA |
-| Tests | updater/NSIS/release tests and full coverage | lifecycle flags, destination, shortcut, no-store | source tests passed; exact source pending |
-| Runtime/host | packaged smoke on both candidates | exact artifact startup and runtime receipts | pending |
-| Packaged artifact | candidate identity and R2 bundle verification | version/source/size/SHA-256 binding | pending |
-| Target OS/manual | Windows/macOS installed in-app upgrades | before/after versions and lifecycle | pending |
+| Source | `corepack pnpm run check` on exact source | every required gate exit 0 | passed on Alpha.33 source; 595 files, 3,086 passed, 3 skipped |
+| Tests | updater/NSIS/release tests and full coverage | lifecycle flags, destination, shortcut, no-store | passed locally and in exact Windows Candidate |
+| Runtime/host | packaged smoke on both candidates | exact artifact startup and runtime receipts | passed on hosted Windows x64 and local Apple Silicon macOS |
+| Packaged artifact | candidate identity and R2 bundle verification | version/source/size/SHA-256 binding | passed for the exact three-file Alpha.33 bundle |
+| Target OS/manual | Windows/macOS installed in-app upgrades | before/after versions and lifecycle | exact Windows candidate accepted; post-publication in-app upgrades pending |
 
 ## Rollback
 
@@ -114,13 +119,12 @@ preserve failed candidate bytes and credential-free receipts for diagnosis.
 
 ## Risks and unknowns
 
-- Source tests do not prove NSIS macro compilation, Windows shortcut behavior, or
-  post-install relaunch; exact Windows Candidate and target-machine evidence are
-  mandatory.
-- The large committed t3code mechanism set expands packaged smoke scope, notably
-  HEIC normalization and Worktree lifecycle.
+- Exact Candidate lifecycle and manual candidate acceptance do not replace the
+  post-publication Alpha.32-to-Alpha.33 in-app upgrade on both target systems.
 - Clients that cached an older mutable manifest before `no-store` may still need
   cache expiry; new responses prevent recurrence but cannot evict existing bytes.
+- Alpha.31 and Alpha.32 remain intentional rollback artifacts; cleanup is still
+  unauthorized until both post-publication target upgrades pass.
 
 ## Progress log
 
@@ -132,12 +136,30 @@ preserve failed candidate bytes and credential-free receipts for diagnosis.
   testable candidate because its cross-version fixture applied Alpha.33 HEIC asset
   requirements to the installed Alpha.32 baseline. The fixture now versions that
   contract from Alpha.33 onward before rebuilding both exact-source candidates.
+- 2026-08-26: Pushed harness repair `a04b6841`; replacement Candidate
+  `32944754809/1` passed all hosted gates and received exact Windows manual
+  acceptance. Generated the bound receipt and verified the three-file Alpha.33 R2
+  bundle.
+- 2026-08-26: The read-only R2 plan found no conflicts or unknown objects. Publish
+  uploaded and publicly re-read the Windows EXE and macOS DMG/ZIP, switched the
+  Alpha.33 manifest last, and wrote receipt `2026-08-26T08-36-22.711Z`. Independent
+  public checks confirmed manifest `no-store` and Range `206` for all three files.
+- 2026-08-26: The first publish invocation stopped during local flag parsing before
+  any R2 write because pnpm forwarded a standalone `--`; the documented publish
+  and cleanup examples now use the verified argument form.
 
 ## Closeout
 
-- Final source SHA: pending
-- Changed files: pending exact commit
-- Validation completed: pre-version full source gate and focused updater tests
-- Validation not completed: exact candidates, R2 publication, target upgrades
-- Remaining risks: Windows NSIS lifecycle and expanded packaged feature scope
-- Commit/push/release state: pending
+- Final application source SHA: `a04b684148b9136914856d7b787334f1735651ce`
+- Changed files in post-publication closeout: this plan and corrected R2 command
+  examples; generated installers, receipts, manifests, and logs remain ignored.
+- Validation completed: full source gate, exact Windows/macOS packaging, Windows
+  Candidate lifecycle and manual acceptance, R2 bundle verification, immutable
+  upload, full public readback, manifest-last switch, cache header, and Range checks.
+- Validation not completed: installed Alpha.32-to-Alpha.33 in-app upgrades on
+  Windows x64 and macOS arm64.
+- Remaining risks: target update/restart/shortcut behavior until those upgrades
+  pass; pre-existing cached Alpha.32 manifests; rollback cleanup remains pending.
+- Commit/push/release state: application source and release tooling were published
+  from `a04b6841`; this documentation closeout is committed/pushed afterward. No
+  Tag, GitHub Release, promotion, signing, notarization, deletion, or cache purge.
