@@ -35,7 +35,10 @@ export async function verifyWindowsPreviewPromotion({
     packagedExecutablePath
   });
   const run = await readBoundedJson(candidateRunMetadataPath, "candidate workflow metadata");
-  assertWindowsPreviewCandidateRun(run, { candidateRunAttempt, candidateRunId, repository });
+  const certificationRunAttempt = assertWindowsPreviewCandidateRun(
+    run,
+    { candidateRunAttempt, candidateRunId, repository }
+  );
   const receipt = {
     schema: WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA,
     status: "passed",
@@ -46,6 +49,7 @@ export async function verifyWindowsPreviewPromotion({
       identitySha256: candidate.identitySha256,
       runId: candidateRunId,
       runAttempt: candidateRunAttempt,
+      certificationRunAttempt,
       installerSha256: candidate.identity.installer.sha256,
       packagedExecutableSha256: candidate.identity.packagedExecutable.sha256
     },
@@ -54,6 +58,7 @@ export async function verifyWindowsPreviewPromotion({
   };
   assertWindowsPreviewManualTestReceipt(receipt, {
     candidateIdentitySha256: candidate.identitySha256,
+    candidateCertificationRunAttempt: certificationRunAttempt,
     candidateRunAttempt,
     candidateRunId,
     repository,
@@ -86,7 +91,10 @@ export async function recordWindowsPreviewManualTest({
     packagedExecutablePath
   });
   const run = await readBoundedJson(candidateRunMetadataPath, "candidate workflow metadata");
-  assertWindowsPreviewCandidateRun(run, { candidateRunAttempt, candidateRunId, repository });
+  const certificationRunAttempt = assertWindowsPreviewCandidateRun(
+    run,
+    { candidateRunAttempt, candidateRunId, repository }
+  );
   const receipt = {
     schema: WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
     status: "passed",
@@ -97,6 +105,7 @@ export async function recordWindowsPreviewManualTest({
       identitySha256: candidate.identitySha256,
       runId: candidateRunId,
       runAttempt: candidateRunAttempt,
+      certificationRunAttempt,
       installerSha256: candidate.identity.installer.sha256,
       packagedExecutableSha256: candidate.identity.packagedExecutable.sha256
     },
@@ -104,6 +113,7 @@ export async function recordWindowsPreviewManualTest({
   };
   assertWindowsPreviewManualTestReceipt(receipt, {
     candidateIdentitySha256: candidate.identitySha256,
+    candidateCertificationRunAttempt: certificationRunAttempt,
     candidateRunAttempt,
     candidateRunId,
     repository,
@@ -130,6 +140,15 @@ export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
     ["candidate run attempt", value?.candidate?.runAttempt]
   ]) {
     if (!POSITIVE_INTEGER.test(field ?? "")) failures.push(`invalid ${label}`);
+  }
+  const certificationRunAttempt = value?.candidate?.certificationRunAttempt;
+  if (certificationRunAttempt !== undefined) {
+    if (!POSITIVE_INTEGER.test(certificationRunAttempt)) {
+      failures.push("invalid candidate certification run attempt");
+    } else if (POSITIVE_INTEGER.test(value?.candidate?.runAttempt ?? "")
+      && BigInt(certificationRunAttempt) < BigInt(value.candidate.runAttempt)) {
+      failures.push("candidate certification run attempt predates build attempt");
+    }
   }
   if (isPromotionReceipt) {
     for (const [label, field] of [
@@ -164,6 +183,11 @@ export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
     ["source commit", value?.source?.commit, expected.sourceCommit],
     ["candidate run ID", value?.candidate?.runId, expected.candidateRunId],
     ["candidate run attempt", value?.candidate?.runAttempt, expected.candidateRunAttempt],
+    [
+      "candidate certification run attempt",
+      value?.candidate?.certificationRunAttempt,
+      expected.candidateCertificationRunAttempt
+    ],
     ["candidate identity", value?.candidate?.identitySha256, expected.candidateIdentitySha256]
   ]) {
     if (wanted !== undefined && actual !== wanted) failures.push(`${label} mismatch`);
@@ -177,7 +201,17 @@ export function assertWindowsPreviewManualTestReceipt(value, expected = {}) {
 export function assertWindowsPreviewCandidateRun(run, expected) {
   const failures = [];
   if (String(run?.id) !== expected.candidateRunId) failures.push("run ID mismatch");
-  if (String(run?.run_attempt) !== expected.candidateRunAttempt) failures.push("run attempt mismatch");
+  const candidateRunAttempt = String(expected.candidateRunAttempt);
+  const certificationRunAttempt = String(run?.run_attempt);
+  if (!POSITIVE_INTEGER.test(candidateRunAttempt)) {
+    failures.push("invalid candidate build run attempt");
+  }
+  if (!POSITIVE_INTEGER.test(certificationRunAttempt)) {
+    failures.push("invalid certification run attempt");
+  } else if (POSITIVE_INTEGER.test(candidateRunAttempt)
+    && BigInt(certificationRunAttempt) < BigInt(candidateRunAttempt)) {
+    failures.push("certification run attempt predates candidate build attempt");
+  }
   if (run?.name !== "Windows candidate") failures.push("unexpected workflow name");
   if (run?.event !== "workflow_dispatch") failures.push("unexpected workflow event");
   if (run?.status !== "completed" || run?.conclusion !== "success") failures.push("candidate workflow did not succeed");
@@ -185,6 +219,7 @@ export function assertWindowsPreviewCandidateRun(run, expected) {
   if (failures.length > 0) {
     throw new Error(`Windows candidate workflow run is invalid:\n${failures.map((item) => `- ${item}`).join("\n")}`);
   }
+  return certificationRunAttempt;
 }
 
 async function readBoundedJson(path, label) {

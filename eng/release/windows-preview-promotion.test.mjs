@@ -32,7 +32,7 @@ describe("Windows preview promotion", () => {
     expect(result.receipt).toMatchObject({
       status: "passed",
       evidenceLevel: "manual-windows-x64-test-confirmed",
-      candidate: { runId: "42", runAttempt: "2" }
+      candidate: { runId: "42", runAttempt: "2", certificationRunAttempt: "2" }
     });
     await prepareUnsignedPreview(fixture.releaseRoot, fixture.version, "0.81.1");
     const outputRoot = join(fixture.root, "bundle");
@@ -58,6 +58,63 @@ describe("Windows preview promotion", () => {
     }));
     await expect(verifyWindowsPreviewPromotion(fixture.promotionOptions))
       .rejects.toThrow("candidate workflow did not succeed");
+  });
+
+  it("preserves an earlier build attempt when a later certification rerun succeeds", async () => {
+    const fixture = await promotionFixture();
+    await writeFile(fixture.runMetadataPath, JSON.stringify({
+      id: 42,
+      run_attempt: 3,
+      name: "Windows candidate",
+      event: "workflow_dispatch",
+      status: "completed",
+      conclusion: "success",
+      repository: { full_name: "bigKING67/pi-67-desktop" }
+    }));
+    const result = await recordWindowsPreviewManualTest({
+      actor: fixture.promotionOptions.actor,
+      candidateIdentityPath: fixture.promotionOptions.candidateIdentityPath,
+      candidateRunAttempt: fixture.promotionOptions.candidateRunAttempt,
+      candidateRunId: fixture.promotionOptions.candidateRunId,
+      candidateRunMetadataPath: fixture.promotionOptions.candidateRunMetadataPath,
+      installerPath: fixture.promotionOptions.installerPath,
+      outputPath: fixture.promotionOptions.outputPath,
+      packagedExecutablePath: fixture.promotionOptions.packagedExecutablePath,
+      repository: fixture.promotionOptions.repository,
+      sourceCommit: fixture.promotionOptions.sourceCommit
+    });
+
+    expect(result.receipt.candidate).toMatchObject({
+      runId: "42",
+      runAttempt: "2",
+      certificationRunAttempt: "3"
+    });
+  });
+
+  it("rejects workflow metadata that predates the Candidate build attempt", async () => {
+    const fixture = await promotionFixture();
+    await writeFile(fixture.runMetadataPath, JSON.stringify({
+      id: 42,
+      run_attempt: 1,
+      name: "Windows candidate",
+      event: "workflow_dispatch",
+      status: "completed",
+      conclusion: "success",
+      repository: { full_name: "bigKING67/pi-67-desktop" }
+    }));
+
+    await expect(recordWindowsPreviewManualTest({
+      actor: fixture.promotionOptions.actor,
+      candidateIdentityPath: fixture.promotionOptions.candidateIdentityPath,
+      candidateRunAttempt: fixture.promotionOptions.candidateRunAttempt,
+      candidateRunId: fixture.promotionOptions.candidateRunId,
+      candidateRunMetadataPath: fixture.promotionOptions.candidateRunMetadataPath,
+      installerPath: fixture.promotionOptions.installerPath,
+      outputPath: fixture.promotionOptions.outputPath,
+      packagedExecutablePath: fixture.promotionOptions.packagedExecutablePath,
+      repository: fixture.promotionOptions.repository,
+      sourceCommit: fixture.promotionOptions.sourceCommit
+    })).rejects.toThrow("certification run attempt predates candidate build attempt");
   });
 
   it("rejects a prepared Windows installer whose bytes differ from the tested candidate", async () => {
@@ -92,7 +149,7 @@ describe("Windows preview promotion", () => {
       schema: WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
       status: "passed",
       evidenceLevel: "manual-windows-x64-test-confirmed",
-      candidate: { runId: "42", runAttempt: "2" },
+      candidate: { runId: "42", runAttempt: "2", certificationRunAttempt: "2" },
       attestation: { actor: "bigKING67", channel: "operator-confirmed" }
     });
     expect(result.receipt).not.toHaveProperty("promotion");

@@ -59,10 +59,12 @@ corepack pnpm run release:r2:windows-test:record -- \
 ```
 
 The command verifies the candidate identity, workflow name/status/repository/run, source SHA,
-installer SHA-256, and packaged executable SHA-256 before writing the credential-free receipt. It
-does not treat a hosted workflow as the manual test, publish anything, create a Tag/Release, or
-invent a promotion run. The current operator must run it only after receiving the exact Windows
-test confirmation.
+installer SHA-256, and packaged executable SHA-256 before writing the credential-free receipt. If
+GitHub reran only a failed certification job, the Candidate identity remains bound to its original
+build attempt while the receipt separately records the later successful certification attempt. A
+certification attempt earlier than the build attempt fails closed. The command does not treat a
+hosted workflow as the manual test, publish anything, create a Tag/Release, or invent a promotion
+run. The current operator must run it only after receiving the exact Windows test confirmation.
 
 Then prepare the existing unsigned-preview manifest and R2 allowlist bundle:
 
