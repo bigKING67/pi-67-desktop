@@ -1,6 +1,6 @@
 # Alpha.34 Windows candidate
 
-Status: active
+Status: complete
 Owner: root agent
 Started: 2026-08-26
 Last updated: 2026-08-26
@@ -66,6 +66,9 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Final run `32960108896/1` at source `7a56fae25121f76ac09d01997064b1cdf1e5e982` passed provenance, Windows build/package evidence, all 53 Windows helper tests, candidate and exact Alpha.33 baseline identity, baseline install/launch, missing-shortcut observation, byte-exact Alpha.34 installation, and automatic updated-process launch. The recreated `π.lnk` still exposed an empty target after direct executable binding, so certification withheld the Candidate. | live Git, exact workflow jobs, and lifecycle diagnostic summary | 2026-08-26 |
 | OBSERVED | The user resumed the blocked flow, and the exact failed-run Alpha.34 build artifact `windows-candidate-build-32960108896-1` plus the exact Alpha.33 baseline remain available. The next run will reuse those bytes, preserve the generated link, and compare `WScript.Shell` with `Shell.Application` against both the Unicode original and an ASCII-named byte copy; it will not rebuild the application. | live GitHub Actions artifact inventory and current verifier diff | 2026-08-26 |
 | OBSERVED | Lifecycle-only run `32969170526/1` reused and reverified the exact Alpha34 and Alpha33 artifacts. Its preserved 3,079-byte `π.lnk` (`ecf52527...dde563`) resolved to the complete installed executable through `Shell.Application` for both the Unicode original and an ASCII-named byte copy. `WScript.Shell` alone returned empty for `π.lnk` and replaced the copied link's Chinese target segment with question marks. The prior certification failure is therefore a Unicode-unsafe verifier false negative, not a malformed Alpha34 shortcut. | exact dual-resolver JSON, preserved link bytes, and workflow log | 2026-08-26 |
+| OBSERVED | Lifecycle-only run `32970084606/1` passed the complete Alpha33-to-Alpha34 cross-version lifecycle with automatic launch, a valid repaired shortcut, both three-restart Profile lanes, uninstall, and user-data preservation. | exact hosted Windows lifecycle summary | 2026-08-26 |
+| OBSERVED | Final Candidate `32971119431/2` at source `f50a44429ddaefe5ef28a8edeff3a8b255e71853` passed provenance, build/package, packaged smoke/UI, exact identities, all Windows helper tests, and the full lifecycle. Attempt 1 exceeded the unchanged 5-second shutdown budget once at 5,438ms; the exact failed certification rerun passed without a source or contract change. | live GitHub Actions jobs and both lifecycle summaries | 2026-08-26 |
+| OBSERVED | Standard artifact `windows-candidate-32971119431-2` was downloaded locally and reverified as Alpha34 Windows x64 from source `f50a4442`; the installer is 273,793,797 bytes with SHA-256 `ff155c7a...ffc2ff`, and the local candidate verifier fingerprint is `cf9deca9...ad257e`. | exact downloaded artifact, identity file, local verifier, `stat`, and SHA-256 readback | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -101,7 +104,7 @@ and verify that the Desktop shortcut targets the updated executable.
   new exact-source certification run; record its shortcut-target blocker.
 - [x] 4b. Distinguish an actually malformed link from a Unicode-path
   `WScript.Shell` inspection failure before another full Candidate build.
-- [ ] 5. Download the successful Candidate artifact, verify its bound identity,
+- [x] 5. Download the successful Candidate artifact, verify its bound identity,
   and record the Windows manual-test handoff without publishing it.
 
 ## Validation matrix
@@ -110,8 +113,8 @@ and verify that the Desktop shortcut targets the updated executable.
 | --- | --- | --- | --- |
 | Source | version scan, `git diff --check`, typecheck, lint, architecture, dead-code, references, structure, transport, and workflow checks | eight Alpha.34 manifests and zero source gate failure | passed; standard `check` reached coverage and only an unrelated 5-second Git fixture timed out under full concurrency |
 | Tests | updater/lifecycle tests and full coverage | update args, relaunch, shortcut, and repository regression gates | prior focused candidate/update tests 29/29; resumed workflow helper suite 52 passed/1 Windows-only execution skipped on macOS; timed-out Git fixture 4/4 in isolation; 50% worker coverage 595 files, 3,086 passed, 3 skipped |
-| Runtime/host | Windows Candidate packaged smoke/UI and NSIS lifecycle | exact hosted Windows x64 receipts | blocked: final run passed packaged smoke/UI, all 53 helper tests, both identities, baseline install/launch, Alpha.34 installation, and automatic launch; shortcut-target certification still failed |
-| Packaged artifact | Candidate identity verification and local readback | exact version/source/size/SHA-256 binding | blocked: failed-run build identity was `cf580345978c92548d5c919262f7f96e52078f970c71eedf2c45575e07ce3fa9`, 273,793,712 bytes; no certified testable Candidate was uploaded or downloaded |
+| Runtime/host | Windows Candidate packaged smoke/UI and NSIS lifecycle | exact hosted Windows x64 receipts | passed in `32971119431/2`: automatic Alpha34 launch, valid repaired shortcut, post-upgrade runtime, both three-restart Profile lanes, uninstall, and user-data preservation |
+| Packaged artifact | Candidate identity verification and local readback | exact version/source/size/SHA-256 binding | passed: `windows-candidate-32971119431-2`, source `f50a4442`, 273,793,797-byte installer, SHA-256 `ff155c7a1bc22bee17a2f196eda949283eeb8a8ab42425d240f55e3886ffc2ff` |
 | Target OS/manual | installed Alpha.33-to-Alpha.34 in-app update | automatic restart and working Desktop shortcut | pending user test |
 
 ## Rollback
@@ -125,9 +128,9 @@ Alpha.33 remains the public R2 version until separate publication authorization.
 
 - PowerShell COM shortcut inspection and NSIS force-run behavior require the
   hosted Windows runner and then real Windows x64 evidence.
-- The current evidence does not distinguish a malformed post-AUMI shortcut from
-  `WScript.Shell` failing to resolve the Unicode `π.lnk` path. Preserve and
-  inspect the exact link with an independent resolver before another build.
+- `WScript.Shell` is not reliable for this Unicode shortcut name and localized
+  target; certification now uses the independently verified `Shell.Application`
+  result and retains comparative evidence.
 - The Alpha.33 baseline artifact must still be retained and downloadable by the
   new workflow run.
 - A hosted pass proves a controlled synthetic profile, not the user's existing
@@ -214,8 +217,40 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   both link names, while `WScript.Shell` returned empty for `π.lnk` and a lossy
   target for its ASCII-named copy. Certification now uses the Unicode-safe Shell
   result; another lifecycle-only reuse run is required, not another package.
+- 2026-08-26: Verifier-only run `32970084606/1` reused the same exact Alpha34
+  and Alpha33 bytes and passed the full cross-version lifecycle: automatic
+  launch, valid repaired shortcut, post-upgrade runtime, both three-restart
+  Profile lanes, uninstall, and user-data preservation.
+- 2026-08-26: Final Candidate run `32971119431/1` built source `f50a4442` and
+  passed all gates through the clean-profile lane, then one existing-profile
+  shutdown took 5,438ms against the unchanged 5,000ms contract. The exact
+  failed certification job was rerun once without changing source or budget;
+  attempt 2 passed the complete lifecycle and uploaded the standard Candidate.
+- 2026-08-26: `windows-candidate-32971119431-2` was downloaded to
+  `artifacts/candidates/windows-candidate-32971119431-2`. Local identity
+  verification, file-size readback, and SHA-256 readback passed. Real Windows
+  x64 manual acceptance remains pending; no R2/Feishu upload or publication was
+  performed.
 
-## Most recent blocked checkpoint
+## Completed closeout
+
+- Candidate source SHA: `f50a44429ddaefe5ef28a8edeff3a8b255e71853`
+- Workflow and artifact: `32971119431/2`,
+  `windows-candidate-32971119431-2`
+- Installer: `Pi-67-Desktop-0.1.0-alpha.34-win-x64.exe`, 273,793,797 bytes,
+  SHA-256 `ff155c7a1bc22bee17a2f196eda949283eeb8a8ab42425d240f55e3886ffc2ff`
+- Local verifier fingerprint:
+  `cf9deca916bb16dcf6f1dcc9bb4118fce4abfd3db8fc6c5c6e83a8d372ad257e`
+- Hosted validation: provenance, packaged smoke/UI, exact Alpha34 and Alpha33
+  identities, automatic post-update launch, valid repaired shortcut,
+  post-upgrade runtime, clean/existing Profile restart lanes, uninstall, and
+  user-data preservation
+- Remaining manual boundary: real Windows x64 Alpha33-to-Alpha34 update under
+  the user's existing Desktop, OneDrive/Defender/EDR, and default install path
+- Publication state: Candidate only; no Feishu/R2 upload, manifest switch, tag,
+  release, signing, notarization, cleanup, or promotion
+
+## Historical shortcut-verifier checkpoint
 
 - Final attempted source SHA: `7a56fae25121f76ac09d01997064b1cdf1e5e982`
 - Final workflow: `32960108896/1`; provenance and build jobs passed, certification
