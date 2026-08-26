@@ -51,6 +51,12 @@ describe("R2 update release", () => {
       ...release.artifacts.map((entry) => `verify:${entry.name}`),
       "put:unsigned-preview-manifest.json"
     ]);
+    expect(client.putFile).toHaveBeenLastCalledWith(
+      "unsigned-preview-manifest.json",
+      release.manifestPath,
+      "application/json; charset=utf-8",
+      "no-store"
+    );
     expect(result.published).toBe(true);
   });
 

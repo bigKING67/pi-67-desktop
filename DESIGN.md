@@ -2075,10 +2075,12 @@ loading error where the operation can produce those states
   a hidden background side effect. After exact size and SHA-256 verification, the
   state becomes `正在安装`, the dialog stops accepting actions, and Main performs
   the normal shutdown checkpoint before platform handoff. Windows starts the
-  per-user NSIS update mode. macOS validates the extracted bundle identity and
-  version, requires a writable same-volume destination, and uses an adjacent backup
-  for replacement rollback before restart. Failures keep the current application
-  and Pi Session state visible and actionable; local paths, hashes, and remote
+  per-user NSIS update mode against the running executable's exact installation
+  directory, rewrites an existing Desktop shortcut against the replaced executable,
+  and launches the updated version after installation. macOS validates the extracted
+  bundle identity and version, requires a writable same-volume destination, and uses
+  an adjacent backup for replacement rollback before restart. Failures keep the current
+  application and Pi Session state visible and actionable; local paths, hashes, and remote
   manifest payloads never enter Renderer state.
 
 ### Empty, loading, and error states

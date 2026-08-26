@@ -24,6 +24,7 @@ import {
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultBundleDirectory = join(root, "artifacts/r2-update-bundle");
 const defaultReceiptDirectory = join(root, "artifacts/r2-release-receipts");
+const mutableManifestCacheControl = "no-store";
 
 export async function planR2Release({
   release,
@@ -60,7 +61,12 @@ export async function publishR2Release({
     await verifyArtifact(origin, artifact, fetchImpl);
   }
   if (plan.manifestAction === "publish-last") {
-    await client.putFile(R2_UPDATE_MANIFEST_NAME, release.manifestPath, "application/json; charset=utf-8");
+    await client.putFile(
+      R2_UPDATE_MANIFEST_NAME,
+      release.manifestPath,
+      "application/json; charset=utf-8",
+      mutableManifestCacheControl
+    );
   }
   const publicManifest = await readPublicManifest(origin, fetchImpl);
   if (!manifestsMatch(publicManifest, release.manifest)) {

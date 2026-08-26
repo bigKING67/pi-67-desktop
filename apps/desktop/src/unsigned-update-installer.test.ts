@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildWindowsUpdateInstallerArguments,
   installUnsignedUpdate,
   resolveMacosApplicationBundle
 } from "./unsigned-update-installer.js";
@@ -14,7 +15,7 @@ describe("unsigned update platform installer", () => {
     await Promise.all(temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
   });
 
-  it("starts the existing per-user NSIS update mode before requesting app quit", async () => {
+  it("pins the NSIS update to the current installation and restarts the updated app", async () => {
     const events: string[] = [];
     const spawnDetached = vi.fn((_file: string, _arguments: readonly string[]) => fakeSpawn(events));
     const quit = vi.fn(() => events.push("quit"));
@@ -30,8 +31,20 @@ describe("unsigned update platform installer", () => {
       spawnDetached
     });
 
-    expect(spawnDetached).toHaveBeenCalledWith("C:\\Pi67\\update.exe", ["--updated", "/S"]);
+    expect(spawnDetached).toHaveBeenCalledWith("C:\\Pi67\\update.exe", [
+      "--updated",
+      "--force-run",
+      "/S",
+      "/D=C:\\Pi67"
+    ]);
     expect(events).toEqual(["spawn", "unref", "quit"]);
+  });
+
+  it("rejects an updater destination that is not the running Pi-67 executable", () => {
+    expect(() => buildWindowsUpdateInstallerArguments("C:\\Pi67\\other.exe"))
+      .toThrow("cannot bind the Windows update");
+    expect(() => buildWindowsUpdateInstallerArguments("C:\\Pi67\nPi-67 Desktop.exe"))
+      .toThrow("path is invalid");
   });
 
   it("stages and validates one macOS bundle before starting the rollback helper", async () => {

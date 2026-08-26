@@ -55,6 +55,34 @@ describe("Cloudflare R2 release client", () => {
     expect(done).toHaveBeenCalledOnce();
   });
 
+  it("sets explicit cache metadata when uploading mutable release metadata", async () => {
+    const done = vi.fn(async () => undefined);
+    const createUpload = vi.fn(() => ({ done }));
+    const body = { stream: true };
+    const client = createCloudflareR2Client({
+      accountId: "account",
+      bucketName: "bucket",
+      s3Client: { send: vi.fn() },
+      createUpload,
+      statImpl: vi.fn(async () => ({ size: 898 })),
+      createReadStreamImpl: vi.fn(() => body)
+    });
+
+    await client.putFile(
+      "unsigned-preview-manifest.json",
+      "/manifest.json",
+      "application/json; charset=utf-8",
+      "no-store"
+    );
+
+    expect(createUpload).toHaveBeenCalledWith(expect.objectContaining({
+      params: expect.objectContaining({
+        CacheControl: "no-store",
+        ContentType: "application/json; charset=utf-8"
+      })
+    }));
+  });
+
   it("purges only the supplied exact URLs in bounded batches", async () => {
     const requests = [];
     const fetchImpl = vi.fn(async (_url, init) => {

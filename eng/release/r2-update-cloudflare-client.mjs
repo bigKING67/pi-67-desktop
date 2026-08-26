@@ -55,7 +55,7 @@ export function createCloudflareR2Client({
       return objects;
     },
 
-    async putFile(key, path, contentType) {
+    async putFile(key, path, contentType, cacheControl) {
       const metadata = await statImpl(path);
       const upload = createUpload({
         client: objectClient,
@@ -64,7 +64,8 @@ export function createCloudflareR2Client({
           Key: key,
           Body: createReadStreamImpl(path),
           ContentLength: metadata.size,
-          ContentType: contentType
+          ContentType: contentType,
+          ...(cacheControl ? { CacheControl: cacheControl } : {})
         },
         queueSize: 4,
         partSize: 16 * 1024 * 1024,

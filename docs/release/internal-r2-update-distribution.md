@@ -159,17 +159,23 @@ Successful publish writes a credential-free receipt under ignored
 `artifacts/r2-release-receipts/`.
 
 Uploading metadata first is forbidden because clients could retain a reference to a missing
-artifact. The JSON/YML/SIG cache rule bypasses edge caching for the mutable manifest; immutable
-EXE/DMG/ZIP files use the one-year cache rule.
+artifact. The JSON/YML/SIG cache rule bypasses edge caching for the mutable manifest, and the R2
+manifest object must also carry `Cache-Control: no-store` so Electron's local HTTP cache cannot
+reuse a previously fetched mutable manifest. Immutable EXE/DMG/ZIP files use the one-year cache
+rule.
 
 ## Platform behavior
 
 ### Windows x64
 
 After exact download verification, Desktop starts the existing per-user NSIS installer with the
-electron-builder update and silent flags, then performs the normal Pi-67 shutdown checkpoint. The
-installer replaces the installed application and starts the updated version. A real Windows x64
-upgrade test remains required for every candidate identity.
+electron-builder update, force-run, and silent flags. The final `/D=` argument pins replacement to
+the running executable's directory instead of allowing missing or stale installer registry state to
+move the application. If a Desktop shortcut existed before the update, the installer rewrites that
+shortcut against the replaced executable; it does not recreate a shortcut the user had removed.
+Desktop then performs the normal Pi-67 shutdown checkpoint. The installer replaces the installed
+application and starts the updated version. A real Windows x64 upgrade test remains required for
+every candidate identity.
 
 ### macOS arm64
 

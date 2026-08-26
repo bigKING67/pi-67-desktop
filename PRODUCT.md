@@ -1292,7 +1292,11 @@ the only Runtime and behavior specification source.
 - The small-team Unsigned Preview update channel accepts only one complete,
   canonical SemVer artifact set whose Windows x64 NSIS and macOS arm64 DMG/ZIP
   names, sizes, hashes, targets, and fixed-origin URLs match the application-owned
-  contract. Windows hands a verified EXE to the existing per-user NSIS update mode.
+  contract. Windows hands a verified EXE to the existing per-user NSIS update mode,
+  pins the destination to the directory of the running executable, preserves whether
+  the user had a Desktop shortcut, and starts the updated executable after replacement.
+  An existing Desktop shortcut is rewritten against the installed executable instead
+  of retaining a stale target.
   Because official macOS auto-updaters require signing, the accepted unsigned
   internal path instead validates one exact ZIP application bundle, waits for the
   normal Pi-67 shutdown checkpoint, then performs a same-volume replacement with

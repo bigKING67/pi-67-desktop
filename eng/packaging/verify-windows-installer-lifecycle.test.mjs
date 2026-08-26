@@ -313,6 +313,15 @@ describe("Windows installer lifecycle contract", () => {
     expect(guard).toMatch(/Function Pi67InstallDirectoryGuardLeave\s+Abort\s+FunctionEnd/u);
   });
 
+  it("recreates an existing Desktop shortcut against the updated executable", async () => {
+    const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
+
+    expect(installer).toMatch(/!macro customInit[\s\S]*?\$\{isUpdated\}[\s\S]*?\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk/u);
+    expect(installer).toMatch(/!macro customInstall[\s\S]*?Pi67UpdateDesktopShortcutExisted == "1"/u);
+    expect(installer).toMatch(/CreateShortCut "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk" "\$appExe"/u);
+    expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
+  });
+
   it("waits for a path to become present or absent", async () => {
     const root = await createTemporaryDirectory();
     const target = join(root, "artifact.exe");

@@ -9,7 +9,7 @@ import {
   stat,
   writeFile
 } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, win32 as windowsPath } from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -43,7 +43,11 @@ export async function installUnsignedUpdate(options: InstallUnsignedUpdateOption
     if (!options.downloadPath.endsWith(".exe")) {
       throw new Error("The verified Windows update is not an NSIS executable.");
     }
-    await spawnAndConfirm(options, options.downloadPath, ["--updated", "/S"]);
+    await spawnAndConfirm(
+      options,
+      options.downloadPath,
+      buildWindowsUpdateInstallerArguments(options.executablePath)
+    );
     options.quit();
     return;
   }
@@ -58,6 +62,26 @@ export async function installUnsignedUpdate(options: InstallUnsignedUpdateOption
     helper.stagingRoot
   ]);
   options.quit();
+}
+
+export function buildWindowsUpdateInstallerArguments(executablePath: string): readonly string[] {
+  if (
+    executablePath.length === 0
+    || executablePath.includes("\r")
+    || executablePath.includes("\n")
+    || executablePath.includes("\0")
+  ) {
+    throw new Error("The current Windows executable path is invalid.");
+  }
+  const resolvedExecutable = windowsPath.resolve(executablePath);
+  if (
+    !windowsPath.isAbsolute(resolvedExecutable)
+    || windowsPath.basename(resolvedExecutable).toLowerCase() !== "pi-67 desktop.exe"
+  ) {
+    throw new Error("Pi-67 cannot bind the Windows update to the current installation.");
+  }
+  const installDirectory = windowsPath.dirname(resolvedExecutable);
+  return ["--updated", "--force-run", "/S", `/D=${installDirectory}`];
 }
 
 export function resolveMacosApplicationBundle(executablePath: string): string {
