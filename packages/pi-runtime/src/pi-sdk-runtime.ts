@@ -3,12 +3,11 @@ import { getAgentDir, VERSION } from "@earendil-works/pi-coding-agent";
 import {
   type ApprovalMode, type ApprovalResolution, type ApprovalResponseDecision,
   type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
-  type ExtensionUiCancellationReason, type ModelSummary, type ResourceSummary,
+  type ExtensionUiCancellationReason, type ModelSummary, type ResourceCatalogProjection,
   type RuntimeCapabilities, type RuntimeIdentity, type RuntimeOperationActivity,
   type SessionCatalogPage, type SessionCatalogQuery, type SessionCatalogStatus,
   type SessionControlResult, type SessionModelCatalogResult, type SessionResourceCatalogResult,
-  type SessionSnapshot, type SessionTreeProjection,
-  type SessionInteractionMode,
+  type SessionSnapshot, type SessionTreeProjection, type SessionInteractionMode,
   type PlanImplementationRequestLineage,
   type TaskToolMode,
   type ToolExecutionView,
@@ -29,7 +28,7 @@ import { createRuntimeSessionCatalog, type RuntimeSessionCatalogTarget } from ".
 import { RuntimeSessionTransitions } from "./runtime-session-transitions.js";
 import { RuntimeSessionBindings } from "./runtime-session-bindings.js";
 import { SessionExternalChangeGuard } from "./session-external-change-guard.js";
-import { projectSessionControls, projectSessionModelCatalogResult, projectSessionModels, projectSessionResources } from "./session-snapshot.js";
+import { projectSessionControls, projectSessionModelCatalogResult, projectSessionModels, projectSessionResourceCatalog } from "./session-snapshot.js";
 import { StreamBatcher } from "./stream-batcher.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
 import type { PreparedPromptAttachmentSet, PromptAttachmentAccess } from "./prompt-attachment.js";
@@ -446,7 +445,9 @@ export class PiSdkRuntime implements AgentRuntime {
     };
   }
   getModels(): ModelSummary[] { return projectSessionModels(this.sessionBindings.requireSession()); }
-  getResources(): ResourceSummary[] { return projectSessionResources(this.sessionBindings.services, this.sessionBindings.extensions); }
+  getResources(): ResourceCatalogProjection {
+    return projectSessionResourceCatalog(this.sessionBindings.services, this.sessionBindings.extensions);
+  }
   getIdentity(): RuntimeIdentity {
     return getPiRuntimeIdentity(this.sessionBindings);
   }

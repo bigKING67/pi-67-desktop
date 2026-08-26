@@ -7,6 +7,8 @@ export type GitInspectionStage =
   | "status"
   | "diff"
   | "branch-head"
+  | "submodule-status"
+  | "submodule-update"
   | "worktree-add"
   | "worktree-remove"
   | "branch-delete";
@@ -68,14 +70,34 @@ export interface GitFilterInspection {
   unknownFilterNames: string[];
 }
 
+export interface GitSubmoduleInspection {
+  status: "not-configured" | "complete" | "incomplete" | "conflicted";
+  total: number;
+  uninitialized: number;
+  divergent: number;
+  conflicted: number;
+}
+
 export interface RepositoryMutationGitRunner extends RepositoryWorkingTreeGitRunner {
   inspectFilters(cwd: string, signal?: AbortSignal): Promise<GitFilterInspection>;
+  inspectSubmodules(cwd: string, signal?: AbortSignal): Promise<GitSubmoduleInspection>;
+  initializeSubmodules(
+    cwd: string,
+    mode: "local-only" | "network-explicit",
+    signal?: AbortSignal
+  ): Promise<void>;
   resolveBranchHead(cwd: string, branchName: string, signal?: AbortSignal): Promise<string | undefined>;
   addWorktree(input: {
     cwd: string;
     targetPath: string;
     branchName: string;
     headSha: string;
+    hooksPath: string;
+  }, signal?: AbortSignal): Promise<void>;
+  restoreWorktree(input: {
+    cwd: string;
+    targetPath: string;
+    branchName: string;
     hooksPath: string;
   }, signal?: AbortSignal): Promise<void>;
   removeWorktree(cwd: string, targetPath: string, signal?: AbortSignal): Promise<void>;
@@ -92,6 +114,9 @@ export interface BoundedPrivateGitRunnerOptions {
     worktreeListOutputBytes: number;
     filterInspectionTimeoutMs: number;
     filterInspectionOutputBytes: number;
+    submoduleStatusTimeoutMs: number;
+    submoduleUpdateTimeoutMs: number;
+    submoduleOutputBytes: number;
     statusTimeoutMs: number;
     statusOutputBytes: number;
     diffTimeoutMs: number;

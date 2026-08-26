@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   ComposerDraftPersistedState,
+  AppOwnedWorktreeRecoveryRequest,
+  AppOwnedWorktreeRecoveryResult,
   ComposerDraftStateSnapshot,
   DesktopCapabilitySnapshot,
   DesktopAgentHostFailureState,
@@ -21,13 +23,19 @@ import type {
   RepositoryChangeDetailRequest,
   RepositoryEnvironmentInspectionRequest,
   RepositoryEnvironmentSnapshot,
+  RepositorySubmoduleInitializationRequest,
+  RepositorySubmoduleInitializationResult,
   RepositoryWorkingTreeInspectionRequest,
   RepositoryWorkingTreeSnapshot,
   SupportDiagnosticsExportRequest,
-  StagedPromptAttachment,
+  StagedPromptAttachmentResult,
   WorktreeCreationRequest,
   WorktreeCreationAdvanceRequest,
   WorktreeCreationAdvanceResult,
+  WorktreeCreationActivityRequest,
+  WorktreeCreationActivityResult,
+  WorktreeCreationCancelRequest,
+  WorktreeCreationCancelResult,
   WorktreeCreationResult,
   WorktreeCreationRollbackRequest,
   WorktreeCreationRollbackResult,
@@ -42,11 +50,17 @@ import {
   isRepositoryWorkingTreeSnapshot
 } from "@pi67/protocol/repository-environment-snapshot-validation";
 import {
+  isAppOwnedWorktreeRecoveryResult,
+  isRepositorySubmoduleInitializationResult
+} from "@pi67/protocol/repository-environment-action-result-validation";
+import {
   isPromptStashImagesRestoreResult,
   isPromptStashImagesStoreResult
 } from "@pi67/protocol/prompt-stash-images";
 import {
   isWorktreeCreationAdvanceResult,
+  isWorktreeCreationActivityResult,
+  isWorktreeCreationCancelResult,
   isWorktreeCreationResult,
   isWorktreeCreationRollbackResult
 } from "@pi67/protocol/worktree-creation-result-validation";
@@ -110,6 +124,24 @@ const systemBridge = {
     }
     return value;
   },
+  initializeRepositorySubmodules: async (
+    request: RepositorySubmoduleInitializationRequest
+  ): Promise<RepositorySubmoduleInitializationResult> => {
+    const value = await ipcRenderer.invoke("pi67:repository-submodules-initialize", request) as unknown;
+    if (!isRepositorySubmoduleInitializationResult(value)) {
+      throw new Error("Invalid Repository Submodule initialization response.");
+    }
+    return value;
+  },
+  recoverAppOwnedWorktree: async (
+    request: AppOwnedWorktreeRecoveryRequest
+  ): Promise<AppOwnedWorktreeRecoveryResult> => {
+    const value = await ipcRenderer.invoke("pi67:app-owned-worktree-recover", request) as unknown;
+    if (!isAppOwnedWorktreeRecoveryResult(value)) {
+      throw new Error("Invalid app-owned Worktree recovery response.");
+    }
+    return value;
+  },
   inspectRepositoryWorkingTree: async (
     request: RepositoryWorkingTreeInspectionRequest
   ): Promise<RepositoryWorkingTreeSnapshot> => {
@@ -131,6 +163,20 @@ const systemBridge = {
     if (!isWorktreeCreationResult(value)) {
       throw new Error("Worktree creation response is invalid.");
     }
+    return value;
+  },
+  getWorktreeCreationActivity: async (
+    request: WorktreeCreationActivityRequest
+  ): Promise<WorktreeCreationActivityResult> => {
+    const value = await ipcRenderer.invoke("pi67:worktree-environment-activity", request) as unknown;
+    if (!isWorktreeCreationActivityResult(value)) throw new Error("Invalid Worktree creation activity response.");
+    return value;
+  },
+  cancelWorktreeCreation: async (
+    request: WorktreeCreationCancelRequest
+  ): Promise<WorktreeCreationCancelResult> => {
+    const value = await ipcRenderer.invoke("pi67:worktree-environment-cancel", request) as unknown;
+    if (!isWorktreeCreationCancelResult(value)) throw new Error("Invalid Worktree creation cancellation response.");
     return value;
   },
   advanceWorktreeEnvironment: async (
@@ -290,7 +336,7 @@ const systemBridge = {
     return () => ipcRenderer.removeListener("pi67:renderer-shutdown-checkpoint-requested", handler);
   }
 } satisfies Omit<DesktopSystemBridge, "stagePromptAttachments"> & {
-  stagePromptAttachments(files: File[]): Promise<StagedPromptAttachment[]>;
+  stagePromptAttachments(files: File[]): Promise<StagedPromptAttachmentResult[]>;
 };
 
 contextBridge.exposeInMainWorld("pi67", { system: systemBridge });

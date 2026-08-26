@@ -235,6 +235,33 @@ export function registerCreatedWorktreeWorkspace(
   }, "Created Worktree registration produced invalid Workbench state.");
 }
 
+export function restoreAppOwnedWorktreeWorkspace(
+  state: WorkbenchStateV5,
+  creationId: string,
+  workspace: WorkspaceDescriptor
+): WorkbenchStateV5 {
+  const index = state.workspaces.findIndex((candidate) => candidate.id === workspace.id);
+  const binding = state.workspaceEnvironments.find((candidate) => candidate.workspaceId === workspace.id);
+  const record = state.environmentMutations.find((candidate) => candidate.creationId === creationId);
+  if (
+    index === -1
+    || binding?.kind !== "repository-worktree"
+    || binding.ownership !== "app"
+    || binding.creationId !== creationId
+    || record?.workspaceId !== workspace.id
+    || record.state !== "committed"
+    || workspace.trust !== "trusted"
+    || workspace.trustProvenance !== "indirect"
+    || workspace.availability !== "available"
+  ) throw new Error("App-owned Worktree recovery authority is invalid.");
+  const workspaces = [...state.workspaces];
+  workspaces[index] = workspace;
+  return assertValidWorkbenchState(
+    { ...state, workspaces },
+    "App-owned Worktree recovery produced invalid Workbench state."
+  );
+}
+
 export function removeWorkspaceRegistration(state: WorkbenchStateV5, workspaceId: string): WorkbenchStateV5 {
   assertWorkbenchId(workspaceId, "Workspace id");
   if (!state.workspaces.some((workspace) => workspace.id === workspaceId)) return state;

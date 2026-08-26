@@ -9,6 +9,8 @@ export type {
   RepositoryChangeKind,
   RepositoryWorkingTreeChange,
   RepositoryWorkingTreeSnapshot,
+  RepositorySubmoduleObservation,
+  RepositoryWorktreeRecoveryView,
   WorktreeObservation
 } from "@pi67/domain";
 export {
@@ -31,3 +33,31 @@ export interface RepositoryChangeDetailRequest {
   revision: number;
   changeId: string;
 }
+
+export interface RepositorySubmoduleInitializationRequest {
+  workspaceId: string;
+  mode: "network-explicit";
+}
+
+export type RepositorySubmoduleInitializationResult =
+  | {
+      status: "initialized" | "incomplete";
+      submodules: import("@pi67/domain").RepositorySubmoduleObservation;
+    }
+  | {
+      status: "rejected";
+      error: "invalid-request" | "workspace-unavailable" | "repository-stale" | "git-failed" | "internal";
+    };
+
+export interface AppOwnedWorktreeRecoveryRequest {
+  workspaceId: string;
+  confirmation: "recreate-committed-state";
+}
+
+export type AppOwnedWorktreeRecoveryResult =
+  | { status: "recovered"; workspace: import("@pi67/domain").WorkspaceDescriptor }
+  | {
+      status: "rejected";
+      error: "invalid-request" | "not-app-owned" | "identity-changed" | "not-recoverable" | "git-failed" | "internal";
+      recoverable: boolean;
+    };

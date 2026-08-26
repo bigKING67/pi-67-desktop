@@ -1,7 +1,8 @@
 import type { WorkbenchStateV5, WorkspaceDescriptor } from "@pi67/domain";
 import type {
   WorktreeCreationAdvanceRequest,
-  WorktreeCreationProgressState
+  WorktreeCreationProgressState,
+  WorktreeCreationResult
 } from "@pi67/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../app/app-store.js";
@@ -11,6 +12,7 @@ import {
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
 import {
+  cancelWorktreeSessionEnvironment,
   commitWorktreeSessionEnvironment,
   prepareWorktreeSessionEnvironment,
   type WorktreeSessionEnvironmentDependencies
@@ -89,6 +91,48 @@ describe("Worktree Session environment controller", () => {
 
     expect(fixture.loadWorkbenchState).toHaveBeenCalledOnce();
     expect(fixture.registerWorkspace).toHaveBeenCalledOnce();
+  });
+
+  it("projects checkout progress and keeps the draft after authoritative cancellation rollback", async () => {
+    let resolveCreate: ((result: WorktreeCreationResult) => void) | undefined;
+    const fixture = dependencies({
+      create: vi.fn(() => new Promise<WorktreeCreationResult>((resolve) => {
+        resolveCreate = resolve;
+      })),
+      activity: vi.fn(async () => ({
+        status: "active" as const,
+        activity: {
+          creationId: "environment-creation-1",
+          stage: "checkout" as const,
+          startedAt: 10,
+          updatedAt: 10,
+          budgetMs: 300_000,
+          cancellable: true as const
+        }
+      })),
+      cancel: vi.fn(async () => ({ status: "cancel-requested" as const }))
+    });
+
+    const preparing = prepareWorktreeSessionEnvironment("task-intent", fixture.value);
+    await vi.waitFor(() => {
+      expect(fixture.activity).toHaveBeenCalledWith("environment-creation-1");
+      expect(rendererWorkbenchStore.getState().tasks["task-intent"]?.runtime.detail).toContain("checkout");
+    });
+    await expect(cancelWorktreeSessionEnvironment("task-intent", fixture.value)).resolves.toBe(true);
+    expect(fixture.cancel).toHaveBeenCalledWith("environment-creation-1");
+    resolveCreate?.({
+      status: "rejected",
+      error: { stage: "git", code: "cancelled", recoverable: true }
+    });
+
+    await expect(preparing).resolves.toMatchObject({ status: "failed", error: expect.stringContaining("已取消") });
+    expect(rendererWorkbenchStore.getState().tasks["task-intent"]).toMatchObject({
+      lifecycle: "draft",
+      hasDraft: true,
+      environmentCreationId: undefined,
+      environmentCreationState: undefined,
+      runtime: { phase: "stopped" }
+    });
   });
 
   it("stops before Host side effects when the immediate Workbench checkpoint fails", async () => {
@@ -185,19 +229,25 @@ function dependencies(overrides: Partial<WorktreeSessionEnvironmentDependencies>
     ?? (async () => recoveryState("workspace-registered")));
   const persistCheckpoint = vi.fn(overrides.persistCheckpoint ?? (async () => undefined));
   const registerWorkspace = vi.fn(overrides.registerWorkspace ?? (async () => true));
+  const activity = vi.fn(overrides.activity ?? (async () => ({ status: "inactive" as const })));
+  const cancel = vi.fn(overrides.cancel ?? (async () => ({ status: "inactive" as const })));
   return {
     create,
     advance,
     loadWorkbenchState,
     persistCheckpoint,
     registerWorkspace,
+    activity,
+    cancel,
     value: {
       createId: overrides.createId ?? (() => "environment-creation-1"),
       create,
       advance,
       loadWorkbenchState,
       persistCheckpoint,
-      registerWorkspace
+      registerWorkspace,
+      ...(overrides.activity ? { activity } : {}),
+      ...(overrides.cancel ? { cancel } : {})
     } satisfies WorktreeSessionEnvironmentDependencies
   };
 }

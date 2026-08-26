@@ -74,6 +74,7 @@ const WorktreeCreationErrorSchema = strictObject({
     Type.Literal("queue-full"),
     Type.Literal("repository-indeterminate"),
     Type.Literal("identity-collision"),
+    Type.Literal("cancelled"),
     Type.Literal("git-failed"),
     Type.Literal("rollback-protected"),
     Type.Literal("recovery-required"),
@@ -86,6 +87,47 @@ export const WorktreeCreationRequestSchema = strictObject({
   requestId: BoundedIdSchema,
   creationId: BoundedIdSchema,
   sourceWorkspaceId: BoundedIdSchema
+});
+
+export const WorktreeCreationActivityRequestSchema = strictObject({ creationId: BoundedIdSchema });
+export const WorktreeCreationCancelRequestSchema = strictObject({ creationId: BoundedIdSchema });
+
+const WorktreeCreationActivitySchema = strictObject({
+  creationId: BoundedIdSchema,
+  stage: Type.Union([
+    Type.Literal("preflight"),
+    Type.Literal("queued"),
+    Type.Literal("checkout"),
+    Type.Literal("submodules"),
+    Type.Literal("verifying"),
+    Type.Literal("workspace-registering")
+  ]),
+  startedAt: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  updatedAt: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+  budgetMs: Type.Optional(Type.Integer({ minimum: 1, maximum: 600_000 })),
+  cancellable: Type.Literal(true)
+});
+
+export const WorktreeCreationActivityResultSchema = Type.Union([
+  strictObject({ status: Type.Literal("active"), activity: WorktreeCreationActivitySchema }),
+  strictObject({ status: Type.Literal("inactive") })
+]);
+
+export const WorktreeCreationCancelResultSchema = Type.Union([
+  strictObject({ status: Type.Literal("cancel-requested") }),
+  strictObject({ status: Type.Literal("inactive") })
+]);
+
+const RepositorySubmoduleObservationSchema = strictObject({
+  status: Type.Union([
+    Type.Literal("not-configured"), Type.Literal("complete"),
+    Type.Literal("incomplete"), Type.Literal("conflicted")
+  ]),
+  total: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  uninitialized: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  divergent: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  conflicted: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  networkActionRequired: Type.Boolean()
 });
 
 export const WorktreeCreationRollbackRequestSchema = strictObject({
@@ -121,7 +163,8 @@ export const WorktreeCreationResultSchema = Type.Union([
       sourceWorkspaceId: BoundedIdSchema,
       repositoryGroupId: Type.String({ pattern: "^repo_[0-9a-f]{32}$" }),
       state: Type.Literal("workspace-registered"),
-      workspace: WorkspaceDescriptorSchema
+      workspace: WorkspaceDescriptorSchema,
+      submodules: Type.Optional(RepositorySubmoduleObservationSchema)
     })
   }),
   strictObject({

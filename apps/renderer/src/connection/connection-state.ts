@@ -7,6 +7,7 @@ import type { AppState } from "../app/app-store.types.js";
 import { clearedTransientState, INITIAL_RUNTIME_STATE } from "../app/app-state-projection.js";
 import { messages } from "../localization/message-catalog.js";
 import { publishNotification } from "../notifications/notification-store.js";
+import { rendererReadQueryClient } from "../query/renderer-read-query-client.js";
 import { observeAgentHostFailure } from "./agent-host-startup-state.js";
 import { useShellStore } from "../shell/shell-store.js";
 import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
@@ -60,7 +61,8 @@ export function handleConnected(
     ...(restoredRuntime === undefined ? {} : { runtime: restoredRuntime })
   });
   if (!shouldRecoverProjection || !state.workspace) {
-    synchronizeWorkspaceScopedStateAfterConnection();
+    const workspaceRegistration = prepareRendererReadQueriesAfterConnection(get, identity);
+    synchronizeWorkspaceScopedStateAfterConnection(workspaceRegistration);
     return;
   }
   recoverConnectedRendererProjection(get, set, {
@@ -69,7 +71,8 @@ export function handleConnected(
     workspaceId: workspaceIdForCanonicalPath(rendererWorkbenchStore.getState(), state.workspace),
     trust: state.trust,
     approvalMode: state.approvalMode,
-    sameHost
+    sameHost,
+    onWorkspaceReady: () => connectRendererReadQueriesIfCurrent(get, identity)
   });
 }
 
@@ -118,16 +121,42 @@ function inactiveWorkbenchRuntime(): AppState["runtime"] {
     : { phase: "stopped", detail: messages.runtime.workbench.workspaceRestored, recoverable: true };
 }
 
-function synchronizeWorkspaceScopedStateAfterConnection(): void {
-  void registerAvailableRendererWorkspaces()
+function prepareRendererReadQueriesAfterConnection(
+  get: StoreGet,
+  identity: AgentConnectionIdentity
+): Promise<void> {
+  const registration = registerAvailableRendererWorkspaces();
+  void registration
+    .then(() => connectRendererReadQueriesIfCurrent(get, identity))
+    .catch(() => undefined);
+  return registration;
+}
+
+function connectRendererReadQueriesIfCurrent(
+  get: StoreGet,
+  identity: AgentConnectionIdentity
+): void {
+  if (isCurrentConnection(get(), identity)) rendererReadQueryClient.connect(identity);
+}
+
+function synchronizeWorkspaceScopedStateAfterConnection(registration: Promise<void>): void {
+  void registration
     .then(() => reconcileUnconfirmedRendererSessions())
     .catch(() => undefined);
+}
+
+function isCurrentConnection(state: AppState, identity: AgentConnectionIdentity): boolean {
+  return state.connected
+    && state.connectionIdentity?.appInstanceId === identity.appInstanceId
+    && state.connectionIdentity.hostInstanceId === identity.hostInstanceId
+    && state.connectionIdentity.hostEpoch === identity.hostEpoch;
 }
 
 export function handleTeardown(get: StoreGet, set: StoreSet, error: Error): void {
   const current = get();
   const workspace = current.workspace;
   const revision = beginRendererConnectionLoss(current);
+  rendererReadQueryClient.disconnect();
   set({
     ...clearedTransientState(),
     connectionIdentity: undefined,
@@ -198,6 +227,7 @@ function matchesProjectionAuthority(
 
 export function handleHostFailure(get: StoreGet, set: StoreSet, state: HostFailure): void {
   const deterministicStartupFailure = observeAgentHostFailure(state);
+  rendererReadQueryClient.disconnect();
   prepareRendererHostReplacement();
   useShellStore.getState().closeRuntimeBoundDialogs();
   set({

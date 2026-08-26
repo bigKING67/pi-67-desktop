@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   RepositoryMutationAdmissionError,
   RepositoryMutationScheduler
@@ -74,5 +74,22 @@ describe("RepositoryMutationScheduler", () => {
     await expect(scheduler.run("repo-c", async () => "never")).rejects.toMatchObject({ code: "disposed" });
     release?.();
     await expect(active).resolves.toBe("active-finished");
+  });
+
+  it("removes an aborted queued mutation without interrupting active Repository work", async () => {
+    const scheduler = new RepositoryMutationScheduler({ globalConcurrency: 1, queueLimit: 2 });
+    let release: (() => void) | undefined;
+    const active = scheduler.run("repo-a", () => new Promise<void>((resolve) => { release = resolve; }));
+    const controller = new AbortController();
+    const operation = vi.fn(async () => "never");
+    const queued = scheduler.run("repo-b", operation, controller.signal);
+
+    controller.abort();
+
+    await expect(queued).rejects.toMatchObject({ code: "cancelled" });
+    expect(operation).not.toHaveBeenCalled();
+    expect(scheduler.diagnostics()).toMatchObject({ queuedCount: 0, runningCount: 1 });
+    release?.();
+    await active;
   });
 });

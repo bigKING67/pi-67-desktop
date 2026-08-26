@@ -30,6 +30,7 @@ export const selectSteeringQueue = (state: SessionProjectionState) => state.queu
 export const selectFollowUpQueue = (state: SessionProjectionState) => state.queue?.followUpQueue;
 export const selectSessionStats = (state: SessionProjectionState) => state.usage;
 export const selectSessionResources = (state: SessionProjectionState) => state.resources;
+export const selectSessionResourceCatalog = (state: SessionProjectionState) => state.resourceCatalog;
 export const selectInteractionMode = (state: SessionProjectionState) => (
   state.interaction?.interactionMode ?? "execute"
 );

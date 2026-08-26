@@ -1,14 +1,12 @@
 import type { WorkspaceMessageSearchItem } from "@pi67/domain";
-import { useEffect, useRef, useState } from "react";
-import { useAppStore } from "../app/app-store.js";
-import { agentConnectionController } from "../connection/AgentConnectionController.js";
+import { useMemo } from "react";
+import { createRendererReadQueryRequest } from "../query/renderer-read-query-client.js";
+import { useDebouncedQueryValue } from "../query/use-debounced-query-value.js";
+import { useRendererReadQueries } from "../query/use-renderer-read-query.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
-import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
-
-const SEARCH_DELAY_MS = 180;
 
 export interface NavigationMessageSearchWorkspaceState {
-  status: "idle" | "loading" | "ready" | "failed";
+  status: "idle" | "loading" | "refreshing" | "ready" | "failed" | "unavailable";
   items: WorkspaceMessageSearchItem[];
   incomplete: boolean;
 }
@@ -17,64 +15,51 @@ export function useNavigationMessageSearch(
   query: string,
   workspaceIds: readonly string[]
 ): Record<string, NavigationMessageSearchWorkspaceState> {
-  const connected = useAppStore((state) => state.connected);
-  const hostEpoch = useAppStore((state) => state.hostEpoch);
   const workspaces = useWorkbenchStore((state) => state.workspaces);
-  const [byWorkspace, setByWorkspace] = useState<Record<string, NavigationMessageSearchWorkspaceState>>({});
-  const revision = useRef(0);
   const normalized = query.normalize("NFKC").trim();
+  const enabled = Array.from(normalized).length >= 2;
+  const settledQuery = useDebouncedQueryValue(normalized, enabled);
+  const requests = useMemo(() => settledQuery ? workspaceIds.flatMap((workspaceId) => {
+    const workspace = workspaces[workspaceId];
+    return workspace?.availability === "available"
+      ? [createRendererReadQueryRequest(
+          "session.catalog.contentSearch",
+          { query: settledQuery },
+          { scope: "workspace", workspaceId }
+        )]
+      : [];
+  }) : [], [settledQuery, workspaceIds, workspaces]);
+  const results = useRendererReadQueries(requests);
 
-  useEffect(() => {
-    const requestRevision = ++revision.current;
-    const controller = new AbortController();
-    if (Array.from(normalized).length < 2 || !connected || hostEpoch === undefined) {
-      setByWorkspace({});
-      return () => controller.abort();
-    }
-    setByWorkspace(Object.fromEntries(workspaceIds.map((workspaceId) => [workspaceId, {
-      status: "loading" as const,
-      items: [],
-      incomplete: false
-    }])));
-    const timer = window.setTimeout(() => {
-      void Promise.all(workspaceIds.map(async (workspaceId) => {
-        const workspace = workspaces[workspaceId];
-        if (!workspace || workspace.availability !== "available") return undefined;
-        try {
-          await registerRendererWorkspaceWithHost(workspace, { queryCatalog: false });
-          if (controller.signal.aborted || revision.current !== requestRevision) return undefined;
-          const result = await agentConnectionController.request(
-            "session.catalog.contentSearch",
-            { query: normalized },
-            [],
-            {
-              context: { scope: "workspace", workspaceId },
-              signal: controller.signal
-            }
-          );
-          return [workspaceId, {
-            status: "ready" as const,
-            items: result.items,
-            incomplete: result.incomplete
-          }] as const;
-        } catch {
-          if (controller.signal.aborted) return undefined;
-          return [workspaceId, {
-            status: "failed" as const,
-            items: [],
-            incomplete: true
-          }] as const;
-        }
-      })).then((results) => {
-        if (controller.signal.aborted || revision.current !== requestRevision) return;
-        setByWorkspace(Object.fromEntries(results.filter((result) => result !== undefined)));
-      });
-    }, SEARCH_DELAY_MS);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [connected, hostEpoch, normalized, workspaceIds, workspaces]);
+  return useMemo(() => {
+    if (!enabled) return {};
+    if (!settledQuery) return loadingStates(workspaceIds);
+    return Object.fromEntries(requests.map((request, index) => {
+      const result = results[index];
+      const data = result?.data?.workspaceId === request.context.workspaceId ? result.data : undefined;
+      if (!result || (result.data && !data)) {
+        return [request.context.workspaceId, failedState()] as const;
+      }
+      const status = result.status === "error" ? "failed" : result.status;
+      return [request.context.workspaceId, {
+        status,
+        items: data?.items ?? [],
+        incomplete: data?.incomplete ?? status === "failed"
+      }] as const;
+    }));
+  }, [enabled, requests, results, settledQuery, workspaceIds]);
+}
 
-  return byWorkspace;
+function loadingStates(
+  workspaceIds: readonly string[]
+): Record<string, NavigationMessageSearchWorkspaceState> {
+  return Object.fromEntries(workspaceIds.map((workspaceId) => [workspaceId, {
+    status: "loading",
+    items: [],
+    incomplete: false
+  }]));
+}
+
+function failedState(): NavigationMessageSearchWorkspaceState {
+  return { status: "failed", items: [], incomplete: true };
 }

@@ -136,6 +136,9 @@ describe("packaged Electron launch environment", () => {
 
   it("keeps every Node OCR fallback while excluding browser-only payloads", () => {
     expect(packagedAttachmentRequiredAsarPaths).toEqual(expect.arrayContaining([
+      "apps/desktop/dist/prompt-image-normalization-worker.mjs",
+      "node_modules/heic-decode/index.js",
+      "node_modules/libheif-js/libheif-wasm/libheif-bundle.js",
       "node_modules/tesseract.js-core/tesseract-core.wasm",
       "node_modules/tesseract.js-core/tesseract-core-simd.wasm",
       "node_modules/tesseract.js-core/tesseract-core-relaxedsimd.wasm",

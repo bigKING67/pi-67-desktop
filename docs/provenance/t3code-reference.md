@@ -234,14 +234,154 @@ Pi-67 使用现有 Promise、AbortController、HostCommandError、Workspace fair
 deadline 重新实现；没有复制 t3code 源码，也没有引入 Effect、TxQueue、TxRef 或共享 Worker
 抽象。具体映射记录在 `licenses/provenance.json`。
 
+## 2026-08-26 Batch A：有界 Tool 与 Resource 投影
+
+Batch A 固定审阅 t3code commit
+`504177797676048bf70f64ce56c21949d0b8a018`，没有修改 Repository 的 reviewed
+reference lock。该批只重新实现投影机制，没有复制 Effect、orchestration、persistence、RPC、
+SQLite 或客户端 runtime：
+
+```text
+apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts
+SHA-256 efb4815aee0e584988755ded36d366ef61aca34b50898bac601ae5bd674d4bc5
+
+apps/server/src/orchestration/ActivityPayloadProjection.ts
+SHA-256 19aa53d6039519e0871bbec95ce8843d4155fbc60cee3d9bc8d6b37e00bc8bbd
+
+apps/server/src/orchestration/Layers/ProjectionSnapshotQuery.ts
+SHA-256 a926a3aad5e7f07acd353fcd8e9f1dc8e101b75a2dde88c22e62fcbc0f472bde
+```
+
+Pi-67 的对应重实现为：
+
+- `packages/pi-runtime/src/tool-execution-projection.ts` 在合并、清理 Tool 文本前就施加
+  collection-time budget；现有 100 ms throttle 与 terminal flush 继续由
+  `tool-execution-projector.ts` 负责，Tool Result 和 Pi JSONL 权威不变；
+- `packages/pi-runtime/src/session-snapshot.ts` 只向跨进程边界投影 Resource metadata，增加
+  item、aggregate-text 和 per-field budget，并用明确 disposition 报告 omitted item 与缩短字段；
+- `packages/protocol/src/session-resource-schemas.ts` 约束投影数组和字段上限；Renderer 明示
+  truncation，而 Pi `ResourceLoader` 的内部完整状态与加载优先级不受影响。
+
+具体许可证和 source-target 映射记录在 `licenses/provenance.json`。
+
+## 2026-08-26 Batch B：Pi-native Renderer 只读 Query 生命周期
+
+Batch B 继续固定在 t3code commit
+`504177797676048bf70f64ce56c21949d0b8a018`，没有推进 reviewed reference lock。决定性
+源码证据为：
+
+```text
+apps/web/src/state/query.ts
+SHA-256 7e8091ea2708815bd323a2fcddc1ab55b8fc2f9c9fd5ced618072863005220c0
+
+apps/web/src/state/use-atom-query-runner.ts
+SHA-256 94ba841ba9821939a63e4456fcc1f1a0f17cad8fe12066ffdb9786b1a3ea517b
+
+apps/web/src/state/queries.ts
+SHA-256 41801512ad2db04f53f6994539116c11cc222f2508798b930f3b42d69b24738e
+
+apps/web/src/state/queries.test.ts
+SHA-256 5b0884dcefc5d2a8550d18e0b9ead167fc3a7368382b999da0312c7f1760aa70
+```
+
+t3code 的 Query view 保留最近成功值并显式表达 pending/error，runner 统一执行 Atom Query，
+Thread search key 绑定 environment/query 等目标条件。Pi-67 只吸收这些生命周期不变量，使用现有
+TypeScript、React、MessagePort 和 `AgentConnectionController` 重新实现：
+
+- `apps/renderer/src/query/renderer-read-query-client.ts` 只允许
+  `session.catalog.query` 与 `session.catalog.contentSearch` 两个 Host 白名单读命令，按完整
+  command/context/payload key 单飞，提供 cancellation、Host identity stale fence、last-success
+  retention，以及 loading/refreshing/ready/unavailable/error 状态；
+- `apps/renderer/src/query/use-renderer-read-query.ts` 通过 observed revision 连接 React Compiler
+  与 disposable query snapshot；Navigation 与 Palette 的相同 Workspace/message key 共用 flight；
+- reconnect 仍由现有 `connection-state.ts` 持有；普通连接在 Workspace registration 完成后、
+  Session recovery 在权威恢复提交后，只刷新仍有 observer 的 read key。Workspace registration、Session mutation、Operation、
+  Approval、Tool 与 Plan 均不进入 Query kernel，也不会被其重放；
+- 首批仅迁移 Palette Session search、Palette message search 与 Navigation message search。Pi JSONL、
+  Host epoch、Session physical identity、generation 和 Pi Runtime 继续拥有权威状态。
+
+没有复制 t3code 源码，也没有引入 Effect、Atom runtime、Effect RPC、SQLite Session truth、
+localhost server、业务 WebSocket、多 Provider runtime 或第二套 orchestration loop。具体
+source-target 映射记录在 `licenses/provenance.json`。
+
+## 2026-08-26 Batch C：HEIC/HEIF 安全归一化
+
+Batch C 继续固定在 t3code commit
+`504177797676048bf70f64ce56c21949d0b8a018`，没有推进 reviewed reference lock。决定性
+源码证据为：
+
+```text
+apps/web/src/lib/imageCompression.ts
+SHA-256 dc384032f3ebaa6fc2d7599ae775ba1d3fe186c9db4d6dd49df3ddd62de3f2dc
+
+apps/web/src/lib/imageCompression.test.ts
+SHA-256 3d82a1f3159b5ec18f683230070dcdfb62a20b43ff347a3fe81ed2b4cd683eaa
+```
+
+t3code 的实现提供 HEIC/HEIF 识别、转换前 `ispe` 尺寸读取、源文件和像素预算、JPEG 输出及
+失败回归。Pi-67 只吸收这些安全不变量，并按自身 Electron/opaque attachment 边界重新实现：
+
+- Desktop Main 在 1 MiB 边界内结构化解析 `ftyp/meta/iprp/ipco/ispe`，不信任文件扩展名或
+  Renderer MIME；
+- 独立 Node worker 使用冻结的 `heic-decode`/`libheif-js` 和已存在的
+  `@napi-rs/canvas`，在 RGBA 分配前复核 5,000 万像素与 16,384 单边上限；
+- Main 移除 JPEG APP1/APP2/APP13/COM 段，重新验证尺寸与完整性，再写入现有 version-1
+  opaque manifest；Agent Host claim/hash 和 Pi image truth 不变；
+- Preload 只接收一次性 source-normalization binding；Renderer 校验后丢弃，不持久化源路径、
+  HEIC bytes 或 decoder state，也不为原 HEIC 创建 object URL；
+- 失败仅移除本次 staging 目录，Composer 文本和已有附件保持可重试、可移除。
+
+Pi-67 没有复制 t3code 源码，也没有采用 `heic-to/csp` 的 Renderer Blob worker，因此没有扩大
+`worker-src` CSP。依赖、许可证、资源预算和完整流程见
+`docs/architecture/heic-attachment-normalization.md`，精确 source-target 映射见
+`licenses/provenance.json`。
+
+## 2026-08-26 Batch D：Worktree 完整性、取消与显式恢复
+
+Batch D 继续固定在 t3code commit
+`504177797676048bf70f64ce56c21949d0b8a018`，没有推进 reviewed reference lock。决定性
+源码证据为：
+
+```text
+apps/server/src/vcs/GitVcsDriverCore.ts
+SHA-256 6e6faf75bef4bde73988ee40e4aa54a88d55dede190e3d84d5c321c491e731e7
+
+apps/server/src/orchestration/Layers/ProviderCommandReactor.ts
+SHA-256 3f319cec4693f537655bedc699a5ef71ee1079d44a167c3948e5e482df643242
+```
+
+t3code 将 Worktree checkout timeout 提高到 300 秒，并在创建后 best-effort 递归初始化
+Submodule；Provider turn 发现缺失 Worktree 时会先执行 Repository-wide `git worktree prune`，
+再尝试重建。Pi-67 只吸收“长 checkout 需要合理预算”“Submodule 是创建完整性的一部分”和
+“app-owned 缺失 Worktree 需要恢复机制”三个产品问题，不复制它的隐式副作用：
+
+- 使用精确 packaged private Git 生成 10k、50k、100k tracked-file 合成仓库，各测 3 次
+  `worktree add`，测得约 0.7 秒、3.6 秒和 7.2 秒；据线性外推约 375k files 为 27 秒。保留
+  300 秒 hard timeout，同时让排队和运行中的创建均可取消，并在确认回滚后才报告取消；
+- 新建 Worktree 只自动复用同一 common-dir 中已存在、经路径 containment 验证的 top-level
+  Submodule objects，禁用所有网络 transport 并使用 `--no-fetch`。普通 `submodule update`
+  实测仍会重新 clone，因此不作为 local-only 机制；需要网络时由用户明确点击动作；
+- 缺失恢复只接受 committed app-owned durable binding，逐项验证 source/target/common-dir/
+  branch/HEAD/clean identity。只对 exact stale target registration 定点移除，永不执行
+  Repository-wide prune；Turn/Provider 路径不会触发恢复；
+- 恢复只承诺重建当前 branch 的已提交状态，UI 明示未提交改动与未跟踪文件无法恢复。若 Git
+  已恢复而 Workbench state 写入失败，后续显式重试只在 exact clean identity 对账成功时补写状态。
+
+具体架构与安全合同见 `docs/architecture/worktree-product-model.md`，精确 source-target 映射见
+`licenses/provenance.json`。Pi SDK、Pi JSONL、Workspace/Session authority 和八个 live Task 合同
+均未改变。
+
 ## 验证边界
 
 - 上述路径已具备 source、TypeScript 和对应 targeted unit test 证据；Plan 的 contextual action、
   requested/started UI 和启动前失败重试具备 hosted Chromium E2E。本轮仍未用该 browser 证据外推
   packaged Electron，而 Snooze、图片 Stash 与 Runtime Health 仍需各自完整 E2E 和 packaged
   validation 才能升级证据；
-- packaged private Git smoke fixture 已接入，但在当前 candidate 交付前仍需 fresh packaged
-  execution，不能只凭 fixture 存在宣称通过；
+- Batch C/D 已完成当前 exact macOS arm64 unsigned packaged execution：HEIC 归一化通过真实输入
+  与 metadata-free JPEG 检查，打包内 private Git 2.53.0 和精确 `GIT_EXEC_PATH` 通过 26/26
+  Worktree、Submodule 和 recovery fixtures，production Renderer Worktree preview 通过 5/5。
+  这些证据仍只覆盖 exact macOS artifact、packaged toolchain、UI/inspection 和 synthetic
+  real-filesystem service lifecycle，不能外推为用户真实 Repository 的手工完整生命周期；
 - 当前文档不证明 Windows candidate、Windows 安装或用户真机生命周期；这些结论必须绑定
   后续精确 source SHA、workflow run/attempt、installer hash 和真实目标机结果。
 

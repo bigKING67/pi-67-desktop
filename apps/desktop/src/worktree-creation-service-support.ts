@@ -48,6 +48,9 @@ export function rejected(
 }
 
 export function mapGitPreflightError(error: unknown): WorktreeCreationServiceError {
+  if (error instanceof GitInspectionError && error.code === "cancelled") {
+    return serviceError("preflight", "cancelled", true);
+  }
   if (error instanceof GitInspectionError && error.code === "toolchain-unavailable") {
     return serviceError("preflight", "toolchain-unavailable", true);
   }

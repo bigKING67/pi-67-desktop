@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MAX_REPOSITORY_WORKTREES } from "@pi67/domain";
 import {
+  isAppOwnedWorktreeRecoveryResult,
   isRepositoryEnvironmentSnapshot,
-  parseRepositoryEnvironmentInspectionRequest
+  isRepositorySubmoduleInitializationResult,
+  parseAppOwnedWorktreeRecoveryRequest,
+  parseRepositoryEnvironmentInspectionRequest,
+  parseRepositorySubmoduleInitializationRequest
 } from "./repository-environment.js";
 import { RepositoryEnvironmentSnapshotSchema } from "./repository-environment-schema.js";
 import { Value } from "./typebox-schema.js";
@@ -26,6 +30,74 @@ describe("repository environment protocol", () => {
       ...snapshot,
       commonDir: "/private/repository/.git"
     })).toBe(false);
+  });
+
+  it("projects bounded Submodule completeness and explicit app-owned recovery without paths or URLs", () => {
+    expect(isRepositoryEnvironmentSnapshot({
+      ...readySnapshot(),
+      submodules: {
+        status: "incomplete",
+        total: 2,
+        uninitialized: 1,
+        divergent: 0,
+        conflicted: 0,
+        networkActionRequired: true
+      }
+    })).toBe(true);
+    const missing = {
+      workspaceId: "workspace-a",
+      status: "missing",
+      revision: 0,
+      observedAt: 1,
+      stale: false,
+      worktrees: [],
+      recovery: {
+        kind: "app-owned-worktree",
+        action: "recreate-committed-state",
+        unrecoverableData: "uncommitted-and-untracked"
+      },
+      error: { stage: "workspace", code: "workspace-unavailable", recoverable: true }
+    } as const;
+    expect(isRepositoryEnvironmentSnapshot(missing)).toBe(true);
+    expect(isRepositoryEnvironmentSnapshot({
+      ...missing,
+      recovery: { ...missing.recovery, targetPath: "/private/worktree" }
+    })).toBe(false);
+  });
+
+  it("accepts only exact explicit Submodule and Worktree recovery intents with bounded results", () => {
+    expect(parseRepositorySubmoduleInitializationRequest({
+      workspaceId: "workspace-a",
+      mode: "network-explicit"
+    })).toEqual({ workspaceId: "workspace-a", mode: "network-explicit" });
+    expect(parseRepositorySubmoduleInitializationRequest({
+      workspaceId: "workspace-a",
+      mode: "local-only"
+    })).toBeUndefined();
+    expect(isRepositorySubmoduleInitializationResult({
+      status: "incomplete",
+      submodules: {
+        status: "incomplete",
+        total: 1,
+        uninitialized: 1,
+        divergent: 0,
+        conflicted: 0,
+        networkActionRequired: true
+      }
+    })).toBe(true);
+    expect(parseAppOwnedWorktreeRecoveryRequest({
+      workspaceId: "workspace-a",
+      confirmation: "recreate-committed-state"
+    })).toEqual({ workspaceId: "workspace-a", confirmation: "recreate-committed-state" });
+    expect(parseAppOwnedWorktreeRecoveryRequest({
+      workspaceId: "workspace-a",
+      confirmation: "force"
+    })).toBeUndefined();
+    expect(isAppOwnedWorktreeRecoveryResult({
+      status: "rejected",
+      error: "identity-changed",
+      recoverable: false
+    })).toBe(true);
   });
 
   it("rejects duplicate Worktree identities and an unknown current Worktree", () => {

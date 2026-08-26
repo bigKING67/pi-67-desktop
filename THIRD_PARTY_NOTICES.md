@@ -72,3 +72,19 @@ Copyright 2022 The Maple Mono Project Authors。许可证为 SIL Open Font Licen
 这些组件只在 Agent Host 的有界 worker 中处理用户明确附加的本地文件。英文和简体
 中文 OCR 数据随应用离线打包；运行时不下载语言数据，也不把附件发送给网络 OCR
 服务。完整版权、许可证文本和 NOTICE 仍随对应 npm package 保留在打包内容中。
+
+## HEIC/HEIF attachment normalization
+
+HEIC/HEIF 图片在 Electron Desktop 的有界 Node worker 中离线解码，再编码为不含源图片
+元数据的 JPEG；Renderer 不加载解码器、不扩大 CSP，也不把图片发送给外部转换服务。直接
+和传递依赖冻结为：
+
+- `heic-decode` 2.1.0：npm package metadata 声明 ISC License；
+- `libheif-js` 1.19.8：LGPL-3.0 License，使用其 `wasm-bundle` Node 入口；
+- `@napi-rs/canvas` 1.0.3：MIT License，用于从解码后的 RGBA 像素生成 JPEG。
+
+`pnpm-lock.yaml` 记录精确 tarball integrity。`libheif-js` 的完整 LGPL 文本随 npm package
+保留在 `node_modules/libheif-js/LICENSE` 和其 `libheif` 子目录中；发布包继续保留对应
+package 文件。`heic-decode` 2.1.0 的 npm tarball 没有独立 LICENSE 文件，因此对外发布前的
+SBOM/license inventory 必须保留其 package metadata、来源 commit 和 ISC 声明，不能只依赖
+本摘要。

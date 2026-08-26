@@ -17,7 +17,7 @@ import type {
   SessionInteractionMode,
   OperationView,
   ProviderSummary,
-  ResourceSummary,
+  ResourceCatalogProjection,
   SessionCatalogPage,
   SessionCatalogQuery,
   SessionCatalogStatus,
@@ -398,7 +398,7 @@ export interface CommandResults extends
   "vision.assistant.global.set": PiProviderConfigurationSnapshot;
   "vision.assistant.project.set": PiProviderConfigurationSnapshot;
   "thinking.set": SessionControlResult;
-  "resource.list": ResourceSummary[];
+  "resource.list": ResourceCatalogProjection;
   "resource.reload": SessionResourceCatalogResult;
   "context.file.list": ContextFileCatalogResult;
   "context.file.read": ContextFileReadResult;

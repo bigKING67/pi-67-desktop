@@ -43,6 +43,28 @@ describe("tool execution projection", () => {
     });
   });
 
+  it("collects a bounded tail without materializing every cumulative text block", () => {
+    let reads = 0;
+    const content = Array.from({ length: 10_000 }, (_, index) => {
+      const part = {} as { text: string };
+      Object.defineProperty(part, "text", {
+        enumerable: true,
+        get: () => {
+          reads += 1;
+          return `${"x".repeat(5_000)}-tail-${index}`;
+        }
+      });
+      return part;
+    });
+
+    const progress = projectToolProgress({ content });
+
+    expect(progress).toMatchObject({ truncated: true });
+    expect(progress?.text).toHaveLength(4_096);
+    expect(progress?.text.endsWith("-tail-9999")).toBe(true);
+    expect(reads).toBeLessThan(10);
+  });
+
   it("reports missing failure detail without inventing an error", () => {
     expect(projectToolFailure({}, "pi-result")).toEqual({
       detailState: "missing",

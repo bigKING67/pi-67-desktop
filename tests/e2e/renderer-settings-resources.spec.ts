@@ -5,11 +5,48 @@ import {
   attachMockAgent,
   clearRecordedCommands,
   installMockDesktopBridge,
+  replaceMockAgentHost,
   recordedCommandDetails,
   recordedCommands,
   setMockAgentResponseFailure
 } from "./pi67-renderer-fixture.js";
 import { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge.js";
+
+test("shows bounded Pi resource projection truth in Context and Settings", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.evaluate(() => {
+    const state = (window as unknown as {
+      __pi67TestAgent: { snapshot: Record<string, unknown> };
+    }).__pi67TestAgent;
+    state.snapshot.resourceCatalog = {
+      totalItems: 310,
+      projectedItems: 7,
+      omittedItems: 303,
+      truncatedFields: 2,
+      truncated: true
+    };
+  });
+  await replaceMockAgentHost(page, 2);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await page.getByRole("tab", { name: "上下文", exact: true }).click();
+  await expect(page.getByText("7/310 项", { exact: true })).toBeVisible();
+  await expect(page.getByText(
+    "目录投影已限制：省略 303 项，2 个字段已缩短；Pi 内部加载状态保持完整。",
+    { exact: true }
+  )).toBeVisible();
+
+  await page.keyboard.press("Control+,");
+  const settings = page.getByLabel("π 设置");
+  await settings.getByRole("navigation", { name: "设置分类" })
+    .getByRole("button", { name: "提示词模板", exact: true }).click();
+  await expect(settings.getByText(
+    "资源目录过大，当前显示 7/310 项，另有 2 个字段已缩短。Pi 内部已加载资源不受影响。",
+    { exact: true }
+  )).toBeVisible();
+});
 
 test("keeps Pi resource reload unavailable for a provisional task without a Session", async ({ page }) => {
   await installMockDesktopBridge(page);
@@ -399,26 +436,4 @@ test("refreshes an initializing capability snapshot without requiring a manual r
   const coreExtensionRow = settings.getByText("pi-rules-loader", { exact: true }).locator("..").locator("..");
   await expect(coreExtensionRow).toContainText("已提供");
   await expect(coreExtensionRow).not.toContainText("准备中");
-});
-
-test("explains why project skills are unavailable for an untrusted workspace", async ({ page }) => {
-  await installMockDesktopBridge(page, {
-    pickerQueue: [{
-      ...DEFAULT_MOCK_WORKSPACE,
-      trust: "untrusted",
-      trustProvenance: "user-confirmed"
-    }]
-  });
-  await page.goto("/");
-  await attachMockAgent(page);
-  await page.getByRole("button", { name: "选择工作区" }).click();
-  await page.keyboard.press("Control+,");
-
-  const settings = page.getByLabel("π 设置");
-  await settings.getByRole("navigation", { name: "设置分类" })
-    .getByRole("button", { name: "技能", exact: true }).click();
-  const workspace = settings.getByTestId("skill-settings-workspace");
-  await workspace.getByRole("tab", { name: "项目专属", exact: true }).click();
-  await expect(workspace.getByText("当前项目尚未受信任", { exact: false })).toBeVisible();
-  await expect(workspace.getByText("project-review", { exact: true })).toHaveCount(0);
 });

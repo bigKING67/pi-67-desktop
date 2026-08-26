@@ -61,6 +61,7 @@ interface ConnectedProjectionRecoveryInput {
   trust: AppState["trust"];
   approvalMode: AppState["approvalMode"];
   sameHost: boolean;
+  onWorkspaceReady?: () => void;
 }
 
 export function invalidateProjectionRecoveryGeneration(): number {
@@ -118,6 +119,7 @@ export function recoverConnectedRendererProjection(
       )
     ), recoverySelection.context).then((committed) => {
       recoverySelection.restore();
+      if (committed) input.onWorkspaceReady?.();
       if (committed && input.workspaceId) {
         void reconcileUnconfirmedRendererSessions(input.workspaceId);
       }
@@ -145,6 +147,7 @@ export function recoverConnectedRendererProjection(
     if (disposition === "committed") {
       recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
+      input.onWorkspaceReady?.();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
       return;
@@ -161,6 +164,7 @@ export function recoverConnectedRendererProjection(
     ) {
       recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
+      input.onWorkspaceReady?.();
       if (input.workspaceId) void queryFirstSessionCatalog(input.workspaceId);
       if (input.workspaceId) void reconcileUnconfirmedRendererSessions(input.workspaceId);
       return;
@@ -214,6 +218,7 @@ function recoverCreationOnlyWorkbench(
     if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
     await reconcileUnconfirmedRendererSessions(input.workspaceId);
     if (!projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)) return;
+    input.onWorkspaceReady?.();
     projectionRecoveryLedger.clearInterruptedOperation();
     const selected = selectedWorkbenchTask(rendererWorkbenchStore.getState());
     set({

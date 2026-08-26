@@ -8,6 +8,9 @@ import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { inspectRepositoryEnvironment } from "../worktree/repository-environment-controller.js";
 import { useRepositoryEnvironmentStore } from "../worktree/repository-environment-store.js";
 import {
+  cancelWorktreeSessionEnvironment
+} from "../worktree/worktree-session-environment-controller.js";
+import {
   selectRendererTaskEnvironmentIntent,
   worktreeIntentAvailability
 } from "../worktree/worktree-environment-intent-controller.js";
@@ -82,12 +85,22 @@ export function NewSessionIntentSurface({ task, workspace }: {
             <p aria-live="polite" id={environmentHelpId}>{availability.status === "available"
               ? copy.noSideEffect
               : copy.availability[availability.code]}</p>
+            {task.environmentCreationState === "creating" ? (
+              <p aria-live="polite">{task.runtime.detail}</p>
+            ) : null}
             {availability.retryable ? (
               <button
                 className={styles.environmentRetry}
                 onClick={() => void inspectRepositoryEnvironment(workspace.id)}
                 type="button"
               >{copy.retryInspection}</button>
+            ) : null}
+            {task.environmentCreationState === "creating" && task.environmentCreationId ? (
+              <button
+                className={styles.environmentRetry}
+                onClick={() => void cancelWorktreeSessionEnvironment(task.id)}
+                type="button"
+              >{copy.cancel}</button>
             ) : null}
           </div>
         </fieldset>

@@ -66,6 +66,58 @@ describe("Worktree creation bridge", () => {
     });
   });
 
+  it("projects bounded progress and cancellation without accepting force or path fields", async () => {
+    const activity = vi.fn(() => ({
+      status: "active" as const,
+      activity: {
+        creationId: "creation-1",
+        stage: "checkout" as const,
+        startedAt: 10,
+        updatedAt: 10,
+        budgetMs: 300_000,
+        cancellable: true as const
+      }
+    }));
+    const cancel = vi.fn(() => ({ status: "cancel-requested" as const }));
+    registerWorktreeCreationBridge(bridge({ activity, cancel }));
+
+    await expect(invokeChannel("pi67:worktree-environment-activity", {
+      creationId: "creation-1"
+    })).resolves.toMatchObject({ status: "active", activity: { stage: "checkout", budgetMs: 300_000 } });
+    await expect(invokeChannel("pi67:worktree-environment-cancel", {
+      creationId: "creation-1"
+    })).resolves.toEqual({ status: "cancel-requested" });
+    expect(activity).toHaveBeenCalledWith({ creationId: "creation-1" });
+    expect(cancel).toHaveBeenCalledWith({ creationId: "creation-1" });
+
+    await expect(invokeChannel("pi67:worktree-environment-activity", {
+      creationId: "creation-1",
+      targetPath: "/private/worktree"
+    })).resolves.toEqual({ status: "inactive" });
+    await expect(invokeChannel("pi67:worktree-environment-cancel", {
+      creationId: "creation-1",
+      force: true
+    })).resolves.toEqual({ status: "inactive" });
+    expect(activity).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+
+    activity.mockReturnValue({
+      status: "active",
+      activity: {
+        creationId: "creation-1",
+        stage: "checkout",
+        startedAt: 10,
+        updatedAt: 10,
+        budgetMs: 300_000,
+        cancellable: true,
+        stdout: "private"
+      }
+    } as never);
+    await expect(invokeChannel("pi67:worktree-environment-activity", {
+      creationId: "creation-1"
+    })).resolves.toEqual({ status: "inactive" });
+  });
+
   it("collapses thrown or invalid internal results to a typed failure without leaking details", async () => {
     for (const create of [
       vi.fn(async () => ({ status: "created", stdout: "private" })),
@@ -195,6 +247,8 @@ async function invokeChannel(channel: string, value: unknown): Promise<unknown> 
 
 function bridge(overrides: Partial<WorktreeCreationBridge>): WorktreeCreationBridge {
   return {
+    activity: vi.fn(() => ({ status: "inactive" as const })),
+    cancel: vi.fn(() => ({ status: "inactive" as const })),
     create: vi.fn(async () => ({
       status: "rejected" as const,
       error: { stage: "state" as const, code: "internal" as const, recoverable: true }

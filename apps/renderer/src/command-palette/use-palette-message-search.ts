@@ -1,13 +1,12 @@
 import type { WorkspaceMessageSearchItem } from "@pi67/domain";
-import { useEffect, useRef, useState } from "react";
-import { agentConnectionController } from "../connection/AgentConnectionController.js";
-import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-registration-controller.js";
+import { useMemo } from "react";
+import { createRendererReadQueryRequest } from "../query/renderer-read-query-client.js";
+import { useDebouncedQueryValue } from "../query/use-debounced-query-value.js";
+import { useRendererReadQuery } from "../query/use-renderer-read-query.js";
 import { selectedWorkbenchTask, useWorkbenchStore } from "../workbench/workbench-store.js";
 
-const SEARCH_DELAY_MS = 180;
-
 export interface PaletteMessageSearchState {
-  status: "idle" | "loading" | "ready" | "failed" | "unavailable";
+  status: "idle" | "loading" | "refreshing" | "ready" | "failed" | "unavailable";
   items: WorkspaceMessageSearchItem[];
   incomplete: boolean;
   error: string | undefined;
@@ -15,8 +14,6 @@ export interface PaletteMessageSearchState {
 
 export function usePaletteMessageSearch(options: {
   open: boolean;
-  connected: boolean;
-  hostEpoch: number | undefined;
   query: string;
 }): PaletteMessageSearchState {
   const workspace = useWorkbenchStore((state) => {
@@ -24,64 +21,38 @@ export function usePaletteMessageSearch(options: {
     const workspaceId = task?.workspaceId ?? state.currentWorkspaceId;
     return workspaceId ? state.workspaces[workspaceId] : undefined;
   });
-  const [state, setState] = useState<PaletteMessageSearchState>({
-    status: "idle",
-    items: [],
-    incomplete: false,
-    error: undefined
-  });
-  const revision = useRef(0);
   const normalized = options.query.normalize("NFKC").trim();
-
-  useEffect(() => {
-    const requestRevision = ++revision.current;
-    const controller = new AbortController();
-    if (!options.open || Array.from(normalized).length < 2) {
-      setState({ status: "idle", items: [], incomplete: false, error: undefined });
-      return () => controller.abort();
-    }
-    if (!options.connected || options.hostEpoch === undefined || !workspace) {
-      setState({ status: "unavailable", items: [], incomplete: false, error: undefined });
-      return () => controller.abort();
-    }
-    setState((current) => ({ ...current, status: "loading", error: undefined }));
-    const timer = window.setTimeout(() => {
-      void executeSearch().catch((error: unknown) => {
-        if (revision.current !== requestRevision) return;
-        setState({
-          status: "failed",
-          items: [],
-          incomplete: false,
-          error: error instanceof Error ? error.message : "对话正文搜索失败。"
-        });
-      });
-    }, SEARCH_DELAY_MS);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-
-    async function executeSearch(): Promise<void> {
-      await registerRendererWorkspaceWithHost(workspace!, { queryCatalog: false });
-      if (revision.current !== requestRevision) return;
-      const result = await agentConnectionController.request(
+  const enabled = options.open && workspace !== undefined && Array.from(normalized).length >= 2;
+  const settledQuery = useDebouncedQueryValue(normalized, enabled);
+  const request = useMemo(() => workspace && settledQuery
+    ? createRendererReadQueryRequest(
         "session.catalog.contentSearch",
-        { query: normalized },
-        [],
-        {
-          context: { scope: "workspace", workspaceId: workspace!.id },
-          signal: controller.signal
-        }
-      );
-      if (revision.current !== requestRevision || result.workspaceId !== workspace!.id) return;
-      setState({
-        status: "ready",
-        items: result.items,
-        incomplete: result.incomplete,
-        error: undefined
-      });
-    }
-  }, [normalized, options.connected, options.hostEpoch, options.open, workspace]);
+        { query: settledQuery },
+        { scope: "workspace", workspaceId: workspace.id }
+      )
+    : undefined, [settledQuery, workspace]);
+  const result = useRendererReadQuery(request);
+  const data = result.data?.workspaceId === workspace?.id ? result.data : undefined;
 
-  return state;
+  if (!options.open || Array.from(normalized).length < 2) return idleState();
+  if (!workspace) return unavailableState();
+  if (!request) return { ...idleState(), status: "loading" };
+  if (result.data && !data) {
+    return { ...unavailableState(), status: "failed", error: "对话正文搜索结果不属于当前工作区。" };
+  }
+  const projected = {
+    items: data?.items ?? [],
+    incomplete: data?.incomplete ?? false,
+    error: result.status === "error" ? result.error ?? "对话正文搜索失败。" : undefined
+  };
+  if (result.status === "error") return { ...projected, status: "failed" };
+  return { ...projected, status: result.status };
+}
+
+function idleState(): PaletteMessageSearchState {
+  return { status: "idle", items: [], incomplete: false, error: undefined };
+}
+
+function unavailableState(): PaletteMessageSearchState {
+  return { status: "unavailable", items: [], incomplete: false, error: undefined };
 }

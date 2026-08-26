@@ -8,6 +8,37 @@ export interface WorktreeCreationRequest {
 
 export type WorktreeCreationRollbackRequest = WorktreeCreationRequest;
 
+export type WorktreeMaterializationStage =
+  | "preflight"
+  | "queued"
+  | "checkout"
+  | "submodules"
+  | "verifying"
+  | "workspace-registering";
+
+export interface WorktreeCreationActivityRequest {
+  creationId: string;
+}
+
+export interface WorktreeCreationActivity {
+  creationId: string;
+  stage: WorktreeMaterializationStage;
+  startedAt: number;
+  updatedAt: number;
+  budgetMs?: number;
+  cancellable: true;
+}
+
+export type WorktreeCreationActivityResult =
+  | { status: "active"; activity: WorktreeCreationActivity }
+  | { status: "inactive" };
+
+export type WorktreeCreationCancelRequest = WorktreeCreationActivityRequest;
+
+export type WorktreeCreationCancelResult =
+  | { status: "cancel-requested" }
+  | { status: "inactive" };
+
 export type WorktreeCreationProgressState =
   | "workspace-registered"
   | "host-registering"
@@ -49,6 +80,7 @@ export type WorktreeCreationFailureCode =
   | "queue-full"
   | "repository-indeterminate"
   | "identity-collision"
+  | "cancelled"
   | "git-failed"
   | "rollback-protected"
   | "recovery-required"
@@ -67,6 +99,7 @@ export interface WorktreeCreationReceipt {
   repositoryGroupId: string;
   state: "workspace-registered";
   workspace: WorkspaceDescriptor;
+  submodules?: import("@pi67/domain").RepositorySubmoduleObservation;
 }
 
 export type WorktreeCreationResult =

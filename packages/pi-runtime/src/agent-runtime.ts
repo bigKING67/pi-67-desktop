@@ -5,7 +5,7 @@ import type {
   ExtensionCatalogResult,
   ExtensionUiCancellationReason,
   ModelSummary,
-  ResourceSummary,
+  ResourceCatalogProjection,
   RuntimeCapabilities,
   RuntimeIdentity,
   RuntimeOperationActivity,
@@ -122,7 +122,7 @@ export interface AgentRuntime {
   getIdentity(): RuntimeIdentity;
   getSnapshot(): SessionSnapshot;
   getModels(): ModelSummary[];
-  getResources(): ResourceSummary[];
+  getResources(): ResourceCatalogProjection;
   getCommands(): SlashCommandCatalogResult;
   getExtensionCatalog(): ExtensionCatalogResult;
   resolveExtensionUi(requestId: string, value?: string | boolean, cancelled?: boolean): boolean;

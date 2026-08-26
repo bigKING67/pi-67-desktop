@@ -69,6 +69,7 @@ export function sessionSnapshotProjectionPatch(
       patch.queue = queueProjectionFromSnapshot(snapshot);
     } else if (group === "resources") {
       patch.resources = snapshot.resources;
+      patch.resourceCatalog = snapshot.resourceCatalog;
     } else {
       patch.usage = snapshot.stats;
     }

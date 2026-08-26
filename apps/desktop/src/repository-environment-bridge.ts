@@ -1,13 +1,21 @@
 import { ipcMain } from "electron";
 import {
+  isAppOwnedWorktreeRecoveryResult,
   isRepositoryChangeDetail,
   isRepositoryEnvironmentSnapshot,
+  isRepositorySubmoduleInitializationResult,
   isRepositoryWorkingTreeSnapshot,
+  parseAppOwnedWorktreeRecoveryRequest,
   parseRepositoryChangeDetailRequest,
   parseRepositoryEnvironmentInspectionRequest,
+  parseRepositorySubmoduleInitializationRequest,
   parseRepositoryWorkingTreeInspectionRequest,
+  type AppOwnedWorktreeRecoveryRequest,
+  type AppOwnedWorktreeRecoveryResult,
   type RepositoryChangeDetail,
   type RepositoryEnvironmentSnapshot,
+  type RepositorySubmoduleInitializationRequest,
+  type RepositorySubmoduleInitializationResult,
   type RepositoryWorkingTreeSnapshot
 } from "@pi67/protocol";
 
@@ -25,9 +33,17 @@ export interface RepositoryWorkingTreeBridge {
   dispose(): void;
 }
 
+export interface RepositoryWorktreeActionBridge {
+  initializeSubmodules(
+    request: RepositorySubmoduleInitializationRequest
+  ): Promise<RepositorySubmoduleInitializationResult>;
+  recoverAppOwnedWorktree(request: AppOwnedWorktreeRecoveryRequest): Promise<AppOwnedWorktreeRecoveryResult>;
+}
+
 export function registerRepositoryEnvironmentBridge(
   inspection: RepositoryEnvironmentInspectionBridge,
-  workingTree: RepositoryWorkingTreeBridge
+  workingTree: RepositoryWorkingTreeBridge,
+  actions: RepositoryWorktreeActionBridge
 ): void {
   ipcMain.handle("pi67:repository-environment-inspect", async (_event, value: unknown) => {
     const request = parseRepositoryEnvironmentInspectionRequest(value);
@@ -51,5 +67,29 @@ export function registerRepositoryEnvironmentBridge(
     const detail = await workingTree.detail(request);
     if (!isRepositoryChangeDetail(detail)) throw new Error("Invalid repository change detail.");
     return detail;
+  });
+  ipcMain.handle("pi67:repository-submodules-initialize", async (_event, value: unknown) => {
+    const request = parseRepositorySubmoduleInitializationRequest(value);
+    if (!request) return { status: "rejected", error: "invalid-request" };
+    try {
+      const result = await actions.initializeSubmodules(request);
+      return isRepositorySubmoduleInitializationResult(result)
+        ? result
+        : { status: "rejected", error: "internal" };
+    } catch {
+      return { status: "rejected", error: "internal" };
+    }
+  });
+  ipcMain.handle("pi67:app-owned-worktree-recover", async (_event, value: unknown) => {
+    const request = parseAppOwnedWorktreeRecoveryRequest(value);
+    if (!request) return { status: "rejected", error: "invalid-request", recoverable: false };
+    try {
+      const result = await actions.recoverAppOwnedWorktree(request);
+      return isAppOwnedWorktreeRecoveryResult(result)
+        ? result
+        : { status: "rejected", error: "internal", recoverable: true };
+    } catch {
+      return { status: "rejected", error: "internal", recoverable: true };
+    }
   });
 }

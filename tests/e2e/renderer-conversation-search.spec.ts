@@ -143,6 +143,9 @@ test("searches Workspace conversation text and opens the exact Session result", 
 
   const navigationSearch = page.getByRole("searchbox", { name: "搜索对话" });
   await navigationSearch.fill("installer marker");
+  await expect.poll(async () => (await recordedCommands(page)).filter((command) => (
+    command === "session.catalog.contentSearch"
+  ))).toEqual(["session.catalog.contentSearch"]);
   await expect(page.getByText("对话内容", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Release verification.*installer marker verified/u })).toBeVisible();
   await expect(page.locator('[data-content-search-visible-count="1"]')).toBeVisible();

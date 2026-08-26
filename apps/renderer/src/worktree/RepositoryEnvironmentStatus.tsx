@@ -7,9 +7,13 @@ import {
   RefreshCw,
   TriangleAlert
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { messages } from "../localization/message-catalog.js";
-import { inspectRepositoryEnvironment } from "./repository-environment-controller.js";
+import {
+  initializeRepositorySubmodules,
+  inspectRepositoryEnvironment,
+  recoverAppOwnedWorktree
+} from "./repository-environment-controller.js";
 import {
   useRepositoryEnvironmentStore,
   type RepositoryEnvironmentRecord
@@ -17,6 +21,8 @@ import {
 import styles from "./RepositoryEnvironmentStatus.module.css";
 
 export function RepositoryEnvironmentStatus({ workspaceId }: { workspaceId: string | undefined }) {
+  const [actionPending, setActionPending] = useState(false);
+  const [actionFailed, setActionFailed] = useState(false);
   const record = useRepositoryEnvironmentStore((state) => (
     workspaceId ? state.records[workspaceId] : undefined
   ));
@@ -38,23 +44,57 @@ export function RepositoryEnvironmentStatus({ workspaceId }: { workspaceId: stri
           : presentation.icon === "loading"
             ? RefreshCw
             : FolderGit2;
+  const action = record?.snapshot?.status === "ready"
+    && record.snapshot.submodules?.networkActionRequired
+      ? "submodules" as const
+      : record?.snapshot?.status === "missing" && record.snapshot.recovery
+        ? "recovery" as const
+        : undefined;
+  const runAction = async () => {
+    if (!action || actionPending) return;
+    setActionPending(true);
+    setActionFailed(false);
+    const succeeded = action === "submodules"
+      ? await initializeRepositorySubmodules(workspaceId)
+      : await recoverAppOwnedWorktree(workspaceId);
+    setActionFailed(!succeeded);
+    setActionPending(false);
+  };
   return (
-    <button
-      aria-busy={record?.status === "loading"}
-      aria-label={`${presentation.label}：${presentation.description}`}
-      className={`${styles.status} ${styles[presentation.tone]}`}
-      data-repository-status={presentation.kind}
-      onClick={() => void inspectRepositoryEnvironment(workspaceId)}
-      title={presentation.description}
-      type="button"
-    >
-      <Icon
-        aria-hidden="true"
-        className={presentation.icon === "loading" ? styles.spinning : undefined}
-        size={13}
-      />
-      <span>{presentation.label}</span>
-    </button>
+    <div className={styles.statusGroup}>
+      <button
+        aria-busy={record?.status === "loading"}
+        aria-label={`${presentation.label}：${presentation.description}`}
+        className={`${styles.status} ${styles[presentation.tone]}`}
+        data-repository-status={presentation.kind}
+        onClick={() => void inspectRepositoryEnvironment(workspaceId)}
+        title={presentation.description}
+        type="button"
+      >
+        <Icon
+          aria-hidden="true"
+          className={presentation.icon === "loading" ? styles.spinning : undefined}
+          size={13}
+        />
+        <span>{presentation.label}</span>
+      </button>
+      {action ? (
+        <button
+          aria-label={action === "submodules"
+            ? messages.repositoryEnvironment.initializeSubmodulesDetail
+            : messages.repositoryEnvironment.recoverWorktreeDetail}
+          className={styles.action}
+          disabled={actionPending}
+          onClick={() => void runAction()}
+          title={actionFailed ? messages.repositoryEnvironment.actionFailed : undefined}
+          type="button"
+        >{actionPending
+          ? messages.repositoryEnvironment.actionPending
+          : action === "submodules"
+            ? messages.repositoryEnvironment.initializeSubmodules
+            : messages.repositoryEnvironment.recoverWorktree}</button>
+      ) : null}
+    </div>
   );
 }
 
@@ -130,6 +170,15 @@ function snapshotPresentation(snapshot: RepositoryEnvironmentSnapshot): Reposito
     };
   }
   if (snapshot.status === "missing") {
+    if (snapshot.recovery) {
+      return {
+        kind: "app-owned-worktree-missing",
+        label: messages.repositoryEnvironment.worktreeMissing,
+        description: messages.repositoryEnvironment.worktreeMissingDetail,
+        tone: "warning",
+        icon: "error"
+      };
+    }
     return {
       kind: "missing",
       label: messages.repositoryEnvironment.workspaceMissing,
@@ -170,6 +219,26 @@ function snapshotPresentation(snapshot: RepositoryEnvironmentSnapshot): Reposito
       kind: "state-unavailable",
       label: messages.repositoryEnvironment.stateUnavailable,
       description: messages.repositoryEnvironment.stateUnavailableDetail,
+      tone: "warning",
+      icon: "error"
+    };
+  }
+  if (snapshot.submodules?.status === "conflicted") {
+    return {
+      kind: "submodules-conflicted",
+      label: messages.repositoryEnvironment.submodulesConflicted,
+      description: messages.repositoryEnvironment.submodulesConflictedDetail,
+      tone: "danger",
+      icon: "error"
+    };
+  }
+  if (snapshot.submodules?.status === "incomplete") {
+    return {
+      kind: "submodules-incomplete",
+      label: messages.repositoryEnvironment.submodulesIncomplete,
+      description: snapshot.submodules.networkActionRequired
+        ? messages.repositoryEnvironment.submodulesNetworkRequiredDetail
+        : messages.repositoryEnvironment.submodulesDivergentDetail,
       tone: "warning",
       icon: "error"
     };

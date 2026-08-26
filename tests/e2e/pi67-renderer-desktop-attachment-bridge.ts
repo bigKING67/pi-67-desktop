@@ -6,7 +6,8 @@ import type {
   PromptStashImagesDeleteRequest,
   PromptStashImagesRestoreRequest,
   PromptStashImagesStoreRequest,
-  StagedPromptAttachment
+  StagedPromptAttachment,
+  StagedPromptAttachmentResult
 } from "@pi67/protocol";
 
 export type MockDesktopAttachmentBridge = Pick<DesktopSystemBridge,
@@ -29,13 +30,26 @@ export async function installMockDesktopAttachmentBridge(page: Page): Promise<vo
 
     const attachmentBridge = {
       stagePromptAttachments: async (files: DesktopPromptAttachmentInput[]) => files.map((file) => {
-        const attachment = {
+        if (file.name === "fixture-decode-failure.heic") {
+          throw new Error("无法解码该 HEIC/HEIF 图片，草稿已保留，可以重新选择重试。");
+        }
+        const normalized = /\.(?:heic|heif)$/iu.test(file.name)
+          || file.type === "image/heic" || file.type === "image/heif";
+        const attachment: StagedPromptAttachmentResult = {
           id: `fixture_attachment_${++promptAttachmentCounter}`,
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          byteLength: file.size,
-          kind: promptAttachmentKind(file)
-        } satisfies StagedPromptAttachment;
+          name: normalized ? file.name.replace(/\.[^.]+$/u, ".jpg") : file.name,
+          mimeType: normalized ? "image/jpeg" : file.type || "application/octet-stream",
+          byteLength: normalized ? Math.max(1, file.size - 1) : file.size,
+          kind: normalized ? "image" : promptAttachmentKind(file),
+          ...(normalized ? {
+            normalization: {
+              kind: "heic-to-jpeg",
+              sourceName: file.name,
+              sourceMimeType: file.type,
+              sourceByteLength: file.size
+            }
+          } : {})
+        };
         stagedPromptAttachments.set(attachment.id, attachment);
         return structuredClone(attachment);
       }),

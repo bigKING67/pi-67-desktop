@@ -120,6 +120,43 @@ describe("ToolExecutionProjector", () => {
     expect(emitted.at(-1)?.status).toBe("cancelled");
     expect(reportReceiptFailure).toHaveBeenCalledOnce();
   });
+
+  it("coalesces a cumulative-update flood and flushes the latest bounded progress at terminal state", () => {
+    vi.useFakeTimers();
+    const emitted: ToolExecutionView[] = [];
+    const projector = new ToolExecutionProjector({
+      emit: (execution) => emitted.push(execution),
+      getCwd: () => undefined,
+      persistReceipt: vi.fn(),
+      reportReceiptFailure: vi.fn(),
+      now: () => 10
+    });
+    projector.handle(start("tool-flood", "bash"), "shell");
+
+    let accumulated = "";
+    for (let index = 0; index < 256; index += 1) {
+      accumulated += `${"x".repeat(256)}-${index}\n`;
+      projector.handle(event({
+        type: "tool_execution_update",
+        toolCallId: "tool-flood",
+        toolName: "bash",
+        partialResult: { content: [{ text: accumulated }] }
+      }));
+    }
+
+    expect(emitted).toHaveLength(1);
+    projector.handle(end("tool-flood", "bash", false));
+    expect(emitted).toHaveLength(2);
+    expect(emitted.at(-1)).toMatchObject({
+      status: "completed",
+      progress: { truncated: true }
+    });
+    expect(emitted.at(-1)?.progress?.text).toHaveLength(4_096);
+    expect(emitted.at(-1)?.progress?.text.endsWith("-255\n")).toBe(true);
+
+    vi.runOnlyPendingTimers();
+    expect(emitted).toHaveLength(2);
+  });
 });
 
 function event(value: object): AgentSessionEvent {

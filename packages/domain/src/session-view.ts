@@ -127,6 +127,19 @@ export interface ResourceSummary {
   detail?: string;
 }
 
+export interface ResourceCatalogDisposition {
+  totalItems: number;
+  projectedItems: number;
+  omittedItems: number;
+  truncatedFields: number;
+  truncated: boolean;
+}
+
+export interface ResourceCatalogProjection {
+  resources: ResourceSummary[];
+  resourceCatalog: ResourceCatalogDisposition;
+}
+
 export interface SessionControlsView {
   selectedModel?: { provider: string; id: string };
   thinkingLevel: string;
@@ -149,6 +162,7 @@ export interface SessionModelCatalogResult extends SessionControlResult {
 
 export interface SessionResourceCatalogResult extends SessionModelCatalogResult {
   resources: ResourceSummary[];
+  resourceCatalog?: ResourceCatalogDisposition;
 }
 
 export interface SessionCompatibilityView {
@@ -178,6 +192,7 @@ export interface SessionSnapshot {
   followUpQueue: string[];
   tree: SessionTreeProjection;
   resources: ResourceSummary[];
+  resourceCatalog?: ResourceCatalogDisposition;
   interactionMode?: SessionInteractionMode;
   activeProposedPlan?: ActiveProposedPlan;
   planLifecycle?: PlanLifecycleChange;

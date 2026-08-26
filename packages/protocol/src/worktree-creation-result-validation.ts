@@ -1,6 +1,8 @@
 import type {
   WorktreeCreationErrorView,
   WorktreeCreationAdvanceResult,
+  WorktreeCreationActivityResult,
+  WorktreeCreationCancelResult,
   WorktreeCreationProgressState,
   WorktreeCreationResult,
   WorktreeCreationRollbackResult
@@ -39,6 +41,7 @@ const FAILURE_CODES = new Set<WorktreeCreationErrorView["code"]>([
   "queue-full",
   "repository-indeterminate",
   "identity-collision",
+  "cancelled",
   "git-failed",
   "rollback-protected",
   "recovery-required",
@@ -61,14 +64,43 @@ export function isWorktreeCreationResult(value: unknown): value is WorktreeCreat
     "repositoryGroupId",
     "state",
     "workspace"
-  ])
+  ], ["submodules"])
     && isId(receipt.requestId)
     && isId(receipt.creationId)
     && isId(receipt.sourceWorkspaceId)
     && typeof receipt.repositoryGroupId === "string"
     && REPOSITORY_PATTERN.test(receipt.repositoryGroupId)
     && receipt.state === "workspace-registered"
-    && isWorkspaceDescriptor(receipt.workspace);
+    && isWorkspaceDescriptor(receipt.workspace)
+    && (receipt.submodules === undefined || isSubmoduleObservation(receipt.submodules));
+}
+
+export function isWorktreeCreationActivityResult(value: unknown): value is WorktreeCreationActivityResult {
+  if (!isRecord(value)) return false;
+  if (value.status === "inactive") return hasExactKeys(value, ["status"]);
+  if (value.status !== "active" || !hasExactKeys(value, ["status", "activity"]) || !isRecord(value.activity)) {
+    return false;
+  }
+  const activity = value.activity;
+  return hasExactKeys(activity, [
+    "creationId", "stage", "startedAt", "updatedAt", "cancellable"
+  ], ["budgetMs"])
+    && isId(activity.creationId)
+    && ["preflight", "queued", "checkout", "submodules", "verifying", "workspace-registering"]
+      .includes(activity.stage as string)
+    && isTimestamp(activity.startedAt)
+    && isTimestamp(activity.updatedAt)
+    && Number(activity.updatedAt) >= Number(activity.startedAt)
+    && (activity.budgetMs === undefined || (
+      Number.isSafeInteger(activity.budgetMs) && Number(activity.budgetMs) >= 1 && Number(activity.budgetMs) <= 600_000
+    ))
+    && activity.cancellable === true;
+}
+
+export function isWorktreeCreationCancelResult(value: unknown): value is WorktreeCreationCancelResult {
+  return isRecord(value)
+    && hasExactKeys(value, ["status"])
+    && (value.status === "cancel-requested" || value.status === "inactive");
 }
 
 export function isWorktreeCreationAdvanceResult(value: unknown): value is WorktreeCreationAdvanceResult {
@@ -142,6 +174,26 @@ function isWorkspaceDescriptor(value: unknown): boolean {
       .includes(value.trustProvenance as string)
     && ["available", "missing", "identity-changed", "needs-confirmation", "unavailable"]
       .includes(value.availability as string);
+}
+
+function isSubmoduleObservation(value: unknown): boolean {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "status", "total", "uninitialized", "divergent", "conflicted", "networkActionRequired"
+  ])) return false;
+  if (!["not-configured", "complete", "incomplete", "conflicted"].includes(value.status as string)) return false;
+  if (![value.total, value.uninitialized, value.divergent, value.conflicted].every((count) => (
+    Number.isSafeInteger(count) && Number(count) >= 0 && Number(count) <= 10_000
+  ))) return false;
+  if (Number(value.uninitialized) + Number(value.divergent) + Number(value.conflicted) > Number(value.total)) {
+    return false;
+  }
+  if (typeof value.networkActionRequired !== "boolean") return false;
+  return !value.networkActionRequired || (
+    value.status === "incomplete"
+    && Number(value.uninitialized) > 0
+    && Number(value.divergent) === 0
+    && Number(value.conflicted) === 0
+  );
 }
 
 function isWorkspaceIdentity(value: unknown): boolean {

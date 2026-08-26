@@ -42,6 +42,7 @@ import { WorktreeCatalogStore } from "./worktree-catalog-store.js";
 import { WorktreeCreationService } from "./worktree-creation-service.js";
 import { WorktreeInspectionService } from "./worktree-inspection-service.js";
 import { RepositoryWorkingTreeService } from "./repository-working-tree-service.js";
+import { RepositoryWorktreeActionService } from "./repository-worktree-action-service.js";
 import { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
 import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-service.js";
 import { PromptStashImageStore } from "./prompt-stash-image-store.js";
@@ -257,6 +258,13 @@ if (hasSingleInstanceLock) {
       workbenchState,
       inspection: repositoryEnvironmentInspection
     });
+    const repositoryWorktreeActions = new RepositoryWorktreeActionService({
+      userData: app.getPath("userData"),
+      runner: privateGitRunner,
+      scheduler: repositoryMutationScheduler,
+      workbenchState,
+      inspection: repositoryEnvironmentInspection
+    });
     systemBridgeRegistration = registerSystemBridge({
       connectAgentHost: (replaceCurrent) => agentHostSupervisor.connect(replaceCurrent),
       restartAgentHost: () => agentHostSupervisor.restart(),
@@ -281,6 +289,7 @@ if (hasSingleInstanceLock) {
       workspaceFileState,
       repositoryEnvironmentInspection,
       repositoryWorkingTree,
+      repositoryWorktreeActions,
       repositoryGitRunner: privateGitRunner,
       worktreeCreation,
       repositoryMutationScheduler,

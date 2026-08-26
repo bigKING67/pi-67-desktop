@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 import { Value } from "./typebox-schema.js";
 import {
   isWorktreeCreationAdvanceResult,
+  isWorktreeCreationActivityResult,
+  isWorktreeCreationCancelResult,
   isWorktreeCreationResult,
   isWorktreeCreationRollbackResult,
   parseWorktreeCreationAdvanceRequest,
+  parseWorktreeCreationActivityRequest,
+  parseWorktreeCreationCancelRequest,
   parseWorktreeCreationRequest,
   parseWorktreeCreationRollbackRequest
 } from "./worktree-creation.js";
 import {
   WorktreeCreationAdvanceResultSchema,
+  WorktreeCreationActivityResultSchema,
+  WorktreeCreationCancelResultSchema,
   WorktreeCreationResultSchema,
   WorktreeCreationRollbackResultSchema
 } from "./worktree-creation-schema.js";
@@ -83,9 +89,90 @@ describe("Worktree creation protocol", () => {
     }
   });
 
+  it("keeps progress and cancellation bounded to an opaque creation identity", () => {
+    expect(parseWorktreeCreationActivityRequest({ creationId: "creation-1" })).toEqual({
+      creationId: "creation-1"
+    });
+    expect(parseWorktreeCreationCancelRequest({ creationId: "creation-1" })).toEqual({
+      creationId: "creation-1"
+    });
+    expect(parseWorktreeCreationActivityRequest({ creationId: "creation-1", targetPath: "/private" }))
+      .toBeUndefined();
+    expect(parseWorktreeCreationCancelRequest({ creationId: "creation-1", force: true })).toBeUndefined();
+
+    const activityCases = [
+      {
+        status: "active",
+        activity: {
+          creationId: "creation-1",
+          stage: "checkout",
+          startedAt: 10,
+          updatedAt: 10,
+          budgetMs: 300_000,
+          cancellable: true
+        }
+      },
+      { status: "inactive" },
+      {
+        status: "active",
+        activity: {
+          creationId: "creation-1",
+          stage: "checkout",
+          startedAt: 11,
+          updatedAt: 10,
+          budgetMs: 300_000,
+          cancellable: true
+        }
+      },
+      {
+        status: "active",
+        activity: {
+          creationId: "creation-1",
+          stage: "checkout",
+          startedAt: 10,
+          updatedAt: 10,
+          budgetMs: 300_000,
+          cancellable: true,
+          stdout: "private"
+        }
+      }
+    ];
+    for (const candidate of activityCases) {
+      const strict = Value.Check(WorktreeCreationActivityResultSchema, candidate);
+      expect(isWorktreeCreationActivityResult(candidate)).toBe(candidate === activityCases[2] ? false : strict);
+    }
+    expect(isWorktreeCreationActivityResult(activityCases[0])).toBe(true);
+    expect(isWorktreeCreationActivityResult(activityCases[1])).toBe(true);
+    expect(isWorktreeCreationActivityResult(activityCases[2])).toBe(false);
+    expect(isWorktreeCreationActivityResult(activityCases[3])).toBe(false);
+
+    for (const candidate of [
+      { status: "cancel-requested" },
+      { status: "inactive" },
+      { status: "cancel-requested", force: true }
+    ]) {
+      expect(isWorktreeCreationCancelResult(candidate)).toBe(
+        Value.Check(WorktreeCreationCancelResultSchema, candidate)
+      );
+    }
+  });
+
   it("keeps the lightweight preload validator aligned with the strict TypeBox result schema", () => {
     const cases = [
-      createdResult(),
+      {
+        ...createdResult(),
+        receipt: {
+          ...createdResult().receipt,
+          submodules: {
+            status: "incomplete",
+            total: 2,
+            uninitialized: 0,
+            divergent: 1,
+            conflicted: 0,
+            networkActionRequired: false
+          }
+        }
+      },
       withCanonicalPath("C:\\Users\\Example User\\AppData\\Roaming\\pi67\\worktrees\\task"),
       withCanonicalPath("\\\\server\\share\\pi67\\worktrees\\task"),
       {

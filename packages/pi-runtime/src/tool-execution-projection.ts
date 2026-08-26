@@ -53,23 +53,24 @@ export function projectToolInput(
 }
 
 export function projectToolProgress(value: unknown): BoundedToolText | undefined {
-  const text = extractToolText(value);
-  return text === undefined || text.trim() === ""
-    ? undefined
-    : boundedToolText(text, MAX_TOOL_PROGRESS_CHARS, true);
+  const projection = projectToolText(value, MAX_TOOL_PROGRESS_CHARS, true);
+  return projection === undefined || projection.text.trim() === "" ? undefined : projection;
 }
 
 export function projectToolFailure(
   result: unknown,
   source: ToolExecutionFailureView["source"]
 ): ToolExecutionFailureView {
-  const text = extractToolErrorText(result);
-  return text === undefined || text.trim() === ""
+  const direct = extractToolErrorString(result);
+  const message = direct === undefined
+    ? projectToolText(result, MAX_TOOL_FAILURE_CHARS, false)
+    : boundedToolText(direct, MAX_TOOL_FAILURE_CHARS);
+  return message === undefined || message.text.trim() === ""
     ? { detailState: "missing", source }
     : {
         detailState: "available",
         source,
-        message: boundedToolText(text, MAX_TOOL_FAILURE_CHARS)
+        message
       };
 }
 
@@ -83,8 +84,18 @@ function boundedToolText(value: string, maxLength: number, tail = false): Bounde
   const preBounded = value.length <= preLimit
     ? value
     : tail ? value.slice(-preLimit) : value.slice(0, preLimit);
+  return finalizeBoundedToolText(preBounded, maxLength, tail, value.length > preLimit);
+}
+
+function finalizeBoundedToolText(
+  preBounded: string,
+  maxLength: number,
+  tail: boolean,
+  collectionTruncated: boolean
+): BoundedToolText {
+  const preLimit = Math.max(maxLength, maxLength * 4);
   const sanitized = sanitizeRuntimeText(preBounded, preLimit);
-  const truncated = value.length > preLimit || sanitized.length > maxLength;
+  const truncated = collectionTruncated || sanitized.length > maxLength;
   const text = sanitized.length <= maxLength
     ? sanitized
     : tail ? sanitized.slice(-maxLength) : sanitized.slice(0, maxLength);
@@ -117,7 +128,7 @@ function isCommandTool(toolName: string): boolean {
   return COMMAND_TOOL_NAMES.has(toolName.trim().toLocaleLowerCase("en-US"));
 }
 
-function extractToolErrorText(value: unknown): string | undefined {
+function extractToolErrorString(value: unknown): string | undefined {
   const record = asRecord(value);
   for (const key of ["errorMessage", "error", "message"]) {
     const candidate = record[key];
@@ -125,22 +136,62 @@ function extractToolErrorText(value: unknown): string | undefined {
     const nestedMessage = asRecord(candidate).message;
     if (typeof nestedMessage === "string" && nestedMessage.trim() !== "") return nestedMessage;
   }
-  return extractToolText(value);
+  return undefined;
 }
 
-function extractToolText(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
+function projectToolText(
+  value: unknown,
+  maxLength: number,
+  tail: boolean
+): BoundedToolText | undefined {
+  if (typeof value === "string") return boundedToolText(value, maxLength, tail);
   const record = asRecord(value);
   const direct = record.text;
-  if (typeof direct === "string") return direct;
+  if (typeof direct === "string") return boundedToolText(direct, maxLength, tail);
   const content = record.content;
   if (!Array.isArray(content)) return undefined;
-  const parts = content.flatMap((part) => {
-    if (typeof part === "string") return [part];
-    const text = asRecord(part).text;
-    return typeof text === "string" ? [text] : [];
-  });
-  return parts.length === 0 ? undefined : parts.join("\n");
+  return collectBoundedToolContent(content, maxLength, tail);
+}
+
+function collectBoundedToolContent(
+  content: readonly unknown[],
+  maxLength: number,
+  tail: boolean
+): BoundedToolText | undefined {
+  const preLimit = Math.max(maxLength, maxLength * 4);
+  const selected: string[] = [];
+  let remaining = preLimit;
+  let collectionTruncated = false;
+  const start = tail ? content.length - 1 : 0;
+  const end = tail ? -1 : content.length;
+  const step = tail ? -1 : 1;
+  for (let index = start; index !== end; index += step) {
+    const part = content[index];
+    const text = typeof part === "string" ? part : asRecord(part).text;
+    if (typeof text !== "string") continue;
+    if (remaining === 0) {
+      collectionTruncated = true;
+      break;
+    }
+    const separatorChars = selected.length > 0 ? 1 : 0;
+    if (remaining <= separatorChars) {
+      collectionTruncated = true;
+      break;
+    }
+    const available = remaining - separatorChars;
+    if (text.length > available) {
+      selected.push(tail ? text.slice(-available) : text.slice(0, available));
+      collectionTruncated = true;
+      remaining = 0;
+      break;
+    }
+    selected.push(text);
+    remaining -= text.length + separatorChars;
+  }
+  if (tail) selected.reverse();
+  return selected.length === 0
+    ? undefined
+    : finalizeBoundedToolText(selected.join("\n"), maxLength, tail, collectionTruncated);
 }
 
 function projectSummaryValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {

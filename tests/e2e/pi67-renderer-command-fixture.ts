@@ -1,4 +1,5 @@
-import type { FixtureAgentState, FixtureMessage, FixtureWindow } from "./pi67-renderer-fixture-types.js";
+import type { FixtureAgentState, FixtureWindow } from "./pi67-renderer-fixture-types.js";
+import { pageMetadata } from "./pi67-renderer-command-page-fixture.js";
 import type { MockInspectorCommandHandler } from "./pi67-renderer-inspector-command-fixture.js";
 import type { MockSessionControlCommandHandler } from "./pi67-renderer-snapshot-fixture.js";
 import type { FixtureSessionCatalogStatus } from "./pi67-session-catalog-fixture.js";
@@ -150,7 +151,13 @@ export function installMockCommandResponseHandler({
     if (type === "message.page") return conversationPage(current, payload);
     if (type === "session.tree") return current.snapshot.tree;
     if (type === "command.list") return fixtureExtensionCommands;
-    if (type === "model.list" || type === "resource.list") return [];
+    if (type === "model.list") return [];
+    if (type === "resource.list") {
+      return {
+        resources: current.snapshot.resources,
+        resourceCatalog: current.snapshot.resourceCatalog
+      };
+    }
     if (type === "provider.list") return current.snapshot.providers;
     if (type === "provider.setRuntimeKey") {
       const configured = applyMockSessionControlCommand("model.setRuntimeKey", payload, current.snapshot);
@@ -437,19 +444,6 @@ export function installMockCommandResponseHandler({
       anchorId,
       messages,
       ...pageMetadata(messages, start > 0, end < current.conversationMessages.length)
-    };
-  }
-
-  function pageMetadata(
-    messages: FixtureMessage[],
-    hasOlder: boolean,
-    hasNewer: boolean
-  ): Record<string, unknown> {
-    return {
-      ...(messages[0] === undefined ? {} : { startCursor: messages[0].id }),
-      ...(messages.at(-1) === undefined ? {} : { endCursor: messages.at(-1)!.id }),
-      hasOlder,
-      hasNewer
     };
   }
 

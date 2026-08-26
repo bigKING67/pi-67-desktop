@@ -22,7 +22,7 @@ import { resolveManagedSessionPath } from "./session-import.js";
 import {
   projectSessionControls,
   projectSessionModelCatalog,
-  projectSessionResources
+  projectSessionResourceCatalog
 } from "./session-snapshot.js";
 import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js";
 import type { PiWorkspaceRuntimeServices } from "./workspace-runtime-services.js";
@@ -190,7 +190,7 @@ export class PiSdkRuntimeSessionLifecycle {
         sessionId: session.sessionId,
         controls: projectSessionControls(session),
         modelCatalog: projectSessionModelCatalog(session),
-        resources: projectSessionResources(
+        ...projectSessionResourceCatalog(
           this.options.sessionBindings.services,
           this.options.sessionBindings.extensions
         )

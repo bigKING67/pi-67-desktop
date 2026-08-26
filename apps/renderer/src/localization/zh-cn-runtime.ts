@@ -26,6 +26,17 @@ export const zhCNRuntimeMessages = {
   },
   worktreeCreation: {
     creating: "正在创建隔离 Worktree",
+    cancelling: "正在取消隔离 Worktree 创建",
+    cancelled: "已取消隔离 Worktree 创建，草稿仍保留。",
+    cancel: "取消创建",
+    stages: {
+      preflight: "正在核对 Repository 与精确 HEAD",
+      queued: "正在等待 Repository 创建队列",
+      checkout: "正在创建隔离 Worktree checkout",
+      submodules: "正在检查并使用本地对象补齐 Submodule",
+      verifying: "正在验证 Worktree 身份与回滚边界",
+      "workspace-registering": "正在注册隔离工作区"
+    },
     registeringWorkspace: "正在注册隔离工作区",
     creatingSession: "正在隔离工作区中创建 Pi 会话",
     failed: "无法创建隔离 Worktree",

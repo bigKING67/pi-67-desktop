@@ -31,10 +31,14 @@ import type {
   PromptStashImagesStoreResult
 } from "./prompt-stash-images.js";
 import type {
+  AppOwnedWorktreeRecoveryRequest,
+  AppOwnedWorktreeRecoveryResult,
   RepositoryChangeDetail,
   RepositoryChangeDetailRequest,
   RepositoryEnvironmentInspectionRequest,
   RepositoryEnvironmentSnapshot,
+  RepositorySubmoduleInitializationRequest,
+  RepositorySubmoduleInitializationResult,
   RepositoryWorkingTreeInspectionRequest,
   RepositoryWorkingTreeSnapshot
 } from "./repository-environment-contract.js";
@@ -42,6 +46,10 @@ import type { SupportDiagnosticsExportRequest } from "./runtime-diagnostics-cont
 import type {
   WorktreeCreationAdvanceRequest,
   WorktreeCreationAdvanceResult,
+  WorktreeCreationActivityRequest,
+  WorktreeCreationActivityResult,
+  WorktreeCreationCancelRequest,
+  WorktreeCreationCancelResult,
   WorktreeCreationRequest,
   WorktreeCreationResult,
   WorktreeCreationRollbackRequest,
@@ -133,6 +141,17 @@ export interface DesktopAgentHostFailureState {
   startupFailure?: AgentHostStartupFailedMessage;
 }
 
+export interface PromptAttachmentNormalization {
+  readonly kind: "heic-to-jpeg";
+  readonly sourceName: string;
+  readonly sourceMimeType: string;
+  readonly sourceByteLength: number;
+}
+
+export interface StagedPromptAttachmentResult extends StagedPromptAttachment {
+  readonly normalization?: PromptAttachmentNormalization;
+}
+
 /** Renderer-owned fields persisted through Electron Main. */
 export interface WorkbenchLayoutV5 {
   expandedWorkspaceIds: string[];
@@ -153,7 +172,7 @@ export interface DesktopSystemBridge {
   getPlatformInfo(): Promise<DesktopPlatformInfo>;
   ensureContextPanelRoom(): Promise<boolean>;
   connectAgentHost(options?: { replaceCurrent?: boolean }): Promise<void>;
-  stagePromptAttachments(files: DesktopPromptAttachmentInput[]): Promise<StagedPromptAttachment[]>;
+  stagePromptAttachments(files: DesktopPromptAttachmentInput[]): Promise<StagedPromptAttachmentResult[]>;
   releasePromptAttachments(ids: string[]): Promise<void>;
   storePromptStashImages(request: PromptStashImagesStoreRequest): Promise<PromptStashImagesStoreResult>;
   restorePromptStashImages(request: PromptStashImagesRestoreRequest): Promise<PromptStashImagesRestoreResult>;
@@ -162,11 +181,17 @@ export interface DesktopSystemBridge {
   inspectRepositoryEnvironment(
     request: RepositoryEnvironmentInspectionRequest
   ): Promise<RepositoryEnvironmentSnapshot>;
+  initializeRepositorySubmodules(
+    request: RepositorySubmoduleInitializationRequest
+  ): Promise<RepositorySubmoduleInitializationResult>;
+  recoverAppOwnedWorktree(request: AppOwnedWorktreeRecoveryRequest): Promise<AppOwnedWorktreeRecoveryResult>;
   inspectRepositoryWorkingTree(
     request: RepositoryWorkingTreeInspectionRequest
   ): Promise<RepositoryWorkingTreeSnapshot>;
   readRepositoryChangeDetail(request: RepositoryChangeDetailRequest): Promise<RepositoryChangeDetail>;
   createWorktreeEnvironment(request: WorktreeCreationRequest): Promise<WorktreeCreationResult>;
+  getWorktreeCreationActivity(request: WorktreeCreationActivityRequest): Promise<WorktreeCreationActivityResult>;
+  cancelWorktreeCreation(request: WorktreeCreationCancelRequest): Promise<WorktreeCreationCancelResult>;
   advanceWorktreeEnvironment(request: WorktreeCreationAdvanceRequest): Promise<WorktreeCreationAdvanceResult>;
   rollbackWorktreeEnvironment(request: WorktreeCreationRollbackRequest): Promise<WorktreeCreationRollbackResult>;
   loadComposerDraftState(): Promise<ComposerDraftStateSnapshot>;

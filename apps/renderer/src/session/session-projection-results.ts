@@ -1,4 +1,5 @@
 import type {
+  ResourceCatalogDisposition,
   ResourceSummary,
   SessionControlsView,
   SessionModelCatalogView,
@@ -15,6 +16,7 @@ export interface ResourceCatalogProjectionPatch {
   controls?: SessionControlsView;
   modelCatalog?: SessionModelCatalogView;
   resources?: ResourceSummary[];
+  resourceCatalog?: ResourceCatalogDisposition | undefined;
   revisions: SessionProjectionRevisions;
 }
 
@@ -38,6 +40,7 @@ export function resourceCatalogProjectionPatch(
   }
   if (revisions.resources === target.revisions.resources) {
     patch.resources = result.resources;
+    patch.resourceCatalog = result.resourceCatalog;
     nextRevisions.resources += 1;
   }
   if (Object.keys(patch).length === 0) return undefined;

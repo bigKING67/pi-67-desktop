@@ -9,7 +9,8 @@ import {
   BoundedPrivateGitRunner,
   GitInspectionError,
   parseConfiguredFilters,
-  parseGitWorktreePorcelain
+  parseGitWorktreePorcelain,
+  parseSubmoduleStatus
 } from "./worktree-git-runner.js";
 
 const execFileAsync = promisify(execFile);
@@ -100,6 +101,30 @@ describe("Git filter parser", () => {
   });
 });
 
+describe("Git Submodule parser", () => {
+  it("projects only bounded completeness counts without exposing paths or URLs", () => {
+    expect(parseSubmoduleStatus("")).toEqual({
+      status: "not-configured",
+      total: 0,
+      uninitialized: 0,
+      divergent: 0,
+      conflicted: 0
+    });
+    expect(parseSubmoduleStatus([
+      ` ${"a".repeat(40)} packages/ready`,
+      `-${"b".repeat(40)} packages/missing`,
+      `+${"c".repeat(40)} packages/divergent`
+    ].join("\n"))).toEqual({
+      status: "incomplete",
+      total: 3,
+      uninitialized: 1,
+      divergent: 1,
+      conflicted: 0
+    });
+    expect(() => parseSubmoduleStatus(` ${"a".repeat(39)} private/path`)).toThrow("invalid-output");
+  });
+});
+
 describe("BoundedPrivateGitRunner", () => {
   it("inspects a real no-origin repository with non-ASCII, spaces and special path characters", async () => {
     const root = await temporaryRoot();
@@ -162,6 +187,37 @@ describe("BoundedPrivateGitRunner", () => {
     await runner.deleteBranch(repository, branchName);
     await expect(runner.resolveBranchHead(repository, branchName)).resolves.toBeUndefined();
     await expect(runner.listWorktrees(repository)).resolves.toHaveLength(1);
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
+  it("initializes a linked-checkout Submodule from existing local objects without network transport", async () => {
+    const root = await temporaryRoot();
+    const module = join(root, "module");
+    const repository = join(root, "repository");
+    const linked = join(root, "linked");
+    await mkdir(module);
+    await mkdir(repository);
+    await runSystemGit(module, ["init"]);
+    await writeFile(join(module, "module.txt"), "module");
+    await runSystemGit(module, ["add", "."]);
+    await runSystemGit(module, ["-c", "user.name=Pi-67", "-c", "user.email=pi67@example.invalid", "commit", "-m", "module"]);
+    await runSystemGit(repository, ["init"]);
+    await runSystemGit(repository, ["-c", "protocol.file.allow=always", "submodule", "add", module, "vendor/module"]);
+    await runSystemGit(repository, ["-c", "user.name=Pi-67", "-c", "user.email=pi67@example.invalid", "commit", "-m", "super"]);
+    await runSystemGit(repository, ["config", "submodule.vendor/module.url", "https://example.invalid/vendor/module.git"]);
+    await runSystemGit(repository, ["worktree", "add", "-b", "linked", linked, "HEAD"]);
+    const runner = new BoundedPrivateGitRunner(await systemGitToolchain(root));
+
+    await expect(runner.inspectSubmodules(linked)).resolves.toMatchObject({
+      status: "incomplete",
+      uninitialized: 1
+    });
+    await runner.initializeSubmodules(linked, "local-only");
+    await expect(runner.inspectSubmodules(linked)).resolves.toMatchObject({
+      status: "complete",
+      total: 1,
+      uninitialized: 0
+    });
+    await expect(runner.statusPorcelain(linked)).resolves.toBe("");
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
   it("bounds timeout and output while confirming child cleanup", async () => {

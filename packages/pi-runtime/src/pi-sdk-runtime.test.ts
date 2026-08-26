@@ -49,7 +49,20 @@ describe("PiSdkRuntime", () => {
       expect(created.sessionId).not.toBe(initial.sessionId);
       expect(created.cwd).toBe(cwd);
       const resources = await runtime.reloadResources();
-      expect(Object.keys(resources).sort()).toEqual(["controls", "modelCatalog", "resources", "sessionId"]);
+      expect(Object.keys(resources).sort()).toEqual([
+        "controls",
+        "modelCatalog",
+        "resourceCatalog",
+        "resources",
+        "sessionId"
+      ]);
+      expect(resources.resourceCatalog).toEqual({
+        totalItems: resources.resources.length,
+        projectedItems: resources.resources.length,
+        omittedItems: 0,
+        truncatedFields: 0,
+        truncated: false
+      });
       expect(resources).not.toHaveProperty("messages");
       expect(resources).not.toHaveProperty("tree");
       expect(resources).not.toHaveProperty("steeringQueue");

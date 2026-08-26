@@ -1,17 +1,23 @@
 import { Value } from "./typebox-schema.js";
 import type {
   WorktreeCreationAdvanceRequest,
+  WorktreeCreationActivityRequest,
+  WorktreeCreationCancelRequest,
   WorktreeCreationRequest,
   WorktreeCreationRollbackRequest
 } from "./worktree-creation-contract.js";
 import {
   WorktreeCreationAdvanceRequestSchema,
+  WorktreeCreationActivityRequestSchema,
+  WorktreeCreationCancelRequestSchema,
   WorktreeCreationRequestSchema,
   WorktreeCreationRollbackRequestSchema
 } from "./worktree-creation-schema.js";
 
 export {
   isWorktreeCreationAdvanceResult,
+  isWorktreeCreationActivityResult,
+  isWorktreeCreationCancelResult,
   isWorktreeCreationResult,
   isWorktreeCreationRollbackResult
 } from "./worktree-creation-result-validation.js";
@@ -23,6 +29,20 @@ export function parseWorktreeCreationRequest(value: unknown): WorktreeCreationRe
     creationId: value.creationId,
     sourceWorkspaceId: value.sourceWorkspaceId
   };
+}
+
+export function parseWorktreeCreationActivityRequest(
+  value: unknown
+): WorktreeCreationActivityRequest | undefined {
+  if (!Value.Check(WorktreeCreationActivityRequestSchema, value)) return undefined;
+  return { creationId: value.creationId };
+}
+
+export function parseWorktreeCreationCancelRequest(
+  value: unknown
+): WorktreeCreationCancelRequest | undefined {
+  if (!Value.Check(WorktreeCreationCancelRequestSchema, value)) return undefined;
+  return { creationId: value.creationId };
 }
 
 export function parseWorktreeCreationAdvanceRequest(

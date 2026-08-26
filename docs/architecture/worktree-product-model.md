@@ -1,15 +1,19 @@
 # Worktree 产品模型与实施规划
 
-状态：`Phase A implemented with macOS arm64 packaged inspection evidence; Phase B creation path implemented in source and targeted tests; packaged creation and Windows installed evidence pending`
+状态：`Phase A inspection and Phase B creation are implemented; Batch D progress, Submodule completeness and explicit app-owned recovery have source, targeted-test, exact macOS packaged private-Git, and packaged UI/inspection evidence; manual user-Repository and Windows installed evidence remain pending`
 
 参考上游：`minghinmatthewlam/pi-gui@eb9a7380705dffad36db3efa771ee825aafbef6f`
 
 本文定义产品模型、架构边界、恢复语义、Windows 风险和分阶段验收，并记录当前实现
 快照。当前源码已经包含只读 Repository inspection、Workbench V5、事务化 Worktree
-创建、startup reconcile、保守 pre-Host rollback 和 `当前工作区 | 隔离 Worktree`
-入口。macOS arm64 unsigned packaged smoke 已验证 private Git Repository inspection、Repository
-status 与 Local/Worktree intent，但没有实际创建 Worktree；源码测试、Renderer browser fixture、
-macOS 或 `pi-gui` 的运行结果均不得外推为 Pi-67 的 Windows 真机证据。
+创建、可取消的分阶段 checkout、Submodule 完整性、本地优先初始化、显式联网补齐、app-owned
+缺失 Worktree 恢复、startup reconcile、保守 pre-Host rollback 和 `当前工作区 | 隔离 Worktree`
+入口。当前 Batch D macOS arm64 exact unsigned artifact 已通过完整 packaged smoke/open；打包内
+private Git 2.53.0 与精确 `GIT_EXEC_PATH` 通过 26/26 Worktree、Submodule 和 recovery fixtures，
+production Renderer preview 通过 5/5 UI 场景。上述结果验证 packaged toolchain、UI/inspection
+和 synthetic real-filesystem service lifecycle，不等于用户真实 Repository 的手工完整生命周期；
+源码测试、Renderer browser fixture、macOS 或 `pi-gui` 的运行结果均不得外推为 Pi-67 的
+Windows 真机证据。
 
 ## 1. 决策
 
@@ -333,8 +337,10 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
 | `rev-parse` / common-dir | 5 s | 64 KiB |
 | `worktree list --porcelain` | 8 s | 1 MiB |
 | status/removal preflight | 10 s | 1 MiB |
-| `worktree add` | 60 s | 1 MiB |
+| `worktree add` / exact branch restore | 300 s | 1 MiB |
 | `worktree remove` | 30 s | 1 MiB |
+| `submodule status --recursive` | 10 s | 1 MiB |
+| `submodule update --init` | 120 s | 1 MiB |
 | branch/merge-base cleanup | 10 s | 256 KiB |
 
 预算不是成功证据；timeout 后必须终止并确认进程树退出。
@@ -358,6 +364,30 @@ Renderer 是跨 Main 与 Agent Host 的产品流程协调者，但不拥有 Git 
 - read-only inspect 可以 single-flight 合并；
 - create/remove/reconcile-cleanup 不得互相越过；
 - queue 有 bounded count，超限返回 recoverable resource-limit，不创建无界 Promise 链。
+
+### 9.6 当前 Batch D 完整性与恢复合同
+
+- 创建活动只跨进程投影 opaque `creationId`、当前阶段、阶段开始时间、阶段预算和可取消标志。
+  阶段为 `preflight`、`queued`、`checkout`、`submodules`、`verifying`、
+  `workspace-registering`；Renderer 轮询进度只用于展示，最终创建 receipt 仍是权威。
+- 排队期取消会从有界队列移除尚未执行的 mutation；Git 已开始后的取消会终止私有 Git，随后按既有
+  exact branch/path/HEAD/clean preflight 回滚。只有回滚确认后才返回 `cancelled`；无法证明清理时继续
+  fence Repository。应用退出先取消创建 flight，再 dispose mutation scheduler 和 inspection runner。
+- `git submodule status --recursive` 只投影 `total/uninitialized/divergent/conflicted` 计数，不跨
+  Preload 暴露 URL、路径或 Git 输出。新 Worktree 只会自动尝试已存在于同一 Git common-dir 的
+  top-level Submodule object：逐项覆盖到已验证的本地 module source，`--no-fetch`，并禁用 HTTP、
+  HTTPS、SSH 和 Git transport。普通 `submodule update` 可能重新 clone，因此不能作为“本地优先”。
+- 需要网络的 Submodule 只在用户点击“联网补齐”后运行；该动作仍禁用交互式 credential prompt，
+  不自动写 Git config，也不把失败伪装成完整。divergent 或 conflicted 状态不通过网络动作覆盖。
+- 缺失恢复只适用于 durable binding 标记为 app-owned、创建记录已 `committed`、source Workspace
+  可用且可信的 Worktree。UI 明确说明只重建已提交的 branch 状态，原目录中的未提交改动和未跟踪
+  文件无法恢复。
+- 恢复只处理 profile 内 exact target。若 Git 留有该 exact missing registration，只定点执行
+  `git worktree remove --force <exact-target>`；禁止 Repository-wide `git worktree prune`。随后 checkout
+  已存在的 exact branch，验证 common-dir、branch、HEAD、非 detached/locked/prunable 和 clean status。
+  如果上一次 Git 恢复成功但 Workbench state 写入失败，重试只对账同一精确 Worktree 并补写状态；
+  foreign、dirty、branch elsewhere、identity drift 或任何 ambiguous target 都 fail closed。
+- Turn/Session 启动、Provider command 或普通 inspection 永远不触发上述恢复或网络动作。
 
 ## 10. Git 安全与信任
 
@@ -705,6 +735,8 @@ Repository group
 - 在系统文件管理器中打开；
 - 保留 Worktree、只移除 Pi-67 注册；
 - 在满足安全 preflight 时删除 app-owned Worktree；
+- 对已提交的 app-owned 缺失 Worktree，显式重建 branch 当前提交状态；
+- 在 Submodule 仅缺少 object 且无 divergent/conflict 时，显式执行联网补齐；
 - 导出不含 raw path/content 的 bounded diagnostics。
 
 ## 19. Windows 设计要求
@@ -764,8 +796,10 @@ hosted Windows、unit tests、macOS packaged smoke 和 `pi-gui` Windows 脚本�
 - private Git 路径、quarantine/notarization 和 app relocation 后资源解析必须保持稳定。
 - profile-owned Worktree 不放进 `.app` bundle，也不因 preview 替换 app bundle 被删除。
 - APFS case-sensitive/case-insensitive volume、external volume 和 file identity 需要测试。
-- exact `preview:mac:unsigned` 已验证 private Git Repository inspection、Repository status 与
-  Local/Worktree intent；该 smoke 随后切回 Local 完成 Session creation，没有实际创建 Worktree。
+- 当前 exact `preview:mac:unsigned` 已验证 private Git Repository inspection、Repository status、
+  Local/Worktree intent 和 Batch D UI/inspection；打包内 private Git 与精确 `GIT_EXEC_PATH` 已通过
+  26/26 Worktree、Submodule 和 recovery fixtures。该 smoke 没有在用户真实 Repository 中手工走完
+  Worktree 创建、联网补齐、恢复、重启和删除生命周期。
 
 ## 21. 分阶段实施
 
@@ -796,10 +830,11 @@ Repository inspection，Windows x64 installed 仍未验证。
 ### Phase B：Transactional Worktree Creation
 
 当前状态：Workbench V5、Main creation/reconcile/rollback、Renderer creation saga、草稿环境 intent 和
-可见 `Local | Worktree` 入口已实现；定向 unit/integration/browser fixture 已覆盖。macOS arm64
-unsigned packaged smoke 只验证了 Local/Worktree intent，未实际创建 Worktree；packaged Worktree
-creation、Windows x64 installed lifecycle 和用户 Windows 真机均未验证，Phase B 不能据此标记为
-跨平台完成。
+可见 `Local | Worktree` 入口已实现；定向 unit/integration/browser fixture 已覆盖。当前 exact
+macOS arm64 unsigned artifact 已通过 packaged smoke/open，打包内 private Git fixtures 也覆盖了
+Worktree 创建、取消、Submodule 和 recovery，但没有在用户真实 Repository 中通过 packaged UI
+手工走完完整生命周期；Windows x64 installed lifecycle 和用户 Windows 真机仍未验证，Phase B
+不能据此标记为跨平台完成。
 
 范围：
 

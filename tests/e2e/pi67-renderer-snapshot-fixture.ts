@@ -124,6 +124,13 @@ export function createMockSessionSnapshot(messages: FixtureMessage[]): Record<st
       origin: "top-level",
       status: "ready"
     }],
+    resourceCatalog: {
+      totalItems: 7,
+      projectedItems: 7,
+      omittedItems: 0,
+      truncatedFields: 0,
+      truncated: false
+    },
     stats: { tokens: 0, cost: 0, contextPercent: 0 }
   };
 }
@@ -197,6 +204,10 @@ export function installMockSessionControlCommandHandler(): void {
   }
 
   function resourceCatalogResult(snapshot: Record<string, unknown>): Record<string, unknown> {
-    return { ...modelCatalogResult(snapshot), resources: snapshot.resources };
+    return {
+      ...modelCatalogResult(snapshot),
+      resources: snapshot.resources,
+      resourceCatalog: snapshot.resourceCatalog
+    };
   }
 }

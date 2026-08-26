@@ -4,7 +4,8 @@ import {
   MAX_PROMPT_ATTACHMENT_NAME_CHARS,
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
-  type StagedPromptAttachment
+  type StagedPromptAttachment,
+  type StagedPromptAttachmentResult
 } from "@pi67/protocol";
 
 export interface DraftAttachment extends StagedPromptAttachment {
@@ -29,13 +30,19 @@ export async function stageDraftAttachments(
     for (let index = 0; index < staged.length; index += 1) {
       const attachment = staged[index];
       const file = selected[index];
-      if (!attachment || !file || attachment.name !== file.name || attachment.byteLength !== file.size) {
+      if (!attachment || !file || !stageResultMatchesFile(attachment, file)) {
         throw new Error("附件暂存结果与所选文件不一致，请重新选择。");
       }
       created.push({
-        ...attachment,
+        id: attachment.id,
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        byteLength: attachment.byteLength,
+        kind: attachment.kind,
         identity: fileIdentity(file),
-        ...(attachment.kind === "image" ? { previewUrl: URL.createObjectURL(file) } : {})
+        ...(attachment.kind === "image" && !attachment.normalization
+          ? { previewUrl: URL.createObjectURL(file) }
+          : {})
       });
     }
     const inlineImageBytes = [...current, ...created]
@@ -117,4 +124,18 @@ function releaseAttachmentIds(ids: readonly string[]): Promise<void> {
 
 function fileIdentity(file: File): string {
   return `${file.name}\0${file.type}\0${file.size}\0${file.lastModified}`;
+}
+
+function stageResultMatchesFile(attachment: StagedPromptAttachmentResult, file: File): boolean {
+  if (!attachment.normalization) {
+    return attachment.name === file.name && attachment.byteLength === file.size;
+  }
+  return attachment.normalization.kind === "heic-to-jpeg"
+    && attachment.normalization.sourceName === file.name
+    && attachment.normalization.sourceMimeType === file.type
+    && attachment.normalization.sourceByteLength === file.size
+    && attachment.name !== file.name
+    && attachment.mimeType === "image/jpeg"
+    && attachment.kind === "image"
+    && attachment.byteLength > 0;
 }

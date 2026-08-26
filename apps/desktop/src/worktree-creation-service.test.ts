@@ -88,6 +88,43 @@ describe("WorktreeCreationService", () => {
     expect(await fixture.runner.listWorktrees(fixture.repository)).toHaveLength(1);
   }, REAL_GIT_TEST_TIMEOUT_MS);
 
+  it("reports checkout activity and cancels queued Git work through the normal rollback contract", async () => {
+    const fixture = await creationFixture();
+    vi.spyOn(fixture.runner, "addWorktree").mockImplementationOnce(async (_input, signal) => {
+      await new Promise<void>((_resolve, reject) => {
+        const cancelled = () => reject(new GitInspectionError(
+          "worktree-add",
+          "cancelled",
+          { cleanupConfirmed: true }
+        ));
+        if (signal?.aborted) cancelled();
+        else signal?.addEventListener("abort", cancelled, { once: true });
+      });
+    });
+    const request = {
+      requestId: "request-cancel",
+      creationId: "creation-cancel",
+      sourceWorkspaceId: fixture.source.id
+    };
+    const pending = fixture.service.create(request);
+    await vi.waitFor(() => expect(fixture.service.activity({ creationId: request.creationId })).toMatchObject({
+      status: "active",
+      activity: { stage: "checkout", budgetMs: 300_000, cancellable: true }
+    }), { timeout: 10_000 });
+
+    expect(fixture.service.cancel({ creationId: request.creationId })).toEqual({ status: "cancel-requested" });
+    await expect(pending).resolves.toMatchObject({
+      status: "rejected",
+      error: { stage: "git", code: "cancelled", recoverable: true }
+    });
+    expect(fixture.service.activity({ creationId: request.creationId })).toEqual({ status: "inactive" });
+    expect((await fixture.workbenchState.load()).state.environmentMutations).toMatchObject([{
+      creationId: request.creationId,
+      state: "rolled-back"
+    }]);
+    expect(await fixture.runner.listWorktrees(fixture.repository)).toHaveLength(1);
+  }, REAL_GIT_TEST_TIMEOUT_MS);
+
   it("advances Host and Session milestones one durable step at a time with idempotent replay", async () => {
     const fixture = await creationFixture();
     await fixture.service.create({

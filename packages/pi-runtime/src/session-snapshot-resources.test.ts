@@ -3,8 +3,16 @@ import type {
   LoadExtensionsResult,
   SourceInfo
 } from "@earendil-works/pi-coding-agent";
+import {
+  MAX_RESOURCE_CATALOG_ITEMS,
+  MAX_RESOURCE_DETAIL_CHARS,
+  MAX_RESOURCE_ID_CHARS,
+  MAX_RESOURCE_LABEL_CHARS,
+  MAX_RESOURCE_PATH_CHARS,
+  MAX_RESOURCE_SOURCE_CHARS
+} from "@pi67/domain";
 import { describe, expect, it } from "vitest";
-import { isPathWithin, projectSessionResources } from "./session-snapshot.js";
+import { isPathWithin, projectSessionResourceCatalog } from "./session-snapshot.js";
 
 describe("session resource projection", () => {
   it("keeps Pi resource kinds, scopes, and package origins explicit", () => {
@@ -50,7 +58,7 @@ describe("session resource projection", () => {
       runtime: {}
     } as unknown as LoadExtensionsResult;
 
-    expect(projectSessionResources(services, extensions)).toEqual([
+    expect(projectSessionResourceCatalog(services, extensions).resources).toEqual([
       expect.objectContaining({
         kind: "skill",
         label: "design-craft",
@@ -75,6 +83,50 @@ describe("session resource projection", () => {
       expect.objectContaining({ kind: "context", path: "/Users/test/.pi/agent/AGENTS.md", scope: "user" }),
       expect.objectContaining({ kind: "context", path: "/workspace/AGENTS.md", scope: "project" })
     ]);
+  });
+
+  it("bounds catalog items and strings while reporting the exact projection disposition", () => {
+    const oversized = "\u{1F642}".repeat(MAX_RESOURCE_PATH_CHARS * 2);
+    const skills = Array.from({ length: MAX_RESOURCE_CATALOG_ITEMS + 44 }, (_, index) => ({
+      name: `skill-${index}-${"n".repeat(MAX_RESOURCE_ID_CHARS)}`,
+      description: "unused",
+      filePath: `/workspace/${oversized}/${index}/SKILL.md`,
+      baseDir: `/workspace/${oversized}/${index}`,
+      sourceInfo: source(
+        `/workspace/${oversized}/${index}`,
+        `npm:${oversized}`,
+        "project",
+        "package"
+      ),
+      disableModelInvocation: false
+    }));
+    const services = {
+      agentDir: "/Users/test/.pi/agent",
+      resourceLoader: {
+        getSkills: () => ({ skills, diagnostics: [] }),
+        getPrompts: () => ({ prompts: [], diagnostics: [] }),
+        getAgentsFiles: () => ({ agentsFiles: [] })
+      }
+    } as unknown as AgentSessionServices;
+    const errors = [{ path: oversized, error: oversized }];
+    const extensions = { extensions: [], errors, runtime: {} } as unknown as LoadExtensionsResult;
+
+    const projection = projectSessionResourceCatalog(services, extensions);
+
+    expect(projection.resourceCatalog.totalItems).toBe(MAX_RESOURCE_CATALOG_ITEMS + 45);
+    expect(projection.resourceCatalog.projectedItems).toBe(projection.resources.length);
+    expect(projection.resourceCatalog.projectedItems).toBeLessThan(MAX_RESOURCE_CATALOG_ITEMS);
+    expect(projection.resourceCatalog.omittedItems).toBeGreaterThan(0);
+    expect(projection.resourceCatalog.truncatedFields).toBeGreaterThan(0);
+    expect(projection.resourceCatalog.truncated).toBe(true);
+    for (const resource of projection.resources) {
+      expect(resource.id.length).toBeLessThanOrEqual(MAX_RESOURCE_ID_CHARS);
+      expect(resource.label.length).toBeLessThanOrEqual(MAX_RESOURCE_LABEL_CHARS);
+      expect(resource.path?.length ?? 0).toBeLessThanOrEqual(MAX_RESOURCE_PATH_CHARS);
+      expect(resource.source?.length ?? 0).toBeLessThanOrEqual(MAX_RESOURCE_SOURCE_CHARS);
+      expect(resource.detail?.length ?? 0).toBeLessThanOrEqual(MAX_RESOURCE_DETAIL_CHARS);
+    }
+    expect(Buffer.byteLength(JSON.stringify(projection), "utf8")).toBeLessThan(512 * 1024);
   });
 
   it("compares Windows context paths without case sensitivity", () => {

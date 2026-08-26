@@ -43,7 +43,14 @@ describe("App Store resource controls", () => {
         providers: [{ id: "anthropic", label: "Anthropic", configured: true, modelCount: 1 }],
         availableThinkingLevels: ["off", "high"]
       },
-      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }]
+      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }],
+      resourceCatalog: {
+        totalItems: 3,
+        projectedItems: 1,
+        omittedItems: 2,
+        truncatedFields: 0,
+        truncated: true
+      }
     } as never);
     emitQueue(["current queue"], []);
     emitUsage(60, 0.6, 30);
@@ -68,6 +75,13 @@ describe("App Store resource controls", () => {
         thinkingLevel: "high"
       },
       resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }],
+      resourceCatalog: {
+        totalItems: 3,
+        projectedItems: 1,
+        omittedItems: 2,
+        truncatedFields: 0,
+        truncated: true
+      },
       queue: { steeringQueue: ["current queue"], followUpQueue: [] },
       usage: { tokens: 60, cost: 0.6, contextPercent: 30 }
     });

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   AgentSession,
   AgentSessionServices,
@@ -6,14 +7,24 @@ import type {
   SourceInfo
 } from "@earendil-works/pi-coding-agent";
 import type {
+  ExtensionToolAdapterView,
   ModelSummary,
   ProviderSummary,
+  ResourceCatalogProjection,
   ResourceSummary,
-  ExtensionToolAdapterView,
   SessionControlsView,
   SessionModelCatalogResult,
   SessionModelCatalogView,
   SessionSnapshot
+} from "@pi67/domain";
+import {
+  MAX_RESOURCE_CATALOG_ITEMS,
+  MAX_RESOURCE_CATALOG_TEXT_CHARS,
+  MAX_RESOURCE_DETAIL_CHARS,
+  MAX_RESOURCE_ID_CHARS,
+  MAX_RESOURCE_LABEL_CHARS,
+  MAX_RESOURCE_PATH_CHARS,
+  MAX_RESOURCE_SOURCE_CHARS
 } from "@pi67/domain";
 import type { ImageAssetProjector } from "./message-normalizer.js";
 import { projectMessagePage } from "./message-projection.js";
@@ -35,6 +46,7 @@ export function projectSessionSnapshot(
   const messagePage = projectMessagePage(projection, {}, resolveToolAdapter, projectImageAsset);
   const controls = projectSessionControls(session);
   const modelCatalog = projectSessionModelCatalog(session);
+  const resourceCatalog = projectSessionResourceCatalog(services, extensionsResult);
   return {
     sessionId: session.sessionId,
     ...(sessionFileIdentity ? { sessionFileIdentity } : {}),
@@ -57,7 +69,7 @@ export function projectSessionSnapshot(
     steeringQueue: [...session.getSteeringMessages()],
     followUpQueue: [...session.getFollowUpMessages()],
     tree: projectSessionTree(projection),
-    resources: projectSessionResources(services, extensionsResult),
+    ...resourceCatalog,
     compatibility: projection.getCompatibility(),
     stats: {
       tokens: stats.tokens.total,
@@ -137,56 +149,56 @@ export function projectRuntimeProviders(
     });
 }
 
-export function projectSessionResources(
+export function projectSessionResourceCatalog(
   services: AgentSessionServices | undefined,
   extensionsResult: LoadExtensionsResult | undefined
-): ResourceSummary[] {
-  const resources: ResourceSummary[] = [];
+): ResourceCatalogProjection {
+  const projection = new ResourceCatalogProjectionBuilder();
   const loader = services?.resourceLoader;
-  if (!loader || !services) return resources;
+  if (!loader || !services) return projection.finish();
   for (const skill of loader.getSkills().skills) {
-    resources.push({
+    projection.add(() => ({
       kind: "skill",
       id: skill.name,
       label: skill.name,
       path: skill.filePath,
       ...projectResourceSource(skill.sourceInfo),
       status: "ready"
-    });
+    }));
   }
   for (const prompt of loader.getPrompts().prompts) {
-    resources.push({
+    projection.add(() => ({
       kind: "prompt",
       id: prompt.name,
       label: `/${prompt.name}`,
       path: prompt.filePath,
       ...projectResourceSource(prompt.sourceInfo),
       status: "ready"
-    });
+    }));
   }
   for (const extension of extensionsResult?.extensions ?? []) {
     if (extension.hidden) continue;
-    resources.push({
+    projection.add(() => ({
       kind: "extension",
       id: extension.resolvedPath,
       label: extensionResourceLabel(extension.path, extension.sourceInfo),
       path: extension.resolvedPath,
       ...projectResourceSource(extension.sourceInfo),
       status: "ready"
-    });
+    }));
   }
   for (const error of extensionsResult?.errors ?? []) {
-    resources.push({
+    projection.add(() => ({
       kind: "extension",
       id: error.path,
       label: error.path,
       status: "failed",
-      detail: sanitizeRuntimeText(error.error)
-    });
+      detail: error.error
+    }));
   }
   for (const file of loader.getAgentsFiles().agentsFiles) {
     const global = isPathWithin(file.path, services.agentDir);
-    resources.push({
+    projection.add(() => ({
       kind: "context",
       id: file.path,
       label: file.path.split(/[\\/]/).pop() ?? file.path,
@@ -195,9 +207,121 @@ export function projectSessionResources(
       scope: global ? "user" : "project",
       origin: "top-level",
       status: "ready"
-    });
+    }));
   }
-  return resources;
+  return projection.finish();
+}
+
+class ResourceCatalogProjectionBuilder {
+  private readonly resources: ResourceSummary[] = [];
+  private totalItems = 0;
+  private textChars = 0;
+  private truncatedFields = 0;
+
+  add(create: () => ResourceSummary): void {
+    this.totalItems += 1;
+    if (this.resources.length >= MAX_RESOURCE_CATALOG_ITEMS) return;
+    const projected = projectResourceSummary(create());
+    if (this.textChars + projected.textChars > MAX_RESOURCE_CATALOG_TEXT_CHARS) return;
+    this.resources.push(projected.resource);
+    this.textChars += projected.textChars;
+    this.truncatedFields += projected.truncatedFields;
+  }
+
+  finish(): ResourceCatalogProjection {
+    const projectedItems = this.resources.length;
+    const omittedItems = this.totalItems - projectedItems;
+    return {
+      resources: this.resources,
+      resourceCatalog: {
+        totalItems: this.totalItems,
+        projectedItems,
+        omittedItems,
+        truncatedFields: this.truncatedFields,
+        truncated: omittedItems > 0 || this.truncatedFields > 0
+      }
+    };
+  }
+}
+
+interface ProjectedResourceSummary {
+  resource: ResourceSummary;
+  textChars: number;
+  truncatedFields: number;
+}
+
+function projectResourceSummary(resource: ResourceSummary): ProjectedResourceSummary {
+  const fields = {
+    id: projectResourceIdentity(resource.id),
+    label: projectResourceText(resource.label, MAX_RESOURCE_LABEL_CHARS, "Unnamed resource"),
+    ...(resource.path === undefined
+      ? {}
+      : { path: projectResourceText(resource.path, MAX_RESOURCE_PATH_CHARS) }),
+    ...(resource.source === undefined
+      ? {}
+      : { source: projectResourceText(resource.source, MAX_RESOURCE_SOURCE_CHARS) }),
+    ...(resource.detail === undefined
+      ? {}
+      : { detail: projectResourceText(resource.detail, MAX_RESOURCE_DETAIL_CHARS) })
+  };
+  const projected: ResourceSummary = {
+    kind: resource.kind,
+    id: fields.id.text,
+    label: fields.label.text,
+    ...(fields.path === undefined ? {} : { path: fields.path.text }),
+    ...(fields.source === undefined ? {} : { source: fields.source.text }),
+    ...(resource.scope === undefined ? {} : { scope: resource.scope }),
+    ...(resource.origin === undefined ? {} : { origin: resource.origin }),
+    status: resource.status,
+    ...(fields.detail === undefined ? {} : { detail: fields.detail.text })
+  };
+  const boundedFields = Object.values(fields);
+  return {
+    resource: projected,
+    textChars: boundedFields.reduce((total, field) => total + field.text.length, 0),
+    truncatedFields: boundedFields.filter((field) => field.truncated).length
+  };
+}
+
+interface ProjectedResourceText {
+  text: string;
+  truncated: boolean;
+}
+
+function projectResourceIdentity(value: string): ProjectedResourceText {
+  const projected = projectResourceText(value, MAX_RESOURCE_ID_CHARS, "unknown-resource");
+  if (!projected.truncated) return projected;
+  const digest = createHash("sha256").update(value).digest("hex");
+  const suffix = `:${digest}`;
+  const prefix = projectResourceText(
+    value,
+    MAX_RESOURCE_ID_CHARS - suffix.length,
+    "resource"
+  ).text;
+  return { text: `${prefix}${suffix}`, truncated: true };
+}
+
+function projectResourceText(
+  value: string,
+  maximum: number,
+  fallback = ""
+): ProjectedResourceText {
+  const preLimit = maximum * 4;
+  const preBounded = value.length <= preLimit ? value : value.slice(0, preLimit);
+  const sanitized = sanitizeRuntimeText(preBounded, maximum);
+  const wellFormed = dropTrailingHighSurrogate(sanitized);
+  return {
+    text: wellFormed || fallback,
+    truncated: value.length > preLimit
+      || sanitized.length >= maximum && value.length > maximum
+      || wellFormed.length !== sanitized.length
+  };
+}
+
+function dropTrailingHighSurrogate(value: string): string {
+  if (value.length === 0) return value;
+  const code = value.charCodeAt(value.length - 1);
+  return code >= 0xd800 && code <= 0xdbff ? value.slice(0, -1) : value;
 }
 
 function projectResourceSource(sourceInfo: SourceInfo): Pick<

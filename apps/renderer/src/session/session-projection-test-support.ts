@@ -49,3 +49,21 @@ export function installSessionProjectionFixture(
     )
     : undefined;
 }
+
+export function planLifecycleFixture(
+  authority: SessionProjectionAuthority,
+  phase: "implementation-requested" | "implementation-started" | "implementation-start-failed"
+) {
+  return {
+    phase,
+    planId: "plan-lifecycle",
+    sourceOperationId: "operation-plan-source",
+    submissionId: "submission-plan",
+    operationId: "operation-plan",
+    hostEpoch: authority.hostEpoch,
+    sessionId: authority.sessionId,
+    sessionFileIdentity: authority.sessionFileIdentity,
+    sessionGeneration: authority.sessionGeneration,
+    timestamp: 68
+  };
+}

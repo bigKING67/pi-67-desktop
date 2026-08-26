@@ -6,7 +6,10 @@ import {
   useSessionProjectionStore,
   type SessionProjectionAuthority
 } from "./session-projection-store.js";
-import { installSessionProjectionFixture } from "./session-projection-test-support.js";
+import {
+  installSessionProjectionFixture,
+  planLifecycleFixture
+} from "./session-projection-test-support.js";
 import {
   selectSessionModels,
   selectActiveProposedPlan,
@@ -94,7 +97,7 @@ describe("session projection store", () => {
       interactionMode: "plan",
       activeProposedPlan: proposedPlan
     }, 3);
-    const requested = planLifecycle("implementation-requested");
+    const requested = planLifecycleFixture(AUTHORITY, "implementation-requested");
 
     expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
     expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
@@ -102,7 +105,7 @@ describe("session projection store", () => {
     expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toEqual(proposedPlan);
     expect(selectPlanLifecycle(useSessionProjectionStore.getState())).toEqual(requested);
 
-    const started = planLifecycle("implementation-started");
+    const started = planLifecycleFixture(AUTHORITY, "implementation-started");
     expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, started)).toBe(true);
     expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, started)).toBe(true);
     expect(selectActiveProposedPlan(useSessionProjectionStore.getState())).toBeUndefined();
@@ -121,8 +124,8 @@ describe("session projection store", () => {
       interactionMode: "plan",
       activeProposedPlan: proposedPlan
     }, 3);
-    const requested = planLifecycle("implementation-requested");
-    const failed = planLifecycle("implementation-start-failed");
+    const requested = planLifecycleFixture(AUTHORITY, "implementation-requested");
+    const failed = planLifecycleFixture(AUTHORITY, "implementation-start-failed");
 
     expect(useSessionProjectionStore.getState().applyPlanLifecycle(AUTHORITY, requested)).toBe(true);
     expect(useSessionProjectionStore.getState().applyPlanLifecycle({
@@ -358,7 +361,14 @@ describe("session projection store", () => {
         providers: [{ id: "anthropic", label: "Anthropic", configured: true, modelCount: 1 }],
         availableThinkingLevels: ["off", "high"]
       },
-      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }]
+      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }],
+      resourceCatalog: {
+        totalItems: 2,
+        projectedItems: 1,
+        omittedItems: 1,
+        truncatedFields: 0,
+        truncated: true
+      }
     })).toBe(true);
 
     expect(useSessionProjectionStore.getState()).toMatchObject({
@@ -369,7 +379,14 @@ describe("session projection store", () => {
       modelCatalog: {
         models: [{ provider: "anthropic", id: "claude", label: "Claude", configured: true, reasoning: true }]
       },
-      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }]
+      resources: [{ kind: "extension", id: "new", label: "New", status: "ready" }],
+      resourceCatalog: {
+        totalItems: 2,
+        projectedItems: 1,
+        omittedItems: 1,
+        truncatedFields: 0,
+        truncated: true
+      }
     });
     expect(store.applyResourceCatalogResult(target, {
       sessionId: "session-1",
@@ -436,22 +453,5 @@ function snapshot(sessionId: string): SessionSnapshot {
     tree: { nodes: [], truncated: false, total: 0 },
     resources: [{ kind: "skill", id: "testing", label: "Testing", status: "ready" }],
     stats: { tokens: 10, cost: 0.1, contextPercent: 5 }
-  };
-}
-
-function planLifecycle(
-  phase: "implementation-requested" | "implementation-started" | "implementation-start-failed"
-) {
-  return {
-    phase,
-    planId: "plan-lifecycle",
-    sourceOperationId: "operation-plan-source",
-    submissionId: "submission-plan",
-    operationId: "operation-plan",
-    hostEpoch: AUTHORITY.hostEpoch,
-    sessionId: AUTHORITY.sessionId,
-    sessionFileIdentity: AUTHORITY.sessionFileIdentity,
-    sessionGeneration: AUTHORITY.sessionGeneration,
-    timestamp: 68
   };
 }

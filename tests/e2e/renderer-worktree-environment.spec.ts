@@ -28,6 +28,18 @@ const READY_REPOSITORY: RepositoryEnvironmentSnapshot = {
   }]
 };
 
+const INCOMPLETE_SUBMODULE_REPOSITORY: RepositoryEnvironmentSnapshot = {
+  ...READY_REPOSITORY,
+  submodules: {
+    status: "incomplete",
+    total: 1,
+    uninitialized: 1,
+    divergent: 0,
+    conflicted: 0,
+    networkActionRequired: true
+  }
+};
+
 test("selects Local or Worktree without mutating Git and checkpoints the draft intent", async ({ page }, testInfo) => {
   await installMockDesktopBridge(page, { repositoryEnvironmentSnapshot: READY_REPOSITORY });
   await page.goto("/");
@@ -119,6 +131,24 @@ test("keeps Worktree unavailable when the selected workspace is not a Git Reposi
   await page.screenshot({ path: testInfo.outputPath("worktree-environment-non-git.png"), animations: "disabled" });
 });
 
+test("requires an explicit action before network-capable Submodule initialization", async ({ page }, testInfo) => {
+  await installMockDesktopBridge(page, { repositoryEnvironmentSnapshot: INCOMPLETE_SUBMODULE_REPOSITORY });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  await expect(page.locator('[data-repository-status="submodules-incomplete"]')).toContainText("Submodule 未完整");
+  expect(await readRepositoryActionCalls(page)).toEqual({ initializeCalls: 0, recoveryCalls: 0 });
+  const initialize = page.getByRole("button", { name: /明确允许 Git/u });
+  await expect(initialize).toContainText("联网补齐");
+  await initialize.click();
+
+  await expect.poll(() => readRepositoryActionCalls(page)).toEqual({ initializeCalls: 1, recoveryCalls: 0 });
+  await expect(page.locator('[data-repository-status="primary"]')).toContainText("主工作树");
+  await expect(page.getByRole("button", { name: /明确允许 Git/u })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("submodules-explicit-network-action.png"), animations: "disabled" });
+});
+
 async function readPersistedEnvironmentIntent(page: Parameters<typeof installMockDesktopBridge>[0]) {
   return page.evaluate(() => (
     window as unknown as {
@@ -139,4 +169,12 @@ async function readWorktreeCalls(page: Parameters<typeof installMockDesktopBridg
       };
     }
   ).__pi67WorktreeTest));
+}
+
+async function readRepositoryActionCalls(page: Parameters<typeof installMockDesktopBridge>[0]) {
+  return page.evaluate(() => structuredClone((
+    window as unknown as {
+      __pi67RepositoryActionTest: { initializeCalls: number; recoveryCalls: number };
+    }
+  ).__pi67RepositoryActionTest));
 }

@@ -5,6 +5,11 @@ import type {
   WorktreeCreationAdvanceReceipt,
   WorktreeCreationAdvanceRequest,
   WorktreeCreationAdvanceResult,
+  WorktreeCreationActivity,
+  WorktreeCreationActivityRequest,
+  WorktreeCreationActivityResult,
+  WorktreeCreationCancelRequest,
+  WorktreeCreationCancelResult,
   WorktreeCreationRequest,
   WorktreeCreationResult,
   WorktreeCreationRollbackRequest,
@@ -20,9 +25,12 @@ import {
   reserveEnvironmentMutation
 } from "./workbench-state-mutations.js";
 import {
-  GitInspectionError,
   type RepositoryMutationGitRunner
 } from "./worktree-git-runner.js";
+import {
+  materializeLocalSubmodules,
+  observeRepositorySubmodules
+} from "./worktree-submodule-materialization.js";
 import {
   RepositoryMutationAdmissionError,
   RepositoryMutationScheduler
@@ -39,15 +47,14 @@ import {
   type RecoveredWorktreeProfilePath
 } from "./worktree-profile-root.js";
 import { WorktreeCreationRollbackService } from "./worktree-creation-rollback-service.js";
+import { rollbackFailedWorktreeCreation } from "./worktree-creation-failure-rollback.js";
 import {
   PROGRESS_STATES,
   WorktreeCreationServiceError,
   creationRequestFingerprint,
   existingCreationResult,
   isProgressState,
-  isTerminalCreationState,
   mapGitPreflightError,
-  monotonicNow,
   pathsEqual,
   progressReceipt,
   rejected,
@@ -77,7 +84,17 @@ export interface WorktreeCreationServiceOptions {
 interface CreationFlight {
   fingerprint: string;
   promise: Promise<WorktreeCreationResult>;
+  controller: AbortController;
+  activity: WorktreeCreationActivity;
 }
+
+const CREATION_STAGE_BUDGETS = {
+  preflight: 30_000,
+  checkout: 300_000,
+  submodules: 120_000,
+  verifying: 30_000,
+  "workspace-registering": 30_000
+} as const;
 
 export class WorktreeCreationService {
   readonly #userData: string;
@@ -126,15 +143,48 @@ export class WorktreeCreationService {
         ? existing.promise
         : Promise.resolve(rejected("request", "invalid-request", false));
     }
-    const promise = this.#create(request, fingerprint).catch((error: unknown) => (
+    const controller = new AbortController();
+    const startedAt = this.#now();
+    const flight = {
+      fingerprint,
+      controller,
+      activity: {
+        creationId: request.creationId,
+        stage: "preflight" as const,
+        startedAt,
+        updatedAt: startedAt,
+        budgetMs: CREATION_STAGE_BUDGETS.preflight,
+        cancellable: true as const
+      }
+    } as CreationFlight;
+    const promise = this.#create(request, fingerprint, flight).catch((error: unknown) => (
       error instanceof WorktreeCreationServiceError
         ? { status: "rejected" as const, error: error.view }
         : rejected("state", "internal", true)
     )).finally(() => {
       if (this.#flights.get(request.creationId)?.promise === promise) this.#flights.delete(request.creationId);
     });
-    this.#flights.set(request.creationId, { fingerprint, promise });
+    flight.promise = promise;
+    this.#flights.set(request.creationId, flight);
     return promise;
+  }
+
+  activity(request: WorktreeCreationActivityRequest): WorktreeCreationActivityResult {
+    const flight = this.#flights.get(request.creationId);
+    return flight
+      ? { status: "active", activity: { ...flight.activity } }
+      : { status: "inactive" };
+  }
+
+  cancel(request: WorktreeCreationCancelRequest): WorktreeCreationCancelResult {
+    const flight = this.#flights.get(request.creationId);
+    if (!flight) return { status: "inactive" };
+    flight.controller.abort();
+    return { status: "cancel-requested" };
+  }
+
+  dispose(): void {
+    for (const flight of this.#flights.values()) flight.controller.abort();
   }
 
   async advance(request: WorktreeCreationAdvanceRequest): Promise<WorktreeCreationAdvanceResult> {
@@ -192,9 +242,22 @@ export class WorktreeCreationService {
     return this.#rollbackService.rollback(request);
   }
 
-  async #create(request: WorktreeCreationRequest, fingerprint: string): Promise<WorktreeCreationResult> {
+  async #create(
+    request: WorktreeCreationRequest,
+    fingerprint: string,
+    flight: CreationFlight
+  ): Promise<WorktreeCreationResult> {
+    const signal = flight.controller.signal;
+    if (signal.aborted) return rejected("preflight", "cancelled", true);
     const initial = (await this.#workbenchState.load()).state;
     const replay = existingCreationResult(initial, request, fingerprint);
+    if (replay?.status === "created") {
+      const submodules = observeRepositorySubmodules(await this.#runner.inspectSubmodules(
+        replay.receipt.workspace.identity.canonicalPath,
+        signal
+      ));
+      return { ...replay, receipt: { ...replay.receipt, submodules } };
+    }
     if (replay) return replay;
     const source = initial.workspaces.find((workspace) => workspace.id === request.sourceWorkspaceId);
     if (!source) throw serviceError("preflight", "workspace-not-found", false);
@@ -202,6 +265,7 @@ export class WorktreeCreationService {
     if (source.trust !== "trusted") throw serviceError("preflight", "workspace-untrusted", true);
 
     const snapshot = await this.#inspection.inspect({ workspaceId: source.id });
+    if (signal.aborted) return rejected("preflight", "cancelled", true);
     if (snapshot.status !== "ready" || !snapshot.repository) {
       throw serviceError("preflight", "repository-not-ready", true);
     }
@@ -216,12 +280,12 @@ export class WorktreeCreationService {
 
     let exactHeadSha: string;
     try {
-      exactHeadSha = await this.#runner.resolveHeadSha(source.identity.canonicalPath);
+      exactHeadSha = await this.#runner.resolveHeadSha(source.identity.canonicalPath, signal);
     } catch (error) {
       throw mapGitPreflightError(error);
     }
     if (exactHeadSha !== current.headSha) throw serviceError("preflight", "repository-stale", true);
-    const filters = await this.#runner.inspectFilters(source.identity.canonicalPath).catch((error: unknown) => {
+    const filters = await this.#runner.inspectFilters(source.identity.canonicalPath, signal).catch((error: unknown) => {
       throw mapGitPreflightError(error);
     });
     if (filters.unknownFilterNames.length > 0) throw serviceError("preflight", "custom-filter", true);
@@ -245,14 +309,15 @@ export class WorktreeCreationService {
     };
 
     try {
+      this.#setStage(flight, "queued");
       return await this.#scheduler.run(record.repositoryGroupId, () => (
-        this.#materialize(request, record, source, prepared)
-      ));
+        this.#materialize(request, record, source, prepared, flight)
+      ), signal);
     } catch (error) {
       if (error instanceof RepositoryMutationAdmissionError) {
-        return error.code === "queue-full"
-          ? rejected("preflight", "queue-full", true)
-          : rejected("preflight", "repository-indeterminate", true);
+        if (error.code === "queue-full") return rejected("preflight", "queue-full", true);
+        if (error.code === "cancelled") return rejected("preflight", "cancelled", true);
+        return rejected("preflight", "repository-indeterminate", true);
       }
       throw error;
     }
@@ -262,8 +327,11 @@ export class WorktreeCreationService {
     request: WorktreeCreationRequest,
     record: EnvironmentMutationRecoveryRecord,
     source: WorkspaceDescriptor,
-    prepared: PreparedWorktreeProfilePath
+    prepared: PreparedWorktreeProfilePath,
+    flight: CreationFlight
   ): Promise<WorktreeCreationResult> {
+    const signal = flight.controller.signal;
+    if (signal.aborted) return rejected("preflight", "cancelled", true);
     try {
       await this.#workbenchState.update((state) => reserveEnvironmentMutation(state, record));
       await this.#workbenchState.update((state) => (
@@ -275,6 +343,7 @@ export class WorktreeCreationService {
 
     let gitStarted = false;
     try {
+      this.#setStage(flight, "checkout");
       gitStarted = true;
       await this.#runner.addWorktree({
         cwd: source.identity.canonicalPath,
@@ -282,11 +351,15 @@ export class WorktreeCreationService {
         branchName: record.branchName,
         headSha: record.headSha,
         hooksPath: prepared.hooksPath
-      });
+      }, signal);
       await this.#workbenchState.update((state) => (
         advanceEnvironmentMutation(state, record.creationId, "git-materialized", this.#now())
       ));
-      await this.#verifyMaterializedWorktree(source.identity.canonicalPath, prepared.targetPath, record);
+      this.#setStage(flight, "submodules");
+      const submodules = await materializeLocalSubmodules(this.#runner, prepared.targetPath, signal);
+      this.#setStage(flight, "verifying");
+      await this.#verifyMaterializedWorktree(source.identity.canonicalPath, prepared.targetPath, record, signal);
+      this.#setStage(flight, "workspace-registering");
       const workspace = await createAppOwnedWorkspaceDescriptor(prepared.targetPath, {
         id: this.#createWorkspaceId(),
         now: this.#now
@@ -309,24 +382,32 @@ export class WorktreeCreationService {
           sourceWorkspaceId: request.sourceWorkspaceId,
           repositoryGroupId: record.repositoryGroupId,
           state: "workspace-registered",
-          workspace: registeredWorkspace
+          workspace: registeredWorkspace,
+          submodules
         }
       };
     } catch (error) {
       if (!gitStarted) return rejected("state", "state-unavailable", true);
-      return this.#rollbackFailedCreation(source.identity.canonicalPath, prepared.targetPath, record, error);
+      return rollbackFailedWorktreeCreation({
+        runner: this.#runner,
+        scheduler: this.#scheduler,
+        workbenchState: this.#workbenchState,
+        now: this.#now,
+        platform: this.#platform
+      }, source.identity.canonicalPath, prepared.targetPath, record, error);
     }
   }
 
   async #verifyMaterializedWorktree(
     sourcePath: string,
     targetPath: string,
-    record: EnvironmentMutationRecoveryRecord
+    record: EnvironmentMutationRecoveryRecord,
+    signal?: AbortSignal
   ): Promise<void> {
     const [commonDirectory, worktrees, status] = await Promise.all([
-      this.#runner.resolveCommonDirectory(targetPath),
-      this.#runner.listWorktrees(sourcePath),
-      this.#runner.statusPorcelain(targetPath)
+      this.#runner.resolveCommonDirectory(targetPath, signal),
+      this.#runner.listWorktrees(sourcePath, signal),
+      this.#runner.statusPorcelain(targetPath, signal)
     ]);
     const commonIdentity = await this.#observeIdentity(commonDirectory);
     if (repositoryGroupId(commonIdentity) !== record.repositoryGroupId) {
@@ -344,79 +425,6 @@ export class WorktreeCreationService {
     ) throw new Error("Created Worktree does not match its reservation.");
   }
 
-  async #rollbackFailedCreation(
-    sourcePath: string,
-    targetPath: string,
-    record: EnvironmentMutationRecoveryRecord,
-    originalError: unknown
-  ): Promise<WorktreeCreationResult> {
-    if (originalError instanceof GitInspectionError && originalError.details.cleanupConfirmed === false) {
-      await this.#markIndeterminate(record);
-      return rejected("git", "repository-indeterminate", true);
-    }
-    try {
-      const [worktrees, branchHead] = await Promise.all([
-        this.#runner.listWorktrees(sourcePath),
-        this.#runner.resolveBranchHead(sourcePath, record.branchName)
-      ]);
-      const worktree = worktrees.find((candidate) => pathsEqual(candidate.path, targetPath, this.#platform));
-      if (worktree) {
-        const clean = await this.#runner.statusPorcelain(targetPath);
-        if (
-          worktree.branchName !== record.branchName
-          || worktree.headSha !== record.headSha
-          || branchHead !== record.headSha
-          || clean.length !== 0
-        ) return this.#markRollbackProtected(record);
-      } else if (branchHead !== undefined && branchHead !== record.headSha) {
-        return this.#markRollbackProtected(record);
-      }
-
-      await this.#workbenchState.update((state) => (
-        advanceEnvironmentMutation(state, record.creationId, "rollback-pending", this.#now())
-      ));
-      if (worktree) await this.#runner.removeWorktree(sourcePath, targetPath);
-      if (branchHead === record.headSha) await this.#runner.deleteBranch(sourcePath, record.branchName);
-      await this.#workbenchState.update((state) => (
-        advanceEnvironmentMutation(state, record.creationId, "rolled-back", this.#now())
-      ));
-      return rejected("git", "git-failed", true);
-    } catch {
-      await this.#markIndeterminate(record);
-      return rejected("git", "repository-indeterminate", true);
-    }
-  }
-
-  async #markRollbackProtected(record: EnvironmentMutationRecoveryRecord): Promise<WorktreeCreationResult> {
-    try {
-      await this.#workbenchState.update((state) => (
-        advanceEnvironmentMutation(state, record.creationId, "rollback-pending", this.#now())
-      ));
-      await this.#workbenchState.update((state) => (
-        advanceEnvironmentMutation(state, record.creationId, "rollback-protected", this.#now())
-      ));
-    } catch {
-      await this.#markIndeterminate(record);
-      return rejected("git", "repository-indeterminate", true);
-    }
-    this.#scheduler.fence(record.repositoryGroupId);
-    return rejected("rollback", "rollback-protected", false);
-  }
-
-  async #markIndeterminate(record: EnvironmentMutationRecoveryRecord): Promise<void> {
-    this.#scheduler.fence(record.repositoryGroupId);
-    await this.#workbenchState.update((state) => {
-      const current = state.environmentMutations.find((candidate) => candidate.creationId === record.creationId);
-      if (!current || current.state === "indeterminate" || isTerminalCreationState(current.state)) return state;
-      return advanceEnvironmentMutation(
-        state,
-        record.creationId,
-        "indeterminate",
-        monotonicNow(this.#now(), current.updatedAt)
-      );
-    }).catch(() => undefined);
-  }
-
   async #reserveProfilePath(repositoryId: string): Promise<PreparedWorktreeProfilePath> {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const token = this.#createToken();
@@ -429,5 +437,18 @@ export class WorktreeCreationService {
       }
     }
     throw serviceError("identity", "identity-collision", true);
+  }
+
+  #setStage(flight: CreationFlight, stage: WorktreeCreationActivity["stage"]): void {
+    const updatedAt = Math.max(this.#now(), flight.activity.updatedAt);
+    const budgetMs = stage === "queued" ? undefined : CREATION_STAGE_BUDGETS[stage];
+    flight.activity = {
+      creationId: flight.activity.creationId,
+      stage,
+      startedAt: updatedAt,
+      updatedAt,
+      ...(budgetMs ? { budgetMs } : {}),
+      cancellable: true
+    };
   }
 }

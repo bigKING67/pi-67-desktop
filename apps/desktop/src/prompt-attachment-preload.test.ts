@@ -72,15 +72,60 @@ describe("prompt attachment preload staging", () => {
     expect(selected.arrayBuffer).not.toHaveBeenCalled();
     expect(invoke).not.toHaveBeenCalled();
   });
+
+  it("accepts only an exact source binding for HEIC-to-JPEG normalization", async () => {
+    const selected = file("camera.heic", 12, "image/heic");
+    const invoke = vi.fn(async () => [{
+      id: "normalized_camera",
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8,
+      kind: "image",
+      normalization: {
+        kind: "heic-to-jpeg",
+        sourceName: "camera.heic",
+        sourceMimeType: "image/heic",
+        sourceByteLength: 12
+      }
+    }]);
+
+    await expect(stagePromptAttachmentsFromPreload([selected.value], {
+      getPathForFile: () => "/private/camera.heic",
+      invoke
+    })).resolves.toEqual([expect.objectContaining({
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8
+    })]);
+    expect(selected.arrayBuffer).not.toHaveBeenCalled();
+
+    invoke.mockResolvedValueOnce([{
+      id: "forged_camera",
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8,
+      kind: "image",
+      normalization: {
+        kind: "heic-to-jpeg",
+        sourceName: "other.heic",
+        sourceMimeType: "image/heic",
+        sourceByteLength: 12
+      }
+    }]);
+    await expect(stagePromptAttachmentsFromPreload([selected.value], {
+      getPathForFile: () => "/private/camera.heic",
+      invoke
+    })).rejects.toThrow("does not match");
+  });
 });
 
-function file(name: string, size: number) {
+function file(name: string, size: number, type = "text/plain") {
   const arrayBuffer = vi.fn(async () => new ArrayBuffer(size));
   return {
     arrayBuffer,
     value: {
       name,
-      type: "text/plain",
+      type,
       size,
       lastModified: 1,
       arrayBuffer

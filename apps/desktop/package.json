@@ -7,11 +7,13 @@
     ".": "./dist/main.mjs"
   },
   "scripts": {
-    "build": "tsdown src/main.ts --format esm --dts false && tsdown src/preload.ts --config tsdown.preload.config.ts && node ../../eng/quality/verify-sandbox-preload-bundle.mjs dist/preload.cjs",
+    "build": "tsdown src/main.ts src/prompt-image-normalization-worker.ts --format esm --dts false && tsdown src/preload.ts --config tsdown.preload.config.ts && node ../../eng/quality/verify-sandbox-preload-bundle.mjs dist/preload.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@napi-rs/canvas": "1.0.3",
     "@pi67/protocol": "workspace:*",
+    "heic-decode": "2.1.0",
     "semver": "7.7.4"
   },
   "peerDependencies": {

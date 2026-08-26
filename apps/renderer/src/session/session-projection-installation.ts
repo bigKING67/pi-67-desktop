@@ -74,6 +74,7 @@ export function beginSessionSnapshotReplacement(
       interaction: undefined,
       queue: undefined,
       resources: undefined,
+      resourceCatalog: undefined,
       usage: undefined,
       compatibility: undefined,
       revisions: incrementAllSessionProjectionRevisions(state.revisions)
@@ -109,6 +110,7 @@ export function commitSessionSnapshotReplacement(
       interaction: interactionProjectionFromSnapshot(snapshot),
       queue: queueProjectionFromSnapshot(snapshot),
       resources: snapshot.resources,
+      resourceCatalog: snapshot.resourceCatalog,
       usage: snapshot.stats,
       compatibility: snapshot.compatibility,
       recoverySessionFileIdentity: snapshot.sessionFileIdentity,
@@ -133,6 +135,7 @@ export function resetSessionProjection(
     interaction: undefined,
     queue: undefined,
     resources: undefined,
+    resourceCatalog: undefined,
     usage: undefined,
     compatibility: undefined,
     recoverySessionFileIdentity: options?.preserveRecoverySessionIdentity

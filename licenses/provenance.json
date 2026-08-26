@@ -345,6 +345,201 @@
       },
       "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
       "modifications": "Reimplemented pre-dispatch oversized Prompt validation with Chinese recovery copy, existing Pi-67 inline alert presentation, preserved drafts and attachments, and a no-Session-creation guard for provisional submissions. No t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/orchestration/Layers/ProviderRuntimeIngestion.ts",
+      "sourceSha256": "efb4815aee0e584988755ded36d366ef61aca34b50898bac601ae5bd674d4bc5",
+      "targetPath": "packages/pi-runtime/src/tool-execution-projection.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented streaming Tool payload projection over Pi SDK events with collection-time text bounds, redaction, truthful truncation, and terminal delivery. Effect orchestration, persistence, RPC, and t3code source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/orchestration/ActivityPayloadProjection.ts",
+      "sourceSha256": "19aa53d6039519e0871bbec95ce8843d4155fbc60cee3d9bc8d6b37e00bc8bbd",
+      "targetPath": "packages/pi-runtime/src/tool-execution-projection.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented the payload-to-safe-projection boundary as a bounded Pi Tool progress and failure projection. Raw Tool payloads remain transient and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/orchestration/Layers/ProjectionSnapshotQuery.ts",
+      "sourceSha256": "a926a3aad5e7f07acd353fcd8e9f1dc8e101b75a2dde88c22e62fcbc0f472bde",
+      "targetPath": "packages/pi-runtime/src/session-snapshot.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented bounded projection materialization as a metadata-only Pi Resource catalog with item, aggregate-text, and field budgets plus explicit truncation disposition. Exact ResourceLoader state remains internal and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/state/query.ts",
+      "sourceSha256": "7e8091ea2708815bd323a2fcddc1ab55b8fc2f9c9fd5ced618072863005220c0",
+      "targetPath": "apps/renderer/src/query/renderer-read-query-client.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented last-success retention and explicit loading, refreshing, unavailable, and error states as a disposable Renderer read-query snapshot. Pi JSONL and Agent Host remain authoritative, and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/state/use-atom-query-runner.ts",
+      "sourceSha256": "94ba841ba9821939a63e4456fcc1f1a0f17cad8fe12066ffdb9786b1a3ea517b",
+      "targetPath": "apps/renderer/src/query/use-renderer-read-query.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented a shared React subscription and query-observer runner over the existing MessagePort AgentConnectionController. Effect, Atom runtime, RPC, and t3code source code were not copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/state/queries.ts",
+      "sourceSha256": "41801512ad2db04f53f6994539116c11cc222f2508798b930f3b42d69b24738e",
+      "targetPath": "apps/renderer/src/query/renderer-read-query-client.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented exact command, Workspace context, and payload query keys with bounded retained cache, keyed single-flight execution, cancellation, and Host stale-result fencing. The kernel accepts only two explicit read commands and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/lib/imageCompression.ts",
+      "sourceSha256": "dc384032f3ebaa6fc2d7599ae775ba1d3fe186c9db4d6dd49df3ddd62de3f2dc",
+      "targetPath": "apps/desktop/src/prompt-image-inspection.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented content identification and bounded ISO BMFF ispe inspection for the Desktop staging boundary, plus strict metadata-free JPEG validation. The implementation does not copy t3code source or use its Renderer decoder."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/lib/imageCompression.ts",
+      "sourceSha256": "dc384032f3ebaa6fc2d7599ae775ba1d3fe186c9db4d6dd49df3ddd62de3f2dc",
+      "targetPath": "apps/desktop/src/prompt-image-normalization-worker.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented HEIC main-image decoding and JPEG encoding in a bounded Desktop Node worker using different frozen dependencies. Renderer CSP, Pi runtime, Session truth, and Agent Host attachment claims remain unchanged."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/lib/imageCompression.ts",
+      "sourceSha256": "dc384032f3ebaa6fc2d7599ae775ba1d3fe186c9db4d6dd49df3ddd62de3f2dc",
+      "targetPath": "apps/desktop/src/prompt-attachment-staging.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented HEIC-to-JPEG normalization before the existing opaque staged manifest, including source binding, hash validation, metadata removal, atomic replacement, retryable failure, and cleanup. No t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/web/src/lib/imageCompression.test.ts",
+      "sourceSha256": "3d82a1f3159b5ec18f683230070dcdfb62a20b43ff347a3fe81ed2b4cd683eaa",
+      "targetPath": "apps/desktop/src/prompt-image-inspection.test.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented behavioral coverage for HEIC and HEIF brands, 48 MP inputs, malformed metadata, pixel and dimension bombs, and metadata-free JPEG output using Pi-67-owned fixtures and limits. No t3code test code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "sourceSha256": "6e6faf75bef4bde73988ee40e4aa54a88d55dede190e3d84d5c321c491e731e7",
+      "targetPath": "apps/desktop/src/worktree-git-runner.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented the longer Worktree checkout budget and post-checkout Submodule concern through Pi-67 private Git, bounded output, AbortSignal cancellation, local-object-only initialization, and a separate explicit network action. No t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/vcs/GitVcsDriverCore.ts",
+      "sourceSha256": "6e6faf75bef4bde73988ee40e4aa54a88d55dede190e3d84d5c321c491e731e7",
+      "targetPath": "apps/desktop/src/worktree-creation-service.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented staged Worktree creation with measured budgets, supplemental progress, queued and active cancellation, confirmed rollback, and truthful Submodule completeness. Pi-67 mutation journals and Workspace authority remain unchanged, and no t3code source code was copied."
+    },
+    {
+      "sourceRepository": "https://github.com/pingdotgg/t3code",
+      "sourceCommit": "504177797676048bf70f64ce56c21949d0b8a018",
+      "sourcePath": "apps/server/src/orchestration/Layers/ProviderCommandReactor.ts",
+      "sourceSha256": "3f319cec4693f537655bedc699a5ef71ee1079d44a167c3948e5e482df643242",
+      "targetPath": "apps/desktop/src/repository-worktree-action-service.ts",
+      "reuseType": "reimplemented",
+      "license": {
+        "spdx": "MIT",
+        "path": "LICENSE",
+        "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43"
+      },
+      "copyrightNotice": "Copyright (c) 2026 T3 Tools Inc.",
+      "modifications": "Reimplemented missing app-owned Worktree handling as an explicit user action with exact durable authority, targeted stale-registration reconciliation, clean identity verification, and retry after state-write failure. Provider turns never repair Worktrees, repository-wide prune is forbidden, and no t3code source code was copied."
     }
   ]
 }

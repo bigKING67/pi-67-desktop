@@ -38,7 +38,6 @@ import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.
 
 export { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge-contract.js";
 export type { MockDesktopBridgeOptions, MockWorkspaceDescriptor } from "./pi67-renderer-desktop-bridge-contract.js";
-
 type MockDesktopPrimaryBridge = Omit<
   DesktopSystemBridge,
   | keyof MockDesktopCapabilityBridge
@@ -201,6 +200,8 @@ export async function installMockDesktopBridge(
               }
             };
           },
+          getWorktreeCreationActivity: async () => ({ status: "inactive" as const }),
+          cancelWorktreeCreation: async () => ({ status: "inactive" as const }),
           advanceWorktreeEnvironment: async () => {
             worktreeTest.advanceCalls += 1;
             return {
@@ -454,6 +455,5 @@ export async function installMockDesktopBridge(
       if (surface?.kind === "conversation") return surface.conversation.workspaceId;
       return undefined;
     }
-
   }, fixture);
 }

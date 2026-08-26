@@ -4,7 +4,8 @@ import {
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_INLINE_IMAGE_TOTAL_BYTES,
   type PromptAttachmentKind,
-  type StagedPromptAttachment
+  type StagedPromptAttachment,
+  type StagedPromptAttachmentResult
 } from "@pi67/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -17,7 +18,9 @@ import {
 } from "./composer-attachments.js";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
-const stagePromptAttachments = vi.fn(async (files: File[]) => files.map(stagedAttachment));
+const stagePromptAttachments = vi.fn<(files: File[]) => Promise<StagedPromptAttachmentResult[]>>(
+  async (files: File[]) => files.map(stagedAttachment)
+);
 const releasePromptAttachments = vi.fn(async (_ids: string[]) => undefined);
 
 beforeEach(() => {
@@ -70,6 +73,64 @@ describe("Composer attachments", () => {
     expect(removeDraftAttachment([attachment], attachment.id)).toEqual([]);
     expect(revoke).toHaveBeenCalledWith("blob:preview");
     expect(releasePromptAttachments).toHaveBeenCalledWith([attachment.id]);
+  });
+
+  it("accepts normalized HEIC source binding without exposing the original HEIC blob", async () => {
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL");
+    const source = attachmentFile("camera.heic", 12, "image/heic");
+    stagePromptAttachments.mockResolvedValueOnce([{
+      id: "normalized-camera",
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8,
+      kind: "image",
+      normalization: {
+        kind: "heic-to-jpeg",
+        sourceName: "camera.heic",
+        sourceMimeType: "image/heic",
+        sourceByteLength: 12
+      }
+    }]);
+
+    await expect(stageDraftAttachments([source], [])).resolves.toEqual([{
+      id: "normalized-camera",
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8,
+      kind: "image",
+      identity: ["camera.heic", "image/heic", "12", "1"].join("\0")
+    }]);
+    expect(createObjectUrl).not.toHaveBeenCalled();
+  });
+
+  it("rejects forged normalization binding and leaves the existing draft unchanged", async () => {
+    const current: DraftAttachment[] = [{
+      id: "existing",
+      name: "existing.txt",
+      mimeType: "text/plain",
+      byteLength: 4,
+      kind: "document",
+      identity: "existing"
+    }];
+    stagePromptAttachments.mockResolvedValueOnce([{
+      id: "forged-camera",
+      name: "camera.jpg",
+      mimeType: "image/jpeg",
+      byteLength: 8,
+      kind: "image",
+      normalization: {
+        kind: "heic-to-jpeg",
+        sourceName: "other.heic",
+        sourceMimeType: "image/heic",
+        sourceByteLength: 12
+      }
+    }]);
+
+    await expect(stageDraftAttachments([
+      attachmentFile("camera.heic", 12, "image/heic")
+    ], current)).rejects.toThrow("不一致");
+    expect(current).toHaveLength(1);
+    expect(releasePromptAttachments).toHaveBeenCalledWith(["forged-camera"]);
   });
 
   it("rejects duplicates and bounded-count or byte-limit violations before staging", async () => {

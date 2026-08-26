@@ -1,6 +1,7 @@
 import type {
   ActiveProposedPlan,
   PlanLifecycleChange,
+  ResourceCatalogDisposition,
   ResourceSummary,
   SessionControlResult,
   SessionModelCatalogResult,
@@ -53,6 +54,7 @@ export interface SessionProjectionData {
   interaction: SessionInteractionProjection | undefined;
   queue: SessionQueueProjection | undefined;
   resources: ResourceSummary[] | undefined;
+  resourceCatalog: ResourceCatalogDisposition | undefined;
   usage: SessionSnapshot["stats"];
   compatibility: SessionSnapshot["compatibility"];
   recoverySessionFileIdentity: string | undefined;

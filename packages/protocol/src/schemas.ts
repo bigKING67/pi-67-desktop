@@ -3,6 +3,7 @@ import {
   MAX_SLASH_COMMAND_DESCRIPTION_CHARS,
   MAX_SLASH_COMMAND_ITEMS,
   MAX_SLASH_COMMAND_NAME_CHARS,
+  MAX_RESOURCE_CATALOG_ITEMS,
   MAX_SESSION_FILE_IDENTITY_CHARS
 } from "@pi67/domain";
 import type { AgentCommandType, AgentEventType } from "./agent-messages.js";
@@ -73,6 +74,8 @@ import {
   SessionModelCatalogResultSchema
 } from "./session-control-schemas.js";
 import {
+  ResourceCatalogDispositionSchema,
+  ResourceCatalogProjectionSchema,
   ResourceSummarySchema,
   SessionResourceCatalogResultSchema
 } from "./session-resource-schemas.js";
@@ -125,7 +128,8 @@ const SessionSnapshotSchema = strictObject({
   steeringQueue: Type.Array(Type.String()),
   followUpQueue: Type.Array(Type.String()),
   tree: SessionTreeProjectionSchema,
-  resources: Type.Array(ResourceSummarySchema),
+  resources: Type.Array(ResourceSummarySchema, { maxItems: MAX_RESOURCE_CATALOG_ITEMS }),
+  resourceCatalog: Type.Optional(ResourceCatalogDispositionSchema),
   interactionMode: Type.Optional(SessionInteractionModeSchema),
   activeProposedPlan: Type.Optional(ActiveProposedPlanSchema),
   planLifecycle: Type.Optional(PlanLifecycleChangeSchema),
@@ -315,7 +319,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "vision.assistant.global.set": PiProviderConfigurationSnapshotSchema,
   "vision.assistant.project.set": PiProviderConfigurationSnapshotSchema,
   "thinking.set": SessionControlResultSchema,
-  "resource.list": Type.Array(ResourceSummarySchema),
+  "resource.list": ResourceCatalogProjectionSchema,
   "resource.reload": SessionResourceCatalogResultSchema,
   "context.file.list": ContextFileCatalogResultSchema,
   "context.file.read": ContextFileReadResultSchema,

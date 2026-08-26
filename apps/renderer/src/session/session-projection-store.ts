@@ -48,6 +48,7 @@ export const useSessionProjectionStore = create<SessionProjectionState>((set, ge
   interaction: undefined,
   queue: undefined,
   resources: undefined,
+  resourceCatalog: undefined,
   usage: undefined,
   compatibility: undefined,
   recoverySessionFileIdentity: undefined,

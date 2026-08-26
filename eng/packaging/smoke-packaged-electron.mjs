@@ -28,6 +28,7 @@ import { verifyPackagedLarkSettings } from "./packaged-lark-settings-smoke.mjs";
 import { verifyPackagedExtensionUpdateCheck, verifyPackagedSkillUpdateCheck } from "./packaged-package-update-smoke.mjs";
 import { verifyPackagedProviderSettings } from "./packaged-provider-settings-smoke.mjs";
 import { verifyPackagedSessionCreation } from "./packaged-session-creation-smoke.mjs";
+import { verifyPackagedHeicAttachment } from "./packaged-heic-attachment-smoke.mjs";
 import { assertPackagedSkillSuites } from "./smoke-packaged-skill-suites.mjs";
 import { assertNoWorkspaceChangesAuthorityWarning, verifyPackagedChangesInspector } from "./packaged-changes-inspector-smoke.mjs";
 const artifact = resolvePackagedArtifact();
@@ -302,6 +303,8 @@ try {
     const returnedSurface = await inspectRendererSurface(window);
     throw new Error(`Packaged Settings did not return to the conversation: ${JSON.stringify(returnedSurface)}`, { cause: error });
   }
+  const heicAttachment = await verifyPackagedHeicAttachment({ artifact, userDataDirectory, window });
+  console.info(`Packaged HEIC attachment: ${JSON.stringify(heicAttachment)}`);
   await capturePackagedWorkbenchVisualEvidence(application, window);
   await startControlledPrompt(window);
   await window.getByRole("button", { name: "停止", exact: true }).click({ timeout: 10_000 });

@@ -9,11 +9,14 @@ import { gte as semverGreaterThanOrEqual, valid as validSemver } from "semver";
 export const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 export const packagedAttachmentRequiredAsarPaths = [
+  "apps/desktop/dist/prompt-image-normalization-worker.mjs",
   "apps/agent-host/dist/prompt-attachment-worker.mjs",
   "apps/agent-host/dist/skill-pack-process-worker.mjs",
   "node_modules/mediainfo.js/dist/MediaInfoModule.wasm",
   "node_modules/officeparser/package.json",
   "node_modules/officeparser/dist/index.mjs",
+  "node_modules/heic-decode/index.js",
+  "node_modules/libheif-js/libheif-wasm/libheif-bundle.js",
   "node_modules/tesseract.js/src/worker-script/node/index.js",
   "node_modules/tesseract.js-core/tesseract-core.js",
   "node_modules/tesseract.js-core/tesseract-core.wasm",

@@ -164,14 +164,26 @@ test("keeps Session search failures observable instead of presenting an authorit
   await page.goto("/");
   await attachMockAgent(page);
   await page.getByRole("button", { name: "选择工作区" }).click();
+  await waitForMockWorkspaceReady(page);
+  await expect.poll(async () => (await recordedCommands(page)).includes(
+    "session.catalog.query"
+  )).toBe(true);
   await setMockAgentResponseFailure(page, "session.catalog.query", {
     code: "INTERNAL",
     message: "fixture catalog failure",
     recoverable: true
   });
+  await clearRecordedCommands(page);
   await page.keyboard.press("Control+k");
 
   await page.getByLabel("搜索对话标题、正文、扩展命令和应用操作").fill("definitely-missing-session");
+  await expect.poll(async () => (await recordedCommandDetails(page)).filter((command) => (
+    command.type === "session.catalog.query"
+    && (command.payload as { search?: string }).search === "definitely-missing-session"
+  ))).toEqual([expect.objectContaining({
+    type: "session.catalog.query",
+    payload: expect.objectContaining({ search: "definitely-missing-session" })
+  })]);
   await expect(page.getByRole("status").filter({ hasText: "对话目录查询失败" })).toBeVisible();
   await expect(page.getByText("对话目录暂时不可用", { exact: true })).toBeVisible();
 });

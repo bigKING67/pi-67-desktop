@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "rea
 import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
 import { useAppStore } from "../app/app-store.js";
 import { messages } from "../localization/message-catalog.js";
-import { importRendererSessionFile } from "../session/session-import-controller.js";
 import {
   rendererWorkbenchStore,
   rendererConversationIdentity,
@@ -29,17 +28,13 @@ import {
   moveRendererWorkspace,
   repairAndOpenRendererWorkspace
 } from "../workbench/workspace-registration-controller.js";
-import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { ConversationRow } from "./ConversationRow.js";
 import { ConversationContentResult } from "./ConversationContentResult.js";
 import styles from "./NavigationRail.module.css";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { useConversationSnoozeClock } from "./conversation-snooze-clock.js";
-import {
-  loadMoreSessionCatalog,
-  queryFirstSessionCatalog
-} from "./session-catalog-controller.js";
+import { loadMoreSessionCatalog } from "./session-catalog-controller.js";
 import {
   selectWorkspaceSessionCatalog,
   useSessionCatalogStore,
@@ -51,6 +46,10 @@ import {
   workspaceStatus
 } from "./workspace-conversation-model.js";
 import type { NavigationMessageSearchWorkspaceState } from "./use-navigation-message-search.js";
+import {
+  importSessionIntoWorkspace,
+  refreshWorkspaceConversations
+} from "./workspace-conversation-actions.js";
 
 const RECENT_SESSION_LIMIT = 6;
 
@@ -333,10 +332,16 @@ function WorkspaceConversationGroup({
               ))}
             </div>
           ) : null}
-          {query && messageSearch?.status === "loading" ? (
+          {query && (
+            messageSearch?.status === "loading"
+            || messageSearch?.status === "refreshing"
+          ) ? (
             <p aria-live="polite" className={styles.catalogNotice} role="status">正在建立或查询对话内容索引…</p>
           ) : null}
-          {query && messageSearch?.status === "failed" ? (
+          {query && (
+            messageSearch?.status === "failed"
+            || messageSearch?.status === "unavailable"
+          ) ? (
             <p className={styles.catalogNotice} role="status">对话内容索引暂时不可用，当前仅显示对话名称结果。</p>
           ) : null}
           {query && messageSearch?.status === "ready" && messageSearch.incomplete ? (
@@ -420,10 +425,10 @@ function WorkspaceMenu({
       </Button>
       <Popover className={styles.menuPopover!} placement="bottom end" offset={5}>
         <Menu className={styles.menu!} aria-label={`${workspace.displayName} 工作区菜单`}>
-          <MenuItem className={styles.menuItem!} onAction={() => void refreshWorkspace(workspace)} textValue="刷新对话">
+          <MenuItem className={styles.menuItem!} onAction={() => void refreshWorkspaceConversations(workspace)} textValue="刷新对话">
             <RefreshCw aria-hidden="true" size={14} />刷新对话
           </MenuItem>
-          <MenuItem className={styles.menuItem!} onAction={() => void importIntoWorkspace(workspace)} textValue="导入 Pi Session">
+          <MenuItem className={styles.menuItem!} onAction={() => void importSessionIntoWorkspace(workspace)} textValue="导入 Pi Session">
             <FileInput aria-hidden="true" size={14} />导入 Pi Session
           </MenuItem>
           <MenuItem className={styles.menuItem!} onAction={() => useConversationDialogStore.getState().openArchived(workspace.id)} textValue="已归档对话">
@@ -443,15 +448,4 @@ function WorkspaceMenu({
       </Popover>
     </MenuTrigger>
   );
-}
-
-async function refreshWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
-  await queryFirstSessionCatalog(workspace.id, { refresh: true });
-}
-
-async function importIntoWorkspace(workspace: WorkspaceDescriptor): Promise<void> {
-  if (useAppStore.getState().workspace !== workspace.identity.canonicalPath) {
-    await openRendererWorkspaceDescriptor(workspace);
-  }
-  await importRendererSessionFile();
 }

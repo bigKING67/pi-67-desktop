@@ -14,6 +14,7 @@ import {
 import {
   selectSessionId,
   selectSessionName,
+  selectSessionResourceCatalog,
   selectSessionResources,
   selectSessionStats
 } from "../session/session-projection-selectors.js";
@@ -25,6 +26,7 @@ export function RuntimeContextPanel() {
   const projectedSessionName = useSessionProjectionStore(selectSessionName);
   const projectedStats = useSessionProjectionStore(selectSessionStats);
   const projectedResources = useSessionProjectionStore(selectSessionResources);
+  const projectedResourceCatalog = useSessionProjectionStore(selectSessionResourceCatalog);
   const projectionAuthority = useSessionProjectionStore((state) => state.authority);
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
@@ -38,6 +40,7 @@ export function RuntimeContextPanel() {
   const sessionName = projectionCurrent ? projectedSessionName : undefined;
   const stats = projectionCurrent ? projectedStats : undefined;
   const resources = projectionCurrent ? projectedResources : undefined;
+  const resourceCatalog = projectionCurrent ? projectedResourceCatalog : undefined;
   const statuses = useExtensionUiStore((state) => state.statuses);
   const compatibility = useExtensionUiStore((state) => state.compatibility);
   const extensionCatalog = useCommittedExtensionCatalog();
@@ -71,10 +74,16 @@ export function RuntimeContextPanel() {
       </div>
       <ExtensionCatalog catalog={extensionCatalog} />
       <div className="context-heading">
-        <div><span className="section-label"><PackageOpen size={13} /> Pi 资源</span><strong>{resources?.length ?? 0} 项</strong></div>
+        <div>
+          <span className="section-label"><PackageOpen size={13} /> Pi 资源</span>
+          <strong>{resourceCatalog
+            ? `${resourceCatalog.projectedItems}/${resourceCatalog.totalItems} 项`
+            : `${resources?.length ?? 0} 项`}</strong>
+        </div>
         <SessionResourceReloadButton compact />
       </div>
       <div className="resource-list">
+        {resourceCatalog?.truncated ? <ContextEmpty text={resourceCatalogNotice(resourceCatalog)} /> : null}
         {resources?.length ? resources.map((resource) => (
           <div className="resource-row" key={`${resource.kind}-${resource.id}`}>
             <span className={`resource-status status-${resource.status}`} aria-label={resource.status} />
@@ -86,6 +95,11 @@ export function RuntimeContextPanel() {
       </div>
     </>
   );
+}
+
+function resourceCatalogNotice(catalog: NonNullable<ReturnType<typeof selectSessionResourceCatalog>>): string {
+  const fields = catalog.truncatedFields > 0 ? `，${catalog.truncatedFields} 个字段已缩短` : "";
+  return `目录投影已限制：省略 ${catalog.omittedItems} 项${fields}；Pi 内部加载状态保持完整。`;
 }
 
 function ContextEmpty({ text }: { text: string }) {

@@ -17,6 +17,7 @@ export type RepositoryEnvironmentFailureStage =
   | "repository-root"
   | "common-dir"
   | "worktree-list"
+  | "submodule-status"
   | "identity"
   | "state"
   | "catalog";
@@ -58,6 +59,21 @@ export interface WorktreeObservation {
   locked: boolean;
 }
 
+export interface RepositorySubmoduleObservation {
+  status: "not-configured" | "complete" | "incomplete" | "conflicted";
+  total: number;
+  uninitialized: number;
+  divergent: number;
+  conflicted: number;
+  networkActionRequired: boolean;
+}
+
+export interface RepositoryWorktreeRecoveryView {
+  kind: "app-owned-worktree";
+  action: "recreate-committed-state";
+  unrecoverableData: "uncommitted-and-untracked";
+}
+
 export interface RepositoryEnvironmentSnapshot {
   workspaceId: WorkspaceId;
   status: RepositoryEnvironmentStatus;
@@ -66,6 +82,8 @@ export interface RepositoryEnvironmentSnapshot {
   stale: boolean;
   repository?: RepositoryIdentityView;
   worktrees: WorktreeObservation[];
+  submodules?: RepositorySubmoduleObservation;
+  recovery?: RepositoryWorktreeRecoveryView;
   error?: RepositoryEnvironmentError;
 }
 
@@ -123,7 +141,9 @@ export function staleRepositoryEnvironmentSnapshot(
     stale: true,
     error: { ...error },
     ...(previous.repository ? { repository: { ...previous.repository } } : {}),
-    worktrees: previous.worktrees.map((worktree) => ({ ...worktree }))
+    worktrees: previous.worktrees.map((worktree) => ({ ...worktree })),
+    ...(previous.submodules ? { submodules: { ...previous.submodules } } : {}),
+    ...(previous.recovery ? { recovery: { ...previous.recovery } } : {})
   };
 }
 

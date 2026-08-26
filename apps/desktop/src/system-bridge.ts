@@ -27,10 +27,7 @@ import { resolveRegisteredWorkspaceEntry } from "./workspace-entry.js";
 import type { WorkspaceFileStateStore } from "./workspace-file-state.js";
 import type { ComposerDraftStateStore } from "./composer-draft-state.js";
 import { NativeNotificationManager } from "./native-notification-manager.js";
-import {
-  openBrowser67ExtensionPage,
-  type Browser67BrowserId
-} from "./browser67-integration.js";
+import { openBrowser67ExtensionPage, type Browser67BrowserId } from "./browser67-integration.js";
 import {
   asExternalUrl,
   asNativeNotificationId,
@@ -45,14 +42,12 @@ import {
   type RepositoryEnvironmentInspectionBridge,
   type RepositoryWorkingTreeBridge
 } from "./repository-environment-bridge.js";
-import {
-  registerWorktreeCreationBridge,
-  type WorktreeCreationBridge
-} from "./worktree-creation-bridge.js";
+import { registerWorktreeCreationBridge, type WorktreeCreationBridge } from "./worktree-creation-bridge.js";
 import type { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js";
 import type { PromptStashImageStore } from "./prompt-stash-image-store.js";
 import { registerPromptInputBridge } from "./prompt-input-bridge.js";
 import type { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
+import type { RepositoryWorktreeActionService } from "./repository-worktree-action-service.js";
 
 export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
@@ -71,6 +66,7 @@ export interface SystemBridgeOptions {
   workspaceFileState: WorkspaceFileStateStore;
   repositoryEnvironmentInspection: RepositoryEnvironmentInspectionBridge;
   repositoryWorkingTree: RepositoryWorkingTreeBridge;
+  repositoryWorktreeActions: Pick<RepositoryWorktreeActionService, "initializeSubmodules" | "recoverAppOwnedWorktree">;
   repositoryGitRunner: Pick<BoundedPrivateGitRunner, "diagnostics">;
   worktreeCreation: WorktreeCreationBridge;
   repositoryMutationScheduler: Pick<RepositoryMutationScheduler, "diagnostics" | "dispose">;
@@ -165,7 +161,11 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   ));
   registerPromptInputBridge(options.promptAttachments, options.promptStashImages);
   ipcMain.handle("pi67:workbench-load", async () => (await workbenchState.load()).state);
-  registerRepositoryEnvironmentBridge(options.repositoryEnvironmentInspection, options.repositoryWorkingTree);
+  registerRepositoryEnvironmentBridge(
+    options.repositoryEnvironmentInspection,
+    options.repositoryWorkingTree,
+    options.repositoryWorktreeActions
+  );
   registerWorktreeCreationBridge(options.worktreeCreation);
   ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
   ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
@@ -440,6 +440,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
     dispose: () => {
       nativeNotifications.dispose();
       updateController.dispose();
+      options.worktreeCreation.dispose?.();
       options.repositoryMutationScheduler.dispose();
       options.repositoryEnvironmentInspection.dispose();
       options.repositoryWorkingTree.dispose();

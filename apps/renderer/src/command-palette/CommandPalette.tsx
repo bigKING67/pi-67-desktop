@@ -69,8 +69,8 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [selectedKey, setSelectedKey] = useState<string>();
   const [keyboardNavigationActive, setKeyboardNavigationActive] = useState(false);
-  const sessionSearch = usePaletteSessions({ open, connected, hostEpoch, query });
-  const messageSearch = usePaletteMessageSearch({ open, connected, hostEpoch, query });
+  const sessionSearch = usePaletteSessions({ open, connected, query });
+  const messageSearch = usePaletteMessageSearch({ open, query });
   const extensionCommands = usePaletteExtensionCommands({ open, connected, hostEpoch });
 
   const actions = useMemo(() => [
@@ -298,11 +298,17 @@ function paletteStatus(options: {
   messageSearch: ReturnType<typeof usePaletteMessageSearch>;
 }): string {
   if (options.messageSearch.status === "failed") return options.messageSearch.error ?? "对话正文搜索失败";
-  if (options.messageSearch.status === "loading") return "正在建立或查询对话内容索引…";
+  if (
+    options.messageSearch.status === "loading"
+    || options.messageSearch.status === "refreshing"
+  ) return "正在建立或查询对话内容索引…";
   if (options.messageSearch.incomplete) return "对话内容索引尚未完整覆盖当前工作区";
   if (options.sessionSearch.status === "failed") return options.sessionSearch.error;
   if (options.extensionStatus === "failed") return messages.commandPalette.extensionLoadFailedWithFallback;
-  if (options.sessionSearch.status === "loading") return messages.commandPalette.searchingSessions;
+  if (
+    options.sessionSearch.status === "loading"
+    || options.sessionSearch.status === "refreshing"
+  ) return messages.commandPalette.searchingSessions;
   if (options.extensionStatus === "loading") return messages.commandPalette.loadingExtensions;
   if (!options.connected || options.extensionStatus === "unavailable") {
     return messages.commandPalette.hostUnavailable;

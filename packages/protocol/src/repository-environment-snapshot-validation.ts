@@ -5,6 +5,7 @@ import {
   type RepositoryChangeDetail,
   type RepositoryEnvironmentError,
   type RepositoryEnvironmentSnapshot,
+  type RepositorySubmoduleObservation,
   type RepositoryWorkingTreeChange,
   type RepositoryWorkingTreeSnapshot,
   type WorktreeObservation
@@ -26,6 +27,7 @@ const FAILURE_STAGES = new Set<RepositoryEnvironmentError["stage"]>([
   "repository-root",
   "common-dir",
   "worktree-list",
+  "submodule-status",
   "identity",
   "state",
   "catalog"
@@ -135,11 +137,12 @@ function isReadySnapshot(value: Record<string, unknown>): boolean {
     "stale",
     "repository",
     "worktrees"
-  ], ["error"])) return false;
+  ], ["error", "submodules"])) return false;
   if (!isRepositoryIdentity(value.repository) || !isWorktreeList(value.worktrees, false)) {
     return false;
   }
   if (value.error !== undefined && !isEnvironmentError(value.error)) return false;
+  if (value.submodules !== undefined && !isSubmoduleObservation(value.submodules)) return false;
 
   const ids = new Set<string>();
   for (const worktree of value.worktrees) {
@@ -171,8 +174,38 @@ function isFailureSnapshot(value: Record<string, unknown>): boolean {
     "stale",
     "worktrees",
     "error"
+  ], ["recovery"])) return false;
+  return isWorktreeList(value.worktrees, true)
+    && isEnvironmentError(value.error)
+    && (value.recovery === undefined || isRecoveryView(value.recovery));
+}
+
+function isSubmoduleObservation(value: unknown): value is RepositorySubmoduleObservation {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "status", "total", "uninitialized", "divergent", "conflicted", "networkActionRequired"
   ])) return false;
-  return isWorktreeList(value.worktrees, true) && isEnvironmentError(value.error);
+  if (!["not-configured", "complete", "incomplete", "conflicted"].includes(value.status as string)) return false;
+  if (![value.total, value.uninitialized, value.divergent, value.conflicted].every((count) => (
+    Number.isSafeInteger(count) && Number(count) >= 0 && Number(count) <= 10_000
+  ))) return false;
+  if (Number(value.uninitialized) + Number(value.divergent) + Number(value.conflicted) > Number(value.total)) {
+    return false;
+  }
+  if (typeof value.networkActionRequired !== "boolean") return false;
+  return !value.networkActionRequired || (
+    value.status === "incomplete"
+    && Number(value.uninitialized) > 0
+    && Number(value.divergent) === 0
+    && Number(value.conflicted) === 0
+  );
+}
+
+function isRecoveryView(value: unknown): boolean {
+  return isRecord(value)
+    && hasExactKeys(value, ["kind", "action", "unrecoverableData"])
+    && value.kind === "app-owned-worktree"
+    && value.action === "recreate-committed-state"
+    && value.unrecoverableData === "uncommitted-and-untracked";
 }
 
 function hasBaseFields(value: Record<string, unknown>): boolean {

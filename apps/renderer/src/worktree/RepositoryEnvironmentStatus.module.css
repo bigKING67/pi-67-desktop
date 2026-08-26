@@ -61,3 +61,25 @@
 @media (prefers-reduced-motion: reduce) {
   .spinning { animation: none; }
 }
+.statusGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action {
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border));
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.action:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}

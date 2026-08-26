@@ -185,12 +185,22 @@ describe("operationSubmissionIdentity", () => {
       label: "Testing",
       status: "ready" as const
     }];
+    const resourceCatalog = {
+      resources,
+      resourceCatalog: {
+        totalItems: 1,
+        projectedItems: 1,
+        omittedItems: 0,
+        truncatedFields: 0,
+        truncated: false
+      }
+    };
     const getSnapshot = vi.fn(() => {
       throw new Error("Query commands must not construct a Session snapshot.");
     });
     const runtime = {
       getModels: vi.fn(() => models),
-      getResources: vi.fn(() => resources),
+      getResources: vi.fn(() => resourceCatalog),
       getSnapshot
     } as unknown as AgentRuntime;
 
@@ -203,7 +213,7 @@ describe("operationSubmissionIdentity", () => {
       runtime,
       { type: "resource.list", payload: {} },
       {} as never
-    )).resolves.toEqual(resources);
+    )).resolves.toEqual(resourceCatalog);
     expect(getSnapshot).not.toHaveBeenCalled();
   });
 

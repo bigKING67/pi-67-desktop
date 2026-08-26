@@ -8,6 +8,43 @@ const WorkspaceIdSchema = Type.String({
   maxLength: 200,
   pattern: "^[A-Za-z0-9._:-]+$"
 });
+const PathSchema = Type.String({
+  minLength: 1,
+  maxLength: 32_768,
+  pattern: "^(?!.*\\x00)(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\[^\\\\]+\\\\[^\\\\]+)"
+});
+const DecimalBigintSchema = Type.String({ minLength: 1, maxLength: 40, pattern: "^(?:0|[1-9][0-9]*)$" });
+const WorkspaceIdentitySchema = Type.Union([
+  strictObject({
+    canonicalPath: PathSchema,
+    device: DecimalBigintSchema,
+    inode: DecimalBigintSchema,
+    birthtimeNs: Type.Optional(DecimalBigintSchema),
+    assurance: Type.Literal("filesystem")
+  }),
+  strictObject({
+    canonicalPath: PathSchema,
+    device: Type.Optional(DecimalBigintSchema),
+    inode: Type.Optional(DecimalBigintSchema),
+    birthtimeNs: Type.Optional(DecimalBigintSchema),
+    assurance: Type.Literal("path-only")
+  })
+]);
+const WorkspaceDescriptorSchema = strictObject({
+  id: WorkspaceIdSchema,
+  displayName: Type.String({ minLength: 1, maxLength: 1_024 }),
+  identity: WorkspaceIdentitySchema,
+  lastVerifiedAt: Type.Optional(Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER })),
+  trust: Type.Union([Type.Literal("unknown"), Type.Literal("trusted"), Type.Literal("untrusted")]),
+  trustProvenance: Type.Union([
+    Type.Literal("native-picker"), Type.Literal("user-confirmed"), Type.Literal("restored"),
+    Type.Literal("identity-changed"), Type.Literal("indirect")
+  ]),
+  availability: Type.Union([
+    Type.Literal("available"), Type.Literal("missing"), Type.Literal("identity-changed"),
+    Type.Literal("needs-confirmation"), Type.Literal("unavailable")
+  ])
+});
 
 const EnvironmentErrorSchema = strictObject({
   stage: Type.Union([
@@ -16,6 +53,7 @@ const EnvironmentErrorSchema = strictObject({
     Type.Literal("repository-root"),
     Type.Literal("common-dir"),
     Type.Literal("worktree-list"),
+    Type.Literal("submodule-status"),
     Type.Literal("identity"),
     Type.Literal("state"),
     Type.Literal("catalog")
@@ -48,6 +86,26 @@ const WorktreeObservationSchema = strictObject({
   locked: Type.Boolean()
 });
 
+const RepositorySubmoduleObservationSchema = strictObject({
+  status: Type.Union([
+    Type.Literal("not-configured"),
+    Type.Literal("complete"),
+    Type.Literal("incomplete"),
+    Type.Literal("conflicted")
+  ]),
+  total: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  uninitialized: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  divergent: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  conflicted: Type.Integer({ minimum: 0, maximum: 10_000 }),
+  networkActionRequired: Type.Boolean()
+});
+
+const RepositoryWorktreeRecoverySchema = strictObject({
+  kind: Type.Literal("app-owned-worktree"),
+  action: Type.Literal("recreate-committed-state"),
+  unrecoverableData: Type.Literal("uncommitted-and-untracked")
+});
+
 const SnapshotBase = {
   workspaceId: WorkspaceIdSchema,
   revision: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
@@ -78,6 +136,7 @@ export const RepositoryEnvironmentSnapshotSchema = Type.Union([
       currentWorktreeId: Type.String({ pattern: "^wt_[0-9a-f]{32}$" })
     }),
     worktrees: WorktreesSchema,
+    submodules: Type.Optional(RepositorySubmoduleObservationSchema),
     error: Type.Optional(EnvironmentErrorSchema)
   }),
   strictObject({
@@ -94,7 +153,54 @@ export const RepositoryEnvironmentSnapshotSchema = Type.Union([
       Type.Literal("error")
     ]),
     worktrees: EmptyWorktreesSchema,
+    recovery: Type.Optional(RepositoryWorktreeRecoverySchema),
     error: EnvironmentErrorSchema
+  })
+]);
+
+export const RepositorySubmoduleInitializationRequestSchema = strictObject({
+  workspaceId: WorkspaceIdSchema,
+  mode: Type.Literal("network-explicit")
+});
+
+export const RepositorySubmoduleInitializationResultSchema = Type.Union([
+  strictObject({
+    status: Type.Union([Type.Literal("initialized"), Type.Literal("incomplete")]),
+    submodules: RepositorySubmoduleObservationSchema
+  }),
+  strictObject({
+    status: Type.Literal("rejected"),
+    error: Type.Union([
+      Type.Literal("invalid-request"),
+      Type.Literal("workspace-unavailable"),
+      Type.Literal("repository-stale"),
+      Type.Literal("git-failed"),
+      Type.Literal("internal")
+    ])
+  })
+]);
+
+export const AppOwnedWorktreeRecoveryRequestSchema = strictObject({
+  workspaceId: WorkspaceIdSchema,
+  confirmation: Type.Literal("recreate-committed-state")
+});
+
+export const AppOwnedWorktreeRecoveryResultSchema = Type.Union([
+  strictObject({
+    status: Type.Literal("recovered"),
+    workspace: WorkspaceDescriptorSchema
+  }),
+  strictObject({
+    status: Type.Literal("rejected"),
+    error: Type.Union([
+      Type.Literal("invalid-request"),
+      Type.Literal("not-app-owned"),
+      Type.Literal("identity-changed"),
+      Type.Literal("not-recoverable"),
+      Type.Literal("git-failed"),
+      Type.Literal("internal")
+    ]),
+    recoverable: Type.Boolean()
   })
 ]);
 

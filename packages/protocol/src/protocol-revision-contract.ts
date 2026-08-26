@@ -9,8 +9,12 @@ import {
 } from "./envelope.js";
 import { CommandPayloadSchemas, CommandResultSchemas, EventPayloadSchemas } from "./schemas.js";
 import {
+  AppOwnedWorktreeRecoveryRequestSchema,
+  AppOwnedWorktreeRecoveryResultSchema,
   RepositoryEnvironmentInspectionRequestSchema,
-  RepositoryEnvironmentSnapshotSchema
+  RepositoryEnvironmentSnapshotSchema,
+  RepositorySubmoduleInitializationRequestSchema,
+  RepositorySubmoduleInitializationResultSchema
 } from "./repository-environment-schema.js";
 import {
   AgentHostReadyMessageSchema,
@@ -22,8 +26,14 @@ import {
 import {
   WorktreeCreationAdvanceRequestSchema,
   WorktreeCreationAdvanceResultSchema,
+  WorktreeCreationActivityRequestSchema,
+  WorktreeCreationActivityResultSchema,
+  WorktreeCreationCancelRequestSchema,
+  WorktreeCreationCancelResultSchema,
   WorktreeCreationRequestSchema,
-  WorktreeCreationResultSchema
+  WorktreeCreationResultSchema,
+  WorktreeCreationRollbackRequestSchema,
+  WorktreeCreationRollbackResultSchema
 } from "./worktree-creation-schema.js";
 
 export function canonicalProtocolRevisionMaterial(): string {
@@ -45,13 +55,23 @@ export function canonicalProtocolRevisionMaterial(): string {
     desktop: {
       repositoryEnvironment: {
         inspectionRequest: RepositoryEnvironmentInspectionRequestSchema,
-        snapshot: RepositoryEnvironmentSnapshotSchema
+        snapshot: RepositoryEnvironmentSnapshotSchema,
+        submoduleInitializationRequest: RepositorySubmoduleInitializationRequestSchema,
+        submoduleInitializationResult: RepositorySubmoduleInitializationResultSchema,
+        appOwnedWorktreeRecoveryRequest: AppOwnedWorktreeRecoveryRequestSchema,
+        appOwnedWorktreeRecoveryResult: AppOwnedWorktreeRecoveryResultSchema
       },
       worktreeCreation: {
         advanceRequest: WorktreeCreationAdvanceRequestSchema,
         advanceResult: WorktreeCreationAdvanceResultSchema,
+        activityRequest: WorktreeCreationActivityRequestSchema,
+        activityResult: WorktreeCreationActivityResultSchema,
+        cancelRequest: WorktreeCreationCancelRequestSchema,
+        cancelResult: WorktreeCreationCancelResultSchema,
         request: WorktreeCreationRequestSchema,
-        result: WorktreeCreationResultSchema
+        result: WorktreeCreationResultSchema,
+        rollbackRequest: WorktreeCreationRollbackRequestSchema,
+        rollbackResult: WorktreeCreationRollbackResultSchema
       }
     },
     supervisor: {

@@ -117,6 +117,59 @@ describe("system bridge repository environment inspection", () => {
     expect(detail).toHaveBeenCalledOnce();
   });
 
+  it("admits only explicit bounded Submodule and app-owned Worktree recovery actions", async () => {
+    const initializeSubmodules = vi.fn(async () => ({
+      status: "initialized" as const,
+      submodules: {
+        status: "complete" as const,
+        total: 1,
+        uninitialized: 0,
+        divergent: 0,
+        conflicted: 0,
+        networkActionRequired: false
+      }
+    }));
+    const recoverAppOwnedWorktree = vi.fn(async () => ({
+      status: "rejected" as const,
+      error: "not-recoverable" as const,
+      recoverable: false
+    }));
+    registerFixture(vi.fn(), undefined, undefined, { initializeSubmodules, recoverAppOwnedWorktree });
+
+    await expect(invoke("pi67:repository-submodules-initialize", {
+      workspaceId: "workspace-a",
+      mode: "network-explicit"
+    })).resolves.toMatchObject({ status: "initialized", submodules: { status: "complete" } });
+    await expect(invoke("pi67:app-owned-worktree-recover", {
+      workspaceId: "workspace-a",
+      confirmation: "recreate-committed-state"
+    })).resolves.toEqual({ status: "rejected", error: "not-recoverable", recoverable: false });
+    expect(initializeSubmodules).toHaveBeenCalledWith({ workspaceId: "workspace-a", mode: "network-explicit" });
+    expect(recoverAppOwnedWorktree).toHaveBeenCalledWith({
+      workspaceId: "workspace-a",
+      confirmation: "recreate-committed-state"
+    });
+
+    await expect(invoke("pi67:repository-submodules-initialize", {
+      workspaceId: "workspace-a",
+      mode: "local-only",
+      gitArgs: ["submodule", "update"]
+    })).resolves.toEqual({ status: "rejected", error: "invalid-request" });
+    await expect(invoke("pi67:app-owned-worktree-recover", {
+      workspaceId: "workspace-a",
+      confirmation: "recreate-committed-state",
+      targetPath: "/private/worktree"
+    })).resolves.toEqual({ status: "rejected", error: "invalid-request", recoverable: false });
+    expect(initializeSubmodules).toHaveBeenCalledOnce();
+    expect(recoverAppOwnedWorktree).toHaveBeenCalledOnce();
+
+    initializeSubmodules.mockRejectedValueOnce(new Error("private Git arguments"));
+    await expect(invoke("pi67:repository-submodules-initialize", {
+      workspaceId: "workspace-a",
+      mode: "network-explicit"
+    })).resolves.toEqual({ status: "rejected", error: "internal" });
+  });
+
   it("keeps Prompt Stash image IPC opaque and validates Main metadata", async () => {
     const store = vi.fn(async (request: { itemId: string }) => ({
       itemId: request.itemId,
@@ -172,8 +225,13 @@ function registerFixture(
     store: ReturnType<typeof vi.fn>;
     restore: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
-  } = { store: vi.fn(), restore: vi.fn(), delete: vi.fn() }
+  } | undefined = { store: vi.fn(), restore: vi.fn(), delete: vi.fn() },
+  repositoryWorktreeActions: {
+    initializeSubmodules: ReturnType<typeof vi.fn>;
+    recoverAppOwnedWorktree: ReturnType<typeof vi.fn>;
+  } = { initializeSubmodules: vi.fn(), recoverAppOwnedWorktree: vi.fn() }
 ) {
+  const activePromptStashImages = promptStashImages ?? { store: vi.fn(), restore: vi.fn(), delete: vi.fn() };
   const activeWorkingTree = workingTree ?? { inspect: vi.fn(), detail: vi.fn() };
   registerSystemBridge({
     connectAgentHost: vi.fn(),
@@ -184,12 +242,13 @@ function registerFixture(
     packageNetworkSettings: {},
     promptAttachments: {},
     promptStashImages: {
-      ...promptStashImages, removeWorkspace: vi.fn(), dispose: vi.fn()
+      ...activePromptStashImages, removeWorkspace: vi.fn(), dispose: vi.fn()
     },
     workbenchState: {},
     workspaceFileState: {},
     repositoryEnvironmentInspection: { inspect, removeWorkspace: vi.fn(), dispose: vi.fn() },
-    repositoryWorkingTree: { ...activeWorkingTree, removeWorkspace: vi.fn(), dispose: vi.fn() }
+    repositoryWorkingTree: { ...activeWorkingTree, removeWorkspace: vi.fn(), dispose: vi.fn() },
+    repositoryWorktreeActions
   } as unknown as Parameters<typeof registerSystemBridge>[0]);
 }
 

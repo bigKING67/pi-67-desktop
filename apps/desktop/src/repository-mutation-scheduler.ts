@@ -1,7 +1,7 @@
 const DEFAULT_GLOBAL_CONCURRENCY = 2;
 const DEFAULT_QUEUE_LIMIT = 32;
 
-export type RepositoryMutationAdmissionFailure = "queue-full" | "repository-indeterminate" | "disposed";
+export type RepositoryMutationAdmissionFailure = "queue-full" | "repository-indeterminate" | "cancelled" | "disposed";
 
 export class RepositoryMutationAdmissionError extends Error {
   constructor(readonly code: RepositoryMutationAdmissionFailure) {
@@ -15,6 +15,8 @@ interface PendingMutation<T> {
   operation: () => Promise<T>;
   resolve: (value: T) => void;
   reject: (error: unknown) => void;
+  signal?: AbortSignal;
+  abortListener?: () => void;
 }
 
 export interface RepositoryMutationSchedulerOptions {
@@ -44,7 +46,7 @@ export class RepositoryMutationScheduler {
     this.#queueLimit = positiveInteger(options.queueLimit ?? DEFAULT_QUEUE_LIMIT);
   }
 
-  run<T>(repositoryGroupId: string, operation: () => Promise<T>): Promise<T> {
+  run<T>(repositoryGroupId: string, operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (this.#disposed) return Promise.reject(new RepositoryMutationAdmissionError("disposed"));
     if (this.#fencedRepositories.has(repositoryGroupId)) {
       return Promise.reject(new RepositoryMutationAdmissionError("repository-indeterminate"));
@@ -52,8 +54,19 @@ export class RepositoryMutationScheduler {
     if (this.#queue.length >= this.#queueLimit) {
       return Promise.reject(new RepositoryMutationAdmissionError("queue-full"));
     }
+    if (signal?.aborted) return Promise.reject(new RepositoryMutationAdmissionError("cancelled"));
     return new Promise<T>((resolve, reject) => {
-      this.#queue.push({ repositoryGroupId, operation, resolve, reject } as PendingMutation<unknown>);
+      const pending: PendingMutation<T> = { repositoryGroupId, operation, resolve, reject, ...(signal ? { signal } : {}) };
+      if (signal) {
+        pending.abortListener = () => {
+          const index = this.#queue.indexOf(pending as PendingMutation<unknown>);
+          if (index === -1) return;
+          this.#queue.splice(index, 1);
+          pending.reject(new RepositoryMutationAdmissionError("cancelled"));
+        };
+        signal.addEventListener("abort", pending.abortListener, { once: true });
+      }
+      this.#queue.push(pending as PendingMutation<unknown>);
       this.#drain();
     });
   }
@@ -65,6 +78,9 @@ export class RepositoryMutationScheduler {
       const pending = this.#queue[index];
       if (pending?.repositoryGroupId !== repositoryGroupId) continue;
       this.#queue.splice(index, 1);
+      if (pending.signal && pending.abortListener) {
+        pending.signal.removeEventListener("abort", pending.abortListener);
+      }
       pending.reject(error);
     }
   }
@@ -92,7 +108,12 @@ export class RepositoryMutationScheduler {
     if (this.#disposed) return;
     this.#disposed = true;
     const error = new RepositoryMutationAdmissionError("disposed");
-    for (const pending of this.#queue.splice(0)) pending.reject(error);
+    for (const pending of this.#queue.splice(0)) {
+      if (pending.signal && pending.abortListener) {
+        pending.signal.removeEventListener("abort", pending.abortListener);
+      }
+      pending.reject(error);
+    }
   }
 
   #drain(): void {
@@ -105,6 +126,13 @@ export class RepositoryMutationScheduler {
       if (index === -1) return;
       const [pending] = this.#queue.splice(index, 1);
       if (!pending) return;
+      if (pending.signal && pending.abortListener) {
+        pending.signal.removeEventListener("abort", pending.abortListener);
+      }
+      if (pending.signal?.aborted) {
+        pending.reject(new RepositoryMutationAdmissionError("cancelled"));
+        continue;
+      }
       this.#activeCount += 1;
       this.#activeRepositories.add(pending.repositoryGroupId);
       void pending.operation().then(pending.resolve, pending.reject).finally(() => {

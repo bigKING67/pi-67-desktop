@@ -10,7 +10,6 @@ import {
   lstat,
   mkdir,
   open,
-  readdir,
   rename,
   rm,
   writeFile
@@ -26,7 +25,8 @@ import {
   MAX_PROMPT_ATTACHMENT_TOTAL_BYTES,
   MAX_PROMPT_PATHLESS_ATTACHMENT_BYTES,
   type PromptAttachmentStagingDiagnostics,
-  type StagedPromptAttachment
+  type StagedPromptAttachment,
+  type StagedPromptAttachmentResult
 } from "@pi67/protocol";
 import {
   asRecord,
@@ -39,6 +39,15 @@ import {
   publicManifest,
   type PromptAttachmentManifest
 } from "./prompt-attachment-metadata.js";
+import { MAX_PROMPT_HEIC_METADATA_BYTES } from "./prompt-image-inspection.js";
+import {
+  PromptImageNormalizationWorker,
+  type PromptImageNormalizer
+} from "./prompt-image-normalization-client.js";
+import {
+  normalizePromptHeicAttachment
+} from "./prompt-heic-attachment-normalization.js";
+import { inspectPromptAttachmentStagingDirectory } from "./prompt-attachment-staging-diagnostics.js";
 
 export interface PromptAttachmentStageCandidate {
   name: string;
@@ -64,24 +73,26 @@ export {
   cleanupStalePromptAttachmentRuns
 } from "./prompt-attachment-stale-run-cleanup.js";
 
-const MAX_DIAGNOSTIC_STAGING_ENTRIES = 256;
 const MAX_PROMPT_ATTACHMENT_MANIFEST_BYTES = 64 * 1024;
 
 export class PromptAttachmentStagingService {
   readonly root: string;
   readonly draftRoot: string;
   readonly claimedRoot: string;
+  private readonly normalizer: PromptImageNormalizer;
+  private readonly normalizationControllers = new Set<AbortController>();
 
-  constructor(root: string) {
+  constructor(root: string, options: { normalizer?: PromptImageNormalizer } = {}) {
     this.root = resolve(root);
     this.draftRoot = join(this.root, "draft");
     this.claimedRoot = join(this.root, "claimed");
+    this.normalizer = options.normalizer ?? new PromptImageNormalizationWorker();
   }
 
-  async stage(value: unknown): Promise<StagedPromptAttachment[]> {
+  async stage(value: unknown): Promise<StagedPromptAttachmentResult[]> {
     const candidates = validateCandidates(value);
     await this.ensureRoots();
-    const staged: StagedPromptAttachment[] = [];
+    const staged: StagedPromptAttachmentResult[] = [];
     let inlineImageBytes = 0;
     try {
       for (const candidate of candidates) {
@@ -181,13 +192,15 @@ export class PromptAttachmentStagingService {
   }
 
   async cleanup(): Promise<void> {
+    for (const controller of this.normalizationControllers) controller.abort();
+    await this.normalizer.dispose();
     await rm(this.root, { recursive: true, force: true });
   }
 
   async diagnostics(): Promise<PromptAttachmentStagingDiagnostics> {
     const [drafts, claimed] = await Promise.all([
-      inspectStagingDirectory(this.draftRoot),
-      inspectStagingDirectory(this.claimedRoot)
+      inspectPromptAttachmentStagingDirectory(this.draftRoot),
+      inspectPromptAttachmentStagingDirectory(this.claimedRoot)
     ]);
     return {
       draftCount: drafts.directoryCount,
@@ -205,7 +218,7 @@ export class PromptAttachmentStagingService {
     }
   }
 
-  private async stageOne(candidate: PromptAttachmentStageCandidate): Promise<StagedPromptAttachment> {
+  private async stageOne(candidate: PromptAttachmentStageCandidate): Promise<StagedPromptAttachmentResult> {
     const id = randomUUID().replaceAll("-", "_");
     const directory = join(this.draftRoot, id);
     const payloadPath = join(directory, "payload.bin");
@@ -217,22 +230,49 @@ export class PromptAttachmentStagingService {
       if (copied.byteLength !== candidate.byteLength) {
         throw new Error(`${candidate.name} changed while it was being attached. Select it again.`);
       }
-      const header = await readHeader(payloadPath);
-      const mimeType = detectMimeType(header, candidate.mimeType, candidate.name);
+      const metadataBytes = await readHeader(payloadPath, MAX_PROMPT_HEIC_METADATA_BYTES);
+      let normalized: Awaited<ReturnType<typeof normalizePromptHeicAttachment>>;
+      const controller = new AbortController();
+      this.normalizationControllers.add(controller);
+      try {
+        normalized = await normalizePromptHeicAttachment({
+          source: candidate,
+          copiedByteLength: copied.byteLength,
+          metadataBytes,
+          payloadPath,
+          directory,
+          normalizer: this.normalizer,
+          signal: controller.signal
+        });
+      } finally {
+        this.normalizationControllers.delete(controller);
+      }
+      let name = candidate.name;
+      let byteLength = copied.byteLength;
+      let sha256 = copied.sha256;
+      let mimeType: string;
+      if (normalized) {
+        ({ name, byteLength, sha256, mimeType } = normalized);
+      } else {
+        mimeType = detectMimeType(metadataBytes.subarray(0, 4_100), candidate.mimeType, candidate.name);
+      }
       const manifest: PromptAttachmentManifest = {
         version: 1,
         id,
-        name: candidate.name,
+        name,
         mimeType,
-        byteLength: copied.byteLength,
-        kind: attachmentKind(mimeType, candidate.name),
-        sha256: copied.sha256,
+        byteLength,
+        kind: attachmentKind(mimeType, name),
+        sha256,
         stagedAt: Date.now()
       };
       const temporaryManifest = join(directory, "manifest.json.tmp");
       await writeFile(temporaryManifest, `${JSON.stringify(manifest)}\n`, { encoding: "utf8", mode: 0o600 });
       await rename(temporaryManifest, join(directory, "manifest.json"));
-      return publicManifest(manifest);
+      const attachment = publicManifest(manifest);
+      return normalized === undefined
+        ? attachment
+        : { ...attachment, normalization: normalized.normalization };
     } catch (error) {
       await rm(directory, { recursive: true, force: true });
       throw error;
@@ -242,28 +282,6 @@ export class PromptAttachmentStagingService {
   private async releaseOne(id: string): Promise<void> {
     await rm(join(this.draftRoot, id), { recursive: true, force: true });
   }
-}
-
-async function inspectStagingDirectory(path: string): Promise<{
-  directoryCount: number;
-  invalidEntryCount: number;
-  truncated: boolean;
-}> {
-  const entries = await readdir(path, { withFileTypes: true }).catch((error: unknown) => {
-    if (isNodeError(error, "ENOENT")) return [];
-    throw error;
-  });
-  let directoryCount = 0;
-  let invalidEntryCount = 0;
-  for (const entry of entries.slice(0, MAX_DIAGNOSTIC_STAGING_ENTRIES)) {
-    if (entry.isDirectory() && !entry.isSymbolicLink()) directoryCount += 1;
-    else invalidEntryCount += 1;
-  }
-  return {
-    directoryCount,
-    invalidEntryCount,
-    truncated: entries.length > MAX_DIAGNOSTIC_STAGING_ENTRIES
-  };
 }
 
 async function readBoundedRegularFile(path: string, maximumBytes: number): Promise<Buffer> {
@@ -279,10 +297,6 @@ async function readBoundedRegularFile(path: string, maximumBytes: number): Promi
   } finally {
     await handle.close();
   }
-}
-
-function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function validateCandidates(value: unknown): PromptAttachmentStageCandidate[] {
@@ -417,10 +431,10 @@ async function copyAndHash(
   return { byteLength, sha256: hash.digest("hex") };
 }
 
-async function readHeader(path: string): Promise<Uint8Array> {
-  const handle = await open(path, "r");
+async function readHeader(path: string, maximumBytes = 4_100): Promise<Uint8Array> {
+  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
-    const bytes = Buffer.alloc(4_100);
+    const bytes = Buffer.alloc(maximumBytes);
     const result = await handle.read(bytes, 0, bytes.byteLength, 0);
     return bytes.subarray(0, result.bytesRead);
   } finally {

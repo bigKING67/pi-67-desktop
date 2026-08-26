@@ -5,7 +5,10 @@ import {
   currentSessionResourceTask,
   sessionResourceProjectionMatchesTask
 } from "../session/session-control-controller.js";
-import { selectSessionResources } from "../session/session-projection-selectors.js";
+import {
+  selectSessionResourceCatalog,
+  selectSessionResources
+} from "../session/session-projection-selectors.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import { useWorkbenchStore } from "../workbench/workbench-store.js";
 import styles from "./SettingsWorkbench.module.css";
@@ -38,17 +41,18 @@ export function SessionResourcePanel({
   const settingsScope = useWorkbenchStore((state) => state.settingsScope);
   const scope = requestedScope ?? settingsScope;
   const projectedResources = useSessionProjectionStore(selectSessionResources);
+  const projectedResourceCatalog = useSessionProjectionStore(selectSessionResourceCatalog);
   const projectionAuthority = useSessionProjectionStore((state) => state.authority);
   const connected = useAppStore((state) => state.connected);
   const hostEpoch = useAppStore((state) => state.hostEpoch);
   const task = useWorkbenchStore(currentSessionResourceTask);
-  const resources = sessionResourceProjectionMatchesTask(
+  const projectionMatches = sessionResourceProjectionMatchesTask(
     task,
     projectionAuthority,
     connected ? hostEpoch : undefined
-  )
-    ? projectedResources
-    : undefined;
+  );
+  const resources = projectionMatches ? projectedResources : undefined;
+  const resourceCatalog = projectionMatches ? projectedResourceCatalog : undefined;
   const displayed = filterSessionResources(resources ?? [], kind, scope, origin, resourceScope)
     .filter((resource) => !excludeIds?.has(resource.id));
   return (
@@ -57,6 +61,9 @@ export function SessionResourcePanel({
       title={title}
       description={description}
     >
+      {resourceCatalog?.truncated
+        ? <SettingsNotice>{resourceCatalogNotice(resourceCatalog)}</SettingsNotice>
+        : null}
       {displayed.length > 0 ? <SettingsRows>{displayed.map((resource) => (
         <SettingsRow
           key={`${resource.kind}-${resource.id}`}
@@ -67,13 +74,18 @@ export function SessionResourcePanel({
         >
           {resource.path ? <code className={styles.resourcePath} title={resource.path}>{resource.path}</code> : null}
         </SettingsRow>
-      ))}</SettingsRows> : (
-        <SettingsNotice>{resources === undefined
-          ? "当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。"
-          : empty}</SettingsNotice>
-      )}
+      ))}</SettingsRows> : resources === undefined ? (
+        <SettingsNotice>当前 Pi 会话尚未就绪；请返回工作台打开对话后再查看或重新加载资源。</SettingsNotice>
+      ) : resourceCatalog?.truncated ? null : <SettingsNotice>{empty}</SettingsNotice>}
     </SettingsSectionBlock>
   );
+}
+
+function resourceCatalogNotice(catalog: NonNullable<ReturnType<typeof selectSessionResourceCatalog>>): string {
+  const fieldNotice = catalog.truncatedFields > 0
+    ? `，另有 ${catalog.truncatedFields} 个字段已缩短`
+    : "";
+  return `资源目录过大，当前显示 ${catalog.projectedItems}/${catalog.totalItems} 项${fieldNotice}。Pi 内部已加载资源不受影响。`;
 }
 
 export function filterSessionResources(

@@ -6,6 +6,8 @@ import {
   createMessageId,
   type WorktreeCreationAdvanceRequest,
   type WorktreeCreationAdvanceResult,
+  type WorktreeCreationActivityResult,
+  type WorktreeCreationCancelResult,
   type WorktreeCreationProgressState,
   type WorktreeCreationRequest,
   type WorktreeCreationResult
@@ -23,6 +25,10 @@ import {
 import {
   registerRendererWorkspaceWithHost
 } from "../workbench/workspace-host-registration-controller.js";
+import {
+  markCancelledWorktreeTask,
+  trackWorktreeCreationActivity
+} from "./worktree-session-environment-activity.js";
 
 export type WorktreeSessionEnvironmentResult =
   | {
@@ -43,6 +49,8 @@ export interface WorktreeSessionEnvironmentDependencies {
   createId(): string;
   create(request: WorktreeCreationRequest): Promise<WorktreeCreationResult>;
   advance(request: WorktreeCreationAdvanceRequest): Promise<WorktreeCreationAdvanceResult>;
+  activity?(this: void, creationId: string): Promise<WorktreeCreationActivityResult>;
+  cancel?(this: void, creationId: string): Promise<WorktreeCreationCancelResult>;
   loadWorkbenchState(): Promise<WorkbenchStateV5>;
   persistCheckpoint(): Promise<void>;
   registerWorkspace(workspace: WorkspaceDescriptor): Promise<boolean>;
@@ -52,6 +60,8 @@ const DEFAULT_DEPENDENCIES: WorktreeSessionEnvironmentDependencies = {
   createId: () => createMessageId("environment-creation"),
   create: (request) => window.pi67.system.createWorktreeEnvironment(request),
   advance: (request) => window.pi67.system.advanceWorktreeEnvironment(request),
+  activity: (creationId) => window.pi67.system.getWorktreeCreationActivity({ creationId }),
+  cancel: (creationId) => window.pi67.system.cancelWorktreeCreation({ creationId }),
   loadWorkbenchState: () => window.pi67.system.loadWorkbenchState(),
   persistCheckpoint: persistRendererWorkbenchCheckpoint,
   registerWorkspace: (workspace) => registerRendererWorkspaceWithHost(workspace, { queryCatalog: false })
@@ -80,6 +90,10 @@ export async function prepareWorktreeSessionEnvironment(
   let materialized = progressFromTask(initial);
   if (!materialized) {
     let result: WorktreeCreationResult | undefined;
+    const activity = dependencies.activity;
+    const stopActivity = activity
+      ? trackWorktreeCreationActivity(taskId, creationId, (currentCreationId) => activity(currentCreationId))
+      : () => undefined;
     try {
       result = await dependencies.create({
         requestId: initial.id,
@@ -94,6 +108,8 @@ export async function prepareWorktreeSessionEnvironment(
         dependencies
       );
       if (!materialized) return markRecoveryRequired(taskId);
+    } finally {
+      stopActivity();
     }
     if (!materialized && result?.status === "created") {
       materialized = {
@@ -102,6 +118,7 @@ export async function prepareWorktreeSessionEnvironment(
       };
     }
     if (!materialized && result?.status === "rejected") {
+      if (result.error.code === "cancelled") return markCancelledWorktreeTask(taskId);
       if (requiresRecovery(result)) {
         materialized = await recoverMaterializedEnvironment(
           initial.id,
@@ -189,6 +206,24 @@ export async function prepareWorktreeSessionEnvironment(
     || task.creationStatus === undefined
   ) return markRecoveryRequired(taskId);
   return { status: "prepared", creationId, task };
+}
+
+export async function cancelWorktreeSessionEnvironment(
+  taskId: string,
+  dependencies: WorktreeSessionEnvironmentDependencies = DEFAULT_DEPENDENCIES
+): Promise<boolean> {
+  const task = rendererWorkbenchStore.getState().tasks[taskId];
+  const creationId = task?.environmentCreationId;
+  if (!task || task.environmentCreationState !== "creating" || !creationId || !dependencies.cancel) return false;
+  rendererWorkbenchStore.getState().updateTask(taskId, {
+    runtime: { phase: "starting", detail: messages.runtime.worktreeCreation.cancelling, recoverable: true }
+  });
+  try {
+    const result = await dependencies.cancel(creationId);
+    return result.status === "cancel-requested";
+  } catch {
+    return false;
+  }
 }
 
 export async function commitWorktreeSessionEnvironment(

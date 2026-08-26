@@ -4,6 +4,7 @@ import {
   type RepositoryEnvironmentError,
   type RepositoryEnvironmentInspectionRequest,
   type RepositoryEnvironmentSnapshot,
+  type RepositorySubmoduleObservation,
   type WorkspaceDescriptor
 } from "@pi67/protocol";
 import {
@@ -17,6 +18,7 @@ import {
 import {
   GitInspectionError,
   type GitWorktreeRecord,
+  type RepositoryMutationGitRunner,
   type RepositoryReadOnlyGitRunner
 } from "./worktree-git-runner.js";
 import { recordObservedWorkspaceEnvironment } from "./workbench-state-mutations.js";
@@ -42,7 +44,7 @@ interface InspectionFlight {
 const DEFAULT_DRAIN_DEADLINE_MS = 4_000;
 
 export interface WorktreeInspectionServiceOptions {
-  runner: RepositoryReadOnlyGitRunner;
+  runner: RepositoryReadOnlyGitRunner & Partial<Pick<RepositoryMutationGitRunner, "inspectSubmodules">>;
   workbenchState: WorkbenchStateReader;
   catalog: WorktreeCatalogProjection;
   now?: () => number;
@@ -51,7 +53,7 @@ export interface WorktreeInspectionServiceOptions {
 }
 
 export class WorktreeInspectionService {
-  readonly #runner: RepositoryReadOnlyGitRunner;
+  readonly #runner: RepositoryReadOnlyGitRunner & Partial<Pick<RepositoryMutationGitRunner, "inspectSubmodules">>;
   readonly #workbenchState: WorkbenchStateReader;
   readonly #catalog: WorktreeCatalogProjection;
   readonly #now: () => number;
@@ -150,11 +152,12 @@ export class WorktreeInspectionService {
       catalogUnavailable = true;
     }
     if (workspace.availability !== "available") {
+      const recovery = appOwnedMissingRecovery(workbench.state, workspaceId);
       return failureSnapshot(workspaceId, this.#now(), "missing", {
         stage: "workspace",
         code: "workspace-unavailable",
         recoverable: true
-      });
+      }, recovery);
     }
 
     try {
@@ -162,11 +165,21 @@ export class WorktreeInspectionService {
       const controller = new AbortController();
       let commonDirectory: string;
       let records: GitWorktreeRecord[];
+      let submodules: RepositorySubmoduleObservation | undefined;
+      let submoduleError: RepositoryEnvironmentError | undefined;
       try {
         [commonDirectory, records] = await Promise.all([
           this.#runner.resolveCommonDirectory(repositoryRoot, controller.signal),
           this.#runner.listWorktrees(repositoryRoot, controller.signal)
         ]);
+        if (this.#runner.inspectSubmodules) {
+          try {
+            const inspection = await this.#runner.inspectSubmodules(workspace.identity.canonicalPath, controller.signal);
+            submodules = repositorySubmoduleObservation(inspection);
+          } catch (error) {
+            submoduleError = mapSubmoduleInspectionError(error);
+          }
+        }
       } catch (error) {
         controller.abort();
         throw error;
@@ -176,6 +189,7 @@ export class WorktreeInspectionService {
         registeredWorkspaces: workbench.state.workspaces,
         commonDirectory,
         records,
+        submodules,
         previous: cached
       });
       const latestWorkbench = await this.#workbenchState.load();
@@ -231,7 +245,9 @@ export class WorktreeInspectionService {
             ...snapshot,
             error: { stage: "catalog", code: "catalog-unavailable", recoverable: true }
           }
-        : snapshot;
+        : submoduleError
+          ? { ...snapshot, error: submoduleError }
+          : snapshot;
     } catch (error) {
       if (error instanceof GitInspectionError && error.code === "not-a-repository") {
         const snapshot: RepositoryEnvironmentSnapshot = {
@@ -265,6 +281,7 @@ export class WorktreeInspectionService {
     registeredWorkspaces: WorkspaceDescriptor[];
     commonDirectory: string;
     records: GitWorktreeRecord[];
+    submodules: RepositorySubmoduleObservation | undefined;
     previous: RepositoryEnvironmentSnapshot | undefined;
   }): Promise<RepositoryEnvironmentSnapshot> {
     const [commonIdentity, currentIdentity, observedWorktrees] = await Promise.all([
@@ -326,7 +343,8 @@ export class WorktreeInspectionService {
         assurance: commonIdentity.assurance,
         currentWorktreeId
       },
-      worktrees
+      worktrees,
+      ...(options.submodules ? { submodules: options.submodules } : {})
     };
   }
 }
@@ -347,7 +365,7 @@ function mapInspectionError(error: unknown): RepositoryEnvironmentError {
 function inspectionFailureStage(
   stage: GitInspectionError["stage"]
 ): RepositoryEnvironmentError["stage"] | undefined {
-  return stage === "repository-root" || stage === "common-dir" || stage === "worktree-list"
+  return stage === "repository-root" || stage === "common-dir" || stage === "worktree-list" || stage === "submodule-status"
     ? stage
     : undefined;
 }
@@ -356,7 +374,8 @@ function failureSnapshot(
   workspaceId: string,
   observedAt: number,
   status: "toolchain-unavailable" | "missing" | "error",
-  error: RepositoryEnvironmentError
+  error: RepositoryEnvironmentError,
+  recovery?: RepositoryEnvironmentSnapshot["recovery"]
 ): RepositoryEnvironmentSnapshot {
   return {
     workspaceId,
@@ -365,7 +384,50 @@ function failureSnapshot(
     observedAt,
     stale: false,
     worktrees: [],
-    error
+    error,
+    ...(recovery ? { recovery } : {})
+  };
+}
+
+function repositorySubmoduleObservation(
+  inspection: Awaited<ReturnType<RepositoryMutationGitRunner["inspectSubmodules"]>>
+): RepositorySubmoduleObservation {
+  return {
+    ...inspection,
+    networkActionRequired: inspection.status === "incomplete"
+      && inspection.uninitialized > 0
+      && inspection.divergent === 0
+      && inspection.conflicted === 0
+  };
+}
+
+function mapSubmoduleInspectionError(error: unknown): RepositoryEnvironmentError {
+  if (error instanceof GitInspectionError) {
+    return {
+      stage: "submodule-status",
+      code: error.code === "cancelled" || error.code === "not-a-repository" ? "unknown" : error.code,
+      recoverable: error.code !== "invalid-output"
+    };
+  }
+  return { stage: "submodule-status", code: "unknown", recoverable: true };
+}
+
+function appOwnedMissingRecovery(
+  state: WorkbenchStateV5,
+  workspaceId: string
+): RepositoryEnvironmentSnapshot["recovery"] | undefined {
+  const binding = state.workspaceEnvironments.find((candidate) => candidate.workspaceId === workspaceId);
+  if (binding?.kind !== "repository-worktree" || binding.ownership !== "app" || !binding.creationId) {
+    return undefined;
+  }
+  const record = state.environmentMutations.find((candidate) => (
+    candidate.creationId === binding.creationId && candidate.workspaceId === workspaceId
+  ));
+  if (!record || record.state !== "committed") return undefined;
+  return {
+    kind: "app-owned-worktree",
+    action: "recreate-committed-state",
+    unrecoverableData: "uncommitted-and-untracked"
   };
 }
 
