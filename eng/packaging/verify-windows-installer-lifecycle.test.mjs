@@ -25,6 +25,7 @@ import {
 import {
   assertPreservedUserData,
   buildNsisInstallArguments,
+  buildNsisUpdateArguments,
   parseWindowsInstallerLifecycleArguments,
   resolveExpectedLifecycleSigner,
   resolveUpgradeBaselineInstaller,
@@ -96,6 +97,13 @@ describe("Windows installer lifecycle contract", () => {
   it("keeps the silent NSIS destination argument last and rejects control characters", () => {
     expect(buildNsisInstallArguments("C:\\Pi-67 Desktop 中文"))
       .toEqual(["/S", "/D=C:\\Pi-67 Desktop 中文"]);
+    expect(buildNsisUpdateArguments("C:\\Pi-67 Desktop 中文"))
+      .toEqual([
+        "--updated",
+        "--force-run",
+        "/S",
+        "/D=C:\\Pi-67 Desktop 中文"
+      ]);
     expect(() => buildNsisInstallArguments("C:\\Pi-67\nDesktop"))
       .toThrow("single-line path");
   });
@@ -149,6 +157,10 @@ describe("Windows installer lifecycle contract", () => {
       join(repositoryRoot, "eng/packaging/verify-windows-installer-lifecycle.mjs"),
       "utf8"
     );
+    const updateSource = await readFile(
+      join(repositoryRoot, "eng/packaging/windows-installer-update-lifecycle.mjs"),
+      "utf8"
+    );
     const cleanProfileGate = source.indexOf("const cleanProfileLifecycle = await verifyInstalledRealUserLifecycle({");
     const existingProfileGate = source.indexOf("const existingProfileLifecycle = await verifyInstalledRealUserLifecycle({");
     const uninstall = source.indexOf("const uninstallPath = await resolveUninstallerPath");
@@ -162,7 +174,12 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("resolvePackagedRuntimeAssetContract(initialVersion)");
     expect(source).toContain("resolveInstalledUserInterfaceContract(initialVersion)");
     expect(source).toContain("assertPackagedRuntimeAssets(installedArtifact, initialRuntimeAssetContract)");
-    expect(source).toContain("assertPackagedRuntimeAssets(finalInstalledArtifact)");
+    expect(source).toContain("await verifyWindowsInstallerUpdateLifecycle({");
+    expect(updateSource).toContain("await assertPackagedRuntimeAssets(installedArtifact)");
+    expect(updateSource).toContain("processId = await installNsisUpdatePackage(");
+    expect(updateSource).toContain("automaticPostInstallLaunch: true");
+    expect(updateSource).toContain("desktopShortcut: await assertWindowsShortcutTarget(");
+    expect(updateSource).toMatch(/finally \{[\s\S]*?await stopWindowsProcessTree\(processId\)/u);
     expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");
     expect(source).toContain("await assertWindowsExistingProfileInteractionPreserved(");
   });
@@ -313,12 +330,11 @@ describe("Windows installer lifecycle contract", () => {
     expect(guard).toMatch(/Function Pi67InstallDirectoryGuardLeave\s+Abort\s+FunctionEnd/u);
   });
 
-  it("recreates an existing Desktop shortcut against the updated executable", async () => {
+  it("repairs the Desktop shortcut against the updated executable", async () => {
     const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
 
-    expect(installer).toMatch(/!macro customInit[\s\S]*?\$\{isUpdated\}[\s\S]*?\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk/u);
-    expect(installer).toMatch(/!macro customInstall[\s\S]*?Pi67UpdateDesktopShortcutExisted == "1"/u);
-    expect(installer).toMatch(/CreateShortCut "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk" "\$appExe"/u);
+    expect(installer).not.toContain("Pi67UpdateDesktopShortcutExisted");
+    expect(installer).toMatch(/!macro customInstall\s+\$\{If\} \$\{isUpdated\}[\s\S]*?CreateShortCut "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk" "\$appExe"/u);
     expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
   });
 

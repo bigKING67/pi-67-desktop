@@ -9,19 +9,9 @@
   Var Pi67InstallPathGuardLabel
   Var Pi67InstallPathGuardPathLabel
   Var Pi67InstallPathGuardReason
-  Var Pi67UpdateDesktopShortcutExisted
-
-  !macro customInit
-    StrCpy $Pi67UpdateDesktopShortcutExisted "0"
-    ${If} ${isUpdated}
-    ${AndIf} ${FileExists} "$DESKTOP\${SHORTCUT_NAME}.lnk"
-      StrCpy $Pi67UpdateDesktopShortcutExisted "1"
-    ${EndIf}
-  !macroend
 
   !macro customInstall
     ${If} ${isUpdated}
-    ${AndIf} $Pi67UpdateDesktopShortcutExisted == "1"
       CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$appExe" "" "$appExe" 0 "" "" "${APP_DESCRIPTION}"
       ClearErrors
       WinShell::SetLnkAUMI "$DESKTOP\${SHORTCUT_NAME}.lnk" "${APP_ID}"

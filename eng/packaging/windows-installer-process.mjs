@@ -1,9 +1,12 @@
 import { execFile } from "node:child_process";
 import { access, readdir } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS } from "./windows-installer-lifecycle-contract.mjs";
 
 const FILE_STATE_TIMEOUT_MS = 30_000;
+const WINDOWS_POST_UPDATE_LAUNCH_TIMEOUT_MS = 30_000;
+const execFileAsync = promisify(execFile);
 export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
 
 export function buildNsisInstallArguments(installDirectory) {
@@ -19,9 +22,76 @@ export function buildNsisInstallArguments(installDirectory) {
   return ["/S", `/D=${installDirectory}`];
 }
 
+export function buildNsisUpdateArguments(installDirectory) {
+  return ["--updated", "--force-run", ...buildNsisInstallArguments(installDirectory)];
+}
+
 export async function installNsisPackage(installerPath, installDirectory) {
   await runExecutable(installerPath, buildNsisInstallArguments(installDirectory));
   await waitForPathState(join(installDirectory, "Pi-67 Desktop.exe"), true);
+}
+
+export async function installNsisUpdatePackage(installerPath, installDirectory) {
+  const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
+  await runExecutable(installerPath, buildNsisUpdateArguments(installDirectory));
+  await waitForPathState(executablePath, true);
+  return waitForWindowsExecutableLaunch(executablePath);
+}
+
+export async function resolveWindowsDesktopShortcutPath(shortcutName) {
+  if (process.platform !== "win32") {
+    throw new Error("Windows Desktop shortcut resolution requires win32.");
+  }
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    "[Console]::Out.Write([Environment]::GetFolderPath('Desktop'))"
+  ], { encoding: "utf8", timeout: 15_000 });
+  const desktopPath = stdout.trim();
+  if (desktopPath.length === 0) throw new Error("Windows Desktop path is unavailable.");
+  return join(desktopPath, `${shortcutName}.lnk`);
+}
+
+export async function assertWindowsShortcutTarget(shortcutPath, executablePath) {
+  await access(shortcutPath);
+  const command = [
+    "$shell = New-Object -ComObject WScript.Shell",
+    "$shortcut = $shell.CreateShortcut($args[0])",
+    "[Console]::Out.Write($shortcut.TargetPath)"
+  ].join("; ");
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    command,
+    shortcutPath
+  ], { encoding: "utf8", timeout: 15_000 });
+  const targetPath = stdout.trim();
+  if (resolve(targetPath).toLowerCase() !== resolve(executablePath).toLowerCase()) {
+    throw new Error("Windows Desktop shortcut does not target the installed Pi-67 executable.");
+  }
+  return { exists: true, targetsInstalledExecutable: true };
+}
+
+export async function stopWindowsProcessTree(processId) {
+  if (!Number.isSafeInteger(processId) || processId <= 0) {
+    throw new Error("Windows process ID must be a positive safe integer.");
+  }
+  let killError;
+  try {
+    await execFileAsync("taskkill.exe", ["/PID", String(processId), "/T", "/F"], {
+      encoding: "utf8",
+      timeout: 30_000
+    });
+  } catch (error) {
+    killError = error;
+  }
+  if (!(await isWindowsProcessRunning(processId))) return;
+  if (killError) {
+    throw new Error(`taskkill failed to stop Windows process ${processId}.`, { cause: killError });
+  }
+  await waitForWindowsProcessExit(processId);
 }
 
 export async function resolveUninstallerPath(installDirectory) {
@@ -77,6 +147,59 @@ export async function waitForPathState(path, shouldExist, timeoutMs = FILE_STATE
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   throw new Error(`Timed out waiting for ${path} to become ${shouldExist ? "present" : "absent"}.`);
+}
+
+async function waitForWindowsExecutableLaunch(executablePath) {
+  const deadline = Date.now() + WINDOWS_POST_UPDATE_LAUNCH_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const processId = await findWindowsMainProcess(executablePath);
+    if (processId !== undefined) return processId;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  throw new Error("NSIS update did not automatically launch the updated Pi-67 executable.");
+}
+
+async function findWindowsMainProcess(executablePath) {
+  const command = [
+    "$target = [IO.Path]::GetFullPath($args[0])",
+    "$match = Get-CimInstance -ClassName Win32_Process | Where-Object {",
+    "  $_.ExecutablePath -and",
+    "  [IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) -and",
+    "  $_.CommandLine -notmatch '--type='",
+    "} | Select-Object -First 1 -ExpandProperty ProcessId",
+    "if ($null -ne $match) { [Console]::Out.Write($match) }"
+  ].join(" ");
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    command,
+    executablePath
+  ], { encoding: "utf8", timeout: 15_000 });
+  const value = stdout.trim();
+  if (value.length === 0) return undefined;
+  const processId = Number.parseInt(value, 10);
+  return Number.isSafeInteger(processId) && processId > 0 ? processId : undefined;
+}
+
+async function isWindowsProcessRunning(processId) {
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    "if (Get-Process -Id $args[0] -ErrorAction SilentlyContinue) { [Console]::Out.Write('1') }",
+    String(processId)
+  ], { encoding: "utf8", timeout: 15_000 });
+  return stdout.trim() === "1";
+}
+
+async function waitForWindowsProcessExit(processId) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (!(await isWindowsProcessRunning(processId))) return;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  throw new Error(`Timed out waiting for Windows process ${processId} to exit.`);
 }
 
 export async function waitForInstallationRemoval(

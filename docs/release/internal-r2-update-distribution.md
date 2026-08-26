@@ -171,11 +171,14 @@ rule.
 After exact download verification, Desktop starts the existing per-user NSIS installer with the
 electron-builder update, force-run, and silent flags. The final `/D=` argument pins replacement to
 the running executable's directory instead of allowing missing or stale installer registry state to
-move the application. If a Desktop shortcut existed before the update, the installer rewrites that
-shortcut against the replaced executable; it does not recreate a shortcut the user had removed.
+move the application. Every in-app update recreates the Desktop shortcut against the exact replaced
+executable. This deliberately repairs both a stale shortcut target and a shortcut already lost by a
+previous broken update, so the user retains a normal launch path after the application exits.
 Desktop then performs the normal Pi-67 shutdown checkpoint. The installer replaces the installed
-application and starts the updated version. A real Windows x64 upgrade test remains required for
-every candidate identity.
+application and starts the updated version. The Windows lifecycle gate must invoke the installer
+with the same update arguments, observe the automatic post-install application process, and verify
+the Desktop shortcut target. A real Windows x64 in-app upgrade remains required for every candidate
+identity; a direct silent install followed by a test-controlled launch is not equivalent evidence.
 
 ### macOS arm64
 

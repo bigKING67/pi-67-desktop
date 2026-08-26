@@ -32,13 +32,16 @@ import {
   resolveWindowsInstallerLifecycleContract
 } from "./windows-installer-lifecycle-contract.mjs";
 import {
+  assertWindowsShortcutTarget,
   cleanupWindowsInstallation,
   installNsisPackage,
+  resolveWindowsDesktopShortcutPath,
   resolveUninstallerPath,
   runExecutable,
   waitForInstallationRemoval,
   waitForPathState
 } from "./windows-installer-process.mjs";
+import { verifyWindowsInstallerUpdateLifecycle } from "./windows-installer-update-lifecycle.mjs";
 import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
 import {
   assertWindowsExistingProfileInteractionPreserved,
@@ -66,6 +69,7 @@ export {
 } from "./windows-installer-lifecycle-contract.mjs";
 export {
   buildNsisInstallArguments,
+  buildNsisUpdateArguments,
   waitForInstallationRemoval,
   WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   waitForPathState
@@ -118,6 +122,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
 
   const root = await mkdtemp(join(tmpdir(), "pi67-windows-installer-"));
   const installDirectory = join(root, "Pi-67 Desktop 中文安装路径");
+  const desktopShortcutPath = await resolveWindowsDesktopShortcutPath("π");
   const userDataDirectory = join(root, "用户数据 含空格");
   const {
     agentDir,
@@ -248,6 +253,10 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       );
     }
     report.initialInstalledExecutable = initialInstalledIdentity;
+    report.initialDesktopShortcut = await assertWindowsShortcutTarget(
+      desktopShortcutPath,
+      installedArtifact.executablePath
+    );
 
     await resetControlledShutdownLifecycle(lifecyclePath);
     const firstLaunch = await launchInstalledApplication({
@@ -279,24 +288,18 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         await writeControlledShutdownExtension({ extensionPath, childPidPath, lifecyclePath });
       }
 
-      const reinstall = await timedPhase(
-        baseline ? "upgrade" : "reinstall",
-        () => installNsisPackage(installerPath, installDirectory)
-      );
-      report.phases.push(reinstall);
-      finalInstalledArtifact = await resolveInstalledArtifact(installDirectory);
-      await assertPackagedRuntimeAssets(finalInstalledArtifact);
-      const finalInstalledIdentity = await readLifecycleArtifactIdentity(
-        finalInstalledArtifact.executablePath,
+      const update = await verifyWindowsInstallerUpdateLifecycle({
+        desktopShortcutPath,
         expectedSigner,
-        "Upgraded Windows executable"
-      );
-      assertSameArtifactBytes(
-        finalInstalledIdentity,
+        installDirectory,
+        installerPath,
         packagedExecutableIdentity,
-        "Upgraded Windows executable"
-      );
-      report.finalInstalledExecutable = finalInstalledIdentity;
+        phaseName: baseline ? "upgrade" : "reinstall"
+      });
+      report.phases.push(update.phase);
+      finalInstalledArtifact = update.installedArtifact;
+      report.finalInstalledExecutable = update.installedExecutableIdentity;
+      report.updateHandoff = update.updateHandoff;
 
       await resetControlledShutdownLifecycle(lifecyclePath);
       const secondLaunch = await launchInstalledApplication({
@@ -373,6 +376,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
     const uninstall = await timedPhase("uninstall", async () => {
       await runExecutable(uninstallPath, ["/S"]);
       await waitForPathState(finalInstalledArtifact.executablePath, false);
+      await waitForPathState(desktopShortcutPath, false);
       await waitForInstallationRemoval(installDirectory);
     });
     report.phases.push(uninstall);

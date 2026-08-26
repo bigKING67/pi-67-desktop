@@ -1,6 +1,6 @@
 # Alpha.33 R2 release
 
-Status: published; target upgrades pending
+Status: published; Windows target upgrade failed; remediation moved to Alpha.34 candidate
 Owner: root agent
 Started: 2026-08-26
 Last updated: 2026-08-26
@@ -11,7 +11,8 @@ Publish `0.1.0-alpha.33` through the internal unsigned R2 channel from one exact
 `main` source SHA. The release includes the committed scoped t3code mechanisms,
 the mutable-manifest cache fix, and the Windows update lifecycle repair that pins
 the existing installation, relaunches the new version, and preserves a valid
-Desktop shortcut when one existed before update.
+Desktop shortcut. The post-publication target result below records where that
+intended Windows lifecycle did not hold.
 
 ## Non-goals
 
@@ -33,8 +34,8 @@ Desktop shortcut when one existed before update.
 - R2 plan reports no immutable conflicts or unknown objects; publish verifies all
   three public artifacts before switching the manifest last with `no-store`.
 - An installed Alpha.32 Windows copy updates through the app, remains in the same
-  installation directory, automatically starts Alpha.33, and retains a working
-  Desktop shortcut if it existed before the update.
+  installation directory, automatically starts Alpha.33, and provides a working
+  Desktop shortcut.
 - An installed Alpha.32 macOS arm64 copy updates and restarts as Alpha.33.
 
 ## Delivery boundary
@@ -54,8 +55,10 @@ Desktop shortcut when one existed before update.
 | State | Evidence | Source | Verified at |
 | --- | --- | --- | --- |
 | OBSERVED | The scoped t3code commit `541e7181b1e0bc94caf5af664c1205acf3163c02` and Alpha.33 preparation commit `6842f36a1351042859f7e43eccaafde0fedfa866` were pushed to `origin/main`. | live Git and push receipt | 2026-08-26 |
-| OBSERVED | Alpha.32 Windows application replacement reached the new executable, but did not relaunch it and left an existing Desktop shortcut with a missing target. | real Windows target-machine execution and screenshots | 2026-08-26 |
-| OBSERVED | The local remediation passes `--force-run`, pins the final NSIS `/D=` to the running executable directory, and rewrites only a Desktop shortcut that existed before the update. | updater, NSIS include, and focused tests | 2026-08-26 |
+| OBSERVED | The public Alpha.32-to-Alpha.33 in-app update replaced the installed application with Alpha.33, then exited without relaunching it and removed or invalidated the Desktop shortcut. Alpha.33 remained launchable from the installation directory. | real Windows x64 target-machine execution and screenshots | 2026-08-26 |
+| OBSERVED | The failing hop was controlled by the installed Alpha.32 updater, whose installer arguments were only `--updated /S`; Alpha.33's added `--force-run` and pinned `/D=` could not affect the already-running Alpha.32 source side. | exact Git history and updater source | 2026-08-26 |
+| OBSERVED | The hosted Alpha.32-to-Alpha.33 lifecycle gate invoked the installer only with `/S /D=...` and then launched the application itself, so it did not verify the real update arguments, automatic post-install relaunch, or Desktop shortcut continuity. | lifecycle harness source | 2026-08-26 |
+| OBSERVED | The current local remediation always repairs the Desktop shortcut after an update and makes the Windows lifecycle gate invoke `--updated --force-run /S /D=...`, observe the automatically launched main process, verify the shortcut target, and fail if the observed process cannot be cleaned up. | NSIS include, lifecycle harness, focused tests, and local quality gates | 2026-08-26 |
 | OBSERVED | The mutable R2 manifest now carries `Cache-Control: no-store`; local release tooling has a regression test for future manifest writes. | live public headers and release tooling tests | 2026-08-26 |
 | OBSERVED | The complete repository gate passed before the Alpha.33 version bump with 589 test files, 3,047 passing tests, and 3 skipped. | `corepack pnpm run check` exit 0 | 2026-08-26 |
 | OBSERVED | The exact `6842f36a` source passed the complete repository gate with 595 test files, 3,086 passing tests, and 3 skipped; its macOS arm64 DMG/ZIP were rebuilt and packaged smoke passed. | `corepack pnpm run check` and `preview:mac:unsigned` exits 0 | 2026-08-26 |
@@ -83,7 +86,7 @@ Desktop shortcut when one existed before update.
 | --- | --- | --- |
 | Release as Alpha.33 rather than overwrite Alpha.32. | R2 artifact names are immutable and Alpha.32 is already public. | None; Alpha.32 bytes must remain immutable. |
 | Bind Windows NSIS `/D=` to `dirname(process.execPath)`. | Live evidence showed application and shortcut continuity cannot rely only on installer registry state. | A verified updater API supplies an equivalent exact-install authority. |
-| Recreate a Desktop shortcut only when it existed before update. | Repair the stale target without overriding a user's decision to remove the shortcut. | Product explicitly changes shortcut ownership. |
+| Recreate the Desktop shortcut after every in-app update. | A broken prior update can erase the shortcut before the next installer starts, so conditional preservation cannot distinguish damage from intentional removal. A reliable post-update launch path takes priority. | A durable explicit user preference is added for suppressing shortcut recreation. |
 | Retain Alpha.31 and Alpha.32 through target upgrades. | They are recovery baselines until the new lifecycle is proven. | Both target upgrades pass and cleanup is separately authorized. |
 
 ## Checkpoints
@@ -97,30 +100,42 @@ Desktop shortcut when one existed before update.
 - [x] 5. Upload immutable artifacts, verify public bytes/hashes/Range, and publish
   the `no-store` manifest last.
 - [ ] 6. Verify Alpha.32-to-Alpha.33 in-app upgrades on Windows x64 and macOS arm64.
+  Windows failed: files reached Alpha.33, but automatic restart and shortcut
+  continuity failed. macOS remains unverified.
 - [x] 7. Record publication closeout and leave old-version cleanup pending separate
   approval.
+- [x] 8. Repair the local Windows lifecycle contract so the hosted gate uses the
+  real update handoff and hard-gates automatic relaunch plus shortcut target.
+- [ ] 9. Ship the remediation only as a new immutable version, then verify the
+  installed Alpha.33-to-new-version path on real Windows x64 before acceptance.
 
 ## Validation matrix
 
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Source | `corepack pnpm run check` on exact source | every required gate exit 0 | passed on Alpha.33 source; 595 files, 3,086 passed, 3 skipped |
-| Tests | updater/NSIS/release tests and full coverage | lifecycle flags, destination, shortcut, no-store | passed locally and in exact Windows Candidate |
+| Tests | updater/NSIS/release tests and full coverage | lifecycle flags, destination, shortcut, no-store | remediation focused tests 25/25; typecheck, lint, and structure pass; 50% worker coverage passes 595 files and 3,086 tests with 3 skipped; default full concurrency remains flaky on unrelated 5-second Git fixture and Provider startup budgets |
 | Runtime/host | packaged smoke on both candidates | exact artifact startup and runtime receipts | passed on hosted Windows x64 and local Apple Silicon macOS |
 | Packaged artifact | candidate identity and R2 bundle verification | version/source/size/SHA-256 binding | passed for the exact three-file Alpha.33 bundle |
-| Target OS/manual | Windows/macOS installed in-app upgrades | before/after versions and lifecycle | exact Windows candidate accepted; post-publication in-app upgrades pending |
+| Target OS/manual | Windows/macOS installed in-app upgrades | before/after versions and lifecycle | Windows Alpha.32-to-Alpha.33 failed restart and shortcut continuity; macOS pending |
 
 ## Rollback
 
 Before the Alpha.33 manifest switch, leave the public Alpha.32 manifest and all
 older files unchanged. If post-publication verification fails, restore the
 previous manifest before any object cleanup. Never overwrite a versioned file;
-preserve failed candidate bytes and credential-free receipts for diagnosis.
+preserve failed candidate bytes and credential-free receipts for diagnosis. Any
+manifest rollback is a separately authorized external mutation and does not repair
+clients that already installed Alpha.33 or change the source-side Alpha.32 updater.
 
 ## Risks and unknowns
 
-- Exact Candidate lifecycle and manual candidate acceptance do not replace the
-  post-publication Alpha.32-to-Alpha.33 in-app upgrade on both target systems.
+- Alpha.33 remains public while its Windows source-side update hop is known not to
+  relaunch automatically or preserve the Desktop shortcut. No rollback or
+  replacement publication is authorized in this remediation step.
+- The local repair has only source and focused-test evidence. It requires a new
+  immutable version, an exact Windows Candidate, and a real installed
+  Alpha.33-to-new-version in-app upgrade before it can be called fixed in release.
 - Clients that cached an older mutable manifest before `no-store` may still need
   cache expiry; new responses prevent recurrence but cannot evict existing bytes.
 - Alpha.31 and Alpha.32 remain intentional rollback artifacts; cleanup is still
@@ -147,19 +162,40 @@ preserve failed candidate bytes and credential-free receipts for diagnosis.
 - 2026-08-26: The first publish invocation stopped during local flag parsing before
   any R2 write because pnpm forwarded a standalone `--`; the documented publish
   and cleanup examples now use the verified argument form.
+- 2026-08-26: Real Windows x64 post-publication testing disproved the hosted
+  lifecycle conclusion: Alpha.32 installed Alpha.33 but did not relaunch it and
+  left no usable Desktop shortcut. Git history showed that the source-side
+  Alpha.32 runner lacked `--force-run` and pinned `/D=`. The hosted gate also used
+  direct silent installation plus a test-controlled launch rather than the real
+  update handoff. Local remediation now restores the shortcut unconditionally and
+  hard-gates the real update arguments, automatic relaunch, and shortcut target.
+- 2026-08-26: The remediation passes focused updater/lifecycle tests 25/25,
+  typecheck, lint, structure, and `diff --check`. The complete 595-file coverage
+  suite passes with 50% workers (3,086 passed, 3 skipped). Two default-concurrency
+  runs reached coverage but timed out on unrelated five-second Git fixture and Pi
+  offline Provider startup budgets; those files pass in isolation, so the standard
+  default-concurrency `check` invocation is not recorded as fully green.
 
 ## Closeout
 
-- Final application source SHA: `a04b684148b9136914856d7b787334f1735651ce`
-- Changed files in post-publication closeout: this plan and corrected R2 command
-  examples; generated installers, receipts, manifests, and logs remain ignored.
+- Published Alpha.33 application source SHA:
+  `a04b684148b9136914856d7b787334f1735651ce`
+- The Alpha.34 Candidate carries the NSIS shortcut repair, Windows lifecycle
+  process harness, lifecycle tests, this plan correction, and the R2 update
+  contract; generated installers, receipts, manifests, and logs remain ignored.
 - Validation completed: full source gate, exact Windows/macOS packaging, Windows
   Candidate lifecycle and manual acceptance, R2 bundle verification, immutable
-  upload, full public readback, manifest-last switch, cache header, and Range checks.
-- Validation not completed: installed Alpha.32-to-Alpha.33 in-app upgrades on
-  Windows x64 and macOS arm64.
-- Remaining risks: target update/restart/shortcut behavior until those upgrades
-  pass; pre-existing cached Alpha.32 manifests; rollback cleanup remains pending.
-- Commit/push/release state: application source and release tooling were published
-  from `a04b6841`; this documentation closeout is committed/pushed afterward. No
-  Tag, GitHub Release, promotion, signing, notarization, deletion, or cache purge.
+  upload, full public readback, manifest-last switch, cache header, and Range
+  checks for published Alpha.33; local remediation focused tests, typecheck, lint,
+  structure, and reduced-worker full coverage.
+- Validation failed: installed Alpha.32-to-Alpha.33 Windows x64 automatic restart
+  and Desktop shortcut continuity. The macOS arm64 in-app upgrade remains
+  unverified.
+- Remaining risks: Alpha.33 public Windows update experience; local remediation
+  lacks exact Windows artifact and target-machine proof; pre-existing cached
+  Alpha.32 manifests; rollback cleanup remains pending.
+- Commit/push/release state: Alpha.33 application source and release tooling were
+  published from `a04b6841`; the Windows remediation is versioned for the
+  separately authorized Alpha.34 Candidate. No Alpha.34 R2 mutation, Tag, GitHub
+  Release, promotion, signing, notarization, deletion, or cache purge is
+  authorized by this remediation step.
