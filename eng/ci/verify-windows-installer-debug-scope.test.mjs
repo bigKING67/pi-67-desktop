@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   verifySourceRunJobsMetadata,
   verifySourceRunMetadata,
+  verifyWindowsCandidateSourceRunJobsMetadata,
+  verifyWindowsCandidateSourceRunMetadata,
   verifyWindowsInstallerDebugScope
 } from "./verify-windows-installer-debug-scope.mjs";
 import {
@@ -18,6 +20,7 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-installed-application-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.test.mjs",
       "eng/packaging/windows-installer-process.mjs",
+      "eng/packaging/windows-installer-update-lifecycle.mjs",
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",
       "eng/packaging/windows-real-user-lifecycle.test.mjs",
@@ -102,6 +105,41 @@ describe("Windows installer debug artifact reuse", () => {
       .not.toThrow();
   });
 
+  it("binds candidate reuse to the exact failed installer-certification run", () => {
+    const sourceSha = "a".repeat(40);
+    const metadata = {
+      conclusion: "failure",
+      head_sha: sourceSha,
+      path: ".github/workflows/windows-candidate.yml",
+      run_attempt: 2,
+      status: "completed"
+    };
+    expect(() => verifyWindowsCandidateSourceRunMetadata(metadata, sourceSha, 2)).not.toThrow();
+    expect(() => verifyWindowsCandidateSourceRunMetadata(metadata, sourceSha, 1))
+      .toThrow(/requested completed failed Windows Candidate run/u);
+  });
+
+  it("requires candidate provenance and build success before lifecycle-only reuse", () => {
+    const steps = [
+      { conclusion: "success", name: "Download exact candidate build", number: 7 },
+      { conclusion: "success", name: "Verify exact previous-version upgrade baseline", number: 11 },
+      { conclusion: "failure", name: "Verify full Windows NSIS installer lifecycle", number: 12 }
+    ];
+    const metadata = {
+      jobs: [
+        { conclusion: "success", name: "provenance", status: "completed" },
+        { conclusion: "success", name: "build-windows", status: "completed" },
+        { conclusion: "failure", name: "certify-installer", status: "completed", steps }
+      ]
+    };
+    expect(() => verifyWindowsCandidateSourceRunJobsMetadata(metadata)).not.toThrow();
+    expect(() => verifyWindowsCandidateSourceRunJobsMetadata({
+      jobs: metadata.jobs.map((job) => (
+        job.name === "build-windows" ? { ...job, conclusion: "failure" } : job
+      ))
+    })).toThrow(/build-windows did not complete with success/u);
+  });
+
   it("builds workspace dependencies before running the direct Node verifier", async () => {
     const workflow = await readFile(new URL("../../.github/workflows/windows-installer-debug.yml", import.meta.url), "utf8");
     const buildStep = workflow.indexOf("- name: Build verifier workspace dependencies");
@@ -120,6 +158,9 @@ describe("Windows installer debug artifact reuse", () => {
     expect(workflow).toMatch(/workflow_call:[\s\S]*?source_run_id:/u);
     expect(workflow).toContain("source-run-jobs.json");
     expect(workflow).toContain("--jobs-metadata $jobsMetadata");
+    expect(workflow).toContain("--source-kind $env:SOURCE_KIND");
+    expect(workflow).toContain("windows-candidate-build-");
+    expect(workflow).toContain("PI67_WINDOWS_BASELINE_INSTALLER");
     expect(workflow).toContain("eng/ci/verify-windows-installer-debug-scope.test.mjs");
     expect(workflow).toContain("eng/packaging/windows-artifact-identity.test.mjs");
   });

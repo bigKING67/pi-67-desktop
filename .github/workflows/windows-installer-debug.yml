@@ -15,6 +15,31 @@ on:
         description: Ref containing verifier-only changes descended from source_sha
         required: true
         type: string
+      source_kind:
+        description: Source workflow contract (ci or candidate)
+        required: false
+        default: ci
+        type: string
+      source_run_attempt:
+        description: Exact source workflow run attempt
+        required: false
+        default: "1"
+        type: string
+      baseline_run_id:
+        description: Exact previous-version Candidate run for candidate diagnostics
+        required: false
+        default: ""
+        type: string
+      baseline_run_attempt:
+        description: Exact previous-version Candidate run attempt
+        required: false
+        default: ""
+        type: string
+      baseline_source_sha:
+        description: Exact previous-version Candidate source SHA
+        required: false
+        default: ""
+        type: string
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -28,6 +53,31 @@ on:
       verifier_ref:
         description: Ref containing verifier-only changes descended from source_sha
         required: true
+        type: string
+      source_kind:
+        description: Source workflow contract (ci or candidate)
+        required: true
+        default: ci
+        type: choice
+        options:
+          - ci
+          - candidate
+      source_run_attempt:
+        description: Exact source workflow run attempt
+        required: true
+        default: "1"
+        type: string
+      baseline_run_id:
+        description: Exact previous-version Candidate run for candidate diagnostics
+        required: false
+        type: string
+      baseline_run_attempt:
+        description: Exact previous-version Candidate run attempt
+        required: false
+        type: string
+      baseline_source_sha:
+        description: Exact previous-version Candidate source SHA
+        required: false
         type: string
 
 permissions:
@@ -64,6 +114,8 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_KIND: ${{ inputs.source_kind }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
@@ -78,20 +130,45 @@ jobs:
             --base $env:SOURCE_SHA `
             --head $headSha `
             --run-metadata $metadata `
-            --jobs-metadata $jobsMetadata
+            --jobs-metadata $jobsMetadata `
+            --source-kind $env:SOURCE_KIND `
+            --source-run-attempt $env:SOURCE_RUN_ATTEMPT
       - name: Install frozen dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify pnpm execution runtime
         run: pnpm exec node -e "if (process.version !== 'v24.18.0') throw new Error('pnpm exec resolved ' + process.version)"
       - name: Build verifier workspace dependencies
         run: pnpm run build:packages
+      - name: Resolve source artifact transport
+        id: source-artifact
+        shell: bash
+        env:
+          SOURCE_KIND: ${{ inputs.source_kind }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          if [[ "$SOURCE_KIND" == "candidate" ]]; then
+            echo "name=windows-candidate-build-${SOURCE_RUN_ID}-${SOURCE_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+            echo "path=artifacts" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=windows-installer-debug-candidate-${SOURCE_RUN_ID}" >> "$GITHUB_OUTPUT"
+            echo "path=artifacts/release" >> "$GITHUB_OUTPUT"
+          fi
       - name: Download source Windows installer candidate
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: windows-installer-debug-candidate-${{ inputs.source_run_id }}
-          path: artifacts/release
+          name: ${{ steps.source-artifact.outputs.name }}
+          path: ${{ steps.source-artifact.outputs.path }}
           github-token: ${{ github.token }}
           run-id: ${{ inputs.source_run_id }}
+      - name: Download exact previous-version candidate
+        if: inputs.source_kind == 'candidate'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: windows-candidate-${{ inputs.baseline_run_id }}-${{ inputs.baseline_run_attempt }}
+          path: artifacts/baseline
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.baseline_run_id }}
       - name: Verify installer helper tests
         run: >-
           pnpm exec vitest run
@@ -100,6 +177,39 @@ jobs:
           eng/packaging/verify-windows-installer-lifecycle.test.mjs
           eng/packaging/windows-installed-application-lifecycle.test.mjs
           eng/packaging/windows-artifact-identity.test.mjs
+      - name: Verify exact Candidate and previous-version identities
+        if: inputs.source_kind == 'candidate'
+        shell: pwsh
+        env:
+          BASELINE_RUN_ATTEMPT: ${{ inputs.baseline_run_attempt }}
+          BASELINE_RUN_ID: ${{ inputs.baseline_run_id }}
+          BASELINE_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
+          SOURCE_RUN_ATTEMPT: ${{ inputs.source_run_attempt }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidateInstallers = @(Get-ChildItem artifacts/release/Pi-67-Desktop-*-win-x64.exe -File)
+          if ($candidateInstallers.Count -ne 1) { throw "Expected one Windows candidate installer, found $($candidateInstallers.Count)." }
+          pnpm run release:preview:candidate verify `
+            --candidate-identity artifacts/release/windows-preview-candidate-identity.json `
+            --installer $candidateInstallers[0].FullName `
+            --packaged-executable 'artifacts/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-commit $env:SOURCE_SHA `
+            --expected-run-id $env:SOURCE_RUN_ID `
+            --expected-run-attempt $env:SOURCE_RUN_ATTEMPT
+          $baselineInstallers = @(Get-ChildItem artifacts/baseline/release/Pi-67-Desktop-*-win-x64.exe -File)
+          if ($baselineInstallers.Count -ne 1) { throw "Expected one previous-version installer, found $($baselineInstallers.Count)." }
+          pnpm run release:preview:candidate verify `
+            --candidate-identity artifacts/baseline/release/windows-preview-candidate-identity.json `
+            --installer $baselineInstallers[0].FullName `
+            --packaged-executable 'artifacts/baseline/release/win-unpacked/Pi-67 Desktop.exe' `
+            --expected-repository $env:GITHUB_REPOSITORY `
+            --expected-source-commit $env:BASELINE_SOURCE_SHA `
+            --expected-run-id $env:BASELINE_RUN_ID `
+            --expected-run-attempt $env:BASELINE_RUN_ATTEMPT
+          "PI67_WINDOWS_BASELINE_INSTALLER=$($baselineInstallers[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify Windows NSIS installer lifecycle
         run: pnpm run package:smoke:windows-installer
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

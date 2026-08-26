@@ -295,7 +295,8 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
         installDirectory,
         installerPath,
         packagedExecutableIdentity,
-        phaseName: baseline ? "upgrade" : "reinstall"
+        phaseName: baseline ? "upgrade" : "reinstall",
+        shortcutEvidenceDirectory: outputDirectory
       });
       report.phases.push(update.phase);
       finalInstalledArtifact = update.installedArtifact;

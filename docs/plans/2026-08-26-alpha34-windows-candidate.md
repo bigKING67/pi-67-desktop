@@ -1,6 +1,6 @@
 # Alpha.34 Windows candidate
 
-Status: blocked
+Status: active
 Owner: root agent
 Started: 2026-08-26
 Last updated: 2026-08-26
@@ -64,6 +64,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Run `32957178689/1` passed provenance and the complete build/package evidence, then stopped in the intended Windows helper-test stage because the new PowerShell/CIM execution exceeded Vitest's default 5-second test timeout. The production probe retains its separate 15-second child-process timeout; no lifecycle or Candidate upload ran. | exact failed helper-test log | 2026-08-26 |
 | OBSERVED | Run `32958302320/1` passed the real Windows process probe, exact candidate and baseline identity, installed Alpha.33, removed its shortcut, installed byte-exact Alpha.34, and automatically launched the updated process. The recreated `π.lnk` existed but exposed an empty target, so certification stopped before the remaining lanes and withheld the Candidate. | exact lifecycle summary and failed job log | 2026-08-26 |
 | OBSERVED | Final run `32960108896/1` at source `7a56fae25121f76ac09d01997064b1cdf1e5e982` passed provenance, Windows build/package evidence, all 53 Windows helper tests, candidate and exact Alpha.33 baseline identity, baseline install/launch, missing-shortcut observation, byte-exact Alpha.34 installation, and automatic updated-process launch. The recreated `π.lnk` still exposed an empty target after direct executable binding, so certification withheld the Candidate. | live Git, exact workflow jobs, and lifecycle diagnostic summary | 2026-08-26 |
+| OBSERVED | The user resumed the blocked flow, and the exact failed-run Alpha.34 build artifact `windows-candidate-build-32960108896-1` plus the exact Alpha.33 baseline remain available. The next run will reuse those bytes, preserve the generated link, and compare `WScript.Shell` with `Shell.Application` against both the Unicode original and an ASCII-named byte copy; it will not rebuild the application. | live GitHub Actions artifact inventory and current verifier diff | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -197,8 +198,15 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   does not distinguish actual post-AUMI link corruption from a Unicode-path COM
   inspection failure. No testable Candidate was uploaded; another full build is
   blocked pending narrow dual-resolver/link-artifact diagnostics.
+- 2026-08-26: The user resumed the flow. Live artifact inventory confirmed the
+  exact failed-run Alpha.34 build and Alpha.33 baseline remain downloadable.
+  The existing installer-debug workflow is being extended under its
+  verifier-only scope to authenticate the failed Candidate run, reuse both
+  exact artifacts, preserve the generated `.lnk`, and inspect the Unicode
+  original plus an ASCII-named byte copy through `WScript.Shell` and
+  `Shell.Application`. This diagnostic does not rebuild or publish Alpha.34.
 
-## Current blocked closeout
+## Most recent blocked checkpoint
 
 - Final attempted source SHA: `7a56fae25121f76ac09d01997064b1cdf1e5e982`
 - Final workflow: `32960108896/1`; provenance and build jobs passed, certification

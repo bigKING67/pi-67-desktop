@@ -211,6 +211,7 @@ describe("Windows installer lifecycle contract", () => {
     expect(updateSource).toContain("processId = await installNsisUpdatePackage(");
     expect(updateSource).toContain("automaticPostInstallLaunch: true");
     expect(updateSource).toContain("desktopShortcut: await assertWindowsShortcutTarget(");
+    expect(updateSource).toContain("{ evidenceDirectory: shortcutEvidenceDirectory }");
     expect(updateSource).toMatch(/finally \{[\s\S]*?await stopWindowsProcessTree\(processId\)/u);
     expect(processSource).not.toContain("$args[0]");
     expect(processSource).toContain("PI67_WINDOWS_SHORTCUT_PATH");
@@ -374,6 +375,20 @@ describe("Windows installer lifecycle contract", () => {
     expect(installer).not.toMatch(/CreateShortCut[^\n]+"\$appExe"/u);
     expect(installer).toContain('Abort "Updated Desktop shortcut could not be created."');
     expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
+  });
+
+  it("preserves dual-resolver shortcut evidence before target certification", async () => {
+    const processSource = await readFile(
+      join(repositoryRoot, "eng/packaging/windows-installer-process.mjs"),
+      "utf8"
+    );
+
+    expect(processSource).toContain('"desktop-shortcut-observed.lnk"');
+    expect(processSource).toContain('"desktop-shortcut-inspection.json"');
+    expect(processSource).toContain("resolveWindowsShortcutWithWScript(shortcutPath)");
+    expect(processSource).toContain("resolveWindowsShortcutWithWScript(preservedShortcutPath)");
+    expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(shortcutPath)");
+    expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(preservedShortcutPath)");
   });
 
   it("waits for a path to become present or absent", async () => {

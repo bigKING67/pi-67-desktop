@@ -56,6 +56,43 @@ export function verifySourceRunJobsMetadata(metadata, { allowPackagedUiFailure =
   verifySuccessfulPredecessors(steps, packagedUiSteps[0]);
 }
 
+export function verifyWindowsCandidateSourceRunMetadata(metadata, sourceSha, runAttempt) {
+  if (
+    metadata?.head_sha !== sourceSha
+    || metadata?.status !== "completed"
+    || metadata?.conclusion !== "failure"
+    || metadata?.path !== ".github/workflows/windows-candidate.yml"
+    || metadata?.run_attempt !== runAttempt
+  ) throw new Error("Source run is not the requested completed failed Windows Candidate run.");
+}
+
+export function verifyWindowsCandidateSourceRunJobsMetadata(metadata) {
+  const jobs = Array.isArray(metadata?.jobs) ? metadata.jobs : [];
+  const expectedJobs = new Map([
+    ["provenance", "success"],
+    ["build-windows", "success"],
+    ["certify-installer", "failure"]
+  ]);
+  for (const [name, conclusion] of expectedJobs) {
+    const matches = jobs.filter((job) => job?.name === name);
+    if (
+      matches.length !== 1
+      || matches[0].status !== "completed"
+      || matches[0].conclusion !== conclusion
+    ) {
+      throw new Error(`Windows Candidate source job ${name} did not complete with ${conclusion}.`);
+    }
+  }
+
+  const certificationJob = jobs.find((job) => job?.name === "certify-installer");
+  const steps = Array.isArray(certificationJob?.steps) ? certificationJob.steps : [];
+  const lifecycleSteps = steps.filter((step) => step?.name === "Verify full Windows NSIS installer lifecycle");
+  if (lifecycleSteps.length !== 1 || lifecycleSteps[0].conclusion !== "failure") {
+    throw new Error("Windows Candidate source run did not fail at the installer lifecycle step.");
+  }
+  verifySuccessfulPredecessors(steps, lifecycleSteps[0]);
+}
+
 function verifySuccessfulPredecessors(steps, failureStep) {
   if (!Number.isSafeInteger(failureStep.number) || failureStep.number <= 0) {
     throw new Error("Source Windows native failure step did not expose a valid step number.");

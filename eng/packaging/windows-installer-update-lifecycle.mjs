@@ -17,7 +17,8 @@ export async function verifyWindowsInstallerUpdateLifecycle({
   installDirectory,
   installerPath,
   packagedExecutableIdentity,
-  phaseName
+  phaseName,
+  shortcutEvidenceDirectory
 }) {
   let processId;
   const startedAt = performance.now();
@@ -41,7 +42,8 @@ export async function verifyWindowsInstallerUpdateLifecycle({
       arguments: buildNsisUpdateArguments("<existing-install-directory>"),
       desktopShortcut: await assertWindowsShortcutTarget(
         desktopShortcutPath,
-        installedArtifact.executablePath
+        installedArtifact.executablePath,
+        { evidenceDirectory: shortcutEvidenceDirectory }
       )
     };
     return { installedArtifact, installedExecutableIdentity, phase, updateHandoff };
