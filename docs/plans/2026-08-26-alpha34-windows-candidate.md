@@ -62,6 +62,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | OBSERVED | Run `32954970758/1` installed and launched Alpha.33 and observed the simulated missing shortcut, but the lifecycle harness then failed while parsing space-joined PowerShell process-detection statements. It did not verify automatic relaunch or the repaired shortcut and withheld the testable Candidate. | exact lifecycle diagnostic artifact and failed job log | 2026-08-26 |
 | OBSERVED | The user resumed the blocked Candidate flow. The next attempt must first execute the process-discovery command in the workflow's Windows helper-test stage, before the full installer lifecycle. | current authorization and workflow order | 2026-08-26 |
 | OBSERVED | Run `32957178689/1` passed provenance and the complete build/package evidence, then stopped in the intended Windows helper-test stage because the new PowerShell/CIM execution exceeded Vitest's default 5-second test timeout. The production probe retains its separate 15-second child-process timeout; no lifecycle or Candidate upload ran. | exact failed helper-test log | 2026-08-26 |
+| OBSERVED | Run `32958302320/1` passed the real Windows process probe, exact candidate and baseline identity, installed Alpha.33, removed its shortcut, installed byte-exact Alpha.34, and automatically launched the updated process. The recreated `π.lnk` existed but exposed an empty target, so certification stopped before the remaining lanes and withheld the Candidate. | exact lifecycle summary and failed job log | 2026-08-26 |
 
 ## Affected boundaries
 
@@ -81,6 +82,7 @@ and verify that the Desktop shortcut targets the updated executable.
 | Use Alpha.34 as a new immutable version. | Alpha.33 is already public and its bytes must not be overwritten. | None. |
 | Use the exact Alpha.33 Candidate as the hosted upgrade baseline. | The next-hop behavior must prove the installed Alpha.33 source updater and Alpha.34 target installer together. | The baseline artifact fails exact identity verification. |
 | Recreate the Desktop shortcut on every in-app update. | A missing shortcut may be damage from an earlier broken update; preserving a reliable launch path takes priority. | A durable explicit suppression preference is implemented and verified. |
+| Bind the recovered shortcut directly to `$INSTDIR\${APP_EXECUTABLE_FILENAME}`. | The exact hosted run proved the installed executable and automatic launch while the `$appExe`-based recovery link had an empty target; the direct path is also electron-builder's own launch fallback. | Hosted evidence proves the direct path is not the decisive difference. |
 | Stop at a verified Candidate. | Hosted evidence cannot replace the user's installed Windows x64 upgrade. | The user separately accepts the exact Candidate and authorizes R2 publication. |
 
 ## Checkpoints
@@ -173,6 +175,13 @@ Alpha.33 remains the public R2 version until separate publication authorization.
   seconds, before the production probe's own 15-second timeout. The regression
   now has a bounded 20-second test budget so success or the production timeout,
   rather than the test framework, is authoritative on the next run.
+- 2026-08-26: Exact-source run `32958302320/1` passed the Windows helper probe,
+  candidate and Alpha.33 baseline identity, baseline install/launch, byte-exact
+  Alpha.34 installation, and automatic post-update launch. Its recovered
+  `π.lnk` existed but returned an empty target, matching the user's unusable-link
+  symptom. The recovery macro now deletes any stale link, binds directly to the
+  installed executable path, and fails explicitly if the target or new link is
+  unavailable.
 
 ## Prior blocked closeout
 

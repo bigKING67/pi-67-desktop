@@ -370,7 +370,9 @@ describe("Windows installer lifecycle contract", () => {
     const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
 
     expect(installer).not.toContain("Pi67UpdateDesktopShortcutExisted");
-    expect(installer).toMatch(/!macro customInstall\s+\$\{If\} \$\{isUpdated\}[\s\S]*?CreateShortCut "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk" "\$appExe"/u);
+    expect(installer).toMatch(/!macro customInstall\s+\$\{If\} \$\{isUpdated\}[\s\S]*?\$\{FileExists\} "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"[\s\S]*?Delete "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk"[\s\S]*?CreateShortCut "\$DESKTOP\\\$\{SHORTCUT_NAME\}\.lnk" "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"/u);
+    expect(installer).not.toMatch(/CreateShortCut[^\n]+"\$appExe"/u);
+    expect(installer).toContain('Abort "Updated Desktop shortcut could not be created."');
     expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
   });
 

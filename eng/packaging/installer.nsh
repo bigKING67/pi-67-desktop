@@ -12,8 +12,15 @@
 
   !macro customInstall
     ${If} ${isUpdated}
-      CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$appExe" "" "$appExe" 0 "" "" "${APP_DESCRIPTION}"
+      ${IfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+        Abort "Updated application executable is unavailable."
+      ${EndIf}
+      Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
       ClearErrors
+      CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
+      ${If} ${Errors}
+        Abort "Updated Desktop shortcut could not be created."
+      ${EndIf}
       WinShell::SetLnkAUMI "$DESKTOP\${SHORTCUT_NAME}.lnk" "${APP_ID}"
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
     ${EndIf}
