@@ -10,6 +10,10 @@ import {
   promptSubmissionFingerprint,
   textOperationSubmissionIdentity
 } from "./operation-submission-identity.js";
+import {
+  assertInteractiveResponseContext,
+  completeInteractiveResponse
+} from "./host-interactive-response.js";
 import { HostCommandError } from "./protocol-error.js";
 export { operationSubmissionIdentity } from "./operation-submission-identity.js";
 export type RuntimeLoadedCommand = Exclude<
@@ -377,7 +381,7 @@ export async function dispatchHostCommand(
       return runtime.getExtensionCatalog();
     case "extension.ui.respond":
       assertInteractiveResponseContext(runtime, context.operations(), command.payload);
-      return interactiveResponse(
+      return completeInteractiveResponse(
         command.payload.requestId,
         runtime.resolveExtensionUi(
           command.payload.requestId,
@@ -411,52 +415,5 @@ export async function dispatchHostCommand(
       return runtime.collectDiagnostics();
     case "doctor.run":
       return runtime.runDoctor();
-  }
-}
-
-function interactiveResponse(
-  requestId: string,
-  resolved: boolean,
-  completeInteractiveWait: (requestId: string) => void
-): { resolved: boolean } {
-  if (resolved) completeInteractiveWait(requestId);
-  return { resolved };
-}
-
-function assertInteractiveResponseContext(
-  runtime: AgentRuntime,
-  operations: OperationRegistry,
-  payload: Extract<AgentCommand, { type: "extension.ui.respond" | "approval.respond" }>["payload"]
-): void {
-  const identity = runtime.getIdentity();
-  if (
-    identity.sessionId !== payload.sessionId
-    || identity.sessionGeneration !== payload.sessionGeneration
-  ) {
-    throw new HostCommandError(
-      "STALE_SESSION_GENERATION",
-      "The extension UI response belongs to a stale session generation.",
-      true,
-      {
-        expectedSessionGeneration: identity.sessionGeneration,
-        receivedSessionGeneration: payload.sessionGeneration
-      }
-    );
-  }
-
-  if (
-    payload.operationId === undefined
-    && "toolCallId" in payload
-    && runtime.hasPendingSubagentApproval(payload.requestId, payload.toolCallId)
-  ) return;
-
-  const activeOperation = operations.activeView();
-  if (activeOperation?.operationId !== payload.operationId) {
-    throw new HostCommandError(
-      "STALE_OPERATION",
-      "The extension UI response does not belong to the active operation.",
-      true,
-      { activeOperation: activeOperation !== undefined }
-    );
   }
 }

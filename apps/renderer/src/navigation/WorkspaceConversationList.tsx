@@ -1,6 +1,5 @@
 import {
   taskConsumesRunSlot,
-  type WorkspaceMessageSearchItem,
   type WorkspaceDescriptor
 } from "@pi67/domain";
 import {
@@ -11,7 +10,6 @@ import {
   Ellipsis,
   FileInput,
   FolderSearch,
-  MessageSquareText,
   Plus,
   RefreshCw,
   Trash2
@@ -34,7 +32,7 @@ import {
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { ConversationRow } from "./ConversationRow.js";
-import { openWorkspaceMessageResult } from "../command-palette/palette-message-result.js";
+import { ConversationContentResult } from "./ConversationContentResult.js";
 import styles from "./NavigationRail.module.css";
 import { useConversationDialogStore } from "./conversation-dialog-store.js";
 import { useConversationSnoozeClock } from "./conversation-snooze-clock.js";
@@ -397,29 +395,6 @@ function WorkspaceConversationGroup({
         </div>
       ) : null}
     </section>
-  );
-}
-
-function ConversationContentResult({
-  disabled,
-  item
-}: {
-  disabled: boolean;
-  item: WorkspaceMessageSearchItem;
-}) {
-  return (
-    <button
-      className={styles.contentSearchResult}
-      disabled={disabled}
-      onClick={() => void openWorkspaceMessageResult(item)}
-      type="button"
-    >
-      <MessageSquareText aria-hidden="true" size={13} />
-      <span>
-        <strong>{item.sessionName}</strong>
-        <small>{item.role === "user" ? "用户" : "Pi"} · {item.snippet}</small>
-      </span>
-    </button>
   );
 }
 

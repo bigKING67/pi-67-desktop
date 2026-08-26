@@ -7,15 +7,23 @@ import {
 } from "@pi67/domain";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { publishNotification } from "../notifications/notification-store.js";
-import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import {
   rendererWorkbenchStore,
-  rendererConversationIdentity,
-  taskForConversation,
-  type RendererWorkbenchTask
+  rendererConversationIdentity
 } from "../workbench/workbench-store.js";
 import { workbenchProtocolContextForTask } from "../workbench/workbench-protocol-context.js";
+import {
+  archiveBlockerMessage,
+  conversationOrganizationErrorMessage as errorMessage,
+  formatSnoozeUntil,
+  hasTaskDraft,
+  snoozeBlockerMessage,
+  taskForSession,
+  type RendererSessionLocator
+} from "./conversation-organization-policy.js";
 import { queryFirstSessionCatalog, querySessionCatalogPage } from "./session-catalog-controller.js";
+
+export type { RendererSessionLocator } from "./conversation-organization-policy.js";
 
 export async function renameRendererConversation(
   workspaceId: WorkspaceId,
@@ -434,59 +442,4 @@ async function setSnoozedUntil(
     [],
     { context: { scope: "workspace", workspaceId } }
   );
-}
-
-function taskForSession(
-  workspaceId: WorkspaceId,
-  session: RendererSessionLocator
-): RendererWorkbenchTask | undefined {
-  return taskForConversation(rendererWorkbenchStore.getState().tasks, {
-    kind: "session",
-    workspaceId,
-    sessionFileIdentity: session.fileIdentity,
-    sessionPath: session.path
-  });
-}
-
-export interface RendererSessionLocator {
-  fileIdentity: string;
-  path: string;
-}
-
-function hasTaskDraft(task: RendererWorkbenchTask): boolean {
-  const draft = useTaskDraftStore.getState().drafts[task.id];
-  return task.hasDraft
-    || task.attachmentCount > 0
-    || Boolean(draft && (
-      draft.text.trim()
-      || draft.attachments.length > 0
-      || draft.workspaceFiles.length > 0
-    ));
-}
-
-function archiveBlockerMessage(blocker: NonNullable<ReturnType<typeof conversationArchiveBlocker>>): string {
-  if (blocker === "active-task") return "任务仍在运行或等待输入，请先完成或停止任务。";
-  if (blocker === "initializing") return "对话仍在初始化，请稍后再试。";
-  if (blocker === "draft") return "输入框中仍有未发送内容，请发送或清空草稿。";
-  return "尚未保存的新对话不能归档。";
-}
-
-function snoozeBlockerMessage(blocker: NonNullable<ReturnType<typeof conversationArchiveBlocker>>): string {
-  if (blocker === "active-task") return "任务仍在运行、等待批准或等待扩展输入，请先处理或停止任务。";
-  if (blocker === "initializing") return "对话仍在初始化，请稍后再试。";
-  if (blocker === "draft") return "输入框中仍有未发送内容，请先发送、暂存或清空草稿。";
-  return "尚未保存的新对话不能稍后处理。";
-}
-
-function formatSnoozeUntil(value: number): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(value);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Pi 运行服务未能完成操作。";
 }

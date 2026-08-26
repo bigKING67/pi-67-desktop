@@ -58,7 +58,7 @@ describe("command palette actions", () => {
   it("marks the current Session without making it the enabled selection", () => {
     const actions = build(true, undefined);
 
-    expect(byId(actions, "session:session-file-current")).toMatchObject({ disabled: true, disabledReason: "当前会话" });
+    expect(byId(actions, "session:session-file-current")).toMatchObject({ disabled: true, disabledReason: "当前对话" });
     expect(byId(actions, "session:session-file-other").disabled).toBeUndefined();
   });
 });

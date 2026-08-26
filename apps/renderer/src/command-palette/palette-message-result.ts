@@ -34,5 +34,3 @@ export async function openWorkspaceMessageResult(item: WorkspaceMessageSearchIte
     });
   }
 }
-
-export const openPaletteMessageResult = openWorkspaceMessageResult;

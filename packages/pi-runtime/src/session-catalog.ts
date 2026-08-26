@@ -10,45 +10,36 @@ import {
 } from "@pi67/domain";
 import { assertSessionCatalogCursor, createSessionCatalogQueryKey } from "./session-catalog-cursor.js";
 import {
-  clearAppliedSessionCatalogUpserts,
-  mergePendingSessionCatalogUpserts,
-  type PendingSessionCatalogUpsert
-} from "./session-catalog-pending-upserts.js";
-import {
   createBoundedSessionCatalogPage,
   normalizeSessionCatalogSearch,
   querySessionCatalogFallback,
-  sanitizeSessionCatalogDiscovery,
   sanitizeSessionCatalogRecord,
-  sessionCatalogSummaryFromRecord,
   sortSessionCatalogRecords,
   validateSessionCatalogContext,
   validateSessionCatalogQuery,
-  type SessionCatalogDiscoveryResult,
   type ValidatedSessionCatalogQuery
 } from "./session-catalog-projection.js";
-import {
-  indexSessionContentRecords,
-  searchIndexedSessionContent
-} from "./session-content-index.js";
-import { searchWorkspaceSessionContent } from "./session-content-search.js";
+import { searchSessionCatalogContent } from "./session-catalog-content-search.js";
 import { normalizeSessionCatalogWorkspaceIdentity } from "./session-path-identity.js";
-import { upsertSessionCatalogRecordByIdentity } from "./session-catalog-record-identity.js";
 import type { CreateSessionCatalogOptions, SessionCatalog, SessionCatalogContext } from "./session-catalog-contract.js";
 import {
   SessionCatalogRecordEnricher,
   type SessionCatalogOrganizationMutation
 } from "./session-catalog-record-enricher.js";
-import { SessionCatalogAutomaticTitlePublisher } from "./session-catalog-automatic-title-publisher.js";
+import { SessionCatalogIndexCoordinator } from "./session-catalog-index-coordinator.js";
+import { runSessionCatalogReconcile } from "./session-catalog-reconciler.js";
+import { SessionCatalogUpsertCoordinator } from "./session-catalog-upsert-coordinator.js";
 import {
   organizeSessionCatalogRecord,
   reorderPinnedSessionCatalogRecords,
   type SessionCatalogOrganizationHost
 } from "./session-catalog-organization.js";
-import { SessionCatalogSqliteLifecycle } from "./session-catalog-sqlite-lifecycle.js";
+import {
+  SessionCatalogSqliteLifecycle,
+  sessionCatalogStatusFromSqliteState
+} from "./session-catalog-sqlite-lifecycle.js";
 import {
   openSqliteSessionCatalog,
-  supportsSessionContentIndex,
   type SessionCatalogRecord,
   type SqliteSessionCatalog
 } from "./sqlite-session-catalog.js";
@@ -59,18 +50,6 @@ interface ReconcileFlight {
   contextGeneration: number;
   promise: Promise<void>;
 }
-interface AutomaticTitleFlight {
-  sourceKey: string;
-  contextGeneration: number;
-  promise: Promise<void>;
-}
-interface ContentIndexFlight {
-  sourceKey: string;
-  contextGeneration: number;
-  promise: Promise<void>;
-}
-const AUTOMATIC_TITLE_WORKERS = 4;
-const MAX_AUTOMATIC_TITLE_BATCH = 16;
 export function createSessionCatalog(options: CreateSessionCatalogOptions = {}): SessionCatalog {
   return new DefaultSessionCatalog(options);
 }
@@ -81,26 +60,9 @@ class DefaultSessionCatalog implements SessionCatalog {
   private fallbackRecords: SessionCatalogRecord[] = [];
   private fallbackReady = false;
   private reconcileFlight: ReconcileFlight | undefined;
-  private automaticTitleFlight: AutomaticTitleFlight | undefined;
-  private contentIndexFlight: ContentIndexFlight | undefined;
-  private automaticTitleActiveReads = 0;
-  private automaticTitleCapacity: Promise<void> | undefined;
-  private releaseAutomaticTitleCapacity: (() => void) | undefined;
-  private readonly pendingAutomaticTitleRecords = new Map<string, SessionCatalogRecord>();
-  private readonly pendingContentIndexRecords = new Map<string, SessionCatalogRecord>();
-  private readonly pendingAutomaticTitleUpdates = new Map<string, {
-    record: SessionCatalogRecord;
-    automaticName: string;
-    automaticNameSource: "generated" | "seed";
-    context: SessionCatalogContext;
-    contextGeneration: number;
-  }>();
-  private automaticTitleBatch: Promise<void> | undefined;
   private autoReconciledSource: string | undefined;
   private activeContext: SessionCatalogContext | undefined;
   private contextGeneration = 0;
-  private mutationGeneration = 0;
-  private readonly pendingUpserts = new Map<string, PendingSessionCatalogUpsert>();
   private readonly projectionRecords = new Map<string, SessionCatalogRecord>();
   private contextPreparation: Promise<void> = Promise.resolve();
   private disposed = false;
@@ -116,7 +78,8 @@ class DefaultSessionCatalog implements SessionCatalog {
   private readonly onChanged: ((event: SessionCatalogChangedEvent) => void) | undefined;
   private readonly now: () => number;
   private readonly recordEnricher: SessionCatalogRecordEnricher;
-  private readonly automaticTitlePublisher = new SessionCatalogAutomaticTitlePublisher();
+  private readonly indexes: SessionCatalogIndexCoordinator;
+  private readonly upserts: SessionCatalogUpsertCoordinator;
   constructor(options: CreateSessionCatalogOptions) {
     this.onChanged = options.onChanged;
     this.now = options.now ?? (() => Date.now());
@@ -127,6 +90,39 @@ class DefaultSessionCatalog implements SessionCatalog {
       options.openSqlite ?? openSqliteSessionCatalog,
       this.now
     );
+    this.indexes = new SessionCatalogIndexCoordinator({
+      sqlite: () => this.sqlite,
+      status: () => this.current,
+      setStatus: (status) => { this.current = status; },
+      projectionRecord: (fileIdentity) => this.projectionRecords.get(fileIdentity),
+      setProjectionRecord: (record) => this.projectionRecords.set(record.fileIdentity, record),
+      fallback: () => ({ records: this.fallbackRecords, ready: this.fallbackReady }),
+      setFallbackRecords: (records) => { this.fallbackRecords = records; },
+      isCurrentContext: (context, generation) => this.isCurrentContext(context, generation),
+      applySqliteState: (state) => this.applySqliteState(state, false),
+      demoteSqlite: () => this.demoteSqlite(true),
+      publishAutomaticTitle: () => this.publish("automatic-title"),
+      readAutomaticTitle: (path) => this.recordEnricher.readAutomaticTitle(path),
+      isDisposed: () => this.disposed
+    });
+    this.upserts = new SessionCatalogUpsertCoordinator({
+      sqlite: () => this.sqlite,
+      status: () => this.current,
+      setStatus: (status) => { this.current = status; },
+      fallbackRecords: () => this.fallbackRecords,
+      setFallback: (records, ready) => {
+        this.fallbackRecords = records;
+        this.fallbackReady = ready;
+      },
+      setProjectionRecord: (record) => this.projectionRecords.set(record.fileIdentity, record),
+      contextGeneration: () => this.contextGeneration,
+      reconcileActive: () => this.reconcileFlight !== undefined,
+      indexes: this.indexes,
+      applySqliteState: (state) => this.applySqliteState(state, false),
+      demoteSqlite: () => this.demoteSqlite(true),
+      publish: (reason) => this.publish(reason),
+      degradedReason: () => this.sqliteLifecycle.degradedReason
+    });
   }
   private get sqlite(): SqliteSessionCatalog | undefined {
     return this.sqliteLifecycle.catalog;
@@ -150,7 +146,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       }
       if (normalizeSessionCatalogSearch(validated.search ?? "").length > 0) {
         await (requestedReconcile ?? (this.hasReadableProjection() ? undefined : this.reconcileFlight?.promise));
-        await this.awaitAutomaticTitleIndex(context, contextGeneration);
+        await this.indexes.awaitAutomaticTitles(context, contextGeneration);
       }
       assertSessionCatalogCursor(validated.cursor, this.current.revision, queryKey);
       const result = this.readProjection(validated);
@@ -172,49 +168,23 @@ class DefaultSessionCatalog implements SessionCatalog {
         ? this.startReconcile(context, "reconciled", contextGeneration)
         : undefined;
       await (requestedReconcile ?? (this.hasReadableProjection() ? undefined : this.reconcileFlight?.promise));
-      await this.awaitAutomaticTitleIndex(context, contextGeneration);
+      await this.indexes.awaitAutomaticTitles(context, contextGeneration);
       const records = sortSessionCatalogRecords([...this.projectionRecords.values()].filter((record) => (
         record.cwdKey === this.activeWorkspaceKey && record.archivedAt === undefined
       )));
-      const sqlite = this.sqlite;
-      if (sqlite && this.current.source === "sqlite" && supportsSessionContentIndex(sqlite)) {
-        try {
-          this.startContentIndex(context, contextGeneration, records);
-          await awaitWithSignal(this.awaitContentIndex(context, contextGeneration), signal);
-          const outcome = await searchIndexedSessionContent({
-            workspaceId,
-            workspaceKey: this.activeWorkspaceKey,
-            query,
-            records,
-            catalogIncomplete: this.current.incomplete || this.current.rebuilding,
-            catalogSkippedCount: this.current.skippedCount,
-            sqlite,
-            ...(signal === undefined ? {} : { signal })
-          });
-          for (const fileIdentity of outcome.staleFileIdentities) {
-            sqlite.removeContentIndex(fileIdentity);
-            const record = this.projectionRecords.get(fileIdentity);
-            if (record) this.pendingContentIndexRecords.set(fileIdentity, record);
-          }
-          if (outcome.staleFileIdentities.length > 0) {
-            this.startContentIndex(context, contextGeneration, []);
-          }
-          const { staleFileIdentities: _stale, ...result } = outcome;
-          return result;
-        } catch (error) {
-          if (signal?.aborted) throw error;
-        }
-      }
-      const fallback = await searchWorkspaceSessionContent({
+      return searchSessionCatalogContent({
         workspaceId,
+        workspaceKey: this.activeWorkspaceKey,
         query,
-        sessions: records.map(sessionCatalogSummaryFromRecord),
-        catalogTotal: records.length,
-        catalogIncomplete: true,
-        catalogSkippedCount: this.current.skippedCount,
+        context,
+        contextGeneration,
+        records,
+        status: this.current,
+        sqlite: this.sqlite,
+        indexes: this.indexes,
+        projectionRecord: (fileIdentity) => this.projectionRecords.get(fileIdentity),
         ...(signal === undefined ? {} : { signal })
       });
-      return { ...fallback, incomplete: true };
     });
   }
   status(): SessionCatalogStatus {
@@ -237,7 +207,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     return this.withPreparedContext(context, (contextGeneration) => {
       const safe = sanitizeSessionCatalogRecord(this.recordEnricher.withOrganization(context.sourceKey, record));
       if (!safe || !this.isCurrentContext(context, contextGeneration)) return;
-      this.upsertPrepared(safe, context, reason);
+      this.upserts.upsert(safe, context, reason);
     });
   }
   organize(
@@ -272,64 +242,16 @@ class DefaultSessionCatalog implements SessionCatalog {
       publish: () => this.publish("conversation-organized")
     };
   }
-  private upsertPrepared(
-    safe: SessionCatalogRecord,
-    context: SessionCatalogContext,
-    reason: Extract<SessionCatalogChangedReason, "session-created" | "session-updated" | "session-imported">
-  ): void {
-    const generation = ++this.mutationGeneration;
-    this.pendingUpserts.set(safe.fileIdentity, { generation, record: safe });
-    this.projectionRecords.set(safe.fileIdentity, safe);
-    if (safe.explicitName === undefined) this.enqueueAutomaticTitleRecord(safe, context, this.contextGeneration);
-    let recoveryScheduled = false;
-    const sqliteAwaitingReconcile = this.sqlite !== undefined && this.current.source !== "sqlite";
-    if (this.sqlite && this.current.source === "sqlite") {
-      try {
-        if (this.sqlite.getState().sourceKey === context.sourceKey) {
-          const state = this.sqlite.upsert(safe, this.current.revision);
-          this.applySqliteState(state, false);
-          if (!this.reconcileFlight) this.pendingUpserts.delete(safe.fileIdentity);
-          this.publish(reason);
-          this.startContentIndex(context, this.contextGeneration, [safe]);
-          return;
-        }
-      } catch {
-        this.demoteSqlite(true);
-        recoveryScheduled = true;
-      }
-    }
-    this.fallbackRecords = sortSessionCatalogRecords(
-      upsertSessionCatalogRecordByIdentity(this.fallbackRecords, safe)
-    );
-    this.fallbackReady = true;
-    this.current = {
-      ...this.current,
-      revision: this.current.revision + 1,
-      source: "sdk-fallback",
-      state: "fallback",
-      rebuilding: this.reconcileFlight !== undefined,
-      itemCount: this.fallbackRecords.length,
-      ...degradedReason(this.sqliteLifecycle.degradedReason)
-    };
-    if (!this.reconcileFlight && !recoveryScheduled && !sqliteAwaitingReconcile) this.pendingUpserts.delete(safe.fileIdentity);
-    this.publish(reason);
-    this.startContentIndex(context, this.contextGeneration, [safe]);
-  }
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
     this.contextGeneration += 1;
     this.reconcileFlight = undefined;
-    this.automaticTitleFlight = undefined;
-    this.contentIndexFlight = undefined;
-    this.pendingAutomaticTitleRecords.clear();
-    this.pendingContentIndexRecords.clear();
-    this.pendingAutomaticTitleUpdates.clear();
+    this.indexes.dispose();
     this.sqliteLifecycle.close();
     this.fallbackRecords = [];
     this.projectionRecords.clear();
-    this.pendingUpserts.clear();
-    this.automaticTitlePublisher.dispose();
+    this.upserts.reset();
     this.recordEnricher.clear();
     this.activeContext = undefined;
   }
@@ -361,12 +283,7 @@ class DefaultSessionCatalog implements SessionCatalog {
       this.reconcileFlight = undefined;
     }
     if (changed) {
-      this.automaticTitleFlight = undefined;
-      this.contentIndexFlight = undefined;
-      this.pendingAutomaticTitleRecords.clear();
-      this.pendingContentIndexRecords.clear();
-      this.pendingAutomaticTitleUpdates.clear();
-      this.automaticTitlePublisher.dispose();
+      this.indexes.reset(true);
     }
     this.activeSourceKey = context.sourceKey;
     this.contextGeneration += 1;
@@ -375,8 +292,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     this.projectionRecords.clear();
     this.fallbackReady = false;
     this.autoReconciledSource = undefined;
-    this.mutationGeneration += 1;
-    this.pendingUpserts.clear();
+    this.upserts.reset();
     let sqliteState: ReturnType<SqliteSessionCatalog["getState"]> | undefined;
     try {
       sqliteState = this.sqlite?.getState();
@@ -413,11 +329,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     if (existing) this.reconcileFlight = undefined;
     // Reconciliation replaces the record version set; old title callbacks are
     // detached and additionally rejected by their physical-version check.
-    this.automaticTitleFlight = undefined;
-    this.contentIndexFlight = undefined;
-    this.pendingAutomaticTitleRecords.clear();
-    this.pendingContentIndexRecords.clear();
-    this.pendingAutomaticTitleUpdates.clear();
+    this.indexes.reset();
     this.current = { ...this.current, state: "rebuilding", rebuilding: true };
     const promise = this.runReconcile(context, reason, contextGeneration).finally(() => {
       if (this.reconcileFlight?.promise === promise) this.reconcileFlight = undefined;
@@ -430,70 +342,29 @@ class DefaultSessionCatalog implements SessionCatalog {
     reason: SessionCatalogChangedReason,
     contextGeneration: number
   ): Promise<void> {
-    let discovered: SessionCatalogDiscoveryResult;
-    try {
-      discovered = sanitizeSessionCatalogDiscovery(await context.discover());
-    } catch {
-      if (!this.isCurrentContext(context, contextGeneration)) return;
-      this.current = {
-        ...this.current,
-        state: this.current.itemCount > 0 ? "fallback" : "unavailable",
-        rebuilding: false,
-        incomplete: true
-      };
-      this.publish(reason);
-      return;
-    }
-    if (!this.isCurrentContext(context, contextGeneration)) return;
-    const appliedMutation = this.mutationGeneration;
-    const discoveredRecords = this.recordEnricher.withOrganizations(
-      context.sourceKey,
-      mergePendingSessionCatalogUpserts(discovered.records, this.pendingUpserts, appliedMutation)
-    );
-    const reconciledAt = this.now();
-    if (this.sqlite) {
-      try {
-        const records = this.sqlite.preserveAutomaticNames?.(context.sourceKey, discoveredRecords) ?? discoveredRecords;
-        const state = this.sqlite.replaceAll(
-          context.sourceKey,
-          records,
-          { reconciledAt, incomplete: discovered.incomplete, skippedCount: discovered.skippedCount },
-          this.current.revision
-        );
-        if (!this.isCurrentContext(context, contextGeneration)) return;
-        this.fallbackRecords = [];
-        this.fallbackReady = false;
-        this.setProjectionRecords(records);
-        this.applySqliteState(state, false);
-        clearAppliedSessionCatalogUpserts(this.pendingUpserts, appliedMutation);
-        this.publish(reason);
-        this.startAutomaticTitleIndex(context, contextGeneration, records);
-        void this.awaitAutomaticTitleIndex(context, contextGeneration)
-          .then(() => this.startContentIndex(context, contextGeneration, records))
-          .catch(() => undefined);
-        return;
-      } catch {
-        this.demoteSqlite(false);
-      }
-    }
-    this.fallbackRecords = discoveredRecords;
-    this.fallbackReady = true;
-    this.setProjectionRecords(discoveredRecords);
-    this.current = {
-      revision: this.current.revision + 1,
-      source: "sdk-fallback",
-      state: "fallback",
-      rebuilding: false,
-      reconciledAt,
-      itemCount: discoveredRecords.length,
-      incomplete: discovered.incomplete,
-      skippedCount: discovered.skippedCount,
-      ...degradedReason(this.sqliteLifecycle.degradedReason)
-    };
-    this.autoReconciledSource = context.sourceKey;
-    clearAppliedSessionCatalogUpserts(this.pendingUpserts, appliedMutation);
-    this.publish(reason);
-    this.startAutomaticTitleIndex(context, contextGeneration, discoveredRecords);
+    await runSessionCatalogReconcile({
+      context,
+      contextGeneration,
+      reason,
+      isCurrent: () => this.isCurrentContext(context, contextGeneration),
+      status: () => this.current,
+      setStatus: (status) => { this.current = status; },
+      sqlite: () => this.sqlite,
+      recordEnricher: this.recordEnricher,
+      upserts: this.upserts,
+      indexes: this.indexes,
+      now: this.now,
+      setFallback: (records, ready) => {
+        this.fallbackRecords = records;
+        this.fallbackReady = ready;
+      },
+      setProjectionRecords: (records) => this.setProjectionRecords(records),
+      applySqliteState: (state) => this.applySqliteState(state, false),
+      demoteSqlite: () => this.demoteSqlite(false),
+      setAutoReconciledSource: (sourceKey) => { this.autoReconciledSource = sourceKey; },
+      degradedReason: () => this.sqliteLifecycle.degradedReason,
+      publish: () => this.publish(reason)
+    });
   }
   private readProjection(query: ValidatedSessionCatalogQuery) {
     if (this.sqlite && this.current.source === "sqlite") {
@@ -538,16 +409,7 @@ class DefaultSessionCatalog implements SessionCatalog {
     rebuilding: boolean,
     minimumRevision?: number
   ): void {
-    this.current = {
-      revision: Math.max(state.revision, minimumRevision ?? state.revision),
-      source: "sqlite",
-      state: rebuilding ? "rebuilding" : "ready",
-      rebuilding,
-      ...(state.reconciledAt === undefined ? {} : { reconciledAt: state.reconciledAt }),
-      itemCount: state.itemCount,
-      incomplete: state.incomplete,
-      skippedCount: state.skippedCount
-    };
+    this.current = sessionCatalogStatusFromSqliteState(state, rebuilding, minimumRevision);
   }
   private demoteSqlite(scheduleReconcile: boolean): void {
     this.sqliteLifecycle.demote();
@@ -578,239 +440,6 @@ class DefaultSessionCatalog implements SessionCatalog {
   private publish(reason: SessionCatalogChangedReason): void {
     if (!this.disposed) this.onChanged?.({ revision: this.current.revision, reason });
   }
-  private scheduleAutomaticTitlePublish(context: SessionCatalogContext, contextGeneration: number): void {
-    this.automaticTitlePublisher.schedule(
-      () => this.isCurrentContext(context, contextGeneration),
-      () => this.publish("automatic-title")
-    );
-  }
-  private startContentIndex(
-    context: SessionCatalogContext,
-    contextGeneration: number,
-    records: readonly SessionCatalogRecord[]
-  ): void {
-    if (!this.isCurrentContext(context, contextGeneration)
-      || !this.sqlite
-      || !supportsSessionContentIndex(this.sqlite)
-      || this.current.source !== "sqlite") return;
-    for (const record of records) this.pendingContentIndexRecords.set(record.fileIdentity, record);
-    const existing = this.contentIndexFlight;
-    if (existing?.sourceKey === context.sourceKey && existing.contextGeneration === contextGeneration) return;
-    const batch = [...this.pendingContentIndexRecords.values()];
-    this.pendingContentIndexRecords.clear();
-    if (batch.length === 0) return;
-    const sqlite = this.sqlite;
-    const promise = indexSessionContentRecords({
-      records: batch,
-      sqlite,
-      isCurrent: (record) => {
-        const current = this.projectionRecords.get(record.fileIdentity);
-        return this.isCurrentContext(context, contextGeneration)
-          && current !== undefined
-          && sameSessionCatalogRecordVersion(current, record);
-      }
-    }).catch(() => undefined).finally(() => {
-      if (this.contentIndexFlight?.promise !== promise) return;
-      this.contentIndexFlight = undefined;
-      if (this.pendingContentIndexRecords.size > 0 && this.isCurrentContext(context, contextGeneration)) {
-        this.startContentIndex(context, contextGeneration, []);
-      }
-    });
-    this.contentIndexFlight = { sourceKey: context.sourceKey, contextGeneration, promise };
-  }
-  private async awaitContentIndex(context: SessionCatalogContext, contextGeneration: number): Promise<void> {
-    while (this.isCurrentContext(context, contextGeneration)) {
-      const flight = this.contentIndexFlight;
-      if (flight?.sourceKey === context.sourceKey && flight.contextGeneration === contextGeneration) {
-        await flight.promise;
-        continue;
-      }
-      if (this.pendingContentIndexRecords.size > 0) {
-        this.startContentIndex(context, contextGeneration, []);
-        continue;
-      }
-      return;
-    }
-  }
-  private async awaitAutomaticTitleIndex(context: SessionCatalogContext, contextGeneration: number): Promise<void> {
-    while (this.isCurrentContext(context, contextGeneration)) {
-      const flight = this.automaticTitleFlight;
-      if (flight?.sourceKey === context.sourceKey && flight.contextGeneration === contextGeneration) {
-        await flight.promise;
-        continue;
-      }
-      if (this.automaticTitleBatch) {
-        await this.automaticTitleBatch;
-        continue;
-      }
-      if (this.pendingAutomaticTitleUpdates.size > 0) {
-        this.scheduleAutomaticTitleBatch();
-        continue;
-      }
-      if (this.pendingAutomaticTitleRecords.size > 0) {
-        this.startAutomaticTitleIndex(context, contextGeneration, []);
-        continue;
-      }
-      return;
-    }
-  }
-  private startAutomaticTitleIndex(
-    context: SessionCatalogContext,
-    contextGeneration: number,
-    records: readonly SessionCatalogRecord[]
-  ): void {
-    if (!this.isCurrentContext(context, contextGeneration)) return;
-    const existing = this.automaticTitleFlight;
-    if (existing?.sourceKey === context.sourceKey && existing.contextGeneration === contextGeneration) return;
-    if (!records.some((record) => record.explicitName === undefined && record.automaticName === undefined)
-      && this.pendingAutomaticTitleRecords.size === 0) return;
-    let next = 0;
-    const worker = async () => {
-      while (this.isCurrentContext(context, contextGeneration)) {
-        const record = records[next++] ?? this.takePendingAutomaticTitleRecord();
-        if (!record) return;
-        if (record.explicitName !== undefined || record.automaticName !== undefined) continue;
-        const outcome = await this.readAutomaticTitleBounded(record.path, context, contextGeneration);
-        if (!outcome) return;
-        if (!this.isCurrentContext(context, contextGeneration)) return;
-        if (outcome.kind === "failed") {
-          this.markAutomaticTitleReadFailure(record, context, contextGeneration);
-        } else if (outcome.kind === "title") {
-          this.queueAutomaticTitleUpdate(record, outcome.title, outcome.source ?? "seed", context, contextGeneration);
-        }
-      }
-    };
-    const promise = Promise.all(Array.from({ length: AUTOMATIC_TITLE_WORKERS }, worker)).then(() => undefined).finally(() => {
-      if (this.automaticTitleFlight?.promise === promise) {
-        this.automaticTitleFlight = undefined;
-        if (this.pendingAutomaticTitleRecords.size > 0 && this.isCurrentContext(context, contextGeneration)) {
-          this.startAutomaticTitleIndex(context, contextGeneration, []);
-        }
-      }
-    });
-    this.automaticTitleFlight = { sourceKey: context.sourceKey, contextGeneration, promise };
-  }
-  private queueAutomaticTitleUpdate(
-    record: SessionCatalogRecord,
-    automaticName: string,
-    automaticNameSource: "generated" | "seed",
-    context: SessionCatalogContext,
-    contextGeneration: number
-  ): void {
-    this.pendingAutomaticTitleUpdates.set(record.fileIdentity, {
-      record,
-      automaticName,
-      automaticNameSource,
-      context,
-      contextGeneration
-    });
-    this.scheduleAutomaticTitleBatch();
-  }
-  private scheduleAutomaticTitleBatch(): void {
-    if (this.automaticTitleBatch || this.pendingAutomaticTitleUpdates.size === 0) return;
-    let batch!: Promise<void>;
-    batch = new Promise<void>((resolve) => queueMicrotask(resolve))
-      .then(() => {
-        while (this.pendingAutomaticTitleUpdates.size > 0) this.flushAutomaticTitleUpdateBatch();
-      })
-      .finally(() => {
-        if (this.automaticTitleBatch === batch) this.automaticTitleBatch = undefined;
-        if (!this.disposed && this.pendingAutomaticTitleUpdates.size > 0) this.scheduleAutomaticTitleBatch();
-      });
-    this.automaticTitleBatch = batch;
-  }
-  private flushAutomaticTitleUpdateBatch(): void {
-    const updates = [...this.pendingAutomaticTitleUpdates.values()].slice(0, MAX_AUTOMATIC_TITLE_BATCH);
-    for (const update of updates) this.pendingAutomaticTitleUpdates.delete(update.record.fileIdentity);
-    if (updates.length === 0) return;
-    const applicableUpdates = updates.flatMap(({
-      record,
-      automaticName,
-      automaticNameSource,
-      context,
-      contextGeneration
-    }) => {
-      const current = this.projectionRecords.get(record.fileIdentity);
-      if (!this.isCurrentContext(context, contextGeneration) || !current
-        || !sameSessionCatalogRecordVersion(current, record) || current.explicitName !== undefined
-        || (current.automaticName === automaticName && current.automaticNameSource === automaticNameSource)) return [];
-      return [{ record: { ...current, automaticName, automaticNameSource }, context, contextGeneration }];
-    });
-    if (applicableUpdates.length === 0) return;
-    const context = applicableUpdates[0]!.context;
-    const contextGeneration = applicableUpdates[0]!.contextGeneration;
-    const currentUpdates = applicableUpdates.map((update) => update.record);
-    if (this.sqlite && this.current.source === "sqlite") {
-      try {
-        const state = this.sqlite.upsertMany(currentUpdates, this.current.revision);
-        if (!this.isCurrentContext(context, contextGeneration)) return;
-        for (const record of currentUpdates) this.projectionRecords.set(record.fileIdentity, record);
-        this.applySqliteState(state, false);
-        this.scheduleAutomaticTitlePublish(context, contextGeneration);
-        return;
-      } catch {
-        this.demoteSqlite(true);
-        return;
-      }
-    }
-    if (!this.fallbackReady) return;
-    this.fallbackRecords = sortSessionCatalogRecords(this.fallbackRecords.map((candidate) => (
-      currentUpdates.find((record) => record.fileIdentity === candidate.fileIdentity) ?? candidate
-    )));
-    for (const record of currentUpdates) this.projectionRecords.set(record.fileIdentity, record);
-    this.current = {
-      ...this.current,
-      revision: this.current.revision + 1,
-      itemCount: this.fallbackRecords.length
-    };
-    this.scheduleAutomaticTitlePublish(context, contextGeneration);
-  }
-  private enqueueAutomaticTitleRecord(record: SessionCatalogRecord, context: SessionCatalogContext, contextGeneration: number): void {
-    if (!this.isCurrentContext(context, contextGeneration)) return;
-    this.pendingAutomaticTitleRecords.set(record.fileIdentity, record);
-    this.startAutomaticTitleIndex(context, contextGeneration, []);
-  }
-  private takePendingAutomaticTitleRecord(): SessionCatalogRecord | undefined {
-    const next = this.pendingAutomaticTitleRecords.entries().next().value as [string, SessionCatalogRecord] | undefined;
-    if (!next) return undefined;
-    this.pendingAutomaticTitleRecords.delete(next[0]);
-    return next[1];
-  }
-  private async readAutomaticTitleBounded(path: string, context: SessionCatalogContext, contextGeneration: number) {
-    while (this.isCurrentContext(context, contextGeneration) && this.automaticTitleActiveReads >= AUTOMATIC_TITLE_WORKERS) {
-      await (this.automaticTitleCapacity ??= new Promise((resolve) => { this.releaseAutomaticTitleCapacity = resolve; }));
-    }
-    if (!this.isCurrentContext(context, contextGeneration)) return undefined;
-    this.automaticTitleActiveReads += 1;
-    try {
-      return await this.recordEnricher.readAutomaticTitle(path);
-    } finally {
-      this.automaticTitleActiveReads -= 1;
-      this.releaseAutomaticTitleCapacity?.();
-      this.automaticTitleCapacity = undefined;
-      this.releaseAutomaticTitleCapacity = undefined;
-    }
-  }
-  private markAutomaticTitleReadFailure(record: SessionCatalogRecord, context: SessionCatalogContext, contextGeneration: number): void {
-    if (!this.isCurrentContext(context, contextGeneration)) return;
-    const current = this.projectionRecords.get(record.fileIdentity);
-    if (!current || !sameSessionCatalogRecordVersion(current, record)
-      || current.explicitName !== undefined || current.automaticName !== undefined) return;
-    const skippedCount = this.current.skippedCount + 1;
-    if (this.sqlite && this.current.source === "sqlite") {
-      try {
-        const state = this.sqlite.setIncomplete(true, skippedCount);
-        if (!this.isCurrentContext(context, contextGeneration)) return;
-        this.applySqliteState(state, false);
-      } catch {
-        this.demoteSqlite(true);
-        return;
-      }
-    } else {
-      this.current = { ...this.current, incomplete: true, skippedCount };
-    }
-    this.scheduleAutomaticTitlePublish(context, contextGeneration);
-  }
   private setProjectionRecords(records: readonly SessionCatalogRecord[]): void {
     this.projectionRecords.clear();
     for (const record of records) this.projectionRecords.set(record.fileIdentity, record);
@@ -827,25 +456,4 @@ class DefaultSessionCatalog implements SessionCatalog {
 
 function degradedReason(reason: SessionCatalogDegradedReason | undefined) {
   return reason === undefined ? {} : { degradedReason: reason };
-}
-
-function sameSessionCatalogRecordVersion(
-  current: SessionCatalogRecord,
-  expected: SessionCatalogRecord
-): boolean {
-  return current.fileIdentity === expected.fileIdentity
-    && current.id === expected.id
-    && current.path === expected.path
-    && current.modifiedAt === expected.modifiedAt
-    && current.messageCount === expected.messageCount;
-}
-
-function awaitWithSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
-  if (!signal) return promise;
-  if (signal.aborted) return Promise.reject(new DOMException("Session content search was cancelled.", "AbortError"));
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(new DOMException("Session content search was cancelled.", "AbortError"));
-    signal.addEventListener("abort", onAbort, { once: true });
-    void promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
-  });
 }

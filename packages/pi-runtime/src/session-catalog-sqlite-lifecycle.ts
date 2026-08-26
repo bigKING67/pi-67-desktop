@@ -1,10 +1,28 @@
-import type { SessionCatalogDegradedReason } from "@pi67/domain";
+import type { SessionCatalogDegradedReason, SessionCatalogStatus } from "@pi67/domain";
 import type {
   OpenSqliteSessionCatalog,
+  SqliteCatalogState,
   SqliteSessionCatalog
 } from "./sqlite-session-catalog.js";
 
 const SQLITE_RETRY_MS = { initial: 1_000, maximum: 30_000 };
+
+export function sessionCatalogStatusFromSqliteState(
+  state: SqliteCatalogState,
+  rebuilding: boolean,
+  minimumRevision?: number
+): SessionCatalogStatus {
+  return {
+    revision: Math.max(state.revision, minimumRevision ?? state.revision),
+    source: "sqlite",
+    state: rebuilding ? "rebuilding" : "ready",
+    rebuilding,
+    ...(state.reconciledAt === undefined ? {} : { reconciledAt: state.reconciledAt }),
+    itemCount: state.itemCount,
+    incomplete: state.incomplete,
+    skippedCount: state.skippedCount
+  };
+}
 
 export class SessionCatalogSqliteLifecycle {
   private catalogValue: SqliteSessionCatalog | undefined;

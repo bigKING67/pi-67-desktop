@@ -29,7 +29,7 @@ vi.mock("../workbench/workbench-protocol-context.js", () => ({
   workbenchProtocolContextForTask: mocks.workbenchProtocolContextForTask
 }));
 
-import { openPaletteMessageResult } from "./palette-message-result.js";
+import { openWorkspaceMessageResult } from "./palette-message-result.js";
 
 describe("palette message result", () => {
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe("palette message result", () => {
 
   it("reports an exact Session opening failure without attempting message location", async () => {
     mocks.openRendererSession.mockRejectedValueOnce(new Error("Session identity is stale."));
-    await openPaletteMessageResult({
+    await openWorkspaceMessageResult({
       sessionPath: "/opaque/session-a.jsonl",
       sessionFileIdentity: "identity-a",
       sessionName: "对话 A",
@@ -74,7 +74,7 @@ describe("palette message result", () => {
   ])("rejects a Task without the exact opened Session authority", async (task, message) => {
     mocks.selectedWorkbenchTask.mockReturnValueOnce(task);
 
-    await openPaletteMessageResult(messageItem());
+    await openWorkspaceMessageResult(messageItem());
 
     expect(mocks.request).not.toHaveBeenCalled();
     expect(mocks.publishNotification).toHaveBeenCalledWith({
@@ -90,7 +90,7 @@ describe("palette message result", () => {
     mocks.workbenchProtocolContextForTask.mockReturnValueOnce({ taskId: "task-a" });
     mocks.request.mockResolvedValueOnce({ sessionId: "session-obsolete" });
 
-    await openPaletteMessageResult(messageItem());
+    await openWorkspaceMessageResult(messageItem());
 
     expect(mocks.publishNotification).toHaveBeenCalledWith({
       level: "warning",
@@ -107,7 +107,7 @@ describe("palette message result", () => {
     mocks.workbenchProtocolContextForTask.mockReturnValueOnce({ taskId: "task-a" });
     mocks.request.mockResolvedValueOnce(locatedWindow);
 
-    await openPaletteMessageResult(messageItem());
+    await openWorkspaceMessageResult(messageItem());
 
     expect(mocks.request).toHaveBeenCalledWith(
       "message.locate",
@@ -125,7 +125,7 @@ describe("palette message result", () => {
   it("uses the bounded fallback for a non-Error failure", async () => {
     mocks.openRendererSession.mockRejectedValueOnce("unavailable");
 
-    await openPaletteMessageResult(messageItem());
+    await openWorkspaceMessageResult(messageItem());
 
     expect(mocks.publishNotification).toHaveBeenCalledWith({
       level: "warning",

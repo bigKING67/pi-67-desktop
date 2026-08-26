@@ -14,7 +14,7 @@ describe("command palette model", () => {
     );
 
     expect(projection.groups).toHaveLength(1);
-    expect(projection.groups[0]?.label).toBe("会话");
+    expect(projection.groups[0]?.label).toBe("对话");
     expect(projection.groups[0]?.items).toHaveLength(12);
     expect(projection).toMatchObject({ totalMatchCount: 40, visibleMatchCount: 12, truncated: true });
   });

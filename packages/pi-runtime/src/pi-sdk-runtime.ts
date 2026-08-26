@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getAgentDir, VERSION } from "@earendil-works/pi-coding-agent";
 import {
-  RuntimeError,
   type ApprovalMode, type ApprovalResolution, type ApprovalResponseDecision,
   type ConversationPage, type DoctorReport, type ExtensionCatalogResult,
   type ExtensionUiCancellationReason, type ModelSummary, type ResourceSummary,
@@ -39,8 +38,9 @@ import { RuntimeToolSafetyController } from "./runtime-tool-safety-controller.js
 import { ToolAuthorizationTracker } from "./tool-authorization-tracker.js";
 import { PiSdkRuntimeSessionLifecycle } from "./pi-sdk-runtime-session-lifecycle.js";
 import { PiRuntimeSessionActions } from "./pi-runtime-session-actions.js";
+import { PiRuntimeConversationActions } from "./pi-runtime-conversation-actions.js";
 import { PiRuntimePromptActions } from "./pi-runtime-prompt-actions.js";
-import { SessionSemanticTitleGenerator } from "./session-semantic-title.js";
+import { PiRuntimeEventBus } from "./pi-runtime-event-bus.js";
 import {
   collectPiRuntimeDiagnostics,
   getPiRuntimeIdentity,
@@ -48,18 +48,12 @@ import {
 } from "./pi-runtime-observability.js";
 import { NativeSubagentCoordinator } from "./native-subagent-coordinator.js";
 import { NativeSubagentAdmission } from "./native-subagent-admission.js";
-export interface PiSdkRuntimeOptions {
-  workspaceServices?: PiWorkspaceRuntimeServices;
-  runtimeCredentialOverrides?: RuntimeCredentialOverrideStore;
-  promptAttachmentAccess?: PromptAttachmentAccess;
-  subagentAdmission?: NativeSubagentAdmission;
-  subagentParentKey?: string;
-}
+import type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
+
+export type { PiSdkRuntimeOptions } from "./pi-sdk-runtime-options.js";
 
 export class PiSdkRuntime implements AgentRuntime {
-  private readonly listeners = new Set<(event: AgentEvent) => void>();
-  private readonly activityListeners = new Set<(activity: RuntimeOperationActivity) => void>();
-  private readonly toolExecutionListeners = new Set<(execution: ToolExecutionView) => void>();
+  private readonly events = new PiRuntimeEventBus();
   private readonly runtimeCredentialOverrides: RuntimeCredentialOverrideStore;
   private readonly ownsRuntimeCredentialOverrides: boolean;
   private readonly workspaceServices: PiWorkspaceRuntimeServices | undefined;
@@ -78,9 +72,8 @@ export class PiSdkRuntime implements AgentRuntime {
   private readonly sessionCatalog: ReturnType<typeof createRuntimeSessionCatalog>;
   private readonly sessionTransitions: RuntimeSessionTransitions;
   private readonly sessionLifecycle: PiSdkRuntimeSessionLifecycle;
-  private readonly sessionActions: PiRuntimeSessionActions;
+  private readonly conversationActions: PiRuntimeConversationActions;
   private readonly promptActions: PiRuntimePromptActions;
-  private readonly semanticTitles: SessionSemanticTitleGenerator;
   private readonly subagents: NativeSubagentCoordinator;
   private uiBridge: ReturnType<typeof createSessionExtensionUiBridge>;
 
@@ -94,19 +87,19 @@ export class PiSdkRuntime implements AgentRuntime {
     this.runtimeCredentialOverrides = options.runtimeCredentialOverrides
       ?? createRuntimeCredentialOverrideStore();
     this.uiBridge = createSessionExtensionUiBridge(
-      (event) => this.emit(event),
+      (event) => this.events.emitAgent(event),
       () => this.sessionBindings?.session?.sessionId
     );
     this.streamBatcher = new StreamBatcher<StreamDelta>((events) => {
-      this.emit({ type: "turn.streamBatch", payload: { events } });
+      this.events.emitAgent({ type: "turn.streamBatch", payload: { events } });
     });
     this.projections = new RuntimeProjectionController({
       getSession: () => this.sessionBindings.requireSession(),
       getSessionFileIdentity: () => this.sessionBindings.sessionFileIdentity,
       getSessionGeneration: () => this.sessionBindings.sessionGeneration,
-      emit: (event) => this.emit(event),
-      emitActivity: (activity) => this.emitOperationActivity(activity),
-      emitToolExecution: (execution) => this.toolExecutionListeners.forEach((listener) => listener(execution)),
+      emit: (event) => this.events.emitAgent(event),
+      emitActivity: (activity) => this.events.emitActivity(activity),
+      emitToolExecution: (execution) => this.events.emitToolExecution(execution),
       getToolAuthorization: (toolCallId) => this.toolAuthorizations.get(toolCallId),
       completeToolAuthorization: (toolCallId) => this.toolAuthorizations.complete(toolCallId),
       resetToolAuthorizations: () => this.toolAuthorizations.reset(),
@@ -118,14 +111,14 @@ export class PiSdkRuntime implements AgentRuntime {
       parentKey: options.subagentParentKey ?? `runtime-${randomUUID()}`,
       getAgentDir: () => this.agentDir,
       createSession: (input) => this.sessionBindings.createSubagentSession(input),
-      emit: (item, reason) => this.emit({
+      emit: (item, reason) => this.events.emitAgent({
         type: "subagent.changed",
         payload: { item, reason }
       })
     });
     this.sessionBindings = new RuntimeSessionBindings({
       cancelInteractiveRequests: (reason) => { this.uiBridge.cancelAll(reason); },
-      emit: (event) => this.emit(event),
+      emit: (event) => this.events.emitAgent(event),
       externalChangeGuard: this.externalSessionChangeGuard,
       getAgentDir: () => this.agentDir,
       getRuntimeCredentialOverrides: () => this.runtimeCredentialOverrides,
@@ -136,13 +129,13 @@ export class PiSdkRuntime implements AgentRuntime {
       rebindExtensionUi: async (session) => {
         this.uiBridge.dispose();
         this.uiBridge = createSessionExtensionUiBridge(
-          (event) => this.emit(event),
+          (event) => this.events.emitAgent(event),
           () => this.sessionBindings.session?.sessionId
         );
-        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
+        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.events.emitAgent(event));
       },
       bindChildExtensionUi: async (session) => {
-        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.emit(event));
+        await bindSessionExtensionUi(session, this.uiBridge, (event) => this.events.emitAgent(event));
       },
       requestApproval: (request, options) => this.uiBridge.requestApproval(request, options),
       recordToolAuthorization: (toolCallId, reason) => {
@@ -155,10 +148,10 @@ export class PiSdkRuntime implements AgentRuntime {
     });
     this.configurationReload = new PiRuntimeConfigurationReload({
       getSession: () => this.sessionBindings.session,
-      emit: (event) => this.emit(event)
+      emit: (event) => this.events.emitAgent(event)
     });
     const sessionCatalogTarget: RuntimeSessionCatalogTarget = {
-      emit: (event) => this.emit(event),
+      emit: (event) => this.events.emitAgent(event),
       getAgentDir: () => this.agentDir,
       getConfiguredSessionDir: () => this.sessionBindings.settingsManager?.getSessionDir(),
       getWorkspaceCwd: () => this.toolSafety.policy.cwd,
@@ -172,13 +165,6 @@ export class PiSdkRuntime implements AgentRuntime {
         sessionCatalogTarget,
         process.env.PI67_STORAGE_ROOT
       );
-    this.semanticTitles = new SessionSemanticTitleGenerator({
-      isCurrent: (session, generation) => (
-        this.sessionBindings.session === session
-        && this.sessionBindings.sessionGeneration === generation
-      ),
-      persistProjection: () => this.sessionCatalog.upsertCurrent("session-updated")
-    });
     this.sessionTransitions = new RuntimeSessionTransitions({
       getCwd: () => this.toolSafety.policy.cwd,
       getAgentDir: () => this.agentDir,
@@ -213,9 +199,9 @@ export class PiSdkRuntime implements AgentRuntime {
       getSnapshot: () => this.getSnapshot(),
       getExtensionCatalog: () => this.getExtensionCatalog(),
       assertSessionWritable: () => this.assertSessionWritable(),
-      emit: (event) => this.emit(event)
+      emit: (event) => this.events.emitAgent(event)
     });
-    this.sessionActions = new PiRuntimeSessionActions({
+    const sessionActions = new PiRuntimeSessionActions({
       sessionBindings: this.sessionBindings,
       sessionTransitions: this.sessionTransitions,
       sessionCatalog: this.sessionCatalog,
@@ -225,7 +211,14 @@ export class PiSdkRuntime implements AgentRuntime {
       cancelInteractiveRequests: () => this.uiBridge.cancelAll("session-transition"),
       dropStream: () => this.streamBatcher.drop(),
       getSnapshot: () => this.getSnapshot(),
-      emit: (event) => this.emit(event)
+      emit: (event) => this.events.emitAgent(event)
+    });
+    this.conversationActions = new PiRuntimeConversationActions({
+      sessionBindings: this.sessionBindings,
+      sessionLifecycle: this.sessionLifecycle,
+      sessionActions,
+      persistProjection: () => this.sessionCatalog.upsertCurrent("session-updated"),
+      assertWritable: () => this.assertSessionWritable()
     });
     this.promptActions = new PiRuntimePromptActions({
       sessionBindings: this.sessionBindings,
@@ -233,7 +226,7 @@ export class PiSdkRuntime implements AgentRuntime {
       configurationReload: this.configurationReload,
       promptAttachments: this.promptAttachments,
       assertWritable: () => this.assertSessionWritable(),
-      generateSemanticTitle: () => this.scheduleAutomaticSemanticTitle()
+      generateSemanticTitle: () => this.conversationActions.scheduleSemanticTitle()
     });
     this.runtimeCredentialUnsubscribe = this.runtimeCredentialOverrides.subscribe(
       async (provider, apiKey) => {
@@ -249,23 +242,17 @@ export class PiSdkRuntime implements AgentRuntime {
   }
   getSdkVersion(): string { return VERSION; }
   getExtensionUiCapabilities(): RuntimeCapabilities["extensionUi"] { return this.projections.getCapabilities(); }
-  subscribe(listener: (event: AgentEvent) => void): () => void {
-    this.listeners.add(listener); return () => this.listeners.delete(listener);
-  }
-  subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void {
-    this.activityListeners.add(listener); return () => this.activityListeners.delete(listener);
-  }
-  subscribeToolExecution(listener: (execution: ToolExecutionView) => void): () => void {
-    this.toolExecutionListeners.add(listener); return () => this.toolExecutionListeners.delete(listener);
-  }
+  subscribe(listener: (event: AgentEvent) => void): () => void { return this.events.subscribeAgent(listener); }
+  subscribeOperationActivity(listener: (activity: RuntimeOperationActivity) => void): () => void { return this.events.subscribeActivity(listener); }
+  subscribeToolExecution(listener: (execution: ToolExecutionView) => void): () => void { return this.events.subscribeToolExecution(listener); }
   async initialize(options: RuntimeInitializeOptions, observeStage?: RuntimeInitializationObserver): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
+    this.conversationActions.cancelSemanticTitle();
     const snapshot = await this.sessionLifecycle.initialize(options, observeStage);
-    if (options.sessionPath) this.scheduleAutomaticSemanticTitle();
+    if (options.sessionPath) this.conversationActions.scheduleSemanticTitle();
     return snapshot;
   }
   async dispose(): Promise<void> {
-    this.semanticTitles.cancel();
+    this.conversationActions.cancelSemanticTitle();
     this.streamBatcher.drop();
     this.uiBridge.cancelAll("runtime-dispose");
     await this.subagents.dispose();
@@ -278,9 +265,7 @@ export class PiSdkRuntime implements AgentRuntime {
     this.configurationRuntimeUnsubscribe = undefined;
     this.uiBridge.dispose();
     if (this.ownsRuntimeCredentialOverrides) await this.runtimeCredentialOverrides.clear();
-    this.listeners.clear();
-    this.activityListeners.clear();
-    this.toolExecutionListeners.clear();
+    this.events.clear();
   }
   setWorkspacePolicy(trust: WorkspaceTrust, approvalMode: ApprovalMode): TaskToolMode {
     const mode = this.toolSafety.setWorkspacePolicy(trust, approvalMode);
@@ -323,74 +308,43 @@ export class PiSdkRuntime implements AgentRuntime {
   }): AssetReadResult { return this.projections.readAsset(options); }
 
   async createSession(creationId: string): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
-    return this.sessionLifecycle.create(creationId);
+    return this.conversationActions.create(creationId);
   }
 
   async openSession(path: string, cwdOverride?: string): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
-    const snapshot = await this.sessionActions.open(path, cwdOverride);
-    this.scheduleAutomaticSemanticTitle();
-    return snapshot;
+    return this.conversationActions.open(path, cwdOverride);
   }
   async importSession(path: string): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
-    const snapshot = await this.sessionActions.import(path);
-    this.scheduleAutomaticSemanticTitle();
-    return snapshot;
+    return this.conversationActions.import(path);
   }
 
   async forkSession(entryId: string, position: "before" | "at" = "at"): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
-    return this.sessionActions.fork(entryId, position);
+    return this.conversationActions.fork(entryId, position);
   }
 
   async forkSessionFrom(sourcePath: string, entryId: string): Promise<SessionSnapshot> {
-    this.semanticTitles.cancel();
-    return this.sessionActions.forkFrom(sourcePath, entryId);
+    return this.conversationActions.forkFrom(sourcePath, entryId);
   }
 
   async rollback(entryId: string, summarize = false): Promise<void> {
-    this.semanticTitles.cancel();
-    await this.sessionActions.rollback(entryId, summarize);
+    await this.conversationActions.rollback(entryId, summarize);
   }
 
   async compact(instructions?: string): Promise<void> {
-    await this.sessionActions.compact(instructions);
+    await this.conversationActions.compact(instructions);
   }
   async setSessionName(name?: string): Promise<void> {
-    if (name?.trim()) this.semanticTitles.cancel();
-    await this.sessionActions.setName(name);
+    await this.conversationActions.setName(name);
   }
   async regenerateSessionTitle(): Promise<void> {
-    await this.assertSessionWritable();
-    const result = await this.semanticTitles.generate(
-      this.sessionBindings.requireSession(),
-      this.sessionBindings.sessionGeneration,
-      "manual"
-    );
-    if (result.kind === "skipped") {
-      throw new RuntimeError("INVALID_PAYLOAD", "The active Pi Session does not have enough completed conversation context to generate a title.", {
-        recoverable: true
-      });
-    }
-  }
-
-  private scheduleAutomaticSemanticTitle(): void {
-    const session = this.sessionBindings.session;
-    if (!session) return;
-    void this.semanticTitles.generate(
-      session,
-      this.sessionBindings.sessionGeneration,
-      "automatic"
-    ).catch(() => undefined);
+    await this.conversationActions.regenerateTitle();
   }
   async setInteractionMode(mode: SessionInteractionMode): Promise<void> {
-    await this.sessionActions.setInteractionMode(mode);
+    await this.conversationActions.setInteractionMode(mode);
   }
 
   async implementPlan(planId: string, lineage: PlanImplementationRequestLineage): Promise<void> {
-    await this.sessionActions.implementPlan(planId, lineage);
+    await this.conversationActions.implementPlan(planId, lineage);
   }
 
   async preparePromptAttachments(submissionId: string, refs: readonly PromptAttachmentRef[]): Promise<PreparedPromptAttachmentSet | undefined> {
@@ -412,7 +366,7 @@ export class PiSdkRuntime implements AgentRuntime {
   clearQueue() { return this.promptActions.clearQueue(); }
 
   async abort(): Promise<void> {
-    this.semanticTitles.cancel();
+    this.conversationActions.cancelSemanticTitle();
     this.uiBridge.cancelAll("abort");
     this.projections.requestToolCancellation();
     this.promptAttachments.abort();
@@ -420,7 +374,7 @@ export class PiSdkRuntime implements AgentRuntime {
   }
 
   async selectModel(provider: string, id: string): Promise<SessionModelCatalogResult> {
-    this.semanticTitles.cancel();
+    this.conversationActions.cancelSemanticTitle();
     await this.assertSessionWritable();
     await this.configurationReload.apply();
     const session = this.sessionBindings.requireSession();
@@ -477,7 +431,7 @@ export class PiSdkRuntime implements AgentRuntime {
     return runPiRuntimeDoctor(
       this.sessionBindings,
       this.getSessionCatalogStatus(),
-      (event) => this.emit(event)
+      (event) => this.events.emitAgent(event)
     );
   }
 
@@ -500,11 +454,5 @@ export class PiSdkRuntime implements AgentRuntime {
 
   private assertSessionWritable(): Promise<void> {
     return this.externalSessionChangeGuard.assertUnchanged(this.sessionBindings.session);
-  }
-  private emit(event: AgentEvent): void {
-    this.listeners.forEach((listener) => listener(event));
-  }
-  private emitOperationActivity(activity: RuntimeOperationActivity): void {
-    this.activityListeners.forEach((listener) => listener(activity));
   }
 }

@@ -48,7 +48,7 @@ import { CommandPaletteResults, paletteOptionId } from "./CommandPaletteResults.
 import { usePaletteExtensionCommands } from "./use-palette-extension-commands.js";
 import { usePaletteSessions } from "./use-palette-sessions.js";
 import { usePaletteMessageSearch } from "./use-palette-message-search.js";
-import { openPaletteMessageResult } from "./palette-message-result.js";
+import { openWorkspaceMessageResult } from "./palette-message-result.js";
 import { formatRelativeTime } from "../localization/date-time.js";
 import styles from "./CommandPalette.module.css";
 
@@ -138,7 +138,7 @@ export function CommandPalette() {
       detail: `${item.role === "user" ? "用户" : "Pi"}${item.createdAt === undefined ? "" : ` · ${formatRelativeTime(item.createdAt)}`} · ${item.snippet}`,
       keywords: `${item.snippet} ${item.sessionName} ${item.role}`,
       icon: MessageSquareText,
-      run: () => openPaletteMessageResult(item)
+      run: () => openWorkspaceMessageResult(item)
     }))
   ], [
     activeSessionFileIdentity,
