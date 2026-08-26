@@ -1,5 +1,7 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   S3Client
 } from "@aws-sdk/client-s3";
@@ -74,6 +76,48 @@ export function createCloudflareR2Client({
       await upload.done();
     },
 
+    async verifyObject(artifact) {
+      const response = await objectClient.send(new GetObjectCommand({
+        Bucket: bucketName,
+        Key: artifact.name
+      }));
+      if (!response.Body) throw new Error(`${artifact.name}: R2 readback returned no body.`);
+      const { bytes, sha256 } = await hashBody(response.Body);
+      if (bytes !== artifact.bytes) throw new Error(`${artifact.name}: R2 byte count mismatch.`);
+      if (sha256 !== artifact.sha256) throw new Error(`${artifact.name}: R2 SHA-256 mismatch.`);
+      if (typeof response.ETag !== "string" || response.ETag.length === 0) {
+        throw new Error(`${artifact.name}: R2 readback omitted the ETag required for conditional metadata repair.`);
+      }
+      return {
+        cacheControl: response.CacheControl,
+        contentType: response.ContentType,
+        etag: response.ETag,
+        preservedMetadata: {
+          ...(response.ContentDisposition ? { ContentDisposition: response.ContentDisposition } : {}),
+          ...(response.ContentEncoding ? { ContentEncoding: response.ContentEncoding } : {}),
+          ...(response.ContentLanguage ? { ContentLanguage: response.ContentLanguage } : {}),
+          ...(response.Expires ? { Expires: response.Expires } : {}),
+          ...(response.Metadata ? { Metadata: response.Metadata } : {}),
+          ...(response.WebsiteRedirectLocation
+            ? { WebsiteRedirectLocation: response.WebsiteRedirectLocation }
+            : {})
+        }
+      };
+    },
+
+    async replaceObjectHttpMetadata(key, { contentType, cacheControl, etag, preservedMetadata }) {
+      await objectClient.send(new CopyObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        CopySource: `${encodeURIComponent(bucketName)}/${encodeObjectKey(key)}`,
+        CopySourceIfMatch: etag,
+        MetadataDirective: "REPLACE",
+        ...preservedMetadata,
+        ContentType: contentType,
+        CacheControl: cacheControl
+      }));
+    },
+
     async deleteObject(key) {
       await objectClient.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
     },
@@ -119,14 +163,10 @@ export async function verifyPublicArtifact(origin, artifact, fetchImpl = fetch) 
   if (response.status !== 200 || !response.body) {
     throw new Error(`${artifact.name}: public readback returned HTTP ${response.status}.`);
   }
-  const hash = createHash("sha256");
-  let bytes = 0;
-  for await (const chunk of response.body) {
-    bytes += chunk.byteLength;
-    hash.update(chunk);
-  }
+  assertImmutableCacheControl(artifact.name, response.headers);
+  const { bytes, sha256 } = await hashBody(response.body);
   if (bytes !== artifact.bytes) throw new Error(`${artifact.name}: public byte count mismatch.`);
-  if (hash.digest("hex") !== artifact.sha256) throw new Error(`${artifact.name}: public SHA-256 mismatch.`);
+  if (sha256 !== artifact.sha256) throw new Error(`${artifact.name}: public SHA-256 mismatch.`);
 
   const range = await fetchImpl(url, {
     cache: "no-store",
@@ -137,10 +177,35 @@ export async function verifyPublicArtifact(origin, artifact, fetchImpl = fetch) 
   if (range.status !== 206 || rangeBytes.length !== 1) {
     throw new Error(`${artifact.name}: public Range probe did not return one-byte HTTP 206.`);
   }
+  assertImmutableCacheControl(artifact.name, range.headers);
   const contentRange = range.headers.get("content-range");
   if (contentRange !== `bytes 0-0/${artifact.bytes}`) {
     throw new Error(`${artifact.name}: public Content-Range mismatch.`);
   }
+}
+
+async function hashBody(body) {
+  const hash = createHash("sha256");
+  let bytes = 0;
+  for await (const chunk of body) {
+    bytes += chunk.byteLength;
+    hash.update(chunk);
+  }
+  return { bytes, sha256: hash.digest("hex") };
+}
+
+function assertImmutableCacheControl(name, headers) {
+  const directives = new Set((headers.get("cache-control") ?? "")
+    .split(",")
+    .map((directive) => directive.trim().toLowerCase())
+    .filter(Boolean));
+  if (!directives.has("public") || !directives.has("max-age=31536000") || !directives.has("immutable")) {
+    throw new Error(`${name}: public Cache-Control is not the immutable one-year artifact policy.`);
+  }
+}
+
+function encodeObjectKey(key) {
+  return key.split("/").map((segment) => encodeURIComponent(segment)).join("/");
 }
 
 async function cloudflareEnvelope(fetchImpl, url, init) {

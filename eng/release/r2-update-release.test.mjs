@@ -5,6 +5,7 @@ import {
 } from "./r2-update-release-contract.mjs";
 import {
   cleanupR2Release,
+  immutableArtifactCacheControl,
   parseReleaseCommandFlags,
   publishR2Release
 } from "./r2-update-release.mjs";
@@ -51,6 +52,14 @@ describe("R2 update release", () => {
       ...release.artifacts.map((entry) => `verify:${entry.name}`),
       "put:unsigned-preview-manifest.json"
     ]);
+    for (const artifact of release.artifacts) {
+      expect(client.putFile).toHaveBeenCalledWith(
+        artifact.name,
+        artifact.path,
+        expect.any(String),
+        immutableArtifactCacheControl
+      );
+    }
     expect(client.putFile).toHaveBeenLastCalledWith(
       "unsigned-preview-manifest.json",
       release.manifestPath,
@@ -58,6 +67,84 @@ describe("R2 update release", () => {
       "no-store"
     );
     expect(result.published).toBe(true);
+    expect(result.metadataRepairs).toEqual([]);
+  });
+
+  it("verifies existing bytes before conditionally repairing HTTP metadata", async () => {
+    const release = fixtureRelease();
+    const calls = [];
+    let manifestReads = 0;
+    const client = {
+      listObjects: vi.fn(async () => release.artifacts.map((artifact) => ({
+        key: artifact.name,
+        size: artifact.bytes
+      }))),
+      putFile: vi.fn(async (key) => calls.push(`put:${key}`)),
+      verifyObject: vi.fn(async (artifact) => {
+        calls.push(`verify-r2:${artifact.name}`);
+        return {
+          cacheControl: artifact === release.artifacts[0]
+            ? "max-age=31536000"
+            : immutableArtifactCacheControl,
+          contentType: artifact.name.endsWith(".zip")
+            ? "application/zip"
+            : artifact.name.endsWith(".dmg")
+              ? "application/x-apple-diskimage"
+              : "application/vnd.microsoft.portable-executable",
+          etag: '"verified-etag"',
+          preservedMetadata: { Metadata: { source: "candidate" } }
+        };
+      }),
+      replaceObjectHttpMetadata: vi.fn(async (key) => calls.push(`repair:${key}`))
+    };
+
+    const result = await publishR2Release({
+      release,
+      client,
+      readPublicManifest: vi.fn(async () => {
+        manifestReads += 1;
+        return manifestReads === 1 ? null : release.manifest;
+      }),
+      verifyArtifact: vi.fn(async (_origin, artifact) => calls.push(`verify-public:${artifact.name}`))
+    });
+
+    expect(calls).toEqual([
+      `verify-r2:${release.artifacts[0].name}`,
+      `repair:${release.artifacts[0].name}`,
+      `verify-r2:${release.artifacts[1].name}`,
+      `verify-r2:${release.artifacts[2].name}`,
+      ...release.artifacts.map((artifact) => `verify-public:${artifact.name}`),
+      "put:unsigned-preview-manifest.json"
+    ]);
+    expect(client.replaceObjectHttpMetadata).toHaveBeenCalledWith(release.artifacts[0].name, {
+      contentType: "application/vnd.microsoft.portable-executable",
+      cacheControl: immutableArtifactCacheControl,
+      etag: '"verified-etag"',
+      preservedMetadata: { Metadata: { source: "candidate" } }
+    });
+    expect(result.metadataRepairs).toEqual([release.artifacts[0].name]);
+  });
+
+  it("does not mutate metadata when direct R2 verification fails", async () => {
+    const release = fixtureRelease();
+    const client = {
+      listObjects: vi.fn(async () => release.artifacts.map((artifact) => ({
+        key: artifact.name,
+        size: artifact.bytes
+      }))),
+      putFile: vi.fn(),
+      verifyObject: vi.fn(async () => { throw new Error("R2 SHA-256 mismatch"); }),
+      replaceObjectHttpMetadata: vi.fn()
+    };
+
+    await expect(publishR2Release({
+      release,
+      client,
+      readPublicManifest: vi.fn(async () => null),
+      verifyArtifact: vi.fn()
+    })).rejects.toThrow("R2 SHA-256 mismatch");
+    expect(client.replaceObjectHttpMetadata).not.toHaveBeenCalled();
+    expect(client.putFile).not.toHaveBeenCalled();
   });
 
   it("fails closed instead of overwriting an immutable artifact", async () => {

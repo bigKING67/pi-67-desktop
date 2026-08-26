@@ -34,6 +34,18 @@ unsigned-preview-manifest.json
 Artifact names are immutable. Never overwrite an existing versioned artifact with different
 bytes. `unsigned-preview-manifest.json` is the only mutable publication pointer.
 
+Every versioned EXE/DMG/ZIP object must carry this R2 origin metadata:
+
+```text
+Cache-Control: public, max-age=31536000, immutable
+```
+
+The Cloudflare artifact Cache Rule may keep successful versioned responses at the edge for one
+year, but Browser TTL must **respect origin**. Its HTTP 404 status-code TTL must be `no-store`
+(`-1`), not `no-cache` (`0`). A Cache Response Rule must also emit `Cache-Control: no-store` for
+404 responses on the update host's artifact extensions. This keeps successful immutable downloads
+cacheable for other users while preventing a browser or edge from retaining a pre-upload miss.
+
 ## Prepare locally
 
 The normal candidate gates still apply. After the exact Windows and macOS artifacts for one source
@@ -116,6 +128,11 @@ lists the live bucket without modifying it, reads the public manifest, and repor
 
 The plan never uploads, overwrites, deletes, purges, or writes a release receipt.
 
+Do not probe a future artifact through `updates.52671314.xyz` before it exists in R2. Inspect
+pre-publication state through the R2 S3 API and the read-only plan instead. A mistaken public probe
+must be treated as a negative-cache incident: correct the rules, purge only the exact affected URL,
+and verify the missing-object behavior before publication.
+
 ## Publish with separate authorization
 
 R2 upload is an external write and requires current authorization for the exact version. Resolve a
@@ -126,12 +143,16 @@ IDs, access keys, API tokens, cookies, or dashboard state in Git, workflow logs,
 Publication order is mandatory:
 
 1. Re-verify source SHA, version, platform test receipts, local size, and SHA-256.
-2. Upload all three immutable versioned artifacts.
-3. Read each artifact back through `updates.52671314.xyz`; verify HTTP 200, byte count, Range 206,
-   and downloaded SHA-256.
-4. Upload `unsigned-preview-manifest.json` **last**.
-5. Fetch the public manifest without credentials and confirm the exact version and hashes.
-6. Test `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an installed macOS
+2. Verify any same-name/same-size R2 object directly through the S3 API before changing metadata.
+   A size match alone never authorizes mutation.
+3. Upload missing versioned artifacts with the immutable one-year origin metadata. For a directly
+   verified existing object whose HTTP metadata is stale, conditionally replace only that metadata
+   against its verified ETag.
+4. Read each artifact back through `updates.52671314.xyz`; verify HTTP 200, byte count, Range 206,
+   downloaded SHA-256, and immutable one-year `Cache-Control` on both responses.
+5. Upload `unsigned-preview-manifest.json` **last**.
+6. Fetch the public manifest without credentials and confirm the exact version and hashes.
+7. Test `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an installed macOS
    arm64 copy. Bind the result to exact bytes and source SHA.
 
 After current authorization for the exact package version, publication is invoked with:
@@ -153,18 +174,22 @@ source SHA; the publication receipt separately records the later release-tooling
 allows a release-only tooling fix without rebuilding different application bytes under the same
 version. `--bundle` can select another verified local bundle; unknown or duplicate flags fail closed.
 
-The release tool uses Cloudflare R2's S3-compatible API for object listing, uploads, and deletion.
+The release tool uses Cloudflare R2's S3-compatible API for object listing, direct readback,
+conditional same-object metadata replacement, uploads, and deletion.
 Uploads stream from disk; the AWS high-level uploader automatically uses multipart transfer for
 large DMG/ZIP artifacts, aborts incomplete parts on failure, and never buffers a complete installer
-in memory. The Cloudflare REST API is used only for the separately authorized exact cache purge.
+in memory. Existing bytes are hashed directly from R2 before a conditional ETag-bound metadata
+replacement, so a same-name/same-size collision cannot be normalized accidentally. The Cloudflare
+REST API is used only for the separately authorized exact cache purge.
 Successful publish writes a credential-free receipt under ignored
 `artifacts/r2-release-receipts/`.
 
 Uploading metadata first is forbidden because clients could retain a reference to a missing
 artifact. The JSON/YML/SIG cache rule bypasses edge caching for the mutable manifest, and the R2
 manifest object must also carry `Cache-Control: no-store` so Electron's local HTTP cache cannot
-reuse a previously fetched mutable manifest. Immutable EXE/DMG/ZIP files use the one-year cache
-rule.
+reuse a previously fetched mutable manifest. Immutable EXE/DMG/ZIP files use one-year edge and
+origin caching for successful responses; missing artifact responses remain `no-store` at both the
+edge-status and browser-response layers.
 
 ## Platform behavior
 

@@ -25,6 +25,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultBundleDirectory = join(root, "artifacts/r2-update-bundle");
 const defaultReceiptDirectory = join(root, "artifacts/r2-release-receipts");
 const mutableManifestCacheControl = "no-store";
+export const immutableArtifactCacheControl = "public, max-age=31536000, immutable";
 
 export async function planR2Release({
   release,
@@ -52,9 +53,27 @@ export async function publishR2Release({
   if (plan.immutableConflicts.length > 0) {
     throw new Error("Refusing to overwrite an immutable R2 artifact with different bytes.");
   }
+  const metadataRepairs = [];
   for (const artifact of release.artifacts) {
     if (plan.uploads.includes(artifact.name)) {
-      await client.putFile(artifact.name, artifact.path, artifactContentType(artifact.name));
+      await client.putFile(
+        artifact.name,
+        artifact.path,
+        artifactContentType(artifact.name),
+        immutableArtifactCacheControl
+      );
+      continue;
+    }
+    const contentType = artifactContentType(artifact.name);
+    const metadata = await client.verifyObject(artifact);
+    if (metadata.cacheControl !== immutableArtifactCacheControl || metadata.contentType !== contentType) {
+      await client.replaceObjectHttpMetadata(artifact.name, {
+        contentType,
+        cacheControl: immutableArtifactCacheControl,
+        etag: metadata.etag,
+        preservedMetadata: metadata.preservedMetadata
+      });
+      metadataRepairs.push(artifact.name);
     }
   }
   for (const artifact of release.artifacts) {
@@ -72,7 +91,7 @@ export async function publishR2Release({
   if (!manifestsMatch(publicManifest, release.manifest)) {
     throw new Error("Public R2 manifest does not match the local release after publication.");
   }
-  return { ...plan, provenance: release.provenance, published: true };
+  return { ...plan, metadataRepairs, provenance: release.provenance, published: true };
 }
 
 export async function cleanupR2Release({

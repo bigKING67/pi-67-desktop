@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import {
   createCloudflareR2Client,
-  fetchPublicManifest
+  fetchPublicManifest,
+  verifyPublicArtifact
 } from "./r2-update-cloudflare-client.mjs";
 
 describe("Cloudflare R2 release client", () => {
@@ -83,6 +86,94 @@ describe("Cloudflare R2 release client", () => {
     }));
   });
 
+  it("verifies existing R2 bytes before returning metadata for repair", async () => {
+    const body = Buffer.from("verified R2 object");
+    const artifact = {
+      name: "candidate.zip",
+      bytes: body.length,
+      sha256: createHash("sha256").update(body).digest("hex")
+    };
+    const s3Client = {
+      send: vi.fn(async () => ({
+        Body: Readable.from([body]),
+        CacheControl: "max-age=60",
+        ContentDisposition: "attachment",
+        ContentType: "application/octet-stream",
+        ETag: '"r2-etag"',
+        Metadata: { source: "candidate" }
+      }))
+    };
+    const client = createCloudflareR2Client({
+      accountId: "account",
+      bucketName: "bucket",
+      s3Client
+    });
+
+    await expect(client.verifyObject(artifact)).resolves.toEqual({
+      cacheControl: "max-age=60",
+      contentType: "application/octet-stream",
+      etag: '"r2-etag"',
+      preservedMetadata: {
+        ContentDisposition: "attachment",
+        Metadata: { source: "candidate" }
+      }
+    });
+    expect(s3Client.send.mock.calls[0]?.[0].input).toEqual({
+      Bucket: "bucket",
+      Key: "candidate.zip"
+    });
+  });
+
+  it("rejects an existing R2 object whose direct hash differs", async () => {
+    const client = createCloudflareR2Client({
+      accountId: "account",
+      bucketName: "bucket",
+      s3Client: {
+        send: vi.fn(async () => ({
+          Body: Readable.from([Buffer.from("wrong bytes")]),
+          ETag: '"r2-etag"'
+        }))
+      }
+    });
+
+    await expect(client.verifyObject({
+      name: "candidate.exe",
+      bytes: 11,
+      sha256: "a".repeat(64)
+    })).rejects.toThrow("R2 SHA-256 mismatch");
+  });
+
+  it("conditionally replaces only HTTP metadata on a verified object", async () => {
+    const s3Client = { send: vi.fn(async () => ({})) };
+    const client = createCloudflareR2Client({
+      accountId: "account",
+      bucketName: "bucket",
+      s3Client
+    });
+
+    await client.replaceObjectHttpMetadata("releases/candidate file.dmg", {
+      contentType: "application/x-apple-diskimage",
+      cacheControl: "public, max-age=31536000, immutable",
+      etag: '"r2-etag"',
+      preservedMetadata: {
+        ContentDisposition: "attachment",
+        Metadata: { source: "candidate" }
+      }
+    });
+
+    expect(s3Client.send.mock.calls[0]?.[0].input).toEqual({
+      Bucket: "bucket",
+      Key: "releases/candidate file.dmg",
+      CopySource: "bucket/releases/candidate%20file.dmg",
+      CopySourceIfMatch: '"r2-etag"',
+      MetadataDirective: "REPLACE",
+      ContentDisposition: "attachment",
+      Metadata: { source: "candidate" },
+      ContentType: "application/x-apple-diskimage",
+      CacheControl: "public, max-age=31536000, immutable"
+    });
+  });
+
   it("purges only the supplied exact URLs in bounded batches", async () => {
     const requests = [];
     const fetchImpl = vi.fn(async (_url, init) => {
@@ -126,6 +217,46 @@ describe("Cloudflare R2 release client", () => {
       "https://updates.52671314.xyz",
       vi.fn(async () => response)
     )).rejects.toThrow("redirected");
+  });
+
+  it("verifies public immutable cache metadata with full and Range reads", async () => {
+    const body = Buffer.from("public artifact");
+    const artifact = {
+      name: "candidate.zip",
+      bytes: body.length,
+      sha256: createHash("sha256").update(body).digest("hex")
+    };
+    const cacheControl = "public, max-age=31536000, immutable";
+    const fetchImpl = vi.fn(async (_url, init) => init?.headers?.Range
+      ? new Response(body.subarray(0, 1), {
+          status: 206,
+          headers: {
+            "cache-control": cacheControl,
+            "content-range": `bytes 0-0/${body.length}`
+          }
+        })
+      : new Response(body, { status: 200, headers: { "cache-control": cacheControl } }));
+
+    await expect(verifyPublicArtifact("https://updates.example", artifact, fetchImpl))
+      .resolves.toBeUndefined();
+  });
+
+  it("rejects a public artifact without the immutable origin cache policy", async () => {
+    const body = Buffer.from("public artifact");
+    const artifact = {
+      name: "candidate.zip",
+      bytes: body.length,
+      sha256: createHash("sha256").update(body).digest("hex")
+    };
+
+    await expect(verifyPublicArtifact(
+      "https://updates.example",
+      artifact,
+      vi.fn(async () => new Response(body, {
+        status: 200,
+        headers: { "cache-control": "max-age=31536000" }
+      }))
+    )).rejects.toThrow("immutable one-year artifact policy");
   });
 });
 
