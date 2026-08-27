@@ -9,29 +9,19 @@
   Var Pi67InstallPathGuardLabel
   Var Pi67InstallPathGuardPathLabel
   Var Pi67InstallPathGuardReason
-  Var Pi67UpdateProgressVisible
-
-  !macro Pi67HideUpdateProgress
-    ${If} $Pi67UpdateProgressVisible == "1"
-      SpiderBanner::Destroy
-      StrCpy $Pi67UpdateProgressVisible "0"
-    ${EndIf}
-  !macroend
-
   # SpiderBanner is an install-section plugin. Starting it from .onInit leaves
   # silent assisted updates with an invisible plugin lifetime that never ends.
   !macro customHeader
     Section "-pi67-update-progress"
-      StrCpy $Pi67UpdateProgressVisible "0"
       ${If} ${isUpdated}
       ${AndIf} ${Silent}
         # A per-machine outer process relaunches elevated; let only the process
         # that performs extraction own the visible update surface.
         ${If} $hasPerMachineInstallation != "1"
         ${OrIf} ${UAC_IsAdmin}
-          # Destroy must address the same plugin instance after extraction.
-          SpiderBanner::Show /NOUNLOAD /MODERN
-          StrCpy $Pi67UpdateProgressVisible "1"
+          # Match electron-builder's maintained plugin lifetime: the modeless
+          # banner is owned by the installer instead of retained across sections.
+          SpiderBanner::Show /MODERN
           FindWindow $0 "#32770" "" $HWNDPARENT
           FindWindow $0 "#32770" "" $HWNDPARENT $0
           GetDlgItem $0 $0 1000
@@ -44,19 +34,16 @@
   !macro customInstall
     ${If} ${isUpdated}
       ${IfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
-        !insertmacro Pi67HideUpdateProgress
         Abort "Updated application executable is unavailable."
       ${EndIf}
       Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
       ClearErrors
       CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
       ${If} ${Errors}
-        !insertmacro Pi67HideUpdateProgress
         Abort "Updated Desktop shortcut could not be created."
       ${EndIf}
       WinShell::SetLnkAUMI "$DESKTOP\${SHORTCUT_NAME}.lnk" "${APP_ID}"
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
-      !insertmacro Pi67HideUpdateProgress
     ${EndIf}
   !macroend
 

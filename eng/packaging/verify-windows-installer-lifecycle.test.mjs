@@ -403,11 +403,11 @@ describe("Windows installer lifecycle contract", () => {
   it("shows liveness for unattended updates without exposing the assisted wizard", async () => {
     const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
 
-    expect(installer).toMatch(/!macro customHeader\s+Section "-pi67-update-progress"\s+StrCpy \$Pi67UpdateProgressVisible "0"\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SpiderBanner::Show \/NOUNLOAD \/MODERN[\s\S]*?StrCpy \$Pi67UpdateProgressVisible "1"[\s\S]*?SectionEnd\s+!macroend/u);
+    expect(installer).toMatch(/!macro customHeader\s+Section "-pi67-update-progress"\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SpiderBanner::Show \/MODERN[\s\S]*?SectionEnd\s+!macroend/u);
     expect(installer).not.toMatch(/!macro customInit[\s\S]*?SpiderBanner::Show/u);
-    expect(installer).not.toMatch(/SpiderBanner::Show \/MODERN/u);
-    expect(installer).toMatch(/!macro Pi67HideUpdateProgress[\s\S]*?SpiderBanner::Destroy[\s\S]*?!macroend/u);
-    expect(installer).toMatch(/!macro customInstall[\s\S]*?Shell32::SHChangeNotify[\s\S]*?!insertmacro Pi67HideUpdateProgress/u);
+    expect(installer).not.toContain("/NOUNLOAD");
+    expect(installer).not.toContain("SpiderBanner::Destroy");
+    expect(installer).not.toContain("Pi67UpdateProgressVisible");
     expect(installer).toContain("Installing Pi-67 update / 正在安装 Pi-67 更新，请稍候");
     expect(installer).not.toContain("SetSilent normal");
   });

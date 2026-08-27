@@ -294,6 +294,17 @@ publish the same accepted Candidate through the internal R2 update channel.
   review artifacts. The Desktop lock and catalog now advance together to
   browser67 `0.6.0` and catalog `2026.08.27.4`; the freshness and package-version
   gates are preserved rather than bypassed.
+- 2026-08-27: Candidate run `33086994507` bound source `d489ea14`, passed
+  provenance, Windows package construction, packaged Electron smoke, UI/IME,
+  and artifact identity, but the Alpha.35 to Alpha.36 installer reproduced the
+  same hang for the extended 420-second limit. The timeout snapshot again found
+  only the installer process, no visible window, an installed executable and
+  uninstaller, and no repaired Desktop shortcut. Moving the banner into a
+  Section therefore was not sufficient. The remaining mismatch with
+  electron-builder's maintained invocation is Desktop's cross-Section retained
+  plugin instance: the banner now uses plain `SpiderBanner::Show /MODERN`, with
+  no `/NOUNLOAD` or manual `Destroy`, while preserving the hidden update-only
+  Section and shortcut repair.
 
 ## Closeout
 
@@ -307,9 +318,9 @@ publish the same accepted Candidate through the internal R2 update channel.
 - Validation completed: current focused tests, final current-tree full coverage,
   source gates, build, Capability source fetch/freshness, resource UI E2E,
   isolated SpiderBanner compilation, and an exact-source full packaged macOS
-  smoke/open. The latest `/NOUNLOAD` NSIS-only source still requires an exact-SHA
-  Windows build and target lifecycle after commit.
-- Validation not completed: lifecycle-only Windows timeout snapshot, successful
+  smoke/open. The latest maintained-lifetime NSIS source still requires an
+  exact-SHA Windows build and target lifecycle after commit.
+- Validation not completed: successful
   exact-SHA Windows Candidate/runtime observation, Feishu distribution, and
   credentialed R2 publication with live progress.
 - Remaining risks: `SpiderBanner` visibility and the new PowerShell observation
