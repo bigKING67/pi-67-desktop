@@ -167,6 +167,8 @@ export interface ShutdownCheckpointResponse {
   succeeded: boolean;
 }
 
+export type SecureStorageAccess = "available" | "unavailable";
+
 /** Complete, typed surface exposed by the sandboxed Desktop preload. */
 export interface DesktopSystemBridge {
   getPlatformInfo(): Promise<DesktopPlatformInfo>;
@@ -195,6 +197,7 @@ export interface DesktopSystemBridge {
   advanceWorktreeEnvironment(request: WorktreeCreationAdvanceRequest): Promise<WorktreeCreationAdvanceResult>;
   rollbackWorktreeEnvironment(request: WorktreeCreationRollbackRequest): Promise<WorktreeCreationRollbackResult>;
   loadComposerDraftState(): Promise<ComposerDraftStateSnapshot>;
+  ensureSecureStorageAccess(): Promise<SecureStorageAccess>;
   updateComposerDraftState(state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot>;
   loadWorkspaceFileState(): Promise<WorkspaceFileStateSnapshot>;
   updateWorkspaceFileState(state: WorkspaceFilePersistedState): Promise<WorkspaceFileStateSnapshot>;

@@ -60,6 +60,7 @@ export async function installMockDesktopBridge(
       drafts: []
     },
     composerDraftPersistence: options.composerDraftPersistence ?? "available" as const,
+    secureStorageAccess: options.secureStorageAccess ?? "available" as const,
     composerDraftUpdateDelayMs: options.composerDraftUpdateDelayMs ?? 0,
     composerDraftFailureCalls: options.composerDraftFailureCalls ?? [],
     composerDraftFailFirstPromptStashWrite: options.composerDraftFailFirstPromptStashWrite ?? false,
@@ -228,6 +229,7 @@ export async function installMockDesktopBridge(
             state: structuredClone(composerDraftState),
             persistence: bridgeFixture.composerDraftPersistence
           }),
+          ensureSecureStorageAccess: async () => bridgeFixture.secureStorageAccess,
           updateComposerDraftState: async (state: ComposerDraftPersistedState) => {
             await composerDraftTest.beforeUpdate();
             if (bridgeFixture.composerDraftUpdateDelayMs > 0) {

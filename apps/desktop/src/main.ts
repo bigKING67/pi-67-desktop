@@ -47,6 +47,7 @@ import { RepositoryMutationScheduler } from "./repository-mutation-scheduler.js"
 import { WorktreeStartupReconcileService } from "./worktree-startup-reconcile-service.js";
 import { PromptStashImageStore } from "./prompt-stash-image-store.js";
 import { ensureMainWindowContextRoom } from "./main-window-context-room.js";
+import { DesktopSafeStorage } from "./desktop-safe-storage.js";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = normalize(join(currentDirectory, "../../renderer/dist"));
@@ -170,26 +171,15 @@ if (hasSingleInstanceLock) {
     }).catch(() => {
       console.info("Prompt attachment cleanup removed=0 errors=1 classes=UnknownError");
     });
+    const desktopSafeStorage = new DesktopSafeStorage(safeStorage);
     workspaceFileState = new WorkspaceFileStateStore(app.getPath("userData"), {
-      encryption: {
-        isAvailable: () => safeStorage.isEncryptionAvailable(),
-        encrypt: (value) => safeStorage.encryptString(value),
-        decrypt: (value) => safeStorage.decryptString(value)
-      }
+      encryption: desktopSafeStorage
     });
     composerDraftState = new ComposerDraftStateStore(app.getPath("userData"), {
-      encryption: {
-        isAvailable: () => safeStorage.isEncryptionAvailable(),
-        encrypt: (value) => safeStorage.encryptString(value),
-        decrypt: (value) => safeStorage.decryptString(value)
-      }
+      encryption: desktopSafeStorage
     });
     promptStashImages = new PromptStashImageStore(app.getPath("userData"), {
-      encryption: {
-        isAvailable: () => safeStorage.isEncryptionAvailable(),
-        encrypt: (value) => safeStorage.encryptString(value),
-        decrypt: (value) => safeStorage.decryptString(value)
-      },
+      encryption: desktopSafeStorage,
       staging: promptAttachments
     });
     desktopCapabilities = new DesktopCapabilityService({
@@ -283,6 +273,7 @@ if (hasSingleInstanceLock) {
       packageNetworkSettings,
       promptAttachments,
       promptStashImages,
+      secureStorage: desktopSafeStorage,
       previousRunExit,
       workbenchState,
       composerDraftState,

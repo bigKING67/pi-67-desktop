@@ -52,6 +52,7 @@ export class ComposerDraftStateStore {
   readonly #createToken: () => string;
   #memoryState: ComposerDraftPersistedState | undefined;
   #memoryPersistence: "available" | "unavailable" | undefined;
+  #persistenceBlocked = false;
   #pending: Promise<void> = Promise.resolve();
 
   constructor(userData: string, options: ComposerDraftStateStoreOptions) {
@@ -136,6 +137,7 @@ export class ComposerDraftStateStore {
       decodedPrimary?.kind === "decrypt-failed"
       || decodedBackup?.kind === "decrypt-failed"
     ) {
+      this.#persistenceBlocked = true;
       const state = emptyComposerDraftState();
       this.#memoryState = state;
       this.#memoryPersistence = "unavailable";
@@ -221,7 +223,24 @@ export class ComposerDraftStateStore {
   async #writeUnlocked(
     state: ComposerDraftPersistedState
   ): Promise<"available" | "unavailable"> {
-    const stored = encodeStoredComposerDraftState(state, this.#encryption);
+    if (state.drafts.length === 0 && this.#persistenceBlocked && !this.#encryption.isAvailable()) {
+      return "unavailable";
+    }
+    if (state.drafts.length > 0 && !this.#encryption.isAvailable()) {
+      this.#persistenceBlocked = true;
+      return "unavailable";
+    }
+    let stored: StoredComposerDraftState;
+    try {
+      stored = encodeStoredComposerDraftState(state, this.#encryption);
+    } catch {
+      this.#persistenceBlocked = true;
+      return "unavailable";
+    }
+    if (state.drafts.length > 0 && stored.encryptedState === undefined) {
+      this.#persistenceBlocked = true;
+      return "unavailable";
+    }
     const serialized = `${JSON.stringify(stored)}\n`;
     if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_COMPOSER_DRAFT_STATE_BYTES) {
       throw new Error("Composer draft state exceeds the persistence size limit.");
@@ -229,7 +248,8 @@ export class ComposerDraftStateStore {
     const directory = await this.#ensureStorageDirectory();
     await this.#writeAtomic(join(directory, BACKUP_FILENAME), serialized);
     await this.#writeAtomic(join(directory, STATE_FILENAME), serialized);
-    return stored.emptyState || stored.encryptedState ? "available" : "unavailable";
+    this.#persistenceBlocked = false;
+    return "available";
   }
 
   async #writeAtomic(path: string, serialized: string): Promise<void> {

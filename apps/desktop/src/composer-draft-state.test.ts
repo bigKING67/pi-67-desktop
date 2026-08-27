@@ -3,6 +3,21 @@ import { describe, expect, it } from "vitest";
 import { parseComposerDraftPersistedState } from "./composer-draft-state.js";
 
 describe("parseComposerDraftPersistedState", () => {
+  it("accepts the canonical NUL-delimited physical identity used by real Pi sessions", () => {
+    const state = draftState();
+    const conversation = {
+      ...state.drafts[0]!.conversation,
+      sessionFileIdentity: "session-file-v1\0device-1\0inode-1\0birthtime-1"
+    };
+    const canonical = {
+      ...state,
+      drafts: [{ ...state.drafts[0], conversation }],
+      selectedConversation: conversation
+    };
+
+    expect(parseComposerDraftPersistedState(canonical)).toEqual(canonical);
+  });
+
   it("rejects duplicate identities and selected conversations without a draft", () => {
     const state = draftState();
     expect(parseComposerDraftPersistedState({

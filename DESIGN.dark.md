@@ -147,7 +147,8 @@ spacing, component states, and motion as `DESIGN.md`.
   on hue alone. At 720x480 the Composer may wrap to two rows, but both Timeline card
   and action bar remain reachable without overlap.
 - Prompt Stash uses one raised neutral Popover above the Composer. Exact text preview,
-  image count/size, disabled restore, persistence failure, focus return, and 20-item limit stay
+  image count/size, disabled restore, actionable cross-platform secure-storage failure,
+  focus return, and 20-item limit stay
   legible without a green success surface. Current/Workspace conversation search uses
   the same neutral overlay grammar; match selection, incomplete results, and focused
   navigation never resemble a Web Search on/off state.

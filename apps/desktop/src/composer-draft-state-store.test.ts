@@ -45,10 +45,28 @@ describe("ComposerDraftStateStore", () => {
     const state = draftState();
     const snapshot = await store.update(state);
     expect(snapshot).toEqual({ state, persistence: "unavailable" });
-    expect(await readFile(store.requestedStatePath, "utf8")).not.toContain("继续完成 Windows 会话恢复");
+    await expect(readFile(store.requestedStatePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 
     await expect(new ComposerDraftStateStore(root, { encryption: unavailableEncryption() }).load())
-      .resolves.toEqual({ state: { version: 1, drafts: [] }, persistence: "unavailable" });
+      .resolves.toEqual({ state: { version: 1, drafts: [] }, persistence: "available" });
+  });
+
+  it("preserves the last encrypted state when a later write cannot access safe storage", async () => {
+    const root = await userData();
+    const original = new ComposerDraftStateStore(root, { encryption: reversibleEncryption() });
+    await original.update(draftState());
+    const encrypted = await readFile(original.requestedStatePath, "utf8");
+
+    const unavailable = new ComposerDraftStateStore(root, { encryption: unavailableEncryption() });
+    const next = {
+      ...draftState(),
+      drafts: [{ ...draftState().drafts[0]!, text: "new runtime-only draft" }]
+    };
+    await expect(unavailable.update(next)).resolves.toEqual({
+      state: next,
+      persistence: "unavailable"
+    });
+    expect(await readFile(original.requestedStatePath, "utf8")).toBe(encrypted);
   });
 
   it("does not probe safe storage for an explicitly empty draft state", async () => {

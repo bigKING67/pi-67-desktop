@@ -1,9 +1,10 @@
 import { resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rendererWorkbenchStore, type RendererWorkbenchTask } from "./workbench-store.js";
 import { useTaskDraftStore } from "./task-draft-store.js";
 import {
   restorePersistedDrafts,
+  persistPromptStashRemovalAcknowledged,
   serializeTaskDraftState,
   shouldPublishBackgroundPersistenceFailure,
   shouldScheduleDraftPersistenceRetry
@@ -157,6 +158,29 @@ describe("task draft persistence", () => {
     expect(JSON.stringify(state)).not.toContain("attachment-secret");
     expect(JSON.stringify(state)).not.toContain("private-preview");
     useTaskDraftStore.getState().setAttachments(task.id, []);
+  });
+
+  it("acknowledges deleting the final Prompt stash item as an empty persisted state", async () => {
+    const task = sessionTask("task-session-stash-delete", "session-file-stash-delete");
+    expect(rendererWorkbenchStore.getState().restoreTask(task)).toBe(task.id);
+    useTaskDraftStore.getState().addPromptStash(task.id, {
+      id: "only-stash",
+      text: "delete this",
+      createdAt: 125
+    });
+    useTaskDraftStore.getState().removePromptStash(task.id, "only-stash");
+    const updateComposerDraftState = vi.fn(async (state) => ({
+      state: structuredClone(state),
+      persistence: "available" as const
+    }));
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { pi67: { system: { updateComposerDraftState } } }
+    });
+
+    await expect(persistPromptStashRemovalAcknowledged(task.id, "only-stash"))
+      .resolves.toBe("persisted");
+    expect(updateComposerDraftState).toHaveBeenCalledWith({ version: 1, drafts: [] });
   });
 
   it("rotates a provisional draft to the materialized Session identity", () => {

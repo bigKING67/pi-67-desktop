@@ -1,5 +1,9 @@
 import type { PromptStashImageRef, PromptStashItem } from "@pi67/domain";
-import { persistTaskDraftStateAcknowledged } from "../workbench/task-draft-persistence.js";
+import {
+  persistPromptStashRemovalAcknowledged,
+  persistTaskDraftStateAcknowledged,
+  type TaskDraftPersistenceOutcome
+} from "../workbench/task-draft-persistence.js";
 import { useTaskDraftStore } from "../workbench/task-draft-store.js";
 import { revokeDraftAttachments, type DraftAttachment } from "./composer-attachments.js";
 
@@ -20,6 +24,7 @@ export type PromptStashResult =
         | "unsupported-attachments"
         | "conflict"
         | "missing"
+        | "secure-storage-unavailable"
         | "persistence-failed";
     };
 
@@ -32,6 +37,8 @@ export async function stashComposerPrompt(taskId: string, workspaceId: string): 
   if (sourceAttachments.some((attachment) => attachment.kind !== "image")) {
     return { status: "unsupported-attachments" };
   }
+  const secureStorageFailure = await ensurePromptStashSecureStorage();
+  if (secureStorageFailure) return secureStorageFailure;
 
   const itemId = crypto.randomUUID();
   let storedAttachments: PromptStashImageRef[] | undefined;
@@ -62,12 +69,13 @@ export async function stashComposerPrompt(taskId: string, workspaceId: string): 
     }
     return { status: admission };
   }
-  if (!await persistTaskDraftStateAcknowledged(taskId)) {
+  const stashPersistence = await persistTaskDraftStateAcknowledged(taskId);
+  if (stashPersistence !== "persisted") {
     if (admission === "added") useTaskDraftStore.getState().removePromptStash(taskId, item.id);
     if (storedAttachments?.length) {
       await window.pi67.system.deletePromptStashImages({ taskId, itemId }).catch(() => undefined);
     }
-    return { status: "persistence-failed" };
+    return persistenceFailure(stashPersistence);
   }
 
   const current = useTaskDraftStore.getState().drafts[taskId];
@@ -76,13 +84,14 @@ export async function stashComposerPrompt(taskId: string, workspaceId: string): 
   }
   useTaskDraftStore.getState().setText(taskId, "");
   useTaskDraftStore.getState().setAttachments(taskId, []);
-  if (!await persistTaskDraftStateAcknowledged(taskId)) {
+  const clearPersistence = await persistTaskDraftStateAcknowledged(taskId);
+  if (clearPersistence !== "persisted") {
     const cleared = useTaskDraftStore.getState().drafts[taskId];
     if (cleared?.text === "" && cleared.attachments.length === 0) {
       useTaskDraftStore.getState().setText(taskId, sourceText);
       useTaskDraftStore.getState().setAttachments(taskId, sourceAttachments);
     }
-    return { status: "persistence-failed" };
+    return persistenceFailure(clearPersistence);
   }
   revokeDraftAttachments(sourceAttachments);
   return { status: "stashed" };
@@ -99,6 +108,8 @@ export async function restoreComposerPromptStash(
   }
   const item = draft.promptStash.find((candidate) => candidate.id === itemId);
   if (!item) return { status: "missing" };
+  const secureStorageFailure = await ensurePromptStashSecureStorage();
+  if (secureStorageFailure) return secureStorageFailure;
 
   let restoredAttachments: DraftAttachment[] = [];
   if (item.attachments?.length) {
@@ -115,19 +126,21 @@ export async function restoreComposerPromptStash(
   }
   useTaskDraftStore.getState().setText(taskId, item.text);
   useTaskDraftStore.getState().setAttachments(taskId, restoredAttachments);
-  if (!await persistTaskDraftStateAcknowledged(taskId)) {
+  const restorePersistence = await persistTaskDraftStateAcknowledged(taskId);
+  if (restorePersistence !== "persisted") {
     const current = useTaskDraftStore.getState().drafts[taskId];
     if (current?.text === item.text && sameAttachmentIds(current.attachments, restoredAttachments)) {
       useTaskDraftStore.getState().setAttachments(taskId, []);
       useTaskDraftStore.getState().setText(taskId, "");
     }
     revokeDraftAttachments(restoredAttachments);
-    return { status: "persistence-failed" };
+    return persistenceFailure(restorePersistence);
   }
   useTaskDraftStore.getState().removePromptStash(taskId, itemId);
-  if (!await persistTaskDraftStateAcknowledged(taskId)) {
+  const removalPersistence = await persistPromptStashRemovalAcknowledged(taskId, itemId);
+  if (removalPersistence !== "persisted") {
     useTaskDraftStore.getState().addPromptStash(taskId, item);
-    return { status: "persistence-failed" };
+    return persistenceFailure(removalPersistence);
   }
   if (item.attachments?.length) {
     try {
@@ -145,10 +158,13 @@ export async function deleteComposerPromptStash(
 ): Promise<PromptStashResult> {
   const item = useTaskDraftStore.getState().drafts[taskId]?.promptStash.find((candidate) => candidate.id === itemId);
   if (!item) return { status: "missing" };
+  const secureStorageFailure = await ensurePromptStashSecureStorage();
+  if (secureStorageFailure) return secureStorageFailure;
   useTaskDraftStore.getState().removePromptStash(taskId, itemId);
-  if (!await persistTaskDraftStateAcknowledged(taskId)) {
+  const deletePersistence = await persistPromptStashRemovalAcknowledged(taskId, itemId);
+  if (deletePersistence !== "persisted") {
     useTaskDraftStore.getState().addPromptStash(taskId, item);
-    return { status: "persistence-failed" };
+    return persistenceFailure(deletePersistence);
   }
   if (item.attachments?.length) {
     try {
@@ -162,4 +178,22 @@ export async function deleteComposerPromptStash(
 
 function sameAttachmentIds(left: readonly DraftAttachment[], right: readonly DraftAttachment[]): boolean {
   return left.length === right.length && left.every((attachment, index) => attachment.id === right[index]?.id);
+}
+
+async function ensurePromptStashSecureStorage(): Promise<PromptStashResult | undefined> {
+  try {
+    return await window.pi67.system.ensureSecureStorageAccess() === "available"
+      ? undefined
+      : { status: "secure-storage-unavailable" };
+  } catch {
+    return { status: "persistence-failed" };
+  }
+}
+
+function persistenceFailure(outcome: TaskDraftPersistenceOutcome): PromptStashResult {
+  return {
+    status: outcome === "secure-storage-unavailable"
+      ? "secure-storage-unavailable"
+      : "persistence-failed"
+  };
 }

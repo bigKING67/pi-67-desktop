@@ -17,11 +17,11 @@ import {
   type ComposerDraftRecord
 } from "@pi67/protocol";
 import type { DesktopTextEncryption } from "./desktop-text-encryption.js";
+import { isBoundedSessionFileIdentity } from "./workbench-state-value-contract.js";
 
 export const MAX_STORED_COMPOSER_DRAFT_STATE_BYTES = 8 * 1024 * 1024;
 const MAX_ID_CHARS = 1_024;
 const MAX_DRAFT_ID_CHARS = 200;
-const MAX_SESSION_FILE_IDENTITY_CHARS = 32_832;
 const MAX_SESSION_PATH_CHARS = 32_768;
 
 export interface StoredComposerDraftState {
@@ -209,7 +209,7 @@ function parseReviewAuthority(
       value,
       ["source", "workspaceId", "sessionFileIdentity", "toolCallId", "contentFingerprint"]
     )
-    && isBoundedString(value.sessionFileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
+    && isBoundedSessionFileIdentity(value.sessionFileIdentity)
     && isBoundedString(value.toolCallId, 512)
     && isBoundedString(value.contentFingerprint, 512)
   ) return {
@@ -376,7 +376,7 @@ function parseConversation(value: unknown): ComposerDraftRecord["conversation"] 
   if (
     value.kind === "session"
     && hasExactKeys(value, ["kind", "workspaceId", "sessionFileIdentity", "sessionPath"])
-    && isBoundedString(value.sessionFileIdentity, MAX_SESSION_FILE_IDENTITY_CHARS)
+    && isBoundedSessionFileIdentity(value.sessionFileIdentity)
     && typeof value.sessionPath === "string"
     && value.sessionPath.length > 0
     && value.sessionPath.length <= MAX_SESSION_PATH_CHARS

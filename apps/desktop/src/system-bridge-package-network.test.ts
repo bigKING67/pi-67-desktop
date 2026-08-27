@@ -95,6 +95,7 @@ function registerFixture() {
   };
   registerSystemBridge({
     connectAgentHost: vi.fn(),
+    secureStorage: { ensureAvailable: () => "available" },
     getMainWindow: () => undefined,
     activateMainWindow: async () => undefined,
     desktopToolchain: {},

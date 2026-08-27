@@ -34,6 +34,10 @@ import { registerRendererWorkspaceWithHost } from "../workbench/workspace-host-r
 import type { WorkspaceId } from "@pi67/domain";
 import { reconcileUnconfirmedRendererSessions } from "../session/session-creation-recovery-controller.js";
 import { selectAuthoritativeRecoveryTask } from "./projection-recovery-task-selection.js";
+import {
+  settleOwnedConnectedProjectionRecoveryFailure,
+  settleOwnedProjectionResyncFailure
+} from "./projection-recovery-failure.js";
 
 type StoreGet = () => AppState;
 type StoreSet = (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
@@ -123,6 +127,19 @@ export function recoverConnectedRendererProjection(
       if (committed && input.workspaceId) {
         void reconcileUnconfirmedRendererSessions(input.workspaceId);
       }
+      if (
+        !committed
+        && projectionRecoveryLedger.isCurrent(get(), input.identity.hostEpoch, revision)
+        && acceptRendererSessionTransitionResponse(get(), transitionTarget)
+      ) {
+        settleOwnedConnectedProjectionRecoveryFailure(
+          get,
+          set,
+          input.identity.hostEpoch,
+          revision,
+          recoverySelection.context
+        );
+      }
     }).catch((error: unknown) => {
       recoverySelection.restore();
       failProjectionRecovery(get, set, input.identity.hostEpoch, revision, messages.runtime.connection.restoreSessionFailed, error, transitionTarget);
@@ -139,11 +156,15 @@ export function recoverConnectedRendererProjection(
       recoverySelection.restore();
       return;
     }
-    const disposition = classifyRendererSessionBootstrap(
+    const responseDisposition = classifyRendererSessionBootstrap(
       get(),
       transitionTarget,
       acknowledgement
     );
+    const disposition = responseDisposition === "stale"
+      && classifyRendererSessionBootstrap(get(), transitionTarget) === "committed"
+      ? "committed"
+      : responseDisposition;
     if (disposition === "committed") {
       recoverySelection.restore();
       projectionRecoveryLedger.clearInterruptedOperation();
@@ -379,7 +400,17 @@ export async function resynchronizeRendererProjection(
         workspaceId
       )
     ), options.context);
-    return committed ? "committed" : "stale";
+    if (committed) return "committed";
+    if (!projectionRecoveryLedger.isCurrent(get(), options.hostEpoch, revision)) return "stale";
+    if (!acceptRendererSessionTransitionResponse(get(), transitionTarget)) return "stale";
+    settleOwnedProjectionResyncFailure(
+      get,
+      set,
+      options.hostEpoch,
+      revision,
+      options.failureTitle
+    );
+    return "failed";
   } catch (error) {
     if (
       options.deferRuntimeNotReady

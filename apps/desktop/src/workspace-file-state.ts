@@ -50,6 +50,8 @@ export class WorkspaceFileStateStore {
   readonly #now: () => number;
   readonly #createToken: () => string;
   #memoryState: WorkspaceFilePersistedState | undefined;
+  #memoryDraftPersistence: "available" | "unavailable" | undefined;
+  #draftPersistenceBlocked = false;
   #pending: Promise<void> = Promise.resolve();
 
   constructor(userData: string, options: WorkspaceFileStateStoreOptions) {
@@ -71,9 +73,10 @@ export class WorkspaceFileStateStore {
     return this.#enqueue(async () => {
       const state = parseWorkspaceFilePersistedState(value);
       if (!state) throw new Error("Workspace file state update is invalid.");
+      const draftPersistence = await this.#writeUnlocked(state);
       this.#memoryState = structuredClone(state);
-      await this.#writeUnlocked(state);
-      return this.#snapshot(state);
+      this.#memoryDraftPersistence = draftPersistence;
+      return this.#snapshot(state, draftPersistence);
     });
   }
 
@@ -84,8 +87,9 @@ export class WorkspaceFileStateStore {
         ...loaded.state,
         workspaces: loaded.state.workspaces.filter((workspace) => workspace.workspaceId !== workspaceId)
       };
+      const draftPersistence = await this.#writeUnlocked(state);
       this.#memoryState = state;
-      await this.#writeUnlocked(state);
+      this.#memoryDraftPersistence = draftPersistence;
     });
   }
 
@@ -96,31 +100,38 @@ export class WorkspaceFileStateStore {
   }
 
   async #loadUnlocked(): Promise<WorkspaceFileStateSnapshot> {
-    if (this.#memoryState) return this.#snapshot(this.#memoryState);
+    if (this.#memoryState) {
+      if (!this.#memoryDraftPersistence) throw new Error("Workspace file persistence state is unavailable.");
+      return this.#snapshot(this.#memoryState, this.#memoryDraftPersistence);
+    }
     const directory = await this.#ensureStorageDirectory();
     const statePath = join(directory, STATE_FILENAME);
     const stored = await this.#readStoredState(statePath);
     if (stored.kind === "missing") {
       const state = emptyState();
       this.#memoryState = state;
-      return this.#snapshot(state);
+      this.#memoryDraftPersistence = "available";
+      return this.#snapshot(state, "available");
     }
     if (stored.kind === "invalid") return this.#quarantineCorruptState(statePath);
     const decoded = decodeStoredState(stored.state, this.#encryption);
+    this.#draftPersistenceBlocked = decoded.decryptFailed;
     this.#memoryState = decoded.state;
+    this.#memoryDraftPersistence = decoded.decryptFailed ? "unavailable" : "available";
     if (process.platform !== "win32") await chmod(statePath, 0o600);
     return {
-      ...this.#snapshot(decoded.state),
+      ...this.#snapshot(decoded.state, this.#memoryDraftPersistence),
       ...(decoded.decryptFailed ? { recovery: "draft-decrypt-failed" as const } : {})
     };
   }
 
-  #snapshot(state: WorkspaceFilePersistedState): WorkspaceFileStateSnapshot {
+  #snapshot(
+    state: WorkspaceFilePersistedState,
+    draftPersistence: "available" | "unavailable"
+  ): WorkspaceFileStateSnapshot {
     return {
       state: structuredClone(state),
-      draftPersistence: !hasWorkspaceFileDrafts(state) || this.#encryption.isAvailable()
-        ? "available"
-        : "unavailable"
+      draftPersistence
     };
   }
 
@@ -156,8 +167,21 @@ export class WorkspaceFileStateStore {
     }
   }
 
-  async #writeUnlocked(state: WorkspaceFilePersistedState): Promise<void> {
-    const stored = encodeStoredState(state, this.#encryption);
+  async #writeUnlocked(
+    state: WorkspaceFilePersistedState
+  ): Promise<"available" | "unavailable"> {
+    const hasDrafts = hasWorkspaceFileDrafts(state);
+    if ((this.#draftPersistenceBlocked || hasDrafts) && !this.#encryption.isAvailable()) {
+      this.#draftPersistenceBlocked = true;
+      return "unavailable";
+    }
+    let stored: StoredWorkspaceFileState;
+    try {
+      stored = encodeStoredState(state, this.#encryption);
+    } catch {
+      this.#draftPersistenceBlocked = true;
+      return "unavailable";
+    }
     const serialized = `${JSON.stringify(stored)}\n`;
     if (Buffer.byteLength(serialized, "utf8") > MAX_STORED_STATE_BYTES) {
       throw new Error("Workspace file state exceeds the persistence size limit.");
@@ -181,6 +205,8 @@ export class WorkspaceFileStateStore {
     } finally {
       if (temporaryExists) await unlink(temporaryPath).catch(() => undefined);
     }
+    this.#draftPersistenceBlocked = false;
+    return "available";
   }
 
   async #quarantineCorruptState(statePath: string): Promise<WorkspaceFileStateSnapshot> {
@@ -193,7 +219,8 @@ export class WorkspaceFileStateStore {
     });
     const state = emptyState();
     this.#memoryState = state;
-    return { ...this.#snapshot(state), recovery: "corrupt-reset" };
+    this.#memoryDraftPersistence = "available";
+    return { ...this.#snapshot(state, "available"), recovery: "corrupt-reset" };
   }
 
   async #ensureStorageDirectory(): Promise<string> {

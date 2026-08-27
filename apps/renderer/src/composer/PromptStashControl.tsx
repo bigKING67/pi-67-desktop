@@ -160,7 +160,9 @@ function publishStashFailure(result: PromptStashResult): void {
             : "暂存记录已删除，但旧的加密图片副本暂未清理；应用下次启动会重新协调。"
         : result.status === "persistence-failed"
           ? "安全存储未确认最终状态，内容仍保留在当前输入或暂存中。"
-          : "没有可暂存或恢复的 Prompt。";
+          : result.status === "secure-storage-unavailable"
+            ? "系统安全存储当前不可用。请解锁系统凭据或完成系统身份验证后，再次执行当前操作；内容仍完整保留在当前输入或暂存中。"
+            : "没有可暂存或恢复的 Prompt。";
   publishNotification({ level: "warning", title: "Prompt 暂存未完成", message });
 }
 

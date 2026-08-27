@@ -70,7 +70,11 @@ async function activateRendererTaskOnce(taskId: string): Promise<boolean> {
       clearTaskConversationAttention(task.id);
       return true;
     }
-    if (recovery !== "runtime-not-ready" || !isSelectedRendererTask(task)) return false;
+    if (recovery !== "runtime-not-ready") {
+      if (recovery === "failed" && isSelectedRendererTask(task)) markTaskRecoveryFailed(task.id);
+      return false;
+    }
+    if (!isSelectedRendererTask(task)) return false;
     return await reopenRendererTask(task, workspace, true);
   } catch (error) {
     if (!isSelectedRendererTask(task)) return false;
@@ -131,7 +135,7 @@ async function resumeRendererTaskOnce(taskId: string): Promise<boolean> {
         return true;
       }
       if (recovery !== "runtime-not-ready") {
-        if (recovery === "failed") markTaskRecoveryFailed(task.id);
+        if (recovery === "failed" && isSelectedRendererTask(task)) markTaskRecoveryFailed(task.id);
         return false;
       }
     }
@@ -181,10 +185,18 @@ function markTaskRecoveryFailed(taskId: string, error?: unknown): void {
   const detail = error instanceof Error
     ? error.message
     : useAppStore.getState().runtime.detail || "无法恢复任务";
+  const runtime = { phase: "failed" as const, detail, recoverable: true };
   rendererWorkbenchStore.getState().updateTask(taskId, {
     lifecycle: "lost",
-    runtime: { phase: "failed", detail, recoverable: true }
+    runtime
   });
+  if (selectedWorkbenchTask(rendererWorkbenchStore.getState())?.id === taskId) {
+    useAppStore.setState({
+      sessionTransitionPending: false,
+      sessionBootstrapTransitionPending: false,
+      runtime
+    });
+  }
 }
 
 function clearTaskConversationAttention(taskId: string): void {

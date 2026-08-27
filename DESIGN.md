@@ -1546,7 +1546,12 @@ loading error where the operation can produce those states
   and verifies ownership, length, canonical base64, and SHA-256 before restore.
   The Composer is cleared only after image storage plus the stash addition and
   resulting empty draft have each received a durable acknowledgement; any failure
-  rolls back to a non-lossy state. Restore is allowed only into an empty Composer,
+  rolls back to a non-lossy state. Windows and macOS use the same process-wide
+  secure-storage circuit breaker: background persistence stops after access becomes
+  unavailable, while an explicit stash, restore, or delete action performs one bounded
+  retry. The warning tells the user to unlock system credentials or complete system
+  authentication and retry the same action; it also confirms that current content was
+  retained. Restore is allowed only into an empty Composer,
   creates new staging identities, removes the item through the acknowledged flow,
   closes the Popover, and returns focus to the Composer.
 - Context pressure is a compact status beside the Composer: below 75% is neutral,

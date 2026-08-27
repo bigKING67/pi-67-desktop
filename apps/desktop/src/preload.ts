@@ -27,6 +27,7 @@ import type {
   RepositorySubmoduleInitializationResult,
   RepositoryWorkingTreeInspectionRequest,
   RepositoryWorkingTreeSnapshot,
+  SecureStorageAccess,
   SupportDiagnosticsExportRequest,
   StagedPromptAttachmentResult,
   WorktreeCreationRequest,
@@ -200,6 +201,13 @@ const systemBridge = {
   loadComposerDraftState: (): Promise<ComposerDraftStateSnapshot> => (
     ipcRenderer.invoke("pi67:composer-draft-state-load")
   ),
+  ensureSecureStorageAccess: async (): Promise<SecureStorageAccess> => {
+    const value = await ipcRenderer.invoke("pi67:secure-storage-ensure") as unknown;
+    if (value !== "available" && value !== "unavailable") {
+      throw new Error("Secure storage access response is invalid.");
+    }
+    return value;
+  },
   updateComposerDraftState: (state: ComposerDraftPersistedState): Promise<ComposerDraftStateSnapshot> => (
     ipcRenderer.invoke("pi67:composer-draft-state-update", state)
   ),

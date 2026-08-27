@@ -175,11 +175,15 @@ export async function openRendererWorkspaceDescriptor(
         [],
         { context: workbenchProtocolContextForTask(task) }
       );
-    const disposition = classifyRendererSessionBootstrap(
+    const responseDisposition = classifyRendererSessionBootstrap(
       get(),
       transitionTarget,
       acknowledgement
     );
+    const disposition = responseDisposition === "stale"
+      && classifyRendererSessionBootstrap(get(), transitionTarget) === "committed"
+      ? "committed"
+      : responseDisposition;
     if (disposition === "missing-bootstrap") {
       if (runtimeSessionPath) {
         const recovery = await resynchronizeRendererProjection(get, set, {
@@ -190,6 +194,12 @@ export async function openRendererWorkspaceDescriptor(
           failureTitle: "无法打开对话"
         });
         if (recovery === "committed") clearOpenedConversationAttention(task.id);
+        if (recovery === "failed") {
+          rendererWorkbenchStore.getState().updateTask(task.id, {
+            lifecycle: "lost",
+            runtime: get().runtime
+          });
+        }
         return recovery === "committed";
       }
       throw new Error("Pi 运行服务未发送 authoritative runtime.ready 事件。");
@@ -334,7 +344,10 @@ function openWorkspaceRuntimeTask(
   return task;
 }
 
-function beginWorkspaceTransition(descriptor: WorkspaceDescriptor, detail: string): string {
+function beginWorkspaceTransition(
+  descriptor: WorkspaceDescriptor,
+  detail: string
+): string {
   rendererWorkbenchStore.getState().selectWorkspace(descriptor.id);
   const workspace = descriptor.identity.canonicalPath;
   invalidateProjectionRecoveryGeneration();

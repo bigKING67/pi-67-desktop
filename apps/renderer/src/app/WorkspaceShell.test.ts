@@ -2,35 +2,37 @@ import type { RendererWorkbenchTask } from "../workbench/workbench-store.js";
 import { describe, expect, it } from "vitest";
 import {
   canManageUnconfirmedProvisionalTask,
-  canRenderLiveTask,
   provisionalTaskStateCopy
 } from "./WorkspaceShell.js";
+import { canRenderLiveTask } from "../workbench/live-task-authority.js";
 
 describe("WorkspaceShell live task selection", () => {
   it("does not render a stopped task as a live conversation when a stale projection still matches", () => {
     expect(canRenderLiveTask(task({
       lifecycle: "completed",
       runtime: { phase: "stopped", detail: "会话待打开", recoverable: true }
-    }), "session-a", "session-file-a")).toBe(false);
+    }), "session-a", "session-file-a", 2)).toBe(false);
   });
 
   it("does not render a lost task as a live conversation", () => {
     expect(canRenderLiveTask(task({
       lifecycle: "lost",
       runtime: { phase: "failed", detail: "上次运行已中断", recoverable: true }
-    }), "session-a", "session-file-a")).toBe(false);
+    }), "session-a", "session-file-a", 2)).toBe(false);
   });
 
   it("renders the selected task only when its live projection is current", () => {
     const ready = task({
+      sessionGeneration: 2,
       lifecycle: "idle",
       runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true }
     });
 
-    expect(canRenderLiveTask(ready, "session-a", "session-file-a")).toBe(true);
-    expect(canRenderLiveTask(ready, "session-b", "session-file-a")).toBe(false);
-    expect(canRenderLiveTask(ready, "session-a", "session-file-b")).toBe(false);
-    expect(canRenderLiveTask(undefined, "session-a", "session-file-a")).toBe(false);
+    expect(canRenderLiveTask(ready, "session-a", "session-file-a", 2)).toBe(true);
+    expect(canRenderLiveTask(ready, "session-b", "session-file-a", 2)).toBe(false);
+    expect(canRenderLiveTask(ready, "session-a", "session-file-b", 2)).toBe(false);
+    expect(canRenderLiveTask(ready, "session-a", "session-file-a", 3)).toBe(false);
+    expect(canRenderLiveTask(undefined, "session-a", "session-file-a", 2)).toBe(false);
   });
 });
 

@@ -30,6 +30,7 @@ import { NotificationCenter } from "../notifications/NotificationCenter.js";
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionFileIdentity,
+  selectSessionGeneration,
   selectSessionId,
   selectSessionName
 } from "../session/session-projection-selectors.js";
@@ -41,6 +42,7 @@ import {
   useWorkbenchStore,
   type RendererWorkbenchTask
 } from "../workbench/workbench-store.js";
+import { taskMatchesLiveSessionAuthority } from "../workbench/live-task-authority.js";
 import styles from "./TitleBar.module.css";
 import { toggleRendererContext } from "./context-panel-controller.js";
 
@@ -64,6 +66,7 @@ export function TitleBar({
   const sessionName = useSessionProjectionStore(selectSessionName);
   const sessionId = useSessionProjectionStore(selectSessionId);
   const sessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
+  const sessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const operation = useAppStore((state) => state.operation);
   const operationDetail = useAppStore((state) => state.operationDetail);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
@@ -87,7 +90,12 @@ export function TitleBar({
   const selectedCatalogSession = useSessionCatalogStore((state) => (
     selectConversationSessionSummary(state, selectedConversation)
   ));
-  const selectedTaskIsLive = Boolean(selectedTask && sessionId && selectedTask.sessionId === sessionId);
+  const selectedTaskIsLive = taskMatchesLiveSessionAuthority(
+    selectedTask,
+    sessionId,
+    sessionFileIdentity,
+    sessionGeneration
+  );
   const selectedConversationIsLive = selectedTaskIsLive || Boolean(
     selectedConversation?.kind === "session"
     && sessionFileIdentity

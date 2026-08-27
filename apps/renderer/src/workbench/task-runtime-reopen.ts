@@ -29,7 +29,14 @@ export function rendererTaskBelongsToAgentHost(
 ): boolean {
   const hasRecoveryHostIdentity = task.recoveryHostInstanceId !== undefined
     || task.recoveryHostEpoch !== undefined;
-  if (!hasRecoveryHostIdentity) return true;
+  if (!hasRecoveryHostIdentity) {
+    // A Task restored only from the encrypted Composer draft store has no
+    // Agent Host ownership. Its synthetic pending Session id must not be used
+    // for projection resync; reopen the physical JSONL Session instead. A
+    // live projected Task is distinguishable by its authoritative Session
+    // generation even though it does not retain recovery-only Host metadata.
+    return task.sessionGeneration !== undefined;
+  }
   return task.recoveryHostInstanceId === identity.hostInstanceId
     && task.recoveryHostEpoch === identity.hostEpoch;
 }

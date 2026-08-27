@@ -48,6 +48,7 @@ import type { PromptStashImageStore } from "./prompt-stash-image-store.js";
 import { registerPromptInputBridge } from "./prompt-input-bridge.js";
 import type { BoundedPrivateGitRunner } from "./worktree-git-runner.js";
 import type { RepositoryWorktreeActionService } from "./repository-worktree-action-service.js";
+import type { DesktopSafeStorageAccess } from "./desktop-safe-storage.js";
 
 export interface SystemBridgeOptions {
   connectAgentHost: (replaceCurrent?: boolean) => void;
@@ -60,6 +61,7 @@ export interface SystemBridgeOptions {
   packageNetworkSettings: PackageNetworkSettingsStore;
   promptAttachments: PromptAttachmentStagingService;
   promptStashImages: PromptStashImageStore;
+  secureStorage: { ensureAvailable(): DesktopSafeStorageAccess };
   previousRunExit: PreviousRunExitStatus;
   workbenchState: WorkbenchStateStore;
   composerDraftState: ComposerDraftStateStore;
@@ -168,6 +170,7 @@ export function registerSystemBridge(options: SystemBridgeOptions): SystemBridge
   );
   registerWorktreeCreationBridge(options.worktreeCreation);
   ipcMain.handle("pi67:composer-draft-state-load", () => options.composerDraftState.load());
+  ipcMain.handle("pi67:secure-storage-ensure", () => options.secureStorage.ensureAvailable());
   ipcMain.handle("pi67:composer-draft-state-update", (_event, value: unknown) => (
     options.composerDraftState.update(value)
   ));

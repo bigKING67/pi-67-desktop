@@ -35,6 +35,7 @@ let shuttingDown = false;
 let lastError: string | undefined;
 let consecutiveBackgroundFailures = 0;
 let limitWarningPublished = false;
+let secureStorageUnavailable = false;
 const updatedAtByConversation = new Map<string, number>();
 const contentFingerprintByConversation = new Map<string, string>();
 
@@ -51,6 +52,7 @@ async function initialize(): Promise<void> {
     restorePersistedDrafts(snapshot.state, {
       restoreSelection: restoreSelectionGuard.release()
     });
+    secureStorageUnavailable = snapshot.persistence === "unavailable";
     if (snapshot.recovery === "backup-restored") {
       publishNotification({
         level: "warning",
@@ -195,26 +197,38 @@ function schedulePersistence(): void {
 }
 
 type PersistenceFeedback = "background" | "checkpoint" | "caller-owned";
+export type TaskDraftPersistenceOutcome = "persisted" | "secure-storage-unavailable" | "failed";
 
 function persistTaskDraftState(
   requiredTaskId?: string,
-  feedback: PersistenceFeedback = "background"
-): Promise<boolean> {
+  feedback: PersistenceFeedback = "background",
+  removedPromptStashItemId?: string
+): Promise<TaskDraftPersistenceOutcome> {
   if (persistenceTimer !== undefined) {
     window.clearTimeout(persistenceTimer);
     persistenceTimer = undefined;
   }
   const state = serializeTaskDraftState();
-  if (requiredTaskId && !serializedStateIncludesTaskDraft(state, requiredTaskId)) {
-    return Promise.resolve(false);
+  if (requiredTaskId && !serializedStateIncludesTaskDraft(state, requiredTaskId, removedPromptStashItemId)) {
+    return Promise.resolve("failed");
   }
-  let succeeded = false;
+  if (feedback === "background" && secureStorageUnavailable) {
+    return Promise.resolve("secure-storage-unavailable");
+  }
+  let outcome: TaskDraftPersistenceOutcome = "failed";
   const operation = persistencePromise.then(async () => {
     try {
-      await window.pi67.system.updateComposerDraftState(state);
+      const snapshot = await window.pi67.system.updateComposerDraftState(state);
+      if (snapshot.persistence === "unavailable") {
+        secureStorageUnavailable = true;
+        outcome = "secure-storage-unavailable";
+        if (feedback === "background") publishSecureStorageUnavailableWarning();
+        return;
+      }
+      secureStorageUnavailable = false;
       lastError = undefined;
       consecutiveBackgroundFailures = 0;
-      succeeded = true;
+      outcome = "persisted";
     } catch (error) {
       if (feedback === "background") {
         reportBackgroundPersistenceError(error);
@@ -225,11 +239,13 @@ function persistTaskDraftState(
     }
   });
   persistencePromise = operation;
-  return operation.then(() => succeeded);
+  return operation.then(() => outcome);
 }
 
 export async function persistTaskDraftStateCheckpoint(): Promise<void> {
-  if (!await persistTaskDraftState(undefined, "checkpoint")) throw new Error("Composer draft checkpoint failed.");
+  if (await persistTaskDraftState(undefined, "checkpoint") !== "persisted") {
+    throw new Error("Composer draft checkpoint failed.");
+  }
 }
 
 export function beginTaskDraftShutdown(): void {
@@ -238,8 +254,15 @@ export function beginTaskDraftShutdown(): void {
   persistenceTimer = undefined;
 }
 
-export function persistTaskDraftStateAcknowledged(taskId?: string): Promise<boolean> {
+export function persistTaskDraftStateAcknowledged(taskId?: string): Promise<TaskDraftPersistenceOutcome> {
   return persistTaskDraftState(taskId, "caller-owned");
+}
+
+export function persistPromptStashRemovalAcknowledged(
+  taskId: string,
+  itemId: string
+): Promise<TaskDraftPersistenceOutcome> {
+  return persistTaskDraftState(taskId, "caller-owned", itemId);
 }
 
 export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersistedState {
@@ -345,7 +368,8 @@ export function serializeTaskDraftState(now = Date.now()): ComposerDraftPersiste
 
 function serializedStateIncludesTaskDraft(
   state: ComposerDraftPersistedState,
-  taskId: string
+  taskId: string,
+  removedPromptStashItemId?: string
 ): boolean {
   const workbench = rendererWorkbenchStore.getState();
   const task = workbench.tasks[taskId];
@@ -354,6 +378,14 @@ function serializedStateIncludesTaskDraft(
   const record = state.drafts.find((candidate) => (
     conversationKeyIdentity(candidate.conversation) === conversationKeyIdentity(task.conversation)
   ));
+  if (removedPromptStashItemId !== undefined) {
+    if (draft.promptStash.some((item) => item.id === removedPromptStashItemId)) return false;
+    if (!record) {
+      return draft.text.length === 0
+        && draft.reviewComments.length === 0
+        && draft.promptStash.length === 0;
+    }
+  }
   return Boolean(
     record
     && draftContentFingerprint(record) === taskDraftFingerprint(draft, task.environmentIntent)
@@ -434,6 +466,18 @@ function reportBackgroundPersistenceError(error: unknown): void {
     level: "warning",
     title: "对话草稿未保存",
     message: `${detail} 草稿仍保留在当前窗口中，Desktop 将继续自动重试。`,
+    toast: false
+  });
+}
+
+function publishSecureStorageUnavailableWarning(): void {
+  const detail = "系统安全存储不可用。";
+  if (lastError === detail) return;
+  lastError = detail;
+  publishNotification({
+    level: "warning",
+    title: "对话草稿仅保留在当前窗口",
+    message: "Desktop 已暂停后台重试，不会把 Prompt 草稿以明文写入磁盘。再次执行 Prompt 暂存时会重试安全存储。",
     toast: false
   });
 }

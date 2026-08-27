@@ -830,7 +830,11 @@ the only Runtime and behavior specification source.
   with `safeStorage`, stores ownership plus hash metadata, and exposes only opaque
   item/blob references across IPC. Stashing clears the Composer only after encrypted
   image storage and both draft persistence phases are acknowledged; any failure
-  preserves or rolls back to a non-lossy state. Restore is allowed only into an empty
+  preserves or rolls back to a non-lossy state. Windows and macOS share one Main-owned
+  secure-storage circuit: an OS credential failure suspends background retries, and
+  each explicit Prompt Stash action may perform one bounded access retry. An unavailable
+  result never clears the Composer, never falls back to plaintext, and never replaces
+  the last encrypted state with an unencrypted placeholder. Restore is allowed only into an empty
   Composer, creates new staging identities after decrypt/hash validation, is durably
   removed from the stash, closes the Popover, and returns focus to input.
 - Composer context pressure becomes warning state at 75% and critical state at 92%.

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProjectionRecoveryDisposition } from "../connection/projection-recovery-controller.js";
 import { useAppStore } from "../app/app-store.js";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { resynchronizeRendererProjection } from "../connection/projection-recovery-controller.js";
@@ -122,6 +121,22 @@ describe("task activation controller", () => {
     )).toBe(false);
   });
 
+  it("treats a live projected Session generation as current Host ownership", async () => {
+    rendererWorkbenchStore.getState().updateTask("task-a", {
+      lifecycle: "idle",
+      runtime: { phase: "ready", detail: "Pi SDK 已就绪", recoverable: true },
+      sessionGeneration: 4,
+      recoveryHostInstanceId: undefined,
+      recoveryHostEpoch: undefined
+    });
+    resynchronize.mockResolvedValue("committed");
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(resynchronize).toHaveBeenCalledOnce();
+    expect(openWorkspace).not.toHaveBeenCalled();
+  });
+
   it("uses the authoritative Catalog title in conversation transition feedback", async () => {
     rendererWorkbenchStore.getState().updateTask("task-a", {
       title: "未命名会话",
@@ -166,22 +181,55 @@ describe("task activation controller", () => {
     );
   });
 
-  it.each<ProjectionRecoveryDisposition>(["failed", "stale"])(
-    "returns false when Task activation recovery is %s",
-    async (disposition) => {
-      markTaskActive();
-      useConversationAttentionStore.getState().mark("workspace-a", "session-file-a");
-      resynchronize.mockResolvedValue(disposition);
+  it("settles the selected Task when activation recovery fails", async () => {
+    markTaskActive();
+    useConversationAttentionStore.getState().mark("workspace-a", "session-file-a");
+    resynchronize.mockImplementation(async () => {
+      useAppStore.setState({
+        sessionTransitionPending: false,
+        runtime: { phase: "failed", detail: "Current recovery failed", recoverable: true }
+      });
+      return "failed";
+    });
 
-      await expect(activateRendererTask("task-a")).resolves.toBe(false);
-      expect(openWorkspace).not.toHaveBeenCalled();
-      expect(conversationNeedsAttention(
-        useConversationAttentionStore.getState(),
-        "workspace-a",
-        "session-file-a"
-      )).toBe(true);
-    }
-  );
+    await expect(activateRendererTask("task-a")).resolves.toBe(false);
+    expect(openWorkspace).not.toHaveBeenCalled();
+    expect(conversationNeedsAttention(
+      useConversationAttentionStore.getState(),
+      "workspace-a",
+      "session-file-a"
+    )).toBe(true);
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      lifecycle: "lost",
+      runtime: { phase: "failed", detail: "Current recovery failed" }
+    });
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: false,
+      runtime: { phase: "failed", detail: "Current recovery failed" }
+    });
+  });
+
+  it("preserves a newer transition when activation recovery is stale", async () => {
+    markTaskActive();
+    resynchronize.mockImplementation(async () => {
+      useAppStore.setState({
+        sessionTransitionPending: true,
+        runtime: { phase: "recovering", detail: "Newer recovery", recoverable: true }
+      });
+      return "stale";
+    });
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(false);
+
+    expect(rendererWorkbenchStore.getState().tasks["task-a"]).toMatchObject({
+      lifecycle: "idle",
+      runtime: { phase: "ready" }
+    });
+    expect(useAppStore.getState()).toMatchObject({
+      sessionTransitionPending: true,
+      runtime: { phase: "recovering", detail: "Newer recovery" }
+    });
+  });
 
   it("reopens a cold formal Session once and transfers its draft to the replacement Task", async () => {
     markTaskActive();
@@ -225,6 +273,53 @@ describe("task activation controller", () => {
       "/sessions/a.jsonl",
       "session-file-a"
     );
+  });
+
+  it("reopens a draft-restored Session without resyncing a synthetic pending Task", async () => {
+    const current = rendererWorkbenchStore.getState().tasks["task-a"]!;
+    const {
+      sessionGeneration: _sessionGeneration,
+      recoveryHostInstanceId: _recoveryHostInstanceId,
+      recoveryHostEpoch: _recoveryHostEpoch,
+      ...draftRestoredTask
+    } = current;
+    rendererWorkbenchStore.setState((state) => ({
+      tasks: {
+        ...state.tasks,
+        "task-a": {
+          ...draftRestoredTask,
+          sessionId: "pending:draft-task-a",
+          hasDraft: true
+        }
+      }
+    }));
+    useTaskDraftStore.getState().setText("task-a", "重启后仍需保留的输入");
+    openWorkspace.mockResolvedValue(true);
+
+    await expect(activateRendererTask("task-a")).resolves.toBe(true);
+
+    expect(resynchronize).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalledWith(
+      "task.close",
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(openWorkspace).toHaveBeenCalledOnce();
+    expect(openWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "workspace-a" }),
+      "/sessions/a.jsonl",
+      "session-file-a"
+    );
+    const replacement = selectedWorkbenchTask(rendererWorkbenchStore.getState());
+    expect(replacement).toMatchObject({
+      id: expect.not.stringMatching(/^task-a$/u),
+      sessionId: expect.stringMatching(/^pending:/u),
+      lifecycle: "initializing",
+      hasDraft: true
+    });
+    expect(replacement && useTaskDraftStore.getState().drafts[replacement.id]?.text)
+      .toBe("重启后仍需保留的输入");
   });
 
   it("abandons a late activation before resync when a newer Task is selected", async () => {

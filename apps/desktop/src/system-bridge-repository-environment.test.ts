@@ -235,6 +235,7 @@ function registerFixture(
   const activeWorkingTree = workingTree ?? { inspect: vi.fn(), detail: vi.fn() };
   registerSystemBridge({
     connectAgentHost: vi.fn(),
+    secureStorage: { ensureAvailable: () => "available" },
     getMainWindow: () => undefined,
     activateMainWindow: async () => undefined,
     desktopToolchain: {},

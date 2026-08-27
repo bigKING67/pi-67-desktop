@@ -21,6 +21,7 @@ import {
 import { useSessionProjectionStore } from "../session/session-projection-store.js";
 import {
   selectSessionFileIdentity,
+  selectSessionGeneration,
   selectSessionId
 } from "../session/session-projection-selectors.js";
 import { Transcript } from "../transcript/Transcript.js";
@@ -31,6 +32,7 @@ import {
   resumeRendererTask
 } from "../workbench/task-activation-controller.js";
 import { repairAndOpenRendererWorkspace } from "../workbench/workspace-registration-controller.js";
+import { canRenderLiveTask } from "../workbench/live-task-authority.js";
 import { openRendererWorkspaceDescriptor } from "../workspace/workspace-open-controller.js";
 import { beginRendererSessionIntentInWorkspace } from "../workspace/workspace-session-controller.js";
 import { WorkspaceFileSurface } from "../workspace-files/WorkspaceFileSurface.js";
@@ -75,6 +77,7 @@ export function WorkspaceShell({
   });
   const liveSessionId = useSessionProjectionStore(selectSessionId);
   const liveSessionFileIdentity = useSessionProjectionStore(selectSessionFileIdentity);
+  const liveSessionGeneration = useSessionProjectionStore(selectSessionGeneration);
   const liveWorkspacePath = useAppStore((state) => state.workspace);
   const liveRuntime = useAppStore((state) => state.runtime);
   const sessionTransitionPending = useAppStore((state) => state.sessionTransitionPending);
@@ -83,7 +86,8 @@ export function WorkspaceShell({
   const liveTaskSelected = taskSelected && canRenderLiveTask(
     selectedTask,
     liveSessionId,
-    liveSessionFileIdentity
+    liveSessionFileIdentity,
+    liveSessionGeneration
   );
   const taskRecoveryPending = Boolean(
     taskSelected
@@ -209,23 +213,6 @@ export function WorkspaceShell({
         </>
       ) : null}
     </main>
-  );
-}
-
-export function canRenderLiveTask(
-  task: RendererWorkbenchTask | undefined,
-  liveSessionId: string | undefined,
-  liveSessionFileIdentity: string | undefined
-): boolean {
-  return Boolean(
-    task
-    && liveSessionId
-    && liveSessionFileIdentity
-    && task.sessionId === liveSessionId
-    && task.sessionFileIdentity === liveSessionFileIdentity
-    && task.runtime.phase !== "stopped"
-    && task.lifecycle !== "lost"
-    && task.lifecycle !== "stopped"
   );
 }
 

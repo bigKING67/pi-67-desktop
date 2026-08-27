@@ -50,11 +50,36 @@ describe("WorkspaceFileStateStore", () => {
       }]
     });
     expect(snapshot.draftPersistence).toBe("unavailable");
-    expect(await readFile(unavailable.requestedStatePath, "utf8")).not.toContain("runtime-only");
+    await expect(readFile(unavailable.requestedStatePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
 
+    const corrupt = new WorkspaceFileStateStore(root, { encryption: reversibleEncryption() });
+    await corrupt.update({ version: 1, workspaces: [] });
     await writeFile(unavailable.requestedStatePath, "{broken", "utf8");
     const restored = await new WorkspaceFileStateStore(root, { encryption: reversibleEncryption() }).load();
     expect(restored).toMatchObject({ state: { version: 1, workspaces: [] }, recovery: "corrupt-reset" });
+  });
+
+  it("preserves encrypted dirty drafts when a later write cannot access safe storage", async () => {
+    const root = await userData();
+    const original = new WorkspaceFileStateStore(root, { encryption: reversibleEncryption() });
+    const state = {
+      version: 1 as const,
+      workspaces: [{
+        workspaceId: "workspace-1",
+        tabs: [{ relativePath: "notes.md", baseRevision: "revision_1", draft: "encrypted original" }]
+      }]
+    };
+    await original.update(state);
+    const encrypted = await readFile(original.requestedStatePath, "utf8");
+
+    const unavailable = new WorkspaceFileStateStore(root, { encryption: unavailableEncryption() });
+    const next = structuredClone(state);
+    next.workspaces[0]!.tabs[0]!.draft = "runtime-only replacement";
+    await expect(unavailable.update(next)).resolves.toEqual({
+      state: next,
+      draftPersistence: "unavailable"
+    });
+    expect(await readFile(original.requestedStatePath, "utf8")).toBe(encrypted);
   });
 
   it("does not probe safe storage until a Workspace file has a dirty draft", async () => {

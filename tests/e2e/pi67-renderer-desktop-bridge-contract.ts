@@ -32,6 +32,7 @@ export interface MockDesktopBridgeOptions {
   initialSessionCreationRecovery?: SessionCreationRecoveryRecord[];
   initialComposerDraftState?: ComposerDraftPersistedState;
   composerDraftPersistence?: "available" | "unavailable";
+  secureStorageAccess?: "available" | "unavailable";
   composerDraftUpdateDelayMs?: number;
   composerDraftFailureCalls?: number[];
   composerDraftFailFirstPromptStashWrite?: boolean;

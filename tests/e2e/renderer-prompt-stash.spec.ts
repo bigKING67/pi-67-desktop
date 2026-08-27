@@ -89,6 +89,64 @@ test("keeps the Composer text when the first Prompt Stash persistence write fail
   ).__pi67ComposerDraftTest.state().drafts.flatMap((draft) => draft.promptStash ?? []))).toEqual([]);
 });
 
+test("deletes the final Prompt Stash item after persisting the empty state", async ({ page }) => {
+  await installMockDesktopBridge(page);
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("Delete this durable Prompt");
+  await page.getByRole("button", { name: "Prompt 暂存，0 条" }).click();
+  const stash = page.getByRole("dialog", { name: "Prompt 暂存" });
+  await stash.getByRole("button", { name: "暂存当前输入" }).click();
+  await expect(page.getByRole("button", { name: "Prompt 暂存，1 条" })).toBeVisible();
+
+  await stash.getByRole("button", { name: "删除暂存：Delete this durable Prompt" }).click();
+
+  await expect(page.getByRole("button", { name: "Prompt 暂存，0 条" })).toBeVisible();
+  await expect(stash.getByText("还没有暂存的 Prompt。", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (
+    window as unknown as {
+      __pi67ComposerDraftTest: { state(): { drafts: Array<{ promptStash?: unknown[] }> } };
+    }
+  ).__pi67ComposerDraftTest.state())).toEqual({ version: 1, drafts: [] });
+});
+
+test("offers a bounded secure-storage retry without changing the Composer when access is unavailable", async ({ page }) => {
+  await installMockDesktopBridge(page, { secureStorageAccess: "unavailable" });
+  await page.goto("/");
+  await attachMockAgent(page);
+  await page.getByRole("button", { name: "选择工作区" }).click();
+  await page.setViewportSize({ width: 720, height: 520 });
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+
+  const composer = page.getByLabel("给 Pi 发送消息");
+  await composer.fill("Keep this on Windows and macOS");
+  await page.getByRole("button", { name: "Prompt 暂存，0 条" }).click();
+  await page.getByRole("dialog", { name: "Prompt 暂存" })
+    .getByRole("button", { name: "暂存当前输入" })
+    .click();
+
+  await expect(composer).toHaveValue("Keep this on Windows and macOS");
+  await expect(page.getByRole("button", { name: "Prompt 暂存，0 条" })).toBeVisible();
+  await expect(page.getByText(
+    "系统安全存储当前不可用。请解锁系统凭据或完成系统身份验证后，再次执行当前操作；内容仍完整保留在当前输入或暂存中。",
+    { exact: true }
+  )).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/visual-review/prompt-stash-secure-storage-unavailable-dark-narrow.png",
+    animations: "disabled"
+  });
+  expect(await page.evaluate(() => (
+    window as unknown as {
+      __pi67ComposerDraftTest: {
+        state(): { drafts: Array<{ promptStash?: unknown[] }> };
+      };
+    }
+  ).__pi67ComposerDraftTest.state().drafts.flatMap((draft) => draft.promptStash ?? []))).toEqual([]);
+});
+
 test("retries a routine autosave failure without interrupting Composer input", async ({ page }) => {
   await installMockDesktopBridge(page);
   await page.goto("/");
