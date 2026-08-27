@@ -276,6 +276,17 @@ publish the same accepted Candidate through the internal R2 update channel.
   the verifier-only workflow budget is 25 minutes so the same Candidate can
   prove whether the operation eventually completes instead of being killed at a
   boundary already shorter than the real Windows observation.
+- 2026-08-27: A second exact-artifact debug run, `33083311307`, extended the
+  per-process boundary to 420 seconds and reproduced the same state at 390
+  seconds. The installer never exposed a window, never created the repaired
+  shortcut, never launched the application, and never released the installed
+  executable. This rules out a merely slow but completing update. The remaining
+  product-specific regression is the update-only SpiderBanner call from
+  `.onInit`; electron-builder's maintained template and NSIS examples execute
+  banner plugins from an install `Section`. The update banner now runs in a
+  hidden leading Section declared through `customHeader`, before the maintained
+  electron-builder install Section, while cleanup remains paired in
+  `customInstall`.
 
 ## Closeout
 
