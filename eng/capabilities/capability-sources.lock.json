@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.27.3",
+  "catalogVersion": "2026.08.27.4",
   "sources": [
     {
       "id": "pi67-core",
@@ -21,9 +21,9 @@
       "origin": "first-party",
       "repository": "https://github.com/bigKING67/browser67.git",
       "ref": "refs/heads/main",
-      "commit": "ff0396f304f90cd3222cd9940df2420f30d0d5ff",
+      "commit": "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc",
       "localSibling": "../browser67",
-      "version": "0.5.0"
+      "version": "0.6.0"
     },
     {
       "id": "design-craft",

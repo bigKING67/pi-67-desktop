@@ -287,6 +287,13 @@ publish the same accepted Candidate through the internal R2 update channel.
   hidden leading Section declared through `customHeader`, before the maintained
   electron-builder install Section, while cleanup remains paired in
   `customInstall`.
+- 2026-08-27: Candidate run `33085596260` stopped at provenance before any
+  Windows build because browser67 `main` advanced from locked commit
+  `ff0396f3` to `3c1d224b`. Exact source preparation then proved that commit is
+  browser67 `0.6.0`, not the previous `0.5.0`; its tip refreshes the GenericAgent
+  review artifacts. The Desktop lock and catalog now advance together to
+  browser67 `0.6.0` and catalog `2026.08.27.4`; the freshness and package-version
+  gates are preserved rather than bypassed.
 
 ## Closeout
 

@@ -60,7 +60,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "真实浏览器运行和自动化能力。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.5.0",
+    version: "0.6.0",
     installed: true
   }, {
     id: "js-reverse",
@@ -68,7 +68,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "浏览器 JavaScript 逆向和证据化分析。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.5.0",
+    version: "0.6.0",
     installed: true
   }, {
     id: "design-craft",
@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.27.3",
+    catalogVersion: "2026.08.27.4",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -106,8 +106,8 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       origin: "first-party",
       bundled: true,
       defaultEnabled: true,
-      version: "0.5.0",
-      commit: "ff0396f304f90cd3222cd9940df2420f30d0d5ff",
+      version: "0.6.0",
+      commit: "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc",
       resourceTypes: ["skill", "integration"],
       installed: true
     }, {
@@ -181,9 +181,9 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       displayName: "browser67",
       description: "真实浏览器操作、诊断和 JavaScript 逆向能力。",
       versionSource: "capability-package",
-      bundledVersion: "0.5.0",
+      bundledVersion: "0.6.0",
       upstream: "https://github.com/bigKING67/browser67",
-      sourceCommit: "ff0396f304f90cd3222cd9940df2420f30d0d5ff",
+      sourceCommit: "3c1d224bf2a4d7416aa15e3f3861dbd1c4dfb7dc",
       updatePolicy: "capability-package",
       updateManager: "desktop-capability",
       independentUpdateState: "not-applicable",
