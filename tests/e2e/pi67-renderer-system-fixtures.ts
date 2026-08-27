@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.27.2",
+    catalogVersion: "2026.08.27.3",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -107,7 +107,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       bundled: true,
       defaultEnabled: true,
       version: "0.5.0",
-      commit: "aa8ca485fc27a5282e7215c0bcd3f355585231b0",
+      commit: "ff0396f304f90cd3222cd9940df2420f30d0d5ff",
       resourceTypes: ["skill", "integration"],
       installed: true
     }, {
@@ -183,7 +183,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       versionSource: "capability-package",
       bundledVersion: "0.5.0",
       upstream: "https://github.com/bigKING67/browser67",
-      sourceCommit: "aa8ca485fc27a5282e7215c0bcd3f355585231b0",
+      sourceCommit: "ff0396f304f90cd3222cd9940df2420f30d0d5ff",
       updatePolicy: "capability-package",
       updateManager: "desktop-capability",
       independentUpdateState: "not-applicable",

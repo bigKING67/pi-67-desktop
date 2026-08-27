@@ -78,6 +78,7 @@ publish the same accepted Candidate through the internal R2 update channel.
 | OBSERVED | The Alpha.35 publish process remained alive for more than 52 minutes after upload while full public verification transferred about 802 MB without phase output. | live process/network observation | 2026-08-27 |
 | OBSERVED | The canonical checkout started this release at `ed6ded0 == origin/main`, with the complete observability/retention change uncommitted and all manifests still on Alpha.35. | live Git and version scan | 2026-08-27 |
 | OBSERVED | Candidate freshness initially found browser67 and AI Berkshire stale. browser67 then published formal `v0.5.0`; its annotated Tag resolves to the same `aa8ca485` commit as `main`, and the final increment adds the versioned MCP identities plus upstream/CI contract hardening. AI Berkshire advanced through `e83c2544`; every increment changed reports only, while the exact-source provenance adapter retained the same 21 members and produced reproducible Pack `1.0.6`. | GitHub Release/Tag/compare, isolated adapter, generated hashes | 2026-08-27 |
+| OBSERVED | Windows Candidate run `33064062825` bound to source `4c734201` stopped before build because browser67 `main` advanced by one same-version commit from `aa8ca485` to `ff0396f3`. The increment scopes cleanup by Browser Instance and fails closed on ambiguous multi-instance lifecycle operations; browser67 remains version `0.5.0`. | GitHub Actions provenance log, GitHub compare, browser67 package metadata | 2026-08-27 |
 
 ## Affected boundaries
 
@@ -210,10 +211,21 @@ publish the same accepted Candidate through the internal R2 update channel.
   seconds; its integration-test timeout was raised to 15 seconds without changing
   assertions, after which the full run passed. Targeted resource UI E2E passed
   all eight tests.
+- 2026-08-27: Pushed initial Alpha.36 source commit `4c734201`, then dispatched
+  Windows Candidate run `33064062825`. Its provenance job passed source identity,
+  unpublished-version, and source-fetchability checks but stopped before build
+  when browser67 advanced to `ff0396f3`. The one-commit increment is still
+  browser67 `0.5.0` and changes packaged lifecycle behavior, so the immutable
+  lock and catalog advance to `2026.08.27.3` rather than bypassing freshness.
+- 2026-08-27: The refreshed lock passed remote fetchability for all five source
+  commits, live freshness for all first-party sources and the AI Berkshire Pack,
+  Capability preparation and 10 focused tests, the eight-test Renderer resource
+  suite, repository lint, and Git whitespace validation.
 
 ## Closeout
 
-- Final source SHA: uncommitted working tree based on `ed6ded0807b7678566d500b5096f197801229c98`
+- Final source SHA: to be bound by the successful Candidate after the browser67
+  lock refresh; the first Alpha.36 source commit was `4c734201d436818eb50387c33c83cfa238484892`.
 - Changed files: update handoff copy/design/product contracts, NSIS include and
   lifecycle gate, R2 progress/client/publisher/retention tests, release operations
   guide, and this execution plan.
@@ -221,8 +233,9 @@ publish the same accepted Candidate through the internal R2 update channel.
   source gates, build, Capability source fetch/freshness, and resource UI E2E;
   prior isolated SpiderBanner compilation and macOS packaged smoke remain
   supporting evidence rather than exact Alpha.36 Candidate evidence.
-- Validation not completed: credentialed R2 publication with live progress and
-  exact-SHA Windows Candidate/runtime observation.
+- Validation not completed: successful exact-SHA Windows Candidate/runtime
+  observation, exact-SHA macOS Candidate, Feishu distribution, and credentialed
+  R2 publication with live progress.
 - Remaining risks: `SpiderBanner` visibility and the new PowerShell observation
   must pass on hosted and real Windows; live network rate/ETA and retention
   behavior must be observed on the next separately authorized R2 publication.
