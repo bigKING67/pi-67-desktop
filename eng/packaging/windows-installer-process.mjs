@@ -250,7 +250,9 @@ export function runExecutable(executablePath, argumentsList, options = {}) {
       encoding: "utf8",
       maxBuffer: 256 * 1024,
       timeout: WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS,
-      windowsHide: true
+      // Match the product updater: the update-only NSIS progress surface must
+      // be allowed to create a visible top-level window.
+      windowsHide: false
     }, (error, stdout, stderr) => {
       if (diagnosticTimer !== undefined) clearTimeout(diagnosticTimer);
       void (async () => {
