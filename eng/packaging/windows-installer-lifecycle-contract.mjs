@@ -1,4 +1,4 @@
-export const WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS = 240_000;
+export const WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS = 420_000;
 
 export function parseWindowsInstallerLifecycleArguments(arguments_) {
   if (arguments_.length === 0) return { quick: false };

@@ -265,6 +265,17 @@ publish the same accepted Candidate through the internal R2 update channel.
   state. The existing Candidate bytes will be reused by the lifecycle-only debug
   workflow so the next decision is based on Windows runtime evidence rather than
   another packaging guess.
+- 2026-08-27: Lifecycle-only debug run `33082032588` captured the installer at
+  210 seconds: the only matching process was the original installer with no
+  visible main window or child application; the new executable and uninstaller
+  existed, but the executable remained unreadable for SHA-256 and the Desktop
+  shortcut did not yet exist. The same runner needed 155.7 seconds for the
+  Alpha.35 baseline install. This is evidence of an installation still writing
+  before `customInstall`, not evidence of an automatically launched app holding
+  the installer open. The per-process observation window is now 420 seconds and
+  the verifier-only workflow budget is 25 minutes so the same Candidate can
+  prove whether the operation eventually completes instead of being killed at a
+  boundary already shorter than the real Windows observation.
 
 ## Closeout
 
