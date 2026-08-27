@@ -30,17 +30,23 @@ export async function verifyPackagedHeicAttachment({ artifact, userDataDirectory
     sourcePath
   ], { timeout: 30_000, maxBuffer: 64 * 1024 });
   await writeFile(invalidPath, "not-heic", "utf8");
+  const sourcePayload = await readFile(sourcePath);
+  const invalidPayload = await readFile(invalidPath);
 
   const composer = window.getByLabel("给 Pi 发送消息");
   await composer.fill("HEIC packaged 草稿保留检查");
   const startedAt = Date.now();
-  await window.getByLabel("选择附件").setInputFiles(sourcePath);
-  const normalized = window.locator('[data-attachment-kind="image"]').filter({ hasText: "pi67-batch-c-real.jpg" });
-  await normalized.waitFor({ state: "visible", timeout: 45_000 });
-  if (await normalized.getByRole("img").count()) {
+  await dropAttachment(window, "pi67-batch-c-real.heic", "image/heic", sourcePayload);
+  const normalized = await waitForRendererText(
+    window,
+    '[data-attachment-kind="image"]',
+    "pi67-batch-c-real.jpg",
+    45_000
+  );
+  if (normalized.hasImage) {
     throw new Error("Packaged normalized HEIC exposed the original HEIC object URL.");
   }
-  if (await composer.inputValue() !== "HEIC packaged 草稿保留检查") {
+  if (await composerText(window) !== "HEIC packaged 草稿保留检查") {
     throw new Error("Packaged HEIC normalization changed the Composer draft text.");
   }
 
@@ -52,20 +58,19 @@ export async function verifyPackagedHeicAttachment({ artifact, userDataDirectory
     || staged.manifest.sha256 !== createHash("sha256").update(staged.payload).digest("hex")) {
     throw new Error("Packaged normalized HEIC manifest did not bind the staged JPEG payload.");
   }
-  await window.getByRole("button", { name: "移除附件：pi67-batch-c-real.jpg" }).click();
+  await clickButtonByLabel(window, "移除附件：pi67-batch-c-real.jpg");
   await waitForManifestRemoval(staged.manifestPath);
 
-  await window.getByLabel("选择附件").setInputFiles(invalidPath);
-  await window.getByRole("alert").filter({ hasText: "无法从文件内容确认 HEIC/HEIF 图片" })
-    .waitFor({ state: "visible", timeout: 15_000 });
-  if (await composer.inputValue() !== "HEIC packaged 草稿保留检查") {
+  await dropAttachment(window, "fixture-decode-failure.heic", "image/heic", invalidPayload);
+  await waitForRendererText(window, '[role="alert"]', "无法从文件内容确认 HEIC/HEIF 图片", 15_000);
+  if (await composerText(window) !== "HEIC packaged 草稿保留检查") {
     throw new Error("Packaged HEIC decode failure changed the Composer draft text.");
   }
 
-  await window.getByLabel("选择附件").setInputFiles(sourcePath);
-  await normalized.waitFor({ state: "visible", timeout: 45_000 });
-  await window.getByRole("button", { name: "移除附件：pi67-batch-c-real.jpg" }).click();
-  await composer.fill("");
+  await dropAttachment(window, "pi67-batch-c-real.heic", "image/heic", sourcePayload);
+  await waitForRendererText(window, '[data-attachment-kind="image"]', "pi67-batch-c-real.jpg", 45_000);
+  await clickButtonByLabel(window, "移除附件：pi67-batch-c-real.jpg");
+  await setComposerText(window, "");
   return {
     status: "passed",
     sourceBytes,
@@ -74,6 +79,75 @@ export async function verifyPackagedHeicAttachment({ artifact, userDataDirectory
     height: jpeg.height,
     elapsedMs: Date.now() - startedAt
   };
+}
+
+async function dropAttachment(window, name, mimeType, bytes) {
+  // Playwright's Electron path-based file injection can stop answering CDP
+  // after the app handles the file. A real DragEvent avoids that driver seam.
+  await window.evaluate((payload) => {
+    const element = document.querySelector('[data-testid="composer-shell"]');
+    if (!(element instanceof HTMLElement)) throw new Error("Packaged Composer shell is unavailable.");
+    const decoded = Uint8Array.from(atob(payload.base64), (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([decoded], payload.name, { type: payload.mimeType }));
+    element.dispatchEvent(new DragEvent("drop", {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: transfer
+    }));
+  }, { base64: bytes.toString("base64"), mimeType, name });
+}
+
+async function waitForRendererText(window, selector, text, timeoutMs) {
+  return window.evaluate(({ selector: expectedSelector, text: expectedText, timeout }) => (
+    new Promise((resolve, reject) => {
+      const inspect = () => {
+        const element = [...document.querySelectorAll(expectedSelector)]
+          .find((candidate) => candidate.textContent?.includes(expectedText));
+        if (!element) return false;
+        resolve({ hasImage: element.querySelector("img") !== null, text: element.textContent ?? "" });
+        return true;
+      };
+      if (inspect()) return;
+      const observer = new MutationObserver(() => {
+        if (!inspect()) return;
+        observer.disconnect();
+        clearTimeout(timer);
+      });
+      const timer = setTimeout(() => {
+        observer.disconnect();
+        reject(new Error(`Timed out waiting for ${expectedSelector} containing ${expectedText}.`));
+      }, timeout);
+      observer.observe(document.body, { childList: true, subtree: true });
+    })
+  ), { selector, text, timeout: timeoutMs });
+}
+
+async function clickButtonByLabel(window, label) {
+  await window.evaluate((expectedLabel) => {
+    const button = [...document.querySelectorAll("button")]
+      .find((candidate) => candidate.getAttribute("aria-label") === expectedLabel);
+    if (!(button instanceof HTMLButtonElement)) throw new Error(`Button ${expectedLabel} is unavailable.`);
+    button.click();
+  }, label);
+}
+
+function composerText(window) {
+  return window.evaluate(() => {
+    const composer = document.querySelector('textarea[aria-label="给 Pi 发送消息"]');
+    if (!(composer instanceof HTMLTextAreaElement)) throw new Error("Packaged Composer input is unavailable.");
+    return composer.value;
+  });
+}
+
+async function setComposerText(window, text) {
+  await window.evaluate((nextText) => {
+    const composer = document.querySelector('textarea[aria-label="给 Pi 发送消息"]');
+    if (!(composer instanceof HTMLTextAreaElement)) throw new Error("Packaged Composer input is unavailable.");
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+    descriptor?.set?.call(composer, nextText);
+    composer.dispatchEvent(new Event("input", { bubbles: true }));
+  }, text);
 }
 
 async function waitForStagedJpeg(userDataDirectory, name) {

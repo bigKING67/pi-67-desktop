@@ -221,18 +221,40 @@ publish the same accepted Candidate through the internal R2 update channel.
   commits, live freshness for all first-party sources and the AI Berkshire Pack,
   Capability preparation and 10 focused tests, the eight-test Renderer resource
   suite, repository lint, and Git whitespace validation.
+- 2026-08-27: Windows Candidate run `33070984818` bound source `945b2e4a` and
+  passed provenance, packaging, packaged Electron smoke, UI/IME, identity, and
+  artifact construction. Certification stopped only in the full Alpha.35 to
+  Alpha.36 NSIS lifecycle: the updated silent installer remained alive for the
+  240-second operation limit even though the application bytes were installed.
+- 2026-08-27: Downloaded lifecycle diagnostics bound the failed installer to
+  size `273807193` and SHA-256 `102e2e57...e3f6b`; the Alpha.35 baseline install,
+  launch, and shutdown had already passed. Source/template inspection found the
+  decisive mismatch: Desktop's update-only `SpiderBanner::Show` had no paired
+  `SpiderBanner::Destroy`, while electron-builder owns banner cleanup only for
+  its non-silent path. The fix now destroys the Desktop-owned banner on success
+  and before both aborts; the lifecycle contract requires that pairing.
+- 2026-08-27: The first macOS Alpha.36 artifact completed packaging but the
+  packaged smoke appeared to hang after attachment staging. API logs plus an
+  out-of-band DOM receipt proved the attachment was rendered and its manifest
+  was complete while Playwright's Electron utility world stopped answering
+  after file injection. The packaged test now dispatches a real in-memory
+  `DragEvent` and observes the main Renderer world, preserving the real
+  Renderer, Preload, Main, HEIC worker, staging, decode-failure, and retry path.
+  The same artifact then passed the full packaged smoke; HEIC normalization
+  produced a 27,948-byte 1024x1024 JPEG from 15,703 source bytes in 630 ms.
 
 ## Closeout
 
-- Final source SHA: to be bound by the successful Candidate after the browser67
-  lock refresh; the first Alpha.36 source commit was `4c734201d436818eb50387c33c83cfa238484892`.
+- Final source SHA: to be bound by the successful Candidate after the silent
+  installer cleanup fix; the first Alpha.36 source commit was `4c734201d436818eb50387c33c83cfa238484892`.
 - Changed files: update handoff copy/design/product contracts, NSIS include and
   lifecycle gate, R2 progress/client/publisher/retention tests, release operations
   guide, and this execution plan.
 - Validation completed: current focused tests, final current-tree full coverage,
-  source gates, build, Capability source fetch/freshness, and resource UI E2E;
-  prior isolated SpiderBanner compilation and macOS packaged smoke remain
-  supporting evidence rather than exact Alpha.36 Candidate evidence.
+  source gates, build, Capability source fetch/freshness, resource UI E2E,
+  isolated SpiderBanner compilation, and a full packaged macOS smoke for the
+  pre-fix artifact. The NSIS-only final source still requires exact-SHA target
+  builds after commit.
 - Validation not completed: successful exact-SHA Windows Candidate/runtime
   observation, exact-SHA macOS Candidate, Feishu distribution, and credentialed
   R2 publication with live progress.

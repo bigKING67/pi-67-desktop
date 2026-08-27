@@ -9,8 +9,17 @@
   Var Pi67InstallPathGuardLabel
   Var Pi67InstallPathGuardPathLabel
   Var Pi67InstallPathGuardReason
+  Var Pi67UpdateProgressVisible
+
+  !macro Pi67HideUpdateProgress
+    ${If} $Pi67UpdateProgressVisible == "1"
+      SpiderBanner::Destroy
+      StrCpy $Pi67UpdateProgressVisible "0"
+    ${EndIf}
+  !macroend
 
   !macro customInit
+    StrCpy $Pi67UpdateProgressVisible "0"
     ${If} ${isUpdated}
     ${AndIf} ${Silent}
       # A per-machine outer process relaunches elevated; let only the process
@@ -18,6 +27,7 @@
       ${If} $hasPerMachineInstallation != "1"
       ${OrIf} ${UAC_IsAdmin}
         SpiderBanner::Show /MODERN
+        StrCpy $Pi67UpdateProgressVisible "1"
         FindWindow $0 "#32770" "" $HWNDPARENT
         FindWindow $0 "#32770" "" $HWNDPARENT $0
         GetDlgItem $0 $0 1000
@@ -29,16 +39,19 @@
   !macro customInstall
     ${If} ${isUpdated}
       ${IfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+        !insertmacro Pi67HideUpdateProgress
         Abort "Updated application executable is unavailable."
       ${EndIf}
       Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
       ClearErrors
       CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
       ${If} ${Errors}
+        !insertmacro Pi67HideUpdateProgress
         Abort "Updated Desktop shortcut could not be created."
       ${EndIf}
       WinShell::SetLnkAUMI "$DESKTOP\${SHORTCUT_NAME}.lnk" "${APP_ID}"
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
+      !insertmacro Pi67HideUpdateProgress
     ${EndIf}
   !macroend
 
