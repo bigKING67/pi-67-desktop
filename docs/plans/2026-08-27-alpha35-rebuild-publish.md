@@ -63,6 +63,7 @@ that same accepted Candidate through the internal R2 update channel.
 | OBSERVED | The exact upstream range changes no `codex-skills/`, `tools/`, or `LICENSE` input; the locked Pi-67 adapter retained 21 members and generated Pack `1.0.2` with new immutable manifest and bundle hashes. | exact Git diff and isolated adapter output | 2026-08-27 |
 | OBSERVED | The first post-lock `prepare:capabilities` failed because the Desktop lock lacked member hashes and therefore could not seed its own `1.0.1` Pack baseline on a clean machine. | local clean regeneration attempt and overlay implementation trace | 2026-08-27 |
 | OBSERVED | Windows run `33037846524/1` built and smoke-tested Alpha.35, then certification stopped before installation because `verify-windows-installer-lifecycle.mjs` referenced an unimported `writeFile`. | failed Windows step log and lifecycle diagnostic artifact | 2026-08-27 |
+| OBSERVED | Windows run `33038883822/1` stopped before packaging because AI Berkshire advanced once more from `fad8a0fa` to `956e7987`; the single new commit only changes `README.md` and adds one `reports/` document, with no Pack input change. | GitHub Actions freshness report and GitHub compare API | 2026-08-27 |
 
 ## Affected boundaries
 
@@ -186,6 +187,19 @@ that same accepted Candidate through the internal R2 update channel.
   598 other files before an unrelated temporary-directory cleanup race in the
   unsigned-preview symlink test; all three tests in that file passed immediately
   in isolation. No timeout, assertion, or product contract was weakened.
+- 2026-08-27: Windows run `33038883822/1` passed exact-main and remote-lock
+  provenance, then stopped before dependency installation because AI Berkshire
+  advanced by one commit from `fad8a0fa` to `956e7987`. Exact upstream compare
+  showed only a README addition and a new research report, with no changes to
+  `codex-skills/`, `tools/`, or `LICENSE`. The adapter still binds each generated
+  member and aggregate manifest to source provenance, so this produces Pack
+  `1.0.3` with newly verified member, manifest, and bundle identities.
+- 2026-08-27: Self-contained capability preparation reproduced Pack `1.0.3`;
+  all five source commits were remotely fetchable, live freshness passed, 43
+  focused capability/installer tests passed, and typecheck, lint, structure,
+  and `git diff --check` passed. The production Renderer resource flow was
+  advanced to the `1.0.3 -> 1.0.4` fixture and passed all eight Playwright tests
+  on isolated port 5174.
 
 ## Closeout
 
