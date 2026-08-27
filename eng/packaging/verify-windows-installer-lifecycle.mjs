@@ -404,6 +404,9 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
   } catch (error) {
     report.status = "failed";
     report.error = boundedErrorMessage(error, root);
+    if (error instanceof Error && error.windowsInstallerEvidence) {
+      report.windowsInstallerFailure = error.windowsInstallerEvidence;
+    }
     await writeReport(report);
     throw error;
   } finally {

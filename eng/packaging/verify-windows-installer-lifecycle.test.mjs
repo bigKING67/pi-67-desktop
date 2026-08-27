@@ -224,6 +224,11 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("repairScenario: \"missing-before-cross-version-upgrade\"");
     expect(updateSource).toContain("await assertPackagedRuntimeAssets(installedArtifact)");
     expect(updateSource).toContain("const updateResult = await installNsisUpdatePackage(");
+    expect(updateSource).toContain("evidenceDirectory: shortcutEvidenceDirectory");
+    expect(processSource).toContain('"windows-installer-timeout-snapshot.json"');
+    expect(processSource).toContain("PI67_WINDOWS_INSTALL_DIRECTORY");
+    expect(processSource).toContain("WINDOWS_TIMEOUT_DIAGNOSTIC_LEAD_MS = 30_000");
+    expect(source).toContain("report.windowsInstallerFailure = error.windowsInstallerEvidence");
     expect(updateSource).toContain("processId = updateResult.processId");
     expect(updateSource).toContain("automaticPostInstallLaunch: true");
     expect(updateSource).toContain("installationSurface: updateResult.updateSurface");

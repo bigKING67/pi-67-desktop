@@ -17,6 +17,7 @@ const FILE_STATE_TIMEOUT_MS = 30_000;
 const POWERSHELL_TIMEOUT_MS = 15_000;
 const WINDOWS_POST_UPDATE_LAUNCH_TIMEOUT_MS = 30_000;
 const WINDOWS_UPDATE_SURFACE_TIMEOUT_MS = 30_000;
+const WINDOWS_TIMEOUT_DIAGNOSTIC_LEAD_MS = 30_000;
 const execFileAsync = promisify(execFile);
 export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
 
@@ -42,13 +43,34 @@ export async function installNsisPackage(installerPath, installDirectory) {
   await waitForPathState(join(installDirectory, "Pi-67 Desktop.exe"), true);
 }
 
-export async function installNsisUpdatePackage(installerPath, installDirectory) {
+export async function installNsisUpdatePackage(installerPath, installDirectory, options = {}) {
   const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
   const [execution, updateSurface] = await Promise.allSettled([
-    runExecutable(installerPath, buildNsisUpdateArguments(installDirectory)),
+    runExecutable(installerPath, buildNsisUpdateArguments(installDirectory), {
+      captureBeforeTimeout: options.evidenceDirectory
+        ? ({ processId }) => captureWindowsInstallerTimeoutSnapshot({
+            desktopShortcutPath: options.desktopShortcutPath,
+            evidenceDirectory: options.evidenceDirectory,
+            installDirectory,
+            installerPath,
+            processId
+          })
+        : undefined
+    }),
     waitForWindowsInstallerSurface(installerPath)
   ]);
-  if (execution.status === "rejected") throw execution.reason;
+  if (execution.status === "rejected") {
+    const error = execution.reason instanceof Error
+      ? execution.reason
+      : new Error("NSIS update process failed with an unknown error.");
+    error.windowsInstallerEvidence = {
+      ...error.windowsInstallerEvidence,
+      updateSurface: updateSurface.status === "fulfilled"
+        ? { status: "observed", ...updateSurface.value }
+        : { status: "not-observed", error: boundedDiagnosticError(updateSurface.reason) }
+    };
+    throw error;
+  }
   if (updateSurface.status === "rejected") throw updateSurface.reason;
   await waitForPathState(executablePath, true);
   return {
@@ -220,15 +242,23 @@ export async function cleanupWindowsInstallation(installDirectory) {
   }
 }
 
-export function runExecutable(executablePath, argumentsList) {
+export function runExecutable(executablePath, argumentsList, options = {}) {
   return new Promise((resolvePromise, reject) => {
-    execFile(executablePath, argumentsList, {
+    let diagnosticTimer;
+    let diagnosticCapture;
+    const child = execFile(executablePath, argumentsList, {
       encoding: "utf8",
       maxBuffer: 256 * 1024,
       timeout: WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS,
       windowsHide: true
     }, (error, stdout, stderr) => {
-      if (error) {
+      if (diagnosticTimer !== undefined) clearTimeout(diagnosticTimer);
+      void (async () => {
+        const timeoutEvidence = diagnosticCapture ? await diagnosticCapture : undefined;
+        if (!error) {
+          resolvePromise();
+          return;
+        }
         const detail = [stdout, stderr].filter(Boolean).join("\n").slice(0, 4_096);
         const termination = [
           `timeoutMs=${WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS}`,
@@ -236,14 +266,94 @@ export function runExecutable(executablePath, argumentsList) {
           `code=${String(error.code ?? "none")}`,
           `signal=${String(error.signal ?? "none")}`
         ].join(", ");
-        reject(new Error(
+        const failure = new Error(
           `${basename(executablePath)} failed (${termination}): ${error.message}${detail ? `\n${detail}` : ""}`
-        ));
-        return;
-      }
-      resolvePromise();
+        );
+        failure.windowsInstallerEvidence = {
+          launchedProcessId: child.pid ?? null,
+          timeoutSnapshot: timeoutEvidence
+        };
+        reject(failure);
+      })();
     });
+    if (typeof options.captureBeforeTimeout === "function") {
+      diagnosticTimer = setTimeout(() => {
+        diagnosticCapture = Promise.resolve()
+          .then(() => options.captureBeforeTimeout({ processId: child.pid }))
+          .catch((error) => ({
+            error: boundedDiagnosticError(error),
+            status: "capture-failed"
+          }));
+      }, WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS - WINDOWS_TIMEOUT_DIAGNOSTIC_LEAD_MS);
+    }
   });
+}
+
+async function captureWindowsInstallerTimeoutSnapshot({
+  desktopShortcutPath,
+  evidenceDirectory,
+  installDirectory,
+  installerPath,
+  processId
+}) {
+  await mkdir(evidenceDirectory, { recursive: true });
+  const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
+  const command = [
+    "$installerPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALLER_PATH', 'Process')",
+    "$installDirectory = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALL_DIRECTORY', 'Process')",
+    "$executablePath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_EXECUTABLE_PATH', 'Process')",
+    "$shortcutPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_SHORTCUT_PATH', 'Process')",
+    "$rootProcessId = [int][Environment]::GetEnvironmentVariable('PI67_WINDOWS_PROCESS_ID', 'Process')",
+    "function Test-ExactPath([string]$candidate, [string]$target) { if ([string]::IsNullOrWhiteSpace($candidate)) { return $false }; try { return [IO.Path]::GetFullPath($candidate).Equals([IO.Path]::GetFullPath($target), [StringComparison]::OrdinalIgnoreCase) } catch { return $false } }",
+    "function Get-FileState([string]$path) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return [PSCustomObject]@{ exists = $false } }; $item = Get-Item -LiteralPath $path; $hash = $null; try { $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() } catch {}; return [PSCustomObject]@{ exists = $true; byteLength = [long]$item.Length; lastWriteUtc = $item.LastWriteTimeUtc.ToString('o'); sha256 = $hash } }",
+    "$allProcesses = @(Get-CimInstance -ClassName Win32_Process)",
+    "$treeIds = [System.Collections.Generic.HashSet[int]]::new()",
+    "if ($rootProcessId -gt 0) { [void]$treeIds.Add($rootProcessId) }",
+    "do { $added = $false; foreach ($entry in $allProcesses) { if ($treeIds.Contains([int]$entry.ParentProcessId) -and $treeIds.Add([int]$entry.ProcessId)) { $added = $true } } } while ($added)",
+    "$observedProcesses = @($allProcesses | Where-Object { $treeIds.Contains([int]$_.ProcessId) -or (Test-ExactPath $_.ExecutablePath $installerPath) -or (Test-ExactPath $_.ExecutablePath $executablePath) } | ForEach-Object { $native = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; $title = if ($null -ne $native) { [string]$native.MainWindowTitle } else { '' }; if ($title.Length -gt 200) { $title = $title.Substring(0, 200) }; $roles = @(); if ($treeIds.Contains([int]$_.ProcessId)) { $roles += 'installer-tree' }; if (Test-ExactPath $_.ExecutablePath $installerPath) { $roles += 'installer-image' }; if (Test-ExactPath $_.ExecutablePath $executablePath) { $roles += 'installed-application' }; [PSCustomObject]@{ processId = [int]$_.ProcessId; parentProcessId = [int]$_.ParentProcessId; executableFileName = [IO.Path]::GetFileName([string]$_.ExecutablePath); roles = $roles; mainWindowVisible = ($null -ne $native -and $native.MainWindowHandle -ne 0); mainWindowTitle = $title; creationDate = [string]$_.CreationDate } })",
+    "$uninstallers = @(); if (Test-Path -LiteralPath $installDirectory -PathType Container) { $uninstallers = @(Get-ChildItem -LiteralPath $installDirectory -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { [PSCustomObject]@{ fileName = $_.Name; byteLength = [long]$_.Length; lastWriteUtc = $_.LastWriteTimeUtc.ToString('o') } }) }",
+    "$installFileCount = if (Test-Path -LiteralPath $installDirectory -PathType Container) { @(Get-ChildItem -LiteralPath $installDirectory -File -ErrorAction SilentlyContinue).Count } else { 0 }",
+    "$snapshot = [PSCustomObject]@{ schemaVersion = 1; capturedAt = [DateTime]::UtcNow.ToString('o'); launchedProcessId = $rootProcessId; processes = $observedProcesses; files = [PSCustomObject]@{ installedExecutable = Get-FileState $executablePath; desktopShortcut = Get-FileState $shortcutPath; installDirectoryExists = (Test-Path -LiteralPath $installDirectory -PathType Container); installFileCount = $installFileCount; uninstallers = $uninstallers } }",
+    "[Console]::Out.Write(($snapshot | ConvertTo-Json -Compress -Depth 6))"
+  ].join("\n");
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    command
+  ], powershellOptions({
+    PI67_WINDOWS_EXECUTABLE_PATH: executablePath,
+    PI67_WINDOWS_INSTALL_DIRECTORY: installDirectory,
+    PI67_WINDOWS_INSTALLER_PATH: installerPath,
+    PI67_WINDOWS_PROCESS_ID: String(processId ?? 0),
+    PI67_WINDOWS_SHORTCUT_PATH: desktopShortcutPath
+  }));
+  const snapshot = JSON.parse(stdout.trim());
+  if (
+    snapshot?.schemaVersion !== 1
+    || !Array.isArray(snapshot.processes)
+    || typeof snapshot.files !== "object"
+    || snapshot.files === null
+  ) {
+    throw new Error("Windows installer timeout snapshot returned invalid evidence.");
+  }
+  const snapshotFileName = "windows-installer-timeout-snapshot.json";
+  await writeFile(
+    join(evidenceDirectory, snapshotFileName),
+    `${JSON.stringify(snapshot, null, 2)}\n`,
+    { encoding: "utf8", mode: 0o600 }
+  );
+  return {
+    installedExecutable: snapshot.files.installedExecutable,
+    observedProcessCount: snapshot.processes.length,
+    snapshotFileName,
+    status: "captured"
+  };
+}
+
+function boundedDiagnosticError(error) {
+  if (!(error instanceof Error)) return "unknown diagnostic error";
+  return `${error.name}: ${error.code ?? "no-code"}`.slice(0, 200);
 }
 
 export async function waitForPathState(path, shouldExist, timeoutMs = FILE_STATE_TIMEOUT_MS) {

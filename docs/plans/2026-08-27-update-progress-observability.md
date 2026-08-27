@@ -254,12 +254,24 @@ publish the same accepted Candidate through the internal R2 update channel.
   the cleanup call cannot address the original plugin instance. The update-only
   surface now uses `Show /NOUNLOAD /MODERN`, and the lifecycle test rejects the
   unloadable form.
+- 2026-08-27: Exact-source Windows Candidate run `33079428481` compiled the
+  retained SpiderBanner form and again passed provenance, package construction,
+  packaged Electron smoke, UI/IME, and artifact identity, but the Alpha.35 to
+  Alpha.36 installer still remained alive at the 240-second lifecycle boundary.
+  This disproves missing `Destroy` and missing `/NOUNLOAD` as complete root
+  causes. Before another product change, the verifier now preserves the already
+  observed installer window result and captures a timeout-imminent, target-only
+  process tree plus installed executable, uninstaller, and Desktop shortcut
+  state. The existing Candidate bytes will be reused by the lifecycle-only debug
+  workflow so the next decision is based on Windows runtime evidence rather than
+  another packaging guess.
 
 ## Closeout
 
-- Final source SHA: to be bound by the successful Candidate after the complete
-  SpiderBanner lifetime fix; the latest pushed source before that fix was
-  `5e1093908b860fdade8816376aee862f118e9850`.
+- Final source SHA: to be bound by the successful Candidate after the Windows
+  update hang is resolved; Candidate source
+  `b5b24f86d4a5e87e9a8e8b9413b41721d104bfe4` still fails only at installer
+  process termination.
 - Changed files: update handoff copy/design/product contracts, NSIS include and
   lifecycle gate, R2 progress/client/publisher/retention tests, release operations
   guide, and this execution plan.
@@ -268,9 +280,9 @@ publish the same accepted Candidate through the internal R2 update channel.
   isolated SpiderBanner compilation, and an exact-source full packaged macOS
   smoke/open. The latest `/NOUNLOAD` NSIS-only source still requires an exact-SHA
   Windows build and target lifecycle after commit.
-- Validation not completed: successful exact-SHA Windows Candidate/runtime
-  observation, exact-SHA macOS Candidate, Feishu distribution, and credentialed
-  R2 publication with live progress.
+- Validation not completed: lifecycle-only Windows timeout snapshot, successful
+  exact-SHA Windows Candidate/runtime observation, Feishu distribution, and
+  credentialed R2 publication with live progress.
 - Remaining risks: `SpiderBanner` visibility and the new PowerShell observation
   must pass on hosted and real Windows; live network rate/ETA and retention
   behavior must be observed on the next separately authorized R2 publication.
