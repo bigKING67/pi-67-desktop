@@ -189,6 +189,7 @@ function skillPackSource() {
     commit: CURRENT_COMMIT,
     version: "1.0.1",
     manifestSha256: "4".repeat(64),
-    bundleSha256: "5".repeat(64)
+    bundleSha256: "5".repeat(64),
+    skills: [{ name: "investment-research", sha256: "6".repeat(64) }]
   };
 }

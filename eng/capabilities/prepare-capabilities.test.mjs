@@ -17,7 +17,7 @@ describe("Desktop first-party capability source lock", () => {
   it("pins four first-party repositories, the AI Berkshire Pack source, and recommended externals", async () => {
     const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
     expect(lock.schema).toBe("pi67.capability-sources-lock.v1");
-    expect(lock.catalogVersion).toBe("2026.08.26.1");
+    expect(lock.catalogVersion).toBe("2026.08.27.1");
     expect(lock.sources.map((source) => source.id)).toEqual([
       "pi67-core",
       "browser67",
@@ -35,18 +35,44 @@ describe("Desktop first-party capability source lock", () => {
       ref: "refs/heads/main",
       commit: "bb43570f139feafc2632f8da19f34b4863e6bccb"
     });
-    expect(lock.skillPacks).toEqual([{
+    expect(lock.skillPacks).toHaveLength(1);
+    expect(lock.skillPacks[0]).toMatchObject({
       name: "ai-berkshire-investment-suite",
       adapter: "pi67-ai-berkshire-v1",
       adapterSourceId: "pi67-core",
       repository: "https://github.com/xbtlin/ai-berkshire",
       ref: "refs/heads/main",
-      commit: "2760dc48cfd3c4738229aa15c24571942af8f8ed",
+      commit: "fad8a0fae2f3ca8c99b572eb20bb74e4714ef266",
       localSibling: "../ai-berkshire",
-      version: "1.0.1",
-      manifestSha256: "40d3c3b80af4fcc7b23f3b603b12fde3ae5f8d93585210bc0cbe571398c5a9be",
-      bundleSha256: "5605783d4858a5eb370b7ae6b8fd12465c3d67a095098e8b426691dd0d493fa8"
-    }]);
+      version: "1.0.2",
+      manifestSha256: "7c757d9e05b8e07780994305b69eb508cfa0f5e51f179f2873c75a39a3d715f6",
+      bundleSha256: "c26e36005e64b5c893cbf6797e5a2b811976b1655c2d68bb8dbc5976d9b9cf31"
+    });
+    expect(lock.skillPacks[0].skills).toHaveLength(21);
+    expect(lock.skillPacks[0].skills.map((skill) => skill.name)).toEqual([
+      "bottleneck-hunter",
+      "deep-company-series",
+      "dyp-ask",
+      "earnings-review",
+      "earnings-team",
+      "financial-data",
+      "income-investment",
+      "industry-funnel",
+      "industry-research",
+      "investment-checklist",
+      "investment-memo-craft",
+      "investment-research",
+      "investment-team",
+      "management-deep-dive",
+      "news-pulse",
+      "portfolio-review",
+      "private-company-research",
+      "quality-screen",
+      "thesis-drift",
+      "thesis-tracker",
+      "wechat-article"
+    ]);
+    expect(lock.skillPacks[0].skills.every((skill) => /^[0-9a-f]{64}$/u.test(skill.sha256))).toBe(true);
     expect(() => assertPi67SkillPackSource(lock.skillPacks[0])).not.toThrow();
     expect(lock.managedNpmBundles).toMatchObject([{
       id: "pi-mcp-adapter",
@@ -91,6 +117,17 @@ describe("Desktop first-party capability source lock", () => {
       manifestSha256: "invalid",
       bundleSha256: "2".repeat(64)
     })).toThrow(/source is invalid/u);
+  });
+
+  it("rejects an incomplete or unordered Skill Pack member baseline", async () => {
+    const lock = JSON.parse(await readFile(resolve(root, "eng/capabilities/capability-sources.lock.json"), "utf8"));
+    const missing = structuredClone(lock.skillPacks[0]);
+    delete missing.skills;
+    expect(() => assertPi67SkillPackSource(missing)).toThrow(/source is invalid/u);
+
+    const unordered = structuredClone(lock.skillPacks[0]);
+    unordered.skills.reverse();
+    expect(() => assertPi67SkillPackSource(unordered)).toThrow(/source is invalid/u);
   });
 
   it("rejects malformed first-party tracked branch refs", async () => {

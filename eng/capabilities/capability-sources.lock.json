@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.26.1",
+  "catalogVersion": "2026.08.27.1",
   "sources": [
     {
       "id": "pi67-core",
@@ -51,11 +51,97 @@
       "adapterSourceId": "pi67-core",
       "repository": "https://github.com/xbtlin/ai-berkshire",
       "ref": "refs/heads/main",
-      "commit": "2760dc48cfd3c4738229aa15c24571942af8f8ed",
+      "commit": "fad8a0fae2f3ca8c99b572eb20bb74e4714ef266",
       "localSibling": "../ai-berkshire",
-      "version": "1.0.1",
-      "manifestSha256": "40d3c3b80af4fcc7b23f3b603b12fde3ae5f8d93585210bc0cbe571398c5a9be",
-      "bundleSha256": "5605783d4858a5eb370b7ae6b8fd12465c3d67a095098e8b426691dd0d493fa8"
+      "version": "1.0.2",
+      "manifestSha256": "7c757d9e05b8e07780994305b69eb508cfa0f5e51f179f2873c75a39a3d715f6",
+      "bundleSha256": "c26e36005e64b5c893cbf6797e5a2b811976b1655c2d68bb8dbc5976d9b9cf31",
+      "skills": [
+        {
+          "name": "bottleneck-hunter",
+          "sha256": "2c7dbd08b7cc800fcd041bccd62b4c1dc3b2c851fe07d0131d40ed0933acd101"
+        },
+        {
+          "name": "deep-company-series",
+          "sha256": "0dc712508c6e0d27e74a0a4e44e4199d64c8257656471c17dbd8f32597ee2c4a"
+        },
+        {
+          "name": "dyp-ask",
+          "sha256": "d85f88c9e5904a80b77ee2b8c159c9bde6f5642bff6168ce8cc425bd9e3b8f28"
+        },
+        {
+          "name": "earnings-review",
+          "sha256": "4ab600892ef0b9d94faeb9b0fb1ae7500485ea590f0e99c896110170ce4f1c40"
+        },
+        {
+          "name": "earnings-team",
+          "sha256": "e2106e86f9e8adc074111cd210ce86aa5531deb1fdb154ec4fd953a3bb7884ba"
+        },
+        {
+          "name": "financial-data",
+          "sha256": "6ecb0e09563623be964606d1f8c2c15dd4cd6754ef333cbcfc52798d0e0274bf"
+        },
+        {
+          "name": "income-investment",
+          "sha256": "8fd09a272799a6d29adc87f73ec72d7d96c1f53f3e59e57d511c75b7d2f05a1c"
+        },
+        {
+          "name": "industry-funnel",
+          "sha256": "d341a9c2452b9991dfe4083f157c4e87c37f5005ddf6ea2c83b76b9b8d63c73a"
+        },
+        {
+          "name": "industry-research",
+          "sha256": "b0cb2b554c293456f1d64f51c250c008196639de882714970f22c61a22114a87"
+        },
+        {
+          "name": "investment-checklist",
+          "sha256": "5f540ce6dba2cc902e152000deeeff5a13a08a2fd34a0d016da32291b15c8799"
+        },
+        {
+          "name": "investment-memo-craft",
+          "sha256": "54d36f709e0b35d4e8064fce00f175d1e52915399e57eb1f42b4a7599f6c0c82"
+        },
+        {
+          "name": "investment-research",
+          "sha256": "0c3d0dd146cc6fe0207c2dd66623cb3ad1f2db9dc3f84b5a6fc77f461cc69de6"
+        },
+        {
+          "name": "investment-team",
+          "sha256": "f46beade836423b7065b8f40a5f0c898ad1e1700acdeb5e3a7c6d64b68fe2d35"
+        },
+        {
+          "name": "management-deep-dive",
+          "sha256": "1fdaa07c0e10e29f12c646c8df7f1232b9b81b09fe3ffd22d84b14fc13234513"
+        },
+        {
+          "name": "news-pulse",
+          "sha256": "7c92d625506055f0e1a74ddd499e30a614292aa79e4a7128ed098113976ad7c9"
+        },
+        {
+          "name": "portfolio-review",
+          "sha256": "f2b3b0cceaaaacaf6bd31358b2dff147da8b17fd59c3067593677bc2dec78e64"
+        },
+        {
+          "name": "private-company-research",
+          "sha256": "f10be3e6fe99838405a79ff2738dcc463b1bdb1593716fbbcfc3cd5c5988a0ab"
+        },
+        {
+          "name": "quality-screen",
+          "sha256": "055c9b687b0bafff51f4a41d5c04d141f8877390e9e41a638fc043c7eb3fbb73"
+        },
+        {
+          "name": "thesis-drift",
+          "sha256": "850f52a79817a789eeac510fcf76cfa92d40cc680d97cafbbfdc19e10f6a92a8"
+        },
+        {
+          "name": "thesis-tracker",
+          "sha256": "2f172abf1ff479299732bb2e221f9b07763a12fc89d0f2a53d9d423a8fe096c7"
+        },
+        {
+          "name": "wechat-article",
+          "sha256": "63562568d53059e5030b42883fcad106c0bfcdf8e1a43cce81552e87c00ea6e0"
+        }
+      ]
     }
   ],
   "managedNpmBundles": [

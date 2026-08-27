@@ -59,6 +59,9 @@ that same accepted Candidate through the internal R2 update channel.
 | OBSERVED | Alpha.34 Candidate `32971119431/2` at `f50a4442` is the required previous-version Windows baseline. | live GitHub Actions and Candidate plan | 2026-08-27 |
 | OBSERVED | Alpha.34 standard Candidate artifact was uploaded by certification attempt 2, while its immutable build identity records attempt 1; the prior workflow exposed only one attempt input for both boundaries. | live artifact inventory and identity JSON | 2026-08-27 |
 | OBSERVED | The public R2 manifest still advertises Alpha.33; no Alpha.35 artifacts or manual-test receipt exist yet. | prior publication checkpoint and local artifact scan | 2026-08-27 |
+| OBSERVED | Windows run `33036847162/1` stopped before packaging because the branch-tracked AI Berkshire Pack lock was stale: locked `2760dc48`, live `main` `fad8a0fa`. | GitHub Actions provenance gate and local freshness audit | 2026-08-27 |
+| OBSERVED | The exact upstream range changes no `codex-skills/`, `tools/`, or `LICENSE` input; the locked Pi-67 adapter retained 21 members and generated Pack `1.0.2` with new immutable manifest and bundle hashes. | exact Git diff and isolated adapter output | 2026-08-27 |
+| OBSERVED | The first post-lock `prepare:capabilities` failed because the Desktop lock lacked member hashes and therefore could not seed its own `1.0.1` Pack baseline on a clean machine. | local clean regeneration attempt and overlay implementation trace | 2026-08-27 |
 
 ## Affected boundaries
 
@@ -81,6 +84,8 @@ that same accepted Candidate through the internal R2 update channel.
 | Stop before R2 publication until real Windows acceptance. | Hosted lifecycle evidence cannot replace the user's installed environment. | The user confirms the exact Alpha.35 Candidate and the receipt validates. |
 | Upload immutable R2 objects before the manifest. | Clients must never receive metadata for missing or mismatched bytes. | None. |
 | Pass the baseline Artifact attempt and build-identity attempt separately. | A rerun can certify unchanged build bytes in a later workflow attempt. | GitHub changes rerun artifact provenance so both attempts are guaranteed identical. |
+| Advance the branch-tracked AI Berkshire Pack lock before rebuilding. | Candidate freshness is fail-closed; a floating branch is never consumed implicitly by ordinary builds. | The tracked source policy changes or the reviewed ref returns to the prior commit. |
+| Make the Desktop Skill Pack lock self-contained at member level. | A Candidate must regenerate the same Pack version and bytes without relying on a prior local artifact cache or a stale Pi-67 Core baseline. | Pi-67 exposes an equivalent immutable Pack artifact contract that Desktop can verify directly. |
 
 ## Checkpoints
 
@@ -97,7 +102,7 @@ that same accepted Candidate through the internal R2 update channel.
 | Layer | Command or procedure | Required evidence | Result |
 | --- | --- | --- | --- |
 | Source | focused Vitest, `typecheck`, `lint`, repository quality gates, `git diff --check` | no source or contract failure | passed; structure-only extraction restored the 460-line gate without changing behavior |
-| Tests | full coverage suite plus release-contract tests | no weakened persistence, recovery, packaging, or publication gate | passed: 599 files, 3,120 passed, 3 skipped with one worker; default/50% concurrency exposed only independently passing timing/temp-file fixtures |
+| Tests | full coverage suite plus release-contract tests | no weakened persistence, recovery, packaging, or publication gate | passed: final one-worker run 599 files, 3,122 passed, 3 skipped; targeted capability tests 25 passed; Renderer resource E2E 8 passed on isolated port |
 | Runtime/host | Windows Candidate workflow and `preview:mac:unsigned` | exact-source packaged smoke and installer lifecycle evidence | pending |
 | Packaged artifact | Candidate identity, size, SHA-256, bundle verification | exact three Alpha.35 product files | pending |
 | Target OS/manual | real Windows x64 Candidate test; later in-app update checks | exact identity-bound operator result | pending |
@@ -146,6 +151,26 @@ that same accepted Candidate through the internal R2 update channel.
   build identity belongs to attempt 1. The Candidate and lifecycle-debug
   workflows now carry those attempts separately, with contract tests, instead
   of forcing one false value to serve both download and byte identity.
+- 2026-08-27: Windows Candidate run `33036847162/1` failed before packaging at
+  the first-party freshness gate because AI Berkshire `main` advanced from the
+  locked `2760dc48` to `fad8a0fa`. Exact diff review found no Pack input changes;
+  the locked Pi-67 adapter preserved all 21 members and generated Pack `1.0.2`
+  with manifest `7c757d9e...` and bundle `c26e3600...`. The earlier macOS
+  Alpha.35 artifacts at source `92bdb11` are superseded and will not be
+  distributed; both platforms must rebuild from the post-lock final SHA.
+- 2026-08-27: The first clean Pack regeneration then exposed that the Desktop
+  lock stored only aggregate hashes, so it could not reconstruct the prior
+  `1.0.1` member baseline and incorrectly restarted from Pi-67 Core `1.0.0`.
+  The lock now records all 21 ordered member hashes and seeds the adapter input
+  before every build, removing dependence on local generated-cache history.
+- 2026-08-27: Self-contained `prepare:capabilities`, remote source-lock
+  verification, live freshness, build, type/lint/architecture/reference/
+  structure/workflow gates, and the final one-worker coverage run passed. The
+  default concurrent coverage run had one five-second Git-fixture timeout; its
+  four tests passed in isolation. Renderer resource E2E initially reused an
+  unrelated service already on port 5173, then passed all eight tests against
+  the production Renderer on isolated port 5174 after the expected baseline
+  string was advanced to `1.0.2`.
 
 ## Closeout
 

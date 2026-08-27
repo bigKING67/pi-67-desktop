@@ -1,9 +1,10 @@
-import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { spawn } from "node:child_process";
 
 const ADAPTER_ID = "pi67-ai-berkshire-v1";
 const ADAPTER_PATH = "scripts/pi67-sync-ai-berkshire-skill-pack.mjs";
+const SYNC_HELPER = "scripts/pi67-sync-ai-berkshire-skill-pack.sh";
 const REPORT_LIMIT_BYTES = 128 * 1024;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/u;
 const GIT_OBJECT_PATTERN = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u;
@@ -20,6 +21,7 @@ export function assertPi67SkillPackSource(definition) {
     || !GIT_OBJECT_PATTERN.test(definition.commit ?? "")
     || !SHA256_PATTERN.test(definition.manifestSha256 ?? "")
     || !SHA256_PATTERN.test(definition.bundleSha256 ?? "")
+    || !isValidSkillBaseline(definition.skills)
     || definition.ref !== "refs/heads/main"
     || !isHttpsUrl(definition.repository)
   ) throw new Error("Bundled Pi-67 Skill Pack source is invalid.");
@@ -40,6 +42,7 @@ export async function preparePi67SkillPackOverlay({
     copyFile(join(pi67SourceRoot, "shared-skill-packs.json"), registryPath),
     copyFile(join(pi67SourceRoot, "shared-skill-packs.lock.json"), lockPath)
   ]);
+  await seedDesktopSkillPackBaseline({ definition, registryPath, lockPath });
   const report = JSON.parse(await capture(process.execPath, [
     join(pi67SourceRoot, ADAPTER_PATH),
     "--source", upstreamSourceRoot,
@@ -67,6 +70,45 @@ export async function preparePi67SkillPackOverlay({
   };
 }
 
+async function seedDesktopSkillPackBaseline({ definition, registryPath, lockPath }) {
+  const registry = JSON.parse(await readFile(registryPath, "utf8"));
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  if (
+    registry?.schema !== "pi67.shared-skill-packs.v1"
+    || !Array.isArray(registry.packs)
+    || lock?.schema !== "pi67.shared-skill-packs-lock.v1"
+    || !Array.isArray(lock.packs)
+  ) throw new Error("Pi-67 Skill Pack baseline is invalid.");
+  const skillNames = definition.skills.map((skill) => skill.name);
+  replacePack(registry.packs, {
+    name: definition.name,
+    version: definition.version,
+    upstream: definition.repository,
+    sync_helper: SYNC_HELPER,
+    skills: skillNames
+  });
+  replacePack(lock.packs, {
+    name: definition.name,
+    version: definition.version,
+    upstream: definition.repository,
+    source_commit: definition.commit,
+    manifest_sha256: definition.manifestSha256,
+    bundle_sha256: definition.bundleSha256,
+    skills: definition.skills
+  });
+  await Promise.all([
+    writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8"),
+    writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8")
+  ]);
+}
+
+function replacePack(packs, next) {
+  const index = packs.findIndex((pack) => pack?.name === next.name);
+  if (index >= 0) packs[index] = next;
+  else packs.push(next);
+  packs.sort((left, right) => String(left?.name).localeCompare(String(right?.name)));
+}
+
 function validateGeneratedPack({ definition, report, registry, lock, pack, locked }) {
   if (
     report?.schemaId !== "pi67-ai-berkshire-skill-pack-sync/v1"
@@ -85,6 +127,7 @@ function validateGeneratedPack({ definition, report, registry, lock, pack, locke
     || locked?.source_commit !== definition.commit
     || locked?.manifest_sha256 !== definition.manifestSha256
     || locked?.bundle_sha256 !== definition.bundleSha256
+    || JSON.stringify(locked?.skills) !== JSON.stringify(definition.skills)
     || !Array.isArray(pack.skills)
     || !Array.isArray(locked.skills)
   ) throw new Error(`Generated Pi-67 Skill Pack ${definition.name} did not match its Desktop lock.`);
@@ -104,6 +147,17 @@ function validateGeneratedPack({ definition, report, registry, lock, pack, locke
     || JSON.stringify(skillNames) !== JSON.stringify(lockedNames)
   ) throw new Error(`Generated Pi-67 Skill Pack ${definition.name} has invalid member provenance.`);
   return skillNames;
+}
+
+function isValidSkillBaseline(skills) {
+  if (!Array.isArray(skills) || skills.length === 0 || skills.length > 128) return false;
+  const names = skills.map((skill) => skill?.name);
+  return skills.every((skill) => (
+    SKILL_NAME_PATTERN.test(skill?.name ?? "")
+    && SHA256_PATTERN.test(skill?.sha256 ?? "")
+  ))
+    && new Set(names).size === names.length
+    && JSON.stringify(names) === JSON.stringify([...names].sort((left, right) => left.localeCompare(right)));
 }
 
 function capture(command, arguments_) {

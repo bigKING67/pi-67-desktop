@@ -3,20 +3,24 @@ import { readFileSync } from "node:fs";
 const capabilitySourcesLock = JSON.parse(
   readFileSync(new URL("../capabilities/capability-sources.lock.json", import.meta.url), "utf8")
 );
-const aiBerkshireSourceCommit = resolveSkillPackSourceCommit(
+const aiBerkshireSource = resolveSkillPackSource(
   capabilitySourcesLock,
   "ai-berkshire-investment-suite"
 );
 
-export function resolveSkillPackSourceCommit(lock, packName) {
+export function resolveSkillPackSource(lock, packName) {
   if (lock?.schema !== "pi67.capability-sources-lock.v1" || !Array.isArray(lock.skillPacks)) {
     throw new Error("Capability source lock does not contain a valid Skill Pack catalog.");
   }
   const matches = lock.skillPacks.filter((pack) => pack?.name === packName);
-  if (matches.length !== 1 || !/^[0-9a-f]{40}$/u.test(matches[0]?.commit ?? "")) {
+  if (
+    matches.length !== 1
+    || !/^[0-9a-f]{40}$/u.test(matches[0]?.commit ?? "")
+    || !/^\d+\.\d+\.\d+$/u.test(matches[0]?.version ?? "")
+  ) {
     throw new Error(`Capability source lock does not uniquely pin Skill Pack ${packName}.`);
   }
-  return matches[0].commit;
+  return { commit: matches[0].commit, version: matches[0].version };
 }
 
 export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureScreenshot) {
@@ -34,17 +38,17 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
   if (await bundledRows.getByText("design-craft", { exact: true }).count()) {
     throw new Error("Packaged bundled Skill summary flattened individual Skill entries.");
   }
-  await aiBerkshireRow.getByText(/^21 个技能 · .*1\.0\.1/u)
+  await aiBerkshireRow.getByText(new RegExp(`^21 个技能 · .*${escapeRegExp(aiBerkshireSource.version)}`, "u"))
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-bundled-skill-suites.png");
   await bundledSkillPanel.getByTestId("bundled-skill-suite-row")
     .filter({ hasText: "AI Berkshire 投资研究" }).click();
   const suiteDetail = bundledSkillPanel.getByTestId("bundled-skill-suite-detail");
-  await suiteDetail.getByText("1.0.1", { exact: true })
+  await suiteDetail.getByText(aiBerkshireSource.version, { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await suiteDetail.getByText("https://github.com/xbtlin/ai-berkshire", { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
-  await suiteDetail.getByText(aiBerkshireSourceCommit.slice(0, 9), { exact: true })
+  await suiteDetail.getByText(aiBerkshireSource.commit.slice(0, 9), { exact: true })
     .waitFor({ state: "visible", timeout: 15_000 });
   await captureScreenshot("07-ai-berkshire-skill-suite-detail.png");
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
@@ -58,4 +62,8 @@ export async function assertPackagedSkillSuites(skillSettingsWorkspace, captureS
     throw new Error("Packaged bundled Skill detail repeated suite readiness on individual Skills.");
   }
   await captureScreenshot("07-bundled-skill-suite-detail.png");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }

@@ -8,7 +8,8 @@ new or retired upstream Extension cannot silently enter the Desktop baseline.
 
 The same lock also records Desktop-release-managed Skill Pack inputs. AI Berkshire
 pins one exact upstream commit plus its expected Pi-67 Pack version, source-manifest
-hash, and bundle hash. `prepare:capabilities` regenerates that Pack with the adapter
+hash, bundle hash, and ordered member hashes. `prepare:capabilities` seeds the full
+Desktop baseline from that lock and regenerates the Pack with the adapter
 from the locked Pi-67 Core source and overlays only the verified Pack members onto
 the Core capability. It never advances the tracked branch implicitly and fails if
 the generated provenance differs from the lock.
@@ -91,7 +92,9 @@ packaging so a local sibling repository or cache cannot hide an unpublished SHA.
 2. Use the sync adapter from the locked Pi-67 Core source to generate the Pack from
    the prior registry/lock baseline.
 3. Review Skill membership and tool changes, then update the Pack `commit`, `version`,
-   `manifestSha256`, and `bundleSha256` in `capability-sources.lock.json`.
+   `manifestSha256`, `bundleSha256`, and ordered member `skills` hashes in
+   `capability-sources.lock.json`. The complete Desktop lock, not a local generated
+   cache, is the prior baseline for the next update.
 4. Increment `catalogVersion`; never change the Pi-67 Core version merely because a
    carried Skill Pack changed.
 5. Run `prepare:capabilities`, freshness, targeted tests, the full quality gate, and
