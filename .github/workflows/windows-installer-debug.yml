@@ -31,7 +31,12 @@ on:
         default: ""
         type: string
       baseline_run_attempt:
-        description: Exact previous-version Candidate run attempt
+        description: Build attempt recorded by the previous-version Candidate identity
+        required: false
+        default: ""
+        type: string
+      baseline_artifact_run_attempt:
+        description: Successful attempt that uploaded the previous-version Candidate artifact
         required: false
         default: ""
         type: string
@@ -72,7 +77,11 @@ on:
         required: false
         type: string
       baseline_run_attempt:
-        description: Exact previous-version Candidate run attempt
+        description: Build attempt recorded by the previous-version Candidate identity
+        required: false
+        type: string
+      baseline_artifact_run_attempt:
+        description: Successful attempt that uploaded the previous-version Candidate artifact
         required: false
         type: string
       baseline_source_sha:
@@ -165,7 +174,7 @@ jobs:
         if: inputs.source_kind == 'candidate'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: windows-candidate-${{ inputs.baseline_run_id }}-${{ inputs.baseline_run_attempt }}
+          name: windows-candidate-${{ inputs.baseline_run_id }}-${{ inputs.baseline_artifact_run_attempt }}
           path: artifacts/baseline
           github-token: ${{ github.token }}
           run-id: ${{ inputs.baseline_run_id }}

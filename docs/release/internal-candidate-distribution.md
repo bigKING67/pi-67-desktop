@@ -45,6 +45,8 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
    把进程环境指向另一个空目录，并分别验证 Agent Host ready、Workspace、Provider、Catalog、Session
    materialization、Prompt、退出和三次冷重启。该探针只使用合成测试凭据和 Profile，不读取 runner 操作者
    的真实 Pi profile。
+   前一版本 Candidate 若通过 rerun-failed-jobs 才完成认证，调度参数必须把标准 Candidate Artifact
+   所在的成功 attempt 与 identity 记录的原始 build attempt 分开传入；普通未重跑的 Candidate 两者相同。
 3. **Build macOS**：在 Apple Silicon Mac 上运行相关 quality gate 和
    `corepack pnpm run preview:mac:unsigned`。该命令必须重新打包、执行 packaged smoke 并打开当前仓库
    artifact；不能用一次 `open` 冒充新包已加载。分发的是生成的 DMG 和 ZIP。

@@ -57,6 +57,7 @@ that same accepted Candidate through the internal R2 update channel.
 | OBSERVED | `acf6007` changes application behavior and tests across Desktop, Renderer, Protocol, and product/design contracts. | exact commit diff | 2026-08-27 |
 | OBSERVED | All eight manifests still identified Alpha.34 before this plan. | live version scan | 2026-08-27 |
 | OBSERVED | Alpha.34 Candidate `32971119431/2` at `f50a4442` is the required previous-version Windows baseline. | live GitHub Actions and Candidate plan | 2026-08-27 |
+| OBSERVED | Alpha.34 standard Candidate artifact was uploaded by certification attempt 2, while its immutable build identity records attempt 1; the prior workflow exposed only one attempt input for both boundaries. | live artifact inventory and identity JSON | 2026-08-27 |
 | OBSERVED | The public R2 manifest still advertises Alpha.33; no Alpha.35 artifacts or manual-test receipt exist yet. | prior publication checkpoint and local artifact scan | 2026-08-27 |
 
 ## Affected boundaries
@@ -79,6 +80,7 @@ that same accepted Candidate through the internal R2 update channel.
 | Use the exact Alpha.34 Candidate as the Windows upgrade baseline. | The new in-app hop must exercise the currently accepted previous version. | The baseline artifact fails provenance or byte verification. |
 | Stop before R2 publication until real Windows acceptance. | Hosted lifecycle evidence cannot replace the user's installed environment. | The user confirms the exact Alpha.35 Candidate and the receipt validates. |
 | Upload immutable R2 objects before the manifest. | Clients must never receive metadata for missing or mismatched bytes. | None. |
+| Pass the baseline Artifact attempt and build-identity attempt separately. | A rerun can certify unchanged build bytes in a later workflow attempt. | GitHub changes rerun artifact provenance so both attempts are guaranteed identical. |
 
 ## Checkpoints
 
@@ -139,6 +141,11 @@ that same accepted Candidate through the internal R2 update channel.
   Git/process/temp-file fixture failures; every failed file passed in isolation.
   The complete one-worker coverage run then passed all 599 files with 3,120
   tests passed and 3 platform skips. No timeout or assertion was weakened.
+- 2026-08-27: Pre-dispatch provenance inspection found that Alpha.34's standard
+  Candidate artifact belongs to certification attempt 2 while its immutable
+  build identity belongs to attempt 1. The Candidate and lifecycle-debug
+  workflows now carry those attempts separately, with contract tests, instead
+  of forcing one false value to serve both download and byte identity.
 
 ## Closeout
 
