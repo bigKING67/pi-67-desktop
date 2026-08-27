@@ -406,7 +406,7 @@ describe("Windows installer lifecycle contract", () => {
 
     expect(installer).toMatch(/!macro customInit\s+StrCpy \$Pi67VisibleUpdateInstaller "0"\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SetSilent normal[\s\S]*?SetAutoClose true[\s\S]*?!macroend/u);
     expect(installer).toMatch(/!macro customInstallMode[\s\S]*?\$hasPerMachineInstallation == "1"[\s\S]*?StrCpy \$isForceMachineInstall "1"[\s\S]*?StrCpy \$isForceCurrentInstall "1"[\s\S]*?!macroend/u);
-    expect(installer).toMatch(/!macro customInstall[\s\S]*?Shell32::SHChangeNotify[\s\S]*?\$Pi67VisibleUpdateInstaller == "1"[\s\S]*?StdUtils\.ExecShellAsUser[\s\S]*?"--updated"/u);
+    expect(installer).toMatch(/!macro customInstall[\s\S]*?Shell32::SHChangeNotify[\s\S]*?\$Pi67VisibleUpdateInstaller == "1"[\s\S]*?StdUtils\.ExecShellAsUser[\s\S]*?"--updated"[\s\S]*?!insertmacro quitSuccess/u);
     expect(installer).not.toContain("SpiderBanner::");
     expect(installer).not.toContain("-pi67-update-progress");
   });

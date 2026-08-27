@@ -49,6 +49,7 @@
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
       ${If} $Pi67VisibleUpdateInstaller == "1"
         ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "--updated"
+        !insertmacro quitSuccess
       ${EndIf}
     ${EndIf}
   !macroend

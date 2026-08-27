@@ -319,6 +319,18 @@ publish the same accepted Candidate through the internal R2 update channel.
   InstFiles progress page from silent to visible, forces the already detected
   install mode, skips the existing update choice pages, auto-closes, repairs the
   shortcut, and explicitly restarts the updated app.
+- 2026-08-28: Candidate run `33094717784` bound source `5f5bbbfc` and passed
+  provenance, Windows packaging, packaged smoke, UI/IME, and identity. The
+  lifecycle observed the native Setup window after 9.2 seconds; roughly 152
+  seconds after the update process started, the Alpha.36 application was running
+  and the repaired Desktop shortcut existed. The installer nevertheless remained
+  on its assisted Finish page until the 420-second process timeout. This proves
+  replacement, restart, shortcut repair, and visible progress all completed, and
+  narrows the remaining failure to termination only: `SetAutoClose true` does
+  not skip an assisted Finish page. The update-only `customInstall` now invokes
+  electron-builder's existing `quitSuccess` immediately after starting the new
+  app, after all application files, registry entries, Start Menu/Desktop links,
+  and Pi-67 shortcut repair have completed.
 
 ## Closeout
 
