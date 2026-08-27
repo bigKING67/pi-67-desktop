@@ -79,6 +79,7 @@ publish the same accepted Candidate through the internal R2 update channel.
 | OBSERVED | The canonical checkout started this release at `ed6ded0 == origin/main`, with the complete observability/retention change uncommitted and all manifests still on Alpha.35. | live Git and version scan | 2026-08-27 |
 | OBSERVED | Candidate freshness initially found browser67 and AI Berkshire stale. browser67 then published formal `v0.5.0`; its annotated Tag resolves to the same `aa8ca485` commit as `main`, and the final increment adds the versioned MCP identities plus upstream/CI contract hardening. AI Berkshire advanced through `e83c2544`; every increment changed reports only, while the exact-source provenance adapter retained the same 21 members and produced reproducible Pack `1.0.6`. | GitHub Release/Tag/compare, isolated adapter, generated hashes | 2026-08-27 |
 | OBSERVED | Windows Candidate run `33064062825` bound to source `4c734201` stopped before build because browser67 `main` advanced by one same-version commit from `aa8ca485` to `ff0396f3`. The increment scopes cleanup by Browser Instance and fails closed on ambiguous multi-instance lifecycle operations; browser67 remains version `0.5.0`. | GitHub Actions provenance log, GitHub compare, browser67 package metadata | 2026-08-27 |
+| OBSERVED | Windows Candidate run `33076732169` bound source `5e109390` and again timed out only during the Alpha.35 to Alpha.36 update process. The exact Candidate was installed but its installer process did not exit within 240 seconds. `SpiderBanner`'s function contract requires `Show /NOUNLOAD` when the same plugin instance later receives `Destroy`; the first cleanup fix added `Destroy` but did not retain that instance. | lifecycle summary, exact installer source, SpiderBanner plugin documentation/example | 2026-08-27 |
 
 ## Affected boundaries
 
@@ -116,7 +117,7 @@ publish the same accepted Candidate through the internal R2 update channel.
 - [x] 4. Pass focused and repository source gates; record target-platform gaps.
 - [x] 5. Add read-only retention planning and post-manifest automatic cleanup for
   the fourth and older recognized versions, with fail-closed inventory checks.
-- [ ] 6. Freeze Alpha.36 in all manifests, scoped commit, push, and prove exact
+- [x] 6. Freeze Alpha.36 in all manifests, scoped commit, push, and prove exact
   `main == origin/main` source identity.
 - [ ] 7. Build exact-SHA Windows/macOS Candidates, verify their identities, and
   upload the three versioned product files to Feishu.
@@ -131,8 +132,8 @@ publish the same accepted Candidate through the internal R2 update channel.
 | --- | --- | --- | --- |
 | Source | focused Vitest for release, updater, packaging, and Capability modules; targeted Renderer E2E | deterministic progress events, ordering, Capability projection, no contract regression | passed: 63 focused tests across six files and eight Renderer E2E tests |
 | Tests | full Vitest coverage, `typecheck`, `lint`, build, architecture, references, production transport, structure, `git diff --check` | no source gate failure | passed on final current tree: 601 files; 3,132 passed, 3 platform skips; all source gates and build passed |
-| Runtime/host | deterministic reporter exercise; exact Alpha.36 macOS unsigned preview | bounded stderr liveness, platform-specific copy, packaged launch | reporter passed; exact post-commit macOS package is pending |
-| Packaged artifact | exact-SHA Windows Candidate; macOS package/smoke/open | updater surface compiles; packaged application remains healthy | earlier isolated SpiderBanner compile and macOS smoke passed; exact Alpha.36 Candidates are pending source freeze |
+| Runtime/host | deterministic reporter exercise; exact Alpha.36 macOS unsigned preview | bounded stderr liveness, platform-specific copy, packaged launch | reporter and exact `5e109390` macOS package/smoke/open passed |
+| Packaged artifact | exact-SHA Windows Candidate; macOS package/smoke/open | updater surface compiles; packaged application remains healthy | exact macOS Candidate passed; Windows build/package/UI passed but Candidate certification remains blocked by update installer exit |
 | Target OS/manual | real Windows x64 in-app update | visible post-exit progress, measured duration, relaunch, shortcut | authorized and pending exact Candidate distribution |
 
 ## Rollback
@@ -242,19 +243,31 @@ publish the same accepted Candidate through the internal R2 update channel.
   Renderer, Preload, Main, HEIC worker, staging, decode-failure, and retry path.
   The same artifact then passed the full packaged smoke; HEIC normalization
   produced a 27,948-byte 1024x1024 JPEG from 15,703 source bytes in 630 ms.
+- 2026-08-27: Exact source `5e109390` packaged, smoked, and opened the Alpha.36
+  macOS arm64 DMG/ZIP. Windows Candidate run `33076732169` passed provenance,
+  build, packaged smoke, UI/IME, and byte identity, but the cross-version update
+  installer again remained alive for the 240-second limit. Its exact installer
+  is 273,807,320 bytes with SHA-256 `4f36920e...ab5686`.
+- 2026-08-27: The second failure disproved the assumption that adding a late
+  `Destroy` call alone was sufficient. SpiderBanner's documented contract and
+  example retain `Show` with `/NOUNLOAD` before a later `Destroy`; without it,
+  the cleanup call cannot address the original plugin instance. The update-only
+  surface now uses `Show /NOUNLOAD /MODERN`, and the lifecycle test rejects the
+  unloadable form.
 
 ## Closeout
 
-- Final source SHA: to be bound by the successful Candidate after the silent
-  installer cleanup fix; the first Alpha.36 source commit was `4c734201d436818eb50387c33c83cfa238484892`.
+- Final source SHA: to be bound by the successful Candidate after the complete
+  SpiderBanner lifetime fix; the latest pushed source before that fix was
+  `5e1093908b860fdade8816376aee862f118e9850`.
 - Changed files: update handoff copy/design/product contracts, NSIS include and
   lifecycle gate, R2 progress/client/publisher/retention tests, release operations
   guide, and this execution plan.
 - Validation completed: current focused tests, final current-tree full coverage,
   source gates, build, Capability source fetch/freshness, resource UI E2E,
-  isolated SpiderBanner compilation, and a full packaged macOS smoke for the
-  pre-fix artifact. The NSIS-only final source still requires exact-SHA target
-  builds after commit.
+  isolated SpiderBanner compilation, and an exact-source full packaged macOS
+  smoke/open. The latest `/NOUNLOAD` NSIS-only source still requires an exact-SHA
+  Windows build and target lifecycle after commit.
 - Validation not completed: successful exact-SHA Windows Candidate/runtime
   observation, exact-SHA macOS Candidate, Feishu distribution, and credentialed
   R2 publication with live progress.

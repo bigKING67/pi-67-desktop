@@ -26,7 +26,8 @@
       # that performs extraction own the visible update surface.
       ${If} $hasPerMachineInstallation != "1"
       ${OrIf} ${UAC_IsAdmin}
-        SpiderBanner::Show /MODERN
+        # Destroy must address the same plugin instance after extraction.
+        SpiderBanner::Show /NOUNLOAD /MODERN
         StrCpy $Pi67UpdateProgressVisible "1"
         FindWindow $0 "#32770" "" $HWNDPARENT
         FindWindow $0 "#32770" "" $HWNDPARENT $0
