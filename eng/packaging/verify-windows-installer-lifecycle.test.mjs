@@ -37,6 +37,7 @@ import {
   WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS
 } from "./verify-windows-installer-lifecycle.mjs";
+import { prepareWindowsInstallerWorkspaceFixture } from "./windows-installer-workspace-fixture.mjs";
 import {
   findWindowsMainProcess
 } from "./windows-installer-process.mjs";
@@ -137,6 +138,20 @@ describe("Windows installer lifecycle contract", () => {
       repairScenario: "missing-before-cross-version-upgrade"
     });
     await expect(readFile(shortcutPath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("writes the temporary Git workspace used by Windows certification", async () => {
+    const root = await createTemporaryDirectory();
+    const workspace = join(root, "中文工作区 包含空格");
+
+    await prepareWindowsInstallerWorkspaceFixture(workspace);
+
+    await expect(readFile(join(workspace, "README.md"), "utf8"))
+      .resolves.toBe("Windows installed lifecycle fixture.\n");
+    await expect(readFile(join(workspace, ".git", "HEAD"), "utf8"))
+      .resolves.toBe("ref: refs/heads/main\n");
+    await expect(readFile(join(workspace, ".git", "config"), "utf8"))
+      .resolves.toContain("bare = false");
   });
 
   it("allows bounded time for deferred NSIS self-cleanup", async () => {

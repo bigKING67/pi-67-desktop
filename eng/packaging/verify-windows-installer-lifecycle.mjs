@@ -42,6 +42,7 @@ import {
   waitForPathState
 } from "./windows-installer-process.mjs";
 import { verifyWindowsInstallerUpdateLifecycle } from "./windows-installer-update-lifecycle.mjs";
+import { prepareWindowsInstallerWorkspaceFixture } from "./windows-installer-workspace-fixture.mjs";
 import { verifyInstalledRealUserLifecycle } from "./windows-real-user-lifecycle.mjs";
 import {
   assertWindowsExistingProfileInteractionPreserved,
@@ -197,12 +198,7 @@ export async function verifyWindowsInstallerLifecycle(options = {}) {
       mkdir(userDataDirectory, { recursive: true }),
       mkdir(lifecycleUserDataDirectory, { recursive: true }),
       mkdir(cleanLifecycleUserDataDirectory, { recursive: true }),
-      mkdir(join(workspace, ".git"), { recursive: true })
-    ]);
-    await Promise.all([
-      writeFile(join(workspace, "README.md"), "Windows installed lifecycle fixture.\n", "utf8"),
-      writeFile(join(workspace, ".git", "HEAD"), "ref: refs/heads/main\n", "utf8"),
-      writeFile(join(workspace, ".git", "config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n", "utf8")
+      prepareWindowsInstallerWorkspaceFixture(workspace)
     ]);
     const extensionPath = join(extensionsDirectory, "installer-lifecycle-fixture.ts");
     const lifecycleExtensionPath = join(lifecycleExtensionsDirectory, "installer-lifecycle-fixture.ts");

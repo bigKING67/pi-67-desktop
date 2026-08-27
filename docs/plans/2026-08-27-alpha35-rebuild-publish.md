@@ -62,6 +62,7 @@ that same accepted Candidate through the internal R2 update channel.
 | OBSERVED | Windows run `33036847162/1` stopped before packaging because the branch-tracked AI Berkshire Pack lock was stale: locked `2760dc48`, live `main` `fad8a0fa`. | GitHub Actions provenance gate and local freshness audit | 2026-08-27 |
 | OBSERVED | The exact upstream range changes no `codex-skills/`, `tools/`, or `LICENSE` input; the locked Pi-67 adapter retained 21 members and generated Pack `1.0.2` with new immutable manifest and bundle hashes. | exact Git diff and isolated adapter output | 2026-08-27 |
 | OBSERVED | The first post-lock `prepare:capabilities` failed because the Desktop lock lacked member hashes and therefore could not seed its own `1.0.1` Pack baseline on a clean machine. | local clean regeneration attempt and overlay implementation trace | 2026-08-27 |
+| OBSERVED | Windows run `33037846524/1` built and smoke-tested Alpha.35, then certification stopped before installation because `verify-windows-installer-lifecycle.mjs` referenced an unimported `writeFile`. | failed Windows step log and lifecycle diagnostic artifact | 2026-08-27 |
 
 ## Affected boundaries
 
@@ -171,6 +172,20 @@ that same accepted Candidate through the internal R2 update channel.
   unrelated service already on port 5173, then passed all eight tests against
   the production Renderer on isolated port 5174 after the expected baseline
   string was advanced to `1.0.2`.
+- 2026-08-27: Windows run `33037846524/1` passed provenance, packaging,
+  packaged Electron smoke, UI, and Candidate identity, but did not exercise an
+  install: the lifecycle verifier failed while creating its temporary Git
+  workspace because `writeFile` was not imported after the Alpha.35 module
+  extraction. The verifier now owns a directly tested workspace-fixture writer;
+  this source change invalidates the first Windows build and final-SHA macOS
+  artifacts, so both platforms must rebuild again.
+- 2026-08-27: The workspace-fixture regression test, typecheck, lint, structure,
+  and `git diff --check` passed. A fresh default coverage run passed 598 of 599
+  files before two known five-second Git-fixture timeouts; those four tests
+  passed in isolation. A one-worker coverage run passed the target verifier and
+  598 other files before an unrelated temporary-directory cleanup race in the
+  unsigned-preview symlink test; all three tests in that file passed immediately
+  in isolation. No timeout, assertion, or product contract was weakened.
 
 ## Closeout
 
