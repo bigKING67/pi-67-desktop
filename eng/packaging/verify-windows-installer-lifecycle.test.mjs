@@ -401,16 +401,14 @@ describe("Windows installer lifecycle contract", () => {
     expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
   });
 
-  it("shows liveness for unattended updates without exposing the assisted wizard", async () => {
+  it("shows the native install-progress page without exposing update choices", async () => {
     const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
 
-    expect(installer).toMatch(/!macro customHeader\s+Section "-pi67-update-progress"\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SpiderBanner::Show \/MODERN[\s\S]*?SectionEnd\s+!macroend/u);
-    expect(installer).not.toMatch(/!macro customInit[\s\S]*?SpiderBanner::Show/u);
-    expect(installer).not.toContain("/NOUNLOAD");
-    expect(installer).not.toContain("SpiderBanner::Destroy");
-    expect(installer).not.toContain("Pi67UpdateProgressVisible");
-    expect(installer).toContain("Installing Pi-67 update / 正在安装 Pi-67 更新，请稍候");
-    expect(installer).not.toContain("SetSilent normal");
+    expect(installer).toMatch(/!macro customInit\s+StrCpy \$Pi67VisibleUpdateInstaller "0"\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SetSilent normal[\s\S]*?SetAutoClose true[\s\S]*?!macroend/u);
+    expect(installer).toMatch(/!macro customInstallMode[\s\S]*?\$hasPerMachineInstallation == "1"[\s\S]*?StrCpy \$isForceMachineInstall "1"[\s\S]*?StrCpy \$isForceCurrentInstall "1"[\s\S]*?!macroend/u);
+    expect(installer).toMatch(/!macro customInstall[\s\S]*?Shell32::SHChangeNotify[\s\S]*?\$Pi67VisibleUpdateInstaller == "1"[\s\S]*?StdUtils\.ExecShellAsUser[\s\S]*?"--updated"/u);
+    expect(installer).not.toContain("SpiderBanner::");
+    expect(installer).not.toContain("-pi67-update-progress");
   });
 
   it("preserves dual-resolver shortcut evidence before target certification", async () => {

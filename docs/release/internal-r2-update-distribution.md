@@ -211,15 +211,18 @@ edge-status and browser-response layers.
 ### Windows x64
 
 After exact download verification, Desktop starts the existing per-user NSIS installer with the
-electron-builder update, force-run, and silent flags. The final `/D=` argument pins replacement to
-the running executable's directory instead of allowing missing or stale installer registry state to
-move the application. Every in-app update recreates the Desktop shortcut against the exact replaced
-executable. This deliberately repairs both a stale shortcut target and a shortcut already lost by a
-previous broken update, so the user retains a normal launch path after the application exits.
+electron-builder update, force-run, and silent flags. The target installer promotes only the native
+install-progress page to a visible, automatically closing surface; installation-mode and directory
+choices remain suppressed, including for the Alpha.35 argument contract. The final `/D=` argument
+pins replacement to the running executable's directory instead of allowing missing or stale
+installer registry state to move the application. Every in-app update recreates the Desktop shortcut
+against the exact replaced executable. This deliberately repairs both a stale shortcut target and a
+shortcut already lost by a previous broken update, so the user retains a normal launch path after
+the application exits.
 Desktop then performs the normal Pi-67 shutdown checkpoint. The installer replaces the installed
-application and starts the updated version. Although wizard choices remain suppressed, an
-update-only NSIS banner stays visible during replacement and communicates liveness without a fake
-percentage. The Windows lifecycle gate must invoke the installer
+application and starts the updated version. The native NSIS progress page stays visible during
+replacement and communicates real installer liveness without a fabricated product percentage. The
+Windows lifecycle gate must invoke the installer
 with the same update arguments, observe the automatic post-install application process, and verify
 the Desktop shortcut target. A real Windows x64 in-app upgrade remains required for every candidate
 identity; a direct silent install followed by a test-controlled launch is not equivalent evidence.

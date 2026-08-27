@@ -97,7 +97,7 @@ publish the same accepted Candidate through the internal R2 update channel.
 
 | Decision | Rationale | Reversal condition |
 | --- | --- | --- |
-| Preserve `/S`, `--updated`, and `--force-run`. | The accepted upgrade path depends on unattended replacement and automatic relaunch; exposing the ordinary installer wizard would regress the product flow. | Windows Candidate proves the chosen progress surface cannot render reliably in silent mode. |
+| Preserve `/S`, `--updated`, and `--force-run`, but promote only the target install-progress page to visible. | Alpha.35 already owns the source-side invocation, while the accepted upgrade path still requires no choices and automatic relaunch. The target installer can skip mode/directory pages, show native install progress, auto-close, and restart without changing old arguments. | Windows Candidate proves the native progress page cannot render or the choice pages cannot remain suppressed. |
 | Show indeterminate installation liveness, not a fabricated percentage. | NSIS extraction does not expose a reliable product-level completion percentage through the current integration. | A measured helper protocol exposes trustworthy stage/byte progress. |
 | Emit release progress on stderr and final JSON on stdout. | Humans need live feedback while scripts must retain stable parseable output. | The CLI adopts a versioned structured event stream as its primary contract. |
 | Keep full public SHA readback and manifest-last publication. | The hour-long path is an integrity and atomicity boundary, not disposable overhead. | A different verified origin-side checksum contract replaces client readback with equivalent evidence. |
@@ -305,6 +305,20 @@ publish the same accepted Candidate through the internal R2 update channel.
   plugin instance: the banner now uses plain `SpiderBanner::Show /MODERN`, with
   no `/NOUNLOAD` or manual `Destroy`, while preserving the hidden update-only
   Section and shortcut repair.
+- 2026-08-28: Candidate run `33089439670/2` bound source `447abb2f`; its first
+  build attempt stopped on a transient packaged 1.5x-scale shutdown budget, and
+  the unchanged rerun passed build, packaged smoke, UI/IME, and identity. The
+  exact Alpha.35 to Alpha.36 update then reproduced the same 420-second hang.
+  Lifecycle-only run `33093232986` reused those exact installer bytes with the
+  verifier aligned from `windowsHide: true` to the product's `false`; it again
+  observed no window and the same pre-`customInstall` state. This rules out the
+  verifier's launch visibility as the complete cause and, together with all
+  earlier plugin variants, isolates any update-only `SpiderBanner` invocation as
+  the regression. The fallback now removes that plugin entirely. On an existing
+  Alpha.35 invocation, the target installer promotes only the maintained native
+  InstFiles progress page from silent to visible, forces the already detected
+  install mode, skips the existing update choice pages, auto-closes, repairs the
+  shortcut, and explicitly restarts the updated app.
 
 ## Closeout
 
@@ -317,15 +331,16 @@ publish the same accepted Candidate through the internal R2 update channel.
   guide, and this execution plan.
 - Validation completed: current focused tests, final current-tree full coverage,
   source gates, build, Capability source fetch/freshness, resource UI E2E,
-  isolated SpiderBanner compilation, and an exact-source full packaged macOS
-  smoke/open. The latest maintained-lifetime NSIS source still requires an
-  exact-SHA Windows build and target lifecycle after commit.
+  isolated SpiderBanner compilation, exact-artifact lifecycle replay, and an
+  exact-source full packaged macOS smoke/open. The native-progress NSIS source
+  still requires an exact-SHA Windows build and target lifecycle after commit.
 - Validation not completed: successful
   exact-SHA Windows Candidate/runtime observation, Feishu distribution, and
   credentialed R2 publication with live progress.
-- Remaining risks: `SpiderBanner` visibility and the new PowerShell observation
-  must pass on hosted and real Windows; live network rate/ETA and retention
-  behavior must be observed on the next separately authorized R2 publication.
+- Remaining risks: native InstFiles visibility, automatic close/relaunch, and the
+  new PowerShell observation must pass on hosted and real Windows; live network
+  rate/ETA and retention behavior must be observed on the next separately
+  authorized R2 publication.
 - Commit/push/release state: Alpha.36 source freeze, Candidate builds, Feishu
   upload, Windows acceptance, and R2 publication are active checkpoints; no Tag,
   GitHub Release, signing, notarization, or stable promotion is authorized.

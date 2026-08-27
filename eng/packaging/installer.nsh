@@ -9,26 +9,29 @@
   Var Pi67InstallPathGuardLabel
   Var Pi67InstallPathGuardPathLabel
   Var Pi67InstallPathGuardReason
-  # SpiderBanner is an install-section plugin. Starting it from .onInit leaves
-  # silent assisted updates with an invisible plugin lifetime that never ends.
-  !macro customHeader
-    Section "-pi67-update-progress"
-      ${If} ${isUpdated}
-      ${AndIf} ${Silent}
-        # A per-machine outer process relaunches elevated; let only the process
-        # that performs extraction own the visible update surface.
-        ${If} $hasPerMachineInstallation != "1"
-        ${OrIf} ${UAC_IsAdmin}
-          # Match electron-builder's maintained plugin lifetime: the modeless
-          # banner is owned by the installer instead of retained across sections.
-          SpiderBanner::Show /MODERN
-          FindWindow $0 "#32770" "" $HWNDPARENT
-          FindWindow $0 "#32770" "" $HWNDPARENT $0
-          GetDlgItem $0 $0 1000
-          SendMessage $0 ${WM_SETTEXT} 0 "STR:Installing Pi-67 update / 正在安装 Pi-67 更新，请稍候"
-        ${EndIf}
+  Var Pi67VisibleUpdateInstaller
+
+  !macro customInit
+    StrCpy $Pi67VisibleUpdateInstaller "0"
+    ${If} ${isUpdated}
+    ${AndIf} ${Silent}
+      # Keep Alpha.35-compatible update arguments while exposing only the
+      # maintained assisted install-progress page.
+      StrCpy $Pi67VisibleUpdateInstaller "1"
+      SetSilent normal
+      SetAutoClose true
+    ${EndIf}
+  !macroend
+
+  !macro customInstallMode
+    ${If} $Pi67VisibleUpdateInstaller == "1"
+      ${If} $hasPerMachineInstallation == "1"
+      ${AndIf} $hasPerUserInstallation == "0"
+        StrCpy $isForceMachineInstall "1"
+      ${Else}
+        StrCpy $isForceCurrentInstall "1"
       ${EndIf}
-    SectionEnd
+    ${EndIf}
   !macroend
 
   !macro customInstall
@@ -44,6 +47,9 @@
       ${EndIf}
       WinShell::SetLnkAUMI "$DESKTOP\${SHORTCUT_NAME}.lnk" "${APP_ID}"
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
+      ${If} $Pi67VisibleUpdateInstaller == "1"
+        ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "--updated"
+      ${EndIf}
     ${EndIf}
   !macroend
 
