@@ -1,9 +1,9 @@
 # Alpha.34 R2 and Feishu distribution
 
-Status: active
+Status: blocked
 Owner: Codex CLI
 Started: 2026-08-26
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
 ## Goal
 
@@ -143,6 +143,9 @@ three versioned product files through the configured Feishu Drive folder.
   certification attempt. Earlier certification metadata fails closed. All 18
   release test files (80 tests), typecheck, type-aware lint, dead-code analysis,
   and `git diff --check` passed.
+- 2026-08-27: Alpha.34 publication is blocked and superseded by the Alpha.35
+  flow because application bytes changed in `acf6007`. Its Candidate identity
+  and manual acceptance cannot be reused for the new source.
 
 ## Closeout
 

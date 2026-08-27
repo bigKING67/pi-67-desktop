@@ -38,13 +38,9 @@ import { MOCK_DESKTOP_RUNTIME_HEALTH } from "./pi67-runtime-diagnostics-fixture.
 
 export { DEFAULT_MOCK_WORKSPACE } from "./pi67-renderer-desktop-bridge-contract.js";
 export type { MockDesktopBridgeOptions, MockWorkspaceDescriptor } from "./pi67-renderer-desktop-bridge-contract.js";
-type MockDesktopPrimaryBridge = Omit<
-  DesktopSystemBridge,
-  | keyof MockDesktopCapabilityBridge
-  | keyof MockDesktopAttachmentBridge
-  | keyof MockDesktopRepositoryBridge
-  | keyof MockDesktopShutdownBridge
->;
+type MockDesktopPrimaryBridge = Omit<DesktopSystemBridge,
+  keyof MockDesktopCapabilityBridge | keyof MockDesktopAttachmentBridge
+  | keyof MockDesktopRepositoryBridge | keyof MockDesktopShutdownBridge>;
 export async function installMockDesktopBridge(
   page: Page,
   options: MockDesktopBridgeOptions = {}

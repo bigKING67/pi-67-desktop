@@ -4,8 +4,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
-  rm,
-  writeFile
+  rm
 } from "node:fs/promises";
 import { release, tmpdir, version as osVersion } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
@@ -22,6 +21,7 @@ import {
   resolvePackagedRuntimeAssetContract,
   repositoryRoot
 } from "./packaged-electron-fixture.mjs";
+import { boundedErrorMessage, outputDirectory, summaryPath, timedPhase, writeReport } from "./windows-installer-lifecycle-report.mjs";
 import { assertSameArtifactBytes } from "./windows-artifact-identity.mjs";
 import {
   launchInstalledApplication,
@@ -74,8 +74,6 @@ export {
   WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS,
   waitForPathState
 } from "./windows-installer-process.mjs";
-const outputDirectory = join(repositoryRoot, "artifacts/validation/windows-installer-lifecycle");
-const summaryPath = join(outputDirectory, "summary.json");
 const [controlledProvider, controlledModelId] = CONTROLLED_MODEL_VALUE.split("/");
 
 export async function verifyWindowsInstallerLifecycle(options = {}) {
@@ -448,25 +446,6 @@ function assertRuntimeVersion(launchResult, expectedVersion) {
   if (launchResult.runtime.appVersion !== expectedVersion) {
     throw new Error(`Installed app version mismatch: expected ${expectedVersion}, got ${launchResult.runtime.appVersion}.`);
   }
-}
-
-async function timedPhase(name, action) {
-  const startedAt = performance.now();
-  await action();
-  return { durationMs: round(performance.now() - startedAt), name };
-}
-
-async function writeReport(report) {
-  await writeFile(summaryPath, `${JSON.stringify(report, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-}
-
-function boundedErrorMessage(error, privateRoot) {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.replaceAll(privateRoot, "<temporary-root>").slice(0, 2_000);
-}
-
-function round(value) {
-  return Math.round(value * 10) / 10;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

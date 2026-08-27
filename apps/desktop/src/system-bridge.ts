@@ -76,10 +76,7 @@ export interface SystemBridgeOptions {
   agentDirectorySource: "default" | "environment";
   getAgentHostDiagnostics: () => AgentHostSupervisorDiagnostics;
 }
-export interface SystemBridgeRegistration {
-  handlePowerResume(): void;
-  dispose(): void;
-}
+export interface SystemBridgeRegistration { handlePowerResume(): void; dispose(): void; }
 export function registerSystemBridge(options: SystemBridgeOptions): SystemBridgeRegistration {
   const workbenchState = options.workbenchState;
   const nativeNotifications = new NativeNotificationManager({
