@@ -33,6 +33,9 @@ unsigned-preview-manifest.json
 
 Artifact names are immutable. Never overwrite an existing versioned artifact with different
 bytes. `unsigned-preview-manifest.json` is the only mutable publication pointer.
+Normal publication retains at most the newest three canonical SemVer version sets: up to nine
+recognized EXE/DMG/ZIP objects plus the manifest. Unknown or malformed object names are never
+deleted automatically and therefore remain part of the operator's storage budget.
 
 Every versioned EXE/DMG/ZIP object must carry this R2 origin metadata:
 
@@ -123,7 +126,9 @@ lists the live bucket without modifying it, reads the public manifest, and repor
 - missing target-version artifacts;
 - same-name/same-size artifacts that still need public hash verification;
 - immutable same-name/different-size conflicts that block publication;
-- recognized older Pi-67 artifacts eligible for later cleanup; and
+- the newest three versions that would be retained and the exact recognized older artifacts that
+  would be deleted after a successful manifest cutover;
+- recognized versions newer than the target, which block publication before any mutation; and
 - unknown objects that the tool will preserve.
 
 The plan never uploads, overwrites, deletes, purges, or writes a release receipt.
@@ -135,10 +140,11 @@ and verify the missing-object behavior before publication.
 
 ## Publish with separate authorization
 
-R2 upload is an external write and requires current authorization for the exact version. Resolve a
+R2 publication is an external write and requires current authorization for the exact version. That
+publication includes the bounded post-cutover retention deletion described below. Resolve a
 least-privilege R2 credential from repository-external operator configuration; never put account
-IDs, access keys, API tokens, cookies, or dashboard state in Git, workflow logs, or committed
-`.env` files.
+IDs, access keys, API tokens, cookies, or dashboard state in Git, workflow logs, or committed `.env`
+files.
 
 Publication order is mandatory:
 
@@ -152,7 +158,9 @@ Publication order is mandatory:
    downloaded SHA-256, and immutable one-year `Cache-Control` on both responses.
 5. Upload `unsigned-preview-manifest.json` **last**.
 6. Fetch the public manifest without credentials and confirm the exact version and hashes.
-7. Test `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an installed macOS
+7. Re-list R2, retain the target and two newest lower SemVer versions, delete only recognized
+   artifacts from the fourth and older versions, then re-list and verify the retention bound.
+8. Test `检查更新 -> 下载并安装 -> restart -> version` on Windows x64 and an installed macOS
    arm64 copy. Bind the result to exact bytes and source SHA.
 
 After current authorization for the exact package version, publication is invoked with:
@@ -181,6 +189,13 @@ large DMG/ZIP artifacts, aborts incomplete parts on failure, and never buffers a
 in memory. Existing bytes are hashed directly from R2 before a conditional ETag-bound metadata
 replacement, so a same-name/same-size collision cannot be normalized accidentally. The Cloudflare
 REST API is used only for the separately authorized exact cache purge.
+During publication, named stages and rate-limited byte progress are written to stderr so the final
+stdout remains one machine-readable JSON document. Upload, direct R2 readback, and public full-byte
+verification report bytes, average rate, ETA when calculable, elapsed time, and a liveness heartbeat
+at least every 15 seconds while a stage remains active. The artifact stages explicitly say that the
+manifest is not yet published. A separate retention stage reports only after manifest verification.
+The credential-free receipt records the completed stage, transfer timings, retained versions, and
+deleted recognized artifact names so later work can audit both performance and storage behavior.
 Successful publish writes a credential-free receipt under ignored
 `artifacts/r2-release-receipts/`.
 
@@ -202,7 +217,9 @@ move the application. Every in-app update recreates the Desktop shortcut against
 executable. This deliberately repairs both a stale shortcut target and a shortcut already lost by a
 previous broken update, so the user retains a normal launch path after the application exits.
 Desktop then performs the normal Pi-67 shutdown checkpoint. The installer replaces the installed
-application and starts the updated version. The Windows lifecycle gate must invoke the installer
+application and starts the updated version. Although wizard choices remain suppressed, an
+update-only NSIS banner stays visible during replacement and communicates liveness without a fake
+percentage. The Windows lifecycle gate must invoke the installer
 with the same update arguments, observe the automatic post-install application process, and verify
 the Desktop shortcut target. A real Windows x64 in-app upgrade remains required for every candidate
 identity; a direct silent install followed by a test-controlled launch is not equivalent evidence.
@@ -243,12 +260,33 @@ To stop a bad version from reaching additional clients:
 Rollback of already installed clients is a separate, explicit operation. The normal updater does
 not accept a lower or equal version.
 
-## Latest-only steady-state cleanup
+## Automatic three-version retention
 
-R2 steady state keeps only the three artifacts named by the current public manifest plus
-`unsigned-preview-manifest.json`. During a release cutover, old and new artifacts coexist. Cleanup
-is forbidden until the new manifest has been published and the exact Windows x64 and installed
-macOS arm64 application upgrades have both been accepted.
+The normal steady state retains at most the newest three recognized Pi-67 SemVer versions. Retention
+is version-based even if an older version has an incomplete artifact set. It runs only after all
+target artifacts pass public byte verification and the public manifest exactly matches the target,
+so an upload or manifest failure never deletes a rollback version. The tool re-lists R2 after any
+deletion and fails the publication command if a recognized fourth-or-older artifact remains.
+
+Only exact names accepted by the Pi-67 artifact parser can be deleted. The mutable manifest and
+unknown, malformed, or operator-owned objects are preserved. If the preflight inventory contains a
+recognized version newer than the target, publication stops before uploading or deleting anything;
+if the post-cutover retention inventory contains one, deletion stops before removing an old object.
+Publishers must still be serialized because an R2 list followed by individual deletes is not a
+transaction. A future object added after that snapshot is always preserved, and the final re-list
+detects it when retention deleted older objects.
+
+Automatic retention deletes origin objects through the same least-privilege R2 S3 credential used
+for publication. It intentionally does not purge their immutable Cloudflare edge entries: an
+unreferenced old URL may remain an edge HIT until TTL expiry, but that cached copy does not consume
+R2 bucket storage. Withdrawal and exact edge eviction remain separately authorized operations.
+
+## Optional latest-only cleanup
+
+Automatic publication keeps three versions for bounded rollback coverage. The explicit cleanup
+command can reduce that further to only the three artifacts named by the current public manifest
+plus `unsigned-preview-manifest.json`. It is forbidden until the new manifest has been published and
+the exact Windows x64 and installed macOS arm64 application upgrades have both been accepted.
 
 With separate deletion/cache-purge authorization, run:
 
@@ -263,10 +301,10 @@ corepack pnpm run release:r2:cleanup \
   --confirm-target-upgrades
 ```
 
-The cleanup command re-reads the public manifest, rejects a version mismatch, deletes only exact
-recognized Pi-67 update artifact names from older SemVer versions, preserves unknown objects and
-the manifest, purges only the deleted public URLs, and re-lists the bucket to verify that no
-recognized old version remains.
+The cleanup command re-reads the public manifest, rejects a version mismatch or recognized future
+version, deletes only exact recognized Pi-67 update artifact names from lower SemVer versions,
+preserves unknown objects and the manifest, purges only the deleted public URLs, and re-lists the
+bucket to verify that no recognized old version remains.
 
 ## First updater bootstrap
 

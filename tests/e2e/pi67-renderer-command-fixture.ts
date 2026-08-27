@@ -359,17 +359,17 @@ export function installMockCommandResponseHandler({
       canUpdate: status === "update-available",
       effectiveSource: aiSource,
       canRestore: aiSource === "managed",
-      baselineVersion: "1.0.3",
-      installedVersion: aiSource === "managed" ? "1.0.4" : "1.0.3",
+      baselineVersion: "1.0.6",
+      installedVersion: aiSource === "managed" ? "1.0.7" : "1.0.6",
       ...(status === "not-checked" ? {} : {
-        latestVersion: "1.0.4",
+        latestVersion: "1.0.7",
         registryCommit: "7".repeat(40)
       }),
       source: "https://github.com/xbtlin/ai-berkshire",
       detail: aiSource === "managed"
         ? "当前使用 Pi-67 官方 registry 安装的受管 Overlay。"
         : status === "update-available"
-          ? "Pi-67 官方 registry 已发布兼容版本 1.0.4，确认后将安装为独立 Overlay。"
+          ? "Pi-67 官方 registry 已发布兼容版本 1.0.7，确认后将安装为独立 Overlay。"
           : "当前使用随 Desktop 发布的不可变内置基线。"
     };
     return [lark, aiBerkshire];

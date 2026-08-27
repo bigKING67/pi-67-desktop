@@ -223,14 +223,17 @@ describe("Windows installer lifecycle contract", () => {
     expect(source).toContain("await verifyWindowsInstallerUpdateLifecycle({");
     expect(source).toContain("repairScenario: \"missing-before-cross-version-upgrade\"");
     expect(updateSource).toContain("await assertPackagedRuntimeAssets(installedArtifact)");
-    expect(updateSource).toContain("processId = await installNsisUpdatePackage(");
+    expect(updateSource).toContain("const updateResult = await installNsisUpdatePackage(");
+    expect(updateSource).toContain("processId = updateResult.processId");
     expect(updateSource).toContain("automaticPostInstallLaunch: true");
+    expect(updateSource).toContain("installationSurface: updateResult.updateSurface");
     expect(updateSource).toContain("desktopShortcut: await assertWindowsShortcutTarget(");
     expect(updateSource).toContain("{ evidenceDirectory: shortcutEvidenceDirectory }");
     expect(updateSource).toMatch(/finally \{[\s\S]*?await stopWindowsProcessTree\(processId\)/u);
     expect(processSource).not.toContain("$args[0]");
     expect(processSource).toContain("PI67_WINDOWS_SHORTCUT_PATH");
     expect(processSource).toContain("PI67_WINDOWS_EXECUTABLE_PATH");
+    expect(processSource).toContain("PI67_WINDOWS_INSTALLER_PATH");
     expect(processSource).toContain("PI67_WINDOWS_PROCESS_ID");
     expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");
     expect(source).toContain("await assertWindowsExistingProfileInteractionPreserved(");
@@ -390,6 +393,14 @@ describe("Windows installer lifecycle contract", () => {
     expect(installer).not.toMatch(/CreateShortCut[^\n]+"\$appExe"/u);
     expect(installer).toContain('Abort "Updated Desktop shortcut could not be created."');
     expect(installer).toMatch(/WinShell::SetLnkAUMI[\s\S]*?Shell32::SHChangeNotify/u);
+  });
+
+  it("shows liveness for unattended updates without exposing the assisted wizard", async () => {
+    const installer = await readFile(join(repositoryRoot, "eng/packaging/installer.nsh"), "utf8");
+
+    expect(installer).toMatch(/!macro customInit\s+\$\{If\} \$\{isUpdated\}\s+\$\{AndIf\} \$\{Silent\}[\s\S]*?SpiderBanner::Show \/MODERN/u);
+    expect(installer).toContain("Installing Pi-67 update / 正在安装 Pi-67 更新，请稍候");
+    expect(installer).not.toContain("SetSilent normal");
   });
 
   it("preserves dual-resolver shortcut evidence before target certification", async () => {

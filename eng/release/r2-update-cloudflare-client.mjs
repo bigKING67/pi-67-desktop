@@ -21,7 +21,8 @@ export function createCloudflareR2Client({
   s3Client,
   createUpload = (options) => new Upload(options),
   statImpl = stat,
-  createReadStreamImpl = createReadStream
+  createReadStreamImpl = createReadStream,
+  onTransferProgress = () => undefined
 }) {
   const objectClient = s3Client ?? new S3Client({
     region: "auto",
@@ -59,6 +60,14 @@ export function createCloudflareR2Client({
 
     async putFile(key, path, contentType, cacheControl) {
       const metadata = await statImpl(path);
+      let transferredBytes = 0;
+      onTransferProgress({
+        phase: "start",
+        operation: "r2-upload",
+        name: key,
+        transferredBytes,
+        totalBytes: metadata.size
+      });
       const upload = createUpload({
         client: objectClient,
         params: {
@@ -73,7 +82,36 @@ export function createCloudflareR2Client({
         partSize: 16 * 1024 * 1024,
         leavePartsOnError: false
       });
-      await upload.done();
+      upload.on?.("httpUploadProgress", (progress) => {
+        if (!Number.isSafeInteger(progress.loaded) || progress.loaded < 0) return;
+        transferredBytes = progress.loaded;
+        onTransferProgress({
+          phase: "progress",
+          operation: "r2-upload",
+          name: key,
+          transferredBytes,
+          totalBytes: Number.isSafeInteger(progress.total) ? progress.total : metadata.size
+        });
+      });
+      try {
+        await upload.done();
+        onTransferProgress({
+          phase: "complete",
+          operation: "r2-upload",
+          name: key,
+          transferredBytes: metadata.size,
+          totalBytes: metadata.size
+        });
+      } catch (error) {
+        onTransferProgress({
+          phase: "failed",
+          operation: "r2-upload",
+          name: key,
+          transferredBytes,
+          totalBytes: metadata.size
+        });
+        throw error;
+      }
     },
 
     async verifyObject(artifact) {
@@ -82,7 +120,12 @@ export function createCloudflareR2Client({
         Key: artifact.name
       }));
       if (!response.Body) throw new Error(`${artifact.name}: R2 readback returned no body.`);
-      const { bytes, sha256 } = await hashBody(response.Body);
+      const { bytes, sha256 } = await hashBody(response.Body, {
+        name: artifact.name,
+        operation: "r2-readback",
+        totalBytes: artifact.bytes,
+        onTransferProgress
+      });
       if (bytes !== artifact.bytes) throw new Error(`${artifact.name}: R2 byte count mismatch.`);
       if (sha256 !== artifact.sha256) throw new Error(`${artifact.name}: R2 SHA-256 mismatch.`);
       if (typeof response.ETag !== "string" || response.ETag.length === 0) {
@@ -157,14 +200,24 @@ export async function fetchPublicManifest(origin, fetchImpl = fetch) {
   return response.json();
 }
 
-export async function verifyPublicArtifact(origin, artifact, fetchImpl = fetch) {
+export async function verifyPublicArtifact(
+  origin,
+  artifact,
+  fetchImpl = fetch,
+  onTransferProgress = () => undefined
+) {
   const url = `${origin}/${encodeURIComponent(artifact.name)}`;
   const response = await fetchImpl(url, { cache: "no-store", redirect: "error" });
   if (response.status !== 200 || !response.body) {
     throw new Error(`${artifact.name}: public readback returned HTTP ${response.status}.`);
   }
   assertImmutableCacheControl(artifact.name, response.headers);
-  const { bytes, sha256 } = await hashBody(response.body);
+  const { bytes, sha256 } = await hashBody(response.body, {
+    name: artifact.name,
+    operation: "public-readback",
+    totalBytes: artifact.bytes,
+    onTransferProgress
+  });
   if (bytes !== artifact.bytes) throw new Error(`${artifact.name}: public byte count mismatch.`);
   if (sha256 !== artifact.sha256) throw new Error(`${artifact.name}: public SHA-256 mismatch.`);
 
@@ -184,13 +237,45 @@ export async function verifyPublicArtifact(origin, artifact, fetchImpl = fetch) 
   }
 }
 
-async function hashBody(body) {
+async function hashBody(body, { name, operation, totalBytes, onTransferProgress }) {
   const hash = createHash("sha256");
   let bytes = 0;
-  for await (const chunk of body) {
-    bytes += chunk.byteLength;
-    hash.update(chunk);
+  onTransferProgress({
+    phase: "start",
+    operation,
+    name,
+    transferredBytes: bytes,
+    totalBytes
+  });
+  try {
+    for await (const chunk of body) {
+      bytes += chunk.byteLength;
+      hash.update(chunk);
+      onTransferProgress({
+        phase: "progress",
+        operation,
+        name,
+        transferredBytes: bytes,
+        totalBytes
+      });
+    }
+  } catch (error) {
+    onTransferProgress({
+      phase: "failed",
+      operation,
+      name,
+      transferredBytes: bytes,
+      totalBytes
+    });
+    throw error;
   }
+  onTransferProgress({
+    phase: "complete",
+    operation,
+    name,
+    transferredBytes: bytes,
+    totalBytes
+  });
   return { bytes, sha256: hash.digest("hex") };
 }
 

@@ -165,7 +165,7 @@ function updateTitle(
   return update.automaticChecks ? "正在等待自动检查" : "尚未检查更新";
 }
 
-function updateDetail(update: UpdateState, initialized: boolean): string {
+export function updateDetail(update: UpdateState, initialized: boolean): string {
   if (!initialized) return "正在确认当前版本和自动检查设置。";
   if (update.phase === "available") {
     return `安装包 ${formatBytes(update.artifactBytes)}。点击后会自动下载、校验，并启动内部更新安装。`;
@@ -174,7 +174,9 @@ function updateDetail(update: UpdateState, initialized: boolean): string {
     return `${formatBytes(update.transferred)} / ${formatBytes(update.artifactBytes)}（${Math.round(update.percent)}%）`;
   }
   if (update.phase === "installing") {
-    return "安装包已通过 SHA-256 校验；应用即将退出、替换并重新启动。";
+    return update.artifactName.endsWith(".exe")
+      ? "安装包已通过 SHA-256 校验；应用将退出，Windows 会继续显示独立安装进度，完成后自动重新打开。"
+      : "安装包已通过 SHA-256 校验；应用即将退出、替换并重新启动。";
   }
   if (update.phase === "current") {
     return `当前版本 ${update.currentVersion}；自动检查已开启，但不会在未点击时下载或安装。`;

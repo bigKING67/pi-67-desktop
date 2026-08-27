@@ -32,15 +32,24 @@ describe("Cloudflare R2 release client", () => {
 
   it("streams large objects through the multipart-capable S3 uploader", async () => {
     const done = vi.fn(async () => undefined);
-    const createUpload = vi.fn(() => ({ done }));
+    let progressListener;
+    const createUpload = vi.fn(() => ({
+      done: async () => {
+        progressListener?.({ loaded: 200_000_000, total: 359_483_990 });
+        await done();
+      },
+      on: vi.fn((_event, listener) => { progressListener = listener; })
+    }));
     const body = { stream: true };
+    const onTransferProgress = vi.fn();
     const client = createCloudflareR2Client({
       accountId: "account",
       bucketName: "bucket",
       s3Client: { send: vi.fn() },
       createUpload,
       statImpl: vi.fn(async () => ({ size: 359_483_990 })),
-      createReadStreamImpl: vi.fn(() => body)
+      createReadStreamImpl: vi.fn(() => body),
+      onTransferProgress
     });
 
     await client.putFile("candidate.dmg", "/candidate.dmg", "application/x-apple-diskimage");
@@ -56,6 +65,11 @@ describe("Cloudflare R2 release client", () => {
       leavePartsOnError: false
     }));
     expect(done).toHaveBeenCalledOnce();
+    expect(onTransferProgress.mock.calls.map(([event]) => event)).toEqual([
+      expect.objectContaining({ phase: "start", transferredBytes: 0, totalBytes: 359_483_990 }),
+      expect.objectContaining({ phase: "progress", transferredBytes: 200_000_000 }),
+      expect.objectContaining({ phase: "complete", transferredBytes: 359_483_990 })
+    ]);
   });
 
   it("sets explicit cache metadata when uploading mutable release metadata", async () => {
@@ -103,10 +117,12 @@ describe("Cloudflare R2 release client", () => {
         Metadata: { source: "candidate" }
       }))
     };
+    const onTransferProgress = vi.fn();
     const client = createCloudflareR2Client({
       accountId: "account",
       bucketName: "bucket",
-      s3Client
+      s3Client,
+      onTransferProgress
     });
 
     await expect(client.verifyObject(artifact)).resolves.toEqual({
@@ -122,6 +138,11 @@ describe("Cloudflare R2 release client", () => {
       Bucket: "bucket",
       Key: "candidate.zip"
     });
+    expect(onTransferProgress).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "complete",
+      operation: "r2-readback",
+      transferredBytes: body.length
+    }));
   });
 
   it("rejects an existing R2 object whose direct hash differs", async () => {
@@ -237,8 +258,14 @@ describe("Cloudflare R2 release client", () => {
         })
       : new Response(body, { status: 200, headers: { "cache-control": cacheControl } }));
 
-    await expect(verifyPublicArtifact("https://updates.example", artifact, fetchImpl))
+    const onTransferProgress = vi.fn();
+    await expect(verifyPublicArtifact("https://updates.example", artifact, fetchImpl, onTransferProgress))
       .resolves.toBeUndefined();
+    expect(onTransferProgress).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "complete",
+      operation: "public-readback",
+      transferredBytes: body.length
+    }));
   });
 
   it("rejects a public artifact without the immutable origin cache policy", async () => {

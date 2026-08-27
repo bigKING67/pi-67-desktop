@@ -10,6 +10,22 @@
   Var Pi67InstallPathGuardPathLabel
   Var Pi67InstallPathGuardReason
 
+  !macro customInit
+    ${If} ${isUpdated}
+    ${AndIf} ${Silent}
+      # A per-machine outer process relaunches elevated; let only the process
+      # that performs extraction own the visible update surface.
+      ${If} $hasPerMachineInstallation != "1"
+      ${OrIf} ${UAC_IsAdmin}
+        SpiderBanner::Show /MODERN
+        FindWindow $0 "#32770" "" $HWNDPARENT
+        FindWindow $0 "#32770" "" $HWNDPARENT $0
+        GetDlgItem $0 $0 1000
+        SendMessage $0 ${WM_SETTEXT} 0 "STR:Installing Pi-67 update / 正在安装 Pi-67 更新，请稍候"
+      ${EndIf}
+    ${EndIf}
+  !macroend
+
   !macro customInstall
     ${If} ${isUpdated}
       ${IfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"

@@ -1300,7 +1300,9 @@ the only Runtime and behavior specification source.
   pins the destination to the directory of the running executable, preserves whether
   the user had a Desktop shortcut, and starts the updated executable after replacement.
   An existing Desktop shortcut is rewritten against the installed executable instead
-  of retaining a stale target.
+  of retaining a stale target. The no-choice update remains silent at the wizard level,
+  but owns a separate visible installation-in-progress surface after the old application
+  exits; it never fabricates a percentage that NSIS cannot report truthfully.
   Because official macOS auto-updaters require signing, the accepted unsigned
   internal path instead validates one exact ZIP application bundle, waits for the
   normal Pi-67 shutdown checkpoint, then performs a same-volume replacement with

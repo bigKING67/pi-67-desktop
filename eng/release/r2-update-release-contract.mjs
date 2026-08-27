@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { valid as validSemver } from "semver";
+import { gt as semverGt, rcompare as semverRcompare, valid as validSemver } from "semver";
 import {
   assertSameArtifactBytes,
   readFileByteIdentity
@@ -16,6 +16,7 @@ import { assertWindowsPreviewManualTestReceipt } from "./windows-preview-promoti
 
 export const R2_UPDATE_MANIFEST_NAME = "unsigned-preview-manifest.json";
 export const R2_UPDATE_ORIGIN = "https://updates.52671314.xyz";
+export const R2_RETAINED_VERSION_COUNT = 3;
 
 const ARTIFACT_SUFFIXES = [
   "-win-x64-unsigned-preview.exe",
@@ -109,7 +110,7 @@ export function parseR2ArtifactKey(key) {
   const suffix = ARTIFACT_SUFFIXES.find((candidate) => key.endsWith(candidate));
   if (!suffix) return undefined;
   const version = key.slice("Pi-67-Desktop-".length, -suffix.length);
-  if (!validSemver(version)) return undefined;
+  if (validSemver(version) !== version) return undefined;
   const expectedNames = new Set(unsignedPreviewArtifactSpecs(version).map((entry) => entry.name));
   return expectedNames.has(key) ? { key, version } : undefined;
 }
@@ -143,7 +144,50 @@ export function createR2ReleasePlan(release, remoteObjects, publicManifest) {
     immutableConflicts,
     manifestAction: manifestsMatch(publicManifest, release.manifest) ? "unchanged" : "publish-last",
     oldArtifacts: oldArtifacts.sort((left, right) => left.localeCompare(right)),
-    unknownObjects: unknownObjects.sort((left, right) => left.localeCompare(right))
+    unknownObjects: unknownObjects.sort((left, right) => left.localeCompare(right)),
+    retention: createR2RetentionPlan(remoteObjects, release.version)
+  };
+}
+
+export function createR2RetentionPlan(
+  remoteObjects,
+  targetVersion,
+  retainedVersionLimit = R2_RETAINED_VERSION_COUNT
+) {
+  if (!validSemver(targetVersion)) throw new Error(`Invalid R2 retention target version: ${targetVersion}`);
+  if (!Number.isSafeInteger(retainedVersionLimit) || retainedVersionLimit < 1) {
+    throw new Error("R2 retained version limit must be a positive safe integer.");
+  }
+
+  const artifactsByVersion = new Map();
+  for (const object of remoteObjects) {
+    const parsed = parseR2ArtifactKey(object.key);
+    if (!parsed) continue;
+    const artifacts = artifactsByVersion.get(parsed.version) ?? [];
+    artifacts.push(parsed.key);
+    artifactsByVersion.set(parsed.version, artifacts);
+  }
+
+  const futureVersions = [...artifactsByVersion.keys()]
+    .filter((version) => semverGt(version, targetVersion))
+    .sort(semverRcompare);
+  const eligibleVersions = new Set([
+    targetVersion,
+    ...[...artifactsByVersion.keys()].filter((version) => !semverGt(version, targetVersion))
+  ]);
+  const orderedVersions = [...eligibleVersions].sort(semverRcompare);
+  const retainedVersions = orderedVersions.slice(0, retainedVersionLimit);
+  const deletedVersions = orderedVersions.slice(retainedVersionLimit);
+  const artifactsToDelete = deletedVersions
+    .flatMap((version) => artifactsByVersion.get(version) ?? [])
+    .sort((left, right) => left.localeCompare(right));
+
+  return {
+    retainedVersionLimit,
+    retainedVersions,
+    deletedVersions,
+    futureVersions,
+    artifactsToDelete
   };
 }
 

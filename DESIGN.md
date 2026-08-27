@@ -2081,7 +2081,10 @@ loading error where the operation can produce those states
   state becomes `正在安装`, the dialog stops accepting actions, and Main performs
   the normal shutdown checkpoint before platform handoff. Windows starts the
   per-user NSIS update mode against the running executable's exact installation
-  directory, rewrites an existing Desktop shortcut against the replaced executable,
+  directory. Before the Electron window closes, the dialog says that a separate
+  Windows installation surface will remain visible. The unattended NSIS path shows
+  indeterminate installation liveness without exposing wizard choices or a fabricated
+  percentage, rewrites an existing Desktop shortcut against the replaced executable,
   and launches the updated version after installation. macOS validates the extracted
   bundle identity and version, requires a writable same-volume destination, and uses
   an adjacent backup for replacement rollback before restart. Failures keep the current

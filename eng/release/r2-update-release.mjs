@@ -9,17 +9,23 @@ import {
 import {
   assertCurrentPublicRelease,
   createR2ReleasePlan,
+  createR2RetentionPlan,
   loadLocalR2Release,
   manifestsMatch,
   parseR2ArtifactKey,
   R2_UPDATE_MANIFEST_NAME,
-  R2_UPDATE_ORIGIN
+  R2_UPDATE_ORIGIN,
+  R2_RETAINED_VERSION_COUNT
 } from "./r2-update-release-contract.mjs";
 import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 import {
   assertCleanPreviewCandidateSource,
   verifyR2PublicationSource
 } from "./preview-candidate-source.mjs";
+import {
+  createR2ReleaseProgressReporter,
+  silentR2ReleaseProgress
+} from "./r2-release-progress.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const defaultBundleDirectory = join(root, "artifacts/r2-update-bundle");
@@ -47,51 +53,107 @@ export async function publishR2Release({
   origin = R2_UPDATE_ORIGIN,
   fetchImpl = fetch,
   readPublicManifest = fetchPublicManifest,
-  verifyArtifact = verifyPublicArtifact
+  verifyArtifact = verifyPublicArtifact,
+  progress = silentR2ReleaseProgress
 }) {
-  const plan = await planR2Release({ release, client, origin, fetchImpl, readPublicManifest });
+  const plan = await runProgressStage(progress, {
+    name: "release-plan",
+    detail: "reading R2 inventory and current public manifest",
+    manifestState: "unchanged"
+  }, () => planR2Release({ release, client, origin, fetchImpl, readPublicManifest }));
   if (plan.immutableConflicts.length > 0) {
     throw new Error("Refusing to overwrite an immutable R2 artifact with different bytes.");
   }
+  assertNoFutureR2Versions(plan.retention);
+  const preCutoverManifestState = plan.manifestAction === "publish-last"
+    ? "not published"
+    : "already current";
   const metadataRepairs = [];
-  for (const artifact of release.artifacts) {
-    if (plan.uploads.includes(artifact.name)) {
-      await client.putFile(
-        artifact.name,
-        artifact.path,
-        artifactContentType(artifact.name),
-        immutableArtifactCacheControl
-      );
-      continue;
+  await runProgressStage(progress, {
+    name: "immutable-artifacts",
+    detail: `${release.artifacts.length} artifact(s): upload missing or verify existing R2 bytes`,
+    manifestState: preCutoverManifestState
+  }, async () => {
+    for (const artifact of release.artifacts) {
+      if (plan.uploads.includes(artifact.name)) {
+        await client.putFile(
+          artifact.name,
+          artifact.path,
+          artifactContentType(artifact.name),
+          immutableArtifactCacheControl
+        );
+        continue;
+      }
+      const contentType = artifactContentType(artifact.name);
+      const metadata = await client.verifyObject(artifact);
+      if (metadata.cacheControl !== immutableArtifactCacheControl || metadata.contentType !== contentType) {
+        await client.replaceObjectHttpMetadata(artifact.name, {
+          contentType,
+          cacheControl: immutableArtifactCacheControl,
+          etag: metadata.etag,
+          preservedMetadata: metadata.preservedMetadata
+        });
+        metadataRepairs.push(artifact.name);
+      }
     }
-    const contentType = artifactContentType(artifact.name);
-    const metadata = await client.verifyObject(artifact);
-    if (metadata.cacheControl !== immutableArtifactCacheControl || metadata.contentType !== contentType) {
-      await client.replaceObjectHttpMetadata(artifact.name, {
-        contentType,
-        cacheControl: immutableArtifactCacheControl,
-        etag: metadata.etag,
-        preservedMetadata: metadata.preservedMetadata
-      });
-      metadataRepairs.push(artifact.name);
+  });
+  await runProgressStage(progress, {
+    name: "public-verification",
+    detail: `${release.artifacts.length} full public SHA-256 readback(s), followed by Range probes`,
+    manifestState: preCutoverManifestState
+  }, async () => {
+    for (const artifact of release.artifacts) {
+      await verifyArtifact(origin, artifact, fetchImpl, progress.transfer);
     }
-  }
-  for (const artifact of release.artifacts) {
-    await verifyArtifact(origin, artifact, fetchImpl);
-  }
+  });
   if (plan.manifestAction === "publish-last") {
-    await client.putFile(
-      R2_UPDATE_MANIFEST_NAME,
-      release.manifestPath,
-      "application/json; charset=utf-8",
-      mutableManifestCacheControl
-    );
+    await runProgressStage(progress, {
+      name: "manifest-publication",
+      detail: "switching the mutable update channel after artifact verification",
+      manifestState: "publishing last"
+    }, () => client.putFile(
+        R2_UPDATE_MANIFEST_NAME,
+        release.manifestPath,
+        "application/json; charset=utf-8",
+        mutableManifestCacheControl
+      ), "published");
   }
-  const publicManifest = await readPublicManifest(origin, fetchImpl);
-  if (!manifestsMatch(publicManifest, release.manifest)) {
-    throw new Error("Public R2 manifest does not match the local release after publication.");
-  }
-  return { ...plan, metadataRepairs, provenance: release.provenance, published: true };
+  await runProgressStage(progress, {
+    name: "manifest-verification",
+    detail: "reading the public no-store manifest and comparing exact release metadata",
+    manifestState: plan.manifestAction === "publish-last" ? "published" : "already current"
+  }, async () => {
+    const publicManifest = await readPublicManifest(origin, fetchImpl);
+    if (!manifestsMatch(publicManifest, release.manifest)) {
+      throw new Error("Public R2 manifest does not match the local release after publication.");
+    }
+  });
+  const retention = await runProgressStage(progress, {
+    name: "retention-cleanup",
+    detail: `keeping the newest ${R2_RETAINED_VERSION_COUNT} recognized versions after manifest verification`,
+    manifestState: "published"
+  }, async () => {
+    const currentObjects = await client.listObjects();
+    const retentionPlan = createR2RetentionPlan(currentObjects, release.version);
+    assertNoFutureR2Versions(retentionPlan);
+    for (const key of retentionPlan.artifactsToDelete) await client.deleteObject(key);
+
+    if (retentionPlan.artifactsToDelete.length > 0) {
+      const remainingObjects = await client.listObjects();
+      const remainingPlan = createR2RetentionPlan(remainingObjects, release.version);
+      assertNoFutureR2Versions(remainingPlan);
+      if (remainingPlan.artifactsToDelete.length > 0) {
+        throw new Error("R2 retention verification found artifacts older than the newest three versions.");
+      }
+    }
+    return {
+      retainedVersionLimit: retentionPlan.retainedVersionLimit,
+      retainedVersions: retentionPlan.retainedVersions,
+      deletedVersions: retentionPlan.deletedVersions,
+      deletedArtifacts: retentionPlan.artifactsToDelete
+    };
+  });
+  return { ...plan, metadataRepairs, retention, provenance: release.provenance, published: true };
 }
 
 export async function cleanupR2Release({
@@ -109,6 +171,7 @@ export async function cleanupR2Release({
   const publicManifest = await readPublicManifest(origin, fetchImpl);
   assertCurrentPublicRelease(publicManifest, confirmedVersion, runtimeVersion);
   const remoteObjects = await client.listObjects();
+  assertNoFutureR2Versions(createR2RetentionPlan(remoteObjects, confirmedVersion));
   const oldArtifacts = remoteObjects
     .map((entry) => parseR2ArtifactKey(entry.key))
     .filter((entry) => entry && entry.version !== confirmedVersion)
@@ -136,7 +199,8 @@ async function main() {
     throw new Error(`--confirm-version must exactly match package version ${version}.`);
   }
 
-  const client = createClientFromEnvironment(command);
+  const progress = command === "publish" ? createR2ReleaseProgressReporter() : undefined;
+  const client = createClientFromEnvironment(command, progress?.transfer);
   if (command === "cleanup") {
     const receipt = await cleanupR2Release({
       client,
@@ -169,14 +233,24 @@ async function main() {
       }
     };
   }
-  const result = command === "plan"
-    ? await planR2Release({ release, client })
-    : await publishR2Release({ release, client });
-  if (command === "publish") await writeReceipt(command, version, result);
+  if (command === "plan") {
+    printJson(await planR2Release({ release, client }));
+    return;
+  }
+  let result;
+  try {
+    result = await publishR2Release({ release, client, progress });
+    result = { ...result, publicationProgress: progress.finish() };
+  } catch (error) {
+    progress.fail(error);
+    progress.finish();
+    throw error;
+  }
+  await writeReceipt(command, version, result);
   printJson(result);
 }
 
-function createClientFromEnvironment(command) {
+function createClientFromEnvironment(command, onTransferProgress) {
   const accountId = requiredEnvironment("PI67_R2_ACCOUNT_ID");
   const accessKeyId = requiredEnvironment("PI67_R2_ACCESS_KEY_ID");
   const secretAccessKey = requiredEnvironment("PI67_R2_SECRET_ACCESS_KEY");
@@ -190,8 +264,36 @@ function createClientFromEnvironment(command) {
     secretAccessKey,
     bucketName,
     apiToken,
-    zoneId
+    zoneId,
+    onTransferProgress
   });
+}
+
+async function runProgressStage(progress, stage, operation, completedManifestState = stage.manifestState) {
+  progress.stage({ phase: "start", ...stage });
+  try {
+    const result = await operation();
+    progress.stage({
+      phase: "complete",
+      name: stage.name,
+      manifestState: completedManifestState
+    });
+    return result;
+  } catch (error) {
+    progress.stage({
+      phase: "failed",
+      name: stage.name,
+      detail: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+}
+
+function assertNoFutureR2Versions(retentionPlan) {
+  if (retentionPlan.futureVersions.length === 0) return;
+  throw new Error(
+    `Refusing R2 mutation because recognized artifacts are newer than the target version: ${retentionPlan.futureVersions.join(", ")}`
+  );
 }
 
 function requiredEnvironment(name) {

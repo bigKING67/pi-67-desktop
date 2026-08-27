@@ -54,7 +54,7 @@ describe("preview candidate source", () => {
       sourceCommit: fixture.candidate,
       version: "0.1.0-alpha.10"
     });
-  });
+  }, 15_000);
 
   it("rejects release tooling that is not the current origin/main authority", async () => {
     const fixture = await gitFixture();

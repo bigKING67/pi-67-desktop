@@ -438,7 +438,7 @@ function updateSettingsDescription(update: UpdateState, initialized: boolean): s
   if (update.phase === "downloading") {
     return `正在下载 ${update.version}，完成后会校验并启动安装。${checkedAt}`;
   }
-  if (update.phase === "installing") return `正在用已校验安装包更新至 ${update.version}。`;
+  if (update.phase === "installing") return update.artifactName.endsWith(".exe") ? `正在用已校验安装包更新至 ${update.version}；应用退出后 Windows 会继续显示安装进度并自动重新打开。` : `正在用已校验安装包更新至 ${update.version}。`;
   if (update.phase === "checking") return "正在读取固定 R2 更新清单。";
   if (update.phase === "current") return `当前版本 ${update.currentVersion}。${checkedAt}`;
   if (update.phase === "error") return `上次检查未完成，可以手动重试。${checkedAt}`;

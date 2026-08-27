@@ -60,7 +60,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "真实浏览器运行和自动化能力。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.4.0",
+    version: "0.5.0",
     installed: true
   }, {
     id: "js-reverse",
@@ -68,7 +68,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
     description: "浏览器 JavaScript 逆向和证据化分析。",
     packageId: "browser67",
     packageDisplayName: "browser67",
-    version: "0.4.0",
+    version: "0.5.0",
     installed: true
   }, {
     id: "design-craft",
@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.27.1",
+    catalogVersion: "2026.08.27.2",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -106,8 +106,8 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       origin: "first-party",
       bundled: true,
       defaultEnabled: true,
-      version: "0.4.0",
-      commit: "eb857d335660380a383490f549c4d40227dbf3dc",
+      version: "0.5.0",
+      commit: "aa8ca485fc27a5282e7215c0bcd3f355585231b0",
       resourceTypes: ["skill", "integration"],
       installed: true
     }, {
@@ -157,9 +157,9 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       displayName: "AI Berkshire 投资研究",
       description: "公司研究、财务分析和组合管理能力。",
       versionSource: "skill-pack",
-      bundledVersion: "1.0.3",
+      bundledVersion: "1.0.6",
       upstream: "https://github.com/xbtlin/ai-berkshire",
-      sourceCommit: "956e7987676ccfe2d5b4678f35389a281fc49cf3",
+      sourceCommit: "e83c25444989a045ce59da0ba6142cd03d62f580",
       updatePolicy: "hybrid",
       updateManager: "pi67-skill-pack-registry",
       independentUpdateState: "available",
@@ -181,9 +181,9 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       displayName: "browser67",
       description: "真实浏览器操作、诊断和 JavaScript 逆向能力。",
       versionSource: "capability-package",
-      bundledVersion: "0.4.0",
+      bundledVersion: "0.5.0",
       upstream: "https://github.com/bigKING67/browser67",
-      sourceCommit: "eb857d335660380a383490f549c4d40227dbf3dc",
+      sourceCommit: "aa8ca485fc27a5282e7215c0bcd3f355585231b0",
       updatePolicy: "capability-package",
       updateManager: "desktop-capability",
       independentUpdateState: "not-applicable",

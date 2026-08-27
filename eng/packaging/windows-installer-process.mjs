@@ -16,6 +16,7 @@ import { WINDOWS_INSTALLER_PROCESS_TIMEOUT_MS } from "./windows-installer-lifecy
 const FILE_STATE_TIMEOUT_MS = 30_000;
 const POWERSHELL_TIMEOUT_MS = 15_000;
 const WINDOWS_POST_UPDATE_LAUNCH_TIMEOUT_MS = 30_000;
+const WINDOWS_UPDATE_SURFACE_TIMEOUT_MS = 30_000;
 const execFileAsync = promisify(execFile);
 export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
 
@@ -43,9 +44,17 @@ export async function installNsisPackage(installerPath, installDirectory) {
 
 export async function installNsisUpdatePackage(installerPath, installDirectory) {
   const executablePath = join(installDirectory, "Pi-67 Desktop.exe");
-  await runExecutable(installerPath, buildNsisUpdateArguments(installDirectory));
+  const [execution, updateSurface] = await Promise.allSettled([
+    runExecutable(installerPath, buildNsisUpdateArguments(installDirectory)),
+    waitForWindowsInstallerSurface(installerPath)
+  ]);
+  if (execution.status === "rejected") throw execution.reason;
+  if (updateSurface.status === "rejected") throw updateSurface.reason;
   await waitForPathState(executablePath, true);
-  return waitForWindowsExecutableLaunch(executablePath);
+  return {
+    processId: await waitForWindowsExecutableLaunch(executablePath),
+    updateSurface: updateSurface.value
+  };
 }
 
 export async function resolveWindowsDesktopShortcutPath(shortcutName) {
@@ -255,6 +264,49 @@ async function waitForWindowsExecutableLaunch(executablePath) {
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
   }
   throw new Error("NSIS update did not automatically launch the updated Pi-67 executable.");
+}
+
+async function waitForWindowsInstallerSurface(installerPath) {
+  const startedAt = performance.now();
+  const deadline = Date.now() + WINDOWS_UPDATE_SURFACE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const observation = await findWindowsInstallerSurface(installerPath);
+    if (observation) {
+      return {
+        ...observation,
+        observedAfterMs: Math.round((performance.now() - startedAt) * 100) / 100
+      };
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  throw new Error("NSIS update did not expose a visible installation progress surface.");
+}
+
+async function findWindowsInstallerSurface(installerPath) {
+  const command = [
+    "$targetPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALLER_PATH', 'Process')",
+    "$target = [IO.Path]::GetFullPath($targetPath)",
+    "$match = Get-CimInstance -ClassName Win32_Process | Where-Object { $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { $process = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($null -ne $process -and $process.MainWindowHandle -ne 0) { [PSCustomObject]@{ processId = [int]$_.ProcessId; mainWindowTitle = [string]$process.MainWindowTitle } } } | Select-Object -First 1",
+    "if ($null -ne $match) { [Console]::Out.Write(($match | ConvertTo-Json -Compress)) }"
+  ].join("; ");
+  const { stdout } = await execFileAsync("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    command
+  ], powershellOptions({ PI67_WINDOWS_INSTALLER_PATH: installerPath }));
+  const value = stdout.trim();
+  if (value.length === 0) return undefined;
+  const parsed = JSON.parse(value);
+  if (
+    !Number.isSafeInteger(parsed?.processId)
+    || parsed.processId <= 0
+    || typeof parsed.mainWindowTitle !== "string"
+    || parsed.mainWindowTitle.length > 200
+  ) {
+    throw new Error("NSIS update progress surface returned invalid process evidence.");
+  }
+  return { processId: parsed.processId, mainWindowTitle: parsed.mainWindowTitle };
 }
 
 export async function findWindowsMainProcess(executablePath) {

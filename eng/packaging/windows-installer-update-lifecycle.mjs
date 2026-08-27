@@ -23,7 +23,8 @@ export async function verifyWindowsInstallerUpdateLifecycle({
   let processId;
   const startedAt = performance.now();
   try {
-    processId = await installNsisUpdatePackage(installerPath, installDirectory);
+    const updateResult = await installNsisUpdatePackage(installerPath, installDirectory);
+    processId = updateResult.processId;
     const phase = { durationMs: round(performance.now() - startedAt), name: phaseName };
     const installedArtifact = await resolveInstalledArtifact(installDirectory);
     await assertPackagedRuntimeAssets(installedArtifact);
@@ -40,6 +41,7 @@ export async function verifyWindowsInstallerUpdateLifecycle({
     const updateHandoff = {
       automaticPostInstallLaunch: true,
       arguments: buildNsisUpdateArguments("<existing-install-directory>"),
+      installationSurface: updateResult.updateSurface,
       desktopShortcut: await assertWindowsShortcutTarget(
         desktopShortcutPath,
         installedArtifact.executablePath,
