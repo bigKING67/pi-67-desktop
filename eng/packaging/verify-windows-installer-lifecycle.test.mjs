@@ -241,6 +241,12 @@ describe("Windows installer lifecycle contract", () => {
     expect(processSource).toContain("PI67_WINDOWS_EXECUTABLE_PATH");
     expect(processSource).toContain("PI67_WINDOWS_INSTALLER_PATH");
     expect(processSource).toContain("PI67_WINDOWS_PROCESS_ID");
+    expect(processSource).toContain(
+      "$candidateIds = @(Get-Process -ErrorAction SilentlyContinue"
+    );
+    expect(processSource).toContain(
+      'Get-CimInstance -ClassName Win32_Process -Filter \\"ProcessId = $($_)\\"'
+    );
     expect(source).toContain("verifyInitialProfileState: () => assertWindowsExistingProfilePreserved(");
     expect(source).toContain("await assertWindowsExistingProfileInteractionPreserved(");
   });

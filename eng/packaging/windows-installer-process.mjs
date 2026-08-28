@@ -21,6 +21,13 @@ const WINDOWS_TIMEOUT_DIAGNOSTIC_LEAD_MS = 30_000;
 const execFileAsync = promisify(execFile);
 export const WINDOWS_INSTALLATION_REMOVAL_TIMEOUT_MS = 90_000;
 
+const EXACT_WINDOWS_PROCESS_PATH_FUNCTION = [
+  "function Test-ExactProcessPath([System.Diagnostics.Process]$candidate, [string]$target) {",
+  "try { return $null -ne $candidate.Path -and [IO.Path]::GetFullPath($candidate.Path).Equals($target, [StringComparison]::OrdinalIgnoreCase) }",
+  "catch { return $false }",
+  "}"
+].join(" ");
+
 export function buildNsisInstallArguments(installDirectory) {
   if (typeof installDirectory !== "string" || installDirectory.length === 0) {
     throw new Error("NSIS install directory must be a non-empty single-line path.");
@@ -274,8 +281,9 @@ async function findWindowsInstallerSurface(installerPath) {
   const command = [
     "$targetPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_INSTALLER_PATH', 'Process')",
     "$target = [IO.Path]::GetFullPath($targetPath)",
-    "$match = Get-CimInstance -ClassName Win32_Process | Where-Object { $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object { $process = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($null -ne $process -and $process.MainWindowHandle -ne 0) { [PSCustomObject]@{ processId = [int]$_.ProcessId; mainWindowTitle = [string]$process.MainWindowTitle } } } | Select-Object -First 1",
-    "if ($null -ne $match) { [Console]::Out.Write(($match | ConvertTo-Json -Compress)) }"
+    EXACT_WINDOWS_PROCESS_PATH_FUNCTION,
+    "$match = Get-Process -ErrorAction SilentlyContinue | Where-Object { (Test-ExactProcessPath $_ $target) -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1",
+    "if ($null -ne $match) { [Console]::Out.Write(([PSCustomObject]@{ processId = [int]$match.Id; mainWindowTitle = [string]$match.MainWindowTitle } | ConvertTo-Json -Compress)) }"
   ].join("; ");
   const { stdout } = await execFileAsync("powershell.exe", [
     "-NoProfile",
@@ -298,15 +306,12 @@ async function findWindowsInstallerSurface(installerPath) {
 }
 
 export async function findWindowsMainProcess(executablePath) {
-  const processPredicate = [
-    "$_.ExecutablePath -and",
-    "[IO.Path]::GetFullPath($_.ExecutablePath).Equals($target, [StringComparison]::OrdinalIgnoreCase) -and",
-    "$_.CommandLine -notmatch '--type='"
-  ].join(" ");
   const command = [
     "$targetPath = [Environment]::GetEnvironmentVariable('PI67_WINDOWS_EXECUTABLE_PATH', 'Process')",
     "$target = [IO.Path]::GetFullPath($targetPath)",
-    `$match = Get-CimInstance -ClassName Win32_Process | Where-Object { ${processPredicate} } | Select-Object -First 1 -ExpandProperty ProcessId`,
+    EXACT_WINDOWS_PROCESS_PATH_FUNCTION,
+    "$candidateIds = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { Test-ExactProcessPath $_ $target } | Select-Object -ExpandProperty Id)",
+    "$match = $candidateIds | ForEach-Object { $candidate = Get-CimInstance -ClassName Win32_Process -Filter \"ProcessId = $($_)\" -ErrorAction SilentlyContinue; if ($null -ne $candidate -and $candidate.CommandLine -notmatch '--type=') { [int]$candidate.ProcessId } } | Select-Object -First 1",
     "if ($null -ne $match) { [Console]::Out.Write($match) }"
   ].join("; ");
   const { stdout } = await execFileAsync("powershell.exe", [
