@@ -6,6 +6,7 @@ import { unsignedPreviewArtifactSpecs, verifyUnsignedPreview } from "./unsigned-
 import { readPiRuntimeContract } from "./pi-runtime-contract.mjs";
 import { assertWindowsPreviewManualTestReceipt } from "./windows-preview-promotion.mjs";
 import { readWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
+import { verifyMacosPreviewCandidateFiles } from "./macos-preview-candidate.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const releaseDirectory = join(repositoryRoot, "artifacts/release");
@@ -17,7 +18,9 @@ export function unsignedPreviewBundleFiles(version) {
     "SHA256SUMS.txt",
     "unsigned-preview-manifest.json",
     "windows-preview-candidate-identity.json",
-    "windows-preview-manual-test.json"
+    "windows-preview-manual-test.json",
+    "macos-preview-candidate-identity.json",
+    "macos-preview-packaged-smoke.json"
   ];
 }
 
@@ -52,6 +55,21 @@ export async function prepareUnsignedPreviewBundle({
     candidate.installer,
     "Unsigned preview Windows installer"
   );
+  const macosArtifacts = unsignedPreviewArtifactSpecs(version)
+    .filter((spec) => spec.target === "macos-arm64");
+  const dmg = macosArtifacts.find((spec) => spec.name.endsWith(".dmg"));
+  const zip = macosArtifacts.find((spec) => spec.name.endsWith(".zip"));
+  if (!dmg || !zip) throw new Error("Unsigned preview macOS artifact specifications are incomplete.");
+  await verifyMacosPreviewCandidateFiles({
+    candidateIdentityPath: join(releaseRoot, "macos-preview-candidate-identity.json"),
+    dmgPath: join(releaseRoot, dmg.name),
+    expectedRepository: candidate.repository,
+    expectedRuntimeSpecifier: `@earendil-works/pi-coding-agent@${runtime}`,
+    expectedSourceCommit: candidate.source.commit,
+    packagedSmokeReceiptPath: join(releaseRoot, "macos-preview-packaged-smoke.json"),
+    version,
+    zipPath: join(releaseRoot, zip.name)
+  });
   await rm(outputRoot, { recursive: true, force: true });
   await mkdir(outputRoot, { recursive: true });
   for (const name of unsignedPreviewBundleFiles(version)) {

@@ -13,6 +13,7 @@ import {
 } from "./unsigned-preview-artifacts.mjs";
 import { readWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
 import { assertWindowsPreviewManualTestReceipt } from "./windows-preview-promotion.mjs";
+import { verifyMacosPreviewCandidateFiles } from "./macos-preview-candidate.mjs";
 
 export const R2_UPDATE_MANIFEST_NAME = "unsigned-preview-manifest.json";
 export const R2_UPDATE_ORIGIN = "https://updates.52671314.xyz";
@@ -88,6 +89,24 @@ export async function loadLocalR2Release({ directory, version, runtimeVersion })
       failures.push(error instanceof Error ? error.message : "R2 Windows update installer mismatch");
     }
   }
+  const macosDmg = artifacts.find((entry) => entry.target === "macos-arm64" && entry.name.endsWith(".dmg"));
+  const macosZip = artifacts.find((entry) => entry.target === "macos-arm64" && entry.name.endsWith(".zip"));
+  if (!macosDmg || !macosZip) {
+    failures.push("macOS update artifacts are incomplete");
+  }
+  let macosEvidence;
+  if (macosDmg && macosZip) {
+    macosEvidence = await verifyMacosPreviewCandidateFiles({
+      candidateIdentityPath: join(directory, "macos-preview-candidate-identity.json"),
+      dmgPath: macosDmg.path,
+      expectedRepository: candidate.repository,
+      expectedRuntimeSpecifier: `@earendil-works/pi-coding-agent@${runtimeVersion}`,
+      expectedSourceCommit: candidate.source.commit,
+      packagedSmokeReceiptPath: join(directory, "macos-preview-packaged-smoke.json"),
+      version,
+      zipPath: macosZip.path
+    });
+  }
   if (failures.length > 0) throwR2VerificationFailures(failures);
   return {
     version,
@@ -100,7 +119,9 @@ export async function loadLocalR2Release({ directory, version, runtimeVersion })
       repository: candidate.repository,
       sourceCommit: candidate.source.commit,
       windowsCandidateRunId: candidate.workflow.runId,
-      windowsCandidateRunAttempt: candidate.workflow.runAttempt
+      windowsCandidateRunAttempt: candidate.workflow.runAttempt,
+      macosCandidateIdentitySha256: macosEvidence.identitySha256,
+      macosPackagedSmokeReceiptSha256: macosEvidence.packagedSmokeReceiptSha256
     }
   };
 }

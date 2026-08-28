@@ -8,6 +8,10 @@ import { readFileByteIdentity } from "../packaging/windows-artifact-identity.mjs
 import { createWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
 import { WINDOWS_PREVIEW_MANUAL_TEST_SCHEMA } from "./windows-preview-promotion.mjs";
 import { loadLocalR2Release } from "./r2-update-release-contract.mjs";
+import {
+  resolveMacosPreviewEvidencePaths,
+  writeMacosPreviewCandidateEvidence
+} from "./macos-preview-candidate.mjs";
 
 const temporaryDirectories = [];
 
@@ -24,6 +28,7 @@ describe("R2 update bundle", () => {
     const runtimeVersion = "0.55.3";
     await writeSources(releaseDirectory, version);
     await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
 
     const result = await prepareR2UpdateBundle({
@@ -36,10 +41,12 @@ describe("R2 update bundle", () => {
     expect(result.files).toEqual(r2UpdateUploadOrder(version));
     expect(result.localProvenanceFiles).toEqual([
       "windows-preview-candidate-identity.json",
-      "windows-preview-manual-test.json"
+      "windows-preview-manual-test.json",
+      "macos-preview-candidate-identity.json",
+      "macos-preview-packaged-smoke.json"
     ]);
     expect(result.metadataLast).toBe("unsigned-preview-manifest.json");
-    expect(await readdir(outputDirectory)).toHaveLength(6);
+    expect(await readdir(outputDirectory)).toHaveLength(8);
     expect(JSON.parse(await readFile(join(outputDirectory, "unsigned-preview-manifest.json"), "utf8")))
       .toMatchObject({ version, channel: "unsigned-preview", signed: false });
     await expect(loadLocalR2Release({
@@ -51,7 +58,9 @@ describe("R2 update bundle", () => {
         repository: "bigKING67/pi-67-desktop",
         sourceCommit: "a".repeat(40),
         windowsCandidateRunId: "42",
-        windowsCandidateRunAttempt: "2"
+        windowsCandidateRunAttempt: "2",
+        macosCandidateIdentitySha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        macosPackagedSmokeReceiptSha256: expect.stringMatching(/^[a-f0-9]{64}$/u)
       }
     });
   });
@@ -64,6 +73,7 @@ describe("R2 update bundle", () => {
     const runtimeVersion = "0.55.3";
     await writeSources(releaseDirectory, version);
     await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
     await writeFile(
       join(releaseDirectory, `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`),
@@ -104,6 +114,7 @@ describe("R2 update bundle", () => {
     const runtimeVersion = "0.55.3";
     await writeSources(releaseDirectory, version);
     await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion);
     await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
     await prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion });
     const artifactPath = join(
@@ -116,7 +127,23 @@ describe("R2 update bundle", () => {
     await symlink(targetPath, artifactPath);
 
     await expect(loadLocalR2Release({ directory: outputDirectory, version, runtimeVersion }))
-      .rejects.toThrow("source is not a regular file");
+      .rejects.toThrow("not a regular file");
+  });
+
+  it("rejects macOS artifacts built from a different source commit", async () => {
+    const root = await temporaryDirectory();
+    const releaseDirectory = join(root, "release");
+    const outputDirectory = join(root, "r2");
+    const version = "0.1.0-alpha.30";
+    const runtimeVersion = "0.55.3";
+    await writeSources(releaseDirectory, version);
+    await writeWindowsProvenance(releaseDirectory, version, runtimeVersion);
+    await writeMacosProvenance(releaseDirectory, version, runtimeVersion, "b".repeat(40));
+    await prepareUnsignedPreview(releaseDirectory, version, runtimeVersion);
+    await prepareR2UpdateBundle({ releaseDirectory, outputDirectory, version, runtimeVersion });
+
+    await expect(loadLocalR2Release({ directory: outputDirectory, version, runtimeVersion }))
+      .rejects.toThrow("source commit mismatch");
   });
 });
 
@@ -127,13 +154,37 @@ async function temporaryDirectory() {
 }
 
 async function writeSources(directory, version) {
-  await mkdir(join(directory, "win-unpacked"), { recursive: true });
+  await Promise.all([
+    mkdir(join(directory, "win-unpacked"), { recursive: true }),
+    mkdir(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/MacOS"), { recursive: true }),
+    mkdir(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/Resources"), { recursive: true })
+  ]);
   await Promise.all([
     writeFile(join(directory, `Pi-67-Desktop-${version}-win-x64.exe`), "windows"),
     writeFile(join(directory, "win-unpacked/Pi-67 Desktop.exe"), "windows-executable"),
     writeFile(join(directory, `Pi-67-Desktop-${version}-mac-arm64.dmg`), "macos-dmg"),
-    writeFile(join(directory, `Pi-67-Desktop-${version}-mac-arm64.zip`), "macos-zip")
+    writeFile(join(directory, `Pi-67-Desktop-${version}-mac-arm64.zip`), "macos-zip"),
+    writeFile(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/MacOS/Pi-67 Desktop"), "macos-executable"),
+    writeFile(join(directory, "mac-arm64/Pi-67 Desktop.app/Contents/Resources/app.asar"), "macos-asar")
   ]);
+}
+
+async function writeMacosProvenance(
+  directory,
+  version,
+  runtimeVersion,
+  sourceCommit = "a".repeat(40)
+) {
+  await writeMacosPreviewCandidateEvidence({
+    host: { platform: "darwin", architecture: "arm64" },
+    paths: resolveMacosPreviewEvidencePaths(version, directory),
+    releaseRoot: directory,
+    repository: "bigKING67/pi-67-desktop",
+    runtimeSpecifier: `@earendil-works/pi-coding-agent@${runtimeVersion}`,
+    source: { policy: "main", commit: sourceCommit, clean: true },
+    verifyContainers: async () => undefined,
+    version
+  });
 }
 
 async function writeWindowsProvenance(directory, version, runtimeVersion) {

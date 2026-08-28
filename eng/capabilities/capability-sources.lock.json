@@ -1,6 +1,6 @@
 {
   "schema": "pi67.capability-sources-lock.v1",
-  "catalogVersion": "2026.08.27.4",
+  "catalogVersion": "2026.08.28.1",
   "sources": [
     {
       "id": "pi67-core",
@@ -51,95 +51,95 @@
       "adapterSourceId": "pi67-core",
       "repository": "https://github.com/xbtlin/ai-berkshire",
       "ref": "refs/heads/main",
-      "commit": "e83c25444989a045ce59da0ba6142cd03d62f580",
+      "commit": "76aa42feddbb6246d5d665d99c3b6b4034b20eaf",
       "localSibling": "../ai-berkshire",
-      "version": "1.0.6",
-      "manifestSha256": "2a7110775213dea3991247fe9935006f773b38091ac8905bacfde13b830fbb03",
-      "bundleSha256": "691ec7f0bdcb376b279b6fa5e6c1e719295aaa92a5a3d8a4beb66150b8bc5f9f",
+      "version": "1.0.7",
+      "manifestSha256": "20fe513801285771c69a8015a17d3cc3c77f542faf479763a67e74135fb40880",
+      "bundleSha256": "a1bd34ca867dd33e3dda1591cb0860b65c7cdbf35b1a47f5900dd0d5dfe29354",
       "skills": [
         {
           "name": "bottleneck-hunter",
-          "sha256": "3e9f086af6c8e987e5e2179013ab00f6c68aa6c2b670c7883dcba28af66c5045"
+          "sha256": "4c2330c3abf45a7a758d4be40d59cb842dd42b07cbacbdd17ef77f7c8d09c201"
         },
         {
           "name": "deep-company-series",
-          "sha256": "0040d414842177666bf56c55d8df4083f93bab0269062dc0c5a8604679e4918b"
+          "sha256": "49902e885411a06713fd3fd18cde65b39c748b6a28f97c1870c7031efea2eecc"
         },
         {
           "name": "dyp-ask",
-          "sha256": "6ff9bc85bad6149b50147117a98220aa8de957e324c5eac9afd9034fc806fef5"
+          "sha256": "4ab5c6cfa61fb75a91bd8559c7516f47f12668938db5a82c622e0c8c538f5b50"
         },
         {
           "name": "earnings-review",
-          "sha256": "31a8244918f46a4104b5ef51143264714cb71224fbf7de642e9eaee0ff868e36"
+          "sha256": "11cdb97b412dd05c98953755d0c121fbdb3bf491fe405cad20139371fbb85a74"
         },
         {
           "name": "earnings-team",
-          "sha256": "4bdf2ff5bfaf93ad0b96129f70a114b60f883610ddab52a236597b04869cde75"
+          "sha256": "b8bfda407f4be79698fc2002a585d0427a1c4691ba5d330f6674312e7ae0d114"
         },
         {
           "name": "financial-data",
-          "sha256": "843faca07fcd86a0fd3429125bd75546e911f839b4a5f7da2792526cb60a2403"
+          "sha256": "e6515bb0676ee502327f8d69f10f59e9a1a24500a6065408411e82d9597bb29e"
         },
         {
           "name": "income-investment",
-          "sha256": "803e9671f14f0539a6b1f41d40bb649414fd61e4397f093042693afab5a31556"
+          "sha256": "459ce4b830fd1f5ae2bba66a55941fdd2a36126d317089c82412af3a7919146d"
         },
         {
           "name": "industry-funnel",
-          "sha256": "25062a3720cc8f1ea578c2b2e600904894b2884ad6a81c3795be7771466589e8"
+          "sha256": "965c17202cb0bc7af34b2896989ef8dfe183ca96b038b6fd05f8f25230c590d8"
         },
         {
           "name": "industry-research",
-          "sha256": "2ce99312948e5e73b03d14ae9cbfac55318c5b46fe0087e55dbdd924cb33f0b0"
+          "sha256": "179c74d988503dcf2cd1b08596ed17fc6b52a3d4893a5f9c61492e9c93ac9ecb"
         },
         {
           "name": "investment-checklist",
-          "sha256": "606ef40fa74cced102fed7bb94bbfbea2369b7ffd417a71db820b6e6dbe85869"
+          "sha256": "4b52bcb816ede47cdf2d1decfd82f3bb8114acc548d47370c498c0636ddf2db2"
         },
         {
           "name": "investment-memo-craft",
-          "sha256": "53c12ef200615a46e010a330b1982ee086352bc1f0effe8e67cc164f9a27f65d"
+          "sha256": "09dfbfdeb5d4b469c5e7bae2d16f7edcaf324a0a029427ae95cf55237aedafc3"
         },
         {
           "name": "investment-research",
-          "sha256": "1ff1bfb736dceedc02fe51803e74fc2adbdbb5177d3274e9b33b485553e8449f"
+          "sha256": "0cd14e4a72d7d770cfa6e794ca93392062d935c72df6cb51ead9ec58252542c9"
         },
         {
           "name": "investment-team",
-          "sha256": "6ff5d66094536ff3c3ba78da9f1d9c38a582d64bcc01376e26fda692f7903886"
+          "sha256": "3d7e672d832e184913be019424f266175c01e7fd49a9393415b211bca3a6bd8b"
         },
         {
           "name": "management-deep-dive",
-          "sha256": "5475b9eed16df6ede1d74858527a3be0868d98f82e63abf897cc160eccd2a171"
+          "sha256": "1c508507ded2bc2e6853f998252115ccefdff91787d5b6d8a4da792b9720887a"
         },
         {
           "name": "news-pulse",
-          "sha256": "b2427ea50d667decf6812c7bbb7a62d5199cde01571d6e6b3d461f42c4f7e08f"
+          "sha256": "4f27e956e9f2a1ddaab4f6a36bd25e2e01756075b70d4de1997f11fe96862cf4"
         },
         {
           "name": "portfolio-review",
-          "sha256": "c9b36dec3cfefebb79bfa0231e3b14fa6fbc6390452d61d8fc128535ed66dc92"
+          "sha256": "b6ef1759f2decfe08912132a06f379ba20b308c9b114ca395cb071473793e80a"
         },
         {
           "name": "private-company-research",
-          "sha256": "3116e373491a8fec876b602fbb657676b391f9a0c125b2da5ed48825ee3577bc"
+          "sha256": "18f5d6d744b4d037aee89364b2b6d8add3a3342449d51ecb3709eced76ea0a4a"
         },
         {
           "name": "quality-screen",
-          "sha256": "cc0af3bcb087e335a33b31b24aaf59d9866d8e4bead427e29c11a4aacd41b955"
+          "sha256": "768642fe6c2214af77ec3f5db066f94e59998d9e6dd75f2cf9e8d84e237710c5"
         },
         {
           "name": "thesis-drift",
-          "sha256": "edc7b909a054a3d212ad1f11307761cc4416a8810157f0058bd7c2833f47c987"
+          "sha256": "8503096c2340cac1df14450bdf5fee33c16634894bdc7070aefb1a1fe04d8094"
         },
         {
           "name": "thesis-tracker",
-          "sha256": "4ff8db6099aa291d4e1e80a0899a58dbea406104284c233466f68601acd94ec9"
+          "sha256": "d48b83b7ea0885b8f4340fcd8dfc189d543882323a876f4bb51b14af010c7874"
         },
         {
           "name": "wechat-article",
-          "sha256": "36a7c4dc2e5a2da49b96816b2285cdae81f63a67e92126cfa2f1237956c65f4c"
+          "sha256": "6018f556fa7affc160e1cdf027ee028e87e8fffc78418340956ec9d7abbc3abf"
         }
       ]
     }

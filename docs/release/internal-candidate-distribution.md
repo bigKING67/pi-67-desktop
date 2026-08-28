@@ -27,8 +27,10 @@ Pi-67-Desktop-<version>-mac-arm64.dmg
 Pi-67-Desktop-<version>-mac-arm64.zip
 ```
 
-Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作为构建证据，但该 identity、
-`win-unpacked`、验证截图和 receipt 不上传到面向测试者的飞书产品目录。
+Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作为构建证据。macOS 构建必须保留
+`macos-preview-candidate-identity.json` 和 `macos-preview-packaged-smoke.json`，用于把 app、DMG、ZIP、
+packaged smoke、source SHA、version 和 Pi runtime 绑定为同一候选。上述 identity/receipt、`win-unpacked`、
+验证截图和日志都不上传到面向测试者的飞书产品目录。
 
 ## Default development loop
 
@@ -49,9 +51,13 @@ Windows candidate 还必须保留 `windows-preview-candidate-identity.json` 作�
    所在的成功 attempt 与 identity 记录的原始 build attempt 分开传入；普通未重跑的 Candidate 两者相同。
 3. **Build macOS**：在 Apple Silicon Mac 上运行相关 quality gate 和
    `corepack pnpm run preview:mac:unsigned`。该命令必须重新打包、执行 packaged smoke 并打开当前仓库
-   artifact；不能用一次 `open` 冒充新包已加载。分发的是生成的 DMG 和 ZIP。
+   artifact；不能用一次 `open` 冒充新包已加载。命令在 open 前还会用原生 `hdiutil verify` 和
+   `unzip -tq` 验证 DMG/ZIP 容器，并写入绑定 app executable、`app.asar`、DMG、ZIP 和 smoke receipt
+   SHA-256 的 macOS candidate identity。分发的是生成的 DMG 和 ZIP。
 4. **Record identity**：对三个产品文件记录 version、完整 source SHA、size 和 SHA-256；Windows 另记录
-   workflow run/attempt、candidate identity SHA-256、installer identity 和 `signed=false`。
+   workflow run/attempt、candidate identity SHA-256、installer identity 和 `signed=false`；macOS 另记录
+   candidate identity、packaged-smoke receipt 和 app 内关键运行文件 identity。进入 promotion/R2 前，
+   macOS 与 Windows evidence 必须声明相同 repository、source SHA、version 和 Pi runtime。
 5. **Resolve destination**：飞书文件夹 URL/token、OAuth token、cookie 和登录态必须留在仓库外。
    目标可由 `PI67_FEISHU_CANDIDATE_FOLDER_TOKEN` 等 operator configuration 提供；不得把实际值写入文档、
    workflow、`.env` 或日志。

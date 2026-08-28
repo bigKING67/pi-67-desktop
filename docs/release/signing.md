@@ -386,16 +386,20 @@ Workspace、Prompt/streaming/Tools、审批、停止与恢复、中文输入、D
 `Unsigned preview promotion` 必须同时收到完整 source SHA、成功 candidate run/attempt、
 `confirm_windows_tested=true` 和 `confirm_publish=true`：
 
-1. source SHA 必须仍可从 `main` 到达，package version 对应的 Tag/Release 必须不存在；
+1. source SHA 必须仍可从 `main` 到达，package version 对应的 Tag/Release 必须不存在，且 package
+   version 必须严格大于固定 R2 update origin 当前公开 manifest 的版本；
 2. candidate run 必须是本仓库成功完成的 `Windows candidate` manual workflow；
 3. promotion 跨 run 下载 `windows-candidate-<run-id>-<attempt>`，重新验证 candidate identity 和
    installer/executable bytes，并生成绑定该 identity SHA-256 的 `windows-preview-manual-test.json`；
-4. Windows 不再构建；macOS arm64 从同一 source SHA 运行完整 quality、package 和 smoke；
+4. Windows 不再构建；macOS arm64 从同一 source SHA 运行完整 quality、package 和 smoke，并生成
+   `macos-preview-candidate-identity.json` 与 `macos-preview-packaged-smoke.json`；identity 必须绑定
+   app executable、`app.asar`、DMG、ZIP、source、version、runtime，且 DMG/ZIP 经过原生容器验证；
 5. `unsigned-preview-manifest.json` 必须声明 `channel=unsigned-preview`、`signed=false`，并与
    `SHA256SUMS.txt`、Windows NSIS、macOS DMG/ZIP 逐一验证 size、target 和 SHA-256；重命名后的
    Windows 发布 EXE 还必须与人工测试 candidate identity 中的 size/SHA-256 完全相同；
-6. verify job 只把三个产品、manifest、checksums、candidate identity 和 manual-test receipt 复制到
-   固定 allowlist bundle；持有 `contents: write` 的 publish job 不 checkout 或执行仓库代码；
+6. verify job 只把三个产品、manifest、checksums、Windows candidate identity/manual-test receipt 和
+   macOS candidate identity/packaged-smoke receipt 复制到固定 allowlist bundle；它要求两平台 evidence
+   的 repository/source/version/runtime 相同。持有 `contents: write` 的 publish job 不 checkout 或执行仓库代码；
 7. publish 使用 candidate 中已经人工测试的 Windows bytes，不调用 electron-builder；Tag 只在全部
    gate 通过后由 `gh release create --target <source_sha>` 创建；
 8. 文件名必须带 `-unsigned-preview`，Release 必须是 prerelease，不发布 `latest*.yml` 或 blockmap；

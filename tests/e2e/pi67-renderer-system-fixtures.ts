@@ -89,7 +89,7 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
   }];
   return {
     phase: "ready",
-    catalogVersion: "2026.08.27.4",
+    catalogVersion: "2026.08.28.1",
     packages: [{
       id: "pi67-core",
       displayName: "Pi-67 Core",
@@ -157,9 +157,9 @@ export function createMockDesktopCapabilitySnapshot(): DesktopCapabilitySnapshot
       displayName: "AI Berkshire 投资研究",
       description: "公司研究、财务分析和组合管理能力。",
       versionSource: "skill-pack",
-      bundledVersion: "1.0.6",
+      bundledVersion: "1.0.7",
       upstream: "https://github.com/xbtlin/ai-berkshire",
-      sourceCommit: "e83c25444989a045ce59da0ba6142cd03d62f580",
+      sourceCommit: "76aa42feddbb6246d5d665d99c3b6b4034b20eaf",
       updatePolicy: "hybrid",
       updateManager: "pi67-skill-pack-registry",
       independentUpdateState: "available",

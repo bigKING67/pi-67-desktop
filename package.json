@@ -1,6 +1,6 @@
 {
   "name": "pi-67-desktop",
-  "version": "0.1.0-alpha.36",
+  "version": "0.1.0-alpha.37",
   "description": "Pi-first desktop client for Windows x64 and macOS Apple Silicon.",
   "author": "bigKING67",
   "private": true,
@@ -81,8 +81,10 @@
     "release:r2:publish": "node eng/release/r2-update-release.mjs publish",
     "release:r2:cleanup": "node eng/release/r2-update-release.mjs cleanup",
     "release:preview:source:verify": "node eng/release/preview-candidate-source.mjs",
+    "release:preview:version:verify": "node eng/release/preview-version-availability.mjs",
     "release:preview:candidate": "node eng/release/windows-preview-candidate.mjs",
     "release:preview:promotion:verify": "node eng/release/windows-preview-promotion.mjs",
+    "release:preview:macos:candidate": "node eng/release/macos-preview-candidate.mjs create",
     "release:preview:bundle:prepare": "node eng/release/prepare-unsigned-preview-bundle.mjs"
   },
   "dependencies": {

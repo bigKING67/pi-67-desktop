@@ -1,6 +1,6 @@
 {
   "name": "@pi67/extension-compat",
-  "version": "0.1.0-alpha.36",
+  "version": "0.1.0-alpha.37",
   "private": true,
   "type": "module",
   "sideEffects": false,

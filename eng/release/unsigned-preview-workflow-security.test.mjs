@@ -87,6 +87,11 @@ describe("unsigned preview candidate and promotion workflow security", () => {
     expect(source).toContain("confirm_windows_tested:");
     expect(source).toContain("confirm_publish:");
     expect(source).toContain("windows-preview-manual-test.json");
+    expect(source).toContain("macos-preview-candidate-identity.json");
+    expect(source).toContain("macos-preview-packaged-smoke.json");
+    expect(source).toContain("release:preview:macos:candidate");
+    expect(source).toContain("release:preview:version:verify");
+    expect(source).toContain("Require a version newer than the public update manifest");
     expect(source).toContain("verified-unsigned-preview-${{ github.run_id }}-${{ github.run_attempt }}");
     expect(source).not.toContain("build-windows:");
     const publish = source.slice(source.indexOf("  publish:"));

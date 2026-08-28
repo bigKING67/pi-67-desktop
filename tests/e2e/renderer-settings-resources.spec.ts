@@ -120,7 +120,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await expect(globalPanel.getByText("AI Berkshire 投资研究", { exact: true })).toHaveCount(1);
   await expect(globalPanel.getByText("Commerce Growth OS", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 基线未独立版本化", { exact: true })).toBeVisible();
-  await expect(globalPanel.getByText("1 个技能 · 内置基线 1.0.6", { exact: true })).toBeVisible();
+  await expect(globalPanel.getByText("1 个技能 · 内置基线 1.0.7", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("1 个技能 · 内置基线 2.2.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 内置基线 0.6.0", { exact: true })).toBeVisible();
   await expect(globalPanel.getByText("2 个技能 · 2 个内置来源", { exact: true })).toBeVisible();
@@ -146,10 +146,10 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await globalPanel.getByTestId("bundled-skill-suite-row")
     .filter({ hasText: "AI Berkshire 投资研究" }).click();
   await expect(suiteDetail.getByRole("heading", { name: "AI Berkshire 投资研究", exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("1.0.6", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByText("1.0.7", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("可独立管理", { exact: true })).toBeVisible();
   await expect(suiteDetail.getByText("https://github.com/xbtlin/ai-berkshire", { exact: true })).toBeVisible();
-  await expect(suiteDetail.getByText("e83c25444", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByText("76aa42fed", { exact: true })).toBeVisible();
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
 
   await expect(skillWorkspace.getByTestId("managed-skill-pack-row")).toHaveCount(0);
@@ -182,7 +182,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   await aiSuiteRow.click();
   await suiteDetail.getByRole("button", { name: "更新套件", exact: true }).click();
   const skillUpdateDialog = page.getByRole("dialog", { name: "更新技能套件" });
-  await expect(skillUpdateDialog).toContainText("1.0.6");
+  await expect(skillUpdateDialog).toContainText("1.0.7");
   await expect(skillUpdateDialog).toContainText("1.0.7");
   await skillUpdateDialog.getByRole("button", { name: "确认更新", exact: true }).click();
   await expect(suiteDetail.getByText("1.0.7 · Overlay", { exact: true })).toBeVisible();
@@ -192,7 +192,7 @@ test("separates extension packages, extensions, skills, prompt templates, and co
   const restoreDialog = page.getByRole("dialog", { name: "恢复内置技能套件" });
   await expect(restoreDialog).toContainText("恢复会移除受管 Overlay");
   await restoreDialog.getByRole("button", { name: "确认恢复", exact: true }).click();
-  await expect(suiteDetail.getByText("1.0.6 · 内置", { exact: true })).toBeVisible();
+  await expect(suiteDetail.getByText("1.0.7 · 内置", { exact: true })).toBeVisible();
   await suiteDetail.getByRole("button", { name: "返回全局可用技能" }).click();
 
   await skillTabs.getByRole("tab", { name: "项目专属", exact: true }).click();

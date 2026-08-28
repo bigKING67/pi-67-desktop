@@ -7,6 +7,10 @@ import { prepareUnsignedPreview } from "./unsigned-preview-artifacts.mjs";
 import { createWindowsPreviewCandidateIdentity } from "./windows-preview-candidate.mjs";
 import { parseWindowsPreviewManualTestArguments } from "./windows-preview-manual-test.mjs";
 import {
+  resolveMacosPreviewEvidencePaths,
+  writeMacosPreviewCandidateEvidence
+} from "./macos-preview-candidate.mjs";
+import {
   WINDOWS_PREVIEW_OPERATOR_MANUAL_TEST_SCHEMA,
   recordWindowsPreviewManualTest,
   verifyWindowsPreviewPromotion
@@ -171,16 +175,33 @@ async function promotionFixture() {
   temporaryDirectories.push(root);
   const releaseRoot = join(root, "release");
   const unpacked = join(releaseRoot, "win-unpacked");
-  await mkdir(unpacked, { recursive: true });
   const version = "0.1.0-alpha.10";
+  const macosPaths = resolveMacosPreviewEvidencePaths(version, releaseRoot);
+  await Promise.all([
+    mkdir(unpacked, { recursive: true }),
+    mkdir(join(macosPaths.applicationPath, "Contents/MacOS"), { recursive: true }),
+    mkdir(join(macosPaths.applicationPath, "Contents/Resources"), { recursive: true })
+  ]);
   const installerPath = join(releaseRoot, `Pi-67-Desktop-${version}-win-x64.exe`);
   const executablePath = join(unpacked, "Pi-67 Desktop.exe");
   await Promise.all([
     writeFile(installerPath, "installer"),
     writeFile(executablePath, "executable"),
-    writeFile(join(releaseRoot, `Pi-67-Desktop-${version}-mac-arm64.dmg`), "dmg"),
-    writeFile(join(releaseRoot, `Pi-67-Desktop-${version}-mac-arm64.zip`), "zip")
+    writeFile(macosPaths.dmgPath, "dmg"),
+    writeFile(macosPaths.zipPath, "zip"),
+    writeFile(macosPaths.executablePath, "macos-executable"),
+    writeFile(macosPaths.appAsarPath, "macos-asar")
   ]);
+  await writeMacosPreviewCandidateEvidence({
+    host: { platform: "darwin", architecture: "arm64" },
+    paths: macosPaths,
+    releaseRoot,
+    repository: "bigKING67/pi-67-desktop",
+    runtimeSpecifier: "@earendil-works/pi-coding-agent@0.81.1",
+    source: { policy: "main", commit: "a".repeat(40), clean: true },
+    verifyContainers: async () => undefined,
+    version
+  });
   const identity = await createWindowsPreviewCandidateIdentity({
     host: { platform: "win32", architecture: "x64" },
     installerPath,

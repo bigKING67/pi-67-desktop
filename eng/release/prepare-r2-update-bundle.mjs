@@ -12,7 +12,9 @@ const defaultReleaseDirectory = join(root, "artifacts/verified-unsigned-preview"
 const defaultOutputDirectory = join(root, "artifacts/r2-update-bundle");
 const LOCAL_PROVENANCE_FILES = [
   "windows-preview-candidate-identity.json",
-  "windows-preview-manual-test.json"
+  "windows-preview-manual-test.json",
+  "macos-preview-candidate-identity.json",
+  "macos-preview-packaged-smoke.json"
 ];
 
 export function r2UpdateUploadOrder(version) {

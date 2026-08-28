@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { access, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeMacosPreviewCandidateEvidence } from "../release/macos-preview-candidate.mjs";
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const APPLICATION_BUNDLE_ID = "com.pi67.desktop";
@@ -39,6 +40,10 @@ export async function previewMacosUnsigned({
   await quitRunningApplication(target.executablePath);
   await runPnpmScript("package:native:unsigned", root);
   await runPnpmScript("package:smoke", root);
+  await writeMacosPreviewCandidateEvidence({
+    releaseRoot: join(root, "artifacts/release"),
+    sourceRoot: root
+  });
   await Promise.all([access(target.applicationPath), access(target.asarPath), access(target.executablePath)]);
   await run("/usr/bin/open", ["-n", target.applicationPath], { cwd: root });
   const processIds = await waitForProcessState(target.executablePath, true, 10_000);

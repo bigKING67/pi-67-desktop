@@ -97,17 +97,23 @@ artifacts/r2-update-bundle/
 ```
 
 The command consumes `artifacts/verified-unsigned-preview/`, not raw packaging output. It verifies
-the manifest and every artifact again, then copies six local files:
+the manifest and every artifact again, then copies eight local files:
 
 - the three versioned product artifacts;
 - `unsigned-preview-manifest.json`;
 - `windows-preview-candidate-identity.json`; and
-- `windows-preview-manual-test.json`.
+- `windows-preview-manual-test.json`;
+- `macos-preview-candidate-identity.json`; and
+- `macos-preview-packaged-smoke.json`.
 
-Only the first four files are uploaded. The two Windows provenance files remain local release
-evidence and bind the R2 Windows EXE to the exact manually tested candidate, workflow run/attempt,
-source SHA, packaged executable hash, and Pi runtime version. The command prints the four-file
-upload order with `unsigned-preview-manifest.json` last.
+Only the first four files are uploaded. The four provenance files remain local release evidence.
+The Windows pair binds the R2 Windows EXE to the exact manually tested candidate, workflow
+run/attempt, source SHA, packaged executable hash, and Pi runtime version. The macOS pair binds the
+R2 DMG/ZIP to the packaged app executable, `app.asar`, real DMG/ZIP container verification,
+packaged-smoke receipt, source SHA, and Pi runtime version. Bundle preparation rejects missing,
+drifted, dirty-source, or cross-source macOS evidence and requires it to match the Windows candidate
+repository/source/version/runtime. The command prints the four-file upload order with
+`unsigned-preview-manifest.json` last.
 
 ## Read-only publication plan
 

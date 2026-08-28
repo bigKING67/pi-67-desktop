@@ -367,8 +367,8 @@ export function installMockCommandResponseHandler({
       canUpdate: status === "update-available",
       effectiveSource: aiSource,
       canRestore: aiSource === "managed",
-      baselineVersion: "1.0.6",
-      installedVersion: aiSource === "managed" ? "1.0.7" : "1.0.6",
+      baselineVersion: "1.0.7",
+      installedVersion: "1.0.7",
       ...(status === "not-checked" ? {} : {
         latestVersion: "1.0.7",
         registryCommit: "7".repeat(40)
