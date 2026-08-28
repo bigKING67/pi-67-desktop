@@ -249,7 +249,7 @@ test("persists a Provider credential through App authority without starting a Ta
   await expect(connection.getByText("需要 API Key", { exact: true })).toBeVisible();
   await expect(connection.getByText("https://api.deepseek.com", { exact: true })).toBeVisible();
   await expect(connection.getByText("openai-completions", { exact: true })).toBeVisible();
-  await expect(connection.getByText(/DeepSeek V4 Flash 通过官方 Responses \/responses 自动联网搜索/u)).toBeVisible();
+  await expect(connection.getByText(/DeepSeek 官方目录模型通过 Responses \/responses 自动联网搜索/u)).toBeVisible();
   await expect(providerPanel.getByLabel("Base URL")).toHaveCount(0);
   await providerPanel.getByRole("button", { name: "配置 API Key", exact: true }).click();
 

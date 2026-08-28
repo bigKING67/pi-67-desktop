@@ -412,18 +412,18 @@ describe("Windows installer lifecycle contract", () => {
   });
 
   it("preserves dual-resolver shortcut evidence before target certification", async () => {
-    const processSource = await readFile(
-      join(repositoryRoot, "eng/packaging/windows-installer-process.mjs"),
+    const shortcutSource = await readFile(
+      join(repositoryRoot, "eng/packaging/windows-shortcut-inspection.mjs"),
       "utf8"
     );
 
-    expect(processSource).toContain('"desktop-shortcut-observed.lnk"');
-    expect(processSource).toContain('"desktop-shortcut-inspection.json"');
-    expect(processSource).toContain("resolveWindowsShortcutWithWScript(shortcutPath)");
-    expect(processSource).toContain("resolveWindowsShortcutWithWScript(preservedShortcutPath)");
-    expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(shortcutPath)");
-    expect(processSource).toContain("resolveWindowsShortcutWithShellApplication(preservedShortcutPath)");
-    expect(processSource).toContain("inspection?.resolvers.shellApplicationOriginal.targetPath");
+    expect(shortcutSource).toContain('"desktop-shortcut-observed.lnk"');
+    expect(shortcutSource).toContain('"desktop-shortcut-inspection.json"');
+    expect(shortcutSource).toContain("resolveWindowsShortcutWithWScript(shortcutPath)");
+    expect(shortcutSource).toContain("resolveWindowsShortcutWithWScript(preservedShortcutPath)");
+    expect(shortcutSource).toContain("resolveWindowsShortcutWithShellApplication(shortcutPath)");
+    expect(shortcutSource).toContain("resolveWindowsShortcutWithShellApplication(preservedShortcutPath)");
+    expect(shortcutSource).toContain("inspection?.resolvers.shellApplicationOriginal.targetPath");
   });
 
   it("waits for a path to become present or absent", async () => {

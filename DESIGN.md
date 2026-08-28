@@ -1233,11 +1233,13 @@ loading error where the operation can produce those states
   `仅本次使用` is secondary and clearly states that the value disappears with
   the runtime. If a persistent credential exists while a runtime override is
   active, the UI names both facts rather than implying the stored value is active.
-- The focused built-in DeepSeek connection states that `deepseek-v4-flash`
-  reuses the same credential for official Responses `/responses` Web Search.
+- The focused built-in DeepSeek connection states that every model in Pi's
+  official DeepSeek catalog reuses the same credential and official
+  `api.deepseek.com/responses` Web Search route; new catalog models inherit the
+  Provider route without a Desktop Model ID allowlist.
   Streaming `response.web_search_call.in_progress`, `.searching`, and
   `.completed` events update the in-place Tool state without introducing a
-  search switch or implying support for `deepseek-v4-pro`.
+  search switch. A custom or third-party endpoint remains unavailable.
 - `配置 API Key` / `更新 API Key` opened from a Provider editor preserves that exact Provider as the
   credential-dialog selection, even when the active Session uses another model.
   This targeted entry opens a focused `配置 <Provider> API Key` dialog without a
@@ -1273,7 +1275,10 @@ loading error where the operation can produce those states
   task views rather than mutually exclusive storage folders, so a configured
   custom Provider intentionally appears in both `已配置` and `自定义`. Search is
   retained while switching views and matches both display name and Provider ID.
-  `重新加载` remains global while `新建模型服务` belongs to the custom view.
+  The global sync toolbar separates `刷新模型目录` from `重新加载配置`:
+  the first forces Pi's official remote directory with an in-button loading label
+  and outcome notification, while the second only reloads shared Pi files.
+  Both remain global; `新建模型服务` belongs to the custom view.
   Selecting a row replaces the Catalog with the Provider editor at every width.
   Inside the editor, `基本配置`, `模型`, `默认模型`, and `文件与诊断` are
   Provider-setting sections rather than Task tabs. They prevent frequent
@@ -1292,9 +1297,9 @@ loading error where the operation can produce those states
   Each row exposes protocol, image/text, reasoning, and search routing as restrained
   metadata rather than a badge pile. `原生搜索 · 已声明` means the built-in
   model/protocol route is known; it never claims a live request succeeded. Groland
-  custom or protocol-mismatched model IDs remain `原生搜索 · 不可用`, and only
-  `deepseek-v4-flash` is declared native-search capable for Pi's official DeepSeek
-  Provider. Filtering or switching models preserves the Provider draft. Adding a
+  custom or protocol-mismatched model IDs remain `原生搜索 · 不可用`; every model
+  under Pi's official DeepSeek Provider and `api.deepseek.com` endpoint is
+  declared native-search capable. Filtering or switching models preserves the Provider draft. Adding a
   model clears filters, selects the new row, and focuses Model ID; removing the
   active model selects a neighboring row. Header mutations and advanced JSON
   remain collapsed until requested or an error requires attention.
@@ -1845,8 +1850,9 @@ loading error where the operation can produce those states
   execution, and external side effects retain one-shot approval.
 - One `web_search` call owns strict native routing. Protocol-matching built-in
   Groland Claude/GPT and Pi official Anthropic/OpenAI models use their declared
-  Anthropic Web Search or Responses `web_search` request; Pi official DeepSeek is
-  declared native only for `deepseek-v4-flash`. A missing native route or credential
+  Anthropic Web Search or Responses `web_search` request; every model from Pi's
+  official DeepSeek Provider uses the official DeepSeek Responses route. A custom
+  endpoint, missing native route, or missing credential
   fails before sending a search request. HTTP/auth/quota/rate-limit/server errors,
   malformed or oversized JSON, and empty results fail visibly. Pi-67 never switches
   Provider, invokes a search Extension, or silently resends the same query.
@@ -2006,6 +2012,10 @@ loading error where the operation can produce those states
   hot-reload its model runtime. Fast reloads remain `applied`; a slow or failed
   reload becomes `pending` after a bounded Agent Host wait and is retried by the
   Task runtime without blocking the Settings snapshot.
+- Background and manual model-directory refreshes reuse Pi's cache and only
+  re-project an active Task when it is idle. A dirty Provider draft remains live
+  while the catalog snapshot updates; the refresh never creates a revision
+  conflict, discards the draft, or silently switches the model for a running Turn.
 - The first Provider configuration read is also bounded before any Task exists.
   Agent Host limits individual configuration file access to 1.5 seconds, offline
   Pi Provider validation to 4 seconds, and Settings reload to 2 seconds; Renderer

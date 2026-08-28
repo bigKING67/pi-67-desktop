@@ -168,6 +168,14 @@ export function installMockCommandResponseHandler({
       || type === "provider.projectConfiguration.get" || type === "provider.projectConfiguration.reload") {
       return current.providerConfiguration;
     }
+    if (type === "provider.modelCatalog.refresh") {
+      return {
+        status: "current",
+        snapshot: current.providerConfiguration,
+        providers: ["deepseek"],
+        failedProviders: []
+      };
+    }
     if (type === "provider.credential.reveal") {
       return payload.provider === "openai"
         ? { provider: "openai", status: "revealed", apiKey: "fixture-persisted-openai-key" }

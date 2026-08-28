@@ -13,13 +13,15 @@ export type AppConfigurationCommandType =
   | "provider.credential.remove"
   | "model.default.set"
   | "vision.assistant.global.set"
-  | "provider.configuration.reload";
+  | "provider.configuration.reload"
+  | "provider.modelCatalog.refresh";
 
 type AppConfigurationCommand = AgentCommand<AppConfigurationCommandType>;
 type AppConfigurationResult = CommandResults[AppConfigurationCommandType];
 type AppConfigurationMutationType = Exclude<AppConfigurationCommandType,
   | "provider.configuration.get"
   | "provider.configuration.reload"
+  | "provider.modelCatalog.refresh"
   | "provider.credential.reveal">;
 type AppConfigurationMutation = AgentCommand<AppConfigurationMutationType>;
 
@@ -36,6 +38,7 @@ export class AppConfigurationCommandRouter {
   private readonly mutations = new Map<string, MutationRecord>();
   private readonly pending = new Set<Promise<AppConfigurationResult>>();
   private unsubscribe: (() => void) | undefined;
+  private backgroundModelCatalogRefreshStarted = false;
 
   constructor(private readonly configuration: PiConfigurationService) {}
 
@@ -50,9 +53,16 @@ export class AppConfigurationCommandRouter {
     });
   }
 
+  startBackgroundModelCatalogRefresh(): void {
+    if (this.backgroundModelCatalogRefreshStarted) return;
+    this.backgroundModelCatalogRefreshStarted = true;
+    void this.track(this.configuration.refreshModelCatalogs(false)).catch(() => undefined);
+  }
+
   async shutdown(): Promise<void> {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.configuration.cancelModelCatalogRefresh();
     await Promise.allSettled(this.pending);
   }
 
@@ -62,6 +72,9 @@ export class AppConfigurationCommandRouter {
   ): Promise<AppConfigurationResult> {
     if (command.type === "provider.configuration.get") return this.configuration.getGlobal();
     if (command.type === "provider.configuration.reload") return this.configuration.reloadGlobal();
+    if (command.type === "provider.modelCatalog.refresh") {
+      return this.track(this.configuration.refreshModelCatalogs(true));
+    }
     if (command.type === "provider.credential.reveal") {
       return this.configuration.revealGlobalCredential(
         command.payload.expectedRevision,
@@ -114,6 +127,12 @@ export class AppConfigurationCommandRouter {
       record.settledAt = Date.now();
       this.pending.delete(promise);
     }).catch(() => undefined);
+    return promise;
+  }
+
+  private track(promise: Promise<AppConfigurationResult>): Promise<AppConfigurationResult> {
+    this.pending.add(promise);
+    void promise.finally(() => this.pending.delete(promise)).catch(() => undefined);
     return promise;
   }
 
@@ -195,5 +214,6 @@ export function isAppConfigurationCommand(type: AgentCommandType): type is AppCo
     || type === "provider.credential.remove"
     || type === "model.default.set"
     || type === "vision.assistant.global.set"
-    || type === "provider.configuration.reload";
+    || type === "provider.configuration.reload"
+    || type === "provider.modelCatalog.refresh";
 }

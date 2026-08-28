@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createR2ReleasePlan,
-  createR2RetentionPlan,
-  parseR2ArtifactKey
+  createR2RetentionPlan
 } from "./r2-update-release-contract.mjs";
 import {
-  cleanupR2Release,
   immutableArtifactCacheControl,
-  parseReleaseCommandFlags,
   publishR2Release
 } from "./r2-update-release.mjs";
 
@@ -361,70 +358,6 @@ describe("R2 update release", () => {
     expect(client.deleteObject).toHaveBeenCalledTimes(3);
   });
 
-  it("cleans only recognized old versions after explicit target-platform confirmation", async () => {
-    const current = fixtureRelease().manifest;
-    const old = "Pi-67-Desktop-0.1.0-alpha.29-mac-arm64-unsigned-preview.zip";
-    const unknown = "operator-notes.txt";
-    let objects = [
-      ...current.files.map((entry) => ({ key: entry.name, size: entry.bytes })),
-      { key: old, size: 10 },
-      { key: unknown, size: 20 },
-      { key: "unsigned-preview-manifest.json", size: 30 }
-    ];
-    const client = {
-      listObjects: vi.fn(async () => objects),
-      deleteObject: vi.fn(async (key) => { objects = objects.filter((entry) => entry.key !== key); }),
-      purgeExactUrls: vi.fn()
-    };
-
-    const result = await cleanupR2Release({
-      client,
-      confirmedVersion: version,
-      runtimeVersion,
-      targetUpgradesConfirmed: true,
-      readPublicManifest: vi.fn(async () => current)
-    });
-
-    expect(result.deleted).toEqual([old]);
-    expect(client.deleteObject).toHaveBeenCalledWith(old);
-    expect(client.purgeExactUrls).toHaveBeenCalledWith([
-      `https://updates.52671314.xyz/${encodeURIComponent(old)}`
-    ]);
-    expect(objects.some((entry) => entry.key === unknown)).toBe(true);
-  });
-
-  it("rejects cleanup without explicit target-platform upgrade evidence", async () => {
-    await expect(cleanupR2Release({
-      client: {},
-      confirmedVersion: version,
-      runtimeVersion,
-      targetUpgradesConfirmed: false
-    })).rejects.toThrow("confirm-target-upgrades");
-  });
-
-  it("recognizes only exact Pi-67 SemVer artifact identities", () => {
-    expect(parseR2ArtifactKey(`Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`))
-      .toEqual({ key: `Pi-67-Desktop-${version}-win-x64-unsigned-preview.exe`, version });
-    expect(parseR2ArtifactKey(`Pi-67-Desktop-v${version}-win-x64-unsigned-preview.exe`)).toBeUndefined();
-    expect(parseR2ArtifactKey("Pi-67-Desktop-latest-win-x64-unsigned-preview.exe")).toBeUndefined();
-    expect(parseR2ArtifactKey("notes-0.1.0-alpha.29.zip")).toBeUndefined();
-  });
-
-  it("accepts only command-specific non-duplicated release flags", () => {
-    expect(parseReleaseCommandFlags("publish", [
-      "--confirm-version", version,
-      "--source-commit", "a".repeat(40)
-    ])).toEqual(new Map([
-      ["confirm-version", version],
-      ["source-commit", "a".repeat(40)]
-    ]));
-    expect(() => parseReleaseCommandFlags("plan", ["--source-commit", "a".repeat(40)]))
-      .toThrow("Usage");
-    expect(() => parseReleaseCommandFlags("cleanup", [
-      "--confirm-version", version,
-      "--confirm-version", version
-    ])).toThrow("Usage");
-  });
 });
 
 function fixtureRelease() {

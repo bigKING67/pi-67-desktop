@@ -57,6 +57,29 @@ describe("provider configuration store", () => {
     });
   });
 
+  it("updates a remote model catalog without replacing a dirty Provider draft", () => {
+    const initial = snapshot("1", "Initial");
+    const catalog = snapshot("1", "Fresh catalog");
+    const store = useProviderConfigurationStore.getState();
+    store.beginLoad("workspace-a");
+    store.install("workspace-a", initial);
+    store.updateDraft((draft) => ({ ...draft, name: "Unsaved draft" }));
+    store.observeExternal("workspace-a", {
+      snapshot: catalog,
+      source: "catalog",
+      changedFiles: [],
+      taskReload: "pending"
+    });
+
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      snapshot: catalog,
+      draft: { name: "Unsaved draft" },
+      baselineRevision: initial.revision,
+      dirty: true,
+      externalConflict: undefined
+    });
+  });
+
   it("discards a draft against the latest observed snapshot", () => {
     const initial = snapshot("1", "Initial");
     const external = snapshot("2", "External");

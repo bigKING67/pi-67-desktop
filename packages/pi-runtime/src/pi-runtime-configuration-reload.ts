@@ -20,6 +20,7 @@ export class PiRuntimeConfigurationReload {
   private reload: Promise<void> | undefined;
   private reloadAbort: AbortController | undefined;
   private pendingRevision: string | undefined;
+  private pendingModelCatalog = false;
   private appliedRevision: string | undefined;
   private invalidatedModel: { provider: string; id: string } | undefined;
   private selectionRequired = false;
@@ -37,6 +38,16 @@ export class PiRuntimeConfigurationReload {
     if (!session.isIdle) return "pending";
     await this.apply();
     return this.pendingRevision ? "pending" : "applied";
+  }
+
+  async requestModelCatalog(): Promise<PiConfigurationReloadState> {
+    if (this.disposed) return "not-loaded";
+    this.pendingModelCatalog = true;
+    const session = this.options.getSession();
+    if (!session) return "not-loaded";
+    if (!session.isIdle) return "pending";
+    await this.apply();
+    return this.pendingRevision || this.pendingModelCatalog ? "pending" : "applied";
   }
 
   async assertReady(): Promise<void> {
@@ -69,11 +80,13 @@ export class PiRuntimeConfigurationReload {
     if (this.disposed) return;
     if (this.reload) return this.reload;
     const execute = async (): Promise<void> => {
-      while (this.pendingRevision && !this.disposed) {
+      while ((this.pendingRevision || this.pendingModelCatalog) && !this.disposed) {
         const session = this.options.getSession();
         if (!session?.isIdle) return;
         const revision = this.pendingRevision;
+        const catalogOnly = this.pendingModelCatalog;
         this.pendingRevision = undefined;
+        this.pendingModelCatalog = false;
         const current = session.model;
         const target = current
           ? { provider: current.provider, id: current.id }
@@ -92,21 +105,22 @@ export class PiRuntimeConfigurationReload {
           });
           if (result.aborted) {
             if (this.disposed) return;
-            if (this.pendingRevision !== undefined) continue;
-            this.pendingRevision = revision;
+            if (this.pendingRevision !== undefined || this.pendingModelCatalog) continue;
+            if (revision) this.pendingRevision = revision;
+            if (catalogOnly) this.pendingModelCatalog = true;
             throw new RuntimeError(
               "RUNTIME_NOT_READY",
               "Pi model configuration refresh timed out.",
               { recoverable: true }
             );
           }
-          await reloadDesktopSettings(session.settingsManager);
+          if (revision) await reloadDesktopSettings(session.settingsManager);
           session.setScopedModels(session.scopedModels.flatMap((entry) => {
             const refreshed = session.modelRuntime.getModel(entry.model.provider, entry.model.id);
             return refreshed ? [{ ...entry, model: refreshed }] : [];
           }));
           if (target) this.refreshSelectedModel(session, target);
-          this.appliedRevision = revision;
+          if (revision) this.appliedRevision = revision;
           this.options.emit(sessionMetaChangedEvent(session));
           this.options.emit({
             type: "model.catalog.changed",
@@ -117,7 +131,8 @@ export class PiRuntimeConfigurationReload {
             }
           });
         } catch (error) {
-          this.pendingRevision ??= revision;
+          if (revision) this.pendingRevision ??= revision;
+          if (catalogOnly) this.pendingModelCatalog = true;
           throw error;
         } finally {
           clearTimeout(timeout);
@@ -134,6 +149,7 @@ export class PiRuntimeConfigurationReload {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.pendingRevision = undefined;
+    this.pendingModelCatalog = false;
     this.reloadAbort?.abort();
     await this.reload?.catch(() => undefined);
   }

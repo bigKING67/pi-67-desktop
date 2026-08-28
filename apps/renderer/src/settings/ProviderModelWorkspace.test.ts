@@ -27,15 +27,24 @@ describe("Provider model capability view", () => {
     });
   });
 
-  it("distinguishes DeepSeek V4 Flash native search from V4 Pro without a declared route", () => {
+  it.each([
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+    "deepseek-v4-flash-vision-exp"
+  ])("shows official DeepSeek model %s as native-search capable", (id) => {
     expect(modelCapabilityView("deepseek", {
-      id: "deepseek-v4-flash",
+      id,
+      baseUrl: "https://api.deepseek.com",
       input: ["text", "image"],
       reasoning: true
     }).search).toBe("native-declared");
+  });
+
+  it("does not grant DeepSeek native search to a custom endpoint", () => {
     expect(modelCapabilityView("deepseek", {
       id: "deepseek-v4-pro",
-      input: ["text", "image"],
+      baseUrl: "https://deepseek-proxy.example.test/v1",
+      input: ["text"],
       reasoning: true
     }).search).toBe("unavailable");
   });

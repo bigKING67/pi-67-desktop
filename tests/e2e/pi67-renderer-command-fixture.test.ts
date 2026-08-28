@@ -69,4 +69,20 @@ describe("renderer Provider command fixture", () => {
     expect(isResponseEnvelope(response)).toBe(true);
     expect(JSON.stringify(createMockProviderConfigurationSnapshot())).not.toContain("fixture-persisted-openai-key");
   });
+
+  it("returns a schema-valid Pi-owned model catalog refresh receipt", () => {
+    const snapshot = createMockProviderConfigurationSnapshot();
+    const response = responseEnvelope("fixture-model-catalog", 1, APP_CONTEXT, {
+      ok: true,
+      type: "provider.modelCatalog.refresh",
+      result: {
+        status: "current",
+        snapshot,
+        providers: ["deepseek"],
+        failedProviders: []
+      }
+    });
+
+    expect(isResponseEnvelope(response)).toBe(true);
+  });
 });

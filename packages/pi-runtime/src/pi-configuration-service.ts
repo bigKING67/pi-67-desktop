@@ -10,6 +10,7 @@ import type {
   PiConfigurationReloadState,
   PiCredentialRevealResult,
   PiDefaultModelSelection,
+  PiModelCatalogRefreshResult,
   PiProviderConfigurationChanged,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot,
@@ -35,10 +36,12 @@ import {
 import { normalizeSessionCatalogWorkspaceIdentity as workspaceIdentity } from "./session-path-identity.js";
 import { installFirstPartyModelProviders } from "./first-party-model-providers.js";
 import { PiConfigurationMutations } from "./pi-configuration-mutations.js";
+import { PiModelCatalogRefreshCoordinator } from "./pi-model-catalog-refresh.js";
 
 export type { PiConfigurationServiceOptions } from "./pi-configuration-service-options.js";
 export interface PiConfigurationReloadTarget {
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
+  requestModelCatalogReload(): Promise<PiConfigurationReloadState>;
 }
 export interface RegisterPiConfigurationWorkspaceOptions {
   cwd: string;
@@ -64,6 +67,7 @@ export class PiConfigurationService {
   private readonly watcher: PiConfigurationWatcher;
   private readonly limits: ResolvedPiConfigurationServiceOptions;
   private readonly mutations: PiConfigurationMutations;
+  private readonly modelCatalogRefresh: PiModelCatalogRefreshCoordinator;
   private modelRuntime: ModelRuntime | undefined;
   private taskModelRuntimeCandidate: TaskModelRuntimeCandidate | undefined;
   private taskModelRuntimeLoad: Promise<TaskModelRuntimeCandidate> | undefined;
@@ -115,6 +119,10 @@ export class PiConfigurationService {
       refresh: (source, emit, force, states, validatedRuntime) => (
         this.refreshLocked(source, emit, force, states, validatedRuntime)
       )
+    });
+    this.modelCatalogRefresh = new PiModelCatalogRefreshCoordinator({
+      timeoutMs: this.limits.modelCatalogRefreshWaitMs,
+      createRuntime: (signal) => this.createPiModelRuntime(signal)
     });
     this.watcher.start();
   }
@@ -220,48 +228,47 @@ export class PiConfigurationService {
     });
   }
 
+  async refreshModelCatalogs(force: boolean): Promise<PiModelCatalogRefreshResult> {
+    this.assertActive();
+    const receipt = await this.modelCatalogRefresh.refresh(force);
+    return this.serial(async () => {
+      this.assertActive();
+      const projectCatalog = ["current", "partial", "timed-out"].includes(receipt.status);
+      if (projectCatalog) {
+        this.taskModelRuntimeCandidate = undefined;
+        this.taskModelRuntimeLoad = undefined;
+      }
+      await this.refreshLocked(projectCatalog ? "catalog" : "manual", projectCatalog, true);
+      return { ...receipt, snapshot: this.requireSnapshot(this.globalState) };
+    });
+  }
+  cancelModelCatalogRefresh(): void { this.modelCatalogRefresh.cancel(); }
   saveGlobalProvider(expectedRevision: string, provider: PiProviderConfigurationInput): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.saveGlobalProvider(expectedRevision, provider);
-  }
-
+    return this.mutations.saveGlobalProvider(expectedRevision, provider); }
   removeGlobalProvider(expectedRevision: string, providerId: string): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.removeGlobalProvider(expectedRevision, providerId);
-  }
-
+    return this.mutations.removeGlobalProvider(expectedRevision, providerId); }
   storeGlobalCredential(expectedRevision: string, providerId: string, apiKey: string): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.storeGlobalCredential(expectedRevision, providerId, apiKey);
-  }
-
+    return this.mutations.storeGlobalCredential(expectedRevision, providerId, apiKey); }
   removeGlobalCredential(expectedRevision: string, providerId: string): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.removeGlobalCredential(expectedRevision, providerId);
-  }
-
+    return this.mutations.removeGlobalCredential(expectedRevision, providerId); }
   revealGlobalCredential(expectedRevision: string, providerId: string): Promise<PiCredentialRevealResult> {
-    return this.mutations.revealGlobalCredential(expectedRevision, providerId);
-  }
-
+    return this.mutations.revealGlobalCredential(expectedRevision, providerId); }
   setGlobalDefaultModel(expectedRevision: string, selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.setGlobalDefaultModel(expectedRevision, selection);
-  }
-
+    return this.mutations.setGlobalDefaultModel(expectedRevision, selection); }
   setGlobalVisionAssistant(expectedRevision: string, selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.setGlobalVisionAssistant(expectedRevision, selection);
-  }
-
+    return this.mutations.setGlobalVisionAssistant(expectedRevision, selection); }
   setProjectVisionAssistant(cwd: string, expectedRevision: string,
     override?: PiVisionAssistantOverride): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override);
-  }
-
+    return this.mutations.setProjectVisionAssistant(cwd, expectedRevision, override); }
   setProjectDefaultModel(cwd: string, expectedRevision: string,
     selection?: PiDefaultModelSelection): Promise<PiProviderConfigurationSnapshot> {
-    return this.mutations.setProjectDefaultModel(cwd, expectedRevision, selection);
-  }
+    return this.mutations.setProjectDefaultModel(cwd, expectedRevision, selection); }
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
     this.watcher.dispose();
+    await this.modelCatalogRefresh.dispose();
     const activeTaskModelRuntimeLoad = this.taskModelRuntimeLoad;
     if (activeTaskModelRuntimeLoad) {
       await withPiConfigurationBudget(
@@ -298,7 +305,9 @@ export class PiConfigurationService {
       validationRuntimeWaitMs: this.limits.validationRuntimeWaitMs,
       settingsReloadWaitMs: this.limits.settingsReloadWaitMs,
       ...(validatedRuntime ? { validatedRuntime } : {}),
-      createValidationRuntime: () => this.createPiValidationRuntime(),
+      createValidationRuntime: () => source === "catalog"
+        ? this.createPiModelRuntime()
+        : this.createPiValidationRuntime(),
       installModelRuntime: (runtime) => { this.modelRuntime = runtime; }
     });
   }
@@ -324,11 +333,12 @@ export class PiConfigurationService {
     return this.modelRuntime;
   }
 
-  private async createPiModelRuntime(): Promise<ModelRuntime> {
+  private async createPiModelRuntime(signal?: AbortSignal): Promise<ModelRuntime> {
     const runtime = await ModelRuntime.create({
       credentials: this.credentials,
       modelsPath: this.modelsPath,
-      allowModelNetwork: false
+      allowModelNetwork: false,
+      ...(signal ? { signal } : {})
     });
     await installFirstPartyModelProviders(runtime);
     return runtime;

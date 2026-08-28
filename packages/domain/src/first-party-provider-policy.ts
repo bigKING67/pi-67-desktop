@@ -10,6 +10,9 @@ export const GROLAND_GPT_MODEL_IDS = ["gpt-5.4", "gpt-5.5"] as const;
 
 export type GrolandNativeSearchApi = "anthropic-messages" | "openai-responses";
 
+const DEEPSEEK_PROVIDER_ID = "deepseek";
+const DEEPSEEK_API_HOSTNAME = "api.deepseek.com";
+
 const GROLAND_CLAUDE_MODEL_ID_SET = new Set<string>(GROLAND_CLAUDE_MODEL_IDS);
 const GROLAND_GPT_MODEL_ID_SET = new Set<string>(GROLAND_GPT_MODEL_IDS);
 
@@ -24,4 +27,29 @@ export function grolandNativeSearchApi(
     return api;
   }
   return undefined;
+}
+
+export function deepSeekNativeSearchEndpoint(
+  providerId: string,
+  baseUrl: string | undefined
+): string | undefined {
+  if (providerId.trim().toLocaleLowerCase() !== DEEPSEEK_PROVIDER_ID || !baseUrl) return undefined;
+  try {
+    const url = new URL(baseUrl);
+    const path = url.pathname.replace(/\/+$/u, "");
+    if (
+      url.protocol !== "https:"
+      || url.hostname.toLocaleLowerCase() !== DEEPSEEK_API_HOSTNAME
+      || Boolean(url.username || url.password)
+      || Boolean(url.port && url.port !== "443")
+      || !["", "/v1", "/responses", "/v1/responses"].includes(path)
+    ) return undefined;
+    url.port = "";
+    url.pathname = "/responses";
+    url.search = "";
+    url.hash = "";
+    return url.href;
+  } catch {
+    return undefined;
+  }
 }

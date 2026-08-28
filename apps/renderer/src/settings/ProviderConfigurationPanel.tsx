@@ -30,6 +30,7 @@ import {
 } from "./SettingsPrimitives.js";
 import {
   loadProviderConfiguration,
+  refreshProviderModelCatalog,
   reloadProviderConfiguration,
   removeProviderConfiguration,
   saveProviderConfiguration
@@ -69,6 +70,7 @@ function GlobalProviderConfigurationPanel() {
   const [providerDetailOpen, setProviderDetailOpen] = useState(initialEditorRequestRef.current !== undefined);
   const [pendingProviderId, setPendingProviderId] = useState<string | null>();
   const [removalTarget, setRemovalTarget] = useState<string>();
+  const [catalogRefreshing, setCatalogRefreshing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const catalogScrollTopRef = useRef(0);
   const catalogViewWorkspaceRef = useRef<string | undefined>(undefined);
@@ -185,7 +187,12 @@ function GlobalProviderConfigurationPanel() {
       <ConfigurationStatusBar
         snapshot={snapshot}
         busy={phase === "saving"}
+        catalogBusy={catalogRefreshing}
         onReload={() => void reloadProviderConfiguration(workspaceId)}
+        onRefreshCatalog={() => {
+          setCatalogRefreshing(true);
+          void refreshProviderModelCatalog().finally(() => setCatalogRefreshing(false));
+        }}
       />
       {externalConflict ? (
         <SettingsNotice

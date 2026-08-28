@@ -52,6 +52,7 @@ import type {
 import type { LarkCommandPayloads, LarkCommandResults } from "./lark-command-messages.js";
 import type {
   PiCredentialRevealResult,
+  PiModelCatalogRefreshResult,
   PiProviderConfigurationInput,
   PiProviderConfigurationSnapshot
 } from "./provider-configuration-schemas.js";
@@ -66,7 +67,6 @@ import type {
   WorkspaceFileCommandPayloads,
   WorkspaceFileCommandResults
 } from "./workspace-file-messages.js";
-
 export { ProtocolRequestError } from "./protocol-error.js";
 export type { ProtocolError, ProtocolErrorCode } from "./protocol-error.js";
 export { isOperationSettled } from "./operation-messages.js";
@@ -274,6 +274,7 @@ export interface CommandPayloads extends
     model?: string;
   };
   "provider.configuration.reload": Record<string, never>;
+  "provider.modelCatalog.refresh": Record<string, never>;
   "provider.projectConfiguration.get": Record<string, never>;
   "provider.projectConfiguration.reload": Record<string, never>;
   "model.projectDefault.set": { expectedRevision: string; provider?: string; model?: string };
@@ -392,6 +393,7 @@ export interface CommandResults extends
   "provider.credential.remove": PiProviderConfigurationSnapshot;
   "model.default.set": PiProviderConfigurationSnapshot;
   "provider.configuration.reload": PiProviderConfigurationSnapshot;
+  "provider.modelCatalog.refresh": PiModelCatalogRefreshResult;
   "provider.projectConfiguration.get": PiProviderConfigurationSnapshot;
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshot;
   "model.projectDefault.set": PiProviderConfigurationSnapshot;
@@ -428,7 +430,6 @@ export interface CommandResults extends
 }
 
 export type AgentCommandType = keyof CommandPayloads;
-
 export {
   REPLAY_SAFE_CONTROL_MUTATION_TYPES,
   REPLAY_SAFE_OPERATION_ACK_TYPES,
@@ -437,7 +438,6 @@ export {
   type ReplaySafeControlMutationType,
   type ReplaySafeOperationAckType
 } from "./replay-safe-commands.js";
-
 export type AgentCommand<T extends AgentCommandType = AgentCommandType> = {
   [K in T]: { type: K; payload: CommandPayloads[K] };
 }[T];

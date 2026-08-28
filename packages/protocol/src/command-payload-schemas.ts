@@ -231,6 +231,7 @@ export const CommandPayloadSchemas: Record<AgentCommandType, TSchema> = {
     })
   ]),
   "provider.configuration.reload": EmptyPayloadSchema,
+  "provider.modelCatalog.refresh": EmptyPayloadSchema,
   "provider.projectConfiguration.get": EmptyPayloadSchema,
   "provider.projectConfiguration.reload": EmptyPayloadSchema,
   "model.projectDefault.set": Type.Union([

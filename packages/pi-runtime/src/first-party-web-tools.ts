@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { grolandNativeSearchApi } from "@pi67/domain";
+import { deepSeekNativeSearchEndpoint, grolandNativeSearchApi } from "@pi67/domain";
 import {
   type DeepSeekWebSearchState,
   readDeepSeekResponsesStream
@@ -44,11 +44,12 @@ interface CachedSearchResult extends SearchResult {
 
 export function resolveNativeSearchRoute(model: Pick<Model<any>, "provider" | "id" | "api" | "baseUrl">): NativeSearchRoute | undefined {
   if (model.provider === "deepseek") {
-    if (model.id !== "deepseek-v4-flash") return undefined;
+    const endpoint = deepSeekNativeSearchEndpoint(model.provider, model.baseUrl);
+    if (!endpoint) return undefined;
     return {
       kind: "native",
       protocol: "deepseek-web-search",
-      endpoint: responsesEndpoint(model.baseUrl),
+      endpoint,
       sourceLabel: `模型原生 · DeepSeek · ${model.id}`
     };
   }

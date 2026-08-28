@@ -64,10 +64,7 @@ export class AgentHostServer {
   private readonly events: HostEventChannel;
   private readonly runtimeLoader: AgentRuntimeLoader;
   private readonly usesCompatibilityRuntime: boolean;
-  constructor(
-    runtimeLoader?: AgentRuntimeLoader,
-    private readonly options: AgentHostServerOptions = {}
-  ) {
+  constructor(runtimeLoader?: AgentRuntimeLoader, private readonly options: AgentHostServerOptions = {}) {
     this.runtimeLoader = runtimeLoader ?? defaultRuntimeLoader;
     this.usesCompatibilityRuntime = runtimeLoader !== undefined && options.sdkVersionLoader === undefined;
     const configurationServices = options.configurationServices ?? new PiConfigurationServiceRegistry();
@@ -209,7 +206,9 @@ export class AgentHostServer {
       port,
       identity,
       async () => {
-        return { sdkVersion: await this.sdkVersions.load(), eventSequence: this.events.eventSequence };
+        const sdkVersion = await this.sdkVersions.load();
+        if (this.options.modelCatalogRefreshOnStartup ?? process.env.NODE_ENV !== "test") this.appConfiguration.startBackgroundModelCatalogRefresh();
+        return { sdkVersion, eventSequence: this.events.eventSequence };
       },
       (origin, request) => this.requests.handle(origin, request),
       () => {
@@ -444,7 +443,6 @@ export class AgentHostServer {
       state.operations
     );
   }
-
   private resolveHostIdentity(options: AttachPortOptions): HostConnectionIdentity {
     if (!this.hostIdentity) {
       this.hostIdentity = {

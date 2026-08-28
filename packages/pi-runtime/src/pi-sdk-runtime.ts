@@ -276,7 +276,7 @@ export class PiSdkRuntime implements AgentRuntime {
   async requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> {
     return this.configurationReload.request(revision);
   }
-
+  async requestModelCatalogReload(): Promise<PiConfigurationReloadState> { return this.configurationReload.requestModelCatalog(); }
   listSubagents(): NativeSubagentView[] { return this.subagents.list(); }
   getSubagentStatus(id: string): NativeSubagentView { return this.subagents.status(id); }
   waitForSubagents(

@@ -87,6 +87,7 @@ export interface AgentRuntime {
   getTaskToolMode(): TaskToolMode;
   setTaskToolMode(mode: TaskToolMode): TaskToolMode;
   requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
+  requestModelCatalogReload(): Promise<PiConfigurationReloadState>;
   querySessionCatalog(query: SessionCatalogQuery): Promise<SessionCatalogPage>;
   getSessionCatalogStatus(): SessionCatalogStatus;
   getSessionTree(): SessionTreeProjection;

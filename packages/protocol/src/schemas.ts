@@ -94,6 +94,7 @@ import {
 import {
   PiCredentialRevealResultSchema,
   PiProviderConfigurationChangedSchema,
+  PiModelCatalogRefreshResultSchema,
   PiProviderConfigurationSnapshotSchema
 } from "./provider-configuration-schemas.js";
 import {
@@ -189,7 +190,6 @@ const RuntimeCapabilitiesSchema = strictObject({
     })
   })
 });
-
 const DoctorCheckSchema = strictObject({
   id: Type.Union([
     Type.Literal("platform"),
@@ -205,7 +205,6 @@ const DoctorCheckSchema = strictObject({
   detail: Type.String()
 });
 const DoctorReportSchema = strictObject({ generatedAt: Type.Number(), checks: Type.Array(DoctorCheckSchema) });
-
 const AcknowledgementSchema = strictObject({ accepted: Type.Literal(true) });
 const ProjectionMutationAcknowledgementSchema = strictObject({
   accepted: Type.Literal(true),
@@ -313,6 +312,7 @@ export const CommandResultSchemas: Record<AgentCommandType, TSchema> = {
   "provider.credential.remove": PiProviderConfigurationSnapshotSchema,
   "model.default.set": PiProviderConfigurationSnapshotSchema,
   "provider.configuration.reload": PiProviderConfigurationSnapshotSchema,
+  "provider.modelCatalog.refresh": PiModelCatalogRefreshResultSchema,
   "provider.projectConfiguration.get": PiProviderConfigurationSnapshotSchema,
   "provider.projectConfiguration.reload": PiProviderConfigurationSnapshotSchema,
   "model.projectDefault.set": PiProviderConfigurationSnapshotSchema,

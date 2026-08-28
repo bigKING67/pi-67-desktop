@@ -71,6 +71,24 @@ describe("PiRuntimeConfigurationReload", () => {
     await expect(pending).resolves.toBe("applied");
     expect(refresh.mock.calls[0]?.[0].signal?.aborted).toBe(true);
   });
+
+  it("defers a catalog-only reload until the Session is idle", async () => {
+    const refresh = vi.fn(async () => ({ aborted: false, errors: new Map() }));
+    const session = successfulSession(refresh);
+    const mutableSession = session as unknown as { isIdle: boolean };
+    mutableSession.isIdle = false;
+    const emit = vi.fn();
+    const reload = new PiRuntimeConfigurationReload({ getSession: () => session, emit });
+
+    await expect(reload.requestModelCatalog()).resolves.toBe("pending");
+    expect(refresh).not.toHaveBeenCalled();
+    mutableSession.isIdle = true;
+    await reload.assertReady();
+
+    expect(refresh).toHaveBeenCalledWith(expect.objectContaining({ allowNetwork: false }));
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ type: "model.catalog.changed" }));
+    await reload.dispose();
+  });
 });
 
 function abortableRefresh() {
@@ -89,5 +107,26 @@ function sessionWithRefresh(refresh: ReturnType<typeof abortableRefresh>): Agent
     isIdle: true,
     model: undefined,
     modelRuntime: { refresh }
+  } as unknown as AgentSession;
+}
+
+function successfulSession(refresh: ReturnType<typeof vi.fn>): AgentSession {
+  return {
+    isIdle: true,
+    isStreaming: false,
+    model: undefined,
+    thinkingLevel: "off",
+    sessionId: "session-catalog",
+    scopedModels: [],
+    setScopedModels: vi.fn(),
+    getAvailableThinkingLevels: () => ["off"],
+    modelRuntime: {
+      refresh,
+      getModels: () => [],
+      getProviders: () => [],
+      getProviderAuthStatus: () => ({ configured: false }),
+      hasConfiguredAuth: () => false
+    },
+    agent: { state: {} }
   } as unknown as AgentSession;
 }

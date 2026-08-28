@@ -7,6 +7,7 @@ export interface PiConfigurationServiceOptions {
   fileAccessWaitMs?: number;
   validationRuntimeWaitMs?: number;
   settingsReloadWaitMs?: number;
+  modelCatalogRefreshWaitMs?: number;
 }
 
 export interface ResolvedPiConfigurationServiceOptions {
@@ -16,6 +17,7 @@ export interface ResolvedPiConfigurationServiceOptions {
   fileAccessWaitMs: number;
   validationRuntimeWaitMs: number;
   settingsReloadWaitMs: number;
+  modelCatalogRefreshWaitMs: number;
 }
 
 export type PiConfigurationBudgetStage =
@@ -33,7 +35,8 @@ export function resolvePiConfigurationServiceOptions(
     runtimeReloadWaitMs: boundedWaitMilliseconds(options.runtimeReloadWaitMs, 1_000),
     fileAccessWaitMs: boundedWaitMilliseconds(options.fileAccessWaitMs, 4_000),
     validationRuntimeWaitMs: boundedWaitMilliseconds(options.validationRuntimeWaitMs, 4_000),
-    settingsReloadWaitMs: boundedWaitMilliseconds(options.settingsReloadWaitMs, 2_000)
+    settingsReloadWaitMs: boundedWaitMilliseconds(options.settingsReloadWaitMs, 2_000),
+    modelCatalogRefreshWaitMs: boundedWaitMilliseconds(options.modelCatalogRefreshWaitMs, 15_000)
   };
 }
 

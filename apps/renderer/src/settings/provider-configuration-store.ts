@@ -22,6 +22,7 @@ export interface ProviderConfigurationState {
   providerEditorRequest: { workspaceId: string; section: ProviderEditorSectionRequest } | undefined;
   beginLoad(workspaceId: string): void;
   install(workspaceId: string, snapshot: PiProviderConfigurationSnapshot): void;
+  installCatalog(workspaceId: string, snapshot: PiProviderConfigurationSnapshot): void;
   fail(workspaceId: string, error: string): void;
   selectProvider(providerId: string): void;
   startProvider(preset?: PiProviderConfigurationInput): void;
@@ -71,6 +72,16 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
       phase: "idle",
       error: undefined
     });
+  },
+
+  installCatalog(workspaceId, snapshot) {
+    const state = get();
+    if (state.workspaceId !== workspaceId) return;
+    if (!state.dirty) {
+      state.install(workspaceId, snapshot);
+      return;
+    }
+    set({ snapshot });
   },
 
   fail(workspaceId, error) {
@@ -127,6 +138,10 @@ export const useProviderConfigurationStore = create<ProviderConfigurationState>(
   observeExternal(workspaceId, change) {
     const state = get();
     if (state.workspaceId !== workspaceId) return;
+    if (change.source === "catalog") {
+      state.installCatalog(workspaceId, change.snapshot);
+      return;
+    }
     if (state.dirty && state.baselineRevision !== change.snapshot.revision) {
       set({
         snapshot: change.snapshot,

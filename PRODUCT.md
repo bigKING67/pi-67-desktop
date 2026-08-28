@@ -712,9 +712,11 @@ the only Runtime and behavior specification source.
 - Native-search capability is declared only for a protocol-matching built-in
   model: Groland Claude uses Anthropic Web Search, Groland GPT uses Responses
   `web_search`, Pi's official Anthropic/OpenAI Providers use their corresponding
-  protocols, and Pi's official DeepSeek Provider declares native search only for
-  `deepseek-v4-flash`. Other models have no native search route and fail visibly
-  without Provider fallback. The Settings label
+  protocols, and every model from Pi's official DeepSeek Provider uses DeepSeek's
+  official Responses `web_search` route when its effective endpoint is
+  `api.deepseek.com`. DeepSeek model IDs remain Pi-catalog data rather than a
+  Desktop allowlist; custom or third-party endpoints have no native route and fail
+  visibly without Provider fallback. The Settings label
   `原生搜索 · 已声明` describes routing metadata, not a completed live request.
 - DeepSeek native search calls the official Responses `/responses` endpoint with
   `stream: true`, reuses the selected Provider credential, and maps the official
@@ -756,6 +758,15 @@ the only Runtime and behavior specification source.
   validation returns an `invalid` snapshot with bounded diagnostics; a stalled
   file read returns a structured recoverable error before the Renderer transport
   budget expires.
+- Agent Host starts one non-blocking Pi official model-directory refresh after
+  startup for configured dynamic Providers. Automatic refresh honors Pi cache
+  freshness, has a 15-second deadline, is single-flight, and is skipped when
+  `PI_OFFLINE` is enabled; timeout or partial failure continues from Pi's
+  `models-store.json` without blocking configuration or Task creation. A separate
+  global Settings action forces the same Pi-owned refresh and reports current,
+  partial, timeout, offline, and unconfigured outcomes. It does not create a
+  Desktop catalog, send Provider credentials to Desktop, or hard-code newly
+  published models.
 - Creating the Pi `ModelRuntime` for a real Task uses the same 4-second Host-side
   offline startup budget. Agent Host keeps one revision-bound Task runtime warm while
   Desktop runs; each Task consumes one complete runtime and queues a fresh independent

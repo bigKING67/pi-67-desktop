@@ -1,8 +1,14 @@
 import { Type, type TProperties } from "./typebox-schema.js";
 
 export type PiConfigurationFileKind = "models" | "auth" | "global-settings" | "project-settings";
-export type PiConfigurationChangeSource = "desktop" | "external" | "manual";
+export type PiConfigurationChangeSource = "desktop" | "external" | "manual" | "catalog";
 export type PiConfigurationReloadState = "applied" | "pending" | "not-loaded";
+export type PiModelCatalogRefreshStatus =
+  | "current"
+  | "partial"
+  | "timed-out"
+  | "offline"
+  | "unconfigured";
 
 export interface PiConfigurationDiagnostic {
   file: PiConfigurationFileKind;
@@ -129,6 +135,13 @@ export interface PiProviderConfigurationChanged {
   source: PiConfigurationChangeSource;
   changedFiles: PiConfigurationFileKind[];
   taskReload: PiConfigurationReloadState;
+}
+
+export interface PiModelCatalogRefreshResult {
+  status: PiModelCatalogRefreshStatus;
+  snapshot: PiProviderConfigurationSnapshot;
+  providers: string[];
+  failedProviders: string[];
 }
 
 const IdentifierSchema = Type.String({ minLength: 1, maxLength: 512 });
@@ -292,9 +305,27 @@ export const PiProviderConfigurationSnapshotSchema = strictObject({
 
 export const PiProviderConfigurationChangedSchema = strictObject({
   snapshot: PiProviderConfigurationSnapshotSchema,
-  source: Type.Union([Type.Literal("desktop"), Type.Literal("external"), Type.Literal("manual")]),
+  source: Type.Union([
+    Type.Literal("desktop"),
+    Type.Literal("external"),
+    Type.Literal("manual"),
+    Type.Literal("catalog")
+  ]),
   changedFiles: Type.Array(PiConfigurationFileKindSchema, { maxItems: 4, uniqueItems: true }),
   taskReload: Type.Union([Type.Literal("applied"), Type.Literal("pending"), Type.Literal("not-loaded")])
+});
+
+export const PiModelCatalogRefreshResultSchema = strictObject({
+  status: Type.Union([
+    Type.Literal("current"),
+    Type.Literal("partial"),
+    Type.Literal("timed-out"),
+    Type.Literal("offline"),
+    Type.Literal("unconfigured")
+  ]),
+  snapshot: PiProviderConfigurationSnapshotSchema,
+  providers: Type.Array(IdentifierSchema, { maxItems: 512, uniqueItems: true }),
+  failedProviders: Type.Array(IdentifierSchema, { maxItems: 512, uniqueItems: true })
 });
 
 export const PiConfigurationExpectedRevisionSchema = RevisionSchema;

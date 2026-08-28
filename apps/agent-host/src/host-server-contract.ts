@@ -45,6 +45,7 @@ export interface AgentHostServerOptions {
   promptAttachments?: PromptAttachmentAccessOwner;
   onRuntimeInitializationObservation?: (observation: RuntimeInitializationObservation) => void;
   sessionWriterLeaseRegistry?: SessionWriterLeaseRegistry;
+  modelCatalogRefreshOnStartup?: boolean;
 }
 
 export type AgentHostShutdownResult = Omit<AgentHostShutdownCompleteMessage, "type">;

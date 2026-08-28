@@ -69,6 +69,21 @@ describe("AgentHostServer Provider configuration", () => {
       ))[0];
       expect(imageModel).toBeDefined();
 
+      const catalogRefreshResponse = (await hostCommand(
+        port,
+        APP_PROTOCOL_CONTEXT,
+        "provider.modelCatalog.refresh",
+        {}
+      )).response;
+      if (!catalogRefreshResponse.ok) throw new Error(catalogRefreshResponse.error.message);
+      expect(catalogRefreshResponse.result).toMatchObject({
+        status: "unconfigured",
+        providers: [],
+        failedProviders: [],
+        snapshot: { syncState: "current" }
+      });
+      expect(runtimeLoader).not.toHaveBeenCalled();
+
       const savePayload = {
         expectedRevision: initialResponse.result.revision,
         provider: {

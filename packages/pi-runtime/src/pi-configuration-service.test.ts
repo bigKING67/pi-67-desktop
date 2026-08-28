@@ -254,7 +254,8 @@ describe("PiConfigurationService", () => {
       const changes: PiProviderConfigurationChanged[] = [];
       fixture.service.subscribe(fixture.cwd, (change) => changes.push(change));
       unregisterRuntime = fixture.service.registerRuntime(fixture.cwd, {
-        requestConfigurationReload: () => runtimeReload.promise
+        requestConfigurationReload: () => runtimeReload.promise,
+        requestModelCatalogReload: async () => "applied"
       });
       await writeFile(fixture.service.modelsPath, `${JSON.stringify({ providers: {} }, null, 2)}\n`, "utf8");
 

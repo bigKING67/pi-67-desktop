@@ -47,7 +47,10 @@ export interface WorkspaceConfigurationState {
   projectTrusted: boolean;
   registrations: number;
   listeners: Set<(change: PiProviderConfigurationChanged) => void>;
-  runtimes: Set<{ requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> }>;
+  runtimes: Set<{
+    requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
+    requestModelCatalogReload(): Promise<PiConfigurationReloadState>;
+  }>;
   snapshot?: PiProviderConfigurationSnapshot;
   fileRevisions?: Record<PiConfigurationFileKind, string>;
   projectWatcher?: FSWatcher;

@@ -20,6 +20,7 @@ describe("Windows installer debug artifact reuse", () => {
       "eng/packaging/windows-installed-application-lifecycle.mjs",
       "eng/packaging/windows-installed-application-lifecycle.test.mjs",
       "eng/packaging/windows-installer-process.mjs",
+      "eng/packaging/windows-shortcut-inspection.mjs",
       "eng/packaging/windows-installer-update-lifecycle.mjs",
       "eng/packaging/windows-installer-lifecycle-contract.mjs",
       "eng/packaging/windows-real-user-lifecycle.mjs",

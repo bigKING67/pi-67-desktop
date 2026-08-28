@@ -74,7 +74,7 @@ export function createMockProviderConfigurationSnapshot(): PiProviderConfigurati
   };
 }
 
-export function createMockDeepSeekProviderConfigurationSnapshot(): PiProviderConfigurationSnapshot {
+export function createMockDeepSeekProviderConfigurationSnapshot(configured = false): PiProviderConfigurationSnapshot {
   const snapshot = createMockProviderConfigurationSnapshot();
   const openai = snapshot.providers.find((provider) => provider.id === "openai")!;
   const template = snapshot.providers.find((provider) => provider.id === "anthropic")!;
@@ -84,13 +84,31 @@ export function createMockDeepSeekProviderConfigurationSnapshot(): PiProviderCon
       ...template,
       id: "deepseek",
       name: "DeepSeek",
+      configured,
+      ...(configured ? { credentialSource: "stored" as const } : {}),
       models: [{
         ...template.models[0]!,
         id: "deepseek-v4-flash",
         name: "DeepSeek V4 Flash",
         api: "openai-completions",
-        baseUrl: "https://api.deepseek.com"
-      }]
+        baseUrl: "https://api.deepseek.com",
+        input: ["text"]
+      }, {
+        ...template.models[0]!,
+        id: "deepseek-v4-pro",
+        name: "DeepSeek V4 Pro",
+        api: "openai-completions",
+        baseUrl: "https://api.deepseek.com",
+        input: ["text"]
+      }, {
+        ...template.models[0]!,
+        id: "deepseek-v4-flash-vision-exp",
+        name: "DeepSeek V4 Flash Vision Exp",
+        api: "openai-completions",
+        baseUrl: "https://api.deepseek.com",
+        input: ["text", "image"]
+      }],
+      modelCount: 3
     }]
   };
 }

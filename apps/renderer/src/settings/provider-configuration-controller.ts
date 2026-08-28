@@ -1,4 +1,4 @@
-import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
+import { ProtocolRequestError, type AgentCommandType, type CommandPayloads, type CommandResults, type PiCredentialRevealResult, type PiModelCatalogRefreshResult, type PiProviderConfigurationChanged, type PiProviderConfigurationSnapshot } from "@pi67/protocol";
 import { agentConnectionController } from "../connection/AgentConnectionController.js";
 import { ensureAgentConnection } from "../connection/connection-recovery.js";
 import { publishNotification } from "../notifications/notification-store.js";
@@ -8,6 +8,7 @@ import { useProviderConfigurationStore } from "./provider-configuration-store.js
 
 const providerLoadFlights = new Map<string, Promise<boolean>>();
 const PROVIDER_CONFIGURATION_LOAD_ACK_TIMEOUT_MS = 12_000;
+const MODEL_CATALOG_REFRESH_ACK_TIMEOUT_MS = 35_000;
 export const GLOBAL_PROVIDER_CONFIGURATION_KEY = "app";
 
 export function loadProviderConfiguration(_workspaceId?: string): Promise<boolean> {
@@ -223,6 +224,26 @@ export async function reloadProviderConfiguration(_workspaceId?: string): Promis
   }
 }
 
+export async function refreshProviderModelCatalog(): Promise<boolean> {
+  try {
+    const result = await request(
+      "provider.modelCatalog.refresh",
+      {},
+      MODEL_CATALOG_REFRESH_ACK_TIMEOUT_MS
+    );
+    useProviderConfigurationStore.getState().installCatalog(
+      GLOBAL_PROVIDER_CONFIGURATION_KEY,
+      result.snapshot
+    );
+    publishModelCatalogRefreshNotification(result);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "未知错误";
+    publishNotification({ level: "error", title: "Pi 模型目录刷新失败", message });
+    return false;
+  }
+}
+
 export async function reloadProjectProviderConfiguration(workspaceId: string): Promise<boolean> {
   const key = projectConfigurationKey(workspaceId);
   try {
@@ -353,4 +374,29 @@ function reportFailure(workspaceId: string, error: unknown): false {
   const message = error instanceof Error ? error.message : "未知错误";
   useProviderConfigurationStore.getState().fail(workspaceId, message);
   return false;
+}
+
+function publishModelCatalogRefreshNotification(result: PiModelCatalogRefreshResult): void {
+  switch (result.status) {
+    case "current":
+      publishNotification({ level: "info", title: "Pi 模型目录已刷新" });
+      return;
+    case "partial":
+      publishNotification({
+        level: "warning",
+        title: "部分 Pi 模型目录未能刷新",
+        message: result.failedProviders.length
+          ? `继续使用缓存：${result.failedProviders.join("、")}`
+          : "未更新的模型服务继续使用本地缓存。"
+      });
+      return;
+    case "timed-out":
+      publishNotification({ level: "warning", title: "Pi 模型目录刷新超时", message: "继续使用本地缓存。" });
+      return;
+    case "offline":
+      publishNotification({ level: "warning", title: "Pi 当前处于离线模式", message: "PI_OFFLINE 已启用，未访问远程模型目录。" });
+      return;
+    case "unconfigured":
+      publishNotification({ level: "info", title: "没有可刷新的模型服务", message: "请先连接一个支持远程目录的 Pi Provider。" });
+  }
 }

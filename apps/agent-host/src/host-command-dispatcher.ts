@@ -43,6 +43,7 @@ export type RuntimeLoadedCommand = Exclude<
       | "provider.credential.remove"
       | "model.default.set"
       | "provider.configuration.reload"
+      | "provider.modelCatalog.refresh"
       | "provider.projectConfiguration.get" | "provider.projectConfiguration.reload"
       | "model.projectDefault.set" | "vision.assistant.global.set" | "vision.assistant.project.set"
       | "context.file.list"

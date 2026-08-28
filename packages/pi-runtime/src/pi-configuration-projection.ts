@@ -188,7 +188,12 @@ export async function refreshPiConfigurationProjection(options: RefreshPiConfigu
       && credentials
     ) {
       const reloads = await Promise.all([...state.runtimes].map((target) => (
-        requestBoundedRuntimeReload(target, bundle.revision, options.runtimeReloadWaitMs)
+        requestBoundedRuntimeReload(
+          target,
+          bundle.revision,
+          options.source === "catalog",
+          options.runtimeReloadWaitMs
+        )
       )));
       taskReload = reloads.includes("pending")
         ? "pending"
@@ -263,8 +268,12 @@ async function withConfigurationProjectionBudget<T>(
 }
 
 async function requestBoundedRuntimeReload(
-  target: { requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState> },
+  target: {
+    requestConfigurationReload(revision: string): Promise<PiConfigurationReloadState>;
+    requestModelCatalogReload(): Promise<PiConfigurationReloadState>;
+  },
   revision: string,
+  catalogOnly: boolean,
   waitMs: number
 ): Promise<PiConfigurationReloadState> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -274,7 +283,9 @@ async function requestBoundedRuntimeReload(
   });
   try {
     return await Promise.race([
-      target.requestConfigurationReload(revision),
+      catalogOnly
+        ? target.requestModelCatalogReload()
+        : target.requestConfigurationReload(revision),
       pending
     ]);
   } catch {

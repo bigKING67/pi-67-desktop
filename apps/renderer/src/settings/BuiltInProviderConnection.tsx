@@ -93,5 +93,5 @@ function builtInCredentialSource(provider: PiProviderConfigurationView): string 
 
 function builtInSearchConnection(providerId: string): string | undefined {
   if (providerId !== "deepseek") return undefined;
-  return "DeepSeek V4 Flash 通过官方 Responses /responses 自动联网搜索，并与对话共用这个 API Key；V4 Pro 暂未声明此能力";
+  return "DeepSeek 官方目录模型通过 Responses /responses 自动联网搜索，并与对话共用这个 API Key；目录刷新后新增模型沿用同一官方 Provider 路由";
 }

@@ -7,6 +7,7 @@ import { resetWorkspaceHostRegistrationState } from "../workbench/workspace-host
 import {
   loadProviderConfiguration,
   loadProjectProviderConfiguration,
+  refreshProviderModelCatalog,
   resetProviderConfigurationLoadState,
   saveProviderConfiguration,
   setDefaultModelConfiguration,
@@ -137,6 +138,43 @@ describe("provider configuration controller", () => {
     expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
       level: "warning",
       title: "Pi 配置已在外部修改"
+    });
+  });
+
+  it("reports a partial model catalog refresh without replacing a dirty draft", async () => {
+    const initial = snapshot("1");
+    const refreshed = snapshot("1");
+    refreshed.providers[0]!.name = "Catalog name";
+    useProviderConfigurationStore.getState().beginLoad("app");
+    useProviderConfigurationStore.getState().install("app", initial);
+    useProviderConfigurationStore.getState().updateDraft((draft) => ({
+      ...draft,
+      name: "Unsaved Provider Draft"
+    }));
+    const request = vi.spyOn(agentConnectionController, "request").mockResolvedValue({
+      status: "partial",
+      snapshot: refreshed,
+      providers: ["deepseek", "openai"],
+      failedProviders: ["openai"]
+    } as never);
+
+    await expect(refreshProviderModelCatalog()).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith(
+      "provider.modelCatalog.refresh",
+      {},
+      [],
+      { context: { scope: "app" }, ackTimeoutMs: 35_000 }
+    );
+    expect(useProviderConfigurationStore.getState()).toMatchObject({
+      snapshot: refreshed,
+      draft: { name: "Unsaved Provider Draft" },
+      baselineRevision: initial.revision,
+      dirty: true
+    });
+    expect(useNotificationStore.getState().items.at(-1)).toMatchObject({
+      level: "warning",
+      title: "部分 Pi 模型目录未能刷新",
+      message: "继续使用缓存：openai"
     });
   });
 

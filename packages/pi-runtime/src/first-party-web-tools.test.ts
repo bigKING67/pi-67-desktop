@@ -39,19 +39,26 @@ describe("first-party web tools", () => {
     })).toBeUndefined();
   });
 
-  it("does not mark unsupported DeepSeek models as native-search capable", () => {
+  it.each([
+    ["deepseek-v4-flash", "https://api.deepseek.com"],
+    ["deepseek-v4-pro", "https://api.deepseek.com/v1"],
+    ["deepseek-v4-flash-vision-exp", "https://api.deepseek.com/responses"]
+  ])("routes official DeepSeek model %s through provider-native search", (id, baseUrl) => {
+    expect(resolveNativeSearchRoute({
+      provider: "deepseek",
+      id,
+      api: "openai-completions",
+      baseUrl
+    })?.endpoint).toBe("https://api.deepseek.com/responses");
+  });
+
+  it("does not grant DeepSeek native search to a custom endpoint", () => {
     expect(resolveNativeSearchRoute({
       provider: "deepseek",
       id: "deepseek-v4-pro",
       api: "openai-completions",
-      baseUrl: "https://api.deepseek.com/v1"
+      baseUrl: "https://deepseek-proxy.example.test/v1"
     })).toBeUndefined();
-    expect(resolveNativeSearchRoute({
-      provider: "deepseek",
-      id: "deepseek-v4-flash",
-      api: "openai-completions",
-      baseUrl: "https://api.deepseek.com"
-    })?.endpoint).toBe("https://api.deepseek.com/responses");
   });
 
   it("streams official DeepSeek Responses search states and projects the terminal response", async () => {
@@ -262,7 +269,7 @@ describe("first-party web tools", () => {
         provider: "deepseek",
         id: "deepseek-v4-pro",
         api: "openai-completions",
-        baseUrl: "https://api.deepseek.com/v1"
+        baseUrl: "https://deepseek-proxy.example.test/v1"
       },
       auth: { ok: true, apiKey: "unused" }
     })).rejects.toThrow(/NATIVE_WEB_SEARCH_UNAVAILABLE/iu);

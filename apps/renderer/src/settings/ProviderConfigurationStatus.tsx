@@ -45,11 +45,15 @@ export function ProviderConfigurationFiles({ snapshot }: { snapshot: PiProviderC
 export function ProviderConfigurationStatusBar({
   snapshot,
   busy,
-  onReload
+  onReload,
+  catalogBusy = false,
+  onRefreshCatalog
 }: {
   snapshot: PiProviderConfigurationSnapshot;
   busy: boolean;
   onReload: () => void;
+  catalogBusy?: boolean;
+  onRefreshCatalog?: () => void;
 }) {
   return <SettingsToolbar
     className={styles.statusBar!}
@@ -60,9 +64,19 @@ export function ProviderConfigurationStatusBar({
       <strong>{snapshot.syncState === "current" ? "已与当前用户 Pi Profile 同步" : "Pi Profile 需要处理"}</strong>
       <small>Desktop 与 Pi TUI 双向共用 · revision {snapshot.revision.slice(0, 10)}</small>
     </span>}
-    actions={<Button className="secondary-button" isDisabled={busy} onPress={onReload}>
-      <RefreshCw aria-hidden="true" size={14} />重新加载
-    </Button>}
+    actions={<>
+      {onRefreshCatalog ? <Button
+        className="secondary-button"
+        isDisabled={busy || catalogBusy}
+        onPress={onRefreshCatalog}
+      >
+        <RefreshCw aria-hidden="true" size={14} />
+        {catalogBusy ? "刷新目录中…" : "刷新模型目录"}
+      </Button> : null}
+      <Button className="secondary-button" isDisabled={busy || catalogBusy} onPress={onReload}>
+        <RefreshCw aria-hidden="true" size={14} />重新加载配置
+      </Button>
+    </>}
   />;
 }
 

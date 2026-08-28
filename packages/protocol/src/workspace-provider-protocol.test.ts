@@ -30,6 +30,7 @@ describe("Provider configuration protocol", () => {
     const appQueries = [
       "provider.configuration.get",
       "provider.configuration.reload",
+      "provider.modelCatalog.refresh",
       "provider.credential.reveal"
     ] as const;
     const appMutations = [

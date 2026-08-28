@@ -85,6 +85,10 @@ spacing, component states, and motion as `DESIGN.md`.
   roles as light mode. The API-key eye control may reveal only the current user
   input; persisted credentials and Header values never gain a theme-specific
   value preview, and focus rings remain visible on every raised surface.
+- `刷新模型目录` and `重新加载配置` remain neutral secondary controls in dark
+  mode. Refreshing changes the text state without glow, color cycling, or an
+  additional status card; partial, timeout, offline, and unconfigured outcomes
+  use the shared notification roles.
 - Lark uses the same two page-level Tabs in both themes: `用户授权` is first and
   selected by default, while `应用连接` is second. The selected, hover, and
   focus-visible states reuse the neutral Settings Tab family without glow or a green

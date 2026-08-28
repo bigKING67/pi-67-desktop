@@ -1,4 +1,4 @@
-import { grolandNativeSearchApi } from "@pi67/domain";
+import { deepSeekNativeSearchEndpoint, grolandNativeSearchApi } from "@pi67/domain";
 import type { PiModelConfigurationInput, PiModelConfigurationView } from "@pi67/protocol";
 
 export interface ModelCapabilityView {
@@ -17,13 +17,14 @@ export function modelCapabilityView(
   const protocol = model.api ?? existingView?.api ?? providerApi ?? "Pi 内置";
   const normalizedProvider = normalizeCapabilityId(providerId);
   const normalizedProtocol = normalizeCapabilityId(protocol);
+  const baseUrl = model.baseUrl ?? existingView?.baseUrl;
   const nativeSearch = (
     normalizedProvider === "groland"
     && grolandNativeSearchApi(model.id, normalizedProtocol) !== undefined
-  )
+    )
     || (normalizedProvider === "anthropic" && normalizedProtocol === "anthropic-messages")
     || (normalizedProvider === "openai" && normalizedProtocol === "openai-responses")
-    || (normalizedProvider === "deepseek" && model.id === "deepseek-v4-flash");
+    || (Boolean(model.id.trim()) && deepSeekNativeSearchEndpoint(normalizedProvider, baseUrl) !== undefined);
   return {
     protocol,
     image: model.input?.includes("image") ?? existingView?.input.includes("image") ?? false,
